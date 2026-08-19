@@ -1,0 +1,170 @@
+{
+  "updated": "2026-08-18",
+
+  "_": [
+    "AUTHORED. This file holds attention and nothing else.",
+    "",
+    "Existence, title and DONE come from the origin — the README's roadmap checkbox,",
+    "a test case's status marker, an operations record's frontmatter. `done` is not a",
+    "legal value here; tick it at the origin instead. Every id below must resolve, so",
+    "run `python3 tracker/tools/build_tracker.py --ids` rather than guessing one.",
+    "",
+    "Keys per item: state, note, since, blocked_by, lane.",
+    "States: later, next, in-progress, blocked."
+  ],
+
+  "attention": { "slack_weeks": 6, "stale_days": 14 },
+
+  "items": {
+    "ops:duns": {
+      "state": "next",
+      "since": "2026-08-19",
+      "note": "Hold lifted 2026-08-19: file as a sole proprietorship. Steps + the exact details checklist are in this record (§How to file) — search Apple's D-U-N-S lookup first, the request is free, details must match the GST certificate exactly, and the verification email arrives from D&B's domain (check the sender). Pay nobody.",
+      "start": "2026-08-20",
+      "due": "2026-08-21"
+    },
+    "ops:dlt-entity": {
+      "state": "next",
+      "note": "Gates every SMS the platform will ever send. Needs PAN + GST certificate in hand."
+    },
+    "ops:meta-business": {
+      "state": "next",
+      "note": "Gates WhatsApp entirely. Free, and the whole WABA chain waits behind it."
+    },
+    "ops:play-console": {
+      "state": "blocked",
+      "blocked_by": "ops:owner-store-account-entity",
+      "note": "Organisation or personal is undecided, and it changes what this account IS — a new personal account carries Google's closed-test requirement (a dozen testers before production)."
+    },
+
+    "ops:apple-developer": {
+      "state": "blocked",
+      "blocked_by": "ops:owner-store-account-entity",
+      "note": "Same undecided enrolment path. Also the account that unlocks APNs, so iOS push waits behind it either way."
+    },
+
+    "ops:bank-account": {
+      "state": "next",
+      "note": "Gates UPI PSP onboarding, which is itself weeks."
+    },
+    "ops:gcp-maps": {
+      "state": "next",
+      "note": "Restricted key, not an open one. Nothing downstream is blocked by it, but it costs an hour.",
+      "start": "2026-08-28",
+      "due": "2026-08-28"
+    },
+    "ops:firebase": {
+      "state": "next",
+      "note": "Free, five minutes, and push on every platform waits on it.",
+      "start": "2026-08-28",
+      "due": "2026-08-28"
+    },
+    "ops:owner-store-account-entity": {
+      "state": "next",
+      "note": "Blocks the D-U-N-S, and therefore both store accounts. Ask Apple and Google directly rather than inferring from docs written for companies — a proprietorship has no legal personality separate from its proprietor. If the answer is individual-only, ~4 weeks come off the critical path and the apps publish under a personal name.",
+      "start": "2026-08-19",
+      "due": "2026-08-21"
+    },
+
+    "ops:accountant-hsn-digits": {
+      "note": "The tightest dependency in the whole plan — needed W7, and the only one with no service level on the other side."
+    },
+    "ops:owner-catalogue-export": {
+      "state": "next",
+      "note": "Everything about the real catalogue is waiting on this. The 60 products in the prototypes are demo data; nobody here has seen the shop's actual range, its size, or whether it already carries HSN codes.",
+      "start": "2026-08-20",
+      "due": "2026-08-22"
+    },
+
+    "ops:accountant-hsn-values": {
+      "state": "blocked",
+      "blocked_by": "ops:owner-catalogue-export",
+      "note": "Ask in the same conversation as the digit count. An HSN has no check digit, so a wrong one is invisible."
+    },
+    "ops:accountant-cloud-gst": {
+      "state": "next",
+      "note": "Needed W4 — the nearest deadline on the board. Ask it in the same conversation as the HSN questions.",
+      "start": "2026-08-19",
+      "due": "2026-08-20"
+    },
+    "ops:accountant-gst-scheme": {
+      "state": "next",
+      "note": "Send with accountant-cloud-gst — one message, two questions; the scheme answer decides what the cloud question even means.",
+      "start": "2026-08-19",
+      "due": "2026-08-20"
+    },
+    "ops:owner-github-plan": {
+      "state": "next",
+      "note": "Blocks server-side protection on main. Either GitHub Pro or a public repo — no third option exists."
+    },
+    "ops:owner-delivery-hours": {
+      "state": "next",
+      "note": "The 7am–9pm / 8am–8:30pm in Settings.dc.html are fabrications and must not survive into product.",
+      "start": "2026-08-24",
+      "due": "2026-08-25"
+    },
+    "ops:owner-bank-account": {
+      "state": "next",
+      "start": "2026-08-24",
+      "due": "2026-08-28"
+    },
+    "ops:owner-font-licence": {
+      "state": "next",
+      "note": "Cheap to ask, awkward to discover late. Either the licence permits embedding or Montserrat + DM Sans is final.",
+      "start": "2026-08-26",
+      "due": "2026-08-27"
+    },
+
+    "roadmap:p0-branch-protection-on-main": {
+      "state": "blocked",
+      "blocked_by": "ops:owner-github-plan",
+      "note": "Both classic protection and rulesets return 403 on a private free-plan repo. The pre-push hook is the current substitute."
+    },
+    "roadmap:p0-provision-dev-and-staging": {
+      "state": "next",
+      "note": "Hosting is settled — DigitalOcean App Platform + Managed PostgreSQL in BLR1, R2 for imagery. This is the part still to do, nightly pg_dump included.",
+      "start": "2026-08-25",
+      "due": "2026-08-27"
+    },
+    "roadmap:p1-schema-products-variants-taxonomy": {
+      "state": "later",
+      "note": "The approved 2026-08-18 domain design deliberately excludes the SQL schema from Phase 1 — packages/domain forbids drivers, so the rules are proven before they are persisted. Schema follows the domain package."
+    },
+    "roadmap:p1-7-taxonomy-as-data": {
+      "state": "later",
+      "note": "Seed generated and gated (#75), lookups shipped in packages/domain (#76). What remains is 'read by every surface' — Phase 2 onward reads the package instead of carrying literals."
+    },
+
+    "case:1.12": {
+      "state": "blocked",
+      "blocked_by": "roadmap:p1-schema-products-variants-taxonomy",
+      "note": "Rules are tested code (#76) and the reachability half already holds; closes when a surface computes availability — schema and backend first."
+    },
+    "case:1.17": {
+      "state": "blocked",
+      "blocked_by": "roadmap:p1-schema-products-variants-taxonomy",
+      "note": "Blocked on a surface: no history screen exists to re-mask, and domain rules alone cannot exercise masking."
+    },
+    "case:1.21": {
+      "state": "blocked",
+      "blocked_by": "roadmap:p1-schema-products-variants-taxonomy",
+      "note": "One catalogue arrives with the real-catalogue import (Phase 2); the opaque-id-plus-slug model it maps onto shipped in #76."
+    },
+    "case:1.30": {
+      "state": "blocked",
+      "blocked_by": "roadmap:p1-schema-products-variants-taxonomy",
+      "note": "Opaque ULIDs + unique slugs (#76) make the collision structurally impossible once surfaces migrate; the duplicate chip and unauthored packs close with the customer-surface port."
+    },
+    "case:1.38": {
+      "state": "blocked",
+      "blocked_by": "roadmap:p1-schema-products-variants-taxonomy",
+      "note": "A delivered COD order becomes a register sale when the register reads the ledger — backend first."
+    },
+    "case:3.6": {
+      "state": "next",
+      "note": "The operations records agree with the README Schedule because they were copied carefully, not because anything checks. 1.46's defect, live in a new folder."
+    }
+  },
+
+  "tasks": {}
+}
