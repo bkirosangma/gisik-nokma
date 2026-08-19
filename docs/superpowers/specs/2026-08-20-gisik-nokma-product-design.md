@@ -52,7 +52,7 @@ One TypeScript/Node server; three clients sharing common packages. In the base, 
 
 **The editor.** Descriptions and comments use a WYSIWYG editor in the mould of the knowledge-base document editor (same Tiptap v3 family and conventions, including deterministic markdown serialisation): when a typed reserved character would trigger formatting, the editor surfaces an inline **escape-character suggestion**, so literal text is always reachable and nothing silently becomes markup. Documents are stored as structured content inside events; description edits stay versioned claims. One document schema across all three clients; the editor component is shared web code — native in Next.js and Tauri, embedded via webview in React Native, which is the honest mobile path for a Tiptap-family editor.
 
-**Attachments.** Only **images** may embed inline in descriptions and comments, with wrapping options: inline with text-wrap left or right, or full-width block. Documents, videos and every other file type are list-style attachments only — never inline. Files live in object storage; events carry references. An attachment on a fact-gated transition can serve as its evidence.
+**Attachments.** Only **images** may embed inline in descriptions and comments, with wrapping options: inline with text-wrap left or right, or full-width block. Documents, videos and every other file type are list-style attachments only — never inline. Files live in object storage; events carry references. An attachment on a transition carrying a `require-evidence` rule (§4) serves as its evidence.
 
 **Workflows** attach to ticket types — a workspace default per type, overridable per project. A ticket's status is always a state of its attached workflow; statuses are never free text.
 
