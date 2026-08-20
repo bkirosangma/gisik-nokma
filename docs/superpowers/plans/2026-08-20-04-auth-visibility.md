@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md` — this plan implements section 6 (permissions, visibility, auth) plus the three visibility-honesty guarantees (true counts with restriction named; restricted-parent placeholder; provenance never redacted from those entitled to see).
 
-**Series position:** Plan 4 of 11. **Consumes** from Plan 1: `EventEnvelope`, the event-type registry and pure `parseEvent` in `packages/domain`; the Fastify 5 server and ingest pipeline calling `evaluateEvent(env, ctx)` in `apps/server`; the projection registry `registerProjection({name, apply, reset})` with `proj_`-prefixed tables; node-pg-migrate; the verify-projections CLI. From Plan 2: the rule engine and the `Refusal` shape it returns. From Plan 3: ticket events (`ticket.created`, `ticket.reparented`, …), `proj_tickets` (head states incl. parentId), `proj_rollups` (direct-children counts by category), `TicketState`. **Produces** (consumed by later plans, exact signatures in the task Interfaces blocks): `proj_memberships`, `proj_visibility`, `canSee(db, userId, ticketId)`, `visibleEventsFor(db, userId, workspaceId, afterSeq)`, and the auth surface (`/api/auth/*` routes, `makeRequireSession`, `OtpSender`) for all client plans.
+**Series position:** Plan 4 of 11. **Consumes** from Plan 1: `EventEnvelope`, the event-type registry and pure `parseEvent` in `packages/domain`; the Fastify 5 server and ingest pipeline calling `evaluateEvent(env, ctx)` in `apps/server`; the projection registry `registerProjection({name, apply, reset})` with `proj_`-prefixed tables; node-pg-migrate; the verify-projections CLI. From Plan 2: the rule engine and the `Refusal` shape it returns. From Plan 3: ticket events (`ticket.created`, `ticket.reparented`, …), `proj_tickets` (head states incl. parentId), `proj_rollups` (direct-children counts by category), `TicketState`. **Produces** (consumed by later plans, exact signatures in the task Interfaces blocks): `proj_memberships`, `proj_visibility`, `canSee(db, userId, ticketId)`, `visibleEventsFor(db, userId, workspaceId, afterSeq)` (where `afterSeq` is Plan 1's per-workspace `workspace_seq` cursor, coordination §18), and the auth surface (`/api/auth/*` routes, `makeRequireSession`, `OtpSender`) for all client plans.
 
 ## Global Constraints
 
@@ -1221,6 +1221,7 @@ git commit -m "Membership and visibility claims parse at the door: seven event t
 // apps/server/test/helpers/envelope.ts
 import { ulid } from 'ulidx';
 import type { EventEnvelope } from '@gisik-nokma/domain';
+import type { LedgerEvent } from '../../src/ledger/event-store';
 
 let seqCounter = 0;
 
@@ -1234,17 +1235,23 @@ export function resetSeq(): void {
 }
 
 export function testEnvelope(
-  overrides: Partial<EventEnvelope> &
+  overrides: Partial<LedgerEvent> &
     Pick<EventEnvelope, 'workspaceId' | 'entity' | 'type' | 'payload' | 'actorId'>,
-): EventEnvelope {
+): LedgerEvent {
   const now = new Date().toISOString();
+  const seq = nextSeq();
   return {
     id: ulid(),
     version: 1,
     origin: 'web',
     clientTime: now,
     serverTime: now,
-    seq: nextSeq(),
+    seq,
+    // One counter drives both numbers here: `workspace_seq` is Plan 1's
+    // per-workspace stream cursor (coordination §18), and a globally monotonic
+    // value is unique inside every workspace — so a test can resume at
+    // `env.workspaceSeq - 1` and land exactly before that event.
+    workspaceSeq: seq,
     ...overrides,
   };
 }
@@ -2848,23 +2855,26 @@ git commit -m "canSee is the one visibility decision, pure at its core: guests g
 
 ```ts
 // apps/server/test/helpers/ledger.ts
-import type { EventEnvelope } from '@gisik-nokma/domain';
 import type { Queryable } from '../../src/db/queryable';
+import type { LedgerEvent } from '../../src/ledger/event-store';
 
 /**
- * Append one envelope to the ledger table directly (tests seed history
- * without the full ingest pipeline). Adapt column names if Plan 1's
- * events table differs — see Cross-plan path assumptions.
+ * Append one event to the ledger table directly (tests seed history without
+ * the full ingest pipeline). `workspace_seq` is NOT NULL in Plan 1's schema —
+ * the stream cursor is part of a stored event, so the helper writes the one
+ * `testEnvelope` assigned. Adapt column names if Plan 1's events table
+ * differs — see Cross-plan path assumptions.
  */
-export async function appendTestEvent(db: Queryable, env: EventEnvelope): Promise<void> {
+export async function appendTestEvent(db: Queryable, env: LedgerEvent): Promise<void> {
   await db.query(
     `INSERT INTO events
        (id, workspace_id, entity_kind, entity_id, type, version, payload,
-        actor_id, origin, client_time, server_time, seq)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        actor_id, origin, client_time, server_time, seq, workspace_seq)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
       env.id, env.workspaceId, env.entity.kind, env.entity.id, env.type, env.version,
-      JSON.stringify(env.payload), env.actorId, env.origin, env.clientTime, env.serverTime, env.seq,
+      JSON.stringify(env.payload), env.actorId, env.origin, env.clientTime, env.serverTime,
+      env.seq, env.workspaceSeq,
     ],
   );
 }
@@ -3652,16 +3662,16 @@ git commit -m "Rollups tell the truth under restriction: stored counts stay comp
 - Test: `apps/server/test/visibility/visible-events-for.test.ts`
 
 **Interfaces:**
-- Consumes: the `events` ledger table (Plan 1), `canSee`/`canSeeResolved`/`getResolvedVisibility` (Task 7), `resolveEffectiveRole` (Task 4), `proj_visibility` (Task 6).
+- Consumes: the `events` ledger table with its `workspace_seq` cursor column and `LedgerEvent` type (Plan 1), `canSee`/`canSeeResolved`/`getResolvedVisibility` (Task 7), `resolveEffectiveRole` (Task 4), `proj_visibility` (Task 6).
 - Produces (THE interface Plan 10 consumes — do not rename anything here):
   - `interface PurgeInstruction { kind: 'purge'; entityId: string }`
-  - `type SyncItem = EventEnvelope | PurgeInstruction`
-  - `visibleEventsFor(db: Queryable, userId: string, workspaceId: string, afterSeq: number): AsyncIterable<SyncItem>`
+  - `type SyncItem = LedgerEvent | PurgeInstruction` — each yielded event carries `workspaceSeq`, server-enriched per Plan 1 (the domain `EventEnvelope` stays frozen).
+  - `visibleEventsFor(db: Queryable, userId: string, workspaceId: string, afterSeq: number): AsyncIterable<SyncItem>` — **`afterSeq` is the WORKSPACE cursor (`workspace_seq`), not a per-entity `seq`.** Per coordination §18, per-entity `seq` cannot order a workspace stream: every entity restarts at 1, so resuming a workspace at a per-entity number would silently skip newer entities' early events. Callers hand back the last `workspaceSeq` they saw and treat it as an opaque resume token.
   - The contract types the return as `AsyncIterable<EventEnvelope>`, but purge instructions force the union — flagged under Open questions, not silently resolved. A consumer discriminates with `'kind' in item && item.kind === 'purge'` (envelopes have no `kind` property at the top level; `entity.kind` is nested).
 
 **Filter semantics (exact — each clause is a test):**
 
-1. Events are streamed in `seq` order for `seq > afterSeq`, filtered against visibility **as of now** (current projections). The filter is a per-event primitive; backfilling a ticket's pre-`afterSeq` history when visibility is newly granted is Plan 10's job, on top of this interface.
+1. Events are streamed in `workspace_seq` order for `workspace_seq > afterSeq`, filtered against visibility **as of now** (current projections). The filter is a per-event primitive; backfilling a ticket's pre-`afterSeq` history when visibility is newly granted is Plan 10's job, on top of this interface.
 2. **Ticket events:** yielded iff `canSee(userId, ticketId)` now. Events about invisible tickets are NEVER yielded — not even their existence.
 3. **Purge on revocation:** when a `visibility.set` or `ticket.reparented` event in the range leaves the target — or any descendant inheriting from it — invisible to this user, yield `{kind:'purge', entityId: <ticketId>}` for each such ticket (deduplicated per call). The traversal prunes at authored descendants, exactly like re-resolution: their visibility cannot have changed from above.
 4. **Purge on membership loss:** a `membership.revoked` or `project.member_removed` event in the range naming THIS user yields purges for every ticket in the lost scope that the user cannot see now.
@@ -3675,6 +3685,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { ulid } from 'ulidx';
 import { membershipId, type EventEnvelope } from '@gisik-nokma/domain';
+import type { LedgerEvent } from '../../src/ledger/event-store';
 import { visibleEventsFor, type SyncItem } from '../../src/visibility/visible-events-for';
 import { migrateTestDb, testPool, truncateAll } from '../helpers/db';
 import { testEnvelope } from '../helpers/envelope';
@@ -3697,12 +3708,13 @@ beforeEach(async () => {
 });
 
 /** Seed an event into BOTH the ledger and this plan's projections, like ingest would. */
-async function record(env: EventEnvelope): Promise<EventEnvelope> {
+async function record(env: LedgerEvent): Promise<LedgerEvent> {
   await appendTestEvent(pool, env);
   await applyAll(pool, [env]);
   return env;
 }
 
+/** `afterSeq` is the WORKSPACE cursor (coordination §18), never a per-entity seq. */
 async function collect(userId: string, afterSeq = 0): Promise<SyncItem[]> {
   const items: SyncItem[] = [];
   for await (const item of visibleEventsFor(pool, userId, WS, afterSeq)) items.push(item);
@@ -3736,7 +3748,7 @@ describe('visibleEventsFor', () => {
     await seedTicket(pool, { workspaceId: WS, projectId: PRJ, ticketId: 'tkt_1' });
     const revoke = await record(setVisibilityEnv(WS, 'tkt_1', 'explicit', ['usr_someone_else']));
 
-    const items = await collect('usr_a', revoke.seq - 1);
+    const items = await collect('usr_a', revoke.workspaceSeq - 1);
     expect(items).toEqual([{ kind: 'purge', entityId: 'tkt_1' }]);
   });
 
@@ -3748,7 +3760,7 @@ describe('visibleEventsFor', () => {
     await applyAll(pool, [setVisibilityEnv(WS, 'tkt_open', 'project')]); // authored — survives the parent change
     const revoke = await record(setVisibilityEnv(WS, 'tkt_p', 'explicit', ['usr_someone_else']));
 
-    const items = await collect('usr_a', revoke.seq - 1);
+    const items = await collect('usr_a', revoke.workspaceSeq - 1);
     expect(idsOf(items).sort()).toEqual(['purge:tkt_c', 'purge:tkt_p']);
   });
 
@@ -3765,7 +3777,7 @@ describe('visibleEventsFor', () => {
       }),
     );
 
-    const items = await collect('usr_a', removal.seq - 1);
+    const items = await collect('usr_a', removal.workspaceSeq - 1);
     expect(idsOf(items)).toContain('purge:tkt_1');
   });
 
@@ -3807,12 +3819,39 @@ describe('visibleEventsFor', () => {
     expect(await collect('usr_stranger')).toEqual([]);
   });
 
-  it('respects afterSeq: only events beyond the cursor are yielded', async () => {
+  it('respects afterSeq as the WORKSPACE cursor: only events beyond it are yielded, and each carries its own cursor', async () => {
     await seedMember(pool, WS, 'usr_a', 'member', [{ projectId: PRJ }]);
     await seedTicket(pool, { workspaceId: WS, projectId: PRJ, ticketId: 'tkt_1' });
     const first = await record(ticketEvent('comment.added', 'tkt_1', { body: 'one' }));
     const second = await record(ticketEvent('comment.added', 'tkt_1', { body: 'two' }));
-    expect(idsOf(await collect('usr_a', first.seq))).toEqual([second.id]);
+    const tail = await collect('usr_a', first.workspaceSeq);
+    expect(idsOf(tail)).toEqual([second.id]);
+    // The consumer resumes from what it was handed, so the cursor must travel.
+    expect((tail[0] as LedgerEvent).workspaceSeq).toBe(second.workspaceSeq);
+  });
+
+  it('planted defect: a ticket born after the cursor is never skipped — the cursor counts the workspace, not the entity', async () => {
+    await seedMember(pool, WS, 'usr_a', 'member', [{ projectId: PRJ }]);
+    await seedTicket(pool, { workspaceId: WS, projectId: PRJ, ticketId: 'tkt_old' });
+    await seedTicket(pool, { workspaceId: WS, projectId: PRJ, ticketId: 'tkt_new' });
+    await record(ticketEvent('comment.added', 'tkt_old', { body: 'one' }));
+    const older = await record(ticketEvent('comment.added', 'tkt_old', { body: 'two' }));
+    // tkt_new's FIRST event: per-entity seq 1, workspace cursor past `older`.
+    // An iterator ordering by `seq > afterSeq` drops it and never recovers —
+    // the defect coordination §18 exists to kill.
+    const newborn = await record(
+      testEnvelope({
+        workspaceId: WS,
+        entity: { kind: 'ticket', id: 'tkt_new' },
+        type: 'comment.added',
+        payload: { body: 'hello' },
+        actorId: 'usr_a',
+        seq: 1,
+      }),
+    );
+    expect(newborn.seq).toBeLessThan(older.seq);
+    expect(newborn.workspaceSeq).toBeGreaterThan(older.workspaceSeq);
+    expect(idsOf(await collect('usr_a', older.workspaceSeq))).toEqual([newborn.id]);
   });
 });
 ```
@@ -3828,6 +3867,7 @@ Expected: FAIL — cannot resolve `../../src/visibility/visible-events-for`.
 // apps/server/src/visibility/visible-events-for.ts
 import type { EventEnvelope, MembershipScope } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable';
+import type { LedgerEvent } from '../ledger/event-store';
 import { resolveEffectiveRole } from '../permissions/effective-role';
 import { canSee } from './can-see';
 
@@ -3836,11 +3876,11 @@ export interface PurgeInstruction {
   entityId: string;
 }
 
-export type SyncItem = EventEnvelope | PurgeInstruction;
+export type SyncItem = LedgerEvent | PurgeInstruction;
 
 const VISIBILITY_AFFECTING: ReadonlySet<string> = new Set(['visibility.set', 'ticket.reparented']);
 
-function envelopeFromRow(row: Record<string, unknown>): EventEnvelope {
+function envelopeFromRow(row: Record<string, unknown>): LedgerEvent {
   return {
     id: row.id as string,
     workspaceId: row.workspace_id as string,
@@ -3853,6 +3893,9 @@ function envelopeFromRow(row: Record<string, unknown>): EventEnvelope {
     clientTime: String(row.client_time),
     serverTime: String(row.server_time),
     seq: Number(row.seq),
+    // Server-enriched (Plan 1, coordination §18): the domain envelope stays
+    // frozen; the cursor rides along so the consumer can resume by it.
+    workspaceSeq: Number(row.workspace_seq),
   };
 }
 
@@ -3896,6 +3939,12 @@ async function nowInvisibleTicketsInScope(
  * events about invisible tickets are never yielded; whatever revocation
  * takes away comes back as a purge tombstone. Backfill on newly granted
  * visibility is Plan 10's job, on top of this primitive.
+ *
+ * afterSeq is the WORKSPACE cursor (`workspace_seq`, coordination §18) — per
+ * entity `seq` restarts at 1 for every entity, so ordering a workspace stream
+ * by it would silently skip the early events of anything born after the
+ * cursor. Callers hand back the last `workspaceSeq` they were given and treat
+ * it as opaque.
  */
 export async function* visibleEventsFor(
   db: Queryable,
@@ -3919,8 +3968,10 @@ export async function* visibleEventsFor(
 
   const { rows } = await db.query(
     `SELECT id, workspace_id, entity_kind, entity_id, type, version, payload,
-            actor_id, origin, client_time, server_time, seq
-     FROM events WHERE workspace_id = $1 AND seq > $2 ORDER BY seq`,
+            actor_id, origin, client_time, server_time, seq, workspace_seq
+     FROM events
+     WHERE workspace_id = $1 AND workspace_seq > $2
+     ORDER BY workspace_seq ASC`,
     [workspaceId, afterSeq],
   );
 
@@ -3968,7 +4019,7 @@ export async function* visibleEventsFor(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run (from `apps/server/`): `pnpm vitest run test/visibility/visible-events-for.test.ts`
-Expected: PASS (7 tests).
+Expected: PASS (8 tests) — including the workspace-cursor defect: a newborn entity's first event survives a resume.
 
 - [ ] **Step 5: Run the full suite and commit**
 
@@ -3976,7 +4027,7 @@ Run (from `apps/server/`): `pnpm vitest run` — Expected: PASS.
 
 ```bash
 git add apps/server/src/visibility/visible-events-for.ts apps/server/test/visibility/visible-events-for.test.ts
-git commit -m "Sync-down never leaks: visibleEventsFor streams only visible-ticket events, walks inherit subtrees to purge what a revocation took away, and hands guests the definitions they need without the membership history they don't."
+git commit -m "Sync-down never leaks and never skips: visibleEventsFor walks the workspace stream by workspace_seq so a ticket born after the cursor still arrives, streams only visible-ticket events, walks inherit subtrees to purge what a revocation took away, and hands guests the definitions they need without the membership history they don't."
 ```
 
 ---
@@ -4163,7 +4214,7 @@ Append to `Features.md` (§6 is this plan's section, settled per the coordinatio
 - ✅ **Permission refusals** — a pre-engine ingest gate refuses identity spoofing, borrowed server origin, and role shortfalls with the standard `{refused, rule, reason}` shape (`permission.role`, `permission.visibility`), reasons in plain language, every refusal proven against a planted defect. `apps/server/src/permissions/`
 - ✅ **Ticket visibility** — `visibility.set` claims a mode (workspace / project / explicit / inherit); `proj_visibility` resolves every ticket's audience by walking inherit chains to the nearest authored ancestor (roots default to project) and re-resolves on reparent and ancestor changes; `canSee` backs 404-enforced reads and one-pass filtered lists; guests see only explicit shares; admins get no bypass. `apps/server/src/visibility/`
 - ✅ **Honesty under restriction** — rollup responses carry true totals over all children plus the viewer's `restrictedCount`; a visible child under a restricted parent gets `{kind: 'restricted'}` — existence, no title; ledger history goes out with provenance untouched for anyone entitled to see. `apps/server/src/visibility/rollup.ts`, `apps/server/src/routes/tickets.ts`
-- ⚙️ **Visibility-scoped sync feed** — `visibleEventsFor(userId, workspaceId, afterSeq)` yields only visible-ticket events and `{kind:'purge'}` tombstones for whatever revocation takes away; the interface the sync plan consumes. `apps/server/src/visibility/visible-events-for.ts`
+- ⚙️ **Visibility-scoped sync feed** — `visibleEventsFor(userId, workspaceId, afterSeq)` walks the workspace stream in `workspace_seq` order (the per-workspace cursor, coordination §18 — never per-entity `seq`, which would skip newborn entities on resume), yields only visible-ticket events, each carrying its cursor, plus `{kind:'purge'}` tombstones for whatever revocation takes away; the interface the sync plan consumes. `apps/server/src/visibility/visible-events-for.ts`
 ```
 
 - [ ] **Step 5: Create the test-cases bucket**
@@ -4195,6 +4246,7 @@ Mirrors Features.md §6. Status: ❌ not covered · ✅ covered · 🟡 partial 
 - **6.18** ✅ Session hygiene: sign-out invalidates the token; a pre-set cookie never becomes the session; session cookies are HttpOnly. (`test/routes/security.test.ts`)
 - **6.19** ✅ visibility.set demands project-admin rights or ticket creatorship, and must name the ticket it is attached to. (`test/permissions/check-visibility-permission.test.ts`)
 - **6.20** 🚫 Real SMS delivery through the DLT-registered provider — deployment concern, tracked as an operational errand, not a test. (this plan, Open questions)
+- **6.21** ✅ visibleEventsFor resumes by the WORKSPACE cursor: only events past `workspace_seq > afterSeq` are yielded, each carries its `workspaceSeq`, and the planted defect proves a ticket born after the cursor is not skipped (per-entity `seq` would bury its first event). (`test/visibility/visible-events-for.test.ts`)
 ```
 
 - [ ] **Step 6: Final full run and commit**
@@ -4212,7 +4264,7 @@ git commit -m "Route-level security proven end to end — the guest, the prober,
 ## Open questions (owner review before or during execution)
 
 1. **Auth library: better-auth** (justified above). Pin the latest 1.x at execution; the exact version lands in the lockfile and PR description. Owner sign-off requested on the library choice itself.
-2. **`visibleEventsFor` return type vs the contract.** The contract types it `AsyncIterable<EventEnvelope>` but also requires revocation to yield `{kind:'purge', entityId}` — those cannot both hold. This plan implements `AsyncIterable<SyncItem>` with `SyncItem = EventEnvelope | PurgeInstruction`. Flagged, not silently resolved; Plan 10's consumption should confirm the union.
+2. **`visibleEventsFor` return type vs the contract.** The contract types it `AsyncIterable<EventEnvelope>` but also requires revocation to yield `{kind:'purge', entityId}` — those cannot both hold. This plan implements `AsyncIterable<SyncItem>` with `SyncItem = LedgerEvent | PurgeInstruction`. Flagged, not silently resolved; Plan 10's consumption should confirm the union.
 3. **Two ways onto a project.** `membership.granted {scope:{projectId}}` and `project.member_added` overlap. This plan's modeling: `membership.granted` carries *roles* (and is how guests attach to a project); `project.member_added` is the roster path for existing workspace members (with the projectAdmin flag). Both land in `proj_memberships`. Confirm or collapse.
 4. **Non-ticket events in sync-down.** Chosen: workspace/project/membership events go to non-guest members; workflow and ticket-type definitions go to everyone including guests (they cannot render a shared ticket's status without its workflow). Confirm the guest slice.
 5. **No owner/admin visibility bypass.** Admins manage, but do not silently see: an admin not on a project cannot read its project-mode tickets, and must join a project (an attributed event) before creating tickets in it. Deliberate — the alternative is an invisible superuser, which sits badly with the provenance floor. Confirm.

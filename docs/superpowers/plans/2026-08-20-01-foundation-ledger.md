@@ -4,7 +4,7 @@
 
 **Goal:** Build the monorepo foundation and the append-only event ledger with deterministic, verifiable projections — the core that makes every later feature a claim the board cannot lie about.
 
-**Architecture:** An event-sourced core: clients submit event envelopes to `POST /v1/events`; the server validates the envelope (pure `parseEvent`), assigns `serverTime` and a per-entity `seq` inside a transaction, gates each event through the shared rule engine (pass-through in this plan), appends accepted events to an append-only Postgres `events` table, and applies registered projections in the same transaction. Every projection is rebuildable from scratch; a verifier CLI re-derives them into a shadow schema and diffs against live.
+**Architecture:** An event-sourced core: clients submit event envelopes to `POST /v1/events`; the server validates the envelope (pure `parseEvent`), assigns `serverTime`, a per-entity `seq`, and a per-workspace `workspace_seq` stream cursor inside a transaction, gates each event through the shared rule engine (pass-through in this plan), appends accepted events to an append-only Postgres `events` table, and applies registered projections in the same transaction. Both sequences are assigned under advisory locks, and **lock order is always workspace first, then entity — one global order across the whole server, so two ingests can never deadlock by taking the pair in opposite orders.** Every projection is rebuildable from scratch; a verifier CLI re-derives them into a shadow schema and diffs against live.
 
 **Tech Stack:** pnpm 9 workspaces + Turborepo, TypeScript strict (Node 22 LTS, ESM), Fastify 5, Postgres 16 via `pg`, node-pg-migrate, zod 3, ulidx, Vitest 3.
 
@@ -1571,7 +1571,7 @@ git commit -m "Server skeleton: env config that refuses to boot half-configured,
 **Interfaces:**
 - Consumes: `createPool` from Task 5.
 - Produces:
-  - `events` table (append-only): columns `id text PK`, `workspace_id text`, `entity_kind text`, `entity_id text`, `type text`, `version integer`, `payload jsonb`, `actor_id text`, `origin text`, `client_time text` (claim verbatim), `server_time timestamptz`, `seq bigint`; constraint `events_entity_seq_unique UNIQUE (entity_kind, entity_id, seq)` (doubles as the per-entity replay index); index `events_workspace_server_time_idx (workspace_id, server_time)`; trigger `events_no_update_no_delete` + `events_no_truncate` raising `events is append-only`.
+  - `events` table (append-only): columns `id text PK`, `workspace_id text`, `entity_kind text`, `entity_id text`, `type text`, `version integer`, `payload jsonb`, `actor_id text`, `origin text`, `client_time text` (claim verbatim), `server_time timestamptz`, `seq bigint`, `workspace_seq bigint` (the workspace stream cursor, coordination §18); constraint `events_entity_seq_unique UNIQUE (entity_kind, entity_id, seq)` (doubles as the per-entity replay index); constraint `events_workspace_seq_unique UNIQUE (workspace_id, workspace_seq)` (doubles as the `(workspace_id, workspace_seq)` range index the stream reads resume through); index `events_workspace_server_time_idx (workspace_id, server_time)`; trigger `events_no_update_no_delete` + `events_no_truncate` raising `events is append-only`.
   - `snapshots` table: `entity_kind text`, `entity_id text`, `seq bigint`, `state jsonb`, `created_at timestamptz default now()`, PK `(entity_kind, entity_id, seq)`.
   - Test helper `createTestDatabase(): Promise<TestDatabase>` where `type TestDatabase = { pool: Pool; url: string; drop(): Promise<void> }` — creates a uniquely named database, runs all migrations, returns a parser-correct pool. Admin URL from `TEST_DATABASE_ADMIN_URL`, default `postgres://gisik:gisik@localhost:54329/postgres`.
   - Dev database: `docker compose up -d` → Postgres 16 on port 54329, user/password `gisik`/`gisik`, database `gisik_nokma`.
@@ -1618,12 +1618,16 @@ CREATE TABLE events (
   client_time  text NOT NULL,
   server_time  timestamptz NOT NULL,
   seq          bigint NOT NULL,
-  CONSTRAINT events_entity_seq_unique UNIQUE (entity_kind, entity_id, seq)
+  workspace_seq bigint NOT NULL,
+  CONSTRAINT events_entity_seq_unique UNIQUE (entity_kind, entity_id, seq),
+  CONSTRAINT events_workspace_seq_unique UNIQUE (workspace_id, workspace_seq)
 );
 
 COMMENT ON TABLE events IS 'Append-only ledger: every row is an immutable, attributed claim.';
 COMMENT ON COLUMN events.client_time IS 'The actor''s claim about when — stored verbatim, offset preserved.';
 COMMENT ON COLUMN events.server_time IS 'The system''s fact about when — assigned at ingest.';
+COMMENT ON COLUMN events.seq IS 'Per-entity sequence: entity history, replay, snapshots.';
+COMMENT ON COLUMN events.workspace_seq IS 'Per-workspace stream cursor (coordination §18): the only order a workspace stream may resume by. Its unique index doubles as the (workspace_id, workspace_seq) range index those resumes scan.';
 
 CREATE INDEX events_workspace_server_time_idx ON events (workspace_id, server_time);
 
@@ -1681,11 +1685,11 @@ afterAll(async () => {
   await db.drop();
 });
 
-function insertEventSql(id: string, seq: number): { text: string; values: unknown[] } {
+function insertEventSql(id: string, seq: number, workspaceSeq = seq): { text: string; values: unknown[] } {
   return {
     text: `INSERT INTO events
-             (id, workspace_id, entity_kind, entity_id, type, version, payload, actor_id, origin, client_time, server_time, seq)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+             (id, workspace_id, entity_kind, entity_id, type, version, payload, actor_id, origin, client_time, server_time, seq, workspace_seq)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     values: [
       id,
       '01J60000000000000000000WKA',
@@ -1699,6 +1703,7 @@ function insertEventSql(id: string, seq: number): { text: string; values: unknow
       '2026-08-20T14:30:00.000+05:30',
       '2026-08-20T09:00:00.000Z',
       seq,
+      workspaceSeq,
     ],
   };
 }
@@ -1715,24 +1720,39 @@ describe('events and snapshots schema', () => {
     expect(names).toContain('pgmigrations');
   });
 
-  it('a stored claim reads back exactly: jsonb payload, verbatim client_time with its offset, seq as number', async () => {
+  it('a stored claim reads back exactly: jsonb payload, verbatim client_time with its offset, both seqs as numbers', async () => {
     const query = insertEventSql('01J6000000000000000000TT01', 1);
     await db.pool.query(query.text, query.values);
-    const read = await db.pool.query('SELECT payload, client_time, seq FROM events WHERE id = $1', [
-      '01J6000000000000000000TT01',
-    ]);
+    const read = await db.pool.query(
+      'SELECT payload, client_time, seq, workspace_seq FROM events WHERE id = $1',
+      ['01J6000000000000000000TT01'],
+    );
     expect(read.rows[0]).toEqual({
       payload: { name: 'Convenience Corner' },
       client_time: '2026-08-20T14:30:00.000+05:30',
       seq: 1,
+      workspace_seq: 1,
     });
   });
 
   it('planted defect: a duplicate (entity_kind, entity_id, seq) violates events_entity_seq_unique', async () => {
-    const query = insertEventSql('01J6000000000000000000TT02', 1);
+    // workspace_seq 99 is free, so the entity constraint is the one that fires.
+    const query = insertEventSql('01J6000000000000000000TT02', 1, 99);
     await expect(db.pool.query(query.text, query.values)).rejects.toMatchObject({
       code: '23505',
       constraint: 'events_entity_seq_unique',
+    });
+  });
+
+  it('planted defect: a duplicate (workspace_id, workspace_seq) violates events_workspace_seq_unique — the stream cursor cannot fork', async () => {
+    // A different entity in the same workspace, reusing workspace_seq 1: the
+    // per-entity constraint is satisfied, and the workspace constraint refuses.
+    const query = insertEventSql('01J6000000000000000000TT03', 1, 1);
+    query.values[2] = 'project';
+    query.values[3] = '01J60000000000000000000PRA';
+    await expect(db.pool.query(query.text, query.values)).rejects.toMatchObject({
+      code: '23505',
+      constraint: 'events_workspace_seq_unique',
     });
   });
 
@@ -1844,13 +1864,13 @@ execFileSync('pnpm', ['exec', 'node-pg-migrate', 'up', '--migrations-dir', MIGRA
 - [ ] **Step 6: Run the migrations test to verify it passes**
 
 Run: `pnpm turbo run test --filter=@gisik-nokma/server`
-Expected: PASS — schema exists, the roundtrip is exact, and all four planted defects (duplicate seq, UPDATE, DELETE, TRUNCATE) are refused. This proves the append-only floor before anything is built on it.
+Expected: PASS — schema exists, the roundtrip is exact, and all five planted defects (duplicate entity seq, duplicate workspace_seq, UPDATE, DELETE, TRUNCATE) are refused. This proves the append-only floor before anything is built on it.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add docker-compose.yml apps/server/migrations apps/server/test
-git commit -m "The append-only ledger schema: events cannot be updated, deleted, or truncated, per-entity seq is unique, and a claim's client_time survives storage byte-for-byte"
+git commit -m "The append-only ledger schema: events cannot be updated, deleted, or truncated, per-entity seq is unique, the workspace stream cursor cannot fork, and a claim's client_time survives storage byte-for-byte"
 ```
 
 ---
@@ -1869,20 +1889,25 @@ git commit -m "The append-only ledger schema: events cannot be updated, deleted,
 - Produces (later plans call these):
   - `lockEntity(client: PoolClient, kind: EntityKind, id: string): Promise<void>` — advisory xact lock serialising all seq assignment for one entity; released at COMMIT/ROLLBACK.
   - `nextSeq(client: PoolClient, kind: EntityKind, id: string): Promise<number>` — max(seq)+1, starts at 1; only meaningful after `lockEntity` in the same transaction.
-  - `insertEvent(client: PoolClient, envelope: EventEnvelope): Promise<void>`
-  - `readEntityEvents(client: PoolClient | Pool, kind: EntityKind, id: string, afterSeq?: number): Promise<EventEnvelope[]>` — per-entity seq order (this is also the sync-catch-up read shape Plan 5 builds on).
-  - `readLedger(client: PoolClient | Pool): Promise<EventEnvelope[]>` — the CANONICAL REPLAY ORDER (`entity_kind, entity_id, seq`).
-  - `rowToEnvelope(row: EventRow): EventEnvelope` and `type EventRow` (snake_case row shape).
+  - `lockWorkspace(client: PoolClient, workspaceId: string): Promise<void>` — advisory xact lock serialising all `workspace_seq` assignment for one workspace (coordination §18). Its key namespace is deliberately disjoint from `lockEntity`'s, so a workspace-entity lock and a workspace-stream lock never collide.
+  - `nextWorkspaceSeq(client: PoolClient, workspaceId: string): Promise<number>` — max(workspace_seq)+1 for the workspace, starts at 1; only meaningful after `lockWorkspace` in the same transaction.
+  - **Lock order is always workspace first, then entity — one global order across the whole server, so two ingests can never deadlock by taking the pair in opposite orders.**
+  - `type LedgerEvent = EventEnvelope & { workspaceSeq: number }` — what the ledger actually stores: the contract-frozen domain envelope plus the server-assigned stream cursor. The domain `EventEnvelope` does NOT gain the field (see Open questions); only server-side code sees `LedgerEvent`.
+  - `insertEvent(client: PoolClient, event: LedgerEvent): Promise<void>`
+  - `readEntityEvents(client: PoolClient | Pool, kind: EntityKind, id: string, afterSeq?: number): Promise<LedgerEvent[]>` — per-entity seq order (entity history; a *workspace* stream resumes by `workspace_seq` instead — Plan 4's `visibleEventsFor`).
+  - `readLedger(client: PoolClient | Pool): Promise<LedgerEvent[]>` — the CANONICAL REPLAY ORDER (`entity_kind, entity_id, seq`), unchanged by the workspace cursor.
+  - `rowToEnvelope(row: EventRow): LedgerEvent` and `type EventRow` (snake_case row shape) — readers emit the optional, server-enriched `workspaceSeq` alongside the frozen envelope fields.
   - `isUniqueViolation(error: unknown, constraint: string): boolean`
   - `type Snapshot = { entityKind: EntityKind; entityId: string; seq: number; state: Record<string, unknown> }`; `writeSnapshot(client, snapshot)`; `readLatestSnapshot(client, kind, id): Promise<Snapshot | null>` — no caller writes snapshots in Plan 1; the repo exists so the plan that introduces replayed entity state has the bounded-replay primitive ready.
-  - Test helper: `submittedWorkspaceCreated(overrides?: Partial<SubmittedEvent>): SubmittedEvent` and `committed(submitted: SubmittedEvent, seq: number, serverTime?: string): EventEnvelope`.
+  - Test helper: `submittedWorkspaceCreated(overrides?: Partial<SubmittedEvent>): SubmittedEvent` and `committed(submitted: SubmittedEvent, seq: number, serverTime?: string, workspaceSeq?: number): LedgerEvent` (`workspaceSeq` defaults to `seq` — in these fixtures the entity IS the workspace, so the two counters coincide; tests that need them to diverge pass it explicitly).
 
 - [ ] **Step 1: Write the shared event test helper**
 
 `apps/server/test/helpers/events.ts`:
 
 ```ts
-import { newUlid, type EventEnvelope, type SubmittedEvent } from '@gisik-nokma/domain';
+import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import type { LedgerEvent } from '../../src/ledger/event-store.js';
 
 /** A valid workspace.created submission; each call invents a fresh workspace. */
 export function submittedWorkspaceCreated(overrides: Partial<SubmittedEvent> = {}): SubmittedEvent {
@@ -1901,13 +1926,20 @@ export function submittedWorkspaceCreated(overrides: Partial<SubmittedEvent> = {
   };
 }
 
-/** Completes a submission into a full envelope the way ingest would. */
+/**
+ * Completes a submission into a full ledger event the way ingest would.
+ * `workspaceSeq` defaults to `seq`: these fixtures are workspace entities, so
+ * the per-entity and per-workspace counters coincide. Tests that need them to
+ * diverge — a second entity in the same workspace, or a deliberate collision —
+ * pass it explicitly.
+ */
 export function committed(
   submitted: SubmittedEvent,
   seq: number,
   serverTime = '2026-08-20T09:00:01.000Z',
-): EventEnvelope {
-  return { ...submitted, serverTime, seq };
+  workspaceSeq = seq,
+): LedgerEvent {
+  return { ...submitted, serverTime, seq, workspaceSeq };
 }
 ```
 
@@ -1917,12 +1949,14 @@ export function committed(
 
 ```ts
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import {
   insertEvent,
   isUniqueViolation,
   lockEntity,
+  lockWorkspace,
   nextSeq,
+  nextWorkspaceSeq,
   readEntityEvents,
   readLedger,
 } from '../src/ledger/event-store.js';
@@ -1990,7 +2024,8 @@ describe('event store', () => {
       await insertEvent(client, committed(base, 1));
       let caught: unknown;
       try {
-        await insertEvent(client, committed({ ...base, id: newUlid() }, 1));
+        // workspaceSeq 2 is free, so the per-entity constraint is the one that fires.
+        await insertEvent(client, committed({ ...base, id: newUlid() }, 1, undefined, 2));
       } catch (error) {
         caught = error;
       }
@@ -2031,6 +2066,89 @@ describe('event store', () => {
 });
 ```
 
+- [ ] **Step 2a: Add the workspace-cursor tests to the same file — still failing, for the same reason**
+
+Coordination §18: per-entity `seq` cannot order a workspace stream, because every entity restarts at 1. `workspace_seq` is the cursor a stream resumes by; `seq` keeps entity history, replay and snapshots. Append to `apps/server/test/event-store.test.ts`:
+
+```ts
+describe('workspace stream cursor (coordination §18)', () => {
+  /** A second entity inside an existing workspace. The store stores rows; the
+   *  vocabulary gate lives at the door (Task 3), so any kind is fine here. */
+  function siblingEntity(workspaceId: string, kind: 'project' | 'ticket'): SubmittedEvent {
+    return submittedWorkspaceCreated({ workspaceId, entity: { kind, id: newUlid() } });
+  }
+
+  async function appendUnderBothLocks(submitted: SubmittedEvent): Promise<number> {
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Lock order is always workspace first, then entity — one global order
+      // across the whole server, so two ingests can never deadlock by taking
+      // the pair in opposite orders.
+      await lockWorkspace(client, submitted.workspaceId);
+      await lockEntity(client, submitted.entity.kind, submitted.entity.id);
+      const workspaceSeq = await nextWorkspaceSeq(client, submitted.workspaceId);
+      const seq = await nextSeq(client, submitted.entity.kind, submitted.entity.id);
+      await insertEvent(client, committed(submitted, seq, undefined, workspaceSeq));
+      await client.query('COMMIT');
+      return workspaceSeq;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  it('two events on different entities in one workspace get strictly increasing workspace_seq', async () => {
+    const first = submittedWorkspaceCreated();
+    const second = siblingEntity(first.workspaceId, 'project');
+    expect(await appendUnderBothLocks(first)).toBe(1);
+    expect(await appendUnderBothLocks(second)).toBe(2);
+
+    const stream = await db.pool.query<{ id: string; seq: number; workspace_seq: number }>(
+      'SELECT id, seq, workspace_seq FROM events WHERE workspace_id = $1 ORDER BY workspace_seq',
+      [first.workspaceId],
+    );
+    expect(stream.rows.map((row) => [row.id, row.workspace_seq])).toEqual([
+      [first.id, 1],
+      [second.id, 2],
+    ]);
+    // The defect §18 names: per-entity seq says NOTHING about stream order —
+    // both entities honestly start at 1, so resuming at seq 1 would skip the
+    // second entity's first event forever.
+    expect(stream.rows.map((row) => row.seq)).toEqual([1, 1]);
+  });
+
+  it('planted defect: concurrent appends to different entities never mint one workspace_seq twice', async () => {
+    const first = submittedWorkspaceCreated();
+    const cursors = await Promise.all([
+      appendUnderBothLocks(first),
+      appendUnderBothLocks(siblingEntity(first.workspaceId, 'project')),
+      appendUnderBothLocks(siblingEntity(first.workspaceId, 'ticket')),
+    ]);
+    // Without the workspace lock these three transactions read the same
+    // max(workspace_seq) and events_workspace_seq_unique rejects two of them.
+    expect([...cursors].sort()).toEqual([1, 2, 3]);
+  });
+
+  it('replay is unaffected: the canonical order is still (entity_kind, entity_id, seq)', async () => {
+    const ledger = await readLedger(db.pool);
+    const keys = ledger.map((event) => `${event.entity.kind}|${event.entity.id}|${event.seq}`);
+    expect(keys).toEqual([...keys].sort());
+
+    const perWorkspace = new Map<string, number[]>();
+    for (const event of ledger) {
+      expect(typeof event.workspaceSeq).toBe('number');
+      perWorkspace.set(event.workspaceId, [...(perWorkspace.get(event.workspaceId) ?? []), event.workspaceSeq]);
+    }
+    for (const cursors of perWorkspace.values()) {
+      expect(new Set(cursors).size).toBe(cursors.length);
+    }
+  });
+});
+```
+
 - [ ] **Step 3: Run it to verify it fails**
 
 Run: `pnpm turbo run test --filter=@gisik-nokma/server`
@@ -2061,24 +2179,57 @@ export async function nextSeq(client: PoolClient, kind: EntityKind, id: string):
   return (result.rows[0]?.head ?? 0) + 1;
 }
 
-export async function insertEvent(client: PoolClient, envelope: EventEnvelope): Promise<void> {
+/**
+ * Serialises all workspace_seq assignment for one workspace within the current
+ * transaction (coordination §18). Key: 64-bit hash of 'workspace-seq:<id>' —
+ * a namespace deliberately disjoint from lockEntity's 'workspace:<id>', so the
+ * stream lock and the workspace-entity lock never collide.
+ *
+ * Lock order is always workspace first, then entity — one global order across
+ * the whole server, so two ingests can never deadlock by taking the pair in
+ * opposite orders.
+ */
+export async function lockWorkspace(client: PoolClient, workspaceId: string): Promise<void> {
+  await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+    `workspace-seq:${workspaceId}`,
+  ]);
+}
+
+/** Next workspace stream cursor; only meaningful after lockWorkspace in the same transaction. */
+export async function nextWorkspaceSeq(client: PoolClient, workspaceId: string): Promise<number> {
+  const result = await client.query<{ head: number }>(
+    'SELECT coalesce(max(workspace_seq), 0)::bigint AS head FROM events WHERE workspace_id = $1',
+    [workspaceId],
+  );
+  return (result.rows[0]?.head ?? 0) + 1;
+}
+
+/**
+ * What the ledger stores: the contract-frozen domain envelope plus the
+ * server-assigned workspace stream cursor. `EventEnvelope` itself does not
+ * gain the field — clients never author it and treat it as opaque.
+ */
+export type LedgerEvent = EventEnvelope & { workspaceSeq: number };
+
+export async function insertEvent(client: PoolClient, event: LedgerEvent): Promise<void> {
   await client.query(
     `INSERT INTO events
-       (id, workspace_id, entity_kind, entity_id, type, version, payload, actor_id, origin, client_time, server_time, seq)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+       (id, workspace_id, entity_kind, entity_id, type, version, payload, actor_id, origin, client_time, server_time, seq, workspace_seq)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
-      envelope.id,
-      envelope.workspaceId,
-      envelope.entity.kind,
-      envelope.entity.id,
-      envelope.type,
-      envelope.version,
-      JSON.stringify(envelope.payload),
-      envelope.actorId,
-      envelope.origin,
-      envelope.clientTime,
-      envelope.serverTime,
-      envelope.seq,
+      event.id,
+      event.workspaceId,
+      event.entity.kind,
+      event.entity.id,
+      event.type,
+      event.version,
+      JSON.stringify(event.payload),
+      event.actorId,
+      event.origin,
+      event.clientTime,
+      event.serverTime,
+      event.seq,
+      event.workspaceSeq,
     ],
   );
 }
@@ -2097,9 +2248,10 @@ export type EventRow = {
   client_time: string;
   server_time: Date;
   seq: number;
+  workspace_seq: number;
 };
 
-export function rowToEnvelope(row: EventRow): EventEnvelope {
+export function rowToEnvelope(row: EventRow): LedgerEvent {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
@@ -2112,16 +2264,21 @@ export function rowToEnvelope(row: EventRow): EventEnvelope {
     clientTime: row.client_time,
     serverTime: row.server_time.toISOString(),
     seq: row.seq,
+    workspaceSeq: row.workspace_seq,
   };
 }
 
-/** Per-entity history in seq order; afterSeq supports catch-up reads. */
+/**
+ * Per-entity history in seq order; afterSeq supports per-entity catch-up.
+ * A WORKSPACE stream resumes by workspace_seq instead — per-entity seq cannot
+ * order a workspace (coordination §18); Plan 4's visibleEventsFor owns that read.
+ */
 export async function readEntityEvents(
   client: PoolClient | Pool,
   kind: EntityKind,
   id: string,
   afterSeq = 0,
-): Promise<EventEnvelope[]> {
+): Promise<LedgerEvent[]> {
   const result = await client.query<EventRow>(
     'SELECT * FROM events WHERE entity_kind = $1 AND entity_id = $2 AND seq > $3 ORDER BY seq',
     [kind, id, afterSeq],
@@ -2133,11 +2290,12 @@ export async function readEntityEvents(
  * CANONICAL REPLAY ORDER: (entity_kind, entity_id, seq) — a total order over
  * the ledger (the triple is unique). Replay guarantees per-entity causality
  * only; a projection's table contents must be a pure function of the ledger's
- * rows, never of cross-entity arrival interleaving.
+ * rows, never of cross-entity arrival interleaving. workspace_seq changes
+ * nothing here: it orders live streams, never replay.
  * In-memory load is fine at Plan-1 scale; the plan that first ships a
  * large-ledger deployment swaps this for a cursor without changing callers.
  */
-export async function readLedger(client: PoolClient | Pool): Promise<EventEnvelope[]> {
+export async function readLedger(client: PoolClient | Pool): Promise<LedgerEvent[]> {
   const result = await client.query<EventRow>(
     'SELECT * FROM events ORDER BY entity_kind, entity_id, seq',
   );
@@ -2156,7 +2314,7 @@ export function isUniqueViolation(error: unknown, constraint: string): boolean {
 - [ ] **Step 5: Run the event-store test to verify it passes**
 
 Run: `pnpm turbo run test --filter=@gisik-nokma/server`
-Expected: PASS, including the concurrency serialisation and the planted seq-conflict defect.
+Expected: PASS, including the concurrency serialisation, the planted seq-conflict defect, and the workspace-cursor block (strictly increasing across entities, no duplicate cursor under parallel transactions, canonical replay order untouched).
 
 - [ ] **Step 6: Write the failing snapshot-store test**
 
@@ -2270,7 +2428,7 @@ Expected: PASS and clean.
 
 ```bash
 git add apps/server/src/ledger apps/server/test
-git commit -m "Ledger stores: advisory-locked per-entity sequencing proven under concurrency, canonical replay reads, and the snapshot primitive that will bound future replays"
+git commit -m "Ledger stores: advisory-locked per-entity sequencing and the per-workspace stream cursor beside it — workspace lock first, then entity, one order so nothing deadlocks — both proven under concurrency, with canonical replay reads left exactly as they were"
 ```
 
 ---
@@ -2767,7 +2925,7 @@ git commit -m "proj_entity_heads: the reference projection — head pointers der
 - Test: `apps/server/test/ingest.test.ts`
 
 **Interfaces:**
-- Consumes: `parseEvent`, `domainRegistry`, `EnvelopeErrorCode`, `SubmittedEvent`, `EventEnvelope` (`@gisik-nokma/domain`); `evaluateEvent`, `EngineContext` (`@gisik-nokma/rule-engine`); `lockEntity`, `nextSeq`, `insertEvent`, `isUniqueViolation` (Task 7); `readEntityHead` (Task 9); `ProjectionRegistry` (Task 8).
+- Consumes: `parseEvent`, `domainRegistry`, `EnvelopeErrorCode`, `SubmittedEvent`, `EventEnvelope` (`@gisik-nokma/domain`); `evaluateEvent`, `EngineContext` (`@gisik-nokma/rule-engine`); `lockEntity`, `nextSeq`, `lockWorkspace`, `nextWorkspaceSeq`, `insertEvent`, `isUniqueViolation`, `LedgerEvent` (Task 7); `readEntityHead` (Task 9); `ProjectionRegistry` (Task 8).
 - Produces (cross-plan API — Plan 5's WebSocket layer and the sync plans build directly on this):
   - `createEngineContext(client: PoolClient): EngineContext` — state reads see the world as of the events committed before the one under evaluation.
   - `type IngestErrorCode = EnvelopeErrorCode | 'duplicate-event-id'`
@@ -2776,9 +2934,10 @@ git commit -m "proj_entity_heads: the reference projection — head pointers der
     - `| { status: 'invalid'; eventId: string | null; code: IngestErrorCode; message: string }` — envelope errors: not a well-formed claim, never touches the rule engine
     - `| { status: 'refused'; eventId: string; rule: string; reason: string }` — a rule refusal: a well-formed claim the rules reject
   - `type IngestDeps = { pool: Pool; evaluate: typeof evaluateEvent; projections: ProjectionRegistry; registry?: EventTypeRegistry; now?: () => Date }`
-  - `type CommittedEventListener = (event: EventEnvelope) => void`
+  - `type CommittedEventListener = (event: LedgerEvent) => void` — listeners receive the server-enriched event, so Plan 5's stream can carry `workspaceSeq` as its resume cursor without re-reading the ledger.
   - `type IngestService = { ingestBatch(rawEvents: unknown[]): Promise<IngestResult[]>; onEventCommitted(listener: CommittedEventListener): () => void }` — `ingestBatch` processes in order, `result[i]` answers `rawEvents[i]`, each event commits or fails independently; `onEventCommitted` fires AFTER the transaction commits, never for invalid/refused events, returns an unsubscribe function.
   - `createIngestService(deps: IngestDeps): IngestService`
+  - **Sequencing inside the transaction (coordination §18):** the workspace stream cursor is assigned beside the per-entity seq. **Lock order is always workspace first, then entity — one global order across the whole server, so two ingests can never deadlock by taking the pair in opposite orders.** `IngestResult` is unchanged: `seq` stays the per-entity number clients already receive, and the cursor stays server-side and opaque.
 
 - [ ] **Step 1: Write the failing ingest test**
 
@@ -2960,6 +3119,78 @@ describe('onEventCommitted', () => {
 });
 ```
 
+- [ ] **Step 1a: Add the ingest workspace-cursor tests to the same file**
+
+The batch above proves per-entity sequencing; this block proves the workspace stream cursor the whole realtime layer resumes by (coordination §18). Append to `apps/server/test/ingest.test.ts`:
+
+```ts
+describe('workspace stream cursor (coordination §18)', () => {
+  it('two entities in one workspace get strictly increasing workspace_seq while both keep seq 1', async () => {
+    const ingest = service();
+    const workspaceCreated = submittedWorkspaceCreated();
+    const workspaceId = workspaceCreated.workspaceId;
+    const renamed = {
+      ...workspaceCreated,
+      id: newUlid(),
+      type: 'workspace.renamed',
+      payload: { name: 'CC HQ' },
+    };
+    const otherWorkspace = submittedWorkspaceCreated();
+
+    await ingest.ingestBatch([workspaceCreated, renamed, otherWorkspace]);
+
+    const stream = await db.pool.query<{ id: string; seq: number; workspace_seq: number }>(
+      'SELECT id, seq, workspace_seq FROM events WHERE workspace_id = $1 ORDER BY workspace_seq',
+      [workspaceId],
+    );
+    expect(stream.rows.map((row) => [row.id, row.workspace_seq])).toEqual([
+      [workspaceCreated.id, 1],
+      [renamed.id, 2],
+    ]);
+    // Cursors are per workspace, so a second workspace starts at 1 again —
+    // and never appears in this workspace's stream.
+    const other = await db.pool.query<{ workspace_seq: number }>(
+      'SELECT workspace_seq FROM events WHERE workspace_id = $1',
+      [otherWorkspace.workspaceId],
+    );
+    expect(other.rows.map((row) => row.workspace_seq)).toEqual([1]);
+  });
+
+  it('onEventCommitted hands the listener the cursor the stream resumes by', async () => {
+    const ingest = service();
+    const cursors: number[] = [];
+    ingest.onEventCommitted((event) => cursors.push(event.workspaceSeq));
+    const base = submittedWorkspaceCreated();
+    await ingest.ingestBatch([base]);
+    await ingest.ingestBatch([{ ...base, id: newUlid(), type: 'workspace.renamed', payload: { name: 'CC HQ' } }]);
+    expect(cursors).toEqual([1, 2]);
+  });
+
+  it('planted defect: concurrent ingests to different entities never mint a cursor twice', async () => {
+    const ingest = service();
+    const anchor = submittedWorkspaceCreated();
+    const workspaceId = anchor.workspaceId;
+    // Four DIFFERENT entities in one workspace: the per-entity lock cannot
+    // serialise them, so only the per-workspace lock keeps the cursor unique.
+    // Without it all four read the same max(workspace_seq) and
+    // events_workspace_seq_unique refuses the losers.
+    const racers = [
+      anchor,
+      submittedWorkspaceCreated({ workspaceId, entity: { kind: 'project', id: newUlid() } }),
+      submittedWorkspaceCreated({ workspaceId, entity: { kind: 'ticket', id: newUlid() } }),
+      submittedWorkspaceCreated({ workspaceId, entity: { kind: 'membership', id: newUlid() } }),
+    ];
+    const results = await Promise.all(racers.map((event) => ingest.ingestBatch([event])));
+    expect(results.flat().filter((result) => result.status === 'committed')).toHaveLength(4);
+    const cursors = await db.pool.query<{ workspace_seq: number }>(
+      'SELECT workspace_seq FROM events WHERE workspace_id = $1 ORDER BY workspace_seq',
+      [workspaceId],
+    );
+    expect(cursors.rows.map((row) => row.workspace_seq)).toEqual([1, 2, 3, 4]);
+  });
+});
+```
+
 - [ ] **Step 2: Run it to verify it fails**
 
 Run: `pnpm turbo run test --filter=@gisik-nokma/server`
@@ -3014,13 +3245,20 @@ import {
   domainRegistry,
   parseEvent,
   type EnvelopeErrorCode,
-  type EventEnvelope,
   type EventTypeRegistry,
   type SubmittedEvent,
 } from '@gisik-nokma/domain';
 import type { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { createEngineContext } from '../engine-context.js';
-import { insertEvent, isUniqueViolation, lockEntity, nextSeq } from '../ledger/event-store.js';
+import {
+  insertEvent,
+  isUniqueViolation,
+  lockEntity,
+  lockWorkspace,
+  nextSeq,
+  nextWorkspaceSeq,
+  type LedgerEvent,
+} from '../ledger/event-store.js';
 import type { ProjectionRegistry } from '../projections/registry.js';
 
 export type IngestErrorCode = EnvelopeErrorCode | 'duplicate-event-id';
@@ -3038,7 +3276,7 @@ export type IngestDeps = {
   now?: () => Date;             // injectable clock for tests
 };
 
-export type CommittedEventListener = (event: EventEnvelope) => void;
+export type CommittedEventListener = (event: LedgerEvent) => void;
 
 export type IngestService = {
   /** Processes a batch in order; result[i] answers rawEvents[i]. Each event
@@ -3056,7 +3294,7 @@ export function createIngestService(deps: IngestDeps): IngestService {
   const now = deps.now ?? (() => new Date());
   const listeners = new Set<CommittedEventListener>();
 
-  function notifyCommitted(event: EventEnvelope): void {
+  function notifyCommitted(event: LedgerEvent): void {
     for (const listener of listeners) {
       try {
         listener(event);
@@ -3071,10 +3309,15 @@ export function createIngestService(deps: IngestDeps): IngestService {
     const client = await deps.pool.connect();
     try {
       await client.query('BEGIN');
+      // Lock order is always workspace first, then entity — one global order
+      // across the whole server, so two ingests can never deadlock by taking
+      // the pair in opposite orders.
+      await lockWorkspace(client, submitted.workspaceId);
       await lockEntity(client, submitted.entity.kind, submitted.entity.id);
+      const workspaceSeq = await nextWorkspaceSeq(client, submitted.workspaceId);
       const seq = await nextSeq(client, submitted.entity.kind, submitted.entity.id);
       const serverTime = now().toISOString();
-      const envelope: EventEnvelope = { ...submitted, serverTime, seq };
+      const envelope: LedgerEvent = { ...submitted, serverTime, seq, workspaceSeq };
 
       const verdict = await deps.evaluate(envelope, createEngineContext(client));
       if (verdict.refused) {
@@ -3136,13 +3379,13 @@ export function createIngestService(deps: IngestDeps): IngestService {
 - [ ] **Step 5: Run the ingest test to verify it passes**
 
 Run: `pnpm turbo run test --filter=@gisik-nokma/server`
-Expected: PASS — all three outcome shapes exact, refusals leave no trace, the hook fires only after commit, the engine reads the pre-event world.
+Expected: PASS — all three outcome shapes exact, refusals leave no trace, the hook fires only after commit carrying the workspace cursor, the engine reads the pre-event world, and the workspace stream cursor stays unique and gap-free under four racing ingests.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add apps/server/src/ingest apps/server/src/engine-context.ts apps/server/test
-git commit -m "Ingest pipeline: parse at the door, sequence under lock, let the rule engine judge the pre-event world, persist with projections atomically, notify only what truly committed"
+git commit -m "Ingest pipeline: parse at the door, take the workspace lock then the entity lock, stamp both the entity seq and the stream cursor, let the rule engine judge the pre-event world, persist with projections atomically, notify only what truly committed"
 ```
 
 ---
@@ -3666,15 +3909,15 @@ git commit -m "verify-projections: the freshness gate reborn — every projectio
 - Test: `apps/server/test/determinism.test.ts`
 
 **Interfaces:**
-- Consumes: `insertEvent`, `rebuildProjection`, `buildProjectionRegistry`, `createTestDatabase`, `ULID_REGEX`.
-- Produces: `FIXTURE_EVENTS: readonly EventEnvelope[]` (10 events, 3 workspaces, fixed ids and times) plus `FIXTURE_WORKSPACE_A/B/C`, `FIXTURE_ACTOR` — the shared deterministic ledger later plans reuse for replay tests.
+- Consumes: `insertEvent`, `LedgerEvent`, `rebuildProjection`, `buildProjectionRegistry`, `createTestDatabase`, `ULID_REGEX`.
+- Produces: `FIXTURE_EVENTS: readonly LedgerEvent[]` (10 events, 3 workspaces, fixed ids and times) plus `FIXTURE_WORKSPACE_A/B/C`, `FIXTURE_ACTOR` — the shared deterministic ledger later plans reuse for replay tests. Every fixture entity IS its workspace, so `workspaceSeq` equals `seq` here; the fixture states it rather than leaving the coincidence to be rediscovered.
 
 - [ ] **Step 1: Write the fixture**
 
 `apps/server/test/fixtures/ledger-fixture.ts`:
 
 ```ts
-import type { EventEnvelope } from '@gisik-nokma/domain';
+import type { LedgerEvent } from '../../src/ledger/event-store.js';
 
 /**
  * A fixed ledger: three workspaces, ten events, hand-built deterministic ids.
@@ -3697,7 +3940,7 @@ function fixtureEvent(input: {
   seq: number;
   type: 'workspace.created' | 'workspace.renamed';
   name: string;
-}): EventEnvelope {
+}): LedgerEvent {
   const second = String(input.index).padStart(2, '0');
   return {
     id: eventId(input.index),
@@ -3711,10 +3954,12 @@ function fixtureEvent(input: {
     clientTime: `2026-08-20T09:00:${second}.000Z`,
     serverTime: `2026-08-20T09:01:${second}.000Z`,
     seq: input.seq,
+    // Every fixture entity IS its workspace, so the two counters coincide.
+    workspaceSeq: input.seq,
   };
 }
 
-export const FIXTURE_EVENTS: readonly EventEnvelope[] = [
+export const FIXTURE_EVENTS: readonly LedgerEvent[] = [
   fixtureEvent({ index: 1, workspace: FIXTURE_WORKSPACE_A, seq: 1, type: 'workspace.created', name: 'Convenience Corner' }),
   fixtureEvent({ index: 2, workspace: FIXTURE_WORKSPACE_A, seq: 2, type: 'workspace.renamed', name: 'Convenience Corner HQ' }),
   fixtureEvent({ index: 3, workspace: FIXTURE_WORKSPACE_A, seq: 3, type: 'workspace.renamed', name: 'CC HQ' }),
@@ -3888,8 +4133,9 @@ Append to `Features.md`:
 - ⚙️ **Monorepo workspace** — pnpm workspaces + Turborepo, TypeScript strict, Node 22, ESM, Vitest; packages `@gisik-nokma/domain`, `@gisik-nokma/rule-engine`, `@gisik-nokma/server`. Root configs `pnpm-workspace.yaml`, `turbo.json`, `tsconfig.base.json`; dev Postgres via `docker-compose.yml`.
 - ⚙️ **Event envelope & vocabulary** — the exact `EventEnvelope` contract with zod validation, ULID helpers, and the versioned event-type registry; pure `parseEvent` refuses unknown types, unknown versions, invalid payloads, malformed envelopes. Provisional seed vocabulary: `workspace.created` v1, `workspace.renamed` v1. `packages/domain/`
 - ⚙️ **Rule-engine boundary** — `evaluateEvent(env, ctx)` returning Accept or a Refusal that names its rule; pass-through internals that Plan 2 replaces. `packages/rule-engine/`
-- ✅ **Event ingest API** — `POST /v1/events` batch ingest: parse at the door → advisory-locked per-entity `seq` + `serverTime` → rule-engine gate → append + projections in one transaction → index-aligned per-event committed/invalid/refused results. `GET /healthz`. `apps/server/src/routes/events.ts`, `apps/server/src/ingest/`
+- ✅ **Event ingest API** — `POST /v1/events` batch ingest: parse at the door → advisory-locked per-entity `seq` and per-workspace `workspace_seq` (workspace lock first, then entity) + `serverTime` → rule-engine gate → append + projections in one transaction → index-aligned per-event committed/invalid/refused results. `GET /healthz`. `apps/server/src/routes/events.ts`, `apps/server/src/ingest/`
 - ⚙️ **Append-only ledger** — Postgres `events` table where UPDATE/DELETE/TRUNCATE are refused by trigger, `(entity_kind, entity_id, seq)` is unique, and `client_time` is stored verbatim as the actor's claim beside `server_time` the system's fact; `snapshots` table ready to bound future replay. `apps/server/migrations/`
+- ⚙️ **Workspace stream cursor** — `workspace_seq`, unique per `(workspace_id, workspace_seq)` and assigned in the ingest transaction under a per-workspace advisory lock, is the only order a workspace stream may resume by; per-entity `seq` keeps entity history, replay and snapshots. Server-enriched and opaque to clients (coordination §18). `apps/server/src/ledger/event-store.ts`
 - ⚙️ **Projection framework** — registry of deterministic `apply`/`reset` read models applied in the ingest transaction; `rebuildProjection` replays the canonical order; reference projection `proj_entity_heads` (newest event per entity, replay-safe). `apps/server/src/projections/`
 - ⚙️ **Broadcast hook** — `onEventCommitted(cb)` fires only after commit, never for refused or invalid events; Plan 5 attaches WebSocket fan-out. `apps/server/src/ingest/ingest-service.ts`
 - ⚙️ **Projection verifier** — `verify-projections` CLI re-derives every projection into a shadow schema, diffs against live in both directions, names drifted rows, exits nonzero on drift. `apps/server/src/tools/verify-projections.ts`
@@ -3927,6 +4173,8 @@ Mirrors `Features.md` §3. Status: `❌` not covered · `✅` covered · `🟡` 
 - **3.21** ✅ Replaying the fixture ledger twice yields byte-identical projection rows with the expected heads; reversed arrival derives the same bytes; every fixture id is regex-proven a ULID. — `apps/server/test/determinism.test.ts`
 - **3.22** ✅ Boot refuses a missing `DATABASE_URL` or non-numeric `PORT` with the variable named (planted defects). — `apps/server/test/config.test.ts`
 - **3.23** 🧪 End-to-end smoke: compose up, migrate, verify clean, boot, healthz ok, one event ingested over HTTP, verify clean again — run per release (Plan 1 Task 14 steps 1–2).
+- **3.24** ✅ A duplicate `(workspace_id, workspace_seq)` violates `events_workspace_seq_unique` (planted defect); two entities in one workspace get strictly increasing cursors while both honestly keep `seq` 1; concurrent appends and four racing ingests never mint one cursor twice (planted defects). — `apps/server/test/migrations.test.ts`, `apps/server/test/event-store.test.ts`, `apps/server/test/ingest.test.ts`
+- **3.25** ✅ The workspace cursor changes nothing about replay: canonical order stays `(entity_kind, entity_id, seq)`, every stored row carries a cursor unique within its workspace, and `onEventCommitted` hands listeners the cursor a stream resumes by. — `apps/server/test/event-store.test.ts`, `apps/server/test/ingest.test.ts`
 ```
 
 In `test-cases/README.md`, replace the line beginning `Buckets so far: none —` with:
@@ -3944,7 +4192,7 @@ Expected: every package green — this is the evidence for every ✅ above.
 
 ```bash
 git add Features.md test-cases
-git commit -m "Catalogue the foundation: Features.md section 3 and 23 test cases, every refusal path traced to the planted defect that proves it"
+git commit -m "Catalogue the foundation: Features.md section 3 and 25 test cases, every refusal path traced to the planted defect that proves it"
 ```
 
 ---
@@ -3960,6 +4208,7 @@ Flagged per instruction rather than silently resolved; none blocks execution of 
 5. **Features.md/test-cases numbering across four parallel plan-writers.** This plan claims Features.md §3 and `test-cases/03-foundation-ledger.md`. The other parallel plans must claim distinct section numbers; the orchestrator should check for collisions before execution.
 6. **`client_time` storage.** The contract fixes `payload jsonb` but not the time columns. Chosen here: `client_time text` verbatim (the claim keeps its stated offset — honesty-aligned per spec §3 "both are true in different senses") and `server_time timestamptz`. If a later plan needs to ORDER BY client time, it casts (`client_time::timestamptz`) or projects a derived column — the stored claim itself stays untouched.
 7. **Contract's "entities" zod schemas.** The contract describes `packages/domain` as "shared types + zod schemas (event envelope, entities, ids)". Plan 1 ships envelope + ids + state types; per-entity aggregate schemas (ticket, project, workspace documents) belong to the plans that own those entities.
+8. **`workspace_seq` is server-enriched; the domain envelope stays frozen (coordination §18).** The `EventEnvelope` contract in Global Constraints does NOT gain a required `workspaceSeq` — it is the pinned cross-plan type, and clients never author the cursor. The column is `NOT NULL` in the ledger, and server-side readers emit it as an optional, server-enriched `workspaceSeq?: number` (typed here as `LedgerEvent = EventEnvelope & { workspaceSeq: number }`, which every read path returns). **Clients treat the cursor as an opaque resume token** — they may pass back what they were given and must never compute, compare across workspaces, or display it. Consequence for the siblings: any test helper that inserts into `events` directly rather than through `insertEvent` must supply `workspace_seq` (Plan 4's `appendTestEvent` and Plan 5's `applyCommitted` are amended; Plan 9's and Plan 10's direct inserts are an execution-time adaptation the orchestrator owns).
 
 ## Self-review (performed by the plan author)
 
@@ -3970,7 +4219,7 @@ Flagged per instruction rather than silently resolved; none blocks execution of 
 - §1 (3) parents/children and (5) contested claims: later plans (workflow rules, sync) — deliberately absent here per assignment scope. ✓
 - §1 (4) nothing is invented: projections derive only from ledger rows; `head_server_time` from the event, never `now()` → Tasks 8, 9, 13. ✓
 - §1 (6) planted defects: every refusal path in this plan has one (envelope, type, version, payload, duplicate id, seq conflict, append-only trigger, refusal-no-trace, drift, config). ✓
-- §3 ledger fields (ULID, workspace, entity, type+payload, actor, origin, both times, per-entity seq) → Tasks 2, 6, 7. ✓
+- §3 ledger fields (ULID, workspace, entity, type+payload, actor, origin, both times, per-entity seq) → Tasks 2, 6, 7. ✓ Plus the per-workspace `workspace_seq` stream cursor (coordination §18) → Tasks 6, 7, 10, with the domain envelope left frozen (Open questions 8). ✓
 - §3 unknown types refused at ingest → Tasks 3, 10. ✓
 - §3 projections rebuilt deterministically + scheduled verifier re-derives and diffs → Tasks 8, 12, 13 (scheduling itself deferred to deployment, noted in Task 12). ✓
 - §3 realtime WebSocket push → hook only (`onEventCommitted`), per assignment; Plan 5 wires transport. ✓
@@ -3979,4 +4228,4 @@ Flagged per instruction rather than silently resolved; none blocks execution of 
 
 **2. Placeholder scan:** none of the skill's forbidden placeholder patterns appear in any step; every code step contains complete code; the two `node-pg-migrate create` steps intentionally let the tool own filenames, with the full SQL given. The pass-through engine and empty-world context answers are real Plan-1 semantics (documented as such), not deferred work; the PROVISIONAL stubs in `provisional.ts` are complete, contract-exact shapes with a named replacement (Plan 2 Task 2), not placeholders.
 
-**3. Type consistency (spot-checked across tasks):** `EnvelopeErrorCode` union identical in Tasks 3 and 10; `IngestErrorCode = EnvelopeErrorCode | 'duplicate-event-id'` only at ingest; `AppDeps` evolution spelled in both Task 5 and Task 11 with the final shape stated in both; `EntityHead` fields (`kind, id, headSeq, headEventId, headEventType`) match between Task 4 (type), Task 9 (`readEntityHead`), and Task 10 (context test expecting `headSeq`); constraint names `events_entity_seq_unique`/`events_pkey` consistent across Tasks 6, 7, 10; canonical order stated identically in Global Constraints, Task 7 (`readLedger`), Task 8 (registry doc + rebuild), Task 12 (shadow replay); fixture ids are 26-char literals validated by a dedicated test (Task 13); `buildProjectionRegistry` is the single registry source in Tasks 9–12 and boot.
+**3. Type consistency (spot-checked across tasks):** `EnvelopeErrorCode` union identical in Tasks 3 and 10; `IngestErrorCode = EnvelopeErrorCode | 'duplicate-event-id'` only at ingest; `AppDeps` evolution spelled in both Task 5 and Task 11 with the final shape stated in both; `EntityHead` fields (`kind, id, headSeq, headEventId, headEventType`) match between Task 4 (type), Task 9 (`readEntityHead`), and Task 10 (context test expecting `headSeq`); constraint names `events_entity_seq_unique`/`events_workspace_seq_unique`/`events_pkey` consistent across Tasks 6, 7, 10, with the lock-order sentence (workspace first, then entity) stated identically in the Architecture paragraph, Task 7's Produces block, and Task 10's ingest transaction; `LedgerEvent` is the single stored-event type across Tasks 7, 10, 13; canonical order stated identically in Global Constraints, Task 7 (`readLedger`), Task 8 (registry doc + rebuild), Task 12 (shadow replay); fixture ids are 26-char literals validated by a dedicated test (Task 13); `buildProjectionRegistry` is the single registry source in Tasks 9–12 and boot.

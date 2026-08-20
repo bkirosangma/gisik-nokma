@@ -1865,7 +1865,7 @@ describe('docToPlainText conformance — schema v1 through the domain walker', (
 - [ ] **Step 2: Run the suite**
 
 Run: `pnpm --filter @gisik-nokma/editor exec vitest run test/doc-to-plain-text.test.ts`
-Expected: PASS. **If the mention placeholder assertions fail** because Plan 5's walker renders mentions differently (a different attr name or format), do NOT change the walker or the schema unilaterally: this is the cross-plan reconciliation point of Open questions 2 — raise it to the series coordinator, then align whichever side the coordinator rules against.
+Expected: PASS. Plan 5's walker was checked against these assertions during the series self-review and matches: mentions are `{userId, label?}` rendered `@label` with `@userId` as the fallback, images contribute no text, and unknown node types are descended into rather than dropped (Open question 2, now settled). **If an assertion nevertheless fails**, do NOT change the walker or the schema unilaterally — that is the cross-plan reconciliation point; raise it to the series coordinator, then align whichever side the coordinator rules against.
 
 - [ ] **Step 3: Commit**
 
@@ -4703,21 +4703,38 @@ git commit -m "Evidence picker: existing attachment or fresh upload, attachment.
   - `type EditorSubmission = { type: 'comment.added'; payload: { body: DocJson } } | { type: 'ticket.field_set'; payload: { fieldId: 'description'; value: DocJson } }`
   - `composeEditorSubmission(mode: 'comment' | 'description', doc: DocJson): EditorSubmission` — the single mapping from editor modes onto ledger events (Plan 3's payloads exactly). Plan 6's sheet may call it directly even if it mounts its own chrome.
   - `function TicketEditorSlot(props: EditorSlotProps): React.JSX.Element` — the concrete component behind Plan 6's `<EditorSlot>` boundary.
-  - **Assumed `<EditorSlot>` contract** (Plan 6 is written in parallel and its document was not on disk when this plan was authored — reconcile per Open questions 1):
+  - **The `<EditorSlot>` contract, reconciled with Plan 6 (which owns the declaration — `packages/app-core/src/views/editor-slot.ts`).** `packages/editor` must NOT import `@gisik-nokma/app-core` (that would invert the dependency and drag app-core's React tree into the RN webview bundle), so it re-declares the identical shape locally and TypeScript's structural typing makes `TicketEditorSlot` assignable to Plan 6's `EditorSlotComponent`. One contract written twice on purpose — **edit both or neither**:
 
 ```ts
-type EditorSlotProps = {
-  mode: 'comment' | 'description';
-  ticketId: string;
-  initialDoc: DocJson | null;             // null → empty composer
-  queryUsers(query: string): Promise<MentionCandidate[]>;
-  uploadAttachment(file: File): Promise<UploadResult>;
-  emitAttachmentAdded(result: UploadResult): Promise<void>;  // sheet → DataSource.ingest attachment.added
-  submit(submission: EditorSubmission): Promise<void>;       // sheet → DataSource.ingest the composed event
-  onDone?(): void;                        // successful submit (sheet closes/clears chrome)
-  onError?(err: unknown): void;
+// Structurally identical to packages/app-core/src/views/editor-slot.ts.
+// Plan 6 spells documents `unknown` there (amendment 12 keeps ProseMirror JSON
+// opaque outside this package); DocJson is assignable to unknown, so the
+// narrower spelling here is legal and more useful inside the editor.
+export type EditorSlotUpload = { attachmentId: string; filename: string; mime: string; size: number; url: string };
+
+export type EditorSlotProps = {
+  mode: 'comment' | 'description';        // which ledger event a submit becomes
+  doc: DocJson | null;                    // Plan 6's name for the initial document; null → empty composer
+  readOnly: boolean;
+  workspaceId: string;                    // mention/member resolution scope
+  ticketId: string;                       // uploads and attachment.added are ticket-scoped
+  placeholder?: string;
+  autoFocus?: boolean;
+  // Editor capabilities. Optional in the shared declaration because Plan 6's
+  // read-only PlainTextEditorSlot supplies none of them. This component STATES
+  // the gap rather than pretending: without `submit` the submit button is
+  // disabled with an honest label; without `uploadAttachment` image paste is
+  // refused through onError instead of silently dropping the file.
+  queryUsers?: (query: string) => Promise<MentionCandidate[]>;
+  uploadAttachment?: (file: File) => Promise<EditorSlotUpload>;
+  emitAttachmentAdded?: (uploaded: EditorSlotUpload) => Promise<void>;
+  submit?: (submission: EditorSubmission) => Promise<void>;
+  onDone?: () => void;
+  onError?: (err: unknown) => void;
 };
 ```
+
+`UploadResult` (Task 12) is `EditorSlotUpload` — same five fields, same meaning (the SERVER-sniffed truth); the alias exists so app-core can name the shape without importing this package.
 
   - Behavioral contract: comment mode clears the composer after a successful submit; description mode keeps the content (it is now the saved value). A failed submit **never clears** — a refused claim must not cost the user their words.
 
@@ -4756,8 +4773,10 @@ describe('composeEditorSubmission', () => {
 function makeProps(overrides: Partial<EditorSlotProps> = {}): EditorSlotProps {
   return {
     mode: 'comment',
+    doc: null,
+    readOnly: false,
+    workspaceId: 'ws_1',
     ticketId: '01J9GTKA000000000000000000',
-    initialDoc: null,
     queryUsers: async () => [],
     uploadAttachment: vi.fn(),
     emitAttachmentAdded: vi.fn(async () => {}),
@@ -4785,7 +4804,7 @@ describe('TicketEditorSlot', () => {
   it('comment mode: submit sends comment.added and clears the composer on success', async () => {
     const submit = vi.fn(async () => {});
     const onDone = vi.fn();
-    const view = await mountSlot(makeProps({ submit, onDone, initialDoc: DOC }));
+    const view = await mountSlot(makeProps({ submit, onDone, doc: DOC }));
     fireEvent.click(view.container.querySelector('.editor-slot__submit') as HTMLButtonElement);
     await vi.waitFor(() => {
       expect(submit).toHaveBeenCalledTimes(1);
@@ -4802,7 +4821,7 @@ describe('TicketEditorSlot', () => {
 
   it('description mode: submit sends ticket.field_set and keeps the content', async () => {
     const submit = vi.fn(async () => {});
-    const view = await mountSlot(makeProps({ mode: 'description', initialDoc: DOC, submit }));
+    const view = await mountSlot(makeProps({ mode: 'description', doc: DOC, submit }));
     fireEvent.click(view.container.querySelector('.editor-slot__submit') as HTMLButtonElement);
     await vi.waitFor(() => {
       expect(submit).toHaveBeenCalledTimes(1);
@@ -4819,7 +4838,7 @@ describe('TicketEditorSlot', () => {
       throw new Error('This move must carry a comment explaining it, and none was provided.');
     });
     const onError = vi.fn();
-    const view = await mountSlot(makeProps({ submit, onError, initialDoc: DOC }));
+    const view = await mountSlot(makeProps({ submit, onError, doc: DOC }));
     fireEvent.click(view.container.querySelector('.editor-slot__submit') as HTMLButtonElement);
     await vi.waitFor(() => {
       expect(onError).toHaveBeenCalled();
@@ -4879,38 +4898,50 @@ import type { Editor } from '@tiptap/core';
 import { emptyDoc, type DocJson } from '../doc.js';
 import type { MentionCandidate } from '../extensions/mention.js';
 import type { UploadResult } from '../upload.js';
-import { composeEditorSubmission } from '../attachments/compose-editor-submission.js';
+import { composeEditorSubmission, type EditorSubmission } from '../attachments/compose-editor-submission.js';
 import { TicketEditor } from './TicketEditor.js';
 
 /**
- * ASSUMED Plan 6 contract (parallel authoring — reconcile per Open
- * questions 1). Plan 6's <EditorSlot> lazy boundary mounts this component;
- * the sheet supplies event emission through submit/emitAttachmentAdded so
- * the editor package never speaks HTTP or DataSource directly.
+ * Plan 6 owns this contract (`packages/app-core/src/views/editor-slot.ts`) and
+ * mounts this component through its `<EditorSlot>` boundary. The shape is
+ * re-declared here, structurally identical, because packages/editor must not
+ * depend on app-core — see the Interfaces block above. The host supplies event
+ * emission through submit/emitAttachmentAdded, so the editor package never
+ * speaks HTTP or DataSource directly.
  */
+export type EditorSlotUpload = UploadResult;
+
 export type EditorSlotProps = {
   mode: 'comment' | 'description';
+  doc: DocJson | null;
+  readOnly: boolean;
+  workspaceId: string;
   ticketId: string;
-  initialDoc: DocJson | null;
-  queryUsers(query: string): Promise<MentionCandidate[]>;
-  uploadAttachment(file: File): Promise<UploadResult>;
-  emitAttachmentAdded(result: UploadResult): Promise<void>;
-  submit(submission: ReturnType<typeof composeEditorSubmission>): Promise<void>;
-  onDone?(): void;
-  onError?(err: unknown): void;
+  placeholder?: string;
+  autoFocus?: boolean;
+  queryUsers?: (query: string) => Promise<MentionCandidate[]>;
+  uploadAttachment?: (file: File) => Promise<EditorSlotUpload>;
+  emitAttachmentAdded?: (uploaded: EditorSlotUpload) => Promise<void>;
+  submit?: (submission: EditorSubmission) => Promise<void>;
+  onDone?: () => void;
+  onError?: (err: unknown) => void;
 };
+
+const NO_MENTIONS = async (): Promise<MentionCandidate[]> => [];
 
 export function TicketEditorSlot(props: EditorSlotProps): React.JSX.Element {
   const editorRef = useRef<Editor | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const canSubmit = props.submit !== undefined && !props.readOnly;
 
   async function handleSubmit(doc?: DocJson): Promise<void> {
     const editor = editorRef.current;
-    if (!editor || submitting) return;
+    const submit = props.submit;
+    if (!editor || submitting || submit === undefined || props.readOnly) return;
     const currentDoc = doc ?? (editor.getJSON() as DocJson);
     setSubmitting(true);
     try {
-      await props.submit(composeEditorSubmission(props.mode, currentDoc));
+      await submit(composeEditorSubmission(props.mode, currentDoc));
       if (props.mode === 'comment') {
         // The claim landed; the composer resets for the next one.
         editor.commands.setContent(emptyDoc(), { emitUpdate: false });
@@ -4924,14 +4955,23 @@ export function TicketEditorSlot(props: EditorSlotProps): React.JSX.Element {
     }
   }
 
+  // No uploader wired: say so and refuse, rather than swallowing the file.
+  async function uploadOrRefuse(file: File): Promise<UploadResult> {
+    if (props.uploadAttachment === undefined) {
+      throw new Error('Attachments are unavailable here — this editor was mounted without an uploader.');
+    }
+    return props.uploadAttachment(file);
+  }
+
   return (
     <div className="editor-slot">
       <TicketEditor
-        initialDoc={props.initialDoc ?? emptyDoc()}
-        placeholder={props.mode === 'comment' ? 'Write a comment…' : 'Describe this ticket…'}
-        queryUsers={props.queryUsers}
-        uploadAttachment={props.uploadAttachment}
-        onAttachmentAdded={props.emitAttachmentAdded}
+        initialDoc={props.doc ?? emptyDoc()}
+        editable={!props.readOnly}
+        placeholder={props.placeholder ?? (props.mode === 'comment' ? 'Write a comment…' : 'Describe this ticket…')}
+        queryUsers={props.queryUsers ?? NO_MENTIONS}
+        uploadAttachment={uploadOrRefuse}
+        onAttachmentAdded={props.emitAttachmentAdded ?? (async () => {})}
         onUploadError={(err) => props.onError?.(err)}
         onSubmit={(doc) => void handleSubmit(doc)}
         editorRef={editorRef}
@@ -4939,7 +4979,8 @@ export function TicketEditorSlot(props: EditorSlotProps): React.JSX.Element {
       <button
         type="button"
         className="editor-slot__submit"
-        disabled={submitting}
+        disabled={submitting || !canSubmit}
+        title={canSubmit ? undefined : 'Read-only: this editor was mounted without a submit handler.'}
         onClick={() => void handleSubmit()}
       >
         {props.mode === 'comment' ? 'Comment' : 'Save description'}
@@ -4953,7 +4994,7 @@ Append to `packages/editor/src/index.ts`:
 
 ```ts
 export { composeEditorSubmission, type EditorSubmission } from './attachments/compose-editor-submission.js';
-export { TicketEditorSlot, type EditorSlotProps } from './components/TicketEditorSlot.js';
+export { TicketEditorSlot, type EditorSlotProps, type EditorSlotUpload } from './components/TicketEditorSlot.js';
 ```
 
 - [ ] **Step 3: Run the tests to verify they pass**
@@ -5569,7 +5610,7 @@ git commit -m "Catalogue the editor and attachments: Features.md section 9 and 2
 For successor plans (6, 8, 9, 10, 11) — the exact names this plan contributes:
 
 - **Schema v1** (`@gisik-nokma/editor`): nodes `doc` (attrs `schemaVersion: 1`), `paragraph`, `text`, `heading`, `bulletList`, `orderedList`, `listItem`, `blockquote`, `codeBlock`, `horizontalRule`, `hardBreak`, `table`, `tableRow`, `tableHeader`, `tableCell`, `image {attachmentId, wrap: 'inline-left'|'inline-right'|'block', alt}`, `mention {userId, label}`; marks `bold`, `italic`, `strike`, `code`, `link`. `DOC_SCHEMA_VERSION`, `DocJson`, `emptyDoc`, `isDocJson`, `buildEditorExtensions(options)`.
-- **Editor surface**: `TicketEditor`, `TicketEditorSlot` (+ assumed `EditorSlotProps`), `EvidencePicker`, `ImageWrapMenu`, `composeEditorSubmission`, `transitionRequiresEvidence`, `getEscapeSuggestion`, `uploadAttachmentHttp`/`UploadResult`/`UploadRefusedError`, `createAttachmentPasteExtension`.
+- **Editor surface**: `TicketEditor`, `TicketEditorSlot` (+ `EditorSlotProps`/`EditorSlotUpload`, structurally identical to Plan 6's declaration in `packages/app-core/src/views/editor-slot.ts` — see Open question 1), `EvidencePicker`, `ImageWrapMenu`, `composeEditorSubmission`, `transitionRequiresEvidence`, `getEscapeSuggestion`, `uploadAttachmentHttp`/`UploadResult`/`UploadRefusedError`, `createAttachmentPasteExtension`.
 - **Domain additions** (`@gisik-nokma/domain`): `EMBEDDABLE_IMAGE_MIME`, `isEmbeddableImageMime`, `collectImageAttachmentIds`.
 - **Server**: `ObjectStore {put, getStream, delete}` + `ObjectMeta`, `LocalDiskStore`, `S3ObjectStore`, `createObjectStoreFromEnv`, `ObjectNotFoundError`, `InvalidObjectKeyError`, `assertValidObjectKey`; `attachments` table + `AttachmentRow` repo functions; `ALLOWED_ATTACHMENT_MIME`, `sniffAllowedMime`, `sanitizeFilename`, `ATTACHMENT_MAX_BYTES`; routes `POST /v1/attachments` → `201 {attachmentId, url, mime, filename, size}` and `GET /v1/attachments/:id`; `registerAttachmentRoutes(app, {pool, store, auth, maxBytes?})`.
 - **Ingest seam** (additive to Plan 1): `IngestDeps.gates?: ServerGate[]`; `ServerGate {eventType, check(event, db)}`, `GateRefusal`; `buildServerGates()`; rule ids `attachment.embed-unknown`, `attachment.embed-not-image`, `attachment.evidence-unknown`.
@@ -5579,8 +5620,8 @@ For successor plans (6, 8, 9, 10, 11) — the exact names this plan contributes:
 
 Flagged rather than silently resolved; none blocks execution of this plan as written.
 
-1. **Plan 6's `<EditorSlot>` exact props.** Plan 6 is written in parallel and its document was not on disk when this plan was authored. Task 14 states the assumed contract (`EditorSlotProps`: mode/ticketId/initialDoc/queryUsers/uploadAttachment/emitAttachmentAdded/submit/onDone/onError) and keeps it minimal. **Reconcile against Plan 6's actual boundary before executing Task 14**; `composeEditorSubmission` and `TicketEditor` are stable regardless of how the slot's props land.
-2. **`docToPlainText` mention rendering.** Plan 5 (parallel) owns the walker; this plan pins the assumption in exactly one file (Task 6): mention nodes carry `{userId, label}` and render as `@${label}`. If Plan 5 chose a different attr or format, the coordinator picks the winner and one side adjusts — the mention node's `label` attr exists precisely so the dependency-free walker can name a person.
+1. **Plan 6's `<EditorSlot>` props — RECONCILED, nothing outstanding.** Plan 6 owns the declaration (`packages/app-core/src/views/editor-slot.ts`) and its earlier draft was too thin for the real editor (no mode, no ticket scope, no uploader — image embedding could not have worked behind it). Taken: **Plan 6's names, widened to this plan's needs.** `initialDoc` became `doc` (Plan 6's spelling); `readOnly`, `workspaceId`, `placeholder?` and `autoFocus?` came from Plan 6; `mode`, `ticketId`, `queryUsers`, `uploadAttachment`, `emitAttachmentAdded`, `submit`, `onDone?`, `onError?` came from here; Plan 6's `onSubmit(doc)` was dropped so there is exactly ONE submit path. Every editor capability is optional so Plan 6's read-only `PlainTextEditorSlot` can satisfy the same type; this component states the gap (disabled submit, refused upload) instead of pretending. Plan 6's declaration spells documents `unknown` and app-core never imports this package; `packages/editor` re-declares the shape locally and structural typing joins them. **Both declarations are one contract — edit both or neither.**
+2. **`docToPlainText` mention rendering — RECONCILED, nothing outstanding.** Plan 5 owns the walker (its Task 1, `packages/domain/src/doc-text.ts`) and pinned `type MentionNodeAttrs = { userId: string; label?: string }` rendering as `@label` with `@userId` as the fallback. This plan's mention node emits exactly `{userId, label}`, so Task 6's conformance test asserts the behaviour Plan 5 already implements — no adjustment on either side. The `label` attr exists precisely so the dependency-free walker can name a person; the fallback is why a label-less mention still renders an id rather than nothing (provenance is never anonymous).
 3. **Server gates are an additive ingest amendment.** `IngestDeps.gates?: ServerGate[]` extends Plan 1's contract (default `[]`, invisible when unused). Needs recording in the coordination document. Deliberate consequence: gates run inside `ingestBatch`, so Plan 10's `POST /v1/sync` path inherits them with no extra wiring — a sync-refused embed becomes a contested claim like any other refusal.
 4. **Upload response superset.** Amendment 15 says `POST /v1/attachments → {attachmentId, url}`; this plan returns `{attachmentId, url, mime, filename, size}` — additive, and load-bearing: the client MUST echo the server-sniffed mime/size into `attachment.added`, not the local file's claims. Coordination doc should record the superset.
 5. **Unsniffable file types are refused in v1.** Plain text, CSV, and SVG have no magic bytes (SVG additionally being a script vector), so the allow-list cannot admit them under sniff-only detection. Named degradation, honest refusal reason shown to the user. If operators need CSVs, a future plan must add content-inspection (not extension trust) for text formats.
@@ -5605,6 +5646,6 @@ Flagged rather than silently resolved; none blocks execution of this plan as wri
 
 **2. Placeholder scan:** no TBD/TODO/"implement later"/"add validation"/"similar to Task N" anywhere; every code step contains complete code; the two deliberate executor-verification steps (Tiptap named exports, `isInputRules`) verify recorded facts and name the exact fallback rather than deferring work. The Task 11 ingest modification names the precise insertion point and the observable contract because the target file is Plan 1's — the code given is complete for the seam itself.
 
-**3. Type consistency:** `UploadResult` fields = upload 201 body = `attachment.added` payload inputs (attachmentId/filename/mime/size) ✓; `wrap` union identical in node attrs, `IMAGE_WRAP_MODES`, menu labels, and coordination amendment 12 ✓; `ServerGate.check(event: SubmittedEvent, db: Queryable)` matches gate implementations and the ingest seam ✓; rule-id constants exported and asserted by the same names ✓; `EditorSlotProps.submit` takes `EditorSubmission` = `composeEditorSubmission`'s return ✓; bridge message types used identically in `bridge.ts`, `create-editor-bridge.ts`, entry, and tests ✓; `MentionCandidate {userId, name}` (picker input) vs mention attrs `{userId, label}` (stored) is an intentional rename at the insertion boundary, performed in exactly one place (`Suggestion.command`) and documented there ✓.
+**3. Type consistency:** `UploadResult` fields = upload 201 body = `attachment.added` payload inputs (attachmentId/filename/mime/size) ✓; `wrap` union identical in node attrs, `IMAGE_WRAP_MODES`, menu labels, and coordination amendment 12 ✓; `ServerGate.check(event: SubmittedEvent, db: Queryable)` matches gate implementations and the ingest seam ✓; rule-id constants exported and asserted by the same names ✓; `EditorSlotProps.submit` takes `EditorSubmission` = `composeEditorSubmission`'s return ✓, and the whole `EditorSlotProps` shape is structurally identical to Plan 6's declaration (`doc`, not `initialDoc`; capabilities optional) ✓; bridge message types used identically in `bridge.ts`, `create-editor-bridge.ts`, entry, and tests ✓; `MentionCandidate {userId, name}` (picker input) vs mention attrs `{userId, label}` (stored) is an intentional rename at the insertion boundary, performed in exactly one place (`Suggestion.command`) and documented there ✓.
 
-Result: no gaps found that block execution; the two parallel-plan seams (EditorSlot props, docToPlainText mention format) are flagged as Open questions 1–2 with a single reconciliation point each.
+Result: no gaps found that block execution. The two parallel-plan seams (EditorSlot props, docToPlainText mention format) were reconciled against the landed Plan 6 and Plan 5 documents during the series self-review and are now recorded as settled in Open questions 1–2 rather than left as assumptions.

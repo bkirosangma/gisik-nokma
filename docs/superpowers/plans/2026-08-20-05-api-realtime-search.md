@@ -14,10 +14,10 @@
 
 ## Consumed interfaces (exact, from the siblings' Produces blocks)
 
-- **Plan 1 (`@gisik-nokma/domain`, `apps/server`):** `EventEnvelope` (contract shape: `{id, workspaceId, entity: {kind, id}, type, version, payload, actorId, origin, clientTime, serverTime, seq}`), `SubmittedEvent = Omit<EventEnvelope, 'serverTime' | 'seq'>`, `newUlid()`, `domainRegistry`/`EventTypeRegistry` (`register({type, version, payloadSchema})`), `parseEvent`; `insertEvent(client, envelope)`; `Projection = {name, tables, apply(event, tx), reset(tx)}` and `buildProjectionRegistry()` in `apps/server/src/projections/index.ts` (registration order is application order); `IngestService = {ingestBatch(rawEvents): Promise<IngestResult[]>, onEventCommitted(listener): () => void}` (`onEventCommitted` fires only after commit, never for invalid/refused); `IngestResult = {status:'committed', eventId, seq, serverTime} | {status:'invalid', eventId|null, code, message} | {status:'refused', eventId, rule, reason}`; `buildApp(deps)`, `POST /v1/events` `{events:[1..100]}` → `{results: IngestResult[]}`.
+- **Plan 1 (`@gisik-nokma/domain`, `apps/server`):** `EventEnvelope` (contract shape: `{id, workspaceId, entity: {kind, id}, type, version, payload, actorId, origin, clientTime, serverTime, seq}`), `SubmittedEvent = Omit<EventEnvelope, 'serverTime' | 'seq'>`, `newUlid()`, `domainRegistry`/`EventTypeRegistry` (`register({type, version, payloadSchema})`), `parseEvent`; `insertEvent(client, event: LedgerEvent)` where `LedgerEvent = EventEnvelope & { workspaceSeq: number }` — the `events` table carries a per-workspace `workspace_seq` cursor beside the per-entity `seq` (coordination §18), server-assigned and NOT NULL, so anything writing the ledger directly supplies it; `Projection = {name, tables, apply(event, tx), reset(tx)}` and `buildProjectionRegistry()` in `apps/server/src/projections/index.ts` (registration order is application order); `IngestService = {ingestBatch(rawEvents): Promise<IngestResult[]>, onEventCommitted(listener): () => void}` (`onEventCommitted` fires only after commit, never for invalid/refused); `IngestResult = {status:'committed', eventId, seq, serverTime} | {status:'invalid', eventId|null, code, message} | {status:'refused', eventId, rule, reason}`; `buildApp(deps)`, `POST /v1/events` `{events:[1..100]}` → `{results: IngestResult[]}`.
 - **Plan 2:** `StateCategory = 'open'|'active'|'terminal'`, `WorkflowState {id, name, category}` (+ optional `blocked?: boolean`, amendment 9), `WorkflowDef {id, version, name, initialStateId, states, transitions}`, `PublishedWorkflowDef`; `getWorkflowDefFromProjection(db, workflowId, version?): Promise<PublishedWorkflowDef | null>` over table `proj_workflows` (`definition` jsonb, PK `(workflow_id, version)`).
-- **Plan 3:** `TicketState` (coordination §4 merged shape: id, workspaceId, projectId, typeId, parentId, workflowId, stateId, stateCategory, assigneeId, collaboratorIds, fields with per-field `FieldClaim {value, actorId, clientTime, serverTime}`, plus the transition log); table `proj_tickets` (columns `ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, state_id, state_category, assignee_id, collaborator_ids jsonb, fields jsonb`); `proj_rollups`/`getRollup`; ticket event vocabulary (`ticket.created {typeId, projectId, parentId, title}`, `ticket.transitioned {toStateId, comment?, evidenceAttachmentId?, cause?}`, `ticket.assigned {assigneeId}`, `ticket.field_set {fieldId, value}`, `comment.added {body}`, …); `dueDateValueSchema` (`{date: 'YYYY-MM-DD', note?}`); `GET /v1/tickets/:id/history` (owned there, not here).
-- **Plan 4:** `type Queryable = Pool | PoolClient`; `makeRequireSession(auth)` (preHandler; 401s without a session; sets `request.currentUserId`), `registerAuthRoutes`, `createAuth`, `signInWithPhone(app, sender, phone)` test helper; `resolveEffectiveRole(db, userId, workspaceId): Promise<EffectiveRole>` with `EffectiveRole {workspaceRole: WorkspaceRole | null, projects: Map<string, {projectAdmin: boolean}>}`; `canSee(db, userId, ticketId): Promise<boolean>`; `visibleEventsFor(db, userId, workspaceId, afterSeq): AsyncIterable<SyncItem>` with `SyncItem = EventEnvelope | PurgeInstruction {kind:'purge', entityId}` (discriminate with `'kind' in item`); `rollupFor(db, viewerId, ticketId): Promise<RollupView | null>` with `RollupView {total, open, active, terminal, restrictedCount}`; table `proj_visibility` (columns `ticket_id, workspace_id, project_id, parent_id, own_mode, own_user_ids, resolved_mode, resolved_user_ids, resolved_from`); table `proj_memberships`; `membershipId(workspaceId, userId)` (coordination decision 5); test helpers `migrateTestDb()`, `testPool()`, `truncateAll(pool)`.
+- **Plan 3:** `TicketState` (coordination §4 merged shape: id, workspaceId, projectId, typeId, parentId, workflowId, stateId, stateCategory, assigneeId, collaboratorIds, fields with per-field `FieldClaim {value, actorId, clientTime, serverTime}`, plus the transition log); table `proj_tickets` (columns `ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, state_id, state_category, assignee_id, collaborator_ids jsonb, fields jsonb`); `proj_rollups`/`getRollup`; ticket event vocabulary (`ticket.created {typeId, projectId, parentId, title}`, `ticket.transitioned {toStateId, comment?, evidenceAttachmentId?, cause?}`, `ticket.assigned {assigneeId}`, `ticket.field_set {fieldId, value}`, `comment.added {body}`, …); `dueDateValueSchema` (`{date: 'YYYY-MM-DD', note?}` — the one day-claim shape, shared by the `dueDate` and `startDate` built-ins); `GET /v1/tickets/:id/history` (owned there, not here).
+- **Plan 4:** `type Queryable = Pool | PoolClient`; `makeRequireSession(auth)` (preHandler; 401s without a session; sets `request.currentUserId`), `registerAuthRoutes`, `createAuth`, `signInWithPhone(app, sender, phone)` test helper; `resolveEffectiveRole(db, userId, workspaceId): Promise<EffectiveRole>` with `EffectiveRole {workspaceRole: WorkspaceRole | null, projects: Map<string, {projectAdmin: boolean}>}`; `canSee(db, userId, ticketId): Promise<boolean>`; `visibleEventsFor(db, userId, workspaceId, afterSeq): AsyncIterable<SyncItem>` with `SyncItem = LedgerEvent | PurgeInstruction {kind:'purge', entityId}` (discriminate with `'kind' in item`) — `afterSeq` is the per-workspace `workspace_seq` cursor and every yielded event carries its `workspaceSeq` (coordination §18); `rollupFor(db, viewerId, ticketId): Promise<RollupView | null>` with `RollupView {total, open, active, terminal, restrictedCount}`; table `proj_visibility` (columns `ticket_id, workspace_id, project_id, parent_id, own_mode, own_user_ids, resolved_mode, resolved_user_ids, resolved_from`); table `proj_memberships`; `membershipId(workspaceId, userId)` (coordination decision 5); test helpers `migrateTestDb()`, `testPool()`, `truncateAll(pool)`.
 
 ## Global Constraints
 
@@ -57,7 +57,8 @@ packages/domain/src/
 ├── doc-text.ts                    # NEW — docToPlainText, MentionNodeAttrs (amendment 12)
 ├── filter-spec.ts                 # NEW — FilterSpec + Grouping zod (cross-plan wire type)
 ├── read-models.ts                 # NEW — TicketCard, BoardResponse, ListResponse, SearchResponse,
-│                                  #        MyWorkResponse, AttentionItem/Response, StateProvenance
+│                                  #        MyWorkResponse, AttentionItem/Response, StateProvenance,
+│                                  #        builder reads: Workflow/TicketType/Member/StateOccupancy responses
 ├── preferences.ts                 # NEW — PreferencesDoc zod (amendment 14)
 ├── stream-frames.ts               # NEW — subscribe/event/purge/caught-up/error frames (amendment 13)
 ├── events/workspace-settings.ts   # NEW — workspace.settings_set v1 + defaults + WorkspaceSettings
@@ -78,6 +79,7 @@ apps/server/src/
 ├── preferences/store.ts           # NEW — get/put user_preferences rows
 ├── routes/board.ts                # NEW — GET /v1/projects/:projectId/board
 ├── routes/list.ts                 # NEW — GET /v1/projects/:projectId/tickets
+├── routes/builder-reads.ts        # NEW — workflows, ticket-types, members, state-occupancy
 ├── routes/search.ts               # NEW — GET /v1/search
 ├── routes/my-work.ts              # NEW — GET /v1/me/work
 ├── routes/attention.ts            # NEW — GET /v1/workspaces/:workspaceId/attention
@@ -884,7 +886,7 @@ git commit -m "workspace.settings_set v1: attention thresholds are attributed cl
   - Table `proj_workspace_settings` (`workspace_id` PK, `stale_days int NULL`, `due_soon_days int NULL`, `set_by`, `set_client_time`, `set_server_time`).
   - `workspaceSettingsProjection: Projection` (name `'proj_workspace_settings'`).
   - `getWorkspaceSettings(db: Queryable, workspaceId: string): Promise<WorkspaceSettings>` — defaults applied, last claim's provenance carried.
-  - Test helpers every later task uses: `makeCommitted(partial)` (full envelope with HONEST per-entity seqs — two entities each start at seq 1, exactly like the real ledger) and `applyCommitted(pool, envelopes)` (insert into the ledger + apply every registered projection, one transaction per event, exactly like ingest).
+  - Test helpers every later task uses: `makeCommitted(partial)` (full `LedgerEvent` with HONEST per-entity seqs — two entities each start at seq 1, exactly like the real ledger — plus the per-workspace `workspaceSeq` stream cursor Plan 1 assigns, coordination §18) and `applyCommitted(pool, envelopes)` (insert into the ledger + apply every registered projection, one transaction per event, exactly like ingest).
 
 - [ ] **Step 1: Write the shared apply helpers**
 
@@ -893,14 +895,16 @@ git commit -m "workspace.settings_set v1: attention thresholds are attributed cl
 ```ts
 import type { Pool } from 'pg';
 import { newUlid, type EventEnvelope } from '@gisik-nokma/domain';
-import { insertEvent } from '../../src/ledger/event-store.js';
+import { insertEvent, type LedgerEvent } from '../../src/ledger/event-store.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 
 const seqs = new Map<string, number>();
+const workspaceSeqs = new Map<string, number>();
 
 /** Reset between test suites when exact seq numbers matter. */
 export function resetEntitySeqs(): void {
   seqs.clear();
+  workspaceSeqs.clear();
 }
 
 /**
@@ -911,11 +915,20 @@ export function resetEntitySeqs(): void {
  */
 export function makeCommitted(
   partial: Pick<EventEnvelope, 'workspaceId' | 'entity' | 'type' | 'payload' | 'actorId'> &
-    Partial<EventEnvelope>,
-): EventEnvelope {
+    Partial<LedgerEvent>,
+): LedgerEvent {
   const key = `${partial.entity.kind}:${partial.entity.id}`;
   const seq = partial.seq ?? (seqs.get(key) ?? 0) + 1;
   seqs.set(key, Math.max(seq, seqs.get(key) ?? 0));
+  // The workspace stream cursor beside it (Plan 1, coordination §18): one
+  // counter per workspace, so the seeded ledger orders exactly as ingest
+  // would — and the per-entity seqs above stay honestly restarting at 1.
+  const workspaceSeq =
+    partial.workspaceSeq ?? (workspaceSeqs.get(partial.workspaceId) ?? 0) + 1;
+  workspaceSeqs.set(
+    partial.workspaceId,
+    Math.max(workspaceSeq, workspaceSeqs.get(partial.workspaceId) ?? 0),
+  );
   return {
     id: newUlid(),
     version: 1,
@@ -924,6 +937,7 @@ export function makeCommitted(
     serverTime: '2026-08-20T09:00:01.000Z',
     ...partial,
     seq,
+    workspaceSeq,
   };
 }
 
@@ -931,7 +945,7 @@ export function makeCommitted(
  * Seeds envelopes the way ingest would: into the ledger AND through every
  * registered projection, one transaction per event, registry order.
  */
-export async function applyCommitted(pool: Pool, envelopes: EventEnvelope[]): Promise<void> {
+export async function applyCommitted(pool: Pool, envelopes: LedgerEvent[]): Promise<void> {
   const registry = buildProjectionRegistry();
   const client = await pool.connect();
   try {
@@ -1206,7 +1220,8 @@ git commit -m "proj_workspace_settings: the attention thresholds as a rebuild-cl
 
 ```ts
 import type { Pool } from 'pg';
-import { membershipId, newUlid, type EventEnvelope } from '@gisik-nokma/domain';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { LedgerEvent } from '../../src/ledger/event-store.js';
 import { applyCommitted, makeCommitted } from './apply.js';
 
 /** The frozen "now" every read test computes against. */
@@ -1256,7 +1271,7 @@ export async function seedReadScenario(pool: Pool, users: ReadScenarioUsers): Pr
   const { owner, member, outsider, guest } = users;
   const ws = { workspaceId, actorId: owner };
 
-  const events: EventEnvelope[] = [
+  const events: LedgerEvent[] = [
     makeCommitted({ ...ws, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.created', payload: { name: 'Convenience Corner' } }),
     makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.created', payload: { name: 'Registrations' } }),
     makeCommitted({ ...ws, entity: { kind: 'membership', id: membershipId(workspaceId, owner) }, type: 'membership.granted', payload: { userId: owner, role: 'owner', scope: 'workspace' } }),
@@ -3056,6 +3071,459 @@ Expected: PASS (12 tests), the end-to-end injection planted defect included.
 ```bash
 git add apps/server/src/routes/list.ts apps/server/test/routes/list.test.ts apps/server/test/helpers/read-app.ts apps/server/src/app.ts
 git commit -m "List read API: composable filters, five groupings with children-by-parent-query pinned, keyset pages that group per page — and the hostile filter executed end-to-end proves the tables outlive the attacker"
+```
+
+---
+
+### Task 9b: Builder read surface — workflows, ticket types, members, and state occupancy
+
+Plan 8's workflow builder authors `workflow.defined` and `ticket-type.defined` claims, but it cannot author against definitions it cannot read: it needs the workflow roster to list, one definition to load onto the canvas, the ticket types bound to a workflow, the people a `require-different-user` rule can name, and — before a publish remaps states — how many tickets are actually sitting in each state today. Plan 8 flagged all five as missing from this plan's read surface (its "Read APIs this plan needs"); they land here, beside the other read routes, enforced the same way.
+
+**Files:**
+- Create: `apps/server/src/routes/builder-reads.ts`
+- Modify: `packages/domain/src/read-models.ts` (add the five response shapes)
+- Modify: the app assembly — add `registerBuilderReadRoutes(app, { pool, auth })`
+- Modify: `apps/server/test/helpers/read-app.ts` (register the routes in the test app)
+- Test: `apps/server/test/routes/builder-reads.test.ts`
+
+**Interfaces:**
+- Consumes: `makeRequireSession`/`Auth`/`signInWithPhone` (Plan 4), `requireMember` (Task 5), `latestWorkflowDefs` (Task 7), `getWorkflowDefFromProjection`/`PublishedWorkflowDef` and table `proj_workflows` (Plan 2), `TicketTypeDef` and table `proj_ticket_types` (Plan 3), table `proj_memberships` and better-auth's `"user"` table (Plan 4), `proj_tickets` (Plan 3), `Queryable` (Plan 4), scenario helpers (Task 5).
+- Produces (cross-plan API — Plan 8 consumes these through Plan 6's `DataSource.query`):
+  - `registerBuilderReadRoutes(app: FastifyInstance, deps: { pool: Pool; auth: Auth }): void` serving, all session-gated and all answering `404 {error:'not_found'}` when the caller is not a member of the workspace (an unknown workspace and a workspace you are not in are indistinguishable — this plan's reads never 403):
+    - `GET /v1/workspaces/:workspaceId/workflows` → `200 WorkflowListResponse` — the latest published definition of every workflow in the workspace, member-visible (guests included: they already receive definition events on the stream, and a guest's shared ticket cannot render its status without one).
+    - `GET /v1/workspaces/:workspaceId/workflows/:workflowId?version=` → `200 WorkflowResponse` | `400 {error:'invalid_version'}` | `404 {error:'not_found'}` — latest by default; `version` selects an exact published version (the builder loads an older one to compare before republishing). A version that was never published is a 404, not an empty body.
+    - `GET /v1/workspaces/:workspaceId/ticket-types` → `200 TicketTypeListResponse` — every type defined in the workspace, last definition wins (`proj_ticket_types` already holds only the winner).
+    - `GET /v1/workspaces/:workspaceId/members` → `200 MemberListResponse` — `{userId, displayName, role}` per member, `proj_memberships` joined to better-auth's `"user"` table for the display name. **Guests are excluded from the listing for non-admin callers**: a guest is a person invited to one shared ticket, not a member of the workspace's roster, and handing every member a directory of them leaks who else the workspace is talking to. Owners and admins — who manage people — see the full list.
+    - `GET /v1/workspaces/:workspaceId/workflows/:workflowId/state-occupancy` → `200 StateOccupancyResponse` — how many tickets currently sit in each state of that workflow, **owner/admin only**, because it powers Plan 8's publish mapping dialog ("14 tickets are in Waiting — where do they go?").
+  - Domain response shapes: `WorkflowListResponse {workspaceId; workflows: PublishedWorkflowDef[]}`, `WorkflowResponse {workspaceId; workflow: PublishedWorkflowDef}`, `TicketTypeListResponse {workspaceId; ticketTypes: TicketTypeDef[]}`, `WorkspaceMember {userId; displayName; role: WorkspaceRole}`, `MemberListResponse {workspaceId; members: WorkspaceMember[]}`, `StateOccupancyResponse {workspaceId; workflowId; counts: Record<string, number>}`.
+
+**Honesty decisions encoded here (each is a sentence someone would otherwise have to guess):**
+- **State occupancy counts every ticket, including ones the caller cannot see.** It is an operational number about the workflow, not a view of the work — the same "true counts" principle as Plan 4's rollups, which show a real total beside a named `restrictedCount`. There is no per-viewer variant to drift out of step: the endpoint is admin-only precisely because the honest number is the whole workspace's.
+- **Every state of the latest definition appears in `counts`, zeroes included**, and a `state_id` that no longer exists in the definition appears too (Open questions #8's straggler). A mapping dialog that silently omitted an empty state would invite an author to delete a state that turns out to hold work tomorrow, and one that hid a straggler would strand it.
+- **`displayName` is whatever better-auth's `"user"."name"` holds** — the vendor owns identity (Plan 4), and this route neither invents a fallback nor formats a phone number into a name.
+
+- [ ] **Step 1: Write the failing route test**
+
+`apps/server/test/routes/builder-reads.test.ts`:
+
+```ts
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { FastifyInstance } from 'fastify';
+import type { Pool } from 'pg';
+import { newUlid, type MemberListResponse, type StateOccupancyResponse, type TicketTypeListResponse, type WorkflowListResponse, type WorkflowResponse } from '@gisik-nokma/domain';
+import { migrateTestDb, testPool, truncateAll } from '../helpers/db.js';
+import { resetEntitySeqs } from '../helpers/apply.js';
+import { seedReadScenario, type ReadScenario } from '../helpers/read-scenario.js';
+import { buildReadTestApp, signInAs } from '../helpers/read-app.js';
+
+let pool: Pool;
+let app: FastifyInstance;
+let world: ReadScenario;
+let ownerToken: string;
+let memberToken: string;
+let guestToken: string;
+let strangerToken: string;
+
+beforeAll(async () => {
+  migrateTestDb();
+  pool = testPool();
+  app = await buildReadTestApp(pool);
+});
+afterAll(async () => {
+  await app.close();
+  await pool.end();
+});
+beforeEach(async () => {
+  await truncateAll(pool);
+  resetEntitySeqs();
+  const owner = await signInAs(app, '+911111111101');
+  const member = await signInAs(app, '+911111111102');
+  const outsider = await signInAs(app, '+911111111103');
+  const guest = await signInAs(app, '+911111111104');
+  const stranger = await signInAs(app, '+911111111105');
+  ownerToken = owner.token;
+  memberToken = member.token;
+  guestToken = guest.token;
+  strangerToken = stranger.token;
+  world = await seedReadScenario(pool, {
+    owner: owner.userId,
+    member: member.userId,
+    outsider: outsider.userId,
+    guest: guest.userId,
+  });
+});
+
+function get(token: string, path: string) {
+  return app.inject({
+    method: 'GET',
+    url: `/v1/workspaces/${world.workspaceId}${path}`,
+    headers: { authorization: `Bearer ${token}` },
+  });
+}
+
+describe('GET /v1/workspaces/:workspaceId/workflows', () => {
+  it('answers the latest definition of every workflow in the workspace', async () => {
+    const body = (await get(memberToken, '/workflows')).json() as WorkflowListResponse;
+    expect(body.workspaceId).toBe(world.workspaceId);
+    expect(body.workflows.map((def) => [def.id, def.version])).toEqual([[world.workflowId, 1]]);
+    expect(body.workflows[0].states.map((state) => state.id)).toEqual(['todo', 'doing', 'waiting', 'done']);
+    expect(body.workflows[0].initialStateId).toBe('todo');
+  });
+
+  it('reaches guests too — a shared ticket cannot render its status without its definition', async () => {
+    const body = (await get(guestToken, '/workflows')).json() as WorkflowListResponse;
+    expect(body.workflows.map((def) => def.id)).toEqual([world.workflowId]);
+  });
+
+  it('a non-member gets the same 404 as an unknown workspace, and no session is a 401', async () => {
+    expect((await get(strangerToken, '/workflows')).statusCode).toBe(404);
+    const unknown = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${newUlid()}/workflows`,
+      headers: { authorization: `Bearer ${memberToken}` },
+    });
+    expect(unknown.statusCode).toBe(404);
+    expect(unknown.json()).toEqual({ error: 'not_found' });
+    const anonymous = await app.inject({ method: 'GET', url: `/v1/workspaces/${world.workspaceId}/workflows` });
+    expect(anonymous.statusCode).toBe(401);
+  });
+});
+
+describe('GET /v1/workspaces/:workspaceId/workflows/:workflowId', () => {
+  it('answers the latest version by default and an exact version on request', async () => {
+    const latest = (await get(memberToken, `/workflows/${world.workflowId}`)).json() as WorkflowResponse;
+    expect(latest.workflow.version).toBe(1);
+    const pinned = (await get(memberToken, `/workflows/${world.workflowId}?version=1`)).json() as WorkflowResponse;
+    expect(pinned.workflow).toEqual(latest.workflow);
+  });
+
+  it('refuses a malformed version and 404s a version that was never published', async () => {
+    const malformed = await get(memberToken, `/workflows/${world.workflowId}?version=one`);
+    expect(malformed.statusCode).toBe(400);
+    expect(malformed.json()).toEqual({ error: 'invalid_version' });
+    expect((await get(memberToken, `/workflows/${world.workflowId}?version=0`)).statusCode).toBe(400);
+    expect((await get(memberToken, `/workflows/${world.workflowId}?version=7`)).statusCode).toBe(404);
+    expect((await get(memberToken, '/workflows/wf-ghost')).statusCode).toBe(404);
+  });
+});
+
+describe('GET /v1/workspaces/:workspaceId/ticket-types', () => {
+  it('answers every type defined in the workspace', async () => {
+    const body = (await get(memberToken, '/ticket-types')).json() as TicketTypeListResponse;
+    expect(body.ticketTypes.map((type) => [type.id, type.rank, type.workflowId])).toEqual([
+      ['epic', 1, world.workflowId],
+      ['task', 3, world.workflowId],
+    ]);
+    expect(body.ticketTypes[0].name).toBe('Epic');
+  });
+});
+
+describe('GET /v1/workspaces/:workspaceId/members', () => {
+  it('answers userId, displayName and role for the workspace roster', async () => {
+    const body = (await get(ownerToken, '/members')).json() as MemberListResponse;
+    const byUser = Object.fromEntries(body.members.map((m) => [m.userId, m.role]));
+    expect(byUser[world.owner]).toBe('owner');
+    expect(byUser[world.member]).toBe('member');
+    expect(byUser[world.outsider]).toBe('member');
+    // better-auth owns what a fresh phone sign-up puts in "name"; the contract
+    // here is that the column travels as displayName, not what it contains.
+    expect(body.members.every((m) => typeof m.displayName === 'string')).toBe(true);
+  });
+
+  it('PLANTED DEFECT: a plain member never sees the guest — not the row, not the id', async () => {
+    const asMember = await get(memberToken, '/members');
+    expect(asMember.body).not.toContain(world.guest);
+    expect((asMember.json() as MemberListResponse).members.map((m) => m.role)).not.toContain('guest');
+
+    const asOwner = await get(ownerToken, '/members');
+    expect(asOwner.body).toContain(world.guest);
+    expect((asOwner.json() as MemberListResponse).members.find((m) => m.userId === world.guest)?.role).toBe('guest');
+  });
+
+  it('a guest asking for the roster gets the non-guest members and never their own kind', async () => {
+    const body = (await get(guestToken, '/members')).json() as MemberListResponse;
+    expect(body.members.map((m) => m.role)).not.toContain('guest');
+  });
+});
+
+describe('GET /v1/workspaces/:workspaceId/workflows/:workflowId/state-occupancy', () => {
+  it('counts the tickets sitting in each state, zeroes included', async () => {
+    const body = (
+      await get(ownerToken, `/workflows/${world.workflowId}/state-occupancy`)
+    ).json() as StateOccupancyResponse;
+    expect(body.workflowId).toBe(world.workflowId);
+    // epic + hidden + guest-shared sit in todo; the GST task moved to doing;
+    // the trade licence waits. Done is empty and says so.
+    expect(body.counts).toEqual({ todo: 3, doing: 1, waiting: 1, done: 0 });
+  });
+
+  it('PLANTED DEFECT: the count is the workspace truth, and only admins may have it', async () => {
+    // The hidden ticket the member cannot see is INSIDE the owner's todo count —
+    // an occupancy that quietly dropped it would send a publish mapping into
+    // production believing three tickets were two.
+    const owner = (
+      await get(ownerToken, `/workflows/${world.workflowId}/state-occupancy`)
+    ).json() as StateOccupancyResponse;
+    expect(owner.counts.todo).toBe(3);
+
+    expect((await get(memberToken, `/workflows/${world.workflowId}/state-occupancy`)).statusCode).toBe(404);
+    expect((await get(guestToken, `/workflows/${world.workflowId}/state-occupancy`)).statusCode).toBe(404);
+    expect((await get(strangerToken, `/workflows/${world.workflowId}/state-occupancy`)).statusCode).toBe(404);
+    expect((await get(ownerToken, '/workflows/wf-ghost/state-occupancy')).statusCode).toBe(404);
+  });
+});
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `pnpm --filter @gisik-nokma/server exec vitest run test/routes/builder-reads.test.ts`
+Expected: FAIL — `registerBuilderReadRoutes` does not exist. Add `registerBuilderReadRoutes(app, { pool, auth: authInstance });` to `buildReadTestApp` now, mirroring Task 8's line.
+
+- [ ] **Step 3: Add the response shapes to the domain read models**
+
+Append to `packages/domain/src/read-models.ts`:
+
+```ts
+import type { PublishedWorkflowDef, WorkspaceRole } from './index.js';
+import type { TicketTypeDef } from './ticket-types.js';
+
+/** The builder's read surface (Plan 8 consumes these through DataSource.query). */
+export type WorkflowListResponse = { workspaceId: string; workflows: PublishedWorkflowDef[] };
+
+export type WorkflowResponse = { workspaceId: string; workflow: PublishedWorkflowDef };
+
+export type TicketTypeListResponse = { workspaceId: string; ticketTypes: TicketTypeDef[] };
+
+export type WorkspaceMember = { userId: string; displayName: string; role: WorkspaceRole };
+
+export type MemberListResponse = { workspaceId: string; members: WorkspaceMember[] };
+
+/**
+ * Tickets currently sitting in each state of one workflow. Counts cover the
+ * whole workspace, not the caller's view — the route is admin-only for exactly
+ * that reason. Every state of the latest definition appears, zeroes included,
+ * and so does any state id still occupied but no longer defined.
+ */
+export type StateOccupancyResponse = {
+  workspaceId: string;
+  workflowId: string;
+  counts: Record<string, number>;
+};
+```
+
+(Import `PublishedWorkflowDef` and `WorkspaceRole` from wherever Plans 2 and 4 export them — the names are contract, the module paths are not.)
+
+- [ ] **Step 4: Implement the routes**
+
+`apps/server/src/routes/builder-reads.ts`:
+
+```ts
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { Pool } from 'pg';
+import { z } from 'zod';
+import type {
+  MemberListResponse,
+  PublishedWorkflowDef,
+  StateOccupancyResponse,
+  TicketTypeDef,
+  TicketTypeListResponse,
+  WorkflowListResponse,
+  WorkflowResponse,
+  WorkspaceMember,
+} from '@gisik-nokma/domain';
+import type { Auth } from '../auth/auth.js';
+import { makeRequireSession } from '../auth/routes.js';
+import type { Queryable } from '../db/queryable.js';
+import type { EffectiveRole } from '../permissions/effective-role.js';
+import { getWorkflowDefFromProjection } from '../projections/workflows.js';
+import { requireMember } from '../read/membership.js';
+import { latestWorkflowDefs } from '../read/workflow-defs.js';
+
+/** A published version is a positive integer; anything else is a bad request. */
+const versionSchema = z.coerce.number().int().positive();
+
+function sessionUserId(request: FastifyRequest): string {
+  return (request as FastifyRequest & { currentUserId: string }).currentUserId;
+}
+
+function isWorkspaceAdmin(eff: EffectiveRole): boolean {
+  return eff.workspaceRole === 'owner' || eff.workspaceRole === 'admin';
+}
+
+/** Every workflow id defined in this workspace, in a stable order. */
+async function workflowIdsOf(db: Queryable, workspaceId: string): Promise<string[]> {
+  const { rows } = await db.query(
+    'SELECT DISTINCT workflow_id FROM proj_workflows WHERE workspace_id = $1 ORDER BY workflow_id',
+    [workspaceId],
+  );
+  return (rows as Array<{ workflow_id: string }>).map((row) => row.workflow_id);
+}
+
+export async function readTicketTypes(db: Queryable, workspaceId: string): Promise<TicketTypeDef[]> {
+  const { rows } = await db.query(
+    `SELECT type_id, name, icon, rank, workflow_id, fields
+     FROM proj_ticket_types WHERE workspace_id = $1 ORDER BY rank, type_id`,
+    [workspaceId],
+  );
+  return (rows as Array<{
+    type_id: string; name: string; icon: string; rank: number; workflow_id: string; fields: TicketTypeDef['fields'];
+  }>).map((row) => ({
+    id: row.type_id,
+    name: row.name,
+    icon: row.icon,
+    rank: row.rank,
+    workflowId: row.workflow_id,
+    fields: row.fields,
+  }));
+}
+
+/**
+ * One role per person: the workspace-scope grant when there is one, otherwise
+ * the project-scope grant that attached them (how guests arrive — coordination
+ * decision 5). Guests are withheld from non-admin callers: a guest is a person
+ * invited to one shared ticket, and the roster is not a directory of them.
+ */
+export async function readMembers(
+  db: Queryable,
+  workspaceId: string,
+  includeGuests: boolean,
+): Promise<WorkspaceMember[]> {
+  const { rows } = await db.query(
+    `WITH roles AS (
+       SELECT DISTINCT ON (m.user_id) m.user_id, m.role
+       FROM proj_memberships m
+       WHERE m.workspace_id = $1
+       ORDER BY m.user_id, (m.scope_kind = 'workspace') DESC, m.project_id
+     )
+     SELECT r.user_id, u."name" AS display_name, r.role
+     FROM roles r
+     JOIN "user" u ON u."id" = r.user_id
+     WHERE $2::boolean OR r.role <> 'guest'
+     ORDER BY r.user_id`,
+    [workspaceId, includeGuests],
+  );
+  return (rows as Array<{ user_id: string; display_name: string; role: WorkspaceMember['role'] }>).map((row) => ({
+    userId: row.user_id,
+    displayName: row.display_name,
+    role: row.role,
+  }));
+}
+
+/**
+ * Occupancy of one workflow's states. Seeded from the definition so empty
+ * states report 0 rather than vanishing, then filled from proj_tickets — a
+ * ticket parked in a state the definition no longer names still shows up,
+ * because stranding it silently is how a publish loses work.
+ */
+export async function readStateOccupancy(
+  db: Queryable,
+  workspaceId: string,
+  def: PublishedWorkflowDef,
+): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  for (const state of def.states) {
+    counts[state.id] = 0;
+  }
+  const { rows } = await db.query(
+    `SELECT state_id, count(*)::int AS occupants
+     FROM proj_tickets WHERE workspace_id = $1 AND workflow_id = $2
+     GROUP BY state_id`,
+    [workspaceId, def.id],
+  );
+  for (const row of rows as Array<{ state_id: string; occupants: number }>) {
+    counts[row.state_id] = row.occupants;
+  }
+  return counts;
+}
+
+export function registerBuilderReadRoutes(app: FastifyInstance, deps: { pool: Pool; auth: Auth }): void {
+  const requireSession = makeRequireSession(deps.auth);
+
+  /** Member-or-404: an unknown workspace and one you are not in read alike. */
+  async function memberOr404(request: FastifyRequest, workspaceId: string): Promise<EffectiveRole | null> {
+    return requireMember(deps.pool, sessionUserId(request), workspaceId);
+  }
+
+  app.get('/v1/workspaces/:workspaceId/workflows', { preHandler: requireSession }, async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const eff = await memberOr404(request, workspaceId);
+    if (eff === null) return reply.status(404).send({ error: 'not_found' });
+    const defs = await latestWorkflowDefs(deps.pool, await workflowIdsOf(deps.pool, workspaceId));
+    const body: WorkflowListResponse = { workspaceId, workflows: [...defs.values()] };
+    return body;
+  });
+
+  app.get('/v1/workspaces/:workspaceId/workflows/:workflowId', { preHandler: requireSession }, async (request, reply) => {
+    const { workspaceId, workflowId } = request.params as { workspaceId: string; workflowId: string };
+    const raw = request.query as { version?: string };
+    let version: number | undefined;
+    if (raw.version !== undefined) {
+      const parsed = versionSchema.safeParse(raw.version);
+      if (!parsed.success) return reply.status(400).send({ error: 'invalid_version' });
+      version = parsed.data;
+    }
+    const eff = await memberOr404(request, workspaceId);
+    if (eff === null) return reply.status(404).send({ error: 'not_found' });
+    const workflow = await getWorkflowDefFromProjection(deps.pool, workflowId, version);
+    if (workflow === null) return reply.status(404).send({ error: 'not_found' });
+    const body: WorkflowResponse = { workspaceId, workflow };
+    return body;
+  });
+
+  app.get('/v1/workspaces/:workspaceId/ticket-types', { preHandler: requireSession }, async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const eff = await memberOr404(request, workspaceId);
+    if (eff === null) return reply.status(404).send({ error: 'not_found' });
+    const body: TicketTypeListResponse = {
+      workspaceId,
+      ticketTypes: await readTicketTypes(deps.pool, workspaceId),
+    };
+    return body;
+  });
+
+  app.get('/v1/workspaces/:workspaceId/members', { preHandler: requireSession }, async (request, reply) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    const eff = await memberOr404(request, workspaceId);
+    if (eff === null) return reply.status(404).send({ error: 'not_found' });
+    const body: MemberListResponse = {
+      workspaceId,
+      members: await readMembers(deps.pool, workspaceId, isWorkspaceAdmin(eff)),
+    };
+    return body;
+  });
+
+  app.get(
+    '/v1/workspaces/:workspaceId/workflows/:workflowId/state-occupancy',
+    { preHandler: requireSession },
+    async (request, reply) => {
+      const { workspaceId, workflowId } = request.params as { workspaceId: string; workflowId: string };
+      const eff = await memberOr404(request, workspaceId);
+      // Not an admin reads exactly like not a member: this endpoint's number
+      // is the whole workspace's, so nobody learns it exists by being refused.
+      if (eff === null || !isWorkspaceAdmin(eff)) return reply.status(404).send({ error: 'not_found' });
+      const def = await getWorkflowDefFromProjection(deps.pool, workflowId);
+      if (def === null) return reply.status(404).send({ error: 'not_found' });
+      const body: StateOccupancyResponse = {
+        workspaceId,
+        workflowId,
+        counts: await readStateOccupancy(deps.pool, workspaceId, def),
+      };
+      return body;
+    },
+  );
+}
+```
+
+- [ ] **Step 5: Run the test to verify it passes**
+
+Run: `pnpm --filter @gisik-nokma/server exec vitest run test/routes/builder-reads.test.ts`
+Expected: PASS (11 tests), including both planted defects — the guest who never appears in a plain member's roster, and the occupancy count that keeps the invisible ticket while refusing the non-admin outright.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add packages/domain/src/read-models.ts apps/server/src/routes/builder-reads.ts apps/server/test/routes/builder-reads.test.ts apps/server/test/helpers/read-app.ts apps/server/src/app.ts
+git commit -m "The builder can finally read what it authors: workflow roster and one definition by version, the ticket types bound to them, the roster of people a rule may name — with guests withheld from everyone but the admins who manage them — and the admin-only state occupancy that tells a publish mapping how much live work it is about to move"
 ```
 
 ---
@@ -5291,6 +5759,7 @@ git commit -m "WS /v1/stream: session at upgrade, membership per subscribe, hear
 
 - ✅ **Board read API** — `GET /v1/projects/:id/board`: columns are exactly the attached workflows' states (mixed workflows side by side, each ticket under its own workflow's state), per-column `{stateId, name, category, blocked}`; cards carry the TicketState summary, the provenance of the current state (actor, both clocks, reopen cause), and the viewer-honest parent rollup `{totalChildren, terminalChildren, restrictedCount}`. `apps/server/src/routes/board.ts`
 - ✅ **List read API** — `GET /v1/projects/:id/tickets`: composable FilterSpec, five groupings (epic / status / assignee / type / flat), keyset pagination by ticket id, hierarchy by parent query (`parentId=<id>` for children, `parentId=root` for roots). Grouping arranges truth; it never changes what matches. `apps/server/src/routes/list.ts`
+- ✅ **Builder read surface** — `GET /v1/workspaces/:id/workflows` (latest definition per workflow), `…/workflows/:workflowId?version=` (one definition, latest by default), `…/ticket-types`, `…/members` (`{userId, displayName, role}`, guests withheld from non-admin callers), and admin-only `…/workflows/:workflowId/state-occupancy` (live ticket counts per state, zeroes and undefined-state stragglers included) — the reads Plan 8's workflow builder authors against. `apps/server/src/routes/builder-reads.ts`
 - ✅ **Full-text search** — `GET /v1/search`: ranked cross-project search over titles, descriptions, and comments, visibility-filtered at read time, snippets with the match marked; composable with FilterSpec (`q` owns the text term). `apps/server/src/routes/search.ts`
 - ✅ **My Work** — `GET /v1/me/work`: assigned-to-me across a workspace's projects, grouped by state category; Plan 10's contested-claims extension point documented in the shape. `apps/server/src/routes/my-work.ts`
 - ✅ **Attention strip API** — `GET /v1/workspaces/:id/attention`: blocked-flagged states, active-state staleness, and due-window claims — computed at read time from claims plus the clock, never stored; every item carries its reason and the claim's provenance; thresholds come from `workspace.settings_set` claims. `apps/server/src/routes/attention.ts`
@@ -5347,6 +5816,11 @@ Mirrors `Features.md` §7. Status: `❌` not covered · `✅` covered · `🟡` 
 - 7.33 ✅ Stream integration: visibility-filtered catch-up → caught-up{seq = max yielded} → live tail; planted invisible-ticket silence proven live; purge frames follow mid-stream revocation with the revoking event unleaked; non-member subscribe gets an error frame and zero events; no session refused at upgrade; bad frames answered without closing; heartbeat terminates silent peers. (`stream-route.test.ts`)
 - 7.34 ✅ Pinned series defect (`it.fails`): a new entity born after the cursor is LOST on resume because per-entity seq cannot serve as a workspace cursor — turns red, and flips to `it`, when the workspace-cursor amendment lands. (`stream-route.test.ts`; Open questions #1)
 - 7.35 🚫 Load/soak of the stream under thousands of subscribers — an operational concern for Plan 11's deployment work, not a correctness case here.
+- 7.36 ✅ Workflow roster: latest definition per workflow with states and `initialStateId`; guests receive definitions too; non-members and unknown workspaces answer the same 404, no session is 401. (`builder-reads.test.ts`)
+- 7.37 ✅ One workflow by id: latest by default, exact `?version=` on request; malformed or non-positive versions are a generic 400, an unpublished version and an unknown workflow are 404. (`builder-reads.test.ts`)
+- 7.38 ✅ Ticket types read back from `proj_ticket_types` with name, rank and workflow binding, last definition winning. (`builder-reads.test.ts`)
+- 7.39 ✅ Planted defect: the workspace roster withholds guests from a plain member and from a guest — the guest's id appears nowhere in the body — while owners and admins see them with role `guest`. (`builder-reads.test.ts`)
+- 7.40 ✅ Planted defect: state occupancy counts every ticket in the workflow's states including one the caller could never see, reports empty states as 0, and answers 404 to members, guests and strangers alike — the number is the workspace's, so only admins hold it. (`builder-reads.test.ts`)
 ````
 
 - [ ] **Step 3: Run the full suite one last time**
@@ -5358,7 +5832,7 @@ Expected: PASS across packages/domain, packages/rule-engine, apps/server; typech
 
 ```bash
 git add Features.md test-cases/07-api-realtime-search.md
-git commit -m "Catalogue the read surface, realtime stream and search in Features.md §7 and thirty-five test cases in the same change set as the work — including the pinned series defect that documents what the stream cannot yet promise about resume"
+git commit -m "Catalogue the read surface, realtime stream and search in Features.md §7 and forty test cases in the same change set as the work — including the pinned series defect that documents what the stream cannot yet promise about resume"
 ```
 
 ---
@@ -5367,7 +5841,7 @@ git commit -m "Catalogue the read surface, realtime stream and search in Feature
 
 Flagged rather than silently resolved. Only #1 is blocking-grade; each names the assumption the plan proceeds on.
 
-1. **Per-entity seq cannot serve as a workspace stream cursor (BLOCKING for stream resume correctness).** Plan 1 pins `seq` as per-entity (`UNIQUE (entity_kind, entity_id, seq)`, `nextSeq` per entity), while Plan 4's `visibleEventsFor` reads `WHERE workspace_id = $1 AND seq > $2 ORDER BY seq` — treating `seq` as workspace-orderable. With two entities both carrying seqs 1..n, any resume with `afterSeq > 0` silently skips newer entities' early events; amendment 13's `afterSeq`/`caught-up` inherit the defect. This plan (a) keeps its stream layer cursor-opaque (cursor = max yielded envelope seq — unchanged whatever ordering lands), (b) pins the defect as an executable `it.fails` test (case 7.34) that turns red the day it is fixed, and (c) recommends the coordination-level fix: a `workspace_seq bigint` assigned inside the ingest transaction under a per-workspace advisory lock (alongside Plan 1's per-entity lock), with `visibleEventsFor` filtering and ordering by it. Do NOT paper over it with a max-seq pre-read — out-of-order commits would still skip events. Corollary fixed by the same amendment: purge instructions carry no seq, so a purge-only drain cannot advance the cursor and re-emits purges on the next drain (idempotent, but wasteful).
+1. **Per-entity seq cannot serve as a workspace stream cursor (BLOCKING for stream resume correctness).** Plan 1 pins `seq` as per-entity (`UNIQUE (entity_kind, entity_id, seq)`, `nextSeq` per entity), while Plan 4's `visibleEventsFor` reads `WHERE workspace_id = $1 AND seq > $2 ORDER BY seq` — treating `seq` as workspace-orderable. With two entities both carrying seqs 1..n, any resume with `afterSeq > 0` silently skips newer entities' early events; amendment 13's `afterSeq`/`caught-up` inherit the defect. This plan (a) keeps its stream layer cursor-opaque (cursor = max yielded envelope seq — unchanged whatever ordering lands), (b) pins the defect as an executable `it.fails` test (case 7.34) that turns red the day it is fixed, and (c) recommends the coordination-level fix: a `workspace_seq bigint` assigned inside the ingest transaction under a per-workspace advisory lock (alongside Plan 1's per-entity lock), with `visibleEventsFor` filtering and ordering by it. Do NOT paper over it with a max-seq pre-read — out-of-order commits would still skip events. Corollary fixed by the same amendment: purge instructions carry no seq, so a purge-only drain cannot advance the cursor and re-emits purges on the next drain (idempotent, but wasteful). **Since written, the coordination-level fix has landed** — Plan 1 ships `workspace_seq` with its per-workspace advisory lock and Plan 4's `visibleEventsFor` filters and orders by it — so this plan's stream layer needs no change (its cursor was always the max yielded value) and case 7.34's `it.fails` pin flips to `it` at execution, exactly as designed.
 2. **Purge/caught-up/error frames gained `workspaceId`.** Amendment 13 lists `{type:'purge', entityId}` and `{type:'caught-up', seq}`, and in the same sentence mandates per-connection multi-workspace subscriptions — without a workspace discriminator those frames are ambiguous on a multiplexed socket. Added additively; the event frame is untouched (the envelope already carries `workspaceId`). Confirm at review.
 3. **Route prefix split.** This plan's routes live under `/v1/...` per its assignment; Plan 4 mounted auth under `/api/auth/*` and its ticket reads under `/api/workspaces/...`, and Plan 3's history sits at `/v1/tickets/:id/history`. One prefix should win at integration — mechanical either way; flagged for the coordination doc.
 4. **Settings payload carries `dueSoonDays` alongside `staleDays`.** The assignment names `{staleDays}` but also demands a workspace-configurable due window; one event with optional keys covers both. Defaults 7/7 need owner sign-off (`DEFAULT_STALE_DAYS`, `DEFAULT_DUE_SOON_DAYS`).

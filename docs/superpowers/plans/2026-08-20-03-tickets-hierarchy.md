@@ -82,7 +82,7 @@ Three templated reasons (the interpolated results are what tests assert):
 
 - `hierarchy.rank` → `"${childTypeName}" cannot go under "${parentTypeName}": a ticket's parent must be a bigger kind of work.` — e.g. `"Epic" cannot go under "Story": a ticket's parent must be a bigger kind of work.`
 - `hierarchy.parent-terminal` (owner decision 2026-08-20, coordination doc) → on `ticket.created`: `"${parentTitle}" is finished (${stateName}). Adding live work reopens it — choose a state to reopen it to, then add this ticket.` · on `ticket.reparented`: `"${parentTitle}" is finished (${stateName}). Moving live work under it reopens it — choose a state to reopen it to, then move this ticket.` — e.g. `"Quarterly filings" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.`
-- `field.type-mismatch` → `"${fieldName}" needs ${needsPhrase}.` with `needsPhrase` per field kind: text → `text`; number → `a number`; date → `a date in YYYY-MM-DD form`; select → `one of: ${options.join(', ')}`; person → `a person`; description built-in → `a document`; due-date built-in → `a day in YYYY-MM-DD form (a note is optional)`. E.g. `"Invoice amount" needs a number.`
+- `field.type-mismatch` → `"${fieldName}" needs ${needsPhrase}.` with `needsPhrase` per field kind: text → `text`; number → `a number`; date → `a date in YYYY-MM-DD form`; select → `one of: ${options.join(', ')}`; person → `a person`; description built-in → `a document`; the two day-claim built-ins `dueDate`/`startDate` → `a day in YYYY-MM-DD form (a note is optional)` (named `"Due date"` and `"Start date"` respectively). E.g. `"Invoice amount" needs a number.`
 
 Precondition refusals (`ticket.unknown-type`, `ticket.unknown`, `ticket.workflow-undefined`, `hierarchy.unknown-parent`) are forced by the checks themselves: rank needs both type defs, cycle needs the ticket to exist, and spec §3's "the ledger accepts only what it can later replay" means a `ticket.created` whose workflow cannot resolve must be refused at the door — otherwise the accepted event is unprojectable.
 
@@ -90,7 +90,7 @@ Precondition refusals (`ticket.unknown-type`, `ticket.unknown`, `ticket.workflow
 
 1. **Built-in types are seed data, not special cases.** `epic(1)/story(2)/task(3)/sub-task(4)` ship as canonical constants in packages/domain, but every workspace materialises them as ordinary `ticket-type.defined` events at workspace creation (owned by the workspace-bootstrap plan) — because built-ins need a per-workspace workflow binding anyway. Resolution is therefore uniform: every type lookup reads event-defined types; nothing special-cases built-ins except the `sub-task` parent rule, which keys off the well-known id `sub-task`.
 2. **A ticket's workflow is bound at creation** (`TicketState.workflowId` copied from its type's `workflowId` when the `ticket.created` event applies). Workflow *version* changes apply to all tickets (lookups resolve latest); re-binding a *type* to a different workflow affects new tickets only (Open questions #8).
-3. **`ticket.field_set` with `value: null` clears the field — as a claim, provenance retained.** The single exception is `title`: a ticket always has a title (`field.title-required`). Clearing `description`, `dueDate`, or any custom field is legal; an undated item then simply vanishes from the calendar (invariant 4).
+3. **`ticket.field_set` with `value: null` clears the field — as a claim, provenance retained.** The single exception is `title`: a ticket always has a title (`field.title-required`). Clearing `description`, `dueDate`, `startDate`, or any custom field is legal; an undated item then simply vanishes from the calendar (invariant 4).
 4. **Collaborators:** a duplicate `ticket.collaborator_added` deduplicates (state unchanged); removing a non-collaborator is a no-op. Both are accepted events — the claim is honest even when redundant.
 5. **Rollups count DIRECT children only.** The spec's "open children" (invariant 3) means **direct non-terminal children** — categories `open` + `active`, i.e. `total_children - terminal_children`. Direct-only checking is sufficient by induction: the invariant holds at every level, so a terminal parent's terminal children already had no open children of their own when they went terminal. Derived progress is never authored — `proj_rollups` is computed, and nothing writes it but the projection.
 6. **The cycle check is load-bearing, not redundant.** With strict rank ordering a cycle looks impossible — but `ticket-type.defined` can re-define a type's rank (types are events; last definition wins), after which a rank-legal reparent can close a loop. The planted defect for `hierarchy.cycle` uses exactly that construction.
@@ -146,8 +146,8 @@ Precondition refusals (`ticket.unknown-type`, `ticket.unknown`, `ticket.workflow
   - `customFieldDefSchema`, `ticketTypeDefSchema` (Zod schemas for the above)
   - `BUILTIN_TICKET_TYPE_SEEDS: ReadonlyArray<{ id: string; name: string; icon: string; rank: number }>` — epic(1), story(2), task(3), sub-task(4)
   - `builtinTicketTypeDefs(defaultWorkflowId: string): TicketTypeDef[]`
-  - `SUB_TASK_TYPE_ID = 'sub-task'`, `BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate'] as const`
-  - `dueDateValueSchema` — `{ date: 'YYYY-MM-DD', note?: string }`
+  - `SUB_TASK_TYPE_ID = 'sub-task'`, `BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate'] as const`
+  - `dueDateValueSchema` — `{ date: 'YYYY-MM-DD', note?: string }` — the one day-claim shape, shared by `dueDate` and `startDate` (Plan 9's calendar reads the due claim and its timeline draws a bar only when a ticket carries both).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -228,7 +228,7 @@ describe('built-in seeds', () => {
       ['sub-task', 4],
     ]);
     expect(SUB_TASK_TYPE_ID).toBe('sub-task');
-    expect(BUILTIN_FIELD_IDS).toEqual(['title', 'description', 'dueDate']);
+    expect(BUILTIN_FIELD_IDS).toEqual(['title', 'description', 'dueDate', 'startDate']);
   });
 
   it('materialises full defs bound to a workspace default workflow', () => {
@@ -271,7 +271,7 @@ import { z } from 'zod';
 export const CUSTOM_FIELD_KINDS = ['text', 'number', 'date', 'select', 'person'] as const;
 export type CustomFieldKind = (typeof CUSTOM_FIELD_KINDS)[number];
 
-export const BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate'] as const;
+export const BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate'] as const;
 export type BuiltinFieldId = (typeof BUILTIN_FIELD_IDS)[number];
 
 export const customFieldDefSchema = z
@@ -340,7 +340,11 @@ export function builtinTicketTypeDefs(defaultWorkflowId: string): TicketTypeDef[
   }));
 }
 
-/** A due date is always a claim: { date, note? }, rendered with its author. */
+/**
+ * A day claim: { date, note? }, rendered with its author. Both day-shaped
+ * built-ins use it — `dueDate` and `startDate` have identical value shapes, so
+ * they share one schema rather than growing a second copy to drift from.
+ */
 export const dueDateValueSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a due date is a day in YYYY-MM-DD form'),
   note: z.string().optional(),
@@ -527,7 +531,7 @@ export const ticketCollaboratorPayload = z.object({ userId: z.string().min(1) })
 /**
  * Shape-only at the door: {fieldId, value}. Semantics (does the field exist,
  * does the value fit its kind) are the engine's job — see checkTicketFieldSet.
- * value: null is the clearing claim; built-ins title/description/dueDate ride
+ * value: null is the clearing claim; built-ins title/description/dueDate/startDate ride
  * this same event, and a due date value is always { date, note? } — a claim.
  */
 export const ticketFieldSetPayload = z.object({ fieldId: z.string().min(1), value: z.unknown() });
@@ -1777,7 +1781,7 @@ git commit -m "Reparenting cannot make loops, cross projects, invert rank, or sl
 - Consumes: Task 5's refusal vocabulary and context helpers; `ticketFieldSetPayload`, `dueDateValueSchema`, `CustomFieldDef` (`@gisik-nokma/domain`); `buildMemoryContext` + test-support (Tasks 4–5).
 - Produces: `checkTicketFieldSet(env: EventEnvelope, ctx: EngineContext): Promise<EngineVerdict>`.
 
-**Semantics:** built-in fields `title`, `description`, `dueDate` ride the same event as custom fields. `value: null` clears any field except `title` (`field.title-required`). A due date is `{ date: 'YYYY-MM-DD', note? }` — always a claim; the projection preserves actor and both times (Task 3 already proves that). Custom values must fit their `CustomFieldDef` kind; a `select` value must be one of its options; a `person` value is a non-empty user id string (existence checking belongs to the membership/auth plan).
+**Semantics:** built-in fields `title`, `description`, `dueDate`, `startDate` ride the same event as custom fields. `value: null` clears any field except `title` (`field.title-required`). A due date is `{ date: 'YYYY-MM-DD', note? }` — always a claim; the projection preserves actor and both times (Task 3 already proves that). Custom values must fit their `CustomFieldDef` kind; a `select` value must be one of its options; a `person` value is a non-empty user id string (existence checking belongs to the membership/auth plan).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1891,6 +1895,31 @@ describe('checkTicketFieldSet', () => {
 });
 ```
 
+- [ ] **Step 1a: Add the `startDate` claim cases to the same file**
+
+`startDate` is a built-in day claim with exactly `dueDate`'s value shape — a claim like any other, made by someone, at a time. Append to the `describe('checkTicketFieldSet', …)` block in `packages/rule-engine/src/checks/fields.test.ts`:
+
+```ts
+  it('accepts a start-date claim, with or without a note, and null to clear it', async () => {
+    expect(await checkTicketFieldSet(fieldSet('startDate', { date: '2026-09-01' }), ctx())).toEqual({ refused: false });
+    expect(
+      await checkTicketFieldSet(fieldSet('startDate', { date: '2026-09-01', note: 'after the licence renewal' }), ctx()),
+    ).toEqual({ refused: false });
+    expect(await checkTicketFieldSet(fieldSet('startDate', null), ctx())).toEqual({ refused: false });
+  });
+
+  it('planted defect: a timestamp start date, and a bare string where the claim belongs', async () => {
+    expect(await checkTicketFieldSet(fieldSet('startDate', { date: '2026-09-01T10:00:00Z' }), ctx())).toEqual({
+      refused: true, rule: 'field.type-mismatch',
+      reason: '"Start date" needs a day in YYYY-MM-DD form (a note is optional).',
+    });
+    expect(await checkTicketFieldSet(fieldSet('startDate', '2026-09-01'), ctx())).toEqual({
+      refused: true, rule: 'field.type-mismatch',
+      reason: '"Start date" needs a day in YYYY-MM-DD form (a note is optional).',
+    });
+  });
+```
+
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/checks/fields.test.ts`
@@ -1964,11 +1993,14 @@ export async function checkTicketFieldSet(env: EventEnvelope, ctx: EngineContext
       : refuse('field.type-mismatch', fieldKindRefusal('Description', 'a document'));
   }
 
-  if (p.fieldId === 'dueDate') {
+  // The two day-claim built-ins share one shape, so they share one branch and
+  // one schema — a second copy is a second thing to drift.
+  if (p.fieldId === 'dueDate' || p.fieldId === 'startDate') {
     if (value === null) return ACCEPT;
+    const fieldName = p.fieldId === 'dueDate' ? 'Due date' : 'Start date';
     return dueDateValueSchema.safeParse(value).success
       ? ACCEPT
-      : refuse('field.type-mismatch', fieldKindRefusal('Due date', 'a day in YYYY-MM-DD form (a note is optional)'));
+      : refuse('field.type-mismatch', fieldKindRefusal(fieldName, 'a day in YYYY-MM-DD form (a note is optional)'));
   }
 
   const type = await getTicketTypeDef(ctx, ticket.typeId);
@@ -1996,7 +2028,7 @@ import { checkTicketFieldSet } from './checks/fields';
 - [ ] **Step 5: Run the tests to verify they pass, then the whole rule-engine suite**
 
 Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/checks/fields.test.ts`
-Expected: PASS (8 tests).
+Expected: PASS (10 tests) — including the two `startDate` cases.
 Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run`
 Expected: PASS.
 
@@ -2004,7 +2036,7 @@ Expected: PASS.
 
 ```bash
 git add packages/rule-engine/src/checks/fields.ts packages/rule-engine/src/checks/fields.test.ts packages/rule-engine/src/evaluate.ts
-git commit -m "Field claims are checked against what the type declared: unknown fields refused by name, kinds enforced with the reason spelled out, null clears everything except the title a ticket cannot live without"
+git commit -m "Field claims are checked against what the type declared: unknown fields refused by name, kinds enforced with the reason spelled out, the two day-claim built-ins sharing one shape rather than two that could drift, null clearing everything except the title a ticket cannot live without"
 ```
 
 ### Task 8: End-to-end planted-defect fixtures — the shared suite proves the refusals through the real engine
@@ -3855,7 +3887,7 @@ git commit -m "Ticket history is the ledger filtered, not a summary: every claim
 ## 5. Tickets, hierarchy & rollups
 
 - ⚙️ **Ticket type system** — built-in ladder epic(1)/story(2)/task(3)/sub-task(4) as seed data plus custom reusable types defined by `ticket-type.defined` events: name, icon, rank, workflow binding, and typed custom fields (text, number, date, select, person), Zod-validated, last definition wins. `packages/domain/src/ticket-types.ts`
-- ⚙️ **Ticket event vocabulary** — `ticket.created`, `ticket.transitioned` (optional `cause` marks a reopen forced by arriving live work; the transitions log keeps it out), `ticket.assigned`, `ticket.collaborator_added/removed`, `ticket.field_set` (built-ins title/description/dueDate ride it; a due date is always a `{date, note?}` claim), `ticket.reparented`, `comment.added` (opaque doc body), `attachment.added` (metadata only); unknown types refused at ingest. `packages/domain/src/events/ticket-events.ts`
+- ⚙️ **Ticket event vocabulary** — `ticket.created`, `ticket.transitioned` (optional `cause` marks a reopen forced by arriving live work; the transitions log keeps it out), `ticket.assigned`, `ticket.collaborator_added/removed`, `ticket.field_set` (built-ins title/description/dueDate/startDate ride it; a due date and a start date are always `{date, note?}` claims), `ticket.reparented`, `comment.added` (opaque doc body), `attachment.added` (metadata only); unknown types refused at ingest. `packages/domain/src/events/ticket-events.ts`
 - ⚙️ **Ticket head-state reducer** — one pure fold (`applyTicketEvent`) shared by the server projection and the fixture suite; per-field provenance (actor + both clocks) on every claim. `packages/domain/src/ticket-state.ts`
 - ✅ **Hierarchy sanity refusals** — child rank must exceed parent rank, sub-tasks require a parent, cycles refused (load-bearing after rank re-definitions), cross-project parents refused, live work under a terminal parent refused toward an offered reopen (owner decision; terminal-under-terminal stays legal); every reason in plain language, every refusal proven against a planted defect. `packages/rule-engine/src/checks/hierarchy.ts`
 - ✅ **Field claim refusals** — unknown fields, per-kind mismatches with the field named, title never clearable; `null` clears everything else as an attributed claim. `packages/rule-engine/src/checks/fields.ts`
@@ -3882,7 +3914,7 @@ Mirrors `Features.md` §5. Status: `❌` not covered · `✅` covered · `🟡` 
 - 5.9 ✅ Cycles refused: self-parent, and reparenting under a descendant after a rank re-definition made the loop rank-legal. (`reparent.test.ts`, `reparent-cycle-after-rank-redefinition.json`)
 - 5.10 ✅ Cross-project parents refused on create and reparent. (`hierarchy.test.ts`, `reparent.test.ts`)
 - 5.11 ✅ Forced preconditions refuse plainly: unknown type, unknown parent, unknown ticket, type's workflow undefined. (`hierarchy.test.ts`, `reparent.test.ts`, `fields.test.ts`)
-- 5.12 ✅ `field_set` semantics: unknown field refused; per-kind mismatches refused with the field named (text/number/date/select-with-options/person, document description, day-only due date); the title can never be cleared. (`fields.test.ts`, `field-set-*.json`)
+- 5.12 ✅ `field_set` semantics: unknown field refused; per-kind mismatches refused with the field named (text/number/date/select-with-options/person, document description, day-only `dueDate` and `startDate` claims); the title can never be cleared. (`fields.test.ts`, `field-set-*.json`)
 - 5.13 ✅ Invariant 3 end to end: a parent's terminal claim with an open direct child is refused; the same claim is accepted once every child is terminal — proven in the fixture suite and again against Postgres. (`parent-terminal-*.json`, `engine-context.test.ts`)
 - 5.14 ✅ Every refusal fixture has an accepting twin, so the suite cannot pass by refusing everything. (`fixtures/`)
 - 5.15 ✅ `proj_tickets` reproduces byte-identically on reset-and-replay (rebuild-and-diff). (`proj-tickets.test.ts`)

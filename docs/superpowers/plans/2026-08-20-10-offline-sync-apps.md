@@ -28,11 +28,11 @@
 ## Consumed interfaces (pinned — the executor copies these, never re-derives them)
 
 From **Plan 1** (`@gisik-nokma/domain`, `apps/server`):
-- `type EventEnvelope = { id, workspaceId, entity: {kind, id}, type, version, payload, actorId, origin: 'web'|'mobile'|'desktop'|'server', clientTime, serverTime, seq }`; `type SubmittedEvent = Omit<EventEnvelope, 'serverTime'|'seq'>`; `submittedEventSchema`, `eventEnvelopeSchema`, `newUlid(): Ulid`, `ENTITY_KINDS`, `type EntityKind`, `ORIGINS`, `type Origin`.
+- `type EventEnvelope = { id, workspaceId, entity: {kind, id}, type, version, payload, actorId, origin: 'web'|'mobile'|'desktop'|'server', clientTime, serverTime, seq }` (`seq` is PER-ENTITY); `type LedgerEvent = EventEnvelope & { workspaceSeq: number }` — what the ledger stores and what every server reader emits, the frozen envelope plus the per-workspace stream cursor (coordination §18); `type SubmittedEvent = Omit<EventEnvelope, 'serverTime'|'seq'>`; `submittedEventSchema`, `eventEnvelopeSchema`, `newUlid(): Ulid`, `ENTITY_KINDS`, `type EntityKind`, `ORIGINS`, `type Origin`.
 - `domainRegistry: EventTypeRegistry` with `register({type, version, payloadSchema})`; `parseEvent(raw, registry?): ParsedEvent | EnvelopeError`; `type EnvelopeErrorCode = 'malformed-envelope'|'unknown-event-type'|'unknown-event-version'|'invalid-payload'`.
 - `type IngestErrorCode = EnvelopeErrorCode | 'duplicate-event-id'`; `type IngestResult = {status:'committed'; eventId; seq; serverTime} | {status:'invalid'; eventId: string|null; code: IngestErrorCode; message} | {status:'refused'; eventId; rule; reason}`; `type IngestService = { ingestBatch(rawEvents: unknown[]): Promise<IngestResult[]>; onEventCommitted(listener): () => void }`; `createIngestService(deps)`.
 - `POST /v1/events` body `{events: [raw envelope, …]}` (1–100), response `{results: IngestResult[]}` index-aligned. Interactive refusals return without recording (amendment 16).
-- Ledger repo: `lockEntity(client, kind, id)`, `nextSeq(client, kind, id)`, `insertEvent(client, envelope)`, `readEntityEvents(clientOrPool, kind, id, afterSeq?)`, `readLedger(clientOrPool)`, `rowToEnvelope(row)`, `isUniqueViolation(err, constraint)`.
+- Ledger repo: `lockEntity(client, kind, id)`, `nextSeq(client, kind, id)`, `lockWorkspace(client, workspaceId)` and `nextWorkspaceSeq(client, workspaceId)` (§18 — the workspace lock is taken BEFORE the entity lock, one order so nothing deadlocks), `insertEvent(client, ledgerEvent)` (names `workspace_seq` among its columns), `readEntityEvents(clientOrPool, kind, id, afterSeq?)` → `LedgerEvent[]` in per-entity seq order, `rowToEnvelope(row): LedgerEvent`, `readLedger(clientOrPool)`, `rowToEnvelope(row)`, `isUniqueViolation(err, constraint)`.
 - Snapshots: table `snapshots(entity_kind, entity_id, seq, state jsonb, created_at, PK(entity_kind, entity_id, seq))` — shipped **with no writer; the writer is assigned to this plan**. `type Snapshot = { entityKind; entityId; seq; state: Record<string, unknown> }`; `writeSnapshot(client, snapshot)`; `readLatestSnapshot(client, kind, id): Promise<Snapshot|null>`.
 - Projections: `type Projection = { name; tables: readonly string[]; apply(event, tx: PoolClient): Promise<void>; reset(tx): Promise<void> }` (deterministic, interleaving-insensitive); `buildProjectionRegistry()` in `apps/server/src/projections/index.ts`; registration order per coordination decision 8.
 - Server scaffold: `loadConfig`, `AppConfig`, `buildApp(deps)`, `createPool`; test helpers `createTestDatabase()`, `submittedWorkspaceCreated()`, `committed(submitted, seq, serverTime?)`.
@@ -48,7 +48,7 @@ From **Plan 2** (`@gisik-nokma/rule-engine`, `@gisik-nokma/domain`):
 
 From **Plan 3** (`@gisik-nokma/domain`):
 - `type FieldClaim = { value: unknown; actorId: string; clientTime: string; serverTime: string }`.
-- `type TicketState = { id; workspaceId; projectId; typeId; parentId: string|null; workflowId; stateId; stateCategory: StateCategory; assigneeId: string|null; collaboratorIds: string[]; fields: Record<string, FieldClaim> }` **plus** the coordination §4 transition log `transitions: { toStateId: string; actorId: string; seq: number }[]`.
+- `type TicketState = { kind: 'ticket'; id; workspaceId; projectId; typeId; parentId: string|null; workflowId; workflowVersion: number; stateId; stateCategory: StateCategory; assigneeId: string|null; collaboratorIds: string[]; fields: Record<string, FieldClaim> }` **plus** the coordination §4 transition log `transitions: { toStateId: string; actorId: string; seq: number }[]` — the merged §4 shape, verbatim. `kind` is the `EntityState` discriminant the engine narrows on; `workflowVersion` is what pins a folded state to the definition version it was folded under, so a v2 remap is visible rather than silent. Every `TicketState` literal in this plan carries both.
 - `type TicketStateDeps = { getTicketType(typeId): TicketTypeDef|undefined; getWorkflow(workflowId): WorkflowDef|undefined }`; `TICKET_EVENT_TYPES: readonly string[]`; `applyTicketEvent(state: TicketState|undefined, env: EventEnvelope, deps: TicketStateDeps): TicketState` (throws on ledger-integrity breaks — fold only accepted events); `stateCategoryOf(def, stateId)`.
 - `TicketTypeDef = { id; name; icon; rank; workflowId; fields: CustomFieldDef[] }`, `ticketTypeDefSchema`, `builtinTicketTypeDefs(defaultWorkflowId)`.
 - Registered ticket vocabulary (all v1): `ticket-type.defined`, `ticket.created` (`{typeId, projectId, parentId, title}`), `ticket.transitioned` (`{toStateId, comment?, evidenceAttachmentId?, cause?}` — `cause?: { kind: 'reopened-for-child'; childTicketId: string }` per the owner reopen decision), `ticket.assigned` (`{assigneeId}`), `ticket.collaborator_added/_removed` (`{userId}`), `ticket.field_set` (`{fieldId, value}`), `ticket.reparented` (`{newParentId}`), `comment.added` (`{body}`), `attachment.added` (`{attachmentId, filename, mime, size}`); `makeEnvelope(partial)` test builder.
@@ -56,14 +56,14 @@ From **Plan 3** (`@gisik-nokma/domain`):
 
 From **Plan 4** (`apps/server`):
 - `canSee(db: Queryable, userId, ticketId): Promise<boolean>`; `getResolvedVisibility(db, ticketId): Promise<ResolvedVisibility|null>`; `listVisibleTickets(db, userId, workspaceId): Promise<Array<Record<string, unknown>>>` (rows carry `ticket_id`).
-- `interface PurgeInstruction { kind: 'purge'; entityId: string }`; `type SyncItem = EventEnvelope | PurgeInstruction`; `visibleEventsFor(db, userId, workspaceId, afterSeq): AsyncIterable<SyncItem>` — THE sync-down filter; discriminate with `'kind' in item && item.kind === 'purge'`.
+- `interface PurgeInstruction { kind: 'purge'; entityId: string }`; `type SyncItem = LedgerEvent | PurgeInstruction` (§18: the events a replica receives carry their stream position, so a replica can order its own ledger without asking); `visibleEventsFor(db, userId, workspaceId, afterSeq): AsyncIterable<SyncItem>` — THE sync-down filter; discriminate with `'kind' in item && item.kind === 'purge'`.
 - `resolveEffectiveRole(db, userId, workspaceId)` → `EffectiveRole { workspaceRole: WorkspaceRole|null; projects: Set<string> }` (as used by `visibleEventsFor`).
 - `makeRequireSession(auth)` preHandler setting `request.currentUserId: string`; `registerAuthRoutes(app, auth)`; test helper `signInWithPhone(app, sender, phone): Promise<string>` (bearer token) in `apps/server/test/helpers/session.ts`; seed helpers `seedMember`, `seedGuest`, `seedTicket`; `appendTestEvent(db, env)`.
 - Tables `proj_visibility`, `proj_memberships`.
 
 From the **coordination doc** (amendments 9–17, consumed as pinned; Plans 5–9 are written in parallel — assumptions flagged in Open questions):
 - **Amendment 10:** `packages/app-core` views/view-models consume `DataSource = { ingest(events: SubmittedEvent[]): Promise<IngestResult[]>; query: typed read functions; subscribe(workspaceId, afterSeq, cb): Unsubscribe }`, implemented online (Plan 6) and replica (this plan).
-- **Amendment 13:** WS `/v1/stream`; client → `{type:'subscribe', workspaceId, afterSeq}`; server → `{type:'event', envelope}` · `{type:'purge', entityId}` · `{type:'caught-up', seq}` · ping/pong. Backed by `visibleEventsFor` + `onEventCommitted`. Plan 5 owns the server side.
+- **Amendments 13 + 19:** WS `/v1/stream`; client → `{type:'subscribe', workspaceId, afterSeq}`; server → `{type:'event', envelope}` · `{type:'purge', workspaceId, entityId}` · `{type:'caught-up', workspaceId, seq}` · `{type:'error', workspaceId: string|null, code, message}` · ping/pong. Amendment 19 adds `workspaceId` to purge/caught-up/error (additive — one socket may carry several subscriptions, and `afterSeq` is per-workspace). Purge frames carry no seq, so a purge-only drain may re-emit them: purges must be idempotent (they are deletes). Backed by `visibleEventsFor` + `onEventCommitted`. Plan 5 owns the server side.
 - **Amendment 12:** editor bodies are ProseMirror JSON, opaque outside the editor; `docToPlainText(doc: unknown): string` in domain; RN hosts the editor in a webview (Plan 7 owns the bridge).
 - **Amendment 16:** offline-originated events arrive via `POST /v1/sync` (this plan). Sync-time refusal appends `claim.contested` (entity = the ticket; payload = original event, rule, reason). Resolution `claim.contested_resolved { resolution: 'redone'|'converted-to-comment'|'discarded' }`. Interactive `POST /v1/events` refusals return without recording. On the sync path `duplicate-event-id` becomes idempotent-accept.
 - **Amendment 17:** `apps/desktop` = Tauri 2 + Vite React; `apps/mobile` = React Native (Expo), native navigation over app-core view-models, webview editor, replica DataSource; SQLite behind one storage interface on both.
@@ -82,9 +82,8 @@ packages/rule-engine/src/
   fixtures/harness.ts             # (modify) in-memory getContest + contest-type skip in the ticket fold
 packages/rule-engine/fixtures/    # 5 new contest fixtures (planted defects)
 apps/server/
-  migrations/<ts>_stream-cursor.sql     # events.global_seq — the workspace-monotone stream cursor
   migrations/<ts>_proj-contested.sql    # proj_contested
-  src/visibility/visible-events-for.ts  # (modify) cursor reads global_seq — flagged, see Open questions
+  src/visibility/visible-events-for.ts  # (modify) cursor reads events.workspace_seq (coordination §18; Plan 4's pending amendment)
   src/sync/stream-seq.ts                # readStreamSeq
   src/sync/ledger-deps.ts               # TicketStateDeps folded from ledger definition events
   src/sync/snapshot-writer.ts           # runSnapshotPass + startSnapshotWriter (assigned to this plan)
@@ -135,7 +134,7 @@ test-cases/12-offline-sync-apps.md
 **Interfaces:**
 - Consumes: `submittedEventSchema`, `SubmittedEvent`, `EventEnvelope`, `domainRegistry`, `parseEvent`, `newUlid`, `Origin` (Plan 1); `makeEnvelope` (Plan 3).
 - Produces (cross-plan API, `@gisik-nokma/domain`):
-  - `claimContestedPayloadSchema` / `type ClaimContestedPayload = { original: SubmittedEvent; rule: string; reason: string }` — event type `claim.contested` v1, entity = the ticket, **server-appended only** (Task 2 enforces).
+  - `claimContestedPayloadSchema` / `type ClaimContestedPayload = { originalEvent: SubmittedEvent; rule: string; reason: string }` — event type `claim.contested` v1, entity = the ticket, **server-appended only** (Task 2 enforces).
   - `claimContestedResolvedPayloadSchema` / `type ClaimContestedResolvedPayload = { contestedEventId: string; resolution: 'redone'|'converted-to-comment'|'discarded'; replacementEventId?: string; commentEventId?: string; note?: string }` — `replacementEventId` required iff `redone`; `commentEventId` required iff `converted-to-comment` — event type `claim.contested_resolved` v1.
   - `CONTEST_EVENT_TYPES = ['claim.contested', 'claim.contested_resolved'] as const`.
   - `renderContestedClaimText(payload: ClaimContestedPayload): string` — the human rendering used by "convert to comment" and the banner.
@@ -175,7 +174,7 @@ function original() {
 
 describe('claim.contested', () => {
   it('round-trips through parseEvent with the registered schema', () => {
-    const payload = { original: original(), rule: 'restrict-to', reason: 'Only the assignee may do this.' };
+    const payload = { originalEvent: original(), rule: 'restrict-to', reason: 'Only the assignee may do this.' };
     const env = makeEnvelope({ type: 'claim.contested', entity: { kind: 'ticket', id: TICKET }, payload });
     const parsed = parseEvent(env);
     expect(parsed.ok).toBe(true);
@@ -223,7 +222,7 @@ describe('claim.contested_resolved', () => {
 describe('renderContestedClaimText', () => {
   it('names actor, claim, time, and the refusing rule — the text a comment conversion carries', () => {
     const o = original();
-    const text = renderContestedClaimText({ original: o, rule: 'restrict-to', reason: 'Only the assignee may do this.' });
+    const text = renderContestedClaimText({ originalEvent: o, rule: 'restrict-to', reason: 'Only the assignee may do this.' });
     expect(text).toContain('user_b');
     expect(text).toContain('ticket.transitioned');
     expect(text).toContain(o.clientTime);
@@ -279,7 +278,7 @@ import type { SubmittedEvent } from '../envelope.js';
  */
 export const claimContestedPayloadSchema = z
   .object({
-    original: submittedEventSchema,
+    originalEvent: submittedEventSchema,
     rule: z.string().min(1),
     reason: z.string().min(1),
   })
@@ -325,10 +324,10 @@ domainRegistry.register({
 
 /** The banner line and the comment a conversion carries — attributed, dated, rule named. */
 export function renderContestedClaimText(payload: ClaimContestedPayload): string {
-  const { original, rule, reason } = payload;
+  const { originalEvent, rule, reason } = payload;
   return (
-    `Contested claim by ${original.actorId} at ${original.clientTime}: ` +
-    `${original.type} ${JSON.stringify(original.payload)} — refused by rule "${rule}": ${reason}`
+    `Contested claim by ${originalEvent.actorId} at ${originalEvent.clientTime}: ` +
+    `${originalEvent.type} ${JSON.stringify(originalEvent.payload)} — refused by rule "${rule}": ${reason}`
   );
 }
 
@@ -547,7 +546,7 @@ function ctx(contests: Record<string, ContestLookup>): EngineContext {
 }
 
 const contestedPayload = {
-  original: {
+  originalEvent: {
     id: '01J9GORG000000000000000000',
     workspaceId: 'ws_1',
     entity: { kind: 'ticket', id: TICKET },
@@ -772,7 +771,7 @@ const foldable = completedPriorEvents.filter((e) => !(CONTEST_EVENT_TYPES as rea
     "actorId": "user_b",
     "origin": "mobile",
     "payload": {
-      "original": {
+      "originalEvent": {
         "id": "01J9GORG000000000000000000",
         "workspaceId": "ws_1",
         "entity": { "kind": "ticket", "id": "t1" },
@@ -795,7 +794,40 @@ const foldable = completedPriorEvents.filter((e) => !(CONTEST_EVENT_TYPES as rea
 }
 ```
 
-`packages/rule-engine/fixtures/contest-accepts-server-origin.json` — identical except `"origin": "server"` on the candidate, `"name": "the server's own contest record is accepted"`, and `"expected": { "refused": false }`.
+`packages/rule-engine/fixtures/contest-accepts-server-origin.json`:
+
+```json
+{
+  "name": "the server's own contest record is accepted",
+  "workflowDefs": [],
+  "memberships": [],
+  "priorEvents": [],
+  "candidateEvent": {
+    "type": "claim.contested",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_b",
+    "origin": "server",
+    "payload": {
+      "originalEvent": {
+        "id": "01J9GORG000000000000000000",
+        "workspaceId": "ws_1",
+        "entity": { "kind": "ticket", "id": "t1" },
+        "type": "ticket.transitioned",
+        "version": 1,
+        "payload": { "toStateId": "done" },
+        "actorId": "user_b",
+        "origin": "mobile",
+        "clientTime": "2026-08-20T00:00:00.000Z"
+      },
+      "rule": "restrict-to",
+      "reason": "Only the assignee may do this."
+    }
+  },
+  "expected": { "refused": false }
+}
+```
+
+(The only differences from the previous fixture are `name`, the candidate's `origin`, and `expected` — written out in full rather than described, because the executor may open this file without the previous one in view.)
 
 `packages/rule-engine/fixtures/contest-resolved-refuses-unknown.json`:
 
@@ -834,7 +866,7 @@ const foldable = completedPriorEvents.filter((e) => !(CONTEST_EVENT_TYPES as rea
       "actorId": "user_b",
       "origin": "server",
       "payload": {
-        "original": {
+        "originalEvent": {
           "id": "01J9GORG000000000000000000",
           "workspaceId": "ws_1",
           "entity": { "kind": "ticket", "id": "t1" },
@@ -874,7 +906,48 @@ const foldable = completedPriorEvents.filter((e) => !(CONTEST_EVENT_TYPES as rea
 
 (the harness assigns prior-event ids `fx_evt_<seq>`, so the contest recorded first is `fx_evt_1`.)
 
-`packages/rule-engine/fixtures/contest-resolved-accepts-discard.json` — same `priorEvents[0]` (the contest) but WITHOUT the prior resolution, same candidate, `"name": "discarding a contested claim is a recorded, accepted resolution"`, `"expected": { "refused": false }`.
+`packages/rule-engine/fixtures/contest-resolved-accepts-discard.json`:
+
+```json
+{
+  "name": "discarding a contested claim is a recorded, accepted resolution",
+  "workflowDefs": [],
+  "memberships": [],
+  "priorEvents": [
+    {
+      "type": "claim.contested",
+      "entity": { "kind": "ticket", "id": "t1" },
+      "actorId": "user_b",
+      "origin": "server",
+      "payload": {
+        "originalEvent": {
+          "id": "01J9GORG000000000000000000",
+          "workspaceId": "ws_1",
+          "entity": { "kind": "ticket", "id": "t1" },
+          "type": "ticket.transitioned",
+          "version": 1,
+          "payload": { "toStateId": "done" },
+          "actorId": "user_b",
+          "origin": "mobile",
+          "clientTime": "2026-08-20T00:00:00.000Z"
+        },
+        "rule": "restrict-to",
+        "reason": "Only the assignee may do this."
+      }
+    }
+  ],
+  "candidateEvent": {
+    "type": "claim.contested_resolved",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_b",
+    "origin": "desktop",
+    "payload": { "contestedEventId": "fx_evt_1", "resolution": "discarded" }
+  },
+  "expected": { "refused": false }
+}
+```
+
+(Same contest, same candidate as the previous fixture — the ONLY difference is that no prior resolution exists, which is why this one is accepted. Written out in full because the executor may open it alone.)
 
 - [ ] **Step 7: Run the fixtures runner and the whole package**
 
@@ -894,49 +967,36 @@ additively so server, harness and replica answer the same question."
 
 ---
 
-### Task 3: `global_seq` — a workspace-monotone stream cursor
+### Task 3: `workspace_seq` — the workspace stream cursor (coordination amendment 18)
 
-The wire contract's `seq` is **per-entity** (Plan 1: `UNIQUE (entity_kind, entity_id, seq)`), but amendment 13's `subscribe {workspaceId, afterSeq}` and `caught-up {seq}` need a cursor that is monotone across a whole workspace — per-entity seq restarts at 1 for every entity, so `WHERE seq > $2` skips every new entity's early events once the cursor moves. This task adds an arrival ordinal and points the sync-down filter at it. The envelope is unchanged; clients treat the cursor as opaque. **Flagged in Open questions for Plan 4/5 reconciliation.**
+The wire contract's `seq` is **per-entity** (Plan 1: `UNIQUE (entity_kind, entity_id, seq)`), but amendment 13's `subscribe {workspaceId, afterSeq}` and `caught-up {seq}` need a cursor that is monotone across a whole workspace — per-entity seq restarts at 1 for every entity, so `WHERE seq > $2` skips every new entity's early events once the cursor moves. Plan 5 found this (its case 7.34) and **coordination amendment 18 pinned the fix: `events.workspace_seq bigint` with `UNIQUE (workspace_id, workspace_seq)`, assigned inside the ingest transaction under a per-workspace advisory lock.** Plan 1 has already landed the schema, the lock and the assignment; Plan 4's `visibleEventsFor` semantics are the remaining pending amendment. This task therefore **consumes** the pinned cursor — it does not invent one — and finishes the Plan 4 half so the sync-down filter and the bootstrap/WS cursors all mean the same thing.
+
+Why the pinned design and not a `GENERATED ALWAYS AS IDENTITY` arrival ordinal: an identity column is assigned at INSERT but becomes *visible* at COMMIT, so a transaction that took a lower ordinal can commit after a reader has already passed it — the reader's cursor then skips it forever. That is the same silent skip in a new costume. The advisory lock plus `max(workspace_seq)+1` inside the ingest transaction is what makes "everything at or below this cursor is already visible" true. Do not substitute a sequence, an identity column, or a `max`-pre-read.
 
 **Files:**
-- Create: `apps/server/migrations/<timestamp>_stream-cursor.sql` (generated filename)
-- Create: `apps/server/src/sync/stream-seq.ts`
-- Modify: `apps/server/src/visibility/visible-events-for.ts` (cursor SQL only)
+- Modify: `apps/server/src/visibility/visible-events-for.ts` (cursor SQL only — Plan 4's pending amendment-18 change)
 - Modify: `apps/server/test/visibility/visible-events-for.test.ts` (cursor expectations only)
+- Create: `apps/server/src/sync/stream-seq.ts`
 - Test: `apps/server/test/sync/stream-seq.test.ts`
 
 **Interfaces:**
-- Consumes: Plan 1 migrations setup (`node-pg-migrate`, `--migration-file-language sql`), `createTestDatabase`; Plan 4's `visibleEventsFor`.
+- Consumes (Plan 1, coordination §18): `events.workspace_seq bigint NOT NULL` with `CONSTRAINT events_workspace_seq_unique UNIQUE (workspace_id, workspace_seq)`; `lockWorkspace(client, workspaceId)`; `nextWorkspaceSeq(client, workspaceId)`; `type LedgerEvent = EventEnvelope & { workspaceSeq: number }`; `rowToEnvelope`; `insertEvent`; `createTestDatabase`. Plan 4's `visibleEventsFor`.
 - Produces:
-  - `events.global_seq bigint GENERATED ALWAYS AS IDENTITY` — unique, indexed by `(workspace_id, global_seq)`; assigned at commit, never carried in the envelope.
-  - `readStreamSeq(db: Queryable, workspaceId: string): Promise<number>` — the high-water cursor (`0` for an empty workspace).
-  - `visibleEventsFor` streams `WHERE workspace_id = $1 AND global_seq > $2 ORDER BY global_seq` — `afterSeq` means "after this stream position" everywhere (bootstrap `streamSeq`, WS `subscribe.afterSeq`, `caught-up.seq`).
+  - `readStreamSeq(db: Queryable, workspaceId: string): Promise<number>` — the workspace's high-water cursor, `MAX(workspace_seq)` (`0` for an empty workspace).
+  - `visibleEventsFor` streams `WHERE workspace_id = $1 AND workspace_seq > $2 ORDER BY workspace_seq` — `afterSeq` means "after this stream position" everywhere (bootstrap `streamSeq`, WS `subscribe.afterSeq`, `caught-up.seq`). Per-entity `seq` keeps its own role (entity history, replay, snapshots) and stays in the envelope unchanged.
 
-- [ ] **Step 1: Generate the migration and write the SQL**
+- [ ] **Step 1: Guard — confirm Plan 1's cursor is present before building on it**
 
-Run (from `apps/server/`): `pnpm node-pg-migrate create stream-cursor --migration-file-language sql --migrations-dir migrations`
+Run (from `apps/server/`):
 
-Up SQL:
-
-```sql
--- Per-entity seq orders one entity's history; the stream cursor orders a
--- workspace's ARRIVALS. Both are true in different senses; conflating them
--- makes catch-up skip events (per-entity seq restarts at 1 per entity).
-ALTER TABLE events ADD COLUMN global_seq bigint GENERATED ALWAYS AS IDENTITY;
-
-CREATE UNIQUE INDEX events_global_seq_idx ON events (global_seq);
-CREATE INDEX events_workspace_global_seq_idx ON events (workspace_id, global_seq);
+```bash
+grep -rn "workspace_seq" migrations/ src/ledger/ | head
+grep -n "lockWorkspace\|nextWorkspaceSeq\|workspaceSeq" src/ledger/event-store.ts src/ingest/ingest-service.ts
 ```
 
-Down SQL:
+Expected: the `events` table declares `workspace_seq bigint NOT NULL` with `events_workspace_seq_unique UNIQUE (workspace_id, workspace_seq)`; `lockWorkspace` and `nextWorkspaceSeq` exist; `insertEvent` names `workspace_seq` among its columns; ingest calls `lockWorkspace` **before** `lockEntity` and assigns `workspaceSeq` inside the same transaction.
 
-```sql
-DROP INDEX events_workspace_global_seq_idx;
-DROP INDEX events_global_seq_idx;
-ALTER TABLE events DROP COLUMN global_seq;
-```
-
-Note: `ADD COLUMN … GENERATED ALWAYS AS IDENTITY` backfills existing rows in table order, which may not match historical arrival order — acceptable pre-launch (no production data exists; Plan 11 deploys from scratch). `ALTER TABLE` is DDL and does not trip the append-only row triggers. `insertEvent` needs no change: it names its columns and the identity fills itself.
+If any of that is missing, Plan 1's amendment-18 change has not landed — **stop and apply it there**, in `apps/server/migrations/` and `src/ledger/event-store.ts`, exactly as coordination §18 specifies (column + unique constraint + `pg_advisory_xact_lock` on the workspace id + `max(workspace_seq)+1` in the ingest transaction). Do not add a second, differently-named cursor column here: two cursors on one table is precisely the ambiguity this amendment exists to remove.
 
 - [ ] **Step 2: Write the failing stream-seq test**
 
@@ -961,24 +1021,44 @@ afterAll(async () => {
 });
 
 describe('readStreamSeq', () => {
-  it('is 0 for a workspace with no events, and workspace-scoped, and monotone with arrivals', async () => {
+  it('is 0 for a workspace with no events', async () => {
     expect(await readStreamSeq(db.pool, 'ws_empty')).toBe(0);
+  });
 
-    const a = committed({ ...submittedWorkspaceCreated(), workspaceId: 'ws_a' }, 1);
-    const b = committed({ ...submittedWorkspaceCreated(), id: newUlid(), workspaceId: 'ws_b' }, 1);
+  it('is workspace-SCOPED: each workspace counts its own stream from 1, and they never interleave', async () => {
+    // committed(submitted, seq, serverTime?, workspaceSeq?) — Plan 1's helper;
+    // workspaceSeq is the per-workspace cursor, NOT a global ordinal.
+    const a1 = committed({ ...submittedWorkspaceCreated(), workspaceId: 'ws_a' }, 1, undefined, 1);
+    const b1 = committed({ ...submittedWorkspaceCreated(), id: newUlid(), workspaceId: 'ws_b' }, 1, undefined, 1);
     const client = await db.pool.connect();
     try {
-      await insertEvent(client, a);
-      await insertEvent(client, b);
+      await insertEvent(client, a1);
+      await insertEvent(client, b1);
     } finally {
       client.release();
     }
 
-    const seqA = await readStreamSeq(db.pool, 'ws_a');
-    const seqB = await readStreamSeq(db.pool, 'ws_b');
-    expect(seqA).toBeGreaterThan(0);
-    expect(seqB).toBeGreaterThan(seqA); // b arrived after a — arrivals order the stream
-    expect(await readStreamSeq(db.pool, 'ws_a')).toBe(seqA); // stable until the next arrival
+    // Both are the FIRST event of their own workspace: both cursors read 1.
+    // A global ordinal would have made these differ — and a client resuming
+    // ws_b at ws_a's number would skip its own history.
+    expect(await readStreamSeq(db.pool, 'ws_a')).toBe(1);
+    expect(await readStreamSeq(db.pool, 'ws_b')).toBe(1);
+  });
+
+  it('advances with each arrival in that workspace, across DIFFERENT entities', async () => {
+    const first = submittedWorkspaceCreated({ workspaceId: 'ws_c' });
+    const second = submittedWorkspaceCreated({ workspaceId: 'ws_c' }); // a different entity, seq 1 again
+    const client = await db.pool.connect();
+    try {
+      await insertEvent(client, committed(first, 1, undefined, 1));
+      await insertEvent(client, committed(second, 1, undefined, 2));
+    } finally {
+      client.release();
+    }
+
+    // Per-entity seq is 1 for BOTH; the stream cursor is 1 then 2. This is the
+    // whole point of amendment 18: resuming at 1 must still deliver `second`.
+    expect(await readStreamSeq(db.pool, 'ws_c')).toBe(2);
   });
 });
 ```
@@ -986,7 +1066,7 @@ describe('readStreamSeq', () => {
 - [ ] **Step 3: Run it to verify it fails**
 
 Run (from `apps/server/`): `pnpm vitest run test/sync/stream-seq.test.ts`
-Expected: FAIL — module not found (and, before the migration is applied by `createTestDatabase`'s migrate step, a missing-column error; `createTestDatabase` runs all migrations, so the new file is picked up automatically).
+Expected: FAIL — cannot resolve `../../src/sync/stream-seq.js`. (The `workspace_seq` column itself already exists: `createTestDatabase` runs Plan 1's migrations, and Step 1 confirmed it. If instead you see a missing-column error, Step 1's guard was skipped — go back and apply Plan 1's amendment-18 change first.)
 
 - [ ] **Step 4: Implement readStreamSeq**
 
@@ -996,14 +1076,23 @@ Expected: FAIL — module not found (and, before the migration is applied by `cr
 import type { Queryable } from '../db/queryable.js';
 
 /**
- * The workspace stream's high-water mark. Bootstrap hands it to the client;
- * the client hands it back as subscribe.afterSeq; caught-up frames advance it.
- * Opaque to clients — only "later than" has meaning.
+ * The workspace stream's high-water mark (coordination §18). Bootstrap hands
+ * it to the client; the client hands it back as subscribe.afterSeq; caught-up
+ * frames advance it. Opaque to clients — only "later than" has meaning, and
+ * only WITHIN one workspace: workspace_seq is per-workspace, so a cursor from
+ * one workspace is meaningless in another.
+ *
+ * Reading max() here is safe as a HIGH-WATER READ (bootstrap answers "you have
+ * everything up to N") because ingest assigns workspace_seq under
+ * lockWorkspace inside the appending transaction: nothing at or below a
+ * committed max can still be in flight. It is NOT safe as an ASSIGNMENT
+ * strategy — use nextWorkspaceSeq under lockWorkspace for that.
  */
 export async function readStreamSeq(db: Queryable, workspaceId: string): Promise<number> {
-  const { rows } = await db.query('SELECT COALESCE(MAX(global_seq), 0) AS stream_seq FROM events WHERE workspace_id = $1', [
-    workspaceId,
-  ]);
+  const { rows } = await db.query(
+    'SELECT COALESCE(MAX(workspace_seq), 0) AS stream_seq FROM events WHERE workspace_id = $1',
+    [workspaceId],
+  );
   return Number((rows[0] as { stream_seq: number | string }).stream_seq);
 }
 ```
@@ -1013,22 +1102,24 @@ export async function readStreamSeq(db: Queryable, workspaceId: string): Promise
 - [ ] **Step 5: Run the test to verify it passes**
 
 Run: `pnpm vitest run test/sync/stream-seq.test.ts`
-Expected: PASS (1 test, 3 assertions).
+Expected: PASS (3 tests).
 
-- [ ] **Step 6: Point visibleEventsFor at the stream cursor**
+- [ ] **Step 6: Point visibleEventsFor at the stream cursor (Plan 4's pending amendment-18 change)**
 
-In `apps/server/src/visibility/visible-events-for.ts`, change the main query (locate: `grep -n "seq > \$2" apps/server/src/visibility/visible-events-for.ts`):
+First check whether the orchestrator already applied it: `grep -n "workspace_seq" apps/server/src/visibility/visible-events-for.ts`. If it is already there, skip to Step 8 — there is nothing to change.
+
+Otherwise, in `apps/server/src/visibility/visible-events-for.ts`, change the main query (locate: `grep -n "seq > \$2" apps/server/src/visibility/visible-events-for.ts`):
 
 ```ts
   const { rows } = await db.query(
     `SELECT id, workspace_id, entity_kind, entity_id, type, version, payload,
-            actor_id, origin, client_time, server_time, seq
-     FROM events WHERE workspace_id = $1 AND global_seq > $2 ORDER BY global_seq`,
+            actor_id, origin, client_time, server_time, seq, workspace_seq
+     FROM events WHERE workspace_id = $1 AND workspace_seq > $2 ORDER BY workspace_seq`,
     [workspaceId, afterSeq],
   );
 ```
 
-and update the function's doc comment to say the cursor is the stream position (arrival order), while envelope `seq` stays per-entity. Nothing else in the function changes — the filter and purge logic are position-independent.
+and update the function's doc comment to say `afterSeq` is the per-workspace stream position (`events.workspace_seq`, coordination §18), while envelope `seq` stays per-entity. Nothing else in the function changes — the filter and purge logic are position-independent. If `rowToEnvelope` is what builds each yielded item, it already carries `workspaceSeq` (Plan 1's `LedgerEvent`), so selecting the column keeps the emitted envelope complete rather than silently dropping the cursor the caller needs for `caught-up`.
 
 - [ ] **Step 7: Fix Plan 4's cursor-sensitive tests**
 
@@ -1037,29 +1128,37 @@ Run: `pnpm vitest run test/visibility/visible-events-for.test.ts`
 Any test that passed a non-zero `afterSeq` computed from per-entity seq now needs the stream position instead. In each such test, read the cursor with a helper added to the test file:
 
 ```ts
-async function streamSeqNow(): Promise<number> {
-  const { rows } = await pool.query('SELECT COALESCE(MAX(global_seq), 0) AS s FROM events');
+async function streamSeqNow(workspaceId: string): Promise<number> {
+  const { rows } = await pool.query(
+    'SELECT COALESCE(MAX(workspace_seq), 0) AS s FROM events WHERE workspace_id = $1',
+    [workspaceId],
+  );
   return Number(rows[0].s);
 }
 ```
 
-and replace hard-coded `afterSeq` arguments with `await streamSeqNow()` captured at the intended point in the scenario (i.e., capture the cursor after the events that should be excluded, before the events that should be included). Do not weaken any assertion about which events/purges are yielded — only how the cursor is obtained. Re-run until the file passes.
+(Note the workspace argument: `workspace_seq` is per-workspace, so a cursor read without scoping is meaningless. A test that seeds two workspaces and reads an unscoped `max` would pass by luck and lie later.)
+
+and replace hard-coded `afterSeq` arguments with `await streamSeqNow(workspaceId)` captured at the intended point in the scenario (i.e., capture the cursor after the events that should be excluded, before the events that should be included). Do not weaken any assertion about which events/purges are yielded — only how the cursor is obtained. Re-run until the file passes.
 
 - [ ] **Step 8: Run the whole server suite**
 
 Run (from `apps/server/`): `pnpm test`
-Expected: PASS — projections, ingest, visibility and auth suites unaffected (none reads `global_seq`).
+Expected: PASS — projections, ingest and auth suites unaffected (none reads `workspace_seq`); the visibility suite passes with the cursor helper.
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add apps/server/migrations/*stream-cursor.sql apps/server/src/sync/stream-seq.ts apps/server/src/visibility/visible-events-for.ts apps/server/test/sync/stream-seq.test.ts apps/server/test/visibility/visible-events-for.test.ts
-git commit -m "feat(server): workspace-monotone stream cursor (events.global_seq)
+git add apps/server/src/sync/stream-seq.ts apps/server/src/visibility/visible-events-for.ts apps/server/test/sync/stream-seq.test.ts apps/server/test/visibility/visible-events-for.test.ts
+git commit -m "feat(server): resume the workspace stream by workspace_seq, not per-entity seq
 
-Per-entity seq restarts at 1 for every entity, so 'seq > afterSeq' as a
-workspace cursor silently skips new entities' early events — exactly the
-kind of quiet lie the ledger exists to prevent. Arrival order gets its
-own ordinal; the envelope is unchanged; cursors are opaque to clients."
+Coordination amendment 18: per-entity seq restarts at 1 for every entity,
+so 'seq > afterSeq' as a workspace cursor silently skips new entities'
+early events — exactly the kind of quiet lie the ledger exists to
+prevent. Plan 1 ships the column and its advisory-locked assignment;
+this closes the read half, so bootstrap, subscribe and caught-up all
+mean the same position. The envelope is unchanged; cursors stay opaque
+to clients and scoped to one workspace."
 ```
 
 ---
@@ -1099,7 +1198,7 @@ CREATE TABLE proj_contested (
   claimant_id        text NOT NULL,
   rule               text NOT NULL,
   reason             text NOT NULL,
-  original           jsonb NOT NULL,
+  original_event     jsonb NOT NULL,
   contested_at       timestamptz NOT NULL,
   resolved           boolean NOT NULL DEFAULT false,
   resolution         text,
@@ -1161,7 +1260,7 @@ function contestEnvelope(seq: number, contestId = newUlid()): EventEnvelope {
       entity: { kind: 'ticket', id: TICKET },
       type: 'claim.contested',
       version: 1,
-      payload: { original, rule: 'restrict-to', reason: 'Only the assignee may do this.' },
+      payload: { originalEvent: original, rule: 'restrict-to', reason: 'Only the assignee may do this.' },
       actorId: 'user_b',
       origin: 'server',
       clientTime: '2026-08-20T10:00:00.000Z',
@@ -1290,17 +1389,17 @@ export const projContested: Projection = {
       await tx.query(
         `INSERT INTO proj_contested
            (contested_event_id, original_event_id, workspace_id, ticket_id, claimant_id,
-            rule, reason, original, contested_at, resolved)
+            rule, reason, original_event, contested_at, resolved)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)`,
         [
           event.id,
-          payload.original.id,
+          payload.originalEvent.id,
           event.workspaceId,
           event.entity.id,
-          payload.original.actorId,
+          payload.originalEvent.actorId,
           payload.rule,
           payload.reason,
-          JSON.stringify(payload.original),
+          JSON.stringify(payload.originalEvent),
           event.serverTime,
         ],
       );
@@ -1398,7 +1497,7 @@ describe('GET /v1/contests', () => {
     });
     const contest = committed({
       id: newUlid(), workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'claim.contested', version: 1,
-      payload: { original, rule: 'require-field', reason: 'planted' }, actorId: 'usr_member', origin: 'server',
+      payload: { originalEvent: original, rule: 'require-field', reason: 'planted' }, actorId: 'usr_member', origin: 'server',
       clientTime: new Date().toISOString(),
     }, 2);
     await appendTestEvent(db.pool, contest);
@@ -1419,7 +1518,7 @@ describe('GET /v1/contests', () => {
       rule: 'require-field',
       resolved: false,
     });
-    expect(contests[0].original.id).toBe(original.id); // the claim travels whole — provenance floor
+    expect(contests[0].originalEvent.id).toBe(original.id); // the claim travels whole — provenance floor
   });
 
   it('planted defect: a caller who cannot see the ticket gets NO contest — not even its existence', async () => {
@@ -1470,7 +1569,7 @@ export type ContestView = {
   claimantId: string;
   rule: string;
   reason: string;
-  original: unknown;
+  originalEvent: unknown;
   contestedAt: string;
   resolved: boolean;
   resolution: string | null;
@@ -1533,7 +1632,7 @@ export function registerContestsRoute(app: FastifyInstance, deps: { pool: Pool; 
           claimantId: row.claimant_id as string,
           rule: row.rule as string,
           reason: row.reason as string,
-          original: row.original,
+          originalEvent: row.original_event,
           contestedAt: new Date(row.contested_at as string).toISOString(),
           resolved: row.resolved as boolean,
           resolution: (row.resolution as string) ?? null,
@@ -1908,7 +2007,7 @@ definition events, never from pg projections. snapshot + tail = replay."
 type BootstrapTicket = {
   ticketId: string;
   snapshot: { seq: number; state: TicketState } | null; // null → `events` is the full history
-  events: EventEnvelope[]; // per-entity seq order: everything after snapshot.seq, PLUS all
+  events: LedgerEvent[];   // per-entity seq order: everything after snapshot.seq, PLUS all
                            // comment.added / attachment.added / claim.contested /
                            // claim.contested_resolved regardless of snapshot position
 };
@@ -1917,7 +2016,7 @@ type BootstrapResponse = {
   workspaceId: string;
   me: BootstrapMe;
   streamSeq: number;            // subscribe afterSeq = this
-  definitions: EventEnvelope[]; // ALL workflow.defined + ticket-type.defined events (guests included —
+  definitions: LedgerEvent[];   // ALL workflow.defined + ticket-type.defined events (guests included —
                                 // a guest cannot render status without the workflow definition, Plan 4 §5)
   tickets: BootstrapTicket[];   // exactly the tickets this user canSee — nothing else, not even ids
 };
@@ -2096,7 +2195,7 @@ export const BOOTSTRAP_BACKFILL_TYPES = [
 export type BootstrapTicket = {
   ticketId: string;
   snapshot: { seq: number; state: TicketState } | null;
-  events: EventEnvelope[];
+  events: LedgerEvent[];
 };
 
 export type BootstrapMe = { userId: string; workspaceRole: string; projectIds: string[] };
@@ -2105,7 +2204,7 @@ export type BootstrapResponse = {
   workspaceId: string;
   me: BootstrapMe;
   streamSeq: number;
-  definitions: EventEnvelope[];
+  definitions: LedgerEvent[];
   tickets: BootstrapTicket[];
 };
 
@@ -2150,7 +2249,7 @@ export function registerSyncRoutes(app: FastifyInstance, deps: { pool: Pool; aut
         const streamSeq = await readStreamSeq(client, workspaceId);
         const { rows: defRows } = await client.query(
           `SELECT id, workspace_id, entity_kind, entity_id, type, version, payload,
-                  actor_id, origin, client_time, server_time, seq
+                  actor_id, origin, client_time, server_time, seq, workspace_seq
              FROM events
             WHERE workspace_id = $1 AND entity_kind IN ('workflow', 'ticket-type')
             ORDER BY entity_kind, entity_id, seq`,
@@ -2213,7 +2312,7 @@ export const VISIBILITY_REFUSAL_RULE = 'visibility.not-visible';
 export type SyncInvalidCode = IngestErrorCode | 'actor-mismatch' | 'reserved-type';
 
 export type SyncEventResult =
-  | { status: 'committed'; eventId: string; seq: number; serverTime: string }
+  | { status: 'committed'; eventId: string; seq: number; workspaceSeq: number; serverTime: string }
   | { status: 'contested'; eventId: string; rule: string; reason: string; contestEventId: string }
   | { status: 'refused'; eventId: string; rule: string; reason: string }   // non-ticket entity: no contest recordable
   | { status: 'invalid'; eventId: string | null; code: SyncInvalidCode; message: string };
@@ -2327,6 +2426,9 @@ describe('POST /v1/sync', () => {
     const res = await post('/v1/sync', [e]);
     expect(res.statusCode).toBe(200);
     expect(res.json().results[0]).toMatchObject({ status: 'committed', eventId: e.id });
+    // §18: the committed answer carries the stream position, so the replica stores
+    // what arrived instead of inventing an order for it.
+    expect(typeof res.json().results[0].workspaceSeq).toBe('number');
   });
 
   it('a rule refusal becomes a claim.contested ledger event naming the exact rule', async () => {
@@ -2373,7 +2475,7 @@ describe('POST /v1/sync', () => {
   it('refuses client-supplied claim.contested — reserved for the server', async () => {
     const forged = newSubmittedEvent({
       workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'claim.contested',
-      payload: { original: offlineField(), rule: 'x', reason: 'y' }, actorId: userId, origin: 'mobile',
+      payload: { originalEvent: offlineField(), rule: 'x', reason: 'y' }, actorId: userId, origin: 'mobile',
     });
     const res = await post('/v1/sync', [forged]);
     expect(res.json().results[0]).toMatchObject({ status: 'invalid', code: 'reserved-type' });
@@ -2406,6 +2508,7 @@ import {
   newSubmittedEvent,
   parseEvent,
   type EventEnvelope,
+  type LedgerEvent,
   type SubmittedEvent,
 } from '@gisik-nokma/domain';
 import type { IngestErrorCode, IngestService } from '../ingest/ingest-service.js';
@@ -2417,7 +2520,7 @@ export const VISIBILITY_REFUSAL_RULE = 'visibility.not-visible';
 export type SyncInvalidCode = IngestErrorCode | 'actor-mismatch' | 'reserved-type';
 
 export type SyncEventResult =
-  | { status: 'committed'; eventId: string; seq: number; serverTime: string }
+  | { status: 'committed'; eventId: string; seq: number; workspaceSeq: number; serverTime: string }
   | { status: 'contested'; eventId: string; rule: string; reason: string; contestEventId: string }
   | { status: 'refused'; eventId: string; rule: string; reason: string }
   | { status: 'invalid'; eventId: string | null; code: SyncInvalidCode; message: string };
@@ -2431,7 +2534,9 @@ export type SyncService = { processBatch(userId: string, rawEvents: unknown[]): 
  * history, never a silent drop (honesty invariant 5).
  */
 export function createSyncService(deps: { pool: Pool; ingest: IngestService }): SyncService {
-  async function storedEnvelope(eventId: string): Promise<EventEnvelope | null> {
+  // rowToEnvelope answers a LedgerEvent (§18) — the frozen envelope PLUS its
+  // workspace stream position, which the replica needs to store what arrived.
+  async function storedEnvelope(eventId: string): Promise<LedgerEvent | null> {
     const { rows } = await deps.pool.query('SELECT * FROM events WHERE id = $1', [eventId]);
     return rows.length === 0 ? null : rowToEnvelope(rows[0] as EventRow);
   }
@@ -2453,7 +2558,7 @@ export function createSyncService(deps: { pool: Pool; ingest: IngestService }): 
       workspaceId: event.workspaceId,
       entity: { kind: 'ticket', id: event.entity.id },
       type: 'claim.contested',
-      payload: { original: event, rule, reason },
+      payload: { originalEvent: event, rule, reason },
       actorId: event.actorId, // the contest belongs to the claimant's history
       origin: 'server',
     });
@@ -2479,7 +2584,7 @@ export function createSyncService(deps: { pool: Pool; ingest: IngestService }): 
 
     const stored = await storedEnvelope(event.id);
     if (stored !== null) {
-      return { status: 'committed', eventId: stored.id, seq: stored.seq, serverTime: stored.serverTime };
+      return { status: 'committed', eventId: stored.id, seq: stored.seq, workspaceSeq: stored.workspaceSeq, serverTime: stored.serverTime };
     }
     const priorContest = await storedContest(event.id);
     if (priorContest !== null) {
@@ -2496,8 +2601,20 @@ export function createSyncService(deps: { pool: Pool; ingest: IngestService }): 
     const [result] = await deps.ingest.ingestBatch([event]);
     if (result === undefined) throw new Error('ingestBatch answered nothing for one event');
     switch (result.status) {
-      case 'committed':
-        return { status: 'committed', eventId: result.eventId, seq: result.seq, serverTime: result.serverTime };
+      case 'committed': {
+        // Plan 1's IngestResult carries per-entity seq only; the replica needs the
+        // stream position too, so read back the row ingest just wrote (indexed by
+        // primary key). Inventing a workspaceSeq here would be a lie about order.
+        const written = await storedEnvelope(result.eventId);
+        if (written === null) throw new Error(`ingest reported committed but ${result.eventId} is not in the ledger`);
+        return {
+          status: 'committed',
+          eventId: result.eventId,
+          seq: result.seq,
+          workspaceSeq: written.workspaceSeq,
+          serverTime: result.serverTime,
+        };
+      }
       case 'invalid':
         return { status: 'invalid', eventId: result.eventId, code: result.code, message: result.message };
       case 'refused':
@@ -2790,12 +2907,19 @@ export const LOCAL_SCHEMA_VERSION = 1;
 
 const TABLES = [
   // the visibility-scoped local ledger — exactly what arrived, nothing invented
+  // Mirrors the server's column set (coordination §18) — BOTH sequences are kept
+  // because both are true in different senses: `seq` orders one entity's history
+  // (what the reducer replays), `workspace_seq` orders the workspace's stream
+  // (what a resume cursor means). Dropping either would force the replica to
+  // invent an order it was never told.
   `CREATE TABLE IF NOT EXISTS events (
      id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, entity_kind TEXT NOT NULL, entity_id TEXT NOT NULL,
      type TEXT NOT NULL, version INTEGER NOT NULL, payload TEXT NOT NULL, actor_id TEXT NOT NULL,
-     origin TEXT NOT NULL, client_time TEXT NOT NULL, server_time TEXT NOT NULL, seq INTEGER NOT NULL
+     origin TEXT NOT NULL, client_time TEXT NOT NULL, server_time TEXT NOT NULL,
+     seq INTEGER NOT NULL, workspace_seq INTEGER NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS events_entity_idx ON events (entity_kind, entity_id, seq)`,
+  `CREATE INDEX IF NOT EXISTS events_stream_idx ON events (workspace_id, workspace_seq)`,
   // reducer-state baseline from bootstrap (server snapshots, reducer-folded)
   `CREATE TABLE IF NOT EXISTS snapshots (
      entity_kind TEXT NOT NULL, entity_id TEXT NOT NULL, seq INTEGER NOT NULL, state TEXT NOT NULL,
@@ -2813,7 +2937,7 @@ const TABLES = [
   `CREATE TABLE IF NOT EXISTS contests (
      contested_event_id TEXT PRIMARY KEY, original_event_id TEXT NOT NULL UNIQUE, workspace_id TEXT NOT NULL,
      ticket_id TEXT NOT NULL, claimant_id TEXT NOT NULL, rule TEXT NOT NULL, reason TEXT NOT NULL,
-     original TEXT NOT NULL, contested_at TEXT NOT NULL, resolved INTEGER NOT NULL DEFAULT 0, resolution TEXT
+     original_event TEXT NOT NULL, contested_at TEXT NOT NULL, resolved INTEGER NOT NULL DEFAULT 0, resolution TEXT
    )`,
   // ordered, persisted claims in transit
   `CREATE TABLE IF NOT EXISTS outbox (
@@ -2871,7 +2995,7 @@ schema separates confirmed ledger, reducer state, contests and outbox."
 export type Me = { userId: string; workspaceRole: 'owner'|'admin'|'member'|'guest'; projectIds: string[] };
 export type LocalContest = {
   contestedEventId: string; originalEventId: string; workspaceId: string; ticketId: string;
-  claimantId: string; rule: string; reason: string; original: SubmittedEvent;
+  claimantId: string; rule: string; reason: string; originalEvent: SubmittedEvent;
   contestedAt: string; resolved: boolean; resolution: string | null;
 };
 export type ReplicaTicket = { ticketId: string; confirmed: TicketState | null; contests: LocalContest[] };
@@ -2883,7 +3007,7 @@ export type Replica = {
   getTicket(ticketId: string): Promise<ReplicaTicket | null>;
   listTickets(workspaceId: string): Promise<ReplicaTicket[]>;
   listContests(workspaceId: string, filter?: { ticketId?: string; claimantId?: string; open?: boolean }): Promise<LocalContest[]>;
-  listEntityEvents(ticketId: string): Promise<EventEnvelope[]>;     // local history view, seq order
+  listEntityEvents(ticketId: string): Promise<LedgerEvent[]>;       // local history view, per-entity seq order
   searchLocal(workspaceId: string, text: string): Promise<Array<{ ticketId: string; title: string }>>;
   getCursor(workspaceId: string): Promise<number>;
   setCursor(workspaceId: string, seq: number): Promise<void>;
@@ -2907,6 +3031,7 @@ import {
   newUlid,
   plainTextToDoc,
   type EventEnvelope,
+  type LedgerEvent,
   type SubmittedEvent,
 } from '@gisik-nokma/domain';
 import { createBetterSqliteStorage } from '../src/storage/better-sqlite3.js';
@@ -2927,17 +3052,26 @@ const wf = {
 };
 
 let seqCounter = 0;
-function envelope(entity: EventEnvelope['entity'], type: string, payload: unknown, seq?: number): EventEnvelope {
+let streamCounter = 0;
+/**
+ * A server-shaped LedgerEvent (§18): per-entity `seq` AND the workspace stream
+ * position. `seq` is caller-controllable because reducer order depends on it;
+ * `workspaceSeq` just keeps climbing, exactly as arrivals do.
+ */
+function envelope(entity: EventEnvelope['entity'], type: string, payload: unknown, seq?: number): LedgerEvent {
   seqCounter += 1;
+  streamCounter += 1;
   return {
     ...newSubmittedEvent({ workspaceId: WS, entity, type, payload, actorId: 'user_a', origin: 'server' }),
     serverTime: '2026-08-20T00:00:00.000Z',
     seq: seq ?? seqCounter,
+    workspaceSeq: streamCounter,
   };
 }
 
 async function seededReplica(): Promise<Replica> {
   seqCounter = 0;
+  streamCounter = 0;
   const replica = await createReplica({ storage: createBetterSqliteStorage() });
   await replica.loadBootstrap({
     workspaceId: WS,
@@ -2950,6 +3084,7 @@ async function seededReplica(): Promise<Replica> {
     tickets: [],
   });
   seqCounter = 0;
+  streamCounter = 0;
   return replica;
 }
 
@@ -2980,7 +3115,7 @@ describe('replica read model — folded by the domain reducer', () => {
       workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'ticket.transitioned',
       payload: { toStateId: 'done' }, actorId: 'user_b', origin: 'mobile',
     });
-    const contest = envelope({ kind: 'ticket', id: TICKET }, 'claim.contested', { original, rule: 'restrict-to', reason: 'planted' });
+    const contest = envelope({ kind: 'ticket', id: TICKET }, 'claim.contested', { originalEvent: original, rule: 'restrict-to', reason: 'planted' });
     await replica.applyServerItem(contest);
     const before = await replica.getTicket(TICKET);
     expect(before?.confirmed?.stateId).toBe('todo'); // the contested claim did NOT move the ticket
@@ -2995,10 +3130,12 @@ describe('replica read model — folded by the domain reducer', () => {
 
   it('bootstrap: snapshot + tail equals the folded state, comments searchable', async () => {
     seqCounter = 0;
+    streamCounter = 0;
     const replica = await createReplica({ storage: createBetterSqliteStorage() });
-    const snapshotState = {
+    const snapshotState: TicketState = {
+      kind: 'ticket',
       id: TICKET, workspaceId: WS, projectId: PROJECT, typeId: 'task', parentId: null,
-      workflowId: 'wf_basic', stateId: 'todo', stateCategory: 'open', assigneeId: null,
+      workflowId: 'wf_basic', workflowVersion: 1, stateId: 'todo', stateCategory: 'open', assigneeId: null,
       collaboratorIds: [], fields: {}, transitions: [],
     };
     await replica.loadBootstrap({
@@ -3029,6 +3166,7 @@ describe('purge — revocation removes every local trace', () => {
   it('planted defect: after purge the ticket is unreadable, unsearchable, and gone from raw storage', async () => {
     const storage = createBetterSqliteStorage();
     seqCounter = 0;
+    streamCounter = 0;
     const replica = await createReplica({ storage });
     await replica.loadBootstrap({
       workspaceId: WS, me: { userId: 'user_a', workspaceRole: 'member', projectIds: [PROJECT] }, streamSeq: 0,
@@ -3039,6 +3177,7 @@ describe('purge — revocation removes every local trace', () => {
       tickets: [],
     });
     seqCounter = 0;
+    streamCounter = 0;
     await replica.applyServerItem(envelope({ kind: 'ticket', id: TICKET }, 'ticket.created', { typeId: 'task', projectId: PROJECT, parentId: null, title: 'Secret errand' }));
     await replica.applyServerItem(envelope({ kind: 'ticket', id: TICKET }, 'comment.added', { body: plainTextToDoc('supplier pricing inside') }));
 
@@ -3099,6 +3238,7 @@ import {
   docToPlainText,
   TICKET_EVENT_TYPES,
   type EventEnvelope,
+  type LedgerEvent,
   type SubmittedEvent,
   type TicketState,
   type TicketStateDeps,
@@ -3109,14 +3249,14 @@ import { buildLocalDeps } from './local-deps.js';
 
 // Wire shapes (server Task 6 / Plan 4) — re-declared client-side, structurally identical.
 export type PurgeInstruction = { kind: 'purge'; entityId: string };
-export type SyncItem = EventEnvelope | PurgeInstruction;
+export type SyncItem = LedgerEvent | PurgeInstruction;
 export type Me = { userId: string; workspaceRole: 'owner' | 'admin' | 'member' | 'guest'; projectIds: string[] };
-export type BootstrapTicket = { ticketId: string; snapshot: { seq: number; state: TicketState } | null; events: EventEnvelope[] };
-export type BootstrapResponse = { workspaceId: string; me: Me; streamSeq: number; definitions: EventEnvelope[]; tickets: BootstrapTicket[] };
+export type BootstrapTicket = { ticketId: string; snapshot: { seq: number; state: TicketState } | null; events: LedgerEvent[] };
+export type BootstrapResponse = { workspaceId: string; me: Me; streamSeq: number; definitions: LedgerEvent[]; tickets: BootstrapTicket[] };
 
 export type LocalContest = {
   contestedEventId: string; originalEventId: string; workspaceId: string; ticketId: string;
-  claimantId: string; rule: string; reason: string; original: SubmittedEvent;
+  claimantId: string; rule: string; reason: string; originalEvent: SubmittedEvent;
   contestedAt: string; resolved: boolean; resolution: string | null;
 };
 export type ReplicaTicket = { ticketId: string; confirmed: TicketState | null; contests: LocalContest[] };
@@ -3128,7 +3268,7 @@ export type Replica = {
   getTicket(ticketId: string): Promise<ReplicaTicket | null>;
   listTickets(workspaceId: string): Promise<ReplicaTicket[]>;
   listContests(workspaceId: string, filter?: { ticketId?: string; claimantId?: string; open?: boolean }): Promise<LocalContest[]>;
-  listEntityEvents(ticketId: string): Promise<EventEnvelope[]>;
+  listEntityEvents(ticketId: string): Promise<LedgerEvent[]>;
   searchLocal(workspaceId: string, text: string): Promise<Array<{ ticketId: string; title: string }>>;
   getCursor(workspaceId: string): Promise<number>;
   setCursor(workspaceId: string, seq: number): Promise<void>;
@@ -3137,7 +3277,7 @@ export type Replica = {
   onChange(cb: () => void): () => void;
 };
 
-function rowToEnvelope(row: Record<string, unknown>): EventEnvelope {
+function rowToEnvelope(row: Record<string, unknown>): LedgerEvent {
   return {
     id: row.id as string,
     workspaceId: row.workspace_id as string,
@@ -3150,6 +3290,7 @@ function rowToEnvelope(row: Record<string, unknown>): EventEnvelope {
     clientTime: row.client_time as string,
     serverTime: row.server_time as string,
     seq: Number(row.seq),
+    workspaceSeq: Number(row.workspace_seq),
   };
 }
 
@@ -3159,11 +3300,14 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
   const listeners = new Set<() => void>();
   const notify = (): void => listeners.forEach((cb) => cb());
 
-  async function insertEnvelope(tx: SyncStorage, env: EventEnvelope): Promise<void> {
+  // Column order matches Plan 1's insertEventSql, workspace_seq included: a
+  // replica stores exactly what arrived. Inventing a stream position for a row
+  // that was handed one would be the quietest possible lie about ordering.
+  async function insertEnvelope(tx: SyncStorage, env: LedgerEvent): Promise<void> {
     await tx.run(
-      `INSERT INTO events (id, workspace_id, entity_kind, entity_id, type, version, payload, actor_id, origin, client_time, server_time, seq)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [env.id, env.workspaceId, env.entity.kind, env.entity.id, env.type, env.version, JSON.stringify(env.payload), env.actorId, env.origin, env.clientTime, env.serverTime, env.seq],
+      `INSERT INTO events (id, workspace_id, entity_kind, entity_id, type, version, payload, actor_id, origin, client_time, server_time, seq, workspace_seq)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [env.id, env.workspaceId, env.entity.kind, env.entity.id, env.type, env.version, JSON.stringify(env.payload), env.actorId, env.origin, env.clientTime, env.serverTime, env.seq, env.workspaceSeq],
     );
   }
 
@@ -3190,10 +3334,10 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
       // (client-side timestamp) before the real event streams in — the server's
       // envelope is the truth and corrects the stub, so replicas converge exactly.
       await tx.run(
-        `INSERT INTO contests (contested_event_id, original_event_id, workspace_id, ticket_id, claimant_id, rule, reason, original, contested_at, resolved, resolution)
+        `INSERT INTO contests (contested_event_id, original_event_id, workspace_id, ticket_id, claimant_id, rule, reason, original_event, contested_at, resolved, resolution)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)
-         ON CONFLICT(contested_event_id) DO UPDATE SET contested_at = excluded.contested_at, rule = excluded.rule, reason = excluded.reason, original = excluded.original`,
-        [env.id, p.original.id, env.workspaceId, env.entity.id, p.original.actorId, p.rule, p.reason, JSON.stringify(p.original), env.serverTime],
+         ON CONFLICT(contested_event_id) DO UPDATE SET contested_at = excluded.contested_at, rule = excluded.rule, reason = excluded.reason, original_event = excluded.original_event`,
+        [env.id, p.originalEvent.id, env.workspaceId, env.entity.id, p.originalEvent.actorId, p.rule, p.reason, JSON.stringify(p.originalEvent), env.serverTime],
       );
     } else {
       const p = claimContestedResolvedPayloadSchema.parse(env.payload);
@@ -3233,7 +3377,7 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
       claimantId: row.claimant_id as string,
       rule: row.rule as string,
       reason: row.reason as string,
-      original: JSON.parse(row.original as string) as SubmittedEvent,
+      originalEvent: JSON.parse(row.original_event as string) as SubmittedEvent,
       contestedAt: row.contested_at as string,
       resolved: Number(row.resolved) === 1,
       resolution: (row.resolution as string) ?? null,
@@ -3309,7 +3453,7 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
         await tx.run('DELETE FROM tickets WHERE ticket_id = ?', [entityId]);
         await tx.run("DELETE FROM snapshots WHERE entity_id = ?", [entityId]);
         // Contests OTHERS raised vanish with the ticket. The local user's OWN
-        // contested claims survive as content-light stubs: their `original` is
+        // contested claims survive as content-light stubs: their `originalEvent` is
         // what this user typed on this device — purging it would silently
         // vanish their claim (honesty invariant 5), and it leaks nothing the
         // user did not author themselves.
@@ -3492,12 +3636,16 @@ const wfDone = {
 };
 
 let seq = 0;
-function committed(entity: EventEnvelope['entity'], type: string, payload: unknown, entitySeq?: number): EventEnvelope {
+let streamSeq = 0;
+/** A server-shaped LedgerEvent (§18): per-entity `seq` plus the workspace stream position. */
+function committed(entity: EventEnvelope['entity'], type: string, payload: unknown, entitySeq?: number): LedgerEvent {
   seq += 1;
+  streamSeq += 1;
   return {
     ...newSubmittedEvent({ workspaceId: WS, entity, type, payload, actorId: 'user_a', origin: 'server' }),
     serverTime: '2026-08-20T00:00:00.000Z',
     seq: entitySeq ?? seq,
+    workspaceSeq: streamSeq,
   };
 }
 
@@ -3691,14 +3839,14 @@ export function buildLocalEngineContext(deps: { storage: SyncStorage; replica: R
 
 ```ts
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
-import { TICKET_EVENT_TYPES, applyTicketEvent, type EventEnvelope, type SubmittedEvent, type TicketState } from '@gisik-nokma/domain';
+import { TICKET_EVENT_TYPES, applyTicketEvent, type EventEnvelope, type LedgerEvent, type SubmittedEvent, type TicketState } from '@gisik-nokma/domain';
 import type { SyncStorage } from '../storage/storage.js';
 import type { Replica } from '../replica/replica.js';
 import { buildLocalEngineContext } from '../precheck/local-context.js';
 
 // Wire shape of POST /v1/sync results (server Task 7) — structurally identical re-declaration.
 export type SyncEventResult =
-  | { status: 'committed'; eventId: string; seq: number; serverTime: string }
+  | { status: 'committed'; eventId: string; seq: number; workspaceSeq: number; serverTime: string }
   | { status: 'contested'; eventId: string; rule: string; reason: string; contestEventId: string }
   | { status: 'refused'; eventId: string; rule: string; reason: string }
   | { status: 'invalid'; eventId: string | null; code: string; message: string };
@@ -3790,7 +3938,7 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
         const rows = await storage.all('SELECT envelope FROM outbox WHERE event_id = ?', [eventId]);
         if (rows.length > 0) {
           const submitted = JSON.parse(rows[0]!.envelope as string) as SubmittedEvent;
-          const env: EventEnvelope = { ...submitted, serverTime: result.serverTime, seq: result.seq };
+          const env: LedgerEvent = { ...submitted, serverTime: result.serverTime, seq: result.seq, workspaceSeq: result.workspaceSeq };
           await replica.applyServerItem(env); // idempotent; also deletes the outbox row
         }
         await storage.run('DELETE FROM outbox WHERE event_id = ?', [eventId]);
@@ -3804,7 +3952,7 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
           // envelope also arrives via the stream (or never, if visibility was lost;
           // this local stub is then the claimant's only honest record).
           await storage.run(
-            `INSERT INTO contests (contested_event_id, original_event_id, workspace_id, ticket_id, claimant_id, rule, reason, original, contested_at, resolved, resolution)
+            `INSERT INTO contests (contested_event_id, original_event_id, workspace_id, ticket_id, claimant_id, rule, reason, original_event, contested_at, resolved, resolution)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)
              ON CONFLICT(contested_event_id) DO NOTHING`,
             [result.contestEventId, eventId, rows[0]!.workspace_id as string, rows[0]!.entity_id as string, submitted.actorId, result.rule, result.reason, JSON.stringify(submitted), new Date().toISOString()],
@@ -3886,11 +4034,11 @@ async function fixture() {
           states: [{ id: 'todo', name: 'To do', category: 'open' }, { id: 'done', name: 'Done', category: 'terminal' }],
           transitions: [{ from: '*', to: 'done', rules: [] }, { from: '*', to: 'todo', rules: [] }],
         }, actorId: 'user_a', origin: 'server' }),
-        serverTime: '2026-08-20T00:00:00.000Z', seq: 1,
+        serverTime: '2026-08-20T00:00:00.000Z', seq: 1, workspaceSeq: 1,
       },
       {
         ...newSubmittedEvent({ workspaceId: WS, entity: { kind: 'ticket-type', id: 'task' }, type: 'ticket-type.defined', payload: { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf', fields: [] }, actorId: 'user_a', origin: 'server' }),
-        serverTime: '2026-08-20T00:00:00.000Z', seq: 1,
+        serverTime: '2026-08-20T00:00:00.000Z', seq: 1, workspaceSeq: 2,
       },
     ],
     tickets: [],
@@ -3921,7 +4069,7 @@ describe('outbox ordering and results', () => {
     const { outbox, replica } = await fixture();
     const t1 = createTicket(newUlid());
     await outbox.enqueue(t1);
-    await outbox.applyResult(t1.id, { status: 'committed', eventId: t1.id, seq: 1, serverTime: '2026-08-20T01:00:00.000Z' });
+    await outbox.applyResult(t1.id, { status: 'committed', eventId: t1.id, seq: 1, workspaceSeq: 11, serverTime: '2026-08-20T01:00:00.000Z' });
     expect(await outbox.queuedCount(WS)).toBe(0);
     expect((await replica.getTicket(t1.entity.id))?.confirmed?.stateId).toBe('todo');
   });
@@ -3982,7 +4130,8 @@ sync door confirm, contest, or visibly fail — never silently drop."
 ```ts
 export type StreamHandlers = {
   onItem(item: SyncItem): void;                  // {type:'event'} → envelope · {type:'purge'} → PurgeInstruction
-  onCaughtUp(seq: number): void;
+  onCaughtUp(seq: number): void;                 // amendment 19: only for THIS subscription's workspaceId
+  onError(err: { code: string; message: string }): void;  // amendment 19's error frame — surfaced, never swallowed
   onClose(): void;
 };
 export type StreamHandle = { close(): void };
@@ -3997,13 +4146,14 @@ export type SyncEngine = {
   stop(): void;
   flush(): Promise<void>;                      // drain due outbox batches now
   status(): SyncStatus;
+  lastError(): { code: string; message: string } | null;  // amendment 19's error frame, kept, not swallowed
   onStatus(cb: (status: SyncStatus) => void): () => void;
 };
 export function createSyncEngine(deps: { replica: Replica; outbox: Outbox; transport: SyncTransport; reconnectDelayMs?: number }): SyncEngine;
 export function createHttpTransport(opts: { baseUrl: string; token: string; fetchImpl?: typeof fetch; WebSocketImpl?: typeof WebSocket }): SyncTransport;
 ```
 
-**Behaviour (each line is a test):** first `start` on an empty replica bootstraps, stores the cursor, subscribes at it; a later `start` skips bootstrap and subscribes at the persisted cursor; every `{event}`/`{purge}` frame applies to the replica (duplicates are no-ops — re-delivery after reconnect is expected); `{caught-up, seq}` persists the cursor, flips status to `live`, and triggers a flush; stream close flips to `offline`/`connecting` and reconnects with delay; `flush` sends due batches **in order** and applies per-event results; transport rejection records failure with backoff (items retry later — never lost).
+**Behaviour (each line is a test):** an amendment-19 `error` frame is kept verbatim in `lastError()` and never advances the cursor (an errored stream has not caught up); first `start` on an empty replica bootstraps, stores the cursor, subscribes at it; a later `start` skips bootstrap and subscribes at the persisted cursor; every `{event}`/`{purge}` frame applies to the replica (duplicates are no-ops — re-delivery after reconnect is expected); `{caught-up, seq}` persists the cursor, flips status to `live`, and triggers a flush; stream close flips to `offline`/`connecting` and reconnects with delay; `flush` sends due batches **in order** and applies per-event results; transport rejection records failure with backoff (items retry later — never lost).
 
 - [ ] **Step 1: Write the failing engine test with a scripted fake transport**
 
@@ -4032,11 +4182,11 @@ function bootstrapBody(): BootstrapResponse {
           states: [{ id: 'todo', name: 'To do', category: 'open' }, { id: 'done', name: 'Done', category: 'terminal' }],
           transitions: [{ from: '*', to: 'done', rules: [] }, { from: '*', to: 'todo', rules: [] }],
         }, actorId: 'user_a', origin: 'server' }),
-        serverTime: '2026-08-20T00:00:00.000Z', seq: 1,
+        serverTime: '2026-08-20T00:00:00.000Z', seq: 1, workspaceSeq: 1,
       },
       {
         ...newSubmittedEvent({ workspaceId: WS, entity: { kind: 'ticket-type', id: 'task' }, type: 'ticket-type.defined', payload: { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf', fields: [] }, actorId: 'user_a', origin: 'server' }),
-        serverTime: '2026-08-20T00:00:00.000Z', seq: 1,
+        serverTime: '2026-08-20T00:00:00.000Z', seq: 1, workspaceSeq: 2,
       },
     ],
     tickets: [],
@@ -4072,7 +4222,7 @@ function fakeTransport(script: Script): SyncTransport {
 async function fixture(syncImpl?: Script['syncImpl']) {
   const script: Script = {
     bootstraps: 0, subscribes: [], syncBatches: [], handlers: null,
-    syncImpl: syncImpl ?? (async (events) => events.map((e, i) => ({ status: 'committed' as const, eventId: e.id, seq: i + 1, serverTime: '2026-08-20T02:00:00.000Z' }))),
+    syncImpl: syncImpl ?? (async (events) => events.map((e, i) => ({ status: 'committed' as const, eventId: e.id, seq: i + 1, workspaceSeq: 100 + i, serverTime: '2026-08-20T02:00:00.000Z' }))),
   };
   const storage = createBetterSqliteStorage();
   const replica = await createReplica({ storage });
@@ -4111,7 +4261,7 @@ describe('sync engine lifecycle', () => {
     const ticketId = newUlid();
     const created: SyncItem = {
       ...newSubmittedEvent({ workspaceId: WS, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.created', payload: { typeId: 'task', projectId: PROJECT, parentId: null, title: 'Streamed' }, actorId: 'user_a', origin: 'server' }),
-      serverTime: '2026-08-20T02:00:00.000Z', seq: 1,
+      serverTime: '2026-08-20T02:00:00.000Z', seq: 1, workspaceSeq: 20,
     };
     script.handlers!.onItem(created);
     await vi.waitFor(async () => expect(await replica.getTicket(ticketId)).not.toBeNull());
@@ -4139,7 +4289,7 @@ describe('sync engine lifecycle', () => {
     const { script, outbox, engine } = await fixture(async (events) => {
       calls += 1;
       if (calls === 1) throw new Error('network down');
-      return events.map((e) => ({ status: 'committed' as const, eventId: e.id, seq: 1, serverTime: '2026-08-20T02:00:00.000Z' }));
+      return events.map((e, i) => ({ status: 'committed' as const, eventId: e.id, seq: 1, workspaceSeq: 200 + i, serverTime: '2026-08-20T02:00:00.000Z' }));
     });
     await engine.start(WS);
     const e1 = newSubmittedEvent({ workspaceId: WS, entity: { kind: 'ticket', id: newUlid() }, type: 'ticket.created', payload: { typeId: 'task', projectId: PROJECT, parentId: null, title: 'Retry me' }, actorId: 'user_a', origin: 'desktop' });
@@ -4160,6 +4310,20 @@ describe('sync engine lifecycle', () => {
     expect(statuses).toContain('connecting');
     engine.stop();
   });
+
+  it('PLANTED DEFECT: an error frame is kept verbatim and does NOT advance the cursor', async () => {
+    const { script, engine, replica } = await fixture();
+    await engine.start(WS);
+    const before = await replica.getCursor(WS);
+    expect(engine.lastError()).toBeNull();
+    script.handlers!.onError({ code: 'not-a-member', message: 'not a member of this workspace' });
+    // The server named a reason; the engine keeps it word for word so a shell can
+    // show it. Swallowing it would leave the user staring at a stream that has
+    // silently stopped delivering.
+    expect(engine.lastError()).toEqual({ code: 'not-a-member', message: 'not a member of this workspace' });
+    expect(await replica.getCursor(WS)).toBe(before); // an errored stream has NOT caught up
+    engine.stop();
+  });
 });
 ```
 
@@ -4177,7 +4341,12 @@ import type { SubmittedEvent } from '@gisik-nokma/domain';
 import type { BootstrapResponse, Replica, SyncItem } from '../replica/replica.js';
 import type { Outbox, SyncEventResult } from '../outbox/outbox.js';
 
-export type StreamHandlers = { onItem(item: SyncItem): void; onCaughtUp(seq: number): void; onClose(): void };
+export type StreamHandlers = {
+  onItem(item: SyncItem): void;
+  onCaughtUp(seq: number): void;
+  onError(err: { code: string; message: string }): void;
+  onClose(): void;
+};
 export type StreamHandle = { close(): void };
 export type SyncTransport = {
   bootstrap(workspaceId: string): Promise<BootstrapResponse>;
@@ -4191,6 +4360,8 @@ export type SyncEngine = {
   stop(): void;
   flush(): Promise<void>;
   status(): SyncStatus;
+  /** The last error frame the server sent on this stream (amendment 19), or null. */
+  lastError(): { code: string; message: string } | null;
   onStatus(cb: (status: SyncStatus) => void): () => void;
 };
 
@@ -4215,6 +4386,7 @@ export function createSyncEngine(deps: {
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let applyChain: Promise<unknown> = Promise.resolve(); // frames apply strictly in arrival order
   let flushing: Promise<void> | null = null;
+  let lastStreamError: { code: string; message: string } | null = null;
   const statusListeners = new Set<(s: SyncStatus) => void>();
 
   function setStatus(next: SyncStatus): void {
@@ -4238,6 +4410,12 @@ export function createSyncEngine(deps: {
             await engine.flush();
           })
           .catch(() => undefined);
+      },
+      onError: (err) => {
+        // The server named a reason (not-a-member, bad-message, …). Record it and
+        // do NOT advance the cursor: a stream that errors has not caught up, and
+        // pretending otherwise would silently skip whatever it did not send.
+        lastStreamError = err;
       },
       onClose: () => {
         handle = null;
@@ -4301,6 +4479,7 @@ export function createSyncEngine(deps: {
     },
 
     status: () => currentStatus,
+    lastError: () => lastStreamError,
 
     onStatus(cb) {
       statusListeners.add(cb);
@@ -4354,15 +4533,25 @@ export function createHttpTransport(opts: {
       const socket = new WS(wsUrl, [`bearer.${opts.token}`]); // token via subprotocol — see Open questions (Plan 5 owns the handshake)
       socket.onopen = () => socket.send(JSON.stringify({ type: 'subscribe', workspaceId, afterSeq }));
       socket.onmessage = (msg: MessageEvent) => {
+        // Amendment 19: purge/caught-up/error carry workspaceId. This socket holds ONE
+        // subscription, so a frame for another workspace is a server bug or a crossed
+        // stream — drop it rather than advancing this workspace's cursor with a number
+        // that means nothing here.
         const frame = JSON.parse(String(msg.data)) as
-          | { type: 'event'; envelope: unknown }
-          | { type: 'purge'; entityId: string }
-          | { type: 'caught-up'; seq: number }
+          | { type: 'event'; envelope: { workspaceId?: string } }
+          | { type: 'purge'; workspaceId: string; entityId: string }
+          | { type: 'caught-up'; workspaceId: string; seq: number }
+          | { type: 'error'; workspaceId: string | null; code: string; message: string }
           | { type: 'ping' };
         if (frame.type === 'event') handlers.onItem(frame.envelope as never);
-        else if (frame.type === 'purge') handlers.onItem({ kind: 'purge', entityId: frame.entityId });
-        else if (frame.type === 'caught-up') handlers.onCaughtUp(frame.seq);
-        else if (frame.type === 'ping') socket.send(JSON.stringify({ type: 'pong' }));
+        else if (frame.type === 'purge') {
+          if (frame.workspaceId === workspaceId) handlers.onItem({ kind: 'purge', entityId: frame.entityId });
+        } else if (frame.type === 'caught-up') {
+          if (frame.workspaceId === workspaceId) handlers.onCaughtUp(frame.seq);
+        } else if (frame.type === 'error') {
+          // Never silent: the engine's word reaches the user, and the cursor does not move.
+          handlers.onError({ code: frame.code, message: frame.message });
+        } else if (frame.type === 'ping') socket.send(JSON.stringify({ type: 'pong' }));
       };
       socket.onclose = () => handlers.onClose();
       socket.onerror = () => socket.close();
@@ -4419,7 +4608,7 @@ export type ReplicaQuery = {
   getTicket(ticketId: string): Promise<(ReplicaTicket & { pending: PendingTicket | null }) | null>;
   listTickets(workspaceId: string): Promise<TicketSummary[]>;   // confirmed + pending-created, badged
   listContests(workspaceId: string, filter?: { ticketId?: string; claimantId?: string; open?: boolean }): Promise<LocalContest[]>;
-  listEntityEvents(ticketId: string): Promise<EventEnvelope[]>;
+  listEntityEvents(ticketId: string): Promise<LedgerEvent[]>;
   myWork(workspaceId: string, userId: string): Promise<{ assigned: TicketSummary[]; claimsInTransit: TicketSummary[]; contested: LocalContest[] }>;
   search(workspaceId: string, text: string): Promise<{ offlineCopy: true; hits: Array<{ ticketId: string; title: string }> }>;
   syncStatus(workspaceId: string): Promise<{ status: SyncStatus; queued: number; failed: number }>;
@@ -4475,10 +4664,13 @@ async function fixture() {
   // ^ require-comment rule literal: copy the exact shape from a Plan 2 fixture
   //   (grep -l "require-comment" packages/rule-engine/fixtures)
   let seq = 0;
-  const committed = (entity: EventEnvelope['entity'], type: string, payload: unknown, s?: number): EventEnvelope => ({
+  let streamSeq = 0;
+  // A server-shaped LedgerEvent (§18): per-entity seq plus the workspace stream position.
+  const committed = (entity: EventEnvelope['entity'], type: string, payload: unknown, s?: number): LedgerEvent => ({
     ...newSubmittedEvent({ workspaceId: WS, entity, type, payload, actorId: 'user_a', origin: 'server' }),
     serverTime: '2026-08-20T00:00:00.000Z',
     seq: s ?? (seq += 1),
+    workspaceSeq: (streamSeq += 1),
   });
   await replica.loadBootstrap({
     workspaceId: WS, me: { userId: 'user_a', workspaceRole: 'member', projectIds: [PROJECT] }, streamSeq: 0,
@@ -4549,14 +4741,14 @@ describe('replica DataSource', () => {
     const off = ds.subscribe(WS, 0, () => { fired += 1; });
     await replica.applyServerItem({
       ...newSubmittedEvent({ workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'ticket.field_set', payload: { fieldId: 'notes', value: 'server side' }, actorId: 'user_b', origin: 'server' }),
-      serverTime: '2026-08-20T03:00:00.000Z', seq: 3,
+      serverTime: '2026-08-20T03:00:00.000Z', seq: 3, workspaceSeq: 30,
     });
     expect(fired).toBeGreaterThan(0);
     off();
     const at = fired;
     await replica.applyServerItem({
       ...newSubmittedEvent({ workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'ticket.field_set', payload: { fieldId: 'notes', value: 'again' }, actorId: 'user_b', origin: 'server' }),
-      serverTime: '2026-08-20T03:01:00.000Z', seq: 4,
+      serverTime: '2026-08-20T03:01:00.000Z', seq: 4, workspaceSeq: 31,
     });
     expect(fired).toBe(at);
   });
@@ -4597,7 +4789,7 @@ export type ReplicaQuery = {
   getTicket(ticketId: string): Promise<(ReplicaTicket & { pending: PendingTicket | null }) | null>;
   listTickets(workspaceId: string): Promise<TicketSummary[]>;
   listContests(workspaceId: string, filter?: { ticketId?: string; claimantId?: string; open?: boolean }): Promise<LocalContest[]>;
-  listEntityEvents(ticketId: string): Promise<EventEnvelope[]>;
+  listEntityEvents(ticketId: string): Promise<LedgerEvent[]>;
   myWork(workspaceId: string, userId: string): Promise<{ assigned: TicketSummary[]; claimsInTransit: TicketSummary[]; contested: LocalContest[] }>;
   search(workspaceId: string, text: string): Promise<{ offlineCopy: true; hits: Array<{ ticketId: string; title: string }> }>;
   syncStatus(workspaceId: string): Promise<{ status: SyncStatus; queued: number; failed: number }>;
@@ -4747,7 +4939,7 @@ the badge; search confesses it reads the offline copy."
 // contests/contest-view-model.ts
 export type ContestLike = {
   contestedEventId: string; ticketId: string; claimantId: string; rule: string; reason: string;
-  original: SubmittedEvent; contestedAt: string; resolved: boolean; resolution: string | null;
+  originalEvent: SubmittedEvent; contestedAt: string; resolved: boolean; resolution: string | null;
 };
 export type IngestFn = (events: SubmittedEvent[]) => Promise<Array<{ status: string; eventId: string | null } & Record<string, unknown>>>;
 export type ResolveContestInput =
@@ -4757,7 +4949,9 @@ export type ResolveContestInput =
 export function resolveContest(ingest: IngestFn, contest: ContestLike, input: ResolveContestInput, actor: { userId: string; origin: Origin }): Promise<{ ok: boolean; refused?: { rule: string; reason: string } }>;
 
 // contests/contest-banner.tsx
-export function ContestBanner(props: { contests: ContestLike[]; onResolve(contest: ContestLike, input: ResolveContestInput): void }): JSX.Element | null;
+export function ContestBanner(props: { contests: ContestLike[]; onResolve(contest: ContestLike, input: ResolveContestInput): void; onRedo(contest: ContestLike): void }): JSX.Element | null;
+// onRedo is separate from onResolve on purpose: a redo needs a FRESH envelope, and
+// resolveContest throws if handed the contested claim back as `replacementEvent`.
 
 // offline/reopen-pair.ts
 export function buildReopenPair(input: {
@@ -4882,7 +5076,7 @@ Run: `pnpm vitest run test/reopen-pair.test.ts` (from `packages/app-core/`) → 
 
 ```tsx
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { newSubmittedEvent } from '@gisik-nokma/domain';
 import { resolveContest, type ContestLike } from '../src/contests/contest-view-model.js';
 import { ContestBanner } from '../src/contests/contest-banner.js';
@@ -4896,7 +5090,7 @@ function contest(): ContestLike {
     claimantId: 'user_b',
     rule: 'restrict-to',
     reason: 'Only the assignee may do this.',
-    original: newSubmittedEvent({
+    originalEvent: newSubmittedEvent({
       workspaceId: 'ws_1', entity: { kind: 'ticket', id: TICKET }, type: 'ticket.transitioned',
       payload: { toStateId: 'done' }, actorId: 'user_b', origin: 'mobile',
     }),
@@ -4908,7 +5102,7 @@ function contest(): ContestLike {
 
 describe('ContestBanner', () => {
   it('names what was claimed, by whom, when, and which rule now refuses it', () => {
-    render(<ContestBanner contests={[contest()]} onResolve={() => undefined} />);
+    render(<ContestBanner contests={[contest()]} onResolve={() => undefined} onRedo={() => undefined} />);
     const banner = screen.getByRole('alert');
     expect(banner.textContent).toContain('user_b');
     expect(banner.textContent).toContain('ticket.transitioned');
@@ -4920,8 +5114,18 @@ describe('ContestBanner', () => {
   });
 
   it('renders nothing when there is nothing contested — no empty chrome', () => {
-    const { container } = render(<ContestBanner contests={[]} onResolve={() => undefined} />);
+    const { container } = render(<ContestBanner contests={[]} onResolve={() => undefined} onRedo={() => undefined} />);
     expect(container.innerHTML).toBe('');
+  });
+
+  it('planted defect: Redo goes to onRedo, NEVER to onResolve with the contested envelope as the replacement', () => {
+    const onResolve = vi.fn();
+    const onRedo = vi.fn();
+    const c = contest();
+    render(<ContestBanner contests={[c]} onResolve={onResolve} onRedo={onRedo} />);
+    fireEvent.click(screen.getByRole('button', { name: /redo/i }));
+    expect(onRedo).toHaveBeenCalledWith(c);
+    expect(onResolve).not.toHaveBeenCalled(); // handing back c.originalEvent would throw in resolveContest
   });
 });
 
@@ -4983,7 +5187,7 @@ describe('resolveContest', () => {
     const ingest = vi.fn(async () => []);
     const c = contest();
     await expect(
-      resolveContest(ingest, c, { resolution: 'redone', replacementEvent: c.original }, { userId: 'user_b', origin: 'desktop' }),
+      resolveContest(ingest, c, { resolution: 'redone', replacementEvent: c.originalEvent }, { userId: 'user_b', origin: 'desktop' }),
     ).rejects.toThrow(/fresh envelope/);
     expect(ingest).not.toHaveBeenCalled();
   });
@@ -5005,7 +5209,7 @@ import {
 
 export type ContestLike = {
   contestedEventId: string; ticketId: string; claimantId: string; rule: string; reason: string;
-  original: SubmittedEvent; contestedAt: string; resolved: boolean; resolution: string | null;
+  originalEvent: SubmittedEvent; contestedAt: string; resolved: boolean; resolution: string | null;
 };
 
 export type IngestFn = (
@@ -5031,11 +5235,11 @@ export async function resolveContest(
   const entity = { kind: 'ticket' as const, id: contest.ticketId };
   const resolutionEvent = (payload: Record<string, unknown>): SubmittedEvent =>
     newSubmittedEvent({
-      workspaceId: contest.original.workspaceId, entity, type: 'claim.contested_resolved',
+      workspaceId: contest.originalEvent.workspaceId, entity, type: 'claim.contested_resolved',
       payload, actorId: actor.userId, origin: actor.origin,
     });
 
-  if (input.resolution === 'redone' && input.replacementEvent.id === contest.original.id) {
+  if (input.resolution === 'redone' && input.replacementEvent.id === contest.originalEvent.id) {
     // The original id is already contested — re-sending it would idempotently
     // re-answer 'contested'. A redo is a FRESH claim: fail loudly, not quietly.
     throw new Error('redone requires a fresh envelope: the replacement must not reuse the contested claim id');
@@ -5046,8 +5250,8 @@ export async function resolveContest(
     events = [resolutionEvent({ contestedEventId: contest.contestedEventId, resolution: 'discarded', ...(input.note === undefined ? {} : { note: input.note }) })];
   } else if (input.resolution === 'converted-to-comment') {
     const comment = newSubmittedEvent({
-      workspaceId: contest.original.workspaceId, entity, type: 'comment.added',
-      payload: { body: plainTextToDoc(renderContestedClaimText({ original: contest.original, rule: contest.rule, reason: contest.reason })) },
+      workspaceId: contest.originalEvent.workspaceId, entity, type: 'comment.added',
+      payload: { body: plainTextToDoc(renderContestedClaimText({ originalEvent: contest.originalEvent, rule: contest.rule, reason: contest.reason })) },
       actorId: actor.userId, origin: actor.origin,
     });
     events = [comment, resolutionEvent({ contestedEventId: contest.contestedEventId, resolution: 'converted-to-comment', commentEventId: comment.id })];
@@ -5078,6 +5282,7 @@ import type { ContestLike, ResolveContestInput } from './contest-view-model.js';
 export function ContestBanner(props: {
   contests: ContestLike[];
   onResolve(contest: ContestLike, input: ResolveContestInput): void;
+  onRedo(contest: ContestLike): void;
 }): JSX.Element | null {
   const open = props.contests.filter((c) => !c.resolved);
   if (open.length === 0) return null;
@@ -5086,10 +5291,10 @@ export function ContestBanner(props: {
       {open.map((c) => (
         <div className="contest-banner__item" key={c.contestedEventId}>
           <p className="contest-banner__claim">
-            {renderContestedClaimText({ original: c.original, rule: c.rule, reason: c.reason })}
+            {renderContestedClaimText({ originalEvent: c.originalEvent, rule: c.rule, reason: c.reason })}
           </p>
           <div className="contest-banner__actions">
-            <button className="contest-banner__action" type="button" onClick={() => props.onResolve(c, { resolution: 'redone', replacementEvent: c.original })}>
+            <button className="contest-banner__action" type="button" onClick={() => props.onRedo(c)}>
               Redo legally
             </button>
             <button className="contest-banner__action" type="button" onClick={() => props.onResolve(c, { resolution: 'converted-to-comment' })}>
@@ -5106,9 +5311,9 @@ export function ContestBanner(props: {
 }
 ```
 
-(The "Redo legally" button hands the ORIGINAL event to `onResolve` as a starting point; the host view opens its edit affordance to let the user amend it into a legal claim, then calls `resolveContest` with the amended replacement. The banner itself stays dumb.)
+(The "Redo legally" button calls `onRedo`, NOT `onResolve` — deliberately. A redo is a *fresh* claim: `resolveContest` throws when handed the contested envelope back as `replacementEvent` (the planted defect above), so the banner must never present the contested event under that name. `onRedo` hands the host the contest; the host opens its edit affordance seeded from `contest.originalEvent`, builds a NEW envelope with `newSubmittedEvent`, and only then calls `resolveContest(…, { resolution: 'redone', replacementEvent: fresh })`. The banner itself stays dumb.)
 
-Run: `pnpm vitest run test/contests.test.tsx` → PASS (7 tests).
+Run: `pnpm vitest run test/contests.test.tsx` → PASS (8 tests).
 
 - [ ] **Step 5: Skew badge + status bar (failing test, then implement)**
 
@@ -6723,7 +6928,7 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
       <Text>State: {state?.stateId} {ticket.pending !== null ? '(claim in transit)' : ''}</Text>
       {openContests.map((c) => (
         <View key={c.contestedEventId} accessibilityRole="alert">
-          <Text>Contested: {c.original.type} by {c.claimantId} at {c.original.clientTime} — {c.rule}: {c.reason}</Text>
+          <Text>Contested: {c.originalEvent.type} by {c.claimantId} at {c.originalEvent.clientTime} — {c.rule}: {c.reason}</Text>
           <Button title="Convert to comment" onPress={() => onResolve(c, 'converted-to-comment')} />
           <Button title="Discard" onPress={() => onResolve(c, 'discarded')} />
         </View>
@@ -6792,7 +6997,7 @@ Legend: ✅ user-observable · ⚙️ internal subsystem
 - ⚙️ **Sync ingress `POST /v1/sync`** — ordered batches; idempotent on retries (duplicate ids re-answer from the ledger, prior contests re-answer from `proj_contested`); refusals append contests; interactive `/v1/events` never records contests. `apps/server/src/sync/`
 - ⚙️ **Replica bootstrap `GET /v1/sync/bootstrap`** — visibility-scoped snapshot set + per-entity event tails + full comment/contest backfill, one consistent cut with the stream cursor. `apps/server/src/sync/sync-routes.ts`
 - ⚙️ **Snapshot writer** — periodic per-ticket snapshots into Plan 1's `snapshots` table, folded by the domain reducer so snapshot+tail ≡ replay. `apps/server/src/sync/snapshot-writer.ts`
-- ⚙️ **Stream cursor `events.global_seq`** — workspace-monotone arrival ordinal backing `afterSeq`/`caught-up`; envelope `seq` stays per-entity. `apps/server/migrations/`
+- ⚙️ **Stream cursor `events.workspace_seq`** — the per-workspace cursor (coordination §18, shipped by the foundation plan) is what `afterSeq`/`caught-up` resume by; this plan closes the read half (`readStreamSeq`, `visibleEventsFor`). Envelope `seq` stays per-entity. `apps/server/src/sync/stream-seq.ts`
 - ⚙️ **Contested-claims projection `proj_contested`** + `GET /v1/contests` read surface (visibility-filtered). `apps/server/src/projections/contested.ts`
 - ⚙️ **Contest rule enforcement** — `contest.server-only`, `contest.unknown`, `contest.already-resolved`, `contest.wrong-ticket` in the shared engine, fixture-proven in every build. `packages/rule-engine/src/contests.ts`
 - ⚙️ **One storage interface** — SQLite behind `SyncStorage` (op-sqlite / tauri-plugin-sql / better-sqlite3) with a shared conformance suite; replica read model folded by domain reducers, never server projections. `packages/sync-client/src/storage/`
@@ -6827,10 +7032,10 @@ Test files: packages/domain/test/{contest-events,clock-skew}.test.ts · packages
 - 12.12 ✅ bootstrap: snapshot+tail for exactly the visible tickets; invisible tickets leave no trace in the response — planted defect (bootstrap.test.ts)
 - 12.13 ✅ bootstrap backfills comments/attachments/contests older than the snapshot; guests get definitions + explicit tickets only (bootstrap.test.ts)
 - 12.14 ✅ snapshot writer: snapshot equals the reducer fold byte-for-byte; next pass folds from the previous snapshot — planted defect (snapshot-writer.test.ts)
-- 12.15 ✅ `global_seq` stream cursor is workspace-scoped and monotone with arrivals (stream-seq.test.ts)
+- 12.15 ✅ `readStreamSeq` is 0 for an empty workspace, workspace-SCOPED (two workspaces both start at 1), and advances across different entities whose per-entity seq is both 1 (stream-seq.test.ts)
 
 ## Replica, outbox & pre-check
-- 12.16 ✅ replica read model is the domain reducer's fold; contests fold beside state, never into it (replica.test.ts)
+- 12.16 ✅ replica read model is the domain reducer's fold; contests fold beside state, never into it; the local ledger stores BOTH sequences it was handed — per-entity `seq` and `workspace_seq` (§18) — rather than inventing an order (replica.test.ts)
 - 12.17 ✅ duplicate stream delivery is a no-op (replica.test.ts)
 - 12.18 ✅ purge removes every local trace: unreadable, unsearchable, gone from raw SQLite; only the user's own contested-claim stubs survive — planted defect (replica.test.ts, S4)
 - 12.19 ✅ local pre-check refuses instantly with the named rule and queues nothing — planted defect (precheck.test.ts)
@@ -6841,7 +7046,7 @@ Test files: packages/domain/test/{contest-events,clock-skew}.test.ts · packages
 - 12.24 ✅ offline search names its source (`offlineCopy: true` → "searching offline copy") (data-source.test.ts, board-screen)
 
 ## Contested-claim UX & reopen
-- 12.25 ✅ banner names what was claimed, by whom, when, and the refusing rule; renders nothing when empty (contests.test.tsx)
+- 12.25 ✅ banner names what was claimed, by whom, when, and the refusing rule; renders nothing when empty; PLANTED DEFECT — Redo routes to `onRedo`, never to `onResolve` with the contested envelope as the replacement (contests.test.tsx)
 - 12.26 ✅ discard emits one attributed resolution event; convert emits the linked comment carrying the claim text; redo links its replacement (contests.test.tsx)
 - 12.27 ✅ reopen pair: parent transition with cause first, child unchanged second (reopen-pair.test.ts)
 - 12.28 ✅ clock-skew badge: gross skew renders attributed; sub-threshold renders nothing; unreadable claims flagged — planted defect (skew-and-status.test.tsx)
@@ -6879,7 +7084,7 @@ named as manual instead of pretended."
 
 ## Open questions (owner / reconciliation review)
 
-1. **`global_seq` cursor (Task 3) — needs Plan 4/5 sign-off.** The contract's `afterSeq` cannot be per-entity `seq` for a workspace stream (per-entity seq restarts at 1 per entity; `seq > afterSeq` skips new entities' early events). This plan adds `events.global_seq` and points `visibleEventsFor`'s WHERE/ORDER at it — a surgical change to Plan 4's file, with Plan 4's cursor-sensitive tests updated. Plan 5's `/v1/stream` must send `caught-up.seq` = the high-water `global_seq` (its `visibleEventsFor` pass-through needs no other change). Identity backfill order on pre-existing dev rows is arbitrary — fine pre-launch, worth a note in Plan 11's deploy.
+1. **Stream cursor — RESOLVED to coordination amendment 18, no sign-off outstanding.** An earlier draft of this plan proposed its own `events.global_seq` identity column. That is withdrawn: amendment 18 already pins `events.workspace_seq bigint` with `UNIQUE (workspace_id, workspace_seq)`, assigned inside the ingest transaction under a per-workspace advisory lock, and Plan 1 has landed the schema, `lockWorkspace` and `nextWorkspaceSeq`. Task 3 now consumes that column and finishes the one half amendment 18 still lists as pending — Plan 4's `visibleEventsFor` filtering and ordering by `workspace_seq` — with Plan 4's cursor-sensitive tests updated. Plan 5's `/v1/stream` sends `caught-up.seq` = the high-water `workspace_seq` for that workspace (`readStreamSeq`); its `visibleEventsFor` pass-through needs no other change. Two consequences worth stating: a cursor is meaningful only within its own workspace (a multi-workspace socket must keep one per subscription), and an identity/sequence column must NOT be substituted — it is assigned before COMMIT but becomes visible after it, so a reader can pass a number that later appears.
 2. **Clock-skew flag is derived, not stored.** Spec §5 says "ingest flags gross skew"; Plan 1's ingest stores both clocks and flags nothing. Since both timestamps are immutable in the envelope, this plan derives the flag (`hasGrossClockSkew`) at render — deterministic and rebuild-safe. If the owner wants an ingest-time *persisted* flag (e.g. for server-side reporting), it is an additive projection later; nothing here blocks it.
 3. **`visibility.not-visible` enforcement parity.** This plan's sync door pre-checks `canSee` for events on existing tickets. Interactive `/v1/events` (Plan 1/5) does NOT visibility-check writes today — an online user who lost visibility mid-session gets an engine-level answer only if some rule happens to catch it. Plan 5 should add the same `canSee` write-check to `/v1/events` (refusal, no contest) so the two doors agree; rule id `visibility.not-visible` is exported from `sync-service.ts` for exactly that reuse.
 4. **Contests on non-ticket entities respond `refused`, not `contested`** (no ticket to attach the contest to — e.g. an offline-authored `workflow.defined`). The apps do not author non-ticket events offline in this plan, so the path is theoretical; if a later plan adds offline workflow editing, decide where such contests should live.
@@ -6889,11 +7094,12 @@ named as manual instead of pretended."
 8. **Plan 7 editor bridge assumption.** `EDITOR_BRIDGE` frame names (`editor-ready`/`set-doc`/`doc-changed`) and `getEditorWebviewHtml(): string` are this plan's offer; the mobile fallback textarea page ships until Plan 7 lands. Reconciliation touches one file (`editor-web-view.tsx`).
 9. **Plan 9 push transport assumption.** `POST /v1/push/registrations {platform: 'expo', token}` with 404-tolerance. Plan 9 owns the server side and may rename — the stub is one file.
 10. **Interim session plumbing in the shells** (desktop localStorage token; mobile `EXPO_PUBLIC_DEV_*`; `actorId: me.assigneeId ?? 'me'` in the ticket screen) is explicitly temporary until Plan 6's session handling is the reference — each site is comment-marked. Plan 11 must not ship with these in place.
-11. **Route prefix drift** (`/v1/*` here and in Plans 1/5 vs Plan 4's `/api/*`): this plan follows the coordination doc's `/v1` pins. A series-wide prefix reconciliation belongs to Plan 5's review.
+11. **Route prefix — SETTLED by coordination amendment 20** (`/v1/*` is the whole product API; `/api/auth/*` is better-auth's vendor surface and the only `/api/` mount). Plan 4 registered its ticket reads at `/api/workspaces/…` before that amendment landed; the orchestrator moves them, and Plan 6 already consumes the `/v1/` path. Nothing in this plan changes either way — every route it adds is already `/v1/*`. Original note, kept for provenance: this plan follows the coordination doc's `/v1` pins. A series-wide prefix reconciliation belongs to Plan 5's review.
 12. **Contest resolution permissions.** Anyone who can submit events on the ticket can resolve a contest (engine checks existence/aim/single-resolution; visibility gates reads). If the owner wants resolution restricted (claimant + admins, say), that is a new engine rule on `claim.contested_resolved` — additive.
 13. **Reducer deps version pinning.** `buildLedgerDeps`/`buildLocalDeps` resolve workflow definitions latest-version-wins, matching the reducer's `getWorkflow(id)` call shape (no version argument). If Plan 3's reducer resolves by `ticket.workflowVersion` internally, both helpers must switch to keyed-by-version lookups — verify at execution against `packages/domain/src/ticket-state.ts` (marked in both files).
 14. **S3's exact rule name** (`unknown-state` vs `illegal-transition` vs `stranded-state`) is pinned to a single literal after the first green run — the scenario file carries the instruction. If the engine's answer surprises (e.g. `workflow-version`), that is a reconciliation finding for Plan 2.
-15. **Attention-strip wiring.** This plan supplies open contests per claimant (`query.myWork(...).contested`, `query.listContests`, `GET /v1/contests?claimantId=&open=true`); the attention strip itself belongs to app-core/Plan 9's extension points. Their "contested claims" bucket should read exactly these — if their extension-point signature differs, only the wiring line changes, not the data shape.
+15. **`claim.contested` payload field name — RECONCILED with Plan 9, no decision outstanding.** Amendment 16 pins the event ("payload = the original event, rule, reason") but not the field names, and the two plans spelled it differently: Plan 9's notification fan-out parses `{ originalEvent: { id, type, actorId, clientTime, … }, rule, reason }` (zod `.passthrough()`); this plan's registration carried `{ original: SubmittedEvent, rule, reason }`. Taken: **`{ originalEvent: SubmittedEvent, rule, reason }`** — Plan 9's field name, this plan's richness. This plan owns the registration and needs the whole envelope (the redo path re-issues it, the convert-to-comment path renders its payload, `proj_contested` stores it for the sync-time idempotency lookup), and a full `SubmittedEvent` under the key `originalEvent` satisfies Plan 9's schema unchanged — `id`, `type`, `actorId` and `clientTime` are all envelope fields, and the extra keys pass through. **Plan 9 needs no edit**; `contestedPayloadSchema` in its `fanout.ts` already validates what this plan now emits. The `proj_contested` / local `contests` column is `original_event` to match.
+16. **Attention-strip wiring.** This plan supplies open contests per claimant (`query.myWork(...).contested`, `query.listContests`, `GET /v1/contests?claimantId=&open=true`); the attention strip itself belongs to app-core/Plan 9's extension points. Their "contested claims" bucket should read exactly these — if their extension-point signature differs, only the wiring line changes, not the data shape.
 
 ## Execution notes
 
