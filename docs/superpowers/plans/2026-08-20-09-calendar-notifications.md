@@ -253,11 +253,10 @@ Then find every remaining statement of the day shape. Search for the **whole anc
 grep -rnF '/^\d{4}-\d{2}-\d{2}$/' packages/domain/src packages/app-core/src apps/server/src 2>/dev/null
 ```
 
-Expected hits, and nothing else:
+Expected hits — exactly one, and nothing else:
 1. `packages/domain/src/ist-day.ts` — the `IST_DAY_REGEX` declaration. This one stays; it is the origin.
-2. `packages/domain/src/ticket-types.ts` — Plan 3's `dueDateValueSchema`, which predates `ist-day.ts` and still states the shape itself. **Expected until Plan 3 is amended**; it belongs to the orchestrator, not to this task (Task 15 Step 1 carries the full note and the one-line fix). Do not edit another plan's file from here.
 
-Any *third* hit is a genuine re-declaration introduced since: delete it and import `IST_DAY_REGEX`.
+Plan 3's two former re-declarations are gone: its 2026-08-20 amendment made `dueDateValueSchema` (`packages/domain/src/ticket-types.ts`) and the engine's `date`-kind check (`packages/rule-engine/src/checks/fields.ts`) both import `IST_DAY_REGEX` instead of stating the literal. Any *second* hit is therefore a genuine re-declaration introduced since: delete it and import `IST_DAY_REGEX`.
 
 - [ ] **Step 5: Add the two shared fixtures**
 
@@ -5664,6 +5663,19 @@ git commit -m "saved filters: named FilterSpecs behind the preferences gateway �
 
 **Precondition:** Plan 6's `apps/web` Next.js shell exists (`ls apps/web/package.json`). The parallel wave normally merges Plan 6 first; if it has not, execute every other task, leave this one unchecked, and record the handoff for the orchestrator (Open questions 9). The logic this task wires — store, routes, `InboxView`, formatting — is already fully tested; this task is deliberately thin wiring, verified by typecheck plus a dev-server walk-through, with end-to-end smoke landing in Plan 6's flow suite.
 
+**Coordination with Plan 6 Task 14 Step 5b — check before you touch the shell, because either plan can carry the calendar mount.** Plan 6's Step 5b mounts this plan's `CalendarView` and `TimelineView` on the project page, gated on their existing; Plan 6's own precondition says that if they were absent it *skips* the step and hands the mount to this task. The two orders therefore need different work from you, and doing both is a double mount:
+
+```bash
+grep -n "CalendarView\|istToday()" "apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx"
+```
+
+(Quote the path — the brackets are Next.js route segments, not globs.)
+
+- **Hits (`CalendarView` in the `@gisik-nokma/app-core` import and the line `const today = istToday();`)** — Plan 6 Step 5b already landed the mount. This task then **verifies rather than re-adds**: confirm the four-way `board | list | calendar | timeline` tab chain renders and that `today` comes from `istToday()` and nothing else, and add no second mount, no second tab, no second day source. The Steps below stay as written — they only wire the inbox, which Step 5b does not touch.
+- **No hits, and Plan 6's Task 14 commit records the Step 5b skip** — the mount falls here. Follow Plan 6 Task 14 Step 5b's own steps verbatim (its import list, the widened `view` state, the two tab buttons, `const today = istToday();`, and the four-way chain), taking `istToday` from `apps/web/src/ist-today.ts` — Plan 6 Step 5a lands that helper unconditionally, precisely so this order works. Do not restate the mount here and do not write a second adapter or a second day source; Plan 6's step is the one description of that wiring, exactly as this plan's Task 8 is the one description of `toTicketDatesInput`.
+
+Everything below concerns the inbox only, and is the same in both orders — except that the nav layout is the file both plans modify, so re-read it before editing rather than assuming the shape Plan 6's Step 5 left.
+
 **Files:**
 - Create: `apps/web/src/lib/notifications-gateway.ts` (if the shell keeps code under a different root — e.g. `lib/` without `src/` — mirror its convention; `ls apps/web` first)
 - Create: `apps/web/app/inbox/page.tsx`
@@ -5877,7 +5889,18 @@ import { IST_TIME_ZONE, NOTIFICATION_KINDS, notificationPayloadSchemaByKind } fr
 
 const HERE = new URL('.', import.meta.url).pathname;
 const REPO_ROOT = resolve(HERE, '../../..');
-const SCANNED_ROOTS = ['packages/app-core/src', 'packages/domain/src', 'packages/ui/src', 'apps/server/src'];
+// Every source tree that can answer "when does a day start" — the rule engine
+// included, because the engine is where a day claim is ACCEPTED. Plan 3's
+// `checks/fields.ts` declared a standalone day regex there until the 2026-08-20
+// amendment; a root list that omits it is a guard that states an invariant it
+// does not enforce.
+const SCANNED_ROOTS = [
+  'packages/app-core/src',
+  'packages/domain/src',
+  'packages/rule-engine/src',
+  'packages/ui/src',
+  'apps/server/src',
+];
 const FORBIDDEN = /\b(velocity|burndown|forecast)\b/i;
 
 /**
@@ -5974,7 +5997,7 @@ describe('time has one origin (owner decision: time is Asia/Kolkata)', () => {
 Run: `pnpm --filter @gisik-nokma/app-core exec vitest run test/reporting-scope-guard.test.ts`
 Expected: PASS. If the vocabulary scan fails, the offender is real — rename the identifier or copy; never widen the regex's allowances. If a time scan fails, delete the duplicate and import from `@gisik-nokma/domain`; never add the offending file to an allow-list, because the allow-list would be the drift.
 
-**One expected failure has a named owner.** Plan 3's `dueDateValueSchema` in `packages/domain/src/ticket-types.ts` states the day shape with its own literal — it predates Plan 1's `ist-day.ts`. The fix is one line in Plan 3's file (`import { IST_DAY_REGEX } from './ist-day.js'`, then `z.string().regex(IST_DAY_REGEX, …)`), it is behaviour-preserving, and Plan 3's own day tests prove it. If that file has not already been amended when you reach this step, **hand it to the orchestrator rather than editing another plan's surface from inside this one**, and leave this task's step unchecked with the reason recorded. Everything else in this plan already imports the one regex.
+**No expected failures remain.** Plan 3 used to state the day shape twice with its own literals — `dueDateValueSchema` in `packages/domain/src/ticket-types.ts` and the engine's `date`-kind check in `packages/rule-engine/src/checks/fields.ts`, both predating Plan 1's `ist-day.ts`. Its 2026-08-20 amendment made both import `IST_DAY_REGEX`; the change is behaviour-preserving and Plan 3's own day tests prove it. So this scan should be clean on the first run, and the rule-engine root above is what keeps the second of those two honest. If you nonetheless see a hit in either file, the amendment did not land in your checkout: **hand it to the orchestrator rather than editing another plan's surface from inside this one**, and leave this task's step unchecked with the reason recorded. Everything in this plan already imports the one regex.
 
 - [ ] **Step 2: Append §11 to `Features.md`**
 
@@ -6121,7 +6144,8 @@ Flagged, never silently resolved. None blocks execution; each names the assumpti
     - **The day shape.** `IST_DAY_REGEX` replaces the three local `/^\d{4}-\d{2}-\d{2}$/` literals this plan used to declare (Task 1's pin, Task 3's `notifications.ts`, Task 8's `ticket-dates.ts`). The reason the app-core copy existed — "app-core does not depend on zod" — was never a reason not to import the regex: `ist-day.ts` is **dependency-free**, which is exactly why Plan 1 wrote it that way, and why Plan 10's offline replica can import the same file.
     - **The sweep.** `istDayOf` for the warning horizon, `istDayBounds` half-open for the staleness cut-off, with planted defects for both (cases 11.42, 11.43). This is the one place the decision changes *behaviour* rather than provenance.
     - **Rendering.** Every clock a view shows formats with `IST_TIME_ZONE` imported from the domain; the inbox's `enteredAt` goes through `istDayOf`. An executable scan in Task 15 keeps the zone string and the day regex to one file each.
-    - Carried to the orchestrator, not fixed here: Plan 3's `dueDateValueSchema` still declares its own day regex and should import `IST_DAY_REGEX` (one behaviour-preserving line, noted at Task 15 Step 1); Plan 6's shells must pass IST `today`/`anchor` and render clocks with `IST_TIME_ZONE`; Plan 5's attention windows share this plan's day semantics (Open questions 10).
+    - **The three items this question carried to the orchestrator are all discharged (2026-08-20); nothing about the day boundary is outstanding.** (a) Plan 3's day regex is now a shared import, in both places it was declared — `dueDateValueSchema` in `packages/domain/src/ticket-types.ts` and the engine's `date`-kind check in `packages/rule-engine/src/checks/fields.ts` both `import { IST_DAY_REGEX }` rather than restating the literal, and Task 15's scan now walks `packages/rule-engine/src` so the second one cannot quietly come back. (b) Plan 6's shell wires the decision: `istToday()` in `apps/web/src/ist-today.ts` is the one place the client turns the device's instant into a day, it feeds the `today` prop of both views (its Task 14 Steps 5a/5b), and every instant it shows a person goes through the domain's `formatIstInstant` with `IST_CLOCK_NOTE` naming the clock. (c) Plan 5's attention endpoint counts the same days this plan's sweep does — `istDayOf`/`istDayBounds`, compared half-open, with the boundary cases pinned as planted defects — so the strip and the inbox can no longer disagree about a ticket on the same afternoon.
+    - What survives is not a day-boundary question and is not this question's: the attention windows' *values* (this plan's 7-day approaching / 14-day staleness defaults versus Plan 5's `dueSoonDays`/`staleDays` from workspace settings) still have two sources and must eventually read one. That reconciliation stays open under Open questions 10, where it already lives. **Question 17 itself is settled.**
 
 ## Self-review (writing-plans skill checklist)
 

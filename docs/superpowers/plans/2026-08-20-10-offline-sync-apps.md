@@ -131,7 +131,7 @@ test-cases/12-offline-sync-apps.md
 
 **Files:**
 - Create: `packages/domain/src/events/contest-events.ts`
-- Create: `packages/domain/src/clock-skew.ts`
+- Create **or extend**: `packages/domain/src/clock-skew.ts` — Plan 6 runs in parallel and its Task 6 precondition creates this file with `formatIstInstant` and `IST_CLOCK_NOTE` alone, copied verbatim from this task's Step 5, if this plan has not landed yet. So check first (`ls packages/domain/src/clock-skew.ts`) and, if it is already there, add only what is missing — `clockSkewMs`, `GROSS_CLOCK_SKEW_MS`, `hasGrossClockSkew`, and any absent `index.ts` re-export — leaving the two definitions Plan 6 wrote byte-identical to Step 5's rather than rewriting them, because a formatter that differs between the two copies is exactly the second clock the amendment exists to prevent.
 - Create: `packages/domain/src/submit.ts`
 - Modify: `packages/domain/src/index.ts` (re-exports + registration import)
 - Test: `packages/domain/test/contest-events.test.ts`
