@@ -18,6 +18,9 @@
 - **Every refusal is proven against planted defects before it is trusted** (spec, honesty invariant 6). Every guarantee in this plan carries a planted-defect test.
 - **Closed, versioned event vocabulary** — unknown types are refused at ingest; new event types added here (`claim.contested`, `claim.contested_resolved`) are registered with strict zod payload schemas (spec §3).
 - **Both clocks are kept:** `clientTime` is the actor's claim, `serverTime` the system's fact; "ingest flags gross skew against server time, keeping both" (spec §5).
+- **Both clocks are absolute instants, and the replica stores exactly what it was handed.** Under the owner's Asia/Kolkata decision (2026-08-20) Plan 1 stores both `client_time` and `server_time` as `timestamptz`; the verbatim-text `client_time` is gone, so every readback through `rowToEnvelope` emits ISO 8601 **`Z`** at millisecond precision. A claim submitted as `…+05:30` comes back as the equivalent `…Z` — the same instant, minus the device's offset label. Consequences this plan lives with, all deliberate: the local SQLite `client_time`/`server_time` columns hold those Z strings, so **string order is instant order and string equality is instant equality** in the replica; and no fixture, assertion, or shell may expect an offset label to survive a round trip, because the server no longer has one to return.
+- **A day starts at IST midnight, and the replica computes it with the server's own code.** `@gisik-nokma/domain` ships `IST_TIME_ZONE`, `IST_OFFSET_MINUTES`, `IST_DAY_REGEX`, `istDayOf(instant)` and `istDayBounds(day)` (Plan 1, Task 4a). That module is **dependency-free** — no zod, no date library, no timezone database, nothing but arithmetic against the fixed +05:30 offset — and it was written that way precisely so an offline replica can import the identical file the server runs. Local read-model day math therefore uses those helpers and nothing else. **A replica that computed days differently from the server is exactly the silent disagreement this product refuses:** the same claim would sit in one calendar cell online and another offline, "due today" would be true on the desktop and false on the server, and nothing anywhere would report a conflict — a board that lies while every individual number looks right. The point of an offline copy is that it is a copy.
+- **Rendered timestamps in the shells use `IST_TIME_ZONE` from the domain** — never a `'Asia/Kolkata'` literal written into a component, never the device's locale. The device supplies the instant, which it owns; the domain supplies the day and the zone, which it owns.
 - **Replica = visibility-scoped event log + read model built from domain reducers** (`applyTicketEvent` + workflow defs), never the server's pg projections (coordination amendment 17).
 - **Package scope is `@gisik-nokma/*`** (coordination decision 1). `snake_case` for all SQL identifiers (CODING_STANDARDS). No colour literals outside `packages/ui/src/tokens.ts` (amendment 11).
 - **`reference/` is frozen** — never edit anything under it.
@@ -30,6 +33,7 @@
 From **Plan 1** (`@gisik-nokma/domain`, `apps/server`):
 - `type EventEnvelope = { id, workspaceId, entity: {kind, id}, type, version, payload, actorId, origin: 'web'|'mobile'|'desktop'|'server', clientTime, serverTime, seq }` (`seq` is PER-ENTITY); `type LedgerEvent = EventEnvelope & { workspaceSeq: number }` — what the ledger stores and what every server reader emits, the frozen envelope plus the per-workspace stream cursor (coordination §18); `type SubmittedEvent = Omit<EventEnvelope, 'serverTime'|'seq'>`; `submittedEventSchema`, `eventEnvelopeSchema`, `newUlid(): Ulid`, `ENTITY_KINDS`, `type EntityKind`, `ORIGINS`, `type Origin`.
 - `domainRegistry: EventTypeRegistry` with `register({type, version, payloadSchema})`; `parseEvent(raw, registry?): ParsedEvent | EnvelopeError`; `type EnvelopeErrorCode = 'malformed-envelope'|'unknown-event-type'|'unknown-event-version'|'invalid-payload'`.
+- IST day helpers (Task 4a, `packages/domain/src/ist-day.ts`): `IST_TIME_ZONE = 'Asia/Kolkata'`, `IST_OFFSET_MINUTES = 330`, `IST_DAY_REGEX`, `istDayOf(instant: string): string` (→ `YYYY-MM-DD`, throws `RangeError` naming the input when it is not an ISO instant with a stated offset), `istDayBounds(day: string): { startUtc: string; endUtc: string }` (**half-open** `[startUtc, endUtc)`, both ISO `Z` at millisecond precision). **The module has no dependencies** — that is a deliberate property of Plan 1's design, and this plan is the reason for it: a replica running inside Expo or Tauri imports the same file the server does, so both sides answer "which day is this?" identically or neither does.
 - `type IngestErrorCode = EnvelopeErrorCode | 'duplicate-event-id'`; `type IngestResult = {status:'committed'; eventId; seq; serverTime} | {status:'invalid'; eventId: string|null; code: IngestErrorCode; message} | {status:'refused'; eventId; rule; reason}`; `type IngestService = { ingestBatch(rawEvents: unknown[]): Promise<IngestResult[]>; onEventCommitted(listener): () => void }`; `createIngestService(deps)`.
 - `POST /v1/events` body `{events: [raw envelope, …]}` (1–100), response `{results: IngestResult[]}` index-aligned. Interactive refusals return without recording (amendment 16).
 - Ledger repo: `lockEntity(client, kind, id)`, `nextSeq(client, kind, id)`, `lockWorkspace(client, workspaceId)` and `nextWorkspaceSeq(client, workspaceId)` (§18 — the workspace lock is taken BEFORE the entity lock, one order so nothing deadlocks), `insertEvent(client, ledgerEvent)` (names `workspace_seq` among its columns), `readEntityEvents(clientOrPool, kind, id, afterSeq?)` → `LedgerEvent[]` in per-entity seq order, `rowToEnvelope(row): LedgerEvent`, `readLedger(clientOrPool)`, `rowToEnvelope(row)`, `isUniqueViolation(err, constraint)`.
@@ -74,7 +78,9 @@ From the **coordination doc** (amendments 9–17, consumed as pinned; Plans 5–
 packages/domain/src/
   events/contest-events.ts        # claim.contested + claim.contested_resolved schemas, registration,
                                   # renderContestedClaimText, plainTextToDoc
-  clock-skew.ts                   # clockSkewMs, hasGrossClockSkew, GROSS_CLOCK_SKEW_MS
+  clock-skew.ts                   # clockSkewMs, hasGrossClockSkew, GROSS_CLOCK_SKEW_MS,
+                                  # formatIstInstant + IST_CLOCK_NOTE (the one instant→text renderer)
+  ist-day.ts                      # READ ONLY (Plan 1's) — IST_TIME_ZONE, IST_DAY_REGEX, istDayOf, istDayBounds
   submit.ts                       # newSubmittedEvent — the one client-side envelope builder
 packages/rule-engine/src/
   contests.ts                     # evaluateClaimContested / evaluateClaimContestedResolved
@@ -137,9 +143,10 @@ test-cases/12-offline-sync-apps.md
   - `claimContestedPayloadSchema` / `type ClaimContestedPayload = { originalEvent: SubmittedEvent; rule: string; reason: string }` — event type `claim.contested` v1, entity = the ticket, **server-appended only** (Task 2 enforces).
   - `claimContestedResolvedPayloadSchema` / `type ClaimContestedResolvedPayload = { contestedEventId: string; resolution: 'redone'|'converted-to-comment'|'discarded'; replacementEventId?: string; commentEventId?: string; note?: string }` — `replacementEventId` required iff `redone`; `commentEventId` required iff `converted-to-comment` — event type `claim.contested_resolved` v1.
   - `CONTEST_EVENT_TYPES = ['claim.contested', 'claim.contested_resolved'] as const`.
-  - `renderContestedClaimText(payload: ClaimContestedPayload): string` — the human rendering used by "convert to comment" and the banner.
+  - `renderContestedClaimText(payload: ClaimContestedPayload): string` — the human rendering used by "convert to comment" and the banner; its timestamp goes through `formatIstInstant`, so a contested claim wears the same date here, on the calendar, and in the inbox.
   - `plainTextToDoc(text: string): Record<string, unknown>` — minimal ProseMirror doc (amendment 12: bodies are PM JSON).
   - `clockSkewMs(env: Pick<EventEnvelope, 'clientTime'|'serverTime'>): number | null` (null when `clientTime` unparseable); `GROSS_CLOCK_SKEW_MS = 600_000`; `hasGrossClockSkew(env): boolean`.
+  - `formatIstInstant(instant: string): string` — the ONE way this product prints an absolute instant to a person: `'21 Aug 2026, 00:00 IST'`. Built on Plan 1's `istDayOf` + `IST_OFFSET_MINUTES`, so the day it prints is the day the calendar places the same instant in. An unparseable instant comes back verbatim rather than as an invented time. `IST_CLOCK_NOTE: string` — `` `times are shown in ${IST_TIME_ZONE}` ``, the line a surface puts on a timestamp so a collaborator in another timezone knows which clock they are reading (the coordination doc's named consequence of the owner decision, made visible instead of assumed).
   - `newSubmittedEvent(input: { workspaceId: string; entity: EventEnvelope['entity']; type: string; payload: unknown; actorId: string; origin: Origin; version?: number; now?: () => Date }): SubmittedEvent` — the one client-side builder (ULID + clientTime).
 
 - [ ] **Step 1: Write the failing contest-events test**
@@ -157,6 +164,7 @@ import {
   renderContestedClaimText,
 } from '../src/events/contest-events.js';
 import { newSubmittedEvent } from '../src/submit.js';
+import { formatIstInstant } from '../src/clock-skew.js';
 import { makeEnvelope } from '../src/testing.js';
 
 const TICKET = '01J9GTKA000000000000000000';
@@ -225,9 +233,28 @@ describe('renderContestedClaimText', () => {
     const text = renderContestedClaimText({ originalEvent: o, rule: 'restrict-to', reason: 'Only the assignee may do this.' });
     expect(text).toContain('user_b');
     expect(text).toContain('ticket.transitioned');
-    expect(text).toContain(o.clientTime);
+    expect(text).toContain(formatIstInstant(o.clientTime));
     expect(text).toContain('restrict-to');
     expect(text).toContain('Only the assignee may do this.');
+  });
+
+  it('planted defect: the time is India time, not the raw instant — and it rolls at IST midnight', () => {
+    // The claim was made at 00:00 IST on 21 Aug, which is 18:30Z on the 20th.
+    // A banner printing the ISO string would tell the claimant their claim was
+    // made on the 20th, one IST day off from the date the same claim wears on
+    // the calendar, in its ticket history, and in the inbox.
+    const o = newSubmittedEvent({
+      workspaceId: 'ws_1',
+      entity: { kind: 'ticket', id: TICKET },
+      type: 'ticket.transitioned',
+      payload: { toStateId: 'done' },
+      actorId: 'user_b',
+      origin: 'mobile',
+      now: () => new Date('2026-08-20T18:30:00.000Z'),
+    });
+    const text = renderContestedClaimText({ originalEvent: o, rule: 'restrict-to', reason: 'Only the assignee may do this.' });
+    expect(text).toContain('21 Aug 2026, 00:00 IST');
+    expect(text).not.toContain('2026-08-20T18:30:00.000Z');
   });
 });
 
@@ -269,6 +296,7 @@ import { z } from 'zod';
 import { domainRegistry } from '../registry.js';
 import { submittedEventSchema } from '../envelope.js';
 import type { SubmittedEvent } from '../envelope.js';
+import { formatIstInstant } from '../clock-skew.js';
 
 /**
  * A sync-time refusal is never a silent drop: the server appends the refused
@@ -322,11 +350,22 @@ domainRegistry.register({
   payloadSchema: claimContestedResolvedPayloadSchema,
 });
 
-/** The banner line and the comment a conversion carries — attributed, dated, rule named. */
+/**
+ * The banner line and the comment a conversion carries — attributed, dated,
+ * rule named.
+ *
+ * The time is the claimant's own `clientTime`, printed in India time through
+ * the one formatter (owner decision: time is Asia/Kolkata). Not the raw ISO
+ * string: this text is read by a person — it goes on a ticket banner and,
+ * on "convert to comment", into a comment body that stays in the ledger
+ * forever — and a bare `2026-08-20T18:30:00.000Z` would be the only place in
+ * the product showing a claimant a UTC timestamp, one IST day off from the
+ * date the same claim wears everywhere else.
+ */
 export function renderContestedClaimText(payload: ClaimContestedPayload): string {
   const { originalEvent, rule, reason } = payload;
   return (
-    `Contested claim by ${originalEvent.actorId} at ${originalEvent.clientTime}: ` +
+    `Contested claim by ${originalEvent.actorId} at ${formatIstInstant(originalEvent.clientTime)}: ` +
     `${originalEvent.type} ${JSON.stringify(originalEvent.payload)} — refused by rule "${rule}": ${reason}`
   );
 }
@@ -389,15 +428,17 @@ export {
   type ClaimContestedResolvedPayload,
 } from './events/contest-events.js';
 export { newSubmittedEvent } from './submit.js';
-export { GROSS_CLOCK_SKEW_MS, clockSkewMs, hasGrossClockSkew } from './clock-skew.js';
+export { GROSS_CLOCK_SKEW_MS, IST_CLOCK_NOTE, clockSkewMs, formatIstInstant, hasGrossClockSkew } from './clock-skew.js';
 ```
+
+(`ist-day.ts`'s own exports — `IST_TIME_ZONE`, `IST_OFFSET_MINUTES`, `IST_DAY_REGEX`, `istDayOf`, `istDayBounds` — are already re-exported by Plan 1's `export * from './ist-day.js'`; do not add a second export line for them.)
 
 Note: if `newUlid` lives in a file other than `src/ids.ts`, locate it with `grep -rn "export function newUlid" packages/domain/src` and fix the import — do not create a second implementation.
 
 - [ ] **Step 4: Run the contest-events test to verify it passes**
 
 Run: `pnpm vitest run test/contest-events.test.ts`
-Expected: PASS (9 tests). The `clock-skew` export will fail compilation until Step 5 — if so, comment nothing out; proceed to Step 5 and run both together.
+Expected: PASS (10 tests, including the IST-midnight planted defect). The `clock-skew` export will fail compilation until Step 5 — if so, comment nothing out; proceed to Step 5 and run both together (contest-events imports `formatIstInstant` from it).
 
 - [ ] **Step 5: Write the failing clock-skew test, then implement**
 
@@ -405,7 +446,14 @@ Expected: PASS (9 tests). The `clock-skew` export will fail compilation until St
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { GROSS_CLOCK_SKEW_MS, clockSkewMs, hasGrossClockSkew } from '../src/clock-skew.js';
+import {
+  GROSS_CLOCK_SKEW_MS,
+  IST_CLOCK_NOTE,
+  clockSkewMs,
+  formatIstInstant,
+  hasGrossClockSkew,
+} from '../src/clock-skew.js';
+import { IST_TIME_ZONE, istDayOf } from '../src/ist-day.js';
 
 const SERVER = '2026-08-20T12:00:00.000Z';
 
@@ -432,20 +480,106 @@ describe('hasGrossClockSkew', () => {
     expect(hasGrossClockSkew({ clientTime: 'garbage', serverTime: SERVER })).toBe(true);
   });
 });
+
+describe('formatIstInstant', () => {
+  it('prints India time, and the day it prints is the day istDayOf gives', () => {
+    expect(formatIstInstant('2026-08-20T12:00:00.000Z')).toBe('20 Aug 2026, 17:30 IST');
+    expect(formatIstInstant('2026-08-20T00:00:00.000Z')).toBe('20 Aug 2026, 05:30 IST');
+  });
+
+  it('planted defect: the day rolls at IST midnight, not UTC midnight', () => {
+    // 18:29:59.999Z is 23:59:59 IST on the 20th; one millisecond later is the
+    // 21st. A formatter that printed the UTC day — or the device's day — would
+    // put these two on the same date and disagree with the calendar cell the
+    // same instant lands in.
+    expect(formatIstInstant('2026-08-20T18:29:59.999Z')).toBe('20 Aug 2026, 23:59 IST');
+    expect(formatIstInstant('2026-08-20T18:30:00.000Z')).toBe('21 Aug 2026, 00:00 IST');
+    // And it agrees with the helper the calendar uses, by construction.
+    expect(istDayOf('2026-08-20T18:29:59.999Z')).toBe('2026-08-20');
+    expect(istDayOf('2026-08-20T18:30:00.000Z')).toBe('2026-08-21');
+  });
+
+  it('reads the instant, not the label — the same moment stated two ways prints once', () => {
+    expect(formatIstInstant('2026-08-21T00:00:00.000+05:30')).toBe(formatIstInstant('2026-08-20T18:30:00.000Z'));
+  });
+
+  it('an unreadable instant travels verbatim — a time is never invented to fill the gap', () => {
+    expect(formatIstInstant('garbage')).toBe('garbage');
+  });
+
+  it('planted defect: a DAY claim is not given a time of day', () => {
+    // Date.parse('2026-08-20') is midnight UTC, which a naive formatter would
+    // print as '20 Aug 2026, 05:30 IST' — an hour and a half nobody claimed.
+    expect(formatIstInstant('2026-08-20')).toBe('2026-08-20');
+  });
+
+  it('names the clock it is showing, from the domain constant and not a literal', () => {
+    expect(IST_CLOCK_NOTE).toBe(`times are shown in ${IST_TIME_ZONE}`);
+  });
+});
 ```
 
 `packages/domain/src/clock-skew.ts`:
 
 ```ts
 import type { EventEnvelope } from './envelope.js';
+import { IST_DAY_REGEX, IST_OFFSET_MINUTES, IST_TIME_ZONE, istDayOf } from './ist-day.js';
 
 /**
  * Spec §5 Clocks: client wall time is recorded as the claim it is; gross skew
  * is flagged against server time, keeping both. Both timestamps are immutable
  * in the envelope, so the flag is DERIVED — deterministic, rebuildable, and
  * identical wherever it is computed (server history endpoint or client render).
+ *
+ * Both are absolute instants (Plan 1 Task 6: `timestamptz`, re-emitted as ISO
+ * 'Z'), which is what makes a subtraction meaningful at all — under the old
+ * verbatim-text client_time, '…+05:30' and '…Z' were unequal strings for one
+ * moment and this arithmetic would have needed a cast at every call site.
  */
 export const GROSS_CLOCK_SKEW_MS = 600_000; // 10 minutes
+
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** What a surface says beside a printed time, so nobody has to guess the clock. */
+export const IST_CLOCK_NOTE = `times are shown in ${IST_TIME_ZONE}`;
+
+/**
+ * The ONE way this product prints an absolute instant to a person:
+ * '21 Aug 2026, 00:00 IST'.
+ *
+ * The day component comes from `istDayOf`, so a printed timestamp and the
+ * calendar cell the same instant lands in can never disagree — the failure
+ * this would otherwise cause is quiet and total: a history line saying
+ * "20 Aug" beside a calendar marker on the 21st, with nothing to indicate
+ * which one is wrong.
+ *
+ * The time component is a constant +05:30 shift rather than an Intl lookup,
+ * for ist-day.ts's own reason (IST has no daylight saving, so there is no rule
+ * to look up) plus one this plan cares about specifically: React Native's
+ * Hermes runtime does not reliably ship a full timezone database, and a
+ * formatter that silently fell back to the device's zone on mobile would be
+ * the offline copy disagreeing with the server about when things happened.
+ *
+ * An unparseable instant is returned verbatim. It is someone's claim, however
+ * broken; replacing it with a plausible time would be inventing one. A DAY
+ * claim is returned verbatim too, and for a sharper reason: `Date.parse`
+ * happily accepts '2026-08-20' and calls it midnight UTC, which this function
+ * would then print as '20 Aug 2026, 05:30 IST' — a time of day nobody claimed,
+ * conjured out of a date. `istDayOf` refuses a date-only string for exactly
+ * this reason; a day is not an instant, and neither is it an instant with the
+ * hours guessed.
+ */
+export function formatIstInstant(instant: string): string {
+  if (IST_DAY_REGEX.test(instant)) return instant;
+  const ms = Date.parse(instant);
+  if (Number.isNaN(ms)) return instant;
+  const day = istDayOf(new Date(ms).toISOString());
+  const shifted = new Date(ms + IST_OFFSET_MINUTES * 60_000);
+  const hours = String(shifted.getUTCHours()).padStart(2, '0');
+  const minutes = String(shifted.getUTCMinutes()).padStart(2, '0');
+  const [year, month, date] = day.split('-');
+  return `${Number(date)} ${MONTH_SHORT[Number(month) - 1]} ${year}, ${hours}:${minutes} IST`;
+}
 
 export function clockSkewMs(env: Pick<EventEnvelope, 'clientTime' | 'serverTime'>): number | null {
   const client = Date.parse(env.clientTime);
@@ -463,7 +597,7 @@ export function hasGrossClockSkew(env: Pick<EventEnvelope, 'clientTime' | 'serve
 - [ ] **Step 6: Run the whole domain suite**
 
 Run (from `packages/domain/`): `pnpm test`
-Expected: PASS — all pre-existing tests plus the two new files. `pnpm typecheck` also clean.
+Expected: PASS — all pre-existing tests (Plan 1's `ist-day.test.ts` among them) plus the two new files. `pnpm typecheck` also clean. Watch the two IST planted defects fail first: make `formatIstInstant` slice the ISO string instead of calling `istDayOf`, and the 18:30:00Z case prints 20 Aug; put `originalEvent.clientTime` back into `renderContestedClaimText` raw, and the banner shows a UTC stamp. Restore both.
 
 - [ ] **Step 7: Commit**
 
@@ -1498,6 +1632,14 @@ describe('GET /v1/contests', () => {
     const contest = committed({
       id: newUlid(), workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'claim.contested', version: 1,
       payload: { originalEvent: original, rule: 'require-field', reason: 'planted' }, actorId: 'usr_member', origin: 'server',
+      // Both ledger clocks are timestamptz absolute instants (owner decision
+      // 2026-08-20). Every seeded time in this plan — here, in the harness, in
+      // any direct `appendTestEvent`/`INSERT INTO events` — is an ISO 8601 'Z'
+      // instant, never a wall-clock string with an offset label and never a
+      // bare date. A fixture that supplied '2026-09-01' or
+      // '2026-09-01 10:00:00 +05:30' would be seeding a shape the product
+      // cannot produce, and the test would then be proving something about a
+      // world that does not exist.
       clientTime: new Date().toISOString(),
     }, 2);
     await appendTestEvent(db.pool, contest);
@@ -2327,7 +2469,7 @@ export function createSyncService(deps: { pool: Pool; ingest: IngestService }): 
 1. `parseEvent` fails → `invalid` (envelope errors cannot contest — they are not well-formed claims).
 2. `actorId !== session user` → `invalid` `actor-mismatch` (a synced claim is still the signed-in user's claim).
 3. `type === 'claim.contested'` → `invalid` `reserved-type` (only the server records contests — defense at the door on this path; the engine rule backs it everywhere else).
-4. Event id already in the ledger → **idempotent-accept**: answer `committed` with the STORED seq/serverTime (no re-ingest, no double effects).
+4. Event id already in the ledger → **idempotent-accept**: answer `committed` with the STORED seq/`workspaceSeq`/`serverTime` (no re-ingest, no double effects). The stored `serverTime` is the ledger's `timestamptz` read back through `rowToEnvelope` — an ISO `Z` instant at millisecond precision — which is the same **instant** the first attempt was answered with. That is the guarantee a retry gets: *the same instant*, not *the same characters*. The two happen to coincide because Plan 1 Z-normalises on both paths, and the test below asserts the guarantee (parsed instants) rather than the coincidence (string identity), so a future change to how either side spells an instant is caught as a formatting change instead of being mistaken for a broken idempotency contract.
 5. Event id already contested (`proj_contested.original_event_id`) → answer `contested` with the STORED contest (no second contest).
 6. Entity is an existing ticket the user can no longer see → refusal `{rule: VISIBILITY_REFUSAL_RULE}` → contest path (step 7b). "Existing" = `getResolvedVisibility` non-null; a fresh offline-created ticket must not trip this.
 7. `ingest.ingestBatch([event])`:
@@ -2449,10 +2591,37 @@ describe('POST /v1/sync', () => {
     const first = await post('/v1/sync', [legal, illegal]);
     const countAfterFirst = await ledgerCount();
     const second = await post('/v1/sync', [legal, illegal]);
-    expect(second.json().results).toEqual(first.json().results); // same seqs, same contestEventId
+    // Compare INSTANTS, not strings. The first answer's serverTime comes from
+    // ingest; the retry's is the same row read back through rowToEnvelope, and
+    // both clocks are timestamptz absolute instants (owner decision 2026-08-20),
+    // so what a retry must return is the same MOMENT the first attempt did.
+    // Asserting raw string equality would pass today and turn a harmless change
+    // in how one side spells an instant into a phantom idempotency failure —
+    // and, worse, would have silently passed under the old verbatim-text
+    // client_time while two different instants wore the same characters.
+    const instants = (results: Array<Record<string, unknown>>) =>
+      results.map((r) =>
+        typeof r.serverTime === 'string' ? { ...r, serverTime: Date.parse(r.serverTime) } : r,
+      );
+    expect(instants(second.json().results)).toEqual(instants(first.json().results)); // same seqs, same cursors, same contestEventId, same instants
     expect(await ledgerCount()).toBe(countAfterFirst); // not one event more
     const { rows } = await db.pool.query('SELECT count(*)::int AS n FROM proj_contested WHERE original_event_id = $1', [illegal.id]);
     expect(rows[0].n).toBe(1); // one contest, not two
+  });
+
+  it('a retried claim re-answers the SAME instant, however either side spells it', async () => {
+    const e = offlineField();
+    const first = await post('/v1/sync', [e]);
+    const second = await post('/v1/sync', [e]);
+    const a = first.json().results[0];
+    const b = second.json().results[0];
+    expect(b.status).toBe('committed');
+    expect(Date.parse(b.serverTime)).toBe(Date.parse(a.serverTime));
+    expect(b.seq).toBe(a.seq);
+    expect(b.workspaceSeq).toBe(a.workspaceSeq);
+    // And the stored row agrees: one instant, read back Z-normalised.
+    const { rows } = await db.pool.query('SELECT server_time FROM events WHERE id = $1', [e.id]);
+    expect((rows[0].server_time as Date).getTime()).toBe(Date.parse(a.serverTime));
   });
 
   it('planted defect: interactive /v1/events NEVER records a contest', async () => {
@@ -2912,6 +3081,19 @@ const TABLES = [
   // (what the reducer replays), `workspace_seq` orders the workspace's stream
   // (what a resume cursor means). Dropping either would force the replica to
   // invent an order it was never told.
+  //
+  // client_time / server_time hold ISO 8601 'Z' instant strings — EXACTLY what
+  // the server's rowToEnvelope emits, never a device-offset label. SQLite has
+  // no timestamp type, so these are TEXT; that is safe here and only here,
+  // because every value is Z-normalised at millisecond precision by the server
+  // before it is handed over. Two consequences worth naming: string comparison
+  // IS instant comparison and lexicographic order IS chronological order (which
+  // is why the outbox and the duplicate checks may compare them directly), and
+  // a replica must never write a locally-formatted time into these columns —
+  // '2026-08-21T00:00:00+05:30' and '2026-08-20T18:30:00.000Z' are one moment
+  // and two strings, and the second one is the only one the server will ever
+  // send. Owner decision 2026-08-20: both ledger clocks are timestamptz, so
+  // the offset label the device attached is not a fact the server preserves.
   `CREATE TABLE IF NOT EXISTS events (
      id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, entity_kind TEXT NOT NULL, entity_id TEXT NOT NULL,
      type TEXT NOT NULL, version INTEGER NOT NULL, payload TEXT NOT NULL, actor_id TEXT NOT NULL,
@@ -2988,7 +3170,14 @@ schema separates confirmed ledger, reducer state, contests and outbox."
 - Test: `packages/sync-client/test/replica.test.ts`
 
 **Interfaces:**
-- Consumes: `SyncStorage`, `migrateLocal` (Task 8); `applyTicketEvent`, `TICKET_EVENT_TYPES`, `CONTEST_EVENT_TYPES`, `claimContestedPayloadSchema`, `claimContestedResolvedPayloadSchema`, `TicketState`, `TicketStateDeps`, `WorkflowDef`, `TicketTypeDef`, `EventEnvelope`, `docToPlainText` (domain); `SyncItem`, `PurgeInstruction` shape (Plan 4, as wire data); `BootstrapResponse` (Task 6 wire shape, re-declared here as the client-side type).
+- Consumes: `SyncStorage`, `migrateLocal` (Task 8); `applyTicketEvent`, `TICKET_EVENT_TYPES`, `CONTEST_EVENT_TYPES`, `claimContestedPayloadSchema`, `claimContestedResolvedPayloadSchema`, `TicketState`, `TicketStateDeps`, `WorkflowDef`, `TicketTypeDef`, `EventEnvelope`, `docToPlainText`, `istDayOf`, `istDayBounds`, `IST_DAY_REGEX` (domain); `SyncItem`, `PurgeInstruction` shape (Plan 4, as wire data); `BootstrapResponse` (Task 6 wire shape, re-declared here as the client-side type).
+
+**Day math in the local read model — the same code the server runs, and why that is not negotiable.** Anything this replica derives that involves a *day* — which day a `dueDate` claim falls in, whether a ticket is due today or overdue, how many days it has been in flight, which calendar cell or timeline column app-core's view-models place it in — resolves that day with `istDayOf` and `istDayBounds` from `@gisik-nokma/domain`, exactly as `apps/server` does. Day-vs-day comparisons compare `YYYY-MM-DD` strings; the one shape a day claim may take is `IST_DAY_REGEX`; day-vs-instant comparisons use `istDayBounds`, half-open `[startUtc, endUtc)`.
+
+`packages/domain/src/ist-day.ts` **has no dependencies** — no zod, no date library, no timezone database, just arithmetic against the fixed +05:30 offset — and that is not an accident of style. It is what lets an Expo bundle and a Tauri webview import the identical file that the Fastify process imports, rather than reaching for a local `toLocaleDateString()` or a hand-rolled offset because "the real helper pulls in too much".
+
+**A replica that computed days differently from the server is exactly the silent disagreement this product refuses.** It would not throw, would not sync-error, and would not show up in a contest: the same claim would simply sit in one calendar cell on the desktop and another on the web, "due today" would be true offline and false online, and a rollup counted locally would differ from the same rollup counted on the server — with every individual number looking perfectly reasonable and nothing anywhere naming the conflict. That is a board that lies. The point of an offline copy is that it is a *copy*; the moment it starts answering questions its own way, it is a second product with the same data.
+
 - Produces (cross-plan API):
 
 ```ts
@@ -3277,6 +3466,13 @@ export type Replica = {
   onChange(cb: () => void): () => void;
 };
 
+/**
+ * Local row → envelope. Both clocks come back as the ISO 'Z' strings the
+ * server's own rowToEnvelope emitted and this replica stored verbatim — no
+ * parse, no re-format, no local-offset step. The replica's job is to hold what
+ * it was handed; re-rendering an instant on the way out would give the offline
+ * copy its own opinion about when things happened.
+ */
 function rowToEnvelope(row: Record<string, unknown>): LedgerEvent {
   return {
     id: row.id as string,
@@ -4932,7 +5128,7 @@ the badge; search confesses it reads the offline copy."
 - Test: `packages/app-core/test/skew-and-status.test.tsx`
 
 **Interfaces:**
-- Consumes: `SubmittedEvent`, `newSubmittedEvent`, `renderContestedClaimText`, `plainTextToDoc`, `clockSkewMs`, `hasGrossClockSkew`, `WorkflowDef`, `Origin` (domain); `LocalContest`, `LocalIngestResult` shape (Task 12 — app-core declares the minimal structural types it needs rather than importing sync-client, keeping the package usable with the online DataSource too); amendment 10 `DataSource.ingest`; `packages/ui` tokens (amendment 11 — components use token classes/vars, zero colour literals).
+- Consumes: `SubmittedEvent`, `newSubmittedEvent`, `renderContestedClaimText`, `plainTextToDoc`, `clockSkewMs`, `hasGrossClockSkew`, `formatIstInstant`, `IST_CLOCK_NOTE`, `WorkflowDef`, `Origin` (domain); `LocalContest`, `LocalIngestResult` shape (Task 12 — app-core declares the minimal structural types it needs rather than importing sync-client, keeping the package usable with the online DataSource too); amendment 10 `DataSource.ingest`; `packages/ui` tokens (amendment 11 — components use token classes/vars, zero colour literals).
 - Produces (cross-plan API, `@gisik-nokma/app-core`):
 
 ```ts
@@ -5108,6 +5304,10 @@ describe('ContestBanner', () => {
     expect(banner.textContent).toContain('ticket.transitioned');
     expect(banner.textContent).toContain('restrict-to');
     expect(banner.textContent).toContain('Only the assignee may do this.');
+    // The "when" is India time, named as such — not a raw ISO instant, and not
+    // the viewer's device clock (owner decision 2026-08-20).
+    expect(banner.textContent).toContain('IST');
+    expect(banner.textContent).not.toContain('T00:00:00.000Z');
     expect(screen.getByRole('button', { name: /redo/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /convert to comment/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /discard/i })).toBeTruthy();
@@ -5271,13 +5471,20 @@ export async function resolveContest(
 `packages/app-core/src/contests/contest-banner.tsx`:
 
 ```tsx
-import { renderContestedClaimText } from '@gisik-nokma/domain';
+import { IST_CLOCK_NOTE, renderContestedClaimText } from '@gisik-nokma/domain';
 import type { ContestLike, ResolveContestInput } from './contest-view-model.js';
 
 /**
  * The ticket banner: every open contested claim, verbatim — what was claimed,
  * by whom, when, which rule now refuses it — with the three resolutions.
  * BEM classes; colours come from packages/ui tokens (amendment 11).
+ *
+ * The "when" is India time, because renderContestedClaimText formats it there
+ * (owner decision 2026-08-20) — the same date the calendar, the timeline and
+ * the inbox give the same instant. IST_CLOCK_NOTE says so out loud, since a
+ * collaborator working from another timezone is reading their own action
+ * rendered in IST: the same instant, correctly labelled, and labelled is the
+ * part that makes it honest rather than confusing.
  */
 export function ContestBanner(props: {
   contests: ContestLike[];
@@ -5290,7 +5497,7 @@ export function ContestBanner(props: {
     <div className="contest-banner" role="alert">
       {open.map((c) => (
         <div className="contest-banner__item" key={c.contestedEventId}>
-          <p className="contest-banner__claim">
+          <p className="contest-banner__claim" title={IST_CLOCK_NOTE}>
             {renderContestedClaimText({ originalEvent: c.originalEvent, rule: c.rule, reason: c.reason })}
           </p>
           <div className="contest-banner__actions">
@@ -6387,7 +6594,17 @@ export function App(): JSX.Element {
       <SyncStatusBar status={status} queued={queued} failed={failed} />
       {/* Plan 6's Board/List/ticket views mount here with ds as their DataSource.
           Until they land, the shell renders the status bar and a minimal ticket
-          list driven by ds.query.listTickets — enough to see pending badges live. */}
+          list driven by ds.query.listTickets — enough to see pending badges live.
+
+          When they do mount: the Calendar and Timeline take `today`/`anchor` as
+          `istDayOf(new Date().toISOString())` — the device supplies the instant,
+          which it owns, and the domain decides the day, which it owns — and any
+          timestamp this shell prints goes through `formatIstInstant`, with
+          `IST_CLOCK_NOTE` naming the clock. Never `toLocaleDateString()`, and
+          never the zone name written inline — it comes from IST_TIME_ZONE. A
+          desktop replica that answered "which day is this?" from the OS would
+          put the same claim in a different cell from the server, and nothing
+          would report the disagreement. */}
       {ds === null ? <p>Opening local replica…</p> : <TicketList ds={ds} workspaceId={workspaceId} />}
     </div>
   );
@@ -6881,7 +7098,7 @@ export function BoardScreen(props: { ds: ReplicaDataSource | null; workspaceId: 
 import { useEffect, useState } from 'react';
 import { Alert, Button, ScrollView, Text, View } from 'react-native';
 import { resolveContest, type ContestLike } from '@gisik-nokma/app-core';
-import { newSubmittedEvent, plainTextToDoc } from '@gisik-nokma/domain';
+import { IST_CLOCK_NOTE, formatIstInstant, newSubmittedEvent, plainTextToDoc } from '@gisik-nokma/domain';
 import type { ReplicaDataSource } from '@gisik-nokma/sync-client';
 import { EditorWebView } from '../editor/editor-web-view.js';
 
@@ -6928,7 +7145,19 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
       <Text>State: {state?.stateId} {ticket.pending !== null ? '(claim in transit)' : ''}</Text>
       {openContests.map((c) => (
         <View key={c.contestedEventId} accessibilityRole="alert">
-          <Text>Contested: {c.originalEvent.type} by {c.claimantId} at {c.originalEvent.clientTime} — {c.rule}: {c.reason}</Text>
+          {/*
+            The time renders through formatIstInstant, so this line shows the
+            same date as the ticket's calendar marker and the same date the web
+            banner shows. A raw c.originalEvent.clientTime would print a UTC
+            instant — the only place in the product that does — and for the
+            five and a half hours after IST midnight it would name the wrong
+            day. IST_CLOCK_NOTE names the clock for a collaborator working from
+            somewhere else; the zone string itself lives in the domain
+            (IST_TIME_ZONE), never inline here.
+          */}
+          <Text accessibilityHint={IST_CLOCK_NOTE}>
+            Contested: {c.originalEvent.type} by {c.claimantId} at {formatIstInstant(c.originalEvent.clientTime)} — {c.rule}: {c.reason}
+          </Text>
           <Button title="Convert to comment" onPress={() => onResolve(c, 'converted-to-comment')} />
           <Button title="Discard" onPress={() => onResolve(c, 'discarded')} />
         </View>
@@ -6994,6 +7223,8 @@ Legend: ✅ user-observable · ⚙️ internal subsystem
 - ✅ **Offline search** — local replica search labelled "searching offline copy". `packages/sync-client` `searchLocal`
 - ✅ **Sync status UI** — "N claims waiting to send", per-ticket pending badges, failed-item attention. `packages/app-core/src/sync/sync-status-bar.tsx`
 - ✅ **Clock-skew flag** — gross device-clock skew renders as an attributed badge in history, derived from the two kept clocks. `packages/app-core/src/history/clock-skew-badge.tsx`
+- ✅ **One clock, printed one way** — every instant a shell or banner shows renders through `formatIstInstant` in India time, with `IST_CLOCK_NOTE` naming the zone for collaborators elsewhere; the day it prints is the day `istDayOf` gives, so a timestamp can never disagree with the calendar cell the same instant lands in. `packages/domain/src/clock-skew.ts`
+- ⚙️ **Replica day math is the server's day math** — local read-model day boundaries, due-today/overdue and day counts use the domain's dependency-free `istDayOf`/`istDayBounds`, the same file the server runs; the replica stores the Z-normalised instants it was handed and never re-formats them. `packages/sync-client/src/replica/`, `packages/domain/src/ist-day.ts`
 - ⚙️ **Sync ingress `POST /v1/sync`** — ordered batches; idempotent on retries (duplicate ids re-answer from the ledger, prior contests re-answer from `proj_contested`); refusals append contests; interactive `/v1/events` never records contests. `apps/server/src/sync/`
 - ⚙️ **Replica bootstrap `GET /v1/sync/bootstrap`** — visibility-scoped snapshot set + per-entity event tails + full comment/contest backfill, one consistent cut with the stream cursor. `apps/server/src/sync/sync-routes.ts`
 - ⚙️ **Snapshot writer** — periodic per-ticket snapshots into Plan 1's `snapshots` table, folded by the domain reducer so snapshot+tail ≡ replay. `apps/server/src/sync/snapshot-writer.ts`
@@ -7067,6 +7298,11 @@ Test files: packages/domain/test/{contest-events,clock-skew}.test.ts · packages
 - 12.39 ✅ push registration stub: registers, tolerates missing transport, reports denial (register-push.test.ts)
 - 12.40 🧪 desktop end-to-end smoke: `pnpm tauri dev`, sign in, toggle network, watch pending → committed (manual until Plan 11's e2e)
 - 12.41 🧪 mobile end-to-end smoke: dev build, airplane mode, edit, reconnect, watch the claim land or contest (manual until Plan 11's e2e)
+
+## Time: one clock, one day boundary (owner decision 2026-08-20 — Asia/Kolkata)
+- 12.42 ✅ `formatIstInstant` prints India time and rolls the day at IST midnight, not UTC midnight (18:29:59.999Z is the 20th, 18:30:00.000Z is the 21st, agreeing with `istDayOf`); the same moment stated as `+05:30` and as `Z` prints once; an unreadable instant travels verbatim rather than becoming an invented time — planted defect (clock-skew.test.ts)
+- 12.43 ✅ a contested claim's banner and its converted comment carry the claimant's time in IST, never the raw instant — planted defect: a claim made at 00:00 IST on the 21st does not read as the 20th (contest-events.test.ts, contests.test.tsx)
+- 12.44 ✅ a sync retry re-answers the same INSTANT, not merely the same characters: parsed `serverTime`, `seq` and `workspaceSeq` all match the first answer, and the stored `timestamptz` row agrees with both (sync-route.test.ts)
 ```
 
 - [ ] **Step 3: Commit**
@@ -7100,6 +7336,11 @@ named as manual instead of pretended."
 14. **S3's exact rule name** (`unknown-state` vs `illegal-transition` vs `stranded-state`) is pinned to a single literal after the first green run — the scenario file carries the instruction. If the engine's answer surprises (e.g. `workflow-version`), that is a reconciliation finding for Plan 2.
 15. **`claim.contested` payload field name — RECONCILED with Plan 9, no decision outstanding.** Amendment 16 pins the event ("payload = the original event, rule, reason") but not the field names, and the two plans spelled it differently: Plan 9's notification fan-out parses `{ originalEvent: { id, type, actorId, clientTime, … }, rule, reason }` (zod `.passthrough()`); this plan's registration carried `{ original: SubmittedEvent, rule, reason }`. Taken: **`{ originalEvent: SubmittedEvent, rule, reason }`** — Plan 9's field name, this plan's richness. This plan owns the registration and needs the whole envelope (the redo path re-issues it, the convert-to-comment path renders its payload, `proj_contested` stores it for the sync-time idempotency lookup), and a full `SubmittedEvent` under the key `originalEvent` satisfies Plan 9's schema unchanged — `id`, `type`, `actorId` and `clientTime` are all envelope fields, and the extra keys pass through. **Plan 9 needs no edit**; `contestedPayloadSchema` in its `fanout.ts` already validates what this plan now emits. The `proj_contested` / local `contests` column is `original_event` to match.
 16. **Attention-strip wiring.** This plan supplies open contests per claimant (`query.myWork(...).contested`, `query.listContests`, `GET /v1/contests?claimantId=&open=true`); the attention strip itself belongs to app-core/Plan 9's extension points. Their "contested claims" bucket should read exactly these — if their extension-point signature differs, only the wiring line changes, not the data shape.
+17. **Time is Asia/Kolkata — SETTLED by owner decision (2026-08-20), applied here, nothing outstanding.** Three of this plan's surfaces touched it and all three are now explicit:
+    - **Storage.** Both ledger clocks are `timestamptz` absolute instants; the verbatim-text `client_time` an earlier draft of Plan 1 chose is gone, so `rowToEnvelope` emits ISO `Z` on every read path. The local SQLite `client_time`/`server_time` columns hold exactly those strings (Task 8's schema comment says so), which is what makes string comparison equal instant comparison in the replica. Audited at write time: no fixture, assertion, or seeder in this plan expected an offset label to survive a round trip, so nothing had to be corrected — but the invariant is now stated where a future author would otherwise re-introduce one.
+    - **Day math.** The replica computes days with `istDayOf`/`istDayBounds` from `@gisik-nokma/domain`, the same dependency-free module the server imports (Task 9's Interfaces block carries the full reasoning). A replica with its own day boundary would disagree with the server silently — no error, no contest, just a claim in a different calendar cell offline than online — which is the one failure mode this product exists to refuse.
+    - **Rendering.** `formatIstInstant` + `IST_CLOCK_NOTE` (Task 1, in this plan's own `clock-skew.ts`) are the single instant→text renderer, consumed by `renderContestedClaimText`, the web contest banner, and the mobile ticket screen. The zone string lives in `IST_TIME_ZONE`; no component writes it inline. The time component is a constant +05:30 shift rather than `Intl`, deliberately: Hermes does not reliably ship a timezone database, and a silent fallback to the device zone on mobile is exactly the disagreement above wearing a different hat.
+    - Carried to the orchestrator, not fixed here: Plan 6's shells pass `today`/`anchor` as `istDayOf(new Date().toISOString())` to the views this plan's replica feeds, and format their clocks with `IST_TIME_ZONE`.
 
 ## Execution notes
 

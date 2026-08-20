@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md` — §7 (Views: Calendar and Timeline; Reporting and notifications; Search and filtering), honesty invariant 4 ("Nothing is invented"), invariant 1 (provenance floor). Series contract: `docs/superpowers/plans/2026-08-20-00-series-coordination.md` (amendments 9–17 bind this plan). Precedent: `reference/design-docs/2026-08-19-tracker-calendar-design.md` (read-only) — the base calendar's "dated items only / an undated item is absent, not estimated" discipline, generalised here.
 
-**Series position:** Plan 9 of 11. Runs after Plans 1–5, in parallel with Plans 6/7/8. **Consumes** — from Plan 1: `EventEnvelope`, `SubmittedEvent`, `newUlid`, `IngestService.onEventCommitted(listener): () => void` (fires only after a live commit, never on projection rebuild — which is exactly why notifications built on it can never double on replay), `createTestDatabase()`. From Plan 2: `WorkflowDef` (with `initialStateId`, amendment 3; optional `blocked` on states, amendment 9), `StateCategory`, `getWorkflowDefFromProjection(db, workflowId, version?)`, the fixture harness in `packages/rule-engine/src/fixtures/harness.ts`. From Plan 3: `BUILTIN_FIELD_IDS` (four elements — `'title', 'description', 'dueDate', 'startDate'`; Plan 3's own text, verified by Task 1 Step 1), `dueDateValueSchema` (the ONE day-claim schema BOTH built-ins use — there is no separate start-date schema, by Plan 3's deliberate design), `TicketState`, `FieldClaim`, `applyTicketEvent`, `makeEnvelope`, `checkTicketFieldSet` + `refuse`/`fieldKindRefusal`, `getTicketStateFromDb(db, workspaceId, ticketId)`, the `proj_tickets` table. From Plan 4: `Queryable`, `canSee(db, userId, ticketId)`, `Auth`/`createAuth`, `makeRequireSession`, `registerAuthRoutes`, `signInWithPhone`, `LogOtpSender`. From the amendments (Plans 5/6/7/10 written in parallel — pinned shapes, assumptions flagged in Open questions): `DataSource` (am. 10), `packages/ui` tokens (am. 11), the mention node `{userId}` and `docToPlainText` (am. 12), `/v1/me/preferences` (am. 14), `claim.contested` (am. 16). **Produces** (exact signatures in task Interfaces blocks): `extractMentionedUserIds`; the notification vocabulary (`NotificationKind`, strict payload schemas, `Notification`); the `notifications` table + store; `NotificationTransport` + `createInAppTransport`; `createNotificationFanout`; `runNotificationSweep`; `GET /v1/me/notifications`, `GET /v1/me/notifications/unread-count`, `POST /v1/me/notifications/:id/read`; `CalendarView`, `TimelineView`, `InboxView`, `UnreadBadge`, `SavedFiltersMenu` and their pure view-models.
+**Series position:** Plan 9 of 11. Runs after Plans 1–5, in parallel with Plans 6/7/8. **Consumes** — from Plan 1: `EventEnvelope`, `SubmittedEvent`, `newUlid`, `IngestService.onEventCommitted(listener): () => void` (fires only after a live commit, never on projection rebuild — which is exactly why notifications built on it can never double on replay), `createTestDatabase()`, and the IST day helpers `IST_TIME_ZONE` / `IST_OFFSET_MINUTES` / `IST_DAY_REGEX` / `istDayOf(instant)` / `istDayBounds(day)` (Plan 1 Task 4a, `packages/domain/src/ist-day.ts` — dependency-free, so app-core imports it as freely as the server does). From Plan 2: `WorkflowDef` (with `initialStateId`, amendment 3; optional `blocked` on states, amendment 9), `StateCategory`, `getWorkflowDefFromProjection(db, workflowId, version?)`, the fixture harness in `packages/rule-engine/src/fixtures/harness.ts`. From Plan 3: `BUILTIN_FIELD_IDS` (four elements — `'title', 'description', 'dueDate', 'startDate'`; Plan 3's own text, verified by Task 1 Step 1), `dueDateValueSchema` (the ONE day-claim schema BOTH built-ins use — there is no separate start-date schema, by Plan 3's deliberate design), `TicketState`, `FieldClaim`, `applyTicketEvent`, `makeEnvelope`, `checkTicketFieldSet` + `refuse`/`fieldKindRefusal`, `getTicketStateFromDb(db, workspaceId, ticketId)`, the `proj_tickets` table. From Plan 4: `Queryable`, `canSee(db, userId, ticketId)`, `Auth`/`createAuth`, `makeRequireSession`, `registerAuthRoutes`, `signInWithPhone`, `LogOtpSender`. From the amendments (Plans 5/6/7/10 written in parallel — pinned shapes, assumptions flagged in Open questions): `DataSource` (am. 10), `packages/ui` tokens (am. 11), the mention node `{userId}` and `docToPlainText` (am. 12), `/v1/me/preferences` (am. 14), `claim.contested` (am. 16). **Produces** (exact signatures in task Interfaces blocks): `extractMentionedUserIds`; the notification vocabulary (`NotificationKind`, strict payload schemas, `Notification`); the `notifications` table + store; `NotificationTransport` + `createInAppTransport`; `createNotificationFanout`; `runNotificationSweep`; `GET /v1/me/notifications`, `GET /v1/me/notifications/unread-count`, `POST /v1/me/notifications/:id/read`; `CalendarView`, `TimelineView`, `InboxView`, `UnreadBadge`, `SavedFiltersMenu` and their pure view-models.
 
 ## Global Constraints
 
@@ -20,6 +20,12 @@ Copied from the series contract and the spec; every task's requirements implicit
 - TESTING: Vitest. Every honesty guarantee is proven against a planted defect before it is trusted (spec invariant 6).
 - IDS: ULID via `ulidx`.
 - EVENT ENVELOPE (exact, from `@gisik-nokma/domain`): `{ id, workspaceId, entity: { kind: 'workspace'|'project'|'ticket'|'workflow'|'ticket-type'|'membership', id }, type, version, payload, actorId, origin: 'web'|'mobile'|'desktop'|'server', clientTime, serverTime, seq }`.
+- TIME IS `Asia/Kolkata` (owner decision, 2026-08-20 — coordination doc, "Owner decision: time is Asia/Kolkata"). Binding on this plan, which is the plan most exposed to it:
+  - **A day starts at IST midnight.** `dueDate`/`startDate` are day claims (`YYYY-MM-DD`), so "which calendar cell does this claim fall in", "due today", "overdue", "how long has this been in flight", and the window a notification sweep calls *today* all turn on where the day starts. It starts at IST midnight — never the server's locale, never the viewer's device.
+  - **The helpers are Plan 1's, and this plan rolls none of its own.** `istDayOf(instant): string` converts an absolute instant to its IST day; `istDayBounds(day): { startUtc, endUtc }` gives the **half-open** `[startUtc, endUtc)` UTC interval for one IST day, compared as `>= startUtc AND < endUtc`. `IST_DAY_REGEX` is the one statement of the `YYYY-MM-DD` shape; `IST_TIME_ZONE` is the one origin of the string `'Asia/Kolkata'`. All four live in `packages/domain/src/ist-day.ts`, which pulls in **no dependencies at all** — no zod, no date library, no timezone database — precisely so every consumer (server, web, replica) can import the same code.
+  - **Day-vs-day comparisons compare `YYYY-MM-DD` strings** (both sides already IST, both already lexicographically ordered). **Day-vs-instant comparisons use `istDayBounds`**, half-open. Nothing calls `Date.parse` on a day claim, and nothing does raw millisecond division to count days.
+  - **Rendering:** any timestamp a view shows is formatted with `IST_TIME_ZONE` imported from the domain — never the literal string `'Asia/Kolkata'` written into view code, never the device's locale.
+  - Both ledger clocks are `timestamptz` absolute instants (Plan 1 Task 6), so a claim submitted as `…+05:30` reads back through `rowToEnvelope` as the equivalent `…Z`. The claimed instant and the received instant remain two separate facts; only the device's offset *label* is gone.
 - Spec invariant 4, verbatim: "**Nothing is invented.** No estimated dates, no fabricated progress. An undated item is absent from the calendar; a deadline renders as the claim it is — attributed, never presented as system truth."
 - Spec §7 Calendar/Timeline, verbatim: "bars and markers drawn *only* from claimed dates. An undated ticket is absent; a date renders attributed ('needed by 30 Aug — Kiro's claim'); nothing estimates, extrapolates or back-fills."
 - Spec §7 Reporting, verbatim: "Reporting v1 is derived counts and the ledger itself — activity, history. No velocity, no burndown forecasts, nothing the record does not contain."
@@ -40,6 +46,7 @@ Plans 5–11 were written in parallel against the coordination amendments. Two c
 
 ```
 packages/domain/
+  src/ist-day.ts                    # READ ONLY (Plan 1's Task 4a) — IST_TIME_ZONE, IST_DAY_REGEX, istDayOf, istDayBounds
   src/ticket-types.ts               # READ ONLY (Plan 3's) — BUILTIN_FIELD_IDS + dueDateValueSchema already carry startDate
   src/doc-text.ts                   # NEW (GUARDED — skip if Plan 7 landed it) — docToPlainText (amendment 12)
   src/doc-mentions.ts               # NEW — extractMentionedUserIds JSON-walker
@@ -127,9 +134,9 @@ So this task **defines nothing**. It does three things this plan genuinely needs
 - Create: `packages/rule-engine/fixtures/field-set-accepts-a-start-date-claim.json`
 
 **Interfaces:**
-- Consumes: `BUILTIN_FIELD_IDS`, `dueDateValueSchema` (Plan 3, `@gisik-nokma/domain`) — `startDate` is already in the first and validated by the second; `checkTicketFieldSet` + the `field.type-mismatch` refusal string (Plan 3, `packages/rule-engine/src/checks/`); the fixture harness (Plan 2, `packages/rule-engine/src/fixtures/harness.ts` — `fixtureSchema`, `loadFixtures`, `completeEnvelope`, `buildInMemoryContext`, `assertFixtureOutcome`).
-- Produces (cross-plan API): **none — no new export, no new schema, no new constant.** What this task leaves behind:
-  - A pinned reader contract in `ticket-types.test.ts`: the day-claim value shape is `{ date: 'YYYY-MM-DD', note?: string }`, one schema for both built-ins, and it accepts exactly the days `app-core`'s `DATE_ONLY` regex accepts.
+- Consumes: `BUILTIN_FIELD_IDS`, `dueDateValueSchema` (Plan 3, `@gisik-nokma/domain`) — `startDate` is already in the first and validated by the second; `IST_DAY_REGEX` (Plan 1 Task 4a, same package) — the one statement of the `YYYY-MM-DD` day shape, which the pin holds Plan 3's schema against; `checkTicketFieldSet` + the `field.type-mismatch` refusal string (Plan 3, `packages/rule-engine/src/checks/`); the fixture harness (Plan 2, `packages/rule-engine/src/fixtures/harness.ts` — `fixtureSchema`, `loadFixtures`, `completeEnvelope`, `buildInMemoryContext`, `assertFixtureOutcome`).
+- Produces (cross-plan API): **none — no new export, no new schema, no new constant, and no second day regex.** What this task leaves behind:
+  - A pinned reader contract in `ticket-types.test.ts`: the day-claim value shape is `{ date: 'YYYY-MM-DD', note?: string }`, one schema for both built-ins, and it accepts exactly the days `IST_DAY_REGEX` accepts — the same regex `app-core`'s reader imports.
   - Two shared fixtures every build's fixture runner executes.
 - **Pinned for the rest of this plan:** wherever P9 code or prose validates or types a start-date value, the name is Plan 3's — `dueDateValueSchema` / `DueDateValue`. This plan introduces no start-date-specific schema or type under any name; a start date is a due date's shape wearing a different field id.
 
@@ -164,7 +171,9 @@ Nothing in this task is expected to fail against a landed Plan 3. If either suit
 
 Guard: Plan 3 colocates tests in `src/`; if by execution time they live under `test/`, edit the file there — `ls packages/domain/src/*.test.ts packages/domain/test/*.test.ts` to locate.
 
-This pin belongs to Plan 9, not Plan 3: it asserts the thing *this plan's readers* assume, which Plan 3 has no reason to guarantee. `dateClaimOf` (Task 8) lives in `packages/app-core`, which does not depend on zod, so it re-states the day shape as a literal regex. This is the single place the two statements of "what a day claim is" are held against each other.
+This pin belongs to Plan 9, not Plan 3: it asserts the thing *this plan's readers* assume, which Plan 3 has no reason to guarantee. There is exactly ONE statement of the day shape in the product — `IST_DAY_REGEX`, in Plan 1's `packages/domain/src/ist-day.ts` — and this pin holds Plan 3's `dueDateValueSchema` against it.
+
+An earlier draft of this task declared a local `DATE_ONLY` literal here and another in `packages/app-core`, on the reasoning that app-core does not depend on zod and so could not import the schema. That reasoning is void: **`ist-day.ts` is dependency-free** — no zod, no date library, no timezone database — so app-core imports `IST_DAY_REGEX` as cleanly as the server does, and the duplicate literals are gone. One origin, three consumers.
 
 Append to `packages/domain/src/ticket-types.test.ts` — **append only; change none of Plan 3's existing assertions**:
 
@@ -172,20 +181,17 @@ Append to `packages/domain/src/ticket-types.test.ts` — **append only; change n
 /**
  * Plan 9 consumption pin. The Calendar and Timeline read startDate and dueDate
  * through app-core's dateClaimOf, which destructures { date, note? } and
- * validates the day with its own literal regex (app-core does not depend on
- * zod). This is the one place those two statements of "what a day claim is"
- * are held against each other: if the built-in's schema ever widens — a
- * datetime, a range, or a second schema for startDate — it fails here, loudly,
- * instead of silently inside a bar someone trusts.
+ * validates the day with IST_DAY_REGEX — the SAME regex, imported from the
+ * same dependency-free module, not a second literal that could drift. This is
+ * the one place the built-in's schema is held against that origin: if the
+ * schema ever widens — a datetime, a range, or a second schema for startDate —
+ * it fails here, loudly, instead of silently inside a bar someone trusts.
  *
  * It guards; it does not drive. It passes the moment Plan 3's startDate
  * built-in is in place. To watch it bite, loosen the schema's regex to allow a datetime
  * and re-run: the second case fails.
  */
 describe('the day-claim shape Plan 9 reads', () => {
-  /** The exact literal in packages/app-core/src/claims/ticket-dates.ts. */
-  const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
-
   it('asks for two day built-ins, and both are built-ins', () => {
     expect(BUILTIN_FIELD_IDS).toEqual(expect.arrayContaining(['startDate', 'dueDate']));
   });
@@ -197,11 +203,23 @@ describe('the day-claim shape Plan 9 reads', () => {
 
   it('accepts exactly the days the reader accepts, and refuses exactly the ones it refuses', () => {
     for (const day of ['2026-09-01', '2026-12-31', '2027-01-01']) {
-      expect(dueDateValueSchema.safeParse({ date: day }).success).toBe(DATE_ONLY.test(day));
+      expect(dueDateValueSchema.safeParse({ date: day }).success).toBe(IST_DAY_REGEX.test(day));
     }
     for (const notADay of ['2026-09-01T10:00:00Z', '01/09/2026', '2026-9-1', '']) {
-      expect(dueDateValueSchema.safeParse({ date: notADay }).success).toBe(DATE_ONLY.test(notADay));
+      expect(dueDateValueSchema.safeParse({ date: notADay }).success).toBe(IST_DAY_REGEX.test(notADay));
     }
+  });
+
+  it('a day claim is a day, never an instant — the reader never has to guess which it got', () => {
+    // istDayOf refuses a date-only string and istDayBounds refuses an instant:
+    // the two shapes are not interchangeable, and Plan 1 proves it. The claim
+    // side is the day side, always.
+    expect(IST_DAY_REGEX.test('2026-09-01')).toBe(true);
+    expect(IST_DAY_REGEX.test('2026-09-01T00:00:00.000Z')).toBe(false);
+    expect(istDayBounds('2026-09-01')).toEqual({
+      startUtc: '2026-08-31T18:30:00.000Z',
+      endUtc: '2026-09-01T18:30:00.000Z',
+    });
   });
 
   it('carries an optional note the reader passes through, and nothing else', () => {
@@ -219,6 +237,7 @@ Add to the file's imports whatever is not already there:
 ```ts
 import * as ticketTypesModule from './ticket-types.js';
 import { BUILTIN_FIELD_IDS, dueDateValueSchema } from './ticket-types.js';
+import { IST_DAY_REGEX, istDayBounds } from './ist-day.js';
 ```
 
 (`packages/domain` is Plan 1's NodeNext package — relative imports carry the `.js` suffix. If the file you find imports without suffixes, match what is there.)
@@ -226,7 +245,19 @@ import { BUILTIN_FIELD_IDS, dueDateValueSchema } from './ticket-types.js';
 - [ ] **Step 4: Run the pin**
 
 Run: `pnpm --filter @gisik-nokma/domain exec vitest run src/ticket-types.test.ts`
-Expected: PASS — Plan 3's cases and the four new ones. The pin guards rather than drives, so it is green immediately; that is the point of a guard, and the doc comment says so.
+Expected: PASS — Plan 3's cases and the five new ones. The pin guards rather than drives, so it is green immediately; that is the point of a guard, and the doc comment says so.
+
+Then find every remaining statement of the day shape. Search for the **whole anchored literal**, not a fragment — `Date`'s instant shape (`ISO_DATETIME_REGEX` in `packages/domain/src/envelope.ts`) legitimately begins `/^\d{4}-\d{2}-\d{2}T…`, and it is the one origin of the *instant* shape exactly as `ist-day.ts` is the one origin of the *day* shape. The trailing `$/` is what tells them apart:
+
+```bash
+grep -rnF '/^\d{4}-\d{2}-\d{2}$/' packages/domain/src packages/app-core/src apps/server/src 2>/dev/null
+```
+
+Expected hits, and nothing else:
+1. `packages/domain/src/ist-day.ts` — the `IST_DAY_REGEX` declaration. This one stays; it is the origin.
+2. `packages/domain/src/ticket-types.ts` — Plan 3's `dueDateValueSchema`, which predates `ist-day.ts` and still states the shape itself. **Expected until Plan 3 is amended**; it belongs to the orchestrator, not to this task (Task 15 Step 1 carries the full note and the one-line fix). Do not edit another plan's file from here.
+
+Any *third* hit is a genuine re-declaration introduced since: delete it and import `IST_DAY_REGEX`.
 
 - [ ] **Step 5: Add the two shared fixtures**
 
@@ -653,6 +684,7 @@ Expected: FAIL — module does not exist.
 
 ```ts
 import { z } from 'zod';
+import { IST_DAY_REGEX } from './ist-day.js';
 
 /**
  * Notifications are server-owned per-user rows, NOT ledger events (series
@@ -660,17 +692,21 @@ import { z } from 'zod';
  * person; the fact it points at stays in the ledger. Every payload is
  * .strict() — it carries the originating claim's provenance verbatim and
  * has no field where invented urgency could live.
+ *
+ * The day shape comes from Plan 1's IST_DAY_REGEX, never a local literal:
+ * a notification about a claimed day must agree, character for character,
+ * with the day the claim was validated as and the day the calendar places it
+ * in. Three copies of one regex is three chances to disagree.
  */
 export const NOTIFICATION_KINDS = ['assignment', 'mention', 'contested-claim', 'date-approaching', 'stale-ticket'] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
-const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 const nonEmpty = z.string().min(1);
 
 /** A date claim's provenance — the FieldClaim flattened, never summarised. */
 export const dateClaimProvenanceSchema = z
   .object({
-    date: z.string().regex(DATE_ONLY, 'a claimed date is a day in YYYY-MM-DD form'),
+    date: z.string().regex(IST_DAY_REGEX, 'a claimed date is a day in YYYY-MM-DD form'),
     note: z.string().optional(),
     actorId: nonEmpty,
     clientTime: nonEmpty,
@@ -1641,6 +1677,14 @@ git commit -m "notification fan-out on committed events: assignee, mentioned, co
 
 Attention *transitions* need a clock, and events don't tick: a periodic job scans the projections and notifies claims entering the workspace warning window and active states crossing the staleness threshold. Determinism: given the same tables and the same injected `now`, the sweep computes the same candidate set and the same dedupe keys — so running it twice notifies once (the planted defect). It reads `proj_tickets` (claims) and the `events` ledger (when the current state was entered — derived, never stored anew), and its payloads carry the claim's provenance verbatim. Plan 5's attention endpoint computes the *read-time* strip; this sweep only turns threshold *crossings* into inbox rows — same semantics, different tense.
 
+**The sweep's "today" is an IST day, and this is the one thing about it that must not be improvised.** A sweep is a *periodic* job: whatever schedule Plan 11 gives it, some run will land near midnight, and a run at 18:29Z and a run at 18:31Z on the same UTC date sit on opposite sides of an IST day boundary. Three consequences, all handled here:
+
+- The 7-day **warning horizon** is measured from `istDayOf(now)`, not from a UTC slice of the timestamp. A UTC slice does not roll over until 05:30 IST, so for five and a half hours every night it would compute yesterday's horizon and hold back a warning that is due — a day late, silently, for exactly the tickets whose claims just entered the window.
+- The **staleness window** is a day count, so it is computed with day helpers and compared **half-open** against `server_time`: `entered.server_time < istDayBounds(todayIst − thresholdDays).endUtc`. Raw millisecond subtraction from `now` would make "14 days" mean "14×86 400 000 ms from whenever the cron happened to fire", which drifts with the schedule rather than with the calendar the user reads.
+- **Idempotence survives the boundary.** The dedupe keys embed dates (`date-approaching:<ticketId>:<claimedDate>`, `stale-ticket:<ticketId>:<stateId>:<enteredAtIso>`) and the guarantee this task already tests — run it twice, notify once — only holds if consecutive runs derive the same day from the same facts. A sweep whose day boundary moved underneath it would let one claim notify twice across midnight. Step 1's IST-boundary block is the planted defect for exactly that.
+
+The `dueDate` comparison itself stays a day-vs-day string comparison (`claimedDate <= horizon`): a claim **is** a day, both sides are already IST, and `YYYY-MM-DD` sorts lexicographically. `istDayBounds` is for the one comparison in this task that puts a day against an *instant* column — the staleness window. Nothing here parses a day claim as a timestamp.
+
 **Files:**
 - Create: `apps/server/src/notifications/sweep.ts`
 - Create: `apps/server/src/tools/sweep-notifications.ts`
@@ -1648,7 +1692,7 @@ Attention *transitions* need a clock, and events don't tick: a periodic job scan
 - Create: `apps/server/test/notifications/sweep.test.ts`
 
 **Interfaces:**
-- Consumes: `proj_tickets` (Plan 3), the `events` table (Plan 1), `getWorkflowDefFromProjection` (Plan 2, `apps/server/src/projections/workflows.ts`), `deliverToAll`/`NotificationTransport`/`CanSeeFn` (Task 5), `newUlid`/`Notification` (`@gisik-nokma/domain`).
+- Consumes: `proj_tickets` (Plan 3), the `events` table (Plan 1), `getWorkflowDefFromProjection` (Plan 2, `apps/server/src/projections/workflows.ts`), `deliverToAll`/`NotificationTransport`/`CanSeeFn` (Task 5), `newUlid`/`Notification`/`istDayOf`/`istDayBounds` (`@gisik-nokma/domain`).
 - Produces (Plan 11 schedules the CLI; Plan 5's attention endpoint shares the windows type — Open questions):
   - `type SweepWindows = { approachingWindowDays: number; stalenessThresholdDays: number }`
   - `DEFAULT_SWEEP_WINDOWS: SweepWindows = { approachingWindowDays: 7, stalenessThresholdDays: 14 }`
@@ -1656,7 +1700,8 @@ Attention *transitions* need a clock, and events don't tick: a periodic job scan
   - `type SweepReport = { dueCandidates: number; staleCandidates: number; delivered: number }` (operational logging only — idempotence is proven by row counts, not by the report)
   - `runNotificationSweep(deps: SweepDeps): Promise<SweepReport>`
   - Dedupe-key grammar (exact): `date-approaching:<ticketId>:<claimedDate>` · `stale-ticket:<ticketId>:<stateId>:<enteredAtIso>`
-  - `isoDatePlusDays(isoDay: string, days: number): string`
+  - `isoDatePlusDays(isoDay: string, days: number): string` — day-string arithmetic over `YYYY-MM-DD`, no timezone involved on either side (it shifts a *calendar day*, it does not convert an instant). Accepts negative `days`. The instant→day step is `istDayOf`'s alone.
+  - **Day-boundary contract:** `todayIst = istDayOf(now.toISOString())`; the approaching horizon is `isoDatePlusDays(todayIst, approachingWindowDays)`; the staleness cut-off is `istDayBounds(isoDatePlusDays(todayIst, -stalenessThresholdDays)).endUtc`, compared with a strict `<` because `istDayBounds` is half-open. Nothing in this file slices a timestamp string for a day, and nothing divides milliseconds to count days.
   - CLI: `pnpm --filter @gisik-nokma/server run sweep:notifications` — reads `DATABASE_URL`, prints the report, exit 0; scheduling is Plan 11's concern.
   - Targeting rules (exact): date-approaching goes to the assignee, or to the claim's author when unassigned (the person who made the claim owns the caring); stale-ticket goes to the assignee only — an unassigned stale ticket is the read-time attention strip's job, not a nag with no addressee. Terminal tickets never notify (done work has no approaching deadline). Both targets pass the `canSee` gate.
 
@@ -1685,19 +1730,27 @@ const PROJECT = '01J9GPRJ000000000000000000';
 const KIRO = '01J9GUKR000000000000000000';
 const ANSELMA = '01J9GUAN000000000000000000';
 
-/** Frozen clock: 23 Aug 2026, 05:00 UTC. Window of 7 days reaches 30 Aug. */
-const NOW = () => new Date('2026-08-23T05:00:00.000Z');
+/**
+ * Frozen clock: 23 Aug 2026, 05:00 UTC — 10:30 IST, mid-morning of IST day
+ * 2026-08-23. A 7-day window from that IST day reaches 30 Aug.
+ */
+const NOW_INSTANT = '2026-08-23T05:00:00.000Z';
 
 const seeEverything = async () => true;
 
-function sweep() {
+/** The sweep at an arbitrary instant — the IST-boundary block drives it directly. */
+function sweepAt(instant: string) {
   return runNotificationSweep({
     pool: db.pool,
     transports: [createInAppTransport(db.pool)],
     canSeeTicket: seeEverything as never,
-    now: NOW,
+    now: () => new Date(instant),
     log: () => {},
   });
+}
+
+function sweep() {
+  return sweepAt(NOW_INSTANT);
 }
 
 type SeedTicket = {
@@ -1784,6 +1837,12 @@ describe('isoDatePlusDays', () => {
     expect(isoDatePlusDays('2026-08-23', 7)).toBe('2026-08-30');
     expect(isoDatePlusDays('2026-08-30', 7)).toBe('2026-09-06');
   });
+
+  it('subtracts too — the staleness cut-off walks backwards from today', () => {
+    expect(isoDatePlusDays('2026-08-23', -14)).toBe('2026-08-09');
+    expect(isoDatePlusDays('2026-09-06', -7)).toBe('2026-08-30');
+    expect(isoDatePlusDays('2027-01-01', -1)).toBe('2026-12-31');
+  });
 });
 
 describe('date-approaching', () => {
@@ -1852,7 +1911,7 @@ describe('stale-ticket', () => {
   it('notifies the assignee when an active state outlives the threshold, attributing who moved it there', async () => {
     const ticketId = freshTicketId();
     await seedTicket({ ticketId, assigneeId: ANSELMA });
-    await seedEnteredState(ticketId, '2026-08-01T09:00:00.000Z', KIRO); // 22 days before NOW > 14-day threshold
+    await seedEnteredState(ticketId, '2026-08-01T09:00:00.000Z', KIRO); // IST day 2026-08-01, 22 IST days back > the 14-day threshold
     await sweep();
     const rows = await notificationRows('stale-ticket');
     expect(rows).toHaveLength(1);
@@ -1900,6 +1959,77 @@ describe('stale-ticket', () => {
   });
 });
 
+describe('the sweep window is an IST day, and a sweep across IST midnight proves it', () => {
+  /**
+   * PLANTED DEFECT — the day boundary.
+   *
+   * 18:29:59Z is 23:59:59 IST on 2026-08-23; 18:30:00Z is 00:00:00 IST on
+   * 2026-08-24. Same UTC date, different IST days. A sweep that took its
+   * "today" from a UTC slice of the timestamp (`now.toISOString().slice(0,10)`)
+   * would answer '2026-08-23' at BOTH instants, because a UTC day does not roll
+   * until 05:30 IST. Two things then go wrong, and this block catches both:
+   *
+   *  1. The 31 Aug claim — which enters the 7-day window the moment the IST day
+   *     becomes the 24th — would stay silent all night and only be noticed
+   *     after 05:30 IST. A day late, silently, for exactly the claims that just
+   *     became due-soon.
+   *  2. The 30 Aug claim, already inside the window at both instants, must
+   *     notify EXACTLY ONCE across the pair. Its dedupe key embeds the claimed
+   *     day, so this holds as long as consecutive runs derive their days from
+   *     the same facts. It is the idempotence guarantee above, restated at the
+   *     one moment a shifting boundary could break it.
+   *
+   * To watch it bite: replace `istDayOf(createdAt)` in sweep.ts with
+   * `createdAt.slice(0, 10)` and re-run — the 31 Aug expectation fails.
+   */
+  const BEFORE_IST_MIDNIGHT = '2026-08-23T18:29:00.000Z'; // 23:59 IST, 23 Aug
+  const AFTER_IST_MIDNIGHT = '2026-08-23T18:31:00.000Z'; // 00:01 IST, 24 Aug
+
+  it('one claim, two sweeps either side of IST midnight, exactly one notification — and the next IST day brings its own', async () => {
+    const inWindowBoth = freshTicketId();
+    const entersOnTheNextIstDay = freshTicketId();
+    // 30 Aug is 7 days from IST-day 23 Aug: inside the window at both instants.
+    await seedTicket({ ticketId: inWindowBoth, assigneeId: ANSELMA, dueDate: { date: '2026-08-30' } });
+    // 31 Aug is 8 days from IST-day 23 Aug and 7 from IST-day 24 Aug: it enters
+    // the window precisely when the IST day turns over, and not before.
+    await seedTicket({ ticketId: entersOnTheNextIstDay, assigneeId: ANSELMA, dueDate: { date: '2026-08-31' } });
+
+    await sweepAt(BEFORE_IST_MIDNIGHT);
+    const afterFirst = await notificationRows('date-approaching');
+    expect(afterFirst.map((row) => row.dedupe_key)).toEqual([`date-approaching:${inWindowBoth}:2026-08-30`]);
+
+    await sweepAt(AFTER_IST_MIDNIGHT);
+    const afterSecond = await notificationRows('date-approaching');
+    // The 30 Aug claim did NOT notify a second time — the boundary moved, the key did not.
+    expect(afterSecond.filter((row) => row.dedupe_key === `date-approaching:${inWindowBoth}:2026-08-30`)).toHaveLength(1);
+    // The 31 Aug claim got its own notification, on the IST day it became news.
+    expect(afterSecond.filter((row) => row.dedupe_key === `date-approaching:${entersOnTheNextIstDay}:2026-08-31`)).toHaveLength(1);
+    expect(afterSecond).toHaveLength(2);
+  });
+
+  it('PLANTED DEFECT: the staleness cut-off is an IST day count, not a millisecond subtraction from the cron clock', async () => {
+    // The sweep runs at 00:01 IST on 24 Aug, so today is IST day 2026-08-24 and
+    // the cut-off day is 2026-08-10, whose half-open bounds END at
+    // 2026-08-10T18:30:00.000Z. The ticket entered at 2026-08-10T09:00:00.000Z
+    // — 14:30 IST on IST day 2026-08-10 — which is exactly fourteen IST days
+    // back, so it IS stale.
+    //
+    // A raw `now.getTime() - 14 * 86_400_000` would put the cut-off at
+    // 2026-08-09T18:31:00.000Z and call this ticket fresh, because 13 days
+    // 23 hours 29 minutes is not 14 × 24 h. "Fourteen days" is a statement
+    // about the calendar the user reads, not about the second the scheduler
+    // happened to fire — and under the raw subtraction the answer would move
+    // every time cron drifts.
+    const ticketId = freshTicketId();
+    await seedTicket({ ticketId, assigneeId: ANSELMA });
+    await seedEnteredState(ticketId, '2026-08-10T09:00:00.000Z', KIRO);
+    await sweepAt(AFTER_IST_MIDNIGHT);
+    const rows = await notificationRows('stale-ticket');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].dedupe_key).toBe(`stale-ticket:${ticketId}:doing:2026-08-10T09:00:00.000Z`);
+  });
+});
+
 describe('defaults', () => {
   it('the default windows are 7 days approaching, 14 days staleness', () => {
     expect(DEFAULT_SWEEP_WINDOWS).toEqual({ approachingWindowDays: 7, stalenessThresholdDays: 14 });
@@ -1918,7 +2048,7 @@ Expected: FAIL — `src/notifications/sweep.ts` does not exist.
 
 ```ts
 import type { Pool } from 'pg';
-import { dateClaimProvenanceSchema, newUlid, type Notification } from '@gisik-nokma/domain';
+import { dateClaimProvenanceSchema, istDayBounds, istDayOf, newUlid, type Notification } from '@gisik-nokma/domain';
 import { getWorkflowDefFromProjection } from '../projections/workflows.js';
 import { canSee } from '../visibility/can-see.js';
 import { deliverToAll, type NotificationTransport } from './transport.js';
@@ -1944,11 +2074,21 @@ export type SweepDeps = {
 
 export type SweepReport = { dueCandidates: number; staleCandidates: number; delivered: number };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
+/**
+ * Calendar-day arithmetic over `YYYY-MM-DD`. Both sides are day claims, so no
+ * timezone enters here at all: it shifts a day label, it never converts an
+ * instant. `Date.UTC` is the arithmetic device, not a statement about UTC — the
+ * value goes in as a day and comes out as a day. The instant→day step belongs
+ * to `istDayOf` and to nothing else in this file. Negative `days` walks
+ * backwards, which is how the staleness cut-off is found.
+ */
 export function isoDatePlusDays(isoDay: string, days: number): string {
   const [year, month, day] = isoDay.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  const y = String(shifted.getUTCFullYear()).padStart(4, '0');
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 type DueRow = {
@@ -1976,12 +2116,23 @@ export async function runNotificationSweep(deps: SweepDeps): Promise<SweepReport
   const now = (deps.now ?? (() => new Date()))();
   const log = deps.log ?? ((message: string, error?: unknown) => console.error(message, error));
   const createdAt = now.toISOString();
-  const horizon = isoDatePlusDays(createdAt.slice(0, 10), windows.approachingWindowDays);
+  // The sweep's "today" is an IST day (owner decision: time is Asia/Kolkata).
+  // NOT `createdAt.slice(0, 10)` — a UTC slice does not roll over until 05:30
+  // IST, so between IST midnight and 05:30 every night it would compute
+  // yesterday's horizon and hold back warnings that are due. istDayOf is the
+  // one instant→day conversion in this file.
+  const todayIst = istDayOf(createdAt);
+  const horizon = isoDatePlusDays(todayIst, windows.approachingWindowDays);
   const report: SweepReport = { dueCandidates: 0, staleCandidates: 0, delivered: 0 };
 
   // --- date-approaching: every non-terminal ticket whose CLAIMED date is on
   // or before the horizon. The date is read from the claim; nothing is
   // computed onto tickets that carry no claim (invariant 4).
+  //
+  // Day against day: a dueDate claim IS a day, the horizon IS a day, both are
+  // IST, and `YYYY-MM-DD` sorts lexicographically — so this is a string
+  // comparison and correctly so. Parsing the claim as a timestamp to compare it
+  // against an instant would invent a time of day nobody claimed.
   const due = await deps.pool.query(
     `SELECT ticket_id, workspace_id, assignee_id,
             fields -> 'title' ->> 'value' AS title,
@@ -2033,7 +2184,17 @@ export async function runNotificationSweep(deps: SweepDeps): Promise<SweepReport
   // NOT a cursor. A workspace STREAM resumes by `workspace_seq` instead
   // (coordination §18) — this sweep never resumes a stream; it asks each
   // ticket, independently, "what was the last thing that happened to you?"
-  const staleBefore = new Date(now.getTime() - windows.stalenessThresholdDays * DAY_MS);
+  //
+  // Day against INSTANT: `server_time` is a timestamptz, the threshold is a day
+  // count. So the cut-off day is walked back in day-space and then turned into
+  // an instant by istDayBounds, whose interval is HALF-OPEN — the comparison is
+  // a strict `<` against `endUtc`, meaning "entered on or before the cut-off
+  // day". `now.getTime() - days * 86_400_000` is what this replaced: it makes
+  // "fourteen days" mean fourteen times twenty-four hours from whenever the
+  // scheduler fired, which drifts with the cron and not with the calendar the
+  // assignee reads.
+  const stalenessCutoffDay = isoDatePlusDays(todayIst, -windows.stalenessThresholdDays);
+  const staleBefore = istDayBounds(stalenessCutoffDay).endUtc;
   const stale = await deps.pool.query(
     `SELECT t.ticket_id, t.workspace_id, t.assignee_id, t.state_id, t.workflow_id,
             t.fields -> 'title' ->> 'value' AS title,
@@ -2048,8 +2209,8 @@ export async function runNotificationSweep(deps: SweepDeps): Promise<SweepReport
               LIMIT 1
            ) entered ON true
       WHERE t.state_category = 'active'
-        AND entered.server_time <= $1`,
-    [staleBefore.toISOString()],
+        AND entered.server_time < $1`,
+    [staleBefore],
   );
 
   for (const row of stale.rows as StaleRow[]) {
@@ -2087,7 +2248,7 @@ export async function runNotificationSweep(deps: SweepDeps): Promise<SweepReport
 - [ ] **Step 4: Run to verify they pass**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/notifications/sweep.test.ts`
-Expected: PASS.
+Expected: PASS — including the IST-boundary block. Before trusting it, watch both of its planted defects fail for the right reason: swap `istDayOf(createdAt)` for `createdAt.slice(0, 10)` and the 31 Aug claim never arrives; swap the cut-off for `new Date(now.getTime() - windows.stalenessThresholdDays * 86_400_000).toISOString()` and the fourteen-IST-day ticket reads as fresh. Restore both before moving on.
 
 - [ ] **Step 5: Add the CLI entry and script**
 
@@ -2134,7 +2295,7 @@ Expected: a `sweep: … delivered` line, exit 0.
 
 ```bash
 git add apps/server/src/notifications/sweep.ts apps/server/src/tools/sweep-notifications.ts apps/server/package.json apps/server/test/notifications/sweep.test.ts
-git commit -m "attention sweep: claims entering the window and states outliving the threshold become inbox rows — same tables, same clock, same keys, so twice never nags twice"
+git commit -m "attention sweep: claims entering the window and states outliving the threshold become inbox rows — same tables, same IST day, same keys, so twice never nags twice, midnight included"
 ```
 
 ---
@@ -2378,6 +2539,8 @@ Everything the month grid shows is computed here, in a pure function over `Ticke
 
 **Custom `date`-kind fields render here too (owner sign-off 2026-08-20, v1 scope).** A workspace that defines "Filed on" or "Inspection date" on a ticket type has claimed dates the calendar must not silently swallow. They enter on *identical* honesty terms: each renders as a marker attributed to its claimant with that claim's own timestamps, absent when unclaimed, and **labelled with the field's own name** — never a generic word like "date", because the name is the only thing that says what the day means. Two hard limits, both load-bearing: **(1) a bar still requires a `startDate` + `dueDate` pair.** No span is ever drawn between a custom date and anything else — pairing two arbitrary claims into geometry would invent a duration nobody claimed, which is exactly what invariant 4 forbids. Custom date claims are markers, full stop. **(2) A custom date claim carries no note.** Plan 3's kind check accepts a bare `'YYYY-MM-DD'` string for `type: 'date'` fields (unlike the day-claim built-ins' `{date, note?}`), so the tooltip is the label — there is nothing else to quote, and nothing is invented to fill the gap.
 
+**Identical terms means identical code.** A custom date claim is validated by the same `IST_DAY_REGEX`, placed in its cell by the same `istDayOf`-derived day, and rendered against the same IST clock as `dueDate` and `startDate`. It is not "a lesser date with looser rules": the only differences are the ones Plan 3's schema actually creates (a bare string rather than `{date, note?}`) and the two limits above. Nothing about a custom field gets its own day arithmetic — a "Filed on" claim that landed in a different cell from a `dueDate` claim on the same day would be the product disagreeing with itself in public.
+
 **Files:**
 - Create (guarded, Step 0): `packages/app-core/package.json`, `packages/app-core/tsconfig.json`, `packages/app-core/vitest.config.ts`, `packages/app-core/src/index.ts`; `packages/ui/package.json`, `packages/ui/tsconfig.json`, `packages/ui/src/tokens.ts`, `packages/ui/src/index.ts`
 - Create: `packages/app-core/src/claims/dates.ts`
@@ -2389,9 +2552,10 @@ Everything the month grid shows is computed here, in a pure function over `Ticke
 - Test: `packages/app-core/src/claims/dates.test.ts`, `packages/app-core/src/claims/claim-labels.test.ts`, `packages/app-core/src/calendar/calendar-model.test.ts`
 
 **Interfaces:**
-- Consumes: `TicketState`, `FieldClaim`, `StateCategory`, `CustomFieldDef` (`@gisik-nokma/domain`).
+- Consumes: `TicketState`, `FieldClaim`, `StateCategory`, `CustomFieldDef`, `IST_DAY_REGEX`, `istDayOf` (`@gisik-nokma/domain`). `ist-day.ts` is dependency-free — no zod, no date library — so app-core imports it without taking on anything, and the day shape has one origin instead of a copy per package.
+- **Where the day helpers apply here, and where they deliberately do not.** Everything in `dates.ts` is *day-string calendar arithmetic*: it takes `YYYY-MM-DD` in and gives `YYYY-MM-DD` out, so no timezone is involved and `istDayOf` has nothing to convert. That code stays exactly as it is. `istDayOf` is for the one direction that IS a timezone question — an absolute instant to the day it falls in — and it is what the mounting shell calls to produce the `today`/`anchor` props these views take (`istDayOf(new Date().toISOString())`, never `new Date().toLocaleDateString()` and never a device-local slice). `IST_DAY_REGEX` replaces the local day literal the readers used to declare.
 - Produces (Tasks 9–11 and Plan 6's shells consume; amendment 10 makes app-core the shared home):
-  - `DAY_MS`, `dateMs(isoDate): number`, `isoDate(ms): string`, `addDays(isoDay, days): string`, `mondayOnOrBefore(isoDay): string`, `monthGridWeeks(year, month): string[][]` (Monday-start weeks covering the month, padded with adjacent-month days)
+  - `DAY_MS`, `dateMs(isoDate): number`, `isoDate(ms): string`, `addDays(isoDay, days): string`, `mondayOnOrBefore(isoDay): string`, `monthGridWeeks(year, month): string[][]` (Monday-start weeks covering the month, padded with adjacent-month days) — all day-in/day-out, no instant ever enters them
   - `type DateClaimView = { date, note?, actorId, clientTime, serverTime, pending }`; `type CustomDateField = { id: string; name: string }`; `type TicketDatesInput = { state: TicketState; pendingFieldIds: readonly string[]; customDateFields?: readonly CustomDateField[] }`; `dateClaimOf(input, 'startDate'|'dueDate'): DateClaimView | null`; `titleOf(state): string`
   - `type CustomDateClaimView = { fieldId, fieldName, date, actorId, clientTime, serverTime, pending }`; `customDateClaimsOf(input: TicketDatesInput): CustomDateClaimView[]` — one entry per *claimed* custom `date`-kind field, in the type's declared field order; an unclaimed or malformed field yields nothing at all
   - `formatClaimDate('2026-08-30') === '30 Aug'`; `type UserNameFn = (userId: string) => string`; `dueClaimLabel`, `startClaimLabel`, `claimTooltip`, `barProvenance`, `contradictionCopy` (all `(claims, userName) => string`); `customClaimLabel(claim: CustomDateClaimView, userName): string` — `` `Filed on: 30 Aug — Kiro's claim` ``, the field's own name verbatim; `CALENDAR_EMPTY_MONTH_COPY`, `TIMELINE_SIDE_LIST_COPY` (exact strings below)
@@ -2672,6 +2836,23 @@ Expected: FAIL — modules do not exist.
 `packages/app-core/src/claims/dates.ts`:
 
 ```ts
+/**
+ * Day-string calendar arithmetic: `YYYY-MM-DD` in, `YYYY-MM-DD` out.
+ *
+ * NOTHING here converts an instant to a day, and nothing here is a statement
+ * about UTC. `Date.UTC`/`getUTC*` are used as fixed-offset arithmetic — a way
+ * to add seven days to a calendar label without a leap-year table — and the
+ * value that goes in is already the day someone claimed. That is why these
+ * functions need no timezone: the timezone question was answered before the
+ * day reached them.
+ *
+ * The one place that question IS answered is `istDayOf` in
+ * `@gisik-nokma/domain` (owner decision: a day starts at IST midnight). Every
+ * instant→day step — the shell computing `today`, the timeline's `anchor`, the
+ * inbox rendering a stored `enteredAt` — goes through it. If you find yourself
+ * wanting to pass a timestamp into `dateMs` or `isoDate`, call `istDayOf`
+ * first: these take days, and a truncated timestamp is not one.
+ */
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function dateMs(isoDay: string): number {
@@ -2679,8 +2860,13 @@ export function dateMs(isoDay: string): number {
   return Date.UTC(year, month - 1, day);
 }
 
+/** Inverse of `dateMs` — for day-arithmetic results only, never for a clock reading. */
 export function isoDate(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
+  const at = new Date(ms);
+  const year = String(at.getUTCFullYear()).padStart(4, '0');
+  const month = String(at.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(at.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function addDays(isoDay: string, days: number): string {
@@ -2710,7 +2896,7 @@ export function monthGridWeeks(year: number, month: number): string[][] {
 `packages/app-core/src/claims/ticket-dates.ts`:
 
 ```ts
-import type { TicketState } from '@gisik-nokma/domain';
+import { IST_DAY_REGEX, type TicketState } from '@gisik-nokma/domain';
 
 /** A date claim as a view renders it: the FieldClaim flattened, plus the in-transit flag. */
 export type DateClaimView = {
@@ -2752,14 +2938,22 @@ export type TicketDatesInput = {
   customDateFields?: readonly CustomDateField[];
 };
 
-const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+/**
+ * The day shape has ONE origin: IST_DAY_REGEX in @gisik-nokma/domain's
+ * ist-day.ts. An earlier draft re-declared it here as a local literal, because
+ * app-core does not depend on zod and the built-in's schema does. That reason
+ * is gone: ist-day.ts is dependency-free — no zod, no date library, no
+ * timezone database — so importing it costs nothing and removes the last place
+ * two statements of "what a day claim is" could drift apart. The domain pin in
+ * Task 1 holds Plan 3's schema against this same regex.
+ */
 
 /** The claim, or null. There is NO other source of dates — absence is absence. */
 export function dateClaimOf(input: TicketDatesInput, fieldId: 'startDate' | 'dueDate'): DateClaimView | null {
   const claim = input.state.fields[fieldId];
   if (!claim || claim.value === null || claim.value === undefined) return null;
   const value = claim.value as Record<string, unknown>;
-  if (typeof value !== 'object' || typeof value.date !== 'string' || !DATE_ONLY.test(value.date)) return null;
+  if (typeof value !== 'object' || typeof value.date !== 'string' || !IST_DAY_REGEX.test(value.date)) return null;
   return {
     date: value.date,
     ...(typeof value.note === 'string' ? { note: value.note } : {}),
@@ -2782,7 +2976,7 @@ export function customDateClaimsOf(input: TicketDatesInput): CustomDateClaimView
   for (const field of input.customDateFields ?? []) {
     const claim = input.state.fields[field.id];
     if (!claim || claim.value === null || claim.value === undefined) continue;
-    if (typeof claim.value !== 'string' || !DATE_ONLY.test(claim.value)) continue;
+    if (typeof claim.value !== 'string' || !IST_DAY_REGEX.test(claim.value)) continue;
     claims.push({
       fieldId: field.id,
       fieldName: field.name,
@@ -3476,6 +3670,8 @@ git commit -m "calendar view-model: a pure fold from claims to weeks — no bran
 
 A React DOM component over Task 8's model (web + desktop render it directly; mobile reuses the view-model under native navigation, amendment 17). All state is view state: which month, which weeks are expanded, which custom date fields are switched off. Colours come only from `@gisik-nokma/ui` tokens. `today` is a prop, injected — the component never reads the clock, so tests are deterministic and the today-ring is provable.
 
+**`today` is an IST day, and the shell is the only place that decides so.** The mounting shell passes `istDayOf(new Date().toISOString())` — the device supplies the *instant*, which is a fact it does own, and the domain helper turns it into the day. Never `toLocaleDateString()`, never `toISOString().slice(0, 10)`: the first rings a collaborator's own timezone and the second rings yesterday for five and a half hours every night. Because `today` and the model's day cells are both IST day strings, the ring is a plain `===` comparison and stays one.
+
 **The custom-date legend (the readability affordance, and why it is the smallest honest one).** A workspace can define many `date`-kind fields; a month where four of them all claimed days is unreadable, and unreadable is its own kind of dishonest. The affordance is a legend: one row per custom date field that actually placed a claim in this grid, showing the field's own name and how many claims it placed, each row a checkbox that hides or shows that field's markers. It is the smallest honest design available because (a) it invents nothing — the roster comes from claims that exist, so an unclaimed field never appears and a field's name is never paraphrased; (b) it needs no server round-trip, no schema read, and no stored preference, so it cannot go stale or disagree with the ledger; (c) it is symmetrical with the per-week `+n more` fold already here — pure view state, reset by nothing but the user; and (d) hiding is visibly reversible, because the tally is computed before hiding, so a switched-off field keeps its own switch and its own count. Rejected as bigger without being more honest: a saved per-user preference (Task 13's machinery for a decision that lasts one glance), a server-side field filter (turns arrangement into a query), and colour-coding without switches (readable for three fields, worse than nothing for eight).
 
 **Files:**
@@ -3656,7 +3852,12 @@ import { buildCalendarModel, type CalendarItem, type CalendarMonth } from './cal
 
 export type CalendarViewProps = {
   tickets: TicketDatesInput[];
-  /** ISO day, injected by the shell — the component never reads the clock. */
+  /**
+   * The IST day, injected by the shell as `istDayOf(new Date().toISOString())`
+   * — the component never reads the clock and never asks the device what day
+   * it is. A day starts at IST midnight (owner decision), so a device-local
+   * or UTC-sliced value would ring the wrong cell.
+   */
   today: string;
   userName: UserNameFn;
   onOpenTicket: (ticketId: string) => void;
@@ -3941,6 +4142,7 @@ Week-column Gantt-lite, from the same `TicketDatesInput`s. The rule the whole ta
   - `type TimelineGroup = { epicId: string | null; epicTitle: string; rows: TimelineRow[] }`
   - `type TimelineModel = { weeks: TimelineWeekCol[]; groups: TimelineGroup[]; sideList: TimelineSideEntry[]; sideListCopy: string }`
   - `buildTimelineModel(inputs: TicketDatesInput[], opts: { anchor: string; weeksCount?: number; userName: UserNameFn; filter?: FilterSpec; laneEpicId?: string | null }): TimelineModel` — default 8 weeks starting the Monday on/before `anchor`; a fully-dated ticket wholly outside the window appears nowhere (navigation reaches it — it is scheduled, just not here); side-list membership is about missing claims, not about the window.
+  - **`anchor` is an IST day** — the shell passes `istDayOf(new Date().toISOString())` for "now", exactly as `CalendarView` gets `today`, and the Earlier/Later buttons walk it in day-space from there. Every day column is therefore an IST day, and a claim's column is decided by the same day the calendar would put it in. A timeline whose columns started somewhere other than IST midnight would place the same claim in a different week from the calendar's cell — one product, two answers, which is the failure this decision exists to prevent.
   - `NO_DATES_NOTE = 'no claimed dates'` (the side list's copy for fully undated work); `NO_DAY_CLAIMS_NOTE = 'no claimed start or needed-by'` (the same slot when the ticket *does* carry custom date claims — the note narrows to what is actually missing rather than claiming the ticket is dateless).
   - Custom date claims never affect `reason`, `bar`, or window membership; they hang off the row or the side entry that the `startDate`/`dueDate` pair already decided.
 
@@ -4559,7 +4761,12 @@ import { buildTimelineModel, type TimelineCustomClaim } from './timeline-model';
 
 export type TimelineViewProps = {
   tickets: TicketDatesInput[];
-  /** ISO day, injected by the shell. */
+  /**
+   * The IST day, injected by the shell as `istDayOf(new Date().toISOString())`
+   * — same value the Calendar's `today` prop carries, so both views agree on
+   * which day it is and place the same claim in the same day. The week columns
+   * are derived from it in day-space; nothing here reads a clock.
+   */
   today: string;
   userName: UserNameFn;
   onOpenTicket: (ticketId: string) => void;
@@ -4797,6 +5004,23 @@ describe('notification copy is the claim, attributed — never invented urgency'
     const nameless = base('stale-ticket', { ...(n.payload as object), stateName: null } as Notification['payload']);
     expect(notificationHeadline(nameless, userName)).toBe('In doing since 1 Aug — moved there by Kiro');
   });
+
+  it('planted defect: "since" is the IST day of the stored instant, not a UTC slice of it', () => {
+    // 2026-08-01T19:00:00.000Z is 00:30 IST on 2 Aug. Slicing the string says
+    // "1 Aug"; istDayOf says 2 Aug, which is the day the ticket's own history
+    // shows, and the day the calendar would place it in.
+    const crossing = base('stale-ticket', {
+      ticketId: 't1', ticketTitle: 'DLT', stateId: 'doing', stateName: 'Doing',
+      enteredAt: '2026-08-01T19:00:00.000Z', enteredBy: 'user_kiro',
+    });
+    expect(notificationHeadline(crossing, userName)).toBe('In Doing since 2 Aug — moved there by Kiro');
+    // And the last instant that is still 1 Aug in IST stays 1 Aug.
+    const stillFirst = base('stale-ticket', {
+      ticketId: 't1', ticketTitle: 'DLT', stateId: 'doing', stateName: 'Doing',
+      enteredAt: '2026-08-01T18:29:59.999Z', enteredBy: 'user_kiro',
+    });
+    expect(notificationHeadline(stillFirst, userName)).toBe('In Doing since 1 Aug — moved there by Kiro');
+  });
 });
 ```
 
@@ -4807,6 +5031,7 @@ Run: `pnpm --filter @gisik-nokma/app-core exec vitest run src/inbox/format.test.
 `packages/app-core/src/inbox/format.ts`:
 
 ```ts
+import { istDayOf } from '@gisik-nokma/domain';
 import type {
   AssignmentNotificationPayload,
   ContestedClaimNotificationPayload,
@@ -4821,6 +5046,12 @@ import { dueClaimLabel, formatClaimDate, type UserNameFn } from '../claims/claim
  * Headlines are the claims' own attributed wording. There is no urgency
  * vocabulary here because there is no urgency field to read (Task 3's
  * strict schemas) — the copy CANNOT say "URGENT", only what someone claimed.
+ *
+ * One payload field is an INSTANT rather than a day claim: stale-ticket's
+ * `enteredAt`, which is the ledger's `server_time`. It goes through istDayOf,
+ * never through a string slice — `2026-08-01T19:00:00.000Z` is 2 Aug in IST,
+ * and "since 1 Aug" would be the inbox quietly disagreeing with the ticket
+ * history sitting beside it.
  */
 export function notificationHeadline(notification: Notification, userName: UserNameFn): string {
   switch (notification.kind) {
@@ -4842,7 +5073,7 @@ export function notificationHeadline(notification: Notification, userName: UserN
     }
     case 'stale-ticket': {
       const payload = notification.payload as StaleTicketNotificationPayload;
-      return `In ${payload.stateName ?? payload.stateId} since ${formatClaimDate(payload.enteredAt.slice(0, 10))} — moved there by ${userName(payload.enteredBy)}`;
+      return `In ${payload.stateName ?? payload.stateId} since ${formatClaimDate(istDayOf(payload.enteredAt))} — moved there by ${userName(payload.enteredBy)}`;
     }
   }
 }
@@ -5623,7 +5854,7 @@ git commit -m "web inbox: thin wiring over tested parts — HTTP gateway, /inbox
 
 ### Task 15: Reporting scope guard, `Features.md` §11, `test-cases/11-calendar-notifications.md`, full verification
 
-Spec §7: "Reporting v1 is derived counts and the ledger itself … No velocity, no burndown forecasts, nothing the record does not contain" — restated here as an executable guard, the base's override-scan discipline applied to vocabulary: no source file in any client or server tree may speak the estimation words. Then the workspace bookkeeping in the same change set, and the whole plan's verification pass.
+Spec §7: "Reporting v1 is derived counts and the ledger itself … No velocity, no burndown forecasts, nothing the record does not contain" — restated here as an executable guard, the base's override-scan discipline applied to vocabulary: no source file in any client or server tree may speak the estimation words. The same walker carries a second scan, for the same reason in a different register: the zone string `'Asia/Kolkata'` and the day regex may exist in exactly one file each (`packages/domain/src/ist-day.ts`), because a second copy of either is a second answer to "when does a day start", and this plan is where two answers would show up as two different calendar cells. Then the workspace bookkeeping in the same change set, and the whole plan's verification pass.
 
 **Files:**
 - Create: `packages/app-core/test/reporting-scope-guard.test.ts`
@@ -5631,8 +5862,8 @@ Spec §7: "Reporting v1 is derived counts and the ledger itself … No velocity,
 - Create: `test-cases/11-calendar-notifications.md`
 
 **Interfaces:**
-- Consumes: `NOTIFICATION_KINDS`, `notificationPayloadSchemaByKind` (`@gisik-nokma/domain`); the source trees of Tasks 1–14.
-- Produces: the executable scope guard; `Features.md` §11; test-cases bucket 11 (cases 11.1–11.41; 11.36–11.41 cover the custom `date`-kind fields the owner brought into v1 on 2026-08-20). This plan claims **only** §11 and the `11.x` case numbers.
+- Consumes: `NOTIFICATION_KINDS`, `notificationPayloadSchemaByKind`, `IST_TIME_ZONE` (`@gisik-nokma/domain`); the source trees of Tasks 1–14.
+- Produces: the executable scope guard (estimation vocabulary + single-origin time scan); `Features.md` §11; test-cases bucket 11 (cases 11.1–11.44; 11.36–11.41 cover the custom `date`-kind fields the owner brought into v1 on 2026-08-20; 11.42–11.44 cover the IST day boundary). This plan claims **only** §11 and the `11.x` case numbers.
 
 - [ ] **Step 1: Write the scope-guard test (it should PASS immediately — it guards, it does not drive)**
 
@@ -5642,12 +5873,29 @@ Spec §7: "Reporting v1 is derived counts and the ledger itself … No velocity,
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { NOTIFICATION_KINDS, notificationPayloadSchemaByKind } from '@gisik-nokma/domain';
+import { IST_TIME_ZONE, NOTIFICATION_KINDS, notificationPayloadSchemaByKind } from '@gisik-nokma/domain';
 
 const HERE = new URL('.', import.meta.url).pathname;
 const REPO_ROOT = resolve(HERE, '../../..');
 const SCANNED_ROOTS = ['packages/app-core/src', 'packages/domain/src', 'packages/ui/src', 'apps/server/src'];
 const FORBIDDEN = /\b(velocity|burndown|forecast)\b/i;
+
+/**
+ * The one file allowed to state the zone and the day shape (Plan 1, Task 4a).
+ * The two constants below are SEARCH NEEDLES, not validators — this file
+ * matches text, it never tests a date. The zone needle is built from
+ * IST_TIME_ZONE so the scan cannot drift from the constant it is protecting.
+ *
+ * The day needle is the WHOLE anchored literal, deliberately. `envelope.ts`'s
+ * ISO_DATETIME_REGEX legitimately begins /^\d{4}-\d{2}-\d{2}T… — it is the one
+ * origin of the INSTANT shape, exactly as ist-day.ts is the one origin of the
+ * DAY shape — and a fragment needle would flag it and invite someone to delete
+ * the wrong thing. The trailing `$/` is what separates a day from an instant,
+ * here and in the product.
+ */
+const TIME_ORIGIN = 'packages/domain/src/ist-day.ts';
+const ZONE_LITERAL = `'${IST_TIME_ZONE}'`;
+const DAY_REGEX_LITERAL = String.raw`/^\d{4}-\d{2}-\d{2}$/`;
 
 function walk(dir: string, files: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -5684,10 +5932,49 @@ describe('reporting v1 scope guard (spec §7: nothing the record does not contai
     expect(Object.keys(notificationPayloadSchemaByKind).sort()).toEqual([...NOTIFICATION_KINDS].sort());
   });
 });
+
+describe('time has one origin (owner decision: time is Asia/Kolkata)', () => {
+  function scan(needle: string): string[] {
+    const offenders: string[] = [];
+    for (const root of SCANNED_ROOTS) {
+      let files: string[] = [];
+      try {
+        files = walk(join(REPO_ROOT, root));
+      } catch {
+        continue;
+      }
+      for (const file of files) {
+        if (file.endsWith(TIME_ORIGIN)) continue; // the declaration site itself
+        const lines = readFileSync(file, 'utf8').split('\n');
+        const hit = lines.findIndex((line) => line.includes(needle));
+        if (hit !== -1) offenders.push(`${file}:${hit + 1}`);
+      }
+    }
+    return offenders;
+  }
+
+  it('no file but ist-day.ts writes the zone as a literal — views import IST_TIME_ZONE', () => {
+    // A hard-coded zone is a second answer to "which clock is this?", and the
+    // day it disagrees about is the day a deadline moves.
+    expect(scan(ZONE_LITERAL)).toEqual([]);
+  });
+
+  it('no file but ist-day.ts re-declares the day shape — everyone imports IST_DAY_REGEX', () => {
+    // Three copies of one regex is three chances for the calendar, the schema
+    // and the notification to disagree about what a day claim looks like.
+    expect(scan(DAY_REGEX_LITERAL)).toEqual([]);
+  });
+
+  it('the zone string every view formats with comes from the domain, and is the real IANA name', () => {
+    expect(IST_TIME_ZONE).toBe('Asia/Kolkata');
+  });
+});
 ```
 
 Run: `pnpm --filter @gisik-nokma/app-core exec vitest run test/reporting-scope-guard.test.ts`
-Expected: PASS. If the vocabulary scan fails, the offender is real — rename the identifier or copy; never widen the regex's allowances.
+Expected: PASS. If the vocabulary scan fails, the offender is real — rename the identifier or copy; never widen the regex's allowances. If a time scan fails, delete the duplicate and import from `@gisik-nokma/domain`; never add the offending file to an allow-list, because the allow-list would be the drift.
+
+**One expected failure has a named owner.** Plan 3's `dueDateValueSchema` in `packages/domain/src/ticket-types.ts` states the day shape with its own literal — it predates Plan 1's `ist-day.ts`. The fix is one line in Plan 3's file (`import { IST_DAY_REGEX } from './ist-day.js'`, then `z.string().regex(IST_DAY_REGEX, …)`), it is behaviour-preserving, and Plan 3's own day tests prove it. If that file has not already been amended when you reach this step, **hand it to the orchestrator rather than editing another plan's surface from inside this one**, and leave this task's step unchecked with the reason recorded. Everything else in this plan already imports the one regex.
 
 - [ ] **Step 2: Append §11 to `Features.md`**
 
@@ -5703,12 +5990,13 @@ Append after §10 (Plan 8's section; if the numbering you find differs, take the
 - ✅ **Timeline view** — week-column Gantt-lite: bars only for tickets with BOTH startDate and dueDate claims; single-claim, undated, and start-after-due work sits in a visible side list with attributed notes (a ticket carrying only custom date claims says "no claimed start or needed-by", not "no claimed dates"); epic grouping; no dependencies, no critical path. `packages/app-core/src/timeline/`
 - ✅ **Filters on both views** — FilterSpec (assignee, type, state, category, project, title text) plus an epic lane; in-transit claims render distinctly (`data-pending`) with provenance on hover. `packages/app-core/src/filter/`, `packages/app-core/src/claims/`
 - ⚙️ **Notification fan-out** — on committed events: `ticket.assigned` → assignee, structured `@mention` nodes in comments/descriptions → the mentioned, `claim.contested` → the original claimant; canSee-gated so a notification never out-leaks its ticket; idempotent per (user, dedupe key). `apps/server/src/notifications/fanout.ts`
-- ⚙️ **Attention sweep** — deterministic, idempotent job: dueDate claims entering the warning window and active states outliving the staleness threshold become inbox rows carrying the claim's provenance verbatim; running twice notifies once. `apps/server/src/notifications/sweep.ts`
+- ⚙️ **Attention sweep** — deterministic, idempotent job: dueDate claims entering the warning window and active states outliving the staleness threshold become inbox rows carrying the claim's provenance verbatim; running twice notifies once, including across midnight. `apps/server/src/notifications/sweep.ts`
+- ⚙️ **IST day boundaries everywhere a day is decided** — calendar cell assignment, timeline day columns, the today ring, the sweep's warning horizon and staleness window, and the inbox's "since" all resolve a day through the domain's `istDayOf`/`istDayBounds`; day-vs-instant comparisons are half-open `[startUtc, endUtc)`. Rendered clocks use `IST_TIME_ZONE` from the domain, never a literal and never the device. `packages/app-core/src/claims/`, `apps/server/src/notifications/sweep.ts`, `packages/app-core/src/inbox/format.ts`
 - ⚙️ **Notification storage + API** — per-user `notifications` rows (server-owned, NOT ledger events, NOT a projection — replay can never re-invent a nag); `GET /v1/me/notifications` (cursor), unread count, mark-read; strict payload schemas with no field for invented urgency. `apps/server/src/notifications/store.ts`, `apps/server/src/routes/notifications.ts`
 - ⚙️ **NotificationTransport seam** — at-least-once per (user, dedupeKey); in-app transport ships here, web push (Plan 10) and native push (Plan 11) implement the same interface. `apps/server/src/notifications/transport.ts`
 - ✅ **Inbox** — notification list with per-kind icons, deep links, unread badge, mark-read; headlines are the claims' own attributed wording. `packages/app-core/src/inbox/`, `apps/web/app/inbox/`
 - ✅ **Saved filters** — named FilterSpecs stored via `/v1/me/preferences`; applying one is a view act, never a data act. `packages/app-core/src/filters/`
-- ⚙️ **Reporting scope guard** — an executable scan keeps velocity/burndown/forecast vocabulary out of every client and server source tree. `packages/app-core/test/reporting-scope-guard.test.ts`
+- ⚙️ **Reporting scope guard** — an executable scan keeps velocity/burndown/forecast vocabulary out of every client and server source tree, and keeps the zone string and the day regex to their single origin in the domain. `packages/app-core/test/reporting-scope-guard.test.ts`
 ```
 
 - [ ] **Step 3: Write `test-cases/11-calendar-notifications.md`**
@@ -5746,7 +6034,7 @@ Scope contract for Features.md §11. Status legend: ✅ covered by an automated 
 
 ## Day claims (the `startDate`/`dueDate` built-ins — owned by the tickets plan, consumed here)
 
-- **11.21** ✅ The day-claim shape the views read is held against the built-in's own schema: one schema serves both day built-ins (a `startDateValue*` export would fail the pin), it accepts exactly the days app-core's `DATE_ONLY` regex accepts and refuses exactly the ones it refuses, and it carries the optional note through. Guards the readers; the field itself is pinned by the tickets plan. (`ticket-types.test.ts`)
+- **11.21** ✅ The day-claim shape the views read is held against the built-in's own schema: one schema serves both day built-ins (a `startDateValue*` export would fail the pin), it accepts exactly the days the domain's single `IST_DAY_REGEX` accepts — the same regex app-core's reader imports, not a copy — and refuses exactly the ones it refuses, carries the optional note through, and stays a day rather than an instant. Guards the readers; the field itself is pinned by the tickets plan. (`ticket-types.test.ts`)
 - **11.22** ✅ A built-in day claim runs end to end through the shared fixture runner in every build — a malformed start date refused `field.type-mismatch`, a well-formed `{date, note?}` accepted; both proven to bite by temporarily dropping `startDate` from the engine's merged day branch. (`fixtures/field-set-*start-date*.json`)
 
 ## Notification engine
@@ -5779,6 +6067,12 @@ Scope contract for Features.md §11. Status legend: ✅ covered by an automated 
 - **11.39** ✅ The claimed-date-field legend lists each field by its own name and count, switches its markers off and back on, keeps its own switch while hidden, and is absent entirely when no custom date was claimed. (`calendar-model.test.ts`, `CalendarView.test.tsx`)
 - **11.40** ✅ Timeline: custom claims ride the ticket's row and its side-list entry with their attributed labels and join the bar's hover provenance; side-list membership is decided by the startDate/dueDate pair alone and is unchanged by them. (`timeline-model.test.ts`, `TimelineView.test.tsx`)
 - **11.41** ✅ A ticket carrying only custom date claims is told what it actually lacks — "no claimed start or needed-by" — while a genuinely bare ticket keeps "no claimed dates" verbatim. (`timeline-model.test.ts`, `TimelineView.test.tsx`)
+
+## IST day boundaries (owner decision 2026-08-20 — time is Asia/Kolkata)
+
+- **11.42** ✅ Planted defect: the sweep's "today" is an IST day. Two runs either side of IST midnight on one UTC date (18:29Z and 18:31Z) notify a claim already inside the window exactly once, while a claim that only enters the window on the next IST day gets its own notification on that day — the warning a UTC-sliced horizon would hold back until 05:30 IST. (`sweep.test.ts`)
+- **11.43** ✅ Planted defect: the staleness threshold is a day count in IST, not a millisecond subtraction from the scheduler's clock — a ticket exactly fourteen IST days into its state is stale, compared half-open against `istDayBounds(...).endUtc`; `isoDatePlusDays` walks days forward and backward with no timezone in it. (`sweep.test.ts`)
+- **11.44** ✅ Planted defect: the inbox's "since" is the IST day of the stored instant — `2026-08-01T19:00:00Z` reads as 2 Aug, `18:29:59.999Z` still reads as 1 Aug — and the scope guard proves the zone string and the day regex exist in exactly one source file each, so no view can answer "which day is this?" differently from the domain. (`format.test.ts`, `reporting-scope-guard.test.ts`)
 ```
 
 - [ ] **Step 4: Full verification pass**
@@ -5814,13 +6108,20 @@ Flagged, never silently resolved. None blocks execution; each names the assumpti
 7. **`docToPlainText` double-definition risk (Plan 7).** Amendment 12 pins home and signature; both plans carry a create-if-absent guard. Whoever lands second consumes. If both created it (merge race), keep Plan 7's and delete mine — the signature is identical.
 8. **`packages/app-core` / `packages/ui` scaffolds (Plan 6 owns the real ones).** Task 8 Step 0 creates minimal scaffolds only if absent, including seed `tokens.ts` values. When Plan 6 lands its scaffold/token set, its values win; any token key this plan added that Plan 6 lacks is carried into Plan 6's `tokens.ts` (one colour origin holds).
 9. **Task 14 precondition.** If `apps/web` does not exist when this plan executes, Task 14 is left unchecked and handed to the orchestrator to run after Plan 6 merges. Everything it wires is already tested beneath it.
-10. **Sweep windows vs workspace settings (Plan 5 + owner).** Spec §7 calls the staleness threshold (and by symmetry the warning window) workspace-set. Taken: exported defaults (7 days approaching / 14 days staleness) injected via `SweepDeps.windows` — the DI seam is ready for wherever Plan 5's attention endpoint puts per-workspace values. Sweep and attention endpoint MUST eventually read one source; flagged for that reconciliation.
+10. **Sweep windows vs workspace settings (Plan 5 + owner).** Spec §7 calls the staleness threshold (and by symmetry the warning window) workspace-set. Taken: exported defaults (7 days approaching / 14 days staleness) injected via `SweepDeps.windows` — the DI seam is ready for wherever Plan 5's attention endpoint puts per-workspace values. Sweep and attention endpoint MUST eventually read one source; flagged for that reconciliation. **That single source now has to cover the day boundary as well as the numbers:** this sweep counts days in IST via `istDayOf`/`istDayBounds` (Task 6), and Plan 5's read-time attention strip and days-in-flight must count them the same way, or the strip and the inbox will disagree about the same ticket on the same afternoon. Same windows, same helpers — flagged to the orchestrator as part of this reconciliation, not as a separate one.
 11. **Notification rows are not retroactively redacted.** A stored notification keeps its `ticketTitle` even if visibility is later revoked (the deep link then 404s via `canSee`). A point-in-time message honestly reflects what the recipient was entitled to see when it was sent; scrubbing history-of-messages is an owner decision, not assumed here.
 12. **Silent mention-gate.** A mention of a user who cannot see the ticket produces nothing, and the mentioner is not told. Honest (no leak, no invented delivery), but the editor could warn at mention time — a Plan 6/7 UX consideration, flagged.
 13. **Fixture-schema drift (two axes).** (a) Plan 2's `fixtureSchema` says `workflowDefs` (array); Plan 3's runner snippet used singular. (b) Plan 2's `expected` union spells refusals as `{refused, rule, reason}` or `{refused, rule, reasonStartsWith}`, yet Plan 3 ships `parent-terminal-with-open-children.json` naming the `rule` alone — so either the landed schema grew a rule-only branch or Plan 3's fixture needs a reason. Task 1 Step 5 carries a guard for both, and names the literal reason to add if the schema demands one. Reconciliation is Plans 2/3's; this plan only matches what it finds.
 14. **Test-helper drift (Plans 1/3/4).** `createTestDatabase` vs `testPool`/`wipe` vs `migrateTestDb`/`truncateAll` — this plan's server tests assume Plan 1's `createTestDatabase` (per-suite database; also sidesteps the append-only events table's truncate guard) with a locate-first guard. Reconciliation may standardise; adapt imports only.
 15. **Custom `date`-kind fields on Calendar/Timeline — SETTLED (owner sign-off 2026-08-20): IN v1.** This was flagged as a v2 candidate on the reading that spec §7's "claimed dates" *arguably* includes custom date fields; the owner ruled that it does, and they are now in scope. They render on exactly the honesty terms the built-ins do: attributed to their claimant with that claim's own timestamps, never estimated, absent when unclaimed, and labelled with **the field's own name** — `"Filed on: 30 Aug — Kiro's claim"`, never a generic word, because the name is the only thing that says what the day means. Three limits are pinned in the code rather than left to judgement: **(a) no span is ever drawn from a custom date** — a bar still requires the `startDate` + `dueDate` pair, since pairing arbitrary claims would invent a duration nobody claimed (Task 8's model collects custom claims before, and independently of, the pairing branch, so no code path can reach one); **(b) the timeline's side-list membership is unchanged** — it is decided by that pair alone, and only the *wording* narrows (`NO_DAY_CLAIMS_NOTE` instead of `NO_DATES_NOTE`) when a ticket does carry custom claims, because telling it that it has "no claimed dates" would be false; **(c) a custom date claim carries no note** (Plan 3 accepts a bare `'YYYY-MM-DD'` for `type: 'date'`), so the tooltip is the label and nothing is invented to fill the gap. Readability, where a workspace defines many date fields, is a calendar legend of per-field switches — pure view state, sourced from claims that exist, justified in full in Task 9. Cases 11.36–11.41 cover it, including the two planted defects the sign-off named. The one thing this does NOT change: no date field, custom or built-in, feeds the attention sweep — Task 6 still watches `dueDate` alone, because a sweep over arbitrary fields would nag about days nobody asked to be reminded of.
 16. **`stateName` in stale notifications resolves via the LATEST workflow version** (`getWorkflowDefFromProjection` without a version). A renamed state shows its current name; the `stateId` always travels alongside. Pinning the version the ticket actually sits on would need `workflowVersion` in `proj_tickets` — not added here.
+
+17. **Where a day starts — SETTLED (owner decision 2026-08-20): IST midnight, and this plan uses Plan 1's helpers rather than any of its own.** This was previously undefined across the series, and this is the plan it would have bitten hardest: "which cell does this claim fall in", "due today", "overdue", which week column a bar starts in, and what a notification sweep means by *today* are all the same question. It is answered once, in `packages/domain/src/ist-day.ts` (Plan 1 Task 4a), and consumed here:
+    - **Calendar cells and timeline columns.** The grid arithmetic (`monthGridWeeks`, `addDays`, `mondayOnOrBefore`, `dateMs`/`isoDate`) is unchanged and stays unchanged: it is day-string calendar arithmetic — `YYYY-MM-DD` in, `YYYY-MM-DD` out — with no instant anywhere in it and therefore no timezone question to answer. What changed is the *entry point*: the `today`/`anchor` props are `istDayOf(new Date().toISOString())`, computed by the mounting shell, never a device-local or UTC-sliced day. This is a reconciliation, not a replacement — the two kinds of date code were doing different jobs and now say so in their doc comments.
+    - **The day shape.** `IST_DAY_REGEX` replaces the three local `/^\d{4}-\d{2}-\d{2}$/` literals this plan used to declare (Task 1's pin, Task 3's `notifications.ts`, Task 8's `ticket-dates.ts`). The reason the app-core copy existed — "app-core does not depend on zod" — was never a reason not to import the regex: `ist-day.ts` is **dependency-free**, which is exactly why Plan 1 wrote it that way, and why Plan 10's offline replica can import the same file.
+    - **The sweep.** `istDayOf` for the warning horizon, `istDayBounds` half-open for the staleness cut-off, with planted defects for both (cases 11.42, 11.43). This is the one place the decision changes *behaviour* rather than provenance.
+    - **Rendering.** Every clock a view shows formats with `IST_TIME_ZONE` imported from the domain; the inbox's `enteredAt` goes through `istDayOf`. An executable scan in Task 15 keeps the zone string and the day regex to one file each.
+    - Carried to the orchestrator, not fixed here: Plan 3's `dueDateValueSchema` still declares its own day regex and should import `IST_DAY_REGEX` (one behaviour-preserving line, noted at Task 15 Step 1); Plan 6's shells must pass IST `today`/`anchor` and render clocks with `IST_TIME_ZONE`; Plan 5's attention windows share this plan's day semantics (Open questions 10).
 
 ## Self-review (writing-plans skill checklist)
 
@@ -5835,10 +6136,11 @@ Flagged, never silently resolved. None blocks execution; each names the assumpti
 - §7 saved filters → Task 13; per-user, view-act-only proven (11.34).
 - Custom `date`-kind fields render as claims on both views (owner sign-off 2026-08-20, Open questions 15) → Tasks 8–11; the field's own name is pinned in `claim-labels.test.ts` and asserted through model and component; planted defects 11.36 (own name + own author) and 11.37 (unclaimed ⇒ nothing). The bar rule survives intact: 11.38 proves no span is invented between a custom date and a built-in day claim.
 - Gaps consciously out: velocity/burndown/forecast (guarded), dependencies/critical path (11.20), drag-to-reschedule, push delivery (Plans 10/11). Custom date fields moved OUT of this list on the owner's sign-off; the attention sweep still watches `dueDate` alone, deliberately (Open questions 15).
+- Owner decision "time is Asia/Kolkata" (Open questions 17) → Global Constraints' TIME bullet, then Tasks 1/3/8 (one day regex), 6 (IST horizon + half-open staleness window, planted defects 11.42/11.43), 9/10/11 (IST `today`/`anchor`), 12 (IST `enteredAt`, planted defect 11.44), 15 (single-origin scan). No surface in this plan decides a day for itself.
 
 **2. Placeholder scan:** no TBD/TODO/"implement later"/"add validation"/"similar to Task N" anywhere; every code step carries the actual code; every test step carries the actual tests; the two guarded creations (`docToPlainText`, scaffolds) carry full content for the create branch and an exact consume instruction for the other. Task 14 is thin by design and says why, with concrete verification steps.
 
-**3. Type consistency (checked across tasks):** `Notification` shape identical in Tasks 3/4/5/6/7/12/14; dedupe-key grammar identical in Tasks 5/6 (`assignment:` / `mention:` / `contested-claim:` / `date-approaching:` / `stale-ticket:`); `NotificationTransport.deliver(userId, notification)` identical in 5/6; `TicketDatesInput`/`DateClaimView` identical in 8/9/10/11; `FilterSpec` consumed from one module in 8/9/10/13; `dueClaimLabel` defined once (Task 8) and consumed in 8/10/12; `insertNotification(db, notification)` identical in 4/5(transport)/7(test seeding); `CanSeeFn` defined in Task 5, reused in Task 6; `NO_DATES_NOTE`, `CALENDAR_EMPTY_MONTH_COPY`, `TIMELINE_SIDE_LIST_COPY` defined once, asserted where consumed. Route paths in Task 14's gateway match Task 7's registrations verbatim. Day claims: `startDate` and `dueDate` are validated and typed by Plan 3's single `dueDateValueSchema`/`DueDateValue` everywhere this plan names them (Task 1 pins it; Tasks 8–11 read the shape through `dateClaimOf`) — this plan adds no second day schema under any name. Custom `date`-kind fields are a *different* shape by Plan 3's own design (a bare `'YYYY-MM-DD'` string, validated by `customFieldVerdict`'s `date` branch, no note); this plan defines no schema for them either — `customDateClaimsOf` is a reader that skips anything not matching the same `DATE_ONLY` regex, and `CustomDateClaimView`/`customClaimLabel` are defined once in Task 8 and consumed verbatim by 9/10/11. Ledger writes: the only direct `INSERT INTO events` in this plan (Task 6's `seedEnteredState`) carries Plan 1's full thirteen-column list including `workspace_seq`; the only `ORDER BY seq` (Task 6's stale LATERAL) is per-entity history, not a workspace cursor, and says so in place.
+**3. Type consistency (checked across tasks):** `Notification` shape identical in Tasks 3/4/5/6/7/12/14; dedupe-key grammar identical in Tasks 5/6 (`assignment:` / `mention:` / `contested-claim:` / `date-approaching:` / `stale-ticket:`); `NotificationTransport.deliver(userId, notification)` identical in 5/6; `TicketDatesInput`/`DateClaimView` identical in 8/9/10/11; `FilterSpec` consumed from one module in 8/9/10/13; `dueClaimLabel` defined once (Task 8) and consumed in 8/10/12; `insertNotification(db, notification)` identical in 4/5(transport)/7(test seeding); `CanSeeFn` defined in Task 5, reused in Task 6; `NO_DATES_NOTE`, `CALENDAR_EMPTY_MONTH_COPY`, `TIMELINE_SIDE_LIST_COPY` defined once, asserted where consumed. Route paths in Task 14's gateway match Task 7's registrations verbatim. Day claims: `startDate` and `dueDate` are validated and typed by Plan 3's single `dueDateValueSchema`/`DueDateValue` everywhere this plan names them (Task 1 pins it; Tasks 8–11 read the shape through `dateClaimOf`) — this plan adds no second day schema under any name. Custom `date`-kind fields are a *different* shape by Plan 3's own design (a bare `'YYYY-MM-DD'` string, validated by `customFieldVerdict`'s `date` branch, no note); this plan defines no schema for them either — `customDateClaimsOf` is a reader that skips anything not matching the same `DATE_ONLY` regex, and `CustomDateClaimView`/`customClaimLabel` are defined once in Task 8 and consumed verbatim by 9/10/11. Ledger writes: the only direct `INSERT INTO events` in this plan (Task 6's `seedEnteredState`) carries Plan 1's full thirteen-column list including `workspace_seq`, and both its time columns take ISO 8601 `Z` instants (both columns are `timestamptz` since Plan 1 Task 6 — a text `client_time` is gone, so a readback is Z-normalised); the only `ORDER BY seq` (Task 6's stale LATERAL) is per-entity history, not a workspace cursor, and says so in place. Time: `IST_DAY_REGEX` is the only day-shape statement anywhere in this plan (Tasks 1, 3, 8 all import it; Task 15 scans for a second copy), `istDayOf` is the only instant→day conversion (Task 6's `todayIst`, Task 12's `enteredAt`, and the `today`/`anchor` props the shells compute), `istDayBounds` appears once (Task 6's staleness cut-off, half-open with a strict `<`), and `IST_TIME_ZONE` is the only origin of the zone string — no view code writes `'Asia/Kolkata'`. `isoDatePlusDays` (Task 6, server) and `addDays` (Task 8, app-core) are deliberately separate day-arithmetic helpers in separate packages — the server never imports app-core — and both are day-in/day-out with identical semantics, pinned by tests on each side.
 
 
 
