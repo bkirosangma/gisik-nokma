@@ -22,7 +22,7 @@
 | Plan 1 | `IngestService`, `IngestResult`, `IngestDeps`, `createIngestService(deps)` (`apps/server/src/ingest/ingest-service.ts`); `POST /v1/events` body `{ events: [...] }` → `{ results: [...] }` |
 | Plan 1 | `createProjectionRegistry()` (`apps/server/src/projections/registry.ts`), `createTestDatabase(): Promise<TestDatabase>` (`apps/server/test/helpers/db.ts`), `createPool`, `ConfigError` (`apps/server/src/config.ts`) |
 | Plan 2 | `WorkflowDef` (`states`, `transitions: { from: string \| '*'; to: string; rules: Rule[] }[]`, `initialStateId`), `Rule` incl. `{ kind: 'require-evidence' }` (`@gisik-nokma/domain`) |
-| Plan 3 | Event registrations (all v1): `comment.added` `{ body }`, `ticket.field_set` `{ fieldId, value }`, `attachment.added` `{ attachmentId, filename, mime, size }` (entity = the ticket), `ticket.transitioned` `{ toStateId, comment?, evidenceAttachmentId?, cause? }`; table `proj_tickets` (`ticket_id` PK, `workspace_id`, …) |
+| Plan 3 | Event registrations (all v1): `comment.added` `{ body }`, `ticket.field_set` `{ fieldId, value }`, `attachment.added` `{ attachmentId, filename, mime, size }` (entity = the ticket) — **pending Plan 3 amendment: this payload becomes a `kind`-discriminated union carrying `sha256` (uploads) or the Drive-reference fields; see Open questions, "Pending Plan 3 amendment"** —, `ticket.transitioned` `{ toStateId, comment?, evidenceAttachmentId?, cause? }`; table `proj_tickets` (`ticket_id` PK, `workspace_id`, …) |
 | Plan 4 | `type Queryable = Pool \| PoolClient` (`apps/server/src/db/queryable.ts`), `canSee(db: Queryable, userId: string, ticketId: string): Promise<boolean>` (`apps/server/src/visibility/can-see.ts`), `makeRequireSession(auth)` setting `request.currentUserId` (`apps/server/src/auth/require-session.ts`), `Auth` (`apps/server/src/auth/auth.ts`), seed helpers `seedMember`, `seedGuest`, `seedTicket` (`apps/server/test/helpers/seed.ts`) |
 | Plan 5 (parallel) | `docToPlainText(doc: unknown): string` in `@gisik-nokma/domain` (coordination amendment 12) — Task 6 pins the conformance this plan's schema must satisfy |
 | Plan 6 (parallel) | The `<EditorSlot>` boundary in `apps/web` — Task 14 implements the concrete component against the assumed props stated there; see Open questions 1 |
@@ -36,10 +36,11 @@ Binding on every task in this plan:
 - Tiptap is `^3.22.3` everywhere, **named exports** from every `@tiptap/extension-*` package (`import { Link } from '@tiptap/extension-link'`), default export only for `StarterKit`. Every `useEditor` call sets `immediatelyRender: false` (SSR — both are recorded knowledge-base lessons).
 - ESM everywhere: `"type": "module"`, `NodeNext` resolution, **relative imports carry the `.js` suffix** in source (Plan 1 addenda). TypeScript strict + `noUncheckedIndexedAccess`; `exactOptionalPropertyTypes` stays OFF.
 - Document bodies are ProseMirror JSON, **opaque outside `packages/editor`** — the server, domain reducers, and other packages treat them as `unknown` and may only use the dependency-free walkers `docToPlainText` (Plan 5) and `collectImageAttachmentIds` (Task 2).
-- Only **images** may embed inline (spec §2 Attachments), enforced at three layers: the `insertTicketImage` command refuses non-image mime (Task 3); paste/drop routes non-image files to the attachment list, never to nodes (Task 12); the server gate refuses events whose docs embed non-image or foreign attachments (Task 11). The schema itself cannot know a mime — the command layer is where layer 1 lives.
+- Only **images** may embed inline (spec §2 Attachments), enforced at three layers: the `insertTicketImage` command refuses non-image mime (Task 3); paste/drop routes non-image files to the attachment list, never to nodes (Task 12); the server gate refuses events whose docs embed non-image or foreign attachments (Task 11). The schema itself cannot know a mime — the command layer is where layer 1 lives. **Google Drive references are outside inline embedding entirely** (spec §2, rule 3): they are never uploads, so no layer can ever produce a node for one (Task 12c).
+- **Attachments come in exactly two kinds** (spec §2): an **upload** — bytes this product holds, sniffed, hashed (SHA-256, Task 9a) and stored — and a **Drive reference** — a pointer to a Google Drive file the product does not hold (Tasks 11a, 12a–12c, 13a). The kind is a discriminator on the `attachment.added` payload, never an inference; the three Drive rules (never evidence, honest rendering, never inline) are each proven by a planted defect.
 - Attachment uploads: max **25 MiB** (`ATTACHMENT_MAX_BYTES = 26_214_400`), mime decided by **magic-byte sniffing only** (`file-type`); the client-supplied filename and content-type are never trusted for anything but display (filename, sanitized).
 - Unauthorized or nonexistent attachment downloads answer one **byte-identical 404** — existence must be indistinguishable from invisibility (spec §6 discipline applied to files).
-- Every refusal introduced here is proven against a planted defect (spec §1 invariant 6): each escape-suggestion trigger, non-image embed at every layer, sniffed-mime refusal (renamed `.exe`), size refusal, unauthorized download, path-traversal object key, malformed bridge message.
+- Every refusal introduced here is proven against a planted defect (spec §1 invariant 6): each escape-suggestion trigger, non-image embed at every layer, sniffed-mime refusal (renamed `.exe`), size refusal, unauthorized download, path-traversal object key, malformed bridge message, a Drive reference named as evidence (`attachment.evidence-drive-reference`), a Drive image pushed at the document, and a Drive reference rendered as though the board held it.
 - CSS class names are BEM (`block__element--modifier`, CODING_STANDARDS). The editor stylesheet ships **structural rules only — zero colour literals**; colours arrive later via `packages/ui` tokens (coordination amendment 11; see Open questions 6).
 - Dependency versions (caret ranges): `@tiptap/* ^3.22.3`, `react ^19.0.0`, `@testing-library/react ^16.1.0`, `jsdom ^25.0.1`, `@fastify/multipart ^9.0.0`, `file-type ^19.6.0`, `@aws-sdk/client-s3 ^3.700.0`, `@aws-sdk/lib-storage ^3.700.0`, `aws-sdk-client-mock ^4.1.0`, `vite ^6.0.0`, `@vitejs/plugin-react ^4.3.4`, `vite-plugin-singlefile ^2.0.3`; `typescript`/`vitest`/`zod` versions match Plan 1's pins.
 - The executor runs all commands from the repo root (`/Users/kiro/my_projects/gisik-nokma`). `reference/` is frozen — never touch it. Commits happen at each task's commit step, by the executor.
@@ -71,7 +72,11 @@ packages/editor/                          # @gisik-nokma/editor — NEW package
 │   │   ├── ImageWrapMenu.tsx             # wrap picker + alt input for selected images
 │   │   ├── UploadChips.tsx               # in-flight upload chips (the optimistic placeholder)
 │   │   ├── EvidencePicker.tsx            # require-evidence transition picker
+│   │   ├── AttachmentListItem.tsx        # the two kinds, told apart honestly (Task 12b)
 │   │   └── TicketEditorSlot.tsx          # Plan 6's <EditorSlot> contract, implemented
+│   ├── drive/
+│   │   ├── google-picker.ts              # script loading, drive.file consent, openDrivePicker (Task 12a)
+│   │   └── attachment-claims.ts          # attachment.added payloads: upload + drive-reference
 │   ├── attachments/
 │   │   ├── require-evidence.ts           # transitionRequiresEvidence(def, from, to)
 │   │   └── compose-editor-submission.ts  # comment/description → event {type, payload}
@@ -93,15 +98,24 @@ packages/editor/                          # @gisik-nokma/editor — NEW package
     ├── ticket-editor.test.tsx
     ├── evidence-picker.test.tsx
     ├── ticket-editor-slot.test.tsx
+    ├── google-picker.test.ts             # Task 12a
+    ├── attachment-list-item.test.tsx     # Task 12b
+    ├── drive-never-inline.test.ts        # Task 12c
     └── webview-bridge.test.ts
 
 packages/domain/src/doc-embeds.ts         # NEW: EMBEDDABLE_IMAGE_MIME, isEmbeddableImageMime,
                                           #      collectImageAttachmentIds (dependency-free walker)
 packages/domain/test/doc-embeds.test.ts
+packages/domain/src/attachment-kinds.ts   # NEW (Task 11a): AttachmentKind, DriveReference,
+                                          #      DRIVE_FILE_SCOPE, RULE_EVIDENCE_DRIVE_REFERENCE,
+                                          #      EVIDENCE_DRIVE_REFERENCE_REASON, isDriveReference
+packages/domain/test/attachment-kinds.test.ts
 
 apps/server/
 ├── migrations/<timestamp>_attachments.sql # attachments metadata table
+├── migrations/<timestamp>_attachment_sha256.sql # SHA-256 column (Task 9a)
 ├── src/attachments/
+│   ├── content-hash.ts                   # sha256Hex — the upload's content hash (Task 9a)
 │   ├── object-store.ts                   # ObjectStore interface, ObjectMeta, errors, key validation
 │   ├── local-disk-store.ts               # dev implementation
 │   ├── s3-store.ts                       # S3-compatible implementation
@@ -116,12 +130,13 @@ apps/server/
 │   └── index.ts                          # buildServerGates()
 ├── src/routes/attachments.ts             # POST /v1/attachments, GET /v1/attachments/:id
 └── test/
-    ├── attachments/{local-disk-store,s3-store,store-config,attachment-repo,sniff,filename}.test.ts
+    ├── attachments/{local-disk-store,s3-store,store-config,attachment-repo,sniff,filename,content-hash}.test.ts
     ├── gates/{image-embed-gate,evidence-gate}.test.ts
+    ├── helpers/drive-reference.ts        # seedDriveReference (Task 11a, shared with Task 12c)
     └── routes/{attachments-upload,attachments-download}.test.ts
 ```
 
-Task order: Tasks 1–6 (editor schema, pure) and Tasks 7–11 (server) are two independent tracks an executor may interleave; Tasks 12–15 need both; Task 16 closes. Every task stands alone with its own test cycle and commit.
+Task order: Tasks 1–6 (editor schema, pure) and Tasks 7–11 (server) are two independent tracks an executor may interleave; Tasks 12–15 need both; Task 16 closes. Every task stands alone with its own test cycle and commit. **Lettered tasks (9a, 11a, 12a, 12b, 12c, 13a — the Google Drive references and the SHA-256 hash, owner sign-off 2026-08-20) execute immediately after their numbered parent**, in letter order; each is a full task with its own test cycle and commit, and none renumbers anything that came before.
 
 ---
 ### Task 1: `packages/editor` scaffold and document schema v1
@@ -2598,7 +2613,7 @@ git commit -m "S3-compatible object store behind the same three verbs, path-styl
   - `ATTACHMENT_MAX_BYTES = 26_214_400`
   - `registerAttachmentRoutes(app: FastifyInstance, deps: AttachmentRouteDeps): Promise<void>` where `type AttachmentRouteDeps = { pool: Pool; store: ObjectStore; auth: Auth; maxBytes?: number }`
   - `POST /v1/attachments` — multipart, fields `ticketId` **then** `file` (field parts must precede the file part); session required; visibility of the ticket required (`canSee`); → `201 { attachmentId, url, mime, filename, size }` where `mime`/`size` are the **server-sniffed truth** the client MUST echo into its `attachment.added` event (a client-claimed mime would be a small lie). `{ attachmentId, url }` is coordination amendment 15's shape; the three extra fields are additive. Refusals: 401 unauthenticated · 404 (unknown ticket and invisible ticket, indistinguishable) · 400 missing parts · 413 oversize (multipart's own statusCode, propagated) · 415 `{ error: 'unsupported-media-type', reason }` for sniff failures.
-  - **The upload endpoint appends nothing to the ledger.** The client emits `attachment.added { attachmentId, filename, mime, size }` (entity = the ticket) via `POST /v1/events` after the upload returns — the event is the claim; the upload is just bytes arriving (amendment 15).
+  - **The upload endpoint appends nothing to the ledger.** The client emits `attachment.added { kind: 'upload', attachmentId, filename, mime, size, sha256 }` (entity = the ticket) via `POST /v1/events` after the upload returns — the event is the claim; the upload is just bytes arriving (amendment 15). `kind` and `sha256` arrive with Tasks 9a/11a and the pending Plan 3 amendment; `composeUploadAttachmentAdded` (Task 12a) is the one place that payload is built.
 
 - [ ] **Step 1: Add dependencies**
 
@@ -3042,6 +3057,169 @@ Expected: PASS (6 tests). If `seedMember`/`seedGuest`/`seedTicket` signatures dr
 ```bash
 git add apps/server pnpm-lock.yaml
 git commit -m "Uploads: magic bytes decide the mime and a renamed .exe is refused by what it is, not what it claims; visibility gates the door with a 404 that admits nothing"
+```
+
+---
+
+### Task 9a: SHA-256 at the door — an uploaded file's content hash
+
+Owner sign-off 2026-08-20 (coordination doc, Google Drive row): *"Uploaded attachments additionally carry a SHA-256 so evidence is verifiable rather than merely present."* Spec §2 now says the same. The hash is computed server-side over the bytes that were actually stored — the same buffer the sniffer judged — so it describes what this product holds, never what a client said it was sending.
+
+**Files:**
+- Create: `apps/server/migrations/<timestamp>_attachment_sha256.sql` (via node-pg-migrate, as in Task 7)
+- Create: `apps/server/src/attachments/content-hash.ts`
+- Modify: `apps/server/src/attachments/attachment-repo.ts` (named modification, Step 3)
+- Modify: `apps/server/src/routes/attachments.ts` (named modification, Step 4)
+- Test: `apps/server/test/attachments/content-hash.test.ts`
+- Test: `apps/server/test/routes/attachments-upload.test.ts` (append cases — the existing ones are untouched)
+
+**Interfaces:**
+- Consumes: `insertAttachment`, `getAttachment`, `AttachmentRow` (Task 7); the upload route (Task 9).
+- Produces (cross-plan API):
+  - `sha256Hex(bytes: Uint8Array): string` — lowercase hex, 64 characters.
+  - `attachments.sha256 text` — **nullable on purpose**: `NULL` means *unknown* (a row written before this column existed), and unknown is rendered as unknown, never as verified. Every row this plan writes carries a real hash. A `CHECK` refuses anything that is not 64 lowercase hex characters.
+  - `AttachmentRow` gains `sha256: string | null`; `insertAttachment`'s row argument gains optional `sha256?: string`.
+  - `POST /v1/attachments` 201 body gains `sha256: string` → `{ attachmentId, url, mime, filename, size, sha256 }`. The client MUST echo it into `attachment.added` exactly as the upload answered — the hash is the server's fact about the bytes, like `mime` and `size` (pending Plan 3 amendment; see Open questions).
+  - `UploadResult` (Task 12) and `EditorSlotUpload` (Task 14) carry the same field.
+
+- [ ] **Step 1: Generate and fill the migration**
+
+Run: `pnpm --filter @gisik-nokma/server exec node-pg-migrate create attachment sha256 --migration-file-language sql --migrations-dir migrations`
+Expected: creates `apps/server/migrations/<timestamp>_attachment-sha256.sql`.
+
+Up SQL:
+
+```sql
+ALTER TABLE attachments ADD COLUMN sha256 text;
+
+ALTER TABLE attachments
+  ADD CONSTRAINT attachments_sha256_hex CHECK (sha256 IS NULL OR sha256 ~ '^[0-9a-f]{64}$');
+
+COMMENT ON COLUMN attachments.sha256 IS 'Lowercase-hex SHA-256 of the stored bytes, computed server-side at upload. NULL means unknown — a row written before hashing existed — and is shown as unknown, never as verified.';
+```
+
+Down SQL:
+
+```sql
+ALTER TABLE attachments DROP CONSTRAINT attachments_sha256_hex;
+ALTER TABLE attachments DROP COLUMN sha256;
+```
+
+- [ ] **Step 2: Write the failing hash test**
+
+`apps/server/test/attachments/content-hash.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { sha256Hex } from '../../src/attachments/content-hash.js';
+
+/** Pinned vectors from FIPS 180-4 — the wiring is ours, the arithmetic is not. */
+const EMPTY = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+const ABC = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+
+describe('sha256Hex', () => {
+  it('matches the published vectors', () => {
+    expect(sha256Hex(new Uint8Array(0))).toBe(EMPTY);
+    expect(sha256Hex(new TextEncoder().encode('abc'))).toBe(ABC);
+  });
+
+  it('is lowercase hex, 64 characters', () => {
+    expect(sha256Hex(new TextEncoder().encode('gisik'))).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('planted defect: one flipped byte is a different hash — the hash is of content, not of length', () => {
+    const a = Uint8Array.from([1, 2, 3, 4]);
+    const b = Uint8Array.from([1, 2, 3, 5]);
+    expect(sha256Hex(a)).not.toBe(sha256Hex(b));
+    expect(sha256Hex(a)).toHaveLength(sha256Hex(b).length);
+  });
+});
+```
+
+Run: `pnpm --filter @gisik-nokma/server exec vitest run test/attachments/content-hash.test.ts`
+Expected: FAIL — the module does not exist.
+
+`apps/server/src/attachments/content-hash.ts`:
+
+```ts
+import { createHash } from 'node:crypto';
+
+/**
+ * The SHA-256 of the bytes this product actually stored. Evidence must be
+ * verifiable, not merely present (spec §2): with the hash recorded, a
+ * require-evidence claim points at a file whose identity can be re-proved,
+ * and a substituted file stops matching.
+ */
+export function sha256Hex(bytes: Uint8Array): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+```
+
+Run it again — expected: PASS (3 tests).
+
+- [ ] **Step 3: Carry the hash through the repo (named modification of Task 7's file)**
+
+In `apps/server/src/attachments/attachment-repo.ts`:
+
+1. `type AttachmentRow` gains `sha256: string | null;` immediately after `objectKey`.
+2. `insertAttachment`'s row parameter becomes `Omit<AttachmentRow, 'createdAt' | 'sha256'> & { sha256?: string }`; the INSERT column list gains `sha256` as the last column with a new positional parameter bound to `row.sha256 ?? null` — the `?? null` is the *unknown* case being written honestly, not a default value standing in for a real hash.
+3. `getAttachment` and `listTicketAttachments` add `sha256` to their SELECT lists and map it as `sha256: row.sha256 ?? null`.
+
+No other repo behaviour changes; Task 7's existing repo test still passes unmodified, because a row inserted without a hash reads back `sha256: null` rather than failing.
+
+- [ ] **Step 4: Hash inside the upload route (named modification of Task 9's file)**
+
+In `apps/server/src/routes/attachments.ts`:
+
+1. Add `import { sha256Hex } from '../attachments/content-hash.js';`
+2. After the sniff succeeds and before `deps.store.put(...)`, add:
+
+```ts
+    // Hash the exact buffer that is about to be stored — not the client's
+    // claim about it, and not a re-read (a re-read could hash something else).
+    const sha256 = sha256Hex(buffer);
+```
+
+3. Pass `sha256` in the `insertAttachment({ … })` object literal.
+4. Add `sha256` to the `reply.code(201).send({ … })` body.
+
+- [ ] **Step 5: Append the failing route cases**
+
+Append inside the existing `describe('POST /v1/attachments', …)` block of `apps/server/test/routes/attachments-upload.test.ts` (the file's helpers, seeds and constants are reused as they stand):
+
+```ts
+  it('the 201 body and the stored row carry the same SHA-256 of the stored bytes', async () => {
+    const res = await upload(app, MEMBER, TICKET, { filename: 'photo.png', contentType: 'image/png', data: PNG });
+    expect(res.statusCode).toBe(201);
+    const body = res.json() as { attachmentId: string; sha256: string };
+    expect(body.sha256).toBe(createHash('sha256').update(PNG).digest('hex'));
+    const row = await getAttachment(db.pool, body.attachmentId);
+    expect(row?.sha256).toBe(body.sha256);
+  });
+
+  it('planted defect: two uploads differing by one byte get different hashes, and a lying content-type changes nothing', async () => {
+    const other = Buffer.concat([PNG, Buffer.from([0x01])]);
+    const first = await upload(app, MEMBER, TICKET, { filename: 'a.png', contentType: 'image/png', data: PNG });
+    const second = await upload(app, MEMBER, TICKET, { filename: 'b.png', contentType: 'application/pdf', data: other });
+    const a = first.json() as { sha256: string };
+    const b = second.json() as { sha256: string };
+    expect(a.sha256).not.toBe(b.sha256);
+    expect(b.sha256).toBe(createHash('sha256').update(other).digest('hex'));
+  });
+```
+
+Add to that file's imports: `import { createHash } from 'node:crypto';`.
+
+- [ ] **Step 6: Run the suites**
+
+Run: `pnpm --filter @gisik-nokma/server exec vitest run test/attachments/ test/routes/attachments-upload.test.ts`
+Expected: PASS — the two new upload cases, the three hash cases, and every case Task 7 and Task 9 already had.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add apps/server
+git commit -m "Hash every upload as it lands: evidence should point at a file whose identity can be re-proved, and an unhashed row says unknown rather than pretending"
 ```
 
 ---
@@ -3671,6 +3849,333 @@ git commit -m "Server gates inside the ingest transaction: embedded images must 
 ```
 
 ---
+
+### Task 11a: Attachment kinds in the domain, and the refusal that keeps evidence uploaded
+
+Spec §2, Drive rule 1: **a Drive reference can never satisfy `require-evidence`.** Where the check lives is decided by what each layer can see. The shared rule engine cannot see it: Plan 3's reducer treats `attachment.added` as state-free (`case 'attachment.added': return state;`), so `TicketState` never carries attachments and a pure rule has nothing to read. The evidence gate already runs inside the ingest transaction with the ledger and the `attachments` table in front of it — so the refusal belongs here, beside the evidence-exists check it completes. What Plan 3 must change is only the payload vocabulary; the exact amendment is written out at the end of Open questions.
+
+The rule id and its reason are written **once**, in `@gisik-nokma/domain`, and imported by the gate, the editor surface (Task 13a) and every test. A refusal the user reads must be one sentence in one place; copies drift.
+
+**Files:**
+- Create: `packages/domain/src/attachment-kinds.ts`
+- Modify: `packages/domain/src/index.ts` (export the new module)
+- Modify: `apps/server/src/gates/evidence-gate.ts` (full replacement, Step 3)
+- Create: `apps/server/test/helpers/drive-reference.ts` (shared seed helper; Task 12c imports it too)
+- Test: `packages/domain/test/attachment-kinds.test.ts`
+- Test: `apps/server/test/gates/evidence-gate.test.ts` (append cases — the existing ones are untouched)
+
+**Interfaces:**
+- Consumes: `Queryable` (Plan 4); the gate seam and `RULE_EVIDENCE_UNKNOWN` (Task 11); the `events` table columns (Plan 1: `entity_kind`, `entity_id`, `type`, `payload`, `seq`, `workspace_seq`).
+- Produces (cross-plan API — Plans 3, 6, 8, 10 all consume these names):
+  - `type AttachmentKind = 'upload' | 'drive-reference'` — the discriminator, always declared, never inferred.
+  - `type DriveReference = { driveFileId: string; name: string; mimeType: string; webViewLink: string; iconLink?: string; capturedAt: string }`
+  - `isDriveReference(value: unknown): value is DriveReference`
+  - `DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file'` — the non-sensitive per-file scope, the only Drive scope this product ever requests.
+  - `RULE_EVIDENCE_DRIVE_REFERENCE = 'attachment.evidence-drive-reference'` and `EVIDENCE_DRIVE_REFERENCE_REASON` — **the single origin of that sentence**; nothing anywhere retypes it.
+  - Gate behaviour: a `ticket.transitioned` naming a Drive reference of **this** ticket as `evidenceAttachmentId` is refused `attachment.evidence-drive-reference`; a reference belonging to another ticket, or an id that is nothing at all, keeps the existing `attachment.evidence-unknown` refusal, byte-identical between those two cases (no existence leak).
+
+- [ ] **Step 1: Write the failing domain test**
+
+`packages/domain/test/attachment-kinds.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import {
+  DRIVE_FILE_SCOPE,
+  EVIDENCE_DRIVE_REFERENCE_REASON,
+  RULE_EVIDENCE_DRIVE_REFERENCE,
+  isDriveReference,
+} from '../src/attachment-kinds.js';
+
+const REFERENCE = {
+  driveFileId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456',
+  name: 'GST filing Aug 2026.pdf',
+  mimeType: 'application/pdf',
+  webViewLink: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456/view',
+  capturedAt: '2026-08-20T10:00:00.000Z',
+};
+
+describe('attachment kinds', () => {
+  it('requests exactly the per-file Drive scope', () => {
+    expect(DRIVE_FILE_SCOPE).toBe('https://www.googleapis.com/auth/drive.file');
+  });
+
+  it('pins the evidence refusal id and names the remedy in its reason', () => {
+    expect(RULE_EVIDENCE_DRIVE_REFERENCE).toBe('attachment.evidence-drive-reference');
+    expect(EVIDENCE_DRIVE_REFERENCE_REASON).toContain('cannot serve as evidence');
+    expect(EVIDENCE_DRIVE_REFERENCE_REASON).toContain('Upload the file to this ticket');
+  });
+
+  it('accepts a complete reference, with iconLink optional', () => {
+    expect(isDriveReference(REFERENCE)).toBe(true);
+    expect(isDriveReference({ ...REFERENCE, iconLink: 'https://drive-thirdparty.googleusercontent.com/16/type/application/pdf' })).toBe(true);
+  });
+
+  it('planted defect: an incomplete or mistyped reference is not a reference', () => {
+    for (const broken of [
+      null,
+      'a string',
+      { ...REFERENCE, driveFileId: '' },
+      { ...REFERENCE, capturedAt: undefined },
+      { ...REFERENCE, webViewLink: 42 },
+      { ...REFERENCE, iconLink: 7 },
+    ]) {
+      expect(isDriveReference(broken), `${JSON.stringify(broken)} must not pass`).toBe(false);
+    }
+  });
+});
+```
+
+Run: `pnpm --filter @gisik-nokma/domain exec vitest run test/attachment-kinds.test.ts`
+Expected: FAIL — the module does not exist.
+
+- [ ] **Step 2: Implement the domain module**
+
+`packages/domain/src/attachment-kinds.ts`:
+
+```ts
+/**
+ * An attachment is one of exactly two kinds, and the kind is always
+ * declared on the claim, never inferred from what is or is not in a
+ * table (spec §2):
+ *
+ *  - 'upload'          — bytes this product holds: sniffed, hashed, stored.
+ *  - 'drive-reference' — a pointer to a Google Drive file it does not hold.
+ *
+ * The distinction is load-bearing, not cosmetic: a file we do not hold can
+ * be renamed, edited, moved, re-permissioned or deleted after it is
+ * attached, so the product may not speak about its contents at all.
+ */
+export type AttachmentKind = 'upload' | 'drive-reference';
+
+/**
+ * The non-sensitive, per-file Google Drive scope. The picker grants this
+ * product access to the individual files a user picks — nothing else in
+ * their Drive — and it is the ONLY Drive scope this product ever asks for.
+ */
+export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+/**
+ * What is stored when a Drive file is attached. Every field is a
+ * last-seen observation, not a standing fact: `name` and `mimeType` are
+ * what Drive said at `capturedAt`, and may already be stale by the time
+ * anyone reads them. That is why the renderer dates them (Task 12b).
+ */
+export type DriveReference = {
+  driveFileId: string;
+  name: string;
+  mimeType: string;
+  webViewLink: string;
+  iconLink?: string;
+  /** ISO-8601 instant at which these observations were captured. */
+  capturedAt: string;
+};
+
+/** Rule id for spec §2's first Drive rule: evidence must be an upload. */
+export const RULE_EVIDENCE_DRIVE_REFERENCE = 'attachment.evidence-drive-reference';
+
+/**
+ * The one place this sentence exists. The gate refuses with it, the
+ * evidence picker shows it, the tests assert against the constant — so
+ * every copy a user might see is the same words, and there is exactly one
+ * file to edit if the wording ever improves.
+ */
+export const EVIDENCE_DRIVE_REFERENCE_REASON =
+  'A Google Drive link cannot serve as evidence: the board holds a pointer, not the file, and a Drive file can be renamed, edited, moved or deleted after it is attached. Upload the file to this ticket and name the uploaded copy as the evidence instead.';
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
+export function isDriveReference(value: unknown): value is DriveReference {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  if (candidate['iconLink'] !== undefined && !isNonEmptyString(candidate['iconLink'])) return false;
+  return (
+    isNonEmptyString(candidate['driveFileId']) &&
+    isNonEmptyString(candidate['name']) &&
+    isNonEmptyString(candidate['mimeType']) &&
+    isNonEmptyString(candidate['webViewLink']) &&
+    isNonEmptyString(candidate['capturedAt'])
+  );
+}
+```
+
+Append to `packages/domain/src/index.ts`:
+
+```ts
+export * from './attachment-kinds.js';
+```
+
+Run the domain test again — expected: PASS (4 tests).
+
+- [ ] **Step 3: Extend the evidence gate (full replacement of Task 11's file)**
+
+`apps/server/src/gates/evidence-gate.ts`:
+
+```ts
+import { EVIDENCE_DRIVE_REFERENCE_REASON, RULE_EVIDENCE_DRIVE_REFERENCE } from '@gisik-nokma/domain';
+import type { GateRefusal, ServerGate } from './server-gate.js';
+
+export const RULE_EVIDENCE_UNKNOWN = 'attachment.evidence-unknown';
+export { RULE_EVIDENCE_DRIVE_REFERENCE };
+
+/**
+ * Plan 2's require-evidence rule checks that a transition CARRIES
+ * evidence; this gate checks the named evidence is something this product
+ * can vouch for. Two refusals, in this order:
+ *
+ *  1. The id names a Drive reference on this ticket — it exists, and it is
+ *     still not evidence (spec §2, rule 1). Saying "does not exist" here
+ *     would be a small lie about something the user can see in the list.
+ *  2. The id names nothing on this ticket — the original refusal, shared
+ *     with "belongs to another ticket" so no refusal reveals whether a
+ *     foreign id exists anywhere.
+ */
+export function makeEvidenceGate(): ServerGate {
+  return {
+    eventType: 'ticket.transitioned',
+    async check(event, db): Promise<GateRefusal | null> {
+      const payload = event.payload as { evidenceAttachmentId?: unknown };
+      const evidenceId = payload.evidenceAttachmentId;
+      if (typeof evidenceId !== 'string') return null;
+
+      const uploaded = await db.query('SELECT 1 FROM attachments WHERE id = $1 AND ticket_id = $2', [
+        evidenceId,
+        event.entity.id,
+      ]);
+      if ((uploaded.rows as unknown[]).length > 0) return null;
+
+      // Not an upload. Ask the ledger — where a reference's whole record
+      // lives, since a reference has no bytes and therefore no row — before
+      // deciding which truth to tell.
+      const reference = await db.query(
+        `SELECT 1 FROM events
+          WHERE entity_kind = 'ticket'
+            AND entity_id = $1
+            AND type = 'attachment.added'
+            AND payload->>'kind' = 'drive-reference'
+            AND payload->>'attachmentId' = $2
+          LIMIT 1`,
+        [event.entity.id, evidenceId],
+      );
+      if ((reference.rows as unknown[]).length > 0) {
+        return { rule: RULE_EVIDENCE_DRIVE_REFERENCE, reason: EVIDENCE_DRIVE_REFERENCE_REASON };
+      }
+
+      return {
+        rule: RULE_EVIDENCE_UNKNOWN,
+        reason: `The attachment named as evidence (${evidenceId}) does not exist on this ticket, so this move cannot carry it as evidence.`,
+      };
+    },
+  };
+}
+```
+
+- [ ] **Step 4: Append the failing gate cases**
+
+Append inside the existing `describe('evidence gate', …)` block of `apps/server/test/gates/evidence-gate.test.ts`:
+
+```ts
+  it('planted defect: a Drive reference on THIS ticket is refused as evidence, with the remedy named', async () => {
+    const referenceId = newUlid();
+    await seedDriveReference(db.pool, { workspaceId: WS, ticketId: TICKET, attachmentId: referenceId, actorId: ACTOR });
+    const [result] = await ingest.ingestBatch([transition({ toStateId: 'done', evidenceAttachmentId: referenceId })]);
+    expect(result).toMatchObject({ status: 'refused', rule: RULE_EVIDENCE_DRIVE_REFERENCE });
+    if (result!.status === 'refused') {
+      // Byte-identical to the single origin — the user and the test read the same sentence.
+      expect(result.reason).toBe(EVIDENCE_DRIVE_REFERENCE_REASON);
+      expect(result.reason).not.toContain(referenceId);
+    }
+  });
+
+  it("planted defect: a Drive reference on ANOTHER ticket refuses as unknown — the drive refusal never leaks existence elsewhere", async () => {
+    const elsewhere = newUlid();
+    await seedDriveReference(db.pool, { workspaceId: WS, ticketId: OTHER_TICKET, attachmentId: elsewhere, actorId: ACTOR });
+    const [foreign] = await ingest.ingestBatch([transition({ toStateId: 'done', evidenceAttachmentId: elsewhere })]);
+    const fake = newUlid();
+    const [fabricated] = await ingest.ingestBatch([transition({ toStateId: 'done', evidenceAttachmentId: fake })]);
+    expect(foreign).toMatchObject({ status: 'refused', rule: RULE_EVIDENCE_UNKNOWN });
+    if (foreign!.status === 'refused' && fabricated!.status === 'refused') {
+      expect(foreign.reason.replace(elsewhere, 'ID')).toBe(fabricated.reason.replace(fake, 'ID'));
+    }
+  });
+```
+
+Add to that file's imports:
+
+```ts
+import { EVIDENCE_DRIVE_REFERENCE_REASON, RULE_EVIDENCE_DRIVE_REFERENCE } from '@gisik-nokma/domain';
+import { RULE_EVIDENCE_UNKNOWN } from '../../src/gates/evidence-gate.js';
+```
+
+(`RULE_EVIDENCE_UNKNOWN` is already imported by the existing cases — keep one import.)
+
+And create the shared seed helper (Task 12c's server case imports the same one):
+
+`apps/server/test/helpers/drive-reference.ts`:
+
+```ts
+import { newUlid } from '@gisik-nokma/domain';
+import type { Queryable } from '../../src/db/queryable.js';
+
+let driveSeq = 9000;
+
+/**
+ * Seed a committed `attachment.added` Drive reference straight into the
+ * ledger. A reference has no bytes, so it has no attachments row — the
+ * ledger IS its record. Writing the row directly (rather than through
+ * ingest) keeps these gate tests independent of the pending Plan 3 payload
+ * amendment: the REGISTRATION is proven in Plan 3's own suite, and the
+ * gate's input is a committed row either way.
+ */
+export async function seedDriveReference(
+  db: Queryable,
+  params: { workspaceId: string; ticketId: string; attachmentId: string; actorId: string },
+): Promise<void> {
+  driveSeq += 1;
+  await db.query(
+    `INSERT INTO events (id, workspace_id, entity_kind, entity_id, type, version, payload,
+                         actor_id, origin, client_time, server_time, seq, workspace_seq)
+     VALUES ($1, $2, 'ticket', $3, 'attachment.added', 1, $4::jsonb, $5, 'web', $6, now(), $7, $7)`,
+    [
+      newUlid(),
+      params.workspaceId,
+      params.ticketId,
+      JSON.stringify({
+        kind: 'drive-reference',
+        attachmentId: params.attachmentId,
+        driveFileId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456',
+        name: 'GST filing Aug 2026.pdf',
+        mimeType: 'application/pdf',
+        webViewLink: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456/view',
+        capturedAt: '2026-08-20T10:00:00.000Z',
+      }),
+      params.actorId,
+      '2026-08-20T10:00:00.000Z',
+      driveSeq,
+    ],
+  );
+}
+```
+
+and import it in the gate test: `import { seedDriveReference } from '../helpers/drive-reference.js';`
+
+If Task 11's evidence-gate test does not already declare `OTHER_TICKET`, add `const OTHER_TICKET = '01J9GTKB000000000000000000';` beside its other constants — it needs no seeded ticket row, because the gate reads only the ledger and the attachments table.
+
+- [ ] **Step 5: Run both suites**
+
+Run: `pnpm --filter @gisik-nokma/domain exec vitest run test/attachment-kinds.test.ts && pnpm --filter @gisik-nokma/server exec vitest run test/gates/`
+Expected: PASS — 4 domain cases, and the gate suite with its two new refusals plus everything Task 11 already proved.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add packages/domain apps/server
+git commit -m "A Drive link is not evidence: the gate refuses it by name and tells the user to upload the file, and refusing it never reveals whether someone else's reference exists"
+```
+
+---
 ### Task 12: `TicketEditor` — the shared React component, paste/drop uploads (layer 2), chips, and the wrap menu
 
 **Files:**
@@ -3687,7 +4192,7 @@ git commit -m "Server gates inside the ingest transaction: embedded images must 
 **Interfaces:**
 - Consumes: `buildEditorExtensions`, `emptyDoc`, `DocJson` (Task 1); `isEmbeddableImageMime` (Task 2); `insertTicketImage`, `IMAGE_WRAP_MODES` (Task 3); `MentionCandidate` (Task 4); the upload endpoint's response shape (Task 9).
 - Produces (cross-plan API):
-  - `type UploadResult = { attachmentId: string; url: string; mime: string; filename: string; size: number }` — exactly the upload endpoint's 201 body.
+  - `type UploadResult = { attachmentId: string; url: string; mime: string; filename: string; size: number; sha256: string }` — exactly the upload endpoint's 201 body, `sha256` included (Task 9a, which executes before this task).
   - `uploadAttachmentHttp(file: File, ticketId: string, fetchImpl?: typeof fetch): Promise<UploadResult>`; `class UploadRefusedError extends Error { readonly status: number }`.
   - `createAttachmentPasteExtension(options: AttachmentPasteOptions): Extension` with `type AttachmentPasteOptions = { uploadAttachment(file: File): Promise<UploadResult>; onAttachmentAdded(result: UploadResult): Promise<void> | void; onFileAttached(result: UploadResult): void; onUploadError(err: unknown): void; onUploadStart(uploadId: string, filename: string): void; onUploadEnd(uploadId: string): void; captureFiles?: (files: File[]) => boolean }`.
   - `function TicketEditor(props: TicketEditorProps): React.JSX.Element` with `type TicketEditorProps = { initialDoc?: DocJson | null; editable?: boolean; placeholder?: string; queryUsers(query: string): Promise<MentionCandidate[]>; uploadAttachment(file: File): Promise<UploadResult>; onAttachmentAdded(result: UploadResult): Promise<void> | void; onFileAttached?(result: UploadResult): void; onUploadError?(err: unknown): void; onDocChange?(doc: DocJson): void; onSubmit?(doc: DocJson): void; onEditorReady?(): void; resolveAttachmentUrl?(attachmentId: string): string; captureFiles?: (files: File[]) => boolean; editorRef?: React.MutableRefObject<Editor | null> }`.
@@ -3713,6 +4218,7 @@ const PNG_RESULT: UploadResult = {
   mime: 'image/png',
   filename: 'shelf.png',
   size: 12,
+  sha256: 'b'.repeat(64), // the server's hash, echoed by the client (Task 9a)
 };
 const PDF_RESULT: UploadResult = { ...PNG_RESULT, attachmentId: '01J9GATB000000000000000000', mime: 'application/pdf', filename: 'gst.pdf' };
 
@@ -3852,6 +4358,8 @@ export type UploadResult = {
   mime: string;
   filename: string;
   size: number;
+  /** The server's SHA-256 of the stored bytes (Task 9a) — echoed, never recomputed here. */
+  sha256: string;
 };
 
 export class UploadRefusedError extends Error {
@@ -4015,7 +4523,7 @@ const IMG = '01J9GATA000000000000000000';
 function makeProps(overrides: Partial<TicketEditorProps> = {}): TicketEditorProps {
   return {
     queryUsers: async () => [],
-    uploadAttachment: vi.fn(async () => ({ attachmentId: IMG, url: `/v1/attachments/${IMG}`, mime: 'image/png', filename: 'a.png', size: 1 })),
+    uploadAttachment: vi.fn(async () => ({ attachmentId: IMG, url: `/v1/attachments/${IMG}`, mime: 'image/png', filename: 'a.png', size: 1, sha256: 'd'.repeat(64) })),
     onAttachmentAdded: vi.fn(),
     ...overrides,
   };
@@ -4112,7 +4620,7 @@ describe('TicketEditor', () => {
     const props = makeProps({
       uploadAttachment: vi.fn(async () => {
         await gate;
-        return { attachmentId: IMG, url: `/v1/attachments/${IMG}`, mime: 'image/png', filename: 'slow.png', size: 1 };
+        return { attachmentId: IMG, url: `/v1/attachments/${IMG}`, mime: 'image/png', filename: 'slow.png', size: 1, sha256: 'd'.repeat(64) };
       }),
     });
     const { view, editor } = await mount(props);
@@ -4384,6 +4892,842 @@ git commit -m "TicketEditor: chips as the only optimistic placeholder, attachmen
 
 ---
 
+### Task 12a: The Google Picker — attaching a Drive file as a reference
+
+Owner sign-off 2026-08-20: Drive files may be attached **as references only**, through the Google Picker under the non-sensitive per-file `drive.file` scope, reusing the Google OAuth the workspace already signs in with. Nothing is copied; the `attachment.added` event *is* the whole record (a reference has no bytes, so it has no `attachments` row and no object key).
+
+**Configuration.** `packages/editor` never reads `process.env` — it is one library behind three shells, and only a shell knows its own environment. The host passes a `DrivePickerConfig`; `apps/web` fills it from:
+
+| Variable | What it is |
+|---|---|
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | The **same** OAuth client id as Google sign-in (Plan 4's server-side `GOOGLE_CLIENT_ID`). `drive.file` is added by **incremental consent at the moment of picking** — it is never appended to the sign-in request, so signing in stays a sign-in. |
+| `NEXT_PUBLIC_GOOGLE_PICKER_API_KEY` | The Picker developer key (a browser key, restricted by HTTP referrer). |
+| `NEXT_PUBLIC_GOOGLE_APP_ID` | The Google Cloud project number. The Picker requires it to hand back per-file (`drive.file`) grants. |
+
+Server-side `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (Plan 4, better-auth's social provider) are untouched: this flow needs no server involvement at all.
+
+**Files:**
+- Create: `packages/editor/src/drive/google-picker.ts`
+- Create: `packages/editor/src/drive/attachment-claims.ts`
+- Modify: `packages/editor/src/index.ts` (exports)
+- Test: `packages/editor/test/google-picker.test.ts`
+
+**Interfaces:**
+- Consumes: `DRIVE_FILE_SCOPE`, `DriveReference`, `isDriveReference`, `newUlid` (`@gisik-nokma/domain`, Task 11a and Plan 1).
+- Produces (cross-plan API — Plan 6's ticket sheet and Plan 10's shells consume these):
+  - `type DrivePickerConfig = { clientId: string; developerKey: string; appId: string }`
+  - `type PickedDriveFile = { id: string; name: string; mimeType: string; url?: string; iconUrl?: string }`
+  - `type DrivePickerDeps = { loadScript(src): Promise<void>; google(): GooglePickerGlobals; gapi(): GapiGlobals; now(): Date }`; `createBrowserPickerDeps(): DrivePickerDeps`
+  - `GOOGLE_GSI_SRC`, `GOOGLE_API_SRC`
+  - `requestDriveFileToken(config, deps): Promise<string>` — asks for `DRIVE_FILE_SCOPE` and nothing else
+  - `openDrivePicker(config, deps): Promise<DriveReference[]>` — resolves `[]` when the user cancels
+  - `toDriveReference(picked: PickedDriveFile, capturedAt: Date): DriveReference`
+  - `composeDriveReferenceAdded(reference, mintId?): { type: 'attachment.added'; payload: { kind: 'drive-reference'; attachmentId: string } & DriveReference }` and `composeUploadAttachmentAdded(result: UploadResult): { type: 'attachment.added'; payload: { kind: 'upload'; attachmentId; filename; mime; size; sha256 } }` — the two claims a client submits through `POST /v1/events`, composed in one place so no shell hand-builds a payload (pending Plan 3 amendment; see Open questions)
+
+- [ ] **Step 1: Write the failing picker test**
+
+`packages/editor/test/google-picker.test.ts`:
+
+```ts
+import { describe, expect, it, vi } from 'vitest';
+import { DRIVE_FILE_SCOPE, isDriveReference } from '@gisik-nokma/domain';
+import { composeDriveReferenceAdded, composeUploadAttachmentAdded } from '../src/drive/attachment-claims.js';
+import {
+  GOOGLE_API_SRC,
+  GOOGLE_GSI_SRC,
+  openDrivePicker,
+  requestDriveFileToken,
+  toDriveReference,
+  type DrivePickerConfig,
+  type DrivePickerDeps,
+} from '../src/drive/google-picker.js';
+
+const CONFIG: DrivePickerConfig = { clientId: 'client-123.apps.googleusercontent.com', developerKey: 'dev-key', appId: '48291057' };
+
+const DOC = {
+  id: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456',
+  name: 'GST filing Aug 2026.pdf',
+  mimeType: 'application/pdf',
+  url: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456/view',
+  iconUrl: 'https://drive-thirdparty.googleusercontent.com/16/type/application/pdf',
+};
+
+/** A fake Google, recording exactly what the picker was configured with. */
+function fakeGoogle(action: 'picked' | 'cancel', docs = [DOC]) {
+  const seen = { scopes: [] as string[], prompts: [] as string[], token: '', developerKey: '', appId: '', views: 0, visible: false };
+  const google = {
+    accounts: {
+      oauth2: {
+        initTokenClient(config: { client_id: string; scope: string; callback: (response: { access_token?: string; error?: string }) => void }) {
+          seen.scopes.push(config.scope);
+          return {
+            requestAccessToken(overrides?: { prompt?: string }) {
+              seen.prompts.push(overrides?.prompt ?? '(none)');
+              config.callback({ access_token: 'ya29.fake-token' });
+            },
+          };
+        },
+      },
+    },
+    picker: {
+      DocsView: class {},
+      Action: { PICKED: 'picked', CANCEL: 'cancel' },
+      PickerBuilder: class {
+        addView() { seen.views += 1; return this; }
+        setOAuthToken(token: string) { seen.token = token; return this; }
+        setDeveloperKey(key: string) { seen.developerKey = key; return this; }
+        setAppId(appId: string) { seen.appId = appId; return this; }
+        setCallback(cb: (data: { action: string; docs?: typeof docs }) => void) { this.cb = cb; return this; }
+        cb: ((data: { action: string; docs?: typeof docs }) => void) | null = null;
+        build() {
+          const cb = this.cb;
+          return {
+            setVisible: (visible: boolean) => {
+              seen.visible = visible;
+              cb?.(action === 'picked' ? { action: 'picked', docs } : { action: 'cancel' });
+            },
+          };
+        }
+      },
+    },
+  };
+  return { google, seen };
+}
+
+function deps(google: unknown, loaded: string[] = []): DrivePickerDeps {
+  return {
+    loadScript: vi.fn(async (src: string) => {
+      loaded.push(src);
+    }),
+    google: () => google as never,
+    gapi: () => ({ load: (_name: string, cb: () => void) => cb() }),
+    now: () => new Date('2026-08-20T10:00:00.000Z'),
+  };
+}
+
+describe('the Google Picker path', () => {
+  it('asks for the per-file scope and nothing else, with incremental consent', async () => {
+    const { google, seen } = fakeGoogle('picked');
+    const token = await requestDriveFileToken(CONFIG, deps(google));
+    expect(token).toBe('ya29.fake-token');
+    expect(seen.scopes).toEqual([DRIVE_FILE_SCOPE]);
+    // Incremental: no forced consent screen when the grant already exists.
+    expect(seen.prompts).toEqual(['']);
+  });
+
+  it('planted defect: the requested scope is exactly one non-sensitive scope', async () => {
+    const { google, seen } = fakeGoogle('picked');
+    await requestDriveFileToken(CONFIG, deps(google));
+    const requested = seen.scopes[0]!;
+    expect(requested.split(' ')).toHaveLength(1);
+    expect(requested).toBe('https://www.googleapis.com/auth/drive.file');
+    for (const broader of ['drive.readonly', 'auth/drive ', 'drive.metadata']) {
+      expect(requested).not.toContain(broader);
+    }
+  });
+
+  it('loads both Google scripts, configures the picker, and maps the picked file to a reference', async () => {
+    const loaded: string[] = [];
+    const { google, seen } = fakeGoogle('picked');
+    const references = await openDrivePicker(CONFIG, deps(google, loaded));
+    expect(loaded).toEqual([GOOGLE_GSI_SRC, GOOGLE_API_SRC]);
+    expect(seen).toMatchObject({ token: 'ya29.fake-token', developerKey: 'dev-key', appId: '48291057', visible: true });
+    expect(references).toHaveLength(1);
+    expect(references[0]).toEqual({
+      driveFileId: DOC.id,
+      name: DOC.name,
+      mimeType: DOC.mimeType,
+      webViewLink: DOC.url,
+      iconLink: DOC.iconUrl,
+      capturedAt: '2026-08-20T10:00:00.000Z',
+    });
+    expect(isDriveReference(references[0])).toBe(true);
+  });
+
+  it('cancelling attaches nothing', async () => {
+    const { google } = fakeGoogle('cancel');
+    await expect(openDrivePicker(CONFIG, deps(google))).resolves.toEqual([]);
+  });
+
+  it('planted defect: a doc without a usable view link is dropped, never guessed at', async () => {
+    const { google } = fakeGoogle('picked', [{ ...DOC, url: undefined } as typeof DOC]);
+    await expect(openDrivePicker(CONFIG, deps(google))).resolves.toEqual([]);
+  });
+
+  it('composes an upload claim from the server answer, hash included', () => {
+    const event = composeUploadAttachmentAdded({
+      attachmentId: '01J9GATA000000000000000000',
+      url: '/v1/attachments/01J9GATA000000000000000000',
+      mime: 'image/png',
+      filename: 'shelf.png',
+      size: 12,
+      sha256: 'b'.repeat(64),
+    });
+    expect(event.payload).toEqual({
+      kind: 'upload',
+      attachmentId: '01J9GATA000000000000000000',
+      filename: 'shelf.png',
+      mime: 'image/png',
+      size: 12,
+      sha256: 'b'.repeat(64),
+    });
+    // The URL is a transport detail, not part of the claim.
+    expect(event.payload).not.toHaveProperty('url');
+  });
+
+  it('composes attachment.added as a drive-reference claim with a fresh ULID', () => {
+    const reference = toDriveReference(DOC, new Date('2026-08-20T10:00:00.000Z'));
+    const event = composeDriveReferenceAdded(reference, () => '01J9GATD000000000000000000');
+    expect(event).toEqual({
+      type: 'attachment.added',
+      payload: {
+        kind: 'drive-reference',
+        attachmentId: '01J9GATD000000000000000000',
+        driveFileId: DOC.id,
+        name: DOC.name,
+        mimeType: DOC.mimeType,
+        webViewLink: DOC.url,
+        iconLink: DOC.iconUrl,
+        capturedAt: '2026-08-20T10:00:00.000Z',
+      },
+    });
+  });
+});
+```
+
+Run: `pnpm --filter @gisik-nokma/editor exec vitest run test/google-picker.test.ts`
+Expected: FAIL — the modules do not exist.
+
+- [ ] **Step 2: Implement the picker module**
+
+`packages/editor/src/drive/google-picker.ts`:
+
+```ts
+import { DRIVE_FILE_SCOPE, type DriveReference } from '@gisik-nokma/domain';
+
+export const GOOGLE_GSI_SRC = 'https://accounts.google.com/gsi/client';
+export const GOOGLE_API_SRC = 'https://apis.google.com/js/api.js';
+
+/**
+ * Supplied by the host shell, never read from process.env in here (this
+ * package is shared by Next.js, Tauri and an RN webview). `clientId` is
+ * the same OAuth client as Google sign-in: drive.file is requested by
+ * incremental consent at pick time, so signing in never asks for Drive.
+ */
+export type DrivePickerConfig = { clientId: string; developerKey: string; appId: string };
+
+/** A row of Google's picker callback payload, in the fields we read. */
+export type PickedDriveFile = { id: string; name: string; mimeType: string; url?: string; iconUrl?: string };
+
+type TokenResponse = { access_token?: string; error?: string };
+type TokenClient = { requestAccessToken(overrides?: { prompt?: string }): void };
+type PickerCallbackData = { action: string; docs?: PickedDriveFile[] };
+
+type PickerBuilder = {
+  addView(view: unknown): PickerBuilder;
+  setOAuthToken(token: string): PickerBuilder;
+  setDeveloperKey(key: string): PickerBuilder;
+  setAppId(appId: string): PickerBuilder;
+  setCallback(callback: (data: PickerCallbackData) => void): PickerBuilder;
+  build(): { setVisible(visible: boolean): void };
+};
+
+export type GooglePickerGlobals = {
+  accounts: {
+    oauth2: {
+      initTokenClient(config: {
+        client_id: string;
+        scope: string;
+        callback: (response: TokenResponse) => void;
+      }): TokenClient;
+    };
+  };
+  picker: {
+    PickerBuilder: new () => PickerBuilder;
+    DocsView: new () => unknown;
+    Action: { PICKED: string; CANCEL: string };
+  };
+};
+
+export type GapiGlobals = { load(name: string, callback: () => void): void };
+
+export type DrivePickerDeps = {
+  loadScript(src: string): Promise<void>;
+  google(): GooglePickerGlobals;
+  gapi(): GapiGlobals;
+  /** Injected clock: capturedAt is a fact about when we looked. */
+  now(): Date;
+};
+
+/** Real-browser deps. Tests inject fakes; nothing here touches the network in a test run. */
+export function createBrowserPickerDeps(): DrivePickerDeps {
+  const loaded = new Map<string, Promise<void>>();
+  return {
+    loadScript(src) {
+      const existing = loaded.get(src);
+      if (existing) return existing;
+      const pending = new Promise<void>((resolve, reject) => {
+        const tag = document.createElement('script');
+        tag.src = src;
+        tag.async = true;
+        tag.onload = () => resolve();
+        tag.onerror = () => reject(new Error(`could not load ${src}`));
+        document.head.append(tag);
+      });
+      loaded.set(src, pending);
+      return pending;
+    },
+    google: () => (globalThis as unknown as { google: GooglePickerGlobals }).google,
+    gapi: () => (globalThis as unknown as { gapi: GapiGlobals }).gapi,
+    now: () => new Date(),
+  };
+}
+
+/**
+ * One access token, one scope: DRIVE_FILE_SCOPE. `prompt: ''` is the
+ * incremental-consent request — Google shows a consent screen only if this
+ * user has not already granted it, and the sign-in session is reused.
+ */
+export async function requestDriveFileToken(config: DrivePickerConfig, deps: DrivePickerDeps): Promise<string> {
+  await deps.loadScript(GOOGLE_GSI_SRC);
+  return new Promise<string>((resolve, reject) => {
+    const client = deps.google().accounts.oauth2.initTokenClient({
+      client_id: config.clientId,
+      scope: DRIVE_FILE_SCOPE,
+      callback: (response) => {
+        if (typeof response.access_token === 'string' && response.access_token.length > 0) resolve(response.access_token);
+        else reject(new Error(response.error ?? 'Google did not grant access to the picked file.'));
+      },
+    });
+    client.requestAccessToken({ prompt: '' });
+  });
+}
+
+/**
+ * A picked file becomes a reference: the name and type Drive reported, the
+ * link, and the instant we looked. Nothing is fetched, nothing is copied.
+ */
+export function toDriveReference(picked: PickedDriveFile, capturedAt: Date): DriveReference {
+  const reference: DriveReference = {
+    driveFileId: picked.id,
+    name: picked.name,
+    mimeType: picked.mimeType,
+    webViewLink: picked.url ?? '',
+    capturedAt: capturedAt.toISOString(),
+  };
+  if (picked.iconUrl !== undefined) reference.iconLink = picked.iconUrl;
+  return reference;
+}
+
+/**
+ * Open Google's own picker and resolve the references the user chose.
+ * Cancelling resolves `[]` — an empty pick is not an error. A doc Google
+ * hands back without a view link is dropped rather than have us invent a
+ * URL for it: a link we constructed is not a link Drive gave us.
+ */
+export async function openDrivePicker(config: DrivePickerConfig, deps: DrivePickerDeps): Promise<DriveReference[]> {
+  const token = await requestDriveFileToken(config, deps);
+  await deps.loadScript(GOOGLE_API_SRC);
+  await new Promise<void>((resolve) => {
+    deps.gapi().load('picker', () => resolve());
+  });
+  const google = deps.google();
+  return new Promise<DriveReference[]>((resolve) => {
+    const picker = new google.picker.PickerBuilder()
+      .addView(new google.picker.DocsView())
+      .setOAuthToken(token)
+      .setDeveloperKey(config.developerKey)
+      .setAppId(config.appId)
+      // google.picker.Response.ACTION and .DOCUMENTS are literally the
+      // strings 'action' and 'docs'; reading the keys is the same data.
+      .setCallback((data) => {
+        if (data.action !== google.picker.Action.PICKED) {
+          if (data.action === google.picker.Action.CANCEL) resolve([]);
+          return;
+        }
+        const capturedAt = deps.now();
+        resolve((data.docs ?? []).map((doc) => toDriveReference(doc, capturedAt)).filter((ref) => ref.webViewLink !== ''));
+      })
+      .build();
+    picker.setVisible(true);
+  });
+}
+```
+
+`packages/editor/src/drive/attachment-claims.ts`:
+
+```ts
+import { type DriveReference, newUlid } from '@gisik-nokma/domain';
+import type { UploadResult } from '../upload.js';
+
+export type UploadAttachmentAddedEvent = {
+  type: 'attachment.added';
+  payload: { kind: 'upload'; attachmentId: string; filename: string; mime: string; size: number; sha256: string };
+};
+
+export type DriveReferenceAddedEvent = {
+  type: 'attachment.added';
+  payload: { kind: 'drive-reference'; attachmentId: string } & DriveReference;
+};
+
+/**
+ * The claim that puts an uploaded file on a ticket. Every value comes from
+ * the upload's 201 answer — the sniffed mime, the measured size, the
+ * server's hash — because the local File's claims are exactly what the
+ * server declined to trust. Composed here, in one place, so no shell
+ * hand-builds this payload.
+ */
+export function composeUploadAttachmentAdded(result: UploadResult): UploadAttachmentAddedEvent {
+  return {
+    type: 'attachment.added',
+    payload: {
+      kind: 'upload',
+      attachmentId: result.attachmentId,
+      filename: result.filename,
+      mime: result.mime,
+      size: result.size,
+      sha256: result.sha256,
+    },
+  };
+}
+
+/**
+ * The claim that puts a Drive file on a ticket. There is no upload call and
+ * no server row: a reference has no bytes, so the event IS the record
+ * (spec §2 — "events carry references"). The client submits it through
+ * POST /v1/events like any other claim.
+ */
+export function composeDriveReferenceAdded(
+  reference: DriveReference,
+  mintId: () => string = newUlid,
+): DriveReferenceAddedEvent {
+  return { type: 'attachment.added', payload: { kind: 'drive-reference', attachmentId: mintId(), ...reference } };
+}
+```
+
+Append to `packages/editor/src/index.ts`:
+
+```ts
+export {
+  createBrowserPickerDeps,
+  openDrivePicker,
+  requestDriveFileToken,
+  toDriveReference,
+  GOOGLE_API_SRC,
+  GOOGLE_GSI_SRC,
+  type DrivePickerConfig,
+  type DrivePickerDeps,
+  type PickedDriveFile,
+} from './drive/google-picker.js';
+export {
+  composeDriveReferenceAdded,
+  composeUploadAttachmentAdded,
+  type DriveReferenceAddedEvent,
+  type UploadAttachmentAddedEvent,
+} from './drive/attachment-claims.js';
+```
+
+- [ ] **Step 3: Run the picker test to verify it passes**
+
+Run: `pnpm --filter @gisik-nokma/editor exec vitest run test/google-picker.test.ts`
+Expected: PASS (7 tests).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add packages/editor
+git commit -m "Attach Drive files as references through Google's own picker: one non-sensitive per-file scope asked for at pick time, a pointer recorded as a claim, and a doc without a real link dropped rather than guessed at"
+```
+
+---
+
+### Task 12b: Honest rendering — a reference is not a held file
+
+Spec §2, Drive rule 2. Two kinds render as two kinds: an upload says what the board holds; a reference says what it last saw, when it saw it, and that it cannot vouch for the contents now. There is deliberately **no positive reachability claim** — this product never tells a user a Drive link is fine, because between the check and the click it may not be. `not-checked` and `unreachable` therefore both render as *unknown*, in different words but with the same honesty.
+
+**Files:**
+- Create: `packages/editor/src/components/AttachmentListItem.tsx`
+- Modify: `packages/editor/src/styles/editor.css`
+- Modify: `packages/editor/src/index.ts` (exports)
+- Test: `packages/editor/test/attachment-list-item.test.tsx`
+
+**Interfaces:**
+- Consumes: `DriveReference` (Task 11a).
+- Produces (cross-plan API — **the same union Plan 6 re-declares** in `packages/app-core/src/views/attachment-list.tsx`, the "one contract written twice" pattern of Open questions 1/13; edit both or neither):
+  - ```ts
+    export type AttachmentListEntry =
+      | { kind: 'upload'; attachmentId: string; filename: string; mime: string; size: number; sha256: string | null }
+      | ({ kind: 'drive-reference'; attachmentId: string } & DriveReference);
+    ```
+  - `type DriveLinkCheck = 'not-checked' | 'unreachable'`; `describeDriveReachability(check: DriveLinkCheck): string`
+  - `AttachmentListItem(props: { entry: AttachmentListEntry; linkCheck?: DriveLinkCheck; resolveAttachmentUrl?(id: string): string })`, `UploadedAttachmentItem`, `DriveReferenceItem`
+  - BEM classes `attachment-item`, `attachment-item--upload`, `attachment-item--drive-reference`, `attachment-item__kind`, `attachment-item__name`, `attachment-item__last-seen`, `attachment-item__reachability`; each item carries `data-attachment-kind`.
+
+- [ ] **Step 1: Write the failing rendering test**
+
+`packages/editor/test/attachment-list-item.test.tsx`:
+
+```tsx
+import { render } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { AttachmentListItem, type AttachmentListEntry } from '../src/components/AttachmentListItem.js';
+
+const UPLOAD: AttachmentListEntry = {
+  kind: 'upload',
+  attachmentId: '01J9GATA000000000000000000',
+  filename: 'receipt.pdf',
+  mime: 'application/pdf',
+  size: 1024,
+  sha256: 'a'.repeat(64),
+};
+
+const REFERENCE: AttachmentListEntry = {
+  kind: 'drive-reference',
+  attachmentId: '01J9GATD000000000000000000',
+  driveFileId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456',
+  name: 'GST filing Aug 2026.pdf',
+  mimeType: 'application/pdf',
+  webViewLink: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456/view',
+  capturedAt: '2026-08-20T10:00:00.000Z',
+};
+
+/** Words that would claim knowledge this product does not have. */
+const FORBIDDEN = ['deleted', 'missing', 'no longer', 'available', 'verified', 'up to date'];
+
+describe('AttachmentListItem', () => {
+  it('an upload renders as a file the board holds, downloadable from the board', () => {
+    const view = render(<ul><AttachmentListItem entry={UPLOAD} /></ul>);
+    const item = view.container.querySelector('.attachment-item')!;
+    expect(item.getAttribute('data-attachment-kind')).toBe('upload');
+    expect(item.className).toContain('attachment-item--upload');
+    expect(item.querySelector('a')!.getAttribute('href')).toBe('/v1/attachments/01J9GATA000000000000000000');
+    expect(item.textContent).toContain('receipt.pdf');
+    view.unmount();
+  });
+
+  it('planted defect: a Drive reference renders as external and last-seen, never as a held file', () => {
+    const view = render(<ul><AttachmentListItem entry={REFERENCE} /></ul>);
+    const item = view.container.querySelector('.attachment-item')!;
+    // Distinct kind, distinct class — a reader can tell them apart.
+    expect(item.getAttribute('data-attachment-kind')).toBe('drive-reference');
+    expect(item.className).toContain('attachment-item--drive-reference');
+    expect(item.className).not.toContain('attachment-item--upload');
+    // It is a link into Drive, never a download from this board.
+    const href = item.querySelector('a')!.getAttribute('href')!;
+    expect(href).toBe(REFERENCE.kind === 'drive-reference' ? REFERENCE.webViewLink : '');
+    expect(href).not.toContain('/v1/attachments/');
+    // Last-seen name AND capture date are both on the surface.
+    expect(item.textContent).toContain('GST filing Aug 2026.pdf');
+    expect(item.textContent).toContain('last seen');
+    expect(item.textContent).toContain('2026-08-20');
+    expect(item.textContent).toContain('Google Drive');
+    view.unmount();
+  });
+
+  it('planted defect: an unreachable link is unknown — never absent, never fine', () => {
+    const unchecked = render(<ul><AttachmentListItem entry={REFERENCE} /></ul>);
+    const failed = render(<ul><AttachmentListItem entry={REFERENCE} linkCheck="unreachable" /></ul>);
+    for (const view of [unchecked, failed]) {
+      const text = view.container.querySelector('.attachment-item__reachability')!.textContent!;
+      expect(text.toLowerCase()).toContain('unknown');
+      for (const word of FORBIDDEN) expect(text.toLowerCase()).not.toContain(word);
+    }
+    // The two states say different things, and neither of them settles anything.
+    expect(unchecked.container.textContent).not.toBe(failed.container.textContent);
+    unchecked.unmount();
+    failed.unmount();
+  });
+
+  it('an upload never carries reachability language at all — the board holds it', () => {
+    const view = render(<ul><AttachmentListItem entry={UPLOAD} /></ul>);
+    expect(view.container.querySelector('.attachment-item__reachability')).toBeNull();
+    view.unmount();
+  });
+});
+```
+
+Run: `pnpm --filter @gisik-nokma/editor exec vitest run test/attachment-list-item.test.tsx`
+Expected: FAIL — the module does not exist.
+
+- [ ] **Step 2: Implement the item components**
+
+`packages/editor/src/components/AttachmentListItem.tsx`:
+
+```tsx
+import type { DriveReference } from '@gisik-nokma/domain';
+
+/**
+ * The two kinds of attachment, as a list renders them. Plan 6 re-declares
+ * this union verbatim in `packages/app-core/src/views/attachment-list.tsx`
+ * so app-core never depends on this package; structural typing joins them,
+ * and the two declarations are ONE contract — edit both or neither.
+ */
+export type AttachmentListEntry =
+  | { kind: 'upload'; attachmentId: string; filename: string; mime: string; size: number; sha256: string | null }
+  | ({ kind: 'drive-reference'; attachmentId: string } & DriveReference);
+
+export type DriveLinkCheck = 'not-checked' | 'unreachable';
+
+/**
+ * There is no "reachable" answer here on purpose. The board does not hold
+ * the file, so it cannot say the file is fine — and a link that failed a
+ * moment ago may work now, so it cannot say the file is gone either.
+ * Both states resolve to the only true word: unknown.
+ */
+export function describeDriveReachability(check: DriveLinkCheck): string {
+  return check === 'unreachable'
+    ? 'Contents unknown — the link did not answer when it was last opened from here.'
+    : 'Contents unknown — the board holds a link to this file, not the file.';
+}
+
+function formatCapturedAt(capturedAt: string): string {
+  const at = new Date(capturedAt);
+  return Number.isNaN(at.getTime()) ? capturedAt : at.toISOString().slice(0, 10);
+}
+
+export function UploadedAttachmentItem(props: {
+  entry: Extract<AttachmentListEntry, { kind: 'upload' }>;
+  resolveAttachmentUrl?: (attachmentId: string) => string;
+}): React.JSX.Element {
+  const href = (props.resolveAttachmentUrl ?? ((id: string) => `/v1/attachments/${id}`))(props.entry.attachmentId);
+  return (
+    <li className="attachment-item attachment-item--upload" data-attachment-kind="upload">
+      <a className="attachment-item__name" href={href}>
+        {props.entry.filename}
+      </a>
+      <span className="attachment-item__kind">{props.entry.mime}</span>
+    </li>
+  );
+}
+
+export function DriveReferenceItem(props: {
+  entry: Extract<AttachmentListEntry, { kind: 'drive-reference' }>;
+  linkCheck?: DriveLinkCheck;
+}): React.JSX.Element {
+  const { entry } = props;
+  return (
+    <li className="attachment-item attachment-item--drive-reference" data-attachment-kind="drive-reference">
+      <span className="attachment-item__kind">Google Drive reference</span>
+      <a className="attachment-item__name" href={entry.webViewLink} target="_blank" rel="noreferrer noopener">
+        {entry.name}
+      </a>
+      <span className="attachment-item__last-seen">
+        last seen as “{entry.name}” ({entry.mimeType}) · captured {formatCapturedAt(entry.capturedAt)}
+      </span>
+      <span className="attachment-item__reachability">{describeDriveReachability(props.linkCheck ?? 'not-checked')}</span>
+    </li>
+  );
+}
+
+export function AttachmentListItem(props: {
+  entry: AttachmentListEntry;
+  linkCheck?: DriveLinkCheck;
+  resolveAttachmentUrl?: (attachmentId: string) => string;
+}): React.JSX.Element {
+  if (props.entry.kind === 'drive-reference') {
+    const forwarded = props.linkCheck === undefined ? {} : { linkCheck: props.linkCheck };
+    return <DriveReferenceItem entry={props.entry} {...forwarded} />;
+  }
+  const forwarded = props.resolveAttachmentUrl === undefined ? {} : { resolveAttachmentUrl: props.resolveAttachmentUrl };
+  return <UploadedAttachmentItem entry={props.entry} {...forwarded} />;
+}
+```
+
+Append to `packages/editor/src/styles/editor.css`:
+
+```css
+.attachment-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.35rem 0;
+}
+.attachment-item__kind,
+.attachment-item__last-seen,
+.attachment-item__reachability {
+  font-size: 0.85rem;
+}
+.attachment-item--drive-reference {
+  border-left: 2px dashed;
+  padding-left: 0.5rem;
+}
+```
+
+(Structural only — the dashed rule inherits `currentColor`; colour arrives from `packages/ui` tokens, Open questions 6.)
+
+Append to `packages/editor/src/index.ts`:
+
+```ts
+export {
+  AttachmentListItem,
+  DriveReferenceItem,
+  UploadedAttachmentItem,
+  describeDriveReachability,
+  type AttachmentListEntry,
+  type DriveLinkCheck,
+} from './components/AttachmentListItem.js';
+```
+
+- [ ] **Step 3: Run the test to verify it passes**
+
+Run: `pnpm --filter @gisik-nokma/editor exec vitest run test/attachment-list-item.test.tsx`
+Expected: PASS (4 tests).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add packages/editor
+git commit -m "Render a Drive reference for what it is: an external link with the name it last had and the day we looked, and a reachability line that only ever says unknown — because the board cannot vouch for a file it does not hold"
+```
+
+---
+
+### Task 12c: A Drive image is never an inline image
+
+Spec §2, Drive rule 3. Inline embedding stays uploads-only and images-only, and a Drive image is not an exception — its mime says `image/png` while its bytes live somewhere this product cannot read, so a node pointing at it would render as a hole or, worse, as content the board is showing on its own authority.
+
+Enforcement is structural rather than conditional: the drive module **cannot** insert a node, because it does not import the command that inserts nodes — and a scanner test keeps it that way, in the spirit of Plan 6's views-never-import-HTTP scan. Layer 3 needs nothing new: a reference has no `attachments` row, so the existing image-embed gate already refuses it — this task proves that rather than assuming it.
+
+**Files:**
+- Test: `packages/editor/test/drive-never-inline.test.ts`
+- Test: `apps/server/test/gates/image-embed-gate.test.ts` (append one case)
+
+**Interfaces:**
+- Consumes: `createAttachmentPasteExtension`, `buildEditorExtensions` (Task 12); `composeDriveReferenceAdded`, `toDriveReference` (Task 12a); `seedDriveReference` (Task 11a's helper); `RULE_EMBED_UNKNOWN` (Task 11).
+- Produces: no new API. The guarantee: **no code path anywhere turns a Drive reference into a document node**, proven at the client (structural + behavioural) and at the server (gate).
+
+- [ ] **Step 1: Write the failing client test**
+
+`packages/editor/test/drive-never-inline.test.ts`:
+
+```ts
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { Editor as CoreEditor } from '@tiptap/core';
+import { describe, expect, it, vi } from 'vitest';
+import { composeDriveReferenceAdded } from '../src/drive/attachment-claims.js';
+import { toDriveReference } from '../src/drive/google-picker.js';
+import { createAttachmentPasteExtension } from '../src/extensions/attachment-paste.js';
+import { buildEditorExtensions } from '../src/schema/extensions.js';
+
+const DRIVE_PNG = {
+  id: '1PnGdEfGhIjKlMnOpQrStUvWxYz0123456',
+  name: 'shelf.png',
+  mimeType: 'image/png', // an image by type, and still not ours to show
+  url: 'https://drive.google.com/file/d/1PnGdEfGhIjKlMnOpQrStUvWxYz0123456/view',
+};
+
+function makeEditor() {
+  const calls: string[] = [];
+  const editor = new CoreEditor({
+    element: document.createElement('div'),
+    extensions: [
+      ...buildEditorExtensions(),
+      createAttachmentPasteExtension({
+        uploadAttachment: vi.fn(async () => {
+          calls.push('upload');
+          throw new Error('no upload should happen for a Drive paste');
+        }),
+        onAttachmentAdded: vi.fn(),
+        onFileAttached: vi.fn(),
+        onUploadError: vi.fn(),
+        onUploadStart: vi.fn(),
+        onUploadEnd: vi.fn(),
+      }),
+    ],
+  });
+  return { editor, calls };
+}
+
+function imageNodeCount(editor: CoreEditor): number {
+  let count = 0;
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === 'image') count += 1;
+    return true;
+  });
+  return count;
+}
+
+describe('a Drive reference never becomes an inline image (rule 3)', () => {
+  it('planted defect: picking a Drive PNG produces an attachment claim and NO image node', () => {
+    const { editor } = makeEditor();
+    const before = JSON.stringify(editor.getJSON());
+    const event = composeDriveReferenceAdded(toDriveReference(DRIVE_PNG, new Date('2026-08-20T10:00:00.000Z')));
+    expect(event.payload.kind).toBe('drive-reference');
+    expect(event.payload.mimeType).toBe('image/png');
+    expect(imageNodeCount(editor)).toBe(0);
+    expect(JSON.stringify(editor.getJSON())).toBe(before);
+    editor.destroy();
+  });
+
+  it('planted defect: pasting a Drive link (no file on the clipboard) uploads nothing and embeds nothing', () => {
+    const { editor, calls } = makeEditor();
+    const event = {
+      clipboardData: {
+        items: [{ kind: 'string', type: 'text/uri-list', getAsFile: () => null }],
+        getData: () => DRIVE_PNG.url,
+      },
+      preventDefault: vi.fn(),
+    } as unknown as ClipboardEvent;
+    const handled = editor.view.someProp('handlePaste', (handler) => handler(editor.view, event, editor.state.doc.slice(0))) ?? false;
+    // Not handled by us: ProseMirror's own text handling pastes the link,
+    // which is exactly right — a link is a link.
+    expect(handled).toBe(false);
+    expect(calls).toEqual([]);
+    expect(imageNodeCount(editor)).toBe(0);
+    editor.destroy();
+  });
+
+  it('planted defect: the drive module cannot embed, because it never imports the command that embeds', () => {
+    const driveDir = new URL('../src/drive/', import.meta.url).pathname;
+    const sources = readdirSync(driveDir).filter((name) => name.endsWith('.ts'));
+    expect(sources.length).toBeGreaterThan(0);
+    for (const name of sources) {
+      const source = readFileSync(join(driveDir, name), 'utf8');
+      for (const forbidden of ['ticket-image', 'insertTicketImage', 'setImageWrap']) {
+        expect(source, `${name} must not reach for ${forbidden}`).not.toContain(forbidden);
+      }
+    }
+  });
+});
+```
+
+Run: `pnpm --filter @gisik-nokma/editor exec vitest run test/drive-never-inline.test.ts`
+Expected: PASS immediately **only if** Task 12a's modules are clean — this suite asserts an existing guarantee rather than driving new code. Run it before believing it: if the scanner case passes with an obviously broken input, the scan is not scanning. Verify by temporarily adding `// insertTicketImage` to `packages/editor/src/drive/attachment-claims.ts`, re-running (expect FAIL), and removing it again.
+
+- [ ] **Step 2: Append the server-side case (layer 3)**
+
+Append inside the existing `describe('image-embed gate (layer 3)', …)` block of `apps/server/test/gates/image-embed-gate.test.ts`:
+
+```ts
+  it('planted defect: a document embedding a Drive reference is refused — a reference has no bytes to show', async () => {
+    const referenceId = newUlid();
+    await seedDriveReference(db.pool, { workspaceId: WS, ticketId: TICKET, attachmentId: referenceId, actorId: ACTOR });
+    const event = submitted('comment.added', { body: docEmbedding(referenceId) });
+    const [result] = await ingest.ingestBatch([event]);
+    expect(result).toMatchObject({ status: 'refused', rule: RULE_EMBED_UNKNOWN });
+    expect(await ledgerCount(event.id)).toBe(0);
+  });
+```
+
+Add to that file's imports: `import { seedDriveReference } from '../helpers/drive-reference.js';`
+
+The rule id is deliberately the *existing* `attachment.embed-unknown`: from the embedder's point of view there is no image attachment by that id on this ticket, and inventing a third id here would tell an embedder which ids are references — the same existence-leak the gate already refuses to perform.
+
+- [ ] **Step 3: Run both suites**
+
+Run: `pnpm --filter @gisik-nokma/editor exec vitest run test/drive-never-inline.test.ts && pnpm --filter @gisik-nokma/server exec vitest run test/gates/image-embed-gate.test.ts`
+Expected: PASS — 3 client cases, and the gate suite with its new refusal.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add packages/editor apps/server
+git commit -m "Inline embedding stays uploads-only: a picked Drive image joins the list, a pasted Drive link stays a link, the drive module cannot even reach the insert command, and the server refuses a document that tries anyway"
+```
+
+---
+
 ### Task 13: Evidence picker and the require-evidence lookup
 
 **Files:**
@@ -4481,7 +5825,7 @@ describe('EvidencePicker', () => {
 
   it('uploading new evidence emits attachment.added first, then picks the fresh id', async () => {
     const order: string[] = [];
-    const uploaded = { attachmentId: '01J9GATC000000000000000000', url: '/v1/attachments/01J9GATC000000000000000000', mime: 'application/pdf', filename: 'proof.pdf', size: 3 };
+    const uploaded = { attachmentId: '01J9GATC000000000000000000', url: '/v1/attachments/01J9GATC000000000000000000', mime: 'application/pdf', filename: 'proof.pdf', size: 3, sha256: 'c'.repeat(64) };
     const uploadAttachment = vi.fn(async () => {
       order.push('upload');
       return uploaded;
@@ -4689,6 +6033,158 @@ git commit -m "Evidence picker: existing attachment or fresh upload, attachment.
 
 ---
 
+### Task 13a: Drive references are not offerable as evidence
+
+Spec §2, Drive rule 1, at the surface. Task 11a makes the ledger refuse a Drive reference named as evidence; this task makes sure a user never gets that far by accident, and — when they try — reads the same sentence the server would have said.
+
+The refusal is **structural, not conditional**: references arrive on their own prop and there is no code path from that list to `onPick`. A disabled option is a UI state that can be defeated; a list with no pick handler cannot be.
+
+**Files:**
+- Modify: `packages/editor/src/components/EvidencePicker.tsx`
+- Modify: `packages/editor/src/styles/editor.css`
+- Test: `packages/editor/test/evidence-picker.test.tsx` (append cases — the existing ones are untouched)
+
+**Interfaces:**
+- Consumes: `EVIDENCE_DRIVE_REFERENCE_REASON`, `DriveReference` (Task 11a).
+- Produces (additive to Task 13's contract — every existing call site stays valid):
+  - `type DriveReferenceSummary = { attachmentId: string } & DriveReference`
+  - `EvidencePickerProps` gains `driveReferences?: DriveReferenceSummary[]` (default `[]`). They render in a separate, unofferable section carrying the named reason; `AttachmentSummary` keeps meaning *uploaded attachment*, which is the only thing evidence can be.
+  - BEM classes `evidence-picker__unavailable`, `evidence-picker__unavailable-item`, `evidence-picker__reason`.
+
+- [ ] **Step 1: Append the failing cases**
+
+Append inside the existing `describe('EvidencePicker', …)` block of `packages/editor/test/evidence-picker.test.tsx`:
+
+```tsx
+  const DRIVE_REFERENCES = [
+    {
+      attachmentId: '01J9GATD000000000000000000',
+      driveFileId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456',
+      name: 'receipt.pdf', // same name as an upload on purpose: names prove nothing
+      mimeType: 'application/pdf',
+      webViewLink: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456/view',
+      capturedAt: '2026-08-20T10:00:00.000Z',
+    },
+  ];
+
+  it('planted defect: a Drive reference is never among the offerable options', () => {
+    const onPick = vi.fn();
+    const view = render(
+      <EvidencePicker
+        attachments={ATTACHMENTS}
+        driveReferences={DRIVE_REFERENCES}
+        uploadAttachment={vi.fn()}
+        onAttachmentAdded={vi.fn()}
+        onPick={onPick}
+        onCancel={vi.fn()}
+      />,
+    );
+    // Exactly the uploads are offerable — the reference did not sneak in on a matching name.
+    const options = [...view.container.querySelectorAll('.evidence-picker__option')];
+    expect(options).toHaveLength(ATTACHMENTS.length);
+    for (const option of options) {
+      expect(option.textContent).not.toContain('Google Drive');
+    }
+    // Clicking anything in the unavailable section picks nothing.
+    for (const item of view.container.querySelectorAll('.evidence-picker__unavailable-item')) {
+      fireEvent.click(item);
+    }
+    expect(onPick).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("planted defect: the reference is shown with the server's own reason, word for word", () => {
+    const view = render(
+      <EvidencePicker
+        attachments={[]}
+        driveReferences={DRIVE_REFERENCES}
+        uploadAttachment={vi.fn()}
+        onAttachmentAdded={vi.fn()}
+        onPick={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const unavailable = view.container.querySelector('.evidence-picker__unavailable')!;
+    expect(unavailable.textContent).toContain('receipt.pdf');
+    expect(view.container.querySelector('.evidence-picker__reason')!.textContent).toBe(EVIDENCE_DRIVE_REFERENCE_REASON);
+    view.unmount();
+  });
+```
+
+Add to that file's imports: `import { EVIDENCE_DRIVE_REFERENCE_REASON } from '@gisik-nokma/domain';`
+
+Run: `pnpm --filter @gisik-nokma/editor exec vitest run test/evidence-picker.test.tsx`
+Expected: FAIL — `driveReferences` is not a prop and the unavailable section does not exist.
+
+- [ ] **Step 2: Extend the picker (named modification of Task 13's component)**
+
+In `packages/editor/src/components/EvidencePicker.tsx`:
+
+1. Add the imports: `import { EVIDENCE_DRIVE_REFERENCE_REASON, type DriveReference } from '@gisik-nokma/domain';`
+2. Add the summary type and the prop:
+
+```tsx
+export type DriveReferenceSummary = { attachmentId: string } & DriveReference;
+```
+
+and, inside `EvidencePickerProps`:
+
+```tsx
+  /**
+   * Drive references on this ticket. They are listed so the user is not
+   * left wondering where their file went — and they arrive on their own
+   * prop, with no pick handler anywhere near them, because "not offerable"
+   * must be a fact about the code and not a disabled attribute someone can
+   * defeat (spec §2, Drive rule 1).
+   */
+  driveReferences?: DriveReferenceSummary[];
+```
+
+3. Render the section immediately after the offerable `<ul>` and before the upload control:
+
+```tsx
+      {(props.driveReferences ?? []).length === 0 ? null : (
+        <div className="evidence-picker__unavailable">
+          <p className="evidence-picker__reason">{EVIDENCE_DRIVE_REFERENCE_REASON}</p>
+          <ul>
+            {(props.driveReferences ?? []).map((reference) => (
+              <li key={reference.attachmentId} className="evidence-picker__unavailable-item">
+                {reference.name} · Google Drive reference, last seen {reference.capturedAt.slice(0, 10)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+```
+
+Nothing else in the component changes: the offerable list still maps `props.attachments`, which still means uploads.
+
+Append to `packages/editor/src/styles/editor.css`:
+
+```css
+.evidence-picker__unavailable {
+  border-left: 2px dashed;
+  padding-left: 0.5rem;
+}
+.evidence-picker__unavailable-item {
+  font-size: 0.85rem;
+}
+```
+
+- [ ] **Step 3: Run the picker suite**
+
+Run: `pnpm --filter @gisik-nokma/editor exec vitest run test/evidence-picker.test.tsx`
+Expected: PASS (9 tests — Task 13's seven and these two).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add packages/editor
+git commit -m "The evidence picker will not offer a Drive reference — it lists them with the same words the server would have refused with, and there is no code path from that list to a pick"
+```
+
+---
+
 ### Task 14: `<EditorSlot>` implementation — composer wiring into `comment.added` / description `ticket.field_set`
 
 **Files:**
@@ -4710,7 +6206,7 @@ git commit -m "Evidence picker: existing attachment or fresh upload, attachment.
 // Plan 6 spells documents `unknown` there (amendment 12 keeps ProseMirror JSON
 // opaque outside this package); DocJson is assignable to unknown, so the
 // narrower spelling here is legal and more useful inside the editor.
-export type EditorSlotUpload = { attachmentId: string; filename: string; mime: string; size: number; url: string };
+export type EditorSlotUpload = { attachmentId: string; filename: string; mime: string; size: number; url: string; sha256: string };
 
 export type EditorSlotProps = {
   mode: 'comment' | 'description';        // which ledger event a submit becomes
@@ -4734,7 +6230,7 @@ export type EditorSlotProps = {
 };
 ```
 
-`UploadResult` (Task 12) is `EditorSlotUpload` — same five fields, same meaning (the SERVER-sniffed truth); the alias exists so app-core can name the shape without importing this package.
+`UploadResult` (Task 12) is `EditorSlotUpload` — same six fields (`sha256` included, Task 9a), same meaning (the SERVER-sniffed truth); the alias exists so app-core can name the shape without importing this package.
 
   - Behavioral contract: comment mode clears the composer after a successful submit; description mode keeps the content (it is now the saved value). A failed submit **never clears** — a refused claim must not cost the user their words.
 
@@ -4849,7 +6345,7 @@ describe('TicketEditorSlot', () => {
 
   it('uploads route through emitAttachmentAdded (the sheet owns the event)', async () => {
     const emitAttachmentAdded = vi.fn(async () => {});
-    const uploaded = { attachmentId: '01J9GATA000000000000000000', url: '/v1/attachments/01J9GATA000000000000000000', mime: 'image/png', filename: 'a.png', size: 1 };
+    const uploaded = { attachmentId: '01J9GATA000000000000000000', url: '/v1/attachments/01J9GATA000000000000000000', mime: 'image/png', filename: 'a.png', size: 1, sha256: 'd'.repeat(64) };
     const uploadAttachment = vi.fn(async () => uploaded);
     const view = await mountSlot(makeProps({ uploadAttachment, emitAttachmentAdded }));
     // Reach the paste path exactly as Task 12's tests do.
@@ -5517,7 +7013,7 @@ Workspace convention note: `Features.md`/`test-cases/` move in the same change s
 
 **Interfaces:**
 - Consumes: everything — this task verifies the whole plan.
-- Produces: `Features.md` §9 "Editor & attachments"; `test-cases/09-editor-attachments.md` (cases 9.1–9.28). This plan claims **no other numbers**.
+- Produces: `Features.md` §9 "Editor & attachments"; `test-cases/09-editor-attachments.md` (cases 9.1–9.34 — 9.29–9.34 are the lettered tasks' Drive-reference and SHA-256 cases). This plan claims **no other numbers**.
 
 - [ ] **Step 1: Full verification run**
 
@@ -5543,6 +7039,9 @@ Append to `Features.md`:
 - ✅ **Evidence picker** — for require-evidence transitions: pick an existing attachment or upload fresh (`attachment.added` first), handing `evidenceAttachmentId` into `ticket.transitioned`; `transitionRequiresEvidence` resolves transitions the way the engine does. `packages/editor/src/components/EvidencePicker.tsx`
 - ✅ **Composer & description editing** — `TicketEditorSlot` implements the web `<EditorSlot>` boundary: comment mode → `comment.added {body}`, description mode → `ticket.field_set {fieldId: 'description', value}` via one `composeEditorSubmission` mapping; a refused submit never clears the user's words. `packages/editor/src/components/TicketEditorSlot.tsx`
 - ⚙️ **RN webview bundle & bridge** — a single self-contained HTML bundle plus a versioned five-verb postMessage protocol (`loadDoc`, `change`, `submit`, `insertImage`, `requestUpload`); files never cross the bridge (the host uploads natively); hostile messages parse to null, never crashes. Plan 10 wires the RN side. `packages/editor/src/webview/`
+- ✅ **Upload content hash** — every uploaded file is SHA-256'd server-side over the exact bytes stored, kept with the attachment and echoed into `attachment.added`, so a `require-evidence` claim points at a file whose identity can be re-proved; an unhashed legacy row reads as unknown, never as verified. `apps/server/src/attachments/content-hash.ts`
+- ✅ **Google Drive references (owner sign-off)** — Drive files attach as references through Google's own Picker under the non-sensitive per-file `drive.file` scope, granted by incremental consent at pick time on the existing Google sign-in; the claim stores `{driveFileId, name, mimeType, webViewLink, iconLink?, capturedAt}` and never a copy of the bytes. `packages/editor/src/drive/`
+- ✅ **The three Drive rules** — a reference can never satisfy `require-evidence` (refused `attachment.evidence-drive-reference`, with the remedy named); it renders as an external reference bearing its last-seen name and capture date, its reachability only ever *unknown*; and it can never be inline-embedded — the drive module cannot even reach the insert command, and the server refuses a document that names one. `packages/domain/src/attachment-kinds.ts`, `packages/editor/src/components/AttachmentListItem.tsx`, `apps/server/src/gates/evidence-gate.ts`
 ```
 
 - [ ] **Step 3: Create the test-case bucket**
@@ -5582,6 +7081,12 @@ Mirrors `Features.md` §9. Status: `❌` not covered · `✅` covered · `🟡` 
 - **9.26** ✅ Layer 2 paste/drop: image files upload → `attachment.added` → node (in that order); non-image files go to the list and NEVER become nodes (planted defect); failed uploads clean up to an untouched doc; captureFiles delegates to the host. — `packages/editor/test/attachment-paste.test.ts`
 - **9.27** ✅ TicketEditor mounts SSR-safe (`immediatelyRender: false`), emits doc changes, submits on Mod-Enter, shows upload chips while in flight, and offers the wrap menu on image selection. — `packages/editor/test/ticket-editor.test.tsx`
 - **9.28** ✅ EvidencePicker picks existing or uploads fresh (event before pick), surfaces failures without picking; EditorSlot maps comment/description onto their events and a refused submit never clears the words (planted defect); the webview bridge speaks its five verbs, refuses non-image insertImage, parses hostile messages to null, and builds as one self-contained file (planted defects). — `packages/editor/test/evidence-picker.test.tsx`, `ticket-editor-slot.test.tsx`, `webview-bridge.test.ts`
+- **9.29** ✅ Uploads are hashed server-side: the 201 body and the stored row carry the same SHA-256 of the stored bytes; published vectors pinned; one flipped byte is a different hash and a lying content-type changes nothing (planted defects). — `apps/server/test/attachments/content-hash.test.ts`, `apps/server/test/routes/attachments-upload.test.ts`
+- **9.30** ✅ The Drive picker asks for exactly `drive.file` and nothing else, with incremental consent (`prompt: ''`), loads both Google scripts, passes developer key and app id, maps a picked file to a dated reference, attaches nothing on cancel, drops a doc with no view link rather than inventing a URL, and composes both `attachment.added` claims — upload (hash included) and drive-reference (planted defects). — `packages/editor/test/google-picker.test.ts`
+- **9.31** ✅ Drive rule 2 — a reference renders as external-and-last-seen (own kind marker, Drive link never a `/v1/attachments/` download, last-seen name and capture date on the surface), and its reachability line says *unknown* whether or not a check failed, never "deleted"/"missing"/"available"/"verified"; uploads carry no reachability language at all (planted defects). — `packages/editor/test/attachment-list-item.test.tsx`
+- **9.32** ✅ Drive rule 3 — a picked Drive PNG leaves the document byte-identical, a pasted Drive link uploads nothing and embeds nothing, the drive module never imports the insert command (scanner proven against a planted import), and the server refuses a document embedding a reference as `attachment.embed-unknown` with no ledger trace (planted defects). — `packages/editor/test/drive-never-inline.test.ts`, `apps/server/test/gates/image-embed-gate.test.ts`
+- **9.33** ✅ Drive rule 1, engine side — a Drive reference on this ticket named as evidence is refused `attachment.evidence-drive-reference` with the single-origin reason verbatim and no id leaked into it; a reference on another ticket refuses byte-identically to a fabricated id (planted defects). — `apps/server/test/gates/evidence-gate.test.ts`, `packages/domain/test/attachment-kinds.test.ts`
+- **9.34** ✅ Drive rule 1, surface — the evidence picker offers only uploads, lists references in an unofferable section carrying the server's own reason word for word, and clicking one picks nothing (planted defects). — `packages/editor/test/evidence-picker.test.tsx`
 ```
 
 - [ ] **Step 4: Update the test-cases README buckets line**
@@ -5600,7 +7105,7 @@ Re-read the §9 bullets just added and confirm each names files that exist and b
 
 ```bash
 git add Features.md test-cases
-git commit -m "Catalogue the editor and attachments: Features.md section 9 and 28 test cases, every refusal traced to the planted defect that proves it"
+git commit -m "Catalogue the editor and attachments: Features.md section 9 and 34 test cases, every refusal traced to the planted defect that proves it — the three Drive rules and the upload hash included"
 ```
 
 ---
@@ -5610,10 +7115,10 @@ git commit -m "Catalogue the editor and attachments: Features.md section 9 and 2
 For successor plans (6, 8, 9, 10, 11) — the exact names this plan contributes:
 
 - **Schema v1** (`@gisik-nokma/editor`): nodes `doc` (attrs `schemaVersion: 1`), `paragraph`, `text`, `heading`, `bulletList`, `orderedList`, `listItem`, `blockquote`, `codeBlock`, `horizontalRule`, `hardBreak`, `table`, `tableRow`, `tableHeader`, `tableCell`, `image {attachmentId, wrap: 'inline-left'|'inline-right'|'block', alt}`, `mention {userId, label}`; marks `bold`, `italic`, `strike`, `code`, `link`. `DOC_SCHEMA_VERSION`, `DocJson`, `emptyDoc`, `isDocJson`, `buildEditorExtensions(options)`.
-- **Editor surface**: `TicketEditor`, `TicketEditorSlot` (+ `EditorSlotProps`/`EditorSlotUpload`, structurally identical to Plan 6's declaration in `packages/app-core/src/views/editor-slot.ts` — see Open question 1), `EvidencePicker`, `ImageWrapMenu`, `composeEditorSubmission`, `transitionRequiresEvidence`, `getEscapeSuggestion`, `uploadAttachmentHttp`/`UploadResult`/`UploadRefusedError`, `createAttachmentPasteExtension`.
-- **Domain additions** (`@gisik-nokma/domain`): `EMBEDDABLE_IMAGE_MIME`, `isEmbeddableImageMime`, `collectImageAttachmentIds`.
-- **Server**: `ObjectStore {put, getStream, delete}` + `ObjectMeta`, `LocalDiskStore`, `S3ObjectStore`, `createObjectStoreFromEnv`, `ObjectNotFoundError`, `InvalidObjectKeyError`, `assertValidObjectKey`; `attachments` table + `AttachmentRow` repo functions; `ALLOWED_ATTACHMENT_MIME`, `sniffAllowedMime`, `sanitizeFilename`, `ATTACHMENT_MAX_BYTES`; routes `POST /v1/attachments` → `201 {attachmentId, url, mime, filename, size}` and `GET /v1/attachments/:id`; `registerAttachmentRoutes(app, {pool, store, auth, maxBytes?})`.
-- **Ingest seam** (additive to Plan 1): `IngestDeps.gates?: ServerGate[]`; `ServerGate {eventType, check(event, db)}`, `GateRefusal`; `buildServerGates()`; rule ids `attachment.embed-unknown`, `attachment.embed-not-image`, `attachment.evidence-unknown`.
+- **Editor surface**: `TicketEditor`, `TicketEditorSlot` (+ `EditorSlotProps`/`EditorSlotUpload`, structurally identical to Plan 6's declaration in `packages/app-core/src/views/editor-slot.ts` — see Open question 1), `EvidencePicker` (+ `DriveReferenceSummary`), `ImageWrapMenu`, `AttachmentListItem`/`UploadedAttachmentItem`/`DriveReferenceItem`/`describeDriveReachability` (+ `AttachmentListEntry`, `DriveLinkCheck` — the union Plan 6 re-declares in `packages/app-core/src/views/attachment-list.tsx`), `composeEditorSubmission`, `transitionRequiresEvidence`, `getEscapeSuggestion`, `uploadAttachmentHttp`/`UploadResult`/`UploadRefusedError`, `createAttachmentPasteExtension`, `openDrivePicker`/`requestDriveFileToken`/`toDriveReference`/`createBrowserPickerDeps` (+ `DrivePickerConfig`, `DrivePickerDeps`, `PickedDriveFile`, `GOOGLE_GSI_SRC`, `GOOGLE_API_SRC`), `composeUploadAttachmentAdded`/`composeDriveReferenceAdded`.
+- **Domain additions** (`@gisik-nokma/domain`): `EMBEDDABLE_IMAGE_MIME`, `isEmbeddableImageMime`, `collectImageAttachmentIds`; `AttachmentKind`, `DriveReference`, `isDriveReference`, `DRIVE_FILE_SCOPE`, `RULE_EVIDENCE_DRIVE_REFERENCE`, `EVIDENCE_DRIVE_REFERENCE_REASON` (Task 11a — the single origin of that refusal's wording).
+- **Server**: `ObjectStore {put, getStream, delete}` + `ObjectMeta`, `LocalDiskStore`, `S3ObjectStore`, `createObjectStoreFromEnv`, `ObjectNotFoundError`, `InvalidObjectKeyError`, `assertValidObjectKey`; `attachments` table + `AttachmentRow` repo functions; `ALLOWED_ATTACHMENT_MIME`, `sniffAllowedMime`, `sanitizeFilename`, `ATTACHMENT_MAX_BYTES`, `sha256Hex` (+ `attachments.sha256`, nullable = unknown); routes `POST /v1/attachments` → `201 {attachmentId, url, mime, filename, size, sha256}` and `GET /v1/attachments/:id`; `registerAttachmentRoutes(app, {pool, store, auth, maxBytes?})`.
+- **Ingest seam** (additive to Plan 1): `IngestDeps.gates?: ServerGate[]`; `ServerGate {eventType, check(event, db)}`, `GateRefusal`; `buildServerGates()`; rule ids `attachment.embed-unknown`, `attachment.embed-not-image`, `attachment.evidence-unknown`, `attachment.evidence-drive-reference` (Task 11a; its reason string comes from `EVIDENCE_DRIVE_REFERENCE_REASON` and is never retyped). Test helper `seedDriveReference` (`apps/server/test/helpers/drive-reference.ts`).
 - **Webview bridge** (Plan 10 consumes): `HostToEditorMessage`/`EditorToHostMessage` (verbs `loadDoc`, `change`, `submit`, `insertImage`, `requestUpload`, plus `mentionQuery`/`mentionResults`, `requestSubmit`, `uploadFailed`), `EDITOR_BRIDGE_VERSION = 1`, `parseHostMessage`, `serializeEditorMessage`, `createEditorBridge`; bundle at `packages/editor/dist-webview/index.html` via `build:webview`.
 
 ## Open questions
@@ -5629,6 +7134,81 @@ Flagged rather than silently resolved; none blocks execution of this plan as wri
 7. **Attachment garbage collection.** An upload whose `attachment.added` event never lands (client crashed between POST and ingest) leaves an orphaned object + row, invisible to every view. Harmless to honesty, unbounded in storage; a sweep tool (delete rows/objects with no referencing ledger event after N days) belongs to Plan 11's operational concerns. `ObjectStore.delete` exists and nothing calls it yet — by design (the ledger never forgets; deletion policy is an owner decision).
 8. **Ticket-scoped upload permission = `canSee`.** Uploading to a ticket requires only visibility of that ticket (same bar as commenting). If the owner wants a stricter bar (e.g. guests may view but not attach), that is a Plan 4 role-matrix question; the route's single `canSee` call is the one line to change.
 9. **Two executor-verification steps are built in** where this plan leans on Tiptap internals recorded from the knowledge-base's installed version: Task 1 Step 2 (named exports) and Task 5 Step 1 (`isInputRules` store shape). Both give the exact fallback if the installed minor differs.
+10. **Where the Drive picker's three config values are wired.** `packages/editor` takes a `DrivePickerConfig` and never reads `process.env` (Task 12a). `apps/web` fills it from `NEXT_PUBLIC_GOOGLE_CLIENT_ID` / `NEXT_PUBLIC_GOOGLE_PICKER_API_KEY` / `NEXT_PUBLIC_GOOGLE_APP_ID` at the ticket-sheet mount; the desktop and mobile shells (Plan 10) do the same with their own env spellings, and Plan 11 provisions the Picker API key and adds the three variables to the deployment. Nothing server-side changes — the flow never touches our server. A shell that supplies no config should render no "Attach from Drive" control at all rather than one that fails on click.
+11. **Link-checking Drive references is deliberately absent from v1.** `DriveLinkCheck` has exactly two values and neither is "reachable" (Task 12b): the product never claims a Drive file is fine. If a later plan adds a background check, it may only ever move a reference from `not-checked` to `unreachable` — adding a positive state would be adding a claim this product cannot back.
+
+### Pending Plan 3 amendment (for the orchestrator — Plan 3 is owned elsewhere and must not be edited by this plan's executor)
+
+Drive references and the upload hash both land in Plan 3's event vocabulary. Apply these four changes to `2026-08-20-03-tickets-hierarchy.md`, in Plan 3's own register, without renumbering anything:
+
+**1. `attachment.added` payload becomes a `kind`-discriminated union.** In Plan 3 Task 2 (`packages/domain/src/events/ticket-events.ts`), replace:
+
+```ts
+/** Metadata only — storage/upload is a later plan. */
+export const attachmentAddedPayload = z.object({
+  attachmentId: ulidString,
+  filename: z.string().min(1),
+  mime: z.string().regex(/^[\w.+-]+\/[\w.+-]+$/, 'must be a MIME type'),
+  size: z.number().int().min(0),
+});
+```
+
+with:
+
+```ts
+/**
+ * An attachment is one of exactly two kinds, and the claim says which
+ * (spec §2). An UPLOAD is bytes this product holds: the mime and size are
+ * the server's sniffed truth and `sha256` is its hash of the stored bytes,
+ * so evidence can be verified rather than merely present. A DRIVE
+ * REFERENCE is a pointer to a Google Drive file this product does NOT
+ * hold — name and mimeType are last-seen observations dated by
+ * `capturedAt`, never standing facts. There is no legacy payload to
+ * tolerate: nothing has shipped, so `kind` is required, not inferred.
+ */
+export const attachmentUploadedPayload = z.object({
+  kind: z.literal('upload'),
+  attachmentId: ulidString,
+  filename: z.string().min(1),
+  mime: z.string().regex(/^[\w.+-]+\/[\w.+-]+$/, 'must be a MIME type'),
+  size: z.number().int().min(0),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/, 'must be a lowercase-hex SHA-256'),
+});
+
+export const attachmentDriveReferencePayload = z.object({
+  kind: z.literal('drive-reference'),
+  attachmentId: ulidString,
+  driveFileId: z.string().min(1),
+  name: z.string().min(1),
+  mimeType: z.string().regex(/^[\w.+-]+\/[\w.+-]+$/, 'must be a MIME type'),
+  webViewLink: z.string().url(),
+  iconLink: z.string().url().optional(),
+  capturedAt: z.string().datetime(),
+});
+
+export const attachmentAddedPayload = z.discriminatedUnion('kind', [
+  attachmentUploadedPayload,
+  attachmentDriveReferencePayload,
+]);
+```
+
+The `registerEventType({ type: 'attachment.added', version: 1, payloadSchema: attachmentAddedPayload })` line is unchanged — same type, same version, one wider (and stricter) schema.
+
+Plan 3's prose about this payload needs the same pass: the three places that describe `attachment.added` as "metadata only — storage/upload is a later plan" (its architecture note, the schema comment replaced above, and its Produces summary) should now say that an attachment claim is one of two kinds, and that an upload carries the server's hash.
+
+**2. Fixtures.** Plan 3's `roundTrips('attachment.added', 'ticket', { attachmentId: ATTACHMENT, filename: …, mime: …, size: … })` case gains `kind: 'upload'` and a `sha256` (any 64-char lowercase-hex string), and a second `roundTrips` case covers a `drive-reference` payload. Add a planted-defect case in the same suite: a payload with **no** `kind`, and one with `kind: 'upload'` but no `sha256`, are both refused at the door — an attachment whose kind is unstated is exactly the ambiguity these rules exist to remove.
+
+**3. The reducer is unchanged.** `applyTicketEvent`'s `case 'attachment.added': return state;` stays as it is. This is the reason the evidence refusal below is **not** a rule-engine rule: `TicketState` never carries attachments, so no pure rule can see an attachment's kind. Do not go looking for a Plan 2/3 engine rule to add — there is nowhere for it to read from.
+
+**4. The evidence refusal — implemented in Plan 7, recorded here.** A `ticket.transitioned` naming a Drive reference of the same ticket as its `evidenceAttachmentId` is refused inside the ingest transaction by Plan 7's evidence gate (`apps/server/src/gates/evidence-gate.ts`, Task 11a), which can see both the `attachments` table and the ledger. Plan 3's part is only to *not* contradict it:
+
+- **Rule id:** `attachment.evidence-drive-reference`
+- **Reason (verbatim, one sentence, no interpolation):**
+
+  `A Google Drive link cannot serve as evidence: the board holds a pointer, not the file, and a Drive file can be renamed, edited, moved or deleted after it is attached. Upload the file to this ticket and name the uploaded copy as the evidence instead.`
+
+- Both are exported from `@gisik-nokma/domain` as `RULE_EVIDENCE_DRIVE_REFERENCE` and `EVIDENCE_DRIVE_REFERENCE_REASON` (added by Plan 7 Task 11a). **Any Plan 3 text, test, or fixture that needs them imports those constants — the string is never retyped**, so every copy stays byte-identical by construction.
+- If Plan 3 documents `ticket.transitioned`'s `evidenceAttachmentId` anywhere in its Produces or its history rendering, add the one-line constraint: *evidence must name an `attachment.added` of kind `'upload'` on the same ticket; a `'drive-reference'` is refused `attachment.evidence-drive-reference`, and an id that is neither is refused `attachment.evidence-unknown`.* The `ticket.transitioned` payload itself does **not** change.
 
 ## Self-review (performed by the plan author, per the writing-plans skill)
 
@@ -5640,12 +7220,17 @@ Flagged rather than silently resolved; none blocks execution of this plan as wri
 - "Only images may embed inline … wrapping options: inline with text-wrap left or right, or full-width block" → wrap vocabulary exact (Task 3); three-layer enforcement (Tasks 3, 12, 11), each layer planted-defect proven. ✓
 - "Documents, videos and every other file type are list-style attachments only — never inline" → layer 2 routes them to `onFileAttached` (9.26); layer 3 refuses smuggled embeds (9.24). ✓
 - "Files live in object storage; events carry references" → ObjectStore + `attachment.added` referencing pattern; upload endpoint appends nothing to the ledger (Task 9). ✓
-- "An attachment on a transition carrying a require-evidence rule serves as its evidence" (§4 edge) → EvidencePicker + `evidenceAttachmentId` into `ticket.transitioned` (Task 13); existence proven server-side (Task 11). ✓
+- "Every uploaded file is hashed (SHA-256) as it arrives and the hash is kept with it" → hashed over the exact stored buffer, stored on the row, answered in the 201 and echoed into `attachment.added` (Task 9a); an unhashed row reads `null` = unknown. ✓
+- "Google Drive files may be attached as references … picked through Google's own file picker under the per-file `drive.file` scope … the bytes are never copied" → Picker with exactly `DRIVE_FILE_SCOPE` and incremental consent (Task 12a); the reference is a ledger claim with no bytes, no object key and no row (Tasks 11a, 12a). ✓
+- Drive rule 1, "can never satisfy require-evidence … refused with a reason that says why and what to do instead" → `attachment.evidence-drive-reference` from one domain constant (Task 11a), and no code path from a reference to a pick in the evidence picker (Task 13a). ✓
+- Drive rule 2, "renders as an external pointer bearing its last-seen name and its capture date … shown as unknown, never as absent, never as fine" → distinct kind marker, Drive link never a board download, last-seen name + capture date, and a reachability vocabulary with no positive value (Task 12b). ✓
+- Drive rule 3, "never inline-embeddable … a picked Drive image joins the attachment list, not the document" → structural (the drive module never imports the insert command, scanner-proven), behavioural (picked PNG leaves the doc byte-identical; a pasted link stays a link), and server-side (the embed gate refuses it) (Task 12c). ✓
+- "An **uploaded** attachment on a transition carrying a require-evidence rule serves as its evidence" (§4 edge) → EvidencePicker + `evidenceAttachmentId` into `ticket.transitioned` (Task 13); existence proven server-side (Task 11); *uploaded* enforced by the drive-reference refusal at the gate (Task 11a) and by the picker never offering one (Task 13a). ✓
 - §6 edge (enforcement on every read) → `canSee` on upload and download with indistinguishable 404s (Tasks 9, 10). ✓
 - §1 invariant 6 (planted defects) → every refusal in this plan has one; enumerated in 9.x. ✓
 
 **2. Placeholder scan:** no TBD/TODO/"implement later"/"add validation"/"similar to Task N" anywhere; every code step contains complete code; the two deliberate executor-verification steps (Tiptap named exports, `isInputRules`) verify recorded facts and name the exact fallback rather than deferring work. The Task 11 ingest modification names the precise insertion point and the observable contract because the target file is Plan 1's — the code given is complete for the seam itself.
 
-**3. Type consistency:** `UploadResult` fields = upload 201 body = `attachment.added` payload inputs (attachmentId/filename/mime/size) ✓; `wrap` union identical in node attrs, `IMAGE_WRAP_MODES`, menu labels, and coordination amendment 12 ✓; `ServerGate.check(event: SubmittedEvent, db: Queryable)` matches gate implementations and the ingest seam ✓; rule-id constants exported and asserted by the same names ✓; `EditorSlotProps.submit` takes `EditorSubmission` = `composeEditorSubmission`'s return ✓, and the whole `EditorSlotProps` shape is structurally identical to Plan 6's declaration (`doc`, not `initialDoc`; capabilities optional) ✓; bridge message types used identically in `bridge.ts`, `create-editor-bridge.ts`, entry, and tests ✓; `MentionCandidate {userId, name}` (picker input) vs mention attrs `{userId, label}` (stored) is an intentional rename at the insertion boundary, performed in exactly one place (`Suggestion.command`) and documented there ✓.
+**3. Type consistency:** `UploadResult` fields = upload 201 body = `attachment.added` payload inputs (attachmentId/filename/mime/size/sha256, composed in one place by `composeUploadAttachmentAdded`) ✓; `AttachmentListEntry` is declared twice on purpose (here and in Plan 6's `attachment-list.tsx`) for the same reason `EditorSlotProps` is, and the two must move together ✓; the Drive-reference payload composed by `composeDriveReferenceAdded` matches field-for-field the union the pending Plan 3 amendment registers ✓; `wrap` union identical in node attrs, `IMAGE_WRAP_MODES`, menu labels, and coordination amendment 12 ✓; `ServerGate.check(event: SubmittedEvent, db: Queryable)` matches gate implementations and the ingest seam ✓; rule-id constants exported and asserted by the same names ✓; `EditorSlotProps.submit` takes `EditorSubmission` = `composeEditorSubmission`'s return ✓, and the whole `EditorSlotProps` shape is structurally identical to Plan 6's declaration (`doc`, not `initialDoc`; capabilities optional) ✓; bridge message types used identically in `bridge.ts`, `create-editor-bridge.ts`, entry, and tests ✓; `MentionCandidate {userId, name}` (picker input) vs mention attrs `{userId, label}` (stored) is an intentional rename at the insertion boundary, performed in exactly one place (`Suggestion.command`) and documented there ✓.
 
 Result: no gaps found that block execution. The two parallel-plan seams (EditorSlot props, docToPlainText mention format) were reconciled against the landed Plan 6 and Plan 5 documents during the series self-review and are now recorded as settled in Open questions 1–2 rather than left as assumptions.

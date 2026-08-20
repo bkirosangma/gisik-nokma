@@ -52,7 +52,9 @@ One TypeScript/Node server; three clients sharing common packages. In the base, 
 
 **The editor.** Descriptions and comments use a WYSIWYG editor in the mould of the knowledge-base document editor (same Tiptap v3 family and conventions, including deterministic markdown serialisation): when a typed reserved character would trigger formatting, the editor surfaces an inline **escape-character suggestion**, so literal text is always reachable and nothing silently becomes markup. Documents are stored as structured content inside events; description edits stay versioned claims. One document schema across all three clients; the editor component is shared web code — native in Next.js and Tauri, embedded via webview in React Native, which is the honest mobile path for a Tiptap-family editor.
 
-**Attachments.** Only **images** may embed inline in descriptions and comments, with wrapping options: inline with text-wrap left or right, or full-width block. Documents, videos and every other file type are list-style attachments only — never inline. Files live in object storage; events carry references. An attachment on a transition carrying a `require-evidence` rule (§4) serves as its evidence.
+**Attachments.** Only **images** may embed inline in descriptions and comments, with wrapping options: inline with text-wrap left or right, or full-width block. Documents, videos and every other file type are list-style attachments only — never inline. Files live in object storage; events carry references. Every uploaded file is hashed (SHA-256) as it arrives and the hash is kept with it, so that a claim can point at a file that is verifiably the one attached rather than merely a file that is present. An **uploaded** attachment on a transition carrying a `require-evidence` rule (§4) serves as its evidence.
+
+**Google Drive files may be attached as references.** They are picked through Google's own file picker under the per-file `drive.file` scope, on the Google sign-in the workspace already uses, and what is stored is a pointer — the file's id, the name and type it had when picked, its view link, and the moment of capture. The bytes are never copied. Because the product cannot vouch for content it does not hold, and a Drive file can be edited, renamed, moved, re-permissioned or deleted after it is attached, three rules follow. A Drive reference can never satisfy `require-evidence`: evidence must be an uploaded file, and a transition naming a reference as its evidence is refused with a reason that says why and what to do instead. A reference renders as an external pointer bearing its last-seen name and its capture date, visibly distinct from a file the board holds; if the link later stops answering, that is shown as unknown — never as absent, never as fine. And a reference is never inline-embeddable: inline embedding stays uploads-only and images-only, so a picked Drive image joins the attachment list, not the document.
 
 **Workflows** attach to ticket types — a workspace default per type, overridable per project. A ticket's status is always a state of its attached workflow; statuses are never free text.
 
@@ -76,7 +78,7 @@ One TypeScript/Node server; three clients sharing common packages. In the base, 
 
 - **restrict-to** — only the assignee, a role, or named people may perform the transition
 - **require-comment** — the transition must carry a comment
-- **require-evidence** — the transition must carry an attachment
+- **require-evidence** — the transition must carry an *uploaded* attachment (never a Drive reference, per §2: the board can only vouch for a file it holds)
 - **require-field** — a named field must be set before the transition (e.g. a due date before entering an active state)
 - **require-different-user** — four-eyes: the actor must differ from whoever performed a named earlier transition
 
@@ -159,6 +161,7 @@ Two proving grounds, both real:
 - Offline capability in the web client
 - A native (non-webview) rich-text editor on React Native
 - Full concealment of restricted parents (the placeholder existence-leak is the accepted trade)
+- Promoting a Google Drive reference into an uploaded copy (a reference stays a reference; whoever needs a file as evidence uploads it)
 - Open-sourcing, in any form (closed source is decided)
 - Branding and wordmark — a later design session, not this spec
 - Hosting provider, region, and pricing — implementation-plan decisions, constrained by the audience (India-reachable, phone-first) but not settled here
