@@ -4,7 +4,7 @@
 
 **Goal:** Build the monorepo foundation and the append-only event ledger with deterministic, verifiable projections — the core that makes every later feature a claim the board cannot lie about.
 
-**Architecture:** An event-sourced core: clients submit event envelopes to `POST /v1/events`; the server validates the envelope (pure `parseEvent`), assigns `serverTime`, a per-entity `seq`, and a per-workspace `workspace_seq` stream cursor inside a transaction, gates each event through the shared rule engine (pass-through in this plan), appends accepted events to an append-only Postgres `events` table, and applies registered projections in the same transaction. Both sequences are assigned under advisory locks, and **lock order is always workspace first, then entity — one global order across the whole server, so two ingests can never deadlock by taking the pair in opposite orders.** Every projection is rebuildable from scratch; a verifier CLI re-derives them into a shadow schema and diffs against live.
+**Architecture:** An event-sourced core: clients submit event envelopes to `POST /v1/events`; the server validates the envelope (pure `parseEvent`), assigns `serverTime`, a per-entity `seq`, and a per-workspace `workspace_seq` stream cursor inside a transaction, gates each event through the shared rule engine (pass-through in this plan), appends accepted events to an append-only Postgres `events` table, and applies registered projections in the same transaction. Both sequences are assigned under advisory locks, and **lock order is always workspace first, then entity — one global order across the whole server, so two ingests can never deadlock by taking the pair in opposite orders.** Every projection is rebuildable from scratch; a verifier CLI re-derives them into a shadow schema and diffs against live. **Both clocks are `timestamptz` absolute instants and every session runs in `Asia/Kolkata`** (owner decision, coordination doc), and the IST day-boundary helpers the rest of the series computes days with live in `@gisik-nokma/domain`.
 
 **Tech Stack:** pnpm 9 workspaces + Turborepo, TypeScript strict (Node 22 LTS, ESM), Fastify 5, Postgres 16 via `pg`, node-pg-migrate, zod 3, ulidx, Vitest 3.
 
@@ -59,10 +59,16 @@ Engineering addenda binding on every task in this plan:
 
 - ESM everywhere: every `package.json` has `"type": "module"`; `module`/`moduleResolution` are `NodeNext`; **relative imports in source carry the `.js` suffix** (e.g. `import { newUlid } from './ids.js'`).
 - `pg` import convention: value import `import pg from 'pg'` (use `new pg.Pool(...)`); type imports named: `import type { Pool, PoolClient } from 'pg'`. Requires devDependency `@types/pg`.
-- Postgres `int8` (OID 20) arrives as a string; `apps/server/src/db.ts` installs `pg.types.setTypeParser(20, ...)` once so `seq` reads as `number` (safe: seq stays far below 2^53). Test helpers must route pool creation through `createPool` so the parser is installed.
+- Postgres `int8` (OID 20) arrives as a string; `apps/server/src/db.ts` installs `pg.types.setTypeParser(20, ...)` once so `seq` reads as `number` (safe: seq stays far below 2^53). Test helpers must route pool creation through `createPool` so the parser — and the `Asia/Kolkata` session timezone — are installed.
 - `jsonb` parameters are always passed as `JSON.stringify(value)` — never raw objects (pg mangles arrays otherwise).
 - TypeScript: `strict: true` plus `noUncheckedIndexedAccess`. `exactOptionalPropertyTypes` is deliberately OFF (it fights zod/pg row types for no Plan-1 gain) — do not enable it mid-series.
-- Timestamps: ISO 8601 limited to **at most millisecond precision** (regex-enforced at the envelope), so every stored claim reads back byte-identical. `client_time` is stored as `text` verbatim (the actor's claim, offset preserved); `server_time` as `timestamptz` (the system's orderable fact).
+- Timestamps: ISO 8601 limited to **at most millisecond precision** (regex-enforced at the envelope), so an instant survives storage exactly — millisecond precision is representable in both a JS `Date` and a Postgres `timestamptz`, and readback re-emits the same instant.
+- **Time is Asia/Kolkata.** Binding, quoted from the coordination doc's "Owner decision (2026-08-20): time is Asia/Kolkata" (`docs/superpowers/plans/2026-08-20-00-series-coordination.md`) — that document is the authority; this plan implements it:
+  - > **Storage:** both `client_time` and `server_time` are `timestamptz` — absolute instants. Plan 1's original "`client_time` as verbatim text" is overruled: text made every comparison a cast and every sort fragile, and converting loses nothing about *when* a claim was made, only the label the device attached to it. The spec's "both are true in different senses" is preserved intact — the claimed instant and the received instant remain two separate facts, and the existing skew flag still records when they disagree.
+  - > **Rendering:** every surface renders both clocks in **Asia/Kolkata**, always, in v1. The database session timezone is set to `Asia/Kolkata` so ad-hoc queries agree with the product.
+  - > **Day boundaries are IST.** This settles an ambiguity that was previously undefined and would have produced real disagreement: `dueDate`/`startDate` are day claims (`YYYY-MM-DD`), so "due today", "overdue", which calendar cell a claim falls in, and how many days a ticket has been in flight all depend on where the day starts. It starts at IST midnight. Every plan that computes a day boundary or a day count uses IST, never the server's locale and never the viewer's device.
+  - > **Known consequence:** a collaborator acting from another timezone sees their own action rendered in IST — the same instant, correctly labelled, not a distortion. A per-user or per-workspace display timezone is a cheap later addition; v1 does not have one.
+  - Plan 1's obligations under that decision: both time columns are `timestamptz` (Task 6); the pool and the dev/test databases run with session timezone `Asia/Kolkata` (Tasks 5, 6); and the IST day-boundary helpers every later plan must call — `istDayOf`, `istDayBounds`, `IST_TIME_ZONE` — ship in `@gisik-nokma/domain` (Task 4a). **The domain `EventEnvelope` is unchanged: `clientTime`/`serverTime` stay ISO 8601 strings at the boundary. Only storage and comparison change.**
 - Canonical replay order for projections: `ORDER BY entity_kind, entity_id, seq` — a total order (the triple is unique). Replay guarantees per-entity causality only; **a projection's table contents must be a pure function of the ledger's rows, never of cross-entity arrival interleaving**.
 - Dependency versions (caret ranges): `turbo ^2.5.0`, `typescript ^5.6.3`, `vitest ^3.1.0`, `zod ^3.25.0` (v3 API — our own ISO regex sidesteps zod v3/v4 datetime drift), `ulidx ^2.4.1`, `fastify ^5.3.0`, `pg ^8.13.0`, `@types/pg ^8.11.0`, `node-pg-migrate ^7.9.0`, `tsx ^4.19.0`, `@types/node ^22.10.0`.
 - The executor runs all commands from the repo root (`/Users/kiro/my_projects/gisik-nokma`) unless a step says otherwise. `reference/` is frozen — never touch it.
@@ -85,6 +91,7 @@ gisik-nokma/
 │   │   ├── src/vocabulary.ts     # domainRegistry + provisional seed types
 │   │   ├── src/parse-event.ts    # parseEvent → ParsedEvent | EnvelopeError
 │   │   ├── src/state.ts          # EntityHead (authoritative entity/workflow state types land in Plan 2)
+│   │   ├── src/ist-day.ts        # IST_TIME_ZONE, istDayOf, istDayBounds — the one day-boundary origin
 │   │   ├── src/provisional.ts    # PROVISIONAL EntityState/TicketState/WorkflowDef stubs — Plan 2 Task 2 replaces
 │   │   └── src/index.ts
 │   └── rule-engine/              # @gisik-nokma/rule-engine
@@ -441,9 +448,19 @@ describe('submittedEventSchema', () => {
     expect(submittedEventSchema.safeParse(validSubmitted()).success).toBe(true);
   });
 
-  it('accepts an offset clientTime — a claim keeps its stated timezone', () => {
+  it('accepts an offset clientTime — the wire admits any stated offset; storage normalises the instant', () => {
     const event = { ...validSubmitted(), clientTime: '2026-08-20T14:30:00.000+05:30' };
     expect(submittedEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('two clients stating the same instant with different offsets are the same instant', () => {
+    // The envelope does not care which label the device attached; Task 6 proves
+    // the ledger stores these two as one instant (owner decision: Asia/Kolkata).
+    const ist = { ...validSubmitted(), clientTime: '2026-08-20T14:30:00.000+05:30' };
+    const utc = { ...validSubmitted(), clientTime: '2026-08-20T09:00:00.000Z' };
+    expect(submittedEventSchema.safeParse(ist).success).toBe(true);
+    expect(submittedEventSchema.safeParse(utc).success).toBe(true);
+    expect(Date.parse('2026-08-20T14:30:00.000+05:30')).toBe(Date.parse('2026-08-20T09:00:00.000Z'));
   });
 
   it('planted defect: refuses a non-ULID id', () => {
@@ -456,7 +473,7 @@ describe('submittedEventSchema', () => {
     expect(submittedEventSchema.safeParse(event).success).toBe(false);
   });
 
-  it('planted defect: refuses microsecond precision — stored claims must read back byte-identical', () => {
+  it('planted defect: refuses microsecond precision — a JS Date cannot hold it, so it would not read back as the same instant', () => {
     const event = { ...validSubmitted(), clientTime: '2026-08-20T09:00:00.123456Z' };
     expect(submittedEventSchema.safeParse(event).success).toBe(false);
   });
@@ -507,8 +524,11 @@ export type Origin = (typeof ORIGINS)[number];
 
 /**
  * ISO 8601 with whole seconds and AT MOST 3 fractional digits, 'Z' or a numeric
- * offset. Bounding precision at milliseconds keeps every stored claim
- * byte-identical on readback (JS Date and our text storage both survive it).
+ * offset. Bounding precision at milliseconds keeps every stored claim exact on
+ * readback: a JS Date and a Postgres timestamptz both hold a millisecond
+ * instant without loss. Any offset is admitted on the wire — storage keeps the
+ * instant, not the label the device attached to it (owner decision: time is
+ * Asia/Kolkata).
  */
 export const ISO_DATETIME_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -1245,6 +1265,250 @@ git commit -m "Rule-engine package boundary: the exact Accept/Refusal interface 
 
 ---
 
+### Task 4a: IST day boundaries — the one place a day starts
+
+The owner decision (coordination doc, "time is Asia/Kolkata") makes IST midnight the day boundary for the whole product. `dueDate`/`startDate` are day claims (`YYYY-MM-DD`); "due today", "overdue", which calendar cell a claim falls in, and "3 days in flight" are all questions about where a day starts. Answered once, here, in the package every plan already depends on — so no later plan has to answer it again and none of them can answer it differently.
+
+**Files:**
+- Create: `packages/domain/src/ist-day.ts`
+- Modify: `packages/domain/src/index.ts`
+- Test: `packages/domain/test/ist-day.test.ts`
+
+**Interfaces:**
+- Consumes: `ISO_DATETIME_REGEX` from `./envelope.js` (Task 2) — the instant shape has one definition, and this module reuses it rather than restating it.
+- Produces (cross-plan API, package `@gisik-nokma/domain`):
+  - `IST_TIME_ZONE: 'Asia/Kolkata'` — the one origin for the IANA zone string; every client that formats a clock reads it from here, never a literal.
+  - `IST_OFFSET_MINUTES: 330` — the fixed +05:30 offset.
+  - `IST_DAY_REGEX: RegExp` — the `YYYY-MM-DD` day-claim shape.
+  - `istDayOf(instant: string): string` — the IST calendar day (`YYYY-MM-DD`) an absolute instant falls in. Throws `RangeError` naming the input if it is not an ISO 8601 instant at the envelope's precision (a date-only string is not an instant and is refused).
+  - `istDayBounds(day: string): { startUtc: string; endUtc: string }` — the **half-open** UTC interval `[startUtc, endUtc)` covering one IST day; both are ISO 8601 `Z` strings at millisecond precision. Throws `RangeError` naming the input for a malformed or unreal day.
+  - **Contract for every later plan: day boundaries and day counts are computed with these helpers — never with the server's locale, never with the viewer's device, never with a hand-rolled offset.** Concretely: "due today"/"overdue" and calendar-cell assignment call `istDayOf`; window and sweep queries call `istDayBounds` and compare against `server_time`/`client_time` (both `timestamptz` since Task 6); day counts subtract `istDayOf` results, never raw millisecond division.
+
+- [ ] **Step 1: Write the failing IST day test**
+
+`packages/domain/test/ist-day.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { IST_OFFSET_MINUTES, IST_TIME_ZONE, istDayBounds, istDayOf } from '../src/ist-day.js';
+
+describe('istDayOf', () => {
+  it('names the zone and the offset once, for everyone', () => {
+    expect(IST_TIME_ZONE).toBe('Asia/Kolkata');
+    expect(IST_OFFSET_MINUTES).toBe(330);
+  });
+
+  it('18:29:59Z is still the same IST day — 23:59:59 IST', () => {
+    expect(istDayOf('2026-08-20T18:29:59.000Z')).toBe('2026-08-20');
+    expect(istDayOf('2026-08-20T18:29:59.999Z')).toBe('2026-08-20');
+  });
+
+  it('18:30:00Z is the NEXT IST day — 00:00:00 IST', () => {
+    expect(istDayOf('2026-08-20T18:30:00.000Z')).toBe('2026-08-21');
+  });
+
+  it('the one millisecond between them changes the day — the boundary a naive implementation loses', () => {
+    expect(istDayOf('2026-08-20T18:29:59.999Z')).not.toBe(istDayOf('2026-08-20T18:30:00.000Z'));
+  });
+
+  it('reads the instant, not the label: the same moment stated as +05:30 and as Z lands on one day', () => {
+    expect(istDayOf('2026-08-21T00:00:00.000+05:30')).toBe('2026-08-21');
+    expect(istDayOf('2026-08-20T18:30:00.000Z')).toBe('2026-08-21');
+    expect(istDayOf('2026-08-20T14:30:00.000+05:30')).toBe(istDayOf('2026-08-20T09:00:00.000Z'));
+  });
+
+  it('rolls the month and the year at the IST boundary, not the UTC one', () => {
+    expect(istDayOf('2026-12-31T18:29:59.999Z')).toBe('2026-12-31');
+    expect(istDayOf('2026-12-31T18:30:00.000Z')).toBe('2027-01-01');
+    expect(istDayOf('2028-02-28T18:30:00.000Z')).toBe('2028-02-29'); // leap year
+    expect(istDayOf('2026-08-31T18:30:00.000Z')).toBe('2026-09-01');
+  });
+
+  it('planted defect: refuses a date-only string — a day is not an instant', () => {
+    expect(() => istDayOf('2026-08-20')).toThrowError(/2026-08-20/);
+  });
+
+  it('planted defect: refuses an unparseable instant, naming it', () => {
+    expect(() => istDayOf('yesterday')).toThrowError(/yesterday/);
+  });
+
+  it('planted defect: refuses an instant with no offset at all — the instant would be a guess', () => {
+    expect(() => istDayOf('2026-08-20T18:30:00.000')).toThrowError(RangeError);
+  });
+});
+
+describe('istDayBounds', () => {
+  it('a day runs from IST midnight to IST midnight, expressed in UTC', () => {
+    expect(istDayBounds('2026-08-20')).toEqual({
+      startUtc: '2026-08-19T18:30:00.000Z',
+      endUtc: '2026-08-20T18:30:00.000Z',
+    });
+  });
+
+  it('the interval is half-open: startUtc is inside the day, endUtc is the next day', () => {
+    const { startUtc, endUtc } = istDayBounds('2026-08-20');
+    expect(istDayOf(startUtc)).toBe('2026-08-20');
+    expect(istDayOf(new Date(Date.parse(endUtc) - 1).toISOString())).toBe('2026-08-20');
+    expect(istDayOf(endUtc)).toBe('2026-08-21');
+  });
+
+  it('round-trips: every day in a year maps to bounds that map back to that day', () => {
+    let cursor = Date.parse('2026-01-01T00:00:00.000Z');
+    const end = Date.parse('2027-01-01T00:00:00.000Z');
+    let checked = 0;
+    while (cursor < end) {
+      const day = istDayOf(new Date(cursor).toISOString());
+      const { startUtc, endUtc } = istDayBounds(day);
+      expect(istDayOf(startUtc)).toBe(day);
+      // India has no daylight saving: every day is exactly 24h, no exceptions.
+      expect(Date.parse(endUtc) - Date.parse(startUtc)).toBe(86_400_000);
+      // Days chain with no gap and no overlap.
+      expect(istDayBounds(istDayOf(endUtc)).startUtc).toBe(endUtc);
+      cursor += 86_400_000;
+      checked += 1;
+    }
+    expect(checked).toBe(365);
+  });
+
+  it('handles the leap day', () => {
+    expect(istDayBounds('2028-02-29').startUtc).toBe('2028-02-28T18:30:00.000Z');
+  });
+
+  it('planted defect: refuses a non-YYYY-MM-DD day, naming it', () => {
+    expect(() => istDayBounds('2026-8-20')).toThrowError(/2026-8-20/);
+    expect(() => istDayBounds('20-08-2026')).toThrowError(RangeError);
+  });
+
+  it('planted defect: refuses an instant where a day claim belongs', () => {
+    expect(() => istDayBounds('2026-08-20T00:00:00.000Z')).toThrowError(RangeError);
+  });
+
+  it('planted defect: refuses a well-formed but unreal calendar day instead of silently rolling it forward', () => {
+    expect(() => istDayBounds('2026-02-30')).toThrowError(/2026-02-30/);
+    expect(() => istDayBounds('2026-13-01')).toThrowError(/2026-13-01/);
+  });
+});
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `pnpm --filter @gisik-nokma/domain test`
+Expected: FAIL — cannot resolve `../src/ist-day.js`.
+
+- [ ] **Step 3: Implement `src/ist-day.ts`**
+
+`packages/domain/src/ist-day.ts`:
+
+```ts
+import { ISO_DATETIME_REGEX } from './envelope.js';
+
+/**
+ * Where a day starts, for the whole product.
+ *
+ * Owner decision (coordination doc, "time is Asia/Kolkata"): day boundaries are
+ * IST. `dueDate`/`startDate` are day claims, so "due today", "overdue", which
+ * calendar cell a claim falls in, and how many days a ticket has been in flight
+ * all depend on this and on nothing else — not the server's locale, not the
+ * viewer's device.
+ *
+ * India Standard Time is UTC+05:30 and has NO daylight saving: the offset is
+ * fixed by law (IST is defined against the 82°30'E meridian and has been a
+ * single, unchanging offset since 1945), not an assumption that happens to hold
+ * today. That is why this module does constant-offset arithmetic and pulls in no
+ * date library and no timezone database — there is no rule to look up.
+ */
+export const IST_TIME_ZONE = 'Asia/Kolkata';
+
+/** +05:30, in minutes. Fixed by law; not derived from any runtime clock. */
+export const IST_OFFSET_MINUTES = 330;
+
+const MS_PER_MINUTE = 60_000;
+const MS_PER_DAY = 86_400_000;
+
+/** A day claim: `YYYY-MM-DD`, the shape `dueDate`/`startDate` carry. */
+export const IST_DAY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The IST calendar day an absolute instant falls in.
+ *
+ * Reads the instant, never the label: '2026-08-20T14:30:00.000+05:30' and
+ * '2026-08-20T09:00:00.000Z' are the same moment and yield the same day.
+ * The 18:29:59Z / 18:30:00Z pair straddles the boundary — one is 2026-08-20,
+ * the other 2026-08-21.
+ */
+export function istDayOf(instant: string): string {
+  if (!ISO_DATETIME_REGEX.test(instant)) {
+    throw new RangeError(
+      `not an ISO 8601 instant with a stated offset: ${instant} — a day claim is not an instant`,
+    );
+  }
+  const ms = Date.parse(instant);
+  if (Number.isNaN(ms)) {
+    throw new RangeError(`not a real calendar instant: ${instant}`);
+  }
+  return formatUtcDay(new Date(ms + IST_OFFSET_MINUTES * MS_PER_MINUTE));
+}
+
+/**
+ * The half-open UTC interval [startUtc, endUtc) covering one IST day.
+ * `startUtc` is IST midnight of `day`; `endUtc` is IST midnight of the next day
+ * and is NOT part of it, so consecutive days chain with no gap and no overlap.
+ * Compare a `timestamptz` column with `>= startUtc AND < endUtc`.
+ */
+export function istDayBounds(day: string): { startUtc: string; endUtc: string } {
+  if (!IST_DAY_REGEX.test(day)) {
+    throw new RangeError(`not a YYYY-MM-DD day claim: ${day}`);
+  }
+  const year = Number.parseInt(day.slice(0, 4), 10);
+  const month = Number.parseInt(day.slice(5, 7), 10);
+  const date = Number.parseInt(day.slice(8, 10), 10);
+  const startMs = Date.UTC(year, month - 1, date) - IST_OFFSET_MINUTES * MS_PER_MINUTE;
+  if (Number.isNaN(startMs)) {
+    throw new RangeError(`not a real calendar day: ${day}`);
+  }
+  const startUtc = new Date(startMs).toISOString();
+  // Date.UTC silently rolls 2026-02-30 into March and reads 0099 as 1999.
+  // Round-tripping through istDayOf refuses both instead of inventing a day.
+  if (istDayOf(startUtc) !== day) {
+    throw new RangeError(`not a real calendar day: ${day}`);
+  }
+  return { startUtc, endUtc: new Date(startMs + MS_PER_DAY).toISOString() };
+}
+
+/** `YYYY-MM-DD` of a Date's UTC fields — the shifted clock, never the local one. */
+function formatUtcDay(shifted: Date): string {
+  const year = String(shifted.getUTCFullYear()).padStart(4, '0');
+  const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const date = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${date}`;
+}
+```
+
+Append one line to `packages/domain/src/index.ts` (Task 4 Step 1 wrote it; this adds to it):
+
+```ts
+export * from './ist-day.js';
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `pnpm --filter @gisik-nokma/domain test`
+Expected: PASS — both boundary tests (18:29:59Z and 18:30:00Z land on different IST days), the 365-day round-trip, and every planted defect. If the round-trip test fails on a particular day, that is a real boundary bug: debug it with superpowers:systematic-debugging, do not relax the assertion.
+
+- [ ] **Step 5: Build and typecheck**
+
+Run: `pnpm --filter @gisik-nokma/domain build && pnpm --filter @gisik-nokma/domain typecheck`
+Expected: clean.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add packages/domain
+git commit -m "IST day boundaries in one place: istDayOf and istDayBounds against the fixed +05:30 offset, proven at 18:29:59Z/18:30:00Z and round-tripped across a full year — no later plan rolls its own day"
+```
+
+---
+
 ### Task 5: Server skeleton — config, pool, Fastify app, health endpoint
 
 **Files:**
@@ -1263,7 +1527,7 @@ git commit -m "Rule-engine package boundary: the exact Accept/Refusal interface 
 - Consumes: workspace scaffold (Task 1); `@gisik-nokma/domain`, `@gisik-nokma/rule-engine` as dependencies.
 - Produces:
   - `loadConfig(env: NodeJS.ProcessEnv): AppConfig` where `type AppConfig = { databaseUrl: string; port: number; host: string; logLevel: 'fatal'|'error'|'warn'|'info'|'debug'|'trace' }`; throws `ConfigError` naming the offending variable(s).
-  - `createPool(databaseUrl: string): Pool` (installs the int8→number parser).
+  - `createPool(databaseUrl: string): Pool` (installs the int8→number parser; every connection it hands out runs with session timezone `Asia/Kolkata`).
   - `type HealthDb = { query(sql: string): Promise<unknown> }`; `type AppDeps = { db: HealthDb }` (**Task 11 extends this to `{ db: HealthDb; ingest: IngestService }` — that is the final shape**); `buildApp(deps: AppDeps, options?: { logLevel?: string }): FastifyInstance` with `GET /healthz`.
   - Env contract: `DATABASE_URL` (required), `PORT` (default 3000), `HOST` (default 127.0.0.1), `LOG_LEVEL` (default info).
 
@@ -1439,14 +1703,44 @@ export function loadConfig(env: NodeJS.ProcessEnv | Record<string, string>): App
 ```ts
 import pg from 'pg';
 import type { Pool } from 'pg';
+import { IST_TIME_ZONE } from '@gisik-nokma/domain';
 
 // Postgres int8 (OID 20) arrives as a string by default. Sequence numbers stay
 // far below Number.MAX_SAFE_INTEGER (2^53), so parse to number once, globally.
 // Every pool in app and tests must come through createPool so this holds.
 pg.types.setTypeParser(20, (value) => Number.parseInt(value, 10));
 
+/**
+ * Every connection runs with session timezone Asia/Kolkata (owner decision:
+ * time is Asia/Kolkata), so a timestamptz rendered by an ad-hoc query reads the
+ * same clock the product shows — one time story, not two. This does not change
+ * any stored instant: timestamptz is absolute, and the session zone only
+ * decides which offset Postgres prints it in.
+ *
+ * `options` is sent as the Postgres startup parameter, so the zone is set
+ * before the first query rather than by a query that could race with one.
+ */
 export function createPool(databaseUrl: string): Pool {
-  return new pg.Pool({ connectionString: databaseUrl, max: 10 });
+  return new pg.Pool({
+    connectionString: databaseUrl,
+    max: 10,
+    options: `-c timezone=${IST_TIME_ZONE}`,
+  });
+}
+```
+
+If the driver ignores `options` (Task 6's `SHOW TimeZone` test reads `UTC` instead of `Asia/Kolkata` — it needs a live database, which is why the assertion lives there), replace it with the pooled-connection hook — this is the sanctioned fallback, not an improvisation. Queries issued in the `connect` handler are queued on the client ahead of anything the caller issues later, so the zone is still set before the first caller query:
+
+```ts
+export function createPool(databaseUrl: string): Pool {
+  const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 });
+  pool.on('connect', (client) => {
+    client.query(`SET TIME ZONE '${IST_TIME_ZONE}'`).catch(() => {
+      // The SHOW TimeZone test is the assertion; a swallowed error here would
+      // only re-raise on the caller's next query anyway.
+    });
+  });
+  return pool;
 }
 ```
 
@@ -1555,7 +1849,7 @@ Expected: PASS and clean.
 
 ```bash
 git add apps/server pnpm-lock.yaml
-git commit -m "Server skeleton: env config that refuses to boot half-configured, a pool with honest int8 parsing, and a health endpoint that never fakes ok"
+git commit -m "Server skeleton: env config that refuses to boot half-configured, a pool with honest int8 parsing and an Asia/Kolkata session so ad-hoc queries read the product's clock, and a health endpoint that never fakes ok"
 ```
 
 ---
@@ -1571,10 +1865,10 @@ git commit -m "Server skeleton: env config that refuses to boot half-configured,
 **Interfaces:**
 - Consumes: `createPool` from Task 5.
 - Produces:
-  - `events` table (append-only): columns `id text PK`, `workspace_id text`, `entity_kind text`, `entity_id text`, `type text`, `version integer`, `payload jsonb`, `actor_id text`, `origin text`, `client_time text` (claim verbatim), `server_time timestamptz`, `seq bigint`, `workspace_seq bigint` (the workspace stream cursor, coordination §18); constraint `events_entity_seq_unique UNIQUE (entity_kind, entity_id, seq)` (doubles as the per-entity replay index); constraint `events_workspace_seq_unique UNIQUE (workspace_id, workspace_seq)` (doubles as the `(workspace_id, workspace_seq)` range index the stream reads resume through); index `events_workspace_server_time_idx (workspace_id, server_time)`; trigger `events_no_update_no_delete` + `events_no_truncate` raising `events is append-only`.
+  - `events` table (append-only): columns `id text PK`, `workspace_id text`, `entity_kind text`, `entity_id text`, `type text`, `version integer`, `payload jsonb`, `actor_id text`, `origin text`, `client_time timestamptz` (the claimed instant), `server_time timestamptz` (the received instant), `seq bigint`, `workspace_seq bigint` (the workspace stream cursor, coordination §18); constraint `events_entity_seq_unique UNIQUE (entity_kind, entity_id, seq)` (doubles as the per-entity replay index); constraint `events_workspace_seq_unique UNIQUE (workspace_id, workspace_seq)` (doubles as the `(workspace_id, workspace_seq)` range index the stream reads resume through); index `events_workspace_server_time_idx (workspace_id, server_time)`; trigger `events_no_update_no_delete` + `events_no_truncate` raising `events is append-only`.
   - `snapshots` table: `entity_kind text`, `entity_id text`, `seq bigint`, `state jsonb`, `created_at timestamptz default now()`, PK `(entity_kind, entity_id, seq)`.
-  - Test helper `createTestDatabase(): Promise<TestDatabase>` where `type TestDatabase = { pool: Pool; url: string; drop(): Promise<void> }` — creates a uniquely named database, runs all migrations, returns a parser-correct pool. Admin URL from `TEST_DATABASE_ADMIN_URL`, default `postgres://gisik:gisik@localhost:54329/postgres`.
-  - Dev database: `docker compose up -d` → Postgres 16 on port 54329, user/password `gisik`/`gisik`, database `gisik_nokma`.
+  - Test helper `createTestDatabase(): Promise<TestDatabase>` where `type TestDatabase = { pool: Pool; url: string; drop(): Promise<void> }` — creates a uniquely named database, sets its default timezone to `Asia/Kolkata`, runs all migrations, returns a parser-correct pool (whose sessions are `Asia/Kolkata` via `createPool`). Admin URL from `TEST_DATABASE_ADMIN_URL`, default `postgres://gisik:gisik@localhost:54329/postgres`.
+  - Dev database: `docker compose up -d` → Postgres 16 on port 54329, user/password `gisik`/`gisik`, database `gisik_nokma`, server timezone `Asia/Kolkata`.
 
 - [ ] **Step 1: Write `docker-compose.yml` and start Postgres**
 
@@ -1584,6 +1878,10 @@ git commit -m "Server skeleton: env config that refuses to boot half-configured,
 services:
   postgres:
     image: postgres:16-alpine
+    # Owner decision: time is Asia/Kolkata. The server runs in IST so an ad-hoc
+    # psql session prints the same clock the product does — the pool sets the
+    # zone for app connections, this sets it for everyone else.
+    command: ["postgres", "-c", "timezone=Asia/Kolkata"]
     environment:
       POSTGRES_USER: gisik
       POSTGRES_PASSWORD: gisik
@@ -1615,7 +1913,7 @@ CREATE TABLE events (
   payload      jsonb NOT NULL,
   actor_id     text NOT NULL,
   origin       text NOT NULL,
-  client_time  text NOT NULL,
+  client_time  timestamptz NOT NULL,
   server_time  timestamptz NOT NULL,
   seq          bigint NOT NULL,
   workspace_seq bigint NOT NULL,
@@ -1624,8 +1922,8 @@ CREATE TABLE events (
 );
 
 COMMENT ON TABLE events IS 'Append-only ledger: every row is an immutable, attributed claim.';
-COMMENT ON COLUMN events.client_time IS 'The actor''s claim about when — stored verbatim, offset preserved.';
-COMMENT ON COLUMN events.server_time IS 'The system''s fact about when — assigned at ingest.';
+COMMENT ON COLUMN events.client_time IS 'The claimed instant: when the actor says it happened. Absolute (timestamptz), so it sorts and compares without a cast; the device''s stated offset was a label on this instant, not a separate fact.';
+COMMENT ON COLUMN events.server_time IS 'The received instant: when the system got it. Assigned at ingest. Separate from client_time on purpose — the two disagreeing is the skew the product reports, never hides.';
 COMMENT ON COLUMN events.seq IS 'Per-entity sequence: entity history, replay, snapshots.';
 COMMENT ON COLUMN events.workspace_seq IS 'Per-workspace stream cursor (coordination §18): the only order a workspace stream may resume by. Its unique index doubles as the (workspace_id, workspace_seq) range index those resumes scan.';
 
@@ -1720,19 +2018,59 @@ describe('events and snapshots schema', () => {
     expect(names).toContain('pgmigrations');
   });
 
-  it('a stored claim reads back exactly: jsonb payload, verbatim client_time with its offset, both seqs as numbers', async () => {
+  it('every session runs in Asia/Kolkata, so an ad-hoc query reads the product clock', async () => {
+    const read = await db.pool.query<{ zone: string }>(
+      `SELECT current_setting('TimeZone') AS zone`,
+    );
+    expect(read.rows[0]?.zone).toBe('Asia/Kolkata');
+  });
+
+  it('a stored claim reads back as the same instant: jsonb payload intact, client_time absolute, both seqs as numbers', async () => {
     const query = insertEventSql('01J6000000000000000000TT01', 1);
     await db.pool.query(query.text, query.values);
-    const read = await db.pool.query(
-      'SELECT payload, client_time, seq, workspace_seq FROM events WHERE id = $1',
-      ['01J6000000000000000000TT01'],
+    const read = await db.pool.query<{
+      payload: unknown;
+      client_time: Date;
+      seq: number;
+      workspace_seq: number;
+    }>('SELECT payload, client_time, seq, workspace_seq FROM events WHERE id = $1', [
+      '01J6000000000000000000TT01',
+    ]);
+    const row = read.rows[0];
+    expect(row?.payload).toEqual({ name: 'Convenience Corner' });
+    // Submitted as '2026-08-20T14:30:00.000+05:30'. timestamptz keeps the
+    // instant, not the label — the same moment, stated in UTC.
+    expect(row?.client_time.toISOString()).toBe('2026-08-20T09:00:00.000Z');
+    expect(row?.seq).toBe(1);
+    expect(row?.workspace_seq).toBe(1);
+  });
+
+  it('planted defect: two clients stating one instant with different offsets store ONE instant and compare equal', async () => {
+    // This is exactly what a text column got silently wrong: as text these two
+    // strings are unequal and sort apart, though they name the same moment.
+    const ist = insertEventSql('01J6000000000000000000TT04', 1);
+    ist.values[2] = 'project';
+    ist.values[3] = '01J60000000000000000000PRB';
+    ist.values[9] = '2026-08-20T14:30:00.000+05:30';
+    ist.values[12] = 90;
+    await db.pool.query(ist.text, ist.values);
+
+    const utc = insertEventSql('01J6000000000000000000TT05', 1);
+    utc.values[2] = 'project';
+    utc.values[3] = '01J60000000000000000000PRC';
+    utc.values[9] = '2026-08-20T09:00:00.000Z';
+    utc.values[12] = 91;
+    await db.pool.query(utc.text, utc.values);
+
+    const compared = await db.pool.query<{ same: boolean; distinct_instants: number }>(
+      `SELECT a.client_time = b.client_time AS same,
+              (SELECT count(DISTINCT client_time)::int FROM events WHERE id IN ($1, $2)) AS distinct_instants
+         FROM events a, events b
+        WHERE a.id = $1 AND b.id = $2`,
+      ['01J6000000000000000000TT04', '01J6000000000000000000TT05'],
     );
-    expect(read.rows[0]).toEqual({
-      payload: { name: 'Convenience Corner' },
-      client_time: '2026-08-20T14:30:00.000+05:30',
-      seq: 1,
-      workspace_seq: 1,
-    });
+    expect(compared.rows[0]?.same).toBe(true);
+    expect(compared.rows[0]?.distinct_instants).toBe(1);
   });
 
   it('planted defect: a duplicate (entity_kind, entity_id, seq) violates events_entity_seq_unique', async () => {
@@ -1801,6 +2139,7 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import type { Pool } from 'pg';
 import runner from 'node-pg-migrate';
+import { IST_TIME_ZONE } from '@gisik-nokma/domain';
 import { createPool } from '../../src/db.js';
 
 const ADMIN_URL =
@@ -1815,15 +2154,22 @@ export type TestDatabase = {
 };
 
 /**
- * Creates a uniquely named database, runs every migration, and returns a pool
- * built via createPool (so the int8 parser is installed). Each test file gets
- * its own database — files can run in parallel without sharing state.
+ * Creates a uniquely named database, pins its timezone to Asia/Kolkata, runs
+ * every migration, and returns a pool built via createPool (so the int8 parser
+ * is installed and sessions are Asia/Kolkata). Each test file gets its own
+ * database — files can run in parallel without sharing state.
+ *
+ * The database-level ALTER covers connections that do NOT come through
+ * createPool — the migration runner, and any psql a developer opens against a
+ * surviving test database — so no session anywhere reads a different clock than
+ * the product (owner decision: time is Asia/Kolkata).
  */
 export async function createTestDatabase(): Promise<TestDatabase> {
   const name = `gisik_test_${randomUUID().replaceAll('-', '')}`;
   const admin = new pg.Client({ connectionString: ADMIN_URL });
   await admin.connect();
   await admin.query(`CREATE DATABASE ${name}`);
+  await admin.query(`ALTER DATABASE ${name} SET timezone TO '${IST_TIME_ZONE}'`);
   await admin.end();
 
   const url = ADMIN_URL.replace(/\/[^/]*$/, `/${name}`);
@@ -1864,13 +2210,15 @@ execFileSync('pnpm', ['exec', 'node-pg-migrate', 'up', '--migrations-dir', MIGRA
 - [ ] **Step 6: Run the migrations test to verify it passes**
 
 Run: `pnpm turbo run test --filter=@gisik-nokma/server`
-Expected: PASS — schema exists, the roundtrip is exact, and all five planted defects (duplicate entity seq, duplicate workspace_seq, UPDATE, DELETE, TRUNCATE) are refused. This proves the append-only floor before anything is built on it.
+Expected: PASS — schema exists, sessions report `Asia/Kolkata`, the roundtrip preserves the instant, and all six planted defects (offset-equivalence, duplicate entity seq, duplicate workspace_seq, UPDATE, DELETE, TRUNCATE) are refused or proven. This proves the append-only floor before anything is built on it.
+
+If the `Asia/Kolkata` assertion fails, the pool is not applying the startup `options` — apply Task 5 Step 4's sanctioned fallback (the `connect` handler) and re-run. Do not weaken the assertion.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add docker-compose.yml apps/server/migrations apps/server/test
-git commit -m "The append-only ledger schema: events cannot be updated, deleted, or truncated, per-entity seq is unique, the workspace stream cursor cannot fork, and a claim's client_time survives storage byte-for-byte"
+git commit -m "The append-only ledger schema: events cannot be updated, deleted, or truncated, per-entity seq is unique, the workspace stream cursor cannot fork, and both clocks are timestamptz in Asia/Kolkata so one instant stated two ways is one instant"
 ```
 
 ---
@@ -1896,7 +2244,7 @@ git commit -m "The append-only ledger schema: events cannot be updated, deleted,
   - `insertEvent(client: PoolClient, event: LedgerEvent): Promise<void>`
   - `readEntityEvents(client: PoolClient | Pool, kind: EntityKind, id: string, afterSeq?: number): Promise<LedgerEvent[]>` — per-entity seq order (entity history; a *workspace* stream resumes by `workspace_seq` instead — Plan 4's `visibleEventsFor`).
   - `readLedger(client: PoolClient | Pool): Promise<LedgerEvent[]>` — the CANONICAL REPLAY ORDER (`entity_kind, entity_id, seq`), unchanged by the workspace cursor.
-  - `rowToEnvelope(row: EventRow): LedgerEvent` and `type EventRow` (snake_case row shape) — readers emit the optional, server-enriched `workspaceSeq` alongside the frozen envelope fields.
+  - `rowToEnvelope(row: EventRow): LedgerEvent` and `type EventRow` (snake_case row shape) — readers emit the optional, server-enriched `workspaceSeq` alongside the frozen envelope fields. **Both time columns are `timestamptz`, so pg hands them back as `Date`; `rowToEnvelope` re-emits them as ISO 8601 `Z` strings.** The domain boundary is unchanged — `clientTime`/`serverTime` are still ISO strings — but a claim submitted as `…+05:30` reads back as the equivalent `…Z`: the instant survives, the label the device attached does not. That is the owner's stated trade, not a bug; do not "fix" it back to a verbatim string.
   - `isUniqueViolation(error: unknown, constraint: string): boolean`
   - `type Snapshot = { entityKind: EntityKind; entityId: string; seq: number; state: Record<string, unknown> }`; `writeSnapshot(client, snapshot)`; `readLatestSnapshot(client, kind, id): Promise<Snapshot | null>` — no caller writes snapshots in Plan 1; the repo exists so the plan that introduces replayed entity state has the bounded-replay primitive ready.
   - Test helper: `submittedWorkspaceCreated(overrides?: Partial<SubmittedEvent>): SubmittedEvent` and `committed(submitted: SubmittedEvent, seq: number, serverTime?: string, workspaceSeq?: number): LedgerEvent` (`workspaceSeq` defaults to `seq` — in these fixtures the entity IS the workspace, so the two counters coincide; tests that need them to diverge pass it explicitly).
@@ -1949,7 +2297,7 @@ export function committed(
 
 ```ts
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import { istDayOf, newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import {
   insertEvent,
   isUniqueViolation,
@@ -2062,6 +2410,47 @@ describe('event store', () => {
     const keys = ledger.map((event) => `${event.entity.kind}|${event.entity.id}|${event.seq}`);
     expect(keys).toEqual([...keys].sort());
     expect(ledger.length).toBeGreaterThan(0);
+  });
+
+  it('an ISO clientTime round-trips as the same instant: +05:30 in, the equivalent Z out', async () => {
+    const base = submittedWorkspaceCreated({ clientTime: '2026-08-20T14:30:00.000+05:30' });
+    const client = await db.pool.connect();
+    try {
+      await insertEvent(client, committed(base, 1));
+    } finally {
+      client.release();
+    }
+    const [read] = await readEntityEvents(db.pool, 'workspace', base.entity.id);
+    // The instant is exactly what was claimed...
+    expect(Date.parse(read?.clientTime ?? '')).toBe(Date.parse('2026-08-20T14:30:00.000+05:30'));
+    // ...re-emitted in the one normal form. The device's label is gone; the
+    // moment it labelled is not (owner decision: time is Asia/Kolkata).
+    expect(read?.clientTime).toBe('2026-08-20T09:00:00.000Z');
+    // Claimed and received stay two separate facts — skew is still visible.
+    expect(read?.serverTime).toBe('2026-08-20T09:00:01.000Z');
+    expect(read?.clientTime).not.toBe(read?.serverTime);
+  });
+
+  it('planted defect: two clients claiming one instant with different offsets are equal after the round trip', async () => {
+    const ist = submittedWorkspaceCreated({ clientTime: '2026-08-20T14:30:00.000+05:30' });
+    const utc = submittedWorkspaceCreated({ clientTime: '2026-08-20T09:00:00.000Z' });
+    const client = await db.pool.connect();
+    try {
+      await insertEvent(client, committed(ist, 1));
+      await insertEvent(client, committed(utc, 1));
+    } finally {
+      client.release();
+    }
+    const [readIst] = await readEntityEvents(db.pool, 'workspace', ist.entity.id);
+    const [readUtc] = await readEntityEvents(db.pool, 'workspace', utc.entity.id);
+    // As text these two claims were unequal and sorted apart. As instants they
+    // are one moment — the comparison the text column silently got wrong.
+    expect(readIst?.clientTime).toBe('2026-08-20T09:00:00.000Z');
+    expect(readUtc?.clientTime).toBe('2026-08-20T09:00:00.000Z');
+    expect(readIst?.clientTime).toBe(readUtc?.clientTime);
+    // ...and therefore on one IST day, whichever offset the device stated.
+    expect(istDayOf(readIst?.clientTime ?? '')).toBe('2026-08-20');
+    expect(istDayOf(readUtc?.clientTime ?? '')).toBe('2026-08-20');
   });
 });
 ```
@@ -2234,7 +2623,11 @@ export async function insertEvent(client: PoolClient, event: LedgerEvent): Promi
   );
 }
 
-/** snake_case row shape of the events table as pg returns it. */
+/**
+ * snake_case row shape of the events table as pg returns it. Both time columns
+ * are timestamptz, so both arrive as Date — absolute instants, whatever offset
+ * the submitter stated.
+ */
 export type EventRow = {
   id: string;
   workspace_id: string;
@@ -2245,12 +2638,20 @@ export type EventRow = {
   payload: unknown;
   actor_id: string;
   origin: Origin;
-  client_time: string;
+  client_time: Date;
   server_time: Date;
   seq: number;
   workspace_seq: number;
 };
 
+/**
+ * Row → domain envelope. Both clocks re-emit as ISO 8601 'Z' at millisecond
+ * precision: the instant is exactly what was submitted; the offset label the
+ * device attached is not preserved, because it was a label on this instant and
+ * never a separate fact (owner decision: time is Asia/Kolkata). The claimed
+ * instant and the received instant stay two independent fields — that is the
+ * distinction the spec cares about, and it is untouched.
+ */
 export function rowToEnvelope(row: EventRow): LedgerEvent {
   return {
     id: row.id,
@@ -2261,7 +2662,7 @@ export function rowToEnvelope(row: EventRow): LedgerEvent {
     payload: row.payload,
     actorId: row.actor_id,
     origin: row.origin,
-    clientTime: row.client_time,
+    clientTime: row.client_time.toISOString(),
     serverTime: row.server_time.toISOString(),
     seq: row.seq,
     workspaceSeq: row.workspace_seq,
@@ -2428,7 +2829,7 @@ Expected: PASS and clean.
 
 ```bash
 git add apps/server/src/ledger apps/server/test
-git commit -m "Ledger stores: advisory-locked per-entity sequencing and the per-workspace stream cursor beside it — workspace lock first, then entity, one order so nothing deadlocks — both proven under concurrency, with canonical replay reads left exactly as they were"
+git commit -m "Ledger stores: advisory-locked per-entity sequencing and the per-workspace stream cursor beside it — workspace lock first, then entity, one order so nothing deadlocks — both proven under concurrency, with canonical replay reads left exactly as they were and both clocks round-tripping as instants, so one moment stated two ways compares equal"
 ```
 
 ---
@@ -4094,18 +4495,19 @@ Workspace convention note: `Features.md`/`test-cases/` must move in the same cha
 
 **Interfaces:**
 - Consumes: everything — this task verifies the whole plan end-to-end.
-- Produces: `Features.md` §3 "Foundation & event ledger"; `test-cases/03-foundation-ledger.md` (cases 3.1–3.20).
+- Produces: `Features.md` §3 "Foundation & event ledger"; `test-cases/03-foundation-ledger.md` (cases 3.1–3.28).
 
 - [ ] **Step 1: End-to-end smoke against the dev database**
 
 ```bash
 docker compose up -d
+docker compose exec -T postgres psql -U gisik -d gisik_nokma -c 'SHOW TimeZone'
 export DATABASE_URL='postgres://gisik:gisik@localhost:54329/gisik_nokma'
 pnpm --filter @gisik-nokma/server run migrate
 pnpm --filter @gisik-nokma/server run verify:projections
 ```
 
-Expected: migrations apply (idempotent if already applied); the verifier prints the clean line and exits 0 (empty ledger derives empty projections — clean).
+Expected: `psql` prints `Asia/Kolkata` — an ad-hoc query reads the product's clock, not the container's UTC default; migrations apply (idempotent if already applied); the verifier prints the clean line and exits 0 (empty ledger derives empty projections — clean).
 
 - [ ] **Step 2: Boot, health-check, ingest one event, verify again**
 
@@ -4132,9 +4534,11 @@ Append to `Features.md`:
 
 - ⚙️ **Monorepo workspace** — pnpm workspaces + Turborepo, TypeScript strict, Node 22, ESM, Vitest; packages `@gisik-nokma/domain`, `@gisik-nokma/rule-engine`, `@gisik-nokma/server`. Root configs `pnpm-workspace.yaml`, `turbo.json`, `tsconfig.base.json`; dev Postgres via `docker-compose.yml`.
 - ⚙️ **Event envelope & vocabulary** — the exact `EventEnvelope` contract with zod validation, ULID helpers, and the versioned event-type registry; pure `parseEvent` refuses unknown types, unknown versions, invalid payloads, malformed envelopes. Provisional seed vocabulary: `workspace.created` v1, `workspace.renamed` v1. `packages/domain/`
+- ⚙️ **IST day boundaries** — `istDayOf(instant)` and `istDayBounds(day)` against the fixed +05:30 offset (India has no DST), plus `IST_TIME_ZONE`: the single origin for where a day starts. "Due today", "overdue", calendar-cell assignment and day counts across the whole product resolve here, never from the server's locale or the viewer's device. `packages/domain/src/ist-day.ts`
 - ⚙️ **Rule-engine boundary** — `evaluateEvent(env, ctx)` returning Accept or a Refusal that names its rule; pass-through internals that Plan 2 replaces. `packages/rule-engine/`
 - ✅ **Event ingest API** — `POST /v1/events` batch ingest: parse at the door → advisory-locked per-entity `seq` and per-workspace `workspace_seq` (workspace lock first, then entity) + `serverTime` → rule-engine gate → append + projections in one transaction → index-aligned per-event committed/invalid/refused results. `GET /healthz`. `apps/server/src/routes/events.ts`, `apps/server/src/ingest/`
-- ⚙️ **Append-only ledger** — Postgres `events` table where UPDATE/DELETE/TRUNCATE are refused by trigger, `(entity_kind, entity_id, seq)` is unique, and `client_time` is stored verbatim as the actor's claim beside `server_time` the system's fact; `snapshots` table ready to bound future replay. `apps/server/migrations/`
+- ⚙️ **Append-only ledger** — Postgres `events` table where UPDATE/DELETE/TRUNCATE are refused by trigger, `(entity_kind, entity_id, seq)` is unique, and both clocks are `timestamptz` absolute instants: `client_time` the claimed instant beside `server_time` the received one, so they sort and compare without a cast and one moment stated in two offsets is one moment; `snapshots` table ready to bound future replay. `apps/server/migrations/`
+- ⚙️ **Asia/Kolkata everywhere** — every pooled connection, the dev Postgres server, and every test database run with session timezone `Asia/Kolkata`, so an ad-hoc query reads the same clock the product shows. `apps/server/src/db.ts`, `docker-compose.yml`, `apps/server/test/helpers/db.ts`
 - ⚙️ **Workspace stream cursor** — `workspace_seq`, unique per `(workspace_id, workspace_seq)` and assigned in the ingest transaction under a per-workspace advisory lock, is the only order a workspace stream may resume by; per-entity `seq` keeps entity history, replay and snapshots. Server-enriched and opaque to clients (coordination §18). `apps/server/src/ledger/event-store.ts`
 - ⚙️ **Projection framework** — registry of deterministic `apply`/`reset` read models applied in the ingest transaction; `rebuildProjection` replays the canonical order; reference projection `proj_entity_heads` (newest event per entity, replay-safe). `apps/server/src/projections/`
 - ⚙️ **Broadcast hook** — `onEventCommitted(cb)` fires only after commit, never for refused or invalid events; Plan 5 attaches WebSocket fan-out. `apps/server/src/ingest/ingest-service.ts`
@@ -4158,7 +4562,7 @@ Mirrors `Features.md` §3. Status: `❌` not covered · `✅` covered · `🟡` 
 - **3.6** ✅ The pass-through rule engine accepts every event and consults nothing; a Refusal carries `rule` + plain-language `reason`. — `packages/rule-engine/test/engine.test.ts`
 - **3.7** ✅ UPDATE, DELETE and TRUNCATE on `events` are refused by the append-only trigger (planted defects). — `apps/server/test/migrations.test.ts`
 - **3.8** ✅ A duplicate `(entity_kind, entity_id, seq)` violates `events_entity_seq_unique` (planted defect); two concurrent appends to one entity serialise to consecutive seqs. — `apps/server/test/migrations.test.ts`, `apps/server/test/event-store.test.ts`
-- **3.9** ✅ A stored claim reads back exactly: jsonb payload intact, `client_time` verbatim with its offset, `seq` as a number. — `apps/server/test/migrations.test.ts`
+- **3.9** ✅ A stored claim reads back as the same instant: jsonb payload intact, `client_time` an absolute `timestamptz`, `seq` as a number; an ISO `+05:30` claim round-trips through `rowToEnvelope` as the equivalent `Z` instant, with `client_time` and `server_time` still two separate facts. — `apps/server/test/migrations.test.ts`, `apps/server/test/event-store.test.ts`
 - **3.10** ✅ Snapshots store and return the highest-seq state per entity; absent means null. — `apps/server/test/snapshot-store.test.ts`
 - **3.11** ✅ Batch ingest answers per event, index-aligned: committed with seq/serverTime, invalid with named code, refused with rule + reason. — `apps/server/test/ingest.test.ts`
 - **3.12** ✅ A rule-refused event leaves NO trace in ledger or projections (planted defect). — `apps/server/test/ingest.test.ts`
@@ -4175,6 +4579,9 @@ Mirrors `Features.md` §3. Status: `❌` not covered · `✅` covered · `🟡` 
 - **3.23** 🧪 End-to-end smoke: compose up, migrate, verify clean, boot, healthz ok, one event ingested over HTTP, verify clean again — run per release (Plan 1 Task 14 steps 1–2).
 - **3.24** ✅ A duplicate `(workspace_id, workspace_seq)` violates `events_workspace_seq_unique` (planted defect); two entities in one workspace get strictly increasing cursors while both honestly keep `seq` 1; concurrent appends and four racing ingests never mint one cursor twice (planted defects). — `apps/server/test/migrations.test.ts`, `apps/server/test/event-store.test.ts`, `apps/server/test/ingest.test.ts`
 - **3.25** ✅ The workspace cursor changes nothing about replay: canonical order stays `(entity_kind, entity_id, seq)`, every stored row carries a cursor unique within its workspace, and `onEventCommitted` hands listeners the cursor a stream resumes by. — `apps/server/test/event-store.test.ts`, `apps/server/test/ingest.test.ts`
+- **3.26** ✅ Two clients stating the SAME instant with different offsets (`+05:30` and `Z`) store as one instant and compare equal, in SQL and after the round trip through `rowToEnvelope` — the comparison a text `client_time` silently got wrong (planted defects). — `apps/server/test/migrations.test.ts`, `apps/server/test/event-store.test.ts`
+- **3.27** ✅ IST day boundaries: `18:29:59Z` and `18:30:00Z` fall on different IST days; a day's bounds are the half-open `[startUtc, endUtc)` UTC interval and round-trip back to that day for all 365 days of a year with every day exactly 24h and no gap between consecutive days; month, year and leap-day rollovers happen at the IST boundary; date-only strings, unparseable instants, offsetless instants, malformed days and unreal calendar days are refused (planted defects). — `packages/domain/test/ist-day.test.ts`
+- **3.28** ✅ Every pooled session reports `Asia/Kolkata`, so an ad-hoc query reads the product's clock; the dev compose server and each test database are pinned to it too. — `apps/server/test/migrations.test.ts`
 ```
 
 In `test-cases/README.md`, replace the line beginning `Buckets so far: none —` with:
@@ -4192,7 +4599,7 @@ Expected: every package green — this is the evidence for every ✅ above.
 
 ```bash
 git add Features.md test-cases
-git commit -m "Catalogue the foundation: Features.md section 3 and 25 test cases, every refusal path traced to the planted defect that proves it"
+git commit -m "Catalogue the foundation: Features.md section 3 and 28 test cases, every refusal path traced to the planted defect that proves it, including the Asia/Kolkata clocks and the one place a day starts"
 ```
 
 ---
@@ -4206,20 +4613,28 @@ Flagged per instruction rather than silently resolved; none blocks execution of 
 3. **Duplicate event id = `invalid` for now.** A replayed client id answers `duplicate-event-id`. The offline outbox (sync plans) may prefer idempotent-accept ("already committed, here is its seq") for retry-after-network-failure. Changing this later is additive; deciding it belongs to the sync plan.
 4. **Snapshots have no writer.** The contract mandates the snapshots table ("bounds per-entity replay"); this plan ships table + read/write repo, but no snapshot-taking policy exists yet. The plan that introduces replayed entity state (Plan 2 or 3) should own when snapshots are written.
 5. **Features.md/test-cases numbering across four parallel plan-writers.** This plan claims Features.md §3 and `test-cases/03-foundation-ledger.md`. The other parallel plans must claim distinct section numbers; the orchestrator should check for collisions before execution.
-6. **`client_time` storage.** The contract fixes `payload jsonb` but not the time columns. Chosen here: `client_time text` verbatim (the claim keeps its stated offset — honesty-aligned per spec §3 "both are true in different senses") and `server_time timestamptz`. If a later plan needs to ORDER BY client time, it casts (`client_time::timestamptz`) or projects a derived column — the stored claim itself stays untouched.
+6. **`client_time` storage — SETTLED by owner decision (2026-08-20): `timestamptz`, not text.** This plan originally chose to store `client_time` as a verbatim `text` column, on the reasoning that keeping the device's stated offset was the honest thing to do. The owner overruled it, and the coordination doc's "Owner decision (2026-08-20): time is Asia/Kolkata" is the authority. **Both `client_time` and `server_time` are `timestamptz` — absolute instants.** The reasoning, recorded so nobody re-litigates it:
+   - Text made every comparison a cast and every sort fragile. `'2026-08-20T14:30:00.000+05:30'` and `'2026-08-20T09:00:00.000Z'` are the same moment and unequal strings; as text they sort apart, group apart, and index uselessly. Every "when did this happen" question would have carried a `::timestamptz` cast that a future author could forget — a silent wrong answer, which is precisely the failure mode this product exists to refuse.
+   - Converting loses only the label, not the claim. What the actor claimed is *when* it happened; the offset was the device's way of naming that instant, not a second fact about it. `2026-08-20T14:30:00+05:30` and `2026-08-20T09:00:00Z` are not two claims to preserve separately — they are one claim written twice.
+   - The distinction the spec cares about survives untouched. "Both are true in different senses" is about the **claimed instant** versus the **received instant** — `client_time` versus `server_time`. Those remain two independent columns, and the skew flag still records when they disagree. Nothing about that argument depended on the storage type of either one.
+   - Consequences, all applied in this plan: the migration declares `client_time timestamptz` (Task 6); `EventRow.client_time` is a `Date` and `rowToEnvelope` re-emits ISO 8601 `Z` (Task 7); the domain `EventEnvelope` is unchanged — `clientTime`/`serverTime` are still ISO strings at the boundary (Task 2). A claim submitted as `…+05:30` reads back as the equivalent `…Z`. That is the trade, made deliberately.
+   - Proven, not asserted: the offset-equivalence planted defects in Tasks 6 and 7 show two clients stating one instant with different offsets storing as one instant and comparing equal — the comparison a text column silently got wrong.
+
 7. **Contract's "entities" zod schemas.** The contract describes `packages/domain` as "shared types + zod schemas (event envelope, entities, ids)". Plan 1 ships envelope + ids + state types; per-entity aggregate schemas (ticket, project, workspace documents) belong to the plans that own those entities.
 8. **`workspace_seq` is server-enriched; the domain envelope stays frozen (coordination §18).** The `EventEnvelope` contract in Global Constraints does NOT gain a required `workspaceSeq` — it is the pinned cross-plan type, and clients never author the cursor. The column is `NOT NULL` in the ledger, and server-side readers emit it as an optional, server-enriched `workspaceSeq?: number` (typed here as `LedgerEvent = EventEnvelope & { workspaceSeq: number }`, which every read path returns). **Clients treat the cursor as an opaque resume token** — they may pass back what they were given and must never compute, compare across workspaces, or display it. Consequence for the siblings: any test helper that inserts into `events` directly rather than through `insertEvent` must supply `workspace_seq` (Plan 4's `appendTestEvent` and Plan 5's `applyCommitted` are amended; Plan 9's and Plan 10's direct inserts are an execution-time adaptation the orchestrator owns).
+9. **Day boundaries are IST, and this plan owns the helper (owner decision, 2026-08-20).** Where a day starts was previously undefined across the series and would have produced real disagreement: `dueDate`/`startDate` are day claims, so "due today", "overdue", calendar-cell assignment, and "3 days in flight" all turn on it. It starts at IST midnight. Task 4a lands `istDayOf`/`istDayBounds`/`IST_TIME_ZONE` in `@gisik-nokma/domain`, implemented against the fixed +05:30 offset (India has no DST; the offset is fixed by law, not assumed to hold). **Every later plan computes day boundaries and day counts with these helpers rather than rolling its own** — Plan 5's attention windows and days-in-flight, Plan 9's calendar cells, due-today/overdue and sweep windows, Plan 10's replica-side day math, Plan 6/7/8's rendering via `IST_TIME_ZONE`. The orchestrator applies that to the sibling plans; Plan 1 only guarantees the helper exists and is proven at the boundary.
+10. **Session timezone is `Asia/Kolkata` everywhere a connection is opened.** `createPool` sets it as a startup parameter (Task 5), `docker-compose.yml` sets it on the dev server, and `createTestDatabase` sets it on each test database (Task 6) — so the migration runner and any ad-hoc `psql` read the same clock as the product. This changes no stored instant (`timestamptz` is absolute); it only decides which offset Postgres prints. A per-user or per-workspace display timezone is a cheap later addition the owner deferred out of v1.
 
 ## Self-review (performed by the plan author)
 
 **1. Spec coverage — sections 1 and 3, scoped to Plan 1:**
 - §1 "one TypeScript/Node server … ledger owns the facts, projections computed" → Tasks 1, 6, 7, 8, 9. ✓
-- §1 honesty contract (1) provenance floor: every event carries actor/origin/times and is stored verbatim → Tasks 2, 6. ✓ (UI unfolding is a client-plan concern.)
+- §1 honesty contract (1) provenance floor: every event carries actor/origin and both clocks, stored as absolute instants under the owner's Asia/Kolkata decision — the claimed instant and the received instant stay two separate facts → Tasks 2, 6, 7. ✓ (UI unfolding is a client-plan concern.)
 - §1 (2) refusals over intentions: the engine interface + refusal reporting through ingest → Tasks 4, 10; rule content itself is Plan 2 (contract says so). ✓
 - §1 (3) parents/children and (5) contested claims: later plans (workflow rules, sync) — deliberately absent here per assignment scope. ✓
 - §1 (4) nothing is invented: projections derive only from ledger rows; `head_server_time` from the event, never `now()` → Tasks 8, 9, 13. ✓
-- §1 (6) planted defects: every refusal path in this plan has one (envelope, type, version, payload, duplicate id, seq conflict, append-only trigger, refusal-no-trace, drift, config). ✓
-- §3 ledger fields (ULID, workspace, entity, type+payload, actor, origin, both times, per-entity seq) → Tasks 2, 6, 7. ✓ Plus the per-workspace `workspace_seq` stream cursor (coordination §18) → Tasks 6, 7, 10, with the domain envelope left frozen (Open questions 8). ✓
+- §1 (6) planted defects: every refusal path in this plan has one (envelope, type, version, payload, duplicate id, seq conflict, append-only trigger, refusal-no-trace, drift, config, IST day-helper inputs), plus the offset-equivalence defects that prove the behaviour a text `client_time` silently got wrong. ✓
+- §3 ledger fields (ULID, workspace, entity, type+payload, actor, origin, both times, per-entity seq) → Tasks 2, 6, 7. ✓ Plus the per-workspace `workspace_seq` stream cursor (coordination §18) → Tasks 6, 7, 10, with the domain envelope left frozen (Open questions 8). ✓ Both time columns are `timestamptz` per the owner's Asia/Kolkata decision (Open questions 6), and the IST day-boundary helpers every later plan calls ship in Task 4a (Open questions 9). ✓
 - §3 unknown types refused at ingest → Tasks 3, 10. ✓
 - §3 projections rebuilt deterministically + scheduled verifier re-derives and diffs → Tasks 8, 12, 13 (scheduling itself deferred to deployment, noted in Task 12). ✓
 - §3 realtime WebSocket push → hook only (`onEventCommitted`), per assignment; Plan 5 wires transport. ✓
@@ -4228,4 +4643,4 @@ Flagged per instruction rather than silently resolved; none blocks execution of 
 
 **2. Placeholder scan:** none of the skill's forbidden placeholder patterns appear in any step; every code step contains complete code; the two `node-pg-migrate create` steps intentionally let the tool own filenames, with the full SQL given. The pass-through engine and empty-world context answers are real Plan-1 semantics (documented as such), not deferred work; the PROVISIONAL stubs in `provisional.ts` are complete, contract-exact shapes with a named replacement (Plan 2 Task 2), not placeholders.
 
-**3. Type consistency (spot-checked across tasks):** `EnvelopeErrorCode` union identical in Tasks 3 and 10; `IngestErrorCode = EnvelopeErrorCode | 'duplicate-event-id'` only at ingest; `AppDeps` evolution spelled in both Task 5 and Task 11 with the final shape stated in both; `EntityHead` fields (`kind, id, headSeq, headEventId, headEventType`) match between Task 4 (type), Task 9 (`readEntityHead`), and Task 10 (context test expecting `headSeq`); constraint names `events_entity_seq_unique`/`events_workspace_seq_unique`/`events_pkey` consistent across Tasks 6, 7, 10, with the lock-order sentence (workspace first, then entity) stated identically in the Architecture paragraph, Task 7's Produces block, and Task 10's ingest transaction; `LedgerEvent` is the single stored-event type across Tasks 7, 10, 13; canonical order stated identically in Global Constraints, Task 7 (`readLedger`), Task 8 (registry doc + rebuild), Task 12 (shadow replay); fixture ids are 26-char literals validated by a dedicated test (Task 13); `buildProjectionRegistry` is the single registry source in Tasks 9–12 and boot.
+**3. Type consistency (spot-checked across tasks):** `EnvelopeErrorCode` union identical in Tasks 3 and 10; `IngestErrorCode = EnvelopeErrorCode | 'duplicate-event-id'` only at ingest; `AppDeps` evolution spelled in both Task 5 and Task 11 with the final shape stated in both; `EntityHead` fields (`kind, id, headSeq, headEventId, headEventType`) match between Task 4 (type), Task 9 (`readEntityHead`), and Task 10 (context test expecting `headSeq`); constraint names `events_entity_seq_unique`/`events_workspace_seq_unique`/`events_pkey` consistent across Tasks 6, 7, 10, with the lock-order sentence (workspace first, then entity) stated identically in the Architecture paragraph, Task 7's Produces block, and Task 10's ingest transaction; `LedgerEvent` is the single stored-event type across Tasks 7, 10, 13; both time columns are `timestamptz` in Task 6's migration and `Date` in Task 7's `EventRow`, with `rowToEnvelope` the single conversion back to the ISO strings the frozen `EventEnvelope` declares in Task 2; `IST_TIME_ZONE` is the only place the string `Asia/Kolkata` originates in code (Task 4a), read by `createPool` (Task 5) and `createTestDatabase` (Task 6); canonical order stated identically in Global Constraints, Task 7 (`readLedger`), Task 8 (registry doc + rebuild), Task 12 (shadow replay); fixture ids are 26-char literals validated by a dedicated test (Task 13); `buildProjectionRegistry` is the single registry source in Tasks 9–12 and boot.
