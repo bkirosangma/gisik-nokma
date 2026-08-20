@@ -41,7 +41,7 @@ Plans 1–3 are being written in parallel; their internal file names are not con
 
 - Workspace package names: `@gisik-nokma/domain` (packages/domain), server package in `apps/server`.
 - Event-type registry: `packages/domain/src/events/registry.ts` exporting `registerEventType({type, version, entityKind, parsePayload})`; payload parsers throw `Error` on invalid input (adapt to Plan 1's error style if it used a Result type).
-- Ledger table: `events` with columns `id, workspace_id, entity_kind, entity_id, type, version, payload (jsonb), actor_id, origin, client_time, server_time, seq`.
+- Ledger table: `events` with columns `id, workspace_id, entity_kind, entity_id, type, version, payload (jsonb), actor_id, origin, client_time, server_time, seq`. **Both clocks are `timestamptz`** — absolute instants (owner decision 2026-08-20, "time is Asia/Kolkata"); the driver yields `Date`, and every reader in this plan converts with `.toISOString()`, never `String(...)` and never a SQL cast. `visibleEventsFor`'s ordering is by `workspace_seq` and is unaffected by any of this — the stream cursor is an integer, not a clock.
 - Ingest pipeline: `apps/server/src/ingest/pipeline.ts`, exposing the point where `parseEvent` has succeeded and `evaluateEvent(env, ctx)` is about to run.
 - `proj_tickets` columns used here: `ticket_id, workspace_id, project_id, parent_id, title, created_by`. `proj_rollups` columns used here: `ticket_id, open_count, active_count, terminal_count`.
 - Fastify app assembly: `apps/server/src/app.ts` exporting a builder where routes are registered.
@@ -1234,6 +1234,13 @@ export function resetSeq(): void {
   seqCounter = 0;
 }
 
+/**
+ * `clientTime`/`serverTime` are ISO 8601 `Z` strings at the domain boundary
+ * and land in `timestamptz` columns (owner decision 2026-08-20). A test that
+ * overrides them may state any offset it likes — `appendTestEvent` converts to
+ * an instant on the way in — but must expect the equivalent `…Z` on the way
+ * back out, because the column stores the moment, not the label.
+ */
 export function testEnvelope(
   overrides: Partial<LedgerEvent> &
     Pick<EventEnvelope, 'workspaceId' | 'entity' | 'type' | 'payload' | 'actorId'>,
@@ -2864,6 +2871,14 @@ import type { LedgerEvent } from '../../src/ledger/event-store';
  * the stream cursor is part of a stored event, so the helper writes the one
  * `testEnvelope` assigned. Adapt column names if Plan 1's events table
  * differs — see Cross-plan path assumptions.
+ *
+ * BOTH time columns are `timestamptz` (owner decision 2026-08-20, "time is
+ * Asia/Kolkata"), so this helper feeds pg INSTANTS — `Date` values — rather
+ * than the envelope's ISO strings. The strings would work by implicit cast,
+ * but a fixture that hands text to a timestamp column is the habit that
+ * survived the verbatim-text era, and it hides the conversion that readers
+ * then have to undo. Whatever offset the envelope's ISO string carried, the
+ * stored value is the moment it named; readback is normalized to `…Z`.
  */
 export async function appendTestEvent(db: Queryable, env: LedgerEvent): Promise<void> {
   await db.query(
@@ -2873,7 +2888,8 @@ export async function appendTestEvent(db: Queryable, env: LedgerEvent): Promise<
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
       env.id, env.workspaceId, env.entity.kind, env.entity.id, env.type, env.version,
-      JSON.stringify(env.payload), env.actorId, env.origin, env.clientTime, env.serverTime,
+      JSON.stringify(env.payload), env.actorId, env.origin,
+      new Date(env.clientTime), new Date(env.serverTime),
       env.seq, env.workspaceSeq,
     ],
   );
@@ -3054,7 +3070,7 @@ describe('read enforcement', () => {
 });
 ```
 
-Note on `client_time` comparison: if Plan 1's `events` table stores times as `timestamptz`, pg returns `Date` objects serialized to ISO — if the exact serialization differs, compare with `new Date(event.client_time).toISOString()`. The invariant is the values survive untouched, not the wire format of a timestamp.
+Note on `client_time` comparison — **settled, no longer conditional.** Plan 1's `events` table stores **both** clocks as `timestamptz` (owner decision 2026-08-20, "time is Asia/Kolkata"; the earlier verbatim-text `client_time` is gone). pg therefore returns `Date` objects, and Fastify's JSON serializer emits them as ISO 8601 `Z` at millisecond precision — which is exactly what the fixture above claimed, so the assertion compares string to string with no coercion. The one thing a test here must NOT do is assert a verbatim `+05:30` readback: an event submitted with that offset is stored as the instant it named and reads back as the equivalent `…Z`. The invariant is that the *values* survive untouched — the actor and both instants, unredacted — never the offset label the submitting device happened to attach.
 
 - [ ] **Step 3: Run to verify failure**
 
@@ -3853,6 +3869,34 @@ describe('visibleEventsFor', () => {
     expect(newborn.workspaceSeq).toBeGreaterThan(older.workspaceSeq);
     expect(idsOf(await collect('usr_a', older.workspaceSeq))).toEqual([newborn.id]);
   });
+
+  it('planted defect: a yielded event carries ISO instants, not stringified Dates — and a +05:30 claim arrives as the equivalent Z', async () => {
+    await seedMember(pool, WS, 'usr_a', 'member', [{ projectId: PRJ }]);
+    await seedTicket(pool, { workspaceId: WS, projectId: PRJ, ticketId: 'tkt_1' });
+    // 2026-08-20T14:30:00+05:30 IS 2026-08-20T09:00:00Z. Both columns are
+    // timestamptz, so pg returns Date — and `String(aDate)` would yield
+    // 'Wed Aug 19 2026 …GMT+0530 (India Standard Time)', which no replica
+    // could parse as the instant `EventEnvelope` promises.
+    const claim = await record(
+      testEnvelope({
+        workspaceId: WS,
+        entity: { kind: 'ticket', id: 'tkt_1' },
+        type: 'comment.added',
+        payload: { body: 'filed from a phone in Shillong' },
+        actorId: 'usr_a',
+        clientTime: '2026-08-20T14:30:00.000+05:30',
+        serverTime: '2026-08-20T09:00:02.000Z',
+      }),
+    );
+
+    const yielded = (await collect('usr_a', claim.workspaceSeq - 1))[0] as LedgerEvent;
+    expect(yielded.clientTime).toBe('2026-08-20T09:00:00.000Z');
+    expect(yielded.serverTime).toBe('2026-08-20T09:00:02.000Z');
+    // Round-trippable by any consumer, in any runtime, with no locale in play.
+    expect(new Date(yielded.clientTime).toISOString()).toBe(yielded.clientTime);
+    // The skew between the two clocks is preserved: two facts, still two.
+    expect(Date.parse(yielded.serverTime) - Date.parse(yielded.clientTime)).toBe(2000);
+  });
 });
 ```
 
@@ -3890,8 +3934,14 @@ function envelopeFromRow(row: Record<string, unknown>): LedgerEvent {
     payload: row.payload,
     actorId: row.actor_id as string,
     origin: row.origin as EventEnvelope['origin'],
-    clientTime: String(row.client_time),
-    serverTime: String(row.server_time),
+    // Both clocks are `timestamptz` (Plan 1 Task 6, owner decision
+    // 2026-08-20), so the driver hands back `Date`. `String(aDate)` would
+    // print a locale string — 'Wed Aug 19 2026 15:30:00 GMT+0530 (India
+    // Standard Time)' — which is not the ISO instant `EventEnvelope`
+    // declares. Convert the way Plan 1's `rowToEnvelope` does, and only
+    // that way.
+    clientTime: (row.client_time as Date).toISOString(),
+    serverTime: (row.server_time as Date).toISOString(),
     seq: Number(row.seq),
     // Server-enriched (Plan 1, coordination §18): the domain envelope stays
     // frozen; the cursor rides along so the consumer can resume by it.
@@ -4019,7 +4069,7 @@ export async function* visibleEventsFor(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run (from `apps/server/`): `pnpm vitest run test/visibility/visible-events-for.test.ts`
-Expected: PASS (8 tests) — including the workspace-cursor defect: a newborn entity's first event survives a resume.
+Expected: PASS (9 tests) — including the workspace-cursor defect (a newborn entity's first event survives a resume) and the instant-serialization defect (a `+05:30` claim arrives as the equivalent `…Z`, never a stringified `Date`).
 
 - [ ] **Step 5: Run the full suite and commit**
 
@@ -4214,7 +4264,7 @@ Append to `Features.md` (§6 is this plan's section, settled per the coordinatio
 - ✅ **Permission refusals** — a pre-engine ingest gate refuses identity spoofing, borrowed server origin, and role shortfalls with the standard `{refused, rule, reason}` shape (`permission.role`, `permission.visibility`), reasons in plain language, every refusal proven against a planted defect. `apps/server/src/permissions/`
 - ✅ **Ticket visibility** — `visibility.set` claims a mode (workspace / project / explicit / inherit); `proj_visibility` resolves every ticket's audience by walking inherit chains to the nearest authored ancestor (roots default to project) and re-resolves on reparent and ancestor changes; `canSee` backs 404-enforced reads and one-pass filtered lists; guests see only explicit shares; admins get no bypass. `apps/server/src/visibility/`
 - ✅ **Honesty under restriction** — rollup responses carry true totals over all children plus the viewer's `restrictedCount`; a visible child under a restricted parent gets `{kind: 'restricted'}` — existence, no title; ledger history goes out with provenance untouched for anyone entitled to see. `apps/server/src/visibility/rollup.ts`, `apps/server/src/routes/tickets.ts`
-- ⚙️ **Visibility-scoped sync feed** — `visibleEventsFor(userId, workspaceId, afterSeq)` walks the workspace stream in `workspace_seq` order (the per-workspace cursor, coordination §18 — never per-entity `seq`, which would skip newborn entities on resume), yields only visible-ticket events, each carrying its cursor, plus `{kind:'purge'}` tombstones for whatever revocation takes away; the interface the sync plan consumes. `apps/server/src/visibility/visible-events-for.ts`
+- ⚙️ **Visibility-scoped sync feed** — `visibleEventsFor(userId, workspaceId, afterSeq)` walks the workspace stream in `workspace_seq` order (the per-workspace cursor, coordination §18 — never per-entity `seq`, which would skip newborn entities on resume), yields only visible-ticket events, each carrying its cursor and both clocks as absolute ISO 8601 `Z` instants, plus `{kind:'purge'}` tombstones for whatever revocation takes away; the interface the sync plan consumes. `apps/server/src/visibility/visible-events-for.ts`
 ```
 
 - [ ] **Step 5: Create the test-cases bucket**
@@ -4240,13 +4290,14 @@ Mirrors Features.md §6. Status: ❌ not covered · ✅ covered · 🟡 partial 
 - **6.12** ✅ A member reading or acting on another project's ticket via direct id is refused — reads as an indistinguishable 404, ingest as permission.visibility. (`test/routes/security.test.ts`, `test/permissions/check-visibility-permission.test.ts`)
 - **6.13** ✅ Rollups carry true totals over ALL children plus per-viewer restrictedCount — the "5 of 8 done · 2 restricted" planted defect. (`test/visibility/rollup.test.ts`)
 - **6.14** ✅ A visible child under a restricted parent returns parent {kind:'restricted', id} — existence, no title. (`test/routes/tickets-read.test.ts`)
-- **6.15** ✅ Provenance is never redacted: ticket history returns actor and both times untouched even when the actor shares no project with the viewer. (`test/routes/tickets-read.test.ts`)
+- **6.15** ✅ Provenance is never redacted: ticket history returns actor and both times untouched even when the actor shares no project with the viewer — both clocks arriving as absolute ISO 8601 `Z` instants, which is what "untouched" means for a `timestamptz` column. (`test/routes/tickets-read.test.ts`)
 - **6.16** ✅ visibleEventsFor never yields events about invisible tickets — the id itself does not appear in any yielded item. (`test/visibility/visible-events-for.test.ts`)
 - **6.17** ✅ Revocation yields purge tombstones: direct visibility.set, inheriting descendants (pruned at authored nodes), and membership loss. (`test/visibility/visible-events-for.test.ts`)
 - **6.18** ✅ Session hygiene: sign-out invalidates the token; a pre-set cookie never becomes the session; session cookies are HttpOnly. (`test/routes/security.test.ts`)
 - **6.19** ✅ visibility.set demands project-admin rights or ticket creatorship, and must name the ticket it is attached to. (`test/permissions/check-visibility-permission.test.ts`)
 - **6.20** 🚫 Real SMS delivery through the DLT-registered provider — deployment concern, tracked as an operational errand, not a test. (this plan, Open questions)
 - **6.21** ✅ visibleEventsFor resumes by the WORKSPACE cursor: only events past `workspace_seq > afterSeq` are yielded, each carries its `workspaceSeq`, and the planted defect proves a ticket born after the cursor is not skipped (per-entity `seq` would bury its first event). (`test/visibility/visible-events-for.test.ts`)
+- **6.22** ✅ Planted defect: a yielded envelope's clocks are ISO 8601 `Z` instants, not stringified `Date`s — a claim submitted at `+05:30` arrives as the equivalent `…Z`, still parseable by any runtime, with the client/server skew intact. (`test/visibility/visible-events-for.test.ts`)
 ```
 
 - [ ] **Step 6: Final full run and commit**

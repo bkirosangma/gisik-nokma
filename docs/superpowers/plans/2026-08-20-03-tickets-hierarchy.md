@@ -49,7 +49,8 @@ Plans 1 and 2 are being written in parallel with this one; the contract fixes th
 | `EventEnvelope` import path | `packages/domain/src/envelope.ts` | Plan 1 |
 | `registerProjection({ name, apply, reset })` | `apply(env: EventEnvelope, db: PoolClient): Promise<void>`, `reset(db: PoolClient): Promise<void>`; per event, projections apply **in registration order** (constraint this plan relies on: `proj_workflows` → `proj_ticket_types` → `proj_tickets` → `proj_rollups`) | Plan 1 |
 | `applyEvent(db, env)` / `resetProjections(db)` | ingest's projection fan-out and the rebuild CLI's reset, exported from `apps/server/src/projections/registry.ts` for tests | Plan 1 |
-| Ledger table | `events` with snake_case columns `id, workspace_id, entity_kind, entity_id, type, version, payload (jsonb), actor_id, origin, client_time (timestamptz), server_time (timestamptz), seq (bigint)` | Plan 1 |
+| Ledger table | `events` with snake_case columns `id, workspace_id, entity_kind, entity_id, type, version, payload (jsonb), actor_id, origin, client_time (timestamptz), server_time (timestamptz), seq (bigint)`. **Both clocks are absolute instants** (owner decision 2026-08-20, "time is Asia/Kolkata") — pg hands them back as `Date`, and `rowToEnvelope` re-emits them as ISO 8601 `Z`. A claim submitted as `…+05:30` therefore reads back as the equivalent `…Z`: the instant survives, the label the device attached does not. No reader compares or sorts these columns with a cast. | Plan 1 |
+| IST day helpers | `packages/domain/src/ist-day.ts` exports `IST_TIME_ZONE`, `IST_OFFSET_MINUTES`, `IST_DAY_REGEX`, `istDayOf(instant): string` (the `YYYY-MM-DD` IST day an instant falls in) and `istDayBounds(day): { startUtc, endUtc }` (the half-open UTC interval covering one IST day) | Plan 1 |
 | `buildServer({ db })` | Fastify app factory, `apps/server/src/server.ts` | Plan 1 |
 | `WorkflowDef` | `{ id: string; version: number; name: string; initialStateId: string; states: Array<{ id: string; name: string; category: StateCategory }>; transitions: Array<{ from: string; to: string; rules: Rule[] }> }` — this plan touches only `id`, `version`, `initialStateId`, `states[].{id,category}`; `from: '*'` means from-any. **`initialStateId` is settled** — Plan 2 defines it (coordination doc §3; see Open questions #1) | Plan 2 |
 | `EngineVerdict` | the `evaluateEvent` return union, exported from packages/rule-engine (declared in `packages/rule-engine/src/evaluate.ts`) | Plan 2 |
@@ -370,6 +371,16 @@ export function builtinTicketTypeDefs(defaultWorkflowId: string): TicketTypeDef[
  * A day claim: { date, note? }, rendered with its author. Both day-shaped
  * built-ins use it — `dueDate` and `startDate` have identical value shapes, so
  * they share one schema rather than growing a second copy to drift from.
+ *
+ * The day is an INDIAN day (owner decision 2026-08-20, "time is Asia/Kolkata").
+ * This plan stores and validates the claim and nothing else — but every
+ * consumer that asks "is this overdue?", "is this due today?", "which calendar
+ * cell is it?" or "how many days has this been in flight?" answers it with
+ * `istDayOf`/`istDayBounds` from `@gisik-nokma/domain`, never with `new Date()`
+ * locale math, never with the viewer's device, and never by dividing a
+ * millisecond difference by 86_400_000. `IST_DAY_REGEX` is the same day shape
+ * this schema pins; the regex is restated inline here only because the schema
+ * must stay a self-contained Zod construct.
  */
 export const dueDateValueSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a due date is a day in YYYY-MM-DD form'),
@@ -3853,6 +3864,8 @@ git commit -m "The engine's context is now backed by the projections: getChildre
 
 **Spec §3:** clients read projections, never raw ledger — "except the history view, which *is* the ledger, filtered." This route is that exception: no re-shaping, no summarising, both clocks returned, ordered by `seq`. Auth/visibility enforcement wraps this route in the auth plan — this task ships the route and serialization only. Errors stay generic (workspace security standard: no internals in responses).
 
+**On the two clocks (owner decision 2026-08-20, "time is Asia/Kolkata"):** `client_time` and `server_time` are both `timestamptz`, so the driver returns `Date` and this route emits ISO 8601 `Z` — the same normalization Plan 1's `rowToEnvelope` performs. The consequence to hold onto: a claim submitted as `2026-08-20T14:30:00+05:30` comes back as `2026-08-20T09:00:00.000Z`. That is not lossy about *when* — it is the same instant — and the pair of facts the spec cares about (the claimed instant beside the received instant) is untouched. No test in this plan asserts a verbatim offset on readback; asserting one would pin a storage format the product deliberately gave up.
+
 - [ ] **Step 1: Write the failing test**
 
 ```ts
@@ -3874,14 +3887,23 @@ const app = await buildServer({ db });
 beforeEach(async () => wipe(db));
 afterAll(async () => { await app.close(); await db.end(); });
 
-/** Tests write the ledger directly — ingest owns this in production. */
+/**
+ * Tests write the ledger directly — ingest owns this in production.
+ *
+ * Both time columns are `timestamptz` (Plan 1 Task 6, owner decision
+ * 2026-08-20), so the fixture hands pg an INSTANT — a `Date` — not a text
+ * time. Passing the ISO string would work by implicit cast, which is exactly
+ * the habit the text-column era left behind and the reason a fixture could
+ * quietly disagree with the column it writes.
+ */
 async function ledgerInsert(env: EventEnvelope): Promise<void> {
   await db.query(
     `INSERT INTO events (id, workspace_id, entity_kind, entity_id, type, version, payload,
                          actor_id, origin, client_time, server_time, seq)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     [env.id, env.workspaceId, env.entity.kind, env.entity.id, env.type, env.version,
-     JSON.stringify(env.payload), env.actorId, env.origin, env.clientTime, env.serverTime, env.seq],
+     JSON.stringify(env.payload), env.actorId, env.origin,
+     new Date(env.clientTime), new Date(env.serverTime), env.seq],
   );
   await applyEvent(db, env);
 }
@@ -3924,6 +3946,30 @@ describe('GET /v1/tickets/:id/history', () => {
     });
     expect(typeof body.events[1].clientTime).toBe('string');
     expect(typeof body.events[1].serverTime).toBe('string');
+  });
+
+  it('a +05:30 claim reads back as the equivalent Z instant — the label was never the fact', async () => {
+    await seedTicket();
+    // 2026-08-20T14:30:00+05:30 IS 2026-08-20T09:00:00Z. Since Plan 1 stores
+    // both clocks as timestamptz (owner decision 2026-08-20), the offset the
+    // device typed is not retained; the moment it named is. Assert the Z form
+    // — asserting the verbatim '+05:30' string here would be asserting a
+    // storage format the product deliberately gave up.
+    const claim = makeEnvelope({
+      type: 'ticket.field_set', entity: { kind: 'ticket', id: TICKET }, workspaceId: WS, seq: 4,
+      payload: { fieldId: 'startDate', value: { date: '2026-09-01' } }, actorId: 'user-anselma',
+      clientTime: '2026-08-20T14:30:00.000+05:30',
+      serverTime: '2026-08-20T14:30:01.000+05:30',
+    });
+    await ledgerInsert(claim);
+
+    const res = await app.inject({ method: 'GET', url: `/v1/tickets/${TICKET}/history?afterSeq=3` });
+    const body = res.json() as { events: Array<{ clientTime: string; serverTime: string }> };
+    expect(body.events).toHaveLength(1);
+    expect(body.events[0].clientTime).toBe('2026-08-20T09:00:00.000Z');
+    expect(body.events[0].serverTime).toBe('2026-08-20T09:00:01.000Z');
+    // …and the two clocks are still two separate facts, one second apart.
+    expect(Date.parse(body.events[0].serverTime) - Date.parse(body.events[0].clientTime)).toBe(1000);
   });
 
   it('pages with afterSeq and limit', async () => {
@@ -3970,6 +4016,19 @@ export type TicketHistoryEvent = {
   seq: number;
 };
 
+/** The stored row: both clocks are `timestamptz`, so pg yields `Date`. */
+type EventRow = {
+  id: string;
+  type: string;
+  version: number;
+  payload: unknown;
+  actor_id: string;
+  origin: string;
+  client_time: Date;
+  server_time: Date;
+  seq: string | number;
+};
+
 const MAX_LIMIT = 1000;
 const DEFAULT_LIMIT = 200;
 
@@ -4011,15 +4070,21 @@ export async function ticketHistoryRoutes(app: FastifyInstance, opts: { db: Pool
       [id, afterSeq, limit],
     );
 
-    const events: TicketHistoryEvent[] = res.rows.map((row) => ({
+    // Both time columns are timestamptz, so pg hands them back as Date. Emit
+    // ISO 8601 Z, exactly as Plan 1's `rowToEnvelope` does — one normalization
+    // rule for the whole product, so a claim made at +05:30 and the same claim
+    // made at Z are indistinguishable on the wire, because they were the same
+    // moment. (`String(row.client_time)` would print a locale string here; the
+    // conversion is `.toISOString()`, never a cast and never a stringify.)
+    const events: TicketHistoryEvent[] = (res.rows as EventRow[]).map((row) => ({
       id: row.id,
       type: row.type,
       version: row.version,
       payload: row.payload,
       actorId: row.actor_id,
       origin: row.origin,
-      clientTime: new Date(row.client_time).toISOString(),
-      serverTime: new Date(row.server_time).toISOString(),
+      clientTime: row.client_time.toISOString(),
+      serverTime: row.server_time.toISOString(),
       seq: Number(row.seq),
     }));
 
@@ -4039,7 +4104,7 @@ import { ticketHistoryRoutes } from './routes/ticket-history';
 - [ ] **Step 4: Run the test to verify it passes, then the full server suite**
 
 Run: `pnpm --filter server exec vitest run test/ticket-history.test.ts`
-Expected: PASS (3 tests).
+Expected: PASS (4 tests) — including the `+05:30` → `Z` round trip.
 Run: `pnpm --filter server exec vitest run`
 Expected: PASS.
 
@@ -4073,7 +4138,7 @@ git commit -m "Ticket history is the ledger filtered, not a summary: every claim
 - ✅ **Hierarchy sanity refusals** — child rank must exceed parent rank, any type at or below the deepest rank requires a parent (the built-in `sub-task`, any custom type an admin defines beside it, and anything deeper — the rule follows the rank, not the id), cycles refused (load-bearing after rank re-definitions), cross-project parents refused, live work under a terminal parent refused toward an offered reopen (owner decision; terminal-under-terminal stays legal); every reason in plain language, every refusal proven against a planted defect. `packages/rule-engine/src/checks/hierarchy.ts`
 - ✅ **Field claim refusals** — unknown fields, per-kind mismatches with the field named, title never clearable; `null` clears everything else as an attributed claim. `packages/rule-engine/src/checks/fields.ts`
 - ⚙️ **Ticket projections** — `proj_ticket_types` (workspace-scoped type defs), `proj_tickets` (head state backing the engine's `getEntityState`/`getChildrenStates`), `proj_rollups` (direct-children counts per state category; derived progress is never authored); all rebuild-and-diff clean. `apps/server/src/projections/`
-- ✅ **Ticket history endpoint** — `GET /v1/tickets/:id/history`: the ledger filtered to one ticket, seq-ordered, actor and both clocks on every event, paged; no summarising. `apps/server/src/routes/ticket-history.ts`
+- ✅ **Ticket history endpoint** — `GET /v1/tickets/:id/history`: the ledger filtered to one ticket, seq-ordered, actor and both clocks on every event, paged; no summarising. Both clocks are absolute instants serialized as ISO 8601 `Z`, so a claim made at `+05:30` and the same claim made at `Z` read back identically — they were the same moment (owner decision 2026-08-20). `apps/server/src/routes/ticket-history.ts`
 - ⚙️ **End-to-end planted-defect fixtures** — parent-terminal (invariant 3), rank, custom-type-at-the-deepest-rank-without-a-parent, cycle-after-rank-redefinition, unknown field, kind mismatch, live-work-under-terminal-parent (create and reparent) — with accepting twins, in Plan 2's shared fixture format. `packages/rule-engine/fixtures/`
 ```
 
@@ -4108,6 +4173,7 @@ Mirrors `Features.md` §5. Status: `❌` not covered · `✅` covered · `🟡` 
 - 5.22 ✅ A terminal child moving under a terminal parent is accepted — nothing contradicts, nothing reopens. (`reparent.test.ts`, `reparent-terminal-under-terminal-parent.json`)
 - 5.23 ✅ A CUSTOM type defined at the deepest rank is refused at project root exactly as the built-in `sub-task` is, named as itself in the reason — and so is a custom type defined *below* that rank, because nothing slips underneath the floor. The requirement follows the rank, not the built-in id (owner decision 2026-08-20). (`hierarchy.test.ts`, `created-deepest-rank-no-parent.json`)
 - 5.24 ✅ The same custom deepest-rank type is accepted once it names a parent, and a type at a shallower rank still sits at project root untouched — the rank rule does not over-refuse. (`hierarchy.test.ts`, `created-rank-legal.json`)
+- 5.25 ✅ A history claim submitted at `+05:30` reads back as the equivalent `…Z` instant, with the two clocks still one second apart — the instant survives the round trip, the device's label does not (owner decision 2026-08-20, "time is Asia/Kolkata"). (`ticket-history.test.ts`)
 ```
 
 - [ ] **Step 3: Run the full suite one last time**
@@ -4119,7 +4185,7 @@ Expected: PASS across packages/domain, packages/rule-engine, apps/server.
 
 ```bash
 git add Features.md test-cases/05-tickets-hierarchy.md
-git commit -m "Catalogue the ticket domain in Features.md and test-cases in the same change set as the work: twenty-four scenarios, twenty-three covered by the tests landing with them, one honestly out of scope until client builds exist"
+git commit -m "Catalogue the ticket domain in Features.md and test-cases in the same change set as the work: twenty-five scenarios, twenty-four covered by the tests landing with them, one honestly out of scope until client builds exist"
 ```
 
 ---

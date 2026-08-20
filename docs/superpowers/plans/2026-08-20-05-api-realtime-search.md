@@ -27,6 +27,7 @@
 - Read functions take a leading `db: Queryable` parameter (DI, per coordination contract amendments and CODING_STANDARDS).
 - Every endpoint in this plan enforces session (`makeRequireSession`) + workspace membership (`resolveEffectiveRole`) + per-ticket visibility (the decision table behind `canSee`). Non-members and unknown ids get identical `404 {error:'not_found'}` bodies — invisible and nonexistent are indistinguishable (Plan 4's posture). Errors carry no internals.
 - No user-supplied byte ever appears in SQL text — parameters only, proven by planted-defect injection tests (Task 2, Task 9).
+- **Time is Asia/Kolkata (owner decision 2026-08-20), and it binds every read in this plan two ways.** *Storage:* the ledger's `client_time` and `server_time` are both native `timestamptz`, so pg hands back `Date` and every reader converts with `.toISOString()`. **No query in this plan casts `client_time`** — a `::timestamptz` cast on that column was a habit of the era when it was text, and that column is gone; a cast on a native `timestamptz` is at best noise and at worst a silent re-parse. Provenance columns on this plan's own projections are `timestamptz` for the same reason. *Day boundaries:* every window, every "overdue"/"due today" judgement, and every day count uses `istDayOf`/`istDayBounds` from `@gisik-nokma/domain` (Plan 1 Task 4a) — half-open `>= startUtc AND < endUtc` for windows, subtraction of `istDayOf` results for counts. Never `new Date()` locale math, never `.toISOString().slice(0, 10)`, never a millisecond difference divided by 86 400 000. An event at 18:31Z is already tomorrow in India, and that is the only calendar this product has.
 - Every refusal and every honesty guarantee (invisible-ticket absence, purge-on-revocation, provenance-never-laundered, attention-never-stored) is proven against a planted defect before it is trusted (spec §7, base discipline).
 - View preferences are server-owned rows, never ledger events (coordination amendment 14): they arrange truth, they do not claim anything about the work, so recording them as claims would dilute the ledger's meaning.
 - `Features.md` §7 and `test-cases/07-api-realtime-search.md` (cases 7.x — this plan claims no other numbers) move in the same change set as the work (Task 16).
@@ -1084,7 +1085,12 @@ exports.up = (pgm) => {
     stale_days: { type: 'integer', notNull: false },
     due_soon_days: { type: 'integer', notNull: false },
     set_by: { type: 'text', notNull: true },
-    set_client_time: { type: 'text', notNull: true },
+    // Both provenance clocks are timestamptz — absolute instants (owner
+    // decision 2026-08-20, "time is Asia/Kolkata"). `set_client_time` was
+    // drafted as text back when the ledger's own `client_time` was text; that
+    // storage is gone, and a lone text clock here would be the last place a
+    // comparison needed a cast.
+    set_client_time: { type: 'timestamptz', notNull: true },
     set_server_time: { type: 'timestamptz', notNull: true },
   });
 };
@@ -1129,8 +1135,11 @@ export const workspaceSettingsProjection: Projection = {
         payload.staleDays ?? null,
         payload.dueSoonDays ?? null,
         event.actorId,
-        event.clientTime,
-        event.serverTime,
+        // Both provenance columns are timestamptz — hand pg instants, not the
+        // envelope's ISO strings. An implicit text→timestamptz cast would work
+        // and is exactly the habit the text-column era left behind.
+        new Date(event.clientTime),
+        new Date(event.serverTime),
       ],
     );
   },
@@ -1152,7 +1161,7 @@ export async function getWorkspaceSettings(db: Queryable, workspaceId: string): 
     stale_days: number | null;
     due_soon_days: number | null;
     set_by: string;
-    set_client_time: string;
+    set_client_time: Date;
     set_server_time: Date;
   };
   return {
@@ -1160,7 +1169,9 @@ export async function getWorkspaceSettings(db: Queryable, workspaceId: string): 
     dueSoonDays: row.due_soon_days ?? DEFAULT_DUE_SOON_DAYS,
     provenance: {
       actorId: row.set_by,
-      clientTime: row.set_client_time,
+      // Both clocks are timestamptz, so both arrive as Date and both leave as
+      // ISO 8601 Z — the same normalization Plan 1's `rowToEnvelope` applies.
+      clientTime: row.set_client_time.toISOString(),
       serverTime: row.set_server_time.toISOString(),
     },
   };
@@ -1818,7 +1829,7 @@ git commit -m "proj_search: titles, descriptions and comments as a weighted tsve
   - `type DueDateClaim = { date: string; note?: string; actorId: string; clientTime: string; serverTime: string }`.
   - `type TicketCard = { ticketId; workspaceId; projectId; typeId; parentId: string | null; workflowId; stateId; stateCategory: StateCategory; assigneeId: string | null; collaboratorIds: string[]; title: string; dueDate: DueDateClaim | null; fields: Record<string, FieldClaim>; stateProvenance: StateProvenance; rollup: TicketRollup | null }` (all id/time fields `string`).
   - Response types the route tasks fill: `BoardColumn {workflowId; workflowName; stateId; name; category: StateCategory; blocked: boolean; cards: TicketCard[]}`, `BoardResponse {projectId; workspaceId; columns: BoardColumn[]}`, `ListGroup {key; label; cards: TicketCard[]}`, `ListResponse {projectId; groupBy: Grouping; groups: ListGroup[]; nextCursor: string | null}`, `SearchHit {card: TicketCard; snippet: string}`, `SearchResponse {workspaceId; query: string; hits: SearchHit[]}`, `MyWorkResponse {workspaceId; groups: {open: TicketCard[]; active: TicketCard[]; terminal: TicketCard[]}}`, `AttentionItem` (union below), `AttentionResponse {workspaceId; generatedAt: string; settings: {staleDays: number; dueSoonDays: number}; items: AttentionItem[]}`.
-  - `AttentionItem = {kind:'blocked'; card; stateName: string; reason: string} | {kind:'stale'; card; enteredStateAt: string; thresholdDays: number; reason: string} | {kind:'due-soon'; card; due: DueDateClaim; windowDays: number; reason: string}`.
+  - `AttentionItem = {kind:'blocked'; card; stateName: string; reason: string} | {kind:'stale'; card; enteredStateAt: string; daysInFlight: number; thresholdDays: number; reason: string} | {kind:'due-soon'; card; due: DueDateClaim; windowDays: number; reason: string}`. `enteredStateAt` is the absolute instant; `daysInFlight` is the count of **IST** days from that instant's IST day to today's — the two are different facts, and the second is the one a human reads (owner decision 2026-08-20, "time is Asia/Kolkata").
   - Server: `type ProjTicketRow` + `PROJ_TICKET_COLUMNS` (the `SELECT` list, alias `t`); `stateProvenanceFor(db: Queryable, ticketIds: string[]): Promise<Map<string, StateProvenance>>` (batched: latest `ticket.created`/`ticket.transitioned` per ticket from the ledger — both clocks, the actor, and the reopen `cause`); `latestWorkflowDefs(db: Queryable, workflowIds: string[]): Promise<Map<string, PublishedWorkflowDef>>`; `blockedStateKeys(defs: Map<string, PublishedWorkflowDef>): Set<string>` (keys `` `${workflowId}:${stateId}` ``); `assembleTicketCards(db: Queryable, viewerId: string, rows: ProjTicketRow[]): Promise<TicketCard[]>`.
 
 - [ ] **Step 1: Write the domain read-model types**
@@ -1911,7 +1922,21 @@ export type MyWorkResponse = {
 
 export type AttentionItem =
   | { kind: 'blocked'; card: TicketCard; stateName: string; reason: string }
-  | { kind: 'stale'; card: TicketCard; enteredStateAt: string; thresholdDays: number; reason: string }
+  /**
+   * `enteredStateAt` is the absolute instant the ticket entered its current
+   * state. `daysInFlight` is how many INDIAN days ago that was — computed by
+   * subtracting IST days, not by dividing a millisecond difference (owner
+   * decision 2026-08-20, "time is Asia/Kolkata"). The two disagree for every
+   * instant between 18:30Z and 00:00Z, which is the whole Indian evening.
+   */
+  | {
+      kind: 'stale';
+      card: TicketCard;
+      enteredStateAt: string;
+      daysInFlight: number;
+      thresholdDays: number;
+      reason: string;
+    }
   | { kind: 'due-soon'; card: TicketCard; due: DueDateClaim; windowDays: number; reason: string };
 
 export type AttentionResponse = {
@@ -2111,13 +2136,17 @@ export async function stateProvenanceFor(
       entity_id: string;
       type: string;
       actor_id: string;
-      client_time: string;
+      // BOTH clocks are `timestamptz` (Plan 1 Task 6, owner decision
+      // 2026-08-20) — the driver yields `Date` for each. `client_time` was
+      // typed `string` here from the era when it was a text column; there is
+      // no cast on either side of this query any more, in SQL or in TS.
+      client_time: Date;
       server_time: Date;
       payload: { cause?: TransitionCause };
     };
     provenance.set(row.entity_id, {
       actorId: row.actor_id,
-      clientTime: row.client_time,
+      clientTime: row.client_time.toISOString(),
       serverTime: row.server_time.toISOString(),
       cause: row.type === 'ticket.transitioned' && row.payload.cause !== undefined ? row.payload.cause : null,
     });
@@ -4046,13 +4075,14 @@ git commit -m "My Work: assigned-to-me grouped by state category with Plan 10's 
 - Test: `apps/server/test/routes/attention.test.ts`
 
 **Interfaces:**
-- Consumes: `getWorkspaceSettings` (Task 4), `visibleTicketsWhere`/`requireMember` (Task 5), `assembleTicketCards`/`PROJ_TICKET_COLUMNS` (Task 7), `latestWorkflowDefs`/`blockedStateKeys` (Task 7), `AttentionResponse`/`AttentionItem` (domain), apply helpers (Task 4).
+- Consumes: `getWorkspaceSettings` (Task 4), `visibleTicketsWhere`/`requireMember` (Task 5), `assembleTicketCards`/`PROJ_TICKET_COLUMNS` (Task 7), `latestWorkflowDefs`/`blockedStateKeys` (Task 7), `AttentionResponse`/`AttentionItem` (domain), **`istDayOf`/`istDayBounds` (`@gisik-nokma/domain`, Plan 1 Task 4a)**, apply helpers (Task 4).
 - Produces (cross-plan API):
   - `registerAttentionRoutes(app: FastifyInstance, deps: { pool: Pool; auth: Auth; now?: () => Date }): void` serving `GET /v1/workspaces/:workspaceId/attention` → `200 AttentionResponse` | `404 {error:'not_found'}`.
   - Computed at read time from projections + the injected clock; NOTHING is stored — `generatedAt` names the computation moment. Three buckets, in response order:
-    1. `blocked` — visible tickets sitting in a blocked-flagged state (amendment 9), whatever the category.
-    2. `stale` — visible tickets in an `active` category state whose state-entry `serverTime` (from `stateProvenanceFor`, already on the card) is older than `staleDays` from `proj_workspace_settings`.
-    3. `due-soon` — visible non-terminal tickets whose due-date claim falls on or before `now + dueSoonDays` (overdue included); the item carries the full `DueDateClaim` — the claim's provenance, per assignment.
+    1. `blocked` — visible tickets sitting in a blocked-flagged state (amendment 9), whatever the category. No clock involved.
+    2. `stale` — visible tickets in an `active` category state whose state-entry `serverTime` (from `stateProvenanceFor`, already on the card) falls on or before the IST day `staleDays` back from today. The item carries `daysInFlight`, the IST day count.
+    3. `due-soon` — visible non-terminal tickets whose due-date claim falls on or before the IST day `dueSoonDays` from today (overdue included); the item carries the full `DueDateClaim` — the claim's provenance, per assignment.
+  - **Both windows are INDIAN days** (owner decision 2026-08-20, "time is Asia/Kolkata"). Boundaries come from `istDayBounds(day)` and are compared half-open — `>= startUtc`, `< endUtc` — and day counts subtract `istDayOf` results. Nothing here divides a millisecond difference by 86 400 000 to get a number of days, and nothing slices ten characters off an ISO string to get a date: both answer the UTC question, and the product does not ask it. The 7-day / 7-day defaults are IST days.
   - Every item carries a plain-language `reason`. Contested claims join this strip in Plan 10 (additive item kind), documented in the module header.
 
 - [ ] **Step 1: Write the failing route test**
@@ -4063,11 +4093,17 @@ git commit -m "My Work: assigned-to-me grouped by state category with Plan 10's 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
-import { type AttentionResponse } from '@gisik-nokma/domain';
+import { istDayOf, type AttentionResponse } from '@gisik-nokma/domain';
 import { migrateTestDb, testPool, truncateAll } from '../helpers/db.js';
 import { applyCommitted, makeCommitted, resetEntitySeqs } from '../helpers/apply.js';
 import { SCENARIO_NOW, scenarioUsers, seedReadScenario, type ReadScenario } from '../helpers/read-scenario.js';
 import { buildReadTestApp, signInAs } from '../helpers/read-app.js';
+// The IST-boundary cases inject their own clock, which the HTTP route reads
+// from `deps.now` — fixed at SCENARIO_NOW for the app under test. They call
+// the computation directly instead, so one suite can read the same world at
+// two instants a millisecond apart.
+import { readAttention } from '../../src/routes/attention.js';
+import { requireMember } from '../../src/read/membership.js';
 
 let pool: Pool;
 let app: FastifyInstance;
@@ -4129,7 +4165,13 @@ describe('GET /v1/workspaces/:workspaceId/attention', () => {
     // too but entered 'waiting' only yesterday — not stale)
     expect(itemsOf(response, 'stale')).toEqual([world.taskInEpicId]);
     const stale = response.items.find((i) => i.kind === 'stale');
-    expect(stale).toMatchObject({ enteredStateAt: '2026-08-01T09:00:05.000Z', thresholdDays: 7 });
+    expect(stale).toMatchObject({
+      enteredStateAt: '2026-08-01T09:00:05.000Z',
+      // 2026-08-01 IST → 2026-08-20 IST. A count of Indian days, which is
+      // what "19 days in flight" means to the person reading the strip.
+      daysInFlight: 19,
+      thresholdDays: 7,
+    });
     expect(stale?.reason).toBe('In an active state since 2026-08-01 — past the 7-day staleness threshold.');
 
     // due-soon: taskInEpic due 2026-08-25, within 7 days of 2026-08-20;
@@ -4206,6 +4248,89 @@ describe('GET /v1/workspaces/:workspaceId/attention', () => {
     const stranger = await signInAs(app, '+911111111108');
     expect((await attention(stranger.token)).statusCode).toBe(404);
   });
+
+  it('PLANTED DEFECT: an event at 18:31Z counts as the NEXT Indian day — the window turns over at IST midnight, not UTC midnight', async () => {
+    // 2026-08-13T18:30:00.000Z IS 2026-08-14 00:00 IST. One minute past it is
+    // already tomorrow in India while the UTC page still reads 2026-08-13 —
+    // and SCENARIO_NOW (2026-08-20T12:00Z) is IST day 2026-08-20.
+    expect(istDayOf('2026-08-12T18:35:00.000Z')).toBe('2026-08-13'); // 7 IST days back
+    expect(istDayOf('2026-08-13T18:31:00.000Z')).toBe('2026-08-14'); // 6 IST days back
+
+    await applyCommitted(pool, [
+      // taskInEpic re-enters an active state at 18:35Z on the 12th — 00:05 IST
+      // on the 13th, so 7 IST days back: STALE at the 7-day threshold. Naive
+      // UTC math labels this '2026-08-12' and calls it 8 days.
+      makeCommitted({
+        workspaceId: world.workspaceId,
+        actorId: world.member,
+        entity: { kind: 'ticket', id: world.taskInEpicId },
+        type: 'ticket.transitioned',
+        payload: { toStateId: 'doing' },
+        clientTime: '2026-08-12T18:35:00.000Z',
+        serverTime: '2026-08-12T18:35:00.000Z',
+      }),
+      // sharedTask enters the same active state at 18:31Z on the 13th — 6 IST
+      // days back, INSIDE the window, so NOT stale. Naive UTC math reads the
+      // date as '2026-08-13', counts 7, and wrongly alarms.
+      makeCommitted({
+        workspaceId: world.workspaceId,
+        actorId: world.member,
+        entity: { kind: 'ticket', id: world.sharedTaskId },
+        type: 'ticket.transitioned',
+        payload: { toStateId: 'doing' },
+        clientTime: '2026-08-13T18:31:00.000Z',
+        serverTime: '2026-08-13T18:31:00.000Z',
+      }),
+    ]);
+
+    const response = (await attention(memberToken)).json() as AttentionResponse;
+    expect(itemsOf(response, 'stale')).toEqual([world.taskInEpicId]);
+    expect(itemsOf(response, 'stale')).not.toContain(world.sharedTaskId);
+
+    const stale = response.items.find((i) => i.kind === 'stale');
+    // The label is the IST day too, not the UTC slice of the same instant.
+    expect(stale).toMatchObject({ daysInFlight: 7, enteredStateAt: '2026-08-12T18:35:00.000Z' });
+    expect(stale?.reason).toBe('In an active state since 2026-08-13 — past the 7-day staleness threshold.');
+  });
+
+  it('PLANTED DEFECT: reading the strip at 18:31Z reads it on tomorrow’s Indian date — the due window moves with it', async () => {
+    await applyCommitted(pool, [
+      makeCommitted({
+        workspaceId: world.workspaceId,
+        actorId: world.owner,
+        entity: { kind: 'workspace', id: world.workspaceId },
+        type: 'workspace.settings_set',
+        payload: { dueSoonDays: 2 },
+      }),
+      makeCommitted({
+        workspaceId: world.workspaceId,
+        actorId: world.member,
+        entity: { kind: 'ticket', id: world.taskInEpicId },
+        type: 'ticket.field_set',
+        payload: { fieldId: 'dueDate', value: { date: '2026-08-23' } },
+      }),
+    ]);
+
+    const eff = await requireMember(pool, world.member, world.workspaceId);
+    expect(eff).not.toBeNull();
+    const read = (at: string) =>
+      readAttention(pool, eff!, world.member, world.workspaceId, new Date(at));
+
+    // 18:29:59.999Z — still 2026-08-20 in India, horizon 2026-08-22, so a
+    // claim due 2026-08-23 is outside the window.
+    const justBefore = await read('2026-08-20T18:29:59.999Z');
+    expect(itemsOf(justBefore, 'due-soon')).toEqual([]);
+
+    // One millisecond later it is 2026-08-21 in India, horizon 2026-08-23,
+    // and the same claim is inside. Both instants sit on the SAME UTC day, so
+    // UTC-based math cannot tell these two reads apart at all.
+    const justAfter = await read('2026-08-20T18:30:00.000Z');
+    expect(itemsOf(justAfter, 'due-soon')).toEqual([world.taskInEpicId]);
+    expect(await read('2026-08-20T18:31:00.000Z').then((r) => itemsOf(r, 'due-soon'))).toEqual([
+      world.taskInEpicId,
+    ]);
+    expect(justBefore.generatedAt.slice(0, 10)).toBe(justAfter.generatedAt.slice(0, 10));
+  });
 });
 ```
 
@@ -4229,6 +4354,7 @@ registerAttentionRoutes(app, { pool, auth: authInstance, now: () => SCENARIO_NOW
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import type { AttentionItem, AttentionResponse } from '@gisik-nokma/domain';
+import { istDayBounds, istDayOf } from '@gisik-nokma/domain';
 import type { Auth } from '../auth/auth.js';
 import { makeRequireSession } from '../auth/routes.js';
 import type { Queryable } from '../db/queryable.js';
@@ -4243,9 +4369,48 @@ import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '..
 const DAY_MS = 86_400_000;
 
 /**
+ * `delta` IST days after `day` (negative walks backwards).
+ *
+ * `istDayBounds(day).startUtc` IS IST midnight of `day`, and India has no
+ * daylight saving — every IST day is exactly 24h, no exceptions (Plan 1's
+ * `ist-day.test.ts` asserts that over a full year). So stepping by whole
+ * DAY_MS from one IST midnight lands exactly on another IST midnight, and
+ * `istDayOf` names it. This is calendar arithmetic on IST days, not elapsed
+ * time between two arbitrary instants.
+ */
+function addIstDays(day: string, delta: number): string {
+  return istDayOf(new Date(Date.parse(istDayBounds(day).startUtc) + delta * DAY_MS).toISOString());
+}
+
+/**
+ * How many IST days from `fromDay` to `toDay` — a day COUNT, not a duration.
+ *
+ * Both operands are snapped to IST midnight before subtracting, so the result
+ * is an exact integer number of calendar days. This is what "subtract two
+ * `istDayOf` results" means computationally; it is emphatically NOT
+ * `(b - a) / 86_400_000` over two raw instants, which silently answers a
+ * different question — "how many 24-hour spans" — and gets a day boundary
+ * wrong every time a claim lands between 18:30Z and midnight UTC.
+ */
+function istDaysBetween(fromDay: string, toDay: string): number {
+  return Math.round(
+    (Date.parse(istDayBounds(toDay).startUtc) - Date.parse(istDayBounds(fromDay).startUtc)) / DAY_MS,
+  );
+}
+
+/**
  * The attention strip: computed at read time, NEVER stored — attention is
  * derived from claims plus the clock, and materialising it would freeze a
  * judgment that changes as time passes. generatedAt names the moment.
+ *
+ * EVERY window and every day count here is an INDIAN day (owner decision
+ * 2026-08-20, "time is Asia/Kolkata"). "Stale for 7 days" and "due within 7
+ * days" are questions about where a day starts, and it starts at IST
+ * midnight — 18:30Z — never at the server's locale midnight, never at the
+ * viewer's device midnight. Concretely: an event at 18:31Z is already
+ * TOMORROW in India, and any comparison that slices `.toISOString()` at ten
+ * characters gets that wrong by a full day. Windows compare half-open against
+ * `istDayBounds` (`>= startUtc`, `< endUtc`); counts subtract IST days.
  *
  * Plan 10 adds a fourth, additive item kind for contested claims once
  * `claim.contested` events exist (coordination amendment 16).
@@ -4281,21 +4446,36 @@ export async function readAttention(
     items.push({ kind: 'blocked', card, stateName, reason: `In "${stateName}" — a blocked state.` });
   }
 
-  const staleCutoff = now.getTime() - settings.staleDays * DAY_MS;
+  // Today, in India. Everything below is measured from this day, not from a
+  // UTC calendar page that turns over five and a half hours late.
+  const today = istDayOf(now.toISOString());
+
+  // The staleness window is the last `staleDays` IST days. A ticket is stale
+  // when it entered its state on or before the cutoff day — i.e. strictly
+  // before that day's END, the half-open upper bound `istDayBounds` gives us.
+  // Equivalent to `istDaysBetween(entryDay, today) >= staleDays`, and stated
+  // as an instant comparison so no per-card day string has to be parsed.
+  const staleCutoffUtc = Date.parse(istDayBounds(addIstDays(today, -settings.staleDays)).endUtc);
   for (const card of cards) {
     if (card.stateCategory !== 'active') continue;
     const enteredStateAt = card.stateProvenance.serverTime;
-    if (Date.parse(enteredStateAt) > staleCutoff) continue;
+    if (Date.parse(enteredStateAt) >= staleCutoffUtc) continue;
+    const enteredOnIstDay = istDayOf(enteredStateAt);
     items.push({
       kind: 'stale',
       card,
       enteredStateAt,
+      // Days in flight: two IST days subtracted, never a millisecond quotient.
+      daysInFlight: istDaysBetween(enteredOnIstDay, today),
       thresholdDays: settings.staleDays,
-      reason: `In an active state since ${enteredStateAt.slice(0, 10)} — past the ${settings.staleDays}-day staleness threshold.`,
+      reason: `In an active state since ${enteredOnIstDay} — past the ${settings.staleDays}-day staleness threshold.`,
     });
   }
 
-  const horizon = new Date(now.getTime() + settings.dueSoonDays * DAY_MS).toISOString().slice(0, 10);
+  // The due window runs to the end of the IST day `dueSoonDays` from today.
+  // `dueDate.date` is already a day claim in the same calendar, so the
+  // comparison is day-string to day-string and needs no clock at all.
+  const horizon = addIstDays(today, settings.dueSoonDays);
   for (const card of cards) {
     if (card.stateCategory === 'terminal' || card.dueDate === null) continue;
     if (card.dueDate.date > horizon) continue;
@@ -4339,13 +4519,21 @@ export function registerAttentionRoutes(
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/routes/attention.test.ts`
-Expected: PASS (6 tests).
+Expected: PASS (8 tests) — including the two IST-boundary defects.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add apps/server/src/routes/attention.ts apps/server/test/routes/attention.test.ts apps/server/test/helpers/read-app.ts apps/server/src/app.ts
-git commit -m "Attention strip: blocked flags, staleness and due windows computed at read time from claims plus the clock, never stored — the planted settings claim flips the thresholds, proving they are read from the ledger, not from constants"
+git commit -m "Attention strip: blocked flags, staleness and due windows computed at read time from claims plus the clock, never stored — the planted settings claim flips the thresholds, proving they are read from the ledger, not from constants
+
+Every window and every day count is an INDIAN day (owner decision
+2026-08-20): boundaries from istDayBounds compared half-open, counts by
+subtracting istDayOf results. The planted 18:31Z cases prove it both
+ways — an event a minute past IST midnight belongs to the next Indian
+day, and a read a millisecond past it happens on the next Indian date —
+neither of which UTC math can see, because both instants sit on the same
+UTC day."
 ```
 
 ---
@@ -5830,7 +6018,7 @@ git commit -m "WS /v1/stream: session at upgrade, membership per subscribe, hear
 - ✅ **Builder read surface** — `GET /v1/workspaces/:id/workflows` (latest definition per workflow), `…/workflows/:workflowId?version=` (one definition, latest by default), `…/ticket-types`, `…/members` (`{userId, displayName, role}`, guests withheld from non-admin callers), and admin-only `…/workflows/:workflowId/state-occupancy` (live ticket counts per state, zeroes and undefined-state stragglers included) — the reads Plan 8's workflow builder authors against. `apps/server/src/routes/builder-reads.ts`
 - ✅ **Full-text search** — `GET /v1/search`: ranked cross-project search over titles, descriptions, and comments, visibility-filtered at read time, snippets with the match marked; composable with FilterSpec (`q` owns the text term). `apps/server/src/routes/search.ts`
 - ✅ **My Work** — `GET /v1/me/work`: assigned-to-me across a workspace's projects, grouped by state category; Plan 10's contested-claims extension point documented in the shape. `apps/server/src/routes/my-work.ts`
-- ✅ **Attention strip API** — `GET /v1/workspaces/:id/attention`: blocked-flagged states, active-state staleness, and due-window claims — computed at read time from claims plus the clock, never stored; every item carries its reason and the claim's provenance; thresholds come from `workspace.settings_set` claims. `apps/server/src/routes/attention.ts`
+- ✅ **Attention strip API** — `GET /v1/workspaces/:id/attention`: blocked-flagged states, active-state staleness, and due-window claims — computed at read time from claims plus the clock, never stored; every item carries its reason and the claim's provenance; thresholds come from `workspace.settings_set` claims. Both windows and the `daysInFlight` count are **Indian days**: boundaries from `istDayBounds` compared half-open, counts by subtracting `istDayOf` results, so a claim made in the Indian evening lands on the day India was living in (owner decision 2026-08-20). `apps/server/src/routes/attention.ts`
 - ✅ **Realtime stream** — WS `/v1/stream`: authenticated subscribe per workspace, visibility-filtered catch-up through `visibleEventsFor`, `caught-up` cursor frame, live tail off `onEventCommitted` through the same filter, purge frames on revocation, ping/pong heartbeat, bounded-buffer slow-consumer close (the ledger is the durable buffer; reconnect resumes by cursor). `apps/server/src/stream/`
 - ✅ **View preferences** — `GET/PUT /v1/me/preferences`: saved filters, per-project list columns and grouping as server-owned per-user rows — never ledger events, because preferences arrange truth rather than claim anything. `apps/server/src/routes/preferences.ts`
 - ⚙️ **FilterSpec compiler** — one strict zod shape (`@gisik-nokma/domain`) compiled to parameterized SQL; user bytes travel only as parameters, injection-proven against planted hostile input. `apps/server/src/read/compile-filter.ts`
@@ -5876,7 +6064,7 @@ Mirrors `Features.md` §7. Status: `❌` not covered · `✅` covered · `🟡` 
 - 7.25 ✅ Search: guests search only their shared slice; non-members 404; hostile `q` is a plain phrase. (`search.test.ts` in routes)
 - 7.26 ✅ My Work groups assigned-to-me by state category and follows category changes. (`my-work.test.ts`)
 - 7.27 ✅ Planted defect: assigned-but-invisible never appears in My Work — assignment is not visibility. (`my-work.test.ts`)
-- 7.28 ✅ Attention: blocked / stale / due-soon computed at the injected clock with reasons and claim provenance; overdue included; terminal excluded; `generatedAt` names the moment. (`attention.test.ts`)
+- 7.28 ✅ Attention: blocked / stale / due-soon computed at the injected clock with reasons and claim provenance; overdue included; terminal excluded; `generatedAt` names the moment; the stale item reports `daysInFlight` as a count of Indian days. (`attention.test.ts`)
 - 7.29 ✅ Planted defect: a `workspace.settings_set` claim flips staleness and due-window membership — thresholds are read from the ledger, not constants. (`attention.test.ts`)
 - 7.30 ✅ Planted defect: the hidden ticket's imminent due date alarms the owner and never the member. (`attention.test.ts`)
 - 7.31 ✅ Preferences round-trip with full-replace PUT; malformed documents refused whole; a PUT writes zero ledger events; non-members 404. (`preferences.test.ts`)
@@ -5890,6 +6078,7 @@ Mirrors `Features.md` §7. Status: `❌` not covered · `✅` covered · `🟡` 
 - 7.39 ✅ Planted defect: the workspace roster withholds guests from a plain member and from a guest — the guest's id appears nowhere in the body — while owners and admins see them with role `guest`. (`builder-reads.test.ts`)
 - 7.40 ✅ Planted defect: state occupancy counts every ticket in the workflow's states including one the caller could never see, reports empty states as 0, and answers 404 to members, guests and strangers alike — the number is the workspace's, so only admins hold it. (`builder-reads.test.ts`)
 - 7.41 ✅ Planted defect: a custom type defined at the epic rank heads its own group and keeps its children out of the `no-epic` bucket — grouping resolves the rank, never the id `'epic'` (owner sign-off 2026-08-20). (`list.test.ts`)
+- 7.42 ✅ Planted defect: the attention windows are INDIAN days. An event at 18:31Z belongs to the next Indian day, so a state entered then is 6 days old and not stale at the 7-day threshold while one entered at 18:35Z the previous day is 7 days old and is — and reading the same world a millisecond either side of 18:30Z moves the due-soon horizon by a whole day, though both reads sit on the same UTC date. Boundaries come from `istDayBounds` compared half-open; `daysInFlight` subtracts `istDayOf` results (owner decision 2026-08-20, "time is Asia/Kolkata"). (`attention.test.ts`)
 ````
 
 - [ ] **Step 3: Run the full suite one last time**
@@ -5913,7 +6102,7 @@ Flagged rather than silently resolved. Only #1 is blocking-grade; each names the
 1. **Per-entity seq cannot serve as a workspace stream cursor (BLOCKING for stream resume correctness).** Plan 1 pins `seq` as per-entity (`UNIQUE (entity_kind, entity_id, seq)`, `nextSeq` per entity), while Plan 4's `visibleEventsFor` reads `WHERE workspace_id = $1 AND seq > $2 ORDER BY seq` — treating `seq` as workspace-orderable. With two entities both carrying seqs 1..n, any resume with `afterSeq > 0` silently skips newer entities' early events; amendment 13's `afterSeq`/`caught-up` inherit the defect. This plan (a) keeps its stream layer cursor-opaque (cursor = max yielded envelope seq — unchanged whatever ordering lands), (b) pins the defect as an executable `it.fails` test (case 7.34) that turns red the day it is fixed, and (c) recommends the coordination-level fix: a `workspace_seq bigint` assigned inside the ingest transaction under a per-workspace advisory lock (alongside Plan 1's per-entity lock), with `visibleEventsFor` filtering and ordering by it. Do NOT paper over it with a max-seq pre-read — out-of-order commits would still skip events. Corollary fixed by the same amendment: purge instructions carry no seq, so a purge-only drain cannot advance the cursor and re-emits purges on the next drain (idempotent, but wasteful). **Since written, the coordination-level fix has landed** — Plan 1 ships `workspace_seq` with its per-workspace advisory lock and Plan 4's `visibleEventsFor` filters and orders by it — so this plan's stream layer needs no change (its cursor was always the max yielded value) and case 7.34's `it.fails` pin flips to `it` at execution, exactly as designed.
 2. **Purge/caught-up/error frames gained `workspaceId`.** Amendment 13 lists `{type:'purge', entityId}` and `{type:'caught-up', seq}`, and in the same sentence mandates per-connection multi-workspace subscriptions — without a workspace discriminator those frames are ambiguous on a multiplexed socket. Added additively; the event frame is untouched (the envelope already carries `workspaceId`). Confirm at review.
 3. **Route prefix split.** This plan's routes live under `/v1/...` per its assignment; Plan 4 mounted auth under `/api/auth/*` and its ticket reads under `/api/workspaces/...`, and Plan 3's history sits at `/v1/tickets/:id/history`. One prefix should win at integration — mechanical either way; flagged for the coordination doc.
-4. **Settings payload carries `dueSoonDays` alongside `staleDays`.** The assignment names `{staleDays}` but also demands a workspace-configurable due window; one event with optional keys covers both. Defaults 7/7 need owner sign-off (`DEFAULT_STALE_DAYS`, `DEFAULT_DUE_SOON_DAYS`).
+4. **Settings payload carries `dueSoonDays` alongside `staleDays` — SETTLED (owner sign-off 2026-08-20).** The assignment names `{staleDays}` but also demands a workspace-configurable due window; one event with optional keys covers both. The **7-day / 7-day defaults are approved** (`DEFAULT_STALE_DAYS`, `DEFAULT_DUE_SOON_DAYS`); nothing here waits on a decision. Both are counts of **Indian** days, per the same day's decision on time — 7 days back from today means seven IST midnights, not 168 hours.
 5. **FTS config is `'simple'`, search is top-50 without pagination.** No English stemming — the audience writes in more than one language, and stemming one language while not stemming others would rank dishonestly. Rank order is `ts_rank_cd` (derived, not stored, never presented as anything but ordering). Pagination can be added later without breaking the shape (`hits` stays an array).
 6. **List pins:** hierarchy by parent query (children never inlined); grouping applied per page (a group key may recur across pages; clients merge by key); epic grouping = nearest ancestor-or-self whose type carries the **epic rank**. **SETTLED (owner sign-off 2026-08-20): custom epic-rank types DO head groups.** This was written as an open spec-owner question — whether `groupBy=epic` should match only the built-in id `'epic'` — and the owner ruled that a workspace's own top-rung type ("Initiative", "Campaign") heads its own group exactly as the built-in does. The rank is the concept; `'epic'` is one id of it. Resolution therefore reads `EPIC_RANK` from `BUILTIN_TICKET_TYPE_SEEDS` (never the literal `1`) and joins the workspace's `proj_ticket_types` roster; case 7.41 is the planted defect that bites the old id-matching behaviour. Nothing here waits on Plan 8 any more — the coordination doc's separate sub-task-rank question is unaffected and stays with Plan 8.
 7. **Empty board = empty columns.** The board derives its columns from workflows *in use by visible tickets*; a project with no visible tickets answers `columns: []`. If Plan 6 wants default-workflow columns for an empty project, that needs a project→type-roster source that no projection currently owns — Plan 6 should raise it, not invent it.

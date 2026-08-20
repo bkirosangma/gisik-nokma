@@ -31,7 +31,9 @@ Copied from the series engineering contract and the spec; every task's requireme
 
 ## Production stack — DigitalOcean BLR1, at `pm.artsourced.in` (DECIDED, owner sign-off 2026-08-20)
 
-**The decision:** DigitalOcean, region **BLR1 (Bengaluru)** — App Platform for the server and web containers, Managed PostgreSQL in BLR1, Spaces in BLR1 for attachments and backups. This is the **same stack convenience-corner runs**; the owner signed it off on 2026-08-20, along with the custom domain **`pm.artsourced.in`** (a subdomain of the existing `artsourced.in` zone). Task 15's gate is therefore lifted — it executes with the rest of the plan.
+**The decision:** DigitalOcean, region **BLR1 (Bengaluru)** — App Platform for the server and web containers, Managed PostgreSQL in BLR1, Spaces in BLR1 for attachments and backups. This is the **same stack convenience-corner runs**; the owner signed it off on 2026-08-20, along with the custom domains **`pm.artsourced.in`** (web) and **`pm-api.artsourced.in`** (API) — two sibling single-label subdomains of the existing `artsourced.in` zone, so DNS is two plain CNAMEs side by side rather than a nested name. Task 15's gate is therefore lifted — it executes with the rest of the plan.
+
+**And the whole stack runs on India time.** Owner decision, same day: time is Asia/Kolkata. On the deployed stack that means three settings, none of them redundant — `TZ=Asia/Kolkata` on the server and worker processes, `ALTER DATABASE … SET timezone TO 'Asia/Kolkata'` on the managed database at provisioning, and a smoke check (`scripts/check-db-timezone.mjs`) that asserts it on a connection which sets nothing. Task 15 carries all three and records why the app's pool setting cannot stand alone.
 
 **Object storage: Spaces, not Cloudflare R2 (the comparison, recorded so the reasoning survives).** R2 was considered and lost on **data residency**. Gisik Nokma takes arbitrary user uploads served under permission checks — attachments on tickets whose visibility is enforced per viewer — which is a different thing from convenience-corner's owner-controlled public shop imagery, and it makes *where the bytes physically live* a decision rather than a detail. R2 cannot pin data to India: it offers EU and US jurisdictions only, with `apac` a best-effort, unchangeable location *hint*. Spaces BLR1 keeps the files in Bengaluru, beside the Postgres ledger that describes them. The cost gap at v1 scale is a few dollars a month — not enough to buy a jurisdiction we cannot name. `ObjectStore`/`ObjectSink` speak the S3 protocol either way, so R2 stays available later: **revisit when monthly egress approaches 1 TiB**, the scale at which R2's zero egress charge starts to win materially.
 
@@ -1009,6 +1011,11 @@ tooling. reference/ is excluded from images and mounted read-only instead."
 services:
   postgres:
     image: postgres:16-alpine
+    # Owner decision 2026-08-20: time is Asia/Kolkata. Matches Plan 1's root
+    # docker-compose.yml, so an ad-hoc psql against either dev stack reads the
+    # same clock the product shows. Stored instants are unchanged — timestamptz
+    # is absolute; this only decides which offset Postgres prints.
+    command: ["postgres", "-c", "timezone=Asia/Kolkata"]
     environment:
       POSTGRES_USER: gisik
       POSTGRES_PASSWORD: gisik
@@ -1071,6 +1078,7 @@ services:
         condition: service_started
     environment:
       DATABASE_URL: postgres://gisik:gisik@postgres:5432/gisik_nokma
+      TZ: Asia/Kolkata          # process clock == database clock == product clock
       HOST: 0.0.0.0
       PORT: "3000"
       LOG_LEVEL: info
@@ -1135,6 +1143,15 @@ DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma
 PORT=3000
 HOST=127.0.0.1                       # 0.0.0.0 in containers
 LOG_LEVEL=info                       # fatal|error|warn|info|debug|trace
+
+# Time (owner decision 2026-08-20: time is Asia/Kolkata). TZ sets the Node
+# process's own zone, so logs and any runtime Date formatting agree with the
+# product's screens. Read by the runtime, not by application code — so the
+# check-env gate never sees it; it is documented here because an operator
+# needs to know it exists. The DATABASE's zone is set separately, on the
+# database itself (deploy/do/README.md step 6; docker-compose sets it with
+# `-c timezone=Asia/Kolkata` locally). Verify with `pnpm check:db-tz`.
+TZ=Asia/Kolkata
 
 # Managed-Postgres TLS (production; leave empty for local)
 DATABASE_CA_CERT=
@@ -3769,11 +3786,13 @@ Expected: the standing instruction is present and names `main` explicitly. If it
 **✅ GATE LIFTED (owner sign-off 2026-08-20).** The provider (DigitalOcean App Platform + Managed PostgreSQL + Spaces, all BLR1 — convenience-corner's stack) and the domain (`pm.artsourced.in`) are both decided; Open questions #1, #2 and #3 are settled. This task executes with the rest of the plan. Everything else here stays provider-neutral regardless, which is what keeps the recorded alternatives cheap.
 
 **Files:**
-- Create: `deploy/do/app.yaml`, `deploy/do/README.md`
+- Create: `deploy/do/app.yaml`, `deploy/do/README.md`, `scripts/check-db-timezone.mjs`
+- Modify: root `package.json` (add the `check:db-tz` script)
 
 **Interfaces:**
 - Consumes: Task 5's Dockerfiles, Task 6's env contract, Task 11's worker entry.
-- Produces: the App Platform spec (server + web + backup worker, BLR1, managed Postgres attached, Spaces BLR1 for attachments and backups, secrets as encrypted env vars, health-checked), and the provisioning commands. **Hosts:** the web app at `pm.artsourced.in` and the API at `api.pm.artsourced.in` — one decided name, split into the two hosts the ingress rules need, with the API nested under the product host so a single DNS zone and a single mental model cover both. TLS: App Platform provisions and renews Let's Encrypt certificates on both automatically; DNS is two CNAMEs in the existing `artsourced.in` zone (`pm` and `api.pm`). Secrets: `type: SECRET` env vars, encrypted at rest, rotated via `doctl apps update` (runbook). Database TLS: `${db.DATABASE_URL}` carries `sslmode=require` and `${db.CA_CERT}` feeds `DATABASE_CA_CERT` (Task 1's pool option).
+- Produces: the App Platform spec (server + web + backup worker, BLR1, managed Postgres attached, Spaces BLR1 for attachments and backups, secrets as encrypted env vars, health-checked), and the provisioning commands. **Hosts (owner decision 2026-08-20):** the web app at `pm.artsourced.in` and the API at `pm-api.artsourced.in` — two **sibling single-label subdomains** of `artsourced.in`, not a nested name. DNS is therefore two ordinary CNAMEs side by side in one zone (`pm` and `pm-api`), each one label deep: no nested-name handling, no wildcard, no apex/ALIAS record, and the zone's existing records are untouched. TLS: App Platform provisions and renews Let's Encrypt certificates on both automatically. Secrets: `type: SECRET` env vars, encrypted at rest, rotated via `doctl apps update` (runbook). Database TLS: `${db.DATABASE_URL}` carries `sslmode=require` and `${db.CA_CERT}` feeds `DATABASE_CA_CERT` (Task 1's pool option). **Database timezone:** set on the managed database itself at provisioning time (Step 1a), not only on the app's pool.
+- Produces (also): `scripts/check-db-timezone.mjs` — the deployed-stack timezone assertion (Step 1a), runnable against any `DATABASE_URL`.
 
 - [ ] **Step 1: Write `deploy/do/app.yaml`**
 
@@ -3783,7 +3802,8 @@ Expected: the standing instruction is present and names `main` explicitly. If it
 # phone-first; the region is the point, not a default. Spaces is BLR1 for
 # the same reason: user uploads stay in India, beside the ledger.
 # DOMAINS: decided 2026-08-20 — pm.artsourced.in serves the web app and
-# api.pm.artsourced.in serves the API, both in the artsourced.in zone.
+# pm-api.artsourced.in serves the API. Two sibling single-label subdomains
+# in the artsourced.in zone, not a nested name: two plain CNAMEs, one each.
 name: gisik-nokma
 region: blr
 
@@ -3817,16 +3837,27 @@ services:
         scope: RUN_TIME
       - key: HOST
         value: "0.0.0.0"
+      # Owner decision 2026-08-20: time is Asia/Kolkata. TZ sets the Node
+      # process's own zone, so server logs, any `Date` the runtime formats,
+      # and the database session all read the same clock the product shows.
+      # Without it the container runs UTC and the logs tell a different time
+      # story than every screen — the exact split this decision exists to end.
+      # This is separate from the DATABASE timezone, which is set on the
+      # managed database itself at provisioning (deploy/do/README.md Step 1a).
+      - key: TZ
+        value: Asia/Kolkata
       - key: TRUST_PROXY
         value: "true"
       - key: WEB_ORIGIN
         value: https://pm.artsourced.in
       - key: BETTER_AUTH_URL
-        value: https://api.pm.artsourced.in
+        value: https://pm-api.artsourced.in
       - key: BETTER_AUTH_SECRET
         type: SECRET
       - key: SMTP_URL
         type: SECRET
+      # Confirmed by the owner 2026-08-20: the APEX address, not a subdomain
+      # one. Decided, not a placeholder — see Open questions #13.
       - key: MAGIC_LINK_FROM
         value: sign-in@artsourced.in
       - key: ALERT_WEBHOOK_URL
@@ -3881,6 +3912,10 @@ workers:
       - key: DATABASE_CA_CERT
         value: ${db.CA_CERT}
         scope: RUN_TIME
+      # The worker formats log timestamps too — same clock as the server, or
+      # a backup failure gets read against the wrong evening.
+      - key: TZ
+        value: Asia/Kolkata
       - key: ALERT_WEBHOOK_URL
         type: SECRET
       - key: S3_ENDPOINT
@@ -3895,6 +3930,12 @@ workers:
         type: SECRET
       - key: BACKUP_S3_BUCKET
         value: gisik-nokma-backups
+      # The *_UTC schedule names stay UTC on purpose and are NOT affected by
+      # TZ above: `msUntilNextUtc` reads only setUTCHours/getUTCDay, so the
+      # dump fires at the same absolute instant whatever the process zone is.
+      # Do not "correct" these to IST — the runbook translates them (21:00 UTC
+      # = 02:30 IST), and a schedule that drifts with a container's locale is
+      # the bug this shape avoids.
       - key: BACKUP_TIME_UTC
         value: "21:00"
       - key: LEDGER_EXPORT_TIME_UTC
@@ -3906,7 +3947,7 @@ domains:
   - domain: pm.artsourced.in
     type: PRIMARY
     zone: artsourced.in
-  - domain: api.pm.artsourced.in
+  - domain: pm-api.artsourced.in
     type: ALIAS
     zone: artsourced.in
 
@@ -3914,7 +3955,7 @@ ingress:
   rules:
     - match:
         authority:
-          exact: api.pm.artsourced.in
+          exact: pm-api.artsourced.in
       component:
         name: server
     - match:
@@ -3924,7 +3965,7 @@ ingress:
         name: web
 ```
 
-The web build args are now concrete and go in the spec rather than waiting on a decision — add them under `web.envs` with `scope: BUILD_TIME`: `NEXT_PUBLIC_API_URL=https://api.pm.artsourced.in` and `NEXT_PUBLIC_WS_URL=wss://api.pm.artsourced.in/v1/stream`. (They are build-time because Next.js inlines `NEXT_PUBLIC_*` at build; changing a host means a rebuild, not a restart.)
+The web build args are now concrete and go in the spec rather than waiting on a decision — add them under `web.envs` with `scope: BUILD_TIME`: `NEXT_PUBLIC_API_URL=https://pm-api.artsourced.in` and `NEXT_PUBLIC_WS_URL=wss://pm-api.artsourced.in/v1/stream`. (They are build-time because Next.js inlines `NEXT_PUBLIC_*` at build; changing a host means a rebuild, not a restart.)
 
 - [ ] **Step 2: Write `deploy/do/README.md` — provisioning, once**
 
@@ -3949,31 +3990,172 @@ stack), serving `pm.artsourced.in`.
    the real values.
 4. `doctl apps create --spec deploy/do/app.yaml` — then paste the SECRET
    values in the dashboard (they are never committed).
-5. DNS, in the existing `artsourced.in` zone: CNAME `pm` and `api.pm` to
-   the app's default hostname. Both are subdomains, so no apex/ALIAS
-   handling is needed and the zone's existing records are untouched. TLS
-   issues automatically for both once DNS resolves.
-6. Uptime: create a check on `https://api.pm.artsourced.in/healthz` from
+5. DNS, in the existing `artsourced.in` zone: two sibling CNAMEs, `pm` and
+   `pm-api`, both pointing at the app's default hostname. Each is one label
+   deep — siblings, not a nested name — so there is no apex/ALIAS record,
+   no wildcard, and the zone's existing records are untouched. TLS issues
+   automatically for both once DNS resolves.
+6. **Set the timezone on the database itself** (owner decision 2026-08-20:
+   time is Asia/Kolkata) — substituting the managed cluster's real
+   database name:
+
+       psql "$DATABASE_URL" -c "ALTER DATABASE <db> SET timezone TO 'Asia/Kolkata'"
+
+   This is a provisioning step, not an app concern — see "Why the
+   database, not just the pool" below. Then prove it, on a connection that
+   asks for nothing:
+
+       DATABASE_URL='<the managed url>' node scripts/check-db-timezone.mjs
+
+   It must print `Asia/Kolkata` and exit 0. If it exits 1, the ALTER did
+   not take (or was run against the wrong database) — fix it before the
+   first seed, because every subsequent ad-hoc query reads the wrong clock.
+7. Uptime: create a check on `https://pm-api.artsourced.in/healthz` from
    the nearest probe region, alerting the owner's email.
-7. First deploy runs migrations on boot (the entrypoint). Then, from a
+8. First deploy runs migrations on boot (the entrypoint). Then, from a
    checkout with DATABASE_URL pointed at the managed DB: sign in once in
    the product, run `seed:cc` (per the runbook), then `seed:dev`.
+
+## Why the database, not just the pool
+
+Plan 1 already sets the session timezone from the application side:
+`createPool` passes `options: '-c timezone=Asia/Kolkata'` as a Postgres
+startup parameter (`apps/server/src/db.ts`). That is correct and it stays.
+It is also **not sufficient as the only mechanism**, for three reasons:
+
+1. **It covers app connections only.** Every `psql` session an operator
+   opens, every one-off `doctl`/console query, every future tool that
+   connects with its own client — none of them go through `createPool`, so
+   none of them get the zone. Those are exactly the sessions where a
+   misread timestamp does damage quietly, during an incident.
+2. **Connection poolers can drop startup options.** A managed pooler in
+   transaction mode does not necessarily forward per-connection startup
+   parameters to the backend it hands you. The `options` string can be
+   silently ignored — no error, no warning, just UTC.
+3. **Plan 1's own `SHOW TimeZone` test cannot prove the pool mechanism
+   works.** Its Task 6 helper `createTestDatabase` runs
+   `ALTER DATABASE … SET timezone TO 'Asia/Kolkata'` on every test database
+   it creates. So the session zone is already IST before the pool says a
+   word, and the assertion passes whether the `options` parameter was
+   honoured or silently discarded. **It is a test that cannot fail** — a
+   green light wired to nothing. Deployment must not rest on it.
+
+Point 3 is why step 6 exists in this form. `scripts/check-db-timezone.mjs`
+connects with a bare client that sets **no** startup options and runs no
+`SET TIME ZONE`, so the only thing that can make it print `Asia/Kolkata`
+is the database's own default. It can fail, which is the entire point of
+having it.
 ```
+
+- [ ] **Step 2a: Write `scripts/check-db-timezone.mjs` — an assertion that can actually fail**
+
+The owner decision (coordination doc, "time is Asia/Kolkata") requires the
+**database** to answer `Asia/Kolkata`, not merely the app's pool to ask for
+it. This script is the deployed-stack proof, and it is deliberately built so
+that a broken deployment makes it red.
+
+Its one rule: **connect with a bare client that sets nothing.** No
+`createPool`, no `options` startup parameter, no `SET TIME ZONE` — because
+every one of those would supply the answer the script is supposed to be
+checking for. What remains is the database's own default, which is what an
+operator's `psql` session gets and what the product depends on.
+
+`scripts/check-db-timezone.mjs`:
+
+```js
+#!/usr/bin/env node
+// Assert the PROVISIONED database's own default timezone.
+//
+// This is not a duplicate of Plan 1's `SHOW TimeZone` test. That test runs
+// against a database `createTestDatabase` just ran
+// `ALTER DATABASE … SET timezone TO 'Asia/Kolkata'` on, so it reads IST
+// whether or not the pool's `options` startup parameter was honoured — it
+// cannot fail, and an unfalsifiable check is not evidence. This one connects
+// with a bare client that sets NO startup options and issues NO
+// `SET TIME ZONE`, so the only thing that can produce a pass is
+// `ALTER DATABASE <db> SET timezone TO 'Asia/Kolkata'` having actually taken
+// effect on the database being deployed against.
+//
+// Deliberately NOT imported from apps/server: `createPool` sets the zone,
+// which is exactly the mechanism under test.
+import pg from 'pg';
+
+const EXPECTED = 'Asia/Kolkata';
+const url = process.env.DATABASE_URL;
+if (!url) {
+  console.error('DATABASE_URL is required');
+  process.exit(2);
+}
+
+// Managed Postgres requires TLS; the CA travels in DATABASE_CA_CERT, the
+// same variable Task 1 feeds the app pool. TLS is orthogonal to startup
+// options — supplying the CA does not set any session parameter.
+const ca = process.env.DATABASE_CA_CERT;
+const client = new pg.Client({
+  connectionString: url,
+  ...(ca ? { ssl: { ca, rejectUnauthorized: true } } : {}),
+});
+
+try {
+  await client.connect();
+  const { rows } = await client.query('SHOW TimeZone');
+  const actual = rows[0].TimeZone;
+  if (actual !== EXPECTED) {
+    console.error(
+      `database timezone is '${actual}', expected '${EXPECTED}'.\n` +
+        `Run: ALTER DATABASE <db> SET timezone TO '${EXPECTED}'\n` +
+        'The app pool asking for the zone is not enough — operator psql ' +
+        'sessions and any pooler that drops startup options bypass it.',
+    );
+    process.exit(1);
+  }
+  console.log(`database timezone: ${actual}`);
+} finally {
+  await client.end();
+}
+```
+
+Root `package.json` scripts gain:
+`"check:db-tz": "node scripts/check-db-timezone.mjs"`.
+
+Prove the check is falsifiable before trusting it, against the local stack:
+
+```bash
+# Fails — the dev compose Postgres has not been altered yet in a fresh volume,
+# or point it at any UTC database to see red.
+DATABASE_URL=postgres://gisik:gisik@localhost:54329/postgres node scripts/check-db-timezone.mjs; echo "exit: $?"
+# Passes — docker-compose.dev.yml starts Postgres with -c timezone=Asia/Kolkata
+DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma node scripts/check-db-timezone.mjs; echo "exit: $?"
+```
+
+Expected: a non-zero exit naming the wrong zone, then `database timezone:
+Asia/Kolkata` and exit 0. **If the first invocation does not fail, the check
+is broken** — fix it before relying on it, exactly as with the env-contract
+gate in Task 6.
 
 - [ ] **Step 3: Validate and commit**
 
 ```bash
 doctl apps spec validate deploy/do/app.yaml   # if doctl is available; otherwise proceed — CI cannot validate a provider spec offline
-git add deploy/do/
+git add deploy/do/ scripts/check-db-timezone.mjs package.json
 git commit -m "feat(deploy): DigitalOcean BLR1 App Platform spec, quarantined in deploy/do
 
 Server, web and the backup worker in blr; managed Postgres attached with
 its CA fed to the pool; Spaces BLR1 for attachments and backups, chosen
 over Cloudflare R2 because permission-gated user uploads should sit in a
-jurisdiction we can name; secrets as encrypted env vars; TLS and the two
-CNAMEs under pm.artsourced.in. The provider's name appears nowhere
-outside this directory, so both the AWS-Mumbai alternative and a later
-move to R2 stay contained swaps."
+jurisdiction we can name; secrets as encrypted env vars; TLS and two
+sibling CNAMEs, pm and pm-api, in the artsourced.in zone. The provider's
+name appears nowhere outside this directory, so both the AWS-Mumbai
+alternative and a later move to R2 stay contained swaps.
+
+Time is Asia/Kolkata on the deployed stack three ways, because one way
+was not enough: TZ on the server and worker processes so logs agree with
+the screens; ALTER DATABASE at provisioning so operator psql sessions
+agree too; and check-db-timezone.mjs to prove it on a connection that
+sets nothing. Plan 1's pool option covers app connections only, a pooler
+may drop startup options, and Plan 1's own SHOW TimeZone test runs
+against a database its helper already ALTERed — so that test cannot fail
+and cannot be what a deployment leans on."
 ```
 
 ### Task 16: Runbook, Features.md §13, test-cases/13 — and the whole-stack final smoke
@@ -3984,7 +4166,7 @@ move to R2 stay contained swaps."
 
 **Interfaces:**
 - Consumes: everything above.
-- Produces: the operational runbook; Features.md §13; test-cases 13.1–13.22. **Note:** the workspace convention routes runbooks to `/kb`; this repo keeps implementation docs in-repo. That tension is FLAGGED for the owner (Open questions #10), not resolved here — the runbook lands in-repo per this repo's own convention (`docs/`), and moves later if the owner rules otherwise.
+- Produces: the operational runbook; Features.md §13; test-cases 13.1–13.23. **Note:** the workspace convention routes runbooks to `/kb`; this repo keeps implementation docs in-repo. That tension is FLAGGED for the owner (Open questions #10), not resolved here — the runbook lands in-repo per this repo's own convention (`docs/`), and moves later if the owner rules otherwise.
 
 - [ ] **Step 1: Write `docs/runbook.md`**
 
@@ -4004,7 +4186,43 @@ confirm `GET /healthz` reports the new version.
 ## Deploy (first time)
 `deploy/do/README.md`. The stack is DigitalOcean App Platform + Managed
 PostgreSQL + Spaces, all BLR1 (signed off 2026-08-20), serving
-`pm.artsourced.in` with the API at `api.pm.artsourced.in`.
+`pm.artsourced.in`, with the API at `pm-api.artsourced.in` — two sibling
+single-label CNAMEs (`pm`, `pm-api`) in the `artsourced.in` zone, not a
+nested name.
+
+## Time — read this before reading any timestamp
+Owner decision, 2026-08-20: **time is Asia/Kolkata**, everywhere, in v1.
+Three separate settings hold that up, and they are not redundant:
+
+- **`TZ=Asia/Kolkata`** on the server and backup-worker processes (App
+  Platform env, `deploy/do/app.yaml`) — so log lines and anything the Node
+  runtime formats read the same clock the product's screens do.
+- **`ALTER DATABASE <db> SET timezone TO 'Asia/Kolkata'`** on the managed
+  database itself, at provisioning. This is why **an ad-hoc `psql` session
+  prints IST — by design, not by accident.** The app pool also asks for the
+  zone (Plan 1's `createPool` sends it as a startup parameter), but that
+  covers app connections only: your `psql`, a console query, and any pooler
+  that quietly drops startup options all bypass it. The database-level
+  default is what catches those.
+- **`pnpm check:db-tz`** (`scripts/check-db-timezone.mjs`) — connects with a
+  bare client that sets nothing and asserts `SHOW TimeZone` is
+  `Asia/Kolkata`. Run it after provisioning, after any database restore, and
+  after any managed-database maintenance that could reset defaults. It is
+  the only timezone check in the repo that can fail: Plan 1's `SHOW TimeZone`
+  test runs against a database its own helper already ALTERed, so it passes
+  either way and proves nothing about a deployment.
+
+**Both ledger clocks are absolute instants.** `client_time` (the claimed
+moment) and `server_time` (the received moment) are `timestamptz`, so they
+sort and compare with no cast, and one moment stated at `+05:30` and at `Z`
+is one moment. Neither column stores an offset label; changing a session's
+timezone changes only how an instant is *printed*, never what was stored.
+The two columns disagreeing is skew, which the product reports rather than
+hides — that is a fact about the claim, not a formatting artefact.
+
+The `BACKUP_TIME_UTC` / `LEDGER_EXPORT_TIME_UTC` schedule variables stay in
+UTC on purpose and are unaffected by `TZ` (the scheduler reads only UTC
+accessors). Translations are in the Backups section.
 
 ## Rotate secrets
 - `BETTER_AUTH_SECRET`, `SMTP_URL`, `ALERT_WEBHOOK_URL`, `S3_ACCESS_KEY`/
@@ -4036,6 +4254,14 @@ managed database's own daily backups are a second string, not the plan.
    as a ticket in the Gisik Nokma workspace (the product keeps its own
    operational memory; that is the point of it).
 
+**After a real restore into a real database** (not a drill): re-run
+`ALTER DATABASE <db> SET timezone TO 'Asia/Kolkata'` and then
+`pnpm check:db-tz`. A `createdb` produces a database with the cluster's
+default zone, and `pg_restore` restores objects, not the database-level
+settings that were attached to the old database. Skipping this leaves a
+recovered system whose operator queries silently read UTC — the stored
+instants are unharmed, but every person reading them is off by 5:30.
+
 ## Seeding production
 People are never invented: the owner signs in once first. Then, from a
 checkout with `DATABASE_URL` pointed at production:
@@ -4046,7 +4272,7 @@ seed is idempotent; the second run adds only the guest surface.
 checkout).
 
 ## Incident basics
-- Is it up? `curl https://api.pm.artsourced.in/healthz` — version tells you
+- Is it up? `curl https://pm-api.artsourced.in/healthz` — version tells you
   what is running. The uptime check emails before users do.
 - Logs: `doctl apps logs <app-id> server --follow` (JSON lines; `err`
   carries stacks). 5xx bursts also hit the alert webhook.
@@ -4080,7 +4306,8 @@ Append to `Features.md` (following the numbering: Plans 1–10 own §3–§12):
 - ⚙️ Restore path — `scripts/restore.sh` (scratch-guarded) + the automated restore drill: restore into scratch, `verify-projections` must be clean. `apps/server/test/ops/restore-drill.test.ts`
 - ✅ Deployed-stack E2E smoke — magic link via test inbox, refusal with named reason, comment satisfies, board reflects; guest visibility probe. `e2e/`
 - ⚙️ CI pipeline — lint → typecheck → unit → shared fixtures (both builds) → dual-client harness → E2E. `.github/workflows/ci.yml`
-- ⚙️ Production deployment — DigitalOcean App Platform + Managed PostgreSQL + Spaces, all BLR1, serving `pm.artsourced.in` (API at `api.pm.artsourced.in`); the spec is quarantined in `deploy/do/` so the provider's name appears nowhere in application code; runbook in `docs/runbook.md`.
+- ⚙️ Production deployment — DigitalOcean App Platform + Managed PostgreSQL + Spaces, all BLR1, serving `pm.artsourced.in` (API at `pm-api.artsourced.in`, a sibling single-label CNAME in the same zone); the spec is quarantined in `deploy/do/` so the provider's name appears nowhere in application code; runbook in `docs/runbook.md`.
+- ⚙️ Deployed-stack time is Asia/Kolkata — `TZ` on the server and worker processes, `ALTER DATABASE … SET timezone` on the managed database at provisioning (so operator `psql` sessions read IST too, which the app pool's startup parameter cannot guarantee), and `scripts/check-db-timezone.mjs` asserting `SHOW TimeZone` on a connection that sets nothing.
 ```
 
 - [ ] **Step 3: Write `test-cases/13-deployment-dogfooding.md`**
@@ -4112,8 +4339,9 @@ in the loop) · 🧪 verified manually at deploy time · ❌ not yet covered ·
 - 13.18 ✅ Restore drill: dump → bare scratch → pg_restore → verify-projections clean; planted drift in a restored projection is caught with the table named; the restored ledger still refuses UPDATEs. `test/ops/restore-drill.test.ts`
 - 13.19 ✅ E2E smoke on the deployed stack: magic link via Mailpit, ticket created, bare close refused with a visible non-empty reason, comment satisfies, board reflects after reload. `e2e/tests/smoke.spec.ts`
 - 13.20 ✅ E2E visibility: the guest sees the four shared tickets, not the rest; a direct URL probe of an unshared ticket shows not-found. `e2e/tests/visibility.spec.ts`
-- 13.21 🧪 Production provisioning on DigitalOcean BLR1 (Spaces buckets, the two `pm.artsourced.in` CNAMEs, TLS, secrets, uptime check) per deploy/do/README.md — verified at deploy time; a cloud control plane is not CI-testable from this repo.
+- 13.21 🧪 Production provisioning on DigitalOcean BLR1 (Spaces buckets, the two sibling CNAMEs `pm` and `pm-api` in the `artsourced.in` zone, TLS, secrets, uptime check) per deploy/do/README.md — verified at deploy time; a cloud control plane is not CI-testable from this repo.
 - 13.22 🧪 Monthly restore drill against a real production dump, recorded as a ticket in the Gisik Nokma workspace, per the runbook.
+- 13.23 ✅ `scripts/check-db-timezone.mjs` asserts the database's OWN default zone is `Asia/Kolkata` on a bare connection that sets no startup options and issues no `SET TIME ZONE` — and is proven falsifiable against a UTC database before it is trusted (Task 15 Step 2a). This is the timezone check that can fail: Plan 1's `SHOW TimeZone` test runs against a database `createTestDatabase` has already `ALTER DATABASE`d, so it passes whether or not the pool's `options` parameter was honoured. `scripts/check-db-timezone.mjs`; run at provisioning and after any real restore (runbook).
 ```
 
 - [ ] **Step 4: The whole-stack final smoke**
@@ -4126,18 +4354,20 @@ pnpm run build
 pnpm run test                                    # unit + integration incl. seeds and the drill
 pnpm run test:fixtures && pnpm run test:dual-client
 docker compose -f docker-compose.dev.yml up -d --build
+DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma pnpm run check:db-tz
 pnpm run test:e2e
 docker compose -f docker-compose.dev.yml exec server node dist/ops/backup-daemon-main.js --once
 docker compose -f docker-compose.dev.yml down
 ```
 
-Expected: every command exits 0; the backup prints both `complete` lines.
+Expected: every command exits 0; `check:db-tz` prints `database timezone:
+Asia/Kolkata`; the backup prints both `complete` lines.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add docs/runbook.md Features.md test-cases/13-deployment-dogfooding.md
-git commit -m "docs: runbook, Features.md §13, test-cases 13.1–13.22 — the catalogue moves with the work
+git commit -m "docs: runbook, Features.md §13, test-cases 13.1–13.23 — the catalogue moves with the work
 
 Deploy, rotation, backups, the monthly restore drill (recorded as a
 ticket in the product's own workspace — the keeper of memory keeps its
@@ -4152,7 +4382,7 @@ sideways."
 
 1. **Provider — SETTLED (owner sign-off 2026-08-20).** **DigitalOcean App Platform + Managed PostgreSQL + Spaces, all BLR1** — the same stack convenience-corner runs. This was written as a required sign-off before Task 15, weighing DigitalOcean BLR1 at ≈ $42/mo (list, approximate) against AWS Mumbai (ap-south-1); the owner took DigitalOcean, judging the one-YAML ops surface worth more to a one-operator team than AISPL's INR billing. AWS Mumbai stays **recorded as a considered alternative**, not an open question — the 12-factor env contract keeps it a `deploy/`-contained swap if the accountant's answer ever makes INR billing decisive. The shop's own accountant question (`ops:accountant-cloud-gst`, seeded by this very plan) remains open on its own terms — how to *treat* the spend — and does not reopen this. The USD invoicing that comes with it (forex markup on the card, GST on imported services under reverse charge) is an accepted, already-known cost carried over with the stack, recorded in the cost sketch. Task 15's gate is lifted.
 2. **Spaces in BLR1 — ANSWERED (not moot).** Spaces **Standard Storage IS available in BLR1**; no SGP1 fallback is needed and the `S3_ENDPOINT`/`S3_REGION` values in `deploy/do/app.yaml` stand as written (`https://blr1.digitaloceanspaces.com`, `blr1`). The one caveat worth writing down: Spaces **Cold Storage is not** offered in BLR1. Backups therefore stay on Standard — which is the right tier regardless, since nightly dumps and weekly ledger exports are read back on every monthly restore drill, and a cold tier optimises for objects nobody reads. **Cloudflare R2 was compared here and lost on data residency:** Gisik Nokma serves arbitrary user uploads behind per-viewer permission checks (unlike convenience-corner's owner-controlled public imagery), and R2 offers EU/US jurisdictions only, with `apac` a best-effort, unchangeable hint — it cannot pin bytes to India, while Spaces BLR1 keeps them beside the ledger that describes them. The cost gap at v1 scale is a few dollars a month. `ObjectStore`/`ObjectSink` are S3-protocol either way, so the swap stays cheap: **revisit R2 when monthly egress approaches 1 TiB**, where its zero egress charge starts to win materially.
-3. **Custom domain — SETTLED (owner sign-off 2026-08-20): `pm.artsourced.in`.** Branding was out of scope in the spec and `deploy/do/app.yaml` deliberately carried a placeholder; the owner has now picked a subdomain of the existing `artsourced.in` zone. The spec carries the real hosts: **`pm.artsourced.in`** for the web app and **`api.pm.artsourced.in`** for the API — the API nested under the product host so one zone and one name cover both, and DNS is two CNAMEs (`pm`, `api.pm`) with no apex/ALIAS handling and no disturbance to the zone's existing records. `WEB_ORIGIN`, `BETTER_AUTH_URL`, the two `NEXT_PUBLIC_*` build-time envs, the ingress rules and the uptime check all name them concretely; nothing in Task 15 waits on a decision any more.
+3. **Custom domain — SETTLED (owner sign-off 2026-08-20): `pm.artsourced.in`, with the API at `pm-api.artsourced.in`.** Branding was out of scope in the spec and `deploy/do/app.yaml` deliberately carried a placeholder; the owner has now picked subdomains of the existing `artsourced.in` zone. The spec carries the real hosts: **`pm.artsourced.in`** for the web app and **`pm-api.artsourced.in`** for the API — **two sibling single-label subdomains, not a nested name.** DNS is therefore two ordinary CNAMEs sitting side by side in one zone (`pm`, `pm-api`), each exactly one label deep: no nested-name handling, no wildcard, no apex/ALIAS record, and no disturbance to the zone's existing records. `WEB_ORIGIN`, `BETTER_AUTH_URL`, the two `NEXT_PUBLIC_*` build-time envs, the ingress rules and the uptime check all name them concretely; nothing in Task 15 waits on a decision any more.
 4. **Plan 8 template surfaces (assumed pins).** Export names `ERRAND_WITH_WAITS_TEMPLATE` / `SIMPLE_KANBAN_TEMPLATE` from `@gisik-nokma/domain`, and the errand template's structure: state ids `later`, `next`, `in-progress`, `waiting`, `done`; `waiting` carries `blocked: true`; every mapped state reachable in ONE transition from the initial state; every transition into `done` carries `require-comment`. `checkErrandTemplate` (Task 7) is the executable pin — if Plan 8's payload differs, amend the template or the coordination doc, never the check's honesty requirements (the one-hop rule is what keeps the seed from fabricating intermediate history).
 5. **Plan 6 surfaces (assumed pins).** The data-testid contract table; `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_WS_URL` env names; web package name `@gisik-nokma/web`; `output: 'standalone'` tolerated in its Next config; a `not-found` testid on the invisible-ticket page. Isolated to the two Dockerfile ARG lines, compose args, and the E2E helpers.
 6. **Plan 7 object-storage config names.** This plan pins `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_FORCE_PATH_STYLE` (compose + `.env.example` + backup sink). Plan 7's `ObjectStore` implementation should read the same names; if it landed different ones, reconcile via the coordination doc in one direction, not two.
@@ -4162,12 +4392,14 @@ sideways."
 10. **Runbook location.** The workspace convention routes runbooks to `/kb`; this repo keeps implementation docs in-repo (as with these plans). `docs/runbook.md` lands in-repo; the tension is the owner's to resolve, and moving the document later is cheap.
 11. **Branch protection — SETTLED (owner sign-off 2026-08-20): `main` stays unprotected.** This was written as a fork in the road — GitHub Pro, a public repo, or procedural discipline — because a free-plan private repo cannot enforce server-side protection of `main`, the exact wall the base project hit (`ops:owner-github-plan`, now a seeded ticket). The owner chose to stay on the free private plan, same as convenience-corner, and to carry the rule procedurally instead. **The compensating control is a standing instruction never to commit or push to `main` directly, recorded in the repo's `CLAUDE.md`** — where every session reads it before touching anything. The discipline is unchanged from what the spec always required: branch → PR → merge on explicit approval, CI green. What changes is only who enforces it: a written rule that people and agents follow, not a server that refuses. **No plan upgrade is proposed and none should be added** — this question is closed, not deferred.
 12. **Permission-gate bootstrap for server-origin seeds.** If Plan 4 wired `checkPermission` inside the ingest service (not only the HTTP route), the seed's `workspace.created`-then-`membership.granted` bootstrap order must match Plan 4's own workspace-creation flow. The seed integration test surfaces this immediately and loudly; adapt the seed's event order, never the gate.
+13. **Magic-link sender address — SETTLED (owner confirmed 2026-08-20): `sign-in@artsourced.in`.** The production `MAGIC_LINK_FROM` in `deploy/do/app.yaml` is the **apex** address, not a subdomain one. This was never an open choice in this plan and no sign-off is pending; the owner's confirmation is recorded here so it stays that way. Dev and CI keep `sign-in@gisik-nokma.local`, which never leaves Mailpit. *(Engineering note, not owner reasoning: at execution time confirm the apex's SPF/DKIM actually covers this sender before the first production magic link — an unauthenticated sign-in mail lands in spam, and sign-in is the one flow with no fallback.)*
+14. **Deployed-stack timezone — SETTLED (owner decision 2026-08-20: time is Asia/Kolkata), and deliberately not left to the app.** `TZ=Asia/Kolkata` on the server and worker processes, `ALTER DATABASE … SET timezone TO 'Asia/Kolkata'` on the managed database at provisioning, and `scripts/check-db-timezone.mjs` to prove it. The reason the database-level setting is not redundant with Plan 1's pool `options` parameter is recorded in `deploy/do/README.md` ("Why the database, not just the pool") and is worth restating here because it is a testing lesson, not only a deployment one: **Plan 1's `SHOW TimeZone` test cannot fail.** Its `createTestDatabase` helper runs the same `ALTER DATABASE` before the pool connects, so the assertion is satisfied whether or not the startup parameter was honoured. A check that cannot fail is not evidence, and a deployment must not rest on one. Nothing here is open; the item exists so the reasoning is not rediscovered the hard way.
 
 ## Self-review (per the writing-plans skill)
 
 **Spec coverage.** §7 Dogfooding: Convenience Corner workspace with the shop's actual errands on errand-with-waits with the accountant as guest — Tasks 7–9; Gisik Nokma workspace managing its own build — Task 10. Out-of-scope deferral (provider/region/pricing, India-reachable phone-first) — the production stack section + Task 15, now decided rather than flagged (owner sign-off 2026-08-20: DigitalOcean BLR1 + Spaces BLR1, `pm.artsourced.in`). §1 invariant 4 applied to seeds — the date-mapping table, the refusal paths, and the planted defects in Tasks 8/10. §3's scheduled verifier reaching operations — Tasks 12 and 16 (drill + runbook cadence). §7 testing discipline in CI order — Task 14 (shared fixtures in both builds, dual-client harness, E2E). §6's DLT constraint honoured operationally — Task 4 and the production stack section. Assignment items 1–10 map to Tasks 5–6 (containers/stack/env), the stack section + 15 (provider), 1–2 (TLS-adjacent config, rate limits, CORS), 11–12 (backups/restore/drill), 1+3 + the stack section (monitoring floor: healthz version, uptime check, structured logs, alert hook), 7–9 (CC seed), 10 (dev seed), 13 (E2E), 14 (CI + versioning + repo rule), 16 (runbook + catalogue). Gaps: none found.
 
-**Placeholder scan.** One near-miss was caught and rewritten during drafting (Task 8's description builder now appears once, finished). The placeholder hosts Task 15 once carried were deliberate and flagged rather than silent TODOs; they are now gone — the owner decided the domain on 2026-08-20 and `deploy/do/app.yaml` names `pm.artsourced.in` and `api.pm.artsourced.in` concretely, with the two `NEXT_PUBLIC_*` build-time envs filled in rather than deferred. The one remaining `<…>`-shaped value in the deploy tree is the Spaces key pair, which is a secret and belongs nowhere in the repo. Executor-verify notes (root script names, Plan 6/8/10 surface names, verify CLI filename) each name the exact file to check and the invariant that must survive the check — they are consumption notes on parallel plans' Produces, not deferred design.
+**Placeholder scan.** One near-miss was caught and rewritten during drafting (Task 8's description builder now appears once, finished). The placeholder hosts Task 15 once carried were deliberate and flagged rather than silent TODOs; they are now gone — the owner decided the domain on 2026-08-20 and `deploy/do/app.yaml` names `pm.artsourced.in` and `pm-api.artsourced.in` concretely (two sibling single-label subdomains in one zone, not a nested name), with the two `NEXT_PUBLIC_*` build-time envs filled in rather than deferred and `MAGIC_LINK_FROM=sign-in@artsourced.in` confirmed at the apex. The one remaining `<…>`-shaped value in the deploy tree is the Spaces key pair, which is a secret and belongs nowhere in the repo. Executor-verify notes (root script names, Plan 6/8/10 surface names, verify CLI filename) each name the exact file to check and the invariant that must survive the check — they are consumption notes on parallel plans' Produces, not deferred design.
 
 **Type consistency.** `SeedReport`/`CcSeedDeps` defined in Task 9, reused by Task 10's `seedDevWorkspace` — consistent. `seedUlid('ticket', 'cc#<id>')` convention identical in Task 8's tests, Task 9's runner, and the guest-visibility block. `ObjectSink.put(key, body, contentType)` matches between `object-sink.ts`, `export-ledger.ts`, `pg-dump.ts`, and both capture sinks in tests (the pg-dump capture sink accepts two args — TypeScript structural typing permits the narrower test double). `ErrorAlerter.notify(context, error)` consistent across Tasks 3 and 11. `checkErrandTemplate` returns `{ok:true}|{ok:false;problems}` in both definition and tests. Rate-limit values 10/120/60 agree between Task 1 defaults, Task 2 prose, compose overrides (60/600), `.env.example`, and the DO spec.
 
