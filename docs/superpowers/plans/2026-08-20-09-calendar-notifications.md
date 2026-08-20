@@ -102,7 +102,9 @@ Features.md                         # MODIFY — §11 "Calendar, timeline & noti
 test-cases/11-calendar-notifications.md  # NEW — cases 11.x
 ```
 
-**Out of scope, stated so nobody adds it:** timeline dependencies/critical-path (not in spec); drag-to-reschedule (the page renders; events author — the base's split, kept); custom `date`-kind fields on the Calendar/Timeline (dueDate/startDate only in v1 — flagged in Open questions); velocity/burndown/forecast anywhere (spec Out of scope, guarded by Task 15's scan); web push and native push transports (Plans 10/11 — the seam ships here); notification e-mail digests.
+**In scope by owner sign-off (2026-08-20), so nobody trims it back out:** custom `date`-kind fields render as claims on the Calendar and the Timeline — attributed, absent when unclaimed, labelled with the field's own name, and never forming a bar (Open questions 15 carries the full ruling; Tasks 8–11 implement it).
+
+**Out of scope, stated so nobody adds it:** timeline dependencies/critical-path (not in spec); drag-to-reschedule (the page renders; events author — the base's split, kept); spans drawn between a custom date field and anything else (a bar needs the `startDate`/`dueDate` pair — see above); custom date fields in the attention sweep (Task 6 watches `dueDate` alone, deliberately); velocity/burndown/forecast anywhere (spec Out of scope, guarded by Task 15's scan); web push and native push transports (Plans 10/11 — the seam ships here); notification e-mail digests.
 
 ---
 
@@ -2374,6 +2376,8 @@ git commit -m "notification routes: cursor inbox, unread count, mark-read — yo
 
 Everything the month grid shows is computed here, in a pure function over `TicketState[]` — no React, no DataSource, no clock reads (the month and `today` are inputs). The honesty invariants become theorems of this function: there is no code path that produces an item without a claim, and the planted-defect tests prove the three required guarantees — the undated ticket is absent (an all-undated board is an empty month that says why, echoing the reference calendar's "an undated item is absent, not estimated"), the invented date is impossible (every rendered date exists verbatim among the planted claims), and the attributed label is exact (`needed by 30 Aug — Kiro's claim`). A start-after-due contradiction renders as two attributed markers, never as a bar: negative geometry would be invented geometry.
 
+**Custom `date`-kind fields render here too (owner sign-off 2026-08-20, v1 scope).** A workspace that defines "Filed on" or "Inspection date" on a ticket type has claimed dates the calendar must not silently swallow. They enter on *identical* honesty terms: each renders as a marker attributed to its claimant with that claim's own timestamps, absent when unclaimed, and **labelled with the field's own name** — never a generic word like "date", because the name is the only thing that says what the day means. Two hard limits, both load-bearing: **(1) a bar still requires a `startDate` + `dueDate` pair.** No span is ever drawn between a custom date and anything else — pairing two arbitrary claims into geometry would invent a duration nobody claimed, which is exactly what invariant 4 forbids. Custom date claims are markers, full stop. **(2) A custom date claim carries no note.** Plan 3's kind check accepts a bare `'YYYY-MM-DD'` string for `type: 'date'` fields (unlike the day-claim built-ins' `{date, note?}`), so the tooltip is the label — there is nothing else to quote, and nothing is invented to fill the gap.
+
 **Files:**
 - Create (guarded, Step 0): `packages/app-core/package.json`, `packages/app-core/tsconfig.json`, `packages/app-core/vitest.config.ts`, `packages/app-core/src/index.ts`; `packages/ui/package.json`, `packages/ui/tsconfig.json`, `packages/ui/src/tokens.ts`, `packages/ui/src/index.ts`
 - Create: `packages/app-core/src/claims/dates.ts`
@@ -2385,20 +2389,23 @@ Everything the month grid shows is computed here, in a pure function over `Ticke
 - Test: `packages/app-core/src/claims/dates.test.ts`, `packages/app-core/src/claims/claim-labels.test.ts`, `packages/app-core/src/calendar/calendar-model.test.ts`
 
 **Interfaces:**
-- Consumes: `TicketState`, `FieldClaim`, `StateCategory` (`@gisik-nokma/domain`).
+- Consumes: `TicketState`, `FieldClaim`, `StateCategory`, `CustomFieldDef` (`@gisik-nokma/domain`).
 - Produces (Tasks 9–11 and Plan 6's shells consume; amendment 10 makes app-core the shared home):
   - `DAY_MS`, `dateMs(isoDate): number`, `isoDate(ms): string`, `addDays(isoDay, days): string`, `mondayOnOrBefore(isoDay): string`, `monthGridWeeks(year, month): string[][]` (Monday-start weeks covering the month, padded with adjacent-month days)
-  - `type DateClaimView = { date, note?, actorId, clientTime, serverTime, pending }`; `type TicketDatesInput = { state: TicketState; pendingFieldIds: readonly string[] }`; `dateClaimOf(input, 'startDate'|'dueDate'): DateClaimView | null`; `titleOf(state): string`
-  - `formatClaimDate('2026-08-30') === '30 Aug'`; `type UserNameFn = (userId: string) => string`; `dueClaimLabel`, `startClaimLabel`, `claimTooltip`, `barProvenance`, `contradictionCopy` (all `(claims, userName) => string`); `CALENDAR_EMPTY_MONTH_COPY`, `TIMELINE_SIDE_LIST_COPY` (exact strings below)
+  - `type DateClaimView = { date, note?, actorId, clientTime, serverTime, pending }`; `type CustomDateField = { id: string; name: string }`; `type TicketDatesInput = { state: TicketState; pendingFieldIds: readonly string[]; customDateFields?: readonly CustomDateField[] }`; `dateClaimOf(input, 'startDate'|'dueDate'): DateClaimView | null`; `titleOf(state): string`
+  - `type CustomDateClaimView = { fieldId, fieldName, date, actorId, clientTime, serverTime, pending }`; `customDateClaimsOf(input: TicketDatesInput): CustomDateClaimView[]` — one entry per *claimed* custom `date`-kind field, in the type's declared field order; an unclaimed or malformed field yields nothing at all
+  - `formatClaimDate('2026-08-30') === '30 Aug'`; `type UserNameFn = (userId: string) => string`; `dueClaimLabel`, `startClaimLabel`, `claimTooltip`, `barProvenance`, `contradictionCopy` (all `(claims, userName) => string`); `customClaimLabel(claim: CustomDateClaimView, userName): string` — `` `Filed on: 30 Aug — Kiro's claim` ``, the field's own name verbatim; `CALENDAR_EMPTY_MONTH_COPY`, `TIMELINE_SIDE_LIST_COPY` (exact strings below)
   - `epicAncestorOf(byId: Map<string, TicketState>, ticketId: string): string | null`
   - `type FilterSpec = { text?, assigneeIds?, collaboratorIds?, typeIds?, stateIds?, stateCategories?, projectIds? }`; `matchesFilter(state: TicketState, spec: FilterSpec): boolean` (guarded — Plan 6's wins if landed)
-  - `type CalendarMonth = { year, month }`; `type CalendarItem` (marker | bar union below); `type CalendarWeek = { days: string[]; items: CalendarItem[] }`; `type CalendarModel = { month, weeks, hasItems, emptyCopy: string | null }`; `buildCalendarModel(inputs: TicketDatesInput[], opts: CalendarMonth & { userName: UserNameFn; filter?: FilterSpec; laneEpicId?: string | null }): CalendarModel`
+  - `type CalendarMonth = { year, month }`; `type CalendarItem` (marker | bar union below — the marker member's `marker` is `'due' | 'start' | 'custom'`, and it carries `fieldId`/`fieldName`, `null` for the two built-ins); `type CalendarWeek = { days: string[]; items: CalendarItem[] }`; `type CalendarCustomFieldTally = { fieldId: string; fieldName: string; count: number }`; `type CalendarModel = { month, weeks, hasItems, emptyCopy: string | null; customDateFields: CalendarCustomFieldTally[] }` — the roster is the legend's source, tallied over the fields that actually placed a claim in this month and computed BEFORE legend hiding, so hiding a field never erases its own switch; `buildCalendarModel(inputs: TicketDatesInput[], opts: CalendarMonth & { userName: UserNameFn; filter?: FilterSpec; laneEpicId?: string | null; hiddenCustomFieldIds?: readonly string[] }): CalendarModel`
+
+**Where `customDateFields` comes from (the one adapter site).** `TicketDatesInput` already documents itself as the shape the mounting shell maps the DataSource's read result into; `customDateFields` joins it there — the shell resolves the ticket's `TicketTypeDef` and passes the `fields` entries whose `type` is `'date'`, as `{id, name}`. It is optional and defaults to none, so a shell that has not yet wired the type roster degrades to exactly today's behaviour (built-ins only) rather than to a wrong answer. app-core never fetches type definitions itself — a view-model that reached for data would stop being pure.
 
 - [ ] **Step 0: Guard — scaffold `packages/app-core` and `packages/ui` only if absent**
 
 Run: `ls packages/app-core/package.json packages/ui/src/tokens.ts 2>/dev/null`
 
-**Both exist** (Plan 6 landed first): skip the scaffolds; check `packages/ui/src/tokens.ts` for the token names used below (`color.surface`, `color.ink`, `color.inkMuted`, `color.line`, `color.accent`, `color.todayRing`, `color.pendingHatch`, `color.barActive`, `color.barTerminal`, `color.marker`, `color.contested`, `color.unreadDot`, `space.xs/sm/md/lg`, `radius.sm/md`, `font.body`) and ADD any missing key to `tokens.ts` (the one colour origin — never inline a literal instead). Also confirm the vitest environment is jsdom-capable; if not, add the config below.
+**Both exist** (Plan 6 landed first): skip the scaffolds; check `packages/ui/src/tokens.ts` for the token names used below (`color.surface`, `color.ink`, `color.inkMuted`, `color.line`, `color.accent`, `color.todayRing`, `color.pendingHatch`, `color.barActive`, `color.barTerminal`, `color.marker`, `color.customMarker`, `color.contested`, `color.unreadDot`, `space.xs/sm/md/lg`, `radius.sm/md`, `font.body`) and ADD any missing key to `tokens.ts` (the one colour origin — never inline a literal instead). Also confirm the vitest environment is jsdom-capable; if not, add the config below.
 
 **Absent** (this plan runs first): create the minimal scaffolds — Plan 6's executor will find them via its own guard and extend rather than recreate.
 
@@ -2525,6 +2532,7 @@ export const tokens = {
     barActive: '#9db4e6',
     barTerminal: '#b9d8c2',
     marker: '#8a5cd6',
+    customMarker: '#2f7d6b',
     contested: '#d6675c',
     unreadDot: '#d6675c',
   },
@@ -2584,6 +2592,7 @@ import {
   barProvenance,
   claimTooltip,
   contradictionCopy,
+  customClaimLabel,
   dueClaimLabel,
   formatClaimDate,
   startClaimLabel,
@@ -2610,6 +2619,23 @@ describe("attributed labels (spec §7's exact shape — planted-defect: the labe
     expect(claimTooltip("needed by 30 Aug — Kiro's claim", { date: '2026-08-30', actorId: 'user_kiro', note: 'GST filing' })).toBe(
       `needed by 30 Aug — Kiro's claim · "GST filing"`,
     );
+  });
+
+  it("a custom date claim wears the FIELD'S OWN NAME — never a generic word", () => {
+    expect(
+      customClaimLabel(
+        {
+          fieldId: 'filed-on',
+          fieldName: 'Filed on',
+          date: '2026-08-30',
+          actorId: 'user_kiro',
+          clientTime: '2026-08-19T10:00:00.000Z',
+          serverTime: '2026-08-19T10:00:01.000Z',
+          pending: false,
+        },
+        userName,
+      ),
+    ).toBe("Filed on: 30 Aug — Kiro's claim");
   });
 
   it('bar provenance names both claims and both authors', () => {
@@ -2696,15 +2722,34 @@ export type DateClaimView = {
   pending: boolean;
 };
 
+/** A custom `date`-kind field, reduced to what a view needs: which, and called what. */
+export type CustomDateField = { id: string; name: string };
+
+/** A claimed custom date. No `note`: Plan 3's kind check accepts a bare 'YYYY-MM-DD' string. */
+export type CustomDateClaimView = {
+  fieldId: string;
+  fieldName: string;
+  date: string;
+  actorId: string;
+  clientTime: string;
+  serverTime: string;
+  pending: boolean;
+};
+
 /**
- * What the views take from the DataSource: head state plus which fields'
- * latest claims are still in transit (outbox-applied, not yet accepted).
+ * What the views take from the DataSource: head state, which fields'
+ * latest claims are still in transit (outbox-applied, not yet accepted),
+ * and the ticket type's custom `date`-kind fields as {id, name}.
  * The adapter in src/data maps the DataSource's actual query result to this
- * shape — one site to adjust when Plan 6/10's exact result type lands.
+ * shape — one site to adjust when Plan 6/10's exact result type lands, and
+ * the one place that resolves a TicketTypeDef into `customDateFields`.
+ * Optional: a shell that has not wired the type roster yet renders the two
+ * built-ins only — narrower than the truth, never wrong about it.
  */
 export type TicketDatesInput = {
   state: TicketState;
   pendingFieldIds: readonly string[];
+  customDateFields?: readonly CustomDateField[];
 };
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
@@ -2723,6 +2768,32 @@ export function dateClaimOf(input: TicketDatesInput, fieldId: 'startDate' | 'due
     serverTime: claim.serverTime,
     pending: input.pendingFieldIds.includes(fieldId),
   };
+}
+
+/**
+ * Every CLAIMED custom date field, in the type's declared field order.
+ * Unclaimed is absent — there is no branch that emits an entry for a field
+ * nobody filled in, and none that guesses a value from a neighbouring one.
+ * A malformed stored value is skipped rather than coerced: rendering a
+ * half-parsed day would be inventing one.
+ */
+export function customDateClaimsOf(input: TicketDatesInput): CustomDateClaimView[] {
+  const claims: CustomDateClaimView[] = [];
+  for (const field of input.customDateFields ?? []) {
+    const claim = input.state.fields[field.id];
+    if (!claim || claim.value === null || claim.value === undefined) continue;
+    if (typeof claim.value !== 'string' || !DATE_ONLY.test(claim.value)) continue;
+    claims.push({
+      fieldId: field.id,
+      fieldName: field.name,
+      date: claim.value,
+      actorId: claim.actorId,
+      clientTime: claim.clientTime,
+      serverTime: claim.serverTime,
+      pending: input.pendingFieldIds.includes(field.id),
+    });
+  }
+  return claims;
 }
 
 export function titleOf(state: TicketState): string {
@@ -2751,6 +2822,19 @@ export function dueClaimLabel(claim: AttributedDate, userName: UserNameFn): stri
 
 export function startClaimLabel(claim: AttributedDate, userName: UserNameFn): string {
   return `starts ${formatClaimDate(claim.date)} — ${userName(claim.actorId)}'s claim`;
+}
+
+/**
+ * A custom date claim, labelled with the FIELD'S OWN NAME (owner sign-off
+ * 2026-08-20). "Filed on: 30 Aug — Kiro's claim". The name is user-authored
+ * and arbitrary, so it is placed verbatim ahead of a colon rather than
+ * inflected into a sentence: we cannot know whether "Inspection date" wants
+ * "on", "by" or nothing, and guessing grammar around someone's own words is
+ * the same failure as guessing their dates. The colon carries the relation;
+ * the name carries the meaning.
+ */
+export function customClaimLabel(claim: { fieldName: string; date: string; actorId: string }, userName: UserNameFn): string {
+  return `${claim.fieldName}: ${formatClaimDate(claim.date)} — ${userName(claim.actorId)}'s claim`;
 }
 
 /** The note travels quoted, never paraphrased. */
@@ -2865,7 +2949,11 @@ function claimField(value: unknown, actorId = 'user_kiro') {
 
 let counter = 0;
 
-function ticket(overrides: Partial<TicketState> = {}, pendingFieldIds: string[] = []): TicketDatesInput {
+function ticket(
+  overrides: Partial<TicketState> = {},
+  pendingFieldIds: string[] = [],
+  customDateFields: readonly { id: string; name: string }[] = [],
+): TicketDatesInput {
   counter += 1;
   const base: TicketState = {
     id: `t${counter}`,
@@ -2883,7 +2971,11 @@ function ticket(overrides: Partial<TicketState> = {}, pendingFieldIds: string[] 
     // If the landed TicketState carries more required fields (e.g. a
     // workflowVersion), extend THIS builder — it is the single site.
   } as TicketState;
-  return { state: { ...base, ...overrides, fields: { ...base.fields, ...overrides.fields } }, pendingFieldIds };
+  return {
+    state: { ...base, ...overrides, fields: { ...base.fields, ...overrides.fields } },
+    pendingFieldIds,
+    customDateFields,
+  };
 }
 
 function allItems(model: ReturnType<typeof buildCalendarModel>): CalendarItem[] {
@@ -2966,6 +3058,123 @@ describe('the attributed label is EXACT (planted defect — spec §7)', () => {
   });
 });
 
+describe('custom date-kind fields are claims like any other (owner sign-off 2026-08-20)', () => {
+  const FILED_ON = [{ id: 'filed-on', name: 'Filed on' }];
+  const INSPECTION = [{ id: 'inspection', name: 'Inspection date' }];
+
+  it("PLANTED DEFECT: a custom date claim renders with its OWN field name and its OWN author", () => {
+    const model = buildCalendarModel(
+      [
+        ticket(
+          { fields: { title: claimField('GST return'), 'filed-on': claimField('2026-08-30', 'user_anselma') } },
+          [],
+          FILED_ON,
+        ),
+      ],
+      { ...AUG, userName },
+    );
+    const items = allItems(model);
+    expect(items).toHaveLength(1);
+    const [item] = items;
+    expect(item.kind).toBe('marker');
+    if (item.kind !== 'marker') throw new Error('expected a marker');
+    // The generic-word defect: labelling this "needed by …" or "date 30 Aug"
+    // loses the only thing that says what the day MEANS.
+    expect(item.label).toBe("Filed on: 30 Aug — Anselma's claim");
+    expect(item.marker).toBe('custom');
+    expect(item.fieldId).toBe('filed-on');
+    expect(item.fieldName).toBe('Filed on');
+    expect(item.claim.actorId).toBe('user_anselma');
+    expect(item.date).toBe('2026-08-30');
+    // and the roster the legend reads names it too
+    expect(model.customDateFields).toEqual([{ fieldId: 'filed-on', fieldName: 'Filed on', count: 1 }]);
+  });
+
+  it('PLANTED DEFECT: an UNCLAIMED custom date field puts nothing on the calendar', () => {
+    // The field is defined on the type; nobody filled it in. A defect that
+    // emitted a placeholder marker (or borrowed the due date for it) shows up
+    // here as an item where there must be none.
+    const model = buildCalendarModel(
+      [ticket({ fields: { title: claimField('Never filed') } }, [], FILED_ON)],
+      { ...AUG, userName },
+    );
+    expect(allItems(model)).toHaveLength(0);
+    expect(model.hasItems).toBe(false);
+    expect(model.emptyCopy).toBe(CALENDAR_EMPTY_MONTH_COPY);
+    expect(model.customDateFields).toEqual([]); // an unclaimed field earns no legend entry either
+  });
+
+  it('NO span is invented between a custom date and a built-in day claim', () => {
+    const model = buildCalendarModel(
+      [
+        ticket(
+          {
+            fields: {
+              title: claimField('Inspection then due'),
+              inspection: claimField('2026-08-12'),
+              dueDate: claimField({ date: '2026-08-30' }),
+            },
+          },
+          [],
+          INSPECTION,
+        ),
+      ],
+      { ...AUG, userName },
+    );
+    const items = allItems(model);
+    expect(items.every((item) => item.kind === 'marker')).toBe(true);
+    expect(items).toHaveLength(2); // two markers, never one bar spanning 12→30 Aug
+  });
+
+  it('a bar STILL requires the start+due pair, and custom claims ride alongside it as markers', () => {
+    const model = buildCalendarModel(
+      [
+        ticket(
+          {
+            fields: {
+              title: claimField('Fully dated'),
+              startDate: claimField({ date: '2026-08-24' }),
+              dueDate: claimField({ date: '2026-08-28' }),
+              'filed-on': claimField('2026-08-26'),
+            },
+          },
+          [],
+          FILED_ON,
+        ),
+      ],
+      { ...AUG, userName },
+    );
+    const items = allItems(model);
+    expect(items.filter((item) => item.kind === 'bar')).toHaveLength(1);
+    expect(items.filter((item) => item.kind === 'marker' && item.marker === 'custom')).toHaveLength(1);
+  });
+
+  it('the legend switch hides a field without erasing its own switch — arrangement, not data', () => {
+    const inputs = [
+      ticket({ fields: { title: claimField('One'), 'filed-on': claimField('2026-08-11') } }, [], FILED_ON),
+      ticket({ fields: { title: claimField('Two'), 'filed-on': claimField('2026-08-18') } }, [], FILED_ON),
+    ];
+    const shown = buildCalendarModel(inputs, { ...AUG, userName });
+    expect(allItems(shown)).toHaveLength(2);
+    expect(shown.customDateFields).toEqual([{ fieldId: 'filed-on', fieldName: 'Filed on', count: 2 }]);
+
+    const hidden = buildCalendarModel(inputs, { ...AUG, userName, hiddenCustomFieldIds: ['filed-on'] });
+    expect(allItems(hidden)).toHaveLength(0);
+    // the tally is computed before hiding, so the switch is still there to flip back
+    expect(hidden.customDateFields).toEqual([{ fieldId: 'filed-on', fieldName: 'Filed on', count: 2 }]);
+  });
+
+  it('a pending custom claim stays visibly in transit', () => {
+    const model = buildCalendarModel(
+      [ticket({ fields: { title: claimField('In flight'), 'filed-on': claimField('2026-08-11') } }, ['filed-on'], FILED_ON)],
+      { ...AUG, userName },
+    );
+    const [item] = allItems(model);
+    if (item.kind !== 'marker') throw new Error('expected a marker');
+    expect(item.claim.pending).toBe(true);
+  });
+});
+
 describe('bars, weeks, filters, pending', () => {
   it('a start→due pair renders one bar per week row it crosses, clamped to the row', () => {
     const model = buildCalendarModel(
@@ -3034,11 +3243,19 @@ import {
   CALENDAR_EMPTY_MONTH_COPY,
   barProvenance,
   claimTooltip,
+  customClaimLabel,
   dueClaimLabel,
   startClaimLabel,
   type UserNameFn,
 } from '../claims/claim-labels';
-import { dateClaimOf, titleOf, type DateClaimView, type TicketDatesInput } from '../claims/ticket-dates';
+import {
+  customDateClaimsOf,
+  dateClaimOf,
+  titleOf,
+  type CustomDateClaimView,
+  type DateClaimView,
+  type TicketDatesInput,
+} from '../claims/ticket-dates';
 import { epicAncestorOf } from '../hierarchy/epic-ancestor';
 import { matchesFilter, type FilterSpec } from '../filter/filter-spec';
 
@@ -3050,8 +3267,12 @@ export type CalendarItem =
       ticketId: string;
       title: string;
       date: string;
-      marker: 'due' | 'start';
-      claim: DateClaimView;
+      /** 'custom' is a claimed custom `date`-kind field (owner sign-off 2026-08-20). */
+      marker: 'due' | 'start' | 'custom';
+      /** The field's own id/name when marker === 'custom'; null for the two built-ins. */
+      fieldId: string | null;
+      fieldName: string | null;
+      claim: DateClaimView | CustomDateClaimView;
       label: string;
       tooltip: string;
     }
@@ -3069,25 +3290,46 @@ export type CalendarItem =
 
 export type CalendarWeek = { days: string[]; items: CalendarItem[] };
 
+/** One legend row: a custom date field that actually placed a claim this month. */
+export type CalendarCustomFieldTally = { fieldId: string; fieldName: string; count: number };
+
 export type CalendarModel = {
   month: CalendarMonth;
   weeks: CalendarWeek[];
   hasItems: boolean;
   emptyCopy: string | null;
+  /**
+   * The legend's source, tallied over claims that land inside this month's
+   * grid and computed BEFORE `hiddenCustomFieldIds` is applied — hiding a
+   * field must not erase the switch that unhides it. A field nobody claimed
+   * is absent entirely: the legend describes the grid, not the schema.
+   */
+  customDateFields: CalendarCustomFieldTally[];
 };
 
 export type CalendarModelOptions = CalendarMonth & {
   userName: UserNameFn;
   filter?: FilterSpec;
   laneEpicId?: string | null;
+  /** View state from the legend switches. Arrangement, never data. */
+  hiddenCustomFieldIds?: readonly string[];
 };
+
+function markerRank(item: CalendarItem): string {
+  if (item.kind === 'bar') return '';
+  return item.marker === 'custom' ? `custom:${item.fieldId ?? ''}` : item.marker;
+}
 
 function itemOrder(a: CalendarItem, b: CalendarItem): number {
   if (a.kind !== b.kind) return a.kind === 'bar' ? -1 : 1; // bars first
   const aDate = a.kind === 'bar' ? a.start : a.date;
   const bDate = b.kind === 'bar' ? b.start : b.date;
   if (aDate !== bDate) return aDate < bDate ? -1 : 1;
-  return a.ticketId < b.ticketId ? -1 : a.ticketId > b.ticketId ? 1 : 0;
+  if (a.ticketId !== b.ticketId) return a.ticketId < b.ticketId ? -1 : 1;
+  // two claims, same ticket, same day: order by which claim, so the grid is stable
+  const aRank = markerRank(a);
+  const bRank = markerRank(b);
+  return aRank < bRank ? -1 : aRank > bRank ? 1 : 0;
 }
 
 /**
@@ -3095,6 +3337,13 @@ function itemOrder(a: CalendarItem, b: CalendarItem): number {
  * no branch that fabricates a date (invariant 4). Contradictory claims
  * (start after due) render as two attributed markers, never as a bar:
  * negative geometry would be invented geometry.
+ *
+ * Custom `date`-kind fields (owner sign-off 2026-08-20) join as markers on
+ * the same terms, labelled with their own field names. THEY NEVER FORM
+ * BARS: a bar requires the `startDate` + `dueDate` pair and nothing else,
+ * because a span between two unrelated claims is a duration nobody claimed.
+ * There is deliberately no code path below that pairs a custom date with
+ * anything.
  */
 export function buildCalendarModel(inputs: TicketDatesInput[], opts: CalendarModelOptions): CalendarModel {
   const byId = new Map<string, TicketState>(inputs.map((input) => [input.state.id, input.state]));
@@ -3105,11 +3354,34 @@ export function buildCalendarModel(inputs: TicketDatesInput[], opts: CalendarMod
   });
 
   const items: CalendarItem[] = [];
+  const customItems: CalendarItem[] = [];
   for (const input of visible) {
     const start = dateClaimOf(input, 'startDate');
     const due = dateClaimOf(input, 'dueDate');
     const title = titleOf(input.state);
     const ticketId = input.state.id;
+
+    // Custom date claims are independent of the start/due story — they are
+    // collected first and unconditionally, so no `continue` below can drop
+    // them, and no pairing logic can reach them.
+    for (const claim of customDateClaimsOf(input)) {
+      const label = customClaimLabel(claim, opts.userName);
+      customItems.push({
+        kind: 'marker',
+        ticketId,
+        title,
+        date: claim.date,
+        marker: 'custom',
+        fieldId: claim.fieldId,
+        fieldName: claim.fieldName,
+        claim,
+        label,
+        // A custom date claim carries no note (Plan 3 takes a bare
+        // 'YYYY-MM-DD'), so the tooltip is the label — nothing to quote.
+        tooltip: label,
+      });
+    }
+
     if (start && due && start.date <= due.date) {
       items.push({
         kind: 'bar',
@@ -3126,26 +3398,52 @@ export function buildCalendarModel(inputs: TicketDatesInput[], opts: CalendarMod
     }
     if (due) {
       const label = dueClaimLabel(due, opts.userName);
-      items.push({ kind: 'marker', ticketId, title, date: due.date, marker: 'due', claim: due, label, tooltip: claimTooltip(label, due) });
+      items.push({ kind: 'marker', ticketId, title, date: due.date, marker: 'due', fieldId: null, fieldName: null, claim: due, label, tooltip: claimTooltip(label, due) });
     }
     if (start) {
       const label = startClaimLabel(start, opts.userName);
-      items.push({ kind: 'marker', ticketId, title, date: start.date, marker: 'start', claim: start, label, tooltip: claimTooltip(label, start) });
+      items.push({ kind: 'marker', ticketId, title, date: start.date, marker: 'start', fieldId: null, fieldName: null, claim: start, label, tooltip: claimTooltip(label, start) });
     }
     // No claims → nothing. The undated ticket is absent, not estimated.
   }
 
-  const weeks: CalendarWeek[] = monthGridWeeks(opts.year, opts.month).map((days) => {
+  const gridWeeks = monthGridWeeks(opts.year, opts.month);
+  const gridFirst = gridWeeks[0][0];
+  const gridLast = gridWeeks[gridWeeks.length - 1][6];
+
+  // The legend describes what this grid actually shows, so its bounds are
+  // the grid's — not the calendar month's. A switch always corresponds to
+  // something on screen, and everything on screen has a switch.
+  const tally = new Map<string, CalendarCustomFieldTally>();
+  for (const item of customItems) {
+    if (item.kind !== 'marker' || item.fieldId === null) continue;
+    if (item.date < gridFirst || item.date > gridLast) continue;
+    const existing = tally.get(item.fieldId);
+    if (existing) existing.count += 1;
+    else tally.set(item.fieldId, { fieldId: item.fieldId, fieldName: item.fieldName ?? item.fieldId, count: 1 });
+  }
+  const customDateFields = [...tally.values()].sort((a, b) => (a.fieldName < b.fieldName ? -1 : a.fieldName > b.fieldName ? 1 : 0));
+
+  const hidden = new Set(opts.hiddenCustomFieldIds ?? []);
+  const shown = [...items, ...customItems.filter((item) => item.kind !== 'marker' || item.fieldId === null || !hidden.has(item.fieldId))];
+
+  const weeks: CalendarWeek[] = gridWeeks.map((days) => {
     const first = days[0];
     const last = days[6];
-    const inWeek = items
+    const inWeek = shown
       .filter((item) => (item.kind === 'bar' ? item.start <= last && item.end >= first : item.date >= first && item.date <= last))
       .sort(itemOrder);
     return { days, items: inWeek };
   });
 
   const hasItems = weeks.some((week) => week.items.length > 0);
-  return { month: { year: opts.year, month: opts.month }, weeks, hasItems, emptyCopy: hasItems ? null : CALENDAR_EMPTY_MONTH_COPY };
+  return {
+    month: { year: opts.year, month: opts.month },
+    weeks,
+    hasItems,
+    emptyCopy: hasItems ? null : CALENDAR_EMPTY_MONTH_COPY,
+    customDateFields,
+  };
 }
 ```
 
@@ -3176,7 +3474,9 @@ git commit -m "calendar view-model: a pure fold from claims to weeks — no bran
 
 ### Task 9: `CalendarView` — the month grid component
 
-A React DOM component over Task 8's model (web + desktop render it directly; mobile reuses the view-model under native navigation, amendment 17). All state is view state: which month, which weeks are expanded. Colours come only from `@gisik-nokma/ui` tokens. `today` is a prop, injected — the component never reads the clock, so tests are deterministic and the today-ring is provable.
+A React DOM component over Task 8's model (web + desktop render it directly; mobile reuses the view-model under native navigation, amendment 17). All state is view state: which month, which weeks are expanded, which custom date fields are switched off. Colours come only from `@gisik-nokma/ui` tokens. `today` is a prop, injected — the component never reads the clock, so tests are deterministic and the today-ring is provable.
+
+**The custom-date legend (the readability affordance, and why it is the smallest honest one).** A workspace can define many `date`-kind fields; a month where four of them all claimed days is unreadable, and unreadable is its own kind of dishonest. The affordance is a legend: one row per custom date field that actually placed a claim in this grid, showing the field's own name and how many claims it placed, each row a checkbox that hides or shows that field's markers. It is the smallest honest design available because (a) it invents nothing — the roster comes from claims that exist, so an unclaimed field never appears and a field's name is never paraphrased; (b) it needs no server round-trip, no schema read, and no stored preference, so it cannot go stale or disagree with the ledger; (c) it is symmetrical with the per-week `+n more` fold already here — pure view state, reset by nothing but the user; and (d) hiding is visibly reversible, because the tally is computed before hiding, so a switched-off field keeps its own switch and its own count. Rejected as bigger without being more honest: a saved per-user preference (Task 13's machinery for a decision that lasts one glance), a server-side field filter (turns arrangement into a query), and colour-coding without switches (readable for three fields, worse than nothing for eight).
 
 **Files:**
 - Create: `packages/app-core/src/calendar/CalendarView.tsx`
@@ -3188,6 +3488,7 @@ A React DOM component over Task 8's model (web + desktop render it directly; mob
 - Produces (Plan 6 mounts it; Plan 10's replica shell mounts the same component):
   - `type CalendarViewProps = { tickets: TicketDatesInput[]; today: string; userName: UserNameFn; onOpenTicket: (ticketId: string) => void; filter?: FilterSpec; laneEpicId?: string | null; initialMonth?: CalendarMonth }`
   - `CalendarView(props: CalendarViewProps): JSX.Element` — month nav (‹ Today ›), today ring (`aria-current="date"` + `data-today`), per-week overflow (`+n more` expands on click, `show fewer` collapses), every item is a button that calls `onOpenTicket`, provenance in the `title` attribute (hover/tap), pending items carry `data-pending="true"` and the pending token colour.
+  - Custom date markers carry `data-field-id="<the field's own id>"` and render in `tokens.color.customMarker`; the legend is a `<fieldset aria-label="Claimed date fields">` of checkboxes, one per entry in `model.customDateFields`, labelled `"<Field name> (<count>)"`, all checked by default, and rendered only when there is at least one entry — an empty legend is chrome, and chrome that says nothing is noise.
   - `MAX_VISIBLE_PER_WEEK = 4`.
 
 - [ ] **Step 1: Write the failing component tests**
@@ -3195,7 +3496,7 @@ A React DOM component over Task 8's model (web + desktop render it directly; mob
 `packages/app-core/src/calendar/CalendarView.test.tsx`:
 
 ```tsx
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
 import { CALENDAR_EMPTY_MONTH_COPY } from '../claims/claim-labels';
@@ -3211,7 +3512,11 @@ function claimField(value: unknown, actorId = 'user_kiro') {
 
 let counter = 0;
 
-function ticket(overrides: Partial<TicketState> = {}, pendingFieldIds: string[] = []): TicketDatesInput {
+function ticket(
+  overrides: Partial<TicketState> = {},
+  pendingFieldIds: string[] = [],
+  customDateFields: readonly { id: string; name: string }[] = [],
+): TicketDatesInput {
   counter += 1;
   const base: TicketState = {
     id: `t${counter}`,
@@ -3227,7 +3532,11 @@ function ticket(overrides: Partial<TicketState> = {}, pendingFieldIds: string[] 
     fields: { title: claimField(`Ticket ${counter}`) },
     transitions: [],
   } as TicketState;
-  return { state: { ...base, ...overrides, fields: { ...base.fields, ...overrides.fields } }, pendingFieldIds };
+  return {
+    state: { ...base, ...overrides, fields: { ...base.fields, ...overrides.fields } },
+    pendingFieldIds,
+    customDateFields,
+  };
 }
 
 const TODAY = '2026-08-23';
@@ -3284,6 +3593,44 @@ describe('CalendarView', () => {
     expect(screen.getByRole('heading', { name: 'September 2026' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Today' }));
     expect(screen.getByRole('heading', { name: 'August 2026' })).toBeInTheDocument();
+  });
+
+  it("a custom date claim renders under its own field name and opens its ticket", () => {
+    const input = ticket(
+      { fields: { title: claimField('GST return'), 'filed-on': claimField('2026-08-30') } },
+      [],
+      [{ id: 'filed-on', name: 'Filed on' }],
+    );
+    const onOpenTicket = renderCalendar([input]);
+    const marker = screen.getByRole('button', { name: /Filed on: 30 Aug — Kiro's claim/ });
+    expect(marker).toHaveAttribute('data-field-id', 'filed-on');
+    fireEvent.click(marker);
+    expect(onOpenTicket).toHaveBeenCalledWith(input.state.id);
+  });
+
+  it('the legend lists each claimed date field by its own name and switches it off and back on', () => {
+    const fields = [{ id: 'filed-on', name: 'Filed on' }];
+    renderCalendar([
+      ticket({ fields: { title: claimField('One'), 'filed-on': claimField('2026-08-11') } }, [], fields),
+      ticket({ fields: { title: claimField('Two'), 'filed-on': claimField('2026-08-18') } }, [], fields),
+    ]);
+    const legend = screen.getByRole('group', { name: 'Claimed date fields' });
+    const toggle = within(legend).getByRole('checkbox', { name: 'Filed on (2)' });
+    expect(toggle).toBeChecked();
+    expect(screen.getAllByRole('button', { name: /Filed on:/ })).toHaveLength(2);
+
+    fireEvent.click(toggle);
+    expect(screen.queryAllByRole('button', { name: /Filed on:/ })).toHaveLength(0);
+    // the switch survives its own use — hiding is visibly reversible
+    expect(within(legend).getByRole('checkbox', { name: 'Filed on (2)' })).not.toBeChecked();
+
+    fireEvent.click(toggle);
+    expect(screen.getAllByRole('button', { name: /Filed on:/ })).toHaveLength(2);
+  });
+
+  it('a month with no custom date claims renders no legend — empty chrome is noise', () => {
+    renderCalendar([ticket({ fields: { title: claimField('Plain'), dueDate: claimField({ date: '2026-08-28' }) } })]);
+    expect(screen.queryByRole('group', { name: 'Claimed date fields' })).toBeNull();
   });
 });
 ```
@@ -3366,6 +3713,11 @@ const itemButtonStyle = {
 export function CalendarView(props: CalendarViewProps) {
   const [month, setMonth] = useState<CalendarMonth>(props.initialMonth ?? monthOf(props.today));
   const [expandedWeeks, setExpandedWeeks] = useState<ReadonlySet<number>>(new Set());
+  // Legend switches: pure view state, like expandedWeeks. Nothing is stored,
+  // nothing is fetched — a decision that lasts one glance is not a preference.
+  const [hiddenFields, setHiddenFields] = useState<ReadonlySet<string>>(new Set());
+
+  const hiddenCustomFieldIds = useMemo(() => [...hiddenFields], [hiddenFields]);
 
   const model = useMemo(
     () =>
@@ -3374,8 +3726,9 @@ export function CalendarView(props: CalendarViewProps) {
         userName: props.userName,
         filter: props.filter,
         laneEpicId: props.laneEpicId,
+        hiddenCustomFieldIds,
       }),
-    [props.tickets, props.userName, props.filter, props.laneEpicId, month],
+    [props.tickets, props.userName, props.filter, props.laneEpicId, month, hiddenCustomFieldIds],
   );
 
   function moveTo(next: CalendarMonth): void {
@@ -3395,6 +3748,18 @@ export function CalendarView(props: CalendarViewProps) {
     });
   }
 
+  function toggleField(fieldId: string): void {
+    setHiddenFields((current) => {
+      const next = new Set(current);
+      if (next.has(fieldId)) {
+        next.delete(fieldId);
+      } else {
+        next.add(fieldId);
+      }
+      return next;
+    });
+  }
+
   return (
     <div style={{ fontFamily: tokens.font.body, color: tokens.color.ink, background: tokens.color.surface }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: tokens.space.sm, padding: tokens.space.sm }}>
@@ -3405,6 +3770,36 @@ export function CalendarView(props: CalendarViewProps) {
       </header>
       {!model.hasItems && model.emptyCopy !== null && (
         <p role="note" style={{ padding: tokens.space.md, color: tokens.color.inkMuted }}>{model.emptyCopy}</p>
+      )}
+      {model.customDateFields.length > 0 && (
+        <fieldset
+          aria-label="Claimed date fields"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: tokens.space.md,
+            margin: `0 ${tokens.space.sm} ${tokens.space.sm}`,
+            padding: tokens.space.xs,
+            border: `1px solid ${tokens.color.line}`,
+            borderRadius: tokens.radius.sm,
+          }}
+        >
+          {model.customDateFields.map((field) => (
+            <label
+              key={field.fieldId}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: tokens.space.xs, color: tokens.color.customMarker }}
+            >
+              <input
+                type="checkbox"
+                checked={!hiddenFields.has(field.fieldId)}
+                onChange={() => toggleField(field.fieldId)}
+              />
+              {/* The field's own name, never a generic word — and the count,
+                  so a switched-off field still says how much it is hiding. */}
+              {field.fieldName} ({field.count})
+            </label>
+          ))}
+        </fieldset>
       )}
       {model.weeks.map((week, weekIndex) => {
         const expanded = expandedWeeks.has(weekIndex);
@@ -3460,16 +3855,24 @@ export function CalendarView(props: CalendarViewProps) {
                     </button>
                   </li>
                 ) : (
-                  <li key={`${item.marker}:${item.ticketId}`} style={{ gridColumn: markerColumn(item.date, week.days) }}>
+                  <li
+                    key={`${item.marker}:${item.fieldId ?? ''}:${item.ticketId}`}
+                    style={{ gridColumn: markerColumn(item.date, week.days) }}
+                  >
                     <button
                       type="button"
                       data-pending={item.claim.pending || undefined}
+                      data-field-id={item.fieldId ?? undefined}
                       title={item.tooltip}
                       onClick={() => props.onOpenTicket(item.ticketId)}
                       style={{
                         ...itemButtonStyle,
                         background: 'transparent',
-                        color: item.claim.pending ? tokens.color.inkMuted : tokens.color.marker,
+                        color: item.claim.pending
+                          ? tokens.color.inkMuted
+                          : item.marker === 'custom'
+                            ? tokens.color.customMarker
+                            : tokens.color.marker,
                       }}
                     >
                       ◆ {item.label}
@@ -3520,22 +3923,26 @@ git commit -m "CalendarView: month grid over the pure model — today is a prop,
 
 Week-column Gantt-lite, from the same `TicketDatesInput`s. The rule the whole task exists to enforce: **a bar requires BOTH a claimed start and a claimed due.** Everything else goes to the "undated or partially dated" side list with an attributed note — including the start-after-due contradiction, which is displayed as a contradiction, never resolved into geometry. Grouping is by epic ancestor (arrangement, not data). No dependencies, no critical path — out of spec.
 
+**Custom `date`-kind fields on the timeline (owner sign-off 2026-08-20).** They ride along on the ticket — attributed, labelled with the field's own name — and they change **nothing** about geometry or side-list membership. Both halves of that are deliberate. Geometry: a custom date never starts, ends, or extends a bar; the only pair that draws one is `startDate` + `dueDate`. Membership: which side of the timeline a ticket lands on is decided by that pair alone, exactly as before — a ticket carrying only a "Filed on" claim still has no span to draw and still belongs in the side list. The one thing that must change is the *wording*: telling a ticket with a claimed "Filed on" date that it has "no claimed dates" would be false, so that case gets `NO_DAY_CLAIMS_NOTE` ("no claimed start or needed-by") while the genuinely bare ticket keeps `NO_DATES_NOTE` verbatim. There is no legend here: the timeline shows at most a handful of claims per row, in a row that is already labelled with its ticket, so marker density — the problem the calendar's legend solves — does not arise.
+
 **Files:**
 - Create: `packages/app-core/src/timeline/timeline-model.ts`
 - Test: `packages/app-core/src/timeline/timeline-model.test.ts`
 - Modify: `packages/app-core/src/index.ts`
 
 **Interfaces:**
-- Consumes: `dateClaimOf`, `titleOf`, `TicketDatesInput`, `DateClaimView` (Task 8); `addDays`, `dateMs`, `mondayOnOrBefore`, `DAY_MS`; `barProvenance`, `contradictionCopy`, `dueClaimLabel`, `startClaimLabel`, `formatClaimDate`, `TIMELINE_SIDE_LIST_COPY`, `UserNameFn`; `epicAncestorOf`; `matchesFilter`/`FilterSpec`.
+- Consumes: `dateClaimOf`, `customDateClaimsOf`, `titleOf`, `TicketDatesInput`, `DateClaimView`, `CustomDateClaimView` (Task 8); `addDays`, `dateMs`, `mondayOnOrBefore`, `DAY_MS`; `barProvenance`, `contradictionCopy`, `customClaimLabel`, `dueClaimLabel`, `startClaimLabel`, `formatClaimDate`, `TIMELINE_SIDE_LIST_COPY`, `UserNameFn`; `epicAncestorOf`; `matchesFilter`/`FilterSpec`.
 - Produces (Task 11 renders it; mobile view-models reuse it):
   - `type TimelineWeekCol = { start: string; label: string }` — label `W 17 Aug` (formatClaimDate of the Monday)
   - `type TimelineBarSpan = { fromWeek: number; toWeek: number; clippedStart: boolean; clippedEnd: boolean }`
-  - `type TimelineRow = { ticketId: string; title: string; bar: TimelineBarSpan; startClaim: DateClaimView; dueClaim: DateClaimView; pending: boolean; provenance: string }`
-  - `type TimelineSideEntry = { ticketId: string; title: string; reason: 'no-dates' | 'start-only' | 'due-only' | 'start-after-due'; startClaim: DateClaimView | null; dueClaim: DateClaimView | null; note: string }`
+  - `type TimelineCustomClaim = { claim: CustomDateClaimView; label: string }` — the structured claim plus its attributed rendering (`"Filed on: 30 Aug — Kiro's claim"`), the same pairing the calendar's items use
+  - `type TimelineRow = { ticketId: string; title: string; bar: TimelineBarSpan; startClaim: DateClaimView; dueClaim: DateClaimView; pending: boolean; provenance: string; customClaims: TimelineCustomClaim[] }`
+  - `type TimelineSideEntry = { ticketId: string; title: string; reason: 'no-dates' | 'start-only' | 'due-only' | 'start-after-due'; startClaim: DateClaimView | null; dueClaim: DateClaimView | null; note: string; customClaims: TimelineCustomClaim[] }`
   - `type TimelineGroup = { epicId: string | null; epicTitle: string; rows: TimelineRow[] }`
   - `type TimelineModel = { weeks: TimelineWeekCol[]; groups: TimelineGroup[]; sideList: TimelineSideEntry[]; sideListCopy: string }`
   - `buildTimelineModel(inputs: TicketDatesInput[], opts: { anchor: string; weeksCount?: number; userName: UserNameFn; filter?: FilterSpec; laneEpicId?: string | null }): TimelineModel` — default 8 weeks starting the Monday on/before `anchor`; a fully-dated ticket wholly outside the window appears nowhere (navigation reaches it — it is scheduled, just not here); side-list membership is about missing claims, not about the window.
-  - `NO_DATES_NOTE = 'no claimed dates'` (the side list's copy for fully undated work).
+  - `NO_DATES_NOTE = 'no claimed dates'` (the side list's copy for fully undated work); `NO_DAY_CLAIMS_NOTE = 'no claimed start or needed-by'` (the same slot when the ticket *does* carry custom date claims — the note narrows to what is actually missing rather than claiming the ticket is dateless).
+  - Custom date claims never affect `reason`, `bar`, or window membership; they hang off the row or the side entry that the `startDate`/`dueDate` pair already decided.
 
 - [ ] **Step 1: Write the failing model tests**
 
@@ -3546,7 +3953,7 @@ import { describe, expect, it } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
 import { TIMELINE_SIDE_LIST_COPY } from '../claims/claim-labels';
 import type { TicketDatesInput } from '../claims/ticket-dates';
-import { NO_DATES_NOTE, buildTimelineModel } from './timeline-model';
+import { NO_DATES_NOTE, NO_DAY_CLAIMS_NOTE, buildTimelineModel } from './timeline-model';
 
 const names: Record<string, string> = { user_kiro: 'Kiro', user_anselma: 'Anselma' };
 const userName = (id: string) => names[id] ?? id;
@@ -3557,7 +3964,11 @@ function claimField(value: unknown, actorId = 'user_kiro') {
 
 let counter = 0;
 
-function ticket(overrides: Partial<TicketState> = {}, pendingFieldIds: string[] = []): TicketDatesInput {
+function ticket(
+  overrides: Partial<TicketState> = {},
+  pendingFieldIds: string[] = [],
+  customDateFields: readonly { id: string; name: string }[] = [],
+): TicketDatesInput {
   counter += 1;
   const base: TicketState = {
     id: `t${counter}`,
@@ -3573,7 +3984,11 @@ function ticket(overrides: Partial<TicketState> = {}, pendingFieldIds: string[] 
     fields: { title: claimField(`Ticket ${counter}`) },
     transitions: [],
   } as TicketState;
-  return { state: { ...base, ...overrides, fields: { ...base.fields, ...overrides.fields } }, pendingFieldIds };
+  return {
+    state: { ...base, ...overrides, fields: { ...base.fields, ...overrides.fields } },
+    pendingFieldIds,
+    customDateFields,
+  };
 }
 
 const ANCHOR = '2026-08-23'; // Sunday → window opens Monday 17 Aug; 8 weeks reach 11 Oct
@@ -3698,6 +4113,48 @@ describe('grouping and filters', () => {
     expect(m.sideList).toHaveLength(0); // the undated epic is a lane, not missing work
   });
 
+  it('custom date claims ride the row and change NO geometry (owner sign-off 2026-08-20)', () => {
+    const withCustom = ticket(
+      {
+        fields: {
+          title: claimField('Fully dated'),
+          startDate: claimField({ date: '2026-08-24' }),
+          dueDate: claimField({ date: '2026-08-28' }),
+          'filed-on': claimField('2026-08-26', 'user_anselma'),
+        },
+      },
+      [],
+      [{ id: 'filed-on', name: 'Filed on' }],
+    );
+    const [row] = allRows(model([withCustom]));
+    expect(row.customClaims.map((entry) => entry.label)).toEqual(["Filed on: 26 Aug — Anselma's claim"]);
+    expect(row.customClaims[0].claim.fieldId).toBe('filed-on');
+    // the bar is still exactly the start→due span: 24 Aug and 28 Aug are both
+    // in the 24–30 week, so one column, untouched by the 26 Aug claim
+    expect(row.bar).toEqual({ fromWeek: 1, toWeek: 1, clippedStart: false, clippedEnd: false });
+    expect(row.provenance).toBe("starts 24 Aug — Kiro's claim · needed by 28 Aug — Kiro's claim");
+  });
+
+  it('a custom date claim does NOT rescue a ticket from the side list — but the note stops lying', () => {
+    const onlyCustom = ticket(
+      { fields: { title: claimField('Filed, not scheduled'), 'filed-on': claimField('2026-08-26') } },
+      [],
+      [{ id: 'filed-on', name: 'Filed on' }],
+    );
+    const bare = ticket({ fields: { title: claimField('Nothing claimed') } });
+    const m = model([onlyCustom, bare]);
+    expect(allRows(m)).toHaveLength(0); // no pair, no bar — membership logic unchanged
+
+    const filed = m.sideList.find((entry) => entry.ticketId === onlyCustom.state.id)!;
+    expect(filed.reason).toBe('no-dates');
+    expect(filed.note).toBe(NO_DAY_CLAIMS_NOTE); // NOT "no claimed dates" — it has one
+    expect(filed.customClaims.map((entry) => entry.label)).toEqual(["Filed on: 26 Aug — Kiro's claim"]);
+
+    const nothing = m.sideList.find((entry) => entry.ticketId === bare.state.id)!;
+    expect(nothing.note).toBe(NO_DATES_NOTE);
+    expect(nothing.customClaims).toEqual([]);
+  });
+
   it('filters narrow rows and side list alike; pending claims stay visibly in transit', () => {
     const mine = ticket(
       {
@@ -3730,18 +4187,29 @@ import {
   TIMELINE_SIDE_LIST_COPY,
   barProvenance,
   contradictionCopy,
+  customClaimLabel,
   dueClaimLabel,
   formatClaimDate,
   startClaimLabel,
   type UserNameFn,
 } from '../claims/claim-labels';
 import { DAY_MS, addDays, dateMs, mondayOnOrBefore } from '../claims/dates';
-import { dateClaimOf, titleOf, type DateClaimView, type TicketDatesInput } from '../claims/ticket-dates';
+import {
+  customDateClaimsOf,
+  dateClaimOf,
+  titleOf,
+  type CustomDateClaimView,
+  type DateClaimView,
+  type TicketDatesInput,
+} from '../claims/ticket-dates';
 import { matchesFilter, type FilterSpec } from '../filter/filter-spec';
 import { epicAncestorOf } from '../hierarchy/epic-ancestor';
 
 export type TimelineWeekCol = { start: string; label: string };
 export type TimelineBarSpan = { fromWeek: number; toWeek: number; clippedStart: boolean; clippedEnd: boolean };
+
+/** A claimed custom date field with its attributed rendering. Never geometry. */
+export type TimelineCustomClaim = { claim: CustomDateClaimView; label: string };
 
 export type TimelineRow = {
   ticketId: string;
@@ -3751,6 +4219,7 @@ export type TimelineRow = {
   dueClaim: DateClaimView;
   pending: boolean;
   provenance: string;
+  customClaims: TimelineCustomClaim[];
 };
 
 export type TimelineSideEntry = {
@@ -3760,6 +4229,7 @@ export type TimelineSideEntry = {
   startClaim: DateClaimView | null;
   dueClaim: DateClaimView | null;
   note: string;
+  customClaims: TimelineCustomClaim[];
 };
 
 export type TimelineGroup = { epicId: string | null; epicTitle: string; rows: TimelineRow[] };
@@ -3772,6 +4242,13 @@ export type TimelineModel = {
 };
 
 export const NO_DATES_NOTE = 'no claimed dates';
+
+/**
+ * The same side-list slot for a ticket that DOES carry custom date claims
+ * but no start/needed-by pair. Saying "no claimed dates" there would be
+ * false — the note narrows to exactly what is missing.
+ */
+export const NO_DAY_CLAIMS_NOTE = 'no claimed start or needed-by';
 
 const DEFAULT_WEEKS = 8;
 const NO_EPIC_TITLE = 'No epic';
@@ -3817,6 +4294,14 @@ export function buildTimelineModel(
     const ticketId = input.state.id;
     if (input.state.typeId === 'epic' && !start && !due) continue; // an undated epic is a lane, not missing work
 
+    // Custom date claims are carried, never consulted: nothing below branches
+    // on them except the side-list WORDING. They cannot make a bar, move a
+    // bar, or move a ticket between the rows and the side list.
+    const customClaims: TimelineCustomClaim[] = customDateClaimsOf(input).map((claim) => ({
+      claim,
+      label: customClaimLabel(claim, opts.userName),
+    }));
+
     if (start && due && start.date <= due.date) {
       if (due.date < windowStart || start.date > windowEnd) continue; // scheduled, just not in this window
       const clippedStart = start.date < windowStart;
@@ -3836,19 +4321,28 @@ export function buildTimelineModel(
           dueClaim: due,
           pending: start.pending || due.pending,
           provenance: barProvenance(start, due, opts.userName),
+          customClaims,
         },
       });
       continue;
     }
 
     if (start && due) {
-      sideList.push({ ticketId, title, reason: 'start-after-due', startClaim: start, dueClaim: due, note: contradictionCopy(start, due) });
+      sideList.push({ ticketId, title, reason: 'start-after-due', startClaim: start, dueClaim: due, note: contradictionCopy(start, due), customClaims });
     } else if (due) {
-      sideList.push({ ticketId, title, reason: 'due-only', startClaim: null, dueClaim: due, note: dueClaimLabel(due, opts.userName) });
+      sideList.push({ ticketId, title, reason: 'due-only', startClaim: null, dueClaim: due, note: dueClaimLabel(due, opts.userName), customClaims });
     } else if (start) {
-      sideList.push({ ticketId, title, reason: 'start-only', startClaim: start, dueClaim: null, note: startClaimLabel(start, opts.userName) });
+      sideList.push({ ticketId, title, reason: 'start-only', startClaim: start, dueClaim: null, note: startClaimLabel(start, opts.userName), customClaims });
     } else {
-      sideList.push({ ticketId, title, reason: 'no-dates', startClaim: null, dueClaim: null, note: NO_DATES_NOTE });
+      sideList.push({
+        ticketId,
+        title,
+        reason: 'no-dates',
+        startClaim: null,
+        dueClaim: null,
+        note: customClaims.length > 0 ? NO_DAY_CLAIMS_NOTE : NO_DATES_NOTE,
+        customClaims,
+      });
     }
   }
 
@@ -3909,6 +4403,7 @@ Renders Task 10's model: a title column plus week columns, group headings, bars 
 - Produces:
   - `type TimelineViewProps = { tickets: TicketDatesInput[]; today: string; userName: UserNameFn; onOpenTicket: (ticketId: string) => void; filter?: FilterSpec; laneEpicId?: string | null; weeksCount?: number }`
   - `TimelineView(props: TimelineViewProps): JSX.Element` — window nav (‹ Earlier / Today / Later ›, shifting 4 weeks), bars carry `data-pending` and `title={provenance}`, clipped edges carry `data-clipped-start`/`data-clipped-end`, side list under `aria-label="Undated or partially dated"`.
+  - Custom date claims render on the ticket's own row (and on its side-list entry) as a muted `<ul data-custom-claims>` of their attributed labels, each `<li data-field-id="…">` — in the title column, beside the ticket, not in the week grid, because they are facts about the ticket and not spans across weeks. They also join the bar button's `title` attribute after the bar provenance, so a hover reports every claim the row carries.
 
 - [ ] **Step 1: Write the failing component tests**
 
@@ -3930,7 +4425,11 @@ function claimField(value: unknown, actorId = 'user_kiro') {
 
 let counter = 0;
 
-function ticket(overrides: Partial<TicketState> = {}, pendingFieldIds: string[] = []): TicketDatesInput {
+function ticket(
+  overrides: Partial<TicketState> = {},
+  pendingFieldIds: string[] = [],
+  customDateFields: readonly { id: string; name: string }[] = [],
+): TicketDatesInput {
   counter += 1;
   const base: TicketState = {
     id: `t${counter}`,
@@ -3946,7 +4445,11 @@ function ticket(overrides: Partial<TicketState> = {}, pendingFieldIds: string[] 
     fields: { title: claimField(`Ticket ${counter}`) },
     transitions: [],
   } as TicketState;
-  return { state: { ...base, ...overrides, fields: { ...base.fields, ...overrides.fields } }, pendingFieldIds };
+  return {
+    state: { ...base, ...overrides, fields: { ...base.fields, ...overrides.fields } },
+    pendingFieldIds,
+    customDateFields,
+  };
 }
 
 const TODAY = '2026-08-23';
@@ -3990,6 +4493,40 @@ describe('TimelineView', () => {
     expect(screen.getByRole('button', { name: 'Pending' })).toHaveAttribute('data-pending', 'true');
   });
 
+  it("a custom date claim shows on the ticket's row under its own field name, and on the hover", () => {
+    const dated = ticket(
+      {
+        fields: {
+          title: claimField('Dated'),
+          startDate: claimField({ date: '2026-08-24' }),
+          dueDate: claimField({ date: '2026-08-28' }),
+          'filed-on': claimField('2026-08-26', 'user_anselma'),
+        },
+      },
+      [],
+      [{ id: 'filed-on', name: 'Filed on' }],
+    );
+    render(<TimelineView tickets={[dated]} today={TODAY} userName={userName} onOpenTicket={vi.fn()} />);
+    const claim = screen.getByText("Filed on: 26 Aug — Anselma's claim");
+    expect(claim).toHaveAttribute('data-field-id', 'filed-on');
+    expect(screen.getByRole('button', { name: 'Dated' })).toHaveAttribute(
+      'title',
+      "starts 24 Aug — Kiro's claim · needed by 28 Aug — Kiro's claim · Filed on: 26 Aug — Anselma's claim",
+    );
+  });
+
+  it('a side-list entry carries its custom claims, and its note stops claiming the ticket is dateless', () => {
+    const filedOnly = ticket(
+      { fields: { title: claimField('Filed, not scheduled'), 'filed-on': claimField('2026-08-26') } },
+      [],
+      [{ id: 'filed-on', name: 'Filed on' }],
+    );
+    render(<TimelineView tickets={[filedOnly]} today={TODAY} userName={userName} onOpenTicket={vi.fn()} />);
+    const side = screen.getByRole('complementary', { name: 'Undated or partially dated' });
+    expect(within(side).getByText('no claimed start or needed-by')).toBeInTheDocument();
+    expect(within(side).getByText("Filed on: 26 Aug — Kiro's claim")).toBeInTheDocument();
+  });
+
   it('the window shifts Earlier/Later and Today returns', () => {
     render(<TimelineView tickets={[]} today={TODAY} userName={userName} onOpenTicket={vi.fn()} />);
     expect(screen.getByText('W 17 Aug')).toBeInTheDocument();
@@ -4018,7 +4555,7 @@ import type { UserNameFn } from '../claims/claim-labels';
 import { addDays, mondayOnOrBefore } from '../claims/dates';
 import type { TicketDatesInput } from '../claims/ticket-dates';
 import type { FilterSpec } from '../filter/filter-spec';
-import { buildTimelineModel } from './timeline-model';
+import { buildTimelineModel, type TimelineCustomClaim } from './timeline-model';
 
 export type TimelineViewProps = {
   tickets: TicketDatesInput[];
@@ -4032,6 +4569,26 @@ export type TimelineViewProps = {
 };
 
 const SHIFT_DAYS = 28; // Earlier/Later move four weeks
+
+/**
+ * A ticket's custom date claims, beside the ticket rather than across the
+ * weeks — they are facts about the work, not spans of it. Each label is the
+ * model's attributed rendering, printed verbatim.
+ */
+function CustomClaimList(props: { claims: TimelineCustomClaim[] }) {
+  return (
+    <ul
+      data-custom-claims=""
+      style={{ listStyle: 'none', margin: 0, padding: 0, color: tokens.color.customMarker, fontSize: '0.8rem' }}
+    >
+      {props.claims.map((entry) => (
+        <li key={entry.claim.fieldId} data-field-id={entry.claim.fieldId} data-pending={entry.claim.pending || undefined}>
+          {entry.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function TimelineView(props: TimelineViewProps) {
   const [anchor, setAnchor] = useState<string>(mondayOnOrBefore(props.today));
@@ -4070,15 +4627,16 @@ export function TimelineView(props: TimelineViewProps) {
           <h3 style={{ margin: 0, padding: tokens.space.xs, fontSize: '0.9rem' }}>{group.epicTitle}</h3>
           {group.rows.map((row) => (
             <div key={row.ticketId} style={{ display: 'grid', gridTemplateColumns, alignItems: 'center' }}>
-              <div style={{ padding: tokens.space.xs, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {row.title}
+              <div style={{ padding: tokens.space.xs, overflow: 'hidden' }}>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.title}</div>
+                {row.customClaims.length > 0 && <CustomClaimList claims={row.customClaims} />}
               </div>
               <button
                 type="button"
                 data-pending={row.pending || undefined}
                 data-clipped-start={row.bar.clippedStart || undefined}
                 data-clipped-end={row.bar.clippedEnd || undefined}
-                title={row.provenance}
+                title={[row.provenance, ...row.customClaims.map((entry) => entry.label)].join(' · ')}
                 onClick={() => props.onOpenTicket(row.ticketId)}
                 style={{
                   gridColumn: `${row.bar.fromWeek + 2} / ${row.bar.toWeek + 3}`,
@@ -4112,6 +4670,7 @@ export function TimelineView(props: TimelineViewProps) {
                 {entry.title}
               </button>
               <span style={{ color: tokens.color.inkMuted, marginLeft: tokens.space.sm }}>{entry.note}</span>
+              {entry.customClaims.length > 0 && <CustomClaimList claims={entry.customClaims} />}
             </li>
           ))}
         </ul>
@@ -5073,7 +5632,7 @@ Spec §7: "Reporting v1 is derived counts and the ledger itself … No velocity,
 
 **Interfaces:**
 - Consumes: `NOTIFICATION_KINDS`, `notificationPayloadSchemaByKind` (`@gisik-nokma/domain`); the source trees of Tasks 1–14.
-- Produces: the executable scope guard; `Features.md` §11; test-cases bucket 11 (cases 11.1–11.35). This plan claims **only** §11 and the `11.x` case numbers.
+- Produces: the executable scope guard; `Features.md` §11; test-cases bucket 11 (cases 11.1–11.41; 11.36–11.41 cover the custom `date`-kind fields the owner brought into v1 on 2026-08-20). This plan claims **only** §11 and the `11.x` case numbers.
 
 - [ ] **Step 1: Write the scope-guard test (it should PASS immediately — it guards, it does not drive)**
 
@@ -5139,7 +5698,9 @@ Append after §10 (Plan 8's section; if the numbering you find differs, take the
 
 - ⚙️ **Day-claim consumption contract** — the Calendar and Timeline read the `startDate` and `dueDate` built-ins (owned by the tickets section — do NOT add a second bullet for the field here) through one shared claim shape `{date, note?}`; a domain pin holds the readers' day regex against the built-in's own schema, and two shared rule-engine fixtures run a built-in day claim end to end in every build. `packages/domain/src/ticket-types.test.ts`, `packages/rule-engine/fixtures/field-set-*-start-date-*.json`
 - ✅ **Calendar view** — month grid drawn only from claimed dates: attributed markers ("needed by 30 Aug — Kiro's claim"), start→due bars when both claims exist, undated tickets absent, an all-undated board renders an empty month that says why; month nav + today ring; per-week "+n more" overflow; click opens the ticket. `packages/app-core/src/calendar/`
-- ✅ **Timeline view** — week-column Gantt-lite: bars only for tickets with BOTH startDate and dueDate claims; single-claim, undated, and start-after-due work sits in a visible side list with attributed notes; epic grouping; no dependencies, no critical path. `packages/app-core/src/timeline/`
+- ✅ **Custom date fields on Calendar and Timeline** — any custom `date`-kind field renders as a claim on the same honesty terms as the built-ins: attributed to its claimant, absent when unclaimed, and labelled with the field's own name ("Filed on: 30 Aug — Kiro's claim"). Markers only — a bar still requires the startDate + dueDate pair, so no span is ever invented between arbitrary claims. `packages/app-core/src/claims/ticket-dates.ts`, `packages/app-core/src/calendar/`, `packages/app-core/src/timeline/`
+- ✅ **Claimed-date-field legend** — one switch per custom date field that actually claimed a day in the visible month, named and counted; hiding is view state, reversible, and never touches what matches. `packages/app-core/src/calendar/CalendarView.tsx`
+- ✅ **Timeline view** — week-column Gantt-lite: bars only for tickets with BOTH startDate and dueDate claims; single-claim, undated, and start-after-due work sits in a visible side list with attributed notes (a ticket carrying only custom date claims says "no claimed start or needed-by", not "no claimed dates"); epic grouping; no dependencies, no critical path. `packages/app-core/src/timeline/`
 - ✅ **Filters on both views** — FilterSpec (assignee, type, state, category, project, title text) plus an epic lane; in-transit claims render distinctly (`data-pending`) with provenance on hover. `packages/app-core/src/filter/`, `packages/app-core/src/claims/`
 - ⚙️ **Notification fan-out** — on committed events: `ticket.assigned` → assignee, structured `@mention` nodes in comments/descriptions → the mentioned, `claim.contested` → the original claimant; canSee-gated so a notification never out-leaks its ticket; idempotent per (user, dedupe key). `apps/server/src/notifications/fanout.ts`
 - ⚙️ **Attention sweep** — deterministic, idempotent job: dueDate claims entering the warning window and active states outliving the staleness threshold become inbox rows carrying the claim's provenance verbatim; running twice notifies once. `apps/server/src/notifications/sweep.ts`
@@ -5209,6 +5770,15 @@ Scope contract for Features.md §11. Status legend: ✅ covered by an automated 
 - **11.33** ✅ Saved filters round-trip through the preferences gateway; malformed stored entries are dropped, never thrown over. (`saved-filters.test.ts`)
 - **11.34** ✅ Applying a saved filter is a view act, never a data act — no ingest, no preference write (planted defect for amendment 14). (`SavedFiltersMenu.test.tsx`)
 - **11.35** ✅ No client or server source file speaks velocity/burndown/forecast — the executable restatement of "nothing the record does not contain". (`reporting-scope-guard.test.ts`)
+
+## Custom date-kind fields (owner sign-off 2026-08-20 — in v1)
+
+- **11.36** ✅ Planted defect: a claimed custom date field renders with its OWN field name and its OWN author ("Filed on: 30 Aug — Anselma's claim"), marked `custom` and carrying the field id, in the model and on the rendered marker (`data-field-id`). (`claim-labels.test.ts`, `calendar-model.test.ts`, `CalendarView.test.tsx`)
+- **11.37** ✅ Planted defect: a custom date field that is DEFINED but unclaimed puts nothing on the calendar — no marker, no legend entry, and an otherwise-undated board still renders the empty-month copy. (`calendar-model.test.ts`)
+- **11.38** ✅ No span is invented from a custom date: a custom claim plus a due claim renders two markers and no bar, and a fully dated ticket's bar is unchanged by a custom claim sitting inside it. (`calendar-model.test.ts`, `timeline-model.test.ts`)
+- **11.39** ✅ The claimed-date-field legend lists each field by its own name and count, switches its markers off and back on, keeps its own switch while hidden, and is absent entirely when no custom date was claimed. (`calendar-model.test.ts`, `CalendarView.test.tsx`)
+- **11.40** ✅ Timeline: custom claims ride the ticket's row and its side-list entry with their attributed labels and join the bar's hover provenance; side-list membership is decided by the startDate/dueDate pair alone and is unchanged by them. (`timeline-model.test.ts`, `TimelineView.test.tsx`)
+- **11.41** ✅ A ticket carrying only custom date claims is told what it actually lacks — "no claimed start or needed-by" — while a genuinely bare ticket keeps "no claimed dates" verbatim. (`timeline-model.test.ts`, `TimelineView.test.tsx`)
 ```
 
 - [ ] **Step 4: Full verification pass**
@@ -5249,7 +5819,7 @@ Flagged, never silently resolved. None blocks execution; each names the assumpti
 12. **Silent mention-gate.** A mention of a user who cannot see the ticket produces nothing, and the mentioner is not told. Honest (no leak, no invented delivery), but the editor could warn at mention time — a Plan 6/7 UX consideration, flagged.
 13. **Fixture-schema drift (two axes).** (a) Plan 2's `fixtureSchema` says `workflowDefs` (array); Plan 3's runner snippet used singular. (b) Plan 2's `expected` union spells refusals as `{refused, rule, reason}` or `{refused, rule, reasonStartsWith}`, yet Plan 3 ships `parent-terminal-with-open-children.json` naming the `rule` alone — so either the landed schema grew a rule-only branch or Plan 3's fixture needs a reason. Task 1 Step 5 carries a guard for both, and names the literal reason to add if the schema demands one. Reconciliation is Plans 2/3's; this plan only matches what it finds.
 14. **Test-helper drift (Plans 1/3/4).** `createTestDatabase` vs `testPool`/`wipe` vs `migrateTestDb`/`truncateAll` — this plan's server tests assume Plan 1's `createTestDatabase` (per-suite database; also sidesteps the append-only events table's truncate guard) with a locate-first guard. Reconciliation may standardise; adapt imports only.
-15. **Custom `date`-kind fields on Calendar/Timeline.** Out of scope in v1 (only `startDate`/`dueDate` render). Spec §7's "claimed dates" arguably includes custom date fields — flagged as a v2 candidate for the owner, not silently included.
+15. **Custom `date`-kind fields on Calendar/Timeline — SETTLED (owner sign-off 2026-08-20): IN v1.** This was flagged as a v2 candidate on the reading that spec §7's "claimed dates" *arguably* includes custom date fields; the owner ruled that it does, and they are now in scope. They render on exactly the honesty terms the built-ins do: attributed to their claimant with that claim's own timestamps, never estimated, absent when unclaimed, and labelled with **the field's own name** — `"Filed on: 30 Aug — Kiro's claim"`, never a generic word, because the name is the only thing that says what the day means. Three limits are pinned in the code rather than left to judgement: **(a) no span is ever drawn from a custom date** — a bar still requires the `startDate` + `dueDate` pair, since pairing arbitrary claims would invent a duration nobody claimed (Task 8's model collects custom claims before, and independently of, the pairing branch, so no code path can reach one); **(b) the timeline's side-list membership is unchanged** — it is decided by that pair alone, and only the *wording* narrows (`NO_DAY_CLAIMS_NOTE` instead of `NO_DATES_NOTE`) when a ticket does carry custom claims, because telling it that it has "no claimed dates" would be false; **(c) a custom date claim carries no note** (Plan 3 accepts a bare `'YYYY-MM-DD'` for `type: 'date'`), so the tooltip is the label and nothing is invented to fill the gap. Readability, where a workspace defines many date fields, is a calendar legend of per-field switches — pure view state, sourced from claims that exist, justified in full in Task 9. Cases 11.36–11.41 cover it, including the two planted defects the sign-off named. The one thing this does NOT change: no date field, custom or built-in, feeds the attention sweep — Task 6 still watches `dueDate` alone, because a sweep over arbitrary fields would nag about days nobody asked to be reminded of.
 16. **`stateName` in stale notifications resolves via the LATEST workflow version** (`getWorkflowDefFromProjection` without a version). A renamed state shows its current name; the `stateId` always travels alongside. Pinning the version the ticket actually sits on would need `workflowVersion` in `proj_tickets` — not added here.
 
 ## Self-review (writing-plans skill checklist)
@@ -5263,11 +5833,12 @@ Flagged, never silently resolved. None blocks execution; each names the assumpti
 - Reporting v1 ("derived counts and the ledger… nothing the record does not contain") → Task 15 guard; no reporting surface added anywhere in this plan.
 - Invariant 4 planted defects demanded by the assignment — undated absent, invented date impossible, attributed label exact — are cases 11.1, 11.2, 11.5; sweep idempotence is 11.28.
 - §7 saved filters → Task 13; per-user, view-act-only proven (11.34).
-- Gaps consciously out: velocity/burndown/forecast (guarded), dependencies/critical path (11.20), drag-to-reschedule, custom date fields (Open questions 15), push delivery (Plans 10/11).
+- Custom `date`-kind fields render as claims on both views (owner sign-off 2026-08-20, Open questions 15) → Tasks 8–11; the field's own name is pinned in `claim-labels.test.ts` and asserted through model and component; planted defects 11.36 (own name + own author) and 11.37 (unclaimed ⇒ nothing). The bar rule survives intact: 11.38 proves no span is invented between a custom date and a built-in day claim.
+- Gaps consciously out: velocity/burndown/forecast (guarded), dependencies/critical path (11.20), drag-to-reschedule, push delivery (Plans 10/11). Custom date fields moved OUT of this list on the owner's sign-off; the attention sweep still watches `dueDate` alone, deliberately (Open questions 15).
 
 **2. Placeholder scan:** no TBD/TODO/"implement later"/"add validation"/"similar to Task N" anywhere; every code step carries the actual code; every test step carries the actual tests; the two guarded creations (`docToPlainText`, scaffolds) carry full content for the create branch and an exact consume instruction for the other. Task 14 is thin by design and says why, with concrete verification steps.
 
-**3. Type consistency (checked across tasks):** `Notification` shape identical in Tasks 3/4/5/6/7/12/14; dedupe-key grammar identical in Tasks 5/6 (`assignment:` / `mention:` / `contested-claim:` / `date-approaching:` / `stale-ticket:`); `NotificationTransport.deliver(userId, notification)` identical in 5/6; `TicketDatesInput`/`DateClaimView` identical in 8/9/10/11; `FilterSpec` consumed from one module in 8/9/10/13; `dueClaimLabel` defined once (Task 8) and consumed in 8/10/12; `insertNotification(db, notification)` identical in 4/5(transport)/7(test seeding); `CanSeeFn` defined in Task 5, reused in Task 6; `NO_DATES_NOTE`, `CALENDAR_EMPTY_MONTH_COPY`, `TIMELINE_SIDE_LIST_COPY` defined once, asserted where consumed. Route paths in Task 14's gateway match Task 7's registrations verbatim. Day claims: `startDate` and `dueDate` are validated and typed by Plan 3's single `dueDateValueSchema`/`DueDateValue` everywhere this plan names them (Task 1 pins it; Tasks 8–11 read the shape through `dateClaimOf`) — this plan adds no second day schema under any name. Ledger writes: the only direct `INSERT INTO events` in this plan (Task 6's `seedEnteredState`) carries Plan 1's full thirteen-column list including `workspace_seq`; the only `ORDER BY seq` (Task 6's stale LATERAL) is per-entity history, not a workspace cursor, and says so in place.
+**3. Type consistency (checked across tasks):** `Notification` shape identical in Tasks 3/4/5/6/7/12/14; dedupe-key grammar identical in Tasks 5/6 (`assignment:` / `mention:` / `contested-claim:` / `date-approaching:` / `stale-ticket:`); `NotificationTransport.deliver(userId, notification)` identical in 5/6; `TicketDatesInput`/`DateClaimView` identical in 8/9/10/11; `FilterSpec` consumed from one module in 8/9/10/13; `dueClaimLabel` defined once (Task 8) and consumed in 8/10/12; `insertNotification(db, notification)` identical in 4/5(transport)/7(test seeding); `CanSeeFn` defined in Task 5, reused in Task 6; `NO_DATES_NOTE`, `CALENDAR_EMPTY_MONTH_COPY`, `TIMELINE_SIDE_LIST_COPY` defined once, asserted where consumed. Route paths in Task 14's gateway match Task 7's registrations verbatim. Day claims: `startDate` and `dueDate` are validated and typed by Plan 3's single `dueDateValueSchema`/`DueDateValue` everywhere this plan names them (Task 1 pins it; Tasks 8–11 read the shape through `dateClaimOf`) — this plan adds no second day schema under any name. Custom `date`-kind fields are a *different* shape by Plan 3's own design (a bare `'YYYY-MM-DD'` string, validated by `customFieldVerdict`'s `date` branch, no note); this plan defines no schema for them either — `customDateClaimsOf` is a reader that skips anything not matching the same `DATE_ONLY` regex, and `CustomDateClaimView`/`customClaimLabel` are defined once in Task 8 and consumed verbatim by 9/10/11. Ledger writes: the only direct `INSERT INTO events` in this plan (Task 6's `seedEnteredState`) carries Plan 1's full thirteen-column list including `workspace_seq`; the only `ORDER BY seq` (Task 6's stale LATERAL) is per-entity history, not a workspace cursor, and says so in place.
 
 
 

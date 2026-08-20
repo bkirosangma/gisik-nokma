@@ -2626,12 +2626,12 @@ git commit -m "Board read API: columns are exactly the attached workflows' state
 - Test: `apps/server/test/routes/list.test.ts`
 
 **Interfaces:**
-- Consumes: `filterSpecSchema`/`groupingSchema`/`Grouping` (Task 2), `compileFilterSpec`/`BLOCKED_STATES_CTE`/`SqlParams` (Task 2), `visibleTicketsWhere`/`workspaceOfProject`/`requireMember` (Task 5), `assembleTicketCards`/`PROJ_TICKET_COLUMNS` (Task 7), `latestWorkflowDefs` (Task 7), `ListResponse` (domain).
+- Consumes: `filterSpecSchema`/`groupingSchema`/`Grouping` (Task 2), `compileFilterSpec`/`BLOCKED_STATES_CTE`/`SqlParams` (Task 2), `visibleTicketsWhere`/`workspaceOfProject`/`requireMember` (Task 5), `assembleTicketCards`/`PROJ_TICKET_COLUMNS` (Task 7), `latestWorkflowDefs` (Task 7), `ListResponse` (domain), `BUILTIN_TICKET_TYPE_SEEDS` (domain, Plan 3 — the epic rank is read from the built-in seed, never written as a literal `1`), and table `proj_ticket_types` (Plan 3, for that rank).
 - Produces (cross-plan API):
   - `registerListRoutes(app: FastifyInstance, deps: { pool: Pool; auth: Auth }): void` serving `GET /v1/projects/:projectId/tickets?groupBy=&filter=&parentId=&cursor=&limit=` → `200 ListResponse` | `400 {error:'invalid_filter'|'invalid_grouping'|'invalid_limit'}` | `404 {error:'not_found'}`.
   - `filter` is URL-encoded JSON validated by `filterSpecSchema`; `groupBy` defaults to `flat`; `limit` defaults 50, max 200; keyset pagination by `ticket_id` (`cursor` = last ticket id of the previous page; ULIDs order by creation).
   - **Hierarchy support is children-by-parent-query (pinned):** `parentId=<id>` answers direct children; `parentId=root` answers roots; absent answers the whole project. Children are NOT inlined — clients expand a row by refetching with `parentId`.
-  - **Grouping is applied per page (pinned):** pagination walks the flat matched set in ticket_id order; each page's rows are grouped, so a group key may recur on later pages and clients merge by `key`. Group semantics: `flat` → one group `all`; `status` → key `${workflowId}:${stateId}`, label = state name; `assignee` → key = assignee id or `unassigned`; `type` → key = type id; `epic` → key = the nearest ancestor-or-self of type `epic` (label = its title), else `no-epic`.
+  - **Grouping is applied per page (pinned):** pagination walks the flat matched set in ticket_id order; each page's rows are grouped, so a group key may recur on later pages and clients merge by `key`. Group semantics: `flat` → one group `all`; `status` → key `${workflowId}:${stateId}`, label = state name; `assignee` → key = assignee id or `unassigned`; `type` → key = type id; `epic` → key = the nearest ancestor-or-self whose ticket type carries the **epic rank** (label = its title), else `no-epic`. The epic rank is the rank the built-in `epic` seed carries, read from `BUILTIN_TICKET_TYPE_SEEDS` — so a custom type defined at that same rank heads its own group exactly as the built-in does (owner sign-off 2026-08-20; the rank is the concept, `'epic'` is only one id of it). Resolution therefore joins the workspace's `proj_ticket_types` roster rather than matching a type id.
 
 - [ ] **Step 1: Write the failing route test**
 
@@ -2781,6 +2781,53 @@ describe('GET /v1/projects/:projectId/tickets', () => {
     expect(byKey['no-epic'].cards.map((c) => c.ticketId)).toEqual([world.sharedTaskId]);
   });
 
+  it('PLANTED DEFECT: a custom type at the epic rank heads its own group — the rank is the concept, not the id', async () => {
+    // A workspace that calls its top rung "Initiative" gets headings, not a
+    // "no-epic" pile. Resolving on typeId === 'epic' fails BOTH assertions
+    // below; resolving on the rank passes both.
+    await applyCommitted(pool, [
+      makeCommitted({
+        workspaceId: world.workspaceId,
+        actorId: world.owner,
+        entity: { kind: 'ticket-type', id: 'initiative' },
+        type: 'ticket-type.defined',
+        payload: {
+          id: 'initiative',
+          name: 'Initiative',
+          icon: 'flag',
+          rank: 1, // the same rank the built-in epic carries
+          workflowId: world.workflowId,
+          fields: [],
+        },
+      }),
+    ]);
+    const initiativeId = newUlid();
+    const underInitiativeId = newUlid();
+    await applyCommitted(pool, [
+      makeCommitted({
+        workspaceId: world.workspaceId,
+        actorId: world.owner,
+        entity: { kind: 'ticket', id: initiativeId },
+        type: 'ticket.created',
+        payload: { typeId: 'initiative', projectId: world.projectId, parentId: null, title: 'Shop-front refresh' },
+      }),
+      makeCommitted({
+        workspaceId: world.workspaceId,
+        actorId: world.owner,
+        entity: { kind: 'ticket', id: underInitiativeId },
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: world.projectId, parentId: initiativeId, title: 'Repaint the shutter' },
+      }),
+    ]);
+
+    const list = (await getList(memberToken, { groupBy: 'epic', limit: 200 })).json() as ListResponse;
+    const byKey = Object.fromEntries(list.groups.map((g) => [g.key, g]));
+    expect(byKey[initiativeId].label).toBe('Shop-front refresh');
+    expect(byKey[initiativeId].cards.map((c) => c.ticketId).sort()).toEqual([initiativeId, underInitiativeId].sort());
+    // and the child is NOT swept into the no-epic bucket
+    expect(byKey['no-epic']?.cards.map((c) => c.ticketId) ?? []).not.toContain(underInitiativeId);
+  });
+
   it('groups by status, assignee, and type', async () => {
     const status = (await getList(memberToken, { groupBy: 'status' })).json() as ListResponse;
     const statusKeys = status.groups.map((g) => g.key);
@@ -2859,6 +2906,7 @@ Expected: FAIL — `registerListRoutes` does not exist (the test app helper will
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import {
+  BUILTIN_TICKET_TYPE_SEEDS,
   filterSpecSchema,
   groupingSchema,
   type FilterSpec,
@@ -2880,6 +2928,15 @@ import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '..
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+
+/**
+ * The epic rank — read from the built-in seeds, never hardcoded as 1.
+ * Grouping by epic resolves the nearest ancestor-or-self whose TYPE carries
+ * this rank, so a workspace that renamed its top rung ("Initiative",
+ * "Campaign") gets its own headings without asking us for permission
+ * (owner sign-off 2026-08-20). Rank is the concept; `'epic'` is one id of it.
+ */
+const EPIC_RANK = BUILTIN_TICKET_TYPE_SEEDS.find((seed) => seed.id === 'epic')!.rank;
 
 export type ListQuery = {
   spec: FilterSpec;
@@ -2920,7 +2977,7 @@ export async function readList(
   const overflow = rows.length > query.limit;
   const pageRows = (rows as ProjTicketRow[]).slice(0, query.limit);
   const cards = await assembleTicketCards(db, viewerId, pageRows);
-  const groups = await groupCards(db, cards, pageRows, query.groupBy);
+  const groups = await groupCards(db, workspaceId, cards, pageRows, query.groupBy);
   return {
     projectId,
     groupBy: query.groupBy,
@@ -2936,6 +2993,7 @@ export async function readList(
  */
 async function groupCards(
   db: Queryable,
+  workspaceId: string,
   cards: TicketCard[],
   rows: ProjTicketRow[],
   groupBy: Grouping,
@@ -2956,8 +3014,9 @@ async function groupCards(
       },
     );
   }
-  // epic: nearest ancestor-or-self of type 'epic'
-  const epicOf = await epicAncestors(db, cards.map((c) => c.ticketId));
+  // epic: nearest ancestor-or-self whose type carries the epic rank — the
+  // built-in 'epic' and every custom type defined at the same rank alike
+  const epicOf = await epicAncestors(db, workspaceId, cards.map((c) => c.ticketId));
   const epicIds = [...new Set([...epicOf.values()])];
   const titles = await epicTitles(db, epicIds);
   return bucket(
@@ -2982,7 +3041,13 @@ function bucket(
   return [...buckets.keys()].sort().map((key) => ({ key, label: labelOf(key), cards: buckets.get(key)! }));
 }
 
-async function epicAncestors(db: Queryable, ticketIds: string[]): Promise<Map<string, string>> {
+/**
+ * Nearest ancestor-or-self whose ticket type carries the epic rank. The
+ * rank lives on `proj_ticket_types` (workspace-scoped, last definition
+ * wins), so the walk asks the type roster rather than matching one id —
+ * a workspace's own top-rung type heads its own groups.
+ */
+async function epicAncestors(db: Queryable, workspaceId: string, ticketIds: string[]): Promise<Map<string, string>> {
   if (ticketIds.length === 0) return new Map();
   const { rows } = await db.query(
     `WITH RECURSIVE ancestry AS (
@@ -2994,9 +3059,12 @@ async function epicAncestors(db: Queryable, ticketIds: string[]): Promise<Map<st
        WHERE a.depth < 32
      )
      SELECT DISTINCT ON (start_id) start_id, ticket_id AS epic_id
-     FROM ancestry WHERE type_id = 'epic'
+     FROM ancestry
+     WHERE type_id IN (
+       SELECT type_id FROM proj_ticket_types WHERE workspace_id = $2 AND rank = $3
+     )
      ORDER BY start_id, depth`,
-    [ticketIds],
+    [ticketIds, workspaceId, EPIC_RANK],
   );
   return new Map(rows.map((r) => [(r as { start_id: string }).start_id, (r as { epic_id: string }).epic_id]));
 }
@@ -3064,7 +3132,7 @@ export function registerListRoutes(app: FastifyInstance, deps: { pool: Pool; aut
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/routes/list.test.ts`
-Expected: PASS (12 tests), the end-to-end injection planted defect included.
+Expected: PASS (13 tests), the end-to-end injection planted defect and the custom-epic-rank grouping defect included.
 
 - [ ] **Step 5: Commit**
 
@@ -5758,7 +5826,7 @@ git commit -m "WS /v1/stream: session at upgrade, membership per subscribe, hear
 ## 7. API, realtime & search
 
 - ✅ **Board read API** — `GET /v1/projects/:id/board`: columns are exactly the attached workflows' states (mixed workflows side by side, each ticket under its own workflow's state), per-column `{stateId, name, category, blocked}`; cards carry the TicketState summary, the provenance of the current state (actor, both clocks, reopen cause), and the viewer-honest parent rollup `{totalChildren, terminalChildren, restrictedCount}`. `apps/server/src/routes/board.ts`
-- ✅ **List read API** — `GET /v1/projects/:id/tickets`: composable FilterSpec, five groupings (epic / status / assignee / type / flat), keyset pagination by ticket id, hierarchy by parent query (`parentId=<id>` for children, `parentId=root` for roots). Grouping arranges truth; it never changes what matches. `apps/server/src/routes/list.ts`
+- ✅ **List read API** — `GET /v1/projects/:id/tickets`: composable FilterSpec, five groupings (epic / status / assignee / type / flat), keyset pagination by ticket id, hierarchy by parent query (`parentId=<id>` for children, `parentId=root` for roots). Epic grouping heads a group with the nearest ancestor-or-self whose type carries the **epic rank** — the built-in `epic` and any custom type defined at that rank alike, so a workspace's own top-rung type ("Initiative") heads its own group. Grouping arranges truth; it never changes what matches. `apps/server/src/routes/list.ts`
 - ✅ **Builder read surface** — `GET /v1/workspaces/:id/workflows` (latest definition per workflow), `…/workflows/:workflowId?version=` (one definition, latest by default), `…/ticket-types`, `…/members` (`{userId, displayName, role}`, guests withheld from non-admin callers), and admin-only `…/workflows/:workflowId/state-occupancy` (live ticket counts per state, zeroes and undefined-state stragglers included) — the reads Plan 8's workflow builder authors against. `apps/server/src/routes/builder-reads.ts`
 - ✅ **Full-text search** — `GET /v1/search`: ranked cross-project search over titles, descriptions, and comments, visibility-filtered at read time, snippets with the match marked; composable with FilterSpec (`q` owns the text term). `apps/server/src/routes/search.ts`
 - ✅ **My Work** — `GET /v1/me/work`: assigned-to-me across a workspace's projects, grouped by state category; Plan 10's contested-claims extension point documented in the shape. `apps/server/src/routes/my-work.ts`
@@ -5799,7 +5867,7 @@ Mirrors `Features.md` §7. Status: `❌` not covered · `✅` covered · `🟡` 
 - 7.16 ✅ Planted defect: the hidden ticket appears nowhere in the member's board body; the owner's board has it; the filter is visibility, not deletion. (`board.test.ts`)
 - 7.17 ✅ Board membership: guests see their slice, off-project members get an empty board, strangers and unknown ids get identical 404s, no session is 401. (`board.test.ts`)
 - 7.18 ✅ List filters compose: assignee + category + due window; blocked-flag filter; FTS text term; custom-field eq/contains. (`list.test.ts`)
-- 7.19 ✅ List groupings: epic (nearest ancestor-or-self, `no-epic` bucket, epic titles as labels), status, assignee (`unassigned`), type, flat. (`list.test.ts`)
+- 7.19 ✅ List groupings: epic (nearest ancestor-or-self at the epic rank, `no-epic` bucket, epic titles as labels), status, assignee (`unassigned`), type, flat. (`list.test.ts`)
 - 7.20 ✅ List hierarchy and pagination: children by `parentId`, roots by `parentId=root`, keyset pages without overlap or gap. (`list.test.ts`)
 - 7.21 ✅ Planted defect: the hidden ticket is absent from every grouping and every page of the member's list. (`list.test.ts`)
 - 7.22 ✅ List refuses malformed filter JSON, unknown groupings, and out-of-range limits with generic 400s. (`list.test.ts`)
@@ -5821,6 +5889,7 @@ Mirrors `Features.md` §7. Status: `❌` not covered · `✅` covered · `🟡` 
 - 7.38 ✅ Ticket types read back from `proj_ticket_types` with name, rank and workflow binding, last definition winning. (`builder-reads.test.ts`)
 - 7.39 ✅ Planted defect: the workspace roster withholds guests from a plain member and from a guest — the guest's id appears nowhere in the body — while owners and admins see them with role `guest`. (`builder-reads.test.ts`)
 - 7.40 ✅ Planted defect: state occupancy counts every ticket in the workflow's states including one the caller could never see, reports empty states as 0, and answers 404 to members, guests and strangers alike — the number is the workspace's, so only admins hold it. (`builder-reads.test.ts`)
+- 7.41 ✅ Planted defect: a custom type defined at the epic rank heads its own group and keeps its children out of the `no-epic` bucket — grouping resolves the rank, never the id `'epic'` (owner sign-off 2026-08-20). (`list.test.ts`)
 ````
 
 - [ ] **Step 3: Run the full suite one last time**
@@ -5832,7 +5901,7 @@ Expected: PASS across packages/domain, packages/rule-engine, apps/server; typech
 
 ```bash
 git add Features.md test-cases/07-api-realtime-search.md
-git commit -m "Catalogue the read surface, realtime stream and search in Features.md §7 and forty test cases in the same change set as the work — including the pinned series defect that documents what the stream cannot yet promise about resume"
+git commit -m "Catalogue the read surface, realtime stream and search in Features.md §7 and forty-one test cases in the same change set as the work — including the pinned series defect that documents what the stream cannot yet promise about resume"
 ```
 
 ---
@@ -5846,7 +5915,7 @@ Flagged rather than silently resolved. Only #1 is blocking-grade; each names the
 3. **Route prefix split.** This plan's routes live under `/v1/...` per its assignment; Plan 4 mounted auth under `/api/auth/*` and its ticket reads under `/api/workspaces/...`, and Plan 3's history sits at `/v1/tickets/:id/history`. One prefix should win at integration — mechanical either way; flagged for the coordination doc.
 4. **Settings payload carries `dueSoonDays` alongside `staleDays`.** The assignment names `{staleDays}` but also demands a workspace-configurable due window; one event with optional keys covers both. Defaults 7/7 need owner sign-off (`DEFAULT_STALE_DAYS`, `DEFAULT_DUE_SOON_DAYS`).
 5. **FTS config is `'simple'`, search is top-50 without pagination.** No English stemming — the audience writes in more than one language, and stemming one language while not stemming others would rank dishonestly. Rank order is `ts_rank_cd` (derived, not stored, never presented as anything but ordering). Pagination can be added later without breaking the shape (`hits` stays an array).
-6. **List pins:** hierarchy by parent query (children never inlined); grouping applied per page (a group key may recur across pages; clients merge by key); epic grouping = nearest ancestor-or-self with typeId `'epic'` — custom epic-rank types do NOT head groups, a spec-owner question deferred alongside the coordination doc's sub-task-rank question (Plan 8 makes it concrete).
+6. **List pins:** hierarchy by parent query (children never inlined); grouping applied per page (a group key may recur across pages; clients merge by key); epic grouping = nearest ancestor-or-self whose type carries the **epic rank**. **SETTLED (owner sign-off 2026-08-20): custom epic-rank types DO head groups.** This was written as an open spec-owner question — whether `groupBy=epic` should match only the built-in id `'epic'` — and the owner ruled that a workspace's own top-rung type ("Initiative", "Campaign") heads its own group exactly as the built-in does. The rank is the concept; `'epic'` is one id of it. Resolution therefore reads `EPIC_RANK` from `BUILTIN_TICKET_TYPE_SEEDS` (never the literal `1`) and joins the workspace's `proj_ticket_types` roster; case 7.41 is the planted defect that bites the old id-matching behaviour. Nothing here waits on Plan 8 any more — the coordination doc's separate sub-task-rank question is unaffected and stays with Plan 8.
 7. **Empty board = empty columns.** The board derives its columns from workflows *in use by visible tickets*; a project with no visible tickets answers `columns: []`. If Plan 6 wants default-workflow columns for an empty project, that needs a project→type-roster source that no projection currently owns — Plan 6 should raise it, not invent it.
 8. **Unknown-state straggler columns.** A ticket whose `state_id` is absent from its workflow's latest definition gets a fallback column (named by state id, category from `proj_tickets`). Plan 2's forced state-mapping should make this unreachable; the board shows rather than hides if it ever happens. No planted test — the state is contracted-unreachable; the code path is 12 lines and pure.
 9. **My Work is per-workspace (`?workspaceId=`).** Cross-workspace aggregation is one call per workspace, client-side — a server-side cross-workspace join would need cross-workspace session scoping this series has not defined.

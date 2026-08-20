@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Put Gisik Nokma on real infrastructure — a one-command local stack, a production deployment proposal for DigitalOcean BLR1, backups whose restore path is proven by the freshness gate, a monitoring floor — and load it with its two real dogfood workloads: the Convenience Corner shop's actual errands (seeded verbatim from the frozen tracker snapshot, inventing nothing) and Gisik Nokma's own build (one epic per plan in this series).
+**Goal:** Put Gisik Nokma on real infrastructure — a one-command local stack, a production deployment on DigitalOcean BLR1 at `pm.artsourced.in`, backups whose restore path is proven by the freshness gate, a monitoring floor — and load it with its two real dogfood workloads: the Convenience Corner shop's actual errands (seeded verbatim from the frozen tracker snapshot, inventing nothing) and Gisik Nokma's own build (one epic per plan in this series).
 
 **Architecture:** Everything provider-specific lives behind config and under `deploy/`; the application code stays 12-factor (env vars in, JSON logs out, health at `/healthz`). Seeds are ordinary event batches pushed through the same ingest pipeline as any client — same rule engine, same refusals — with deterministic event ids so a re-run is a no-op, not a duplicate. Backups treat the event ledger as what it is: the source of truth from which every projection rebuilds, so the restore drill is restore + `verify-projections`, the freshness gate applied to disaster recovery.
 
-**Tech Stack:** Docker + docker compose (Postgres 16, MinIO, Mailpit), multi-stage Dockerfiles on node:22-alpine, DigitalOcean App Platform / Managed PostgreSQL / Spaces (proposed, sign-off pending), `@aws-sdk/client-s3` for object storage in ops scripts, nodemailer for SMTP magic links, Playwright for deployed-stack E2E, GitHub Actions for CI.
+**Tech Stack:** Docker + docker compose (Postgres 16, MinIO, Mailpit), multi-stage Dockerfiles on node:22-alpine, DigitalOcean App Platform / Managed PostgreSQL / Spaces — all in BLR1, the same stack convenience-corner runs (owner sign-off 2026-08-20) — `@aws-sdk/client-s3` for object storage in ops scripts, nodemailer for SMTP magic links, Playwright for deployed-stack E2E, GitHub Actions for CI.
 
 **Spec:** `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md` — this plan implements §7 "Dogfooding" and the deferred "Hosting provider, region, and pricing" decision from Out of scope, plus the operational floor the whole system stands on.
 
@@ -25,13 +25,15 @@ Copied from the series engineering contract and the spec; every task's requireme
 - **Spec invariant 4 — "Nothing is invented" — binds seed scripts.** A record without a date stays undated; an undated item is absent from the calendar; every dated claim the seed makes traces to a date the frozen record itself carries (or to the tracker's own published week arithmetic, cited below). Planted-defect tests prove it.
 - The audience constraint governing all hosting decisions: **India-reachable, phone-first** (spec: Out of scope defers provider/region/pricing to this plan *under that constraint*).
 - `Features.md` §13 and `test-cases/13-deployment-dogfooding.md` (cases 13.x) move in the same change set as the work. This plan claims no other section numbers.
-- Delivery: one PR per change, branched off `main`, merged only with explicit approval (spec, "Constraints carried from the base").
+- Delivery: one PR per change, branched off `main`, merged only with explicit approval (spec, "Constraints carried from the base"). `main` is deliberately **not** server-side protected (owner sign-off 2026-08-20 — free private repo, same as convenience-corner); the standing instruction never to commit or push to `main` directly lives in the repo's `CLAUDE.md`, and that instruction is the enforcement. Task 14 Step 4 verifies it is there.
 
 ---
 
-## Production proposal — DigitalOcean BLR1 (flagged for owner sign-off)
+## Production stack — DigitalOcean BLR1, at `pm.artsourced.in` (DECIDED, owner sign-off 2026-08-20)
 
-**The proposal:** DigitalOcean, region **BLR1 (Bengaluru)** — App Platform for the server and web containers, Managed PostgreSQL in BLR1, Spaces in BLR1 for attachments and backups.
+**The decision:** DigitalOcean, region **BLR1 (Bengaluru)** — App Platform for the server and web containers, Managed PostgreSQL in BLR1, Spaces in BLR1 for attachments and backups. This is the **same stack convenience-corner runs**; the owner signed it off on 2026-08-20, along with the custom domain **`pm.artsourced.in`** (a subdomain of the existing `artsourced.in` zone). Task 15's gate is therefore lifted — it executes with the rest of the plan.
+
+**Object storage: Spaces, not Cloudflare R2 (the comparison, recorded so the reasoning survives).** R2 was considered and lost on **data residency**. Gisik Nokma takes arbitrary user uploads served under permission checks — attachments on tickets whose visibility is enforced per viewer — which is a different thing from convenience-corner's owner-controlled public shop imagery, and it makes *where the bytes physically live* a decision rather than a detail. R2 cannot pin data to India: it offers EU and US jurisdictions only, with `apac` a best-effort, unchangeable location *hint*. Spaces BLR1 keeps the files in Bengaluru, beside the Postgres ledger that describes them. The cost gap at v1 scale is a few dollars a month — not enough to buy a jurisdiction we cannot name. `ObjectStore`/`ObjectSink` speak the S3 protocol either way, so R2 stays available later: **revisit when monthly egress approaches 1 TiB**, the scale at which R2's zero egress charge starts to win materially.
 
 **Why this and not elsewhere:**
 
@@ -39,7 +41,7 @@ Copied from the series engineering contract and the spec; every task's requireme
 2. **The convenience-corner precedent.** The base project's infrastructure decisions already targeted DigitalOcean BLR1 — the frozen tracker snapshot itself records it: the `ops:accountant-cloud-gst` record reads "The chosen providers bill in USD. DigitalOcean and Cloudflare invoice in dollars" and asks the accountant about the GST reverse-charge treatment of that spend. The shop's operational memory (which this plan seeds into the product) is already shaped around this stack; the dogfood is more honest when the product runs where its first workload's records say its lineage runs.
 3. **One operator.** App Platform is a single YAML (`deploy/do/app.yaml`), managed TLS, managed Postgres with daily platform backups, no VPC/IAM assembly. The whole ops surface must be carryable by one person who is also building the product.
 
-**Monthly cost sketch** (list prices, **approximate — verify current pricing at sign-off**; DO bills in USD, so the GST reverse-charge question the shop's accountant is already holding applies to this bill too):
+**Monthly cost sketch** (list prices, **approximate — a sketch, not a quote; verify current pricing at provision time**):
 
 | Component | Size | ~USD/mo |
 |---|---|---|
@@ -52,11 +54,13 @@ Copied from the series engineering contract and the spec; every task's requireme
 | SMTP (magic-link email) | Brevo free tier, 300/day | $0 |
 | **Total** | | **≈ $42/mo (≈ ₹3,700 at ~₹88/USD — verify)** |
 
-**The one named alternative — AWS Mumbai (ap-south-1):** AWS bills Indian customers in INR through AISPL with proper Indian GST invoices — exactly the "rupee billing with a proper Indian GST invoice" simplification the shop's accountant question is probing — and SES makes transactional email nearly free. The trade is that Lightsail/ECS + RDS + S3 replaces one YAML with IAM, VPC and service assembly that a one-operator team must own; if the accountant's answer makes INR billing decisive, the compose file and the 12-factor env contract mean the swap is contained to `deploy/` and a re-point of `S3_*`/`DATABASE_URL`/`SMTP_URL`.
+**The USD-invoicing tradeoff — accepted, already known, not a new question.** DigitalOcean and Cloudflare both invoice in US dollars, exactly as convenience-corner's own records state ("The chosen providers bill in USD. DigitalOcean and Cloudflare invoice in dollars", `ops:accountant-cloud-gst`, seeded by this plan). An Indian buyer therefore pays a **card/forex markup on top of the list price**, and **GST on imported services applies under reverse charge**. Both are accepted costs of this stack, carried over with it — the rupee figure above is a conversion, not an invoice total. The accountant question in the seeded board stays open on its own terms (how to *treat* the spend), and its answer does not reopen the provider decision.
 
-**Isolation discipline (what makes the alternative stay cheap):** nothing outside `deploy/do/` knows the provider's name. The app reads `DATABASE_URL`, `S3_ENDPOINT`, `SMTP_URL`, `ALERT_WEBHOOK_URL`; the backup scripts speak the S3 protocol (MinIO locally, Spaces in prod, S3 proper if the alternative wins). Task 15 writes the DO spec; no other task mentions DigitalOcean in code.
+**The one named alternative — AWS Mumbai (ap-south-1) — considered, NOT taken (decision made 2026-08-20; recorded because the reasoning may matter again).** AWS bills Indian customers in INR through AISPL with proper Indian GST invoices — exactly the "rupee billing with a proper Indian GST invoice" simplification the shop's accountant question is probing — and SES makes transactional email nearly free. The trade is that Lightsail/ECS + RDS + S3 replaces one YAML with IAM, VPC and service assembly that a one-operator team must own, and the owner judged that ops surface the more expensive of the two costs. The consideration stands recorded, not open: if the accountant's answer later makes INR billing decisive, the compose file and the 12-factor env contract mean the swap is contained to `deploy/` and a re-point of `S3_*`/`DATABASE_URL`/`SMTP_URL`.
 
-**⚠️ FLAGGED FOR OWNER SIGN-OFF** — see Open questions #1. Task 15 (the DO spec) must not be executed until the owner signs off; every other task is provider-neutral and proceeds regardless.
+**Isolation discipline (what keeps the alternative cheap, and R2 reachable):** nothing outside `deploy/do/` knows the provider's name. The app reads `DATABASE_URL`, `S3_ENDPOINT`, `SMTP_URL`, `ALERT_WEBHOOK_URL`; the backup scripts speak the S3 protocol (MinIO locally, Spaces BLR1 in prod, R2 or S3 proper if a later decision moves object storage). Task 15 writes the DO spec; no other task mentions DigitalOcean in code. This is what makes the R2 revisit above a config change rather than a project.
+
+**✅ SIGNED OFF 2026-08-20** — see Open questions #1 and #3, both settled. Task 15 (the DO spec) is no longer gated; the whole plan executes end to end.
 
 **Production auth honesty note:** phone OTP delivery in India requires a DLT-registered SMS provider (spec §6) — and the seeded board itself tracks the shop's twin of that errand (`ops:dlt-entity`: "Gates every SMS the platform will ever send — OTP included"). Until a DLT registration exists for Gisik Nokma, production sign-in is email magic link + Google OAuth + passkeys; the `OtpSender` stays on `LogOtpSender` (dev-only) and no SMS is attempted. This is invariant 4 applied to operations: we do not pretend a channel exists before its registration clears.
 
@@ -109,7 +113,7 @@ Workspace **"Gisik Nokma"** → project **"Build — the plan series"** on the *
 docker-compose.dev.yml                         — the one-command dev stack (postgres, minio, mailpit, server, web)
 scripts/check-env-example.mjs                  — the env contract gate
 scripts/restore.sh                             — pg_restore wrapper with scratch-db guard
-deploy/do/app.yaml                             — DigitalOcean App Platform spec (Task 15; sign-off gated)
+deploy/do/app.yaml                             — DigitalOcean App Platform spec, BLR1, pm.artsourced.in (Task 15)
 docs/runbook.md                                — deploy · rotate secrets · restore drill · incident basics
 .github/workflows/ci.yml                       — lint → typecheck → unit → fixtures → dual-client → e2e
 apps/server/Dockerfile                         — multi-stage build; migrations on boot
@@ -2948,8 +2952,9 @@ import { Upload } from '@aws-sdk/lib-storage';
 
 export type ObjectSink = { put(key: string, body: Readable, contentType: string): Promise<void> };
 
-/** S3 protocol only — MinIO in dev, DO Spaces in the proposal, S3 proper if
- * the alternative wins. No vendor name appears here; the endpoint is env. */
+/** S3 protocol only — MinIO in dev, DO Spaces BLR1 in production, R2 or S3
+ * proper if object storage ever moves. No vendor name appears here; the
+ * endpoint is env, which is what keeps that move a config change. */
 export function s3SinkFromEnv(env: NodeJS.ProcessEnv, bucketVar: string): ObjectSink {
   const bucket = env[bucketVar];
   const accessKeyId = env.S3_ACCESS_KEY;
@@ -3595,7 +3600,7 @@ indistinguishable from nonexistent."
 - Produces:
   - `.github/workflows/ci.yml` — the pinned order: **lint → typecheck → unit → fixtures (shared, client/server) → dual-client harness → E2E**. Unit runs against a real Postgres service on 54329 with pg client tools installed, so the restore drill runs unconditionally in CI.
   - Root scripts: `"test:fixtures"` (runs the shared fixture suite in the server-side build AND the client-side build — the two-builds-one-suite guarantee of spec §7), `"test:dual-client"` (Plan 10's harness).
-  - Release discipline (restated from the spec, enforced by repo settings): one PR per change, branched off `main`, merged only with explicit approval; CI green required.
+  - Release discipline (restated from the spec, enforced procedurally — see Step 4): one PR per change, branched off `main`, merged only with explicit approval; CI green required. `main` is **not** server-side protected and will not be; the rule lives in the repo's `CLAUDE.md` because the server will not enforce it.
   - Versioning: the **root `package.json` version is the product version** (single version for server and clients — one monorepo, one build, per the spec's single-build delivery). Patch bumps for fixes, minor bumps at plan-series milestones, `v<version>` git tag on `main` after merge; the server reports it at `/healthz` (Task 1); event schema versions are separate and live in the envelope's `version` field, unaffected by product versioning.
 
 - [ ] **Step 1: Add the root aggregate scripts**
@@ -3745,30 +3750,40 @@ gh run watch
 
 Expected: all six jobs green on the PR.
 
-- [ ] **Step 4: Restate the repo rule (settings, not prose)**
+- [ ] **Step 4: Confirm the release rule is written where it is actually read**
 
-On GitHub: Settings → Branches → protect `main`: require the `ci` checks, require 1 approval, forbid force-push. **Known constraint (the base project hit the same wall, and its record is now a seeded ticket — `ops:owner-github-plan`):** a free-plan private repo cannot enforce server-side branch protection. If this repo is private on a free plan, record the same choice the base flagged — Pro or public — in Open questions #11's decision; until decided, the discipline is procedural (the spec's rule stands regardless of enforcement).
+**Settled (owner sign-off 2026-08-20): `main` stays unprotected.** This is a free-plan private repo — same as convenience-corner — and a free-plan private repo cannot enforce server-side branch protection. The base project hit the same wall and its record is now a seeded ticket (`ops:owner-github-plan`). The owner declined both escapes (GitHub Pro, going public) and chose the procedural control instead. Do not plan a plan upgrade.
 
-### Task 15: The DigitalOcean spec — provider-specific, quarantined in deploy/, sign-off gated
+The control, stated plainly: **never commit or push to `main` directly. Branch, open a PR, merge only on explicit approval, with CI green.** That rule lives in the repo's `CLAUDE.md`, not in a GitHub setting, precisely because the server will not enforce it — a rule nobody reads is not a control, and `CLAUDE.md` is read at the start of every session by every person and every agent that touches this repo.
 
-**⛔ GATE: do not execute this task until the owner has signed off on the provider proposal (Open questions #1).** Everything else in this plan is provider-neutral and does not wait.
+Verify (do not skip — an unenforced rule is only as good as its being written down):
+
+```bash
+grep -n "main" CLAUDE.md
+```
+
+Expected: the standing instruction is present and names `main` explicitly. If it is missing, add it before merging this task's PR — the plan's release discipline has no other enforcement point.
+
+### Task 15: The DigitalOcean spec — provider-specific, quarantined in deploy/
+
+**✅ GATE LIFTED (owner sign-off 2026-08-20).** The provider (DigitalOcean App Platform + Managed PostgreSQL + Spaces, all BLR1 — convenience-corner's stack) and the domain (`pm.artsourced.in`) are both decided; Open questions #1, #2 and #3 are settled. This task executes with the rest of the plan. Everything else here stays provider-neutral regardless, which is what keeps the recorded alternatives cheap.
 
 **Files:**
 - Create: `deploy/do/app.yaml`, `deploy/do/README.md`
 
 **Interfaces:**
 - Consumes: Task 5's Dockerfiles, Task 6's env contract, Task 11's worker entry.
-- Produces: the App Platform spec (server + web + backup worker, BLR1, managed Postgres attached, secrets as encrypted env vars, health-checked), and the provisioning commands. TLS: App Platform provisions and renews Let's Encrypt certificates on the custom domains automatically; DNS is two CNAMEs. Secrets: `type: SECRET` env vars, encrypted at rest, rotated via `doctl apps update` (runbook). Database TLS: `${db.DATABASE_URL}` carries `sslmode=require` and `${db.CA_CERT}` feeds `DATABASE_CA_CERT` (Task 1's pool option).
+- Produces: the App Platform spec (server + web + backup worker, BLR1, managed Postgres attached, Spaces BLR1 for attachments and backups, secrets as encrypted env vars, health-checked), and the provisioning commands. **Hosts:** the web app at `pm.artsourced.in` and the API at `api.pm.artsourced.in` — one decided name, split into the two hosts the ingress rules need, with the API nested under the product host so a single DNS zone and a single mental model cover both. TLS: App Platform provisions and renews Let's Encrypt certificates on both automatically; DNS is two CNAMEs in the existing `artsourced.in` zone (`pm` and `api.pm`). Secrets: `type: SECRET` env vars, encrypted at rest, rotated via `doctl apps update` (runbook). Database TLS: `${db.DATABASE_URL}` carries `sslmode=require` and `${db.CA_CERT}` feeds `DATABASE_CA_CERT` (Task 1's pool option).
 
 - [ ] **Step 1: Write `deploy/do/app.yaml`**
 
 ```yaml
 # DigitalOcean App Platform spec — the ONLY file that knows the provider.
 # Region: blr (Bengaluru) — the audience constraint is India-reachable,
-# phone-first; the region is the point, not a default.
-# DOMAINS: gisik-nokma.example placeholders below are DELIBERATE — the real
-# domain is an owner decision (branding is out of scope in the spec);
-# replace api./app. hosts at provision time. Open questions #3.
+# phone-first; the region is the point, not a default. Spaces is BLR1 for
+# the same reason: user uploads stay in India, beside the ledger.
+# DOMAINS: decided 2026-08-20 — pm.artsourced.in serves the web app and
+# api.pm.artsourced.in serves the API, both in the artsourced.in zone.
 name: gisik-nokma
 region: blr
 
@@ -3805,15 +3820,15 @@ services:
       - key: TRUST_PROXY
         value: "true"
       - key: WEB_ORIGIN
-        value: https://app.gisik-nokma.example
+        value: https://pm.artsourced.in
       - key: BETTER_AUTH_URL
-        value: https://api.gisik-nokma.example
+        value: https://api.pm.artsourced.in
       - key: BETTER_AUTH_SECRET
         type: SECRET
       - key: SMTP_URL
         type: SECRET
       - key: MAGIC_LINK_FROM
-        value: sign-in@gisik-nokma.example
+        value: sign-in@artsourced.in
       - key: ALERT_WEBHOOK_URL
         type: SECRET
       - key: S3_ENDPOINT
@@ -3888,48 +3903,58 @@ workers:
         value: "0"
 
 domains:
-  - domain: api.gisik-nokma.example
+  - domain: pm.artsourced.in
     type: PRIMARY
-    zone: gisik-nokma.example
-  - domain: app.gisik-nokma.example
+    zone: artsourced.in
+  - domain: api.pm.artsourced.in
     type: ALIAS
-    zone: gisik-nokma.example
+    zone: artsourced.in
 
 ingress:
   rules:
     - match:
         authority:
-          exact: api.gisik-nokma.example
+          exact: api.pm.artsourced.in
       component:
         name: server
     - match:
         authority:
-          exact: app.gisik-nokma.example
+          exact: pm.artsourced.in
       component:
         name: web
 ```
 
-The web build args (`NEXT_PUBLIC_API_URL=https://api.<domain>`, `NEXT_PUBLIC_WS_URL=wss://api.<domain>/v1/stream`) are set as `build_time`-scoped envs on the `web` service when the domain is known — add them under `web.envs` with `scope: BUILD_TIME` at provision.
+The web build args are now concrete and go in the spec rather than waiting on a decision — add them under `web.envs` with `scope: BUILD_TIME`: `NEXT_PUBLIC_API_URL=https://api.pm.artsourced.in` and `NEXT_PUBLIC_WS_URL=wss://api.pm.artsourced.in/v1/stream`. (They are build-time because Next.js inlines `NEXT_PUBLIC_*` at build; changing a host means a rebuild, not a restart.)
 
 - [ ] **Step 2: Write `deploy/do/README.md` — provisioning, once**
 
 ```markdown
-# Provisioning (DigitalOcean, BLR1) — run once, after owner sign-off
+# Provisioning (DigitalOcean, BLR1) — run once
+
+Provider and domain were signed off on 2026-08-20: DigitalOcean App
+Platform + Managed PostgreSQL + Spaces, all BLR1 (convenience-corner's
+stack), serving `pm.artsourced.in`.
 
 1. `doctl auth init` with the team token.
-2. Spaces (verify BLR1 Spaces availability — fallback SGP1 for Spaces only,
-   see the plan's Open questions #2):
-   create buckets `gisik-nokma-attachments` and `gisik-nokma-backups`
-   (private), generate a Spaces key pair.
-3. Replace every `gisik-nokma.example` host in `app.yaml` with the real
-   domain the owner chose; add the two `BUILD_TIME` envs on `web`
-   (`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`).
+2. Spaces, region **BLR1**: create buckets `gisik-nokma-attachments` and
+   `gisik-nokma-backups` (both private), generate a Spaces key pair.
+   Spaces **Standard Storage is available in BLR1** — confirmed, no
+   fallback region needed. Spaces **Cold Storage is not** available there;
+   backups therefore stay on Standard, which is what the backup design
+   assumes (nightly dumps and weekly ledger exports are read back during
+   the monthly restore drill, so a cold tier would be the wrong shape
+   anyway — it optimises for never reading, and we read on purpose).
+3. Nothing to substitute in `app.yaml` — the hosts and the two `BUILD_TIME`
+   envs on `web` (`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`) are already
+   the real values.
 4. `doctl apps create --spec deploy/do/app.yaml` — then paste the SECRET
    values in the dashboard (they are never committed).
-5. DNS: CNAME `api` and `app` to the app's default hostname. TLS issues
-   automatically once DNS resolves.
-6. Uptime: create a check on `https://api.<domain>/healthz` from the
-   nearest probe region, alerting the owner's email.
+5. DNS, in the existing `artsourced.in` zone: CNAME `pm` and `api.pm` to
+   the app's default hostname. Both are subdomains, so no apex/ALIAS
+   handling is needed and the zone's existing records are untouched. TLS
+   issues automatically for both once DNS resolves.
+6. Uptime: create a check on `https://api.pm.artsourced.in/healthz` from
+   the nearest probe region, alerting the owner's email.
 7. First deploy runs migrations on boot (the entrypoint). Then, from a
    checkout with DATABASE_URL pointed at the managed DB: sign in once in
    the product, run `seed:cc` (per the runbook), then `seed:dev`.
@@ -3943,10 +3968,12 @@ git add deploy/do/
 git commit -m "feat(deploy): DigitalOcean BLR1 App Platform spec, quarantined in deploy/do
 
 Server, web and the backup worker in blr; managed Postgres attached with
-its CA fed to the pool; Spaces for attachments and backups; secrets as
-encrypted env vars; TLS and domains as two CNAMEs. The provider's name
-appears nowhere outside this directory, so the AWS-Mumbai alternative
-stays a contained swap. Execution was gated on the owner's sign-off."
+its CA fed to the pool; Spaces BLR1 for attachments and backups, chosen
+over Cloudflare R2 because permission-gated user uploads should sit in a
+jurisdiction we can name; secrets as encrypted env vars; TLS and the two
+CNAMEs under pm.artsourced.in. The provider's name appears nowhere
+outside this directory, so both the AWS-Mumbai alternative and a later
+move to R2 stay contained swaps."
 ```
 
 ### Task 16: Runbook, Features.md §13, test-cases/13 — and the whole-stack final smoke
@@ -3975,7 +4002,9 @@ the server listens. Watch: `doctl apps logs <app-id> server --follow`;
 confirm `GET /healthz` reports the new version.
 
 ## Deploy (first time)
-`deploy/do/README.md` — gated on the owner's provider sign-off.
+`deploy/do/README.md`. The stack is DigitalOcean App Platform + Managed
+PostgreSQL + Spaces, all BLR1 (signed off 2026-08-20), serving
+`pm.artsourced.in` with the API at `api.pm.artsourced.in`.
 
 ## Rotate secrets
 - `BETTER_AUTH_SECRET`, `SMTP_URL`, `ALERT_WEBHOOK_URL`, `S3_ACCESS_KEY`/
@@ -3989,7 +4018,9 @@ confirm `GET /healthz` reports the new version.
 
 ## Backups
 Nightly pg_dump (21:00 UTC = 02:30 IST) and weekly Sunday ledger export
-(22:00 UTC), both to the backups bucket, both alerting the webhook on
+(22:00 UTC), both to the `gisik-nokma-backups` Spaces bucket in BLR1
+(Standard storage — Cold is not offered in BLR1, and these objects are
+read back on every restore drill anyway), both alerting the webhook on
 failure. Manual run: `pnpm --filter @gisik-nokma/server run ops:backup-once`
 (or `node dist/ops/backup-daemon-main.js --once` in the container). The
 managed database's own daily backups are a second string, not the plan.
@@ -4015,8 +4046,8 @@ seed is idempotent; the second run adds only the guest surface.
 checkout).
 
 ## Incident basics
-- Is it up? `curl https://api.<domain>/healthz` — version tells you what
-  is running. The uptime check emails before users do.
+- Is it up? `curl https://api.pm.artsourced.in/healthz` — version tells you
+  what is running. The uptime check emails before users do.
 - Logs: `doctl apps logs <app-id> server --follow` (JSON lines; `err`
   carries stacks). 5xx bursts also hit the alert webhook.
 - 429 storms: a client in a retry loop — raise `RATE_LIMIT_*` only with a
@@ -4045,11 +4076,11 @@ Append to `Features.md` (following the numbering: Plans 1–10 own §3–§12):
 - ✅ SMTP magic-link delivery when `SMTP_URL` is set (Mailpit in dev); phone OTP stays disabled until a DLT registration exists. `apps/server/src/auth/smtp-magic-link-sender.ts`
 - ✅ Convenience Corner seed — the shop's 23 real errands from the frozen tracker snapshot, statuses mapped, dates only where the record dates, accountant as guest with explicit visibility; idempotent. `apps/server/src/seed/seed-convenience-corner.ts`
 - ✅ Gisik Nokma dev seed — one epic per plan, one ticket per task, titles verbatim, nothing dated, nothing transitioned; idempotent. `apps/server/src/seed/seed-dev-workspace.ts`
-- ⚙️ Backups — nightly pg_dump and weekly ledger export (the ledger is the source of truth) to S3-compatible storage, failure-alerting daemon. `apps/server/src/ops/`
+- ⚙️ Backups — nightly pg_dump and weekly ledger export (the ledger is the source of truth) to S3-compatible storage — Spaces BLR1 in production, MinIO locally — with a failure-alerting daemon. `apps/server/src/ops/`
 - ⚙️ Restore path — `scripts/restore.sh` (scratch-guarded) + the automated restore drill: restore into scratch, `verify-projections` must be clean. `apps/server/test/ops/restore-drill.test.ts`
 - ✅ Deployed-stack E2E smoke — magic link via test inbox, refusal with named reason, comment satisfies, board reflects; guest visibility probe. `e2e/`
 - ⚙️ CI pipeline — lint → typecheck → unit → shared fixtures (both builds) → dual-client harness → E2E. `.github/workflows/ci.yml`
-- ⚙️ Production proposal — DigitalOcean BLR1 spec quarantined in `deploy/do/` (owner sign-off gated); runbook in `docs/runbook.md`.
+- ⚙️ Production deployment — DigitalOcean App Platform + Managed PostgreSQL + Spaces, all BLR1, serving `pm.artsourced.in` (API at `api.pm.artsourced.in`); the spec is quarantined in `deploy/do/` so the provider's name appears nowhere in application code; runbook in `docs/runbook.md`.
 ```
 
 - [ ] **Step 3: Write `test-cases/13-deployment-dogfooding.md`**
@@ -4081,7 +4112,7 @@ in the loop) · 🧪 verified manually at deploy time · ❌ not yet covered ·
 - 13.18 ✅ Restore drill: dump → bare scratch → pg_restore → verify-projections clean; planted drift in a restored projection is caught with the table named; the restored ledger still refuses UPDATEs. `test/ops/restore-drill.test.ts`
 - 13.19 ✅ E2E smoke on the deployed stack: magic link via Mailpit, ticket created, bare close refused with a visible non-empty reason, comment satisfies, board reflects after reload. `e2e/tests/smoke.spec.ts`
 - 13.20 ✅ E2E visibility: the guest sees the four shared tickets, not the rest; a direct URL probe of an unshared ticket shows not-found. `e2e/tests/visibility.spec.ts`
-- 13.21 🧪 Production provisioning on the signed-off provider (DNS, TLS, secrets, uptime check) per deploy/do/README.md — verified at deploy time; a cloud control plane is not CI-testable from this repo.
+- 13.21 🧪 Production provisioning on DigitalOcean BLR1 (Spaces buckets, the two `pm.artsourced.in` CNAMEs, TLS, secrets, uptime check) per deploy/do/README.md — verified at deploy time; a cloud control plane is not CI-testable from this repo.
 - 13.22 🧪 Monthly restore drill against a real production dump, recorded as a ticket in the Gisik Nokma workspace, per the runbook.
 ```
 
@@ -4119,24 +4150,24 @@ sideways."
 
 ## Open questions
 
-1. **Provider sign-off (REQUIRED before Task 15).** DigitalOcean BLR1 at ≈ $42/mo (list, approximate) as proposed, or the named alternative — AWS Mumbai (ap-south-1), INR-billed via AISPL with Indian GST invoices at the cost of a much larger self-managed ops surface? The shop's own accountant question (`ops:accountant-cloud-gst`, seeded by this very plan) bears directly: if the accountant says INR billing is decisively simpler, the alternative gains. Owner decides; everything except Task 15 proceeds either way.
-2. **Spaces in BLR1.** Verify Spaces availability in BLR1 at provision time; if unavailable, the fallback is Spaces in SGP1 *for object storage only* (attachment/backup latency is tolerable; database and compute stay in BLR1). Affects two `S3_ENDPOINT`/`S3_REGION` values in `deploy/do/app.yaml`.
-3. **Custom domain.** Branding (and therefore the domain) is explicitly out of scope in the spec; `deploy/do/app.yaml` carries `gisik-nokma.example` deliberately until the owner picks. Blocking only for Task 15's DNS/TLS steps.
+1. **Provider — SETTLED (owner sign-off 2026-08-20).** **DigitalOcean App Platform + Managed PostgreSQL + Spaces, all BLR1** — the same stack convenience-corner runs. This was written as a required sign-off before Task 15, weighing DigitalOcean BLR1 at ≈ $42/mo (list, approximate) against AWS Mumbai (ap-south-1); the owner took DigitalOcean, judging the one-YAML ops surface worth more to a one-operator team than AISPL's INR billing. AWS Mumbai stays **recorded as a considered alternative**, not an open question — the 12-factor env contract keeps it a `deploy/`-contained swap if the accountant's answer ever makes INR billing decisive. The shop's own accountant question (`ops:accountant-cloud-gst`, seeded by this very plan) remains open on its own terms — how to *treat* the spend — and does not reopen this. The USD invoicing that comes with it (forex markup on the card, GST on imported services under reverse charge) is an accepted, already-known cost carried over with the stack, recorded in the cost sketch. Task 15's gate is lifted.
+2. **Spaces in BLR1 — ANSWERED (not moot).** Spaces **Standard Storage IS available in BLR1**; no SGP1 fallback is needed and the `S3_ENDPOINT`/`S3_REGION` values in `deploy/do/app.yaml` stand as written (`https://blr1.digitaloceanspaces.com`, `blr1`). The one caveat worth writing down: Spaces **Cold Storage is not** offered in BLR1. Backups therefore stay on Standard — which is the right tier regardless, since nightly dumps and weekly ledger exports are read back on every monthly restore drill, and a cold tier optimises for objects nobody reads. **Cloudflare R2 was compared here and lost on data residency:** Gisik Nokma serves arbitrary user uploads behind per-viewer permission checks (unlike convenience-corner's owner-controlled public imagery), and R2 offers EU/US jurisdictions only, with `apac` a best-effort, unchangeable hint — it cannot pin bytes to India, while Spaces BLR1 keeps them beside the ledger that describes them. The cost gap at v1 scale is a few dollars a month. `ObjectStore`/`ObjectSink` are S3-protocol either way, so the swap stays cheap: **revisit R2 when monthly egress approaches 1 TiB**, where its zero egress charge starts to win materially.
+3. **Custom domain — SETTLED (owner sign-off 2026-08-20): `pm.artsourced.in`.** Branding was out of scope in the spec and `deploy/do/app.yaml` deliberately carried a placeholder; the owner has now picked a subdomain of the existing `artsourced.in` zone. The spec carries the real hosts: **`pm.artsourced.in`** for the web app and **`api.pm.artsourced.in`** for the API — the API nested under the product host so one zone and one name cover both, and DNS is two CNAMEs (`pm`, `api.pm`) with no apex/ALIAS handling and no disturbance to the zone's existing records. `WEB_ORIGIN`, `BETTER_AUTH_URL`, the two `NEXT_PUBLIC_*` build-time envs, the ingress rules and the uptime check all name them concretely; nothing in Task 15 waits on a decision any more.
 4. **Plan 8 template surfaces (assumed pins).** Export names `ERRAND_WITH_WAITS_TEMPLATE` / `SIMPLE_KANBAN_TEMPLATE` from `@gisik-nokma/domain`, and the errand template's structure: state ids `later`, `next`, `in-progress`, `waiting`, `done`; `waiting` carries `blocked: true`; every mapped state reachable in ONE transition from the initial state; every transition into `done` carries `require-comment`. `checkErrandTemplate` (Task 7) is the executable pin — if Plan 8's payload differs, amend the template or the coordination doc, never the check's honesty requirements (the one-hop rule is what keeps the seed from fabricating intermediate history).
 5. **Plan 6 surfaces (assumed pins).** The data-testid contract table; `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_WS_URL` env names; web package name `@gisik-nokma/web`; `output: 'standalone'` tolerated in its Next config; a `not-found` testid on the invisible-ticket page. Isolated to the two Dockerfile ARG lines, compose args, and the E2E helpers.
 6. **Plan 7 object-storage config names.** This plan pins `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_FORCE_PATH_STYLE` (compose + `.env.example` + backup sink). Plan 7's `ObjectStore` implementation should read the same names; if it landed different ones, reconcile via the coordination doc in one direction, not two.
 7. **Plan 10 harness command.** `test:dual-client` assumes `pnpm --filter @gisik-nokma/sync-harness run test`, and `test:fixtures`' client half assumes an `@gisik-nokma/app-core` fixture runner — both to be corrected to Plan 10/6's real names at execution (Task 14 Step 1 says exactly where). Also: `/v1/sync` was included in the events rate-limit budget — confirm against Plan 10's retry semantics.
 8. **better-auth as landed (Plan 4).** The seed reads table `"user"` (better-auth's default) by email; the E2E calls `POST /api/auth/sign-in/magic-link` and follows the mailed verify link; env names `BETTER_AUTH_SECRET`/`BETTER_AUTH_URL` and the Google OAuth pair in `.env.example`. Each is isolated to one helper file; verify against Plan 4's code and the check-env gate.
-9. **`startDate` and the calendar (spec owner).** The errand type's `startDate` is a custom date field. Does Plan 9's calendar/timeline draw spans from custom date fields, or only from the built-in `dueDate`? If the latter, the asked-on date renders in the ticket, not as a bar — honest either way, but the spec owner should say which reading Calendar v1 commits to.
+9. **Custom date fields and the calendar — SETTLED (owner sign-off 2026-08-20).** This asked whether Plan 9's calendar/timeline draws spans from custom date fields or only from the built-ins. The answer is **both halves, and neither is a span**: custom `date`-kind fields DO render in v1, as attributed markers labelled with the field's own name — and they never draw a bar, because a bar still requires the `startDate` + `dueDate` pair (pairing arbitrary claims would invent a duration nobody claimed). Plan 9 Open questions 15 carries the full ruling and Plan 9 cases 11.36–11.41 prove it. For this plan's seed the practical consequence is unchanged: a seeded custom date claim shows on the ticket and on the calendar as its own attributed marker, and the seed still claims a date only where the frozen record carries one.
 10. **Runbook location.** The workspace convention routes runbooks to `/kb`; this repo keeps implementation docs in-repo (as with these plans). `docs/runbook.md` lands in-repo; the tension is the owner's to resolve, and moving the document later is cheap.
-11. **Branch protection reality.** If this repo is private on a GitHub free plan, server-side protection of `main` cannot be enforced — the exact fork the base project recorded (`ops:owner-github-plan`, now a seeded ticket). Owner chooses: GitHub Pro, public repo, or procedural discipline meanwhile.
+11. **Branch protection — SETTLED (owner sign-off 2026-08-20): `main` stays unprotected.** This was written as a fork in the road — GitHub Pro, a public repo, or procedural discipline — because a free-plan private repo cannot enforce server-side protection of `main`, the exact wall the base project hit (`ops:owner-github-plan`, now a seeded ticket). The owner chose to stay on the free private plan, same as convenience-corner, and to carry the rule procedurally instead. **The compensating control is a standing instruction never to commit or push to `main` directly, recorded in the repo's `CLAUDE.md`** — where every session reads it before touching anything. The discipline is unchanged from what the spec always required: branch → PR → merge on explicit approval, CI green. What changes is only who enforces it: a written rule that people and agents follow, not a server that refuses. **No plan upgrade is proposed and none should be added** — this question is closed, not deferred.
 12. **Permission-gate bootstrap for server-origin seeds.** If Plan 4 wired `checkPermission` inside the ingest service (not only the HTTP route), the seed's `workspace.created`-then-`membership.granted` bootstrap order must match Plan 4's own workspace-creation flow. The seed integration test surfaces this immediately and loudly; adapt the seed's event order, never the gate.
 
 ## Self-review (per the writing-plans skill)
 
-**Spec coverage.** §7 Dogfooding: Convenience Corner workspace with the shop's actual errands on errand-with-waits with the accountant as guest — Tasks 7–9; Gisik Nokma workspace managing its own build — Task 10. Out-of-scope deferral (provider/region/pricing, India-reachable phone-first) — the production proposal section + Task 15, sign-off flagged. §1 invariant 4 applied to seeds — the date-mapping table, the refusal paths, and the planted defects in Tasks 8/10. §3's scheduled verifier reaching operations — Tasks 12 and 16 (drill + runbook cadence). §7 testing discipline in CI order — Task 14 (shared fixtures in both builds, dual-client harness, E2E). §6's DLT constraint honoured operationally — Task 4 and the production proposal. Assignment items 1–10 map to Tasks 5–6 (containers/stack/env), proposal section + 15 (provider), 1–2 (TLS-adjacent config, rate limits, CORS), 11–12 (backups/restore/drill), 1+3 + proposal (monitoring floor: healthz version, uptime check, structured logs, alert hook), 7–9 (CC seed), 10 (dev seed), 13 (E2E), 14 (CI + versioning + repo rule), 16 (runbook + catalogue). Gaps: none found.
+**Spec coverage.** §7 Dogfooding: Convenience Corner workspace with the shop's actual errands on errand-with-waits with the accountant as guest — Tasks 7–9; Gisik Nokma workspace managing its own build — Task 10. Out-of-scope deferral (provider/region/pricing, India-reachable phone-first) — the production stack section + Task 15, now decided rather than flagged (owner sign-off 2026-08-20: DigitalOcean BLR1 + Spaces BLR1, `pm.artsourced.in`). §1 invariant 4 applied to seeds — the date-mapping table, the refusal paths, and the planted defects in Tasks 8/10. §3's scheduled verifier reaching operations — Tasks 12 and 16 (drill + runbook cadence). §7 testing discipline in CI order — Task 14 (shared fixtures in both builds, dual-client harness, E2E). §6's DLT constraint honoured operationally — Task 4 and the production stack section. Assignment items 1–10 map to Tasks 5–6 (containers/stack/env), the stack section + 15 (provider), 1–2 (TLS-adjacent config, rate limits, CORS), 11–12 (backups/restore/drill), 1+3 + the stack section (monitoring floor: healthz version, uptime check, structured logs, alert hook), 7–9 (CC seed), 10 (dev seed), 13 (E2E), 14 (CI + versioning + repo rule), 16 (runbook + catalogue). Gaps: none found.
 
-**Placeholder scan.** One near-miss was caught and rewritten during drafting (Task 8's description builder now appears once, finished). The `gisik-nokma.example` hosts in Task 15 are deliberate, flagged, and gated on Open questions #1/#3 rather than left as silent TODOs. Executor-verify notes (root script names, Plan 6/8/10 surface names, verify CLI filename) each name the exact file to check and the invariant that must survive the check — they are consumption notes on parallel plans' Produces, not deferred design.
+**Placeholder scan.** One near-miss was caught and rewritten during drafting (Task 8's description builder now appears once, finished). The placeholder hosts Task 15 once carried were deliberate and flagged rather than silent TODOs; they are now gone — the owner decided the domain on 2026-08-20 and `deploy/do/app.yaml` names `pm.artsourced.in` and `api.pm.artsourced.in` concretely, with the two `NEXT_PUBLIC_*` build-time envs filled in rather than deferred. The one remaining `<…>`-shaped value in the deploy tree is the Spaces key pair, which is a secret and belongs nowhere in the repo. Executor-verify notes (root script names, Plan 6/8/10 surface names, verify CLI filename) each name the exact file to check and the invariant that must survive the check — they are consumption notes on parallel plans' Produces, not deferred design.
 
 **Type consistency.** `SeedReport`/`CcSeedDeps` defined in Task 9, reused by Task 10's `seedDevWorkspace` — consistent. `seedUlid('ticket', 'cc#<id>')` convention identical in Task 8's tests, Task 9's runner, and the guest-visibility block. `ObjectSink.put(key, body, contentType)` matches between `object-sink.ts`, `export-ledger.ts`, `pg-dump.ts`, and both capture sinks in tests (the pg-dump capture sink accepts two args — TypeScript structural typing permits the narrower test double). `ErrorAlerter.notify(context, error)` consistent across Tasks 3 and 11. `checkErrandTemplate` returns `{ok:true}|{ok:false;problems}` in both definition and tests. Rate-limit values 10/120/60 agree between Task 1 defaults, Task 2 prose, compose overrides (60/600), `.env.example`, and the DO spec.
 
