@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md` — §7 (Views: Calendar and Timeline; Reporting and notifications; Search and filtering), honesty invariant 4 ("Nothing is invented"), invariant 1 (provenance floor). Series contract: `docs/superpowers/plans/2026-08-20-00-series-coordination.md` (amendments 9–17 bind this plan). Precedent: `reference/design-docs/2026-08-19-tracker-calendar-design.md` (read-only) — the base calendar's "dated items only / an undated item is absent, not estimated" discipline, generalised here.
 
-**Series position:** Plan 9 of 11. Runs after Plans 1–5, in parallel with Plans 6/7/8. **Consumes** — from Plan 1: `EventEnvelope`, `SubmittedEvent`, `newUlid`, `IngestService.onEventCommitted(listener): () => void` (fires only after a live commit, never on projection rebuild — which is exactly why notifications built on it can never double on replay), `createTestDatabase()`, and the IST day helpers `IST_TIME_ZONE` / `IST_OFFSET_MINUTES` / `IST_DAY_REGEX` / `istDayOf(instant)` / `istDayBounds(day)` (Plan 1 Task 4a, `packages/domain/src/ist-day.ts` — dependency-free, so app-core imports it as freely as the server does). From Plan 2: `WorkflowDef` (with `initialStateId`, amendment 3; optional `blocked` on states, amendment 9), `StateCategory`, `getWorkflowDefFromProjection(db, workflowId, version?)`, the fixture harness in `packages/rule-engine/src/fixtures/harness.ts`. From Plan 3: `BUILTIN_FIELD_IDS` (four elements — `'title', 'description', 'dueDate', 'startDate'`; Plan 3's own text, verified by Task 1 Step 1), `dueDateValueSchema` (the ONE day-claim schema BOTH built-ins use — there is no separate start-date schema, by Plan 3's deliberate design), `TicketState`, `FieldClaim`, `applyTicketEvent`, `makeEnvelope`, `checkTicketFieldSet` + `refuse`/`fieldKindRefusal`, `getTicketStateFromDb(db, workspaceId, ticketId)`, the `proj_tickets` table. From Plan 4: `Queryable`, `canSee(db, userId, ticketId)`, `Auth`/`createAuth`, `makeRequireSession`, `registerAuthRoutes`, `signInWithPhone`, `LogOtpSender`. From the amendments (Plans 5/6/7/10 written in parallel — pinned shapes, assumptions flagged in Open questions): `DataSource` (am. 10), `packages/ui` tokens (am. 11), the mention node `{userId}` and `docToPlainText` (am. 12), `/v1/me/preferences` (am. 14), `claim.contested` (am. 16). **Produces** (exact signatures in task Interfaces blocks): `extractMentionedUserIds`; the notification vocabulary (`NotificationKind`, strict payload schemas, `Notification`); the `notifications` table + store; `NotificationTransport` + `createInAppTransport`; `createNotificationFanout`; `runNotificationSweep`; `GET /v1/me/notifications`, `GET /v1/me/notifications/unread-count`, `POST /v1/me/notifications/:id/read`; `CalendarView`, `TimelineView`, `InboxView`, `UnreadBadge`, `SavedFiltersMenu` and their pure view-models.
+**Series position:** Plan 9 of 11. Runs after Plans 1–5, in parallel with Plans 6/7/8. **Consumes** — from Plan 1: `EventEnvelope`, `SubmittedEvent`, `newUlid`, `IngestService.onEventCommitted(listener): () => void` (fires only after a live commit, never on projection rebuild — which is exactly why notifications built on it can never double on replay), `createTestDatabase()`, and the IST day helpers `IST_TIME_ZONE` / `IST_OFFSET_MINUTES` / `IST_DAY_REGEX` / `istDayOf(instant)` / `istDayBounds(day)` (Plan 1 Task 4a, `packages/domain/src/ist-day.ts` — dependency-free, so app-core imports it as freely as the server does). From Plan 2: `WorkflowDef` (with `initialStateId`, amendment 3; optional `blocked` on states, amendment 9), `StateCategory`, `getWorkflowDefFromProjection(db, workflowId, version?)`, the fixture harness in `packages/rule-engine/src/fixtures/harness.ts`. From Plan 3: `BUILTIN_FIELD_IDS` (four elements — `'title', 'description', 'dueDate', 'startDate'`; Plan 3's own text, verified by Task 1 Step 1), `dueDateValueSchema` (the ONE day-claim schema BOTH built-ins use — there is no separate start-date schema, by Plan 3's deliberate design), `TicketState`, `FieldClaim`, `applyTicketEvent`, `makeEnvelope`, `checkTicketFieldSet` + `refuse`/`fieldKindRefusal`, `getTicketStateFromDb(db, workspaceId, ticketId)`, the `proj_tickets` table. From Plan 4: `Queryable`, `canSee(db, userId, ticketId)`, `Auth`/`createAuth`, `makeRequireSession`, `registerAuthRoutes`, `signInWithPhone`, `LogOtpSender`. **From Plan 5 (`2026-08-20-05-api-realtime-search.md`, its Tasks 3–4) — the single origin of both attention thresholds, which this plan's sweep now reads instead of carrying its own copies:** the `workspace.settings_set` v1 event (payload `{staleDays?, dueSoonDays?}`, partial-update, owner/admin only), `DEFAULT_STALE_DAYS = 7` / `DEFAULT_DUE_SOON_DAYS = 7` and `type WorkspaceSettings = { staleDays; dueSoonDays; provenance }` from `packages/domain/src/events/workspace-settings.ts`, the `proj_workspace_settings` projection and its reader `getWorkspaceSettings(db: Queryable, workspaceId: string): Promise<WorkspaceSettings>` from `apps/server/src/projections/workspace-settings.ts`, and the `makeCommitted`/`applyCommitted`/`resetEntitySeqs` test helpers from `apps/server/test/helpers/apply.ts` (Plan 5 Task 4) that this plan's sweep tests seed settings with. **This plan declares no threshold constant of its own, under any name.** From the amendments (Plans 5/6/7/10 written in parallel — pinned shapes, assumptions flagged in Open questions): `DataSource` (am. 10), `packages/ui` tokens (am. 11), the mention node `{userId}` and `docToPlainText` (am. 12), `/v1/me/preferences` (am. 14), `claim.contested` (am. 16). **Produces** (exact signatures in task Interfaces blocks): `extractMentionedUserIds`; the notification vocabulary (`NotificationKind`, strict payload schemas, `Notification`); the `notifications` table + store; `NotificationTransport` + `createInAppTransport`; `createNotificationFanout`; `runNotificationSweep`; `GET /v1/me/notifications`, `GET /v1/me/notifications/unread-count`, `POST /v1/me/notifications/:id/read`; `CalendarView`, `TimelineView`, `InboxView`, `UnreadBadge`, `SavedFiltersMenu` and their pure view-models.
 
 ## Global Constraints
 
@@ -68,7 +68,8 @@ apps/server/
   src/notifications/store.ts        # NEW — insert (dedupe), list (cursor), markRead, unreadCount
   src/notifications/transport.ts    # NEW — NotificationTransport, createInAppTransport, deliverToAll
   src/notifications/fanout.ts       # NEW — createNotificationFanout (assignment/mention/contested)
-  src/notifications/sweep.ts        # NEW — runNotificationSweep (date-approaching, stale-ticket)
+  src/notifications/sweep.ts        # NEW — runNotificationSweep (date-approaching, stale-ticket); windows resolved per workspace from Plan 5's getWorkspaceSettings
+  src/projections/workspace-settings.ts  # READ ONLY (Plan 5's Task 4) — proj_workspace_settings + getWorkspaceSettings, the one origin of staleDays/dueSoonDays
   src/tools/sweep-notifications.ts  # NEW — CLI entry for the periodic job
   src/routes/notifications.ts       # NEW — /v1/me/notifications routes
   src/index.ts                      # MODIFY (Plan 1's, locate by grep) — wire fan-out onto onEventCommitted
@@ -1676,10 +1677,19 @@ git commit -m "notification fan-out on committed events: assignee, mentioned, co
 
 Attention *transitions* need a clock, and events don't tick: a periodic job scans the projections and notifies claims entering the workspace warning window and active states crossing the staleness threshold. Determinism: given the same tables and the same injected `now`, the sweep computes the same candidate set and the same dedupe keys — so running it twice notifies once (the planted defect). It reads `proj_tickets` (claims) and the `events` ledger (when the current state was entered — derived, never stored anew), and its payloads carry the claim's provenance verbatim. Plan 5's attention endpoint computes the *read-time* strip; this sweep only turns threshold *crossings* into inbox rows — same semantics, different tense.
 
+**Both windows are the workspace's own settings, and this sweep owns neither of them.** The thresholds live in exactly one place in the product: Plan 5's `workspace.settings_set` claim, projected into `proj_workspace_settings` and read back by `getWorkspaceSettings(db, workspaceId)` with `DEFAULT_STALE_DAYS`/`DEFAULT_DUE_SOON_DAYS` applied (both 7, owner-approved). The sweep resolves them and maps them onto its own vocabulary, explicitly and in one function:
+
+- the sweep's **approaching window** *is* the workspace's **`dueSoonDays`** — "a claim is due soon" is one question, asked at read time by the strip and on a schedule by the sweep;
+- the sweep's **staleness threshold** *is* the workspace's **`staleDays`** — "this has sat too long" is likewise one question.
+
+`SweepWindows` survives as the *resolved* shape those two settings are read into; it is no longer a place where numbers are written down. There is no threshold constant in this plan under any name, no `windows` dependency to inject, and no way for a caller to hand the sweep a threshold the workspace did not claim — because a second way to set the number is a second number, and a board that flags a ticket stale while the inbox stays quiet is exactly the drift this product exists to remove. An admin who moves `staleDays` moves the strip and the sweep in the same act; the planted defect in Step 1 is what proves it.
+
+**Settings are resolved once per workspace, before that workspace's rows are queried.** The sweep is server-wide (the CLI has one `DATABASE_URL` and no workspace argument), so it enumerates the workspaces that actually have tickets, reads each one's settings exactly once, and runs that workspace's two scoped queries with that workspace's horizon and cut-off. Reading settings per candidate row would be a query per ticket for a value that cannot change mid-run; reading them once globally would be worse than slow — it would be *wrong*, silently applying one workspace's thresholds to every other workspace on the server. The structure makes both mistakes unreachable: by the time a row is in hand its windows are already fixed, and they were fixed from its own workspace's claim.
+
 **The sweep's "today" is an IST day, and this is the one thing about it that must not be improvised.** A sweep is a *periodic* job: whatever schedule Plan 11 gives it, some run will land near midnight, and a run at 18:29Z and a run at 18:31Z on the same UTC date sit on opposite sides of an IST day boundary. Three consequences, all handled here:
 
-- The 7-day **warning horizon** is measured from `istDayOf(now)`, not from a UTC slice of the timestamp. A UTC slice does not roll over until 05:30 IST, so for five and a half hours every night it would compute yesterday's horizon and hold back a warning that is due — a day late, silently, for exactly the tickets whose claims just entered the window.
-- The **staleness window** is a day count, so it is computed with day helpers and compared **half-open** against `server_time`: `entered.server_time < istDayBounds(todayIst − thresholdDays).endUtc`. Raw millisecond subtraction from `now` would make "14 days" mean "14×86 400 000 ms from whenever the cron happened to fire", which drifts with the schedule rather than with the calendar the user reads.
+- The **warning horizon** (`dueSoonDays` ahead) is measured from `istDayOf(now)`, not from a UTC slice of the timestamp. A UTC slice does not roll over until 05:30 IST, so for five and a half hours every night it would compute yesterday's horizon and hold back a warning that is due — a day late, silently, for exactly the tickets whose claims just entered the window.
+- The **staleness window** (`staleDays` back) is a day count, so it is computed with day helpers and compared **half-open** against `server_time`: `entered.server_time < istDayBounds(todayIst − staleDays).endUtc`. Raw millisecond subtraction from `now` would make "N days" mean "N×86 400 000 ms from whenever the cron happened to fire", which drifts with the schedule rather than with the calendar the user reads — and it would disagree with the attention strip's day count for the same setting on the same afternoon.
 - **Idempotence survives the boundary.** The dedupe keys embed dates (`date-approaching:<ticketId>:<claimedDate>`, `stale-ticket:<ticketId>:<stateId>:<enteredAtIso>`) and the guarantee this task already tests — run it twice, notify once — only holds if consecutive runs derive the same day from the same facts. A sweep whose day boundary moved underneath it would let one claim notify twice across midnight. Step 1's IST-boundary block is the planted defect for exactly that.
 
 The `dueDate` comparison itself stays a day-vs-day string comparison (`claimedDate <= horizon`): a claim **is** a day, both sides are already IST, and `YYYY-MM-DD` sorts lexicographically. `istDayBounds` is for the one comparison in this task that puts a day against an *instant* column — the staleness window. Nothing here parses a day claim as a timestamp.
@@ -1691,28 +1701,36 @@ The `dueDate` comparison itself stays a day-vs-day string comparison (`claimedDa
 - Create: `apps/server/test/notifications/sweep.test.ts`
 
 **Interfaces:**
-- Consumes: `proj_tickets` (Plan 3), the `events` table (Plan 1), `getWorkflowDefFromProjection` (Plan 2, `apps/server/src/projections/workflows.ts`), `deliverToAll`/`NotificationTransport`/`CanSeeFn` (Task 5), `newUlid`/`Notification`/`istDayOf`/`istDayBounds` (`@gisik-nokma/domain`).
-- Produces (Plan 11 schedules the CLI; Plan 5's attention endpoint shares the windows type — Open questions):
-  - `type SweepWindows = { approachingWindowDays: number; stalenessThresholdDays: number }`
-  - `DEFAULT_SWEEP_WINDOWS: SweepWindows = { approachingWindowDays: 7, stalenessThresholdDays: 14 }`
-  - `type SweepDeps = { pool: Pool; transports: NotificationTransport[]; windows?: SweepWindows; canSeeTicket?: CanSeeFn; now?: () => Date; log?: (message: string, error?: unknown) => void }`
+- Consumes: `proj_tickets` (Plan 3), the `events` table (Plan 1), `getWorkflowDefFromProjection` (Plan 2, `apps/server/src/projections/workflows.ts`), `Queryable` (Plan 4), `deliverToAll`/`NotificationTransport`/`CanSeeFn` (Task 5), `newUlid`/`Notification`/`istDayOf`/`istDayBounds` (`@gisik-nokma/domain`), **and the whole of Plan 5's workspace-settings surface (`2026-08-20-05-api-realtime-search.md`, Tasks 3–4): `getWorkspaceSettings(db: Queryable, workspaceId: string): Promise<WorkspaceSettings>` from `apps/server/src/projections/workspace-settings.ts`, backed by the `proj_workspace_settings` projection and the `workspace.settings_set` v1 event, with `DEFAULT_STALE_DAYS`/`DEFAULT_DUE_SOON_DAYS` (both 7) applied inside the reader.** The tests additionally consume Plan 5's `makeCommitted`/`applyCommitted`/`resetEntitySeqs` (`apps/server/test/helpers/apply.ts`, Plan 5 Task 4) to seed settings the way Plan 5's own suites do.
+- Produces (Plan 11 schedules the CLI; the windows themselves are Plan 5's settings, produced by nothing here):
+  - `type SweepWindows = { approachingWindowDays: number; stalenessThresholdDays: number }` — the **resolved** shape only. It is what a workspace's settings have been read into for one sweep run; no value is ever written down at this type, and no default lives at it.
+  - `resolveSweepWindows(db: Queryable, workspaceId: string): Promise<SweepWindows>` — the whole mapping, stated once: `approachingWindowDays = settings.dueSoonDays`, `stalenessThresholdDays = settings.staleDays`, where `settings = await getWorkspaceSettings(db, workspaceId)`. **The sweep's "approaching" window IS the workspace's `dueSoonDays`; the sweep's "staleness" threshold IS the workspace's `staleDays`.** Unclaimed workspaces get `DEFAULT_DUE_SOON_DAYS`/`DEFAULT_STALE_DAYS` because the reader applies them — not because this file restates them.
+  - `type SweepDeps = { pool: Pool; transports: NotificationTransport[]; canSeeTicket?: CanSeeFn; now?: () => Date; log?: (message: string, error?: unknown) => void }` — **no `windows` key.** There is deliberately no injection seam for thresholds: an override parameter is a second source of the number, and this task exists to end the second source. A test that needs particular windows claims them with a `workspace.settings_set` event, exactly as an admin would.
   - `type SweepReport = { dueCandidates: number; staleCandidates: number; delivered: number }` (operational logging only — idempotence is proven by row counts, not by the report)
-  - `runNotificationSweep(deps: SweepDeps): Promise<SweepReport>`
+  - `runNotificationSweep(deps: SweepDeps): Promise<SweepReport>` — iterates the workspaces that have tickets, resolving each workspace's windows **exactly once**, before running that workspace's scoped due and stale queries.
   - Dedupe-key grammar (exact): `date-approaching:<ticketId>:<claimedDate>` · `stale-ticket:<ticketId>:<stateId>:<enteredAtIso>`
   - `isoDatePlusDays(isoDay: string, days: number): string` — day-string arithmetic over `YYYY-MM-DD`, no timezone involved on either side (it shifts a *calendar day*, it does not convert an instant). Accepts negative `days`. The instant→day step is `istDayOf`'s alone.
-  - **Day-boundary contract:** `todayIst = istDayOf(now.toISOString())`; the approaching horizon is `isoDatePlusDays(todayIst, approachingWindowDays)`; the staleness cut-off is `istDayBounds(isoDatePlusDays(todayIst, -stalenessThresholdDays)).endUtc`, compared with a strict `<` because `istDayBounds` is half-open. Nothing in this file slices a timestamp string for a day, and nothing divides milliseconds to count days.
+  - **Day-boundary contract:** `todayIst = istDayOf(now.toISOString())` — computed once for the whole run, so every workspace in one sweep answers the same "today"; the approaching horizon is `isoDatePlusDays(todayIst, approachingWindowDays)`; the staleness cut-off is `istDayBounds(isoDatePlusDays(todayIst, -stalenessThresholdDays)).endUtc`, compared with a strict `<` because `istDayBounds` is half-open. Nothing in this file slices a timestamp string for a day, and nothing divides milliseconds to count days.
   - CLI: `pnpm --filter @gisik-nokma/server run sweep:notifications` — reads `DATABASE_URL`, prints the report, exit 0; scheduling is Plan 11's concern.
   - Targeting rules (exact): date-approaching goes to the assignee, or to the claim's author when unassigned (the person who made the claim owns the caring); stale-ticket goes to the assignee only — an unassigned stale ticket is the read-time attention strip's job, not a nag with no addressee. Terminal tickets never notify (done work has no approaching deadline). Both targets pass the `canSee` gate.
 
 - [ ] **Step 1: Write the failing sweep tests**
 
+**Guard (locate before you write).** This suite seeds workspace settings through Plan 5's helpers rather than a hand-rolled INSERT, so that the sweep and the attention strip exercise the *same* mechanism — event → `workspaceSettingsProjection` → `proj_workspace_settings` → `getWorkspaceSettings`. Run `ls apps/server/test/helpers/apply.ts` and `grep -n "export function makeCommitted\|export async function applyCommitted\|export function resetEntitySeqs" apps/server/test/helpers/apply.ts`. If they are there (Plan 5 Task 4 landed), import them as written below. If Plan 5 has not landed yet, **stop and take it to the orchestrator** — this task now depends on Plan 5's settings surface and cannot be executed against a checkout that lacks it; do not substitute a local constant "for now", because that constant is the defect this task removes. If the helpers landed under different names or a different path (Open questions 14's helper drift), adapt the import specifier only — never the mechanism.
+
 `apps/server/test/notifications/sweep.test.ts`:
 
 ```ts
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { DEFAULT_SWEEP_WINDOWS, isoDatePlusDays, runNotificationSweep } from '../../src/notifications/sweep.js';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_DUE_SOON_DAYS, DEFAULT_STALE_DAYS } from '@gisik-nokma/domain';
+import { isoDatePlusDays, resolveSweepWindows, runNotificationSweep } from '../../src/notifications/sweep.js';
 import { createInAppTransport } from '../../src/notifications/transport.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+// Plan 5 Task 4's shared seeders: an event goes into the ledger AND through
+// every registered projection, one transaction per event, exactly as ingest
+// would. Settings are seeded HERE the way Plan 5's own attention tests seed
+// them, so neither suite can pass against a mechanism the other does not use.
+import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 
 let db: TestDatabase;
 
@@ -1725,19 +1743,25 @@ afterAll(async () => {
 });
 
 const WS = '01J9GWS0000000000000000000';
+const OTHER_WS = '01J9GWS2000000000000000000';
 const PROJECT = '01J9GPRJ000000000000000000';
 const KIRO = '01J9GUKR000000000000000000';
 const ANSELMA = '01J9GUAN000000000000000000';
 
 /**
  * Frozen clock: 23 Aug 2026, 05:00 UTC — 10:30 IST, mid-morning of IST day
- * 2026-08-23. A 7-day window from that IST day reaches 30 Aug.
+ * 2026-08-23. A `DEFAULT_DUE_SOON_DAYS` window from that IST day reaches 30 Aug.
  */
 const NOW_INSTANT = '2026-08-23T05:00:00.000Z';
 
 const seeEverything = async () => true;
 
-/** The sweep at an arbitrary instant — the IST-boundary block drives it directly. */
+/**
+ * The sweep at an arbitrary instant — the IST-boundary block drives it directly.
+ * Note what is NOT here: a `windows` argument. The sweep has no threshold
+ * parameter to pass, by design; a test that wants different windows claims them
+ * with `seedWorkspaceSettings` below, the way an admin would.
+ */
 function sweepAt(instant: string) {
   return runNotificationSweep({
     pool: db.pool,
@@ -1754,6 +1778,7 @@ function sweep() {
 
 type SeedTicket = {
   ticketId: string;
+  workspaceId?: string;
   stateId?: string;
   stateCategory?: 'open' | 'active' | 'terminal';
   assigneeId?: string | null;
@@ -1781,11 +1806,44 @@ async function seedTicket(t: SeedTicket): Promise<void> {
   await db.pool.query(
     `INSERT INTO proj_tickets (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, state_id, state_category, assignee_id, collaborator_ids, fields)
      VALUES ($1, $2, $3, 'task', NULL, 'wf-basic', $4, $5, $6, '[]', $7)`,
-    [t.ticketId, WS, PROJECT, t.stateId ?? 'doing', t.stateCategory ?? 'active', t.assigneeId ?? null, JSON.stringify(fields)],
+    [t.ticketId, t.workspaceId ?? WS, PROJECT, t.stateId ?? 'doing', t.stateCategory ?? 'active', t.assigneeId ?? null, JSON.stringify(fields)],
   );
 }
 
 let seq = 0;
+
+/**
+ * Claim workspace settings the way an owner or admin would: a real
+ * `workspace.settings_set` v1 event, through Plan 5's `applyCommitted`, which
+ * runs it past every registered projection — so `proj_workspace_settings` ends
+ * up holding exactly what a production claim would leave there, and
+ * `getWorkspaceSettings` reads it back the same way the attention strip does.
+ *
+ * The explicit `seq`/`workspaceSeq` come from THIS suite's global counter
+ * (`seedEnteredState` feeds from it too). `makeCommitted` would otherwise
+ * allocate from its own module-level maps starting at 1 and collide with the
+ * hand-seeded ledger rows on `UNIQUE (workspace_id, workspace_seq)`. One
+ * counter, monotonic, shared — the same discipline `seedEnteredState`
+ * documents below.
+ */
+async function seedWorkspaceSettings(
+  payload: { staleDays?: number; dueSoonDays?: number },
+  options: { workspaceId?: string; actorId?: string } = {},
+): Promise<void> {
+  const workspaceId = options.workspaceId ?? WS;
+  seq += 1;
+  await applyCommitted(db.pool, [
+    makeCommitted({
+      workspaceId,
+      entity: { kind: 'workspace', id: workspaceId },
+      type: 'workspace.settings_set',
+      payload,
+      actorId: options.actorId ?? KIRO,
+      seq,
+      workspaceSeq: seq,
+    }),
+  ]);
+}
 
 /**
  * Append a state-entering event straight into the ledger (append-only: inserts
@@ -1801,13 +1859,18 @@ let seq = 0;
  * higher `seq`, which is what the sweep's per-entity `ORDER BY e.seq DESC`
  * reads.
  */
-async function seedEnteredState(ticketId: string, serverTime: string, actorId: string): Promise<void> {
+async function seedEnteredState(
+  ticketId: string,
+  serverTime: string,
+  actorId: string,
+  workspaceId: string = WS,
+): Promise<void> {
   seq += 1;
   const id = `01J9GEVT00000000000000${String(seq).padStart(4, '0')}`.slice(0, 26);
   await db.pool.query(
     `INSERT INTO events (id, workspace_id, entity_kind, entity_id, type, version, payload, actor_id, origin, client_time, server_time, seq, workspace_seq)
      VALUES ($1, $2, 'ticket', $3, 'ticket.transitioned', 1, $4, $5, 'web', $6, $7, $8, $9)`,
-    [id, WS, ticketId, JSON.stringify({ toStateId: 'doing' }), actorId, serverTime, serverTime, seq, seq],
+    [id, workspaceId, ticketId, JSON.stringify({ toStateId: 'doing' }), actorId, serverTime, serverTime, seq, seq],
   );
 }
 
@@ -1827,8 +1890,13 @@ async function notificationRows(kind?: string) {
 }
 
 beforeEach(async () => {
+  vi.restoreAllMocks();
   await db.pool.query('DELETE FROM notifications');
   await db.pool.query('DELETE FROM proj_tickets');
+  // Each test starts from an unclaimed workspace, so "the default" in these
+  // tests always means the settings defaults the reader applies — never a
+  // number this file remembers.
+  await db.pool.query('DELETE FROM proj_workspace_settings');
 });
 
 describe('isoDatePlusDays', () => {
@@ -1838,7 +1906,7 @@ describe('isoDatePlusDays', () => {
   });
 
   it('subtracts too — the staleness cut-off walks backwards from today', () => {
-    expect(isoDatePlusDays('2026-08-23', -14)).toBe('2026-08-09');
+    expect(isoDatePlusDays('2026-08-23', -10)).toBe('2026-08-13');
     expect(isoDatePlusDays('2026-09-06', -7)).toBe('2026-08-30');
     expect(isoDatePlusDays('2027-01-01', -1)).toBe('2026-12-31');
   });
@@ -1910,7 +1978,7 @@ describe('stale-ticket', () => {
   it('notifies the assignee when an active state outlives the threshold, attributing who moved it there', async () => {
     const ticketId = freshTicketId();
     await seedTicket({ ticketId, assigneeId: ANSELMA });
-    await seedEnteredState(ticketId, '2026-08-01T09:00:00.000Z', KIRO); // IST day 2026-08-01, 22 IST days back > the 14-day threshold
+    await seedEnteredState(ticketId, '2026-08-01T09:00:00.000Z', KIRO); // IST day 2026-08-01, 22 IST days back — past the unclaimed workspace's DEFAULT_STALE_DAYS
     await sweep();
     const rows = await notificationRows('stale-ticket');
     expect(rows).toHaveLength(1);
@@ -2007,31 +2075,150 @@ describe('the sweep window is an IST day, and a sweep across IST midnight proves
   });
 
   it('PLANTED DEFECT: the staleness cut-off is an IST day count, not a millisecond subtraction from the cron clock', async () => {
-    // The sweep runs at 00:01 IST on 24 Aug, so today is IST day 2026-08-24 and
-    // the cut-off day is 2026-08-10, whose half-open bounds END at
-    // 2026-08-10T18:30:00.000Z. The ticket entered at 2026-08-10T09:00:00.000Z
-    // — 14:30 IST on IST day 2026-08-10 — which is exactly fourteen IST days
-    // back, so it IS stale.
+    // Nothing is claimed for this workspace, so the threshold is the settings
+    // default — DEFAULT_STALE_DAYS, which the owner approved at 7. The sweep
+    // runs at 00:01 IST on 24 Aug, so today is IST day 2026-08-24 and the
+    // cut-off day is 2026-08-17, whose half-open bounds END at
+    // 2026-08-17T18:30:00.000Z. The ticket entered at 2026-08-17T09:00:00.000Z
+    // — 14:30 IST on IST day 2026-08-17 — which is exactly DEFAULT_STALE_DAYS
+    // IST days back, so it IS stale.
     //
-    // A raw `now.getTime() - 14 * 86_400_000` would put the cut-off at
-    // 2026-08-09T18:31:00.000Z and call this ticket fresh, because 13 days
-    // 23 hours 29 minutes is not 14 × 24 h. "Fourteen days" is a statement
-    // about the calendar the user reads, not about the second the scheduler
-    // happened to fire — and under the raw subtraction the answer would move
-    // every time cron drifts.
+    // A raw `now.getTime() - staleDays * 86_400_000` would put the cut-off at
+    // 2026-08-16T18:31:00.000Z and call this ticket fresh, because 6 days
+    // 23 hours 29 minutes is not 7 × 24 h. A day count is a statement about
+    // the calendar the user reads, not about the second the scheduler happened
+    // to fire — and under the raw subtraction the answer would move every time
+    // cron drifts. This block is about the BOUNDARY, not about the number: it
+    // deliberately runs on the unclaimed default so the day arithmetic is the
+    // only thing under test.
     const ticketId = freshTicketId();
     await seedTicket({ ticketId, assigneeId: ANSELMA });
-    await seedEnteredState(ticketId, '2026-08-10T09:00:00.000Z', KIRO);
+    await seedEnteredState(ticketId, '2026-08-17T09:00:00.000Z', KIRO);
     await sweepAt(AFTER_IST_MIDNIGHT);
     const rows = await notificationRows('stale-ticket');
     expect(rows).toHaveLength(1);
-    expect(rows[0].dedupe_key).toBe(`stale-ticket:${ticketId}:doing:2026-08-10T09:00:00.000Z`);
+    expect(rows[0].dedupe_key).toBe(`stale-ticket:${ticketId}:doing:2026-08-17T09:00:00.000Z`);
   });
 });
 
-describe('defaults', () => {
-  it('the default windows are 7 days approaching, 14 days staleness', () => {
-    expect(DEFAULT_SWEEP_WINDOWS).toEqual({ approachingWindowDays: 7, stalenessThresholdDays: 14 });
+describe('the sweep windows ARE the workspace settings — one origin, not two', () => {
+  it('an unclaimed workspace sweeps on the settings defaults — the same two the attention strip shows', async () => {
+    const windows = await resolveSweepWindows(db.pool, WS);
+    // The mapping, asserted rather than described: approaching IS dueSoonDays,
+    // staleness IS staleDays. No number is written down on either side of this
+    // expectation — both come from the domain module Plan 5 owns.
+    expect(windows).toEqual({
+      approachingWindowDays: DEFAULT_DUE_SOON_DAYS,
+      stalenessThresholdDays: DEFAULT_STALE_DAYS,
+    });
+  });
+
+  it('a claimed workspace resolves to what the admin claimed, mapped concept for concept', async () => {
+    await seedWorkspaceSettings({ staleDays: 3, dueSoonDays: 21 });
+    expect(await resolveSweepWindows(db.pool, WS)).toEqual({
+      approachingWindowDays: 21,
+      stalenessThresholdDays: 3,
+    });
+  });
+
+  /**
+   * PLANTED DEFECT — the two-sources-of-truth defect this task exists to close.
+   *
+   * An admin narrows the workspace's staleness threshold to 3 days. A ticket
+   * that has sat in an active state for 5 IST days is now stale BY THE
+   * WORKSPACE'S OWN DEFINITION, and the sweep must say so.
+   *
+   * This test fails against every implementation that keeps its own number:
+   *   - a private staleness constant in the sweep (the fortnight-long default
+   *     this task deleted) → cut-off day 2026-08-09, the ticket reads fresh,
+   *     no row;
+   *   - the settings DEFAULT applied without reading the claim → cut-off day
+   *     2026-08-16, the ticket reads fresh, no row.
+   * It passes only if the sweep read `staleDays` out of proj_workspace_settings
+   * for THIS workspace. That is the whole point: the board flags a ticket stale
+   * and the inbox says so on the same day, because there is one number.
+   */
+  it('PLANTED DEFECT: an admin who narrows staleDays makes the sweep nag sooner — the threshold is the workspace\'s claim, never a constant in the sweep', async () => {
+    const ticketId = freshTicketId();
+    await seedTicket({ ticketId, assigneeId: ANSELMA });
+    // 5 IST days before IST day 2026-08-23: fresh under any default, stale
+    // under the claimed 3.
+    await seedEnteredState(ticketId, '2026-08-18T09:00:00.000Z', KIRO);
+
+    await sweep();
+    expect(await notificationRows('stale-ticket')).toHaveLength(0); // unclaimed: the default holds it back
+
+    await seedWorkspaceSettings({ staleDays: 3 }, { actorId: KIRO });
+    await sweep();
+    const rows = await notificationRows('stale-ticket');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].user_id).toBe(ANSELMA);
+    expect(rows[0].dedupe_key).toBe(`stale-ticket:${ticketId}:doing:2026-08-18T09:00:00.000Z`);
+  });
+
+  it('PLANTED DEFECT: an admin who widens staleDays silences a ticket the default would have flagged — the setting moves the sweep in both directions', async () => {
+    await seedWorkspaceSettings({ staleDays: 30 });
+    const ticketId = freshTicketId();
+    await seedTicket({ ticketId, assigneeId: ANSELMA });
+    await seedEnteredState(ticketId, '2026-08-01T09:00:00.000Z', KIRO); // 22 IST days: stale under the default, fresh under 30
+    await sweep();
+    expect(await notificationRows('stale-ticket')).toHaveLength(0);
+  });
+
+  it('the approaching window is the workspace\'s dueSoonDays — narrowing it holds back a claim the default would have warned about', async () => {
+    await seedWorkspaceSettings({ dueSoonDays: 2 });
+    await seedTicket({ ticketId: freshTicketId(), assigneeId: ANSELMA, dueDate: { date: '2026-08-30' } });
+    await sweep();
+    expect(await notificationRows('date-approaching')).toHaveLength(0); // horizon 2026-08-25, the claim is beyond it
+
+    await seedWorkspaceSettings({ dueSoonDays: 21 });
+    await sweep();
+    expect(await notificationRows('date-approaching')).toHaveLength(1); // horizon 2026-09-13, the claim is inside it
+  });
+
+  it('PLANTED DEFECT: each workspace gets ITS OWN settings — one server-wide sweep is not one workspace\'s thresholds applied to everyone', async () => {
+    await seedWorkspaceSettings({ staleDays: 3 }, { workspaceId: WS });
+    await seedWorkspaceSettings({ staleDays: 30 }, { workspaceId: OTHER_WS });
+
+    const nagged = freshTicketId();
+    const spared = freshTicketId();
+    await seedTicket({ ticketId: nagged, workspaceId: WS, assigneeId: ANSELMA });
+    await seedTicket({ ticketId: spared, workspaceId: OTHER_WS, assigneeId: ANSELMA });
+    // The SAME entry instant in both workspaces — 22 IST days back. Stale under
+    // WS's claimed 3, fresh under OTHER_WS's claimed 30. A sweep that read
+    // settings once and reused them would get exactly one of these wrong.
+    await seedEnteredState(nagged, '2026-08-01T09:00:00.000Z', KIRO, WS);
+    await seedEnteredState(spared, '2026-08-01T09:00:00.000Z', KIRO, OTHER_WS);
+
+    await sweep();
+    const rows = await notificationRows('stale-ticket');
+    expect(rows.map((row) => row.dedupe_key)).toEqual([
+      `stale-ticket:${nagged}:doing:2026-08-01T09:00:00.000Z`,
+    ]);
+  });
+
+  it('settings are read once per workspace, not once per ticket — a sweep must not query them per row', async () => {
+    await seedWorkspaceSettings({ staleDays: 3 }, { workspaceId: WS });
+    await seedWorkspaceSettings({ staleDays: 3 }, { workspaceId: OTHER_WS });
+    for (const workspaceId of [WS, OTHER_WS]) {
+      for (let i = 0; i < 3; i += 1) {
+        const ticketId = freshTicketId();
+        await seedTicket({ ticketId, workspaceId, assigneeId: ANSELMA, dueDate: { date: '2026-08-25' } });
+        await seedEnteredState(ticketId, '2026-08-01T09:00:00.000Z', KIRO, workspaceId);
+      }
+    }
+
+    // Spy AFTER seeding: applyCommitted's projection write touches
+    // proj_workspace_settings too, and counting it would flatter the result.
+    const querySpy = vi.spyOn(db.pool, 'query');
+    await sweep();
+    const settingsReads = querySpy.mock.calls.filter(
+      (call) => typeof call[0] === 'string' && call[0].includes('proj_workspace_settings'),
+    );
+    // Two workspaces, six tickets, twelve notifications — and exactly two reads
+    // of the thresholds. Per-ticket resolution would show six.
+    expect(settingsReads).toHaveLength(2);
+    expect(await notificationRows()).toHaveLength(12);
   });
 });
 ```
@@ -2048,24 +2235,59 @@ Expected: FAIL — `src/notifications/sweep.ts` does not exist.
 ```ts
 import type { Pool } from 'pg';
 import { dateClaimProvenanceSchema, istDayBounds, istDayOf, newUlid, type Notification } from '@gisik-nokma/domain';
+import type { Queryable } from '../db/queryable.js';
 import { getWorkflowDefFromProjection } from '../projections/workflows.js';
+import { getWorkspaceSettings } from '../projections/workspace-settings.js';
 import { canSee } from '../visibility/can-see.js';
 import { deliverToAll, type NotificationTransport } from './transport.js';
 import type { CanSeeFn } from './fanout.js';
 
+/**
+ * The two windows one sweep run uses for one workspace, already RESOLVED.
+ *
+ * This type is a shape, not a place where numbers live. Both values come from
+ * the workspace's settings and from nowhere else; there is no default at this
+ * type, and deliberately no threshold constant anywhere in this file. Spec
+ * §7 calls both thresholds workspace-set, and they are: Plan 5's
+ * `workspace.settings_set` claim is the single origin, projected into
+ * `proj_workspace_settings` and read back by `getWorkspaceSettings`.
+ */
 export type SweepWindows = { approachingWindowDays: number; stalenessThresholdDays: number };
 
 /**
- * Spec §7 calls both thresholds workspace-set; until Plan 5's attention
- * endpoint lands the one source for per-workspace values, the sweep runs on
- * these defaults and the `windows` dep is the seam (Open questions).
+ * The mapping between the sweep's vocabulary and the workspace's settings,
+ * written down exactly once:
+ *
+ *   approaching window  ←  dueSoonDays
+ *   staleness threshold ←  staleDays
+ *
+ * They are the same two questions the read-time attention strip asks ("is this
+ * due soon?", "has this sat too long?"), so they must be the same two numbers.
+ * When they were two sets of numbers, a board could flag a ticket stale while
+ * the sweep stayed silent for another week, and an admin moving the setting
+ * moved one of them — the exact drift this product exists to remove.
+ *
+ * `getWorkspaceSettings` applies `DEFAULT_STALE_DAYS`/`DEFAULT_DUE_SOON_DAYS`
+ * for a workspace that never claimed either, so an unclaimed workspace and the
+ * attention strip agree by construction rather than by coincidence.
  */
-export const DEFAULT_SWEEP_WINDOWS: SweepWindows = { approachingWindowDays: 7, stalenessThresholdDays: 14 };
+export async function resolveSweepWindows(db: Queryable, workspaceId: string): Promise<SweepWindows> {
+  const settings = await getWorkspaceSettings(db, workspaceId);
+  return {
+    approachingWindowDays: settings.dueSoonDays,
+    stalenessThresholdDays: settings.staleDays,
+  };
+}
 
+/**
+ * Note the absence of a `windows` key. There is no threshold to inject: an
+ * override parameter would be a second way to set the number, and a second way
+ * to set the number is a second number. Tests that need particular windows
+ * claim them with a `workspace.settings_set` event, the way an admin does.
+ */
 export type SweepDeps = {
   pool: Pool;
   transports: NotificationTransport[];
-  windows?: SweepWindows;
   canSeeTicket?: CanSeeFn;
   now?: () => Date;
   log?: (message: string, error?: unknown) => void;
@@ -2110,7 +2332,6 @@ type StaleRow = {
 };
 
 export async function runNotificationSweep(deps: SweepDeps): Promise<SweepReport> {
-  const windows = deps.windows ?? DEFAULT_SWEEP_WINDOWS;
   const canSeeTicket: CanSeeFn = deps.canSeeTicket ?? ((db, userId, ticketId) => canSee(db, userId, ticketId));
   const now = (deps.now ?? (() => new Date()))();
   const log = deps.log ?? ((message: string, error?: unknown) => console.error(message, error));
@@ -2119,135 +2340,170 @@ export async function runNotificationSweep(deps: SweepDeps): Promise<SweepReport
   // NOT `createdAt.slice(0, 10)` — a UTC slice does not roll over until 05:30
   // IST, so between IST midnight and 05:30 every night it would compute
   // yesterday's horizon and hold back warnings that are due. istDayOf is the
-  // one instant→day conversion in this file.
+  // one instant→day conversion in this file, and it runs ONCE for the whole
+  // run, so every workspace in one sweep answers the same "today".
   const todayIst = istDayOf(createdAt);
-  const horizon = isoDatePlusDays(todayIst, windows.approachingWindowDays);
   const report: SweepReport = { dueCandidates: 0, staleCandidates: 0, delivered: 0 };
 
-  // --- date-approaching: every non-terminal ticket whose CLAIMED date is on
-  // or before the horizon. The date is read from the claim; nothing is
-  // computed onto tickets that carry no claim (invariant 4).
+  // The sweep is server-wide — the CLI has one DATABASE_URL and no workspace
+  // argument — but the thresholds are PER WORKSPACE. So the run is a loop over
+  // workspaces, and each workspace's settings are read exactly ONCE, before any
+  // of its rows are looked at.
   //
-  // Day against day: a dueDate claim IS a day, the horizon IS a day, both are
-  // IST, and `YYYY-MM-DD` sorts lexicographically — so this is a string
-  // comparison and correctly so. Parsing the claim as a timestamp to compare it
-  // against an instant would invent a time of day nobody claimed.
-  const due = await deps.pool.query(
-    `SELECT ticket_id, workspace_id, assignee_id,
-            fields -> 'title' ->> 'value' AS title,
-            fields -> 'dueDate' AS due_claim
-       FROM proj_tickets
-      WHERE state_category <> 'terminal'
-        AND fields -> 'dueDate' -> 'value' ->> 'date' <= $1`,
-    [horizon],
+  // Both nearby mistakes are structurally unreachable from here. Resolving
+  // inside the row loops would be a settings query per ticket for a value that
+  // cannot change mid-run — a per-row round trip that grows with the board.
+  // Resolving once for the server would be worse than slow: it would apply one
+  // workspace's claim to every other workspace's tickets, quietly nagging one
+  // team on another team's threshold. A workspace with no tickets has nothing
+  // to sweep and never appears.
+  const workspaces = await deps.pool.query(
+    `SELECT DISTINCT workspace_id FROM proj_tickets ORDER BY workspace_id`,
   );
 
-  for (const row of due.rows as DueRow[]) {
-    report.dueCandidates += 1;
-    const claimRecord = row.due_claim as { value?: { date?: string; note?: string }; actorId?: string; clientTime?: string; serverTime?: string } | null;
-    const flattened = {
-      date: claimRecord?.value?.date ?? '',
-      ...(claimRecord?.value?.note !== undefined ? { note: claimRecord.value.note } : {}),
-      actorId: claimRecord?.actorId ?? '',
-      clientTime: claimRecord?.clientTime ?? '',
-      serverTime: claimRecord?.serverTime ?? '',
-    };
-    const claim = dateClaimProvenanceSchema.safeParse(flattened);
-    if (!claim.success) {
-      log(`sweep: dueDate claim on ${row.ticket_id} is not a well-formed FieldClaim — skipped, not guessed`);
-      continue;
+  for (const { workspace_id: workspaceId } of workspaces.rows as Array<{ workspace_id: string }>) {
+    // ONE settings read per workspace. `resolveSweepWindows` is the only place
+    // in this file that knows which setting means which window.
+    const windows = await resolveSweepWindows(deps.pool, workspaceId);
+    const horizon = isoDatePlusDays(todayIst, windows.approachingWindowDays);
+
+    // --- date-approaching: every non-terminal ticket in THIS workspace whose
+    // CLAIMED date is on or before this workspace's horizon. The date is read
+    // from the claim; nothing is computed onto tickets that carry no claim
+    // (invariant 4).
+    //
+    // Day against day: a dueDate claim IS a day, the horizon IS a day, both are
+    // IST, and `YYYY-MM-DD` sorts lexicographically — so this is a string
+    // comparison and correctly so. Parsing the claim as a timestamp to compare
+    // it against an instant would invent a time of day nobody claimed.
+    const due = await deps.pool.query(
+      `SELECT ticket_id, workspace_id, assignee_id,
+              fields -> 'title' ->> 'value' AS title,
+              fields -> 'dueDate' AS due_claim
+         FROM proj_tickets
+        WHERE workspace_id = $1
+          AND state_category <> 'terminal'
+          AND fields -> 'dueDate' -> 'value' ->> 'date' <= $2`,
+      [workspaceId, horizon],
+    );
+
+    for (const row of due.rows as DueRow[]) {
+      report.dueCandidates += 1;
+      const claimRecord = row.due_claim as { value?: { date?: string; note?: string }; actorId?: string; clientTime?: string; serverTime?: string } | null;
+      const flattened = {
+        date: claimRecord?.value?.date ?? '',
+        ...(claimRecord?.value?.note !== undefined ? { note: claimRecord.value.note } : {}),
+        actorId: claimRecord?.actorId ?? '',
+        clientTime: claimRecord?.clientTime ?? '',
+        serverTime: claimRecord?.serverTime ?? '',
+      };
+      const claim = dateClaimProvenanceSchema.safeParse(flattened);
+      if (!claim.success) {
+        log(`sweep: dueDate claim on ${row.ticket_id} is not a well-formed FieldClaim — skipped, not guessed`);
+        continue;
+      }
+      const target = row.assignee_id ?? claim.data.actorId;
+      if (!(await canSeeTicket(deps.pool, target, row.ticket_id))) continue;
+      const notification: Notification = {
+        id: newUlid(),
+        userId: target,
+        workspaceId: row.workspace_id,
+        kind: 'date-approaching',
+        dedupeKey: `date-approaching:${row.ticket_id}:${claim.data.date}`,
+        payload: { ticketId: row.ticket_id, ticketTitle: row.title ?? '', field: 'dueDate', claim: claim.data },
+        read: false,
+        createdAt,
+      };
+      await deliverToAll(deps.transports, notification, log);
+      report.delivered += 1;
     }
-    const target = row.assignee_id ?? claim.data.actorId;
-    if (!(await canSeeTicket(deps.pool, target, row.ticket_id))) continue;
-    const notification: Notification = {
-      id: newUlid(),
-      userId: target,
-      workspaceId: row.workspace_id,
-      kind: 'date-approaching',
-      dedupeKey: `date-approaching:${row.ticket_id}:${claim.data.date}`,
-      payload: { ticketId: row.ticket_id, ticketTitle: row.title ?? '', field: 'dueDate', claim: claim.data },
-      read: false,
-      createdAt,
-    };
-    await deliverToAll(deps.transports, notification, log);
-    report.delivered += 1;
-  }
 
-  // --- stale-ticket: active tickets whose latest state-entering event is
-  // older than the threshold. "When did it enter?" is derived from the
-  // ledger every run — never stored as a second copy that could drift.
-  //
-  // The ORDER BY below is `seq`, and deliberately so: scoped by
-  // (entity_kind, entity_id) this is ONE ticket's history, and per-entity
-  // history is exactly what `seq` orders (Plan 1's readEntityEvents). It is
-  // NOT a cursor. A workspace STREAM resumes by `workspace_seq` instead
-  // (coordination §18) — this sweep never resumes a stream; it asks each
-  // ticket, independently, "what was the last thing that happened to you?"
-  //
-  // Day against INSTANT: `server_time` is a timestamptz, the threshold is a day
-  // count. So the cut-off day is walked back in day-space and then turned into
-  // an instant by istDayBounds, whose interval is HALF-OPEN — the comparison is
-  // a strict `<` against `endUtc`, meaning "entered on or before the cut-off
-  // day". `now.getTime() - days * 86_400_000` is what this replaced: it makes
-  // "fourteen days" mean fourteen times twenty-four hours from whenever the
-  // scheduler fired, which drifts with the cron and not with the calendar the
-  // assignee reads.
-  const stalenessCutoffDay = isoDatePlusDays(todayIst, -windows.stalenessThresholdDays);
-  const staleBefore = istDayBounds(stalenessCutoffDay).endUtc;
-  const stale = await deps.pool.query(
-    `SELECT t.ticket_id, t.workspace_id, t.assignee_id, t.state_id, t.workflow_id,
-            t.fields -> 'title' ->> 'value' AS title,
-            entered.server_time AS entered_at, entered.actor_id AS entered_by
-       FROM proj_tickets t
-       JOIN LATERAL (
-             SELECT e.server_time, e.actor_id
-               FROM events e
-              WHERE e.entity_kind = 'ticket' AND e.entity_id = t.ticket_id
-                AND e.type IN ('ticket.created', 'ticket.transitioned')
-              ORDER BY e.seq DESC
-              LIMIT 1
-           ) entered ON true
-      WHERE t.state_category = 'active'
-        AND entered.server_time < $1`,
-    [staleBefore],
-  );
+    // --- stale-ticket: active tickets in THIS workspace whose latest
+    // state-entering event is older than this workspace's threshold. "When did
+    // it enter?" is derived from the ledger every run — never stored as a
+    // second copy that could drift.
+    //
+    // The ORDER BY below is `seq`, and deliberately so: scoped by
+    // (entity_kind, entity_id) this is ONE ticket's history, and per-entity
+    // history is exactly what `seq` orders (Plan 1's readEntityEvents). It is
+    // NOT a cursor. A workspace STREAM resumes by `workspace_seq` instead
+    // (coordination §18) — this sweep never resumes a stream; it asks each
+    // ticket, independently, "what was the last thing that happened to you?"
+    //
+    // Day against INSTANT: `server_time` is a timestamptz, the threshold is a
+    // day count. So the cut-off day is walked back in day-space and then turned
+    // into an instant by istDayBounds, whose interval is HALF-OPEN — the
+    // comparison is a strict `<` against `endUtc`, meaning "entered on or
+    // before the cut-off day". `now.getTime() - days * 86_400_000` is what this
+    // replaced: it makes a day count mean that many twenty-four-hour spans from
+    // whenever the scheduler fired, which drifts with the cron and not with the
+    // calendar the assignee reads — and would answer differently from the
+    // attention strip reading the very same `staleDays`.
+    const stalenessCutoffDay = isoDatePlusDays(todayIst, -windows.stalenessThresholdDays);
+    const staleBefore = istDayBounds(stalenessCutoffDay).endUtc;
+    const stale = await deps.pool.query(
+      `SELECT t.ticket_id, t.workspace_id, t.assignee_id, t.state_id, t.workflow_id,
+              t.fields -> 'title' ->> 'value' AS title,
+              entered.server_time AS entered_at, entered.actor_id AS entered_by
+         FROM proj_tickets t
+         JOIN LATERAL (
+               SELECT e.server_time, e.actor_id
+                 FROM events e
+                WHERE e.entity_kind = 'ticket' AND e.entity_id = t.ticket_id
+                  AND e.type IN ('ticket.created', 'ticket.transitioned')
+                ORDER BY e.seq DESC
+                LIMIT 1
+             ) entered ON true
+        WHERE t.workspace_id = $1
+          AND t.state_category = 'active'
+          AND entered.server_time < $2`,
+      [workspaceId, staleBefore],
+    );
 
-  for (const row of stale.rows as StaleRow[]) {
-    report.staleCandidates += 1;
-    if (row.assignee_id === null) continue; // no addressee — the attention strip owns it at read time
-    if (!(await canSeeTicket(deps.pool, row.assignee_id, row.ticket_id))) continue;
-    const def = await getWorkflowDefFromProjection(deps.pool, row.workflow_id);
-    const stateName = def?.states.find((state) => state.id === row.state_id)?.name ?? null;
-    const enteredAt = row.entered_at.toISOString();
-    const notification: Notification = {
-      id: newUlid(),
-      userId: row.assignee_id,
-      workspaceId: row.workspace_id,
-      kind: 'stale-ticket',
-      dedupeKey: `stale-ticket:${row.ticket_id}:${row.state_id}:${enteredAt}`,
-      payload: {
-        ticketId: row.ticket_id,
-        ticketTitle: row.title ?? '',
-        stateId: row.state_id,
-        stateName,
-        enteredAt,
-        enteredBy: row.entered_by,
-      },
-      read: false,
-      createdAt,
-    };
-    await deliverToAll(deps.transports, notification, log);
-    report.delivered += 1;
+    for (const row of stale.rows as StaleRow[]) {
+      report.staleCandidates += 1;
+      if (row.assignee_id === null) continue; // no addressee — the attention strip owns it at read time
+      if (!(await canSeeTicket(deps.pool, row.assignee_id, row.ticket_id))) continue;
+      const def = await getWorkflowDefFromProjection(deps.pool, row.workflow_id);
+      const stateName = def?.states.find((state) => state.id === row.state_id)?.name ?? null;
+      const enteredAt = row.entered_at.toISOString();
+      const notification: Notification = {
+        id: newUlid(),
+        userId: row.assignee_id,
+        workspaceId: row.workspace_id,
+        kind: 'stale-ticket',
+        dedupeKey: `stale-ticket:${row.ticket_id}:${row.state_id}:${enteredAt}`,
+        payload: {
+          ticketId: row.ticket_id,
+          ticketTitle: row.title ?? '',
+          stateId: row.state_id,
+          stateName,
+          enteredAt,
+          enteredBy: row.entered_by,
+        },
+        read: false,
+        createdAt,
+      };
+      await deliverToAll(deps.transports, notification, log);
+      report.delivered += 1;
+    }
   }
 
   return report;
 }
 ```
 
+(Two import paths to confirm rather than assume, both consumed from other plans. `getWorkspaceSettings` is Plan 5 Task 4's — `grep -rn "export async function getWorkspaceSettings" apps/server/src` and import from where it actually landed; if the grep finds nothing, Plan 5 has not merged and this task cannot proceed, so hand it to the orchestrator rather than inventing a threshold. `Queryable` is Plan 4's — the same `grep -rn "export type Queryable" apps/server/src` hedge Task 4 already carries.)
+
 - [ ] **Step 4: Run to verify they pass**
 
 Run: `pnpm --filter @gisik-nokma/server exec vitest run test/notifications/sweep.test.ts`
-Expected: PASS — including the IST-boundary block. Before trusting it, watch both of its planted defects fail for the right reason: swap `istDayOf(createdAt)` for `createdAt.slice(0, 10)` and the 31 Aug claim never arrives; swap the cut-off for `new Date(now.getTime() - windows.stalenessThresholdDays * 86_400_000).toISOString()` and the fourteen-IST-day ticket reads as fresh. Restore both before moving on.
+Expected: PASS — including the IST-boundary block and the settings block. Before trusting any of it, watch all four planted defects fail for the right reason, one at a time, restoring after each:
+
+- swap `istDayOf(createdAt)` for `createdAt.slice(0, 10)` → the 31 Aug claim never arrives;
+- swap the cut-off for `new Date(now.getTime() - windows.stalenessThresholdDays * 86_400_000).toISOString()` → the ticket sitting exactly `DEFAULT_STALE_DAYS` IST days in its state reads as fresh;
+- **replace `resolveSweepWindows`'s body with a hard-coded pair — a week-long approaching window and a fortnight-long staleness threshold, the constants this task deleted** → *"an admin who narrows staleDays makes the sweep nag sooner"* fails (the 5-day ticket reads fresh against 14), *"an admin who widens staleDays silences a ticket"* fails (the 22-day ticket nags anyway), and the per-workspace test fails on both rows. This is the two-sources-of-truth defect, and it is the reason the settings block exists;
+- **hoist the `resolveSweepWindows` call out of the workspace loop** so one workspace's windows serve the whole run → the per-workspace test fails: `OTHER_WS`'s ticket is nagged on `WS`'s threshold. Move it into the row loop instead and the read-count test fails at six reads instead of two.
 
 - [ ] **Step 5: Add the CLI entry and script**
 
@@ -2294,7 +2550,17 @@ Expected: a `sweep: … delivered` line, exit 0.
 
 ```bash
 git add apps/server/src/notifications/sweep.ts apps/server/src/tools/sweep-notifications.ts apps/server/package.json apps/server/test/notifications/sweep.test.ts
-git commit -m "attention sweep: claims entering the window and states outliving the threshold become inbox rows — same tables, same IST day, same keys, so twice never nags twice, midnight included"
+git commit -m "attention sweep: claims entering the window and states outliving the threshold become inbox rows — same tables, same IST day, same keys, so twice never nags twice, midnight included
+
+Both windows are the workspace's own settings, read per workspace from
+Plan 5's getWorkspaceSettings: the approaching window IS dueSoonDays and
+the staleness threshold IS staleDays. The sweep's old private constants
+are gone along with the windows injection seam — a second way to set the
+number was a second number, and it let a board flag a ticket stale a
+week before the inbox said anything. The planted defects prove
+it in both directions: an admin who narrows staleDays makes the sweep
+nag sooner, one who widens it goes quiet, and two workspaces on one
+server keep their own thresholds — resolved once each, never per row."
 ```
 
 ---
@@ -6013,7 +6279,7 @@ Append after §10 (Plan 8's section; if the numbering you find differs, take the
 - ✅ **Timeline view** — week-column Gantt-lite: bars only for tickets with BOTH startDate and dueDate claims; single-claim, undated, and start-after-due work sits in a visible side list with attributed notes (a ticket carrying only custom date claims says "no claimed start or needed-by", not "no claimed dates"); epic grouping; no dependencies, no critical path. `packages/app-core/src/timeline/`
 - ✅ **Filters on both views** — FilterSpec (assignee, type, state, category, project, title text) plus an epic lane; in-transit claims render distinctly (`data-pending`) with provenance on hover. `packages/app-core/src/filter/`, `packages/app-core/src/claims/`
 - ⚙️ **Notification fan-out** — on committed events: `ticket.assigned` → assignee, structured `@mention` nodes in comments/descriptions → the mentioned, `claim.contested` → the original claimant; canSee-gated so a notification never out-leaks its ticket; idempotent per (user, dedupe key). `apps/server/src/notifications/fanout.ts`
-- ⚙️ **Attention sweep** — deterministic, idempotent job: dueDate claims entering the warning window and active states outliving the staleness threshold become inbox rows carrying the claim's provenance verbatim; running twice notifies once, including across midnight. `apps/server/src/notifications/sweep.ts`
+- ⚙️ **Attention sweep** — deterministic, idempotent job: dueDate claims entering the warning window and active states outliving the staleness threshold become inbox rows carrying the claim's provenance verbatim; running twice notifies once, including across midnight. Both windows are the workspace's own settings, resolved once per workspace from `getWorkspaceSettings` — the sweep's "approaching" window is `dueSoonDays` and its staleness threshold is `staleDays`, the same two the attention strip reads, so an admin who moves one moves the board and the inbox together and the sweep holds no threshold of its own. `apps/server/src/notifications/sweep.ts`
 - ⚙️ **IST day boundaries everywhere a day is decided** — calendar cell assignment, timeline day columns, the today ring, the sweep's warning horizon and staleness window, and the inbox's "since" all resolve a day through the domain's `istDayOf`/`istDayBounds`; day-vs-instant comparisons are half-open `[startUtc, endUtc)`. Rendered clocks use `IST_TIME_ZONE` from the domain, never a literal and never the device. `packages/app-core/src/claims/`, `apps/server/src/notifications/sweep.ts`, `packages/app-core/src/inbox/format.ts`
 - ⚙️ **Notification storage + API** — per-user `notifications` rows (server-owned, NOT ledger events, NOT a projection — replay can never re-invent a nag); `GET /v1/me/notifications` (cursor), unread count, mark-read; strict payload schemas with no field for invented urgency. `apps/server/src/notifications/store.ts`, `apps/server/src/routes/notifications.ts`
 - ⚙️ **NotificationTransport seam** — at-least-once per (user, dedupeKey); in-app transport ships here, web push (Plan 10) and native push (Plan 11) implement the same interface. `apps/server/src/notifications/transport.ts`
@@ -6094,8 +6360,14 @@ Scope contract for Features.md §11. Status legend: ✅ covered by an automated 
 ## IST day boundaries (owner decision 2026-08-20 — time is Asia/Kolkata)
 
 - **11.42** ✅ Planted defect: the sweep's "today" is an IST day. Two runs either side of IST midnight on one UTC date (18:29Z and 18:31Z) notify a claim already inside the window exactly once, while a claim that only enters the window on the next IST day gets its own notification on that day — the warning a UTC-sliced horizon would hold back until 05:30 IST. (`sweep.test.ts`)
-- **11.43** ✅ Planted defect: the staleness threshold is a day count in IST, not a millisecond subtraction from the scheduler's clock — a ticket exactly fourteen IST days into its state is stale, compared half-open against `istDayBounds(...).endUtc`; `isoDatePlusDays` walks days forward and backward with no timezone in it. (`sweep.test.ts`)
+- **11.43** ✅ Planted defect: the staleness threshold is a day count in IST, not a millisecond subtraction from the scheduler's clock — a ticket exactly `DEFAULT_STALE_DAYS` IST days into its state is stale, compared half-open against `istDayBounds(...).endUtc`; `isoDatePlusDays` walks days forward and backward with no timezone in it. (`sweep.test.ts`)
 - **11.44** ✅ Planted defect: the inbox's "since" is the IST day of the stored instant — `2026-08-01T19:00:00Z` reads as 2 Aug, `18:29:59.999Z` still reads as 1 Aug — and the scope guard proves the zone string and the day regex exist in exactly one source file each, so no view can answer "which day is this?" differently from the domain. (`format.test.ts`, `reporting-scope-guard.test.ts`)
+
+## Attention thresholds (one origin — the workspace's settings)
+
+- **11.45** ✅ The sweep's windows resolve from the workspace's settings and nowhere else: an unclaimed workspace maps to `DEFAULT_DUE_SOON_DAYS`/`DEFAULT_STALE_DAYS` exactly as the attention strip does, and a claimed one maps concept for concept — approaching window ← `dueSoonDays`, staleness threshold ← `staleDays`. No threshold constant exists in the sweep to assert against. (`sweep.test.ts`)
+- **11.46** ✅ Planted defect: an admin who narrows `staleDays` makes the sweep nag sooner, and one who widens it goes quiet — the same ticket, the same clock, the threshold read from `proj_workspace_settings` each run. Fails against any private constant in the sweep (the deleted fortnight-long default) and against the settings default applied without reading the claim; this is the two-sources-of-truth defect that let a board flag a ticket stale while the inbox waited another week. (`sweep.test.ts`)
+- **11.47** ✅ Planted defect: on a server-wide sweep each workspace keeps its OWN thresholds — two workspaces, the same entry instant, opposite verdicts — and the settings are read exactly once per workspace, never once globally (wrong) and never once per ticket (a per-row query). (`sweep.test.ts`)
 ```
 
 - [ ] **Step 4: Full verification pass**
@@ -6131,7 +6403,12 @@ Flagged, never silently resolved. None blocks execution; each names the assumpti
 7. **`docToPlainText` double-definition risk (Plan 7).** Amendment 12 pins home and signature; both plans carry a create-if-absent guard. Whoever lands second consumes. If both created it (merge race), keep Plan 7's and delete mine — the signature is identical.
 8. **`packages/app-core` / `packages/ui` scaffolds (Plan 6 owns the real ones).** Task 8 Step 0 creates minimal scaffolds only if absent, including seed `tokens.ts` values. When Plan 6 lands its scaffold/token set, its values win; any token key this plan added that Plan 6 lacks is carried into Plan 6's `tokens.ts` (one colour origin holds).
 9. **Task 14 precondition.** If `apps/web` does not exist when this plan executes, Task 14 is left unchecked and handed to the orchestrator to run after Plan 6 merges. Everything it wires is already tested beneath it.
-10. **Sweep windows vs workspace settings (Plan 5 + owner).** Spec §7 calls the staleness threshold (and by symmetry the warning window) workspace-set. Taken: exported defaults (7 days approaching / 14 days staleness) injected via `SweepDeps.windows` — the DI seam is ready for wherever Plan 5's attention endpoint puts per-workspace values. Sweep and attention endpoint MUST eventually read one source; flagged for that reconciliation. **That single source now has to cover the day boundary as well as the numbers:** this sweep counts days in IST via `istDayOf`/`istDayBounds` (Task 6), and Plan 5's read-time attention strip and days-in-flight must count them the same way, or the strip and the inbox will disagree about the same ticket on the same afternoon. Same windows, same helpers — flagged to the orchestrator as part of this reconciliation, not as a separate one.
+10. **Sweep windows vs workspace settings — SETTLED (2026-08-20) by unification: the single origin is Plan 5's `workspace.settings_set` claim, projected into `proj_workspace_settings` and read through `getWorkspaceSettings`.** Spec §7 calls the staleness threshold (and by symmetry the warning window) workspace-set, and now it is — once, for both consumers. This plan previously carried its own exported sweep-window constants — a week-long approaching window and a fortnight-long staleness threshold — behind a `SweepDeps.windows` injection seam; that was a second copy of a fact Plan 5 already owned, with a *different* staleness number and no admin able to move it. A board flagging a ticket stale after a week while the sweep waited a fortnight before telling anyone is precisely the defect class this product was founded to remove, so it is removed here rather than deferred:
+    - **The mapping, in full:** the sweep's approaching window **is** the workspace's `dueSoonDays`; the sweep's staleness threshold **is** the workspace's `staleDays`. Both are the owner-approved 7/7 by default, applied inside `getWorkspaceSettings` — this plan restates neither number anywhere.
+    - **What survives and what is gone.** `SweepWindows` survives as the *resolved* shape, one workspace's settings read into the sweep's vocabulary by `resolveSweepWindows(db, workspaceId)`. The exported default pair is gone, and so is `SweepDeps.windows` — deliberately, because an override parameter is a second way to set the number and therefore a second number. Tests that need particular windows claim them with a `workspace.settings_set` event through Plan 5's `applyCommitted`, the same mechanism Plan 5's own attention tests use, so neither suite can pass against a path the other does not exercise.
+    - **Per workspace, once.** The sweep is server-wide; settings are per workspace. It enumerates the workspaces holding tickets, resolves each one's windows exactly once, and runs that workspace's scoped queries — never per row (a query per ticket for a value that cannot change mid-run) and never once globally (one workspace's thresholds silently applied to every other). Cases 11.45–11.47 hold all of this, 11.46 being the planted defect that fails against the deleted constants.
+    - **The day boundary was the other half of the same reconciliation, and it is closed too:** both sides count IST days through Plan 1's `istDayOf`/`istDayBounds`, compared half-open (Task 6 here; Plan 5's Task 12 there, with its own boundary defects). Same numbers, same helpers, same origin — the strip and the inbox can no longer disagree about a ticket on the same afternoon.
+    - **Nothing outstanding for the orchestrator.** No Plan 5 change was required: its settings already carry both concepts the sweep needs. The one behaviour change is the sanctioned one — staleness moves from this plan's deleted private fortnight to the workspace's `staleDays` (`DEFAULT_STALE_DAYS` until an admin claims otherwise).
 11. **Notification rows are not retroactively redacted.** A stored notification keeps its `ticketTitle` even if visibility is later revoked (the deep link then 404s via `canSee`). A point-in-time message honestly reflects what the recipient was entitled to see when it was sent; scrubbing history-of-messages is an owner decision, not assumed here.
 12. **Silent mention-gate.** A mention of a user who cannot see the ticket produces nothing, and the mentioner is not told. Honest (no leak, no invented delivery), but the editor could warn at mention time — a Plan 6/7 UX consideration, flagged.
 13. **Fixture-schema drift (two axes).** (a) Plan 2's `fixtureSchema` says `workflowDefs` (array); Plan 3's runner snippet used singular. (b) Plan 2's `expected` union spells refusals as `{refused, rule, reason}` or `{refused, rule, reasonStartsWith}`, yet Plan 3 ships `parent-terminal-with-open-children.json` naming the `rule` alone — so either the landed schema grew a rule-only branch or Plan 3's fixture needs a reason. Task 1 Step 5 carries a guard for both, and names the literal reason to add if the schema demands one. Reconciliation is Plans 2/3's; this plan only matches what it finds.
@@ -6145,7 +6422,7 @@ Flagged, never silently resolved. None blocks execution; each names the assumpti
     - **The sweep.** `istDayOf` for the warning horizon, `istDayBounds` half-open for the staleness cut-off, with planted defects for both (cases 11.42, 11.43). This is the one place the decision changes *behaviour* rather than provenance.
     - **Rendering.** Every clock a view shows formats with `IST_TIME_ZONE` imported from the domain; the inbox's `enteredAt` goes through `istDayOf`. An executable scan in Task 15 keeps the zone string and the day regex to one file each.
     - **The three items this question carried to the orchestrator are all discharged (2026-08-20); nothing about the day boundary is outstanding.** (a) Plan 3's day regex is now a shared import, in both places it was declared — `dueDateValueSchema` in `packages/domain/src/ticket-types.ts` and the engine's `date`-kind check in `packages/rule-engine/src/checks/fields.ts` both `import { IST_DAY_REGEX }` rather than restating the literal, and Task 15's scan now walks `packages/rule-engine/src` so the second one cannot quietly come back. (b) Plan 6's shell wires the decision: `istToday()` in `apps/web/src/ist-today.ts` is the one place the client turns the device's instant into a day, it feeds the `today` prop of both views (its Task 14 Steps 5a/5b), and every instant it shows a person goes through the domain's `formatIstInstant` with `IST_CLOCK_NOTE` naming the clock. (c) Plan 5's attention endpoint counts the same days this plan's sweep does — `istDayOf`/`istDayBounds`, compared half-open, with the boundary cases pinned as planted defects — so the strip and the inbox can no longer disagree about a ticket on the same afternoon.
-    - What survives is not a day-boundary question and is not this question's: the attention windows' *values* (this plan's 7-day approaching / 14-day staleness defaults versus Plan 5's `dueSoonDays`/`staleDays` from workspace settings) still have two sources and must eventually read one. That reconciliation stays open under Open questions 10, where it already lives. **Question 17 itself is settled.**
+    - The one thing this question used to carry forward — the attention windows' *values* having two sources — is closed as well, though not here: Open questions 10 now records the unification, with this plan's private defaults deleted and both windows read from Plan 5's workspace settings. **Question 17 itself is settled, and so is the value question it pointed at.**
 
 ## Self-review (writing-plans skill checklist)
 
@@ -6155,6 +6432,7 @@ Flagged, never silently resolved. None blocks execution; each names the assumpti
 - "a date renders attributed ('needed by 30 Aug — Kiro's claim')" → the exact string is pinned three times: `claim-labels.test.ts`, `calendar-model.test.ts`, inbox `format.test.ts`.
 - "nothing estimates, extrapolates or back-fills" → no model code path fabricates a date (verbatim-claims planted defect 11.2); start-after-due shown, not resolved; Task 15's vocabulary scan.
 - Notifications ("assignment, @mention, contested claim, attention events — push on the apps, inbox everywhere") → Tasks 3–7 + 12/14; push transports are the seam (Plans 10/11), inbox ships here.
+- §7's workspace-set attention thresholds → Task 6 reads both from Plan 5's `workspace.settings_set` claim via `getWorkspaceSettings` (approaching ← `dueSoonDays`, staleness ← `staleDays`), resolved once per workspace; this plan declares no threshold constant, so the sweep and the attention strip cannot disagree about the same ticket (Open questions 10; planted defects 11.46/11.47).
 - Reporting v1 ("derived counts and the ledger… nothing the record does not contain") → Task 15 guard; no reporting surface added anywhere in this plan.
 - Invariant 4 planted defects demanded by the assignment — undated absent, invented date impossible, attributed label exact — are cases 11.1, 11.2, 11.5; sweep idempotence is 11.28.
 - §7 saved filters → Task 13; per-user, view-act-only proven (11.34).
@@ -6164,7 +6442,7 @@ Flagged, never silently resolved. None blocks execution; each names the assumpti
 
 **2. Placeholder scan:** no TBD/TODO/"implement later"/"add validation"/"similar to Task N" anywhere; every code step carries the actual code; every test step carries the actual tests; the two guarded creations (`docToPlainText`, scaffolds) carry full content for the create branch and an exact consume instruction for the other. Task 14 is thin by design and says why, with concrete verification steps.
 
-**3. Type consistency (checked across tasks):** `Notification` shape identical in Tasks 3/4/5/6/7/12/14; dedupe-key grammar identical in Tasks 5/6 (`assignment:` / `mention:` / `contested-claim:` / `date-approaching:` / `stale-ticket:`); `NotificationTransport.deliver(userId, notification)` identical in 5/6; `TicketDatesInput`/`DateClaimView` identical in 8/9/10/11; `FilterSpec` consumed from one module in 8/9/10/13; `dueClaimLabel` defined once (Task 8) and consumed in 8/10/12; `insertNotification(db, notification)` identical in 4/5(transport)/7(test seeding); `CanSeeFn` defined in Task 5, reused in Task 6; `NO_DATES_NOTE`, `CALENDAR_EMPTY_MONTH_COPY`, `TIMELINE_SIDE_LIST_COPY` defined once, asserted where consumed. Route paths in Task 14's gateway match Task 7's registrations verbatim. Day claims: `startDate` and `dueDate` are validated and typed by Plan 3's single `dueDateValueSchema`/`DueDateValue` everywhere this plan names them (Task 1 pins it; Tasks 8–11 read the shape through `dateClaimOf`) — this plan adds no second day schema under any name. Custom `date`-kind fields are a *different* shape by Plan 3's own design (a bare `'YYYY-MM-DD'` string, validated by `customFieldVerdict`'s `date` branch, no note); this plan defines no schema for them either — `customDateClaimsOf` is a reader that skips anything not matching the same `DATE_ONLY` regex, and `CustomDateClaimView`/`customClaimLabel` are defined once in Task 8 and consumed verbatim by 9/10/11. Ledger writes: the only direct `INSERT INTO events` in this plan (Task 6's `seedEnteredState`) carries Plan 1's full thirteen-column list including `workspace_seq`, and both its time columns take ISO 8601 `Z` instants (both columns are `timestamptz` since Plan 1 Task 6 — a text `client_time` is gone, so a readback is Z-normalised); the only `ORDER BY seq` (Task 6's stale LATERAL) is per-entity history, not a workspace cursor, and says so in place. Time: `IST_DAY_REGEX` is the only day-shape statement anywhere in this plan (Tasks 1, 3, 8 all import it; Task 15 scans for a second copy), `istDayOf` is the only instant→day conversion (Task 6's `todayIst`, Task 12's `enteredAt`, and the `today`/`anchor` props the shells compute), `istDayBounds` appears once (Task 6's staleness cut-off, half-open with a strict `<`), and `IST_TIME_ZONE` is the only origin of the zone string — no view code writes `'Asia/Kolkata'`. `isoDatePlusDays` (Task 6, server) and `addDays` (Task 8, app-core) are deliberately separate day-arithmetic helpers in separate packages — the server never imports app-core — and both are day-in/day-out with identical semantics, pinned by tests on each side.
+**3. Type consistency (checked across tasks):** `Notification` shape identical in Tasks 3/4/5/6/7/12/14; dedupe-key grammar identical in Tasks 5/6 (`assignment:` / `mention:` / `contested-claim:` / `date-approaching:` / `stale-ticket:`); `NotificationTransport.deliver(userId, notification)` identical in 5/6; `TicketDatesInput`/`DateClaimView` identical in 8/9/10/11; `FilterSpec` consumed from one module in 8/9/10/13; `dueClaimLabel` defined once (Task 8) and consumed in 8/10/12; `insertNotification(db, notification)` identical in 4/5(transport)/7(test seeding); `CanSeeFn` defined in Task 5, reused in Task 6; `SweepWindows` (Task 6) is a *resolved* shape only — its two values are `WorkspaceSettings.dueSoonDays`/`.staleDays` read through Plan 5's `getWorkspaceSettings(db, workspaceId)`, mapped in the single function `resolveSweepWindows`, so no threshold constant, default, or injection parameter exists anywhere in this plan under any name (both the old exported default pair and `SweepDeps.windows` are deliberately absent); `NO_DATES_NOTE`, `CALENDAR_EMPTY_MONTH_COPY`, `TIMELINE_SIDE_LIST_COPY` defined once, asserted where consumed. Route paths in Task 14's gateway match Task 7's registrations verbatim. Day claims: `startDate` and `dueDate` are validated and typed by Plan 3's single `dueDateValueSchema`/`DueDateValue` everywhere this plan names them (Task 1 pins it; Tasks 8–11 read the shape through `dateClaimOf`) — this plan adds no second day schema under any name. Custom `date`-kind fields are a *different* shape by Plan 3's own design (a bare `'YYYY-MM-DD'` string, validated by `customFieldVerdict`'s `date` branch, no note); this plan defines no schema for them either — `customDateClaimsOf` is a reader that skips anything not matching the same `DATE_ONLY` regex, and `CustomDateClaimView`/`customClaimLabel` are defined once in Task 8 and consumed verbatim by 9/10/11. Ledger writes: the only direct `INSERT INTO events` in this plan (Task 6's `seedEnteredState`) carries Plan 1's full thirteen-column list including `workspace_seq`, and both its time columns take ISO 8601 `Z` instants (both columns are `timestamptz` since Plan 1 Task 6 — a text `client_time` is gone, so a readback is Z-normalised); the only `ORDER BY seq` (Task 6's stale LATERAL) is per-entity history, not a workspace cursor, and says so in place. Time: `IST_DAY_REGEX` is the only day-shape statement anywhere in this plan (Tasks 1, 3, 8 all import it; Task 15 scans for a second copy), `istDayOf` is the only instant→day conversion (Task 6's `todayIst`, Task 12's `enteredAt`, and the `today`/`anchor` props the shells compute), `istDayBounds` appears once (Task 6's staleness cut-off, half-open with a strict `<`), and `IST_TIME_ZONE` is the only origin of the zone string — no view code writes `'Asia/Kolkata'`. `isoDatePlusDays` (Task 6, server) and `addDays` (Task 8, app-core) are deliberately separate day-arithmetic helpers in separate packages — the server never imports app-core — and both are day-in/day-out with identical semantics, pinned by tests on each side.
 
 
 
