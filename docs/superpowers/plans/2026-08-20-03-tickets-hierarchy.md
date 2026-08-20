@@ -36,7 +36,7 @@ type EventEnvelope = {
 - Spec invariants in force here: **1** "Every visible state traces to the dated, attributed claim that produced it"; **3** "A terminal-state claim on a parent with open children is refused. Derived child progress renders beside every authored parent state"; **4** "Nothing is invented. No estimated dates, no fabricated progress."
 - Every refusal is proven against planted defects before it is trusted. Projection determinism is tested by rebuild-and-diff.
 - `reference/` is frozen — never edit anything under it. `Features.md` and `test-cases/` move in the same change set as the work. Commits are prose that says what was found and why it matters (this repo's convention overrides conventional-commit prefixes — do not "fix" the commit messages below into `feat:` style).
-- Out of this plan's scope (owned by other plans): monorepo scaffold (Plan 1), rule-engine internals for workflow rules (Plan 2), auth/visibility, editor/attachment upload and storage, any UI. `comment.added` bodies are opaque structured-doc JSON here — the editor plan owns their schema. `attachment.added` carries metadata only — storage is a later plan.
+- Out of this plan's scope (owned by other plans): monorepo scaffold (Plan 1), rule-engine internals for workflow rules (Plan 2), auth/visibility, editor/attachment upload and storage, any UI. `comment.added` bodies are opaque structured-doc JSON here — the editor plan owns their schema. `attachment.added` carries the claim and only the claim, in one of its **two kinds**: an *upload*, whose `mime`/`size`/`sha256` are the server's own sniffed-and-hashed truth about bytes it holds, or a *Drive reference*, whose `name`/`mimeType` are last-seen observations about a file this product does not hold. Moving, sniffing, hashing and serving the bytes — and the Drive picker that produces a reference — are Plan 7's.
 
 ## Coordination with Plans 1–2 (assumed identifiers)
 
@@ -143,7 +143,7 @@ Precondition refusals (`ticket.unknown-type`, `ticket.unknown`, `ticket.workflow
 - Modify: `packages/domain/src/index.ts` (add exports)
 
 **Interfaces:**
-- Consumes: nothing from other tasks (Zod only).
+- Consumes: Zod, and `IST_DAY_REGEX` from Plan 1's `packages/domain/src/ist-day.ts` — same package, dependency-free (no zod, no date library, no timezone database), so importing it costs this module nothing and buys the day shape a single origin. (Relative-import style: this plan writes extensionless specifiers throughout; if the landed `packages/domain` sources carry the `.js` suffix, match what is there.)
 - Produces (later tasks import all of these from `@gisik-nokma/domain`):
   - `type CustomFieldDef = { id: string; name: string; type: 'text'|'number'|'date'|'select'|'person'; options?: string[] }`
   - `type TicketTypeDef = { id: string; name: string; icon: string; rank: number; workflowId: string; fields: CustomFieldDef[] }`
@@ -277,6 +277,7 @@ Expected: FAIL — cannot find module `./ticket-types`.
 ```ts
 // packages/domain/src/ticket-types.ts
 import { z } from 'zod';
+import { IST_DAY_REGEX } from './ist-day';
 
 export const CUSTOM_FIELD_KINDS = ['text', 'number', 'date', 'select', 'person'] as const;
 export type CustomFieldKind = (typeof CUSTOM_FIELD_KINDS)[number];
@@ -378,12 +379,14 @@ export function builtinTicketTypeDefs(defaultWorkflowId: string): TicketTypeDef[
  * cell is it?" or "how many days has this been in flight?" answers it with
  * `istDayOf`/`istDayBounds` from `@gisik-nokma/domain`, never with `new Date()`
  * locale math, never with the viewer's device, and never by dividing a
- * millisecond difference by 86_400_000. `IST_DAY_REGEX` is the same day shape
- * this schema pins; the regex is restated inline here only because the schema
- * must stay a self-contained Zod construct.
+ * millisecond difference by 86_400_000. The day shape has ONE origin —
+ * `IST_DAY_REGEX` in the same package's dependency-free `ist-day.ts` — and this
+ * schema imports it rather than restating it, because a due date IS an IST day
+ * and two statements of one shape are two chances to disagree about what a day
+ * claim looks like.
  */
 export const dueDateValueSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a due date is a day in YYYY-MM-DD form'),
+  date: z.string().regex(IST_DAY_REGEX, 'a due date is a day in YYYY-MM-DD form'),
   note: z.string().optional(),
 });
 export type DueDateValue = z.infer<typeof dueDateValueSchema>;
@@ -421,7 +424,8 @@ git commit -m "Ticket types: the built-in ladder as seed data, custom types vali
 - Consumes: `registerEventType({ type, version, payloadSchema })` and `parseEvent(raw): EventEnvelope` (Plan 1, see Coordination); `ticketTypeDefSchema` (Task 1).
 - Produces:
   - Registered event types (all version 1): `ticket-type.defined`, `ticket.created`, `ticket.transitioned`, `ticket.assigned`, `ticket.collaborator_added`, `ticket.collaborator_removed`, `ticket.field_set`, `ticket.reparented`, `comment.added`, `attachment.added`.
-  - Exported Zod schemas: `ticketCreatedPayload` (`{typeId, projectId, parentId: string|null, title}`), `ticketTransitionedPayload` (`{toStateId, comment?, evidenceAttachmentId?, cause?}`), `ticketAssignedPayload` (`{assigneeId: string|null}`), `ticketCollaboratorPayload` (`{userId}`), `ticketFieldSetPayload` (`{fieldId, value: unknown}`), `ticketReparentedPayload` (`{newParentId: string|null}`), `commentAddedPayload` (`{body: Record<string, unknown>}`), `attachmentAddedPayload` (`{attachmentId, filename, mime, size}`), `ulidString` (Zod ULID string).
+  - Exported Zod schemas: `ticketCreatedPayload` (`{typeId, projectId, parentId: string|null, title}`), `ticketTransitionedPayload` (`{toStateId, comment?, evidenceAttachmentId?, cause?}`), `ticketAssignedPayload` (`{assigneeId: string|null}`), `ticketCollaboratorPayload` (`{userId}`), `ticketFieldSetPayload` (`{fieldId, value: unknown}`), `ticketReparentedPayload` (`{newParentId: string|null}`), `commentAddedPayload` (`{body: Record<string, unknown>}`), `attachmentUploadedPayload` (`{kind: 'upload', attachmentId, filename, mime, size, sha256}`), `attachmentDriveReferencePayload` (`{kind: 'drive-reference', attachmentId, driveFileId, name, mimeType, webViewLink, iconLink?, capturedAt}`), `attachmentAddedPayload` (the `kind`-discriminated union of those two — one registration, `attachment.added` v1, one wider and stricter schema), `ulidString` (Zod ULID string).
+  - **Constraint on `ticket.transitioned`'s `evidenceAttachmentId` (recorded here, enforced in Plan 7):** evidence must name an `attachment.added` of kind `'upload'` on the same ticket; a `'drive-reference'` is refused `attachment.evidence-drive-reference`, and an id that is neither is refused `attachment.evidence-unknown`. Neither refusal is a rule-engine rule and neither belongs to this plan — see Task 3's `attachment.added` reducer case for why `TicketState` cannot see an attachment at all. The `ticket.transitioned` payload itself does not change. Any text, test or fixture here that needs the rule id or its reason imports `RULE_EVIDENCE_DRIVE_REFERENCE` / `EVIDENCE_DRIVE_REFERENCE_REASON` from `@gisik-nokma/domain` (added by Plan 7) — the string is never retyped.
   - `makeEnvelope(partial: Partial<EventEnvelope> & Pick<EventEnvelope, 'type' | 'entity' | 'payload'>): EventEnvelope` — test builder used by every later task's tests.
 
 **Coordination note (stated once):** Plan 2 needed `ticket.transitioned` to exist for its own engine tests and may already have registered it. Keep exactly ONE registration, in this file, with the payload schema below — it is the contracted shape (`toStateId, comment?, evidenceAttachmentId?, cause?`). Delete Plan 2's provisional registration if one exists. The optional `cause` (`{ kind: 'reopened-for-child', childTicketId }`, shape defined by Plan 2's schema per the owner decision of 2026-08-20) is opaque reopen provenance: `proj_tickets`' `transitions` log keeps it out — the log shape `{toStateId, actorId, seq}` is unchanged; cause lives in the event payload, and the history endpoint renders it.
@@ -438,6 +442,8 @@ const TICKET = '01J9GTKA000000000000000000';
 const PROJECT = '01J9GPRJ000000000000000000';
 const PARENT = '01J9GPAR000000000000000000';
 const ATTACHMENT = '01J9GATT000000000000000000';
+const DRIVE_ATTACHMENT = '01J9GATD000000000000000000';
+const SHA256 = 'a3f1'.repeat(16); // 64 lowercase-hex characters
 
 function roundTrips(type: string, entityKind: 'ticket' | 'ticket-type', payload: unknown): void {
   const env = makeEnvelope({ type, entity: { kind: entityKind, id: TICKET }, payload });
@@ -464,7 +470,17 @@ describe('ticket event vocabulary', () => {
     roundTrips('ticket.reparented', 'ticket', { newParentId: PARENT });
     roundTrips('ticket.reparented', 'ticket', { newParentId: null });
     roundTrips('comment.added', 'ticket', { body: { type: 'doc', content: [] } });
-    roundTrips('attachment.added', 'ticket', { attachmentId: ATTACHMENT, filename: 'gst-receipt.pdf', mime: 'application/pdf', size: 48211 });
+    roundTrips('attachment.added', 'ticket', {
+      kind: 'upload', attachmentId: ATTACHMENT, filename: 'gst-receipt.pdf',
+      mime: 'application/pdf', size: 48211, sha256: SHA256,
+    });
+    roundTrips('attachment.added', 'ticket', {
+      kind: 'drive-reference', attachmentId: DRIVE_ATTACHMENT,
+      driveFileId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456',
+      name: 'GST filing checklist', mimeType: 'application/vnd.google-apps.document',
+      webViewLink: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456/view',
+      capturedAt: '2026-08-20T10:00:00.000Z',
+    });
   });
 
   it('refuses a ticket.created without a title', () => {
@@ -488,10 +504,24 @@ describe('ticket event vocabulary', () => {
     ).toThrow();
   });
 
-  it('refuses an attachment with a negative size', () => {
+  it('refuses an upload with a negative size', () => {
     expect(() =>
       parseEvent(makeEnvelope({ type: 'attachment.added', entity: { kind: 'ticket', id: TICKET },
-        payload: { attachmentId: ATTACHMENT, filename: 'x.pdf', mime: 'application/pdf', size: -1 } })),
+        payload: { kind: 'upload', attachmentId: ATTACHMENT, filename: 'x.pdf', mime: 'application/pdf', size: -1, sha256: SHA256 } })),
+    ).toThrow();
+  });
+
+  it('refuses an attachment claim that does not say which kind it is — an unstated kind is the ambiguity these rules exist to remove', () => {
+    expect(() =>
+      parseEvent(makeEnvelope({ type: 'attachment.added', entity: { kind: 'ticket', id: TICKET },
+        payload: { attachmentId: ATTACHMENT, filename: 'x.pdf', mime: 'application/pdf', size: 48211, sha256: SHA256 } })),
+    ).toThrow();
+  });
+
+  it('refuses an upload with no sha256 — bytes this product holds are hashed, so evidence can be verified rather than merely present', () => {
+    expect(() =>
+      parseEvent(makeEnvelope({ type: 'attachment.added', entity: { kind: 'ticket', id: TICKET },
+        payload: { kind: 'upload', attachmentId: ATTACHMENT, filename: 'x.pdf', mime: 'application/pdf', size: 48211 } })),
     ).toThrow();
   });
 
@@ -578,13 +608,40 @@ export const ticketReparentedPayload = z.object({ newParentId: ulidString.nullab
 /** Body is opaque structured-doc JSON — the editor plan owns its schema. */
 export const commentAddedPayload = z.object({ body: z.record(z.string(), z.unknown()) });
 
-/** Metadata only — storage/upload is a later plan. */
-export const attachmentAddedPayload = z.object({
+/**
+ * An attachment is one of exactly two kinds, and the claim says which
+ * (spec §2). An UPLOAD is bytes this product holds: the mime and size are
+ * the server's sniffed truth and `sha256` is its hash of the stored bytes,
+ * so evidence can be verified rather than merely present. A DRIVE
+ * REFERENCE is a pointer to a Google Drive file this product does NOT
+ * hold — name and mimeType are last-seen observations dated by
+ * `capturedAt`, never standing facts. There is no legacy payload to
+ * tolerate: nothing has shipped, so `kind` is required, not inferred.
+ */
+export const attachmentUploadedPayload = z.object({
+  kind: z.literal('upload'),
   attachmentId: ulidString,
   filename: z.string().min(1),
   mime: z.string().regex(/^[\w.+-]+\/[\w.+-]+$/, 'must be a MIME type'),
   size: z.number().int().min(0),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/, 'must be a lowercase-hex SHA-256'),
 });
+
+export const attachmentDriveReferencePayload = z.object({
+  kind: z.literal('drive-reference'),
+  attachmentId: ulidString,
+  driveFileId: z.string().min(1),
+  name: z.string().min(1),
+  mimeType: z.string().regex(/^[\w.+-]+\/[\w.+-]+$/, 'must be a MIME type'),
+  webViewLink: z.string().url(),
+  iconLink: z.string().url().optional(),
+  capturedAt: z.string().datetime(),
+});
+
+export const attachmentAddedPayload = z.discriminatedUnion('kind', [
+  attachmentUploadedPayload,
+  attachmentDriveReferencePayload,
+]);
 
 registerEventType({ type: 'ticket-type.defined', version: 1, payloadSchema: ticketTypeDefSchema });
 registerEventType({ type: 'ticket.created', version: 1, payloadSchema: ticketCreatedPayload });
@@ -598,6 +655,8 @@ registerEventType({ type: 'comment.added', version: 1, payloadSchema: commentAdd
 registerEventType({ type: 'attachment.added', version: 1, payloadSchema: attachmentAddedPayload });
 ```
 
+The `attachment.added` registration is unchanged — same type, same version, one wider (and stricter) schema. Nothing has shipped, so there is no legacy `kind`-less payload owed tolerance and no v2 to introduce: widening the schema before first use is free, and doing it now is what keeps `kind` required rather than optional.
+
 Add to `packages/domain/src/index.ts` (registrations run on package import; schemas and the test builder are exported):
 
 ```ts
@@ -608,7 +667,7 @@ export { makeEnvelope } from './testing';
 - [ ] **Step 5: Run the test to verify it passes**
 
 Run: `pnpm --filter @gisik-nokma/domain exec vitest run src/events/ticket-events.test.ts`
-Expected: PASS (6 tests).
+Expected: PASS (8 tests). To watch the two attachment-kind refusals bite, relax `attachmentAddedPayload` back to a single `z.object` without `kind` and re-run: both go green while accepting a claim that never says whether the board holds the file.
 
 - [ ] **Step 6: Run the whole domain suite — Plan 1's and Plan 2's registrations must still be green**
 
@@ -978,6 +1037,13 @@ export function applyTicketEvent(
     }
     case 'comment.added':
     case 'attachment.added':
+      // Neither adds to head state: comments and attachments are ledger
+      // entries the history endpoint renders, not fields anything folds.
+      // This is precisely why "a Drive reference cannot be evidence" is NOT a
+      // rule-engine rule — `TicketState` never carries attachments, so no pure
+      // rule has anywhere to read an attachment's kind from; the refusal lives
+      // in Plan 7's evidence gate, inside the ingest transaction, where the
+      // attachments table and the ledger are both in reach.
       return state;
     default:
       throw new Error(`applyTicketEvent: not a ticket event: ${env.type}`);
@@ -1911,7 +1977,7 @@ git commit -m "Reparenting cannot make loops, cross projects, invert rank, cast 
 - Modify: `packages/rule-engine/src/evaluate.ts` (add the `ticket.field_set` case)
 
 **Interfaces:**
-- Consumes: Task 5's refusal vocabulary and context helpers; `ticketFieldSetPayload`, `dueDateValueSchema`, `CustomFieldDef` (`@gisik-nokma/domain`); `buildMemoryContext` + test-support (Tasks 4–5).
+- Consumes: Task 5's refusal vocabulary and context helpers; `ticketFieldSetPayload`, `dueDateValueSchema`, `IST_DAY_REGEX`, `CustomFieldDef` (`@gisik-nokma/domain`); `buildMemoryContext` + test-support (Tasks 4–5).
 - Produces: `checkTicketFieldSet(env: EventEnvelope, ctx: EngineContext): Promise<EngineVerdict>`.
 
 **Semantics:** built-in fields `title`, `description`, `dueDate`, `startDate` ride the same event as custom fields. `value: null` clears any field except `title` (`field.title-required`). A due date is `{ date: 'YYYY-MM-DD', note? }` — always a claim; the projection preserves actor and both times (Task 3 already proves that). Custom values must fit their `CustomFieldDef` kind; a `select` value must be one of its options; a `person` value is a non-empty user id string (existence checking belongs to the membership/auth plan).
@@ -2063,13 +2129,16 @@ Expected: FAIL — cannot find module `./fields`.
 ```ts
 // packages/rule-engine/src/checks/fields.ts
 import type { CustomFieldDef, EventEnvelope } from '@gisik-nokma/domain';
-import { dueDateValueSchema, ticketFieldSetPayload } from '@gisik-nokma/domain';
+import { IST_DAY_REGEX, dueDateValueSchema, ticketFieldSetPayload } from '@gisik-nokma/domain';
 import type { EngineContext } from '../engine-context';
 import type { EngineVerdict } from '../evaluate';
 import { getTicketState, getTicketTypeDef } from './context-helpers';
 import { ACCEPT, fieldKindRefusal, refuse } from './refusals';
 
-const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+// A custom `date` field claims the same kind of day the built-ins do, so it is
+// held to the same shape from the same origin — `IST_DAY_REGEX`, imported, not
+// restated. A second copy here would be a second answer to "what is a day",
+// and the two would drift the moment either moved.
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -2086,7 +2155,7 @@ function customFieldVerdict(field: CustomFieldDef, value: unknown): EngineVerdic
         ? ACCEPT
         : refuse('field.type-mismatch', fieldKindRefusal(field.name, 'a number'));
     case 'date':
-      return typeof value === 'string' && DATE_ONLY.test(value)
+      return typeof value === 'string' && IST_DAY_REGEX.test(value)
         ? ACCEPT
         : refuse('field.type-mismatch', fieldKindRefusal(field.name, 'a date in YYYY-MM-DD form'));
     case 'select':
@@ -4133,7 +4202,7 @@ git commit -m "Ticket history is the ledger filtered, not a summary: every claim
 ## 5. Tickets, hierarchy & rollups
 
 - ⚙️ **Ticket type system** — built-in ladder epic(1)/story(2)/task(3)/sub-task(4) as seed data plus custom reusable types defined by `ticket-type.defined` events: name, icon, rank, workflow binding, and typed custom fields (text, number, date, select, person), Zod-validated, last definition wins. `packages/domain/src/ticket-types.ts`
-- ⚙️ **Ticket event vocabulary** — `ticket.created`, `ticket.transitioned` (optional `cause` marks a reopen forced by arriving live work; the transitions log keeps it out), `ticket.assigned`, `ticket.collaborator_added/removed`, `ticket.field_set` (built-ins title/description/dueDate/startDate ride it; a due date and a start date are always `{date, note?}` claims), `ticket.reparented`, `comment.added` (opaque doc body), `attachment.added` (metadata only); unknown types refused at ingest. `packages/domain/src/events/ticket-events.ts`
+- ⚙️ **Ticket event vocabulary** — `ticket.created`, `ticket.transitioned` (optional `cause` marks a reopen forced by arriving live work; the transitions log keeps it out), `ticket.assigned`, `ticket.collaborator_added/removed`, `ticket.field_set` (built-ins title/description/dueDate/startDate ride it; a due date and a start date are always `{date, note?}` claims), `ticket.reparented`, `comment.added` (opaque doc body), `attachment.added` (a `kind`-discriminated union: an `upload` carrying the server's sniffed mime/size and its `sha256` of the stored bytes, or a `drive-reference` carrying the pointer plus the name, mimeType and `capturedAt` last seen on a file this product does not hold); unknown types refused at ingest. `packages/domain/src/events/ticket-events.ts`
 - ⚙️ **Ticket head-state reducer** — one pure fold (`applyTicketEvent`) shared by the server projection and the fixture suite; per-field provenance (actor + both clocks) on every claim. `packages/domain/src/ticket-state.ts`
 - ✅ **Hierarchy sanity refusals** — child rank must exceed parent rank, any type at or below the deepest rank requires a parent (the built-in `sub-task`, any custom type an admin defines beside it, and anything deeper — the rule follows the rank, not the id), cycles refused (load-bearing after rank re-definitions), cross-project parents refused, live work under a terminal parent refused toward an offered reopen (owner decision; terminal-under-terminal stays legal); every reason in plain language, every refusal proven against a planted defect. `packages/rule-engine/src/checks/hierarchy.ts`
 - ✅ **Field claim refusals** — unknown fields, per-kind mismatches with the field named, title never clearable; `null` clears everything else as an attributed claim. `packages/rule-engine/src/checks/fields.ts`
@@ -4174,6 +4243,7 @@ Mirrors `Features.md` §5. Status: `❌` not covered · `✅` covered · `🟡` 
 - 5.23 ✅ A CUSTOM type defined at the deepest rank is refused at project root exactly as the built-in `sub-task` is, named as itself in the reason — and so is a custom type defined *below* that rank, because nothing slips underneath the floor. The requirement follows the rank, not the built-in id (owner decision 2026-08-20). (`hierarchy.test.ts`, `created-deepest-rank-no-parent.json`)
 - 5.24 ✅ The same custom deepest-rank type is accepted once it names a parent, and a type at a shallower rank still sits at project root untouched — the rank rule does not over-refuse. (`hierarchy.test.ts`, `created-rank-legal.json`)
 - 5.25 ✅ A history claim submitted at `+05:30` reads back as the equivalent `…Z` instant, with the two clocks still one second apart — the instant survives the round trip, the device's label does not (owner decision 2026-08-20, "time is Asia/Kolkata"). (`ticket-history.test.ts`)
+- 5.26 ✅ An `attachment.added` claim says which of the two kinds it is, or it is refused at the door: an upload round-trips with its `sha256`, a Drive reference round-trips with its pointer and `capturedAt`, and both a payload with no `kind` and an `upload` with no `sha256` are refused — an attachment whose kind is unstated is exactly the ambiguity these rules exist to remove. (`ticket-events.test.ts`)
 ```
 
 - [ ] **Step 3: Run the full suite one last time**
@@ -4185,7 +4255,7 @@ Expected: PASS across packages/domain, packages/rule-engine, apps/server.
 
 ```bash
 git add Features.md test-cases/05-tickets-hierarchy.md
-git commit -m "Catalogue the ticket domain in Features.md and test-cases in the same change set as the work: twenty-five scenarios, twenty-four covered by the tests landing with them, one honestly out of scope until client builds exist"
+git commit -m "Catalogue the ticket domain in Features.md and test-cases in the same change set as the work: twenty-six scenarios, twenty-five covered by the tests landing with them, one honestly out of scope until client builds exist"
 ```
 
 ---
