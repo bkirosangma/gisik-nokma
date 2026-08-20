@@ -1324,6 +1324,12 @@ export const fixtureSchema = z.object({
     z.object({ refused: z.literal(false) }),
     z.object({ refused: z.literal(true), rule: z.string(), reason: z.string() }),
     z.object({ refused: z.literal(true), rule: z.string(), reasonStartsWith: z.string() }),
+    // Rule-only: the fixture asserts WHICH rule refused, and leaves the wording
+    // to the plan that owns the rule. Plans 3 and 9 ship such fixtures against
+    // rules defined here — without this branch their fixtures fail to load, and
+    // copying a reason string into a foreign plan is how two copies of one
+    // sentence start drifting.
+    z.object({ refused: z.literal(true), rule: z.string() }),
   ]),
 });
 export type Fixture = z.infer<typeof fixtureSchema>;
@@ -1521,11 +1527,15 @@ export function assertFixtureOutcome(result: Accept | Refusal, fx: Fixture): voi
         `fixture "${fx.name}": reason mismatch:\n  expected: ${fx.expected.reason}\n  got:      ${result.reason}`,
       );
     }
-  } else if (!result.reason.startsWith(fx.expected.reasonStartsWith)) {
-    throw new Error(
-      `fixture "${fx.name}": reason does not start with: ${fx.expected.reasonStartsWith}\n  got: ${result.reason}`,
-    );
+  } else if ('reasonStartsWith' in fx.expected) {
+    if (!result.reason.startsWith(fx.expected.reasonStartsWith)) {
+      throw new Error(
+        `fixture "${fx.name}": reason does not start with: ${fx.expected.reasonStartsWith}\n  got: ${result.reason}`,
+      );
+    }
   }
+  // Rule-only fixtures stop here: the rule id was asserted above, and the
+  // wording belongs to whichever plan defines that rule.
 }
 ```
 

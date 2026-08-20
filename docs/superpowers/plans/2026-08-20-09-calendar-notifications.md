@@ -4,13 +4,13 @@
 
 **Goal:** Time-honest views (month Calendar, week-column Timeline) drawn only from claimed dates, plus a server-side notification engine (assignment, @mention, contested claim, attention transitions) with per-user storage, an inbox everywhere, saved filters, and a reporting scope guard — nothing invented, everything attributed.
 
-**Architecture:** Client side, two pure view-models in `packages/app-core` fold `TicketState` date claims (`startDate`/`dueDate` `FieldClaim`s) into calendar weeks and timeline bars — a bar exists only when both claims exist; everything else is a marker or a side-list entry, never invented geometry. Server side, a fan-out listener on Plan 1's `onEventCommitted` hook plus a deterministic, idempotent sweep job write per-user rows into a `notifications` table (server-owned rows, NOT ledger events — a notification is a message to a person, not a fact about the work), delivered through a `NotificationTransport` seam whose only v1 implementation is in-app. A small additive change registers `startDate` beside Plan 3's built-in fields so a Timeline bar can have a claimed start.
+**Architecture:** Client side, two pure view-models in `packages/app-core` fold `TicketState` date claims (`startDate`/`dueDate` `FieldClaim`s) into calendar weeks and timeline bars — a bar exists only when both claims exist; everything else is a marker or a side-list entry, never invented geometry. Server side, a fan-out listener on Plan 1's `onEventCommitted` hook plus a deterministic, idempotent sweep job write per-user rows into a `notifications` table (server-owned rows, NOT ledger events — a notification is a message to a person, not a fact about the work), delivered through a `NotificationTransport` seam whose only v1 implementation is in-app. The `startDate` built-in a Timeline bar needs is **Plan 3's** (its own text ships the field beside `dueDate`, sharing the one `dueDateValueSchema`; the orchestrator records this as Plan 3's startDate amendment); this plan verifies it landed, pins the day-claim shape its readers assume, and adds the two shared fixtures that run a built-in day claim end to end.
 
 **Tech Stack:** TypeScript strict / Node 22 / pnpm 9 / Turborepo; Fastify 5 + Postgres 16 (`pg`, node-pg-migrate) on the server; zod validation; `ulidx` ids; React 18 function components in `packages/app-core` (tested with Vitest + jsdom + @testing-library/react); Next.js 15 shell (`apps/web`, Plan 6's) for web wiring.
 
 **Spec:** `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md` — §7 (Views: Calendar and Timeline; Reporting and notifications; Search and filtering), honesty invariant 4 ("Nothing is invented"), invariant 1 (provenance floor). Series contract: `docs/superpowers/plans/2026-08-20-00-series-coordination.md` (amendments 9–17 bind this plan). Precedent: `reference/design-docs/2026-08-19-tracker-calendar-design.md` (read-only) — the base calendar's "dated items only / an undated item is absent, not estimated" discipline, generalised here.
 
-**Series position:** Plan 9 of 11. Runs after Plans 1–5, in parallel with Plans 6/7/8. **Consumes** — from Plan 1: `EventEnvelope`, `SubmittedEvent`, `newUlid`, `IngestService.onEventCommitted(listener): () => void` (fires only after a live commit, never on projection rebuild — which is exactly why notifications built on it can never double on replay), `createTestDatabase()`. From Plan 2: `WorkflowDef` (with `initialStateId`, amendment 3; optional `blocked` on states, amendment 9), `StateCategory`, `getWorkflowDefFromProjection(db, workflowId, version?)`, the fixture harness in `packages/rule-engine/src/fixtures/harness.ts`. From Plan 3: `BUILTIN_FIELD_IDS`, `dueDateValueSchema`, `TicketState`, `FieldClaim`, `applyTicketEvent`, `makeEnvelope`, `checkTicketFieldSet` + `refuse`/`fieldKindRefusal`, `getTicketStateFromDb(db, workspaceId, ticketId)`, the `proj_tickets` table. From Plan 4: `Queryable`, `canSee(db, userId, ticketId)`, `Auth`/`createAuth`, `makeRequireSession`, `registerAuthRoutes`, `signInWithPhone`, `LogOtpSender`. From the amendments (Plans 5/6/7/10 written in parallel — pinned shapes, assumptions flagged in Open questions): `DataSource` (am. 10), `packages/ui` tokens (am. 11), the mention node `{userId}` and `docToPlainText` (am. 12), `/v1/me/preferences` (am. 14), `claim.contested` (am. 16). **Produces** (exact signatures in task Interfaces blocks): the `startDate` built-in field; `extractMentionedUserIds`; the notification vocabulary (`NotificationKind`, strict payload schemas, `Notification`); the `notifications` table + store; `NotificationTransport` + `createInAppTransport`; `createNotificationFanout`; `runNotificationSweep`; `GET /v1/me/notifications`, `GET /v1/me/notifications/unread-count`, `POST /v1/me/notifications/:id/read`; `CalendarView`, `TimelineView`, `InboxView`, `UnreadBadge`, `SavedFiltersMenu` and their pure view-models.
+**Series position:** Plan 9 of 11. Runs after Plans 1–5, in parallel with Plans 6/7/8. **Consumes** — from Plan 1: `EventEnvelope`, `SubmittedEvent`, `newUlid`, `IngestService.onEventCommitted(listener): () => void` (fires only after a live commit, never on projection rebuild — which is exactly why notifications built on it can never double on replay), `createTestDatabase()`. From Plan 2: `WorkflowDef` (with `initialStateId`, amendment 3; optional `blocked` on states, amendment 9), `StateCategory`, `getWorkflowDefFromProjection(db, workflowId, version?)`, the fixture harness in `packages/rule-engine/src/fixtures/harness.ts`. From Plan 3: `BUILTIN_FIELD_IDS` (four elements — `'title', 'description', 'dueDate', 'startDate'`; Plan 3's own text, verified by Task 1 Step 1), `dueDateValueSchema` (the ONE day-claim schema BOTH built-ins use — there is no separate start-date schema, by Plan 3's deliberate design), `TicketState`, `FieldClaim`, `applyTicketEvent`, `makeEnvelope`, `checkTicketFieldSet` + `refuse`/`fieldKindRefusal`, `getTicketStateFromDb(db, workspaceId, ticketId)`, the `proj_tickets` table. From Plan 4: `Queryable`, `canSee(db, userId, ticketId)`, `Auth`/`createAuth`, `makeRequireSession`, `registerAuthRoutes`, `signInWithPhone`, `LogOtpSender`. From the amendments (Plans 5/6/7/10 written in parallel — pinned shapes, assumptions flagged in Open questions): `DataSource` (am. 10), `packages/ui` tokens (am. 11), the mention node `{userId}` and `docToPlainText` (am. 12), `/v1/me/preferences` (am. 14), `claim.contested` (am. 16). **Produces** (exact signatures in task Interfaces blocks): `extractMentionedUserIds`; the notification vocabulary (`NotificationKind`, strict payload schemas, `Notification`); the `notifications` table + store; `NotificationTransport` + `createInAppTransport`; `createNotificationFanout`; `runNotificationSweep`; `GET /v1/me/notifications`, `GET /v1/me/notifications/unread-count`, `POST /v1/me/notifications/:id/read`; `CalendarView`, `TimelineView`, `InboxView`, `UnreadBadge`, `SavedFiltersMenu` and their pure view-models.
 
 ## Global Constraints
 
@@ -40,20 +40,20 @@ Plans 5–11 were written in parallel against the coordination amendments. Two c
 
 ```
 packages/domain/
-  src/ticket-types.ts               # MODIFY (Plan 3's) — BUILTIN_FIELD_IDS gains 'startDate'; startDateValueSchema
+  src/ticket-types.ts               # READ ONLY (Plan 3's) — BUILTIN_FIELD_IDS + dueDateValueSchema already carry startDate
   src/doc-text.ts                   # NEW (GUARDED — skip if Plan 7 landed it) — docToPlainText (amendment 12)
   src/doc-mentions.ts               # NEW — extractMentionedUserIds JSON-walker
   src/notifications.ts              # NEW — NotificationKind, strict payload schemas, Notification, parseNotification
   src/index.ts                      # MODIFY — re-export the new modules
-  src/ticket-types.test.ts          # MODIFY (Plan 3's) — extend the BUILTIN_FIELD_IDS pin; startDate schema tests
+  src/ticket-types.test.ts          # MODIFY (Plan 3's) — APPEND Plan 9's day-claim consumption pin (adds nothing Plan 3 already pins)
   src/doc-text.test.ts              # NEW (guarded with doc-text.ts)
   src/doc-mentions.test.ts          # NEW
   src/notifications.test.ts         # NEW
 
 packages/rule-engine/
-  src/checks/fields.ts              # MODIFY (Plan 3's) — startDate branch beside dueDate
-  src/checks/fields.test.ts         # MODIFY — startDate accept/refuse/clear tests
-  fixtures/field-set-refuses-a-malformed-start-date.json   # NEW — planted defect
+  src/checks/fields.ts              # READ ONLY (Plan 3's) — the merged dueDate||startDate branch already exists
+  src/checks/fields.test.ts         # READ ONLY (Plan 3's) — its startDate cases already pin the refusal strings
+  fixtures/field-set-refuses-a-malformed-start-date.json   # NEW — a built-in day claim through the shared runner (Plan 3's field-set-* trio is custom-field ground only)
   fixtures/field-set-accepts-a-start-date-claim.json       # NEW — accepting twin
 
 apps/server/
@@ -106,158 +106,133 @@ test-cases/11-calendar-notifications.md  # NEW — cases 11.x
 
 ---
 
-### Task 1: `startDate` joins the built-in field vocabulary
+### Task 1: Verify Plan 3's `startDate` built-in, and pin the day-claim shape the views read
 
-A Timeline bar needs a start, and invariant 4 forbids inventing one (back-filling "start = due minus a guess" is exactly the estimated date the spec bans). So the start becomes what the due already is: a claim — `{date, note?}` set via `ticket.field_set`, carrying per-field `FieldClaim` provenance like every other field. This is an additive touch on two Plan 3 surfaces (`BUILTIN_FIELD_IDS`, `checkTicketFieldSet`) — flagged in Open questions as a Plan 3 touchpoint for the orchestrator.
+A Timeline bar needs a start, and invariant 4 forbids inventing one (back-filling "start = due minus a guess" is exactly the estimated date the spec bans). So the start is what the due already is: a claim — `{date, note?}` set via `ticket.field_set`, carrying per-field `FieldClaim` provenance like every other field.
+
+**Plan 3 owns that field and already ships it** — read `docs/superpowers/plans/2026-08-20-03-tickets-hierarchy.md` (its Task 7, `checkTicketFieldSet`) if you want the source. `BUILTIN_FIELD_IDS` is four elements; `checkTicketFieldSet` accepts and refuses `startDate` on ONE branch merged with `dueDate`, reusing ONE schema — `dueDateValueSchema` — because the two day claims have an identical shape and a second copy is a second thing to drift. Plan 3's own suite pins both the legal and the malformed case, including the refusal string `"Start date" needs a day in YYYY-MM-DD form (a note is optional).`
+
+So this task **defines nothing**. It does three things this plan genuinely needs before Tasks 8–11 read those claims:
+
+1. **Verifies** the built-in landed, and stops the plan rather than silently building on a three-element constant.
+2. **Pins the reader contract** — the day-claim shape `dateClaimOf` (Task 8) destructures, held against the built-in's own schema in one place, so a future widening fails here instead of inside a Timeline bar.
+3. **Adds the two shared fixtures** that run a built-in day claim end to end through the fixture runner in every build. Plan 3's `field-set-*` fixture trio (`field-set-unknown-field`, `field-set-kind-mismatch`, `field-set-legal`) is entirely custom-field ground — no fixture in the series exercises `dueDate` or `startDate` through the real engine, so these two are new coverage, not a second copy of Plan 3's.
 
 **Files:**
-- Modify: `packages/domain/src/ticket-types.ts` (Plan 3's — `BUILTIN_FIELD_IDS`, add `startDateValueSchema`)
-- Modify: `packages/domain/src/ticket-types.test.ts` (Plan 3's pin of the old list — extend it)
-- Modify: `packages/rule-engine/src/checks/fields.ts` (Plan 3's — `startDate` branch beside `dueDate`)
-- Modify: `packages/rule-engine/src/checks/fields.test.ts`
+- Read only: `packages/domain/src/ticket-types.ts`, `packages/rule-engine/src/checks/fields.ts`, `packages/rule-engine/src/checks/fields.test.ts` (all Plan 3's — this task must not change any of them)
+- Modify: `packages/domain/src/ticket-types.test.ts` (Plan 3's — APPEND Plan 9's consumption pin; change none of Plan 3's existing assertions)
 - Create: `packages/rule-engine/fixtures/field-set-refuses-a-malformed-start-date.json`
 - Create: `packages/rule-engine/fixtures/field-set-accepts-a-start-date-claim.json`
 
 **Interfaces:**
-- Consumes: `BUILTIN_FIELD_IDS`, `dueDateValueSchema` (Plan 3, `@gisik-nokma/domain`); `checkTicketFieldSet`, `refuse`, `fieldKindRefusal`, `ACCEPT` (Plan 3, `packages/rule-engine/src/checks/`); the fixture harness (Plan 2, `packages/rule-engine/src/fixtures/harness.ts`).
-- Produces (cross-plan API):
-  - `BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate'] as const` — the shadow guard in `ticketTypeDefSchema` now also refuses custom fields named `startDate`, for free.
-  - `startDateValueSchema` — `{ date: 'YYYY-MM-DD', note?: string }` — and `type StartDateValue`.
-  - `checkTicketFieldSet` accepts/refuses `startDate` values exactly as it does `dueDate` (`null` clears; malformed refuses `field.type-mismatch` naming "Start date").
+- Consumes: `BUILTIN_FIELD_IDS`, `dueDateValueSchema` (Plan 3, `@gisik-nokma/domain`) — `startDate` is already in the first and validated by the second; `checkTicketFieldSet` + the `field.type-mismatch` refusal string (Plan 3, `packages/rule-engine/src/checks/`); the fixture harness (Plan 2, `packages/rule-engine/src/fixtures/harness.ts` — `fixtureSchema`, `loadFixtures`, `completeEnvelope`, `buildInMemoryContext`, `assertFixtureOutcome`).
+- Produces (cross-plan API): **none — no new export, no new schema, no new constant.** What this task leaves behind:
+  - A pinned reader contract in `ticket-types.test.ts`: the day-claim value shape is `{ date: 'YYYY-MM-DD', note?: string }`, one schema for both built-ins, and it accepts exactly the days `app-core`'s `DATE_ONLY` regex accepts.
   - Two shared fixtures every build's fixture runner executes.
+- **Pinned for the rest of this plan:** wherever P9 code or prose validates or types a start-date value, the name is Plan 3's — `dueDateValueSchema` / `DueDateValue`. This plan introduces no start-date-specific schema or type under any name; a start date is a due date's shape wearing a different field id.
 
-- [ ] **Step 1: Extend the failing domain tests**
+- [ ] **Step 1: Verify Plan 3's `startDate` built-in actually landed**
 
-In `packages/domain/src/ticket-types.test.ts` (Plan 3 colocates tests in `src/`; if by execution time they live under `test/`, edit the file there — `ls packages/domain/src/*.test.ts packages/domain/test/*.test.ts` to locate), change Plan 3's pin of the built-in list and add the schema suite:
+This is a precondition, not a change. Run each grep and compare against the expected output:
 
-```ts
-// CHANGE the existing assertion (Plan 3 pinned the pre-startDate list):
-expect(BUILTIN_FIELD_IDS).toEqual(['title', 'description', 'dueDate', 'startDate']);
+```bash
+grep -n "BUILTIN_FIELD_IDS = " packages/domain/src/ticket-types.ts
+grep -n "dueDateValueSchema" packages/domain/src/ticket-types.ts
+grep -n "startDate" packages/rule-engine/src/checks/fields.ts
 ```
 
-Append to the same file:
+Expected, respectively:
+- `export const BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate'] as const;` — **four** elements, in that order.
+- `export const dueDateValueSchema = z.object({ … })` and `export type DueDateValue = …` — and **no** second day schema in the file (`grep -cE "startDate[A-Za-z]*(Schema|Value)" packages/domain/src/ticket-types.ts` → `0`; a hit here means someone re-added the duplicate day schema this plan deliberately does not create).
+- one merged branch: `if (p.fieldId === 'dueDate' || p.fieldId === 'startDate') {` with `const fieldName = p.fieldId === 'dueDate' ? 'Due date' : 'Start date';` and `dueDateValueSchema.safeParse(value)`.
 
-```ts
-describe('startDateValueSchema', () => {
-  it('accepts a bare day', () => {
-    expect(startDateValueSchema.parse({ date: '2026-09-01' })).toEqual({ date: '2026-09-01' });
-  });
+If any of the three greps disagrees, **STOP**: Plan 3's `startDate` work has not landed (or has been reverted), and every later task in this plan reads a claim that cannot be set. Hand it to the orchestrator; do not add the field here — a second definition is exactly the drift Plan 3's single branch was written to prevent.
 
-  it('accepts a day with a note — the claim can say why', () => {
-    expect(startDateValueSchema.parse({ date: '2026-09-01', note: 'after the bank account opens' })).toEqual({
-      date: '2026-09-01',
-      note: 'after the bank account opens',
-    });
-  });
-
-  it('refuses a datetime — a start is a day someone claimed, not a timestamp', () => {
-    expect(() => startDateValueSchema.parse({ date: '2026-09-01T10:00:00Z' })).toThrow();
-  });
-
-  it('refuses a bare string — the claim shape is {date, note?}', () => {
-    expect(() => startDateValueSchema.parse('2026-09-01')).toThrow();
-  });
-});
-
-describe('startDate is shadow-guarded like every built-in', () => {
-  it('refuses a custom field named startDate', () => {
-    const base = { id: 'errand', name: 'Errand', icon: 'cart', rank: 3, workflowId: 'wf_1' };
-    expect(() =>
-      ticketTypeDefSchema.parse({ ...base, fields: [{ id: 'startDate', name: 'Start', type: 'date' }] }),
-    ).toThrow(/shadows a built-in field/);
-  });
-});
-```
-
-Add `startDateValueSchema` and `ticketTypeDefSchema` to the file's existing import from `./ticket-types`.
-
-- [ ] **Step 2: Run the domain tests to verify they fail**
+- [ ] **Step 2: Run Plan 3's suites unchanged — the built-in is already proven**
 
 Run: `pnpm --filter @gisik-nokma/domain exec vitest run src/ticket-types.test.ts`
-Expected: FAIL — `startDateValueSchema` is not exported, and the `BUILTIN_FIELD_IDS` assertion fails against the three-element list.
+Expected: PASS, including Plan 3's `expect(BUILTIN_FIELD_IDS).toEqual(['title', 'description', 'dueDate', 'startDate'])`.
 
-- [ ] **Step 3: Implement the domain change**
+Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/checks/fields.test.ts`
+Expected: PASS, including Plan 3's two `startDate` cases — the accepting one (`{date}`, `{date, note}`, and `null` to clear) and the planted-defect one that pins `'"Start date" needs a day in YYYY-MM-DD form (a note is optional).'` for both a timestamp and a bare string.
 
-In `packages/domain/src/ticket-types.ts`, change the constant and append the schema after `dueDateValueSchema`:
+Nothing in this task is expected to fail against a landed Plan 3. If either suite is red before you touch anything, that is Plan 3's regression, not this plan's work — report it and stop.
 
-```ts
-export const BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate'] as const;
-```
+- [ ] **Step 3: Append Plan 9's day-claim consumption pin to the domain tests**
+
+Guard: Plan 3 colocates tests in `src/`; if by execution time they live under `test/`, edit the file there — `ls packages/domain/src/*.test.ts packages/domain/test/*.test.ts` to locate.
+
+This pin belongs to Plan 9, not Plan 3: it asserts the thing *this plan's readers* assume, which Plan 3 has no reason to guarantee. `dateClaimOf` (Task 8) lives in `packages/app-core`, which does not depend on zod, so it re-states the day shape as a literal regex. This is the single place the two statements of "what a day claim is" are held against each other.
+
+Append to `packages/domain/src/ticket-types.test.ts` — **append only; change none of Plan 3's existing assertions**:
 
 ```ts
 /**
- * A start date is a claim exactly like a due date: { date, note? }, rendered
- * with its author. It exists so a Timeline bar can have a claimed start —
- * a bar's start is never derived, estimated, or back-filled (invariant 4).
+ * Plan 9 consumption pin. The Calendar and Timeline read startDate and dueDate
+ * through app-core's dateClaimOf, which destructures { date, note? } and
+ * validates the day with its own literal regex (app-core does not depend on
+ * zod). This is the one place those two statements of "what a day claim is"
+ * are held against each other: if the built-in's schema ever widens — a
+ * datetime, a range, or a second schema for startDate — it fails here, loudly,
+ * instead of silently inside a bar someone trusts.
+ *
+ * It guards; it does not drive. It passes the moment Plan 3's startDate
+ * built-in is in place. To watch it bite, loosen the schema's regex to allow a datetime
+ * and re-run: the second case fails.
  */
-export const startDateValueSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a start date is a day in YYYY-MM-DD form'),
-  note: z.string().optional(),
+describe('the day-claim shape Plan 9 reads', () => {
+  /** The exact literal in packages/app-core/src/claims/ticket-dates.ts. */
+  const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+  it('asks for two day built-ins, and both are built-ins', () => {
+    expect(BUILTIN_FIELD_IDS).toEqual(expect.arrayContaining(['startDate', 'dueDate']));
+  });
+
+  it('validates both of them with ONE schema — startDate has none of its own', () => {
+    expect(dueDateValueSchema.parse({ date: '2026-09-01' })).toEqual({ date: '2026-09-01' });
+    expect(Object.keys(ticketTypesModule).filter((name) => /^startDateValue/.test(name))).toEqual([]);
+  });
+
+  it('accepts exactly the days the reader accepts, and refuses exactly the ones it refuses', () => {
+    for (const day of ['2026-09-01', '2026-12-31', '2027-01-01']) {
+      expect(dueDateValueSchema.safeParse({ date: day }).success).toBe(DATE_ONLY.test(day));
+    }
+    for (const notADay of ['2026-09-01T10:00:00Z', '01/09/2026', '2026-9-1', '']) {
+      expect(dueDateValueSchema.safeParse({ date: notADay }).success).toBe(DATE_ONLY.test(notADay));
+    }
+  });
+
+  it('carries an optional note the reader passes through, and nothing else', () => {
+    expect(dueDateValueSchema.parse({ date: '2026-09-01', note: 'after the bank account opens' })).toEqual({
+      date: '2026-09-01',
+      note: 'after the bank account opens',
+    });
+    expect(dueDateValueSchema.safeParse('2026-09-01').success).toBe(false); // a bare string is not a claim
+  });
 });
-export type StartDateValue = z.infer<typeof startDateValueSchema>;
 ```
 
-`BuiltinFieldId` widens automatically. If `packages/domain/src/index.ts` re-exports `ticket-types` selectively rather than with `export *`, add `startDateValueSchema` and `StartDateValue` to the export list.
+Add to the file's imports whatever is not already there:
 
-- [ ] **Step 4: Run the domain tests to verify they pass**
+```ts
+import * as ticketTypesModule from './ticket-types.js';
+import { BUILTIN_FIELD_IDS, dueDateValueSchema } from './ticket-types.js';
+```
+
+(`packages/domain` is Plan 1's NodeNext package — relative imports carry the `.js` suffix. If the file you find imports without suffixes, match what is there.)
+
+- [ ] **Step 4: Run the pin**
 
 Run: `pnpm --filter @gisik-nokma/domain exec vitest run src/ticket-types.test.ts`
-Expected: PASS.
+Expected: PASS — Plan 3's cases and the four new ones. The pin guards rather than drives, so it is green immediately; that is the point of a guard, and the doc comment says so.
 
-- [ ] **Step 5: Write the failing engine tests**
+- [ ] **Step 5: Add the two shared fixtures**
 
-Append to `packages/rule-engine/src/checks/fields.test.ts` (inside the existing describe block, reusing its `fieldSet`/`ctx` helpers — read the file first and match their exact call shape):
+**Guard (harness shape):** open `packages/rule-engine/src/fixtures/harness.ts` and read `fixtureSchema` before writing these files. Two things to match, and nothing else:
+1. **The workflow-definitions key.** Plan 2 defined `workflowDefs` (array); Plan 3's runner snippet said `workflowDef` singular — mid-reconciliation. The JSON below uses `workflowDefs`; if the landed schema says otherwise, rename the key.
+2. **Whether a refusal `expected` may name the `rule` alone.** Plan 2's `fixtureSchema` union spells refusals as `{refused, rule, reason}` or `{refused, rule, reasonStartsWith}`; Plan 3 nonetheless ships `parent-terminal-with-open-children.json` with `rule` alone, so the landed schema may already have a rule-only branch. If it does not, add `"reason": "\"Start date\" needs a day in YYYY-MM-DD form (a note is optional)."` to the refusal fixture below — the literal Plan 3 owns and already pins in `fields.test.ts`.
 
-```ts
-it('accepts a start-date claim with a note', async () => {
-  expect(await checkTicketFieldSet(fieldSet('startDate', { date: '2026-09-01', note: 'after the bank account opens' }), ctx())).toEqual({ refused: false });
-});
-
-it('accepts clearing a start date — an attributed un-claim', async () => {
-  expect(await checkTicketFieldSet(fieldSet('startDate', null), ctx())).toEqual({ refused: false });
-});
-
-it('refuses a malformed start date with the field named', async () => {
-  expect(await checkTicketFieldSet(fieldSet('startDate', { date: '2026-09-01T10:00:00Z' }), ctx())).toEqual(
-    refuse('field.type-mismatch', fieldKindRefusal('Start date', 'a day in YYYY-MM-DD form (a note is optional)')),
-  );
-});
-
-it('refuses a bare-string start date — the claim shape is {date, note?}', async () => {
-  expect(await checkTicketFieldSet(fieldSet('startDate', '2026-09-01'), ctx())).toEqual(
-    refuse('field.type-mismatch', fieldKindRefusal('Start date', 'a day in YYYY-MM-DD form (a note is optional)')),
-  );
-});
-```
-
-Add `refuse` and `fieldKindRefusal` to the test file's imports from `./refusals` if not already imported.
-
-- [ ] **Step 6: Run the engine tests to verify they fail**
-
-Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/checks/fields.test.ts`
-Expected: FAIL — with no `startDate` branch, the value falls through to the custom-field lookup and refuses `field.unknown` (or Plan 3's equivalent), not the expected verdicts.
-
-- [ ] **Step 7: Implement the engine branch**
-
-In `packages/rule-engine/src/checks/fields.ts`, add `startDateValueSchema` to the `@gisik-nokma/domain` import, and insert directly after the `dueDate` branch of `checkTicketFieldSet`:
-
-```ts
-  if (p.fieldId === 'startDate') {
-    if (value === null) return ACCEPT;
-    return startDateValueSchema.safeParse(value).success
-      ? ACCEPT
-      : refuse('field.type-mismatch', fieldKindRefusal('Start date', 'a day in YYYY-MM-DD form (a note is optional)'));
-  }
-```
-
-- [ ] **Step 8: Run the engine tests to verify they pass**
-
-Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/checks/fields.test.ts`
-Expected: PASS.
-
-- [ ] **Step 9: Add the shared planted-defect fixtures**
-
-**Guard:** open `packages/rule-engine/src/fixtures/harness.ts` and check `fixtureSchema`'s key for workflow definitions (Plan 2 defined `workflowDefs` as an array; Plan 3's runner snippet said `workflowDef` singular — mid-reconciliation). The JSON below uses `workflowDefs`; if the landed schema says otherwise, rename the key, nothing else.
+The abbreviated envelopes below are deliberate and legal: Plan 2's `partialEnvelopeSchema` makes `id`, `workspaceId`, `version`, `origin`, both times and `seq` optional, and `completeEnvelope` fills them (`ws_1`, `user_a`, `server`, `2026-08-20T00:00:00.000Z`, `fx_evt_<n>`, `seq` = position).
 
 `packages/rule-engine/fixtures/field-set-refuses-a-malformed-start-date.json`:
 
@@ -300,11 +275,39 @@ Expected: PASS.
 }
 ```
 
-(The `reason` string is owned by Plan 3's `fieldKindRefusal`; per Plan 3's comparison discipline a fixture names the literal reason only when its plan owns the string, so this one pins the `rule` alone — the exact reason is already pinned by Step 5's Vitest test.)
+(The `reason` string is owned by Plan 3's `fieldKindRefusal`; per Plan 3's comparison discipline a fixture names the literal reason only when its plan owns the string, so this one pins the `rule` alone — the exact reason is already pinned by Plan 3's `fields.test.ts`. If the landed `fixtureSchema` demands a reason, the Guard above says which literal to add.)
 
-`packages/rule-engine/fixtures/field-set-accepts-a-start-date-claim.json` — identical `workflowDefs` and `priorEvents`, then:
+`packages/rule-engine/fixtures/field-set-accepts-a-start-date-claim.json` — the accepting twin: same world, a well-formed claim.
 
 ```json
+{
+  "name": "a start date is a claim like a due date — {date, note?} accepted",
+  "workflowDefs": [
+    {
+      "id": "wf_basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "*", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    {
+      "type": "ticket-type.defined",
+      "entity": { "kind": "ticket-type", "id": "task" },
+      "payload": { "id": "task", "name": "Task", "icon": "check", "rank": 3, "workflowId": "wf_basic", "fields": [] }
+    },
+    {
+      "type": "ticket.created",
+      "entity": { "kind": "ticket", "id": "t1" },
+      "payload": { "typeId": "task", "projectId": "p1", "parentId": null, "title": "Renew the DLT registration" }
+    }
+  ],
   "candidateEvent": {
     "type": "ticket.field_set",
     "entity": { "kind": "ticket", "id": "t1" },
@@ -312,25 +315,37 @@ Expected: PASS.
     "payload": { "fieldId": "startDate", "value": { "date": "2026-09-01", "note": "after the bank account opens" } }
   },
   "expected": { "refused": false }
+}
 ```
 
-with `"name": "a start date is a claim like a due date — {date, note?} accepted"`.
-
-- [ ] **Step 10: Run the fixture runner to verify the new fixtures execute and pass**
+- [ ] **Step 6: Run the fixture runner**
 
 Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/fixtures.test.ts`
-Expected: PASS, fixture count up by 2 (the runner iterates every `fixtures/*.json`; if it pins an exact count, bump it).
+Expected: PASS, fixture count up by 2 (the runner iterates every `fixtures/*.json`; if it pins an exact count, bump it). A schema-validation error here means the Guard in Step 5 was not applied — fix the fixture, never the harness.
 
-- [ ] **Step 11: Run both packages' full suites and typecheck**
+- [ ] **Step 7: Prove the two fixtures bite**
+
+A fixture that cannot fail guards nothing (spec invariant 6). Prove these two do, with ONE temporary edit that you restore in the same step:
+
+1. In `packages/rule-engine/src/checks/fields.ts`, temporarily delete ` || p.fieldId === 'startDate'` from the merged day-claim branch condition.
+2. Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/fixtures.test.ts`
+   Expected: FAIL, both new fixtures — the value now falls through to the custom-field lookup, so the refusal fixture gets `field.unknown` instead of `field.type-mismatch`, and the accepting fixture is refused rather than accepted. (Plan 3's `fields.test.ts` fails too, for the same reason — that is Plan 3's own guard biting, and confirms the mutation took.)
+3. Restore the condition exactly.
+4. Run: `git diff --exit-code packages/rule-engine/src/checks/fields.ts`
+   Expected: no output, exit 0. **Do not proceed until this is clean** — this task must leave Plan 3's source byte-identical.
+5. Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/fixtures.test.ts src/checks/fields.test.ts`
+   Expected: PASS.
+
+- [ ] **Step 8: Run both packages' full suites and typecheck**
 
 Run: `pnpm --filter @gisik-nokma/domain --filter @gisik-nokma/rule-engine test && pnpm --filter @gisik-nokma/domain --filter @gisik-nokma/rule-engine typecheck`
-Expected: PASS — nothing outside the two touched surfaces changes behavior.
+Expected: PASS — this task adds a test file's worth of assertions and two fixtures, and changes no behavior anywhere.
 
-- [ ] **Step 12: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add packages/domain/src/ticket-types.ts packages/domain/src/ticket-types.test.ts packages/rule-engine/src/checks/fields.ts packages/rule-engine/src/checks/fields.test.ts packages/rule-engine/fixtures/field-set-refuses-a-malformed-start-date.json packages/rule-engine/fixtures/field-set-accepts-a-start-date-claim.json
-git commit -m "startDate joins the built-in fields: a timeline bar needs a start, and a start is a claim someone makes — never a value the system back-fills"
+git add packages/domain/src/ticket-types.test.ts packages/rule-engine/fixtures/field-set-refuses-a-malformed-start-date.json packages/rule-engine/fixtures/field-set-accepts-a-start-date-claim.json
+git commit -m "the start date the timeline draws from is Plan 3's built-in, consumed not redefined: one schema for both day claims, a pin holding the reader's shape against it, and two shared fixtures that run a built-in day claim through the real engine in every build"
 ```
 
 ---
@@ -1604,6 +1619,8 @@ ingest.onEventCommitted((event) => {
 });
 ```
 
+Plan 1's `CommittedEventListener` hands the listener a `LedgerEvent = EventEnvelope & { workspaceSeq: number }` — the frozen envelope plus the server-assigned per-workspace stream cursor (coordination §18). `onCommitted(event: EventEnvelope)` accepts it unchanged: `LedgerEvent` is a structural extension, so this compiles with no cast. The fan-out reads only envelope fields and deliberately ignores `workspaceSeq` — a notification is addressed to a person, not resumed from a cursor. Plan 5's WebSocket fan-out is the listener that needs the cursor; this one does not.
+
 - [ ] **Step 7: Typecheck and run the server suite**
 
 Run: `pnpm --filter @gisik-nokma/server typecheck && pnpm --filter @gisik-nokma/server test`
@@ -1716,14 +1733,27 @@ async function seedTicket(t: SeedTicket): Promise<void> {
 
 let seq = 0;
 
-/** Append a state-entering event straight into the ledger (append-only: inserts are legal). */
+/**
+ * Append a state-entering event straight into the ledger (append-only: inserts
+ * are legal). The column list is Plan 1's: `events` carries BOTH counters —
+ * `seq` (per entity, UNIQUE (entity_kind, entity_id, seq)) and `workspace_seq`
+ * (per workspace, NOT NULL, UNIQUE (workspace_id, workspace_seq); coordination
+ * §18). Real ingest assigns them inside the transaction under the workspace
+ * advisory lock taken BEFORE the per-entity lock; a test seeder does not race
+ * anyone, so it does what Plan 1's own `insertEventSql(id, seq, workspaceSeq =
+ * seq)` helper does by default: one suite-global counter feeds both. It is
+ * monotonic, every row here belongs to WS, and every ticket id is distinct, so
+ * both unique constraints hold — and a ticket's later event always carries the
+ * higher `seq`, which is what the sweep's per-entity `ORDER BY e.seq DESC`
+ * reads.
+ */
 async function seedEnteredState(ticketId: string, serverTime: string, actorId: string): Promise<void> {
   seq += 1;
   const id = `01J9GEVT00000000000000${String(seq).padStart(4, '0')}`.slice(0, 26);
   await db.pool.query(
-    `INSERT INTO events (id, workspace_id, entity_kind, entity_id, type, version, payload, actor_id, origin, client_time, server_time, seq)
-     VALUES ($1, $2, 'ticket', $3, 'ticket.transitioned', 1, $4, $5, 'web', $6, $7, $8)`,
-    [id, WS, ticketId, JSON.stringify({ toStateId: 'doing' }), actorId, serverTime, serverTime, seq],
+    `INSERT INTO events (id, workspace_id, entity_kind, entity_id, type, version, payload, actor_id, origin, client_time, server_time, seq, workspace_seq)
+     VALUES ($1, $2, 'ticket', $3, 'ticket.transitioned', 1, $4, $5, 'web', $6, $7, $8, $9)`,
+    [id, WS, ticketId, JSON.stringify({ toStateId: 'doing' }), actorId, serverTime, serverTime, seq, seq],
   );
 }
 
@@ -1994,6 +2024,13 @@ export async function runNotificationSweep(deps: SweepDeps): Promise<SweepReport
   // --- stale-ticket: active tickets whose latest state-entering event is
   // older than the threshold. "When did it enter?" is derived from the
   // ledger every run — never stored as a second copy that could drift.
+  //
+  // The ORDER BY below is `seq`, and deliberately so: scoped by
+  // (entity_kind, entity_id) this is ONE ticket's history, and per-entity
+  // history is exactly what `seq` orders (Plan 1's readEntityEvents). It is
+  // NOT a cursor. A workspace STREAM resumes by `workspace_seq` instead
+  // (coordination §18) — this sweep never resumes a stream; it asks each
+  // ticket, independently, "what was the last thing that happened to you?"
   const staleBefore = new Date(now.getTime() - windows.stalenessThresholdDays * DAY_MS);
   const stale = await deps.pool.query(
     `SELECT t.ticket_id, t.workspace_id, t.assignee_id, t.state_id, t.workflow_id,
@@ -5100,7 +5137,7 @@ Append after §10 (Plan 8's section; if the numbering you find differs, take the
 ```markdown
 ## 11. Calendar, timeline & notifications
 
-- ✅ **startDate built-in field** — a claim `{date, note?}` beside title/description/dueDate, set via `ticket.field_set` with full per-field provenance; exists so a Timeline bar can have a claimed start — never a derived one. `packages/domain/src/ticket-types.ts`
+- ⚙️ **Day-claim consumption contract** — the Calendar and Timeline read the `startDate` and `dueDate` built-ins (owned by the tickets section — do NOT add a second bullet for the field here) through one shared claim shape `{date, note?}`; a domain pin holds the readers' day regex against the built-in's own schema, and two shared rule-engine fixtures run a built-in day claim end to end in every build. `packages/domain/src/ticket-types.test.ts`, `packages/rule-engine/fixtures/field-set-*-start-date-*.json`
 - ✅ **Calendar view** — month grid drawn only from claimed dates: attributed markers ("needed by 30 Aug — Kiro's claim"), start→due bars when both claims exist, undated tickets absent, an all-undated board renders an empty month that says why; month nav + today ring; per-week "+n more" overflow; click opens the ticket. `packages/app-core/src/calendar/`
 - ✅ **Timeline view** — week-column Gantt-lite: bars only for tickets with BOTH startDate and dueDate claims; single-claim, undated, and start-after-due work sits in a visible side list with attributed notes; epic grouping; no dependencies, no critical path. `packages/app-core/src/timeline/`
 - ✅ **Filters on both views** — FilterSpec (assignee, type, state, category, project, title text) plus an epic lane; in-transit claims render distinctly (`data-pending`) with provenance on hover. `packages/app-core/src/filter/`, `packages/app-core/src/claims/`
@@ -5146,10 +5183,10 @@ Scope contract for Features.md §11. Status legend: ✅ covered by an automated 
 - **11.19** ✅ The window is Monday-start weeks with W-labels; Earlier/Later shift it and Today returns. (`timeline-model.test.ts`, `TimelineView.test.tsx`)
 - **11.20** 🚫 Dependencies / critical path — out of spec by design (spec §7, this plan's scope guard).
 
-## startDate field
+## Day claims (the `startDate`/`dueDate` built-ins — owned by the tickets plan, consumed here)
 
-- **11.21** ✅ `startDate` joins `BUILTIN_FIELD_IDS`; the value schema accepts `{date, note?}` and refuses datetimes and bare strings; custom fields named `startDate` are shadow-refused. (`ticket-types.test.ts`)
-- **11.22** ✅ The engine accepts a startDate claim and its clearing, refuses malformed values with "Start date" named — plus the two shared fixtures every build runs. (`fields.test.ts`, `fixtures/field-set-*start-date*.json`)
+- **11.21** ✅ The day-claim shape the views read is held against the built-in's own schema: one schema serves both day built-ins (a `startDateValue*` export would fail the pin), it accepts exactly the days app-core's `DATE_ONLY` regex accepts and refuses exactly the ones it refuses, and it carries the optional note through. Guards the readers; the field itself is pinned by the tickets plan. (`ticket-types.test.ts`)
+- **11.22** ✅ A built-in day claim runs end to end through the shared fixture runner in every build — a malformed start date refused `field.type-mismatch`, a well-formed `{date, note?}` accepted; both proven to bite by temporarily dropping `startDate` from the engine's merged day branch. (`fixtures/field-set-*start-date*.json`)
 
 ## Notification engine
 
@@ -5198,7 +5235,7 @@ git commit -m "scope guard + bookkeeping: the no-forecast rule becomes an execut
 
 Flagged, never silently resolved. None blocks execution; each names the assumption taken and who reconciles it.
 
-1. **`startDate` is a Plan 3 touchpoint (orchestrator note, per assignment).** Task 1 edits Plan 3's surfaces additively: `BUILTIN_FIELD_IDS` (+ its pinned test assertion), `checkTicketFieldSet`, and adds `startDateValueSchema` beside `dueDateValueSchema`. Justification: a Timeline bar needs a start, and a start must be a claim, never an estimate (invariant 4). The orchestrator should record the amendment against Plan 3's contract so its executor is not surprised by the four-element constant.
+1. **`startDate` is Plan 3's — SETTLED, no longer a touchpoint.** This plan originally proposed adding the field to Plan 3's surfaces; the orchestrator folded that into Plan 3 itself (recorded against Plan 3's contract as its startDate amendment; the label carries no marker in Plan 3's text — Task 1 Step 1's greps are the check that matters), so Plan 3 now ships `BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate']`, a `checkTicketFieldSet` branch merged as `p.fieldId === 'dueDate' || p.fieldId === 'startDate'`, and the failing-test-first pair behind it. Critically, Plan 3 reuses ONE schema — `dueDateValueSchema` — for both day claims, deliberately, so the two shapes cannot drift apart. **Plan 9 defines nothing here and consumes all of it**: Task 1 verifies the built-in landed (and STOPS if it did not), pins the shape its readers assume, and adds the two shared fixtures that run a built-in day claim through the real engine — ground Plan 3's custom-field `field-set-*` fixtures do not cover. No start-date-specific schema or type exists anywhere in this plan, under any name; a start date is a due date's shape wearing a different field id. Nothing left for the orchestrator to reconcile.
 2. **`claim.contested` payload shape (Plan 10 reconciliation).** Amendment 16 pins the event ("payload = the original event, rule, reason") but not field names. Taken: `{ originalEvent: { id, type, actorId, clientTime, … }, rule, reason }`, parsed tolerantly (`passthrough`; mismatch → logged, skipped, never thrown). Plan 10 owns the registration; if it spells the payload differently, only `contestedPayloadSchema` in `fanout.ts` adapts.
 3. **Route prefix drift: `/v1` vs `/api`.** The amendments pin `/v1/*` (events, stream, preferences, sync, attachments) and this plan follows them (`/v1/me/notifications`); Plan 4 registered its reads under `/api/workspaces/…` and auth under `/api/auth/*`. Taken: amendments win for MY routes; Plan 4's paths are consumed as found. The orchestrator should reconcile the series to one prefix.
 4. **Preferences API shape (Plan 5 owns).** Amendment 14 pins rows + `/v1/me/preferences` but not verbs. Assumed by Task 13's consumers: `GET /v1/me/preferences` → `{ preferences: Record<string, unknown> }`, `PUT /v1/me/preferences/:key` body `{ value }`. Isolated behind `PreferencesGateway`, so only Plan 6's implementation adapts.
@@ -5210,7 +5247,7 @@ Flagged, never silently resolved. None blocks execution; each names the assumpti
 10. **Sweep windows vs workspace settings (Plan 5 + owner).** Spec §7 calls the staleness threshold (and by symmetry the warning window) workspace-set. Taken: exported defaults (7 days approaching / 14 days staleness) injected via `SweepDeps.windows` — the DI seam is ready for wherever Plan 5's attention endpoint puts per-workspace values. Sweep and attention endpoint MUST eventually read one source; flagged for that reconciliation.
 11. **Notification rows are not retroactively redacted.** A stored notification keeps its `ticketTitle` even if visibility is later revoked (the deep link then 404s via `canSee`). A point-in-time message honestly reflects what the recipient was entitled to see when it was sent; scrubbing history-of-messages is an owner decision, not assumed here.
 12. **Silent mention-gate.** A mention of a user who cannot see the ticket produces nothing, and the mentioner is not told. Honest (no leak, no invented delivery), but the editor could warn at mention time — a Plan 6/7 UX consideration, flagged.
-13. **Fixture-schema key drift.** Plan 2's `fixtureSchema` says `workflowDefs` (array); Plan 3's runner snippet used singular. Task 1 Step 9 carries a guard to match the landed harness.
+13. **Fixture-schema drift (two axes).** (a) Plan 2's `fixtureSchema` says `workflowDefs` (array); Plan 3's runner snippet used singular. (b) Plan 2's `expected` union spells refusals as `{refused, rule, reason}` or `{refused, rule, reasonStartsWith}`, yet Plan 3 ships `parent-terminal-with-open-children.json` naming the `rule` alone — so either the landed schema grew a rule-only branch or Plan 3's fixture needs a reason. Task 1 Step 5 carries a guard for both, and names the literal reason to add if the schema demands one. Reconciliation is Plans 2/3's; this plan only matches what it finds.
 14. **Test-helper drift (Plans 1/3/4).** `createTestDatabase` vs `testPool`/`wipe` vs `migrateTestDb`/`truncateAll` — this plan's server tests assume Plan 1's `createTestDatabase` (per-suite database; also sidesteps the append-only events table's truncate guard) with a locate-first guard. Reconciliation may standardise; adapt imports only.
 15. **Custom `date`-kind fields on Calendar/Timeline.** Out of scope in v1 (only `startDate`/`dueDate` render). Spec §7's "claimed dates" arguably includes custom date fields — flagged as a v2 candidate for the owner, not silently included.
 16. **`stateName` in stale notifications resolves via the LATEST workflow version** (`getWorkflowDefFromProjection` without a version). A renamed state shows its current name; the `stateId` always travels alongside. Pinning the version the ticket actually sits on would need `workflowVersion` in `proj_tickets` — not added here.
@@ -5230,7 +5267,7 @@ Flagged, never silently resolved. None blocks execution; each names the assumpti
 
 **2. Placeholder scan:** no TBD/TODO/"implement later"/"add validation"/"similar to Task N" anywhere; every code step carries the actual code; every test step carries the actual tests; the two guarded creations (`docToPlainText`, scaffolds) carry full content for the create branch and an exact consume instruction for the other. Task 14 is thin by design and says why, with concrete verification steps.
 
-**3. Type consistency (checked across tasks):** `Notification` shape identical in Tasks 3/4/5/6/7/12/14; dedupe-key grammar identical in Tasks 5/6 (`assignment:` / `mention:` / `contested-claim:` / `date-approaching:` / `stale-ticket:`); `NotificationTransport.deliver(userId, notification)` identical in 5/6; `TicketDatesInput`/`DateClaimView` identical in 8/9/10/11; `FilterSpec` consumed from one module in 8/9/10/13; `dueClaimLabel` defined once (Task 8) and consumed in 8/10/12; `insertNotification(db, notification)` identical in 4/5(transport)/7(test seeding); `CanSeeFn` defined in Task 5, reused in Task 6; `NO_DATES_NOTE`, `CALENDAR_EMPTY_MONTH_COPY`, `TIMELINE_SIDE_LIST_COPY` defined once, asserted where consumed. Route paths in Task 14's gateway match Task 7's registrations verbatim.
+**3. Type consistency (checked across tasks):** `Notification` shape identical in Tasks 3/4/5/6/7/12/14; dedupe-key grammar identical in Tasks 5/6 (`assignment:` / `mention:` / `contested-claim:` / `date-approaching:` / `stale-ticket:`); `NotificationTransport.deliver(userId, notification)` identical in 5/6; `TicketDatesInput`/`DateClaimView` identical in 8/9/10/11; `FilterSpec` consumed from one module in 8/9/10/13; `dueClaimLabel` defined once (Task 8) and consumed in 8/10/12; `insertNotification(db, notification)` identical in 4/5(transport)/7(test seeding); `CanSeeFn` defined in Task 5, reused in Task 6; `NO_DATES_NOTE`, `CALENDAR_EMPTY_MONTH_COPY`, `TIMELINE_SIDE_LIST_COPY` defined once, asserted where consumed. Route paths in Task 14's gateway match Task 7's registrations verbatim. Day claims: `startDate` and `dueDate` are validated and typed by Plan 3's single `dueDateValueSchema`/`DueDateValue` everywhere this plan names them (Task 1 pins it; Tasks 8–11 read the shape through `dateClaimOf`) — this plan adds no second day schema under any name. Ledger writes: the only direct `INSERT INTO events` in this plan (Task 6's `seedEnteredState`) carries Plan 1's full thirteen-column list including `workspace_seq`; the only `ORDER BY seq` (Task 6's stale LATERAL) is per-entity history, not a workspace cursor, and says so in place.
 
 
 
