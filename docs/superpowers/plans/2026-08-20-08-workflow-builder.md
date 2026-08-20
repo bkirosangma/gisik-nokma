@@ -59,7 +59,8 @@ type PublishedWorkflowDef = WorkflowDefinedPayload;
 type CustomFieldDef = { id: string; name: string; type: 'text'|'number'|'date'|'select'|'person'; options?: string[] };
 type TicketTypeDef = { id: string; name: string; icon: string; rank: number; workflowId: string; fields: CustomFieldDef[] };
 // ticketTypeDefSchema / customFieldDefSchema (zod) — Plan 3 Task 1; BUILTIN_FIELD_IDS = ['title','description','dueDate'];
-// BUILTIN_TICKET_TYPE_SEEDS: epic(1)/story(2)/task(3)/sub-task(4); SUB_TASK_TYPE_ID = 'sub-task'.
+// BUILTIN_TICKET_TYPE_SEEDS: epic(1)/story(2)/task(3)/sub-task(4); SUB_TASK_TYPE_ID = 'sub-task';
+// DEEPEST_RANK = 4 — the rank at or below which a type's tickets require a parent (Plan 3 design decision 9).
 
 type EventEnvelope = { id, workspaceId, entity: { kind: EntityKind; id }, type, version, payload, actorId, origin, clientTime, serverTime, seq };
 type SubmittedEvent = Omit<EventEnvelope, 'serverTime' | 'seq'>;   // Plan 1; id/workspaceId/entity.id/actorId are ULIDs
@@ -108,7 +109,7 @@ This plan executes in parallel with Plans 6/7/9 (after 1–5). Where Plan 5/6 su
 1. **`removeState` cascades the state's transitions but leaves `initialStateId` and `require-different-user` references dangling.** A dangling edge cannot render on a canvas, so edges from/to a deleted state go with it (standard canvas behaviour, matching React Flow's own node-deletion semantics). But the initial-state marker and a four-eyes rule's named move are things the author *wrote*; silently rewriting them would be its own small lie. They stay, dangle, and surface as `unknown-initial-state` / `rdu-unknown-state` issues the author resolves deliberately.
 2. **Issue anchoring pairs by code, not by global order.** `Issue` carries no structural pointer (`{ code, message }` only). `anchorIssues` recomputes each code's offender list from the def in definition order and zips it with that code's issues in order. Pairing per code makes anchoring robust to the reconciliation inserting `unknown-initial-state` anywhere in `validateWorkflowDef`'s global issue order. If a queue runs dry (copy drift), the issue degrades to a canvas-level anchor — never a crash. An additive `ref?` field on `Issue` is proposed upstream (Open question 7).
 3. **The `require-field` picker is picker-only — no free text.** A typo'd field id would author a transition that can never legally fire: a rule that looks enforced and isn't, which is exactly the lie this product exists to kill. Choices are the three built-ins (`title`, `description`, `dueDate`) plus the union of custom fields on every ticket type currently bound to this workflow. A rule whose field is no longer among the choices renders with an inline warning, not silent acceptance.
-4. **Custom ticket types never require a parent; only the built-in `sub-task` does.** The coordination doc defers this to Plan 8. Decision: `sub-task`'s requires-parent is a property of that seed type, not of "being max rank" — a workspace inventing an `Invoice` at rank 4 should not find its invoices uncreatable at project root. The UI says so in the rank-implications copy; flagged for spec-owner sign-off (Open question 6).
+4. **Requires-parent follows the RANK, not the built-in id** — settled by the owner on 2026-08-20 (coordination doc sign-off table), overruling this plan's earlier reading. Any type defined at **or below** the deepest rank requires a parent: the built-in `sub-task` (rank 4), a workspace's own `Checklist item` at rank 4, and a `Micro step` at rank 7 — smaller work still, and so covered a fortiori. Epic/story/task-rank types are unaffected — an epic-rank custom type still sits at project root. The builder computes the flag as `rank >= DEEPEST_RANK`, importing the **same constant the engine refuses on** (Plan 3 design decision 9); it must never derive its own maximum from the loaded types, because in a workspace that has defined nothing below Task a computed max would make the builder promise that Task requires a parent while the server happily accepted one at project root — a UI describing a rule that isn't there is the exact failure this product exists to refuse. The rank-implications copy states the requirement plainly (see Pinned UI copy). Open question 6 records the settlement.
 5. **Canvas layout is presentation, not truth, and is not published.** Node positions live only in the draft (auto-layout on load via a dependency-free layered BFS from `initialStateId`; drags persist for the session). The `workflow.defined` payload carries no coordinates. Persisting layout later belongs in `/v1/me/preferences` (amendment 14) — Open question 3.
 6. **Ticket-type events mint a fresh entity ULID per submission; the payload id is the stable type key.** Matches Plan 3's own test convention (`entity.id` a ULID, `payload.id` = `'epic'`/`'invoice'`) and the envelope schema's ULID requirement on `entity.id`. Custom types get a ULID payload id at creation; built-ins keep their seed ids. Open question 5 flags the entity-stream consequence.
 7. **Built-in ticket types: name, icon, and workflow binding are editable; id and rank are locked in the UI.** The rank ladder epic(1)/story(2)/task(3)/sub-task(4) is what Plan 3's hierarchy checks lean on; re-ranking built-ins from a settings screen is a foot-gun with no user story. The server does not enforce this lock (last-definition-wins) — UI-only, flagged in Open questions.
@@ -158,7 +159,7 @@ All user-facing strings in one place; components and tests use these character-f
 | Empty restrict-to helper | `Pick at least one — a restriction that names nobody can never be satisfied.` |
 | Unknown require-field warning | `This field is not on any ticket type bound to this workflow.` |
 | rdu start-state note | `A ticket born in the start state has nobody to differ from — this rule only bites once the move to "${stateName}" has actually been performed.` |
-| Rank implications | `Can sit under: ${type names, comma-joined} · or at the project root.` / no possible parents: `Top of the hierarchy — sits at the project root.` / built-in sub-task: `Must sit under a parent (built-in rule for sub-tasks). Can sit under: ${type names}.` |
+| Rank implications | `Can sit under: ${type names, comma-joined} · or at the project root.` / no possible parents: `Top of the hierarchy — sits at the project root.` / any type at or below the deepest rank, built-in or custom: `Must sit under a parent — this is the smallest kind of work, so tickets of this type always belong to something bigger. Can sit under: ${type names}.` |
 | Template gallery heading | `Start from a template` (cards carry `Use this template`; the blank card carries `Start blank`) |
 | Builder screen loading / failure | `Loading workspace people and types…` / `Could not load workspace people and types — reload to try again.` |
 | List screens | `Workflows` / `New workflow` / `No workflows published yet.` / `Loading workflows…` · `Ticket types` / `New ticket type` / `Loading ticket types…` · row buttons `Open` (aria `Open ${name}`) |
@@ -4828,7 +4829,7 @@ git commit -m "Builder, list and gallery screens: gateway-loaded workspace data,
 
 ### Task 11: Ticket-type management — list, editor, fields, rank implications
 
-Custom reusable ticket types (spec §2): name, icon, hierarchy rank, workflow binding (published workflows only), and typed custom fields with a select-options editor. Saving emits `ticket-type.defined`. Rank implications render live (`Can sit under: …` — derived from ranks; design decision 4: only the built-in `sub-task` requires a parent). Built-in types edit name/icon/workflow but their rank is locked in the UI (design decision 7).
+Custom reusable ticket types (spec §2): name, icon, hierarchy rank, workflow binding (published workflows only), and typed custom fields with a select-options editor. Saving emits `ticket-type.defined`. Rank implications render live (`Can sit under: …` — derived from ranks; design decision 4: a type defined at or below the deepest rank requires a parent, whether it is the built-in `sub-task` or one the workspace invented). Built-in types edit name/icon/workflow but their rank is locked in the UI (design decision 7).
 
 **Files:**
 - Create: `packages/app-core/src/workflow-builder/ticket-types/rank.ts`
@@ -4842,7 +4843,7 @@ Custom reusable ticket types (spec §2): name, icon, hierarchy rank, workflow bi
 - Test: `packages/app-core/test/ticket-types/ticket-types.test.tsx`
 
 **Interfaces:**
-- Consumes: `TicketTypeDef`, `CustomFieldDef`, `ticketTypeDefSchema`, `BUILTIN_TICKET_TYPE_SEEDS`, `SUB_TASK_TYPE_ID`, `newUlid` (domain); `buildTicketTypeDefinedEvent`, gateway types (Task 4); `canAuthorRole`, `BuilderSession` (Task 5).
+- Consumes: `TicketTypeDef`, `CustomFieldDef`, `ticketTypeDefSchema`, `BUILTIN_TICKET_TYPE_SEEDS`, `DEEPEST_RANK`, `newUlid` (domain); `buildTicketTypeDefinedEvent`, gateway types (Task 4); `canAuthorRole`, `BuilderSession` (Task 5).
 - Produces:
   - `rankImplications(typeId: string, rank: number, allTypes: readonly TicketTypeDef[]): { parents: TicketTypeDef[]; mustHaveParent: boolean }` and `rankImplicationsCopy(implications): string`
   - `TYPE_ICONS`, `TYPE_ICON_NAMES`, `TypeIcon({ name, size? })` (unknown names fall back to a folder — data never crashes the UI)
@@ -4871,9 +4872,16 @@ describe('rankImplications', () => {
     expect(parents.map((parent) => parent.name)).toEqual(['Epic', 'Story']);
   });
 
-  it('a custom max-rank type never requires a parent — only the built-in sub-task does', () => {
-    expect(rankImplications('invoice', 4, BUILTINS).mustHaveParent).toBe(false);
+  it('the deepest rank requires a parent — built-in or workspace-invented alike (owner decision 2026-08-20)', () => {
     expect(rankImplications('sub-task', 4, BUILTINS).mustHaveParent).toBe(true);
+    expect(rankImplications('invoice', 4, BUILTINS).mustHaveParent).toBe(true);
+    // …and nothing slips underneath the floor: rank 5 is smaller work than a
+    // sub-task, so it needs a parent all the more. This is the standing guard
+    // for `>=` over `===` (design decision 4).
+    expect(rankImplications('micro-step', 5, BUILTINS).mustHaveParent).toBe(true);
+    // …while shallower ranks sit at the project root freely — no over-applying.
+    expect(rankImplications('invoice', 3, BUILTINS).mustHaveParent).toBe(false);
+    expect(rankImplications('epic', 1, BUILTINS).mustHaveParent).toBe(false);
   });
 });
 
@@ -4890,9 +4898,12 @@ describe('rankImplicationsCopy', () => {
     );
   });
 
-  it('the built-in sub-task names its parent requirement', () => {
+  it('the deepest rank names its parent requirement, and says the same thing to a custom type there', () => {
     expect(rankImplicationsCopy(rankImplications('sub-task', 4, BUILTINS))).toBe(
-      'Must sit under a parent (built-in rule for sub-tasks). Can sit under: Epic, Story, Task.',
+      'Must sit under a parent — this is the smallest kind of work, so tickets of this type always belong to something bigger. Can sit under: Epic, Story, Task.',
+    );
+    expect(rankImplicationsCopy(rankImplications('invoice', 4, BUILTINS))).toBe(
+      'Must sit under a parent — this is the smallest kind of work, so tickets of this type always belong to something bigger. Can sit under: Epic, Story, Task.',
     );
   });
 });
@@ -4903,15 +4914,26 @@ describe('rankImplicationsCopy', () => {
 Run: `pnpm --filter @gisik-nokma/app-core exec vitest run test/ticket-types/rank.test.ts` — expected FAIL (module missing). Then create `packages/app-core/src/workflow-builder/ticket-types/rank.ts`:
 
 ```ts
-import { SUB_TASK_TYPE_ID, type TicketTypeDef } from '@gisik-nokma/domain';
+import { DEEPEST_RANK, type TicketTypeDef } from '@gisik-nokma/domain';
 
 export type RankImplications = { parents: TicketTypeDef[]; mustHaveParent: boolean };
 
 /**
  * A child's type must rank strictly below its parent's (Plan 3). Requires-parent
- * is a property of the built-in sub-task seed, NOT of "being max rank" — a
- * custom Invoice at rank 4 stays creatable at project root (design decision 4,
- * flagged for spec-owner sign-off in Open questions).
+ * follows the RANK, not the built-in id (owner decision 2026-08-20): a type at
+ * DEEPEST_RANK or below it always needs a parent — the built-in sub-task, an
+ * Invoice this workspace invented beside it, and anything deeper still.
+ *
+ * `>=` rather than `===`: a type deeper than sub-task is smaller work again, so
+ * exempting it would invert the rule's own justification and leave an escape
+ * hatch at rank 5.
+ *
+ * DEEPEST_RANK is imported from domain — the same constant Plan 3's engine
+ * refuses on — and is deliberately NOT a maximum computed over `allTypes`. In a
+ * workspace that has defined nothing below Task, a locally computed max would
+ * make this screen promise that Task needs a parent while the server accepted
+ * one at project root: the builder would be describing a rule that does not
+ * exist (design decision 4).
  */
 export function rankImplications(
   typeId: string,
@@ -4921,13 +4943,13 @@ export function rankImplications(
   const parents = allTypes
     .filter((candidate) => candidate.rank < rank && candidate.id !== typeId)
     .sort((a, b) => a.rank - b.rank);
-  return { parents, mustHaveParent: typeId === SUB_TASK_TYPE_ID };
+  return { parents, mustHaveParent: rank >= DEEPEST_RANK };
 }
 
 export function rankImplicationsCopy(implications: RankImplications): string {
   const names = implications.parents.map((parent) => parent.name).join(', ');
   if (implications.mustHaveParent) {
-    return `Must sit under a parent (built-in rule for sub-tasks). Can sit under: ${names}.`;
+    return `Must sit under a parent — this is the smallest kind of work, so tickets of this type always belong to something bigger. Can sit under: ${names}.`;
   }
   if (implications.parents.length === 0) return 'Top of the hierarchy — sits at the project root.';
   return `Can sit under: ${names} · or at the project root.`;
@@ -5545,7 +5567,7 @@ export * from './ticket-types/ticket-type-list-screen.tsx';
 
 ```bash
 git add packages/app-core/src/workflow-builder/ticket-types packages/app-core/test/ticket-types packages/app-core/src/workflow-builder/index.ts
-git commit -m "Ticket-type management: five field kinds with a select-options editor, workflow binding from published workflows, live rank implications (custom types never require a parent — only built-in sub-task), built-in ranks locked in the UI, schema and server refusals verbatim"
+git commit -m "Ticket-type management: five field kinds with a select-options editor, workflow binding from published workflows, live rank implications that say plainly when a type sits at or below the deepest rank and will therefore always need a parent — the owner's rule follows the rank, so a workspace's own type there hears the same thing the built-in sub-task does — built-in ranks locked in the UI, schema and server refusals verbatim"
 ```
 
 ---
@@ -6243,7 +6265,7 @@ The authoring half of spec §4: a Jira-style visual builder plus a template gall
 - ✅ **Live validation** — `validateWorkflowDef` on every change; issues panel in the validator's own words, anchored per code to the offending node/edge, click-to-select; publish disabled while any issue stands. `packages/app-core/src/workflow-builder/ui/issues-panel.tsx`
 - ✅ **Publish flow** — `workflow.defined` with version bump from the published base; a state-mapping dialog listing every dropped state with in-flight ticket counts and target pickers (the server's stranded-state refusal surfaced before it fires); committed/refused/invalid results rendered verbatim. `packages/app-core/src/workflow-builder/ui/publish-controls.tsx`
 - ✅ **Template gallery** — simple-kanban, errand-with-waits (waiting states blocked-flagged for the attention strip), approval-chain (four-eyes approve); ordinary workflows, cloned into the canvas. `packages/app-core/src/workflow-builder/templates.ts`
-- ✅ **Ticket-type management** — list/create/edit custom types: name, icon picker, hierarchy rank with live "can sit under" implications, workflow binding from published workflows, five typed custom fields with a select-options editor; emits `ticket-type.defined`. Built-in ranks are locked in the UI. `packages/app-core/src/workflow-builder/ticket-types/`
+- ✅ **Ticket-type management** — list/create/edit custom types: name, icon picker, hierarchy rank with live "can sit under" implications — a type placed at or below the deepest rank is told outright that its tickets will always require a parent, the same rule the engine refuses on — workflow binding from published workflows, five typed custom fields with a select-options editor; emits `ticket-type.defined`. Built-in ranks are locked in the UI. `packages/app-core/src/workflow-builder/ticket-types/`
 - ✅ **Admin gating** — non-admins get read-only views with the look-not-touch banner; server `permission.role` refusals render character for character. `packages/app-core/src/workflow-builder/ui/read-only-banner.tsx`
 - ✅ **System-rules panel** — the two unauthorable invariants (provenance; parent-terminal refusal) named as fixed system rules in the canvas UI (spec §4). `packages/app-core/src/workflow-builder/ui/system-rules-panel.tsx`
 - ⚙️ **Draft store & auto-layout** — immutable `WorkflowDraft` store (cascade-edges-on-delete, never rewrite authored references); deterministic layered layout from `initialStateId`; layout is presentation and never published. `packages/app-core/src/workflow-builder/draft-store.ts`
@@ -6313,7 +6335,7 @@ Mirrors `Features.md` §10. Status: `❌` not covered · `✅` covered · `🟡`
 - 10.41 ✅ List with rank, field count, Built-in badges — `ticket-types.test.tsx`
 - 10.42 ✅ Create flow emits ticket-type.defined with a fresh entity ulid — `ticket-types.test.tsx`, `events.test.ts`
 - 10.43 ✅ Select field without options: schema refusal in zod's own words; save blocked — `ticket-types.test.tsx`
-- 10.44 ✅ Rank implications derived live; custom types never require a parent — `rank.test.ts`, `ticket-types.test.tsx`
+- 10.44 ✅ Rank implications derived live; a type at or below the deepest rank — built-in or workspace-invented, rank 4 or deeper — says plainly that its tickets will need a parent, while shallower ranks say nothing of the sort — `rank.test.ts`, `ticket-types.test.tsx`
 - 10.45 ✅ Built-in ranks locked in the UI with the reason named — `ticket-types.test.tsx`
 - 10.46 ✅ Server refusal on save rendered verbatim — `ticket-types.test.tsx`
 
@@ -6361,7 +6383,7 @@ Flagged, never silently resolved. None blocks execution — each names the decis
 3. **Canvas layout is session-only.** Auto-layout on load, drags kept in memory, nothing published (layout is presentation, not truth). If persisted layout is wanted, it belongs in `/v1/me/preferences` (amendment 14) under a `workflow-layout:{workflowId}` key — a later, additive change.
 4. **`removeState` semantics** (decision 1): edges cascade; `initialStateId` and rdu references dangle into named issues. Consequence: `duplicate-state-id` and `unknown-transition-state` are unauthorable by pointer gestures and are planted via `loadDraft` — argued in the coverage table, flagged here for reviewer sign-off.
 5. **Ticket-type entity streams.** Each `ticket-type.defined` mints a fresh entity ULID (Plan 3's own test convention; the projection folds by payload id). If a later plan keys per-entity sequence for type history, the gateway should return each type's entity id and the builder will reuse it — an additive change confined to `events.ts` and `gateway.ts`.
-6. **Custom max-rank types do not inherit sub-task's requires-parent** (decision 4 — the question the coordination doc explicitly deferred to this plan). The UI copy says so; spec-owner sign-off requested. Related: the built-in rank lock (decision 7) is UI-only — the server's last-definition-wins would accept a re-rank; if the owner wants that refused, it is a Plan 3 rule addition, not a builder change.
+6. **Requires-parent follows the rank — SETTLED by the owner, 2026-08-20.** The coordination doc deferred this here; the owner answered it in the sign-off table and **overruled this plan's earlier call**. The rule: any ticket whose type sits at **or below the deepest rank** requires a parent — the built-in `sub-task` (rank 4), any custom type defined at rank 4, and anything deeper. Types at epic/story/task ranks are unaffected; an epic-rank custom type may still sit at project root. Applied here as `rank >= DEEPEST_RANK` in `rank.ts` (decision 4) with the rank-implications copy stating the requirement plainly, and in Plan 3 as the `hierarchy.deepest-rank-parent-required` refusal keyed on the same imported constant. Two things pinned so a later reader does not "improve" them: the constant is never replaced by a max computed over the loaded types (the builder would then describe a rule the server does not enforce), and the comparison is `>=` rather than `===` (a rank-5 type is smaller work than a sub-task, so exempting it would invert the rule's own justification and leave an escape hatch). **Still open** (the unrelated half of the original question): the built-in rank lock (decision 7) is UI-only — the server's last-definition-wins would accept a re-rank; if the owner wants that refused, it is a Plan 3 rule addition, not a builder change.
 7. **`Issue` carries no structural ref.** Anchoring recomputes offenders per code (robust to the reconciled validator's ordering, degrades to canvas-level, never crashes). Proposed contract amendment: additive `ref?: { stateId: string } | { transition: { from: string; to: string } }` on `Issue`, which would delete `anchor-issues.ts`'s recomputation wholesale.
 8. **rdu start-state warning.** Plan 2's Open question 10 proposed a builder-side warning for `thanActorOf.to === ` the initial state; implemented here as an inline note in the editor (not a blocking issue). If the reconciliation instead adds a validator warning code, drop the local note and let the issues panel carry it.
 9. **`unknown-initial-state` message copy** is owned by the amended Plan 2; every test here asserts through `validateWorkflowDef`'s own output, so whatever copy ships needs no edit in this plan.

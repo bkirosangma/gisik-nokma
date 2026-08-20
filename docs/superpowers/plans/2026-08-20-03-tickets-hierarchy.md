@@ -4,7 +4,7 @@
 
 **Goal:** Build the ticket domain — ticket types (built-in and custom), the ticket event vocabulary, hierarchy sanity refusals, the ticket head-state and rollup projections, and the ledger-backed history endpoint — so the rule engine's view of tickets becomes real and provable.
 
-**Architecture:** Everything mutable is a claim in the event ledger; tickets are projections of it. A pure reducer (`applyTicketEvent`) folds ticket events into a `TicketState`, and the same reducer drives both the Postgres projection (`proj_tickets`) and the in-memory context used by the shared fixture suite — so client and server can never quietly disagree about what a ticket is. Hierarchy sanity (rank order, sub-task-needs-parent, cycles, cross-project) is enforced as engine refusals with plain-language reasons, each proven against a planted defect.
+**Architecture:** Everything mutable is a claim in the event ledger; tickets are projections of it. A pure reducer (`applyTicketEvent`) folds ticket events into a `TicketState`, and the same reducer drives both the Postgres projection (`proj_tickets`) and the in-memory context used by the shared fixture suite — so client and server can never quietly disagree about what a ticket is. Hierarchy sanity (rank order, deepest-rank-needs-parent, cycles, cross-project) is enforced as engine refusals with plain-language reasons, each proven against a planted defect.
 
 **Tech Stack:** TypeScript strict, Node 22 LTS, pnpm 9 workspaces + Turborepo, Vitest, Zod, Postgres 16 via `pg`, node-pg-migrate, Fastify 5, ULID via `ulidx`.
 
@@ -73,14 +73,14 @@ Rule ids and verbatim plain-language reasons, per invariant 2's "the reason name
 | `ticket.workflow-undefined` | This ticket type's workflow has not been defined yet, so the ticket would have no status. |
 | `hierarchy.unknown-parent` | The chosen parent ticket does not exist in this workspace. |
 | `hierarchy.cross-project` | The parent is in a different project. Pick a parent from the same project. |
-| `hierarchy.sub-task-parent-required` | A sub-task always belongs to a parent ticket. Pick the ticket this sub-task is part of. |
 | `hierarchy.cycle` | This move would put the ticket inside one of its own sub-items, making a loop. A ticket cannot contain itself. |
 | `field.unknown` | This ticket's type has no such field. Add the field to the ticket type first. |
 | `field.title-required` | A ticket always has a title. Change the title instead of clearing it. |
 
-Three templated reasons (the interpolated results are what tests assert):
+Four templated reasons (the interpolated results are what tests assert):
 
 - `hierarchy.rank` → `"${childTypeName}" cannot go under "${parentTypeName}": a ticket's parent must be a bigger kind of work.` — e.g. `"Epic" cannot go under "Story": a ticket's parent must be a bigger kind of work.`
+- `hierarchy.deepest-rank-parent-required` (owner decision 2026-08-20, coordination doc sign-off table) → `"${typeName}" is the smallest kind of work, so it always belongs to a parent ticket. Pick the ticket this one is part of.` — e.g. `"Sub-task" is the smallest kind of work, so it always belongs to a parent ticket. Pick the ticket this one is part of.` The reason names the *type*, because the rule keys off the type's rank: the built-in `sub-task` and any custom type defined at that rank or below it all raise it.
 - `hierarchy.parent-terminal` (owner decision 2026-08-20, coordination doc) → on `ticket.created`: `"${parentTitle}" is finished (${stateName}). Adding live work reopens it — choose a state to reopen it to, then add this ticket.` · on `ticket.reparented`: `"${parentTitle}" is finished (${stateName}). Moving live work under it reopens it — choose a state to reopen it to, then move this ticket.` — e.g. `"Quarterly filings" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.`
 - `field.type-mismatch` → `"${fieldName}" needs ${needsPhrase}.` with `needsPhrase` per field kind: text → `text`; number → `a number`; date → `a date in YYYY-MM-DD form`; select → `one of: ${options.join(', ')}`; person → `a person`; description built-in → `a document`; the two day-claim built-ins `dueDate`/`startDate` → `a day in YYYY-MM-DD form (a note is optional)` (named `"Due date"` and `"Start date"` respectively). E.g. `"Invoice amount" needs a number.`
 
@@ -88,20 +88,23 @@ Precondition refusals (`ticket.unknown-type`, `ticket.unknown`, `ticket.workflow
 
 ## Design decisions (made here, argued once)
 
-1. **Built-in types are seed data, not special cases.** `epic(1)/story(2)/task(3)/sub-task(4)` ship as canonical constants in packages/domain, but every workspace materialises them as ordinary `ticket-type.defined` events at workspace creation (owned by the workspace-bootstrap plan) — because built-ins need a per-workspace workflow binding anyway. Resolution is therefore uniform: every type lookup reads event-defined types; nothing special-cases built-ins except the `sub-task` parent rule, which keys off the well-known id `sub-task`.
+1. **Built-in types are seed data, not special cases.** `epic(1)/story(2)/task(3)/sub-task(4)` ship as canonical constants in packages/domain, but every workspace materialises them as ordinary `ticket-type.defined` events at workspace creation (owned by the workspace-bootstrap plan) — because built-ins need a per-workspace workflow binding anyway. Resolution is therefore uniform: every type lookup reads event-defined types, and **nothing special-cases built-ins at all** — the parent-required rule keys off the deepest *rank* (decision 9), not off the id `sub-task`.
 2. **A ticket's workflow is bound at creation** (`TicketState.workflowId` copied from its type's `workflowId` when the `ticket.created` event applies). Workflow *version* changes apply to all tickets (lookups resolve latest); re-binding a *type* to a different workflow affects new tickets only (Open questions #8).
 3. **`ticket.field_set` with `value: null` clears the field — as a claim, provenance retained.** The single exception is `title`: a ticket always has a title (`field.title-required`). Clearing `description`, `dueDate`, `startDate`, or any custom field is legal; an undated item then simply vanishes from the calendar (invariant 4).
 4. **Collaborators:** a duplicate `ticket.collaborator_added` deduplicates (state unchanged); removing a non-collaborator is a no-op. Both are accepted events — the claim is honest even when redundant.
 5. **Rollups count DIRECT children only.** The spec's "open children" (invariant 3) means **direct non-terminal children** — categories `open` + `active`, i.e. `total_children - terminal_children`. Direct-only checking is sufficient by induction: the invariant holds at every level, so a terminal parent's terminal children already had no open children of their own when they went terminal. Derived progress is never authored — `proj_rollups` is computed, and nothing writes it but the projection.
 6. **The cycle check is load-bearing, not redundant.** With strict rank ordering a cycle looks impossible — but `ticket-type.defined` can re-define a type's rank (types are events; last definition wins), after which a rank-legal reparent can close a loop. The planted defect for `hierarchy.cycle` uses exactly that construction.
-7. **Check order** is fixed so the most fundamental truth names the refusal: for `ticket.created`: unknown type → workflow undefined → (root: sub-task rule) → unknown parent → cross-project → rank → parent-terminal. For `ticket.reparented`: unknown ticket → unknown type → (root: sub-task rule) → self/cycle → cross-project → rank → parent-terminal. A loop is named as a loop even when rank is also violated; the remediable contradiction (a finished parent) names the refusal only when the structure itself is sound.
+7. **Check order** is fixed so the most fundamental truth names the refusal: for `ticket.created`: unknown type → workflow undefined → (root: deepest-rank rule) → unknown parent → cross-project → rank → parent-terminal. For `ticket.reparented`: unknown ticket → unknown type → (root: deepest-rank rule) → self/cycle → cross-project → rank → parent-terminal. A loop is named as a loop even when rank is also violated; the remediable contradiction (a finished parent) names the refusal only when the structure itself is sound.
 8. **Live work under a terminal parent refuses toward a reopen** (owner decision 2026-08-20 — see the coordination doc's "Owner decision" section): a `ticket.created` naming a terminal-category parent, and a `ticket.reparented` moving a non-terminal ticket under one, refuse as `hierarchy.parent-terminal` with the remedy in the reason — the parent must reopen because it is acquiring live work; clients offer the reopen (the parent's `ticket.transitioned` carrying `cause: { kind: 'reopened-for-child', childTicketId }`) and then re-submit, while a terminal child under a terminal parent stays legal because nothing contradicts.
+9. **Parent-required follows the RANK, not the built-in id** (owner decision 2026-08-20, coordination doc sign-off table — this overrules Plan 8's Open question 6). Any ticket whose type sits **at or below** the deepest rank requires a parent: the built-in `sub-task` (rank 4), any custom type an admin defines at rank 4, and any custom type deeper than that. Types at epic/story/task ranks are unaffected — an epic-rank custom type still sits at project root. The check is `type.rank >= DEEPEST_RANK`, where `DEEPEST_RANK = 4` is an exported constant matching the built-in sub-task's rank.
+   - **Why a constant and not a max over the defined types.** A computed max would silently change the rule's meaning whenever the type inventory changed: a workspace that had never defined anything below Task would find *Task* suddenly unable to sit at project root, and defining one rank-5 type would release every rank-4 type from the requirement. A refusal that shifts underfoot is exactly what this product refuses to ship.
+   - **Why `>=` and not `===`.** The rule's own justification is that the smallest kind of work always belongs to something bigger. A type deeper than sub-task is smaller still, so exempting it would invert the justification and leave an escape hatch — define rank 5 and your tickets float free at project root. `>=` closes that without reintroducing the shifting-meaning problem: the floor stays pinned at 4, and everything at or beneath it is covered.
 
 ## File structure
 
 | Path | Responsibility |
 |---|---|
-| `packages/domain/src/ticket-types.ts` | `CustomFieldDef`, `TicketTypeDef`, Zod schemas, built-in seeds, `SUB_TASK_TYPE_ID`, `BUILTIN_FIELD_IDS` |
+| `packages/domain/src/ticket-types.ts` | `CustomFieldDef`, `TicketTypeDef`, Zod schemas, built-in seeds, `SUB_TASK_TYPE_ID`, `DEEPEST_RANK`, `BUILTIN_FIELD_IDS` |
 | `packages/domain/src/events/ticket-events.ts` | Zod payload schemas + `registerEventType` calls for all ten event types |
 | `packages/domain/src/workflow-helpers.ts` | `stateCategoryOf(def, stateId)` |
 | `packages/domain/src/ticket-state.ts` | `FieldClaim`, `TicketState`, `TicketStateDeps`, `TICKET_EVENT_TYPES`, pure `applyTicketEvent` |
@@ -112,7 +115,7 @@ Precondition refusals (`ticket.unknown-type`, `ticket.unknown`, `ticket.workflow
 | `packages/rule-engine/src/checks/hierarchy.ts` | `checkTicketCreated`, `checkTicketReparented` |
 | `packages/rule-engine/src/checks/fields.ts` | `checkTicketFieldSet` |
 | `packages/rule-engine/src/checks/test-support.ts` | shared type/event builders for check tests |
-| `packages/rule-engine/fixtures/*.json` | twelve end-to-end planted-defect fixtures (seven refusal scenarios + accepting twins) |
+| `packages/rule-engine/fixtures/*.json` | thirteen end-to-end planted-defect fixtures (eight refusal scenarios + accepting twins) |
 | `apps/server/migrations/1755672000000_proj-ticket-types.js` | `proj_ticket_types` table |
 | `apps/server/migrations/1755672100000_proj-tickets.js` | `proj_tickets` table |
 | `apps/server/migrations/1755672200000_proj-rollups.js` | `proj_rollups` table |
@@ -146,7 +149,7 @@ Precondition refusals (`ticket.unknown-type`, `ticket.unknown`, `ticket.workflow
   - `customFieldDefSchema`, `ticketTypeDefSchema` (Zod schemas for the above)
   - `BUILTIN_TICKET_TYPE_SEEDS: ReadonlyArray<{ id: string; name: string; icon: string; rank: number }>` — epic(1), story(2), task(3), sub-task(4)
   - `builtinTicketTypeDefs(defaultWorkflowId: string): TicketTypeDef[]`
-  - `SUB_TASK_TYPE_ID = 'sub-task'`, `BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate'] as const`
+  - `SUB_TASK_TYPE_ID = 'sub-task'`, `DEEPEST_RANK = 4` (the built-in sub-task's rank; the rank at **or below** which a type's tickets require a parent — design decision 9), `BUILTIN_FIELD_IDS = ['title', 'description', 'dueDate', 'startDate'] as const`
   - `dueDateValueSchema` — `{ date: 'YYYY-MM-DD', note?: string }` — the one day-claim shape, shared by `dueDate` and `startDate` (Plan 9's calendar reads the due claim and its timeline draws a bar only when a ticket carries both).
 
 - [ ] **Step 1: Write the failing test**
@@ -157,6 +160,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BUILTIN_FIELD_IDS,
   BUILTIN_TICKET_TYPE_SEEDS,
+  DEEPEST_RANK,
   SUB_TASK_TYPE_ID,
   builtinTicketTypeDefs,
   customFieldDefSchema,
@@ -228,6 +232,11 @@ describe('built-in seeds', () => {
       ['sub-task', 4],
     ]);
     expect(SUB_TASK_TYPE_ID).toBe('sub-task');
+    // DEEPEST_RANK is the rank the parent-required rule keys off (design
+    // decision 9). It must equal the deepest rank in the shipped ladder — if a
+    // future seed goes deeper, this assertion is the thing that says so.
+    expect(DEEPEST_RANK).toBe(Math.max(...BUILTIN_TICKET_TYPE_SEEDS.map((t) => t.rank)));
+    expect(DEEPEST_RANK).toBe(4);
     expect(BUILTIN_FIELD_IDS).toEqual(['title', 'description', 'dueDate', 'startDate']);
   });
 
@@ -315,6 +324,23 @@ export const ticketTypeDefSchema = z
 export type TicketTypeDef = z.infer<typeof ticketTypeDefSchema>;
 
 export const SUB_TASK_TYPE_ID = 'sub-task';
+
+/**
+ * The floor of the hierarchy — the built-in sub-task's rank. A ticket whose
+ * TYPE sits at this rank OR BELOW it (`rank >= DEEPEST_RANK`) requires a parent
+ * (owner decision 2026-08-20): the requirement follows the rank, so a custom
+ * type defined at rank 4 carries it exactly as `sub-task` does, and one defined
+ * at rank 7 — smaller work still — carries it a fortiori.
+ *
+ * Deliberately a constant and NOT a maximum computed over the workspace's
+ * defined types: a computed max would silently change the rule's meaning the
+ * moment an admin defined a deeper type — a workspace that had defined nothing
+ * below Task would suddenly find its tasks unable to sit at project root — and
+ * a refusal that shifts underfoot is exactly what this product refuses to ship.
+ * A fixed floor plus `>=` gives both properties at once: the meaning never
+ * moves, and nothing slips underneath it.
+ */
+export const DEEPEST_RANK = 4;
 
 export const BUILTIN_TICKET_TYPE_SEEDS = [
   { id: 'epic', name: 'Epic', icon: 'flag', rank: 1 },
@@ -1157,7 +1183,7 @@ git add packages/rule-engine/src/memory-context.ts packages/rule-engine/src/memo
 git commit -m "An in-memory EngineContext built by the same reducer the server uses — the fixture suite now sees tickets exactly as production does, direct children only, last type definition winning"
 ```
 
-### Task 5: Hierarchy checks for ticket.created — rank, sub-task, cross-project, and the forced preconditions
+### Task 5: Hierarchy checks for ticket.created — rank, the deepest-rank parent rule, cross-project, and the forced preconditions
 
 **Files:**
 - Create: `packages/rule-engine/src/checks/refusals.ts`
@@ -1168,10 +1194,10 @@ git commit -m "An in-memory EngineContext built by the same reducer the server u
 - Modify: `packages/rule-engine/src/evaluate.ts` (add the `ticket.created` case to the dispatch)
 
 **Interfaces:**
-- Consumes: `EngineContext`, `EngineVerdict`, `evaluateEvent` dispatch (Plan 2); `buildMemoryContext` (Task 4); `ticketCreatedPayload`, `TicketState`, `TicketTypeDef`, `SUB_TASK_TYPE_ID`, `makeEnvelope` (`@gisik-nokma/domain`).
+- Consumes: `EngineContext`, `EngineVerdict`, `evaluateEvent` dispatch (Plan 2); `buildMemoryContext` (Task 4); `ticketCreatedPayload`, `TicketState`, `TicketTypeDef`, `SUB_TASK_TYPE_ID`, `DEEPEST_RANK`, `makeEnvelope` (`@gisik-nokma/domain`).
 - Produces:
   - `checkTicketCreated(env: EventEnvelope, ctx: EngineContext): Promise<EngineVerdict>`
-  - `REFUSALS` (const map of the fixed reason strings), `rankRefusal(childTypeName, parentTypeName): string`, `parentTerminalRefusal(parentTitle, stateName, move: 'add' | 'move'): string`, `fieldKindRefusal(fieldName, needsPhrase): string`, `refuse(rule, reason): EngineVerdict`, `ACCEPT: EngineVerdict`
+  - `REFUSALS` (const map of the fixed reason strings), `rankRefusal(childTypeName, parentTypeName): string`, `deepestRankParentRefusal(typeName): string`, `parentTerminalRefusal(parentTitle, stateName, move: 'add' | 'move'): string`, `fieldKindRefusal(fieldName, needsPhrase): string`, `refuse(rule, reason): EngineVerdict`, `ACCEPT: EngineVerdict`
   - `getTicketState(ctx, id): Promise<TicketState | null>`, `getTicketTypeDef(ctx, id): Promise<TicketTypeDef | null>` (typed wrappers over `ctx.getEntityState`)
   - test-support builders shared by Tasks 6–7: `WS`, `PROJECT`, `PROJECT_B`, `WF`, `EPIC`, `STORY`, `TASK`, `SUBTASK`, `typeDefined(def)`, `created(id, typeId, parentId, projectId?)`
 
@@ -1259,11 +1285,11 @@ describe('checkTicketCreated', () => {
     });
   });
 
-  it('planted defect: a sub-task without a parent', async () => {
+  it('planted defect: a sub-task without a parent — the deepest rank always belongs to something', async () => {
     expect(await checkTicketCreated(created(NEW, 'sub-task', null), baseCtx())).toEqual({
       refused: true,
-      rule: 'hierarchy.sub-task-parent-required',
-      reason: 'A sub-task always belongs to a parent ticket. Pick the ticket this sub-task is part of.',
+      rule: 'hierarchy.deepest-rank-parent-required',
+      reason: '"Sub-task" is the smallest kind of work, so it always belongs to a parent ticket. Pick the ticket this one is part of.',
     });
   });
 
@@ -1329,8 +1355,6 @@ export const REFUSALS = {
     "This ticket type's workflow has not been defined yet, so the ticket would have no status.",
   'hierarchy.unknown-parent': 'The chosen parent ticket does not exist in this workspace.',
   'hierarchy.cross-project': 'The parent is in a different project. Pick a parent from the same project.',
-  'hierarchy.sub-task-parent-required':
-    'A sub-task always belongs to a parent ticket. Pick the ticket this sub-task is part of.',
   'hierarchy.cycle':
     'This move would put the ticket inside one of its own sub-items, making a loop. A ticket cannot contain itself.',
   'field.unknown': "This ticket's type has no such field. Add the field to the ticket type first.",
@@ -1339,6 +1363,16 @@ export const REFUSALS = {
 
 export function rankRefusal(childTypeName: string, parentTypeName: string): string {
   return `"${childTypeName}" cannot go under "${parentTypeName}": a ticket's parent must be a bigger kind of work.`;
+}
+
+/**
+ * Owner decision (2026-08-20, coordination doc sign-off table): a ticket whose
+ * type sits at the deepest rank always belongs to a parent. The reason names
+ * the TYPE rather than saying "sub-task", because the built-in sub-task is only
+ * the most common type this bites — any custom type at the same rank raises it.
+ */
+export function deepestRankParentRefusal(typeName: string): string {
+  return `"${typeName}" is the smallest kind of work, so it always belongs to a parent ticket. Pick the ticket this one is part of.`;
 }
 
 export function fieldKindRefusal(fieldName: string, needsPhrase: string): string {
@@ -1377,12 +1411,12 @@ import { SUB_TASK_TYPE_ID, ticketCreatedPayload } from '@gisik-nokma/domain';
 import type { EngineContext } from '../engine-context';
 import type { EngineVerdict } from '../evaluate';
 import { getTicketState, getTicketTypeDef } from './context-helpers';
-import { ACCEPT, rankRefusal, refuse } from './refusals';
+import { ACCEPT, deepestRankParentRefusal, rankRefusal, refuse } from './refusals';
 
 /**
  * Hierarchy sanity for ticket.created. Check order is deliberate — the most
  * fundamental truth names the refusal: unknown type → workflow undefined →
- * (root: sub-task rule) → unknown parent → cross-project → rank →
+ * (root: deepest-rank rule) → unknown parent → cross-project → rank →
  * parent-terminal (Step 7c — the remediable contradiction comes last).
  */
 export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext): Promise<EngineVerdict> {
@@ -1395,7 +1429,12 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
   if (!workflow) return refuse('ticket.workflow-undefined');
 
   if (p.parentId === null) {
-    if (type.id === SUB_TASK_TYPE_ID) return refuse('hierarchy.sub-task-parent-required');
+    // First pass keys off the built-in seed id; Step 7e generalises it to the
+    // rank (owner decision 2026-08-20). The rule id and the reason are already
+    // the final ones, so no test written here has to churn twice.
+    if (type.id === SUB_TASK_TYPE_ID) {
+      return refuse('hierarchy.deepest-rank-parent-required', deepestRankParentRefusal(type.name));
+    }
     return ACCEPT;
   }
 
@@ -1500,11 +1539,88 @@ In `packages/rule-engine/src/checks/hierarchy.ts`, extend the `./refusals` impor
 Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/checks/hierarchy.test.ts`
 Expected: PASS (9 tests).
 
+- [ ] **Step 7d: Write the failing tests — a CUSTOM type at the deepest rank (owner decision 2026-08-20)**
+
+The owner overruled the "built-in `sub-task` only" reading: the parent requirement follows the **rank**, so a workspace that invents a `Checklist item` at rank 4 gets the same refusal, with its own name in the reason — and so does a `Micro step` at rank 7, which is smaller work still and cannot coherently be exempt. The refusals come first, the accepting twin right after — the twin is what stops Step 7e from over-refusing the whole type into uselessness.
+
+Append inside the `checkTicketCreated` describe block in `packages/rule-engine/src/checks/hierarchy.test.ts` (both defs are local to this pair — test-support's shared builders stay the built-in ladder):
+
+```ts
+  // Workspace-invented types at and below sub-task's depth. Local to this pair
+  // on purpose: the shared builders describe the built-in ladder.
+  const CHECKLIST: TicketTypeDef = {
+    id: 'checklist-item', name: 'Checklist item', icon: 'list', rank: 4, workflowId: 'wf-basic', fields: [],
+  };
+  const MICRO_STEP: TicketTypeDef = {
+    id: 'micro-step', name: 'Micro step', icon: 'list', rank: 7, workflowId: 'wf-basic', fields: [],
+  };
+  const checklistCtx = () =>
+    buildMemoryContext([WF], [
+      typeDefined(STORY), typeDefined(CHECKLIST), typeDefined(MICRO_STEP), created(PARENT, 'story', null),
+    ]);
+
+  it('planted defect: a CUSTOM type at the deepest rank, cast at project root — the rule follows the rank, not the id', async () => {
+    expect(await checkTicketCreated(created(NEW, 'checklist-item', null), checklistCtx())).toEqual({
+      refused: true,
+      rule: 'hierarchy.deepest-rank-parent-required',
+      reason: '"Checklist item" is the smallest kind of work, so it always belongs to a parent ticket. Pick the ticket this one is part of.',
+    });
+
+    // …and nothing slips underneath the floor: rank 7 is smaller work than a
+    // sub-task, so exempting it would invert the rule's own justification.
+    // This assertion is the standing guard for the `>=` in Step 7e.
+    expect(await checkTicketCreated(created(NEW, 'micro-step', null), checklistCtx())).toEqual({
+      refused: true,
+      rule: 'hierarchy.deepest-rank-parent-required',
+      reason: '"Micro step" is the smallest kind of work, so it always belongs to a parent ticket. Pick the ticket this one is part of.',
+    });
+  });
+
+  it('accepts the same custom deepest-rank type once it names a parent', async () => {
+    expect(await checkTicketCreated(created(NEW, 'checklist-item', PARENT), checklistCtx())).toEqual({ refused: false });
+  });
+```
+
+Extend that file's imports with `import type { TicketTypeDef } from '@gisik-nokma/domain';`.
+
+Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/checks/hierarchy.test.ts`
+Expected: FAIL on the refusal test — both custom types are accepted at project root (`{ refused: false }`) because Step 5's check still asks whether the id is `sub-task`. The accepting twin already passes; it stands guard against over-refusal once Step 7e lands.
+
+- [ ] **Step 7e: Generalise the check from the built-in id to the rank**
+
+In `packages/rule-engine/src/checks/hierarchy.ts`, replace `SUB_TASK_TYPE_ID` in the `@gisik-nokma/domain` import with `DEEPEST_RANK`, and replace the id test inside `checkTicketCreated`'s `p.parentId === null` branch with:
+
+```ts
+    // Owner decision (2026-08-20): the parent requirement follows the RANK, not
+    // the built-in id — the built-in sub-task and any custom type an admin
+    // defines at that rank or below it all carry it.
+    //
+    // `>=` rather than `===`: the rule's justification is that the smallest
+    // kind of work always belongs to something bigger, so a type DEEPER than
+    // sub-task is smaller still and cannot coherently be exempt — `===` would
+    // leave an escape hatch where defining rank 5 floats your tickets free.
+    //
+    // DEEPEST_RANK stays a fixed constant rather than a max computed over the
+    // workspace's defined types: a computed max would silently change this
+    // refusal's meaning as the type inventory changed, and a refusal that
+    // shifts underfoot is exactly what this product refuses to ship. Fixed
+    // floor plus `>=` gives both — the meaning never moves, and nothing slips
+    // underneath it.
+    if (type.rank >= DEEPEST_RANK) {
+      return refuse('hierarchy.deepest-rank-parent-required', deepestRankParentRefusal(type.name));
+    }
+```
+
+Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/checks/hierarchy.test.ts`
+Expected: PASS (11 tests) — the built-in sub-task case still refuses (it is at rank 4), and both custom-type cases now behave.
+Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run`
+Expected: PASS.
+
 - [ ] **Step 8: Commit**
 
 ```bash
 git add packages/rule-engine/src/checks/refusals.ts packages/rule-engine/src/checks/context-helpers.ts packages/rule-engine/src/checks/test-support.ts packages/rule-engine/src/checks/hierarchy.ts packages/rule-engine/src/checks/hierarchy.test.ts packages/rule-engine/src/evaluate.ts
-git commit -m "Creation now answers for the hierarchy: rank order, sub-tasks need parents, no cross-project grafts, and a finished parent refuses new live work until it reopens — every precondition the checks force refusing in the user's language"
+git commit -m "Creation now answers for the hierarchy: rank order, the deepest rank always belongs to a parent — the built-in sub-task and any custom type an admin puts beside it alike — no cross-project grafts, and a finished parent refuses new live work until it reopens, every precondition the checks force refusing in the user's language"
 ```
 
 ### Task 6: Hierarchy checks for ticket.reparented — cycles named as loops, plus rank and project again
@@ -1518,7 +1634,9 @@ git commit -m "Creation now answers for the hierarchy: rank order, sub-tasks nee
 - Consumes: everything Task 5 produced; `ticketReparentedPayload` (`@gisik-nokma/domain`).
 - Produces: `checkTicketReparented(env: EventEnvelope, ctx: EngineContext): Promise<EngineVerdict>`.
 
-**Why the cycle check is load-bearing:** with strict rank ordering a cycle looks unreachable — but `ticket-type.defined` can re-define a type's rank (last definition wins), after which a rank-legal reparent can close a loop. The planted defect below constructs exactly that. Check order: unknown ticket → unknown type → (to root: sub-task rule) → self/cycle → cross-project → rank → parent-terminal (Step 5c) — a loop is named as a loop even when rank is also violated.
+**Why the cycle check is load-bearing:** with strict rank ordering a cycle looks unreachable — but `ticket-type.defined` can re-define a type's rank (last definition wins), after which a rank-legal reparent can close a loop. The planted defect below constructs exactly that. Check order: unknown ticket → unknown type → (to root: deepest-rank rule) → self/cycle → cross-project → rank → parent-terminal (Step 5c) — a loop is named as a loop even when rank is also violated.
+
+**On the deepest-rank rule here:** Task 5 Step 7e already generalised it from the built-in id to `type.rank >= DEEPEST_RANK`, so this task's check ships rank-based from the start — a sub-task, a workspace's own rank-4 type, and anything it defines deeper are all refused when cast loose to project root, each named in its own reason.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1553,7 +1671,7 @@ describe('checkTicketReparented', () => {
     expect(await checkTicketReparented(reparent(C, A), chainCtx())).toEqual({ refused: false });
   });
 
-  it('accepts moving a non-sub-task to project root', async () => {
+  it('accepts moving a ticket above the deepest rank to project root', async () => {
     expect(await checkTicketReparented(reparent(C, null), chainCtx())).toEqual({ refused: false });
   });
 
@@ -1610,8 +1728,8 @@ describe('checkTicketReparented', () => {
     ]);
     expect(await checkTicketReparented(reparent(B, null), ctx)).toEqual({
       refused: true,
-      rule: 'hierarchy.sub-task-parent-required',
-      reason: 'A sub-task always belongs to a parent ticket. Pick the ticket this sub-task is part of.',
+      rule: 'hierarchy.deepest-rank-parent-required',
+      reason: '"Sub-task" is the smallest kind of work, so it always belongs to a parent ticket. Pick the ticket this one is part of.',
     });
   });
 
@@ -1653,7 +1771,11 @@ export async function checkTicketReparented(env: EventEnvelope, ctx: EngineConte
   if (!type) return refuse('ticket.unknown-type');
 
   if (p.newParentId === null) {
-    if (type.id === SUB_TASK_TYPE_ID) return refuse('hierarchy.sub-task-parent-required');
+    // Same rank rule as creation (Task 5 Step 7e): the floor of the hierarchy
+    // always belongs to a parent — whichever type sits at it, or beneath it.
+    if (type.rank >= DEEPEST_RANK) {
+      return refuse('hierarchy.deepest-rank-parent-required', deepestRankParentRefusal(type.name));
+    }
     return ACCEPT;
   }
 
@@ -1767,7 +1889,7 @@ Expected: PASS.
 
 ```bash
 git add packages/rule-engine/src/checks/hierarchy.ts packages/rule-engine/src/checks/reparent.test.ts packages/rule-engine/src/evaluate.ts
-git commit -m "Reparenting cannot make loops, cross projects, invert rank, or slip live work under a finished parent — and the cycle check earns its keep with a planted defect where a rank re-definition made the loop rank-legal"
+git commit -m "Reparenting cannot make loops, cross projects, invert rank, cast the deepest rank loose to project root, or slip live work under a finished parent — and the cycle check earns its keep with a planted defect where a rank re-definition made the loop rank-legal"
 ```
 
 ### Task 7: Field claim checks for ticket.field_set — unknown fields, kind mismatches, and the title that cannot vanish
@@ -2045,7 +2167,8 @@ git commit -m "Field claims are checked against what the type declared: unknown 
 - Create: `packages/rule-engine/fixtures/parent-terminal-with-open-children.json`
 - Create: `packages/rule-engine/fixtures/parent-terminal-all-children-done.json`
 - Create: `packages/rule-engine/fixtures/created-rank-violation.json`
-- Create: `packages/rule-engine/fixtures/created-rank-legal.json`
+- Create: `packages/rule-engine/fixtures/created-rank-legal.json` (doubles as the accepting twin for the deepest-rank refusal — Step 4)
+- Create: `packages/rule-engine/fixtures/created-deepest-rank-no-parent.json`
 - Create: `packages/rule-engine/fixtures/reparent-cycle-after-rank-redefinition.json`
 - Create: `packages/rule-engine/fixtures/reparent-legal-grandchild-up.json`
 - Create: `packages/rule-engine/fixtures/field-set-unknown-field.json`
@@ -2058,7 +2181,7 @@ git commit -m "Field claims are checked against what the type declared: unknown 
 
 **Interfaces:**
 - Consumes: Plan 2's fixture format `{name, workflowDefs: WorkflowDef[], memberships?, priorEvents, candidateEvent, expected}` and runner; `buildMemoryContext` (Task 4); `evaluateEvent` with the Task 5–7 routing.
-- Produces: twelve fixtures that run identically in every build that runs the shared suite (spec §7: "One shared fixture suite runs against the rule engine in client and server builds, so the two can never quietly disagree").
+- Produces: thirteen fixtures that run identically in every build that runs the shared suite (spec §7: "One shared fixture suite runs against the rule engine in client and server builds, so the two can never quietly disagree").
 
 **Runner semantics (load-bearing, spell it in the runner's doc comment):** `priorEvents` are folded into the context WITHOUT evaluation — they are the accepted past. ONLY `candidateEvent` goes through `evaluateEvent`. This is why the rank re-definition event inside the cycle fixture is not itself refused, and why these fixtures compose with Plan 2's without re-litigating history.
 
@@ -2200,7 +2323,7 @@ Expected: PASS (Plan 2's fixtures only, possibly after the prior-event additions
 }
 ```
 
-- [ ] **Step 4: Write the rank pair**
+- [ ] **Step 4: Write the rank pair — the violation, and a twin that guards two refusals at once**
 
 `packages/rule-engine/fixtures/created-rank-violation.json`:
 
@@ -2248,11 +2371,11 @@ Expected: PASS (Plan 2's fixtures only, possibly after the prior-event additions
 }
 ```
 
-`packages/rule-engine/fixtures/created-rank-legal.json` — the accepting twin (same world, a task under the story):
+`packages/rule-engine/fixtures/created-rank-legal.json` — the accepting twin. It carries a workspace-invented `Checklist item` at rank 4 and creates one **under** the story, so one candidate guards two refusals from over-firing: `hierarchy.rank` (4 under 2 is legal) and `hierarchy.deepest-rank-parent-required` (the deepest rank is fine once it names a parent — Step 4a is its planted defect). One twin, two guards, no near-duplicate fixture:
 
 ```json
 {
-  "name": "a task created under a story is accepted",
+  "name": "a custom type at the deepest rank, created under a story, is accepted — rank-legal and its parent named",
   "workflowDefs": [ {
     "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",
     "states": [
@@ -2275,18 +2398,76 @@ Expected: PASS (Plan 2's fixtures only, possibly after the prior-event additions
       "entity": { "kind": "ticket-type", "id": "task" },
       "payload": { "id": "task", "name": "Task", "icon": "check", "rank": 3, "workflowId": "wf-basic", "fields": [] },
       "actorId": "user-kiro", "origin": "server", "clientTime": "2026-08-20T09:00:01.000Z", "serverTime": "2026-08-20T09:00:01.100Z", "seq": 1 },
-    { "id": "01J9GEV3000000000000000000", "workspaceId": "01J9GWS0000000000000000000", "type": "ticket.created", "version": 1,
+    { "id": "01J9GEV3000000000000000000", "workspaceId": "01J9GWS0000000000000000000", "type": "ticket-type.defined", "version": 1,
+      "entity": { "kind": "ticket-type", "id": "checklist-item" },
+      "payload": { "id": "checklist-item", "name": "Checklist item", "icon": "list", "rank": 4, "workflowId": "wf-basic", "fields": [] },
+      "actorId": "user-kiro", "origin": "server", "clientTime": "2026-08-20T09:00:02.000Z", "serverTime": "2026-08-20T09:00:02.100Z", "seq": 1 },
+    { "id": "01J9GEV4000000000000000000", "workspaceId": "01J9GWS0000000000000000000", "type": "ticket.created", "version": 1,
       "entity": { "kind": "ticket", "id": "01J9GPAR000000000000000000" },
       "payload": { "typeId": "story", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Shop compliance" },
-      "actorId": "user-kiro", "origin": "web", "clientTime": "2026-08-20T09:00:02.000Z", "serverTime": "2026-08-20T09:00:02.100Z", "seq": 1 }
+      "actorId": "user-kiro", "origin": "web", "clientTime": "2026-08-20T09:00:03.000Z", "serverTime": "2026-08-20T09:00:03.100Z", "seq": 1 }
   ],
   "candidateEvent": {
     "id": "01J9GCND000000000000000000", "workspaceId": "01J9GWS0000000000000000000", "type": "ticket.created", "version": 1,
     "entity": { "kind": "ticket", "id": "01J9GNEW000000000000000000" },
-    "payload": { "typeId": "task", "projectId": "01J9GPRJ000000000000000000", "parentId": "01J9GPAR000000000000000000", "title": "Renew trade licence" },
-    "actorId": "user-kiro", "origin": "web", "clientTime": "2026-08-20T09:00:03.000Z", "serverTime": "2026-08-20T09:00:03.100Z", "seq": 1
+    "payload": { "typeId": "checklist-item", "projectId": "01J9GPRJ000000000000000000", "parentId": "01J9GPAR000000000000000000", "title": "Photograph the renewed licence" },
+    "actorId": "user-kiro", "origin": "web", "clientTime": "2026-08-20T09:00:04.000Z", "serverTime": "2026-08-20T09:00:04.100Z", "seq": 1
   },
   "expected": { "refused": false }
+}
+```
+
+- [ ] **Step 4a: Write the deepest-rank planted defect (owner decision 2026-08-20 — the rank, not the id)**
+
+Same world as the twin above, same custom type, one difference: nothing is named as its parent. The refusal has to name **`Checklist item`**, not "sub-task" — that is the whole point of the owner's overrule, and a fixture asserting the literal reason is what makes the copy provable outside the unit tests.
+
+`packages/rule-engine/fixtures/created-deepest-rank-no-parent.json`:
+
+```json
+{
+  "name": "a custom type at the deepest rank is refused at project root, named as itself",
+  "workflowDefs": [ {
+    "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+    "states": [
+      { "id": "todo", "name": "To do", "category": "open" },
+      { "id": "doing", "name": "Doing", "category": "active" },
+      { "id": "done", "name": "Done", "category": "terminal" }
+    ],
+    "transitions": [
+      { "from": "*", "to": "todo", "rules": [] },
+      { "from": "*", "to": "doing", "rules": [] },
+      { "from": "*", "to": "done", "rules": [] }
+    ]
+  } ],
+  "priorEvents": [
+    { "id": "01J9GEV1000000000000000000", "workspaceId": "01J9GWS0000000000000000000", "type": "ticket-type.defined", "version": 1,
+      "entity": { "kind": "ticket-type", "id": "story" },
+      "payload": { "id": "story", "name": "Story", "icon": "book", "rank": 2, "workflowId": "wf-basic", "fields": [] },
+      "actorId": "user-kiro", "origin": "server", "clientTime": "2026-08-20T09:00:00.000Z", "serverTime": "2026-08-20T09:00:00.100Z", "seq": 1 },
+    { "id": "01J9GEV2000000000000000000", "workspaceId": "01J9GWS0000000000000000000", "type": "ticket-type.defined", "version": 1,
+      "entity": { "kind": "ticket-type", "id": "task" },
+      "payload": { "id": "task", "name": "Task", "icon": "check", "rank": 3, "workflowId": "wf-basic", "fields": [] },
+      "actorId": "user-kiro", "origin": "server", "clientTime": "2026-08-20T09:00:01.000Z", "serverTime": "2026-08-20T09:00:01.100Z", "seq": 1 },
+    { "id": "01J9GEV3000000000000000000", "workspaceId": "01J9GWS0000000000000000000", "type": "ticket-type.defined", "version": 1,
+      "entity": { "kind": "ticket-type", "id": "checklist-item" },
+      "payload": { "id": "checklist-item", "name": "Checklist item", "icon": "list", "rank": 4, "workflowId": "wf-basic", "fields": [] },
+      "actorId": "user-kiro", "origin": "server", "clientTime": "2026-08-20T09:00:02.000Z", "serverTime": "2026-08-20T09:00:02.100Z", "seq": 1 },
+    { "id": "01J9GEV4000000000000000000", "workspaceId": "01J9GWS0000000000000000000", "type": "ticket.created", "version": 1,
+      "entity": { "kind": "ticket", "id": "01J9GPAR000000000000000000" },
+      "payload": { "typeId": "story", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Shop compliance" },
+      "actorId": "user-kiro", "origin": "web", "clientTime": "2026-08-20T09:00:03.000Z", "serverTime": "2026-08-20T09:00:03.100Z", "seq": 1 }
+  ],
+  "candidateEvent": {
+    "id": "01J9GCND000000000000000000", "workspaceId": "01J9GWS0000000000000000000", "type": "ticket.created", "version": 1,
+    "entity": { "kind": "ticket", "id": "01J9GNEW000000000000000000" },
+    "payload": { "typeId": "checklist-item", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Photograph the renewed licence" },
+    "actorId": "user-kiro", "origin": "web", "clientTime": "2026-08-20T09:00:04.000Z", "serverTime": "2026-08-20T09:00:04.100Z", "seq": 1
+  },
+  "expected": {
+    "refused": true,
+    "rule": "hierarchy.deepest-rank-parent-required",
+    "reason": "\"Checklist item\" is the smallest kind of work, so it always belongs to a parent ticket. Pick the ticket this one is part of."
+  }
 }
 ```
 
@@ -2686,7 +2867,7 @@ Expected: PASS (Plan 2's fixtures only, possibly after the prior-event additions
 }
 ```
 
-- [ ] **Step 7: Run the fixture suite — all twelve new fixtures plus Plan 2's must pass**
+- [ ] **Step 7: Run the fixture suite — all thirteen new fixtures plus Plan 2's must pass**
 
 Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/fixtures.test.ts`
 Expected: PASS. If `parent-terminal-with-open-children` fails on the rule name, align `expected.rule` with the id Plan 2 actually published for the parent-terminal invariant (Coordination table) — that is the ONLY permitted edit to `expected`.
@@ -2695,7 +2876,7 @@ Expected: PASS. If `parent-terminal-with-open-children` fails on the rule name, 
 
 ```bash
 git add packages/rule-engine/fixtures packages/rule-engine/src/fixtures.test.ts
-git commit -m "Twelve end-to-end fixtures: every hierarchy and field refusal proven against a planted defect through the real engine, with accepting twins so the suite cannot pass by refusing everything"
+git commit -m "Thirteen end-to-end fixtures: every hierarchy and field refusal proven against a planted defect through the real engine — including a workspace's own deepest-rank type refused at project root under its own name — with accepting twins so the suite cannot pass by refusing everything"
 ```
 
 ### Task 9: proj_ticket_types — custom types become readable server state
@@ -3889,11 +4070,11 @@ git commit -m "Ticket history is the ledger filtered, not a summary: every claim
 - ⚙️ **Ticket type system** — built-in ladder epic(1)/story(2)/task(3)/sub-task(4) as seed data plus custom reusable types defined by `ticket-type.defined` events: name, icon, rank, workflow binding, and typed custom fields (text, number, date, select, person), Zod-validated, last definition wins. `packages/domain/src/ticket-types.ts`
 - ⚙️ **Ticket event vocabulary** — `ticket.created`, `ticket.transitioned` (optional `cause` marks a reopen forced by arriving live work; the transitions log keeps it out), `ticket.assigned`, `ticket.collaborator_added/removed`, `ticket.field_set` (built-ins title/description/dueDate/startDate ride it; a due date and a start date are always `{date, note?}` claims), `ticket.reparented`, `comment.added` (opaque doc body), `attachment.added` (metadata only); unknown types refused at ingest. `packages/domain/src/events/ticket-events.ts`
 - ⚙️ **Ticket head-state reducer** — one pure fold (`applyTicketEvent`) shared by the server projection and the fixture suite; per-field provenance (actor + both clocks) on every claim. `packages/domain/src/ticket-state.ts`
-- ✅ **Hierarchy sanity refusals** — child rank must exceed parent rank, sub-tasks require a parent, cycles refused (load-bearing after rank re-definitions), cross-project parents refused, live work under a terminal parent refused toward an offered reopen (owner decision; terminal-under-terminal stays legal); every reason in plain language, every refusal proven against a planted defect. `packages/rule-engine/src/checks/hierarchy.ts`
+- ✅ **Hierarchy sanity refusals** — child rank must exceed parent rank, any type at or below the deepest rank requires a parent (the built-in `sub-task`, any custom type an admin defines beside it, and anything deeper — the rule follows the rank, not the id), cycles refused (load-bearing after rank re-definitions), cross-project parents refused, live work under a terminal parent refused toward an offered reopen (owner decision; terminal-under-terminal stays legal); every reason in plain language, every refusal proven against a planted defect. `packages/rule-engine/src/checks/hierarchy.ts`
 - ✅ **Field claim refusals** — unknown fields, per-kind mismatches with the field named, title never clearable; `null` clears everything else as an attributed claim. `packages/rule-engine/src/checks/fields.ts`
 - ⚙️ **Ticket projections** — `proj_ticket_types` (workspace-scoped type defs), `proj_tickets` (head state backing the engine's `getEntityState`/`getChildrenStates`), `proj_rollups` (direct-children counts per state category; derived progress is never authored); all rebuild-and-diff clean. `apps/server/src/projections/`
 - ✅ **Ticket history endpoint** — `GET /v1/tickets/:id/history`: the ledger filtered to one ticket, seq-ordered, actor and both clocks on every event, paged; no summarising. `apps/server/src/routes/ticket-history.ts`
-- ⚙️ **End-to-end planted-defect fixtures** — parent-terminal (invariant 3), rank, cycle-after-rank-redefinition, unknown field, kind mismatch, live-work-under-terminal-parent (create and reparent) — with accepting twins, in Plan 2's shared fixture format. `packages/rule-engine/fixtures/`
+- ⚙️ **End-to-end planted-defect fixtures** — parent-terminal (invariant 3), rank, custom-type-at-the-deepest-rank-without-a-parent, cycle-after-rank-redefinition, unknown field, kind mismatch, live-work-under-terminal-parent (create and reparent) — with accepting twins, in Plan 2's shared fixture format. `packages/rule-engine/fixtures/`
 ```
 
 - [ ] **Step 2: Create the test-cases bucket**
@@ -3910,7 +4091,7 @@ Mirrors `Features.md` §5. Status: `❌` not covered · `✅` covered · `🟡` 
 - 5.5 ✅ Every field claim carries actor + client time + server time; `null` clears with the clearing claim's provenance kept. (`ticket-state.test.ts`, `proj-tickets.test.ts`)
 - 5.6 ✅ Collaborators deduplicate on add; removing a non-collaborator is a no-op. (`ticket-state.test.ts`)
 - 5.7 ✅ Rank violations refused on create and reparent with the exact plain-language reason, equal ranks included. (`hierarchy.test.ts`, `reparent.test.ts`, `created-rank-violation.json`)
-- 5.8 ✅ A sub-task without a parent is refused at creation and when reparented to root. (`hierarchy.test.ts`, `reparent.test.ts`)
+- 5.8 ✅ A ticket whose type sits at or below the deepest rank is refused without a parent, at creation and when reparented to root, with its own type name in the reason. (`hierarchy.test.ts`, `reparent.test.ts`)
 - 5.9 ✅ Cycles refused: self-parent, and reparenting under a descendant after a rank re-definition made the loop rank-legal. (`reparent.test.ts`, `reparent-cycle-after-rank-redefinition.json`)
 - 5.10 ✅ Cross-project parents refused on create and reparent. (`hierarchy.test.ts`, `reparent.test.ts`)
 - 5.11 ✅ Forced preconditions refuse plainly: unknown type, unknown parent, unknown ticket, type's workflow undefined. (`hierarchy.test.ts`, `reparent.test.ts`, `fields.test.ts`)
@@ -3925,6 +4106,8 @@ Mirrors `Features.md` §5. Status: `❌` not covered · `✅` covered · `🟡` 
 - 5.20 🚫 Fixture parity in client builds — the suite is format-shared and ready, but no client build exists until the client plans land; parity runs are asserted there.
 - 5.21 ✅ Live work under a terminal parent is refused toward the offered reopen, on create and on reparent, with the parent's title and state named in the reason. (`hierarchy.test.ts`, `reparent.test.ts`, `created-under-terminal-parent.json`, `reparent-live-under-terminal-parent.json`)
 - 5.22 ✅ A terminal child moving under a terminal parent is accepted — nothing contradicts, nothing reopens. (`reparent.test.ts`, `reparent-terminal-under-terminal-parent.json`)
+- 5.23 ✅ A CUSTOM type defined at the deepest rank is refused at project root exactly as the built-in `sub-task` is, named as itself in the reason — and so is a custom type defined *below* that rank, because nothing slips underneath the floor. The requirement follows the rank, not the built-in id (owner decision 2026-08-20). (`hierarchy.test.ts`, `created-deepest-rank-no-parent.json`)
+- 5.24 ✅ The same custom deepest-rank type is accepted once it names a parent, and a type at a shallower rank still sits at project root untouched — the rank rule does not over-refuse. (`hierarchy.test.ts`, `created-rank-legal.json`)
 ```
 
 - [ ] **Step 3: Run the full suite one last time**
@@ -3936,7 +4119,7 @@ Expected: PASS across packages/domain, packages/rule-engine, apps/server.
 
 ```bash
 git add Features.md test-cases/05-tickets-hierarchy.md
-git commit -m "Catalogue the ticket domain in Features.md and test-cases in the same change set as the work: twenty-two scenarios, twenty-one covered by the tests landing with them, one honestly out of scope until client builds exist"
+git commit -m "Catalogue the ticket domain in Features.md and test-cases in the same change set as the work: twenty-four scenarios, twenty-three covered by the tests landing with them, one honestly out of scope until client builds exist"
 ```
 
 ---
@@ -3948,7 +4131,7 @@ Ambiguities and cross-plan unknowns, flagged rather than silently resolved. None
 1. **`WorkflowDef.initialStateId`.** Settled: Plan 2 defines `initialStateId` on `WorkflowDef`, and its `validateWorkflowDef` refuses an `initialStateId` naming no state (`unknown-initial-state`), per the coordination doc §3 — a ticket cannot exist without a status (spec §2: "A ticket's status is always a state of its attached workflow").
 2. **Parent-terminal rule id and reason.** Settled: the rule id is `parent-terminal-with-open-children` — Plan 2's published string (coordination doc §7); the reason string is Plan 2's. The two parent-terminal fixtures assert the rule id only.
 3. **`ticket.transitioned` registration overlap.** Plan 2 may have provisionally registered the event type for its own tests; Task 2 keeps exactly one registration with the contracted payload shape.
-4. **Sub-task rule for custom max-rank types.** Spec says "sub-tasks require a parent" — implemented for the built-in `sub-task` type id only. Whether a custom type should be able to declare "requires a parent" is a product question for the spec owner; not implemented here.
+4. **Parent-required for custom deepest-rank types.** **Settled by the owner (2026-08-20, coordination doc sign-off table), overruling Plan 8's Open question 6:** the requirement follows the **rank**, not the built-in id. Any ticket whose type sits at or below the deepest rank requires a parent — the built-in `sub-task` (rank 4), any custom type an admin defines at rank 4, and anything deeper; epic/story/task-rank types are unaffected, so an epic-rank custom type still sits at project root. Implemented as `type.rank >= DEEPEST_RANK` in both hierarchy checks (Task 5 Steps 7d–7e, Task 6 Step 3), refused as `hierarchy.deepest-rank-parent-required` with the type named in the reason, proven by `created-deepest-rank-no-parent.json` and its twin. Two things pinned so they are not "fixed" later, both argued in design decision 9: (i) `DEEPEST_RANK` is a fixed constant, not a max computed over defined types, so the refusal's meaning never shifts as the type inventory changes; (ii) the comparison is `>=`, not `===`, so nothing slips underneath the floor — a rank-7 type is smaller work than a sub-task and exempting it would invert the rule's own justification. Still open, and not this plan's: whether a type should be able to *declare* "requires a parent" independent of its rank. Nobody has asked for it; the rank answer covers the cases that exist.
 5. **Non-terminal child under a terminal parent.** Settled by the owner decision (2026-08-20, coordination doc): refused as `hierarchy.parent-terminal` with the reopen named in the reason as the remedy — clients offer to reopen the parent (its `ticket.transitioned` carrying `cause: { kind: 'reopened-for-child', childTicketId }`) and then re-submit; a terminal child under a terminal parent stays legal. Implemented in Tasks 5–6 and the Task 8 trio (design decision 8).
 6. **Project existence.** `ticket.created.projectId` is recorded as-is; validating it against a projects projection belongs to the plan that owns project events.
 7. **Who emits the built-in seed events.** `builtinTicketTypeDefs(defaultWorkflowId)` is ready; the workspace-bootstrap plan owns emitting the four `ticket-type.defined` events (and the default workflow binding) at workspace creation.
