@@ -428,7 +428,7 @@ git commit -m "Ticket types: the built-in ladder as seed data, custom types vali
   - **Constraint on `ticket.transitioned`'s `evidenceAttachmentId` (recorded here, enforced in Plan 7):** evidence must name an `attachment.added` of kind `'upload'` on the same ticket; a `'drive-reference'` is refused `attachment.evidence-drive-reference`, and an id that is neither is refused `attachment.evidence-unknown`. Neither refusal is a rule-engine rule and neither belongs to this plan — see Task 3's `attachment.added` reducer case for why `TicketState` cannot see an attachment at all. The `ticket.transitioned` payload itself does not change. Any text, test or fixture here that needs the rule id or its reason imports `RULE_EVIDENCE_DRIVE_REFERENCE` / `EVIDENCE_DRIVE_REFERENCE_REASON` from `@gisik-nokma/domain` (added by Plan 7) — the string is never retyped.
   - `makeEnvelope(partial: Partial<EventEnvelope> & Pick<EventEnvelope, 'type' | 'entity' | 'payload'>): EventEnvelope` — test builder used by every later task's tests.
 
-**Coordination note (stated once):** Plan 2 needed `ticket.transitioned` to exist for its own engine tests and may already have registered it. Keep exactly ONE registration, in this file, with the payload schema below — it is the contracted shape (`toStateId, comment?, evidenceAttachmentId?, cause?`). Delete Plan 2's provisional registration if one exists. The optional `cause` (`{ kind: 'reopened-for-child', childTicketId }`, shape defined by Plan 2's schema per the owner decision of 2026-08-20) is opaque reopen provenance: `proj_tickets`' `transitions` log keeps it out — the log shape `{toStateId, actorId, seq}` is unchanged; cause lives in the event payload, and the history endpoint renders it.
+**Coordination note (stated once):** Plan 2 needed `ticket.transitioned` to exist for its own engine tests and may already have registered it. Keep exactly ONE registration, in this file, with the payload schema below — it is the contracted shape (`toStateId, comment?, evidenceAttachmentId?, cause?`). Delete Plan 2's provisional registration if one exists. The optional `cause` (`{ kind: 'reopened-for-child', childTicketId }`, shape defined by Plan 2's schema per the owner decision of 2026-08-20) is opaque reopen provenance: `proj_tickets`' `transitions` log keeps it out — the log shape is `{toStateId, actorId, seq, workflowVersion}` and carries no `cause`; cause lives in the event payload, and the history endpoint renders it. (The per-entry `workflowVersion` is the owner decision of 2026-08-26, not part of this reopen decision; see coordination §4.)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -714,7 +714,7 @@ type TicketState = {
   assigneeId: string | null;
   collaboratorIds: string[];
   fields: Record<string, FieldClaim>;
-  transitions: { toStateId: string; actorId: string; seq: number }[];
+  transitions: { toStateId: string; actorId: string; seq: number; workflowVersion: number }[];
 };
 
 export type TicketStateDeps = {
@@ -805,7 +805,7 @@ describe('applyTicketEvent', () => {
     );
     expect(state.stateId).toBe('done');
     expect(state.stateCategory).toBe('terminal');
-    expect(state.transitions).toEqual([{ toStateId: 'done', actorId: 'user-kiro', seq: 1 }]);
+    expect(state.transitions).toEqual([{ toStateId: 'done', actorId: 'user-kiro', seq: 1, workflowVersion: 1 }]);
   });
 
   it('field_set preserves provenance per field — who claimed it, and both times', () => {
@@ -1010,7 +1010,15 @@ export function applyTicketEvent(
         stateId: p.toStateId,
         stateCategory: category,
         workflowVersion: wf.version,
-        transitions: [...state.transitions, { toStateId: p.toStateId, actorId: env.actorId, seq: env.seq }],
+        // The entry's `workflowVersion` is the version in whose vocabulary its
+        // `toStateId` is written — the ticket's own version at the moment the
+        // event applied, AFTER the forward fold this reducer performs on the
+        // line above. So it is `wf.version` (the def `p.toStateId` was just
+        // resolved against), never the pre-spread `state.workflowVersion`,
+        // which is the version the ticket sat at BEFORE this fold. RDU walks a
+        // candidate entry's id forward from this version through `stateMapping`
+        // before comparing, so a remapped state can no longer disarm four-eyes.
+        transitions: [...state.transitions, { toStateId: p.toStateId, actorId: env.actorId, seq: env.seq, workflowVersion: wf.version }],
       };
     }
     case 'ticket.assigned': {
@@ -3177,7 +3185,7 @@ type TicketState = {
   stateId: string; stateCategory: StateCategory;
   assigneeId: string | null; collaboratorIds: string[];
   fields: Record<string, FieldClaim>;
-  transitions: { toStateId: string; actorId: string; seq: number }[];
+  transitions: { toStateId: string; actorId: string; seq: number; workflowVersion: number }[];
 };
 ```
 
@@ -3756,7 +3764,7 @@ type TicketState = {
   stateId: string; stateCategory: StateCategory;
   assigneeId: string | null; collaboratorIds: string[];
   fields: Record<string, FieldClaim>;
-  transitions: { toStateId: string; actorId: string; seq: number }[];
+  transitions: { toStateId: string; actorId: string; seq: number; workflowVersion: number }[];
 };
 ```
 

@@ -1,7 +1,7 @@
 # Gisik Nokma — product design
 
 **Date:** 2026-08-20
-**Status:** awaiting review (design agreed section-by-section in the brainstorm session; this document records it)
+**Status:** approved and merged (PR #1). Design agreed section-by-section in the brainstorm session; this document records it. Owner decisions taken since, at plan review, are recorded in `docs/superpowers/plans/2026-08-20-00-series-coordination.md` and folded back into the sections here that they change — the Google Drive attachment rules in §2 and §4 arrived that way.
 **Lineage:** generalises the convenience-corner tracker (`reference/convenience-corner-tracker/`, upstream `24e2240`) — a board for one repository and one user — into a product. The base's ideas are inherited deliberately, not accidentally; where one could not survive the generalisation, the honest degradation is named.
 
 Gisik Nokma (Garo: *gisik* mind/memory, *nokma* the custodian who holds things in trust) is **the keeper of memory: project management software whose board structurally cannot lie about the work.**

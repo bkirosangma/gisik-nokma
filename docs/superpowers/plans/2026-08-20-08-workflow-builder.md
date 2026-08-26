@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** The Jira-style visual workflow builder and the ticket-type management UI — states as draggable nodes, transitions as drawn edges, the five-rule vocabulary behind proper pickers, live `validateWorkflowDef` validation, a publish flow that surfaces the server's stranded-state refusal as a state-mapping dialog, a three-template gallery, and admin gating end-to-end.
+**Goal:** The Jira-style visual workflow builder and the ticket-type management UI — states as draggable nodes, transitions as drawn edges, the five-rule vocabulary behind proper pickers, live `validateWorkflowDef` validation beside a separate `adviseWorkflowDef` advisory tier that warns without blocking, a publish flow that surfaces the server's stranded-state refusal as a state-mapping dialog, a three-template gallery, and admin gating end-to-end.
 
 **Architecture:** All builder logic and every React component live in `packages/app-core` (amendment 10 — shared views), split into a framework-free core (draft store, layout, rule summaries, issue anchoring, templates, event builders — plain TypeScript, unit-tested) and React components over it (React Flow canvas, inspectors, rule editors, panels, screens — component-tested in jsdom). `apps/web` contributes only thin Next.js pages and a `WorkflowAuthoringGateway` adapter over Plan 6's `DataSource`. The builder authors a `WorkflowDef` draft; `validateWorkflowDef` (the same pure function the server's ingest calls) runs on every change; publishing submits a `workflow.defined` event and renders every server refusal verbatim.
 
@@ -19,7 +19,7 @@
 - `packages/ui/src/tokens.ts` is the one colour origin (amendment 11) — no colour literal anywhere else in any client; this plan's only hex values are the token additions it makes to that file.
 - Shared React views live in `packages/app-core`; views never speak HTTP directly (amendment 10) — the builder consumes a `WorkflowAuthoringGateway` interface; `apps/web` implements it over `DataSource`.
 - `apps/web` is Next.js 15 App Router with the online `DataSource` (amendment 17).
-- Every refusal surfaced in the UI is proven against a planted defect before it is trusted (spec, honesty contract §6); every `validateWorkflowDef` issue code gets a planted-defect test (coverage table below).
+- Every refusal surfaced in the UI is proven against a planted defect before it is trusted (spec, honesty contract §6); every one of the eleven `validateWorkflowDef` issue codes gets a planted-defect test, and so does the one `adviseWorkflowDef` advisory code — whose test proves the opposite property, that publish stays *enabled* (coverage table below).
 - CODING_STANDARDS (`/Users/kiro/my_projects/CODING_STANDARDS.md`): BEM class names, intent-revealing identifiers, DIP (the gateway interface lives with its consumer), testing pyramid, validate at every boundary.
 - `reference/` is frozen — never edit anything under it. `Features.md` and `test-cases/` move in the same change set as the work (Task 15 + per-task commits). One PR per change, branched off `main`, merged only with explicit approval. Commits are prose that says what was found and why it matters.
 - ESM style per Plan 1: NodeNext resolution, explicit `.js` suffix on relative imports of `.ts` modules. `.tsx` modules are imported with their real `.tsx` extension, enabled by `allowImportingTsExtensions` — valid because these packages are never tsc-emitted (Next `transpilePackages` and vitest consume the sources directly).
@@ -48,11 +48,25 @@ type Rule =
   | { kind: 'require-different-user'; thanActorOf: { to: string } };
 type Issue = { code: string; message: string };
 declare function validateWorkflowDef(def: WorkflowDef): Issue[];
-// Issue codes (Plan 2 Task 3, amended by coordination decision 3):
+// Issue codes (Plan 2 Task 3, amended by coordination decision 3 and the
+// 2026-08-26 owner decisions) — eleven, every one of which BLOCKS publish:
 //   no-states, duplicate-state-id, no-terminal-state, unknown-transition-state,
 //   duplicate-transition, unreachable-state, terminal-no-inbound,
-//   unknown-initial-state, empty-restrict-to, rdu-unknown-state
+//   unknown-initial-state, empty-restrict-to, rdu-unknown-state,
+//   rdu-unenterable-state
 // Issues are ALL collected (the builder shows them all); order within each code follows definition order.
+
+// A SECOND, separate function — authoring warnings, NOT publish gates.
+type Advisory = { code: string; message: string };
+declare function adviseWorkflowDef(def: WorkflowDef): Advisory[];
+// Advisory codes: rdu-bypassable (suppressed when rdu-unenterable-state already
+// fired for the same rule).
+//
+// Advisories never enter validateWorkflowDef's array and never reach the rule
+// engine. This plan gates publish on validateWorkflowDef emptiness alone
+// (selectCanPublish, Task 1) and every template asserts it validates clean, so
+// a warning placed in that array would silently become a publish blocker.
+// Keeping the two arrays apart is the whole point of the second function.
 type WorkflowDefinedPayload = WorkflowDef & { stateMapping?: Record<string, string> };
 type PublishedWorkflowDef = WorkflowDefinedPayload;
 
@@ -74,8 +88,11 @@ Server behaviour this UI surfaces (never re-implements):
 
 - **Publishing** is a `workflow.defined` event, entity `{ kind: 'workflow', id: payload.id }`, admin-only (Plan 4 `checkRolePermission`: rule `permission.role`, reason `Only a workspace owner or admin can do this. Your role is ${role}.`).
 - **Version rule** (Plan 2, rule `workflow-version`): first publish must be version 1; the next must be latest+1.
-- **Stranding rule** (Plan 2, rule `workflow-state-mapping`): version N+1 that drops states present in version N is refused unless `stateMapping` covers **every** dropped state — whether or not a ticket sits in it (the conservative rule; Plan 2 Open question 6).
-- **Structural refusal** (Plan 2, rule `workflow-structure`): reason is `This workflow definition cannot be published: ${issue messages joined with ' '}` — the same messages this builder shows live.
+- **Stranding rule** (Plan 2, rule `workflow-state-mapping`): version N+1 that drops states present in version N is refused unless `stateMapping` covers **every** dropped state — whether or not a ticket sits in it. This is permanent semantics, settled by the owner on 2026-08-26 (coordination doc, *Owner decisions: the workflow engine's two open questions*); it is **not** a stopgap awaiting relaxation. The reason: the rule engine runs identically on client and server, proven by one shared fixture suite, and client replicas are visibility-scoped — a user who cannot see three tickets sitting in the dropped state computes occupancy 0 while the server computes 3. Making publish legality depend on occupancy would make the two engines disagree by construction, which is precisely what the shared-fixture promise exists to prevent. So occupancy is a **builder courtesy, never an engine input**: `getStateOccupancy` prefills the mapping dialog's counts and the dialog degrades honestly when that read fails, but no refusal anywhere depends on it. The copy follows: neither the refusal nor the dialog asserts in-flight tickets nobody counted (Pinned UI copy).
+- **Structural refusal** (Plan 2, rule `workflow-structure`): reason is `This workflow definition cannot be published: ${issue messages joined with ' '}` — the same messages this builder shows live. Because the engine joins **every** `validateWorkflowDef` message into this one refusal, an advisory placed in that array would become a refusal; that is the mechanical reason `adviseWorkflowDef` is a separate function.
+- **`rdu-unenterable-state`** (the eleventh issue code, owner-settled 2026-08-26): a `require-different-user` rule naming a state that no transition in this version enters. Message shape, for reference only — `A require-different-user rule on the transition from ${label(from)} to ${label(to)} refers to a move to "${targetName}", but nothing in this version enters that state, so the rule can never require a second person.`
+- **`rdu-bypassable`** (the one advisory code, from `adviseWorkflowDef` — a warning, never a gate): the guarded transition is reachable from `initialStateId` without ever entering the watched state, so on that path the rule finds no earlier performer. Message shape, for reference only — `A require-different-user rule on the transition from ${label(from)} to ${label(to)} watches the move to "${targetName}", but this move can be reached without ever entering "${targetName}"; on that path one person can make it alone.`
+- **Plan 2 owns both copies.** No test in this plan hardcodes either message: the issues panel and the advisory section are asserted against `validateWorkflowDef`'s and `adviseWorkflowDef`'s own output, exactly as Open question 9 already requires for `unknown-initial-state`. Only *this plan's own* copy — headings, footers, banners — is asserted character for character.
 - `ticket-type.defined` (Plan 3): payload is a `TicketTypeDef`, entity kind `ticket-type`, admin-only; the projection folds by **payload** id (last definition wins), so built-ins (`epic`, `story`, …) are edited by submitting a new definition with the same payload id under a fresh ULID entity id (the convention Plan 3's own tests use).
 
 `IngestResult` (Plan 1, served to clients through `DataSource.ingest`, amendment 10):
@@ -107,17 +124,21 @@ This plan executes in parallel with Plans 6/7/9 (after 1–5). Where Plan 5/6 su
 ## Design decisions (named here so nobody "fixes" them mid-execution)
 
 1. **`removeState` cascades the state's transitions but leaves `initialStateId` and `require-different-user` references dangling.** A dangling edge cannot render on a canvas, so edges from/to a deleted state go with it (standard canvas behaviour, matching React Flow's own node-deletion semantics). But the initial-state marker and a four-eyes rule's named move are things the author *wrote*; silently rewriting them would be its own small lie. They stay, dangle, and surface as `unknown-initial-state` / `rdu-unknown-state` issues the author resolves deliberately.
-2. **Issue anchoring pairs by code, not by global order.** `Issue` carries no structural pointer (`{ code, message }` only). `anchorIssues` recomputes each code's offender list from the def in definition order and zips it with that code's issues in order. Pairing per code makes anchoring robust to the reconciliation inserting `unknown-initial-state` anywhere in `validateWorkflowDef`'s global issue order. If a queue runs dry (copy drift), the issue degrades to a canvas-level anchor — never a crash. An additive `ref?` field on `Issue` is proposed upstream (Open question 7).
+2. **Issue anchoring pairs by code, not by global order.** `Issue` carries no structural pointer (`{ code, message }` only). `anchorIssues` recomputes each code's offender list from the def in definition order and zips it with that code's issues in order. Pairing per code makes anchoring robust to the reconciliation inserting `unknown-initial-state` anywhere in `validateWorkflowDef`'s global issue order. **The same robustness covers the eleventh code**: Plan 2 slots `rdu-unenterable-state` immediately after `rdu-unknown-state` in the validator's global order, and because anchoring never reads global position, that insertion needs **no anchoring change at all** — only a new offender computation keyed by the new code. If a queue runs dry (copy drift), the issue degrades to a canvas-level anchor — never a crash. An additive `ref?` field on `Issue` is proposed upstream (Open question 7).
+   `Advisory` is structurally identical to `Issue` (`{ code, message }`), so advisories go through **the same** `anchorIssues` — its signature is widened to a generic over `Issue | Advisory` rather than cloned into a sibling `anchorAdvisories`, because a sibling would duplicate the queue-and-zip logic that is the only interesting thing in the module.
 3. **The `require-field` picker is picker-only — no free text.** A typo'd field id would author a transition that can never legally fire: a rule that looks enforced and isn't, which is exactly the lie this product exists to kill. Choices are the three built-ins (`title`, `description`, `dueDate`) plus the union of custom fields on every ticket type currently bound to this workflow. A rule whose field is no longer among the choices renders with an inline warning, not silent acceptance.
 4. **Requires-parent follows the RANK, not the built-in id** — settled by the owner on 2026-08-20 (coordination doc sign-off table), overruling this plan's earlier reading. Any type defined at **or below** the deepest rank requires a parent: the built-in `sub-task` (rank 4), a workspace's own `Checklist item` at rank 4, and a `Micro step` at rank 7 — smaller work still, and so covered a fortiori. Epic/story/task-rank types are unaffected — an epic-rank custom type still sits at project root. The builder computes the flag as `rank >= DEEPEST_RANK`, importing the **same constant the engine refuses on** (Plan 3 design decision 9); it must never derive its own maximum from the loaded types, because in a workspace that has defined nothing below Task a computed max would make the builder promise that Task requires a parent while the server happily accepted one at project root — a UI describing a rule that isn't there is the exact failure this product exists to refuse. The rank-implications copy states the requirement plainly (see Pinned UI copy). Open question 6 records the settlement.
 5. **Canvas layout is presentation, not truth, and is not published.** Node positions live only in the draft (auto-layout on load via a dependency-free layered BFS from `initialStateId`; drags persist for the session). The `workflow.defined` payload carries no coordinates. Persisting layout later belongs in `/v1/me/preferences` (amendment 14) — Open question 3.
 6. **Ticket-type events mint a fresh entity ULID per submission; the payload id is the stable type key.** Matches Plan 3's own test convention (`entity.id` a ULID, `payload.id` = `'epic'`/`'invoice'`) and the envelope schema's ULID requirement on `entity.id`. Custom types get a ULID payload id at creation; built-ins keep their seed ids. Open question 5 flags the entity-stream consequence.
 7. **Built-in ticket types: name, icon, and workflow binding are editable; id and rank are locked in the UI.** The rank ladder epic(1)/story(2)/task(3)/sub-task(4) is what Plan 3's hierarchy checks lean on; re-ranking built-ins from a settings screen is a foot-gun with no user story. The server does not enforce this lock (last-definition-wins) — UI-only, flagged in Open questions.
 8. **The workflow builder ships on web (and desktop via app-core) only.** React Flow is a DOM library; RN gets no authoring canvas. Workflow authoring is admin work at a desk; the spec's mobile story (§5) is about working tickets, not authoring workflows.
+9. **Advisories are a second tier and must never gate publish** (owner decision, 2026-08-26). `adviseWorkflowDef` is a separate function from `validateWorkflowDef`, and this plan keeps the separation load-bearing at exactly one place: **`selectCanPublish` is `validateWorkflowDef` emptiness and nothing else** (Task 1). It does not call `adviseWorkflowDef`, does not union the two arrays, and does not "unify" them into one `selectProblems` — an executor who does that turns every advisory into a publish blocker and breaks the template tests, which is the failure this tier exists to make impossible. A distinct type name proves nothing under structural typing, so the guarantee is proven by a planted defect instead: a draft that trips `rdu-bypassable` and nothing else renders the advisory (Task 8) **while the Publish button stays enabled and the publish succeeds** (Task 9, where `PublishControls` exists). The advisory section is visually distinct from the issues list, carries its own BEM block, and says in its own heading that it blocks nothing.
 
 ## Planted-defect coverage table (every `validateWorkflowDef` code)
 
 Every code gets a component test that authors the broken def **through the canvas's own model** (the draft store the UI drives) and asserts the named issue renders in the issues panel. Two codes are unauthorable by pointer gestures because the store mints unique ids and cascades edges; they are planted through `loadDraft` — the same store entry point that cloned or previously-saved defs arrive through, so the defect is authored in the canvas's model, not injected around it.
+
+Eleven codes, every one of which blocks publish. The one **advisory** code sits below the table, in its own row set, because it is deliberately not one of these.
 
 | # | Issue code | Authoring route (store actions) | Test (Task 8, `validation.test.tsx`) |
 |---|---|---|---|
@@ -131,6 +152,15 @@ Every code gets a component test that authors the broken def **through the canva
 | 8 | `unknown-initial-state` | `removeState(initialStateId)` — decision 1 leaves the marker dangling | `plants unknown-initial-state by deleting the start state` |
 | 9 | `empty-restrict-to` | `addRule` then `updateRule` to `{ kind: 'restrict-to' }` with everything unpicked | `plants empty-restrict-to by unpicking everyone` |
 | 10 | `rdu-unknown-state` | `addRule` targeting state X, then `removeState(X)` | `plants rdu-unknown-state by deleting the watched state` |
+| 11 | `rdu-unenterable-state` | `removeTransition(1)` on the kanban draft (drops `doing → todo`, so nothing enters the start state any more), then `addRule(1, { kind: 'require-different-user', thanActorOf: { to: 'todo' } })` — a four-eyes rule watching a move nothing in this version makes | `plants rdu-unenterable-state by watching a state nothing enters` |
+
+**Advisory coverage (`adviseWorkflowDef`) — deliberately NOT in the table above, because it does not block publish:**
+
+| # | Advisory code | Authoring route (store actions) | Tests |
+|---|---|---|---|
+| A1 | `rdu-bypassable` | `addTransition('todo', 'done')` on the kanban draft (a fast track that skips Doing), then `addRule(4, { kind: 'require-different-user', thanActorOf: { to: 'doing' } })` — the guarded move is reachable without ever entering the watched state | Task 8, `validation.test.tsx`: `warns about a bypassable four-eyes rule without calling it an issue` · Task 9, `publish.test.tsx`: `an advisory does not gate publish — the button stays enabled and the publish commits` |
+
+That draft validates **clean** (`validateWorkflowDef` returns `[]`), which is the point. The Task 8 test asserts the advisory renders while the issues list still shows the all-clear; the Task 9 test mounts `IssuesPanel` beside `PublishControls` and asserts the advisory is on screen, the Publish button is enabled, and the submission commits. Without the pair, "advisories do not gate publish" is a convention rather than a guarantee.
 
 Server-refusal planted defects (surfaced verbatim, tested in Tasks 9 and 12): `workflow-state-mapping` (stranded state), `workflow-version` (stale publish), `permission.role` (non-admin publish), plus `invalid` envelope results.
 
@@ -141,13 +171,15 @@ All user-facing strings in one place; components and tests use these character-f
 | Where | Copy |
 |---|---|
 | Issues panel, clean | `No issues — this workflow can be published.` |
+| Advisories section heading | `Worth a look — none of these block publishing` |
+| Advisories section footer | `Advisories describe a workflow that is legal but may not do what you meant.` |
 | Publish button disabled title | `Fix the issues below first.` |
 | System rules panel heading | `System rules — in every workflow` |
 | System rules item 1 | `Provenance on everything: every move records who made it and when. "Done" always unfolds to "marked done by X on a date".` |
 | System rules item 2 | `Parents cannot outrun children: no ticket can enter a terminal state while any of its children is still open.` |
 | System rules footer | `These two sit above all workflows and cannot be authored away (product design, §4).` |
-| Mapping dialog heading | `Where do in-flight tickets go?` |
-| Mapping dialog body | `Version ${next} removes states that version ${prev} has. Every ticket sitting in a removed state must be sent to a real state — the server refuses a publish that would strand one.` |
+| Mapping dialog heading | `Every dropped state needs a destination` |
+| Mapping dialog body | `Version ${next} removes states that version ${prev} has. Publishing cannot see which tickets sit in which state, so every removed state needs a destination — occupied or not.` |
 | Mapping row count | `${n} tickets sit here today` (`1 ticket sits here today`; `counting tickets…` while loading; `ticket count unavailable` when the read fails) |
 | Mapping row picker label | `Send them to` |
 | Mapping confirm button | `Publish with this mapping` |
@@ -184,7 +216,7 @@ packages/app-core/                       # Plan 6 owns the scaffold; guard steps
     layout.ts             # layoutDraft (layered BFS from initialStateId), nextFreePosition, ANY_STATE_NODE_ID
     summaries.ts          # summarizeRule/summarizeRules + SummaryContext + summaryContextFor
     fields.ts             # FieldChoice, BUILTIN_FIELD_CHOICES, fieldChoicesFor (require-field picker source)
-    anchor-issues.ts      # IssueAnchor, AnchoredIssue, anchorIssues (per-code pairing)
+    anchor-issues.ts      # IssueAnchor, AnchoredIssue, AnchoredAdvisory, anchorIssues (per-code pairing; issues and advisories alike)
     templates.ts          # WORKFLOW_TEMPLATES (3 full payloads), cloneTemplate, draftFromTemplate
     gateway.ts            # WorkflowAuthoringGateway, WorkspaceMember, IngestResult (client-side mirror)
     fake-gateway.ts       # createFakeGateway — the in-memory test double every component test uses
@@ -205,7 +237,7 @@ packages/app-core/                       # Plan 6 owns the scaffold; guard steps
         restrict-to-editor.tsx        # assignee checkbox, role checkboxes, member picker
         require-field-editor.tsx      # field picker (built-ins + bound types), picker-only
         require-different-user-editor.tsx # inbound-target state picker + start-state note
-      issues-panel.tsx    # live validateWorkflowDef issues, anchored, click-to-select
+      issues-panel.tsx    # live validateWorkflowDef issues, anchored, click-to-select + the non-blocking adviseWorkflowDef section
       system-rules-panel.tsx # the two unauthorable invariants, static (spec §4)
       publish-controls.tsx   # publish button, gating, result banners
       state-mapping-dialog.tsx # stranded states, occupancy counts, target pickers
@@ -271,7 +303,7 @@ The canvas's single source of truth: an immutable `WorkflowDraft` behind a depen
   - `DraftActions`: `setWorkflowName`, `addState` (returns the new id), `renameState`, `setStateCategory`, `setStateBlocked`, `setInitialState`, `removeState`, `moveState`, `addTransition`, `removeTransition`, `addRule`, `updateRule`, `removeRule`, `select`, `loadDraft`
   - `createDraftStore(initial: WorkflowDraft): DraftStore`
   - Constructors: `newDraft(name: string): WorkflowDraft` (seeds one open state named `New`, marked initial), `draftFromPublished(published: PublishedWorkflowDef): WorkflowDraft` (strips `stateMapping`, records `base`)
-  - Selectors: `selectIssues(draft): Issue[]`, `selectCanPublish(draft): boolean`, `selectInboundTargetIds(def): string[]`
+  - Selectors: `selectIssues(draft): Issue[]`, `selectCanPublish(draft): boolean` — **`validateWorkflowDef` emptiness and nothing else; advisories are excluded by design (decision 9)** — `selectInboundTargetIds(def): string[]`
   - From `layout.ts`: `ANY_STATE_NODE_ID = 'any-state'`, `layoutDraft(def: WorkflowDef): Record<string, StatePosition>`, `nextFreePosition(positions): StatePosition`, `COLUMN_WIDTH = 260`, `ROW_HEIGHT = 140`
 
 - [ ] **Step 1: Guard — ensure `packages/app-core` exists and can run Vitest in jsdom**
@@ -576,7 +608,7 @@ Create `packages/app-core/test/workflow-builder/draft-store.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import type { WorkflowDef } from '@gisik-nokma/domain';
+import { adviseWorkflowDef, validateWorkflowDef, type WorkflowDef } from '@gisik-nokma/domain';
 import {
   createDraftStore,
   draftFromPublished,
@@ -751,6 +783,18 @@ describe('subscribe and selectors', () => {
     expect(selectCanPublish(clean.getState())).toBe(false);
   });
 
+  it('an advisory does not gate publish — selectCanPublish ignores adviseWorkflowDef', () => {
+    // a fast track that skips Doing, carrying a four-eyes rule that watches the
+    // move into Doing: legal, structurally clean, and bypassable on this path
+    const store = storeWith(kanbanDef());
+    store.actions.addTransition('todo', 'done');
+    store.actions.addRule(2, { kind: 'require-different-user', thanActorOf: { to: 'doing' } });
+    const draft = store.getState();
+    expect(validateWorkflowDef(draft.def)).toEqual([]);
+    expect(adviseWorkflowDef(draft.def).map((advisory) => advisory.code)).toEqual(['rdu-bypassable']);
+    expect(selectCanPublish(draft)).toBe(true);
+  });
+
   it('selectInboundTargetIds lists distinct transition targets in definition order', () => {
     const store = storeWith(kanbanDef());
     store.actions.addTransition('done', 'doing');
@@ -849,6 +893,14 @@ export function selectIssues(draft: WorkflowDraft): Issue[] {
   return validateWorkflowDef(draft.def);
 }
 
+/**
+ * Publish legality is validateWorkflowDef emptiness — advisories excluded.
+ * adviseWorkflowDef is NOT called here and its Advisory[] is never unioned in:
+ * an advisory is an authoring warning, and folding one into this predicate
+ * would turn every warning into a publish blocker (design decision 9). The
+ * issues panel renders advisories in their own section; this selector ignores
+ * them, and a planted defect in validation.test.tsx keeps it honest.
+ */
 export function selectCanPublish(draft: WorkflowDraft): boolean {
   return selectIssues(draft).length === 0;
 }
@@ -1020,7 +1072,7 @@ export * from './workflow-builder/index.js';
 - [ ] **Step 10: Run both tests to verify they pass**
 
 Run: `pnpm --filter @gisik-nokma/app-core exec vitest run test/workflow-builder/layout.test.ts test/workflow-builder/draft-store.test.ts`
-Expected: PASS (22 tests).
+Expected: PASS (23 tests).
 
 - [ ] **Step 11: Commit**
 
@@ -1044,14 +1096,15 @@ The three pure translation layers between the domain contract and the canvas: ru
 - Test: `packages/app-core/test/workflow-builder/anchor-issues.test.ts`
 
 **Interfaces:**
-- Consumes: `Rule`, `WorkflowDef`, `Issue`, `TicketTypeDef` from `@gisik-nokma/domain`.
+- Consumes: `Rule`, `WorkflowDef`, `Issue`, `Advisory`, `TicketTypeDef` from `@gisik-nokma/domain`.
 - Produces:
   - `type SummaryContext = { stateName(stateId: string): string; memberName(userId: string): string; fieldName(fieldId: string): string }` (each falls back to the raw id when unknown)
   - `summarizeRule(rule: Rule, ctx: SummaryContext): string`, `summarizeRules(rules: Rule[], ctx: SummaryContext): string[]`
   - `summaryContextFor(def: WorkflowDef, options: { memberNames?: ReadonlyMap<string, string>; fields?: readonly { id: string; name: string }[] }): SummaryContext`
   - `type FieldChoice = { id: string; name: string; source: string }`, `BUILTIN_FIELD_CHOICES` (title/description/dueDate, source `Built-in`), `fieldChoicesFor(boundTypes: readonly TicketTypeDef[]): FieldChoice[]`
   - `type IssueAnchor = { kind: 'workflow' } | { kind: 'state'; stateId: string } | { kind: 'transition'; index: number }`
-  - `type AnchoredIssue = Issue & { anchor: IssueAnchor }`, `anchorIssues(def: WorkflowDef, issues: Issue[]): AnchoredIssue[]`
+  - `type AnchoredIssue = Issue & { anchor: IssueAnchor }`, `type AnchoredAdvisory = Advisory & { anchor: IssueAnchor }`
+  - `anchorIssues<T extends Issue | Advisory>(def: WorkflowDef, issues: readonly T[]): (T & { anchor: IssueAnchor })[]` — **one machinery for both tiers.** `Advisory` is structurally identical to `Issue`, so a sibling `anchorAdvisories` would clone the queue-and-zip logic for no gain; the parameter is widened to a generic instead (decision 2). The offender queues cover eleven issue codes plus the one advisory code; a code the map does not know degrades to a canvas anchor, so the module never crashes on a code it has not heard of.
 
 - [ ] **Step 1: Write the failing summaries test**
 
@@ -1276,7 +1329,7 @@ Create `packages/app-core/test/workflow-builder/anchor-issues.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { validateWorkflowDef, type WorkflowDef } from '@gisik-nokma/domain';
+import { adviseWorkflowDef, validateWorkflowDef, type WorkflowDef } from '@gisik-nokma/domain';
 import { anchorIssues } from '../../src/workflow-builder/anchor-issues.js';
 
 function base(): WorkflowDef {
@@ -1304,6 +1357,11 @@ function anchored(def: WorkflowDef) {
 
 function anchorOf(def: WorkflowDef, code: string) {
   return anchored(def).find((issue) => issue.code === code)?.anchor;
+}
+
+/** Advise then anchor — the panel's other pipeline, through the same function. */
+function advisoryAnchorOf(def: WorkflowDef, code: string) {
+  return anchorIssues(def, adviseWorkflowDef(def)).find((advisory) => advisory.code === code)?.anchor;
 }
 
 describe('anchorIssues', () => {
@@ -1363,6 +1421,32 @@ describe('anchorIssues', () => {
       rules: [{ kind: 'require-different-user', thanActorOf: { to: 'ghost' } }],
     };
     expect(anchorOf(rdu, 'rdu-unknown-state')).toEqual({ kind: 'transition', index: 1 });
+
+    // nothing in this def enters 'todo' (it is only the start), so a rule
+    // watching the move into it can never fire — the eleventh code
+    const unenterable = base();
+    unenterable.transitions[1] = {
+      from: 'doing',
+      to: 'done',
+      rules: [{ kind: 'require-different-user', thanActorOf: { to: 'todo' } }],
+    };
+    expect(anchorOf(unenterable, 'rdu-unenterable-state')).toEqual({ kind: 'transition', index: 1 });
+  });
+
+  it('the rdu-bypassable advisory anchors to the transition carrying the rule', () => {
+    const fastTrack = base();
+    fastTrack.transitions = [
+      ...fastTrack.transitions,
+      {
+        from: 'todo',
+        to: 'done',
+        rules: [{ kind: 'require-different-user', thanActorOf: { to: 'doing' } }],
+      },
+    ];
+    // the fast track is clean by validateWorkflowDef's lights — the warning
+    // lives in the other tier, and anchors through the same machinery
+    expect(validateWorkflowDef(fastTrack)).toEqual([]);
+    expect(advisoryAnchorOf(fastTrack, 'rdu-bypassable')).toEqual({ kind: 'transition', index: 2 });
   });
 
   it('two issues of one code pair with offenders in definition order', () => {
@@ -1412,7 +1496,7 @@ Expected: FAIL — cannot resolve `../../src/workflow-builder/anchor-issues.js`.
 Create `packages/app-core/src/workflow-builder/anchor-issues.ts`:
 
 ```ts
-import type { Issue, WorkflowDef } from '@gisik-nokma/domain';
+import type { Advisory, Issue, WorkflowDef } from '@gisik-nokma/domain';
 
 export type IssueAnchor =
   | { kind: 'workflow' }
@@ -1420,6 +1504,9 @@ export type IssueAnchor =
   | { kind: 'transition'; index: number };
 
 export type AnchoredIssue = Issue & { anchor: IssueAnchor };
+export type AnchoredAdvisory = Advisory & { anchor: IssueAnchor };
+
+const CANVAS_ANCHOR: IssueAnchor = { kind: 'workflow' };
 
 /**
  * Issue carries no structural pointer, so anchors are recomputed here and
@@ -1427,9 +1514,18 @@ export type AnchoredIssue = Issue & { anchor: IssueAnchor };
  * order (mirroring validateWorkflowDef's documented per-code order) and zip
  * it against that code's issues in order. Pairing per code — never by global
  * position — keeps anchoring correct wherever the reconciled validator slots
- * a code in its overall ordering. A dry queue degrades to a canvas anchor.
+ * a code in its overall ordering; that is why Plan 2 inserting
+ * rdu-unenterable-state after rdu-unknown-state costs nothing here beyond one
+ * more offender computation. A dry queue degrades to a canvas anchor.
+ *
+ * Advisory is structurally identical to Issue, so both tiers come through this
+ * one function; the generic keeps the caller's element type on the way out
+ * instead of flattening an Advisory into an AnchoredIssue.
  */
-export function anchorIssues(def: WorkflowDef, issues: Issue[]): AnchoredIssue[] {
+export function anchorIssues<T extends Issue | Advisory>(
+  def: WorkflowDef,
+  issues: readonly T[],
+): (T & { anchor: IssueAnchor })[] {
   const queues = new Map<string, IssueAnchor[]>([
     ['duplicate-state-id', duplicateStateAnchors(def)],
     ['unknown-transition-state', unknownTransitionStateAnchors(def)],
@@ -1438,14 +1534,17 @@ export function anchorIssues(def: WorkflowDef, issues: Issue[]): AnchoredIssue[]
     ['terminal-no-inbound', terminalNoInboundAnchors(def)],
     ['empty-restrict-to', ruleAnchors(def, isEmptyRestrictTo)],
     ['rdu-unknown-state', ruleAnchors(def, (rule) => isRduUnknown(def, rule))],
+    ['rdu-unenterable-state', ruleAnchors(def, (rule) => isRduUnenterable(def, rule))],
+    // the advisory tier — same offender shape (the transition carrying the rule)
+    ['rdu-bypassable', ruleAnchors(def, (rule, transition) => isRduBypassable(def, rule, transition))],
   ]);
   const consumed = new Map<string, number>();
   return issues.map((issue) => {
     const queue = queues.get(issue.code);
-    if (queue === undefined) return { ...issue, anchor: { kind: 'workflow' } };
+    if (queue === undefined) return { ...issue, anchor: CANVAS_ANCHOR };
     const at = consumed.get(issue.code) ?? 0;
     consumed.set(issue.code, at + 1);
-    return { ...issue, anchor: queue[at] ?? { kind: 'workflow' } };
+    return { ...issue, anchor: queue[at] ?? CANVAS_ANCHOR };
   });
 }
 
@@ -1484,7 +1583,12 @@ function duplicateTransitionAnchors(def: WorkflowDef): IssueAnchor[] {
   return anchors;
 }
 
-function reachableStateIds(def: WorkflowDef): Set<string> {
+/**
+ * States reachable from initialStateId. `avoiding` closes one state off — the
+ * rdu-bypassable question is "can the guarded move be reached without ever
+ * entering the watched state?", which is this walk with that state removed.
+ */
+function reachableStateIds(def: WorkflowDef, avoiding?: string): Set<string> {
   const stateIds = new Set(def.states.map((state) => state.id));
   const reachable = new Set<string>();
   if (stateIds.has(def.initialStateId)) reachable.add(def.initialStateId);
@@ -1492,6 +1596,7 @@ function reachableStateIds(def: WorkflowDef): Set<string> {
   while (grew) {
     grew = false;
     for (const transition of def.transitions) {
+      if (transition.to === avoiding) continue;
       if (!stateIds.has(transition.to) || reachable.has(transition.to)) continue;
       const fromReachable =
         transition.from === '*' ? reachable.size > 0 : reachable.has(transition.from);
@@ -1526,20 +1631,23 @@ function terminalNoInboundAnchors(def: WorkflowDef): IssueAnchor[] {
     .map((state) => ({ kind: 'state', stateId: state.id }) as IssueAnchor);
 }
 
+type DefRule = WorkflowDef['transitions'][number]['rules'][number];
+type DefTransition = WorkflowDef['transitions'][number];
+
 function ruleAnchors(
   def: WorkflowDef,
-  offending: (rule: WorkflowDef['transitions'][number]['rules'][number]) => boolean,
+  offending: (rule: DefRule, transition: DefTransition) => boolean,
 ): IssueAnchor[] {
   const anchors: IssueAnchor[] = [];
   def.transitions.forEach((transition, index) => {
     for (const rule of transition.rules) {
-      if (offending(rule)) anchors.push({ kind: 'transition', index });
+      if (offending(rule, transition)) anchors.push({ kind: 'transition', index });
     }
   });
   return anchors;
 }
 
-function isEmptyRestrictTo(rule: WorkflowDef['transitions'][number]['rules'][number]): boolean {
+function isEmptyRestrictTo(rule: DefRule): boolean {
   return (
     rule.kind === 'restrict-to' &&
     rule.assignee !== true &&
@@ -1548,21 +1656,48 @@ function isEmptyRestrictTo(rule: WorkflowDef['transitions'][number]['rules'][num
   );
 }
 
-function isRduUnknown(
-  def: WorkflowDef,
-  rule: WorkflowDef['transitions'][number]['rules'][number],
-): boolean {
+function isRduUnknown(def: WorkflowDef, rule: DefRule): boolean {
   return (
     rule.kind === 'require-different-user' &&
     !def.states.some((state) => state.id === rule.thanActorOf.to)
   );
+}
+
+function someTransitionEnters(def: WorkflowDef, stateId: string): boolean {
+  return def.transitions.some((transition) => transition.to === stateId);
+}
+
+/** The watched state exists but nothing moves into it — the rule can never fire. */
+function isRduUnenterable(def: WorkflowDef, rule: DefRule): boolean {
+  return (
+    rule.kind === 'require-different-user' &&
+    def.states.some((state) => state.id === rule.thanActorOf.to) &&
+    !someTransitionEnters(def, rule.thanActorOf.to)
+  );
+}
+
+/**
+ * The advisory offender rule (Plan 2 owns the authoritative algorithm; this is
+ * the recomputation anchoring needs, per decision 2). The guarded transition is
+ * reachable from initialStateId without ever entering the watched state, so on
+ * that path there is no earlier performer to differ from. Suppressed when the
+ * watched state is unknown or unenterable — an error already fired for the
+ * same rule, and the builder does not stack a warning on top of it.
+ */
+function isRduBypassable(def: WorkflowDef, rule: DefRule, transition: DefTransition): boolean {
+  if (rule.kind !== 'require-different-user') return false;
+  const watched = rule.thanActorOf.to;
+  if (!def.states.some((state) => state.id === watched)) return false;
+  if (!someTransitionEnters(def, watched)) return false;
+  if (transition.from === '*') return true; // a from-anywhere move is reachable by definition
+  return reachableStateIds(def, watched).has(transition.from);
 }
 ```
 
 - [ ] **Step 8: Run to verify it passes, then update the barrel**
 
 Run: `pnpm --filter @gisik-nokma/app-core exec vitest run test/workflow-builder/anchor-issues.test.ts`
-Expected: PASS (9 tests).
+Expected: PASS (10 tests).
 
 Add to `packages/app-core/src/workflow-builder/index.ts`:
 
@@ -1576,7 +1711,7 @@ export * from './anchor-issues.js';
 
 ```bash
 git add packages/app-core/src/workflow-builder packages/app-core/test/workflow-builder
-git commit -m "Plain-language rule summaries, field-picker choices, and per-code issue anchoring — anchors pair by code so the validator's global order can shift without mislabelling the canvas"
+git commit -m "Plain-language rule summaries, field-picker choices, and per-code issue anchoring — anchors pair by code so the validator's global order can shift without mislabelling the canvas, and advisories ride the same machinery without joining the issue list"
 ```
 
 ---
@@ -1591,7 +1726,7 @@ Templates are ordinary pre-authored workflows, cloned and edited like any other 
 - Test: `packages/app-core/test/workflow-builder/templates.test.ts`
 
 **Interfaces:**
-- Consumes: `WorkflowDef`, `newUlid`, `validateWorkflowDef` from `@gisik-nokma/domain`; `layoutDraft`, `WorkflowDraft` from Task 1.
+- Consumes: `WorkflowDef`, `newUlid`, `validateWorkflowDef`, `adviseWorkflowDef` from `@gisik-nokma/domain`; `layoutDraft`, `WorkflowDraft` from Task 1.
 - Produces: `type WorkflowTemplate = { id: 'simple-kanban' | 'errand-with-waits' | 'approval-chain'; name: string; tagline: string; def: Omit<WorkflowDef, 'id' | 'version'> }`; `WORKFLOW_TEMPLATES: readonly WorkflowTemplate[]` (in that order); `cloneTemplate(template: WorkflowTemplate): WorkflowDef` (fresh ULID id, version 1); `draftFromTemplate(template: WorkflowTemplate): WorkflowDraft`.
 
 - [ ] **Step 1: Write the failing template test**
@@ -1600,7 +1735,7 @@ Create `packages/app-core/test/workflow-builder/templates.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { validateWorkflowDef } from '@gisik-nokma/domain';
+import { adviseWorkflowDef, validateWorkflowDef } from '@gisik-nokma/domain';
 import {
   WORKFLOW_TEMPLATES,
   cloneTemplate,
@@ -1616,10 +1751,13 @@ describe('WORKFLOW_TEMPLATES', () => {
     ]);
   });
 
-  it('every template clones into a def that validates clean — templates are ordinary workflows', () => {
+  it('every template clones into a def that validates clean AND warns about nothing', () => {
     for (const template of WORKFLOW_TEMPLATES) {
       const def = cloneTemplate(template);
       expect(validateWorkflowDef(def), `template ${template.id}`).toEqual([]);
+      // a shipped template that greets the author with a warning is a shipped
+      // template that is wrong; caught here, at build time, not in the gallery
+      expect(adviseWorkflowDef(def), `template ${template.id} advisories`).toEqual([]);
       expect(def.version).toBe(1);
       expect(def.states.some((state) => state.category === 'terminal')).toBe(true);
     }
@@ -1750,6 +1888,10 @@ export const WORKFLOW_TEMPLATES: readonly WorkflowTemplate[] = [
         { from: 'draft', to: 'submitted', rules: [{ kind: 'restrict-to', assignee: true }] },
         { from: 'submitted', to: 'draft', rules: [{ kind: 'require-comment' }] },
         {
+          // Four eyes, and no way round them: Approved is reachable only through
+          // Submitted, so the rule always finds an earlier performer to differ
+          // from. Adding a draft -> approved fast track would keep this def
+          // valid but trip the rdu-bypassable advisory — don't.
           from: 'submitted',
           to: 'approved',
           rules: [{ kind: 'require-different-user', thanActorOf: { to: 'submitted' } }],
@@ -2186,6 +2328,7 @@ export const tokens = {
     edge: '#94a3b8',
     edgeSelected: '#2563eb',
     issueAccent: '#b45309',
+    advisoryAccent: '#0369a1',
     panelBorder: '#e2e8f0',
     surface: '#ffffff',
     textPrimary: '#0f172a',
@@ -2194,7 +2337,7 @@ export const tokens = {
 } as const;
 ```
 
-These hex values are this plan's only colour literals, and they live in the one permitted file.
+These hex values are this plan's only colour literals, and they live in the one permitted file. `advisoryAccent` is deliberately a different hue from `issueAccent` — a warning that blocks nothing must not wear the colour of a thing that blocks publishing.
 
 - [ ] **Step 2: Write the failing flow-graph test**
 
@@ -3629,9 +3772,11 @@ git commit -m "Rule editors: member and role pickers for restrict-to, picker-onl
 
 ---
 
-### Task 8: Live validation — the issues panel, anchored, plus the system-rules panel
+### Task 8: Live validation — the issues panel, anchored, plus the advisory section and the system-rules panel
 
-`validateWorkflowDef` runs on every store change (it is the `useDraft()` render pass — no debounce, the function is pure and cheap); the issues panel lists every issue in the validator's own plain language, anchored to the offending node or edge, click-to-select. Beside it, the static system-rules panel names the two invariants no workflow can author away (spec §4) — the builder's honesty about its own limits. This task carries the **full planted-defect table**: all ten issue codes, authored through the canvas's model.
+`validateWorkflowDef` runs on every store change (it is the `useDraft()` render pass — no debounce, the function is pure and cheap); the issues panel lists every issue in the validator's own plain language, anchored to the offending node or edge, click-to-select. Below the issues, a visually distinct **advisory section** renders `adviseWorkflowDef`'s output the same way — same anchoring, same click-to-select, the advisory's own plain language — and says outright in its heading that nothing in it blocks publishing. Beside both, the static system-rules panel names the two invariants no workflow can author away (spec §4) — the builder's honesty about its own limits. This task carries the **full planted-defect table**: all eleven issue codes plus the one advisory code, authored through the canvas's model.
+
+The two tiers never merge. `selectCanPublish` (Task 1) stays `validateWorkflowDef` emptiness; the advisory section is rendered from a second call and gates nothing. This task proves the panel half — a draft that trips `rdu-bypassable` and nothing else renders the advisory *while the issues list still says the workflow can be published*, so the advisory demonstrably never entered the issue array. The other half — Publish stays **enabled** and the submission commits — needs `PublishControls`, which Task 9 builds; that test lives in `publish.test.tsx` and mounts `IssuesPanel` beside `PublishControls` so both facts are asserted in one render. Neither half is optional: together they are the guarantee, and without them the tier is only a convention.
 
 **Files:**
 - Create: `packages/app-core/src/workflow-builder/ui/issues-panel.tsx`
@@ -3640,18 +3785,19 @@ git commit -m "Rule editors: member and role pickers for restrict-to, picker-onl
 - Test: `packages/app-core/test/workflow-builder/validation.test.tsx`
 
 **Interfaces:**
-- Consumes: `validateWorkflowDef` (domain), `anchorIssues` (Task 2), contexts (Task 5), `layoutDraft` (Task 1).
-- Produces: `IssuesPanel` (no props), `SystemRulesPanel` (no props).
+- Consumes: `validateWorkflowDef` and `adviseWorkflowDef` (domain), `anchorIssues` (Task 2), contexts (Task 5), `layoutDraft` (Task 1).
+- Produces: `IssuesPanel` (no props — renders the issues block and, when there are any, the advisory block), `SystemRulesPanel` (no props).
+- BEM blocks: `issues-panel` (existing) and `advisories-panel` (new — `__title`, `__list`, `__item`, `__jump`, `__footer`), mirroring each other so the two tiers read as siblings rather than as one list with two moods.
 
 - [ ] **Step 1: Write the failing planted-defect test suite**
 
-Create `packages/app-core/test/workflow-builder/validation.test.tsx`. The assertion helper compares the panel against `validateWorkflowDef`'s own output, so the tests stay correct however the reconciled validator words or orders its messages:
+Create `packages/app-core/test/workflow-builder/validation.test.tsx`. The assertion helper compares the panel against `validateWorkflowDef`'s own output, so the tests stay correct however the reconciled validator words or orders its messages — and the advisory assertions go through `adviseWorkflowDef`'s output for the same reason. Only this plan's own copy (the all-clear line, the advisory heading and footer) is asserted character for character:
 
 ```tsx
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { newUlid, validateWorkflowDef, type WorkflowDef } from '@gisik-nokma/domain';
+import { adviseWorkflowDef, newUlid, validateWorkflowDef, type WorkflowDef } from '@gisik-nokma/domain';
 import { createDraftStore, type DraftStore } from '../../src/workflow-builder/draft-store.js';
 import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { layoutDraft } from '../../src/workflow-builder/layout.js';
@@ -3787,6 +3933,67 @@ describe('IssuesPanel planted defects — every validateWorkflowDef code', () =>
     renderIssues(store);
     expect(expectPanelMatchesValidator(store)).toContain('rdu-unknown-state');
   });
+
+  it('plants rdu-unenterable-state by watching a state nothing enters', () => {
+    const store = kanbanStore();
+    // drop the only way back into the start state, then ask for a second person
+    // on a move into it: the state exists, but no move in this version reaches
+    // it, so the rule can never require anybody
+    store.actions.removeTransition(1); // doing -> todo
+    store.actions.addRule(1, { kind: 'require-different-user', thanActorOf: { to: 'todo' } });
+    renderIssues(store);
+    expect(expectPanelMatchesValidator(store)).toContain('rdu-unenterable-state');
+  });
+});
+
+describe('IssuesPanel advisories — a second tier that blocks nothing', () => {
+  /** The kanban draft plus a fast track that skips Doing, guarded by a rule watching Doing. */
+  function bypassableStore(): DraftStore {
+    const store = kanbanStore();
+    store.actions.addTransition('todo', 'done');
+    store.actions.addRule(4, { kind: 'require-different-user', thanActorOf: { to: 'doing' } });
+    return store;
+  }
+
+  it('warns about a bypassable four-eyes rule without calling it an issue', () => {
+    const store = bypassableStore();
+    const def = store.getState().def;
+    // the def is clean by the validator's lights — that is the whole point
+    expect(validateWorkflowDef(def)).toEqual([]);
+    const advisories = adviseWorkflowDef(def);
+    expect(advisories.map((advisory) => advisory.code)).toEqual(['rdu-bypassable']);
+
+    renderIssues(store);
+    expect(screen.getByText('Worth a look — none of these block publishing')).toBeInTheDocument();
+    expect(
+      screen.getByText('Advisories describe a workflow that is legal but may not do what you meant.'),
+    ).toBeInTheDocument();
+    for (const advisory of advisories) {
+      expect(screen.getAllByText(advisory.message).length).toBeGreaterThan(0);
+    }
+    // and the issues half still says the workflow can go out: the advisory
+    // never entered validateWorkflowDef's array
+    expect(screen.getByText('No issues — this workflow can be published.')).toBeInTheDocument();
+  });
+
+  it('anchors an advisory to its transition, click-to-select, like any issue', async () => {
+    const user = userEvent.setup();
+    const store = bypassableStore();
+    store.actions.select({ kind: 'none' });
+    renderIssues(store);
+    const [advisory] = adviseWorkflowDef(store.getState().def);
+    await user.click(screen.getByRole('button', { name: advisory!.message }));
+    expect(store.getState().selection).toEqual({ kind: 'transition', index: 4 });
+  });
+
+  it('renders no advisory section at all when there is nothing to say', () => {
+    const store = kanbanStore();
+    expect(adviseWorkflowDef(store.getState().def)).toEqual([]);
+    renderIssues(store);
+    expect(
+      screen.queryByText('Worth a look — none of these block publishing'),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe('IssuesPanel anchoring', () => {
@@ -3843,7 +4050,7 @@ Expected: FAIL — cannot resolve `../../src/workflow-builder/ui/issues-panel.ts
 Create `packages/app-core/src/workflow-builder/ui/issues-panel.tsx`:
 
 ```tsx
-import { validateWorkflowDef } from '@gisik-nokma/domain';
+import { adviseWorkflowDef, validateWorkflowDef } from '@gisik-nokma/domain';
 import { tokens } from '@gisik-nokma/ui';
 import { anchorIssues, type IssueAnchor } from '../anchor-issues.js';
 import type { BuilderSelection } from '../draft-store.js';
@@ -3864,35 +4071,71 @@ function selectionFor(anchor: IssueAnchor): BuilderSelection {
  * Live validation: this render IS the validation run — validateWorkflowDef is
  * pure and cheap, and useDraft() re-renders on every store change. The panel
  * speaks the validator's own plain language; it never rephrases an issue.
+ *
+ * Two tiers, two calls, never merged. adviseWorkflowDef's output is rendered
+ * in its own section below the issues and gates nothing: selectCanPublish is
+ * validateWorkflowDef emptiness alone (design decision 9). Note the advisory
+ * section renders even when there are no issues — a clean workflow with a
+ * bypassable four-eyes rule is exactly the case worth showing, and an early
+ * return on the all-clear would hide it.
  */
 export function IssuesPanel() {
   const store = useBuilderStore();
   const draft = useDraft();
-  const anchored = anchorIssues(draft.def, validateWorkflowDef(draft.def));
-  if (anchored.length === 0) {
-    return (
-      <section className="issues-panel issues-panel--clean">
-        <p className="issues-panel__all-clear">No issues — this workflow can be published.</p>
-      </section>
-    );
-  }
+  const anchoredIssues = anchorIssues(draft.def, validateWorkflowDef(draft.def));
+  const anchoredAdvisories = anchorIssues(draft.def, adviseWorkflowDef(draft.def));
   return (
-    <section className="issues-panel" style={{ borderLeft: `3px solid ${tokens.workflowBuilder.issueAccent}` }}>
-      <h3 className="issues-panel__title">Issues</h3>
-      <ul className="issues-panel__list">
-        {anchored.map((issue, at) => (
-          <li className="issues-panel__item" key={`${issue.code}:${at}`}>
-            <button
-              type="button"
-              className="issues-panel__jump"
-              onClick={() => store.actions.select(selectionFor(issue.anchor))}
-            >
-              {issue.message}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <>
+      {anchoredIssues.length === 0 ? (
+        <section className="issues-panel issues-panel--clean">
+          <p className="issues-panel__all-clear">No issues — this workflow can be published.</p>
+        </section>
+      ) : (
+        <section
+          className="issues-panel"
+          style={{ borderLeft: `3px solid ${tokens.workflowBuilder.issueAccent}` }}
+        >
+          <h3 className="issues-panel__title">Issues</h3>
+          <ul className="issues-panel__list">
+            {anchoredIssues.map((issue, at) => (
+              <li className="issues-panel__item" key={`${issue.code}:${at}`}>
+                <button
+                  type="button"
+                  className="issues-panel__jump"
+                  onClick={() => store.actions.select(selectionFor(issue.anchor))}
+                >
+                  {issue.message}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {anchoredAdvisories.length > 0 ? (
+        <section
+          className="advisories-panel"
+          style={{ borderLeft: `3px solid ${tokens.workflowBuilder.advisoryAccent}` }}
+        >
+          <h3 className="advisories-panel__title">Worth a look — none of these block publishing</h3>
+          <ul className="advisories-panel__list">
+            {anchoredAdvisories.map((advisory, at) => (
+              <li className="advisories-panel__item" key={`${advisory.code}:${at}`}>
+                <button
+                  type="button"
+                  className="advisories-panel__jump"
+                  onClick={() => store.actions.select(selectionFor(advisory.anchor))}
+                >
+                  {advisory.message}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="advisories-panel__footer">
+            Advisories describe a workflow that is legal but may not do what you meant.
+          </p>
+        </section>
+      ) : null}
+    </>
   );
 }
 ```
@@ -3942,7 +4185,7 @@ export function SystemRulesPanel() {
 - [ ] **Step 5: Run to verify it passes, update the barrel**
 
 Run: `pnpm --filter @gisik-nokma/app-core exec vitest run test/workflow-builder/validation.test.tsx`
-Expected: PASS (14 tests — 1 all-clear, 10 planted defects, 2 anchoring, 1 system rules). Cross-check against the coverage table: every one of the ten codes appears in a test name.
+Expected: PASS (18 tests — 1 all-clear, 11 planted defects, 2 anchoring, 3 advisory tier, 1 system rules). Cross-check against the coverage table: every one of the eleven issue codes appears in a test name, and the one advisory code appears in the advisory describe block. The advisory half of the guarantee — Publish stays enabled and the submission commits — lands in Task 9's `publish.test.tsx`; do not mark this task done believing it has been proven here.
 
 Add to `packages/app-core/src/workflow-builder/index.ts`:
 
@@ -3955,14 +4198,14 @@ export * from './ui/system-rules-panel.tsx';
 
 ```bash
 git add packages/app-core/src/workflow-builder packages/app-core/test/workflow-builder/validation.test.tsx
-git commit -m "Live validation: issues panel speaks the validator's own language, anchored per code and click-to-select; system-rules panel names the two unauthorable invariants; all ten issue codes proven against planted defects"
+git commit -m "Live validation: issues panel speaks the validator's own language, anchored per code and click-to-select; a separate advisory section that says in its own heading that it blocks nothing; system-rules panel names the two unauthorable invariants; all eleven issue codes and the one advisory code proven against planted defects"
 ```
 
 ---
 
 ### Task 9: The publish flow — version bump, state-mapping dialog, refusals verbatim
 
-Publishing emits `workflow.defined` through the gateway. The button is disabled while the draft is invalid. When the new version drops states the base has, the state-mapping dialog lists every stranded state with its in-flight ticket count and a target picker — the server's stranded-state refusal surfaced as UI before it ever fires. Every server result renders honestly: committed, refused (reason verbatim), invalid (message verbatim).
+Publishing emits `workflow.defined` through the gateway. The button is disabled while the draft is invalid — and only while it is invalid: an advisory never disables it. When the new version drops states the base has, the state-mapping dialog lists every dropped state with its ticket count and a target picker, and requires a destination for each **whether or not anything sits there** — the server's stranded-state refusal surfaced as UI before it ever fires. The count is a courtesy that degrades honestly; the mapping is the contract. Every server result renders honestly: committed, refused (reason verbatim), invalid (message verbatim).
 
 **Files:**
 - Create: `packages/app-core/src/workflow-builder/ui/state-mapping-dialog.tsx`
@@ -3971,7 +4214,8 @@ Publishing emits `workflow.defined` through the gateway. The button is disabled 
 - Test: `packages/app-core/test/workflow-builder/publish.test.tsx`
 
 **Interfaces:**
-- Consumes: `droppedStates`, `buildPublishPayload`, `buildWorkflowDefinedEvent` (Task 4), `selectIssues` (Task 1), contexts (Task 5).
+- Consumes: `droppedStates`, `buildPublishPayload`, `buildWorkflowDefinedEvent` (Task 4), `selectIssues` (Task 1), contexts (Task 5); `IssuesPanel` (Task 8) in the advisory test only.
+- **Gating is `selectIssues(draft).length === 0` — `validateWorkflowDef` emptiness, advisories excluded (design decision 9).** `PublishControls` does not call `adviseWorkflowDef` at all; the advisory section belongs to the issues panel and has no say here. The test below is what stops a later "unification" from quietly turning warnings into blockers.
 - Produces:
   - `StateMappingDialog(props: { dropped: { id: string; name: string }[]; occupancy: Record<string, number> | null; occupancyFailed: boolean; targetStates: { id: string; name: string }[]; fromVersion: number; toVersion: number; onCancel(): void; onConfirm(mapping: Record<string, string>): void })`
   - `PublishControls(props: { onPublished?: (payload: PublishedWorkflowDef) => void })` — renders nothing when `env.canAuthor` is false (the server would refuse anyway; Task 12 proves the refusal path too)
@@ -3984,11 +4228,12 @@ Create `packages/app-core/test/workflow-builder/publish.test.tsx`:
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { newUlid, type PublishedWorkflowDef } from '@gisik-nokma/domain';
+import { adviseWorkflowDef, newUlid, validateWorkflowDef, type PublishedWorkflowDef } from '@gisik-nokma/domain';
 import { createDraftStore, draftFromPublished, type DraftStore } from '../../src/workflow-builder/draft-store.js';
 import { createFakeGateway, type FakeGatewaySeed } from '../../src/workflow-builder/fake-gateway.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { BuilderProvider, type BuilderEnvironment } from '../../src/workflow-builder/ui/builder-context.tsx';
+import { IssuesPanel } from '../../src/workflow-builder/ui/issues-panel.tsx';
 import { PublishControls } from '../../src/workflow-builder/ui/publish-controls.tsx';
 
 const kanban = WORKFLOW_TEMPLATES.find((template) => template.id === 'simple-kanban')!;
@@ -4012,7 +4257,7 @@ function publishedKanban(id: string): PublishedWorkflowDef {
   };
 }
 
-function setup(store: DraftStore, seed: FakeGatewaySeed = {}) {
+function setup(store: DraftStore, seed: FakeGatewaySeed = {}, withPanel = false) {
   const gateway = createFakeGateway(seed);
   const environment: BuilderEnvironment = {
     workspaceId: newUlid(),
@@ -4024,6 +4269,7 @@ function setup(store: DraftStore, seed: FakeGatewaySeed = {}) {
   };
   render(
     <BuilderProvider store={store} env={environment}>
+      {withPanel ? <IssuesPanel /> : null}
       <PublishControls />
     </BuilderProvider>,
   );
@@ -4046,6 +4292,36 @@ describe('PublishControls gating', () => {
     const button = screen.getByRole('button', { name: 'Publish' });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('title', 'Fix the issues below first.');
+  });
+
+  // The planted defect that makes the advisory tier a guarantee rather than a
+  // convention (design decision 9). If anyone ever folds adviseWorkflowDef into
+  // selectCanPublish, this is the test that goes red.
+  it('an advisory does not gate publish — the button stays enabled and the publish commits', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(kanban));
+    store.actions.addTransition('todo', 'done'); // a fast track that skips Doing
+    store.actions.addRule(4, { kind: 'require-different-user', thanActorOf: { to: 'doing' } });
+
+    const def = store.getState().def;
+    expect(validateWorkflowDef(def)).toEqual([]);
+    const advisories = adviseWorkflowDef(def);
+    expect(advisories.map((advisory) => advisory.code)).toEqual(['rdu-bypassable']);
+
+    const gateway = setup(store, {}, true);
+    expect(screen.getByText('Worth a look — none of these block publishing')).toBeInTheDocument();
+    expect(screen.getAllByText(advisories[0]!.message).length).toBeGreaterThan(0);
+
+    const button = screen.getByRole('button', { name: 'Publish' });
+    expect(button).toBeEnabled();
+    expect(button).not.toHaveAttribute('title');
+
+    await user.click(button);
+    expect(await screen.findByText('Version 1 published.')).toBeInTheDocument();
+    expect(gateway.submitted).toHaveLength(1);
+    // and the advisory is still on screen after a successful publish — it was
+    // never a thing to be cleared, only a thing to be told
+    expect(screen.getByText('Worth a look — none of these block publishing')).toBeInTheDocument();
   });
 });
 
@@ -4074,10 +4350,10 @@ describe('PublishControls — the state-mapping dialog', () => {
     const gateway = setup(store, { occupancy: { [workflowId]: { review: 4 } } });
 
     await user.click(screen.getByRole('button', { name: 'Publish' }));
-    expect(await screen.findByText('Where do in-flight tickets go?')).toBeInTheDocument();
+    expect(await screen.findByText('Every dropped state needs a destination')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Version 3 removes states that version 2 has. Every ticket sitting in a removed state must be sent to a real state — the server refuses a publish that would strand one.',
+        'Version 3 removes states that version 2 has. Publishing cannot see which tickets sit in which state, so every removed state needs a destination — occupied or not.',
       ),
     ).toBeInTheDocument();
 
@@ -4113,7 +4389,7 @@ describe('PublishControls — the state-mapping dialog', () => {
     const gateway = setup(store);
     await user.click(screen.getByRole('button', { name: 'Publish' }));
     await user.click(await screen.findByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByText('Where do in-flight tickets go?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Every dropped state needs a destination')).not.toBeInTheDocument();
     expect(gateway.submitted).toHaveLength(0);
   });
 });
@@ -4123,7 +4399,7 @@ describe('PublishControls — server results rendered honestly', () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));
     const reason =
-      'Version 3 drops state(s) "review" that version 2 has; a stateMapping entry for each dropped state is required so no in-flight ticket is stranded.';
+      'Version 3 drops state(s) "review" that version 2 has; publishing cannot see which tickets sit in which state, so every dropped state needs a stateMapping entry.';
     setup(store, {
       submitResults: [{ status: 'refused', eventId: 'evt', rule: 'workflow-state-mapping', reason }],
     });
@@ -4199,7 +4475,7 @@ export function StateMappingDialog(props: {
     <div
       className="state-mapping-dialog"
       role="dialog"
-      aria-label="Where do in-flight tickets go?"
+      aria-label="Every dropped state needs a destination"
       style={{
         background: tokens.workflowBuilder.surface,
         color: tokens.workflowBuilder.textPrimary,
@@ -4208,9 +4484,9 @@ export function StateMappingDialog(props: {
         padding: 16,
       }}
     >
-      <h3 className="state-mapping-dialog__title">Where do in-flight tickets go?</h3>
+      <h3 className="state-mapping-dialog__title">Every dropped state needs a destination</h3>
       <p className="state-mapping-dialog__body">
-        {`Version ${props.toVersion} removes states that version ${props.fromVersion} has. Every ticket sitting in a removed state must be sent to a real state — the server refuses a publish that would strand one.`}
+        {`Version ${props.toVersion} removes states that version ${props.fromVersion} has. Publishing cannot see which tickets sit in which state, so every removed state needs a destination — occupied or not.`}
       </p>
       <ul className="state-mapping-dialog__rows">
         {props.dropped.map((state) => (
@@ -4374,7 +4650,7 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
 - [ ] **Step 5: Run to verify it passes, update the barrel**
 
 Run: `pnpm --filter @gisik-nokma/app-core exec vitest run test/workflow-builder/publish.test.tsx`
-Expected: PASS (8 tests).
+Expected: PASS (9 tests). The ninth is the advisory-does-not-gate-publish defect; if it fails, do not "fix" it by adding the advisory to the issues list — the failure means publish gating grew a dependency on `adviseWorkflowDef` and that dependency is the bug.
 
 Add to `packages/app-core/src/workflow-builder/index.ts`:
 
@@ -4387,7 +4663,7 @@ export * from './ui/state-mapping-dialog.tsx';
 
 ```bash
 git add packages/app-core/src/workflow-builder packages/app-core/test/workflow-builder/publish.test.tsx
-git commit -m "Publish flow: version bump from the base, mapping dialog for every stranded state with in-flight counts (count is courtesy, mapping is contract), and every server result — committed, refused, invalid — rendered verbatim"
+git commit -m "Publish flow: version bump from the base, mapping dialog for every stranded state with in-flight counts (count is courtesy, mapping is contract), an advisory that provably does not gate publish, and every server result — committed, refused, invalid — rendered verbatim"
 ```
 
 ---
@@ -6262,8 +6538,9 @@ The authoring half of spec §4: a Jira-style visual builder plus a template gall
 
 - ✅ **Workflow canvas** — React Flow: states as nodes (name, category picker, blocked checkbox, start marker), transitions drawn as edges, a distinguished from-any source node, select-to-edit inspectors, header Add state. `packages/app-core/src/workflow-builder/ui/`
 - ✅ **Rule editors** — the closed five-kind vocabulary behind pickers: member/role pickers for restrict-to, a picker-only field chooser (built-ins + bound types' fields), a named-move picker for require-different-user with the start-state honesty note; plain-language summaries on every edge. `packages/app-core/src/workflow-builder/ui/rule-editors/`
-- ✅ **Live validation** — `validateWorkflowDef` on every change; issues panel in the validator's own words, anchored per code to the offending node/edge, click-to-select; publish disabled while any issue stands. `packages/app-core/src/workflow-builder/ui/issues-panel.tsx`
-- ✅ **Publish flow** — `workflow.defined` with version bump from the published base; a state-mapping dialog listing every dropped state with in-flight ticket counts and target pickers (the server's stranded-state refusal surfaced before it fires); committed/refused/invalid results rendered verbatim. `packages/app-core/src/workflow-builder/ui/publish-controls.tsx`
+- ✅ **Live validation** — `validateWorkflowDef` on every change; issues panel in the validator's own words, anchored per code to the offending node/edge, click-to-select; publish disabled while any of the eleven issue codes stands. `packages/app-core/src/workflow-builder/ui/issues-panel.tsx`
+- ✅ **Advisories — warnings that do not block** — a second, visually distinct section below the issues, fed by `adviseWorkflowDef` and anchored the same way, headed `Worth a look — none of these block publishing`. It carries `rdu-bypassable`: a four-eyes rule whose guarded move can be reached without ever entering the watched state. Publish gating is `validateWorkflowDef` emptiness alone, proven by a planted defect that publishes successfully while the advisory is on screen. `packages/app-core/src/workflow-builder/ui/issues-panel.tsx`
+- ✅ **Publish flow** — `workflow.defined` with version bump from the published base; a state-mapping dialog listing every dropped state with its ticket count and a target picker, and requiring a destination for each whether or not anything sits there (the count is a courtesy that degrades honestly; the mapping is the contract); committed/refused/invalid results rendered verbatim. `packages/app-core/src/workflow-builder/ui/publish-controls.tsx`
 - ✅ **Template gallery** — simple-kanban, errand-with-waits (waiting states blocked-flagged for the attention strip), approval-chain (four-eyes approve); ordinary workflows, cloned into the canvas. `packages/app-core/src/workflow-builder/templates.ts`
 - ✅ **Ticket-type management** — list/create/edit custom types: name, icon picker, hierarchy rank with live "can sit under" implications — a type placed at or below the deepest rank is told outright that its tickets will always require a parent, the same rule the engine refuses on — workflow binding from published workflows, five typed custom fields with a select-options editor; emits `ticket-type.defined`. Built-in ranks are locked in the UI. `packages/app-core/src/workflow-builder/ticket-types/`
 - ✅ **Admin gating** — non-admins get read-only views with the look-not-touch banner; server `permission.role` refusals render character for character. `packages/app-core/src/workflow-builder/ui/read-only-banner.tsx`
@@ -6303,7 +6580,7 @@ Mirrors `Features.md` §10. Status: `❌` not covered · `✅` covered · `🟡`
 - 10.17 ✅ Plain-language summaries on edges and in the inspector — `summaries.test.ts`, `canvas.test.tsx`
 - 10.18 ✅ Add-rule menu offers exactly the five kinds with honest defaults — `inspectors.test.tsx`
 
-## Live validation (planted defects — every issue code)
+## Live validation (planted defects — every issue code, plus the advisory tier)
 - 10.19 ✅ no-states — `validation.test.tsx` plants no-states
 - 10.20 ✅ duplicate-state-id (via loaded def — the store mints unique ids) — `validation.test.tsx`
 - 10.21 ✅ no-terminal-state — `validation.test.tsx`
@@ -6315,6 +6592,9 @@ Mirrors `Features.md` §10. Status: `❌` not covered · `✅` covered · `🟡`
 - 10.27 ✅ empty-restrict-to — `validation.test.tsx`
 - 10.28 ✅ rdu-unknown-state — `validation.test.tsx`
 - 10.29 ✅ Issues anchor per code and click-to-select the offender; dry queues degrade to canvas — `anchor-issues.test.ts`, `validation.test.tsx`
+- 10.54 ✅ rdu-unenterable-state — a four-eyes rule watching a state no transition enters — `validation.test.tsx` plants rdu-unenterable-state
+- 10.55 ✅ rdu-bypassable advisory: rendered in its own non-blocking section, anchored and click-to-select, and absent when there is nothing to say — `validation.test.tsx`, `anchor-issues.test.ts`
+- 10.56 ✅ An advisory does not gate publish — the button stays enabled, the publish commits, and `selectCanPublish` stays `validateWorkflowDef` emptiness — `publish.test.tsx`, `draft-store.test.ts`
 
 ## Publish
 - 10.30 ✅ Publish disabled while any issue stands, naming why — `publish.test.tsx`
@@ -6327,6 +6607,7 @@ Mirrors `Features.md` §10. Status: `❌` not covered · `✅` covered · `🟡`
 
 ## Templates
 - 10.37 ✅ The three templates validate clean and clone with fresh ids, never sharing structure — `templates.test.ts`
+- 10.57 ✅ The three templates also produce no advisories — a shipped template never greets its author with a warning — `templates.test.ts`
 - 10.38 ✅ errand-with-waits blocked-flags exactly its two waiting states — `templates.test.ts`
 - 10.39 ✅ approval-chain requires a second person on approve — `templates.test.ts`
 - 10.40 ✅ Gallery offers the three plus Start blank — `screens.test.tsx`
@@ -6365,12 +6646,14 @@ git commit -m "Catalogue the workflow builder in Features.md §10 and test-cases
 All exported from `@gisik-nokma/app-core` unless noted:
 
 - **Core:** `WorkflowDraft`, `BuilderSelection`, `DraftStore`/`DraftActions`, `createDraftStore`, `newDraft`, `draftFromPublished`, `selectIssues`, `selectCanPublish`, `selectInboundTargetIds`; `layoutDraft`, `nextFreePosition`, `ANY_STATE_NODE_ID`, `COLUMN_WIDTH`, `ROW_HEIGHT`
-- **Language:** `SummaryContext`, `summarizeRule`, `summarizeRules`, `summaryContextFor`; `FieldChoice`, `BUILTIN_FIELD_CHOICES`, `fieldChoicesFor`; `IssueAnchor`, `AnchoredIssue`, `anchorIssues`
+- **Language:** `SummaryContext`, `summarizeRule`, `summarizeRules`, `summaryContextFor`; `FieldChoice`, `BUILTIN_FIELD_CHOICES`, `fieldChoicesFor`; `IssueAnchor`, `AnchoredIssue`, `AnchoredAdvisory`, `anchorIssues` (generic over `Issue | Advisory` — one machinery for both tiers)
 - **Templates:** `WorkflowTemplate`, `WORKFLOW_TEMPLATES` (`simple-kanban`, `errand-with-waits`, `approval-chain` — full payloads in Task 3), `cloneTemplate`, `draftFromTemplate`
 - **Gateway & events:** `WorkflowAuthoringGateway`, `WorkspaceMember`, `IngestResult` (client mirror), `createFakeGateway`/`FakeGatewaySeed`; `droppedStates`, `buildPublishPayload`, `buildWorkflowDefinedEvent`, `buildTicketTypeDefinedEvent`
 - **Components:** `BuilderProvider`/`BuilderSession`/`BuilderEnvironment`, `canAuthorRole`, `useBuilderStore`/`useBuilderEnv`/`useDraft`/`useSummaryCtx`; `WorkflowCanvas`, `StateNode`, `AnyStateNode`, `TransitionEdge`, `toFlowGraph`, `connectionToTransition`; `InspectorPanel`, `StateInspector`, `TransitionInspector`, `AddRuleMenu`/`defaultRuleFor`, `RuleEditor` (+ the three kind editors); `IssuesPanel`, `SystemRulesPanel`, `ReadOnlyBanner`; `PublishControls`, `StateMappingDialog`; `WorkflowBuilderScreen`, `WorkflowListScreen`, `TemplateGallery`; `rankImplications`/`rankImplicationsCopy`, `TYPE_ICONS`/`TypeIcon`, `IconPicker`, `FieldsEditor`, `TicketTypeEditorScreen`, `TicketTypeListScreen`
 - **apps/web:** `createDataSourceAuthoringGateway`, `useBuilderWiring`, routes `/w/[workspaceId]/settings/workflows` (+ `/new`, `/[workflowId]`) and `/w/[workspaceId]/settings/ticket-types` (+ `/new`, `/[typeId]`)
 - **packages/ui:** `tokens.workflowBuilder.*` colour roles (Task 5 Step 1 — yields to Plan 6's equivalents if they exist)
+
+**Consumed from `@gisik-nokma/domain` and load-bearing here:** `validateWorkflowDef` (eleven issue codes, publish-gating) and `adviseWorkflowDef` / `Advisory` (one advisory code, gating nothing). The two are separate functions and this plan keeps them separate — see design decision 9.
 
 **New read APIs this plan needs (→ Plan 5 endpoints, → Plan 6 `DataSource.query`):** `listWorkflows` (latest per workflow), `getWorkflow`, `listTicketTypes`, `listMembers` (with display names), `getWorkflowStateOccupancy` (tickets per state — `proj_tickets` grouped by `state_id`). Exact route shapes proposed under Cross-plan coordination assumptions, item 3.
 
@@ -6384,8 +6667,8 @@ Flagged, never silently resolved. None blocks execution — each names the decis
 4. **`removeState` semantics** (decision 1): edges cascade; `initialStateId` and rdu references dangle into named issues. Consequence: `duplicate-state-id` and `unknown-transition-state` are unauthorable by pointer gestures and are planted via `loadDraft` — argued in the coverage table, flagged here for reviewer sign-off.
 5. **Ticket-type entity streams.** Each `ticket-type.defined` mints a fresh entity ULID (Plan 3's own test convention; the projection folds by payload id). If a later plan keys per-entity sequence for type history, the gateway should return each type's entity id and the builder will reuse it — an additive change confined to `events.ts` and `gateway.ts`.
 6. **Requires-parent follows the rank — SETTLED by the owner, 2026-08-20.** The coordination doc deferred this here; the owner answered it in the sign-off table and **overruled this plan's earlier call**. The rule: any ticket whose type sits at **or below the deepest rank** requires a parent — the built-in `sub-task` (rank 4), any custom type defined at rank 4, and anything deeper. Types at epic/story/task ranks are unaffected; an epic-rank custom type may still sit at project root. Applied here as `rank >= DEEPEST_RANK` in `rank.ts` (decision 4) with the rank-implications copy stating the requirement plainly, and in Plan 3 as the `hierarchy.deepest-rank-parent-required` refusal keyed on the same imported constant. Two things pinned so a later reader does not "improve" them: the constant is never replaced by a max computed over the loaded types (the builder would then describe a rule the server does not enforce), and the comparison is `>=` rather than `===` (a rank-5 type is smaller work than a sub-task, so exempting it would invert the rule's own justification and leave an escape hatch). **Still open** (the unrelated half of the original question): the built-in rank lock (decision 7) is UI-only — the server's last-definition-wins would accept a re-rank; if the owner wants that refused, it is a Plan 3 rule addition, not a builder change.
-7. **`Issue` carries no structural ref.** Anchoring recomputes offenders per code (robust to the reconciled validator's ordering, degrades to canvas-level, never crashes). Proposed contract amendment: additive `ref?: { stateId: string } | { transition: { from: string; to: string } }` on `Issue`, which would delete `anchor-issues.ts`'s recomputation wholesale.
-8. **rdu start-state warning.** Plan 2's Open question 10 proposed a builder-side warning for `thanActorOf.to === ` the initial state; implemented here as an inline note in the editor (not a blocking issue). If the reconciliation instead adds a validator warning code, drop the local note and let the issues panel carry it.
+7. **`Issue` carries no structural ref — and neither does `Advisory`.** Anchoring recomputes offenders per code (robust to the reconciled validator's ordering, degrades to canvas-level, never crashes). Proposed contract amendment: additive `ref?: { stateId: string } | { transition: { from: string; to: string } }` on **both** shapes, which would delete `anchor-issues.ts`'s recomputation wholesale — including the `rdu-bypassable` reachability walk, which is the one recomputation here that duplicates real algorithmic content rather than a trivial scan.
+8. **rdu start-state warning — SETTLED by the owner, 2026-08-26.** Plan 2's Open question 10 proposed a builder-side warning for `thanActorOf.to === ` the initial state, and this plan implemented it as an inline note in the editor. The owner split the question in two and answered both: the **dead** case (nothing in this version enters the watched state) is now the blocking issue code `rdu-unenterable-state`, and the **reachable-but-vacuous** case is the advisory `rdu-bypassable`, in a tier that does not gate publish. Both arrive through `@gisik-nokma/domain` and both land in the panel, so the plan no longer relies on a local warning to carry the honesty. The inline editor note stays — it speaks at the moment of authoring, before the panel has anything to say — but it is now the least of three, not the only one. Scope note the plan must not overclaim: the advisory characterises reachable vacuous acceptance **within a single workflow version** only; across versions, four-eyes is protected by the transition log carrying its `workflowVersion` (coordination doc, owner decisions part 3), which is Plan 2's business, not the builder's.
 9. **`unknown-initial-state` message copy** is owned by the amended Plan 2; every test here asserts through `validateWorkflowDef`'s own output, so whatever copy ships needs no edit in this plan.
 10. **Drafts are session-only; concurrent publishes are refused, not merged.** Two admins editing the same workflow race to publish; the loser gets the `workflow-version` refusal verbatim (tested, case 10.35) and re-applies their edit on a fresh load. Draft persistence/locking was considered and deferred — the ledger's refusal is the honest floor.
 11. **E2E auth setup** depends on Plan 6's helper; Task 14 documents the `codegen --save-storage` fallback and the suite skips loudly when unconfigured.

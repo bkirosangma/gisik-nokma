@@ -84,19 +84,22 @@ packages/domain/
                                #        WorkflowDefinedPayload (def + optional stateMapping), PublishedWorkflowDef,
                                #        hasStateMapping guard, TicketTransitionedPayload schema
   src/entity-state.ts          # NEW — TicketState, MembershipState, OtherEntityState, EntityState, WorkspaceRole, membershipId
-  src/validate-workflow.ts     # NEW — Issue, validateWorkflowDef (pure, I/O-free; the builder UI calls this same function)
+  src/validate-workflow.ts     # NEW — Issue, validateWorkflowDef (pure, I/O-free; the builder UI calls this same function),
+                               #        plus the exported label() helper the advisory tier shares
+  src/advise-workflow.ts       # NEW — Advisory, adviseWorkflowDef (the warning tier; the rule engine NEVER calls it)
   src/event-types.ts           # MODIFY (Plan 1's) — register 'workflow.defined' v1
   src/index.ts                 # MODIFY (Plan 1's) — re-export the new modules
   test/workflow-schema.test.ts # NEW
   test/entity-state.test.ts    # NEW
   test/validate-workflow.test.ts # NEW
+  test/advise-workflow.test.ts # NEW
 
 packages/rule-engine/
   src/evaluate.ts              # NEW/REPLACE — the real evaluateEvent dispatcher
   src/refusal-rules.ts         # NEW — REFUSAL_RULES canonical rule-name constants
   src/workflow-defined.ts      # NEW — structural + versioning + stranding refusals
   src/transition.ts            # NEW — ticket.transitioned evaluation (built up across Tasks 6-8)
-  src/version-map.ts           # NEW — resolveCurrentStateId across workflow versions via stateMappings
+  src/version-map.ts           # NEW — resolveStateIdForward (the one version walk) + resolveCurrentStateId
   src/rules/types.ts           # NEW — TransitionRuleInput, RuleEvaluator
   src/rules/index.ts           # NEW — evaluateTransitionRules (ordered, first refusal wins, exhaustive switch)
   src/rules/require-comment.ts # NEW
@@ -106,7 +109,7 @@ packages/rule-engine/
   src/rules/require-different-user.ts # NEW
   src/fixtures/harness.ts      # NEW — fixtureSchema, loadFixtures, completeEnvelope/completeCandidate,
                                #        buildInMemoryContext, assertFixtureOutcome (framework-free)
-  fixtures/*.json              # NEW — 55 planted-defect fixtures (inventory in tasks below)
+  fixtures/*.json              # NEW — 58 planted-defect fixtures (inventory in tasks below)
   src/index.ts                 # MODIFY (Plan 1's) — export engine + fixture harness
   test/harness.test.ts         # NEW
   test/fixtures.test.ts        # NEW — the runner: iterates every fixture
@@ -130,11 +133,16 @@ Flagged, never silently resolved. None blocks execution — each names the decis
 3. **`EntityState`/`TicketState` ownership** — the frozen `EngineContext` references these types but the contract does not define them. Taken: this plan defines them in `packages/domain` (Task 2) with exactly the fields the engine reads; if Plan 1 created placeholder definitions, this plan's shapes replace them and Plan 3's ticket projection must maintain every field (notably `stateCategory` and the `transitions` log).
 4. **Membership entity-id convention** — `restrict-to` role checks need the actor's membership via `getEntityState('membership', id)`. Taken: `membershipId(workspaceId, userId) = "${workspaceId}:${userId}"`, exported from domain; the later auth/membership plan must adopt or renegotiate it.
 5. **`registerProjection` handle types** — `apply`/`reset` assumed to receive a `pg`-style `query(text, values)` handle; adapt the two method signatures in Task 12 to Plan 1's actual types.
-6. **"In-flight detection via ctx" vs the frozen `EngineContext`** — the assignment asks that a version that would strand *in-flight* tickets be refused, detecting in-flight via ctx; but the frozen ctx cannot enumerate tickets by state. Occupancy smuggled through `getEntityState('workflow', id)` was considered and rejected: in this plan the server ctx returns `null` for entity lookups until Plan 3, so occupancy-based detection would **false-accept every mapping-less publish** — stranding, the exact thing the spec forbids. Taken: the conservative rule — every state dropped between versions must appear in `stateMapping`, whether or not a ticket currently sits in it. Strictly safer (never strands), spec-compliant ("the builder demands a state mapping at publish time"), and safe to relax later: refused events never entered the ledger, so a future leniency cannot corrupt replay.
+6. **"In-flight detection via ctx" vs the frozen `EngineContext`** — **SETTLED by the owner on 2026-08-26 (coordination doc, "Owner decisions (2026-08-26)"); this is permanent semantics, not a stopgap.** The assignment asks that a version that would strand *in-flight* tickets be refused, detecting in-flight via ctx. The rule is instead: publishing version N+1 that drops states version N has is refused unless `stateMapping` covers **every** dropped state, occupied or not. That rule is permanent and is not to be relaxed. The load-bearing reason is not a limitation of this plan's context — it is the shared-fixture promise. The rule engine runs identically on client and server, proven by one shared fixture suite (Task 4), and client replicas are visibility-scoped (spec §5, §6). A user who cannot see three tickets sitting in the dropped state computes occupancy 0 while the server computes 3; making publish legality depend on occupancy would make the two engines disagree **by construction** — precisely what the shared-fixture promise exists to prevent. Occupancy is therefore a **builder courtesy, never an engine input**: Plan 8's `GET /v1/workspaces/:workspaceId/workflows/:workflowId/state-occupancy` prefills the mapping dialog's counts and degrades honestly when that read fails. Supporting context, no longer the reason: the frozen ctx cannot enumerate tickets by state, and occupancy smuggled through `getEntityState('workflow', id)` was considered and rejected — in this plan the server ctx returns `null` for entity lookups until Plan 3, so occupancy-based detection would false-accept every mapping-less publish. Consequence for copy: neither the refusal nor any dialog may claim in-flight tickets it has not counted, so the `workflow-state-mapping` reason names the real reason instead. A real occupancy *count*, where one is actually computed, stays accurate and stays.
 7. **`stateMapping` and the frozen `WorkflowDef`** — the frozen type has no `stateMapping` field. Taken: the mapping travels in the `workflow.defined` **payload** (`WorkflowDefinedPayload = WorkflowDef & { stateMapping?: Record<string, string> }`, exported as `PublishedWorkflowDef`); `getWorkflowDef` returns the stored payload, which structurally satisfies `WorkflowDef`; the engine narrows via the `hasStateMapping` type guard — no casts, no change to the frozen type.
 8. **Fixture schema deviates from the assignment's singular shape** — `{name, workflowDef, priorEvents, candidateEvent, expected}` became `workflowDefs` (array) plus a `memberships` field. Reasons: the stranded-ticket defense needs **two** planted published versions at once, and role fixtures need memberships — but membership events belong to a later plan's vocabulary, and `priorEvents` must stay restricted to events a real server can eventually ingest, or the "same fixtures on the server" promise breaks.
 9. **Integration-test DB convention** — `TEST_DATABASE_URL`-gated (`describe.skip` when unset, with a loud console warning); if Plan 1 established a different convention (docker-compose, per-test schema), follow Plan 1's.
-10. **`require-different-user` initial-state gap** — creation is not a transition, so a rule whose `thanActorOf.to` is the workflow's starting state finds no prior performer and accepts vacuously (a creator could self-approve). Fixture `rule-rdu-accepts-when-nobody-performed-the-earlier-move` documents the semantics rather than hiding them. Proposed for a later plan: a builder-side validator *warning* when `thanActorOf.to === initialStateId`.
+10. **`require-different-user` vacuous acceptance** — **SETTLED by the owner on 2026-08-26 (coordination doc); three parts, all landed in this plan.** Creation is not a transition, so a rule that watches a move nobody can have made finds no prior performer and accepts vacuously — a creator could self-approve. The gap splits three ways and each half is now closed:
+    - **Dead rule → publish-time refusal.** An RDU rule naming a state that no transition in this version enters is a structural error: `validateWorkflowDef` emits `rdu-unenterable-state` (Task 3) and the engine refuses the publish as `workflow-structure`. Given the existing `unreachable-state` and `terminal-no-inbound` checks this reduces, in a workflow that otherwise validates, to the initial state with nothing looping back — the exact self-approval hole this question named, caught at publish rather than tolerated at runtime.
+    - **Bypassable rule → advisory.** A rule whose guarded transition is reachable from `initialStateId` **without** ever entering the watched state is real but not structural: the workflow works, and on one path the rule finds nobody to differ from. That is a warning, `rdu-bypassable`, and it lives in the separate `adviseWorkflowDef` tier (Task 3) precisely because a warning placed in `validateWorkflowDef`'s array would silently become a refusal.
+    - **Cross-version disarming → per-entry `workflowVersion`.** Log entries used to store a raw `toStateId` and no version while RDU compared them against a state id in the *latest* definition, so a version that dropped and remapped a state left historical entries unmatchable: RDU found no prior performer and one person made both moves. Versioning quietly disarmed four-eyes. Each log entry now carries `workflowVersion` (Task 2) and the evaluator resolves a candidate entry's id forward through the version chain before comparing (Task 11).
+
+    **Scope note this plan must not overclaim:** the advisory characterises reachable vacuous acceptance **within a single workflow version only**. The remap case above is the counterexample across versions — which is exactly why the per-entry version exists, and why the advisory is not, and must not be presented as, a complete account of when four-eyes can be satisfied by one person.
 
 ## Canonical refusal copy
 
@@ -147,7 +155,7 @@ Every refusal `rule` string and `reason` template, in one place. The rule module
 | `malformed-payload` | `This workflow.defined event does not point at a workflow; it points at a ${env.entity.kind}.` / `This workflow.defined event's payload is malformed: ${zodIssues}` / `This workflow.defined event points at workflow ${env.entity.id}, but its payload defines workflow ${payload.id}.` / `This ticket.transitioned event does not point at a ticket; it points at a ${env.entity.kind}.` / `This ticket.transitioned event's payload is malformed: ${zodIssues}` |
 | `workflow-structure` | `This workflow definition cannot be published: ${issue messages joined with ' '}` |
 | `workflow-version` | `The first published version of a workflow must be version 1; this definition claims version ${v}.` / `Workflow "${name}" is at version ${latest}; the next published version must be ${latest + 1}, not ${v}.` |
-| `workflow-state-mapping` | `Version ${v} drops state(s) ${"ids each quoted, comma-joined"} that version ${prev} has; a stateMapping entry for each dropped state is required so no in-flight ticket is stranded.` / `The stateMapping remaps "${oldId}", but that state still exists in version ${v}; only dropped states may be remapped.` / `The stateMapping sends "${oldId}" to "${target}", but "${target}" is not a state in version ${v}.` |
+| `workflow-state-mapping` | `Version ${v} drops state(s) ${"ids each quoted, comma-joined"} that version ${prev} has; publishing cannot see which tickets sit in which state, so every dropped state needs a stateMapping entry.` / `The stateMapping remaps "${oldId}", but that state still exists in version ${v}; only dropped states may be remapped.` / `The stateMapping sends "${oldId}" to "${target}", but "${target}" is not a state in version ${v}.` |
 | `unknown-ticket` | `This event moves ticket ${id}, but no such ticket is known.` |
 | `unknown-workflow` | `Ticket ${ticketId} uses workflow ${workflowId}, but no published definition of that workflow is known.` |
 | `stranded-state` | `Ticket ${ticketId} sits in state "${stateId}" of workflow version ${ticketVersion}, which no longer exists in version ${latestVersion} and no state mapping covers it.` |
@@ -165,7 +173,7 @@ Every refusal `rule` string and `reason` template, in one place. The rule module
 | `require-field` | `This move needs the field "${field}" to be set first, and it is not.` |
 | `require-different-user` | `This step needs a second person: ${priorActorId} already performed the move to "${to}" on this ticket.` |
 
-**Structural issue messages** (`validateWorkflowDef`; `code` → message template). The `code`s beyond the assignment's five (`no-states`, `duplicate-transition`, `unknown-initial-state`, `empty-restrict-to`, `rdu-unknown-state`) are additions, each with a one-line justification in Task 3; `unknown-initial-state` implements the coordination doc's contract amendment (§3).
+**Structural issue messages** (`validateWorkflowDef`; `code` → message template). The `code`s beyond the assignment's five (`no-states`, `duplicate-transition`, `unknown-initial-state`, `empty-restrict-to`, `rdu-unknown-state`, `rdu-unenterable-state`) are additions, each with a one-line justification in Task 3; `unknown-initial-state` implements the coordination doc's contract amendment (§3) and `rdu-unenterable-state` the owner decision of 2026-08-26.
 
 | `code` | message template |
 |---|---|
@@ -179,8 +187,17 @@ Every refusal `rule` string and `reason` template, in one place. The rule module
 | `terminal-no-inbound` | `Terminal state "${name}" has no transition leading into it, so no ticket could ever reach it.` |
 | `empty-restrict-to` | `A restrict-to rule on the transition from ${label(from)} to ${label(to)} names nobody: it must allow the assignee, at least one role, or at least one named person.` |
 | `rdu-unknown-state` | `A require-different-user rule on the transition from ${label(from)} to ${label(to)} refers to a move to "${target}", but no state with that id exists.` |
+| `rdu-unenterable-state` | `A require-different-user rule on the transition from ${label(from)} to ${label(to)} refers to a move to "${targetName}", but nothing in this version enters that state, so the rule can never require a second person.` |
 
-`label(ref)` renders `"${state name}"` for a known state id, `any state` (no quotes) for `'*'`, and `"${ref}"` for an unknown id.
+The helper is `label(def: WorkflowDef, ref: string)`, exported from `validate-workflow.ts` because the advisory tier shares it; the tables above write `label(from)` as shorthand for readability, not as its signature. It renders `"${state name}"` for a known state id, `any state` (no quotes) for `'*'`, and `"${ref}"` for an unknown id.
+
+Two deliberate differences between those last two rows, which an executor must not "harmonise": `rdu-unknown-state` interpolates the **raw id** (`${target}`) because the state does not exist and no name resolves, while `rdu-unenterable-state` interpolates the state's **name** (`${targetName}`) because the state does exist. And `rdu-unenterable-state` says "nothing in **this version** enters that state" rather than "nothing ever" — across workflow versions a legacy ticket can carry an older entry into that state forward, so an unqualified claim would overclaim.
+
+**Advisory messages** (`adviseWorkflowDef`; `code` → message template). These are **warnings, not refusals** — they are returned by a separate function the rule engine never calls, and no refusal reason ever contains them (Task 3).
+
+| `code` | message template |
+|---|---|
+| `rdu-bypassable` | `A require-different-user rule on the transition from ${label(from)} to ${label(to)} watches the move to "${targetName}", but this move can be reached without ever entering "${targetName}"; on that path one person can make it alone.` |
 
 **A distinction the executor must hold:** the envelope's `version` field is the **event-schema version** (always `1` in this plan); the **workflow version** lives only in the payload (`payload.version`). Fixtures below default envelope `version` to 1 while payloads carry 1, 2, or 3.
 
@@ -371,8 +388,9 @@ export const stateMappingSchema = z.record(z.string(), z.string());
 /**
  * The payload of a `workflow.defined` event: the full definition, plus — when
  * this version drops states an earlier version had — a mapping from each
- * dropped state id to its replacement in this version, so no in-flight ticket
- * is stranded.
+ * dropped state id to its replacement in this version. Publishing cannot see
+ * which tickets sit in which state, so the mapping is required for every
+ * dropped state whether or not anything is standing in it.
  */
 export const workflowDefinedPayloadSchema = workflowDefSchema.extend({
   stateMapping: stateMappingSchema.optional(),
@@ -487,7 +505,9 @@ The frozen `EngineContext` returns `EntityState`/`TicketState` but the contract 
 
 **Interfaces:**
 - Consumes: `StateCategory` from Task 1.
-- Produces: `FieldClaim` (`{value, actorId, clientTime, serverTime}` — per-field provenance), `TicketState` (discriminant `kind: 'ticket'`; the merged cross-plan shape per the coordination doc §4: fields `id`, `workspaceId`, `projectId`, `typeId`, `parentId`, `workflowId`, `workflowVersion`, `stateId`, `stateCategory`, `assigneeId`, `collaboratorIds`, `fields: Record<string, FieldClaim>`, and the transition log `transitions: { toStateId; actorId; seq }[]`), `MembershipState` (`kind: 'membership'`; `id`, `workspaceId`, `userId`, `role`), `OtherEntityState`, `EntityState` (the union), `WorkspaceRole`, `membershipId(workspaceId, userId): string`. Plan 3's ticket projection must maintain every `TicketState` field, notably `stateCategory` (denormalized so the parent-terminal check needs no per-child workflow lookup) and the append-only `transitions` log (what `require-different-user` reads).
+- Produces: `FieldClaim` (`{value, actorId, clientTime, serverTime}` — per-field provenance), `TicketState` (discriminant `kind: 'ticket'`; the merged cross-plan shape per the coordination doc §4: fields `id`, `workspaceId`, `projectId`, `typeId`, `parentId`, `workflowId`, `workflowVersion`, `stateId`, `stateCategory`, `assigneeId`, `collaboratorIds`, `fields: Record<string, FieldClaim>`, and the transition log `transitions: { toStateId; actorId; seq; workflowVersion }[]`), `MembershipState` (`kind: 'membership'`; `id`, `workspaceId`, `userId`, `role`), `OtherEntityState`, `EntityState` (the union), `WorkspaceRole`, `membershipId(workspaceId, userId): string`. Plan 3's ticket projection must maintain every `TicketState` field, notably `stateCategory` (denormalized so the parent-terminal check needs no per-child workflow lookup) and the append-only `transitions` log (what `require-different-user` reads).
+
+**A log entry's `workflowVersion`** is the workflow definition version in whose vocabulary that entry's `toStateId` is written — the ticket's `workflowVersion` at the moment the transition was applied, after any forward fold. It is pinned by the coordination doc's decision 4 (as amended 2026-08-26) and it is not optional: without it, a version that drops and remaps a state leaves every historical entry unmatchable against the latest definition's state ids, and `require-different-user` silently finds no prior performer — four-eyes disarmed by a rename (Open question 10, part three; the evaluator's forward walk is Task 11).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -565,7 +585,12 @@ export type FieldClaim = { value: unknown; actorId: string; clientTime: string; 
  * every field. `stateCategory` is denormalized from the ticket's workflow so
  * the parent-terminal invariant needs no per-child workflow lookup.
  * `transitions` is the append-only log of every ticket.transitioned applied
- * to this ticket, oldest first — what require-different-user reads.
+ * to this ticket, oldest first — what require-different-user reads. An
+ * entry's workflowVersion is the definition version in whose vocabulary that
+ * entry's toStateId is written (the ticket's workflowVersion when the
+ * transition was applied, after any forward fold); four-eyes resolves the id
+ * forward from it before comparing, so a dropped-and-remapped state cannot
+ * disarm the rule.
  */
 export type TicketState = {
   kind: 'ticket';
@@ -581,7 +606,7 @@ export type TicketState = {
   assigneeId: string | null;
   collaboratorIds: string[];
   fields: Record<string, FieldClaim>;
-  transitions: { toStateId: string; actorId: string; seq: number }[];
+  transitions: { toStateId: string; actorId: string; seq: number; workflowVersion: number }[];
 };
 
 export type MembershipState = {
@@ -626,25 +651,33 @@ git commit -m "Entity-state shapes the engine reads, pinned in domain
 The frozen EngineContext references TicketState without defining it; these
 shapes are the contract Plan 3's projections must maintain — stateCategory
 denormalized for the parent-terminal check, the transitions log for
-four-eyes, and the workspace:user membership-id convention."
+four-eyes with each entry stamped with the workflow version its state id is
+written in, and the workspace:user membership-id convention."
 ```
 
 ---
 
-### Task 3: Pure structural validation — `validateWorkflowDef`
+### Task 3: Pure structural validation — `validateWorkflowDef`, and the advisory tier
 
-The builder refuses to publish a workflow with no terminal state, an unreachable state, or an unenterable terminal state (spec §4). This function is the single source of that judgment: pure and I/O-free, because the later builder UI calls this same function for live validation while the engine calls it at ingest.
+The builder refuses to publish a workflow with no terminal state, an unreachable state, or an unenterable terminal state (spec §4). This function is the single source of that judgment: pure and I/O-free, because the later builder UI calls this same function for live validation while the engine calls it at ingest. This task also adds the **advisory tier** — a second, separate function for problems that are real but not fatal (Steps 7–8).
 
-Beyond the assignment's five checks (no terminal state, unreachable state, terminal with no inbound, duplicate state ids, transition referencing unknown states), four additions, each preventing a silent lie: `no-states` (an empty draft should say so rather than crash reachability), `duplicate-transition` (two transitions over the same edge make it ambiguous which rules run — rules that look enforced but aren't), `empty-restrict-to` (a restriction that names nobody can never be satisfied), `rdu-unknown-state` (a four-eyes rule watching a nonexistent transition can never fire).
+Beyond the assignment's five checks (no terminal state, unreachable state, terminal with no inbound, duplicate state ids, transition referencing unknown states), five additions, each preventing a silent lie: `no-states` (an empty draft should say so rather than crash reachability), `duplicate-transition` (two transitions over the same edge make it ambiguous which rules run — rules that look enforced but aren't), `empty-restrict-to` (a restriction that names nobody can never be satisfied), `rdu-unknown-state` (a four-eyes rule watching a nonexistent transition can never fire), `rdu-unenterable-state` (a four-eyes rule watching a state that exists but that nothing in this version enters can never require a second person — same class as `terminal-no-inbound`: a declared thing that structurally cannot function).
+
+`rdu-unenterable-state` reduces to a narrow case in practice, and that narrowness is the point. A non-initial state with no inbound transition already fails `unreachable-state`, and a terminal one already fails `terminal-no-inbound` — so in a workflow that otherwise validates, this fires for the **initial state with nothing looping back to it**: the self-approval hole Open question 10 named, now caught at publish instead of tolerated at runtime. Two details are load-bearing. It is checked **only when the watched state is a known state id** — when the id is unknown, `rdu-unknown-state` fires and `rdu-unenterable-state` must not also fire, because one authoring mistake must produce one message. And a transition with `from: '*'` still has a concrete `to`, so it counts as entering that state like any other transition.
 
 **Files:**
 - Create: `packages/domain/src/validate-workflow.ts`
-- Modify: `packages/domain/src/index.ts` (re-export)
+- Create: `packages/domain/src/advise-workflow.ts` (Step 7)
+- Modify: `packages/domain/src/index.ts` (re-export both)
 - Test: `packages/domain/test/validate-workflow.test.ts`
+- Test: `packages/domain/test/advise-workflow.test.ts` (Step 7)
 
 **Interfaces:**
 - Consumes: `WorkflowDef`, `Rule` from Task 1.
-- Produces: `validateWorkflowDef(def: WorkflowDef): Issue[]` and `Issue = { code: string; message: string }`. Issue order is deterministic: no-states short-circuits; then duplicate-state-id, no-terminal-state, unknown-transition-state, duplicate-transition, unknown-initial-state (reachability is skipped when it fires — there is no start to walk from), unreachable-state, terminal-no-inbound, then rule-level checks — each in definition order. Codes: `no-states`, `duplicate-state-id`, `no-terminal-state`, `unknown-transition-state`, `duplicate-transition`, `unknown-initial-state`, `unreachable-state`, `terminal-no-inbound`, `empty-restrict-to`, `rdu-unknown-state`. All issues are collected (the builder shows them all); the engine joins the messages into one refusal.
+- Produces: `validateWorkflowDef(def: WorkflowDef): Issue[]` and `Issue = { code: string; message: string }`. Issue order is deterministic: no-states short-circuits; then duplicate-state-id, no-terminal-state, unknown-transition-state, duplicate-transition, unknown-initial-state (reachability is skipped when it fires — there is no start to walk from), unreachable-state, terminal-no-inbound, then rule-level checks — each in definition order. Codes: `no-states`, `duplicate-state-id`, `no-terminal-state`, `unknown-transition-state`, `duplicate-transition`, `unknown-initial-state`, `unreachable-state`, `terminal-no-inbound`, `empty-restrict-to`, `rdu-unknown-state`, `rdu-unenterable-state`. All issues are collected (the builder shows them all); the engine joins the messages into one refusal. Also produces the `label(def, ref)` helper as a named export, because the advisory tier renders the same state references and two copies of that formatting is how the two tiers' copy starts drifting.
+- Also produces (Step 7): `adviseWorkflowDef(def: WorkflowDef): Advisory[]` and `Advisory = { code: string; message: string }`, from `packages/domain/src/advise-workflow.ts`. Its one code is `rdu-bypassable`.
+
+**Where `rdu-unenterable-state` slots into the issue order:** immediately **after** `rdu-unknown-state`, both in this Produces block and in the implementation's rule-level loop. Insertion there is safe for consumers: Plan 8 anchors issues to builder elements per `code`, not by global index, so adding a code does not shift what any existing issue anchors to.
 
 Semantics pinned here, tested below: the **starting state is the state named by `initialStateId`** (the coordination doc's contract amendment §3 — position in the list is never semantic); a `'*'` transition's target is reachable (the starting state matches `'*'`); an exact `from` transition and a `'*'` transition to the same target are **not** duplicates (the engine prefers the exact one); a self-loop does not count as a way into a terminal state; a `'*'` inbound counts only when the workflow has more than one state.
 
@@ -842,7 +875,13 @@ export function validateWorkflowDef(def: WorkflowDef): Issue[] {
   return issues;
 }
 
-function label(def: WorkflowDef, ref: string): string {
+/**
+ * How a state reference is rendered in a message: its quoted name when the id
+ * is known, the unquoted words `any state` for the wildcard, and the quoted
+ * raw id when nothing resolves. Exported because the advisory tier (Step 7)
+ * renders the same references and must render them identically.
+ */
+export function label(def: WorkflowDef, ref: string): string {
   if (ref === '*') return 'any state';
   const state = def.states.find((s) => s.id === ref);
   return state === undefined ? `"${ref}"` : `"${state.name}"`;
@@ -1026,6 +1065,58 @@ describe('validateWorkflowDef — rule-level checks', () => {
       },
     ]);
   });
+
+  it('a four-eyes rule watching a state nothing enters can never require a second person', () => {
+    // The narrow case that survives the reachability checks: the rule watches
+    // the INITIAL state, which every ticket starts in and nothing loops back
+    // to. Nobody ever performs a move into it, so the rule is dead on arrival.
+    const d = def({
+      transitions: [
+        { from: 'todo', to: 'doing', rules: [] },
+        { from: 'doing', to: 'done', rules: [{ kind: 'require-different-user', thanActorOf: { to: 'todo' } }] },
+      ],
+    });
+    expect(validateWorkflowDef(d)).toEqual([
+      {
+        code: 'rdu-unenterable-state',
+        message:
+          'A require-different-user rule on the transition from "Doing" to "Done" refers to a move to "To do", but nothing in this version enters that state, so the rule can never require a second person.',
+      },
+    ]);
+  });
+
+  it('a four-eyes rule is silent when some transition does enter the watched state', () => {
+    const d = def({
+      transitions: [
+        { from: 'todo', to: 'doing', rules: [] },
+        { from: 'doing', to: 'done', rules: [{ kind: 'require-different-user', thanActorOf: { to: 'doing' } }] },
+      ],
+    });
+    expect(codes(d)).toEqual([]);
+  });
+
+  it('a from-any transition counts as entering its target', () => {
+    const d = def({
+      transitions: [
+        { from: 'todo', to: 'doing', rules: [] },
+        { from: '*', to: 'todo', rules: [] },
+        { from: 'doing', to: 'done', rules: [{ kind: 'require-different-user', thanActorOf: { to: 'todo' } }] },
+      ],
+    });
+    expect(codes(d)).toEqual([]);
+  });
+
+  it('an unknown watched state reports only rdu-unknown-state, never both codes', () => {
+    // One authoring mistake, one message: enterability is checked only for
+    // states that exist, so the two rdu codes can never fire for one rule.
+    const d = def({
+      transitions: [
+        { from: 'todo', to: 'doing', rules: [] },
+        { from: 'doing', to: 'done', rules: [{ kind: 'require-different-user', thanActorOf: { to: 'reviewed' } }] },
+      ],
+    });
+    expect(codes(d)).toEqual(['rdu-unknown-state']);
+  });
 });
 ```
 
@@ -1046,11 +1137,29 @@ Then insert before the final `return issues;` in `validateWorkflowDef` (after th
           });
         }
       }
-      if (rule.kind === 'require-different-user' && !stateIds.has(rule.thanActorOf.to)) {
-        issues.push({
-          code: 'rdu-unknown-state',
-          message: `A require-different-user rule on the transition from ${label(def, transition.from)} to ${label(def, transition.to)} refers to a move to "${rule.thanActorOf.to}", but no state with that id exists.`,
-        });
+      if (rule.kind === 'require-different-user') {
+        const target = rule.thanActorOf.to;
+        if (!stateIds.has(target)) {
+          issues.push({
+            code: 'rdu-unknown-state',
+            message: `A require-different-user rule on the transition from ${label(def, transition.from)} to ${label(def, transition.to)} refers to a move to "${target}", but no state with that id exists.`,
+          });
+        } else if (!def.transitions.some((candidate) => candidate.to === target)) {
+          // Enterability is checked ONLY for states that exist: an unknown id
+          // already reported above must not also report here — one authoring
+          // mistake, one message. A from:'*' transition still has a concrete
+          // `to`, so it counts as entering that state like any other.
+          // "nothing in this version" is deliberate: a legacy ticket can carry
+          // an older version's entry into this state forward, so an
+          // unqualified "nothing ever" would overclaim. The target exists
+          // here, so its NAME resolves — unlike rdu-unknown-state above, which
+          // must print the raw id because no name exists to print.
+          const targetName = def.states.find((state) => state.id === target)?.name ?? target;
+          issues.push({
+            code: 'rdu-unenterable-state',
+            message: `A require-different-user rule on the transition from ${label(def, transition.from)} to ${label(def, transition.to)} refers to a move to "${targetName}", but nothing in this version enters that state, so the rule can never require a second person.`,
+          });
+        }
       }
     }
   }
@@ -1059,17 +1168,238 @@ Then insert before the final `return issues;` in `validateWorkflowDef` (after th
 Run: `pnpm --filter ./packages/domain test`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Write the failing advisory tests, then implement the advisory tier**
+
+**Why this is a second function and not a second issue code.** A warning must never enter `validateWorkflowDef`'s return array. Three independent consumers make that array mean "publish is refused": Plan 8 gates the publish button on it being empty; every Plan 8 template asserts it validates clean; and this plan's engine (Task 5) joins **every** message it returns into one `workflow-structure` refusal. A warning dropped into that array would therefore not be a warning — it would silently be a refusal, and a template that ships with a bypassable four-eyes rule would become unpublishable. So the warning tier is a separate function, in a separate file, that **the rule engine never calls**.
+
+`Advisory` is structurally identical to `Issue`, so under TypeScript's structural typing a distinct type name protects nothing — passing advisories where issues are expected compiles. The guarantee is therefore proven the way this plan proves everything else: by a planted defect. Task 5 Step 3 adds `workflow-defined-accepts-a-def-the-advisory-warns-about.json`, in which the engine **accepts** a `workflow.defined` whose def trips `rdu-bypassable` and nothing else. That fixture exists for exactly one purpose: to fail loudly the day someone folds the advisory tier into the refusal tier.
+
+`adviseWorkflowDef` assumes a def that **validates clean** — the builder runs it alongside a successful `validateWorkflowDef`, and its suppression rules below lean on the error tier having already spoken. Its behavior on a wrecked def is not specified beyond "returns something without throwing"; do not spec it further.
+
+Create `packages/domain/test/advise-workflow.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import type { WorkflowDef } from '../src/workflow.js';
+import { adviseWorkflowDef } from '../src/advise-workflow.js';
+import { validateWorkflowDef } from '../src/validate-workflow.js';
+
+/** Draft → Review → Approved, four-eyes on the approval. The canonical shape. */
+function reviewDef(partial: Partial<WorkflowDef> = {}): WorkflowDef {
+  return {
+    id: 'wf_review',
+    version: 1,
+    name: 'Review',
+    initialStateId: 'draft',
+    states: [
+      { id: 'draft', name: 'Draft', category: 'open' },
+      { id: 'review', name: 'In review', category: 'active' },
+      { id: 'approved', name: 'Approved', category: 'terminal' },
+    ],
+    transitions: [
+      { from: 'draft', to: 'review', rules: [] },
+      { from: 'review', to: 'draft', rules: [] },
+      { from: 'review', to: 'approved', rules: [{ kind: 'require-different-user', thanActorOf: { to: 'review' } }] },
+    ],
+    ...partial,
+  };
+}
+
+function codes(d: WorkflowDef): string[] {
+  return adviseWorkflowDef(d).map((advisory) => advisory.code);
+}
+
+describe('adviseWorkflowDef', () => {
+  it('is silent on canonical four-eyes: the approval is only reachable through review', () => {
+    expect(adviseWorkflowDef(reviewDef())).toEqual([]);
+  });
+
+  it('warns when a fast-track edge reaches the guarded move without entering the watched state', () => {
+    const d = reviewDef({
+      transitions: [
+        { from: 'draft', to: 'review', rules: [] },
+        { from: 'review', to: 'draft', rules: [] },
+        { from: 'review', to: 'approved', rules: [{ kind: 'require-different-user', thanActorOf: { to: 'review' } }] },
+        { from: 'draft', to: 'approved', rules: [{ kind: 'require-different-user', thanActorOf: { to: 'review' } }] },
+      ],
+    });
+    expect(validateWorkflowDef(d)).toEqual([]);
+    expect(adviseWorkflowDef(d)).toEqual([
+      {
+        code: 'rdu-bypassable',
+        message:
+          'A require-different-user rule on the transition from "Draft" to "Approved" watches the move to "In review", but this move can be reached without ever entering "In review"; on that path one person can make it alone.',
+      },
+    ]);
+  });
+
+  it('always warns on a from-any transition — a wildcard move is performable from the very start', () => {
+    const d = reviewDef({
+      transitions: [
+        { from: 'draft', to: 'review', rules: [] },
+        { from: 'review', to: 'draft', rules: [] },
+        { from: 'review', to: 'approved', rules: [] },
+        { from: '*', to: 'approved', rules: [{ kind: 'require-different-user', thanActorOf: { to: 'review' } }] },
+      ],
+    });
+    expect(adviseWorkflowDef(d)).toEqual([
+      {
+        code: 'rdu-bypassable',
+        message:
+          'A require-different-user rule on the transition from any state to "Approved" watches the move to "In review", but this move can be reached without ever entering "In review"; on that path one person can make it alone.',
+      },
+    ]);
+  });
+
+  it('warns when the guarded transition is itself an entry into the watched state and its from is still reachable', () => {
+    const d = reviewDef({
+      transitions: [
+        { from: 'draft', to: 'review', rules: [{ kind: 'require-different-user', thanActorOf: { to: 'review' } }] },
+        { from: 'review', to: 'approved', rules: [] },
+        { from: 'approved', to: 'review', rules: [] },
+      ],
+    });
+    expect(codes(d)).toEqual(['rdu-bypassable']);
+  });
+
+  it('says nothing when rdu-unknown-state or rdu-unenterable-state already spoke', () => {
+    const unknown = reviewDef({
+      transitions: [
+        { from: 'draft', to: 'review', rules: [] },
+        { from: 'review', to: 'draft', rules: [] },
+        { from: 'review', to: 'approved', rules: [{ kind: 'require-different-user', thanActorOf: { to: 'ghost' } }] },
+      ],
+    });
+    expect(codes(unknown)).toEqual([]);
+
+    // Nothing loops back to draft, so validateWorkflowDef already reported
+    // rdu-unenterable-state for this rule; the advisory must stay quiet.
+    const unenterable = reviewDef({
+      transitions: [
+        { from: 'draft', to: 'review', rules: [] },
+        { from: 'review', to: 'approved', rules: [{ kind: 'require-different-user', thanActorOf: { to: 'draft' } }] },
+      ],
+    });
+    expect(validateWorkflowDef(unenterable).map((issue) => issue.code)).toEqual(['rdu-unenterable-state']);
+    expect(codes(unenterable)).toEqual([]);
+  });
+});
+```
+
+Run: `pnpm --filter ./packages/domain test`
+Expected: FAIL — cannot resolve `../src/advise-workflow.js`.
+
+Create `packages/domain/src/advise-workflow.ts`:
+
+```ts
+import { label } from './validate-workflow.js';
+import type { WorkflowDef } from './workflow.js';
+
+/**
+ * A warning: real, but not fatal. Structurally identical to Issue on purpose —
+ * the separation that matters is which FUNCTION returns it, not which type,
+ * because structural typing makes a distinct name worthless as a guard.
+ */
+export type Advisory = { code: string; message: string };
+
+/**
+ * Advisory checks over a workflow definition. Assumes a def that already
+ * validates clean. The rule engine NEVER calls this: everything
+ * validateWorkflowDef returns becomes a refusal, so a warning placed there
+ * would silently become one too.
+ *
+ * Scope, stated so nobody reads more into it: this characterises reachable
+ * vacuous acceptance WITHIN A SINGLE WORKFLOW VERSION. Across versions a
+ * dropped-and-remapped state is the counterexample, which is why transition
+ * log entries carry their workflowVersion and four-eyes resolves them forward.
+ */
+export function adviseWorkflowDef(def: WorkflowDef): Advisory[] {
+  const advisories: Advisory[] = [];
+  const stateIds = new Set(def.states.map((state) => state.id));
+
+  for (const transition of def.transitions) {
+    for (const rule of transition.rules) {
+      if (rule.kind !== 'require-different-user') continue;
+      const target = rule.thanActorOf.to;
+      // Suppression, so one authoring mistake yields one message: both of
+      // these already produced an ERROR in validateWorkflowDef.
+      if (!stateIds.has(target)) continue; // rdu-unknown-state fired
+      if (!def.transitions.some((candidate) => candidate.to === target)) continue; // rdu-unenterable-state fired
+
+      // States reachable from the start WITHOUT ever entering the watched
+      // state: walk the graph with every edge into `target` removed. Same
+      // wildcard semantics the reachability walk pins — a from:'*' edge is
+      // traversable from any state already in the set, and a '*' → target
+      // edge is excluded like any other because its `to` is the target.
+      const reachableWithoutTarget = new Set<string>([def.initialStateId]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const candidate of def.transitions) {
+          if (candidate.to === target) continue;
+          if (!stateIds.has(candidate.to) || reachableWithoutTarget.has(candidate.to)) continue;
+          // A from:'*' edge is traversable from any state already in the set,
+          // and the set always holds at least the initial state.
+          const traversable = candidate.from === '*' || reachableWithoutTarget.has(candidate.from);
+          if (traversable) {
+            reachableWithoutTarget.add(candidate.to);
+            grew = true;
+          }
+        }
+      }
+
+      const bypassable =
+        transition.from === '*' || reachableWithoutTarget.has(transition.from);
+      if (!bypassable) continue;
+
+      const targetName = def.states.find((state) => state.id === target)?.name ?? target;
+      advisories.push({
+        code: 'rdu-bypassable',
+        message: `A require-different-user rule on the transition from ${label(def, transition.from)} to ${label(def, transition.to)} watches the move to "${targetName}", but this move can be reached without ever entering "${targetName}"; on that path one person can make it alone.`,
+      });
+    }
+  }
+
+  return advisories;
+}
+```
+
+In `packages/domain/src/index.ts`, add:
+
+```ts
+export * from './advise-workflow.js';
+```
+
+Run: `pnpm --filter ./packages/domain test`
+Expected: PASS.
+
+- [ ] **Step 8: Check the implementation against the worked cases**
+
+Read the four cases below against the code just written; each is a test above, and together they pin what the walk must and must not conclude.
+
+- **Canonical four-eyes** — Draft → Review → Approved, the RDU on `Review → Approved` watching `review`: **silent**. Excluding the edges into `review` leaves `{draft}`, and the guarded transition's `from` is `review`, which is not in that set. There is no way to stand at Review without having entered it.
+- **A fast-track edge** `Draft → Approved` carrying the same rule watching `review`: **fires**. `draft` is reachable without entering `review` — it is where every ticket starts — so one person can draft and approve.
+- **An RDU rule on a `from: '*'` transition: always fires**, and this is a **true positive, not a false one**. A wildcard move is performable from the initial state, before anyone has entered anything, so there is always a path on which the rule finds nobody to differ from. Do not "fix" this as an over-report.
+- **A guarded transition that is itself an entry into the watched state** (a rework loop where the same edge both enters `T` and carries the rule — e.g. `Draft → Review` watching `review`): **fires** whenever its `from` is still reachable without entering `T`. The walk excludes the guarded edge itself, and that is correct: the question is whether a *prior* entry into `T` exists, and on the first submission there is none.
+
+- [ ] **Step 9: Commit**
 
 ```bash
-git add packages/domain/src/validate-workflow.ts packages/domain/src/index.ts packages/domain/test/validate-workflow.test.ts
+git add packages/domain/src/validate-workflow.ts packages/domain/src/advise-workflow.ts packages/domain/src/index.ts packages/domain/test/validate-workflow.test.ts packages/domain/test/advise-workflow.test.ts
 git commit -m "Structural validation for workflow definitions, pure so the builder shares it
 
-Ten checks, each preventing a board that lies: workflows that cannot
+Eleven checks, each preventing a board that lies: workflows that cannot
 finish, states that cannot be reached or entered, ambiguous duplicate
-edges, and rules that can never fire or never be satisfied. Reachability
-starts from the declared initialStateId and treats from-any targets as
-reachable."
+edges, and rules that can never fire or never be satisfied — including a
+four-eyes rule watching a state nothing in this version enters, which is a
+declared guard that structurally cannot function. Reachability starts from
+the declared initialStateId and treats from-any targets as reachable.
+
+Warnings live in a separate adviseWorkflowDef, not in the issue array:
+everything that array holds becomes a refusal, so a warning placed there
+would silently become one. Its first code names a four-eyes rule whose
+guarded move is reachable without ever entering the watched state — real,
+but not a reason to refuse the publish."
 ```
 
 ---
@@ -1168,7 +1498,7 @@ describe('buildInMemoryContext', () => {
       },
     });
     expect(ticket.transitions).toEqual([
-      { toStateId: 'doing', actorId: 'user_b', seq: 2 },
+      { toStateId: 'doing', actorId: 'user_b', seq: 2, workflowVersion: 1 },
     ]);
   });
 
@@ -1473,7 +1803,14 @@ function applyPriorEvent(
       }
       ticket.stateId = state.id;
       ticket.stateCategory = state.category;
-      ticket.transitions.push({ toStateId: state.id, actorId: env.actorId, seq: env.seq });
+      // The entry records the version whose vocabulary its toStateId is
+      // written in — the ticket's version at the moment the move was applied.
+      ticket.transitions.push({
+        toStateId: state.id,
+        actorId: env.actorId,
+        seq: env.seq,
+        workflowVersion: ticket.workflowVersion,
+      });
       return;
     }
     case 'ticket.assigned': {
@@ -1615,14 +1952,16 @@ framework-free and compares refusal reasons character for character."
 
 ### Task 5: The dispatcher and the `workflow.defined` path
 
-Replace Plan 1's pass-through `evaluateEvent` with the real dispatcher and implement the `workflow.defined` refusals: structural (via `validateWorkflowDef`), versioning (versions are consecutive), and stranding (every dropped state must be mapped — Open question 6 records why this is deliberately conservative).
+Replace Plan 1's pass-through `evaluateEvent` with the real dispatcher and implement the `workflow.defined` refusals: structural (via `validateWorkflowDef`), versioning (versions are consecutive), and stranding (every dropped state must be mapped, occupied or not — Open question 6 records why that is settled, permanent semantics rather than a temporary margin).
+
+The engine calls `validateWorkflowDef` and **never** calls `adviseWorkflowDef`. That is not an omission to be tidied up later: everything the issue array holds is joined into one refusal here, so an advisory routed through it becomes a refusal. Step 3 plants a fixture that fails the day someone changes this.
 
 **Files:**
 - Create: `packages/rule-engine/src/refusal-rules.ts`
 - Create: `packages/rule-engine/src/evaluate.ts`
 - Create: `packages/rule-engine/src/workflow-defined.ts`
 - Modify: `packages/rule-engine/src/index.ts` (export `evaluateEvent` from the new module; delete Plan 1's pass-through body — locate it first with `grep -rn "evaluateEvent" packages/rule-engine/src`)
-- Create: 19 fixture files under `packages/rule-engine/fixtures/` (listed in Step 1)
+- Create: 20 fixture files under `packages/rule-engine/fixtures/` (listed in Steps 1–3)
 
 **Interfaces:**
 - Consumes: `validateWorkflowDef`, `workflowDefinedPayloadSchema` from `@gisik-nokma/domain` (Tasks 1, 3); `Accept`, `Refusal`, `EngineContext`, `EventEnvelope` types; harness (Task 4).
@@ -2050,7 +2389,7 @@ Each planted definition is built to fire **exactly one** structural issue, so th
 }
 ```
 
-- [ ] **Step 3: Write the failing fixtures — stranding**
+- [ ] **Step 3: Write the failing fixtures — stranding, then the advisory-tier boundary**
 
 All four stranding fixtures plant the same "Basic" v1 in `workflowDefs` (identical JSON to the one in `workflow-defined-refuses-a-version-jump.json` — copy that `workflowDefs` array verbatim into each). Only the candidate differs.
 
@@ -2058,7 +2397,7 @@ All four stranding fixtures plant the same "Basic" v1 in `workflowDefs` (identic
 
 ```json
 {
-  "name": "dropping a state without mapping it strands in-flight tickets and is refused",
+  "name": "dropping a state without mapping it is refused",
   "workflowDefs": [
     {
       "id": "wf_basic", "version": 1, "name": "Basic", "initialStateId": "todo",
@@ -2090,7 +2429,7 @@ All four stranding fixtures plant the same "Basic" v1 in `workflowDefs` (identic
   "expected": {
     "refused": true,
     "rule": "workflow-state-mapping",
-    "reason": "Version 2 drops state(s) \"doing\" that version 1 has; a stateMapping entry for each dropped state is required so no in-flight ticket is stranded."
+    "reason": "Version 2 drops state(s) \"doing\" that version 1 has; publishing cannot see which tickets sit in which state, so every dropped state needs a stateMapping entry."
   }
 }
 ```
@@ -2156,6 +2495,35 @@ All four stranding fixtures plant the same "Basic" v1 in `workflowDefs` (identic
         { "from": "todo", "to": "doing", "rules": [] },
         { "from": "doing", "to": "done", "rules": [] },
         { "from": "done", "to": "doing", "rules": [] }
+      ]
+    }
+  },
+  "expected": { "refused": false }
+}
+```
+
+`workflow-defined-accepts-a-def-the-advisory-warns-about.json` — **this fixture exists to prove the advisory tier cannot become a refusal.** Its definition trips `rdu-bypassable` and nothing else: `validateWorkflowDef` returns an empty array, `adviseWorkflowDef` returns one advisory, and the engine — which never calls the latter — must accept. The day someone folds warnings into the issue array, this fixture fails, loudly, with a refusal that names the rule that did it:
+
+```json
+{
+  "name": "a definition the advisory tier warns about still publishes — warnings are not refusals",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_fast" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_fast", "version": 1, "name": "Fast track", "initialStateId": "draft",
+      "states": [
+        { "id": "draft", "name": "Draft", "category": "open" },
+        { "id": "review", "name": "In review", "category": "active" },
+        { "id": "approved", "name": "Approved", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "draft", "to": "review", "rules": [] },
+        { "from": "review", "to": "draft", "rules": [] },
+        { "from": "review", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "review" } } ] },
+        { "from": "draft", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "review" } } ] }
       ]
     }
   },
@@ -2266,9 +2634,13 @@ export async function evaluateWorkflowDefined(
   }
 
   // Stranding: every state the new version drops must be mapped somewhere that
-  // exists in the new version. Deliberately conservative — see the plan's Open
-  // question 6: the frozen ctx cannot enumerate in-flight tickets, and a
-  // refusal here is safe to relax later while a false acceptance never is.
+  // exists in the new version — occupied or not. This is permanent semantics,
+  // not a stopgap (Open question 6, settled by the owner). Making publish
+  // legality depend on occupancy would make the client and server engines
+  // disagree by construction: replicas are visibility-scoped, so a user who
+  // cannot see the tickets in the dropped state computes a different
+  // occupancy than the server does, and one shared fixture suite could no
+  // longer bind both. Occupancy is a builder courtesy, never an engine input.
   const newStateIds = new Set(payload.states.map((state) => state.id));
   const dropped = latest.states.filter((state) => !newStateIds.has(state.id)).map((state) => state.id);
   const mapping = payload.stateMapping ?? {};
@@ -2279,7 +2651,7 @@ export async function evaluateWorkflowDefined(
     return {
       refused: true,
       rule: REFUSAL_RULES.workflowStateMapping,
-      reason: `Version ${payload.version} drops state(s) ${list} that version ${latest.version} has; a stateMapping entry for each dropped state is required so no in-flight ticket is stranded.`,
+      reason: `Version ${payload.version} drops state(s) ${list} that version ${latest.version} has; publishing cannot see which tickets sit in which state, so every dropped state needs a stateMapping entry.`,
     };
   }
 
@@ -2338,7 +2710,7 @@ export { evaluateWorkflowDefined } from './workflow-defined.js';
 - [ ] **Step 6: Run the suite to verify everything passes**
 
 Run: `pnpm --filter ./packages/rule-engine test`
-Expected: PASS — all 19 new fixtures plus the pass-through fixture and the harness tests.
+Expected: PASS — all 20 new fixtures plus the pass-through fixture and the harness tests.
 
 - [ ] **Step 7: Commit**
 
@@ -2348,9 +2720,14 @@ git commit -m "The engine's first real refusals: workflow definitions are valida
 
 Structural defects refuse with every issue named in plain language; versions
 must be consecutive; any dropped state must be mapped into the new version
-before publish — conservative on purpose, because the frozen context cannot
-see in-flight tickets and a refusal is safe to relax later while a silent
-strand never is. Nineteen planted defects prove each path fires."
+before publish, occupied or not. That last rule is permanent: publish
+legality that depended on occupancy would split the client and server
+engines, because replicas only see the tickets their viewer may see, and
+one shared fixture suite could no longer bind both. The refusal therefore
+says what publishing actually knows instead of asserting tickets nobody
+counted. Twenty planted defects prove each path — including one that
+publishes cleanly while the advisory tier warns about it, so warnings can
+never quietly become refusals."
 ```
 
 ---
@@ -2368,7 +2745,7 @@ The transition path's skeleton: parse the claim, find the ticket, resolve its wo
 
 **Interfaces:**
 - Consumes: `ticketTransitionedPayloadSchema`, `TicketState`, `hasStateMapping` from `@gisik-nokma/domain`; `REFUSAL_RULES` (Task 5); harness (Task 4).
-- Produces: `evaluateTicketTransitioned(env, ctx)`; `resolveCurrentStateId(ticket, latest, ctx): Promise<{ ok: true; stateId: string } | { ok: false; unmappedStateId: string }>` — exported because Plan 3's ticket projection applies the same forward-mapping when a new workflow version lands.
+- Produces: `evaluateTicketTransitioned(env, ctx)`; `resolveStateIdForward(workflowId, stateId, fromVersion, latest, ctx): Promise<ResolvedState>` — the one version walk in the engine, so nothing grows a second one (Task 11's `require-different-user` is its other caller); `resolveCurrentStateId(ticket, latest, ctx): Promise<ResolvedState>` where `ResolvedState = { ok: true; stateId: string } | { ok: false; unmappedStateId: string }`, a thin wrapper over it — exported because Plan 3's ticket projection applies the same forward-mapping when a new workflow version lands.
 
 - [ ] **Step 1: Write the failing fixtures — hygiene and existence**
 
@@ -2645,6 +3022,39 @@ import type { EngineContext } from './types.js';
 export type ResolvedState = { ok: true; stateId: string } | { ok: false; unmappedStateId: string };
 
 /**
+ * Walk ONE state id forward from the version whose vocabulary it is written in
+ * to the latest version, following each intermediate version's stateMapping.
+ * On failure it reports the id at the point the chain broke, not the id it
+ * started from — that is the id a refusal must name.
+ *
+ * This is the single version walk in the engine. Two callers need it and they
+ * must not each grow their own: resolveCurrentStateId below (a ticket's
+ * current state) and require-different-user (each transition-log entry's
+ * recorded state — Task 11). A second walk is a second set of rounding errors.
+ */
+export async function resolveStateIdForward(
+  workflowId: string,
+  stateId: string,
+  fromVersion: number,
+  latest: WorkflowDef,
+  ctx: EngineContext,
+): Promise<ResolvedState> {
+  let current = stateId;
+  for (let version = fromVersion + 1; version <= latest.version; version += 1) {
+    const def = version === latest.version ? latest : await ctx.getWorkflowDef(workflowId, version);
+    if (def === null) return { ok: false, unmappedStateId: current };
+    if (def.states.some((state) => state.id === current)) continue;
+    const mapped = hasStateMapping(def) ? def.stateMapping[current] : undefined;
+    if (mapped === undefined) return { ok: false, unmappedStateId: current };
+    current = mapped;
+  }
+  if (!latest.states.some((state) => state.id === current)) {
+    return { ok: false, unmappedStateId: current };
+  }
+  return { ok: true, stateId: current };
+}
+
+/**
  * Resolve a ticket's current state id against the latest workflow version,
  * walking each intermediate version's stateMapping forward. Exported because
  * Plan 3's ticket projection applies the same walk when a new version lands.
@@ -2656,19 +3066,7 @@ export async function resolveCurrentStateId(
   latest: WorkflowDef,
   ctx: EngineContext,
 ): Promise<ResolvedState> {
-  let stateId = ticket.stateId;
-  for (let version = ticket.workflowVersion + 1; version <= latest.version; version += 1) {
-    const def = version === latest.version ? latest : await ctx.getWorkflowDef(ticket.workflowId, version);
-    if (def === null) return { ok: false, unmappedStateId: stateId };
-    if (def.states.some((state) => state.id === stateId)) continue;
-    const mapped = hasStateMapping(def) ? def.stateMapping[stateId] : undefined;
-    if (mapped === undefined) return { ok: false, unmappedStateId: stateId };
-    stateId = mapped;
-  }
-  if (!latest.states.some((state) => state.id === stateId)) {
-    return { ok: false, unmappedStateId: stateId };
-  }
-  return { ok: true, stateId };
+  return resolveStateIdForward(ticket.workflowId, ticket.stateId, ticket.workflowVersion, latest, ctx);
 }
 ```
 
@@ -2776,7 +3174,7 @@ In `packages/rule-engine/src/index.ts`, add:
 
 ```ts
 export { evaluateTicketTransitioned } from './transition.js';
-export { resolveCurrentStateId } from './version-map.js';
+export { resolveCurrentStateId, resolveStateIdForward } from './version-map.js';
 ```
 
 - [ ] **Step 5: Run the suite to verify everything passes**
@@ -3492,20 +3890,24 @@ refuses everyone honestly instead of crashing or waving the move through."
 
 ### Task 11: `require-different-user`
 
-Four-eyes: the actor must differ from whoever **last** performed the named earlier transition — the approval pairs with the submission it approves, so only the latest performer counts. If nobody ever performed the named transition, the rule accepts vacuously (creation is not a transition — Open question 10 records the gap and the proposed builder warning).
+Four-eyes: the actor must differ from whoever **last** performed the named earlier transition — the approval pairs with the submission it approves, so only the latest performer counts. If nobody ever performed the named transition, the rule accepts vacuously (creation is not a transition).
+
+**Vacuous acceptance is now bounded on both sides** (Open question 10, settled). A rule watching a state *nothing enters* can no longer be published at all — `validateWorkflowDef` refuses it as `rdu-unenterable-state` (Task 3). A rule whose guarded move is reachable without entering the watched state still accepts vacuously on that path, and the builder warns about it as `rdu-bypassable`; the workflow is structurally sound, so the engine publishes it and this task's fixtures record the semantics honestly rather than pretending otherwise.
+
+**And versioning may not disarm it.** Each transition-log entry carries the workflow version its `toStateId` is written in (Task 2). The evaluator resolves each candidate entry **forward** through the same `stateMapping` chain the ticket's own state walks, and compares the *result* to `rule.thanActorOf.to`. Without that, a version that dropped and remapped the watched state left every historical entry unmatchable: the rule found no prior performer, one person made both moves, and four-eyes was disarmed by a rename on a workflow the advisory correctly calls clean. This is the counterexample the advisory does **not** cover — it characterises vacuous acceptance within a single version only.
 
 **Files:**
 - Create: `packages/rule-engine/src/rules/require-different-user.ts`
 - Modify: `packages/rule-engine/src/rules/index.ts` (replace the last throw)
-- Create: 4 fixture files (Step 1)
+- Create: 5 fixture files (Step 1)
 
 **Interfaces:**
-- Consumes: `TicketState.transitions` (the append-only log, Task 2); `RuleEvaluator`, `TransitionRuleInput` (Task 8).
+- Consumes: `TicketState.transitions` (the append-only log with its per-entry `workflowVersion`, Task 2); `resolveStateIdForward` from `./version-map.js` (Task 6 — reused, never re-implemented); `RuleEvaluator`, `TransitionRuleInput` (Task 8; `input.def` is the latest definition and `input.ctx` fetches the intermediates).
 - Produces: `evaluateRequireDifferentUser` wired into `evaluateTransitionRules` — completing the vocabulary; after this task no `not implemented yet` throw remains.
 
 - [ ] **Step 1: Write the failing fixtures**
 
-All four use a "Review" workflow. Base fixture, `rule-rdu-refuses-the-same-person.json`:
+Three use a "Review" workflow; a fourth uses the bypassable "Fast track" definition and the fifth a two-version pair. Base fixture, `rule-rdu-refuses-the-same-person.json`:
 
 ```json
 {
@@ -3545,17 +3947,43 @@ All four use a "Review" workflow. Base fixture, `rule-rdu-refuses-the-same-perso
 
 `rule-rdu-accepts-a-second-person.json` — `"name"`: `"four-eyes: a second person may approve"`; identical except the candidate `actorId` is `"user_b"`; expected `{ "refused": false }`.
 
-`rule-rdu-accepts-when-nobody-performed-the-earlier-move.json` — `"name"`: `"four-eyes accepts vacuously when nobody performed the earlier move"`; same `workflowDefs`; the ticket is planted directly in review with an empty transitions log (no `ticket.transitioned` prior event — the harness override is the only way to reach this, which is the point):
+`rule-rdu-accepts-vacuously-on-a-bypassable-workflow.json` — this replaces an earlier fixture that asserted vacuous acceptance with nobody having performed the earlier move. **Why that one could not survive as written:** it planted a ticket directly in review with an empty transitions log, because in a sound single-version workflow reaching the guarded move *requires* having entered the watched state — the vacuous path is unreachable through any legal event sequence, and the old fixture had to stage a state the ledger cannot produce. This plan's fixture format restricts `priorEvents` to events a real server can ingest (Task 4), so a fixture that needs a harness override to exist is proving something the server can never reproduce.
+
+Rebuilt on a definition that is genuinely bypassable — a fast-track `Draft → Approved` edge carrying the same four-eyes rule — the vacuous path is reachable by ordinary events, and no override is needed. **This is exactly the shape `adviseWorkflowDef` warns about with `rdu-bypassable`** (Task 3): the builder tells the author "on that path one person can make it alone", and this fixture is the behaviour the warning is warning about. Note the def is the same one Task 5's `workflow-defined-accepts-a-def-the-advisory-warns-about.json` publishes — advisories do not gate publish, so this workflow really can exist.
 
 ```json
-  "priorEvents": [
-    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_review", "stateId": "review", "stateCategory": "active" } }
+{
+  "name": "four-eyes accepts vacuously on a workflow whose guarded move can be reached without the watched one",
+  "workflowDefs": [
+    {
+      "id": "wf_fast", "version": 1, "name": "Fast track", "initialStateId": "draft",
+      "states": [
+        { "id": "draft", "name": "Draft", "category": "open" },
+        { "id": "review", "name": "In review", "category": "active" },
+        { "id": "approved", "name": "Approved", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "draft", "to": "review", "rules": [] },
+        { "from": "review", "to": "draft", "rules": [] },
+        { "from": "review", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "review" } } ] },
+        { "from": "draft", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "review" } } ] }
+      ]
+    }
   ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_fast" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_a",
+    "payload": { "to": "approved" }
+  },
+  "expected": { "refused": false }
+}
 ```
 
-candidate as in the base fixture (`actorId` `"user_a"`, payload `{ "to": "approved" }`); expected `{ "refused": false }` — with nobody to differ from, the rule is vacuously satisfied.
-
-`rule-rdu-counts-only-the-latest-performer.json` — `"name"`: `"four-eyes counts only the latest performer of the earlier move"`; same `workflowDefs`; the ticket bounces: user_a submits, pulls back, then user_b submits; user_a may now approve because the standing submission is user_b's:
+`rule-rdu-counts-only-the-latest-performer.json` — `"name"`: `"four-eyes counts only the latest performer of the earlier move"`; the base fixture's `workflowDefs` (the "Review" workflow, not the fast-track one above); the ticket bounces: user_a submits, pulls back, then user_b submits; user_a may now approve because the standing submission is user_b's:
 
 ```json
   "priorEvents": [
@@ -3568,10 +3996,64 @@ candidate as in the base fixture (`actorId` `"user_a"`, payload `{ "to": "approv
 
 candidate: `actorId` `"user_a"`, payload `{ "to": "approved" }`; expected `{ "refused": false }`.
 
+`rule-rdu-refuses-across-a-remap.json` — the fifth fixture, and the one that proves versioning cannot disarm four-eyes. Version 1 has `review`; version 2 drops it and maps it to `checking`. A ticket entered `review` under v1, so its log entry reads `"review"` with `workflowVersion: 1`, while the rule in v2 watches `checking`. Comparing the raw entry to the rule's target finds nothing and accepts — one person makes both moves. Resolving the entry forward through the mapping finds `checking`, matches, and refuses. **Before this change this fixture was vacuously accepted; it must now refuse.**
+
+```json
+{
+  "name": "four-eyes survives a state being dropped and remapped in a later version",
+  "workflowDefs": [
+    {
+      "id": "wf_review", "version": 1, "name": "Review", "initialStateId": "draft",
+      "states": [
+        { "id": "draft", "name": "Draft", "category": "open" },
+        { "id": "review", "name": "In review", "category": "active" },
+        { "id": "approved", "name": "Approved", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "draft", "to": "review", "rules": [] },
+        { "from": "review", "to": "draft", "rules": [] },
+        { "from": "review", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "review" } } ] }
+      ]
+    },
+    {
+      "id": "wf_review", "version": 2, "name": "Review", "initialStateId": "draft",
+      "stateMapping": { "review": "checking" },
+      "states": [
+        { "id": "draft", "name": "Draft", "category": "open" },
+        { "id": "checking", "name": "Being checked", "category": "active" },
+        { "id": "approved", "name": "Approved", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "draft", "to": "checking", "rules": [] },
+        { "from": "checking", "to": "draft", "rules": [] },
+        { "from": "checking", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "checking" } } ] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_review", "workflowVersion": 1 } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "review" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_a",
+    "payload": { "to": "approved" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "require-different-user",
+    "reason": "This step needs a second person: user_a already performed the move to \"checking\" on this ticket."
+  }
+}
+```
+
+The reason names `checking`, not `review`: the rule's own `thanActorOf.to` is the vocabulary the user is reading in the current definition, and naming the retired id would be accurate about the past and useless in the present.
+
 - [ ] **Step 2: Run the suite to verify the fixtures fail**
 
 Run: `pnpm --filter ./packages/rule-engine test`
-Expected: FAIL — all four error with `rule kind "require-different-user" is not implemented yet`.
+Expected: FAIL — all five error with `rule kind "require-different-user" is not implemented yet`.
 
 - [ ] **Step 3: Implement the rule**
 
@@ -3580,19 +4062,51 @@ Create `packages/rule-engine/src/rules/require-different-user.ts`:
 ```ts
 import type { Rule } from '@gisik-nokma/domain';
 import { REFUSAL_RULES } from '../refusal-rules.js';
+import { resolveStateIdForward } from '../version-map.js';
 import type { RuleEvaluator } from './types.js';
 
 /**
  * Four-eyes: the actor must differ from whoever LAST performed the named
  * earlier transition — the approval pairs with the submission it approves.
- * Nobody ever performed it → vacuously satisfied (creation is not a
- * transition; see the plan's Open question 10).
+ *
+ * Each log entry's toStateId is written in the vocabulary of the version
+ * recorded beside it, while the rule names a state in the LATEST definition.
+ * So every candidate entry is walked forward through the same stateMapping
+ * chain the ticket's own state walks (one shared helper, never a second walk)
+ * and the RESULT is compared to the rule's target. Without this, a version
+ * that dropped and remapped the watched state would leave every historical
+ * entry unmatchable, the rule would find nobody, and one person could make
+ * both moves — versioning disarming four-eyes silently.
+ *
+ * Nobody ever performed the move → vacuously satisfied (creation is not a
+ * transition). Publishing now refuses a rule watching a state nothing enters,
+ * and the builder warns when the guarded move is reachable without the watched
+ * one, so what remains here is a semantics the author was told about.
  */
 export const evaluateRequireDifferentUser: RuleEvaluator<
   Extract<Rule, { kind: 'require-different-user' }>
 > = async (rule, input) => {
   const target = rule.thanActorOf.to;
-  const prior = [...input.ticket.transitions].reverse().find((entry) => entry.toStateId === target);
+
+  let prior: { actorId: string } | undefined;
+  for (const entry of input.ticket.transitions) {
+    const resolved = await resolveStateIdForward(
+      input.ticket.workflowId,
+      entry.toStateId,
+      entry.workflowVersion,
+      input.def,
+      input.ctx,
+    );
+    // An entry that cannot be resolved forward is skipped, and that is not a
+    // silent disarm: publishing refuses unmapped drops, so an unresolvable
+    // entry only exists in a planted or corrupted store — and in such a store
+    // the ticket's own state resolution refuses first, as stranded-state,
+    // before any rule runs.
+    if (!resolved.ok) continue;
+    // Iterating oldest-first and overwriting leaves the LAST match standing.
+    if (resolved.stateId === target) prior = entry;
+  }
+
   if (prior === undefined || prior.actorId !== input.env.actorId) return { refused: false };
   return {
     refused: true,
@@ -3634,13 +4148,23 @@ Expected: `clean` — the vocabulary is complete.
 
 ```bash
 git add packages/rule-engine/src/rules/require-different-user.ts packages/rule-engine/src/rules/index.ts packages/rule-engine/fixtures/
-git commit -m "Four-eyes closes the vocabulary: the last submitter cannot be the approver
+git commit -m "Four-eyes closes the vocabulary, and a rename can no longer disarm it
 
 Only the latest performer of the named transition counts — an approval
 pairs with the submission standing before it, so an old withdrawn
-submission does not lock its author out. With nobody to differ from the
-rule accepts vacuously, documented as the initial-state gap rather than
-papered over. No unimplemented rule kind remains."
+submission does not lock its author out.
+
+Log entries are written in the vocabulary of the version they were made
+under, so each one is walked forward through the same state mappings the
+ticket's own state follows before it is compared. Without that, a version
+that dropped and remapped the watched state left every historical entry
+unmatchable: the rule found nobody, one person made both moves, and the
+workflow still looked structurally clean. Proven by planting exactly that
+version pair.
+
+With nobody to differ from the rule still accepts vacuously — but the
+workflow it can happen on is one publishing allows and the builder warns
+about, not a hole nobody mentioned. No unimplemented rule kind remains."
 ```
 
 ---
@@ -3924,7 +4448,13 @@ pnpm --filter ./packages/domain --filter ./packages/rule-engine --filter ./apps/
 ls packages/rule-engine/fixtures/*.json | wc -l
 ```
 
-Expected: all tests pass; the grep prints `clean`; `tsc` is silent; the fixture count is **56**. Do not proceed while any of these fails.
+Also prove the advisory tier never reached the engine:
+
+```bash
+grep -rn "adviseWorkflowDef" packages/rule-engine/src && echo "FAIL — the engine must never call the advisory tier" || echo "clean"
+```
+
+Expected: all tests pass; both greps print `clean`; `tsc` is silent; the fixture count is **58**. Do not proceed while any of these fails.
 
 - [ ] **Step 2: Add the Features.md section**
 
@@ -3934,9 +4464,10 @@ Plan 1 will have added its own sections by execution time. Append the section be
 ## 4. Workflow engine & rule vocabulary
 
 - ⚙️ **Workflow vocabulary** — workflow definitions as data: states with open/active/terminal categories, transitions (including from-any), and the closed five-rule vocabulary (restrict-to, require-comment, require-evidence, require-field, require-different-user) as zod schemas; `workflow.defined` payloads carry the full definition plus an optional stateMapping. `packages/domain/src/workflow.ts`
-- ⚙️ **Structural validation** — `validateWorkflowDef`, pure and I/O-free so the future builder UI shares it: ten plain-language checks covering workflows that cannot finish, states that cannot be reached or entered, duplicate ids/edges, and rules that can never fire or be satisfied. `packages/domain/src/validate-workflow.ts`
-- ⚙️ **Rule engine** — the real `evaluateEvent`: `ticket.transitioned` checked against authoritative state (transition legality, version walks across stateMappings, the parent-terminal-with-open-children invariant that no author can switch off, transition rules in order with first-refusal-wins); `workflow.defined` checked for structure, consecutive versioning, and stranding. Every refusal names its rule and reasons in plain language. `packages/rule-engine/src/`
-- ⚙️ **Planted-defect fixture suite** — 56 JSON fixtures, one per refusal path plus accepting twins, run by an in-memory harness and exported so server and client builds prove the same refusals against the same defects. `packages/rule-engine/fixtures/`
+- ⚙️ **Structural validation** — `validateWorkflowDef`, pure and I/O-free so the future builder UI shares it: eleven plain-language checks covering workflows that cannot finish, states that cannot be reached or entered, duplicate ids/edges, and rules that can never fire or be satisfied — including `rdu-unenterable-state`, a four-eyes rule watching a state nothing in this version enters. `packages/domain/src/validate-workflow.ts`
+- ⚙️ **Advisory tier** — `adviseWorkflowDef`, a separate function returning warnings the builder shows without blocking publish; the rule engine never calls it, because everything `validateWorkflowDef` returns becomes a refusal. Its one code, `rdu-bypassable`, names a four-eyes rule whose guarded move is reachable without ever entering the watched state. `packages/domain/src/advise-workflow.ts`
+- ⚙️ **Rule engine** — the real `evaluateEvent`: `ticket.transitioned` checked against authoritative state (transition legality, version walks across stateMappings, the parent-terminal-with-open-children invariant that no author can switch off, transition rules in order with first-refusal-wins); `workflow.defined` checked for structure, consecutive versioning, and stranding. `require-different-user` resolves each transition-log entry forward through the version chain before comparing, so dropping and remapping a state cannot disarm four-eyes. Every refusal names its rule and reasons in plain language. `packages/rule-engine/src/`
+- ⚙️ **Planted-defect fixture suite** — 58 JSON fixtures, one per refusal path plus accepting twins, run by an in-memory harness and exported so server and client builds prove the same refusals against the same defects. `packages/rule-engine/fixtures/`
 - ⚙️ **Workflow projection** — `proj_workflows` keeps every published version queryable (the engine's version walk needs intermediates and their mappings) and backs the server's `getWorkflowDef`; idempotent apply, deterministic rebuild. `apps/server/src/projections/workflows.ts`
 ```
 
@@ -3992,12 +4523,21 @@ Fixture names refer to `packages/rule-engine/fixtures/`; unit tests to `packages
 - 4.25 ✅ require-evidence refuses without an attachment id; with one it passes. — rule-require-evidence-*
 - 4.26 ✅ require-field wants the field set before the move, not with it. — rule-require-field-*
 - 4.27 ✅ restrict-to: assignee, roles (via membership), and named people OR-combine; missing membership refuses; a planted empty restriction refuses everyone. — rule-restrict-to-* (10 fixtures)
-- 4.28 ✅ require-different-user: the last performer of the named move cannot act; a second person can; vacuous acceptance when nobody performed it; only the latest performer counts. — rule-rdu-* (4 fixtures)
+- 4.28 ✅ require-different-user: the last performer of the named move cannot act; a second person can; vacuous acceptance when nobody performed it; only the latest performer counts. — rule-rdu-* (5 fixtures)
 - 4.29 ✅ Rules run in authored order and the first refusal wins — proven with the same violated pair in both orders. — rules-first-refusal-wins, rules-order-comes-from-the-definition
 
 ## Workflow projection
 
 - 4.30 ✅ proj_workflows serves the latest version by default and historical versions on request; ignores foreign events; replay is idempotent; reset-and-reapply reproduces identical rows. — proj-workflows.test.ts (integration, TEST_DATABASE_URL)
+
+## Four-eyes across versions, and the advisory tier
+
+- 4.31 ✅ A require-different-user rule watching a state that exists but that nothing in this version enters is refused at publish. — validate-workflow.test.ts (`rdu-unenterable-state`)
+- 4.32 ✅ An unknown watched state reports only `rdu-unknown-state`; the two four-eyes codes never both fire for one rule. — validate-workflow.test.ts
+- 4.33 ✅ `adviseWorkflowDef` is silent on canonical four-eyes and warns (`rdu-bypassable`) when the guarded move is reachable without entering the watched state, on a from-any transition, and when the guarded edge is itself the entry into the watched state. — advise-workflow.test.ts
+- 4.34 ✅ Advisories never gate publish: a definition that trips only `rdu-bypassable` is accepted by the engine. — workflow-defined-accepts-a-def-the-advisory-warns-about, advise-workflow.test.ts
+- 4.35 ✅ Four-eyes survives a state being dropped and remapped in a later version: a log entry written under the old vocabulary is resolved forward before comparison, so the same person cannot make both moves. — rule-rdu-refuses-across-a-remap
+- 4.36 🚫 Vacuous acceptance across versions is not characterised by the advisory — it is closed by the per-entry `workflowVersion` instead (case 4.35). The advisory deliberately scopes to a single workflow version.
 ```
 
 - [ ] **Step 4: Cross-check against reality, then commit**
@@ -4008,9 +4548,13 @@ Re-read the section just written and confirm every bullet describes something th
 git add Features.md test-cases/04-workflow-engine.md
 git commit -m "Catalogue the workflow engine: features and test scenarios move with the work
 
-Same change set as the code, per the workspace convention. Thirty scenario
-entries land already-covered because every one names the planted-defect
-fixture or test that proves it — the catalogue records reality, not intent."
+Same change set as the code, per the workspace convention. Thirty-six
+scenario entries, all but one landing already-covered because every one
+names the planted-defect fixture or test that proves it — the catalogue
+records reality, not intent. The exception is marked out of scope with its
+reason: vacuous four-eyes across versions is closed by the per-entry
+workflow version, not by the advisory, and the catalogue says so rather
+than implying the warning covers more than it does."
 ```
 
 ---
@@ -4022,13 +4566,15 @@ fixture or test that proves it — the catalogue records reality, not intent."
 - Definitions are data (states with categories, transitions incl. from-any, rules on transitions) → Task 1. At least one terminal state; no unreachable state; no unenterable terminal state → Task 3 (+ engine wiring Task 5). ✓
 - Closed, versioned rule vocabulary; no user code → Task 1 (discriminated union), Task 8 (exhaustive switch); the five rules → Tasks 8–11, each refusing with its reason named (invariant 2's "reason named in the user's language"). ✓
 - Invariants above all workflows, not authorable away → Task 7 runs before authored rules inside the engine; nothing in a definition can disable it (invariant 3). Provenance, the other named invariant, is structural — envelope fields delivered by Plan 1 — so there is deliberately no task for it here. ✓
-- Workflow changes are events (`workflow.defined` v1, v2, …); new versions apply to all tickets of the type; removals/renames demand a state mapping and refuse to strand → Tasks 5–6 (publish-side refusals + evaluation-side version walk). Conservative variance from "in-flight detection" recorded as Open question 6. ✓
-- Invariant 6 / testing discipline: every refusal proven against a planted defect before trusted; one shared fixture suite for client and server → Task 4 (harness, exported), fixtures in every task, 56 total. ✓
-- Builder UI, template gallery: later plan (explicitly out of this plan's scope); `validateWorkflowDef` kept pure for it. ✓
+- Workflow changes are events (`workflow.defined` v1, v2, …); new versions apply to all tickets of the type; removals/renames demand a state mapping and refuse to strand → Tasks 5–6 (publish-side refusals + evaluation-side version walk). Every dropped state must be mapped, occupied or not; the owner settled that as permanent semantics on 2026-08-26 (Open question 6) — occupancy-dependent publish legality would split the client and server engines, so occupancy is a builder courtesy and never an engine input. ✓
+- Eleven structural issue codes, one advisory code: `no-states`, `duplicate-state-id`, `no-terminal-state`, `unknown-transition-state`, `duplicate-transition`, `unknown-initial-state`, `unreachable-state`, `terminal-no-inbound`, `empty-restrict-to`, `rdu-unknown-state`, `rdu-unenterable-state` from `validateWorkflowDef` (Task 3), and `rdu-bypassable` from the separate `adviseWorkflowDef` — which the rule engine never calls, proven by a fixture in which the engine accepts a def that trips only the advisory (Task 5). ✓
+- Four-eyes is not disarmed by versioning: transition-log entries carry the workflow version their state id is written in (Task 2) and `require-different-user` resolves each entry forward through the shared version walk before comparing (Task 11), proven by planting a drop-and-remap pair. The advisory characterises reachable vacuous acceptance **within a single workflow version only**; the cross-version case is closed by the per-entry version, not by the warning (Open question 10). ✓
+- Invariant 6 / testing discipline: every refusal proven against a planted defect before trusted; one shared fixture suite for client and server → Task 4 (harness, exported), fixtures in every task, 58 total. ✓
+- Builder UI, template gallery: later plan (explicitly out of this plan's scope); `validateWorkflowDef` and `adviseWorkflowDef` kept pure for it. ✓
 
 **2. Placeholder scan:** no "TBD"/"TODO"/"add validation"/"similar to Task N". Fixtures that reuse an earlier fixture's structure name the exact source file and list every differing field with verbatim values, including full expected reasons. The `not implemented yet` throws are staged code with exact replacement edits in Tasks 9–11 and a grep gate in Tasks 11 and 13. ✓
 
-**3. Type consistency:** `evaluateEvent(env, ctx)` matches the frozen signature; `Refusal.rule` strings come from `REFUSAL_RULES` in Task 5 and every fixture's `expected.rule` uses one of its 15 values; every fixture `expected.reason` was diffed against the Canonical refusal copy tables and the literal strings in Tasks 3, 5–11; `TransitionRuleInput` fields (`env, ctx, ticket, def, toState, fromStateId, payload`) match between Task 8's type, Task 8's call site in `transition.ts`, and Tasks 9–11's evaluators; `resolveCurrentStateId`'s `ResolvedState` is consumed with `resolved.ok`/`resolved.stateId`/`resolved.unmappedStateId` in Task 6 exactly as defined; `workflowsProjection.apply(env, db)`/`reset(db)` match Task 12's tests; `membershipId('ws_1', 'user_a') === 'ws_1:user_a'` is asserted in Task 2 and relied on by Task 4's harness and Task 10's fixtures. ✓
+**3. Type consistency:** `evaluateEvent(env, ctx)` matches the frozen signature; `Refusal.rule` strings come from `REFUSAL_RULES` in Task 5 and every fixture's `expected.rule` uses one of its 15 values; every fixture `expected.reason` was diffed against the Canonical refusal copy tables and the literal strings in Tasks 3, 5–11; `TransitionRuleInput` fields (`env, ctx, ticket, def, toState, fromStateId, payload`) match between Task 8's type, Task 8's call site in `transition.ts`, and Tasks 9–11's evaluators; `resolveCurrentStateId`'s `ResolvedState` is consumed with `resolved.ok`/`resolved.stateId`/`resolved.unmappedStateId` in Task 6 and Task 11 exactly as defined, and both callers go through the one `resolveStateIdForward` rather than growing a second version walk; `Advisory` is deliberately structurally identical to `Issue` and the separation is enforced by a fixture, not by the type (Tasks 3 and 5); the transition-log entry shape `{ toStateId; actorId; seq; workflowVersion }` matches between Task 2's type, Task 4's harness push and its assertion, and Task 11's evaluator; `workflowsProjection.apply(env, db)`/`reset(db)` match Task 12's tests; `membershipId('ws_1', 'user_a') === 'ws_1:user_a'` is asserted in Task 2 and relied on by Task 4's harness and Task 10's fixtures. ✓
 
 
 

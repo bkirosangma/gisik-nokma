@@ -1032,7 +1032,7 @@ export type TicketState = {
   assigneeId: string | null;
   collaboratorIds: string[];
   fields: Record<string, FieldClaim>;
-  transitions: { toStateId: string; actorId: string; seq: number }[];
+  transitions: { toStateId: string; actorId: string; seq: number; workflowVersion: number }[];
 };
 
 /** PROVISIONAL — replaced by Plan 2 Task 2; see file header. */
