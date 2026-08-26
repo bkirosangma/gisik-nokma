@@ -55,6 +55,9 @@ apps/server/
   migrations/<ts>_auth-tables.cjs            # better-auth vendor schema (Task 1)
   migrations/<ts>_proj-memberships.cjs       # Task 4
   migrations/<ts>_proj-visibility.cjs        # Task 6
+  migrations/<ts>_proj-projects.cjs          # Task 9 Step 3b
+  src/projections/proj-projects.ts           # projProjects + projectExists (Task 9 Step 3b);
+                                             #   registered BEFORE proj_tickets, coordination §8
   src/db/queryable.ts                        # Queryable = Pool | PoolClient (Task 1)
   src/auth/otp-sender.ts                     # OtpSender + LogOtpSender (Task 1)
   src/auth/magic-link-sender.ts              # MagicLinkSender + LogMagicLinkSender (Task 1)
@@ -1874,6 +1877,14 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
   'workflow.defined',
   'ticket-type.defined',
   'project.created',
+  // Migration re-homes work other people are doing: it moves a ticket onto a
+  // different workflow, so the states it can reach, the rules guarding them
+  // and the board column it appears in all change under whoever is holding it.
+  // Ordinary ticket edits are a member's business; this is not (coordination
+  // doc, "a ticket's workflow is pinned at creation, and moved only
+  // deliberately"). Plan 3 owns the event and its structural refusals; the
+  // question of who may emit it is this plan's.
+  'ticket.workflow_rebound',
 ]);
 
 /**
@@ -3686,9 +3697,114 @@ export async function checkPermission(
   const ctx: PermissionContext = { sessionUserId, eff };
   const roleRefusal = checkRolePermission(env, ctx);
   if (roleRefusal) return roleRefusal;
+  // Before any membership question: does the project this event names exist at
+  // all? Ordering is the point — see Step 3b.
+  const projectRefusal = await checkProjectExists(db, env);
+  if (projectRefusal) return projectRefusal;
   return checkVisibilityPermission(db, env, ctx);
 }
 ```
+
+- [ ] **Step 3b: `proj_projects`, so a ticket cannot be created into a project nobody founded**
+
+Owner decision 2026-08-26 (coordination doc). Nothing in the series validated that `ticket.created.projectId` names a real project: there was no `proj_projects` anywhere, and `project.created` was a registered event type that nothing projected into a queryable table.
+
+**What covered it by accident, and why that is not coverage.** The membership check in Step 3 refuses an actor who is not a member of the project — so a fabricated `projectId` was usually refused, because nobody is a member of a project that does not exist. But membership is built from `membership.granted` / `project.member_added`, and those accept any non-empty string as a project scope without checking it either. Grant yourself membership on a typo'd id and the ticket is accepted: it lands in `proj_tickets` and `proj_visibility` with a dangling `project_id`, shows on no board and in no project list, and nobody is ever told. And on the paths where the coincidence *did* hold, the user was told the wrong thing — that they were not a member, when the truth is that the project does not exist.
+
+Hence the ordering above: the existence check runs **before** the membership check, so the honest reason wins whenever both would fire.
+
+**Files:**
+- Create: `apps/server/migrations/<ts>_proj-projects.cjs`, `apps/server/src/projections/proj-projects.ts`
+- Modify: `apps/server/src/projections/index.ts` (register `projProjects` **before** `projTickets` — coordination §8), `apps/server/src/permissions/check-permission.ts`
+- Test: `apps/server/test/projections/proj-projects.test.ts`, `apps/server/test/permissions/check-project-exists.test.ts`
+
+The table carries only what the check needs plus the provenance every projection keeps:
+
+```js
+// apps/server/migrations/<ts>_proj-projects.cjs
+exports.up = (pgm) => {
+  pgm.createTable('proj_projects', {
+    project_id: { type: 'text', primaryKey: true },
+    workspace_id: { type: 'text', notNull: true },
+    name: { type: 'text', notNull: true },
+    created_by: { type: 'text', notNull: true },
+    created_at: { type: 'timestamptz', notNull: true },
+  });
+  pgm.createIndex('proj_projects', 'workspace_id');
+};
+exports.down = (pgm) => pgm.dropTable('proj_projects');
+```
+
+```ts
+// apps/server/src/projections/proj-projects.ts
+export const projProjects = {
+  name: 'proj_projects',
+  tables: ['proj_projects'] as const,
+
+  async apply(env: LedgerEvent, db: Queryable): Promise<void> {
+    if (env.type !== 'project.created') return;
+    const p = parseProjectCreated(env.payload);
+    await db.query(
+      `INSERT INTO proj_projects (project_id, workspace_id, name, created_by, created_at)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (project_id) DO NOTHING`,
+      [env.entity.id, env.workspaceId, p.name, env.actorId, env.serverTime],
+    );
+  },
+
+  async reset(db: Queryable): Promise<void> {
+    await db.query('DELETE FROM proj_projects');
+  },
+};
+
+/** Scoped by workspace: a project id from another workspace is not "found". */
+export async function projectExists(
+  db: Queryable,
+  workspaceId: string,
+  projectId: string,
+): Promise<boolean> {
+  const { rows } = await db.query(
+    'SELECT 1 FROM proj_projects WHERE project_id = $1 AND workspace_id = $2',
+    [projectId, workspaceId],
+  );
+  return rows.length > 0;
+}
+```
+
+The check covers every event that *names* a project, not only ticket creation — the membership path is the one the hole was actually reachable through:
+
+```ts
+// apps/server/src/permissions/check-permission.ts
+/** The project this event names, or null if it names none. */
+function projectNamedBy(env: EventEnvelope): string | null {
+  switch (env.type) {
+    case 'ticket.created':
+      return (env.payload as { projectId: string }).projectId;
+    case 'membership.granted':
+    case 'membership.revoked': {
+      const scope = (env.payload as { scope: MembershipScope }).scope;
+      return scope === 'workspace' ? null : scope.projectId;
+    }
+    case 'project.member_added':
+    case 'project.member_removed':
+      return env.entity.id;
+    default:
+      // project.created names the project it is bringing into existence.
+      return null;
+  }
+}
+
+export async function checkProjectExists(db: Queryable, env: EventEnvelope): Promise<Refusal | null> {
+  const projectId = projectNamedBy(env);
+  if (projectId === null) return null;
+  if (await projectExists(db, env.workspaceId, projectId)) return null;
+  return refuse('project.unknown', `There is no project ${projectId} in this workspace.`);
+}
+```
+
+**Tests, both halves planted.** In `proj-projects.test.ts`: a `project.created` lands a row scoped to its workspace and carrying its creator; a re-delivered duplicate does not double-insert; `reset` empties it; and `projectExists` answers `false` for a real project id asked under the wrong workspace. In `check-project-exists.test.ts`, the planted defect is the reachable one — grant yourself membership on a `projectId` that was never founded, then create a ticket in it. Before this step the ticket is accepted; after it, the refusal is `project.unknown` and **not** `permission.role`, and the test asserts the rule name, because a refusal that fires for the wrong reason is what this step exists to remove. A second case asserts the ordering directly: a non-member creating a ticket in a project that does not exist is told the project does not exist, not that they are not a member.
+
+**One thing this does not do.** `proj_projects` has no `project.renamed` handler because no such event is registered; when one is added it lands here.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -4511,6 +4627,7 @@ Append to `Features.md` (§6 is this plan's section, settled per the coordinatio
 
 - ⚙️ **Identity & sessions** — better-auth on Fastify: phone OTP, email magic link, Google OAuth, passkeys; no passwords. httpOnly-cookie sessions for web, bearer tokens for the apps. OTP delivery behind `OtpSender` (dev/log implementation; the DLT-registered SMS provider is a deployment concern). Identity is infrastructure, not events. `apps/server/src/auth/`
 - ⚙️ **Membership events & effective roles** — `workspace.created`, `project.created`, `membership.granted`/`membership.revoked`, `project.member_added`/`project.member_removed` in the ledger; `proj_memberships` resolves each user's workspace role and per-project admin flags; founding a workspace appends the default simple-Kanban workflow, the four built-in ticket types bound to it, and the founder's owner grant — in that order, on accept and never on a duplicate re-submission. `apps/server/src/projections/proj-memberships.ts`, `apps/server/src/workspaces/bootstrap-workspace.ts`
+- ⚙️ **Project existence** — `proj_projects` makes `project.created` answerable, and every event that names a project is checked against it before any membership question is asked, so a ticket can never be created into a project nobody founded and nobody is ever refused for the wrong reason. Scoped by workspace: a project id from another workspace is not found. `apps/server/src/projections/proj-projects.ts`, `apps/server/src/permissions/check-permission.ts`
 - ✅ **Permission refusals** — a pre-engine ingest gate refuses identity spoofing, borrowed server origin, and role shortfalls with the standard `{refused, rule, reason}` shape (`permission.role`, `permission.visibility`), reasons in plain language, every refusal proven against a planted defect. `apps/server/src/permissions/`
 - ✅ **Ticket visibility** — `visibility.set` claims a mode (workspace / project / explicit / inherit); `proj_visibility` resolves every ticket's audience by walking inherit chains to the nearest authored ancestor (roots default to project) and re-resolves on reparent and ancestor changes; `canSee` backs 404-enforced reads and one-pass filtered lists; guests see only explicit shares; admins get no bypass. `apps/server/src/visibility/`
 - ✅ **Honesty under restriction** — rollup responses carry true totals over all children plus the viewer's `restrictedCount`; a visible child under a restricted parent gets `{kind: 'restricted'}` — existence, no title; ledger history goes out with provenance untouched for anyone entitled to see. `apps/server/src/visibility/rollup.ts`, `apps/server/src/routes/tickets.ts`
@@ -4750,6 +4867,11 @@ Append to `test-cases/06-auth-visibility.md`:
 - **6.24** ✅ Founding appends the default workflow, then the four built-in types naming it, then the founder's owner grant — asserted in `workspace_seq` order, because the sequence spans four entity kinds and per-entity `seq` cannot order it. (`test/permissions/check-role-permission.test.ts`)
 - **6.25** ✅ A founded workspace accepts a ticket immediately: found → project → roster → `ticket.created` is committed and lands in the default workflow's initial state. Before the bootstrap this refused `ticket.unknown-type` and the workspace was permanently unusable. (`test/permissions/check-role-permission.test.ts`)
 - **6.26** ✅ Planted defect: re-submitting the same founding event id answers `duplicate-event-id` and bootstraps nothing a second time — the property both of Plan 11's seed CLIs re-run on. (`test/permissions/check-role-permission.test.ts`)
+- **6.27** ✅ `project.created` lands a `proj_projects` row scoped to its workspace and carrying its creator; a re-delivered duplicate does not double-insert; `reset` empties the table. (`test/projections/proj-projects.test.ts`)
+- **6.28** ✅ `projectExists` answers `false` for a real project id asked under a different workspace — project ids are not globally unique keys to anyone who knows one. (`test/projections/proj-projects.test.ts`)
+- **6.29** ✅ Planted defect, and the one the hole was actually reachable through: a membership granted on a `projectId` that was never founded no longer lets a ticket be created into it. The refusal is `project.unknown`; the test asserts the rule name, because being refused for the wrong reason is what this check exists to remove. (`test/permissions/check-project-exists.test.ts`)
+- **6.30** ✅ Ordering: a non-member creating a ticket in a project that does not exist is told the project does not exist, not that they are not a member — the existence check runs before the membership check. (`test/permissions/check-project-exists.test.ts`)
+- **6.31** ✅ `ticket.workflow_rebound` is admin-only: a plain member's migration is refused `permission.role`, an admin's passes the gate. Migration re-homes work other people are holding, so it is not an ordinary ticket edit. (`test/permissions/check-role-permission.test.ts`)
 ```
 
 - [ ] **Step 6: Commit**
