@@ -2092,7 +2092,7 @@ natural one, ops:duns, dated in attention but not in origin."
 - Test: `apps/server/test/seed/seed-cc.test.ts` (integration)
 
 **Interfaces:**
-- Consumes: Tasks 7–8; `createIngestService`/`IngestService`/`IngestResult` (Plan 1); `verifyProjections` + `buildProjectionRegistry` (Plan 1); `evaluateEvent` (Plan 2); `builtinTicketTypeDefs` (Plan 3); `membershipId` (Plan 2/coordination §5); `workflow.defined` (Plan 2), `ticket-type.defined` (Plan 3), `project.created`/`membership.granted`/`visibility.set` (Plan 4); `ERRAND_WITH_WAITS_TEMPLATE`, `SIMPLE_KANBAN_TEMPLATE` (Plan 8, per Task 7's pin).
+- Consumes: Tasks 7–8; `createIngestService`/`IngestService`/`IngestResult` (Plan 1); `verifyProjections` + `buildProjectionRegistry` (Plan 1); `evaluateEvent` (Plan 2); `membershipId` (Plan 2/coordination §5); `workflow.defined` (Plan 2), `ticket-type.defined` (Plan 3), `project.created`/`membership.granted`/`visibility.set` (Plan 4); `ERRAND_WITH_WAITS_TEMPLATE` (Plan 8, per Task 7's pin). Founding is NOT consumed piecemeal: ingesting `workspace.created` runs Plan 4's bootstrap, which appends the simple-Kanban workflow, the four built-in types and the founder grant, so this seed neither imports `builtinTicketTypeDefs` nor re-emits them.
 - Produces:
   - `type CcSeedDeps = { ingest: IngestService; resolveUserId(email: string): Promise<string | null>; now?: () => Date }`
   - `type CcSeedOptions = { boardPath: string; ownerEmail: string; accountantEmail: string | null; allowMissingGuest: boolean }`
@@ -2224,9 +2224,8 @@ describe('seedConvenienceCorner', () => {
 `apps/server/src/seed/seed-convenience-corner.ts`:
 
 ```ts
-import { ERRAND_WITH_WAITS_TEMPLATE, SIMPLE_KANBAN_TEMPLATE, membershipId } from '@gisik-nokma/domain';
+import { ERRAND_WITH_WAITS_TEMPLATE, membershipId } from '@gisik-nokma/domain';
 import type { SubmittedEvent } from '@gisik-nokma/domain';
-import { builtinTicketTypeDefs } from '@gisik-nokma/domain';
 import type { IngestService } from '../ingest/ingest-service.js';
 import { errandItems, readCcBoard } from './cc-board.js';
 import { buildErrandEvents, type CcMapContext } from './cc-map.js';
@@ -2278,7 +2277,6 @@ export async function seedConvenienceCorner(deps: CcSeedDeps, options: CcSeedOpt
   const workspaceId = seedUlid('workspace', 'convenience-corner');
   const projectId = seedUlid('project', 'cc#shop-operations');
   const errandWorkflowId = seedUlid('workflow', 'cc#errand-with-waits');
-  const kanbanWorkflowId = seedUlid('workflow', 'cc#simple-kanban');
   const clientTime = (deps.now?.() ?? new Date()).toISOString();
 
   const events: SubmittedEvent[] = [];
@@ -2296,20 +2294,17 @@ export async function seedConvenienceCorner(deps: CcSeedDeps, options: CcSeedOpt
     });
   };
 
+  // Founding is NOT re-implemented here. Ingesting `workspace.created` runs
+  // Plan 4's bootstrap in the same transaction, which appends the simple-Kanban
+  // workflow, the four built-in ticket types bound to it, and the founder's
+  // owner grant — in that order. A seed that emitted its own copies would be a
+  // second founding sequence, free to drift from the real one, and it would be
+  // the version everybody sees demoed. So this seed adds only what is genuinely
+  // particular to the shop.
   push('cc#workspace#created', { kind: 'workspace', id: workspaceId }, 'workspace.created', { name: 'Convenience Corner' });
-  push('cc#membership#owner', { kind: 'membership', id: membershipId(workspaceId, ownerUserId) }, 'membership.granted', {
-    userId: ownerUserId,
-    role: 'owner',
-    scope: 'workspace',
-  });
   push('cc#project#shop-operations', { kind: 'project', id: projectId }, 'project.created', { name: 'Shop operations' });
   push('cc#workflow#errand-with-waits', { kind: 'workflow', id: errandWorkflowId }, 'workflow.defined',
     workflowFromTemplate(ERRAND_WITH_WAITS_TEMPLATE, errandWorkflowId));
-  push('cc#workflow#simple-kanban', { kind: 'workflow', id: kanbanWorkflowId }, 'workflow.defined',
-    workflowFromTemplate(SIMPLE_KANBAN_TEMPLATE, kanbanWorkflowId));
-  for (const typeDef of builtinTicketTypeDefs(kanbanWorkflowId)) {
-    push(`cc#type#${typeDef.id}`, { kind: 'ticket-type', id: typeDef.id }, 'ticket-type.defined', typeDef);
-  }
   push('cc#type#errand', { kind: 'ticket-type', id: 'errand' }, 'ticket-type.defined', {
     id: 'errand',
     name: 'Errand',
@@ -2499,7 +2494,7 @@ loudly and completely."
 - Test: `apps/server/test/seed/plan-series.test.ts`, `apps/server/test/seed/seed-dev.test.ts`
 
 **Interfaces:**
-- Consumes: Tasks 7 and 9's plumbing (`seedUlid`, `plainTextDoc`, `workflowFromTemplate`, `SIMPLE_KANBAN_TEMPLATE`, `builtinTicketTypeDefs`, `membershipId`, ingest wiring, `findUserIdByEmail`); the plan documents in `docs/superpowers/plans/` (the record this seed reads).
+- Consumes: Tasks 7 and 9's plumbing (`seedUlid`, `plainTextDoc`, `workflowFromTemplate`, `membershipId`, ingest wiring, `findUserIdByEmail`); the plan documents in `docs/superpowers/plans/` (the record this seed reads).
 - Produces:
   - `type PlanDoc = { file: string; planNumber: string; title: string; goal: string | null; tasks: Array<{ number: number; title: string }> }`
   - `readPlanSeries(plansDir: string): PlanDoc[]` — skips `00` (coordination is not an execution plan); refuses a file with no H1.
@@ -2683,7 +2678,6 @@ Run: FAIL.
 `apps/server/src/seed/seed-dev-workspace.ts`:
 
 ```ts
-import { SIMPLE_KANBAN_TEMPLATE, builtinTicketTypeDefs, membershipId } from '@gisik-nokma/domain';
 import type { SubmittedEvent } from '@gisik-nokma/domain';
 import { plainTextDoc } from './doc-text.js';
 import { readPlanSeries, type PlanDoc } from './plan-series.js';
@@ -2694,7 +2688,6 @@ import { workflowFromTemplate } from './templates.js';
 export function buildDevSeedEvents(docs: PlanDoc[], ownerUserId: string, clientTime: string): SubmittedEvent[] {
   const workspaceId = seedUlid('workspace', 'gisik-nokma-dev');
   const projectId = seedUlid('project', 'dev#build');
-  const workflowId = seedUlid('workflow', 'dev#simple-kanban');
   const events: SubmittedEvent[] = [];
   const push = (key: string, entity: SubmittedEvent['entity'], type: string, payload: unknown): void => {
     events.push({
@@ -2710,18 +2703,12 @@ export function buildDevSeedEvents(docs: PlanDoc[], ownerUserId: string, clientT
     });
   };
 
+  // As in the shop seed: founding is Plan 4's, not this script's. Ingesting
+  // `workspace.created` appends the simple-Kanban workflow, the four built-in
+  // types bound to it, and the founder's owner grant. This seed only adds the
+  // project and the plan-series content.
   push('dev#workspace#created', { kind: 'workspace', id: workspaceId }, 'workspace.created', { name: 'Gisik Nokma' });
-  push('dev#membership#owner', { kind: 'membership', id: membershipId(workspaceId, ownerUserId) }, 'membership.granted', {
-    userId: ownerUserId,
-    role: 'owner',
-    scope: 'workspace',
-  });
   push('dev#project#build', { kind: 'project', id: projectId }, 'project.created', { name: 'Build — the plan series' });
-  push('dev#workflow#simple-kanban', { kind: 'workflow', id: workflowId }, 'workflow.defined',
-    workflowFromTemplate(SIMPLE_KANBAN_TEMPLATE, workflowId));
-  for (const typeDef of builtinTicketTypeDefs(workflowId)) {
-    push(`dev#type#${typeDef.id}`, { kind: 'ticket-type', id: typeDef.id }, 'ticket-type.defined', typeDef);
-  }
 
   for (const doc of docs) {
     const epicId = seedUlid('ticket', `dev#plan-${doc.planNumber}`);
