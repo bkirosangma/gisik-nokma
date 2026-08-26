@@ -92,7 +92,7 @@ Precondition refusals (`ticket.unknown-type`, `ticket.unknown`, `ticket.workflow
 
 ## Design decisions (made here, argued once)
 
-1. **Built-in types are seed data, not special cases.** `epic(1)/story(2)/task(3)/sub-task(4)` ship as canonical constants in packages/domain, but every workspace materialises them as ordinary `ticket-type.defined` events at workspace creation (owned by the workspace-bootstrap plan) — because built-ins need a per-workspace workflow binding anyway. Resolution is therefore uniform: every type lookup reads event-defined types, and **nothing special-cases built-ins at all** — the parent-required rule keys off the deepest *rank* (decision 9), not off the id `sub-task`.
+1. **Built-in types are seed data, not special cases.** `epic(1)/story(2)/task(3)/sub-task(4)` ship as canonical constants in packages/domain, but every workspace materialises them as ordinary `ticket-type.defined` events at workspace creation (owned by Plan 4, which founds the workspace) — because built-ins need a per-workspace workflow binding anyway. Resolution is therefore uniform: every type lookup reads event-defined types, and **nothing special-cases built-ins at all** — the parent-required rule keys off the deepest *rank* (decision 9), not off the id `sub-task`.
 2. **A ticket's workflow is bound at creation** (`TicketState.workflowId` copied from its type's `workflowId` when the `ticket.created` event applies). Workflow *version* changes apply to all tickets on that workflow, but **not by resolving "latest" at read time** — they apply because publishing a version *folds the stored rows forward*, once, in the publishing transaction (design decision 10). Re-binding a *type* to a different workflow affects new tickets only (Open questions #8).
 3. **`ticket.field_set` with `value: null` clears the field — as a claim, provenance retained.** The single exception is `title`: a ticket always has a title (`field.title-required`). Clearing `description`, `dueDate`, `startDate`, or any custom field is legal; an undated item then simply vanishes from the calendar (invariant 4).
 4. **Collaborators:** a duplicate `ticket.collaborator_added` deduplicates (state unchanged); removing a non-collaborator is a no-op. Both are accepted events — the claim is honest even when redundant.
@@ -361,7 +361,7 @@ export const BUILTIN_TICKET_TYPE_SEEDS = [
 
 /**
  * Built-ins are seed data: each workspace materialises them as ordinary
- * `ticket-type.defined` events at creation time (workspace-bootstrap plan),
+ * `ticket-type.defined` events at creation time (Plan 4 founds the workspace),
  * bound to that workspace's default workflow. Type resolution is uniform —
  * every lookup reads event-defined types.
  */
@@ -431,7 +431,7 @@ git commit -m "Ticket types: the built-in ladder as seed data, custom types vali
 **Interfaces:**
 - Consumes: `registerEventType({ type, version, payloadSchema })` and `parseEvent(raw): EventEnvelope` (Plan 1, see Coordination); `ticketTypeDefSchema` (Task 1).
 - Produces:
-  - Registered event types (all version 1): `ticket-type.defined`, `ticket.created`, `ticket.transitioned`, `ticket.assigned`, `ticket.collaborator_added`, `ticket.collaborator_removed`, `ticket.field_set`, `ticket.reparented`, `comment.added`, `attachment.added`.
+  - Registered event types (all version 1): `ticket-type.defined`, `ticket.created`, `ticket.transitioned`, `ticket.assigned`, `ticket.collaborator_added`, `ticket.collaborator_removed`, `ticket.field_set`, `ticket.reparented`, `ticket.workflow_rebound`, `comment.added`, `attachment.added`.
   - Exported Zod schemas: `ticketCreatedPayload` (`{typeId, projectId, parentId: string|null, title}`), `ticketTransitionedPayload` (`{toStateId, comment?, evidenceAttachmentId?, cause?}`), `ticketAssignedPayload` (`{assigneeId: string|null}`), `ticketCollaboratorPayload` (`{userId}`), `ticketFieldSetPayload` (`{fieldId, value: unknown}`), `ticketReparentedPayload` (`{newParentId: string|null}`), `commentAddedPayload` (`{body: Record<string, unknown>}`), `attachmentUploadedPayload` (`{kind: 'upload', attachmentId, filename, mime, size, sha256}`), `attachmentDriveReferencePayload` (`{kind: 'drive-reference', attachmentId, driveFileId, name, mimeType, webViewLink, iconLink?, capturedAt}`), `attachmentAddedPayload` (the `kind`-discriminated union of those two — one registration, `attachment.added` v1, one wider and stricter schema), `ulidString` (Zod ULID string).
   - **Constraint on `ticket.transitioned`'s `evidenceAttachmentId` (recorded here, enforced in Plan 7):** evidence must name an `attachment.added` of kind `'upload'` on the same ticket; a `'drive-reference'` is refused `attachment.evidence-drive-reference`, and an id that is neither is refused `attachment.evidence-unknown`. Neither refusal is a rule-engine rule and neither belongs to this plan — see Task 3's `attachment.added` reducer case for why `TicketState` cannot see an attachment at all. The `ticket.transitioned` payload itself does not change. Any text, test or fixture here that needs the rule id or its reason imports `RULE_EVIDENCE_DRIVE_REFERENCE` / `EVIDENCE_DRIVE_REFERENCE_REASON` from `@gisik-nokma/domain` (added by Plan 7) — the string is never retyped.
   - `makeEnvelope(partial: Partial<EventEnvelope> & Pick<EventEnvelope, 'type' | 'entity' | 'payload'>): EventEnvelope` — test builder used by every later task's tests.
@@ -651,6 +651,24 @@ export const attachmentAddedPayload = z.discriminatedUnion('kind', [
   attachmentDriveReferencePayload,
 ]);
 
+/**
+ * An admin moves one ticket onto a different workflow. A ticket pins the
+ * workflow it was created under (owner decision 2026-08-26), so re-pointing a
+ * TYPE's binding changes only what new tickets get; this event is the
+ * deliberate, attributed act that moves an existing one.
+ *
+ * `toStateId` is named explicitly rather than inferred. The outgoing and
+ * incoming workflows are unrelated graphs with unrelated state ids, and
+ * `stateMapping` cannot help — it is keyed inside a single workflow's version
+ * chain. Guessing where a ticket lands would be inventing its status, which
+ * invariant 4 forbids; so the claim says where it goes, and the refusal below
+ * checks that the destination exists.
+ */
+export const ticketWorkflowReboundPayload = z.object({
+  toWorkflowId: z.string().min(1),
+  toStateId: z.string().min(1),
+});
+
 registerEventType({ type: 'ticket-type.defined', version: 1, payloadSchema: ticketTypeDefSchema });
 registerEventType({ type: 'ticket.created', version: 1, payloadSchema: ticketCreatedPayload });
 registerEventType({ type: 'ticket.transitioned', version: 1, payloadSchema: ticketTransitionedPayload });
@@ -659,6 +677,7 @@ registerEventType({ type: 'ticket.collaborator_added', version: 1, payloadSchema
 registerEventType({ type: 'ticket.collaborator_removed', version: 1, payloadSchema: ticketCollaboratorPayload });
 registerEventType({ type: 'ticket.field_set', version: 1, payloadSchema: ticketFieldSetPayload });
 registerEventType({ type: 'ticket.reparented', version: 1, payloadSchema: ticketReparentedPayload });
+registerEventType({ type: 'ticket.workflow_rebound', version: 1, payloadSchema: ticketWorkflowReboundPayload });
 registerEventType({ type: 'comment.added', version: 1, payloadSchema: commentAddedPayload });
 registerEventType({ type: 'attachment.added', version: 1, payloadSchema: attachmentAddedPayload });
 ```
@@ -1038,7 +1057,7 @@ export type TicketStateDeps = {
 export const TICKET_EVENT_TYPES = [
   'ticket.created', 'ticket.transitioned', 'ticket.assigned',
   'ticket.collaborator_added', 'ticket.collaborator_removed',
-  'ticket.field_set', 'ticket.reparented',
+  'ticket.field_set', 'ticket.reparented', 'ticket.workflow_rebound',
   'comment.added', 'attachment.added',
 ] as const;
 
@@ -1142,6 +1161,34 @@ export function applyTicketEvent(
     case 'ticket.reparented': {
       const p = ticketReparentedPayload.parse(env.payload);
       return { ...state, parentId: p.newParentId };
+    }
+    case 'ticket.workflow_rebound': {
+      const p = ticketWorkflowReboundPayload.parse(env.payload);
+      const wf = deps.getWorkflow(p.toWorkflowId);
+      if (!wf) {
+        throw new Error(
+          `applyTicketEvent: workflow "${p.toWorkflowId}" is not defined — the engine must refuse ticket.workflow_rebound before it reaches a projection`,
+        );
+      }
+      const category = stateCategoryOf(wf, p.toStateId);
+      if (!category) {
+        throw new Error(`applyTicketEvent: workflow "${wf.id}" has no state "${p.toStateId}"`);
+      }
+      // The transition log is NOT appended to, and existing entries are NOT
+      // rewritten. A migration is an attributed claim of its own, not a move
+      // anybody performed, so four-eyes has nobody to differ from on the first
+      // guarded move in the new workflow — and the entries left behind keep the
+      // workflowId they were recorded under, so `require-different-user`
+      // filters them out instead of walking them through a chain they were
+      // never written in. Rewriting them into the new vocabulary would destroy
+      // the very fact that filter reads.
+      return {
+        ...state,
+        workflowId: p.toWorkflowId,
+        workflowVersion: wf.version,
+        stateId: p.toStateId,
+        stateCategory: category,
+      };
     }
     case 'comment.added':
     case 'attachment.added':
@@ -2137,6 +2184,63 @@ import { checkTicketCreated, checkTicketReparented } from './checks/hierarchy';
     case 'ticket.reparented':
       return checkTicketReparented(env, ctx);
 ```
+
+- [ ] **Step 4b: The migration check — `ticket.workflow_rebound`**
+
+A ticket pins the workflow it was created under (owner decision 2026-08-26, coordination doc); re-pointing its *type* changes only what new tickets get, and this event is the deliberate, attributed act that moves an existing one. Its own file, because a workflow migration is not hierarchy.
+
+**The same-workflow refusal is the load-bearing one, and it is not a tidiness rule.** This event sets `stateId` directly. It performs no transition-legality check and evaluates no transition rules, because across two unrelated graphs there is no transition to check — the ticket is being placed, not moved. Permit that within a single workflow and it becomes a universal bypass: any actor who can emit it could reach any state without satisfying `restrict-to`, `require-comment`, `require-evidence`, `require-field` or `require-different-user`, and without the move ever appearing in the transition log that four-eyes reads. Moving inside one workflow already has a mechanism that honours all of those, so there is no case to weigh — refuse it.
+
+Create `packages/rule-engine/src/checks/workflow-rebind.ts`:
+
+```ts
+import { ticketWorkflowReboundPayload } from '@gisik-nokma/domain';
+import type { EngineContext, EngineVerdict } from '../types';
+import { ACCEPT, getTicketState, refuse } from './shared';
+
+export async function checkTicketWorkflowRebound(
+  env: EventEnvelope,
+  ctx: EngineContext,
+): Promise<EngineVerdict> {
+  const p = ticketWorkflowReboundPayload.parse(env.payload);
+
+  const ticket = await getTicketState(ctx, env.entity.id);
+  if (!ticket) return refuse('ticket.unknown');
+
+  // Not a tidiness rule — see above. Within one workflow this event would be a
+  // way to reach any state without satisfying any of the transition's rules,
+  // and without leaving the log entry four-eyes reads.
+  if (p.toWorkflowId === ticket.workflowId) {
+    return refuse(
+      'ticket.rebound-same-workflow',
+      `Ticket ${ticket.id} is already on this workflow. Moving within a workflow is a transition, so that it can be checked against the workflow's own rules.`,
+    );
+  }
+
+  const target = await ctx.getWorkflowDef(p.toWorkflowId);
+  if (!target) return refuse('ticket.workflow-undefined');
+
+  if (!target.states.some((state) => state.id === p.toStateId)) {
+    return refuse(
+      'ticket.rebound-unknown-state',
+      `The workflow "${target.name}" has no state "${p.toStateId}", so ticket ${ticket.id} cannot be placed there.`,
+    );
+  }
+
+  return ACCEPT;
+}
+```
+
+and extend the dispatch:
+
+```ts
+import { checkTicketWorkflowRebound } from './checks/workflow-rebind';
+
+    case 'ticket.workflow_rebound':
+      return checkTicketWorkflowRebound(env, ctx);
+```
+
+**Who may emit it** is Plan 4's to enforce, alongside its other pre-engine permission gates: migration re-homes work that other people are doing, so it belongs with the admin-gated actions rather than with ordinary ticket edits. Recorded here so the ownership is explicit rather than assumed.
 
 - [ ] **Step 5: Run the tests to verify they pass, then the whole rule-engine suite**
 
@@ -3522,6 +3626,28 @@ const WF_V2_RECATEGORISED = workflowDefined({
   transitions: ALL_TRANSITIONS,
 });
 
+/**
+ * A second, unrelated workflow — the destination a migration moves a ticket
+ * to. Its state ids deliberately do NOT overlap wf-basic's: two unrelated
+ * graphs that happen to spell a state the same way is the trap the transition
+ * log's per-entry `workflowId` exists to catch, and it is proven in the rule
+ * engine's own fixtures rather than here.
+ */
+const WF_OTHER = makeEnvelope({
+  type: 'workflow.defined', entity: { kind: 'workflow', id: 'wf-other' }, workspaceId: WS,
+  payload: {
+    id: 'wf-other', version: 1, name: 'Intake', initialStateId: 'intake',
+    states: [
+      { id: 'intake', name: 'Intake', category: 'open' },
+      { id: 'closed', name: 'Closed', category: 'terminal' },
+    ],
+    transitions: [
+      { from: '*', to: 'intake', rules: [] },
+      { from: '*', to: 'closed', rules: [] },
+    ],
+  },
+});
+
 /** v2 drops Doing altogether and maps everyone standing in it back to To do. */
 const WF_V2_DROPS_DOING = workflowDefined({
   id: 'wf-basic', version: 2, name: 'Basic', initialStateId: 'todo',
@@ -3536,9 +3662,9 @@ const WF_V2_DROPS_DOING = workflowDefined({
   stateMapping: { doing: 'todo' },
 });
 
-function typeDefined(id: string, rank: number) {
+function typeDefined(id: string, rank: number, workflowId = 'wf-basic') {
   return makeEnvelope({ type: 'ticket-type.defined', entity: { kind: 'ticket-type', id }, workspaceId: WS,
-    payload: { id, name: id[0].toUpperCase() + id.slice(1), icon: 'check', rank, workflowId: 'wf-basic', fields: [] } });
+    payload: { id, name: id[0].toUpperCase() + id.slice(1), icon: 'check', rank, workflowId, fields: [] } });
 }
 function created(id: string, typeId: string, parentId: string | null, title: string) {
   return makeEnvelope({ type: 'ticket.created', entity: { kind: 'ticket', id }, workspaceId: WS,
@@ -3658,6 +3784,43 @@ describe('proj_tickets', () => {
     const second = (await db.query('SELECT * FROM proj_tickets ORDER BY ticket_id')).rows;
     expect(second).toEqual(first);
   });
+
+  // A ticket pins its workflow — owner decision 2026-08-26.
+
+  it('re-pointing a type at a different workflow leaves existing tickets on the old one', async () => {
+    // One ledger, not two: asLedger numbers workspaceSeq from 1 each call, and
+    // the projection resolves definitions AS OF that number.
+    await applyAll(asLedger([...SEED_EVENTS, WF_OTHER, typeDefined('task', 3, 'wf-other')]));
+
+    const row = (await db.query('SELECT workflow_id, state_id FROM proj_tickets WHERE ticket_id = $1', [CHILD])).rows[0];
+    expect(row.workflow_id).toBe('wf-basic');
+    expect(row.state_id).toBe('todo');
+    // And the type really did move, or this passes for the wrong reason.
+    expect((await getTicketTypeFromDb(db, WS, 'task'))?.workflowId).toBe('wf-other');
+  });
+
+  it('a rebound moves the one ticket it names, and leaves its sibling behind', async () => {
+    await applyAll(asLedger([...SEED_EVENTS, WF_OTHER,
+      ticketEvent(CHILD, 'ticket.workflow_rebound', { toWorkflowId: 'wf-other', toStateId: 'intake' }),
+    ]));
+
+    const moved = (await db.query(
+      'SELECT workflow_id, workflow_version, state_id, state_category FROM proj_tickets WHERE ticket_id = $1', [CHILD],
+    )).rows[0];
+    expect(moved).toMatchObject({
+      workflow_id: 'wf-other', workflow_version: 1, state_id: 'intake', state_category: 'open',
+    });
+
+    const untouched = (await db.query('SELECT workflow_id FROM proj_tickets WHERE ticket_id = $1', [GRANDCHILD])).rows[0];
+    expect(untouched.workflow_id).toBe('wf-basic');
+  });
+
+  // NOTE, so neither test is read as proving more than it does: both assert the
+  // LIVE path. On a re-derivation a re-bound type still resolves its NEW
+  // workflow for a ticket the live path bound to the old one — `loadDeps` reads
+  // `proj_ticket_types`, which is last-definition-wins with no history to ask
+  // as-of. That is Open question 11, scoped out deliberately, and it is the one
+  // place the "pure function of the ledger prefix" claim does not yet hold.
 
   // Refresh on publish — owner decision 2026-08-26, design decision 10.
 
@@ -4797,6 +4960,7 @@ git commit -m "Ticket history is the ledger filtered, not a summary: every claim
 - ⚙️ **Refresh on publish** — `foldTicketToWorkflowVersion`, the one pure fold a newly published workflow version applies to the tickets already standing in its states: the state id walked forward through the version chain's `stateMapping`s, the category recomputed from the new version, the transition log left alone because each entry's version is the vocabulary its state id is written in. Called by the server projection, by the fixture suite's in-memory context, and by the offline replica, which builds its read model from domain reducers and would otherwise keep stale categories forever. Skipping a ticket already at or past the target version is what makes it order-insensitive under canonical replay. `packages/domain/src/ticket-state.ts`
 - ✅ **Hierarchy sanity refusals** — child rank must exceed parent rank, any type at or below the deepest rank requires a parent (the built-in `sub-task`, any custom type an admin defines beside it, and anything deeper — the rule follows the rank, not the id), cycles refused (load-bearing after rank re-definitions), cross-project parents refused, live work under a terminal parent refused toward an offered reopen (owner decision; terminal-under-terminal stays legal); every reason in plain language, every refusal proven against a planted defect. `packages/rule-engine/src/checks/hierarchy.ts`
 - ✅ **Field claim refusals** — unknown fields, per-kind mismatches with the field named, title never clearable; `null` clears everything else as an attributed claim. `packages/rule-engine/src/checks/fields.ts`
+- ✅ **Workflow migration** — a ticket keeps the workflow it was created under, so re-pointing its type changes only what new tickets get; `ticket.workflow_rebound` is the deliberate, attributed act that moves an existing one onto a different workflow at a named state. Refused when the target workflow is undefined, when it has no such state, and — the one that matters — when the target is the ticket's own workflow, because within a workflow this event would place a ticket in any state without satisfying a single transition rule and without leaving the log entry four-eyes reads. `packages/rule-engine/src/checks/workflow-rebind.ts`
 - ⚙️ **Ticket projections** — `proj_ticket_types` (workspace-scoped type defs), `proj_tickets` (head state backing the engine's `getEntityState`/`getChildrenStates`), `proj_rollups` (direct-children counts per state category; derived progress is never authored); all rebuild-and-diff clean. `apps/server/src/projections/`
 - ⚙️ **Workflow republish keeps the projections honest** — `proj_tickets` and `proj_rollups` both consume `workflow.defined`: publishing a version folds every ticket on that workflow forward and recomputes the parents whose progress those tickets feed, in the publishing transaction, so no board column, attention bucket or progress bar repeats a category the workflow has redefined. Both projections resolve a workflow definition **as of the ledger position of the event they are applying**, never as of now — without that, a version that drops a state makes `proj_tickets` unrebuildable and the verifier reports drift after every republish. `apps/server/src/projections/tickets.ts`, `apps/server/src/projections/rollups.ts`
 - ✅ **Ticket history endpoint** — `GET /v1/tickets/:id/history`: the ledger filtered to one ticket, seq-ordered, actor and both clocks on every event, paged; no summarising. Both clocks are absolute instants serialized as ISO 8601 `Z`, so a claim made at `+05:30` and the same claim made at `Z` read back identically — they were the same moment (owner decision 2026-08-20). `apps/server/src/routes/ticket-history.ts`
@@ -4841,6 +5005,10 @@ Mirrors `Features.md` §5. Status: `❌` not covered · `✅` covered · `🟡` 
 - 5.29 ✅ Planted defect: with a v2 published after transitions, a **projection-outer** rebuild of `proj_tickets` (reset that projection alone, replay the whole ledger in canonical order, the way the verifier does) reproduces the live table byte for byte. Resolving definitions as "latest" instead of as of the event's `workspace_seq` fails this two ways — a dropped state throws, and an intact one stamps the wrong `workflow_version`. (`proj-tickets.test.ts`)
 - 5.30 ✅ The fold is a no-op for a ticket already at or past the target version — the guard that makes it order-insensitive when canonical replay hands the projection every ticket event before any workflow event — and a version chain with an unmapped drop throws rather than guessing a state. (`ticket-state.test.ts`)
 - 5.31 ✅ The in-memory context the fixture suite runs on folds on publish too, and answers an explicit `getWorkflowDef` version with that version rather than the latest — so the shared suite and the server cannot disagree about a ticket's category the first time a version re-categorises a state. (`memory-context.test.ts`)
+- 5.32 ✅ Re-pointing a ticket type at a different workflow leaves existing tickets on the workflow they were created under, while new tickets of that type get the new one; the type itself really moves, so the assertion cannot pass by the re-binding having been ignored (owner decision 2026-08-26). (`proj-tickets.test.ts`)
+- 5.33 ✅ `ticket.workflow_rebound` moves the one ticket it names onto the target workflow at the named state, stamping the target's version and category, and leaves siblings on the old workflow untouched. (`proj-tickets.test.ts`)
+- 5.34 ✅ A rebound naming a state the target workflow does not have is refused (`ticket.rebound-unknown-state`), and one naming an undefined workflow is refused (`ticket.workflow-undefined`). (`workflow-rebind.test.ts`)
+- 5.35 ✅ A rebound to the ticket's **own** workflow is refused (`ticket.rebound-same-workflow`) — the planted defect is an actor using it to reach a state whose transition carries `restrict-to` and `require-comment`, which would otherwise succeed with neither satisfied and leave no entry in the log four-eyes reads. (`workflow-rebind.test.ts`)
 ```
 
 - [ ] **Step 3: Run the full suite one last time**
@@ -4866,9 +5034,9 @@ Ambiguities and cross-plan unknowns, flagged rather than silently resolved. None
 3. **`ticket.transitioned` registration overlap.** Plan 2 may have provisionally registered the event type for its own tests; Task 2 keeps exactly one registration with the contracted payload shape.
 4. **Parent-required for custom deepest-rank types.** **Settled by the owner (2026-08-20, coordination doc sign-off table), overruling Plan 8's Open question 6:** the requirement follows the **rank**, not the built-in id. Any ticket whose type sits at or below the deepest rank requires a parent — the built-in `sub-task` (rank 4), any custom type an admin defines at rank 4, and anything deeper; epic/story/task-rank types are unaffected, so an epic-rank custom type still sits at project root. Implemented as `type.rank >= DEEPEST_RANK` in both hierarchy checks (Task 5 Steps 7d–7e, Task 6 Step 3), refused as `hierarchy.deepest-rank-parent-required` with the type named in the reason, proven by `created-deepest-rank-no-parent.json` and its twin. Two things pinned so they are not "fixed" later, both argued in design decision 9: (i) `DEEPEST_RANK` is a fixed constant, not a max computed over defined types, so the refusal's meaning never shifts as the type inventory changes; (ii) the comparison is `>=`, not `===`, so nothing slips underneath the floor — a rank-7 type is smaller work than a sub-task and exempting it would invert the rule's own justification. Still open, and not this plan's: whether a type should be able to *declare* "requires a parent" independent of its rank. Nobody has asked for it; the rank answer covers the cases that exist.
 5. **Non-terminal child under a terminal parent.** Settled by the owner decision (2026-08-20, coordination doc): refused as `hierarchy.parent-terminal` with the reopen named in the reason as the remedy — clients offer to reopen the parent (its `ticket.transitioned` carrying `cause: { kind: 'reopened-for-child', childTicketId }`) and then re-submit; a terminal child under a terminal parent stays legal. Implemented in Tasks 5–6 and the Task 8 trio (design decision 8).
-6. **Project existence.** `ticket.created.projectId` is recorded as-is; validating it against a projects projection belongs to the plan that owns project events.
-7. **Who emits the built-in seed events.** `builtinTicketTypeDefs(defaultWorkflowId)` is ready; the workspace-bootstrap plan owns emitting the four `ticket-type.defined` events (and the default workflow binding) at workspace creation.
-8. **Re-binding a type to a different workflow.** A ticket's workflow is bound at creation here; a later `ticket-type.defined` pointing at a new workflow affects new tickets only. Migrating in-flight tickets is workflow-change territory (spec §4's state-mapping machinery, Plan 2 and later). Note the rebuild caveat in Open question 11: that "new tickets only" promise is true on the live path but not yet on a re-derivation.
+6. **Project existence. SETTLED by the owner (2026-08-26, coordination doc) — Plan 4 adds `proj_projects` and a precondition refusal.** The deferral said validation "belongs to the plan that owns project events", and no plan had taken it: there was no `proj_projects` anywhere, and `project.created` was a registered type nothing projected. What covered it by accident was Plan 4 refusing an actor who is not a member of the project — but membership is built from membership events, which themselves accept any non-empty string as a project scope. So a fabricated `projectId` was refused only where nobody happened to be a member, and named the wrong reason when it was. Plan 4 now owns `proj_projects` (registered before `proj_tickets`, §8), the refusal that names the honest reason, and scope validation on membership grants. This plan's precondition list carries the cross-reference.
+7. **Who emits the built-in seed events. SETTLED by the owner (2026-08-26, coordination doc) — Plan 4 founds the workspace.** "The workspace-bootstrap plan" was named here and never resolved to a plan number, and nothing in the series emitted the events: Plan 4's hook after `workspace.created` appended only the founder's membership, there was no workspace-creation route anywhere, and the only code looping `builtinTicketTypeDefs` lived in Plan 11's demo seeds. A workspace founded through the product therefore held no workflow and no types, so its first `ticket.created` was refused `ticket.unknown-type` and it was unusable. Plan 4 now appends the simple-Kanban `workflow.defined`, then the four `ticket-type.defined` events, then the founder grant — in that order, because a type naming an undefined workflow is refused.
+8. **Re-binding a type to a different workflow. SETTLED by the owner (2026-08-26, coordination doc) — a ticket pins the workflow it was created under, and `ticket.workflow_rebound` moves it.** Re-pointing a type's binding changes only what new tickets get; existing ones stay, and the board renders the two populations side by side because Plan 5 already specifies columns per workflow-in-use. Task 6 Step 4b adds the event's check, including the refusal that matters most: a rebound within the *same* workflow is refused, because this event places a ticket without evaluating any transition rule and would otherwise be a way to reach any state without satisfying `restrict-to`, `require-evidence`, four-eyes or any other guard, and without leaving the log entry four-eyes reads. **Note the rebuild caveat in Open question 11: the "existing tickets stay" promise holds on the live path and not yet on a re-derivation.**
 9. **Workflow version changes re-categorising stored state. SETTLED by the owner (2026-08-26, coordination doc) — refresh on publish, and it is this plan's work after all.** The question was posed as a preference ("who should refresh the rows?") and deferred to a workflow-change plan. It was not a preference: leaving it undone left `proj_tickets` unable to rebuild. `proj_tickets` now consumes `workflow.defined` and folds every row on that workflow forward — `state_id` through the version chain's `stateMapping`s, `state_category` recomputed from the new version, `workflow_version` stamped — and `proj_rollups` recomputes the affected parents in the same transaction, because its counts are `FILTER (WHERE state_category = …)` and a stale category there makes the parent-terminal invariant refuse legitimate closes. One fold, in `@gisik-nokma/domain`, so Plan 10's replica — which builds its read model from domain reducers and never from the server's pg tables — applies exactly the same one, and Task 4's in-memory context applies it too so the shared fixture suite and the server cannot answer `getChildrenStates` differently. Design decision 10 carries the argument; Task 3 the fold; Tasks 10–11 the projections.
    **Two defects this closed, both live before it.** `proj_tickets` resolved its workflow with `getWorkflowDef(db, workspaceId, workflowId)` — no version, contracted as "the latest at the current ledger position", which the projection had no way to honour: it read whatever `proj_workflows` held *now*. Plan 1's verifier rebuilds projection-outer, so `proj_workflows` is complete before `proj_tickets` replays its first event. (i) Replaying a `ticket.transitioned` whose `toStateId` a later version dropped **threw** — the reducer looks the id up in the definition directly, and the mandatory `stateMapping` does not save it because that mapping is consulted by the engine's `resolveCurrentStateId`, not here — so any version dropping a state made this table unrebuildable, breaking spec §3's promise that projections rebuild deterministically from scratch. (ii) Even with nothing dropped, re-derivation stamped the newest `workflow_version` where the live row holds the version in force at the time, so the verifier reported drift after *any* republish. Both are fixed by resolving the definition **as of the event being applied** — the projection passes the current event's `workspaceSeq` to `getWorkflowDefAsOf` — and the two halves need each other: as-of resolution alone leaves rows frozen at old categories, refresh-on-publish alone still throws on replay. Together `proj_tickets` is a pure function of the ledger prefix. **Still open, and not this plan's:** whether a republish should *notify* anyone that their tickets changed category under them. The data is now honest; whether it is announced is a Plan 9 question.
 10. **Projection registry ordering guarantee.** `proj_rollups` reading `proj_tickets` requires apply-in-registration-order per event (Coordination). If Plan 1's registry does not guarantee order, that guarantee must be added there — the rebuild determinism of rollups depends on it. Design decision 10 adds a second dependency on the same guarantee: `proj_tickets` reads the version being published from `proj_workflows`, which is registered before it.
