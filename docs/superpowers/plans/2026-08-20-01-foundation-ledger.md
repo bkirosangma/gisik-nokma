@@ -53,7 +53,7 @@ type EngineContext = {
 declare function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal>
 ```
 
-- DB: `events` table append-only; projections in tables prefixed `proj_`; every projection registered in a projection registry with deterministic `apply(event, tx)` and `reset(tx)`, rebuildable from scratch; rebuild-and-diff verifier CLI at `apps/server/src/tools/verify-projections.ts`. Snapshots table bounds per-entity replay.
+- DB: `events` table append-only; projections in tables prefixed `proj_`; every projection registered in a projection registry with deterministic `apply(event: LedgerEvent, tx)` and `reset(tx)`, rebuildable from scratch; rebuild-and-diff verifier CLI at `apps/server/src/tools/verify-projections.ts`. Snapshots table bounds per-entity replay.
 
 Engineering addenda binding on every task in this plan:
 
@@ -1032,7 +1032,11 @@ export type TicketState = {
   assigneeId: string | null;
   collaboratorIds: string[];
   fields: Record<string, FieldClaim>;
-  transitions: { toStateId: string; actorId: string; seq: number; workflowVersion: number }[];
+  // Coordination doc §4 (amended twice on 2026-08-26): an entry names the
+  // workflow AND version whose vocabulary its toStateId is written in.
+  // require-different-user skips entries from a workflow the ticket has been
+  // migrated off, then walks the rest forward from their recorded version.
+  transitions: { toStateId: string; actorId: string; seq: number; workflowId: string; workflowVersion: number }[];
 };
 
 /** PROVISIONAL — replaced by Plan 2 Task 2; see file header. */
@@ -2842,9 +2846,11 @@ git commit -m "Ledger stores: advisory-locked per-entity sequencing and the per-
 - Test: `apps/server/test/projection-framework.test.ts`
 
 **Interfaces:**
-- Consumes: `readLedger`, `insertEvent` from Task 7; `createTestDatabase` (Task 6); event helpers (Task 7).
+- Consumes: `readLedger`, `insertEvent`, `LedgerEvent` from Task 7; `createTestDatabase` (Task 6); event helpers (Task 7).
 - Produces (cross-plan API — every later projection author implements `Projection` and registers it):
-  - `type Projection = { name: string; tables: readonly string[]; apply(event: EventEnvelope, tx: PoolClient): Promise<void>; reset(tx: PoolClient): Promise<void> }` — `apply` must be deterministic (no clocks, no randomness, nothing outside the event and its own tables) and **insensitive to cross-entity arrival interleaving** (per-entity seq order is the only replay guarantee); `tables` lists every table it writes (all `proj_`-prefixed); `reset` empties them.
+  - `type Projection = { name: string; tables: readonly string[]; apply(event: LedgerEvent, tx: PoolClient): Promise<void>; reset(tx: PoolClient): Promise<void> }` — `apply` must be deterministic (no clocks, no randomness, nothing outside the event and its own tables) and **insensitive to cross-entity arrival interleaving** (per-entity seq order is the only replay guarantee); `tables` lists every table it writes (all `proj_`-prefixed); `reset` empties them.
+  - **`apply` receives a `LedgerEvent`, not the bare domain `EventEnvelope`** — the stored envelope plus its `workspaceSeq`, the workspace stream position (coordination §18). Both call sites already hold one: the ingest transaction assigns `workspaceSeq` before it applies anything, and every ledger reader (`readLedger`, `readEntityEvents`, `rowToEnvelope`) returns `LedgerEvent`. Passing it through costs nothing and a projection genuinely needs it: Plan 2's `proj_workflows` records the position each workflow version was published at, and Plan 3's `proj_tickets` uses that to ask for **the definition in force at the event it is applying** rather than the newest one — without which a replayed transition into a since-dropped state throws and the projection cannot be rebuilt at all.
+  - **This does not weaken the determinism rule above, and nobody should later "fix" it back.** `workspaceSeq` is a *stored property of the event*, written once in the ingest transaction under `UNIQUE(workspace_id, workspace_seq)` — not an artefact of when a projection happened to see it. Replay hands back the same value the ledger holds, so `apply` remains a pure function of the event and its own tables. Arrival interleaving is still invisible to it: `workspaceSeq` says where the event sits in the workspace's stream, never what order this projection was called in.
   - `type ProjectionRegistry = { register(p: Projection): void; get(name: string): Projection | undefined; all(): readonly Projection[] }`; `createProjectionRegistry(): ProjectionRegistry` — duplicate names refused.
   - `rebuildProjection(name: string, deps: { pool: Pool; projections: ProjectionRegistry }): Promise<void>` — resets then replays the whole ledger in canonical order, one transaction. **It truncates the projection's LIVE tables: an offline/operational action, never a request-path one.** (The verifier never calls it against live — it rebuilds into a shadow schema, Task 12.)
 
@@ -2968,7 +2974,7 @@ Expected: FAIL — cannot resolve `../src/projections/registry.js`.
 
 ```ts
 import type { PoolClient } from 'pg';
-import type { EventEnvelope } from '@gisik-nokma/domain';
+import type { LedgerEvent } from '../ledger/event-store.js';
 
 /**
  * A projection is a deterministic read model over the ledger.
@@ -2986,11 +2992,27 @@ import type { EventEnvelope } from '@gisik-nokma/domain';
  *   plans depend on the order proj_entity_heads, proj_workflows,
  *   proj_ticket_types, proj_tickets, proj_rollups, proj_memberships,
  *   proj_visibility (coordination doc §8).
+ *
+ * apply receives a LedgerEvent — the stored envelope plus its workspaceSeq,
+ * the workspace stream position — because a projection may need to know WHERE
+ * IN THE LEDGER the event it is applying sits: proj_workflows records the
+ * position each version was published at, and proj_tickets uses that to ask
+ * for the workflow definition in force at this event rather than the newest
+ * one. Both call sites already have a LedgerEvent in hand; ingest assigns
+ * workspaceSeq in the same transaction, and every ledger reader returns it.
+ *
+ * DO NOT "fix" this back to EventEnvelope on determinism grounds. workspaceSeq
+ * is a stored property of the event, written once under
+ * UNIQUE(workspace_id, workspace_seq) — not an arrival-order artefact. Replay
+ * hands back exactly what the ledger holds, so apply stays a pure function of
+ * the event and its own tables, and interleaving stays invisible to it:
+ * workspaceSeq says where the event sits in the workspace's stream, never in
+ * what order this projection was called.
  */
 export type Projection = {
   name: string;
   tables: readonly string[];
-  apply(event: EventEnvelope, tx: PoolClient): Promise<void>;
+  apply(event: LedgerEvent, tx: PoolClient): Promise<void>;
   reset(tx: PoolClient): Promise<void>;
 };
 

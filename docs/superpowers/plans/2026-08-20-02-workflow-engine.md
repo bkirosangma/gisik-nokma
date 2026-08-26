@@ -4,7 +4,7 @@
 
 **Goal:** Replace the pass-through rule engine with the real workflow engine — workflow definitions as validated data, the five-rule closed vocabulary, workflow versioning with state mappings, the parent-terminal invariant, and a planted-defect fixture suite that client and server builds both run.
 
-**Architecture:** `packages/domain` gains the workflow vocabulary (zod schemas + pure structural validation, I/O-free so the later builder UI calls the same function). `packages/rule-engine` gains the real `evaluateEvent`: a dispatcher that handles `ticket.transitioned` (workflow resolution, transition legality, the parent-terminal invariant, transition rules in order — first refusal wins) and `workflow.defined` (structural validation + versioning + stranding refusals), passing every other event type through. Every refusal path is proven against a planted defect in a JSON fixture before it is trusted; the fixture suite is exported so later server-side plans run the identical fixtures. `apps/server` gains the `proj_workflows` projection backing `EngineContext.getWorkflowDef`.
+**Architecture:** `packages/domain` gains the workflow vocabulary (zod schemas + pure structural validation, I/O-free so the later builder UI calls the same function) and the one pure forward state-id walk, `foldStateIdForward` — in domain rather than in the engine because the engine, Plan 3's ticket projection and Plan 10's offline replica all fold across versions and must fold identically. `packages/rule-engine` gains the real `evaluateEvent`: a dispatcher that handles `ticket.transitioned` (workflow resolution, transition legality, the parent-terminal invariant, transition rules in order — first refusal wins) and `workflow.defined` (structural validation + versioning + stranding refusals), passing every other event type through. Every refusal path is proven against a planted defect in a JSON fixture before it is trusted; the fixture suite is exported so later server-side plans run the identical fixtures. `apps/server` gains the `proj_workflows` projection backing `EngineContext.getWorkflowDef`, recording each version's publish position so a definition can be resolved as of a point in the ledger and not only as of now.
 
 **Tech Stack:** TypeScript strict on Node 22 LTS, pnpm 9 workspaces + Turborepo, zod for schemas, Vitest for tests, Postgres 16 via `pg` + node-pg-migrate for the projection.
 
@@ -82,7 +82,9 @@ Plan 1 is being written in parallel; where its exact spellings are not in the bi
 packages/domain/
   src/workflow.ts              # NEW — StateCategory/WorkflowState/Rule/Transition/WorkflowDef schemas,
                                #        WorkflowDefinedPayload (def + optional stateMapping), PublishedWorkflowDef,
-                               #        hasStateMapping guard, TicketTransitionedPayload schema
+                               #        hasStateMapping guard, TicketTransitionedPayload schema,
+                               #        foldStateIdForward/FoldedState — the PURE version walk, in domain because
+                               #        the engine, the server projection and the offline replica all need it
   src/entity-state.ts          # NEW — TicketState, MembershipState, OtherEntityState, EntityState, WorkspaceRole, membershipId
   src/validate-workflow.ts     # NEW — Issue, validateWorkflowDef (pure, I/O-free; the builder UI calls this same function),
                                #        plus the exported label() helper the advisory tier shares
@@ -99,7 +101,8 @@ packages/rule-engine/
   src/refusal-rules.ts         # NEW — REFUSAL_RULES canonical rule-name constants
   src/workflow-defined.ts      # NEW — structural + versioning + stranding refusals
   src/transition.ts            # NEW — ticket.transitioned evaluation (built up across Tasks 6-8)
-  src/version-map.ts           # NEW — resolveStateIdForward (the one version walk) + resolveCurrentStateId
+  src/version-map.ts           # NEW — resolveStateIdForward (fetches intermediates through ctx, then delegates the
+                               #        walk to domain's foldStateIdForward) + resolveCurrentStateId
   src/rules/types.ts           # NEW — TransitionRuleInput, RuleEvaluator
   src/rules/index.ts           # NEW — evaluateTransitionRules (ordered, first refusal wins, exhaustive switch)
   src/rules/require-comment.ts # NEW
@@ -109,7 +112,7 @@ packages/rule-engine/
   src/rules/require-different-user.ts # NEW
   src/fixtures/harness.ts      # NEW — fixtureSchema, loadFixtures, completeEnvelope/completeCandidate,
                                #        buildInMemoryContext, assertFixtureOutcome (framework-free)
-  fixtures/*.json              # NEW — 58 planted-defect fixtures (inventory in tasks below)
+  fixtures/*.json              # NEW — 59 planted-defect fixtures (inventory in tasks below)
   src/index.ts                 # MODIFY (Plan 1's) — export engine + fixture harness
   test/harness.test.ts         # NEW
   test/fixtures.test.ts        # NEW — the runner: iterates every fixture
@@ -215,7 +218,9 @@ The rule vocabulary is closed and versioned — no user code, so refusals stay p
 
 **Interfaces:**
 - Consumes: nothing beyond zod and Plan 1's registry call shape (coordination assumption above).
-- Produces (Plans 3–11 and the builder UI depend on these exact names): `stateCategorySchema`/`StateCategory`, `workflowStateSchema`/`WorkflowState`, `ruleSchema`/`Rule`, `transitionSchema`/`Transition`, `workflowDefSchema`/`WorkflowDef`, `stateMappingSchema`, `workflowDefinedPayloadSchema`/`WorkflowDefinedPayload`, `PublishedWorkflowDef` (= `WorkflowDefinedPayload`), `hasStateMapping(def)`, `ticketTransitionedPayloadSchema`/`TicketTransitionedPayload`; event type `workflow.defined` v1 registered with `workflowDefinedPayloadSchema`.
+- Produces (Plans 3–11 and the builder UI depend on these exact names): `stateCategorySchema`/`StateCategory`, `workflowStateSchema`/`WorkflowState`, `ruleSchema`/`Rule`, `transitionSchema`/`Transition`, `workflowDefSchema`/`WorkflowDef`, `stateMappingSchema`, `workflowDefinedPayloadSchema`/`WorkflowDefinedPayload`, `PublishedWorkflowDef` (= `WorkflowDefinedPayload`), `hasStateMapping(def)`, `ticketTransitionedPayloadSchema`/`TicketTransitionedPayload`, `foldStateIdForward(stateId, fromVersion, latest, intermediate)`/`FoldedState`; event type `workflow.defined` v1 registered with `workflowDefinedPayloadSchema`.
+
+**`foldStateIdForward` lives in domain, not in the rule engine, and that placement is load-bearing.** Three consumers need the same walk: this plan's engine (`resolveStateIdForward`, Task 6, and `require-different-user`, Task 11), Plan 3's `proj_tickets` (which folds every affected row forward when a new version is published — the refresh-on-publish decision of 2026-08-26), and Plan 10's offline replica (which builds its read model from domain reducers and never from the server's pg projections, so it must fold locally or keep stale categories forever). `@gisik-nokma/domain` is the only package all three depend on — rule-engine depends on domain, not the reverse — so this is the one home that does not force a second copy. The function is **pure**: it takes the definitions it needs rather than fetching them, which is exactly what lets the async ctx-driven caller in the engine and the two synchronous callers with their definitions already in hand share one implementation.
 
 - [ ] **Step 1: Ensure the domain package can run Vitest**
 
@@ -240,6 +245,7 @@ Create `packages/domain/test/workflow-schema.test.ts`:
 ```ts
 import { describe, expect, it } from 'vitest';
 import {
+  foldStateIdForward,
   ruleSchema,
   ticketTransitionedPayloadSchema,
   workflowDefSchema,
@@ -319,6 +325,74 @@ describe('ticketTransitionedPayloadSchema', () => {
   it('accepts a move with comment and evidence', () => {
     const payload = { to: 'done', comment: { text: 'Shipped.' }, evidenceAttachmentId: 'att_1' };
     expect(ticketTransitionedPayloadSchema.safeParse(payload).success).toBe(true);
+  });
+});
+
+describe('foldStateIdForward — the one version walk', () => {
+  const v1 = workflowDefSchema.parse(validDef);
+  const v2 = workflowDefinedPayloadSchema.parse({
+    ...validDef,
+    version: 2,
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' },
+      { id: 'done', name: 'Done', category: 'terminal' },
+    ],
+    transitions: [{ from: 'todo', to: 'done', rules: [] }],
+    stateMapping: { doing: 'todo' },
+  });
+  const v3 = workflowDefinedPayloadSchema.parse({
+    ...validDef,
+    version: 3,
+    states: [
+      { id: 'queued', name: 'Queued', category: 'open' },
+      { id: 'done', name: 'Done', category: 'terminal' },
+    ],
+    transitions: [{ from: 'queued', to: 'done', rules: [] }],
+    stateMapping: { todo: 'queued' },
+  });
+  const chain = new Map([
+    [1, v1],
+    [2, v2],
+  ]);
+  const intermediate = (version: number): typeof v1 | null => chain.get(version) ?? null;
+
+  it('leaves a state the later versions still have exactly where it is', () => {
+    expect(foldStateIdForward('done', 1, v2, intermediate)).toEqual({ ok: true, stateId: 'done' });
+  });
+
+  it('follows one mapping', () => {
+    expect(foldStateIdForward('doing', 1, v2, intermediate)).toEqual({ ok: true, stateId: 'todo' });
+  });
+
+  it('follows mappings through every intermediate version, not just the last', () => {
+    // doing → todo (v2) → queued (v3): the intermediate hop is where a walk
+    // that only consulted the newest definition would silently lose the ticket.
+    expect(foldStateIdForward('doing', 1, v3, intermediate)).toEqual({ ok: true, stateId: 'queued' });
+  });
+
+  it('reports the id at the point the chain broke, not the one it started from', () => {
+    const orphan = workflowDefinedPayloadSchema.parse({
+      ...validDef,
+      version: 3,
+      states: [{ id: 'done', name: 'Done', category: 'terminal' }],
+      transitions: [],
+    });
+    expect(foldStateIdForward('doing', 1, orphan, intermediate)).toEqual({
+      ok: false,
+      unmappedStateId: 'todo',
+    });
+  });
+
+  it('a state the latest version no longer has is unmapped even with no versions to walk', () => {
+    const dropped = workflowDefSchema.parse({
+      ...validDef,
+      states: [{ id: 'done', name: 'Done', category: 'terminal' }],
+      transitions: [],
+    });
+    expect(foldStateIdForward('todo', 1, dropped, intermediate)).toEqual({
+      ok: false,
+      unmappedStateId: 'todo',
+    });
   });
 });
 ```
@@ -406,6 +480,52 @@ export function hasStateMapping(
 ): def is WorkflowDef & { stateMapping: Record<string, string> } {
   const candidate = def as WorkflowDef & { stateMapping?: unknown };
   return typeof candidate.stateMapping === 'object' && candidate.stateMapping !== null;
+}
+
+export type FoldedState = { ok: true; stateId: string } | { ok: false; unmappedStateId: string };
+
+/**
+ * Walk ONE state id forward from the version whose vocabulary it is written in
+ * to `latest`, following each intermediate version's stateMapping. Pure: it
+ * asks for definitions through `intermediate` rather than fetching them, so
+ * the async ctx-driven caller in the rule engine and the synchronous callers
+ * that already hold every version share one implementation.
+ *
+ * `intermediate(version)` is consulted only for versions strictly between
+ * `fromVersion` and `latest.version`; `latest` answers for its own version and
+ * for the final containment check (which is what catches a ticket already at
+ * the latest version whose state id the definition no longer has). A version
+ * the caller cannot supply returns `null` and the walk stops there.
+ *
+ * On failure it reports the id at the point the chain broke, not the id it
+ * started from — that is the id a refusal must name.
+ *
+ * THE ONE VERSION WALK. Every caller in the monorepo goes through this
+ * function: the engine's resolveStateIdForward and require-different-user
+ * (`@gisik-nokma/rule-engine`), the server's proj_tickets refresh-on-publish
+ * (Plan 3), and the offline replica's fold on workflow.defined (Plan 10).
+ * A second walk is a second set of rounding errors, and the two engines are
+ * only interchangeable while they round identically.
+ */
+export function foldStateIdForward(
+  stateId: string,
+  fromVersion: number,
+  latest: WorkflowDef,
+  intermediate: (version: number) => WorkflowDef | null,
+): FoldedState {
+  let current = stateId;
+  for (let version = fromVersion + 1; version <= latest.version; version += 1) {
+    const def = version === latest.version ? latest : intermediate(version);
+    if (def === null) return { ok: false, unmappedStateId: current };
+    if (def.states.some((state) => state.id === current)) continue;
+    const mapped = hasStateMapping(def) ? def.stateMapping[current] : undefined;
+    if (mapped === undefined) return { ok: false, unmappedStateId: current };
+    current = mapped;
+  }
+  if (!latest.states.some((state) => state.id === current)) {
+    return { ok: false, unmappedStateId: current };
+  }
+  return { ok: true, stateId: current };
 }
 
 /**
@@ -505,9 +625,12 @@ The frozen `EngineContext` returns `EntityState`/`TicketState` but the contract 
 
 **Interfaces:**
 - Consumes: `StateCategory` from Task 1.
-- Produces: `FieldClaim` (`{value, actorId, clientTime, serverTime}` — per-field provenance), `TicketState` (discriminant `kind: 'ticket'`; the merged cross-plan shape per the coordination doc §4: fields `id`, `workspaceId`, `projectId`, `typeId`, `parentId`, `workflowId`, `workflowVersion`, `stateId`, `stateCategory`, `assigneeId`, `collaboratorIds`, `fields: Record<string, FieldClaim>`, and the transition log `transitions: { toStateId; actorId; seq; workflowVersion }[]`), `MembershipState` (`kind: 'membership'`; `id`, `workspaceId`, `userId`, `role`), `OtherEntityState`, `EntityState` (the union), `WorkspaceRole`, `membershipId(workspaceId, userId): string`. Plan 3's ticket projection must maintain every `TicketState` field, notably `stateCategory` (denormalized so the parent-terminal check needs no per-child workflow lookup) and the append-only `transitions` log (what `require-different-user` reads).
+- Produces: `FieldClaim` (`{value, actorId, clientTime, serverTime}` — per-field provenance), `TicketState` (discriminant `kind: 'ticket'`; the merged cross-plan shape per the coordination doc §4: fields `id`, `workspaceId`, `projectId`, `typeId`, `parentId`, `workflowId`, `workflowVersion`, `stateId`, `stateCategory`, `assigneeId`, `collaboratorIds`, `fields: Record<string, FieldClaim>`, and the transition log `transitions: { toStateId; actorId; seq; workflowId; workflowVersion }[]`), `MembershipState` (`kind: 'membership'`; `id`, `workspaceId`, `userId`, `role`), `OtherEntityState`, `EntityState` (the union), `WorkspaceRole`, `membershipId(workspaceId, userId): string`. Plan 3's ticket projection must maintain every `TicketState` field, notably `stateCategory` (denormalized so the parent-terminal check needs no per-child workflow lookup) and the append-only `transitions` log (what `require-different-user` reads).
 
-**A log entry's `workflowVersion`** is the workflow definition version in whose vocabulary that entry's `toStateId` is written — the ticket's `workflowVersion` at the moment the transition was applied, after any forward fold. It is pinned by the coordination doc's decision 4 (as amended 2026-08-26) and it is not optional: without it, a version that drops and remaps a state leaves every historical entry unmatchable against the latest definition's state ids, and `require-different-user` silently finds no prior performer — four-eyes disarmed by a rename (Open question 10, part three; the evaluator's forward walk is Task 11).
+**A log entry's `workflowId` and `workflowVersion`** together name the vocabulary that entry's `toStateId` is written in — the ticket's workflow and version at the moment the transition was applied, after any forward fold. Both are pinned by the coordination doc's decision 4 (as amended twice on 2026-08-26) and neither is optional:
+
+- Without **`workflowVersion`**, a version that drops and remaps a state leaves every historical entry unmatchable against the latest definition's state ids, and `require-different-user` silently finds no prior performer — four-eyes disarmed by a rename (Open question 10, part three; the evaluator's forward walk is Task 11).
+- Without **`workflowId`**, the same walk is applied to entries that were never written in this workflow's vocabulary at all. A ticket pins the workflow it was created under and an explicit migration (`ticket.workflow_rebound`, Plan 3) moves it; an entry recorded under the outgoing workflow, walked forward through the incoming workflow's version chain, is meaningless. It either fails to match (the rule finds nobody and one person makes both moves) or matches the wrong move — a state id that merely happens to be spelled the same in two unrelated graphs — and refuses the wrong person. Either way the hole closed by `workflowVersion` reopens through a different door. Task 11's evaluator therefore filters on `workflowId` **before** walking anything forward.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -586,11 +709,13 @@ export type FieldClaim = { value: unknown; actorId: string; clientTime: string; 
  * the parent-terminal invariant needs no per-child workflow lookup.
  * `transitions` is the append-only log of every ticket.transitioned applied
  * to this ticket, oldest first — what require-different-user reads. An
- * entry's workflowVersion is the definition version in whose vocabulary that
- * entry's toStateId is written (the ticket's workflowVersion when the
- * transition was applied, after any forward fold); four-eyes resolves the id
- * forward from it before comparing, so a dropped-and-remapped state cannot
- * disarm the rule.
+ * entry's workflowId + workflowVersion name the vocabulary that entry's
+ * toStateId is written in (the ticket's workflow and version when the
+ * transition was applied, after any forward fold). Four-eyes skips entries
+ * from a different workflow and resolves the rest forward before comparing,
+ * so neither a dropped-and-remapped state nor a workflow migration can
+ * disarm the rule. Entries are never rewritten: a fold moves the ticket's
+ * current state, never the history that got it there.
  */
 export type TicketState = {
   kind: 'ticket';
@@ -606,7 +731,7 @@ export type TicketState = {
   assigneeId: string | null;
   collaboratorIds: string[];
   fields: Record<string, FieldClaim>;
-  transitions: { toStateId: string; actorId: string; seq: number; workflowVersion: number }[];
+  transitions: { toStateId: string; actorId: string; seq: number; workflowId: string; workflowVersion: number }[];
 };
 
 export type MembershipState = {
@@ -1408,7 +1533,7 @@ but not a reason to refuse the publish."
 
 The planted-defect suite is the spine of this plan: every refusal path gets a JSON fixture proving it fires, plus an accepting twin proving the happy path. Fixtures are data, not code, so later plans run the SAME files against the server build — the spec's "client and server can never quietly disagree" (§7, honesty invariant 2). This task builds the fixture contract and the in-memory `EngineContext`; the fixtures themselves land task-by-task with the code they prove.
 
-`priorEvents` is restricted to `ticket.created` / `ticket.transitioned` / `ticket.assigned` / `ticket.field_set` — event types a real server will ingest once Plan 3 registers them — so the server-side harness can eventually replay them for real. Workflow definitions and memberships are planted directly (`workflowDefs`, `memberships` fields) because publishing goes through the very validation some fixtures must bypass, and membership events belong to a later plan's vocabulary (Open question 8).
+`priorEvents` is restricted to `ticket.created` / `ticket.transitioned` / `ticket.workflow_rebound` / `ticket.assigned` / `ticket.field_set` — event types a real server will ingest once Plan 3 registers them — so the server-side harness can eventually replay them for real. (`ticket.workflow_rebound` is the explicit workflow migration of the coordination doc's 2026-08-26 decision; the harness folds it because four-eyes must be provable across one, and a fixture that needed a harness override to exist would be proving something the server can never reproduce.) Workflow definitions and memberships are planted directly (`workflowDefs`, `memberships` fields) because publishing goes through the very validation some fixtures must bypass, and membership events belong to a later plan's vocabulary (Open question 8).
 
 **Files:**
 - Create: `packages/rule-engine/src/fixtures/harness.ts`
@@ -1498,7 +1623,7 @@ describe('buildInMemoryContext', () => {
       },
     });
     expect(ticket.transitions).toEqual([
-      { toStateId: 'doing', actorId: 'user_b', seq: 2, workflowVersion: 1 },
+      { toStateId: 'doing', actorId: 'user_b', seq: 2, workflowId: 'wf_basic', workflowVersion: 1 },
     ]);
   });
 
@@ -1715,6 +1840,13 @@ const ticketCreatedFixturePayloadSchema = z.object({
   stateCategory: stateCategorySchema.optional(),
 });
 const ticketTransitionedFixturePayloadSchema = z.object({ to: z.string() });
+// Plan 3 owns ticket.workflow_rebound; the harness folds it because
+// require-different-user must be provable across a migration, and this plan's
+// fixtures may only contain events a real server can ingest.
+const ticketWorkflowReboundFixturePayloadSchema = z.object({
+  toWorkflowId: z.string(),
+  toStateId: z.string(),
+});
 const ticketAssignedFixturePayloadSchema = z.object({ assigneeId: z.string().nullable() });
 const ticketFieldSetFixturePayloadSchema = z.object({ field: z.string(), value: z.unknown() });
 
@@ -1803,14 +1935,42 @@ function applyPriorEvent(
       }
       ticket.stateId = state.id;
       ticket.stateCategory = state.category;
-      // The entry records the version whose vocabulary its toStateId is
-      // written in — the ticket's version at the moment the move was applied.
+      // The entry records the workflow AND version whose vocabulary its
+      // toStateId is written in — the ticket's own pair at the moment the
+      // move was applied. Both are read back by require-different-user.
       ticket.transitions.push({
         toStateId: state.id,
         actorId: env.actorId,
         seq: env.seq,
+        workflowId: ticket.workflowId,
         workflowVersion: ticket.workflowVersion,
       });
+      return;
+    }
+    case 'ticket.workflow_rebound': {
+      // The explicit migration between two unrelated workflows (Plan 3 owns
+      // the event; the harness folds it because four-eyes must be provable
+      // across one). It moves the ticket's pinned workflow, version and state
+      // and appends NO log entry — a migration is not a transition, and the
+      // entries already in the log keep the vocabulary they were written in.
+      const payload = ticketWorkflowReboundFixturePayloadSchema.parse(env.payload);
+      const ticket = mustTicket(tickets, env);
+      const target = latestOf(payload.toWorkflowId);
+      if (target === null) {
+        throw new Error(
+          `fixture prior event rebinds ticket ${ticket.id} to workflow "${payload.toWorkflowId}", which the fixture never defines`,
+        );
+      }
+      const state = target.states.find((s) => s.id === payload.toStateId);
+      if (state === undefined) {
+        throw new Error(
+          `fixture prior event rebinds ticket ${ticket.id} to unknown state "${payload.toStateId}" of workflow "${payload.toWorkflowId}"`,
+        );
+      }
+      ticket.workflowId = target.id;
+      ticket.workflowVersion = target.version;
+      ticket.stateId = state.id;
+      ticket.stateCategory = state.category;
       return;
     }
     case 'ticket.assigned': {
@@ -1830,7 +1990,7 @@ function applyPriorEvent(
     }
     default:
       throw new Error(
-        `fixture prior events may only be ticket.created/ticket.transitioned/ticket.assigned/ticket.field_set; got ${env.type}`,
+        `fixture prior events may only be ticket.created/ticket.transitioned/ticket.workflow_rebound/ticket.assigned/ticket.field_set; got ${env.type}`,
       );
   }
 }
@@ -2744,8 +2904,8 @@ The transition path's skeleton: parse the claim, find the ticket, resolve its wo
 - Create: 10 fixture files (Steps 1–2)
 
 **Interfaces:**
-- Consumes: `ticketTransitionedPayloadSchema`, `TicketState`, `hasStateMapping` from `@gisik-nokma/domain`; `REFUSAL_RULES` (Task 5); harness (Task 4).
-- Produces: `evaluateTicketTransitioned(env, ctx)`; `resolveStateIdForward(workflowId, stateId, fromVersion, latest, ctx): Promise<ResolvedState>` — the one version walk in the engine, so nothing grows a second one (Task 11's `require-different-user` is its other caller); `resolveCurrentStateId(ticket, latest, ctx): Promise<ResolvedState>` where `ResolvedState = { ok: true; stateId: string } | { ok: false; unmappedStateId: string }`, a thin wrapper over it — exported because Plan 3's ticket projection applies the same forward-mapping when a new workflow version lands.
+- Consumes: `ticketTransitionedPayloadSchema`, `TicketState`, `foldStateIdForward`, `FoldedState` from `@gisik-nokma/domain` (Task 1 — the pure walk); `REFUSAL_RULES` (Task 5); harness (Task 4).
+- Produces: `evaluateTicketTransitioned(env, ctx)`; `resolveStateIdForward(workflowId, stateId, fromVersion, latest, ctx): Promise<ResolvedState>` — the engine's **only** entry to the version walk (Task 11's `require-different-user` is its other caller); it fetches the intermediate definitions through `ctx` and then delegates the walk itself to domain's `foldStateIdForward`, so the engine, Plan 3's projection and Plan 10's replica are provably running one implementation. `resolveCurrentStateId(ticket, latest, ctx): Promise<ResolvedState>` is a thin wrapper over it, and `ResolvedState` is re-exported from domain's `FoldedState` (`{ ok: true; stateId: string } | { ok: false; unmappedStateId: string }`) — one result type, not two structurally identical ones.
 
 - [ ] **Step 1: Write the failing fixtures — hygiene and existence**
 
@@ -3016,21 +3176,38 @@ Expected: FAIL — every `transition-*` refusal fixture reports "expected refusa
 Create `packages/rule-engine/src/version-map.ts`:
 
 ```ts
-import { hasStateMapping, type TicketState, type WorkflowDef } from '@gisik-nokma/domain';
+import { foldStateIdForward, type FoldedState, type TicketState, type WorkflowDef } from '@gisik-nokma/domain';
 import type { EngineContext } from './types.js';
 
-export type ResolvedState = { ok: true; stateId: string } | { ok: false; unmappedStateId: string };
+/**
+ * The engine's name for domain's FoldedState. It is an alias, not a copy:
+ * every consumer (Task 11 here, Plan 3's projection, Plan 10's replica) reads
+ * the same `ok` / `stateId` / `unmappedStateId` shape from one declaration.
+ */
+export type ResolvedState = FoldedState;
 
 /**
  * Walk ONE state id forward from the version whose vocabulary it is written in
  * to the latest version, following each intermediate version's stateMapping.
- * On failure it reports the id at the point the chain broke, not the id it
- * started from — that is the id a refusal must name.
  *
- * This is the single version walk in the engine. Two callers need it and they
- * must not each grow their own: resolveCurrentStateId below (a ticket's
- * current state) and require-different-user (each transition-log entry's
- * recorded state — Task 11). A second walk is a second set of rounding errors.
+ * The WALK itself lives in `@gisik-nokma/domain` (`foldStateIdForward`) —
+ * three consumers need it and domain is the only package all three depend on.
+ * What lives here is the part that cannot: fetching the intermediate
+ * definitions through the async, I/O-backed EngineContext. Everything past the
+ * fetch is the shared pure function, so the engine cannot drift from the
+ * server projection or the offline replica.
+ *
+ * Two callers in this package need it and they must not each grow their own:
+ * resolveCurrentStateId below (a ticket's current state) and
+ * require-different-user (each transition-log entry's recorded state, Task
+ * 11). A second walk is a second set of rounding errors.
+ *
+ * Intermediates are fetched before the walk rather than lazily inside it. The
+ * outcome is identical — the fold stops at the first version it cannot resolve,
+ * with `current` computed from exactly the versions before it — and the only
+ * difference is a few extra reads on a store where publishing's mandatory
+ * stateMapping has already been violated. Correctness first, and that path is
+ * a corrupted or planted store, not a live one.
  */
 export async function resolveStateIdForward(
   workflowId: string,
@@ -3039,27 +3216,23 @@ export async function resolveStateIdForward(
   latest: WorkflowDef,
   ctx: EngineContext,
 ): Promise<ResolvedState> {
-  let current = stateId;
-  for (let version = fromVersion + 1; version <= latest.version; version += 1) {
-    const def = version === latest.version ? latest : await ctx.getWorkflowDef(workflowId, version);
-    if (def === null) return { ok: false, unmappedStateId: current };
-    if (def.states.some((state) => state.id === current)) continue;
-    const mapped = hasStateMapping(def) ? def.stateMapping[current] : undefined;
-    if (mapped === undefined) return { ok: false, unmappedStateId: current };
-    current = mapped;
+  const intermediates = new Map<number, WorkflowDef>();
+  for (let version = fromVersion + 1; version < latest.version; version += 1) {
+    const def = await ctx.getWorkflowDef(workflowId, version);
+    if (def !== null) intermediates.set(version, def);
   }
-  if (!latest.states.some((state) => state.id === current)) {
-    return { ok: false, unmappedStateId: current };
-  }
-  return { ok: true, stateId: current };
+  return foldStateIdForward(stateId, fromVersion, latest, (version) => intermediates.get(version) ?? null);
 }
 
 /**
  * Resolve a ticket's current state id against the latest workflow version,
  * walking each intermediate version's stateMapping forward. Exported because
- * Plan 3's ticket projection applies the same walk when a new version lands.
- * Publishing refuses unmapped drops, so ok:false only occurs on planted or
- * corrupted stores — and then the honest answer is a refusal, not a guess.
+ * the transition path and four-eyes both need it; Plan 3's ticket projection
+ * and Plan 10's replica reach the same walk through domain's
+ * foldStateIdForward directly, because they hold their definitions already and
+ * have no EngineContext to fetch through. Publishing refuses unmapped drops,
+ * so ok:false only occurs on planted or corrupted stores — and then the honest
+ * answer is a refusal, not a guess.
  */
 export async function resolveCurrentStateId(
   ticket: TicketState,
@@ -3175,6 +3348,7 @@ In `packages/rule-engine/src/index.ts`, add:
 ```ts
 export { evaluateTicketTransitioned } from './transition.js';
 export { resolveCurrentStateId, resolveStateIdForward } from './version-map.js';
+export type { ResolvedState } from './version-map.js';
 ```
 
 - [ ] **Step 5: Run the suite to verify everything passes**
@@ -3896,18 +4070,20 @@ Four-eyes: the actor must differ from whoever **last** performed the named earli
 
 **And versioning may not disarm it.** Each transition-log entry carries the workflow version its `toStateId` is written in (Task 2). The evaluator resolves each candidate entry **forward** through the same `stateMapping` chain the ticket's own state walks, and compares the *result* to `rule.thanActorOf.to`. Without that, a version that dropped and remapped the watched state left every historical entry unmatchable: the rule found no prior performer, one person made both moves, and four-eyes was disarmed by a rename on a workflow the advisory correctly calls clean. This is the counterexample the advisory does **not** cover — it characterises vacuous acceptance within a single version only.
 
+**And neither may a migration.** A ticket pins the workflow it was created under; an explicit `ticket.workflow_rebound` (Plan 3) moves it to a different workflow, and `stateMapping` cannot help there — it is keyed inside one workflow's version chain, and across two graphs there is no chain. So the evaluator considers **only entries whose `workflowId` is the ticket's current one**, and filters before it walks. Walking a foreign entry through this workflow's versions produces one of two wrong answers: no match (the rule finds nobody, and the same person makes both moves — the hole reopened through a different door), or a match on a state id that two unrelated workflows merely happen to spell the same way, which refuses a person who has done nothing. Only the second is observable — an entry the walk *cannot* resolve is skipped either way — so the sixth fixture below plants exactly that one: the same-id collision, which is also the case a reader is least likely to see coming.
+
 **Files:**
 - Create: `packages/rule-engine/src/rules/require-different-user.ts`
 - Modify: `packages/rule-engine/src/rules/index.ts` (replace the last throw)
-- Create: 5 fixture files (Step 1)
+- Create: 6 fixture files (Step 1)
 
 **Interfaces:**
-- Consumes: `TicketState.transitions` (the append-only log with its per-entry `workflowVersion`, Task 2); `resolveStateIdForward` from `./version-map.js` (Task 6 — reused, never re-implemented); `RuleEvaluator`, `TransitionRuleInput` (Task 8; `input.def` is the latest definition and `input.ctx` fetches the intermediates).
+- Consumes: `TicketState.transitions` (the append-only log with its per-entry `workflowId` and `workflowVersion`, Task 2); `resolveStateIdForward` from `./version-map.js` (Task 6 — reused, never re-implemented, and itself delegating to domain's `foldStateIdForward`); `RuleEvaluator`, `TransitionRuleInput` (Task 8; `input.def` is the latest definition and `input.ctx` fetches the intermediates).
 - Produces: `evaluateRequireDifferentUser` wired into `evaluateTransitionRules` — completing the vocabulary; after this task no `not implemented yet` throw remains.
 
 - [ ] **Step 1: Write the failing fixtures**
 
-Three use a "Review" workflow; a fourth uses the bypassable "Fast track" definition and the fifth a two-version pair. Base fixture, `rule-rdu-refuses-the-same-person.json`:
+Three use a "Review" workflow; a fourth uses the bypassable "Fast track" definition, the fifth a two-version pair and the sixth a migration between two workflows. Base fixture, `rule-rdu-refuses-the-same-person.json`:
 
 ```json
 {
@@ -4050,10 +4226,58 @@ candidate: `actorId` `"user_a"`, payload `{ "to": "approved" }`; expected `{ "re
 
 The reason names `checking`, not `review`: the rule's own `thanActorOf.to` is the vocabulary the user is reading in the current definition, and naming the retired id would be accurate about the past and useless in the present.
 
+`rule-rdu-ignores-an-entry-from-a-workflow-the-ticket-has-left.json` — the sixth fixture, and the one that proves a **migration** cannot make the rule answer for a workflow the ticket no longer uses. Two unrelated workflows both happen to spell a state `review`: `wf_intake`'s means "waiting on the requester", `wf_review`'s means "submitted for approval". A ticket is created under `wf_intake`, user_a moves it to `wf_intake`'s `review`, and an admin then migrates it to `wf_review` with `ticket.workflow_rebound`, landing it in `wf_review`'s `review`. Nobody has performed `wf_review`'s move to `review` — the ticket arrived there by migration, which is an attributed claim of its own and not a transition — so four-eyes has nobody to differ from and accepts. **Without the `workflowId` filter the leftover `wf_intake` entry matches on the shared spelling and refuses user_a for a move they never made**, so this fixture must accept and does not before the change.
+
+```json
+{
+  "name": "four-eyes ignores a log entry recorded under a workflow the ticket has since been migrated off",
+  "workflowDefs": [
+    {
+      "id": "wf_intake", "version": 1, "name": "Intake", "initialStateId": "new",
+      "states": [
+        { "id": "new", "name": "New", "category": "open" },
+        { "id": "review", "name": "With the requester", "category": "active" }
+      ],
+      "transitions": [
+        { "from": "new", "to": "review", "rules": [] },
+        { "from": "review", "to": "new", "rules": [] }
+      ]
+    },
+    {
+      "id": "wf_review", "version": 1, "name": "Review", "initialStateId": "draft",
+      "states": [
+        { "id": "draft", "name": "Draft", "category": "open" },
+        { "id": "review", "name": "In review", "category": "active" },
+        { "id": "approved", "name": "Approved", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "draft", "to": "review", "rules": [] },
+        { "from": "review", "to": "draft", "rules": [] },
+        { "from": "review", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "review" } } ] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_intake" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "review" } },
+    { "type": "ticket.workflow_rebound", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_admin", "payload": { "toWorkflowId": "wf_review", "toStateId": "review" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_a",
+    "payload": { "to": "approved" }
+  },
+  "expected": { "refused": false }
+}
+```
+
+Note what the fixture does **not** assert: that four-eyes is satisfied. It is vacuous here, and honestly so — the migration is the event that put the ticket in `review`, and it is attributed to `user_admin` in the ledger for anyone reading the history. Making a migration count as a performance of the target transition was considered and declined: a `ticket.workflow_rebound` is authored in bulk against a whole type (coordination doc, 2026-08-26), so counting it would let one admin's housekeeping stand in as the first pair of eyes on every ticket it touched.
+
 - [ ] **Step 2: Run the suite to verify the fixtures fail**
 
 Run: `pnpm --filter ./packages/rule-engine test`
-Expected: FAIL — all five error with `rule kind "require-different-user" is not implemented yet`.
+Expected: FAIL — all six error with `rule kind "require-different-user" is not implemented yet`.
 
 - [ ] **Step 3: Implement the rule**
 
@@ -4069,19 +4293,29 @@ import type { RuleEvaluator } from './types.js';
  * Four-eyes: the actor must differ from whoever LAST performed the named
  * earlier transition — the approval pairs with the submission it approves.
  *
- * Each log entry's toStateId is written in the vocabulary of the version
- * recorded beside it, while the rule names a state in the LATEST definition.
- * So every candidate entry is walked forward through the same stateMapping
- * chain the ticket's own state walks (one shared helper, never a second walk)
- * and the RESULT is compared to the rule's target. Without this, a version
- * that dropped and remapped the watched state would leave every historical
- * entry unmatchable, the rule would find nobody, and one person could make
- * both moves — versioning disarming four-eyes silently.
+ * Each log entry's toStateId is written in the vocabulary of the WORKFLOW and
+ * VERSION recorded beside it, while the rule names a state in the ticket's
+ * current workflow at its LATEST definition. Two guards follow, in this order:
+ *
+ *  1. Entries from a different workflow are skipped outright. A ticket pins
+ *     the workflow it was created under and only an explicit migration
+ *     (ticket.workflow_rebound) moves it; stateMapping is keyed inside one
+ *     workflow's version chain, so across two graphs there is nothing to walk.
+ *     Walking a foreign entry anyway either finds nothing (the rule finds
+ *     nobody and one person makes both moves) or matches a state id the two
+ *     workflows merely spell alike, refusing someone who did nothing.
+ *  2. Surviving entries are walked forward through the same stateMapping chain
+ *     the ticket's own state walks (one shared helper, never a second walk)
+ *     and the RESULT is compared to the rule's target. Without this, a version
+ *     that dropped and remapped the watched state would leave every historical
+ *     entry unmatchable, the rule would find nobody, and one person could make
+ *     both moves — versioning disarming four-eyes silently.
  *
  * Nobody ever performed the move → vacuously satisfied (creation is not a
- * transition). Publishing now refuses a rule watching a state nothing enters,
- * and the builder warns when the guarded move is reachable without the watched
- * one, so what remains here is a semantics the author was told about.
+ * transition, and neither is a migration). Publishing now refuses a rule
+ * watching a state nothing enters, and the builder warns when the guarded move
+ * is reachable without the watched one, so what remains here is a semantics the
+ * author was told about.
  */
 export const evaluateRequireDifferentUser: RuleEvaluator<
   Extract<Rule, { kind: 'require-different-user' }>
@@ -4090,6 +4324,9 @@ export const evaluateRequireDifferentUser: RuleEvaluator<
 
   let prior: { actorId: string } | undefined;
   for (const entry of input.ticket.transitions) {
+    // Guard 1: this entry belongs to a workflow the ticket has left. Its state
+    // ids are another graph's vocabulary; there is no chain to walk them along.
+    if (entry.workflowId !== input.ticket.workflowId) continue;
     const resolved = await resolveStateIdForward(
       input.ticket.workflowId,
       entry.toStateId,
@@ -4148,19 +4385,22 @@ Expected: `clean` — the vocabulary is complete.
 
 ```bash
 git add packages/rule-engine/src/rules/require-different-user.ts packages/rule-engine/src/rules/index.ts packages/rule-engine/fixtures/
-git commit -m "Four-eyes closes the vocabulary, and a rename can no longer disarm it
+git commit -m "Four-eyes closes the vocabulary, and neither a rename nor a migration can disarm it
 
 Only the latest performer of the named transition counts — an approval
 pairs with the submission standing before it, so an old withdrawn
 submission does not lock its author out.
 
-Log entries are written in the vocabulary of the version they were made
-under, so each one is walked forward through the same state mappings the
-ticket's own state follows before it is compared. Without that, a version
-that dropped and remapped the watched state left every historical entry
-unmatchable: the rule found nobody, one person made both moves, and the
-workflow still looked structurally clean. Proven by planting exactly that
-version pair.
+Log entries are written in the vocabulary of the workflow and version they
+were made under. Entries from a workflow the ticket has since been migrated
+off are skipped, and the rest are walked forward through the same state
+mappings the ticket's own state follows before they are compared. Without
+the walk, a version that dropped and remapped the watched state left every
+historical entry unmatchable: the rule found nobody, one person made both
+moves, and the workflow still looked structurally clean. Without the filter,
+an entry from an unrelated workflow matched on a state id the two graphs
+merely spell alike and refused someone who had done nothing. Proven by
+planting exactly that version pair and exactly that migration.
 
 With nobody to differ from the rule still accepts vacuously — but the
 workflow it can happen on is one publishing allows and the builder warns
@@ -4173,6 +4413,14 @@ about, not a hole nobody mentioned. No unimplemented rule kind remains."
 
 Workflow definitions are events; the engine needs them queryable — current and every historical version (the version walk in `resolveCurrentStateId` fetches intermediates). This task adds the projection table, registers it with Plan 1's projection registry, and gives the server's `EngineContext.getWorkflowDef` its real implementation. `apply` is idempotent (`ON CONFLICT DO NOTHING` on the `(workflow_id, version)` key), so Plan 1's rebuild-and-diff verifier can replay the ledger into it deterministically.
 
+**Each row also records the ledger position at which its version was published**, and the reader can be asked as of a position. This is the coordination doc's decision of 2026-08-26 ("A new workflow version refreshes the tickets it re-categorises", corollary), and it fixes a defect that is live today rather than adding a convenience:
+
+- `getWorkflowDefFromProjection(db, workflowId)` is contracted as "the latest version". Plan 3's `proj_tickets` calls it with no version and treats the answer as *the definition in force at the event it is applying*. Those are the same thing only while the projection is live. Plan 1's verifier rebuilds **projection-outer** (`for (const projection of projections) { reset; for (const event of ledger) apply }`), so `proj_workflows` is fully built to the newest version before `proj_tickets` replays its first event.
+- Two consequences, both true today. Replaying a `ticket.transitioned` whose `toStateId` a later version dropped **throws** — the reducer looks the id up in the definition directly and the mandatory `stateMapping` does not save it, because that mapping is consulted by the engine's `resolveCurrentStateId`, not by the reducer. So any version that drops a state makes `proj_tickets` unrebuildable, breaking the spec §3 promise that projections rebuild deterministically from scratch. And even with nothing dropped, re-derivation stamps the newest `workflow_version` where the live row holds the version in force at the time, so the verifier reports drift after *any* republish.
+- The position is `workspace_seq`, the workspace stream cursor (coordination §18), taken from the `workflow.defined` event's own envelope. It is available to `apply` because Plan 1's `Projection.apply` receives a `LedgerEvent` — the stored envelope plus its assigned stream position — rather than the bare domain `EventEnvelope`. `workspace_seq` is `UNIQUE(workspace_id, workspace_seq)` in the ledger and is a **stored property of the event**, not an artefact of when a projection happened to see it, so reading it does not weaken `apply`'s determinism rule.
+
+The reader gains one more way to be asked, alongside "latest" and "this exact version": **as of a position**, meaning the greatest version whose publish position is at or before it. That is what Plan 3's projection passes the current event's `workspaceSeq`, so `proj_tickets` becomes a pure function of the ledger prefix and live and re-derived converge.
+
 **Files:**
 - Create: `apps/server/migrations/<timestamp>_proj-workflows.ts` (timestamp prefix per Plan 1's convention in `apps/server/migrations/` — match the extension Plan 1 uses)
 - Create: `apps/server/src/projections/workflows.ts`
@@ -4182,7 +4430,21 @@ Workflow definitions are events; the engine needs them queryable — current and
 
 **Interfaces:**
 - Consumes: Plan 1's `registerProjection({ name, apply, reset })` and migration runner; `workflowDefinedPayloadSchema`, `PublishedWorkflowDef`, `EventEnvelope` from `@gisik-nokma/domain`.
-- Produces: table `proj_workflows` (`workspace_id`, `workflow_id`, `version`, `name`, `definition` jsonb, `defined_by`, `defined_at`; PK `(workflow_id, version)`); `workflowsProjection` (name `workflows`); `getWorkflowDefFromProjection(db, workflowId, version?): Promise<PublishedWorkflowDef | null>` — latest when `version` is omitted. The stored `definition` is the full `workflow.defined` payload, stateMapping included, so the engine's version walk sees mappings.
+- Produces: table `proj_workflows` (`workspace_id`, `workflow_id`, `version`, `name`, `definition` jsonb, `defined_by`, `defined_at`, **`published_workspace_seq` bigint NOT NULL** — the `workspace_seq` of the `workflow.defined` event that published this version; PK `(workflow_id, version)`); `workflowsProjection` (name `proj_workflows`, `tables: ['proj_workflows']`, matching coordination §8's registration order); and the reader
+
+  ```ts
+  export type WorkflowDefSelector = number | { asOfWorkspaceSeq: number };
+
+  export function getWorkflowDefFromProjection(
+    db: Queryable,
+    workflowId: string,
+    select?: WorkflowDefSelector,
+  ): Promise<PublishedWorkflowDef | null>;
+  ```
+
+  Three ways to ask, one function, and the existing two are unchanged: **omit** `select` for the newest published version; pass a **number** for that exact version (every existing caller keeps working — Plan 5 passes one in `getWorkflowDefFromProjection(deps.pool, workflowId, version)`); pass **`{ asOfWorkspaceSeq: n }`** for the greatest version whose `published_workspace_seq <= n`, i.e. the definition in force at that ledger position, or `null` when the workflow had not been published yet at `n`. A union rather than a fourth positional parameter, because "version 3" and "as of position 3" are two different questions and a call site must not be able to blur them.
+
+  The stored `definition` is the full `workflow.defined` payload, stateMapping included, so the engine's version walk sees mappings.
 
 - [ ] **Step 1: Ensure the server package can run Vitest**
 
@@ -4195,7 +4457,7 @@ Create `apps/server/test/proj-workflows.test.ts`. It is gated on `TEST_DATABASE_
 ```ts
 import { Pool } from 'pg';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import type { EventEnvelope } from '@gisik-nokma/domain';
+import type { LedgerEvent } from '../src/ledger/event-store.js';
 import { getWorkflowDefFromProjection, workflowsProjection } from '../src/projections/workflows.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -4215,7 +4477,14 @@ const basicTransitions = [
   { from: 'done', to: 'doing', rules: [] },
 ];
 
-function workflowDefined(version: number, name: string, seq: number): EventEnvelope {
+/**
+ * `seq` is the per-entity counter; `workspaceSeq` is the workspace stream
+ * position (coordination §18) and is what the projection records as the
+ * publish position. They are given different values deliberately: the two
+ * counters coincide only when the entity IS the workspace, and a test that
+ * let them coincide here would pass even if the code stored the wrong one.
+ */
+function workflowDefined(version: number, name: string, seq: number, workspaceSeq: number): LedgerEvent {
   return {
     id: `evt_wf_${version}`,
     workspaceId: 'ws_1',
@@ -4228,6 +4497,7 @@ function workflowDefined(version: number, name: string, seq: number): EventEnvel
     clientTime: '2026-08-20T00:00:00.000Z',
     serverTime: '2026-08-20T00:00:00.000Z',
     seq,
+    workspaceSeq,
   };
 }
 
@@ -4243,16 +4513,32 @@ describeDb('proj_workflows', () => {
   });
 
   it('serves the latest version by default and historical versions on request', async () => {
-    await workflowsProjection.apply(workflowDefined(1, 'Basic', 1), pool);
-    await workflowsProjection.apply(workflowDefined(2, 'Basic v2', 2), pool);
+    await workflowsProjection.apply(workflowDefined(1, 'Basic', 1, 10), pool);
+    await workflowsProjection.apply(workflowDefined(2, 'Basic v2', 2, 40), pool);
     expect((await getWorkflowDefFromProjection(pool, 'wf_basic'))?.version).toBe(2);
     expect((await getWorkflowDefFromProjection(pool, 'wf_basic', 1))?.name).toBe('Basic');
     expect(await getWorkflowDefFromProjection(pool, 'wf_ghost')).toBeNull();
   });
 
+  it('answers as of a ledger position — the version in force there, not the newest', async () => {
+    await workflowsProjection.apply(workflowDefined(1, 'Basic', 1, 10), pool);
+    await workflowsProjection.apply(workflowDefined(2, 'Basic v2', 2, 40), pool);
+    // Position 25 sits between the two publishes: v1 was in force there. A
+    // projection replaying an event stamped 25 must see v1, however many
+    // versions the table has grown by the time the replay runs — this is the
+    // whole reason the column exists.
+    expect((await getWorkflowDefFromProjection(pool, 'wf_basic', { asOfWorkspaceSeq: 25 }))?.version).toBe(1);
+    // On the publish position itself the new version is already in force: the
+    // definition and the event that carries it are one and the same fact.
+    expect((await getWorkflowDefFromProjection(pool, 'wf_basic', { asOfWorkspaceSeq: 40 }))?.version).toBe(2);
+    expect((await getWorkflowDefFromProjection(pool, 'wf_basic', { asOfWorkspaceSeq: 999 }))?.version).toBe(2);
+    // Before the workflow existed there is no honest answer but "none".
+    expect(await getWorkflowDefFromProjection(pool, 'wf_basic', { asOfWorkspaceSeq: 9 })).toBeNull();
+  });
+
   it('ignores events that are not workflow.defined', async () => {
-    const other: EventEnvelope = {
-      ...workflowDefined(1, 'Basic', 1),
+    const other: LedgerEvent = {
+      ...workflowDefined(1, 'Basic', 1, 10),
       type: 'comment.added',
       entity: { kind: 'ticket', id: 't1' },
       payload: { text: 'hi' },
@@ -4262,19 +4548,19 @@ describeDb('proj_workflows', () => {
   });
 
   it('replaying the same event is a no-op — rebuilds are deterministic', async () => {
-    await workflowsProjection.apply(workflowDefined(1, 'Basic', 1), pool);
-    await workflowsProjection.apply(workflowDefined(1, 'Basic', 1), pool);
+    await workflowsProjection.apply(workflowDefined(1, 'Basic', 1, 10), pool);
+    await workflowsProjection.apply(workflowDefined(1, 'Basic', 1, 10), pool);
     const { rows } = await pool.query('SELECT count(*)::int AS count FROM proj_workflows');
     expect(rows[0].count).toBe(1);
   });
 
   it('reset then re-apply reproduces identical rows', async () => {
-    await workflowsProjection.apply(workflowDefined(1, 'Basic', 1), pool);
-    await workflowsProjection.apply(workflowDefined(2, 'Basic v2', 2), pool);
+    await workflowsProjection.apply(workflowDefined(1, 'Basic', 1, 10), pool);
+    await workflowsProjection.apply(workflowDefined(2, 'Basic v2', 2, 40), pool);
     const before = (await pool.query('SELECT * FROM proj_workflows ORDER BY workflow_id, version')).rows;
     await workflowsProjection.reset(pool);
-    await workflowsProjection.apply(workflowDefined(1, 'Basic', 1), pool);
-    await workflowsProjection.apply(workflowDefined(2, 'Basic v2', 2), pool);
+    await workflowsProjection.apply(workflowDefined(1, 'Basic', 1, 10), pool);
+    await workflowsProjection.apply(workflowDefined(2, 'Basic v2', 2, 40), pool);
     const after = (await pool.query('SELECT * FROM proj_workflows ORDER BY workflow_id, version')).rows;
     expect(after).toEqual(before);
   });
@@ -4302,11 +4588,18 @@ export function up(pgm: MigrationBuilder): void {
     definition: { type: 'jsonb', notNull: true },
     defined_by: { type: 'text', notNull: true },
     defined_at: { type: 'timestamptz', notNull: true },
+    // The workspace stream position of the workflow.defined event that
+    // published this version (coordination §18). It is what makes an as-of
+    // lookup possible, and with it proj_tickets is a pure function of the
+    // ledger prefix rather than of whatever proj_workflows happens to hold now.
+    published_workspace_seq: { type: 'bigint', notNull: true },
   });
   pgm.addConstraint('proj_workflows', 'proj_workflows_pkey', {
     primaryKey: ['workflow_id', 'version'],
   });
   pgm.createIndex('proj_workflows', ['workspace_id']);
+  // The as-of lookup's access path: newest publish at or before a position.
+  pgm.createIndex('proj_workflows', ['workflow_id', 'published_workspace_seq']);
 }
 
 export function down(pgm: MigrationBuilder): void {
@@ -4319,11 +4612,8 @@ Run the migration: `pnpm --filter ./apps/server migrate up` (adapt to Plan 1's s
 Create `apps/server/src/projections/workflows.ts` (if Plan 1 exports a DB-handle type for projections, import and use it in place of the local `Queryable`):
 
 ```ts
-import {
-  workflowDefinedPayloadSchema,
-  type EventEnvelope,
-  type PublishedWorkflowDef,
-} from '@gisik-nokma/domain';
+import { workflowDefinedPayloadSchema, type PublishedWorkflowDef } from '@gisik-nokma/domain';
+import type { LedgerEvent } from '../ledger/event-store.js';
 
 type Queryable = {
   query(text: string, values?: unknown[]): Promise<{ rows: Array<Record<string, unknown>> }>;
@@ -4334,18 +4624,34 @@ type Queryable = {
  * version, queryable individually, because the engine's version walk needs
  * intermediates and their stateMappings. Idempotent on (workflow_id, version)
  * so ledger replays and the rebuild-and-diff verifier are deterministic.
+ *
+ * Each row records published_workspace_seq: the stream position of the event
+ * that published it. It comes off the LedgerEvent apply receives, so it is the
+ * stored position of that event and not a fact about when this projection ran
+ * — replay reproduces it exactly, which is what keeps apply deterministic.
  */
 export const workflowsProjection = {
-  name: 'workflows',
+  name: 'proj_workflows',
+  tables: ['proj_workflows'] as const,
 
-  async apply(env: EventEnvelope, db: Queryable): Promise<void> {
+  async apply(env: LedgerEvent, db: Queryable): Promise<void> {
     if (env.type !== 'workflow.defined') return;
     const payload = workflowDefinedPayloadSchema.parse(env.payload);
     await db.query(
-      `INSERT INTO proj_workflows (workspace_id, workflow_id, version, name, definition, defined_by, defined_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO proj_workflows
+         (workspace_id, workflow_id, version, name, definition, defined_by, defined_at, published_workspace_seq)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (workflow_id, version) DO NOTHING`,
-      [env.workspaceId, payload.id, payload.version, payload.name, JSON.stringify(payload), env.actorId, env.serverTime],
+      [
+        env.workspaceId,
+        payload.id,
+        payload.version,
+        payload.name,
+        JSON.stringify(payload),
+        env.actorId,
+        env.serverTime,
+        env.workspaceSeq,
+      ],
     );
   },
 
@@ -4354,25 +4660,54 @@ export const workflowsProjection = {
   },
 };
 
+/**
+ * How to name the version you want.
+ *
+ *   omitted                  the newest published version
+ *   3                        exactly version 3
+ *   { asOfWorkspaceSeq: 3 }  whatever was in force at stream position 3
+ *
+ * The last is not a nicety. A projection replaying the ledger must resolve the
+ * definition as of the event it is applying, never as of now: the verifier
+ * rebuilds projection-outer, so proj_workflows is already at the newest
+ * version before proj_tickets replays its first event. Asking "latest" there
+ * gives a re-derivation that disagrees with the live row after any republish,
+ * and throws outright once a version has dropped a state.
+ *
+ * A union rather than a fourth parameter, because "version 3" and "as of
+ * position 3" are different questions and a call site must not be able to
+ * blur them.
+ */
+export type WorkflowDefSelector = number | { asOfWorkspaceSeq: number };
+
 export async function getWorkflowDefFromProjection(
   db: Queryable,
   workflowId: string,
-  version?: number,
+  select?: WorkflowDefSelector,
 ): Promise<PublishedWorkflowDef | null> {
   const result =
-    version === undefined
+    select === undefined
       ? await db.query(
           'SELECT definition FROM proj_workflows WHERE workflow_id = $1 ORDER BY version DESC LIMIT 1',
           [workflowId],
         )
-      : await db.query('SELECT definition FROM proj_workflows WHERE workflow_id = $1 AND version = $2', [
-          workflowId,
-          version,
-        ]);
+      : typeof select === 'number'
+        ? await db.query('SELECT definition FROM proj_workflows WHERE workflow_id = $1 AND version = $2', [
+            workflowId,
+            select,
+          ])
+        : await db.query(
+            `SELECT definition FROM proj_workflows
+             WHERE workflow_id = $1 AND published_workspace_seq <= $2
+             ORDER BY version DESC LIMIT 1`,
+            [workflowId, select.asOfWorkspaceSeq],
+          );
   if (result.rows.length === 0) return null;
   return workflowDefinedPayloadSchema.parse(result.rows[0].definition);
 }
 ```
+
+Ordering note for the as-of query: it orders by `version`, not by `published_workspace_seq`. The two agree — publishing refuses a version that is not exactly one past the latest, so versions of one workflow are appended in ascending order and their publish positions ascend with them — and ordering by the version is the one that stays correct if that ever stops being true, because "the greatest version at or before this point" is the question actually being asked.
 
 - [ ] **Step 5: Run the test to verify it passes**
 
@@ -4410,18 +4745,27 @@ import { getWorkflowDefFromProjection } from './projections/workflows.js';
 Run: `TEST_DATABASE_URL=postgres://localhost:5432/gisik_test pnpm --filter ./apps/server test`
 Expected: PASS.
 
-Run Plan 1's verify-projections CLI against the test database (its own documented invocation) — expected: no drift reported for `workflows`.
+Run Plan 1's verify-projections CLI against the test database (its own documented invocation) — expected: no drift reported for `proj_workflows`. (The verifier creates one shadow table per name in the projection's `tables`, so a projection without that field is invisible to it — which is why `workflowsProjection` declares `tables: ['proj_workflows']` and takes its name from coordination §8's registration order rather than a bare `workflows`.)
 
 - [ ] **Step 8: Commit**
 
 ```bash
 git add apps/server/migrations/ apps/server/src/projections/workflows.ts apps/server/src apps/server/test/proj-workflows.test.ts apps/server/vitest.config.ts apps/server/package.json pnpm-lock.yaml
-git commit -m "proj_workflows: every published version queryable, and the server context stops stubbing getWorkflowDef
+git commit -m "proj_workflows: every published version queryable, as of any point in the ledger
 
 The stored definition is the full payload, stateMapping included, because
 the engine's version walk needs intermediates. Idempotent on the version
 key so replays and the rebuild-and-diff verifier stay deterministic —
-proven by applying twice and by rebuilding to identical rows."
+proven by applying twice and by rebuilding to identical rows.
+
+Each row also records the stream position it was published at, and the
+reader can be asked as of a position. A projection replaying the ledger
+must resolve the definition in force at the event it is applying, not the
+newest one: the verifier rebuilds projection-outer, so this table is
+already at the newest version before the ticket projection replays its
+first event. Asking 'latest' there re-derives rows that disagree with live
+after any republish, and throws outright once a version has dropped a
+state. And the server context stops stubbing getWorkflowDef."
 ```
 
 ---
@@ -4463,12 +4807,12 @@ Plan 1 will have added its own sections by execution time. Append the section be
 ```markdown
 ## 4. Workflow engine & rule vocabulary
 
-- ⚙️ **Workflow vocabulary** — workflow definitions as data: states with open/active/terminal categories, transitions (including from-any), and the closed five-rule vocabulary (restrict-to, require-comment, require-evidence, require-field, require-different-user) as zod schemas; `workflow.defined` payloads carry the full definition plus an optional stateMapping. `packages/domain/src/workflow.ts`
+- ⚙️ **Workflow vocabulary** — workflow definitions as data: states with open/active/terminal categories, transitions (including from-any), and the closed five-rule vocabulary (restrict-to, require-comment, require-evidence, require-field, require-different-user) as zod schemas; `workflow.defined` payloads carry the full definition plus an optional stateMapping. Also the one forward state-id walk, `foldStateIdForward` — pure, and in domain because the engine, the server's ticket projection and the offline replica must all fold identically. `packages/domain/src/workflow.ts`
 - ⚙️ **Structural validation** — `validateWorkflowDef`, pure and I/O-free so the future builder UI shares it: eleven plain-language checks covering workflows that cannot finish, states that cannot be reached or entered, duplicate ids/edges, and rules that can never fire or be satisfied — including `rdu-unenterable-state`, a four-eyes rule watching a state nothing in this version enters. `packages/domain/src/validate-workflow.ts`
 - ⚙️ **Advisory tier** — `adviseWorkflowDef`, a separate function returning warnings the builder shows without blocking publish; the rule engine never calls it, because everything `validateWorkflowDef` returns becomes a refusal. Its one code, `rdu-bypassable`, names a four-eyes rule whose guarded move is reachable without ever entering the watched state. `packages/domain/src/advise-workflow.ts`
-- ⚙️ **Rule engine** — the real `evaluateEvent`: `ticket.transitioned` checked against authoritative state (transition legality, version walks across stateMappings, the parent-terminal-with-open-children invariant that no author can switch off, transition rules in order with first-refusal-wins); `workflow.defined` checked for structure, consecutive versioning, and stranding. `require-different-user` resolves each transition-log entry forward through the version chain before comparing, so dropping and remapping a state cannot disarm four-eyes. Every refusal names its rule and reasons in plain language. `packages/rule-engine/src/`
-- ⚙️ **Planted-defect fixture suite** — 58 JSON fixtures, one per refusal path plus accepting twins, run by an in-memory harness and exported so server and client builds prove the same refusals against the same defects. `packages/rule-engine/fixtures/`
-- ⚙️ **Workflow projection** — `proj_workflows` keeps every published version queryable (the engine's version walk needs intermediates and their mappings) and backs the server's `getWorkflowDef`; idempotent apply, deterministic rebuild. `apps/server/src/projections/workflows.ts`
+- ⚙️ **Rule engine** — the real `evaluateEvent`: `ticket.transitioned` checked against authoritative state (transition legality, version walks across stateMappings, the parent-terminal-with-open-children invariant that no author can switch off, transition rules in order with first-refusal-wins); `workflow.defined` checked for structure, consecutive versioning, and stranding. `require-different-user` skips transition-log entries belonging to a workflow the ticket has been migrated off and resolves the rest forward through the version chain before comparing, so neither dropping and remapping a state nor a workflow migration can disarm four-eyes. Every refusal names its rule and reasons in plain language. `packages/rule-engine/src/`
+- ⚙️ **Planted-defect fixture suite** — 59 JSON fixtures, one per refusal path plus accepting twins, run by an in-memory harness and exported so server and client builds prove the same refusals against the same defects. `packages/rule-engine/fixtures/`
+- ⚙️ **Workflow projection** — `proj_workflows` keeps every published version queryable (the engine's version walk needs intermediates and their mappings) and backs the server's `getWorkflowDef`; each row records the ledger position it was published at, so a definition can be asked for as of a point in the ledger rather than only as of now; idempotent apply, deterministic rebuild. `apps/server/src/projections/workflows.ts`
 ```
 
 - [ ] **Step 3: Create the test-cases bucket**
@@ -4523,7 +4867,7 @@ Fixture names refer to `packages/rule-engine/fixtures/`; unit tests to `packages
 - 4.25 ✅ require-evidence refuses without an attachment id; with one it passes. — rule-require-evidence-*
 - 4.26 ✅ require-field wants the field set before the move, not with it. — rule-require-field-*
 - 4.27 ✅ restrict-to: assignee, roles (via membership), and named people OR-combine; missing membership refuses; a planted empty restriction refuses everyone. — rule-restrict-to-* (10 fixtures)
-- 4.28 ✅ require-different-user: the last performer of the named move cannot act; a second person can; vacuous acceptance when nobody performed it; only the latest performer counts. — rule-rdu-* (5 fixtures)
+- 4.28 ✅ require-different-user: the last performer of the named move cannot act; a second person can; vacuous acceptance when nobody performed it; only the latest performer counts. — rule-rdu-* (6 fixtures)
 - 4.29 ✅ Rules run in authored order and the first refusal wins — proven with the same violated pair in both orders. — rules-first-refusal-wins, rules-order-comes-from-the-definition
 
 ## Workflow projection
@@ -4538,6 +4882,9 @@ Fixture names refer to `packages/rule-engine/fixtures/`; unit tests to `packages
 - 4.34 ✅ Advisories never gate publish: a definition that trips only `rdu-bypassable` is accepted by the engine. — workflow-defined-accepts-a-def-the-advisory-warns-about, advise-workflow.test.ts
 - 4.35 ✅ Four-eyes survives a state being dropped and remapped in a later version: a log entry written under the old vocabulary is resolved forward before comparison, so the same person cannot make both moves. — rule-rdu-refuses-across-a-remap
 - 4.36 🚫 Vacuous acceptance across versions is not characterised by the advisory — it is closed by the per-entry `workflowVersion` instead (case 4.35). The advisory deliberately scopes to a single workflow version.
+- 4.37 ✅ A transition-log entry recorded under a workflow the ticket has since been migrated off is ignored, even when both workflows spell the watched state the same way — four-eyes answers only for the workflow the ticket is on. — rule-rdu-ignores-an-entry-from-a-workflow-the-ticket-has-left
+- 4.38 ✅ The version walk lives once, in `@gisik-nokma/domain`: it follows mappings through every intermediate version, reports the id at the point the chain broke, and refuses a state the latest definition no longer has. — workflow-schema.test.ts (`foldStateIdForward`)
+- 4.39 ✅ `getWorkflowDefFromProjection` answers as of a ledger position: the version in force at that `workspace_seq`, not the newest one — v1 before v2 was published, v2 after. — proj-workflows.test.ts (integration, TEST_DATABASE_URL)
 ```
 
 - [ ] **Step 4: Cross-check against reality, then commit**
@@ -4548,7 +4895,7 @@ Re-read the section just written and confirm every bullet describes something th
 git add Features.md test-cases/04-workflow-engine.md
 git commit -m "Catalogue the workflow engine: features and test scenarios move with the work
 
-Same change set as the code, per the workspace convention. Thirty-six
+Same change set as the code, per the workspace convention. Thirty-nine
 scenario entries, all but one landing already-covered because every one
 names the planted-defect fixture or test that proves it — the catalogue
 records reality, not intent. The exception is marked out of scope with its
@@ -4569,12 +4916,12 @@ than implying the warning covers more than it does."
 - Workflow changes are events (`workflow.defined` v1, v2, …); new versions apply to all tickets of the type; removals/renames demand a state mapping and refuse to strand → Tasks 5–6 (publish-side refusals + evaluation-side version walk). Every dropped state must be mapped, occupied or not; the owner settled that as permanent semantics on 2026-08-26 (Open question 6) — occupancy-dependent publish legality would split the client and server engines, so occupancy is a builder courtesy and never an engine input. ✓
 - Eleven structural issue codes, one advisory code: `no-states`, `duplicate-state-id`, `no-terminal-state`, `unknown-transition-state`, `duplicate-transition`, `unknown-initial-state`, `unreachable-state`, `terminal-no-inbound`, `empty-restrict-to`, `rdu-unknown-state`, `rdu-unenterable-state` from `validateWorkflowDef` (Task 3), and `rdu-bypassable` from the separate `adviseWorkflowDef` — which the rule engine never calls, proven by a fixture in which the engine accepts a def that trips only the advisory (Task 5). ✓
 - Four-eyes is not disarmed by versioning: transition-log entries carry the workflow version their state id is written in (Task 2) and `require-different-user` resolves each entry forward through the shared version walk before comparing (Task 11), proven by planting a drop-and-remap pair. The advisory characterises reachable vacuous acceptance **within a single workflow version only**; the cross-version case is closed by the per-entry version, not by the warning (Open question 10). ✓
-- Invariant 6 / testing discipline: every refusal proven against a planted defect before trusted; one shared fixture suite for client and server → Task 4 (harness, exported), fixtures in every task, 58 total. ✓
+- Invariant 6 / testing discipline: every refusal proven against a planted defect before trusted; one shared fixture suite for client and server → Task 4 (harness, exported), fixtures in every task, 59 total. ✓
 - Builder UI, template gallery: later plan (explicitly out of this plan's scope); `validateWorkflowDef` and `adviseWorkflowDef` kept pure for it. ✓
 
 **2. Placeholder scan:** no "TBD"/"TODO"/"add validation"/"similar to Task N". Fixtures that reuse an earlier fixture's structure name the exact source file and list every differing field with verbatim values, including full expected reasons. The `not implemented yet` throws are staged code with exact replacement edits in Tasks 9–11 and a grep gate in Tasks 11 and 13. ✓
 
-**3. Type consistency:** `evaluateEvent(env, ctx)` matches the frozen signature; `Refusal.rule` strings come from `REFUSAL_RULES` in Task 5 and every fixture's `expected.rule` uses one of its 15 values; every fixture `expected.reason` was diffed against the Canonical refusal copy tables and the literal strings in Tasks 3, 5–11; `TransitionRuleInput` fields (`env, ctx, ticket, def, toState, fromStateId, payload`) match between Task 8's type, Task 8's call site in `transition.ts`, and Tasks 9–11's evaluators; `resolveCurrentStateId`'s `ResolvedState` is consumed with `resolved.ok`/`resolved.stateId`/`resolved.unmappedStateId` in Task 6 and Task 11 exactly as defined, and both callers go through the one `resolveStateIdForward` rather than growing a second version walk; `Advisory` is deliberately structurally identical to `Issue` and the separation is enforced by a fixture, not by the type (Tasks 3 and 5); the transition-log entry shape `{ toStateId; actorId; seq; workflowVersion }` matches between Task 2's type, Task 4's harness push and its assertion, and Task 11's evaluator; `workflowsProjection.apply(env, db)`/`reset(db)` match Task 12's tests; `membershipId('ws_1', 'user_a') === 'ws_1:user_a'` is asserted in Task 2 and relied on by Task 4's harness and Task 10's fixtures. ✓
+**3. Type consistency:** `evaluateEvent(env, ctx)` matches the frozen signature; `Refusal.rule` strings come from `REFUSAL_RULES` in Task 5 and every fixture's `expected.rule` uses one of its 15 values; every fixture `expected.reason` was diffed against the Canonical refusal copy tables and the literal strings in Tasks 3, 5–11; `TransitionRuleInput` fields (`env, ctx, ticket, def, toState, fromStateId, payload`) match between Task 8's type, Task 8's call site in `transition.ts`, and Tasks 9–11's evaluators; `resolveCurrentStateId`'s `ResolvedState` is an alias of domain's `FoldedState` and is consumed with `resolved.ok`/`resolved.stateId`/`resolved.unmappedStateId` in Task 6 and Task 11 exactly as defined, and both callers go through the one `resolveStateIdForward`, which itself delegates to domain's `foldStateIdForward` (Task 1) rather than growing a second version walk; `Advisory` is deliberately structurally identical to `Issue` and the separation is enforced by a fixture, not by the type (Tasks 3 and 5); the transition-log entry shape `{ toStateId; actorId; seq; workflowId; workflowVersion }` matches between Task 2's type, Task 4's harness push and its assertion, and Task 11's evaluator (which reads both new fields, `workflowId` as a filter and `workflowVersion` as the walk's origin); `workflowsProjection.apply(env: LedgerEvent, db)`/`reset(db)` match Task 12's tests, and its `name`/`tables` are `proj_workflows` per coordination §8; `getWorkflowDefFromProjection`'s third parameter is `WorkflowDefSelector = number | { asOfWorkspaceSeq: number }`, which leaves Plan 5's two existing call sites (one omitting it, one passing a version number) unchanged; `membershipId('ws_1', 'user_a') === 'ws_1:user_a'` is asserted in Task 2 and relied on by Task 4's harness and Task 10's fixtures. ✓
 
 
 

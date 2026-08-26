@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md` — this plan implements section 6 (permissions, visibility, auth) plus the three visibility-honesty guarantees (true counts with restriction named; restricted-parent placeholder; provenance never redacted from those entitled to see).
 
-**Series position:** Plan 4 of 11. **Consumes** from Plan 1: `EventEnvelope`, the event-type registry and pure `parseEvent` in `packages/domain`; the Fastify 5 server and ingest pipeline calling `evaluateEvent(env, ctx)` in `apps/server`; the projection registry `registerProjection({name, apply, reset})` with `proj_`-prefixed tables; node-pg-migrate; the verify-projections CLI. From Plan 2: the rule engine and the `Refusal` shape it returns. From Plan 3: ticket events (`ticket.created`, `ticket.reparented`, …), `proj_tickets` (head states incl. parentId), `proj_rollups` (direct-children counts by category), `TicketState`. **Produces** (consumed by later plans, exact signatures in the task Interfaces blocks): `proj_memberships`, `proj_visibility`, `canSee(db, userId, ticketId)`, `visibleEventsFor(db, userId, workspaceId, afterSeq)` (where `afterSeq` is Plan 1's per-workspace `workspace_seq` cursor, coordination §18), and the auth surface (`/api/auth/*` routes, `makeRequireSession`, `OtpSender`) for all client plans.
+**Series position:** Plan 4 of 11. **Consumes** from Plan 1: `EventEnvelope`, the event-type registry and pure `parseEvent` in `packages/domain`; the Fastify 5 server and ingest pipeline calling `evaluateEvent(env, ctx)` in `apps/server`; the projection registry `registerProjection({name, apply, reset})` with `proj_`-prefixed tables; node-pg-migrate; the verify-projections CLI. From Plan 2: the rule engine and the `Refusal` shape it returns, `workflow.defined` v1 and `WorkflowDef`. From Plan 3: ticket events (`ticket.created`, `ticket.reparented`, …), `ticket-type.defined` and `builtinTicketTypeDefs(defaultWorkflowId)`, `proj_tickets` (head states incl. parentId), `proj_rollups` (direct-children counts by category), `TicketState`. **Produces** (consumed by later plans, exact signatures in the task Interfaces blocks): `proj_memberships`, `proj_visibility`, `canSee(db, userId, ticketId)`, `visibleEventsFor(db, userId, workspaceId, afterSeq)` (where `afterSeq` is Plan 1's per-workspace `workspace_seq` cursor, coordination §18), the auth surface (`/api/auth/*` routes, `makeRequireSession`, `OtpSender`) for all client plans, and — new, per the owner decision of 2026-08-26 — the **workspace-creation surface**: `bootstrapWorkspace(db, foundingEvent, append)` (Task 5) and `registerWorkspaceRoutes(app, deps)` serving `POST /v1/workspaces` (Task 13). It also **creates** the canonical simple-Kanban definition in `@gisik-nokma/domain` (`SIMPLE_KANBAN_TEMPLATE`, `simpleKanbanWorkflowDef(workflowId)`, Task 5) — Plan 8's template gallery and Plan 11's seeds consume that one export rather than declaring copies.
 
 ## Global Constraints
 
@@ -69,7 +69,9 @@ apps/server/
   src/visibility/visible-tickets.ts          # listVisibleTickets (Task 7)
   src/visibility/rollup.ts                   # rollupFor with restrictedCount (Task 10)
   src/visibility/visible-events-for.ts       # sync-down filter + purge tombstones (Task 11)
+  src/workspaces/bootstrap-workspace.ts      # the founding sequence: workflow → types → owner grant (Task 5)
   src/routes/tickets.ts                      # read endpoints (Task 8, extended Task 10)
+  src/routes/workspaces.ts                   # POST /v1/workspaces — the founding route (Task 13)
   test/helpers/db.ts                         # pool, migrate, truncate (Task 1)
   test/helpers/envelope.ts                   # testEnvelope factory (Task 4)
   test/helpers/seed.ts                       # scenario builders (Task 7)
@@ -77,8 +79,10 @@ apps/server/
 packages/domain/
   src/events/membership.ts                   # payload types + parsers (Task 3)
   src/events/visibility.ts                   # visibility.set payload + parser (Task 3)
+  src/workflows/simple-kanban.ts             # SIMPLE_KANBAN_TEMPLATE + simpleKanbanWorkflowDef (Task 5)
   test/events/membership.test.ts             # Task 3
   test/events/visibility.test.ts             # Task 3
+  test/workflows/simple-kanban.test.ts       # Task 5
 ```
 
 **The identity boundary, stated once and honored everywhere:** the `user`/`session`/`account`/`verification`/`passkey` tables are server-owned infrastructure — who can open the door. They are not events and never enter the ledger, because auth state is not workspace history: a password-less credential rotation is nobody's claim about the work. *Membership* — who is inside which workspace with which role — IS history, so it lives in the ledger as attributed events like everything else. Task 1 builds the first; Tasks 3–4 build the second; nothing blurs them.
@@ -1688,16 +1692,19 @@ git commit -m "proj_memberships turns membership history into effective roles: o
 
 ---
 
-### Task 5: Pre-engine permission gate — role refusals at the ingest door
+### Task 5: Pre-engine permission gate — role refusals at the ingest door, and the founding sequence behind it
 
 **Files:**
 - Create: `apps/server/src/permissions/check-permission.ts`
-- Modify: `apps/server/src/ingest/pipeline.ts` (Plan 1's ingest pipeline — insert the gate between `parseEvent` success and `evaluateEvent`)
+- Create: `packages/domain/src/workflows/simple-kanban.ts` (Step 6 — the canonical default workflow, one home)
+- Create: `apps/server/src/workspaces/bootstrap-workspace.ts` (Step 6)
+- Modify: `apps/server/src/ingest/pipeline.ts` (Plan 1's ingest pipeline — insert the gate between `parseEvent` success and `evaluateEvent`; call the bootstrap after a `workspace.created` is appended)
 - Test: `apps/server/test/permissions/check-role-permission.test.ts`
+- Test: `packages/domain/test/workflows/simple-kanban.test.ts` (Step 6)
 
 **Interfaces:**
-- Consumes: `Refusal` shape from `@gisik-nokma/domain` (contract-fixed: `{refused: true; rule: string; reason: string}`); `EffectiveRole`, `resolveEffectiveRole`, `hasProjectAdminRights` (Task 4); Plan 1's ingest pipeline and `evaluateEvent(env, ctx)`.
-- Produces: `PermissionContext { sessionUserId: string; eff: EffectiveRole }`; `checkRolePermission(env: EventEnvelope, ctx: PermissionContext): Refusal | null` (pure); `checkPermission(db: Queryable, env: EventEnvelope, sessionUserId: string): Promise<Refusal | null>` — the single gate the ingest pipeline calls (Task 9 extends it with visibility checks). Rule names used: `'permission.role'`, `'permission.visibility'` (Task 9).
+- Consumes: `Refusal` shape from `@gisik-nokma/domain` (contract-fixed: `{refused: true; rule: string; reason: string}`); `EffectiveRole`, `resolveEffectiveRole`, `hasProjectAdminRights` (Task 4); Plan 1's ingest pipeline and `evaluateEvent(env, ctx)`; `WorkflowDef` and `validateWorkflowDef` (Plan 2), `builtinTicketTypeDefs(defaultWorkflowId)` (Plan 3).
+- Produces: `PermissionContext { sessionUserId: string; eff: EffectiveRole }`; `checkRolePermission(env: EventEnvelope, ctx: PermissionContext): Refusal | null` (pure); `checkPermission(db: Queryable, env: EventEnvelope, sessionUserId: string): Promise<Refusal | null>` — the single gate the ingest pipeline calls (Task 9 extends it with visibility checks). Rule names used: `'permission.role'`, `'permission.visibility'` (Task 9). Step 6 additionally produces `SIMPLE_KANBAN_TEMPLATE: Omit<WorkflowDef, 'id' | 'version'>` and `simpleKanbanWorkflowDef(workflowId: string): WorkflowDef` in `@gisik-nokma/domain`, and `bootstrapWorkspace(founding: EventEnvelope, append: (env: EventEnvelope) => Promise<void>): Promise<EventEnvelope[]>` in `apps/server`.
 
 **Planted-defect discipline for this task and Task 9:** Plan 2's fixture format (`{name, workflowDef, priorEvents, candidateEvent, expected}` in `packages/rule-engine/fixtures/`) is for *rule-engine* rules — refusals a workflow declares. Permission refusals are PRE-engine and never involve a workflowDef, so they do NOT go into that fixture directory. Their planted defects are ordinary Vitest tests in `apps/server` that construct the defective scenario (the wrong actor, the insufficient role) and assert the exact Refusal object. Same discipline, different harness — do not hunt for a fixtures folder.
 
@@ -1948,30 +1955,159 @@ const engineResult = evaluateEvent(env, ctx);
 
 `sessionUserId` comes from `request.currentUserId` (Task 2's `makeRequireSession`), which the ingest route must now use as a preHandler if Plan 1 left it open. A permission refusal returns through the same response path Plan 1 uses for engine refusals — one refusal surface, one shape.
 
-- [ ] **Step 6: Prove the wiring holds — workspace founding appends the owner grant**
+- [ ] **Step 6: The founding sequence — a new workspace can hold a ticket the moment it exists**
 
-Founding a workspace must leave its founder owning it, or nobody can ever act again. In the ingest pipeline, immediately after a `workspace.created` event is accepted and appended, construct and append a server-origin grant through the same append+project path (NOT through the HTTP gate — it is the server's own record):
+Founding a workspace must leave its founder owning it, or nobody can ever act again. It must also leave the workspace **able to accept its first ticket**, and until the owner decision of 2026-08-26 it did not: nothing in the series emitted a workflow or the built-in ticket types at creation, so the first `ticket.created` in a product-founded workspace was refused `ticket.unknown-type` and the workspace was permanently unusable. **Owner decision (coordination doc, "A new workspace can hold a ticket the moment it exists"): found every workspace with the simple-Kanban template, bound to all four built-in types, changeable immediately afterwards.** The founder is not asked to choose a template — a workspace that cannot accept its first ticket is not a workspace — and nothing about this is permanent: the very next thing an admin may do is publish another workflow and re-point the types (Plan 8's builder), which is ordinary authoring, not an undo.
+
+Three things are load-bearing and an executor must not rearrange them:
+
+1. **The order is workflow → types → grant.** A `ticket-type.defined` naming a workflow that has not been defined yet is refused (coordination doc, same section), so the four type definitions can only follow the `workflow.defined` that gives them something to name. The founder's grant stays last, exactly where it already was. This is safe because the bootstrap appends are server-origin and go through Plan 1's internal append path, **not** through `checkPermission` — the gate is the HTTP door (Step 5), and the server's own record does not knock on it. Nothing in the sequence depends on the founder already being a member.
+2. **The bootstrap fires on accept, never on duplicate.** Both of Plan 11's seed CLIs are idempotent by re-submitting the same deterministic `workspace.created` id and counting `duplicate-event-id` as "already present". If the bootstrap fired again on that duplicate, every re-run would append a second workflow and four more type definitions, and Plan 11's "re-run is a no-op" test would be a lie. Hook it to the branch where the append actually happened.
+3. **The hook lives in the shared ingest path, not in the route.** `POST /v1/workspaces` (Task 13) and Plan 11's seed CLIs both found workspaces, and they have exactly one founding sequence between them because both go through the ingest service. An executor who puts this in the route layer silently breaks the seeds.
+
+First, the canonical definition gets **one home**. Create `packages/domain/src/workflows/simple-kanban.ts`:
+
+```ts
+import type { WorkflowDef } from '../workflows/types.js'; // adapt to Plan 2's WorkflowDef module path
+
+/**
+ * The one simple-Kanban definition in the product. Every workspace is founded
+ * on a clone of it (Plan 4's bootstrap), and it is the first card in Plan 8's
+ * template gallery — the SAME object, not a copy that looks like it. Two
+ * copies of one workflow is the drift this series keeps finding, and a
+ * bootstrap default that quietly diverged from the gallery card an admin
+ * later picks would be invisible until someone compared them by hand.
+ *
+ * Carries no `id` and no `version`: an id is minted per workspace, and every
+ * clone starts at version 1 (spec §4 — templates are cloned, never referenced).
+ */
+export const SIMPLE_KANBAN_TEMPLATE: Omit<WorkflowDef, 'id' | 'version'> = {
+  name: 'Simple kanban',
+  initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'doing', name: 'Doing', category: 'active' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [
+    { from: 'todo', to: 'doing', rules: [] },
+    { from: 'doing', to: 'todo', rules: [] },
+    { from: 'doing', to: 'done', rules: [] },
+    { from: 'done', to: 'doing', rules: [] },
+  ],
+};
+
+/** A publishable clone at version 1. Deep-cloned, so an edited copy can never bleed back. */
+export function simpleKanbanWorkflowDef(workflowId: string): WorkflowDef {
+  return { ...structuredClone(SIMPLE_KANBAN_TEMPLATE), id: workflowId, version: 1 };
+}
+```
+
+Export both from the domain barrel. Create `packages/domain/test/workflows/simple-kanban.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { validateWorkflowDef } from '../../src/workflows/validate.js'; // adapt to Plan 2's path
+import { SIMPLE_KANBAN_TEMPLATE, simpleKanbanWorkflowDef } from '../../src/workflows/simple-kanban.js';
+
+describe('the canonical simple-Kanban definition', () => {
+  it('clones into a def that validates clean at version 1', () => {
+    const def = simpleKanbanWorkflowDef('01JBOOTSTRAPWORKFLOW000001');
+    expect(validateWorkflowDef(def)).toEqual([]);
+    expect(def.version).toBe(1);
+    expect(def.id).toBe('01JBOOTSTRAPWORKFLOW000001');
+    expect(def.initialStateId).toBe('todo');
+    expect(def.states.some((state) => state.category === 'terminal')).toBe(true);
+  });
+
+  it('is deep-cloned — editing a clone never reaches the template', () => {
+    const first = simpleKanbanWorkflowDef('01JBOOTSTRAPWORKFLOW000001');
+    first.states[0]!.name = 'Mutated';
+    expect(SIMPLE_KANBAN_TEMPLATE.states[0]!.name).toBe('To do');
+    expect(simpleKanbanWorkflowDef('01JBOOTSTRAPWORKFLOW000002').states[0]!.name).toBe('To do');
+  });
+});
+```
+
+Then the bootstrap itself. Create `apps/server/src/workspaces/bootstrap-workspace.ts`:
 
 ```ts
 import { ulid } from 'ulidx';
-import { membershipId } from '@gisik-nokma/domain';
+import {
+  builtinTicketTypeDefs,
+  membershipId,
+  simpleKanbanWorkflowDef,
+  type EventEnvelope,
+} from '@gisik-nokma/domain';
 
-// after workspace.created is accepted and appended:
-if (env.type === 'workspace.created') {
-  const grant: EventEnvelope = {
+/**
+ * Everything a workspace needs to be usable, appended immediately after its
+ * `workspace.created` is accepted (owner decision 2026-08-26).
+ *
+ * ORDER IS LOAD-BEARING: the default workflow first, then the four built-in
+ * ticket types that name it, then the founder's owner grant. A
+ * `ticket-type.defined` naming an undefined workflow is refused, so the
+ * sequence cannot be reordered for tidiness.
+ *
+ * These are the SERVER's own records: they are appended through Plan 1's
+ * internal append path and never pass through `checkPermission`, which is the
+ * HTTP door. That is why the grant can come last without the earlier events
+ * needing the founder to already be a member.
+ */
+export async function bootstrapWorkspace(
+  founding: EventEnvelope,
+  append: (env: EventEnvelope) => Promise<void>,
+): Promise<EventEnvelope[]> {
+  const workflowDef = simpleKanbanWorkflowDef(ulid());
+  const at = founding.serverTime;
+  const serverEvent = (
+    entity: EventEnvelope['entity'],
+    type: string,
+    payload: unknown,
+  ): EventEnvelope => ({
     id: ulid(),
-    workspaceId: env.workspaceId,
-    entity: { kind: 'membership', id: membershipId(env.workspaceId, env.actorId) },
-    type: 'membership.granted',
+    workspaceId: founding.workspaceId,
+    entity,
+    type,
     version: 1,
-    payload: { userId: env.actorId, role: 'owner', scope: 'workspace' },
-    actorId: env.actorId,
+    payload,
+    actorId: founding.actorId,
     origin: 'server',
-    clientTime: env.serverTime,
-    serverTime: env.serverTime,
+    clientTime: at,
+    serverTime: at,
     seq: 0, // assigned by the same seq-assignment step Plan 1 applies to every appended event
-  };
-  await appendAndProject(grant); // Plan 1's internal append path — adapt the name
+  });
+
+  const sequence: EventEnvelope[] = [
+    serverEvent({ kind: 'workflow', id: workflowDef.id }, 'workflow.defined', workflowDef),
+    // Fresh entity ULID per ticket-type submission; the payload id is the
+    // stable type key and the projection folds by it (Plan 8 design decision 6).
+    ...builtinTicketTypeDefs(workflowDef.id).map((def) =>
+      serverEvent({ kind: 'ticket-type', id: ulid() }, 'ticket-type.defined', def),
+    ),
+    serverEvent(
+      { kind: 'membership', id: membershipId(founding.workspaceId, founding.actorId) },
+      'membership.granted',
+      { userId: founding.actorId, role: 'owner', scope: 'workspace' },
+    ),
+  ];
+
+  for (const event of sequence) {
+    await append(event); // Plan 1's internal append path — adapt the name
+  }
+  return sequence;
+}
+```
+
+Wire it into the ingest pipeline, on the accepted-and-appended branch only:
+
+```ts
+import { bootstrapWorkspace } from '../workspaces/bootstrap-workspace';
+
+// after workspace.created is accepted and appended — NOT on duplicate-event-id,
+// which is how both seed CLIs re-run without founding a second time:
+if (env.type === 'workspace.created') {
+  await bootstrapWorkspace(env, appendAndProject); // Plan 1's internal append path — adapt the name
 }
 ```
 
@@ -2012,6 +2148,117 @@ describe('ingest pipeline wiring', () => {
     expect(rows).toEqual([{ role: 'owner' }]);
   });
 
+  it('founding appends the default workflow, then the four built-in types, then the grant — in that order', async () => {
+    const e = testEnvelope({
+      workspaceId: 'wks_new',
+      entity: { kind: 'workspace', id: 'wks_new' },
+      type: 'workspace.created',
+      payload: { name: 'Founded' },
+      actorId: 'usr_founder',
+    });
+    await ingestEvent(e, { db: pool, sessionUserId: 'usr_founder' });
+
+    // Ordered by the WORKSPACE cursor, not per-entity `seq` (coordination §18):
+    // this sequence spans four entity kinds, so per-entity seq cannot order it.
+    const { rows } = await pool.query<{ type: string; payload: Record<string, unknown> }>(
+      `SELECT type, payload FROM events WHERE workspace_id = 'wks_new' ORDER BY workspace_seq`,
+    );
+    expect(rows.map((row) => row.type)).toEqual([
+      'workspace.created',
+      'workflow.defined',
+      'ticket-type.defined',
+      'ticket-type.defined',
+      'ticket-type.defined',
+      'ticket-type.defined',
+      'membership.granted',
+    ]);
+    // Every type names the workflow defined one event earlier — the reason the
+    // order cannot be rearranged.
+    const workflowId = rows[1]!.payload.id as string;
+    expect(rows.slice(2, 6).map((row) => row.payload.id)).toEqual(['epic', 'story', 'task', 'sub-task']);
+    for (const row of rows.slice(2, 6)) {
+      expect(row.payload.workflowId).toBe(workflowId);
+    }
+    // The default IS the canonical template, not a copy that resembles it.
+    const { id: _id, version, ...shape } = rows[1]!.payload as Record<string, unknown> & { id: string; version: number };
+    expect(version).toBe(1);
+    expect(shape).toEqual(SIMPLE_KANBAN_TEMPLATE);
+  });
+
+  it('a workspace can hold a ticket the moment it exists', async () => {
+    const founded = await ingestEvent(
+      testEnvelope({
+        workspaceId: 'wks_new',
+        entity: { kind: 'workspace', id: 'wks_new' },
+        type: 'workspace.created',
+        payload: { name: 'Founded' },
+        actorId: 'usr_founder',
+      }),
+      { db: pool, sessionUserId: 'usr_founder' },
+    );
+    expect(founded).not.toMatchObject({ refused: true });
+
+    // A project, and the founder onto its roster — Task 9's ingest rule is that
+    // a non-guest must be ON the target project, with no admin shortcut. This
+    // is the whole legal path from nothing to a first ticket.
+    for (const env of [
+      testEnvelope({
+        workspaceId: 'wks_new',
+        entity: { kind: 'project', id: 'prj_first' },
+        type: 'project.created',
+        payload: { name: 'First project' },
+        actorId: 'usr_founder',
+      }),
+      testEnvelope({
+        workspaceId: 'wks_new',
+        entity: { kind: 'project', id: 'prj_first' },
+        type: 'project.member_added',
+        payload: { userId: 'usr_founder', projectAdmin: true },
+        actorId: 'usr_founder',
+      }),
+    ]) {
+      expect(await ingestEvent(env, { db: pool, sessionUserId: 'usr_founder' })).not.toMatchObject({ refused: true });
+    }
+
+    // The point of the whole decision: this is accepted, where before the
+    // bootstrap it was refused `ticket.unknown-type` and the workspace was
+    // permanently unusable.
+    const created = await ingestEvent(
+      testEnvelope({
+        workspaceId: 'wks_new',
+        entity: { kind: 'ticket', id: 'tkt_first' },
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: 'prj_first', parentId: null, title: 'The first thing' },
+        actorId: 'usr_founder',
+      }),
+      { db: pool, sessionUserId: 'usr_founder' },
+    );
+    expect(created).not.toMatchObject({ refused: true });
+    const { rows } = await pool.query("SELECT state_id FROM proj_tickets WHERE ticket_id = 'tkt_first'");
+    expect(rows).toEqual([{ state_id: 'todo' }]); // the default workflow's initial state
+  });
+
+  it('re-founding with the same event id does not bootstrap a second time', async () => {
+    const founding = testEnvelope({
+      workspaceId: 'wks_new',
+      entity: { kind: 'workspace', id: 'wks_new' },
+      type: 'workspace.created',
+      payload: { name: 'Founded' },
+      actorId: 'usr_founder',
+    });
+    await ingestEvent(founding, { db: pool, sessionUserId: 'usr_founder' });
+    const after = await pool.query("SELECT count(*)::int AS n FROM events WHERE workspace_id = 'wks_new'");
+
+    // Both of Plan 11's seed CLIs re-run by re-submitting the same deterministic
+    // event id and counting `duplicate-event-id` as "already present". If the
+    // bootstrap fired again here, every re-run would append a second workflow
+    // and four more type definitions.
+    const again = await ingestEvent(founding, { db: pool, sessionUserId: 'usr_founder' });
+    expect(again).toMatchObject({ status: 'invalid', code: 'duplicate-event-id' }); // adapt to Plan 1's result shape
+    const now = await pool.query("SELECT count(*)::int AS n FROM events WHERE workspace_id = 'wks_new'");
+    expect(now.rows[0].n).toBe(after.rows[0].n);
+  });
+
   it('a member ingesting workflow.defined is refused before the engine runs', async () => {
     await projMemberships.apply(
       testEnvelope({
@@ -2036,7 +2283,9 @@ describe('ingest pipeline wiring', () => {
 });
 ```
 
-(Add the imports the snippet needs — `projMemberships` from Task 4 — to the file's import block. The `ingestEvent` call signature adapts to Plan 1's actual export; the assertions do not.)
+(Add the imports the snippet needs — `projMemberships` from Task 4, `SIMPLE_KANBAN_TEMPLATE` from `@gisik-nokma/domain` — to the file's import block. The `ingestEvent` call signature and its duplicate-result shape adapt to Plan 1's actual export; the assertions do not.)
+
+Run: `pnpm --filter @gisik-nokma/domain exec vitest run test/workflows/simple-kanban.test.ts` — PASS (2 tests). Then (from `apps/server/`) `pnpm vitest run test/permissions/check-role-permission.test.ts` — PASS.
 
 - [ ] **Step 7: Run the full server suite**
 
@@ -2046,8 +2295,9 @@ Expected: PASS — including Plan 1's ingest tests, proving the gate refuses not
 - [ ] **Step 8: Commit**
 
 ```bash
-git add apps/server/src/permissions/check-permission.ts apps/server/src/ingest apps/server/test/permissions
-git commit -m "Under-privileged claims are refused before the rule engine sees them: identity spoofing, borrowed server origin, and role shortfalls all get the rule named and the reason in plain language — and founding a workspace records its founder as owner."
+git add packages/domain/src/workflows/simple-kanban.ts packages/domain/test/workflows \
+  apps/server/src/permissions/check-permission.ts apps/server/src/workspaces apps/server/src/ingest apps/server/test/permissions
+git commit -m "Under-privileged claims are refused before the rule engine sees them: identity spoofing, borrowed server origin, and role shortfalls all get the rule named and the reason in plain language — and a founded workspace now arrives usable, with the simple-Kanban default and its four built-in types appended before the founder's own grant."
 ```
 
 ---
@@ -4091,7 +4341,7 @@ git commit -m "Sync-down never leaks and never skips: visibleEventsFor walks the
 
 **Interfaces:**
 - Consumes: everything this plan built; Plan 1's ingest HTTP route (adapt its URL — assumed `POST /api/workspaces/:workspaceId/events`; the assertions on refusal bodies do not adapt).
-- Produces: end-to-end proof that the permission and visibility layers hold at the HTTP surface, plus the Features.md / test-cases entries the workspace convention demands in the same change set.
+- Produces: end-to-end proof that the permission and visibility layers hold at the HTTP surface, plus the Features.md / test-cases entries the workspace convention demands in the same change set. (`POST /v1/workspaces` is the one route not proven here — it arrives in Task 13 with its own file, including its no-session 401.)
 
 - [ ] **Step 1: Write the failing end-to-end security tests**
 
@@ -4260,7 +4510,7 @@ Append to `Features.md` (§6 is this plan's section, settled per the coordinatio
 ## 6. Server core — auth, membership & visibility
 
 - ⚙️ **Identity & sessions** — better-auth on Fastify: phone OTP, email magic link, Google OAuth, passkeys; no passwords. httpOnly-cookie sessions for web, bearer tokens for the apps. OTP delivery behind `OtpSender` (dev/log implementation; the DLT-registered SMS provider is a deployment concern). Identity is infrastructure, not events. `apps/server/src/auth/`
-- ⚙️ **Membership events & effective roles** — `workspace.created`, `project.created`, `membership.granted`/`membership.revoked`, `project.member_added`/`project.member_removed` in the ledger; `proj_memberships` resolves each user's workspace role and per-project admin flags; founding a workspace records its founder as owner. `apps/server/src/projections/proj-memberships.ts`
+- ⚙️ **Membership events & effective roles** — `workspace.created`, `project.created`, `membership.granted`/`membership.revoked`, `project.member_added`/`project.member_removed` in the ledger; `proj_memberships` resolves each user's workspace role and per-project admin flags; founding a workspace appends the default simple-Kanban workflow, the four built-in ticket types bound to it, and the founder's owner grant — in that order, on accept and never on a duplicate re-submission. `apps/server/src/projections/proj-memberships.ts`, `apps/server/src/workspaces/bootstrap-workspace.ts`
 - ✅ **Permission refusals** — a pre-engine ingest gate refuses identity spoofing, borrowed server origin, and role shortfalls with the standard `{refused, rule, reason}` shape (`permission.role`, `permission.visibility`), reasons in plain language, every refusal proven against a planted defect. `apps/server/src/permissions/`
 - ✅ **Ticket visibility** — `visibility.set` claims a mode (workspace / project / explicit / inherit); `proj_visibility` resolves every ticket's audience by walking inherit chains to the nearest authored ancestor (roots default to project) and re-resolves on reparent and ancestor changes; `canSee` backs 404-enforced reads and one-pass filtered lists; guests see only explicit shares; admins get no bypass. `apps/server/src/visibility/`
 - ✅ **Honesty under restriction** — rollup responses carry true totals over all children plus the viewer's `restrictedCount`; a visible child under a restricted parent gets `{kind: 'restricted'}` — existence, no title; ledger history goes out with provenance untouched for anyone entitled to see. `apps/server/src/visibility/rollup.ts`, `apps/server/src/routes/tickets.ts`
@@ -4283,7 +4533,7 @@ Mirrors Features.md §6. Status: ❌ not covered · ✅ covered · 🟡 partial 
 - **6.5** ✅ proj_memberships resolves effective roles: grants, re-grants, revocations, project rosters; a project-scope guest is a guest of the workspace; deterministic rebuild. (`test/projections/proj-memberships.test.ts`, `test/permissions/effective-role.test.ts`)
 - **6.6** ✅ Admin-only event types (workflow.defined, ticket-type.defined, project.created) are refused to plain members with rule permission.role. (`test/permissions/check-role-permission.test.ts`)
 - **6.7** ✅ A claim submitted as another person (actorId ≠ session user) is refused. (`test/permissions/check-role-permission.test.ts`)
-- **6.8** ✅ A client-submitted event wearing origin 'server' is refused; founding a workspace appends the owner grant server-side. (`test/permissions/check-role-permission.test.ts`)
+- **6.8** ✅ A client-submitted event wearing origin 'server' is refused; founding a workspace appends the whole founding sequence server-side. (`test/permissions/check-role-permission.test.ts`)
 - **6.9** ✅ Visibility resolution: authored modes win, inherit chains walk to the nearest authored ancestor, roots default to project mode. (`test/projections/proj-visibility.test.ts`)
 - **6.10** ✅ Re-resolution on reparent and on ancestor visibility change, pruning at authored descendants; deterministic rebuild. (`test/projections/proj-visibility.test.ts`)
 - **6.11** ✅ A guest acting on a ticket not explicitly shared with them is refused with rule permission.visibility (pipeline and HTTP). (`test/permissions/check-visibility-permission.test.ts`, `test/routes/security.test.ts`)
@@ -4312,6 +4562,206 @@ git commit -m "Route-level security proven end to end — the guest, the prober,
 
 ---
 
+### Task 13: The founding route — `POST /v1/workspaces`
+
+Task 5 gave a founded workspace everything it needs to be usable. This task gives the product a door to found one through. Until the owner decision of 2026-08-26 there was **no** workspace-creation route anywhere in the series — the surface was unowned end to end, and every workspace in every test arrived by hand-appending a `workspace.created` envelope.
+
+**Route prefix, stated once because this plan is inconsistent about it:** the product API lives under `/v1/*` (coordination doc amendment 20; better-auth's vendor surface at `/api/auth/*` is the only exception). This route is therefore `POST /v1/workspaces`. Task 8's ticket read routes are written `/api/workspaces/...`, which predates amendment 20 and is drift — it is *not* the idiom to copy, and it is left alone here only because its Produces block is a contract Plans 5, 6 and 10 quote. Flag it at execution; do not propagate it.
+
+**Files:**
+- Create: `apps/server/src/routes/workspaces.ts`
+- Modify: `apps/server/src/app.ts` (register the route alongside the ticket routes)
+- Modify: `Features.md` (§6 — the founding bullet), `test-cases/06-auth-visibility.md` (cases 6.23–6.25)
+- Test: `apps/server/test/routes/workspaces.test.ts`
+
+**Interfaces:**
+- Consumes: `makeRequireSession` (Task 2), the ingest path (Task 5's wiring — the route submits through it, so `bootstrapWorkspace` fires exactly as it does for Plan 11's seed CLIs), `newUlid` from `@gisik-nokma/domain`.
+- Produces: `registerWorkspaceRoutes(app: FastifyInstance, deps: { pool: Pool; auth: Auth; ingest: IngestService }): void` serving `POST /v1/workspaces` with body `{ name: string }` → `201 { workspaceId: string }`, or the ingest layer's own refusal/invalid body verbatim.
+
+- [ ] **Step 1: Write the failing route test**
+
+```ts
+// apps/server/test/routes/workspaces.test.ts
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { FastifyInstance } from 'fastify';
+import type { Pool } from 'pg';
+import { buildApp } from '../../src/app'; // Plan 1's app builder — adapt name/signature
+import { migrateTestDb, testPool, truncateAll } from '../helpers/db';
+import { signInWithPhone } from '../helpers/session';
+
+let pool: Pool;
+let app: FastifyInstance;
+
+describe('POST /v1/workspaces', () => {
+  beforeAll(async () => {
+    migrateTestDb();
+    pool = testPool();
+    app = await buildApp({ pool });
+    await app.ready();
+  });
+  afterAll(async () => {
+    await app.close();
+    await pool.end();
+  });
+  beforeEach(async () => {
+    await truncateAll(pool);
+  });
+
+  it('founds a workspace and returns its id', async () => {
+    const { token } = await signInWithPhone('+919000000201');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/workspaces',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { name: 'Convenience Corner' },
+    });
+    expect(res.statusCode).toBe(201);
+    const { workspaceId } = res.json() as { workspaceId: string };
+    expect(workspaceId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+  });
+
+  it('the founded workspace arrives usable — owner, a workflow, and all four built-in types', async () => {
+    const { token, userId } = await signInWithPhone('+919000000202');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/workspaces',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { name: 'Convenience Corner' },
+    });
+    const { workspaceId } = res.json() as { workspaceId: string };
+
+    const role = await pool.query(
+      'SELECT role FROM proj_memberships WHERE workspace_id = $1 AND user_id = $2 AND scope_kind = $3',
+      [workspaceId, userId, 'workspace'],
+    );
+    expect(role.rows).toEqual([{ role: 'owner' }]);
+
+    const workflows = await pool.query('SELECT workflow_id FROM proj_workflows WHERE workspace_id = $1', [workspaceId]);
+    expect(workflows.rows).toHaveLength(1);
+    const types = await pool.query(
+      'SELECT type_id, workflow_id FROM proj_ticket_types WHERE workspace_id = $1 ORDER BY rank',
+      [workspaceId],
+    );
+    expect(types.rows.map((row) => row.type_id)).toEqual(['epic', 'story', 'task', 'sub-task']);
+    for (const row of types.rows) {
+      expect(row.workflow_id).toBe(workflows.rows[0].workflow_id);
+    }
+  });
+
+  it('a request with no session is refused with the generic 401 — founding needs a signed-in person', async () => {
+    const res = await app.inject({ method: 'POST', url: '/v1/workspaces', payload: { name: 'Nobody' } });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('a nameless workspace is refused, and nothing is appended', async () => {
+    const { token } = await signInWithPhone('+919000000203');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/workspaces',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { name: '   ' },
+    });
+    expect(res.statusCode).toBe(400);
+    const { rows } = await pool.query('SELECT count(*)::int AS n FROM events');
+    expect(rows[0].n).toBe(0);
+  });
+});
+```
+
+- [ ] **Step 2: Run to verify failure**
+
+Run (from `apps/server/`): `pnpm vitest run test/routes/workspaces.test.ts`
+Expected: FAIL — 404 on the route.
+
+- [ ] **Step 3: Implement the route**
+
+```ts
+// apps/server/src/routes/workspaces.ts
+import type { FastifyInstance } from 'fastify';
+import type { Pool } from 'pg';
+import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import type { Auth } from '../auth/auth';
+import { makeRequireSession } from '../auth/require-session';
+import type { IngestService } from '../ingest/ingest-service'; // Plan 1's ingest entry point — adapt the name
+
+export function registerWorkspaceRoutes(
+  app: FastifyInstance,
+  deps: { pool: Pool; auth: Auth; ingest: IngestService },
+): void {
+  const requireSession = makeRequireSession(deps.auth);
+
+  app.post('/v1/workspaces', { preHandler: requireSession }, async (request, reply) => {
+    const { name } = (request.body ?? {}) as { name?: unknown };
+    if (typeof name !== 'string' || name.trim() === '') {
+      return reply.code(400).send({ error: 'invalid', message: 'A workspace needs a name.' });
+    }
+
+    // A workspace's id IS its founding entity's id — one ULID, minted here.
+    const workspaceId = newUlid();
+    // Origin is the caller's, not 'server': this is a person's claim to have
+    // founded a workspace, and `checkRolePermission` refuses a borrowed server
+    // origin (Task 5). `actorId` must equal the session user for the same
+    // reason. The gate then lets `workspace.created` through without a
+    // membership — founding needs a session, not a membership.
+    const founding: SubmittedEvent = {
+      id: newUlid(),
+      workspaceId,
+      entity: { kind: 'workspace', id: workspaceId },
+      type: 'workspace.created',
+      version: 1,
+      payload: { name: name.trim() },
+      actorId: request.currentUserId,
+      origin: 'web',
+      clientTime: new Date().toISOString(),
+    };
+
+    // Through the ordinary ingest path — which is what appends the default
+    // workflow, the four built-in types and the founder's owner grant
+    // (Task 5's `bootstrapWorkspace`). The route knows nothing about that
+    // sequence, deliberately: Plan 11's seed CLIs found workspaces through the
+    // same path, and there is exactly one founding sequence between them.
+    const [result] = await deps.ingest.ingestBatch([founding], { sessionUserId: request.currentUserId });
+    if (result === undefined) throw new Error('ingest returned no result for the founding event');
+    if (result.status !== 'committed') return reply.code(422).send(result); // refusal/invalid body verbatim
+    return reply.code(201).send({ workspaceId });
+  });
+}
+```
+
+Register it where Task 8's ticket routes are registered, in `apps/server/src/app.ts`.
+
+- [ ] **Step 4: Run to verify it passes**
+
+Run (from `apps/server/`): `pnpm vitest run test/routes/workspaces.test.ts`
+Expected: PASS (4 tests).
+
+- [ ] **Step 5: Record it — Features.md and test-cases, same change set**
+
+Append to `Features.md` §6:
+
+```markdown
+- ✅ **Founding a workspace** — `POST /v1/workspaces` takes a name from any signed-in person and returns a workspace that already works: the simple-Kanban default workflow, all four built-in ticket types bound to it, and the founder recorded as owner — appended in that order, because a ticket type naming an undefined workflow is refused. The template is a starting point, not a commitment: an admin may publish another workflow and re-point the types immediately. `apps/server/src/routes/workspaces.ts`, `apps/server/src/workspaces/bootstrap-workspace.ts`
+```
+
+Append to `test-cases/06-auth-visibility.md`:
+
+```markdown
+- **6.23** ✅ `POST /v1/workspaces` founds a workspace for any signed-in person and returns its id; no session gets the generic 401; a nameless workspace is refused and appends nothing. (`test/routes/workspaces.test.ts`)
+- **6.24** ✅ Founding appends the default workflow, then the four built-in types naming it, then the founder's owner grant — asserted in `workspace_seq` order, because the sequence spans four entity kinds and per-entity `seq` cannot order it. (`test/permissions/check-role-permission.test.ts`)
+- **6.25** ✅ A founded workspace accepts a ticket immediately: found → project → roster → `ticket.created` is committed and lands in the default workflow's initial state. Before the bootstrap this refused `ticket.unknown-type` and the workspace was permanently unusable. (`test/permissions/check-role-permission.test.ts`)
+- **6.26** ✅ Planted defect: re-submitting the same founding event id answers `duplicate-event-id` and bootstraps nothing a second time — the property both of Plan 11's seed CLIs re-run on. (`test/permissions/check-role-permission.test.ts`)
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/server/src/routes/workspaces.ts apps/server/src/app.ts apps/server/test/routes/workspaces.test.ts \
+  Features.md test-cases/06-auth-visibility.md
+git commit -m "A workspace can now be founded through the product, and it arrives able to hold a ticket: one name in, and the default workflow, the four built-in types and the founder's ownership come back out."
+```
+
+---
+
 ## Open questions (owner review before or during execution)
 
 1. **Auth library: better-auth** (justified above). Pin the latest 1.x at execution; the exact version lands in the lockfile and PR description. Owner sign-off requested on the library choice itself.
@@ -4323,6 +4773,8 @@ git commit -m "Route-level security proven end to end — the guest, the prober,
 7. **Read endpoints live in this plan.** Plan 3 ships projections, not HTTP routes, so the minimal list/read/history endpoints are built here. If another plan also claims ticket read routes, merge at execution — the visibility enforcement in them is this plan's, regardless of file ownership.
 8. **Vendor tables are not snake_case.** better-auth's generated tables keep the library's naming — a deliberate exception to CODING_STANDARDS, called out in the migration header.
 9. **Explicit lists are exactly the authored list.** Creator/assignee are not implicitly appended; a creator can lock themselves out of their own ticket (the claim is attributed, and a project admin can repair it). Confirm this is the wanted sharp edge.
+10. **The client half of workspace creation is still unowned — to be assigned when Plan 6 is walked.** The owner decision of 2026-08-26 settled the **server** surface only, and Tasks 5 and 13 build exactly that: the founding sequence and `POST /v1/workspaces`. Nobody owns the screen that founds a workspace, and nobody owns **invite issuance and acceptance** — Plan 6 has already flagged the invite half as ownerless. Deliberately not built here: this plan ships no client code, and inventing a founding screen inside a server plan would put it where no client plan would look for it. Concretely still missing, so a later reader does not have to re-derive it: a form that calls `POST /v1/workspaces` and routes to the new workspace; a way to invite someone (which today means an admin hand-submitting `membership.granted` with a `userId` they somehow already know — there is no email-an-invite path, and `membership.granted` names a `userId`, not an address, so an invite for a person who has never signed in cannot be expressed by the current vocabulary at all); and acceptance. Assign when Plan 6 is walked.
+11. **The route prefix in this plan is inconsistent, and only half of it is fixed.** `POST /v1/workspaces` (Task 13) follows coordination amendment 20; Task 8's ticket read routes are `/api/workspaces/...`, which predates it. Task 8's Produces block is quoted by Plans 5, 6 and 10, so moving it is a cross-plan change, not a rename — flagged for the same pass that walks those plans, and not done here.
 
 ## Self-review (performed on the finished plan)
 

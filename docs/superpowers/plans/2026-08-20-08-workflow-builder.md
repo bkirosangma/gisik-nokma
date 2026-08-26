@@ -116,6 +116,8 @@ This plan executes in parallel with Plans 6/7/9 (after 1–5). Where Plan 5/6 su
    - `GET /v1/workspaces/:workspaceId/ticket-types` → `TicketTypeDef[]` (from `proj_ticket_types`)
    - `GET /v1/workspaces/:workspaceId/members` → `{ userId, displayName, role }[]` (`proj_memberships` joined with the auth user table for display names)
    - `GET /v1/workspaces/:workspaceId/workflows/:workflowId/state-occupancy` → `{ counts: Record<stateId, number> }` — count of tickets **currently sitting in each state** of that workflow (`proj_tickets` grouped by `state_id`), powering the mapping dialog's in-flight counts.
+   - `GET /v1/workspaces/:workspaceId/ticket-types/:typeId/population?workflowId=…` → `{ count: number }` — how many tickets of that type are **pinned to that workflow** (`proj_tickets` filtered on `type_id` and `workflow_id`; a ticket pins its workflow at creation, owner decision 2026-08-26). Powers the type editor's divergence notice (Task 11). Admin-only on the same terms as state-occupancy.
+   - `POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate-workflow`, body `{ fromWorkflowId, toWorkflowId, stateMap: Record<stateId, stateId> }` → `{ migrated: number }` — the **bulk affordance** the owner decision requires: the admin authors one cross-workflow state map and the server expands it into one `ticket.workflow_rebound { toWorkflowId, toStateId }` per ticket. Plan 3 owns the event, its payload and its refusals; this plan owns only the authoring UI and consumes the outcome. **The endpoint itself is unowned server work** — see Open question 13.
 4. **Session** — Plan 6 owns sign-in state in `apps/web`. Assumed: a hook or loader yielding `{ userId: string; workspaceRole: WorkspaceRole }` for the current workspace. Only the page files (Task 13) touch it; all components take a `BuilderSession` prop.
 5. **Workspace route segment** — assumed `apps/web/app/w/[workspaceId]/…`; the builder claims `…/settings/workflows` and `…/settings/ticket-types` beneath it. If Plan 6 chose a different segment, move the page files; component code is unaffected.
 6. **`packages/ui` tokens export** — assumed `export const tokens = { … }` from `packages/ui/src/tokens.ts`, re-exported by the package index. Task 5 adds the workflow-builder colour roles there if absent; if Plan 6 already defined equivalent roles, use Plan 6's keys and add nothing.
@@ -133,6 +135,9 @@ This plan executes in parallel with Plans 6/7/9 (after 1–5). Where Plan 5/6 su
 7. **Built-in ticket types: name, icon, and workflow binding are editable; id and rank are locked in the UI.** The rank ladder epic(1)/story(2)/task(3)/sub-task(4) is what Plan 3's hierarchy checks lean on; re-ranking built-ins from a settings screen is a foot-gun with no user story. The server does not enforce this lock (last-definition-wins) — UI-only, flagged in Open questions.
 8. **The workflow builder ships on web (and desktop via app-core) only.** React Flow is a DOM library; RN gets no authoring canvas. Workflow authoring is admin work at a desk; the spec's mobile story (§5) is about working tickets, not authoring workflows.
 9. **Advisories are a second tier and must never gate publish** (owner decision, 2026-08-26). `adviseWorkflowDef` is a separate function from `validateWorkflowDef`, and this plan keeps the separation load-bearing at exactly one place: **`selectCanPublish` is `validateWorkflowDef` emptiness and nothing else** (Task 1). It does not call `adviseWorkflowDef`, does not union the two arrays, and does not "unify" them into one `selectProblems` — an executor who does that turns every advisory into a publish blocker and breaks the template tests, which is the failure this tier exists to make impossible. A distinct type name proves nothing under structural typing, so the guarantee is proven by a planted defect instead: a draft that trips `rdu-bypassable` and nothing else renders the advisory (Task 8) **while the Publish button stays enabled and the publish succeeds** (Task 9, where `PublishControls` exists). The advisory section is visually distinct from the issues list, carries its own BEM block, and says in its own heading that it blocks nothing.
+10. **Re-pointing a type's workflow leaves existing tickets where they are, and the editor says so** (owner decision, 2026-08-26 — coordination doc, *"a ticket's workflow is pinned at creation, and moved only deliberately"*). A ticket pins the workflow it was created under; changing a type's binding changes only what **new** tickets get. This is mostly ratification of what the code already does — `proj_tickets` carries its own `workflow_id`, set from `type.workflowId` in the `ticket.created` branch and never touched again, and every read path resolves per ticket — and it is safe because Plan 5 already specifies board columns as *one column per (workflow in use, state of its latest def)*, so a board holding two workflows side by side is a case the design was built for. What this plan owes it is **visibility**: an admin who re-points a type and is never told that two populations now exist is exactly the board knowing something the user does not. So the editor states the divergence with a real count (Task 11), and offers the migration.
+    **The migration is not `stateMapping` and must not reuse it.** `stateMapping` is keyed *inside one workflow's version chain* — it answers "version N had this state, version N+1 does not, where do those tickets go". Across two unrelated workflows there is no chain and no shared history, so the cross-workflow map is a different object with a different lifetime: authored once, applied once, never stored on a def. It rides its own event, `ticket.workflow_rebound { toWorkflowId, toStateId }`, **owned by Plan 3** along with its refusals (chiefly: `toStateId` must be a state of the target workflow). This plan builds the authoring surface and consumes the outcome; it defines neither the event nor the rule.
+    **Migration is optional and the UI must not imply otherwise.** Leaving old tickets on the outgoing workflow is a legitimate choice, not a deferred chore, so "leave them" is an affirmative button beside "move them" — never merely the absence of a click.
 
 ## Planted-defect coverage table (every `validateWorkflowDef` code)
 
@@ -196,6 +201,15 @@ All user-facing strings in one place; components and tests use these character-f
 | Builder screen loading / failure | `Loading workspace people and types…` / `Could not load workspace people and types — reload to try again.` |
 | List screens | `Workflows` / `New workflow` / `No workflows published yet.` / `Loading workflows…` · `Ticket types` / `New ticket type` / `Loading ticket types…` · row buttons `Open` (aria `Open ${name}`) |
 | Ticket-type editor | save button `Save ticket type` · success `Ticket type saved.` · built-in rank note `Built-in type — its place in the hierarchy is fixed.` |
+| Workflow divergence notice (type editor, after the binding is changed) | heading `Existing tickets stay where they are` · body `${n} existing tickets of this type stay on "${outgoing}". New ones will use "${incoming}".` (`1 existing ticket of this type stays on "${outgoing}". New ones will use "${incoming}".`; `counting tickets…` while loading; `ticket count unavailable` when the read fails, and then the body reads `Existing tickets of this type stay on "${outgoing}" — we could not count how many. New ones will use "${incoming}".`) · when the count is zero: `No tickets of this type are on "${outgoing}" — nothing stays behind.` |
+| Divergence notice actions | `Move them to "${incoming}"…` and `Leave them on "${outgoing}"` — two buttons, because leaving them is a choice and not the absence of one · after Leave: `Left on "${outgoing}". They keep their own board columns.` · before the type is saved: `Save the ticket type first — until it is saved, new tickets would still go to "${outgoing}".` |
+| Rebind dialog heading | `Move existing tickets to "${incoming}"` |
+| Rebind dialog body | `These two workflows share no history, so nothing carries across on its own: every state of "${outgoing}" needs a destination in "${incoming}". Each ticket gets its own recorded move.` |
+| Rebind dialog row picker label | `Send them to` (aria `Send them to — ${state name}`) |
+| Rebind dialog footer | `Leaving them is a real choice — a type can have tickets on two workflows, and the board shows each ticket under its own workflow's states.` |
+| Rebind confirm / cancel | `Move these tickets` / `Leave them where they are` |
+| Rebind success | `${n} tickets moved to "${incoming}".` (`1 ticket moved to "${incoming}".`) |
+| Rebind refused banner | `The server refused this move.` then the `reason` verbatim, then `rule: ${rule}` |
 
 Rule summaries (Task 2, rendered on edges and in the transition inspector):
 
@@ -248,7 +262,8 @@ packages/app-core/                       # Plan 6 owns the scaffold; guard steps
       rank.ts             # rankImplications
       icons.tsx           # TYPE_ICONS, TypeIcon (lucide-react map, safe fallback)
       ticket-type-list-screen.tsx
-      ticket-type-editor-screen.tsx  # name/icon/rank/workflow binding + save flow
+      ticket-type-editor-screen.tsx  # name/icon/rank/workflow binding + save flow + divergence notice
+      workflow-rebind-dialog.tsx     # cross-workflow state map — NOT stateMapping (decision 10)
       fields-editor.tsx              # the five field kinds, select-options editor
       icon-picker.tsx
   test/
@@ -1720,14 +1735,17 @@ git commit -m "Plain-language rule summaries, field-picker choices, and per-code
 
 Templates are ordinary pre-authored workflows, cloned and edited like any other (spec §4 — nothing special about them). The three defs below are the complete payloads; the gallery clones one into the canvas with a fresh workflow id. `errand-with-waits` models waiting-on-counterparty as **blocked-flagged active states** (amendment 9 — the attention strip's blocked bucket reads the flag); `approval-chain` carries the four-eyes `require-different-user` rule.
 
+**Simple kanban is not declared here — it is imported.** Its canonical definition lives in `@gisik-nokma/domain` as `SIMPLE_KANBAN_TEMPLATE`, created by Plan 4 (owner decision 2026-08-26, coordination doc: "A new workspace can hold a ticket the moment it exists"). Every workspace is *founded* on a clone of it, so the server needs it before this plan exists at all, and Plan 4 executes first. The gallery's Kanban card carries that same object as its `def` — not a copy that resembles it — and a test asserts the identity. **Only Kanban moved**, and only because the server also needs it: `errand-with-waits` and `approval-chain` are gallery-only, nothing outside this package consumes them, and hoisting them into the domain package to keep the three tidy would push client authoring content into the package the rule engine depends on for no reader's benefit. Two copies of one workflow is the drift this series keeps finding; three homes for one concept is the opposite mistake.
+
 **Files:**
 - Create: `packages/app-core/src/workflow-builder/templates.ts`
 - Modify: `packages/app-core/src/workflow-builder/index.ts`
 - Test: `packages/app-core/test/workflow-builder/templates.test.ts`
 
 **Interfaces:**
-- Consumes: `WorkflowDef`, `newUlid`, `validateWorkflowDef`, `adviseWorkflowDef` from `@gisik-nokma/domain`; `layoutDraft`, `WorkflowDraft` from Task 1.
+- Consumes: `WorkflowDef`, `newUlid`, `validateWorkflowDef`, `adviseWorkflowDef`, **`SIMPLE_KANBAN_TEMPLATE`** (Plan 4) from `@gisik-nokma/domain`; `layoutDraft`, `WorkflowDraft` from Task 1.
 - Produces: `type WorkflowTemplate = { id: 'simple-kanban' | 'errand-with-waits' | 'approval-chain'; name: string; tagline: string; def: Omit<WorkflowDef, 'id' | 'version'> }`; `WORKFLOW_TEMPLATES: readonly WorkflowTemplate[]` (in that order); `cloneTemplate(template: WorkflowTemplate): WorkflowDef` (fresh ULID id, version 1); `draftFromTemplate(template: WorkflowTemplate): WorkflowDraft`.
+- **Guard step:** if `SIMPLE_KANBAN_TEMPLATE` is not yet exported from `@gisik-nokma/domain` (Plan 4 not landed), create `packages/domain/src/workflows/simple-kanban.ts` exactly as Plan 4 Task 5 Step 6 specifies and export it from the barrel — do NOT declare a local Kanban payload here and "reconcile later", which is the drift this arrangement exists to prevent.
 
 - [ ] **Step 1: Write the failing template test**
 
@@ -1735,7 +1753,12 @@ Create `packages/app-core/test/workflow-builder/templates.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { adviseWorkflowDef, validateWorkflowDef } from '@gisik-nokma/domain';
+import {
+  SIMPLE_KANBAN_TEMPLATE,
+  adviseWorkflowDef,
+  simpleKanbanWorkflowDef,
+  validateWorkflowDef,
+} from '@gisik-nokma/domain';
 import {
   WORKFLOW_TEMPLATES,
   cloneTemplate,
@@ -1743,6 +1766,19 @@ import {
 } from '../../src/workflow-builder/templates.js';
 
 describe('WORKFLOW_TEMPLATES', () => {
+  it('the gallery Kanban IS the workspace-bootstrap default — one home, not two copies', () => {
+    const kanban = WORKFLOW_TEMPLATES.find((template) => template.id === 'simple-kanban')!;
+    // Identity, not equality: a structural check would pass on a second copy
+    // that had drifted into agreement, and go on passing until it drifted out.
+    expect(kanban.def).toBe(SIMPLE_KANBAN_TEMPLATE);
+    // …and what Plan 4 founds every workspace with is that object plus an id
+    // and version 1, so the card an admin picks in the gallery and the workflow
+    // their workspace already had are the same workflow.
+    const { id: _id, version, ...founded } = simpleKanbanWorkflowDef('01JBOOTSTRAPWORKFLOW000001');
+    expect(version).toBe(1);
+    expect(founded).toEqual(kanban.def);
+  });
+
   it('offers exactly simple-kanban, errand-with-waits, approval-chain', () => {
     expect(WORKFLOW_TEMPLATES.map((template) => template.id)).toEqual([
       'simple-kanban',
@@ -1809,7 +1845,7 @@ Expected: FAIL — cannot resolve `../../src/workflow-builder/templates.js`.
 Create `packages/app-core/src/workflow-builder/templates.ts`:
 
 ```ts
-import { newUlid, type WorkflowDef } from '@gisik-nokma/domain';
+import { SIMPLE_KANBAN_TEMPLATE, newUlid, type WorkflowDef } from '@gisik-nokma/domain';
 import { layoutDraft } from './layout.js';
 import type { WorkflowDraft } from './draft-store.js';
 
@@ -1823,27 +1859,19 @@ export type WorkflowTemplate = {
 /**
  * Pre-authored, ordinary workflows (spec §4). Cloned — never referenced —
  * so an edited copy can never bleed back into the gallery.
+ *
+ * The Kanban card's `def` is `SIMPLE_KANBAN_TEMPLATE` itself, imported from
+ * `@gisik-nokma/domain`: the server founds every workspace on that same object
+ * (Plan 4), and a gallery copy that merely resembled it would diverge the first
+ * time either side was edited, silently. The other two are gallery-only —
+ * nothing outside this package consumes them.
  */
 export const WORKFLOW_TEMPLATES: readonly WorkflowTemplate[] = [
   {
     id: 'simple-kanban',
     name: 'Simple kanban',
     tagline: 'To do, doing, done. No rules — anything moves along the arrows.',
-    def: {
-      name: 'Simple kanban',
-      initialStateId: 'todo',
-      states: [
-        { id: 'todo', name: 'To do', category: 'open' },
-        { id: 'doing', name: 'Doing', category: 'active' },
-        { id: 'done', name: 'Done', category: 'terminal' },
-      ],
-      transitions: [
-        { from: 'todo', to: 'doing', rules: [] },
-        { from: 'doing', to: 'todo', rules: [] },
-        { from: 'doing', to: 'done', rules: [] },
-        { from: 'done', to: 'doing', rules: [] },
-      ],
-    },
+    def: SIMPLE_KANBAN_TEMPLATE,
   },
   {
     id: 'errand-with-waits',
@@ -1915,7 +1943,7 @@ export function draftFromTemplate(template: WorkflowTemplate): WorkflowDraft {
 - [ ] **Step 4: Run to verify it passes, update the barrel**
 
 Run: `pnpm --filter @gisik-nokma/app-core exec vitest run test/workflow-builder/templates.test.ts`
-Expected: PASS (6 tests).
+Expected: PASS (7 tests).
 
 Add to `packages/app-core/src/workflow-builder/index.ts`:
 
@@ -1927,14 +1955,14 @@ export * from './templates.js';
 
 ```bash
 git add packages/app-core/src/workflow-builder/templates.ts packages/app-core/src/workflow-builder/index.ts packages/app-core/test/workflow-builder/templates.test.ts
-git commit -m "Template gallery payloads: simple-kanban, errand-with-waits (blocked-flagged waiting states), approval-chain (four-eyes approve) — ordinary workflows, cloned never referenced"
+git commit -m "Template gallery payloads: errand-with-waits (blocked-flagged waiting states) and approval-chain (four-eyes approve), with the Kanban card carrying the domain package's own bootstrap default rather than a second copy of it — ordinary workflows, cloned never referenced"
 ```
 
 ---
 
 ### Task 4: The authoring gateway, its in-memory fake, and the event builders
 
-The builder's entire outside world behind one interface (DIP — the consumer defines it; `apps/web` adapts `DataSource` to it in Task 13). Plus the pure builders that turn a draft into the `workflow.defined` / `ticket-type.defined` submissions, with the version-bump and state-mapping mechanics the server will hold us to.
+The builder's entire outside world behind one interface (DIP — the consumer defines it; `apps/web` adapts `DataSource` to it in Task 13). Plus the pure builders that turn a draft into the `workflow.defined` / `ticket-type.defined` submissions, with the version-bump and state-mapping mechanics the server will hold us to. Two of the gateway's reads are **counts the builder shows but never reasons from** — `getStateOccupancy` and `getTypeWorkflowPopulation` — and both may fail; each caller says so plainly rather than substituting a zero.
 
 **Files:**
 - Create: `packages/app-core/src/workflow-builder/gateway.ts`
@@ -1948,8 +1976,9 @@ The builder's entire outside world behind one interface (DIP — the consumer de
 - Produces:
   - `type WorkspaceMember = { userId: string; displayName: string; role: WorkspaceRole }`
   - `type IngestResult = { status: 'committed'; eventId: string; seq: number; serverTime: string } | { status: 'invalid'; eventId: string | null; code: string; message: string } | { status: 'refused'; eventId: string; rule: string; reason: string }` — the client-side mirror of Plan 1's type; **if Plan 6's data-source module already exports `IngestResult`, import and re-export it here instead of declaring it**
-  - `interface WorkflowAuthoringGateway { listWorkflows(workspaceId): Promise<PublishedWorkflowDef[]>; getWorkflow(workspaceId, workflowId): Promise<PublishedWorkflowDef | null>; listTicketTypes(workspaceId): Promise<TicketTypeDef[]>; listMembers(workspaceId): Promise<WorkspaceMember[]>; getStateOccupancy(workspaceId, workflowId): Promise<Record<string, number>>; submit(events: SubmittedEvent[]): Promise<IngestResult[]> }`
-  - `createFakeGateway(seed?: FakeGatewaySeed): WorkflowAuthoringGateway & { submitted: SubmittedEvent[] }` — commits everything by default; `submitResults` queue overrides, `occupancyError: true` makes `getStateOccupancy` reject (the mapping dialog's "unavailable" path)
+  - `interface WorkflowAuthoringGateway { listWorkflows(workspaceId): Promise<PublishedWorkflowDef[]>; getWorkflow(workspaceId, workflowId): Promise<PublishedWorkflowDef | null>; listTicketTypes(workspaceId): Promise<TicketTypeDef[]>; listMembers(workspaceId): Promise<WorkspaceMember[]>; getStateOccupancy(workspaceId, workflowId): Promise<Record<string, number>>; getTypeWorkflowPopulation(workspaceId, typeId, workflowId): Promise<number>; migrateTypeToWorkflow(input: MigrationRequest): Promise<MigrationOutcome>; submit(events: SubmittedEvent[]): Promise<IngestResult[]> }`
+  - `type MigrationRequest = { workspaceId: string; typeId: string; fromWorkflowId: string; toWorkflowId: string; stateMap: Record<string, string> }` and `type MigrationOutcome = { status: 'migrated'; count: number } | { status: 'refused'; rule: string; reason: string }` — the bulk re-bind (decision 10). The map is authored **across two workflows** and is deliberately not a `stateMapping`: that field is keyed inside one workflow's version chain and is stored on a def; this one is applied once and stored nowhere.
+  - `createFakeGateway(seed?: FakeGatewaySeed): WorkflowAuthoringGateway & { submitted: SubmittedEvent[]; migrations: MigrationRequest[] }` — commits everything by default; `submitResults` queue overrides, `occupancyError: true` makes `getStateOccupancy` reject (the mapping dialog's "unavailable" path), `typePopulationError: true` makes `getTypeWorkflowPopulation` reject (the divergence notice's "unavailable" path), `migrationResults` queue overrides the migration outcome
   - `droppedStates(draft: WorkflowDraft): { id: string; name: string }[]`
   - `buildPublishPayload(draft: WorkflowDraft, stateMapping?: Record<string, string>): PublishedWorkflowDef` — version `(base?.version ?? 0) + 1`
   - `buildWorkflowDefinedEvent(input: { workspaceId: string; actorId: string; origin: Origin; payload: PublishedWorkflowDef }): SubmittedEvent`
@@ -2095,8 +2124,48 @@ describe('createFakeGateway', () => {
     ]);
     await expect(gateway.getStateOccupancy(WORKSPACE, 'wf')).rejects.toThrow();
   });
+
+  it('serves the pinned population per (type, workflow) and records the migration it is asked for', async () => {
+    const gateway = createFakeGateway({ typePopulation: { task: { 'wf-old': 12, 'wf-new': 3 } } });
+    // A ticket pins the workflow it was created under, so one type can have a
+    // population on each of two workflows at once (decision 10).
+    expect(await gateway.getTypeWorkflowPopulation(WORKSPACE, 'task', 'wf-old')).toBe(12);
+    expect(await gateway.getTypeWorkflowPopulation(WORKSPACE, 'task', 'wf-new')).toBe(3);
+    expect(await gateway.getTypeWorkflowPopulation(WORKSPACE, 'task', 'wf-never-used')).toBe(0);
+
+    const request = {
+      workspaceId: WORKSPACE,
+      typeId: 'task',
+      fromWorkflowId: 'wf-old',
+      toWorkflowId: 'wf-new',
+      stateMap: { todo: 'backlog', doing: 'in-flight', done: 'closed' },
+    };
+    expect(await gateway.migrateTypeToWorkflow(request)).toEqual({ status: 'migrated', count: 12 });
+    expect(gateway.migrations).toEqual([request]);
+  });
+
+  it('rejects population reads and refuses migrations when told to', async () => {
+    const gateway = createFakeGateway({
+      typePopulationError: true,
+      migrationResults: [
+        { status: 'refused', rule: 'ticket.unknown-state', reason: '"closed" is not a state of this workflow.' },
+      ],
+    });
+    await expect(gateway.getTypeWorkflowPopulation(WORKSPACE, 'task', 'wf-old')).rejects.toThrow();
+    expect(
+      await gateway.migrateTypeToWorkflow({
+        workspaceId: WORKSPACE,
+        typeId: 'task',
+        fromWorkflowId: 'wf-old',
+        toWorkflowId: 'wf-new',
+        stateMap: { todo: 'closed' },
+      }),
+    ).toEqual({ status: 'refused', rule: 'ticket.unknown-state', reason: '"closed" is not a state of this workflow.' });
+  });
 });
 ```
+
+(The refusal rule id above is illustrative only — Plan 3 owns `ticket.workflow_rebound` and names its refusals; this plan renders whatever `reason` and `rule` come back, verbatim, and asserts on the shape rather than on Plan 3's wording.)
 
 - [ ] **Step 2: Run to verify it fails**
 
@@ -2127,6 +2196,19 @@ export type IngestResult =
  * (amendment 10): apps/web adapts DataSource to this in one file; tests use
  * the in-memory fake. Read shapes flagged for Plan 5 in the plan's Open questions.
  */
+export type MigrationRequest = {
+  workspaceId: string;
+  typeId: string;
+  fromWorkflowId: string;
+  toWorkflowId: string;
+  /** Every state of the outgoing workflow → a state of the incoming one. */
+  stateMap: Record<string, string>;
+};
+
+export type MigrationOutcome =
+  | { status: 'migrated'; count: number }
+  | { status: 'refused'; rule: string; reason: string };
+
 export interface WorkflowAuthoringGateway {
   listWorkflows(workspaceId: string): Promise<PublishedWorkflowDef[]>;
   getWorkflow(workspaceId: string, workflowId: string): Promise<PublishedWorkflowDef | null>;
@@ -2134,6 +2216,22 @@ export interface WorkflowAuthoringGateway {
   listMembers(workspaceId: string): Promise<WorkspaceMember[]>;
   /** Tickets currently sitting in each state of the workflow — the mapping dialog's in-flight counts. */
   getStateOccupancy(workspaceId: string, workflowId: string): Promise<Record<string, number>>;
+  /**
+   * Tickets of this type PINNED to this workflow. A ticket pins the workflow it
+   * was created under (owner decision 2026-08-26), so re-pointing a type leaves
+   * a population behind — this is the count the editor names rather than
+   * letting the admin discover it on the board. Same shape and same honest
+   * degradation as `getStateOccupancy`: it may reject, and the caller says
+   * "unavailable" rather than guessing a number.
+   */
+  getTypeWorkflowPopulation(workspaceId: string, typeId: string, workflowId: string): Promise<number>;
+  /**
+   * The bulk affordance: one cross-workflow state map in, one
+   * `ticket.workflow_rebound` per ticket out (emitted server-side — Plan 3 owns
+   * the event and its refusals). Never a `stateMapping`: that is keyed inside
+   * one workflow's version chain, and across workflows there is no chain.
+   */
+  migrateTypeToWorkflow(input: MigrationRequest): Promise<MigrationOutcome>;
   submit(events: SubmittedEvent[]): Promise<IngestResult[]>;
 }
 ```
@@ -2216,7 +2314,13 @@ Create `packages/app-core/src/workflow-builder/fake-gateway.ts`:
 
 ```ts
 import type { PublishedWorkflowDef, SubmittedEvent, TicketTypeDef } from '@gisik-nokma/domain';
-import type { IngestResult, WorkflowAuthoringGateway, WorkspaceMember } from './gateway.js';
+import type {
+  IngestResult,
+  MigrationOutcome,
+  MigrationRequest,
+  WorkflowAuthoringGateway,
+  WorkspaceMember,
+} from './gateway.js';
 
 export type FakeGatewaySeed = {
   workflows?: PublishedWorkflowDef[];
@@ -2224,20 +2328,29 @@ export type FakeGatewaySeed = {
   members?: WorkspaceMember[];
   /** workflowId → stateId → ticket count */
   occupancy?: Record<string, Record<string, number>>;
+  /** typeId → workflowId → count of tickets PINNED to that workflow (decision 10) */
+  typePopulation?: Record<string, Record<string, number>>;
   /** Drained in order; when empty, submissions commit. */
   submitResults?: IngestResult[];
+  /** Drained in order; when empty, a migration moves the whole seeded population. */
+  migrationResults?: MigrationOutcome[];
   /** Simulate the occupancy read failing — the dialog's "ticket count unavailable" path. */
   occupancyError?: boolean;
+  /** Simulate the population read failing — the divergence notice's "unavailable" path. */
+  typePopulationError?: boolean;
 };
 
 export function createFakeGateway(
   seed: FakeGatewaySeed = {},
-): WorkflowAuthoringGateway & { submitted: SubmittedEvent[] } {
+): WorkflowAuthoringGateway & { submitted: SubmittedEvent[]; migrations: MigrationRequest[] } {
   const pendingResults = [...(seed.submitResults ?? [])];
+  const pendingMigrations = [...(seed.migrationResults ?? [])];
   const submitted: SubmittedEvent[] = [];
+  const migrations: MigrationRequest[] = [];
   let committedSeq = 0;
   return {
     submitted,
+    migrations,
     listWorkflows: async () => seed.workflows ?? [],
     getWorkflow: async (_workspaceId, workflowId) =>
       (seed.workflows ?? []).find((workflow) => workflow.id === workflowId) ?? null,
@@ -2246,6 +2359,16 @@ export function createFakeGateway(
     getStateOccupancy: async (_workspaceId, workflowId) => {
       if (seed.occupancyError === true) throw new Error('occupancy read failed (seeded)');
       return seed.occupancy?.[workflowId] ?? {};
+    },
+    getTypeWorkflowPopulation: async (_workspaceId, typeId, workflowId) => {
+      if (seed.typePopulationError === true) throw new Error('type population read failed (seeded)');
+      return seed.typePopulation?.[typeId]?.[workflowId] ?? 0;
+    },
+    migrateTypeToWorkflow: async (input) => {
+      migrations.push(input);
+      const queued = pendingMigrations.shift();
+      if (queued !== undefined) return queued;
+      return { status: 'migrated', count: seed.typePopulation?.[input.typeId]?.[input.fromWorkflowId] ?? 0 };
     },
     submit: async (events) => {
       submitted.push(...events);
@@ -2268,7 +2391,7 @@ export function createFakeGateway(
 - [ ] **Step 4: Run to verify it passes, update the barrel**
 
 Run: `pnpm --filter @gisik-nokma/app-core exec vitest run test/workflow-builder/events.test.ts`
-Expected: PASS (7 tests).
+Expected: PASS (9 tests).
 
 Add to `packages/app-core/src/workflow-builder/index.ts`:
 
@@ -2282,7 +2405,7 @@ export * from './events.js';
 
 ```bash
 git add packages/app-core/src/workflow-builder packages/app-core/test/workflow-builder/events.test.ts
-git commit -m "Authoring gateway interface with in-memory fake, and the event builders: version bump from the published base, stateMapping only when real, fresh entity ulid per ticket-type definition"
+git commit -m "Authoring gateway interface with in-memory fake, and the event builders: version bump from the published base, stateMapping only when real, fresh entity ulid per ticket-type definition — plus the two counts the builder shows without reasoning from them, including how many tickets of a type stay pinned to the workflow it is being moved off"
 ```
 
 ---
@@ -5103,15 +5226,23 @@ git commit -m "Builder, list and gallery screens: gateway-loaded workspace data,
 
 ---
 
-### Task 11: Ticket-type management — list, editor, fields, rank implications
+### Task 11: Ticket-type management — list, editor, fields, rank implications, and the divergence a re-binding leaves behind
 
 Custom reusable ticket types (spec §2): name, icon, hierarchy rank, workflow binding (published workflows only), and typed custom fields with a select-options editor. Saving emits `ticket-type.defined`. Rank implications render live (`Can sit under: …` — derived from ranks; design decision 4: a type defined at or below the deepest rank requires a parent, whether it is the built-in `sub-task` or one the workspace invented). Built-in types edit name/icon/workflow but their rank is locked in the UI (design decision 7).
+
+**And the workflow combobox is where this plan meets the owner decision of 2026-08-26** (design decision 10). A ticket pins the workflow it was created under, so re-pointing a type moves nothing that already exists — it changes only what new tickets get. That is the right semantics and the board was built for it (Plan 5 renders one column per *(workflow in use, state)*, so two populations sit side by side), but an admin who changes the binding and is never told two populations now exist is precisely the board knowing something the user does not. So the editor:
+
+- **States the divergence** as soon as the binding changes, with a real count from `getTypeWorkflowPopulation` — naming the outgoing workflow, and degrading honestly (`counting tickets…`, `ticket count unavailable`) rather than guessing a zero.
+- **Offers the migration**: one cross-workflow state map, expanded server-side into one `ticket.workflow_rebound { toWorkflowId, toStateId }` per ticket. **Plan 3 owns that event, its payload and its refusals**; this task owns the authoring surface and renders whatever refusal comes back, verbatim. The map is emphatically **not** a `stateMapping` — that field is keyed inside a single workflow's version chain and is stored on a def, and across two unrelated workflows there is no chain to key on.
+- **Treats staying as a choice.** `Leave them on "${outgoing}"` is a button, not the absence of a click. A type with tickets on two workflows is a legal, renderable state of the product.
+- **Will not migrate before the type is saved.** Moving existing tickets to a workflow the type is not yet bound to would leave new tickets going to the *old* workflow while the old tickets went to the new one — the exact inversion of what the admin asked for. Until `Save ticket type` commits, the move button is disabled and says why.
 
 **Files:**
 - Create: `packages/app-core/src/workflow-builder/ticket-types/rank.ts`
 - Create: `packages/app-core/src/workflow-builder/ticket-types/icons.tsx`
 - Create: `packages/app-core/src/workflow-builder/ticket-types/icon-picker.tsx`
 - Create: `packages/app-core/src/workflow-builder/ticket-types/fields-editor.tsx`
+- Create: `packages/app-core/src/workflow-builder/ticket-types/workflow-rebind-dialog.tsx`
 - Create: `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx`
 - Create: `packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx`
 - Modify: `packages/app-core/src/workflow-builder/index.ts`
@@ -5119,11 +5250,12 @@ Custom reusable ticket types (spec §2): name, icon, hierarchy rank, workflow bi
 - Test: `packages/app-core/test/ticket-types/ticket-types.test.tsx`
 
 **Interfaces:**
-- Consumes: `TicketTypeDef`, `CustomFieldDef`, `ticketTypeDefSchema`, `BUILTIN_TICKET_TYPE_SEEDS`, `DEEPEST_RANK`, `newUlid` (domain); `buildTicketTypeDefinedEvent`, gateway types (Task 4); `canAuthorRole`, `BuilderSession` (Task 5).
+- Consumes: `TicketTypeDef`, `CustomFieldDef`, `ticketTypeDefSchema`, `BUILTIN_TICKET_TYPE_SEEDS`, `DEEPEST_RANK`, `newUlid` (domain); `buildTicketTypeDefinedEvent`, gateway types incl. `MigrationRequest`/`MigrationOutcome` (Task 4); `canAuthorRole`, `BuilderSession` (Task 5).
 - Produces:
   - `rankImplications(typeId: string, rank: number, allTypes: readonly TicketTypeDef[]): { parents: TicketTypeDef[]; mustHaveParent: boolean }` and `rankImplicationsCopy(implications): string`
   - `TYPE_ICONS`, `TYPE_ICON_NAMES`, `TypeIcon({ name, size? })` (unknown names fall back to a folder — data never crashes the UI)
   - `IconPicker({ value, onChange, disabled? })`, `FieldsEditor({ fields, onChange, disabled? })`
+  - `WorkflowRebindDialog({ population, fromWorkflow, toWorkflow, onCancel, onConfirm(stateMap) })`
   - `TicketTypeEditorScreen({ workspaceId, session, gateway, initialDef: TicketTypeDef | null, onSaved? })`
   - `TicketTypeListScreen({ workspaceId, session, gateway, onOpen(typeId), onNew() })`
 
@@ -5415,6 +5547,8 @@ import { TicketTypeListScreen } from '../../src/workflow-builder/ticket-types/ti
 
 const adminSession: BuilderSession = { userId: newUlid(), role: 'admin' };
 const kanbanPublished = cloneTemplate(WORKFLOW_TEMPLATES[0]!);
+// A second published workflow, so the binding combobox has somewhere to move to.
+const errandPublished = cloneTemplate(WORKFLOW_TEMPLATES[1]!);
 const builtins = builtinTicketTypeDefs(kanbanPublished.id);
 
 function renderEditor(
@@ -5573,6 +5707,161 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
     expect(screen.queryByRole('button', { name: 'Save ticket type' })).not.toBeInTheDocument();
   });
 });
+
+describe('TicketTypeEditorScreen — re-binding a type to a different workflow (owner decision 2026-08-26)', () => {
+  const task = builtins.find((builtin) => builtin.id === 'task')!;
+  const bothWorkflows = { workflows: [kanbanPublished, errandPublished] };
+
+  async function rebind(seed: FakeGatewaySeed = {}) {
+    const user = userEvent.setup();
+    const rendered = renderEditor(task, { ...bothWorkflows, ...seed });
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: 'Workflow' }),
+      errandPublished.id,
+    );
+    return { user, ...rendered };
+  }
+
+  it('says how many tickets stay behind, and names the workflow they stay on', async () => {
+    await rebind({ typePopulation: { task: { [kanbanPublished.id]: 14 } } });
+    const notice = await screen.findByTestId('workflow-divergence');
+    expect(within(notice).getByText('Existing tickets stay where they are')).toBeInTheDocument();
+    expect(
+      await within(notice).findByText(
+        `14 existing tickets of this type stay on "${kanbanPublished.name}". New ones will use "${errandPublished.name}".`,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing stays behind when nothing does — no invented population', async () => {
+    await rebind({ typePopulation: { task: { [kanbanPublished.id]: 0 } } });
+    expect(
+      await screen.findByText(`No tickets of this type are on "${kanbanPublished.name}" — nothing stays behind.`),
+    ).toBeInTheDocument();
+  });
+
+  it('planted defect: when the count read fails it says so rather than showing zero', async () => {
+    await rebind({ typePopulationError: true });
+    const notice = await screen.findByTestId('workflow-divergence');
+    expect(await within(notice).findByText('ticket count unavailable')).toBeInTheDocument();
+    expect(
+      within(notice).getByText(
+        `Existing tickets of this type stay on "${kanbanPublished.name}" — we could not count how many. New ones will use "${errandPublished.name}".`,
+      ),
+    ).toBeInTheDocument();
+    // The honesty that matters: it never claims a number it does not have.
+    expect(within(notice).queryByText(/^0 /)).not.toBeInTheDocument();
+  });
+
+  it('the notice appears only when the binding actually changed', async () => {
+    const user = userEvent.setup();
+    renderEditor(task, { ...bothWorkflows, typePopulation: { task: { [kanbanPublished.id]: 14 } } });
+    await screen.findByRole('combobox', { name: 'Workflow' });
+    expect(screen.queryByTestId('workflow-divergence')).not.toBeInTheDocument();
+    // …and it goes away again when the admin changes their mind back.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Workflow' }), errandPublished.id);
+    expect(await screen.findByTestId('workflow-divergence')).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Workflow' }), kanbanPublished.id);
+    expect(screen.queryByTestId('workflow-divergence')).not.toBeInTheDocument();
+  });
+
+  it('will not offer the move until the type is saved — otherwise new and old tickets swap places', async () => {
+    const { user } = await rebind({ typePopulation: { task: { [kanbanPublished.id]: 14 } } });
+    const move = await screen.findByRole('button', { name: `Move them to "${errandPublished.name}"…` });
+    expect(move).toBeDisabled();
+    expect(
+      screen.getByText(
+        `Save the ticket type first — until it is saved, new tickets would still go to "${kanbanPublished.name}".`,
+      ),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    expect(await screen.findByText('Ticket type saved.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` })).toBeEnabled();
+  });
+
+  it('leaving them is an affirmative choice, not an unclicked button', async () => {
+    const { user, gateway } = await rebind({ typePopulation: { task: { [kanbanPublished.id]: 14 } } });
+    await user.click(await screen.findByRole('button', { name: `Leave them on "${kanbanPublished.name}"` }));
+    expect(
+      await screen.findByText(`Left on "${kanbanPublished.name}". They keep their own board columns.`),
+    ).toBeInTheDocument();
+    expect(gateway.migrations).toEqual([]);
+    // Not an error state, not a warning that lingers — a settled decision.
+    expect(screen.queryByRole('button', { name: `Move them to "${errandPublished.name}"…` })).not.toBeInTheDocument();
+  });
+
+  it('authors one cross-workflow map and hands the server one migration — never a stateMapping', async () => {
+    const { user, gateway } = await rebind({ typePopulation: { task: { [kanbanPublished.id]: 14 } } });
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    await screen.findByText('Ticket type saved.');
+    await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
+
+    const dialog = await screen.findByRole('dialog', { name: `Move existing tickets to "${errandPublished.name}"` });
+    expect(
+      within(dialog).getByText(
+        `These two workflows share no history, so nothing carries across on its own: every state of "${kanbanPublished.name}" needs a destination in "${errandPublished.name}". Each ticket gets its own recorded move.`,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(
+        "Leaving them is a real choice — a type can have tickets on two workflows, and the board shows each ticket under its own workflow's states.",
+      ),
+    ).toBeInTheDocument();
+
+    // Every state of the OUTGOING workflow needs a destination — an unmapped
+    // state would leave its tickets nowhere to go.
+    const confirm = within(dialog).getByRole('button', { name: 'Move these tickets' });
+    expect(confirm).toBeDisabled();
+    for (const state of kanbanPublished.states) {
+      await user.selectOptions(
+        within(dialog).getByRole('combobox', { name: `Send them to — ${state.name}` }),
+        'in-progress',
+      );
+    }
+    expect(confirm).toBeEnabled();
+    await user.click(confirm);
+
+    expect(gateway.migrations).toEqual([
+      {
+        workspaceId: expect.any(String),
+        typeId: 'task',
+        fromWorkflowId: kanbanPublished.id,
+        toWorkflowId: errandPublished.id,
+        stateMap: { todo: 'in-progress', doing: 'in-progress', done: 'in-progress' },
+      },
+    ]);
+    // The map rode its own request. It is NOT a stateMapping: nothing about it
+    // reached a workflow.defined payload, because across two workflows there is
+    // no version chain to key one on (design decision 10).
+    expect(gateway.submitted.some((event) => 'stateMapping' in (event.payload as object))).toBe(false);
+    expect(await screen.findByText(`14 tickets moved to "${errandPublished.name}".`)).toBeInTheDocument();
+  });
+
+  it('renders the server refusal verbatim (planted defect: a state the target workflow does not have)', async () => {
+    const reason = 'That is not a state of the workflow these tickets are moving to.';
+    const { user } = await rebind({
+      typePopulation: { task: { [kanbanPublished.id]: 14 } },
+      migrationResults: [{ status: 'refused', rule: 'ticket.workflow-rebound-unknown-state', reason }],
+    });
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    await screen.findByText('Ticket type saved.');
+    await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
+    const dialog = await screen.findByRole('dialog');
+    for (const state of kanbanPublished.states) {
+      await user.selectOptions(
+        within(dialog).getByRole('combobox', { name: `Send them to — ${state.name}` }),
+        'in-progress',
+      );
+    }
+    await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
+
+    expect(await screen.findByText('The server refused this move.')).toBeInTheDocument();
+    expect(screen.getByText(reason)).toBeInTheDocument();
+    // Plan 3 owns the rule id and the wording; this screen owns neither and
+    // rephrases neither — it asserts on what came back, not on a literal it chose.
+    expect(screen.getByText('rule: ticket.workflow-rebound-unknown-state')).toBeInTheDocument();
+  });
+});
 ```
 
 - [ ] **Step 5: Run to verify it fails**
@@ -5580,7 +5869,88 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
 Run: `pnpm --filter @gisik-nokma/app-core exec vitest run test/ticket-types/ticket-types.test.tsx`
 Expected: FAIL — cannot resolve `../../src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx`.
 
-- [ ] **Step 6: Implement the editor screen**
+- [ ] **Step 6: Implement the rebind dialog, then the editor screen**
+
+Create `packages/app-core/src/workflow-builder/ticket-types/workflow-rebind-dialog.tsx`. It is close in spirit to `StateMappingDialog` — a list of source states, each with a destination picker, confirm disabled until every row is answered — and it is deliberately a **separate component with a separate payload**: that dialog authors a `stateMapping` inside one workflow's version chain, which is stored on the published def; this one authors a one-shot map **between two unrelated workflows**, which is stored nowhere and rides its own request (design decision 10). Sharing the component would eventually mean sharing the payload, which is the mistake.
+
+```tsx
+import { useState } from 'react';
+import type { PublishedWorkflowDef } from '@gisik-nokma/domain';
+import { tokens } from '@gisik-nokma/ui';
+
+/**
+ * The bulk affordance for the owner's versioned-bindings decision: one map from
+ * the outgoing workflow's states to the incoming one's, which the server
+ * expands into one `ticket.workflow_rebound` per ticket (Plan 3 owns that
+ * event). Every outgoing state needs a destination — an unmapped state would
+ * leave its tickets nowhere to land.
+ */
+export function WorkflowRebindDialog(props: {
+  fromWorkflow: PublishedWorkflowDef;
+  toWorkflow: PublishedWorkflowDef;
+  onCancel(): void;
+  onConfirm(stateMap: Record<string, string>): void;
+}) {
+  const [stateMap, setStateMap] = useState<Record<string, string>>({});
+  const complete = props.fromWorkflow.states.every((state) => stateMap[state.id] !== undefined);
+  const heading = `Move existing tickets to "${props.toWorkflow.name}"`;
+  return (
+    <div
+      className="workflow-rebind-dialog"
+      role="dialog"
+      aria-label={heading}
+      style={{
+        background: tokens.workflowBuilder.surface,
+        color: tokens.workflowBuilder.textPrimary,
+        border: `1px solid ${tokens.workflowBuilder.panelBorder}`,
+        borderRadius: 8,
+        padding: 16,
+      }}
+    >
+      <h3 className="workflow-rebind-dialog__title">{heading}</h3>
+      <p className="workflow-rebind-dialog__body">
+        {`These two workflows share no history, so nothing carries across on its own: every state of "${props.fromWorkflow.name}" needs a destination in "${props.toWorkflow.name}". Each ticket gets its own recorded move.`}
+      </p>
+      <ul className="workflow-rebind-dialog__rows">
+        {props.fromWorkflow.states.map((state) => (
+          <li className="workflow-rebind-dialog__row" data-testid={`rebind-row-${state.id}`} key={state.id}>
+            <span className="workflow-rebind-dialog__state-name">{state.name}</span>
+            <label className="workflow-rebind-dialog__target">
+              <span>Send them to</span>
+              <select
+                aria-label={`Send them to — ${state.name}`}
+                value={stateMap[state.id] ?? ''}
+                onChange={(changeEvent) =>
+                  setStateMap((current) => ({ ...current, [state.id]: changeEvent.target.value }))
+                }
+              >
+                <option value="" disabled hidden></option>
+                {props.toWorkflow.states.map((target) => (
+                  <option key={target.id} value={target.id}>
+                    {target.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <p className="workflow-rebind-dialog__footer">
+        Leaving them is a real choice — a type can have tickets on two workflows, and the board shows each ticket under
+        its own workflow&apos;s states.
+      </p>
+      <div className="workflow-rebind-dialog__actions">
+        <button type="button" onClick={props.onCancel}>
+          Leave them where they are
+        </button>
+        <button type="button" disabled={!complete} onClick={() => props.onConfirm(stateMap)}>
+          Move these tickets
+        </button>
+      </div>
+    </div>
+  );
+}
+```
 
 Create `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx`:
 
@@ -5599,6 +5969,7 @@ import { canAuthorRole, type BuilderSession } from '../ui/builder-context.tsx';
 import { FieldsEditor } from './fields-editor.tsx';
 import { IconPicker } from './icon-picker.tsx';
 import { rankImplications, rankImplicationsCopy } from './rank.js';
+import { WorkflowRebindDialog } from './workflow-rebind-dialog.tsx';
 
 type SavePhase =
   | { phase: 'idle' }
@@ -5607,8 +5978,43 @@ type SavePhase =
   | { phase: 'refused'; rule: string; reason: string }
   | { phase: 'invalid'; message: string };
 
+/** What the admin decided about the tickets the re-binding leaves behind. */
+type RebindPhase =
+  | { phase: 'undecided' }
+  | { phase: 'left' }
+  | { phase: 'mapping' }
+  | { phase: 'migrating' }
+  | { phase: 'migrated'; count: number }
+  | { phase: 'refused'; rule: string; reason: string };
+
+/** `null` = still counting; `'failed'` = the read failed and we say so. */
+type Population = { count: number } | 'failed' | null;
+
 function freshDef(): TicketTypeDef {
   return { id: newUlid(), name: '', icon: 'flag', rank: 3, workflowId: '', fields: [] };
+}
+
+function divergenceCountLine(population: Population): string | null {
+  if (population === 'failed') return 'ticket count unavailable';
+  if (population === null) return 'counting tickets…';
+  return null; // the body sentence carries the number
+}
+
+/**
+ * The divergence, said plainly. Never substitutes a zero for a count it does
+ * not have — an admin told "0 tickets stay behind" when the read failed would
+ * make a decision on a number nobody checked.
+ */
+function divergenceBody(population: Population, outgoing: string, incoming: string): string | null {
+  if (population === null) return null;
+  if (population === 'failed') {
+    return `Existing tickets of this type stay on "${outgoing}" — we could not count how many. New ones will use "${incoming}".`;
+  }
+  if (population.count === 0) return `No tickets of this type are on "${outgoing}" — nothing stays behind.`;
+  if (population.count === 1) {
+    return `1 existing ticket of this type stays on "${outgoing}". New ones will use "${incoming}".`;
+  }
+  return `${population.count} existing tickets of this type stay on "${outgoing}". New ones will use "${incoming}".`;
 }
 
 export function TicketTypeEditorScreen(props: {
@@ -5622,6 +6028,15 @@ export function TicketTypeEditorScreen(props: {
   const [def, setDef] = useState<TicketTypeDef>(() => props.initialDef ?? freshDef());
   const [context, setContext] = useState<{ workflows: PublishedWorkflowDef[]; types: TicketTypeDef[] } | null>(null);
   const [save, setSave] = useState<SavePhase>({ phase: 'idle' });
+  const [population, setPopulation] = useState<Population>(null);
+  const [rebind, setRebind] = useState<RebindPhase>({ phase: 'undecided' });
+
+  // The workflow this type was bound to when the screen opened. A ticket pins
+  // the workflow it was created under (owner decision 2026-08-26), so THIS is
+  // the workflow the existing population stays on — not whatever the combobox
+  // currently reads.
+  const outgoingWorkflowId = props.initialDef?.workflowId ?? null;
+  const diverged = outgoingWorkflowId !== null && outgoingWorkflowId !== '' && def.workflowId !== outgoingWorkflowId;
 
   useEffect(() => {
     let cancelled = false;
@@ -5636,12 +6051,57 @@ export function TicketTypeEditorScreen(props: {
     };
   }, [props.gateway, props.workspaceId]);
 
+  useEffect(() => {
+    if (!diverged || outgoingWorkflowId === null) {
+      setPopulation(null);
+      setRebind({ phase: 'undecided' });
+      return;
+    }
+    let cancelled = false;
+    setPopulation(null);
+    props.gateway
+      .getTypeWorkflowPopulation(props.workspaceId, def.id, outgoingWorkflowId)
+      .then((count) => {
+        if (!cancelled) setPopulation({ count });
+      })
+      .catch(() => {
+        // Honest degradation, the same shape the mapping dialog uses: the read
+        // failing is not the same as there being nothing there.
+        if (!cancelled) setPopulation('failed');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [diverged, outgoingWorkflowId, def.id, props.gateway, props.workspaceId]);
+
   if (context === null) return <p className="ticket-type-editor__loading">Loading ticket types…</p>;
 
   const isBuiltin = BUILTIN_TICKET_TYPE_SEEDS.some((seed) => seed.id === def.id);
   const parsed = ticketTypeDefSchema.safeParse(def);
   const schemaMessages = parsed.success ? [] : parsed.error.issues.map((issue) => issue.message);
   const implications = rankImplications(def.id, def.rank, context.types);
+  const outgoingWorkflow = context.workflows.find((workflow) => workflow.id === outgoingWorkflowId) ?? null;
+  const incomingWorkflow = context.workflows.find((workflow) => workflow.id === def.workflowId) ?? null;
+  const showDivergence = diverged && outgoingWorkflow !== null && incomingWorkflow !== null;
+  // Nothing to move and nothing to leave — the notice states the fact and stops.
+  const nothingStaysBehind = population !== null && population !== 'failed' && population.count === 0;
+
+  async function onMigrate(stateMap: Record<string, string>): Promise<void> {
+    if (outgoingWorkflow === null || incomingWorkflow === null) return;
+    setRebind({ phase: 'migrating' });
+    const outcome = await props.gateway.migrateTypeToWorkflow({
+      workspaceId: props.workspaceId,
+      typeId: def.id,
+      fromWorkflowId: outgoingWorkflow.id,
+      toWorkflowId: incomingWorkflow.id,
+      stateMap,
+    });
+    setRebind(
+      outcome.status === 'migrated'
+        ? { phase: 'migrated', count: outcome.count }
+        : { phase: 'refused', rule: outcome.rule, reason: outcome.reason },
+    );
+  }
 
   async function onSave(): Promise<void> {
     setSave({ phase: 'saving' });
@@ -5719,6 +6179,65 @@ export function TicketTypeEditorScreen(props: {
           ))}
         </select>
       </label>
+      {showDivergence ? (
+        <section className="ticket-type-editor__divergence" data-testid="workflow-divergence">
+          <h3 className="ticket-type-editor__divergence-title">Existing tickets stay where they are</h3>
+          {divergenceCountLine(population) !== null ? (
+            <p className="ticket-type-editor__divergence-count">{divergenceCountLine(population)}</p>
+          ) : null}
+          {divergenceBody(population, outgoingWorkflow.name, incomingWorkflow.name) !== null ? (
+            <p className="ticket-type-editor__divergence-body">
+              {divergenceBody(population, outgoingWorkflow.name, incomingWorkflow.name)}
+            </p>
+          ) : null}
+          {nothingStaysBehind || rebind.phase === 'migrated' ? null : rebind.phase === 'left' ? (
+            <p className="ticket-type-editor__divergence-left">
+              {`Left on "${outgoingWorkflow.name}". They keep their own board columns.`}
+            </p>
+          ) : (
+            <div className="ticket-type-editor__divergence-actions">
+              <button
+                type="button"
+                disabled={!canAuthor || save.phase !== 'saved' || rebind.phase === 'migrating'}
+                onClick={() => setRebind({ phase: 'mapping' })}
+              >
+                {`Move them to "${incomingWorkflow.name}"…`}
+              </button>
+              {/* Staying put is a decision, not the absence of one. */}
+              <button type="button" disabled={!canAuthor} onClick={() => setRebind({ phase: 'left' })}>
+                {`Leave them on "${outgoingWorkflow.name}"`}
+              </button>
+              {save.phase === 'saved' ? null : (
+                <p className="ticket-type-editor__divergence-hint">
+                  {`Save the ticket type first — until it is saved, new tickets would still go to "${outgoingWorkflow.name}".`}
+                </p>
+              )}
+            </div>
+          )}
+          {rebind.phase === 'mapping' ? (
+            <WorkflowRebindDialog
+              fromWorkflow={outgoingWorkflow}
+              toWorkflow={incomingWorkflow}
+              onCancel={() => setRebind({ phase: 'left' })}
+              onConfirm={(stateMap) => void onMigrate(stateMap)}
+            />
+          ) : null}
+          {rebind.phase === 'migrated' ? (
+            <p className="ticket-type-editor__divergence-migrated">
+              {rebind.count === 1
+                ? `1 ticket moved to "${incomingWorkflow.name}".`
+                : `${rebind.count} tickets moved to "${incomingWorkflow.name}".`}
+            </p>
+          ) : null}
+          {rebind.phase === 'refused' ? (
+            <div className="ticket-type-editor__divergence-refused">
+              <p>The server refused this move.</p>
+              <p>{rebind.reason}</p>
+              <p>{`rule: ${rebind.rule}`}</p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       <FieldsEditor
         fields={def.fields}
         disabled={!canAuthor}

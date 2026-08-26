@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md` — this plan implements spec §2 (domain model: tickets, types, hierarchy, claims — NOT the WYSIWYG editor or attachment storage, which belong to a later plan) plus honesty-contract invariants 1 (provenance floor), 3 (parents cannot outrun children), and 4 (nothing is invented).
 
-**Position in the series:** This is Plan 3 of 11. It consumes Plan 1 (ingest pipeline, event-type registry + `parseEvent`, projection registry, verify-projections CLI) and Plan 2 (the rule engine for `ticket.transitioned` + `workflow.defined`, `WorkflowDef`/`Rule`/`StateCategory`, `validateWorkflowDef`, the planted-defect fixture format, `proj_workflows` + `getWorkflowDef`). It produces the `TicketState` shape, `proj_tickets`, `proj_rollups`, and the ticket event vocabulary that Plans 4–11 build on. Plan 2 implements the parent-terminal invariant via `ctx.getChildrenStates`; **this plan supplies the data that makes `ctx.getChildrenStates` real** and the end-to-end planted-defect fixtures exercising it.
+**Position in the series:** This is Plan 3 of 11. It consumes Plan 1 (ingest pipeline, event-type registry + `parseEvent`, projection registry, verify-projections CLI) and Plan 2 (the rule engine for `ticket.transitioned` + `workflow.defined`, `WorkflowDef`/`Rule`/`StateCategory`, `validateWorkflowDef`, the planted-defect fixture format, `proj_workflows` + `getWorkflowDef` + its as-of-position selector, and the pure forward walk `foldStateIdForward` placed in domain). It produces the `TicketState` shape, `foldTicketToWorkflowVersion`, `proj_tickets`, `proj_rollups`, and the ticket event vocabulary that Plans 4–11 build on. Plan 2 implements the parent-terminal invariant via `ctx.getChildrenStates`; **this plan supplies the data that makes `ctx.getChildrenStates` real** and the end-to-end planted-defect fixtures exercising it.
 
 ## Global Constraints
 
@@ -47,8 +47,9 @@ Plans 1 and 2 are being written in parallel with this one; the contract fixes th
 | Package names | `@gisik-nokma/domain` (packages/domain), `@gisik-nokma/rule-engine` (packages/rule-engine), server app in `apps/server` with workspace package name `server` (as in `pnpm --filter server`) | Plan 1 |
 | `registerEventType({ type, version, payloadSchema })` | packages/domain event-type registry; `parseEvent(raw: unknown): EventEnvelope` throws on unknown type or payload that fails the registered Zod schema | Plan 1 |
 | `EventEnvelope` import path | `packages/domain/src/envelope.ts` | Plan 1 |
-| `registerProjection({ name, apply, reset })` | `apply(env: EventEnvelope, db: PoolClient): Promise<void>`, `reset(db: PoolClient): Promise<void>`; per event, projections apply **in registration order** (constraint this plan relies on: `proj_workflows` → `proj_ticket_types` → `proj_tickets` → `proj_rollups`) | Plan 1 |
-| `applyEvent(db, env)` / `resetProjections(db)` | ingest's projection fan-out and the rebuild CLI's reset, exported from `apps/server/src/projections/registry.ts` for tests | Plan 1 |
+| `registerProjection({ name, apply, reset })` | `apply(env: LedgerEvent, db: PoolClient): Promise<void>`, `reset(db: PoolClient): Promise<void>`; per event, projections apply **in registration order** (constraint this plan relies on: `proj_workflows` → `proj_ticket_types` → `proj_tickets` → `proj_rollups`) | Plan 1 |
+| `LedgerEvent` | `EventEnvelope & { workspaceSeq: number }` — what the ledger stores: the frozen domain envelope plus the server-assigned per-workspace stream cursor (coordination §18). **`Projection.apply` receives this, not the bare envelope**, because this plan's projections resolve definitions *as of* the position of the event they are applying (design decision 10). The domain `EventEnvelope` does NOT gain the field. | Plan 1 |
+| `applyEvent(db, env)` / `resetProjections(db)` | ingest's projection fan-out (`env: LedgerEvent`) and the rebuild CLI's reset, exported from `apps/server/src/projections/registry.ts` for tests | Plan 1 |
 | Ledger table | `events` with snake_case columns `id, workspace_id, entity_kind, entity_id, type, version, payload (jsonb), actor_id, origin, client_time (timestamptz), server_time (timestamptz), seq (bigint)`. **Both clocks are absolute instants** (owner decision 2026-08-20, "time is Asia/Kolkata") — pg hands them back as `Date`, and `rowToEnvelope` re-emits them as ISO 8601 `Z`. A claim submitted as `…+05:30` therefore reads back as the equivalent `…Z`: the instant survives, the label the device attached does not. No reader compares or sorts these columns with a cast. | Plan 1 |
 | IST day helpers | `packages/domain/src/ist-day.ts` exports `IST_TIME_ZONE`, `IST_OFFSET_MINUTES`, `IST_DAY_REGEX`, `istDayOf(instant): string` (the `YYYY-MM-DD` IST day an instant falls in) and `istDayBounds(day): { startUtc, endUtc }` (the half-open UTC interval covering one IST day) | Plan 1 |
 | `buildServer({ db })` | Fastify app factory, `apps/server/src/server.ts` | Plan 1 |
@@ -57,7 +58,9 @@ Plans 1 and 2 are being written in parallel with this one; the contract fixes th
 | `EngineContext` type location | `packages/rule-engine/src/engine-context.ts`, re-exported from the package index | Plan 2 |
 | verify-projections CLI | invoked as `pnpm --filter server verify-projections`, reading `DATABASE_URL` | Plan 1 |
 | `evaluateEvent` dispatch | a switch on `env.type` in `packages/rule-engine/src/evaluate.ts`; unrouted types accepted | Plan 2 |
-| `getWorkflowDef(db, workspaceId, workflowId, version?)` | server-side reader over `proj_workflows`, `apps/server/src/projections/workflows.ts`; omitting `version` returns the latest at the current ledger position | Plan 2 |
+| `getWorkflowDef(db, workspaceId, workflowId, version?)` | server-side reader over `proj_workflows`, `apps/server/src/projections/workflows.ts`; with an explicit `version` it returns exactly that version. **Omitting `version` returns whatever `proj_workflows` holds *now*** — which is a rebuild hazard for anything replaying the ledger, so no projection in this plan calls it that way (design decision 10). | Plan 2 |
+| `getWorkflowDefAsOf(db, workspaceId, workflowId, asOfWorkspaceSeq)` | server-side reader over `proj_workflows`, same file: the definition **in force at ledger position `asOfWorkspaceSeq`** — the greatest `version` whose publishing event's `workspace_seq` is `<= asOfWorkspaceSeq`, `null` when the workflow had no version yet at that position. Requires the `proj_workflows` column recording the ledger position at which each version was published (owner decision 2026-08-26; Plan 2 adds the column and this reader). The bound is `<=`, not `<`, deliberately — see design decision 10. | Plan 2 |
+| `foldStateIdForward(stateId, fromVersion, latest, intermediate)` | the **pure** forward walk of one state id through a version chain's `stateMapping`s: `fromVersion` is the version `stateId` is written in, `latest` the definition to fold up to, and `intermediate: (version) => WorkflowDef \| null` supplies the versions in between. Returns `FoldedState = { ok: true; stateId } \| { ok: false; unmappedStateId }`. It lives in `@gisik-nokma/domain` (owner decision 2026-08-26) so that this plan's projection, Plan 2's engine and Plan 10's replica all fold identically instead of each growing their own walk. **Import it from `@gisik-nokma/domain`.** Note the rule engine's `resolveStateIdForward` is a *different*, async function that keeps living in `packages/rule-engine/src/version-map.ts`: it fetches the intermediate definitions through `ctx` and then delegates to this one. Do not call it from a projection — it needs an `EngineContext`. | `@gisik-nokma/domain` (Plan 2) |
 | Fixture runner | `packages/rule-engine/src/fixtures.test.ts` loads every `packages/rule-engine/fixtures/*.json`, builds an `EngineContext`, evaluates ONLY `candidateEvent`, and deep-equals the verdict against `expected` | Plan 2 |
 | Parent-terminal rule id | `parent-terminal-with-open-children` (the rule string Plan 2's refusal names) | Plan 2 |
 | Zod | v4 (`"zod": "^4"`); every construct used here is also valid on 3.23+ | Plan 1 |
@@ -90,7 +93,7 @@ Precondition refusals (`ticket.unknown-type`, `ticket.unknown`, `ticket.workflow
 ## Design decisions (made here, argued once)
 
 1. **Built-in types are seed data, not special cases.** `epic(1)/story(2)/task(3)/sub-task(4)` ship as canonical constants in packages/domain, but every workspace materialises them as ordinary `ticket-type.defined` events at workspace creation (owned by the workspace-bootstrap plan) — because built-ins need a per-workspace workflow binding anyway. Resolution is therefore uniform: every type lookup reads event-defined types, and **nothing special-cases built-ins at all** — the parent-required rule keys off the deepest *rank* (decision 9), not off the id `sub-task`.
-2. **A ticket's workflow is bound at creation** (`TicketState.workflowId` copied from its type's `workflowId` when the `ticket.created` event applies). Workflow *version* changes apply to all tickets (lookups resolve latest); re-binding a *type* to a different workflow affects new tickets only (Open questions #8).
+2. **A ticket's workflow is bound at creation** (`TicketState.workflowId` copied from its type's `workflowId` when the `ticket.created` event applies). Workflow *version* changes apply to all tickets on that workflow, but **not by resolving "latest" at read time** — they apply because publishing a version *folds the stored rows forward*, once, in the publishing transaction (design decision 10). Re-binding a *type* to a different workflow affects new tickets only (Open questions #8).
 3. **`ticket.field_set` with `value: null` clears the field — as a claim, provenance retained.** The single exception is `title`: a ticket always has a title (`field.title-required`). Clearing `description`, `dueDate`, `startDate`, or any custom field is legal; an undated item then simply vanishes from the calendar (invariant 4).
 4. **Collaborators:** a duplicate `ticket.collaborator_added` deduplicates (state unchanged); removing a non-collaborator is a no-op. Both are accepted events — the claim is honest even when redundant.
 5. **Rollups count DIRECT children only.** The spec's "open children" (invariant 3) means **direct non-terminal children** — categories `open` + `active`, i.e. `total_children - terminal_children`. Direct-only checking is sufficient by induction: the invariant holds at every level, so a terminal parent's terminal children already had no open children of their own when they went terminal. Derived progress is never authored — `proj_rollups` is computed, and nothing writes it but the projection.
@@ -100,6 +103,11 @@ Precondition refusals (`ticket.unknown-type`, `ticket.unknown`, `ticket.workflow
 9. **Parent-required follows the RANK, not the built-in id** (owner decision 2026-08-20, coordination doc sign-off table — this overrules Plan 8's Open question 6). Any ticket whose type sits **at or below** the deepest rank requires a parent: the built-in `sub-task` (rank 4), any custom type an admin defines at rank 4, and any custom type deeper than that. Types at epic/story/task ranks are unaffected — an epic-rank custom type still sits at project root. The check is `type.rank >= DEEPEST_RANK`, where `DEEPEST_RANK = 4` is an exported constant matching the built-in sub-task's rank.
    - **Why a constant and not a max over the defined types.** A computed max would silently change the rule's meaning whenever the type inventory changed: a workspace that had never defined anything below Task would find *Task* suddenly unable to sit at project root, and defining one rank-5 type would release every rank-4 type from the requirement. A refusal that shifts underfoot is exactly what this product refuses to ship.
    - **Why `>=` and not `===`.** The rule's own justification is that the smallest kind of work always belongs to something bigger. A type deeper than sub-task is smaller still, so exempting it would invert the justification and leave an escape hatch — define rank 5 and your tickets float free at project root. `>=` closes that without reintroducing the shifting-meaning problem: the floor stays pinned at 4, and everything at or beneath it is covered.
+10. **A new workflow version refreshes the tickets it re-categorises, and every projection resolves definitions AS OF the event it is applying** (owner decision 2026-08-26, coordination doc — this settles Open question 9 and fixes two defects that exist without it). Three parts; they only work together.
+    - **Refresh on publish.** `proj_tickets` consumes `workflow.defined`. When version N of workflow W is published, every `proj_tickets` row with `workflow_id = W` is folded forward: `state_id` walked through the version chain's `stateMapping`s, `state_category` recomputed from version N, `workflow_version` set to N. Without it a v2 that moves `doing` from `active` to `terminal` leaves every existing ticket claiming `active` — and that stale category drives rollups, "open children", board columns, the attention strip and the overdue sweep. `proj_rollups` refreshes in the same transaction, because its counts are `FILTER (WHERE state_category = …)`: a category change that stopped at `proj_tickets` would leave every parent's progress lying, and would make the parent-terminal invariant refuse legitimate closes.
+    - **The fold is one function in `@gisik-nokma/domain`, not two implementations.** Amendment 17 builds the client replica's read model from domain reducers, never from the server's pg projections, so an offline client that never re-folds keeps stale categories forever. `foldTicketToWorkflowVersion` (Task 3) is what both sides call; the projection adds only persistence, exactly as it already does for `applyTicketEvent`. Task 4's in-memory context folds too, or the shared fixture suite and the server would answer `getChildrenStates` differently after a re-categorising publish — the one disagreement the shared suite exists to make impossible.
+    - **As-of resolution, and why the fold needs a monotone guard.** `getWorkflowDef` without a version returns whatever `proj_workflows` holds *now*, not what it held at the event's position. Plan 1's verifier rebuilds **projection-outer** (`for (const projection of projections) { reset; for (const event of ledger) apply }`), so `proj_workflows` is fully built to the newest version before `proj_tickets` replays its first event. Two live defects follow: (1) replaying a `ticket.transitioned` whose `toStateId` a later version *dropped* **throws** — the reducer looks the id up in the definition directly and the mandatory `stateMapping` does not save it, because that mapping is consulted by the engine's `resolveCurrentStateId`, not by this reducer — so any version that drops a state makes `proj_tickets` unrebuildable, breaking spec §3's promise that projections rebuild deterministically from scratch; (2) even with nothing dropped, re-derivation stamps the newest `workflow_version` where the live row holds the version in force at the time, so the verifier reports drift after *any* republish. The fix is that every definition lookup in a projection passes the **current event's `workspaceSeq`** to `getWorkflowDefAsOf`. The bound is `<=`, not `<`: the `workflow.defined` event must see the version it is itself publishing (`proj_workflows` is registered first, so the row is already there when `proj_tickets` runs), and no ticket event ever shares a `workspace_seq` with a publish — the cursor is unique per workspace. Do not "tighten" it to `<`.
+      **And the fold must skip a row already at or past the target version.** Plan 1's canonical replay order is `(entity_kind, entity_id, seq)`, not chronological, so on a rebuild every `ticket` event replays *before* every `workflow` event ('t' sorts before 'w') and rows reach their as-of version first; the older `workflow.defined` events then arrive last and would drag those rows *backwards*. With the guard, the folds become no-ops for rows that already passed the version, the final `workflow.defined` puts every row at N whatever path it took, and live and re-derived converge — `proj_tickets` becomes a pure function of the ledger prefix. The guard lives inside `foldTicketToWorkflowVersion` so the replica inherits it. It reads as dead code to anyone thinking only about the live path; it is not, and it is the reason the rebuild test in Task 10 is a *projection-outer* replay rather than a re-run of `applyEvent`.
 
 ## File structure
 
@@ -108,7 +116,7 @@ Precondition refusals (`ticket.unknown-type`, `ticket.unknown`, `ticket.workflow
 | `packages/domain/src/ticket-types.ts` | `CustomFieldDef`, `TicketTypeDef`, Zod schemas, built-in seeds, `SUB_TASK_TYPE_ID`, `DEEPEST_RANK`, `BUILTIN_FIELD_IDS` |
 | `packages/domain/src/events/ticket-events.ts` | Zod payload schemas + `registerEventType` calls for all ten event types |
 | `packages/domain/src/workflow-helpers.ts` | `stateCategoryOf(def, stateId)` |
-| `packages/domain/src/ticket-state.ts` | `FieldClaim`, `TicketState`, `TicketStateDeps`, `TICKET_EVENT_TYPES`, pure `applyTicketEvent` |
+| `packages/domain/src/ticket-state.ts` | `FieldClaim`, `TicketState`, `TicketStateDeps`, `TICKET_EVENT_TYPES`, pure `applyTicketEvent`, pure `foldTicketToWorkflowVersion` (the one refresh-on-publish fold, called by `proj_tickets`, Task 4's memory context, and Plan 10's replica) |
 | `packages/domain/src/testing.ts` | `makeEnvelope` test builder (exported from the package index) |
 | `packages/rule-engine/src/memory-context.ts` | `buildMemoryContext(seedWorkflows, events)` — in-memory `EngineContext` for fixtures and unit tests |
 | `packages/rule-engine/src/checks/refusals.ts` | `REFUSALS`, `rankRefusal`, `fieldKindRefusal`, `refuse`, `ACCEPT` |
@@ -725,6 +733,20 @@ export type TicketStateDeps = {
 export const TICKET_EVENT_TYPES: readonly string[];
 export function applyTicketEvent(state: TicketState | undefined, env: EventEnvelope, deps: TicketStateDeps): TicketState;
 export function stateCategoryOf(def: WorkflowDef, stateId: string): StateCategory | undefined;
+
+/**
+ * Refresh-on-publish (design decision 10, owner decision 2026-08-26). ONE
+ * implementation, in domain, because three callers need it and must not
+ * disagree: the proj_tickets projection (Task 10), the in-memory context the
+ * fixture suite runs on (Task 4), and Plan 10's offline replica, whose read
+ * model is built from domain reducers and never from the server's pg tables.
+ * `getVersion` resolves an exact intermediate version of the SAME workflow.
+ */
+export function foldTicketToWorkflowVersion(
+  state: TicketState,
+  target: WorkflowDef,
+  getVersion: (version: number) => WorkflowDef | undefined,
+): TicketState;
 ```
 
 **Design note:** the reducer folds only *accepted* events (projections consume the ledger; fixtures fold `priorEvents`). It therefore **throws** — fails loudly, per the workspace error-handling standard — on states the engine is contracted to refuse at the door (event for a never-created ticket, unknown type, unresolvable workflow): reaching them in replay means ledger integrity is broken, and degrading silently would be a lie. If Plan 2 already ships an equivalent of `stateCategoryOf`, re-export theirs from `workflow-helpers.ts` instead of duplicating.
@@ -736,7 +758,7 @@ export function stateCategoryOf(def: WorkflowDef, stateId: string): StateCategor
 import { describe, expect, it } from 'vitest';
 import type { WorkflowDef } from './index';
 import type { TicketState } from './entity-state';
-import { applyTicketEvent, stateCategoryOf, type TicketStateDeps } from './ticket-state';
+import { applyTicketEvent, foldTicketToWorkflowVersion, stateCategoryOf, type TicketStateDeps } from './ticket-state';
 import type { TicketTypeDef } from './ticket-types';
 import { makeEnvelope } from './testing';
 
@@ -893,6 +915,78 @@ describe('stateCategoryOf', () => {
     expect(stateCategoryOf(WF, 'ghost')).toBeUndefined();
   });
 });
+
+// Refresh-on-publish: the fold a new workflow version applies to tickets
+// already sitting in its states (design decision 10).
+const WF2_RECATEGORISED: WorkflowDef = {
+  ...WF,
+  version: 2,
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'doing', name: 'Doing', category: 'terminal' }, // was 'active' in v1
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+};
+
+const WF2_DROPS_DOING = {
+  ...WF,
+  version: 2,
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [
+    { from: '*', to: 'todo', rules: [] },
+    { from: '*', to: 'done', rules: [] },
+  ],
+  stateMapping: { doing: 'todo' },
+} as unknown as WorkflowDef;
+
+function inDoing(): TicketState {
+  return applyTicketEvent(
+    createdState(),
+    makeEnvelope({ type: 'ticket.transitioned', entity: { kind: 'ticket', id: TICKET }, payload: { toStateId: 'doing' } }),
+    deps,
+  );
+}
+
+describe('foldTicketToWorkflowVersion', () => {
+  const noIntermediates = () => undefined;
+
+  it('re-categorises a surviving state and stamps the new version', () => {
+    const folded = foldTicketToWorkflowVersion(inDoing(), WF2_RECATEGORISED, noIntermediates);
+    expect(folded).toMatchObject({ stateId: 'doing', stateCategory: 'terminal', workflowVersion: 2 });
+  });
+
+  it('walks a dropped state through the stateMapping instead of throwing', () => {
+    const folded = foldTicketToWorkflowVersion(inDoing(), WF2_DROPS_DOING, noIntermediates);
+    expect(folded).toMatchObject({ stateId: 'todo', stateCategory: 'open', workflowVersion: 2 });
+  });
+
+  it('leaves the transition log alone — each entry keeps the version its toStateId is written in', () => {
+    const before = inDoing();
+    const folded = foldTicketToWorkflowVersion(before, WF2_DROPS_DOING, noIntermediates);
+    // The head state moved to 'todo'; the log still says the actor moved to
+    // 'doing' under version 1, because that is what happened. RDU walks log
+    // entries forward itself (Plan 2 Task 11); rewriting them here would
+    // destroy the very evidence four-eyes compares against.
+    expect(folded.transitions).toEqual(before.transitions);
+    expect(folded.transitions.at(-1)).toMatchObject({ toStateId: 'doing', workflowVersion: 1 });
+  });
+
+  it('is a no-op for a ticket already at or past the target version — the guard that makes replay order-insensitive', () => {
+    const already = { ...inDoing(), workflowVersion: 2, stateCategory: 'terminal' as const };
+    expect(foldTicketToWorkflowVersion(already, WF, noIntermediates)).toBe(already);
+    expect(foldTicketToWorkflowVersion(already, WF2_RECATEGORISED, noIntermediates)).toBe(already);
+  });
+
+  it('planted defect: a chain that cannot be walked throws rather than guessing a state', () => {
+    const stranding = { ...WF2_DROPS_DOING, stateMapping: {} } as unknown as WorkflowDef;
+    expect(() => foldTicketToWorkflowVersion(inDoing(), stranding, noIntermediates)).toThrowError(
+      /cannot be folded forward/,
+    );
+  });
+});
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -929,6 +1023,12 @@ import {
 import type { TicketTypeDef } from './ticket-types';
 import type { WorkflowDef } from './workflow';
 import { stateCategoryOf } from './workflow-helpers';
+// The pure forward walk of a state id through a version chain's stateMappings.
+// It moved out of packages/rule-engine/src/version-map.ts into this package by
+// the owner decision of 2026-08-26, so the projection here and Plan 10's
+// replica share the one walk. Plan 2 owns the module it lands in — if it chose
+// a different filename, this is a one-line rename, not a re-implementation.
+import { foldStateIdForward } from '@gisik-nokma/domain';
 
 export type TicketStateDeps = {
   getTicketType(typeId: string): TicketTypeDef | undefined;
@@ -1057,6 +1157,78 @@ export function applyTicketEvent(
       throw new Error(`applyTicketEvent: not a ticket event: ${env.type}`);
   }
 }
+
+/**
+ * Fold ONE ticket's head state forward onto a newly published workflow
+ * version (design decision 10, owner decision 2026-08-26). The ONE
+ * implementation of refresh-on-publish: the proj_tickets projection, the
+ * fixture suite's in-memory context, and Plan 10's offline replica all call
+ * this. Two of the three would otherwise drift, and the replica — which never
+ * sees the server's pg projections — would keep stale categories forever.
+ *
+ * `getVersion` resolves an exact intermediate version of the SAME workflow;
+ * it is only consulted when the ticket is more than one version behind.
+ *
+ * The `>=` early return is NOT dead code on the live path's account. Plan 1's
+ * canonical replay order is (entity_kind, entity_id, seq), so on a rebuild
+ * every `ticket` event replays before every `workflow` event and rows arrive
+ * here already at their as-of version; the older publishes then land last and
+ * would drag them backwards. Skipping makes the fold monotone, so the last
+ * `workflow.defined` puts every row at the same place whatever order the
+ * ledger was replayed in. Do not remove it.
+ */
+export function foldTicketToWorkflowVersion(
+  state: TicketState,
+  target: WorkflowDef,
+  getVersion: (version: number) => WorkflowDef | undefined,
+): TicketState {
+  if (state.workflowVersion >= target.version) return state;
+
+  // Pre-check the chain so that a hole reports as a hole. `foldStateIdForward`
+  // folds a missing definition into the same `ok: false` as an unmapped drop,
+  // and those are different faults: one is a gap in the ledger, the other a
+  // publish that should have been refused. Naming the wrong one sends whoever
+  // reads the error hunting in the wrong place.
+  for (let version = state.workflowVersion + 1; version < target.version; version += 1) {
+    if (!getVersion(version)) {
+      throw new Error(
+        `foldTicketToWorkflowVersion: workflow "${state.workflowId}" version ${version} is missing — the version chain has a hole and ticket ${state.id} cannot be folded forward`,
+      );
+    }
+  }
+
+  const resolved = foldStateIdForward(
+    state.stateId,
+    state.workflowVersion,
+    target,
+    (version) => getVersion(version) ?? null,
+  );
+  if (!resolved.ok) {
+    // Publishing refuses unmapped drops (Plan 2), so this is only reachable on
+    // a corrupted or hand-planted store. The honest answer is a loud failure,
+    // never a guessed state — a ticket whose status we invented is exactly
+    // what invariant 4 forbids.
+    throw new Error(
+      `foldTicketToWorkflowVersion: ticket ${state.id} cannot be folded forward to workflow "${target.id}" version ${target.version} — state "${resolved.unmappedStateId}" is dropped with no stateMapping entry`,
+    );
+  }
+
+  const category = stateCategoryOf(target, resolved.stateId);
+  if (!category) {
+    throw new Error(`foldTicketToWorkflowVersion: workflow "${target.id}" version ${target.version} has no state "${resolved.stateId}"`);
+  }
+
+  return {
+    ...state,
+    stateId: resolved.stateId,
+    stateCategory: category,
+    workflowVersion: target.version,
+    // `transitions` is deliberately untouched. Each entry's `workflowVersion`
+    // is the vocabulary its `toStateId` is written in; rewriting it would
+    // destroy the evidence `require-different-user` walks forward to find an
+    // earlier performer (Plan 2 Task 11, coordination doc 2026-08-26).
+  };
+}
 ```
 
 - [ ] **Step 5: Export from the package index**
@@ -1071,13 +1243,15 @@ export * from './workflow-helpers';
 - [ ] **Step 6: Run the test to verify it passes**
 
 Run: `pnpm --filter @gisik-nokma/domain exec vitest run src/ticket-state.test.ts`
-Expected: PASS (9 tests).
+Expected: PASS (14 tests) — the nine reducer/helper cases plus the five that pin refresh-on-publish.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add packages/domain/src/ticket-state.ts packages/domain/src/ticket-state.test.ts packages/domain/src/workflow-helpers.ts packages/domain/src/index.ts
-git commit -m "One reducer for ticket head state, shared by projection and fixtures — every field carries its claimant and both clocks, and replay-integrity breaks throw instead of degrading into quiet fiction"
+git commit -m "One reducer for ticket head state, shared by projection and fixtures — every field carries its claimant and both clocks, and replay-integrity breaks throw instead of degrading into quiet fiction
+
+The same file now owns the other half: when a workflow version is published, foldTicketToWorkflowVersion walks a ticket's state id forward through the mapping chain and recomputes its category, leaving the transition log untouched because each entry's version is the vocabulary its state id is written in. It skips a ticket already at or past the target version, which is what lets a projection-outer rebuild — where workflow events replay after ticket events — land on the same answer the live path did."
 ```
 
 ### Task 4: The in-memory EngineContext — fixtures and unit tests see tickets the way the server does
@@ -1095,12 +1269,15 @@ git commit -m "One reducer for ticket head state, shared by projection and fixtu
 export type MemoryContext = EngineContext & {
   tickets: Map<string, TicketState>;
   ticketTypes: Map<string, TicketTypeDef>;
-  workflows: Map<string, WorkflowDef>;
+  workflows: Map<string, WorkflowDef>;            // latest version per workflow id
+  workflowVersions: Map<string, WorkflowDef[]>;   // every version seen, ascending — the fold walks this
 };
 export function buildMemoryContext(seedWorkflows: WorkflowDef[], events: EventEnvelope[]): MemoryContext;
 ```
 
 **Semantics (load-bearing):** events passed in are folded **without evaluation** — they are the already-accepted past. Only a candidate event goes through `evaluateEvent`, against the context this builder returns. `getChildrenStates` returns **direct** children only. `ticket-type.defined` folds last-definition-wins (types are events; a later definition replaces the earlier one — this is what makes rank re-definition, and therefore the cycle defect, reachable).
+
+**And `workflow.defined` re-folds the tickets already on that workflow** (design decision 10). The server's `proj_tickets` refreshes on publish; if this context did not, a fixture that publishes a re-categorising v2 after some transitions would get one verdict from the shared suite and a different one from the server — `getChildrenStates` would hand the parent-terminal invariant stale categories in one and folded ones in the other. That is precisely the disagreement the shared fixture suite exists to make impossible, so the fold happens here too, through the same domain function. `getWorkflowDef` also honours its `version` argument now that the versions are retained: the engine's forward walk asks for intermediates by exact version, and answering "latest" to every such question is a silent wrong answer.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1183,6 +1360,38 @@ describe('buildMemoryContext', () => {
     ]);
     expect(await ctx.getWorkflowDef('wf-two')).toEqual(wf2);
   });
+
+  it('a re-categorising v2 refreshes the tickets already sitting in that state — the fixture suite sees what the server sees', async () => {
+    const wfV2: WorkflowDef = {
+      ...WF,
+      version: 2,
+      states: [
+        { id: 'todo', name: 'To do', category: 'open' },
+        { id: 'doing', name: 'Doing', category: 'terminal' }, // was 'active'
+        { id: 'done', name: 'Done', category: 'terminal' },
+      ],
+    };
+    const ctx = buildMemoryContext([WF], [
+      typeDefined(TASK),
+      created(CHILD, 'task', null),
+      makeEnvelope({ type: 'ticket.transitioned', entity: { kind: 'ticket', id: CHILD }, payload: { toStateId: 'doing' } }),
+      makeEnvelope({ type: 'workflow.defined', entity: { kind: 'workflow', id: 'wf-basic' }, payload: wfV2 }),
+    ]);
+    const state = (await ctx.getEntityState('ticket', CHILD)) as {
+      stateId: string; stateCategory: string; workflowVersion: number;
+    };
+    expect(state).toMatchObject({ stateId: 'doing', stateCategory: 'terminal', workflowVersion: 2 });
+  });
+
+  it('getWorkflowDef answers an explicit version with that version, not the latest', async () => {
+    const wfV2: WorkflowDef = { ...WF, version: 2, name: 'Basic v2' };
+    const ctx = buildMemoryContext([WF], [
+      makeEnvelope({ type: 'workflow.defined', entity: { kind: 'workflow', id: 'wf-basic' }, payload: wfV2 }),
+    ]);
+    expect((await ctx.getWorkflowDef('wf-basic'))?.version).toBe(2);
+    expect((await ctx.getWorkflowDef('wf-basic', 1))?.name).toBe('Basic');
+    expect(await ctx.getWorkflowDef('wf-basic', 7)).toBeNull();
+  });
 });
 ```
 
@@ -1196,13 +1405,16 @@ Expected: FAIL — cannot find module `./memory-context`.
 ```ts
 // packages/rule-engine/src/memory-context.ts
 import type { EventEnvelope, TicketState, TicketStateDeps, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
-import { TICKET_EVENT_TYPES, applyTicketEvent, ticketTypeDefSchema } from '@gisik-nokma/domain';
+import {
+  TICKET_EVENT_TYPES, applyTicketEvent, foldTicketToWorkflowVersion, ticketTypeDefSchema,
+} from '@gisik-nokma/domain';
 import type { EngineContext } from './engine-context';
 
 export type MemoryContext = EngineContext & {
   tickets: Map<string, TicketState>;
   ticketTypes: Map<string, TicketTypeDef>;
   workflows: Map<string, WorkflowDef>;
+  workflowVersions: Map<string, WorkflowDef[]>;
 };
 
 /**
@@ -1212,6 +1424,7 @@ export type MemoryContext = EngineContext & {
  */
 export function buildMemoryContext(seedWorkflows: WorkflowDef[], events: EventEnvelope[]): MemoryContext {
   const workflows = new Map<string, WorkflowDef>(seedWorkflows.map((wf) => [wf.id, wf]));
+  const workflowVersions = new Map<string, WorkflowDef[]>(seedWorkflows.map((wf) => [wf.id, [wf]]));
   const ticketTypes = new Map<string, TicketTypeDef>();
   const tickets = new Map<string, TicketState>();
 
@@ -1220,10 +1433,25 @@ export function buildMemoryContext(seedWorkflows: WorkflowDef[], events: EventEn
     getWorkflow: (id) => workflows.get(id),
   };
 
+  function versionOf(workflowId: string, version: number): WorkflowDef | undefined {
+    return workflowVersions.get(workflowId)?.find((def) => def.version === version);
+  }
+
   for (const env of events) {
     if (env.type === 'workflow.defined') {
       const def = env.payload as WorkflowDef;
       workflows.set(def.id, def);
+      const seen = workflowVersions.get(def.id) ?? [];
+      workflowVersions.set(def.id, [...seen.filter((d) => d.version !== def.version), def]
+        .sort((a, b) => a.version - b.version));
+      // Refresh on publish (design decision 10): the server's proj_tickets
+      // folds its rows here, so this context must too, or the shared fixture
+      // suite and the server would disagree about a ticket's category the
+      // moment a version re-categorises a state.
+      for (const [id, ticket] of tickets) {
+        if (ticket.workflowId !== def.id) continue;
+        tickets.set(id, foldTicketToWorkflowVersion(ticket, def, (v) => versionOf(def.id, v)));
+      }
     } else if (env.type === 'ticket-type.defined') {
       const def = ticketTypeDefSchema.parse(env.payload);
       ticketTypes.set(def.id, def); // last definition wins — types are events
@@ -1238,6 +1466,7 @@ export function buildMemoryContext(seedWorkflows: WorkflowDef[], events: EventEn
     tickets,
     ticketTypes,
     workflows,
+    workflowVersions,
     getEntityState: async (kind, id) => {
       if (kind === 'ticket') return tickets.get(id) ?? null;
       if (kind === 'ticket-type') return ticketTypes.get(id) ?? null;
@@ -1245,7 +1474,11 @@ export function buildMemoryContext(seedWorkflows: WorkflowDef[], events: EventEn
     },
     getChildrenStates: async (ticketId) =>
       [...tickets.values()].filter((t) => t.parentId === ticketId),
-    getWorkflowDef: async (workflowId) => workflows.get(workflowId) ?? null,
+    // An explicit version is answered with THAT version. The engine's forward
+    // walk fetches intermediates by exact version; answering "latest" to every
+    // such question is a wrong answer that looks like an answer.
+    getWorkflowDef: async (workflowId, version) =>
+      (version === undefined ? workflows.get(workflowId) : versionOf(workflowId, version)) ?? null,
   };
 }
 ```
@@ -1259,13 +1492,15 @@ export { buildMemoryContext, type MemoryContext } from './memory-context';
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/memory-context.test.ts`
-Expected: PASS (4 tests).
+Expected: PASS (6 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add packages/rule-engine/src/memory-context.ts packages/rule-engine/src/memory-context.test.ts packages/rule-engine/src/index.ts
-git commit -m "An in-memory EngineContext built by the same reducer the server uses — the fixture suite now sees tickets exactly as production does, direct children only, last type definition winning"
+git commit -m "An in-memory EngineContext built by the same reducer the server uses — the fixture suite now sees tickets exactly as production does, direct children only, last type definition winning
+
+It also keeps every workflow version rather than only the latest, so an explicit version argument gets that version instead of a confident wrong answer, and a published version re-folds the tickets standing in its states through the same domain function the server projection uses. Without that fold the shared suite and the server would answer getChildrenStates differently the first time a version re-categorised a state — the one disagreement this suite exists to make impossible."
 ```
 
 ### Task 5: Hierarchy checks for ticket.created — rank, the deepest-rank parent rule, cross-project, and the forced preconditions
@@ -3189,12 +3424,19 @@ type TicketState = {
 };
 ```
 
-- Also consumes: `getTicketTypeFromDb` (Task 9), `getWorkflowDef(db, workspaceId, workflowId, version?)` (Plan 2), `applyEvent`/`resetProjections` (Plan 1).
+- Also consumes: `getTicketTypeFromDb` (Task 9); `foldTicketToWorkflowVersion` (Task 3, `@gisik-nokma/domain`); `getWorkflowDef(db, workspaceId, workflowId, version)` and **`getWorkflowDefAsOf(db, workspaceId, workflowId, asOfWorkspaceSeq)`** (Plan 2 — see the assumed-identifiers table); `LedgerEvent`, `applyEvent`/`resetProjections` (Plan 1).
 - Produces:
   - Table `proj_tickets`
   - `ticketsProjection` (the registered `{name, apply, reset}`)
   - `getTicketStateFromDb(db, workspaceId, ticketId): Promise<TicketState | null>`
   - `getChildrenStatesFromDb(db, workspaceId, parentId): Promise<TicketState[]>` — DIRECT children only
+
+**Semantics this projection owes the rest of the series (design decision 10, owner decision 2026-08-26):**
+
+1. **It resolves every definition AS OF the event it is applying**, never as of now — `getWorkflowDefAsOf(db, workspaceId, workflowId, env.workspaceSeq)`. Resolving "latest" is a rebuild hazard, not a style preference: Plan 1's verifier rebuilds projection-outer, so `proj_workflows` is complete before this projection replays its first event, and a `ticket.transitioned` into a state a later version dropped would then **throw** (the reducer looks the id up in the definition directly; the mandatory `stateMapping` is consulted by the engine's `resolveCurrentStateId`, not here). Even with nothing dropped, re-derivation would stamp the newest `workflow_version` where the live row holds the version in force at the time, and the verifier would report drift after any republish.
+2. **It consumes `workflow.defined`**, folding every row on that workflow forward through `foldTicketToWorkflowVersion`. That is refresh-on-publish; `proj_rollups` completes it in the same transaction (Task 11).
+
+Together these make `proj_tickets` a pure function of the ledger prefix: whatever order the ledger is replayed in, the last `workflow.defined` puts every row at the same version, and every ticket event resolved the definition that was actually in force when it happened.
 
 - [ ] **Step 1: Write the migration**
 
@@ -3233,10 +3475,12 @@ exports.down = (pgm) => {
 ```ts
 // apps/server/test/proj-tickets.test.ts
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
+import type { EventEnvelope } from '@gisik-nokma/domain';
 import { makeEnvelope } from '@gisik-nokma/domain';
+import type { LedgerEvent } from '../src/ledger/event-store';
 import { applyEvent, resetProjections } from '../src/projections/index';
-import { getChildrenStatesFromDb, getTicketStateFromDb } from '../src/projections/tickets';
+import { getChildrenStatesFromDb, getTicketStateFromDb, ticketsProjection } from '../src/projections/tickets';
 import { testPool, wipe } from './helpers/db';
 
 const WS = '01J9GWS0000000000000000000';
@@ -3245,21 +3489,51 @@ const PARENT = '01J9GPAR000000000000000000';
 const CHILD = '01J9GCHA000000000000000000';
 const GRANDCHILD = '01J9GCHB000000000000000000';
 
-const WF_DEFINED = makeEnvelope({
-  type: 'workflow.defined', entity: { kind: 'workflow', id: 'wf-basic' }, workspaceId: WS,
-  payload: {
-    id: 'wf-basic', version: 1, name: 'Basic', initialStateId: 'todo',
-    states: [
-      { id: 'todo', name: 'To do', category: 'open' },
-      { id: 'doing', name: 'Doing', category: 'active' },
-      { id: 'done', name: 'Done', category: 'terminal' },
-    ],
-    transitions: [
-      { from: '*', to: 'todo', rules: [] },
-      { from: '*', to: 'doing', rules: [] },
-      { from: '*', to: 'done', rules: [] },
-    ],
-  },
+const V1_STATES = [
+  { id: 'todo', name: 'To do', category: 'open' },
+  { id: 'doing', name: 'Doing', category: 'active' },
+  { id: 'done', name: 'Done', category: 'terminal' },
+];
+const ALL_TRANSITIONS = [
+  { from: '*', to: 'todo', rules: [] },
+  { from: '*', to: 'doing', rules: [] },
+  { from: '*', to: 'done', rules: [] },
+];
+
+function workflowDefined(payload: object) {
+  return makeEnvelope({
+    type: 'workflow.defined', entity: { kind: 'workflow', id: 'wf-basic' }, workspaceId: WS, payload,
+  });
+}
+
+const WF_DEFINED = workflowDefined({
+  id: 'wf-basic', version: 1, name: 'Basic', initialStateId: 'todo',
+  states: V1_STATES, transitions: ALL_TRANSITIONS,
+});
+
+/** v2 keeps every state but moves Doing from active to terminal. */
+const WF_V2_RECATEGORISED = workflowDefined({
+  id: 'wf-basic', version: 2, name: 'Basic', initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'doing', name: 'Doing', category: 'terminal' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: ALL_TRANSITIONS,
+});
+
+/** v2 drops Doing altogether and maps everyone standing in it back to To do. */
+const WF_V2_DROPS_DOING = workflowDefined({
+  id: 'wf-basic', version: 2, name: 'Basic', initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [
+    { from: '*', to: 'todo', rules: [] },
+    { from: '*', to: 'done', rules: [] },
+  ],
+  stateMapping: { doing: 'todo' },
 });
 
 function typeDefined(id: string, rank: number) {
@@ -3274,20 +3548,75 @@ function ticketEvent(id: string, type: string, payload: object) {
   return makeEnvelope({ type, entity: { kind: 'ticket', id }, workspaceId: WS, payload });
 }
 
-const SEED = [
+/**
+ * Stamp both counters the way ingest does: `workspaceSeq` is the workspace
+ * stream cursor (coordination §18), `seq` restarts at 1 per entity.
+ * Projections resolve workflow definitions AS OF `workspaceSeq`, so a test
+ * that leaves it off is not testing the projection the server runs; and the
+ * canonical replay order below sorts by the per-entity `seq`, so leaving that
+ * off would make the replay order depend on sort stability rather than on the
+ * ledger.
+ */
+function asLedger(events: EventEnvelope[]): LedgerEvent[] {
+  const perEntity = new Map<string, number>();
+  return events.map((env, index) => {
+    const key = `${env.entity.kind}:${env.entity.id}`;
+    const seq = (perEntity.get(key) ?? 0) + 1;
+    perEntity.set(key, seq);
+    return { ...env, seq, workspaceSeq: index + 1 };
+  });
+}
+
+const SEED_EVENTS = [
   WF_DEFINED, typeDefined('story', 2), typeDefined('task', 3),
   created(PARENT, 'story', null, 'Quarterly filings'),
   created(CHILD, 'task', PARENT, 'File GST'),
   created(GRANDCHILD, 'task', CHILD, 'Collect challans'),
 ];
 
+/** Plan 1's CANONICAL replay order: (entity_kind, entity_id, seq) — deliberately NOT chronological. */
+function canonicalOrder(ledger: LedgerEvent[]): LedgerEvent[] {
+  return [...ledger].sort((a, b) =>
+    a.entity.kind.localeCompare(b.entity.kind) ||
+    a.entity.id.localeCompare(b.entity.id) ||
+    a.seq - b.seq);
+}
+
+/**
+ * Re-derive ONE projection the way Plan 1's verifier does — projection-outer,
+ * over the whole ledger in canonical order — leaving the other projections
+ * (proj_workflows, proj_ticket_types) standing. This is not an alternative
+ * spelling of `resetProjections` + replay: under event-outer replay
+ * proj_workflows is rebuilt alongside proj_tickets and happens to hold the
+ * right version at every point, so the defect this guards cannot appear. The
+ * verifier does not replay that way, and neither does this.
+ */
+async function rebuildTicketsProjectionOuter(pool: Pool, ledger: LedgerEvent[]): Promise<void> {
+  const tx: PoolClient = await pool.connect();
+  try {
+    await tx.query('BEGIN');
+    await ticketsProjection.reset(tx);
+    for (const env of canonicalOrder(ledger)) await ticketsProjection.apply(env, tx);
+    await tx.query('COMMIT');
+  } catch (error) {
+    await tx.query('ROLLBACK');
+    throw error;
+  } finally {
+    tx.release();
+  }
+}
+
 const db: Pool = await testPool();
 beforeEach(async () => wipe(db));
 afterAll(async () => db.end());
 
+async function applyAll(ledger: LedgerEvent[]): Promise<void> {
+  for (const env of ledger) await applyEvent(db, env);
+}
+
 describe('proj_tickets', () => {
   it('creation lands in the workflow initial state with the title as an attributed claim', async () => {
-    for (const env of SEED) await applyEvent(db, env);
+    await applyAll(asLedger(SEED_EVENTS));
     const state = await getTicketStateFromDb(db, WS, PARENT);
     expect(state).toMatchObject({
       id: PARENT, workspaceId: WS, projectId: PROJECT, typeId: 'story', parentId: null,
@@ -3298,11 +3627,12 @@ describe('proj_tickets', () => {
   });
 
   it('transition, assignment, collaborators, and field claims update head state with provenance', async () => {
-    for (const env of SEED) await applyEvent(db, env);
-    await applyEvent(db, ticketEvent(CHILD, 'ticket.transitioned', { toStateId: 'done' }));
-    await applyEvent(db, ticketEvent(CHILD, 'ticket.assigned', { assigneeId: 'user-anselma' }));
-    await applyEvent(db, ticketEvent(CHILD, 'ticket.collaborator_added', { userId: 'user-kiro' }));
-    await applyEvent(db, ticketEvent(CHILD, 'ticket.field_set', { fieldId: 'dueDate', value: { date: '2026-08-30', note: 'GST' } }));
+    await applyAll(asLedger([...SEED_EVENTS,
+      ticketEvent(CHILD, 'ticket.transitioned', { toStateId: 'done' }),
+      ticketEvent(CHILD, 'ticket.assigned', { assigneeId: 'user-anselma' }),
+      ticketEvent(CHILD, 'ticket.collaborator_added', { userId: 'user-kiro' }),
+      ticketEvent(CHILD, 'ticket.field_set', { fieldId: 'dueDate', value: { date: '2026-08-30', note: 'GST' } }),
+    ]));
     const state = await getTicketStateFromDb(db, WS, CHILD);
     expect(state).toMatchObject({ stateId: 'done', stateCategory: 'terminal', assigneeId: 'user-anselma', collaboratorIds: ['user-kiro'] });
     expect(state?.fields.dueDate).toMatchObject({ value: { date: '2026-08-30', note: 'GST' }, actorId: 'user-kiro' });
@@ -3311,22 +3641,92 @@ describe('proj_tickets', () => {
   });
 
   it('getChildrenStates returns DIRECT children only', async () => {
-    for (const env of SEED) await applyEvent(db, env);
+    await applyAll(asLedger(SEED_EVENTS));
     const children = await getChildrenStatesFromDb(db, WS, PARENT);
     expect(children.map((c) => c.id)).toEqual([CHILD]);
   });
 
   it('rebuild-and-diff: reset and replay produces the identical table', async () => {
-    const events = [...SEED,
+    const ledger = asLedger([...SEED_EVENTS,
       ticketEvent(CHILD, 'ticket.transitioned', { toStateId: 'doing' }),
       ticketEvent(GRANDCHILD, 'ticket.reparented', { newParentId: PARENT }),
-    ];
-    for (const env of events) await applyEvent(db, env);
+    ]);
+    await applyAll(ledger);
     const first = (await db.query('SELECT * FROM proj_tickets ORDER BY ticket_id')).rows;
     await resetProjections(db);
-    for (const env of events) await applyEvent(db, env);
+    await applyAll(ledger);
     const second = (await db.query('SELECT * FROM proj_tickets ORDER BY ticket_id')).rows;
     expect(second).toEqual(first);
+  });
+
+  // Refresh on publish — owner decision 2026-08-26, design decision 10.
+
+  it('a v2 that re-categorises a state refreshes every ticket standing in it, in the publishing transaction', async () => {
+    await applyAll(asLedger([...SEED_EVENTS,
+      ticketEvent(CHILD, 'ticket.transitioned', { toStateId: 'doing' }),
+      WF_V2_RECATEGORISED,
+    ]));
+    // The claim did not change; what "Doing" MEANS did.
+    expect(await getTicketStateFromDb(db, WS, CHILD)).toMatchObject({
+      stateId: 'doing', stateCategory: 'terminal', workflowVersion: 2,
+    });
+    // Untouched tickets are folded too — they were sitting in the initial state.
+    expect(await getTicketStateFromDb(db, WS, PARENT)).toMatchObject({
+      stateId: 'todo', stateCategory: 'open', workflowVersion: 2,
+    });
+  });
+
+  it('a v2 that drops a state folds state_id through the stateMapping rather than throwing', async () => {
+    await applyAll(asLedger([...SEED_EVENTS,
+      ticketEvent(CHILD, 'ticket.transitioned', { toStateId: 'doing' }),
+      WF_V2_DROPS_DOING,
+    ]));
+    expect(await getTicketStateFromDb(db, WS, CHILD)).toMatchObject({
+      stateId: 'todo', stateCategory: 'open', workflowVersion: 2,
+    });
+  });
+
+  it('the fold leaves the transition log alone — entries keep the version their state ids are written in', async () => {
+    await applyAll(asLedger([...SEED_EVENTS,
+      ticketEvent(CHILD, 'ticket.transitioned', { toStateId: 'doing' }),
+      WF_V2_DROPS_DOING,
+    ]));
+    const state = await getTicketStateFromDb(db, WS, CHILD);
+    // Head state says 'todo' under v2; history still says this actor moved the
+    // ticket to 'doing' under v1, because that is what they did.
+    expect(state?.transitions).toEqual([
+      { toStateId: 'doing', actorId: 'user-kiro', seq: expect.any(Number), workflowVersion: 1 },
+    ]);
+  });
+
+  it('planted defect: a v2 dropping a state is unrebuildable unless definitions resolve AS OF the event — projection-outer replay reproduces the table byte for byte', async () => {
+    // The defect: with `getWorkflowDef(db, ws, id)` ("latest"), a
+    // projection-outer rebuild sees v2 while replaying the v1 transition, and
+    // `stateCategoryOf(v2, 'doing')` is undefined — the reducer throws and
+    // proj_tickets can never be re-derived. Even without a drop it would stamp
+    // version 2 on a row the live path left at 1, and the verifier would
+    // report drift after every republish.
+    const ledger = asLedger([...SEED_EVENTS,
+      ticketEvent(CHILD, 'ticket.transitioned', { toStateId: 'doing' }),
+      ticketEvent(GRANDCHILD, 'ticket.transitioned', { toStateId: 'done' }),
+      WF_V2_DROPS_DOING,
+      // A move made AFTER the publish, so its toStateId is v2 vocabulary while
+      // the two above are v1 vocabulary. Canonical replay order hands the
+      // projection all three before it ever sees a workflow event.
+      ticketEvent(CHILD, 'ticket.transitioned', { toStateId: 'done' }),
+    ]);
+    await applyAll(ledger);
+    const live = (await db.query('SELECT * FROM proj_tickets ORDER BY ticket_id')).rows;
+
+    await rebuildTicketsProjectionOuter(db, ledger);
+    const rederived = (await db.query('SELECT * FROM proj_tickets ORDER BY ticket_id')).rows;
+
+    expect(rederived).toEqual(live);
+    // And the answer is the honest one, not merely a stable one. CHILD sorts
+    // before GRANDCHILD, which sorts before PARENT.
+    expect(live.map((row) => [row.ticket_id, row.state_id, row.workflow_version])).toEqual([
+      [CHILD, 'done', 2], [GRANDCHILD, 'done', 2], [PARENT, 'todo', 2],
+    ]);
   });
 });
 ```
@@ -3341,10 +3741,13 @@ Expected: FAIL — cannot find module `../src/projections/tickets`.
 ```ts
 // apps/server/src/projections/tickets.ts
 import type { Pool, PoolClient } from 'pg';
-import type { EventEnvelope, TicketState, TicketStateDeps } from '@gisik-nokma/domain';
-import { TICKET_EVENT_TYPES, applyTicketEvent, ticketCreatedPayload } from '@gisik-nokma/domain';
+import type { TicketState, TicketStateDeps, WorkflowDef } from '@gisik-nokma/domain';
+import {
+  TICKET_EVENT_TYPES, applyTicketEvent, foldTicketToWorkflowVersion, ticketCreatedPayload,
+} from '@gisik-nokma/domain';
+import type { LedgerEvent } from '../ledger/event-store';
 import { getTicketTypeFromDb } from './ticket-types';
-import { getWorkflowDef } from './workflows';
+import { getWorkflowDef, getWorkflowDefAsOf } from './workflows';
 
 function rowToTicketState(row: Record<string, unknown>): TicketState {
   return {
@@ -3390,12 +3793,38 @@ export async function getChildrenStatesFromDb(
   return res.rows.map(rowToTicketState);
 }
 
+async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
+  await db.query(
+    `INSERT INTO proj_tickets
+       (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
+        state_id, state_category, assignee_id, collaborator_ids, fields, transitions)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     ON CONFLICT (ticket_id) DO UPDATE SET
+       project_id = EXCLUDED.project_id, type_id = EXCLUDED.type_id,
+       parent_id = EXCLUDED.parent_id, workflow_id = EXCLUDED.workflow_id,
+       workflow_version = EXCLUDED.workflow_version,
+       state_id = EXCLUDED.state_id, state_category = EXCLUDED.state_category,
+       assignee_id = EXCLUDED.assignee_id, collaborator_ids = EXCLUDED.collaborator_ids,
+       fields = EXCLUDED.fields, transitions = EXCLUDED.transitions`,
+    [next.id, next.workspaceId, next.projectId, next.typeId, next.parentId, next.workflowId, next.workflowVersion,
+     next.stateId, next.stateCategory, next.assigneeId,
+     JSON.stringify(next.collaboratorIds), JSON.stringify(next.fields), JSON.stringify(next.transitions)],
+  );
+}
+
 /**
  * Pre-fetches the defs the pure reducer may need, then hands it synchronous
  * lookups. The reducer is the same function the fixture suite uses — the
  * projection adds only persistence.
+ *
+ * The workflow is resolved AS OF this event's position in the workspace
+ * stream, never "latest". Design decision 10 argues why at length; the short
+ * version is that "latest" makes this projection unrebuildable the first time
+ * a workflow version drops a state, and makes the verifier report drift after
+ * every republish. `env.workspaceSeq` is the position; `getWorkflowDefAsOf`
+ * answers with the definition in force there.
  */
-async function loadDeps(db: PoolClient, env: EventEnvelope, current: TicketState | undefined): Promise<TicketStateDeps> {
+async function loadDeps(db: PoolClient, env: LedgerEvent, current: TicketState | undefined): Promise<TicketStateDeps> {
   let typeId: string | undefined;
   let workflowId: string | undefined;
   if (env.type === 'ticket.created') {
@@ -3405,37 +3834,79 @@ async function loadDeps(db: PoolClient, env: EventEnvelope, current: TicketState
   }
   const type = typeId ? await getTicketTypeFromDb(db, env.workspaceId, typeId) : null;
   const wfId = workflowId ?? type?.workflowId;
-  const workflow = wfId ? await getWorkflowDef(db, env.workspaceId, wfId) : null;
+  const workflow = wfId ? await getWorkflowDefAsOf(db, env.workspaceId, wfId, env.workspaceSeq) : null;
   return {
     getTicketType: (id) => (type !== null && id === type.id ? type : undefined),
     getWorkflow: (id) => (workflow !== null && id === workflow.id ? workflow : undefined),
   };
 }
 
+/**
+ * Refresh on publish (owner decision 2026-08-26, design decision 10). A new
+ * version of workflow W re-categorises, renames or drops states that existing
+ * tickets are standing in; every row on W is folded forward so nothing keeps
+ * claiming a category the workflow no longer assigns it.
+ *
+ * The target definition is read through the same as-of lookup rather than
+ * parsed out of the payload — `proj_workflows` is registered before this
+ * projection, so by the time this runs the version being published is already
+ * stored, and `<= env.workspaceSeq` therefore includes it. One code path for
+ * "which definition is in force here", used everywhere.
+ */
+async function refreshTicketsForWorkflow(db: PoolClient, env: LedgerEvent): Promise<void> {
+  const workflowId = env.entity.id;
+  const target = await getWorkflowDefAsOf(db, env.workspaceId, workflowId, env.workspaceSeq);
+  if (!target) {
+    throw new Error(`proj_tickets: workflow.defined for "${workflowId}" but proj_workflows has no version at workspace_seq ${env.workspaceSeq} — projection registration order is broken`);
+  }
+
+  // `workflow_version < target.version` is the monotone guard expressed in SQL
+  // so the rows never leave Postgres. `foldTicketToWorkflowVersion` holds the
+  // same guard because the replica has no SQL — neither copy is redundant, and
+  // deleting either one breaks a different caller.
+  const rows = await db.query(
+    'SELECT * FROM proj_tickets WHERE workspace_id = $1 AND workflow_id = $2 AND workflow_version < $3 ORDER BY ticket_id',
+    [env.workspaceId, workflowId, target.version],
+  );
+  if (rows.rowCount === 0) return;
+
+  // Intermediates are fetched once, not once per row: a workspace with ten
+  // thousand tickets on one workflow must not issue ten thousand lookups.
+  const cache = new Map<number, WorkflowDef>();
+  const getVersion = (version: number): WorkflowDef | undefined => cache.get(version);
+  // reduce, not Math.min(...spread): the row count is a workspace's whole
+  // ticket table, and spreading it is an argument-limit crash waiting for the
+  // first workspace big enough to matter.
+  const oldest = rows.rows.reduce(
+    (lowest, row) => Math.min(lowest, row.workflow_version as number),
+    target.version,
+  );
+  for (let version = oldest + 1; version < target.version; version += 1) {
+    const def = await getWorkflowDef(db, env.workspaceId, workflowId, version);
+    if (def) cache.set(version, def);
+  }
+
+  for (const row of rows.rows) {
+    const folded = foldTicketToWorkflowVersion(rowToTicketState(row), target, getVersion);
+    await upsertTicket(db, folded);
+  }
+}
+
 export const ticketsProjection = {
   name: 'proj_tickets',
 
-  async apply(env: EventEnvelope, db: PoolClient): Promise<void> {
+  async apply(env: LedgerEvent, db: PoolClient): Promise<void> {
+    // A workflow event is not a ticket event, but it changes what every ticket
+    // on that workflow means — so it is handled BEFORE the ticket-vocabulary
+    // filter below, which would otherwise discard it.
+    if (env.type === 'workflow.defined') {
+      await refreshTicketsForWorkflow(db, env);
+      return;
+    }
     if (!(TICKET_EVENT_TYPES as readonly string[]).includes(env.type)) return;
     const current = (await getTicketStateFromDb(db, env.workspaceId, env.entity.id)) ?? undefined;
     const deps = await loadDeps(db, env, current);
-    const next = applyTicketEvent(current, env, deps);
-    await db.query(
-      `INSERT INTO proj_tickets
-         (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
-          state_id, state_category, assignee_id, collaborator_ids, fields, transitions)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-       ON CONFLICT (ticket_id) DO UPDATE SET
-         project_id = EXCLUDED.project_id, type_id = EXCLUDED.type_id,
-         parent_id = EXCLUDED.parent_id, workflow_id = EXCLUDED.workflow_id,
-         workflow_version = EXCLUDED.workflow_version,
-         state_id = EXCLUDED.state_id, state_category = EXCLUDED.state_category,
-         assignee_id = EXCLUDED.assignee_id, collaborator_ids = EXCLUDED.collaborator_ids,
-         fields = EXCLUDED.fields, transitions = EXCLUDED.transitions`,
-      [next.id, next.workspaceId, next.projectId, next.typeId, next.parentId, next.workflowId, next.workflowVersion,
-       next.stateId, next.stateCategory, next.assigneeId,
-       JSON.stringify(next.collaboratorIds), JSON.stringify(next.fields), JSON.stringify(next.transitions)],
-    );
+    await upsertTicket(db, applyTicketEvent(current, env, deps));
   },
 
   async reset(db: PoolClient): Promise<void> {
@@ -3455,13 +3926,15 @@ registerProjection(ticketsProjection);
 - [ ] **Step 5: Run the test to verify it passes**
 
 Run: `pnpm --filter server exec vitest run test/proj-tickets.test.ts`
-Expected: PASS (4 tests) — including rebuild-and-diff, which is the freshness gate for this table.
+Expected: PASS (8 tests) — including both rebuild tests, which are the freshness gate for this table. The projection-outer one is the stricter of the two: it is the only one that fails if definitions are resolved as "latest" instead of as-of.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add apps/server/migrations/1755672100000_proj-tickets.js apps/server/src/projections/tickets.ts apps/server/src/projections/index.ts apps/server/test/proj-tickets.test.ts
-git commit -m "Ticket head state is now a real table fed by the same reducer the fixtures run — field claims keep their claimant and both clocks, and reset-plus-replay reproduces it byte for byte"
+git commit -m "Ticket head state is now a real table fed by the same reducer the fixtures run — field claims keep their claimant and both clocks, and reset-plus-replay reproduces it byte for byte
+
+Two things had to be true for that last clause to survive a workflow republish. The projection resolves a workflow definition as of the position of the event it is applying, not as of now: the verifier rebuilds one projection at a time over the whole ledger, so proj_workflows is already at the newest version when this table replays its first event, and a transition into a state that a later version dropped would look up an id that no longer exists and throw. And publishing a version now folds every ticket on that workflow forward — through the mapping chain for its state id, recomputing its category — because a stored category that a new version has redefined is a lie that rollups, board columns and the overdue sweep all repeat."
 ```
 
 ### Task 11: proj_rollups — derived child progress, direct children only, never authored
@@ -3481,6 +3954,10 @@ git commit -m "Ticket head state is now a real table fed by the same reducer the
   - `getRollup(db, workspaceId, parentTicketId): Promise<RollupRow | null>`
 
 **Semantics:** DIRECT children only. Per-category counts plus total; the invariant's "open children" (spec §4: non-terminal) is `totalChildren - terminalChildren`. Direct-only suffices by induction — the parent-terminal refusal holds at every level, so a terminal child's own subtree was already settled when it went terminal. On `ticket.reparented` the projection recomputes every parent in the ticket's project (old and new parent are always in the same project — cross-project reparents are refused) and deletes rows for parents left childless; on `ticket.created`/`ticket.transitioned` it recomputes just the one affected parent. Nothing else ever writes this table: derived progress is never authored.
+
+**And it consumes `workflow.defined`, in the same transaction as the fold** (owner decision 2026-08-26, design decision 10). Every count here is a `FILTER (WHERE state_category = …)`, so a refresh that stopped at `proj_tickets` would leave each parent's progress bar stating a distribution that no longer exists — and would make the parent-terminal invariant refuse closes that are legitimate, because `open_children` would still count a child whose state the new version has just declared terminal. Derived numbers are the last place this product can afford to lag.
+
+**Recomputation scope, chosen and argued:** the distinct parents of tickets whose `workflow_id` is the published workflow. That is a superset of the strictly-affected set (parents of tickets whose *category* actually changed) and it is deliberately the superset, because the smaller set is not computable here. This projection runs **after** `proj_tickets` for the same event — that ordering is what makes its reads of the ticket table correct — so by the time it looks, the pre-fold categories are gone. Recovering them would mean a side channel from one projection to the next, and two projections that talk to each other are no longer independently rebuildable, which is the property Plan 1's verifier rests on. The superset costs a scan and some idempotent rewrites; it never costs correctness, because `recomputeParent` writes the same numbers when nothing changed. A parent whose children are all on other workflows is untouched, which is correct: a rollup is a function of its children's categories, and those did not move.
 
 - [ ] **Step 1: Write the migration**
 
@@ -3510,7 +3987,9 @@ exports.down = (pgm) => {
 // apps/server/test/proj-rollups.test.ts
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
+import type { EventEnvelope } from '@gisik-nokma/domain';
 import { makeEnvelope } from '@gisik-nokma/domain';
+import type { LedgerEvent } from '../src/ledger/event-store';
 import { applyEvent, resetProjections } from '../src/projections/index';
 import { getRollup } from '../src/projections/rollups';
 import { testPool, wipe } from './helpers/db';
@@ -3522,6 +4001,12 @@ const OTHER = '01J9GTKB000000000000000000';
 const C1 = '01J9GCHA000000000000000000';
 const C2 = '01J9GCHB000000000000000000';
 
+const ALL_TRANSITIONS = [
+  { from: '*', to: 'todo', rules: [] },
+  { from: '*', to: 'doing', rules: [] },
+  { from: '*', to: 'done', rules: [] },
+];
+
 const WF_DEFINED = makeEnvelope({
   type: 'workflow.defined', entity: { kind: 'workflow', id: 'wf-basic' }, workspaceId: WS,
   payload: {
@@ -3531,13 +4016,34 @@ const WF_DEFINED = makeEnvelope({
       { id: 'doing', name: 'Doing', category: 'active' },
       { id: 'done', name: 'Done', category: 'terminal' },
     ],
-    transitions: [
-      { from: '*', to: 'todo', rules: [] },
-      { from: '*', to: 'doing', rules: [] },
-      { from: '*', to: 'done', rules: [] },
-    ],
+    transitions: ALL_TRANSITIONS,
   },
 });
+
+/** v2 says Doing is finished work. Every ticket standing in it changes category without moving. */
+const WF_V2_RECATEGORISED = makeEnvelope({
+  type: 'workflow.defined', entity: { kind: 'workflow', id: 'wf-basic' }, workspaceId: WS,
+  payload: {
+    id: 'wf-basic', version: 2, name: 'Basic', initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' },
+      { id: 'doing', name: 'Doing', category: 'terminal' },
+      { id: 'done', name: 'Done', category: 'terminal' },
+    ],
+    transitions: ALL_TRANSITIONS,
+  },
+});
+
+/** Stamp both counters the way ingest does — workspace stream cursor (coordination §18) plus per-entity seq. */
+function asLedger(events: EventEnvelope[]): LedgerEvent[] {
+  const perEntity = new Map<string, number>();
+  return events.map((env, index) => {
+    const key = `${env.entity.kind}:${env.entity.id}`;
+    const seq = (perEntity.get(key) ?? 0) + 1;
+    perEntity.set(key, seq);
+    return { ...env, seq, workspaceSeq: index + 1 };
+  });
+}
 
 function typeDefined(id: string, rank: number) {
   return makeEnvelope({ type: 'ticket-type.defined', entity: { kind: 'ticket-type', id }, workspaceId: WS,
@@ -3551,7 +4057,7 @@ function ticketEvent(id: string, type: string, payload: object) {
   return makeEnvelope({ type, entity: { kind: 'ticket', id }, workspaceId: WS, payload });
 }
 
-const SEED = [
+const SEED_EVENTS = [
   WF_DEFINED, typeDefined('story', 2), typeDefined('task', 3),
   created(PARENT, 'story', null, 'Quarterly filings'),
   created(OTHER, 'story', null, 'Counter opening'),
@@ -3563,44 +4069,86 @@ const db: Pool = await testPool();
 beforeEach(async () => wipe(db));
 afterAll(async () => db.end());
 
+async function applyAll(ledger: LedgerEvent[]): Promise<void> {
+  for (const env of ledger) await applyEvent(db, env);
+}
+
+/**
+ * One ledger, stamped once, applied in prefixes — so an assertion made half
+ * way through sees the same cursors the whole run will.
+ */
+const SEED_LENGTH = SEED_EVENTS.length;
+function ledgerOf(...extra: EventEnvelope[]): LedgerEvent[] {
+  return asLedger([...SEED_EVENTS, ...extra]);
+}
+
 describe('proj_rollups', () => {
   it('counts direct children per category as they are created and transition', async () => {
-    for (const env of SEED) await applyEvent(db, env);
+    const ledger = ledgerOf(
+      ticketEvent(C1, 'ticket.transitioned', { toStateId: 'doing' }),
+      ticketEvent(C2, 'ticket.transitioned', { toStateId: 'done' }),
+    );
+    await applyAll(ledger.slice(0, SEED_LENGTH));
     expect(await getRollup(db, WS, PARENT)).toEqual({
       parentTicketId: PARENT, workspaceId: WS, projectId: PROJECT,
       totalChildren: 2, openChildren: 2, activeChildren: 0, terminalChildren: 0,
     });
-    await applyEvent(db, ticketEvent(C1, 'ticket.transitioned', { toStateId: 'doing' }));
-    await applyEvent(db, ticketEvent(C2, 'ticket.transitioned', { toStateId: 'done' }));
+    await applyAll(ledger.slice(SEED_LENGTH));
     expect(await getRollup(db, WS, PARENT)).toMatchObject({
       totalChildren: 2, openChildren: 0, activeChildren: 1, terminalChildren: 1,
     });
   });
 
   it('a childless ticket has no rollup row — absence, not zeros, because nothing is invented', async () => {
-    for (const env of SEED) await applyEvent(db, env);
+    await applyAll(asLedger(SEED_EVENTS));
     expect(await getRollup(db, WS, C1)).toBeNull();
   });
 
   it('reparent moves the counts between parents and removes an emptied parent row', async () => {
-    for (const env of SEED) await applyEvent(db, env);
-    await applyEvent(db, ticketEvent(C1, 'ticket.reparented', { newParentId: OTHER }));
+    const ledger = ledgerOf(
+      ticketEvent(C1, 'ticket.reparented', { newParentId: OTHER }),
+      ticketEvent(C2, 'ticket.reparented', { newParentId: OTHER }),
+    );
+    await applyAll(ledger.slice(0, SEED_LENGTH + 1));
     expect(await getRollup(db, WS, PARENT)).toMatchObject({ totalChildren: 1 });
     expect(await getRollup(db, WS, OTHER)).toMatchObject({ totalChildren: 1 });
-    await applyEvent(db, ticketEvent(C2, 'ticket.reparented', { newParentId: OTHER }));
+    await applyAll(ledger.slice(SEED_LENGTH + 1));
     expect(await getRollup(db, WS, PARENT)).toBeNull();
     expect(await getRollup(db, WS, OTHER)).toMatchObject({ totalChildren: 2 });
   });
 
-  it('rebuild-and-diff: reset and replay reproduces the rollups exactly', async () => {
-    const events = [...SEED,
-      ticketEvent(C1, 'ticket.transitioned', { toStateId: 'done' }),
+  it('a re-categorising v2 moves the parent counts in the SAME transaction as the ticket fold', async () => {
+    const ledger = ledgerOf(
+      ticketEvent(C1, 'ticket.transitioned', { toStateId: 'doing' }),
+      WF_V2_RECATEGORISED,
+    );
+    await applyAll(ledger.slice(0, SEED_LENGTH + 1));
+    expect(await getRollup(db, WS, PARENT)).toMatchObject({
+      totalChildren: 2, openChildren: 1, activeChildren: 1, terminalChildren: 0,
+    });
+
+    // Nobody moves a ticket. The workflow changes what "Doing" means.
+    await applyAll(ledger.slice(SEED_LENGTH + 1));
+
+    expect(await getRollup(db, WS, PARENT)).toMatchObject({
+      totalChildren: 2, openChildren: 1, activeChildren: 0, terminalChildren: 1,
+    });
+    // And the parent-terminal invariant now sees one open child, not two —
+    // this is the number that decides whether closing PARENT is refused.
+    const rollup = await getRollup(db, WS, PARENT);
+    expect((rollup?.totalChildren ?? 0) - (rollup?.terminalChildren ?? 0)).toBe(1);
+  });
+
+  it('rebuild-and-diff: reset and replay reproduces the rollups exactly, republish included', async () => {
+    const ledger = ledgerOf(
+      ticketEvent(C1, 'ticket.transitioned', { toStateId: 'doing' }),
+      WF_V2_RECATEGORISED,
       ticketEvent(C2, 'ticket.reparented', { newParentId: OTHER }),
-    ];
-    for (const env of events) await applyEvent(db, env);
+    );
+    await applyAll(ledger);
     const first = (await db.query('SELECT * FROM proj_rollups ORDER BY parent_ticket_id')).rows;
     await resetProjections(db);
-    for (const env of events) await applyEvent(db, env);
+    await applyAll(ledger);
     const second = (await db.query('SELECT * FROM proj_rollups ORDER BY parent_ticket_id')).rows;
     expect(second).toEqual(first);
   });
@@ -3617,8 +4165,8 @@ Expected: FAIL — cannot find module `../src/projections/rollups`.
 ```ts
 // apps/server/src/projections/rollups.ts
 import type { Pool, PoolClient } from 'pg';
-import type { EventEnvelope } from '@gisik-nokma/domain';
 import { ticketCreatedPayload } from '@gisik-nokma/domain';
+import type { LedgerEvent } from '../ledger/event-store';
 
 export type RollupRow = {
   parentTicketId: string;
@@ -3690,11 +4238,43 @@ async function recomputeProject(db: PoolClient, workspaceId: string, projectId: 
   );
 }
 
+/**
+ * Refresh on publish (design decision 10). `proj_tickets` has already folded
+ * every row on this workflow by the time this runs, so the pre-fold categories
+ * are unrecoverable here — which is exactly why the scope is "every parent of
+ * a ticket on this workflow" rather than "every parent whose child's category
+ * moved". Narrowing it would need a channel from one projection into the next,
+ * and projections that talk to each other stop being independently
+ * rebuildable. `recomputeParent` is idempotent, so the extra parents cost work
+ * and nothing else.
+ */
+async function recomputeParentsOnWorkflow(db: PoolClient, workspaceId: string, workflowId: string): Promise<void> {
+  const parents = await db.query(
+    `SELECT DISTINCT parent_id FROM proj_tickets
+     WHERE workspace_id = $1 AND workflow_id = $2 AND parent_id IS NOT NULL
+     ORDER BY parent_id`,
+    [workspaceId, workflowId],
+  );
+  for (const row of parents.rows) {
+    await recomputeParent(db, workspaceId, row.parent_id);
+  }
+}
+
 export const rollupsProjection = {
   name: 'proj_rollups',
 
   /** Runs AFTER ticketsProjection for the same event — registration order is apply order. */
-  async apply(env: EventEnvelope, db: PoolClient): Promise<void> {
+  async apply(env: LedgerEvent, db: PoolClient): Promise<void> {
+    if (env.type === 'workflow.defined') {
+      // Not a ticket event, but every count in this table is a FILTER on
+      // state_category, and a published version has just redefined what some
+      // of those categories mean. Letting the fold stop at proj_tickets would
+      // leave each parent's progress stating a distribution that no longer
+      // exists — and would make the parent-terminal invariant refuse closes
+      // that are now legitimate.
+      await recomputeParentsOnWorkflow(db, env.workspaceId, env.entity.id);
+      return;
+    }
     if (env.type === 'ticket.created') {
       const p = ticketCreatedPayload.parse(env.payload);
       if (p.parentId !== null) await recomputeParent(db, env.workspaceId, p.parentId);
@@ -3735,15 +4315,17 @@ registerProjection(rollupsProjection);
 - [ ] **Step 5: Run the test to verify it passes, then the verify-projections CLI once**
 
 Run: `pnpm --filter server exec vitest run test/proj-rollups.test.ts`
-Expected: PASS (4 tests).
+Expected: PASS (5 tests).
 Run: `pnpm --filter server verify-projections` (Plan 1's rebuild-and-diff CLI, name per Coordination) with `DATABASE_URL=$TEST_DATABASE_URL`
-Expected: reports zero drift for `proj_ticket_types`, `proj_tickets`, and `proj_rollups`.
+Expected: reports zero drift for `proj_ticket_types`, `proj_tickets`, and `proj_rollups` — **including after a workflow republish**, which is the case that drifted before design decision 10.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add apps/server/migrations/1755672200000_proj-rollups.js apps/server/src/projections/rollups.ts apps/server/src/projections/index.ts apps/server/test/proj-rollups.test.ts
-git commit -m "Derived child progress as a projection nothing else may write: direct children counted per category, childless parents absent rather than zeroed, reparents recomputed project-wide because the refusals guarantee both parents share one"
+git commit -m "Derived child progress as a projection nothing else may write: direct children counted per category, childless parents absent rather than zeroed, reparents recomputed project-wide because the refusals guarantee both parents share one
+
+A published workflow version recomputes them too. Every count here is a FILTER on state_category, so when a version moves Doing from active to terminal the parents' progress is wrong the instant proj_tickets folds — and the parent-terminal invariant would go on refusing closes that the new workflow has made legitimate. The scope is every parent of a ticket on that workflow, not only the parents whose counts actually moved: this projection runs after the fold and can no longer see what the categories were, and buying that back would mean one projection reading another's intermediate state, which is the property the rebuild verifier rests on."
 ```
 
 ### Task 12: The server EngineContext — ctx.getChildrenStates becomes real
@@ -4212,9 +4794,11 @@ git commit -m "Ticket history is the ledger filtered, not a summary: every claim
 - ⚙️ **Ticket type system** — built-in ladder epic(1)/story(2)/task(3)/sub-task(4) as seed data plus custom reusable types defined by `ticket-type.defined` events: name, icon, rank, workflow binding, and typed custom fields (text, number, date, select, person), Zod-validated, last definition wins. `packages/domain/src/ticket-types.ts`
 - ⚙️ **Ticket event vocabulary** — `ticket.created`, `ticket.transitioned` (optional `cause` marks a reopen forced by arriving live work; the transitions log keeps it out), `ticket.assigned`, `ticket.collaborator_added/removed`, `ticket.field_set` (built-ins title/description/dueDate/startDate ride it; a due date and a start date are always `{date, note?}` claims), `ticket.reparented`, `comment.added` (opaque doc body), `attachment.added` (a `kind`-discriminated union: an `upload` carrying the server's sniffed mime/size and its `sha256` of the stored bytes, or a `drive-reference` carrying the pointer plus the name, mimeType and `capturedAt` last seen on a file this product does not hold); unknown types refused at ingest. `packages/domain/src/events/ticket-events.ts`
 - ⚙️ **Ticket head-state reducer** — one pure fold (`applyTicketEvent`) shared by the server projection and the fixture suite; per-field provenance (actor + both clocks) on every claim. `packages/domain/src/ticket-state.ts`
+- ⚙️ **Refresh on publish** — `foldTicketToWorkflowVersion`, the one pure fold a newly published workflow version applies to the tickets already standing in its states: the state id walked forward through the version chain's `stateMapping`s, the category recomputed from the new version, the transition log left alone because each entry's version is the vocabulary its state id is written in. Called by the server projection, by the fixture suite's in-memory context, and by the offline replica, which builds its read model from domain reducers and would otherwise keep stale categories forever. Skipping a ticket already at or past the target version is what makes it order-insensitive under canonical replay. `packages/domain/src/ticket-state.ts`
 - ✅ **Hierarchy sanity refusals** — child rank must exceed parent rank, any type at or below the deepest rank requires a parent (the built-in `sub-task`, any custom type an admin defines beside it, and anything deeper — the rule follows the rank, not the id), cycles refused (load-bearing after rank re-definitions), cross-project parents refused, live work under a terminal parent refused toward an offered reopen (owner decision; terminal-under-terminal stays legal); every reason in plain language, every refusal proven against a planted defect. `packages/rule-engine/src/checks/hierarchy.ts`
 - ✅ **Field claim refusals** — unknown fields, per-kind mismatches with the field named, title never clearable; `null` clears everything else as an attributed claim. `packages/rule-engine/src/checks/fields.ts`
 - ⚙️ **Ticket projections** — `proj_ticket_types` (workspace-scoped type defs), `proj_tickets` (head state backing the engine's `getEntityState`/`getChildrenStates`), `proj_rollups` (direct-children counts per state category; derived progress is never authored); all rebuild-and-diff clean. `apps/server/src/projections/`
+- ⚙️ **Workflow republish keeps the projections honest** — `proj_tickets` and `proj_rollups` both consume `workflow.defined`: publishing a version folds every ticket on that workflow forward and recomputes the parents whose progress those tickets feed, in the publishing transaction, so no board column, attention bucket or progress bar repeats a category the workflow has redefined. Both projections resolve a workflow definition **as of the ledger position of the event they are applying**, never as of now — without that, a version that drops a state makes `proj_tickets` unrebuildable and the verifier reports drift after every republish. `apps/server/src/projections/tickets.ts`, `apps/server/src/projections/rollups.ts`
 - ✅ **Ticket history endpoint** — `GET /v1/tickets/:id/history`: the ledger filtered to one ticket, seq-ordered, actor and both clocks on every event, paged; no summarising. Both clocks are absolute instants serialized as ISO 8601 `Z`, so a claim made at `+05:30` and the same claim made at `Z` read back identically — they were the same moment (owner decision 2026-08-20). `apps/server/src/routes/ticket-history.ts`
 - ⚙️ **End-to-end planted-defect fixtures** — parent-terminal (invariant 3), rank, custom-type-at-the-deepest-rank-without-a-parent, cycle-after-rank-redefinition, unknown field, kind mismatch, live-work-under-terminal-parent (create and reparent) — with accepting twins, in Plan 2's shared fixture format. `packages/rule-engine/fixtures/`
 ```
@@ -4252,6 +4836,11 @@ Mirrors `Features.md` §5. Status: `❌` not covered · `✅` covered · `🟡` 
 - 5.24 ✅ The same custom deepest-rank type is accepted once it names a parent, and a type at a shallower rank still sits at project root untouched — the rank rule does not over-refuse. (`hierarchy.test.ts`, `created-rank-legal.json`)
 - 5.25 ✅ A history claim submitted at `+05:30` reads back as the equivalent `…Z` instant, with the two clocks still one second apart — the instant survives the round trip, the device's label does not (owner decision 2026-08-20, "time is Asia/Kolkata"). (`ticket-history.test.ts`)
 - 5.26 ✅ An `attachment.added` claim says which of the two kinds it is, or it is refused at the door: an upload round-trips with its `sha256`, a Drive reference round-trips with its pointer and `capturedAt`, and both a payload with no `kind` and an `upload` with no `sha256` are refused — an attachment whose kind is unstated is exactly the ambiguity these rules exist to remove. (`ticket-events.test.ts`)
+- 5.27 ✅ A workflow version that re-categorises a state refreshes every ticket standing in it — nobody moved the ticket, the workflow changed what the state means — and the parents' rollup counts move in the same transaction, so the parent-terminal invariant stops refusing closes the new version has made legitimate (owner decision 2026-08-26). (`ticket-state.test.ts`, `proj-tickets.test.ts`, `proj-rollups.test.ts`)
+- 5.28 ✅ A workflow version that *drops* a state folds each affected ticket's `state_id` forward through the `stateMapping` instead of throwing, and leaves the transition log untouched — each entry keeps the version its `toStateId` is written in, because that is the evidence `require-different-user` walks forward. (`ticket-state.test.ts`, `proj-tickets.test.ts`)
+- 5.29 ✅ Planted defect: with a v2 published after transitions, a **projection-outer** rebuild of `proj_tickets` (reset that projection alone, replay the whole ledger in canonical order, the way the verifier does) reproduces the live table byte for byte. Resolving definitions as "latest" instead of as of the event's `workspace_seq` fails this two ways — a dropped state throws, and an intact one stamps the wrong `workflow_version`. (`proj-tickets.test.ts`)
+- 5.30 ✅ The fold is a no-op for a ticket already at or past the target version — the guard that makes it order-insensitive when canonical replay hands the projection every ticket event before any workflow event — and a version chain with an unmapped drop throws rather than guessing a state. (`ticket-state.test.ts`)
+- 5.31 ✅ The in-memory context the fixture suite runs on folds on publish too, and answers an explicit `getWorkflowDef` version with that version rather than the latest — so the shared suite and the server cannot disagree about a ticket's category the first time a version re-categorises a state. (`memory-context.test.ts`)
 ```
 
 - [ ] **Step 3: Run the full suite one last time**
@@ -4263,7 +4852,7 @@ Expected: PASS across packages/domain, packages/rule-engine, apps/server.
 
 ```bash
 git add Features.md test-cases/05-tickets-hierarchy.md
-git commit -m "Catalogue the ticket domain in Features.md and test-cases in the same change set as the work: twenty-six scenarios, twenty-five covered by the tests landing with them, one honestly out of scope until client builds exist"
+git commit -m "Catalogue the ticket domain in Features.md and test-cases in the same change set as the work: thirty-one scenarios, thirty covered by the tests landing with them, one honestly out of scope until client builds exist"
 ```
 
 ---
@@ -4279,6 +4868,8 @@ Ambiguities and cross-plan unknowns, flagged rather than silently resolved. None
 5. **Non-terminal child under a terminal parent.** Settled by the owner decision (2026-08-20, coordination doc): refused as `hierarchy.parent-terminal` with the reopen named in the reason as the remedy — clients offer to reopen the parent (its `ticket.transitioned` carrying `cause: { kind: 'reopened-for-child', childTicketId }`) and then re-submit; a terminal child under a terminal parent stays legal. Implemented in Tasks 5–6 and the Task 8 trio (design decision 8).
 6. **Project existence.** `ticket.created.projectId` is recorded as-is; validating it against a projects projection belongs to the plan that owns project events.
 7. **Who emits the built-in seed events.** `builtinTicketTypeDefs(defaultWorkflowId)` is ready; the workspace-bootstrap plan owns emitting the four `ticket-type.defined` events (and the default workflow binding) at workspace creation.
-8. **Re-binding a type to a different workflow.** A ticket's workflow is bound at creation here; a later `ticket-type.defined` pointing at a new workflow affects new tickets only. Migrating in-flight tickets is workflow-change territory (spec §4's state-mapping machinery, Plan 2 and later).
-9. **Workflow version changes re-categorising stored state.** `proj_tickets` stores the category computed at apply time; if a `workflow.defined` v2 re-categorises an existing state id, refreshing affected rows belongs to the workflow-change work, not this plan.
-10. **Projection registry ordering guarantee.** `proj_rollups` reading `proj_tickets` requires apply-in-registration-order per event (Coordination). If Plan 1's registry does not guarantee order, that guarantee must be added there — the rebuild determinism of rollups depends on it.
+8. **Re-binding a type to a different workflow.** A ticket's workflow is bound at creation here; a later `ticket-type.defined` pointing at a new workflow affects new tickets only. Migrating in-flight tickets is workflow-change territory (spec §4's state-mapping machinery, Plan 2 and later). Note the rebuild caveat in Open question 11: that "new tickets only" promise is true on the live path but not yet on a re-derivation.
+9. **Workflow version changes re-categorising stored state. SETTLED by the owner (2026-08-26, coordination doc) — refresh on publish, and it is this plan's work after all.** The question was posed as a preference ("who should refresh the rows?") and deferred to a workflow-change plan. It was not a preference: leaving it undone left `proj_tickets` unable to rebuild. `proj_tickets` now consumes `workflow.defined` and folds every row on that workflow forward — `state_id` through the version chain's `stateMapping`s, `state_category` recomputed from the new version, `workflow_version` stamped — and `proj_rollups` recomputes the affected parents in the same transaction, because its counts are `FILTER (WHERE state_category = …)` and a stale category there makes the parent-terminal invariant refuse legitimate closes. One fold, in `@gisik-nokma/domain`, so Plan 10's replica — which builds its read model from domain reducers and never from the server's pg tables — applies exactly the same one, and Task 4's in-memory context applies it too so the shared fixture suite and the server cannot answer `getChildrenStates` differently. Design decision 10 carries the argument; Task 3 the fold; Tasks 10–11 the projections.
+   **Two defects this closed, both live before it.** `proj_tickets` resolved its workflow with `getWorkflowDef(db, workspaceId, workflowId)` — no version, contracted as "the latest at the current ledger position", which the projection had no way to honour: it read whatever `proj_workflows` held *now*. Plan 1's verifier rebuilds projection-outer, so `proj_workflows` is complete before `proj_tickets` replays its first event. (i) Replaying a `ticket.transitioned` whose `toStateId` a later version dropped **threw** — the reducer looks the id up in the definition directly, and the mandatory `stateMapping` does not save it because that mapping is consulted by the engine's `resolveCurrentStateId`, not here — so any version dropping a state made this table unrebuildable, breaking spec §3's promise that projections rebuild deterministically from scratch. (ii) Even with nothing dropped, re-derivation stamped the newest `workflow_version` where the live row holds the version in force at the time, so the verifier reported drift after *any* republish. Both are fixed by resolving the definition **as of the event being applied** — the projection passes the current event's `workspaceSeq` to `getWorkflowDefAsOf` — and the two halves need each other: as-of resolution alone leaves rows frozen at old categories, refresh-on-publish alone still throws on replay. Together `proj_tickets` is a pure function of the ledger prefix. **Still open, and not this plan's:** whether a republish should *notify* anyone that their tickets changed category under them. The data is now honest; whether it is announced is a Plan 9 question.
+10. **Projection registry ordering guarantee.** `proj_rollups` reading `proj_tickets` requires apply-in-registration-order per event (Coordination). If Plan 1's registry does not guarantee order, that guarantee must be added there — the rebuild determinism of rollups depends on it. Design decision 10 adds a second dependency on the same guarantee: `proj_tickets` reads the version being published from `proj_workflows`, which is registered before it.
+11. **The same as-of problem exists for ticket *types*, and is deliberately NOT fixed here.** `loadDeps` resolves a `ticket.created`'s type with `getTicketTypeFromDb(db, workspaceId, typeId)`, which returns whatever `proj_ticket_types` holds now. Re-binding a type to a different workflow (Open question 8) therefore makes a rebuild resolve the *new* `workflowId` for a ticket the live path bound to the old one — the same drift class as defect (ii) above, and it contradicts Open question 8's stated behaviour that a re-binding affects new tickets only. It is not fixed here because the fix is not symmetric: `proj_workflows` already keeps every version keyed `(workflow_id, version)`, so an as-of lookup is a `WHERE` clause, whereas `proj_ticket_types` is last-definition-wins with no history at all. Giving it history means changing its primary key, and `getTicketTypeFromDb` has readers in Task 12's engine context and in Plans 4–5. Scoped out rather than smuggled in: **the coordination doc's "pure function of the ledger prefix" claim holds for workflow versioning, and holds for type re-binding only until someone re-binds a type.** Whoever owns the type-versioning work takes this with it.

@@ -52,7 +52,7 @@ From **Plan 2** (`@gisik-nokma/rule-engine`, `@gisik-nokma/domain`):
 
 From **Plan 3** (`@gisik-nokma/domain`):
 - `type FieldClaim = { value: unknown; actorId: string; clientTime: string; serverTime: string }`.
-- `type TicketState = { kind: 'ticket'; id; workspaceId; projectId; typeId; parentId: string|null; workflowId; workflowVersion: number; stateId; stateCategory: StateCategory; assigneeId: string|null; collaboratorIds: string[]; fields: Record<string, FieldClaim> }` **plus** the coordination §4 transition log `transitions: { toStateId: string; actorId: string; seq: number; workflowVersion: number }[]` — the merged §4 shape, verbatim. A log entry's `workflowVersion` is the definition version in whose vocabulary that entry's `toStateId` is written (the ticket's `workflowVersion` when the transition applied, after any forward fold); `require-different-user` walks an entry forward from it before comparing, so a remapped state cannot disarm four-eyes. `kind` is the `EntityState` discriminant the engine narrows on; `workflowVersion` is what pins a folded state to the definition version it was folded under, so a v2 remap is visible rather than silent. Every `TicketState` literal in this plan carries both.
+- `type TicketState = { kind: 'ticket'; id; workspaceId; projectId; typeId; parentId: string|null; workflowId; workflowVersion: number; stateId; stateCategory: StateCategory; assigneeId: string|null; collaboratorIds: string[]; fields: Record<string, FieldClaim> }` **plus** the coordination §4 transition log `transitions: { toStateId: string; actorId: string; seq: number; workflowId: string; workflowVersion: number }[]` — the merged §4 shape, verbatim. A log entry's `workflowVersion` is the definition version in whose vocabulary that entry's `toStateId` is written (the ticket's `workflowVersion` when the transition applied); `require-different-user` walks an entry forward from it before comparing, so a remapped state cannot disarm four-eyes. Its `workflowId` names *which* workflow's version chain that walk may use: a ticket pins the workflow it was created under and only an explicit `ticket.workflow_rebound` migration moves it (owner decision 2026-08-26, Plan 3 owns the event), so an entry recorded under the outgoing workflow and walked through the incoming workflow's chain is meaningless — it either fails to match or matches the wrong move, reopening the four-eyes hole through a different door. **The log is append-only and is never re-written by a fold**: when a ticket folds forward to a new version its `stateId`/`stateCategory`/`workflowVersion` move, and every existing entry keeps the `workflowId` and `workflowVersion` it was recorded under. Rewriting entries into the new vocabulary would destroy the very fact the walk needs. `kind` is the `EntityState` discriminant the engine narrows on; the ticket's own `workflowVersion` is what pins a folded state to the definition version it was folded under, so a v2 remap is visible rather than silent. Every `TicketState` literal in this plan carries all of these.
 - `type TicketStateDeps = { getTicketType(typeId): TicketTypeDef|undefined; getWorkflow(workflowId): WorkflowDef|undefined }`; `TICKET_EVENT_TYPES: readonly string[]`; `applyTicketEvent(state: TicketState|undefined, env: EventEnvelope, deps: TicketStateDeps): TicketState` (throws on ledger-integrity breaks — fold only accepted events); `stateCategoryOf(def, stateId)`.
 - `TicketTypeDef = { id; name; icon; rank; workflowId; fields: CustomFieldDef[] }`, `ticketTypeDefSchema`, `builtinTicketTypeDefs(defaultWorkflowId)`.
 - Registered ticket vocabulary (all v1): `ticket-type.defined`, `ticket.created` (`{typeId, projectId, parentId, title}`), `ticket.transitioned` (`{toStateId, comment?, evidenceAttachmentId?, cause?}` — `cause?: { kind: 'reopened-for-child'; childTicketId: string }` per the owner reopen decision), `ticket.assigned` (`{assigneeId}`), `ticket.collaborator_added/_removed` (`{userId}`), `ticket.field_set` (`{fieldId, value}`), `ticket.reparented` (`{newParentId}`), `comment.added` (`{body}`), `attachment.added` (`{attachmentId, filename, mime, size}`); `makeEnvelope(partial)` test builder.
@@ -3170,13 +3170,19 @@ schema separates confirmed ledger, reducer state, contests and outbox."
 - Test: `packages/sync-client/test/replica.test.ts`
 
 **Interfaces:**
-- Consumes: `SyncStorage`, `migrateLocal` (Task 8); `applyTicketEvent`, `TICKET_EVENT_TYPES`, `CONTEST_EVENT_TYPES`, `claimContestedPayloadSchema`, `claimContestedResolvedPayloadSchema`, `TicketState`, `TicketStateDeps`, `WorkflowDef`, `TicketTypeDef`, `EventEnvelope`, `docToPlainText`, `istDayOf`, `istDayBounds`, `IST_DAY_REGEX` (domain); `SyncItem`, `PurgeInstruction` shape (Plan 4, as wire data); `BootstrapResponse` (Task 6 wire shape, re-declared here as the client-side type).
+- Consumes: `SyncStorage`, `migrateLocal` (Task 8); `applyTicketEvent`, `TICKET_EVENT_TYPES`, `CONTEST_EVENT_TYPES`, `claimContestedPayloadSchema`, `claimContestedResolvedPayloadSchema`, `foldStateIdForward`, `stateCategoryOf`, `TicketState`, `TicketStateDeps`, `WorkflowDef`, `TicketTypeDef`, `EventEnvelope`, `docToPlainText`, `istDayOf`, `istDayBounds`, `IST_DAY_REGEX` (domain); `SyncItem`, `PurgeInstruction` shape (Plan 4, as wire data); `BootstrapResponse` (Task 6 wire shape, re-declared here as the client-side type).
 
 **Day math in the local read model — the same code the server runs, and why that is not negotiable.** Anything this replica derives that involves a *day* — which day a `dueDate` claim falls in, whether a ticket is due today or overdue, how many days it has been in flight, which calendar cell or timeline column app-core's view-models place it in — resolves that day with `istDayOf` and `istDayBounds` from `@gisik-nokma/domain`, exactly as `apps/server` does. Day-vs-day comparisons compare `YYYY-MM-DD` strings; the one shape a day claim may take is `IST_DAY_REGEX`; day-vs-instant comparisons use `istDayBounds`, half-open `[startUtc, endUtc)`.
 
 `packages/domain/src/ist-day.ts` **has no dependencies** — no zod, no date library, no timezone database, just arithmetic against the fixed +05:30 offset — and that is not an accident of style. It is what lets an Expo bundle and a Tauri webview import the identical file that the Fastify process imports, rather than reaching for a local `toLocaleDateString()` or a hand-rolled offset because "the real helper pulls in too much".
 
 **A replica that computed days differently from the server is exactly the silent disagreement this product refuses.** It would not throw, would not sync-error, and would not show up in a contest: the same claim would simply sit in one calendar cell on the desktop and another on the web, "due today" would be true offline and false online, and a rollup counted locally would differ from the same rollup counted on the server — with every individual number looking perfectly reasonable and nothing anywhere naming the conflict. That is a board that lies. The point of an offline copy is that it is a *copy*; the moment it starts answering questions its own way, it is a second product with the same data.
+
+**Refresh on publish — the replica folds its own tickets forward, with the same walk the server uses (owner decision 2026-08-26).** When version N of workflow W is published, the server folds every `proj_tickets` row with `workflow_id = W`: `state_id` through the version chain's `stateMapping`, `state_category` recomputed from version N, `workflow_version` set to N. Amendment 17 forbids this replica from ever downloading those rows — its read model is folded from domain reducers — so **the replica must perform the identical fold locally the moment a `workflow.defined` arrives over sync**, or it keeps stale categories forever. That is not a cosmetic drift: `stateCategory` is what drives the board's columns, the rollup counts, the "open children" check behind the parent-terminal invariant, and the attention strip. A desktop that has been running all afternoon would quietly disagree with the web tab beside it about which tickets are still open, and nothing would say so.
+
+**The walk is `foldStateIdForward` from `@gisik-nokma/domain` — imported, never re-implemented.** Plan 2 put it in domain precisely so the engine, Plan 3's `proj_tickets` and this replica run one implementation; a hand-rolled second walk here is a second set of rounding errors, and the offline copy is only a copy while it rounds identically. It is pure — it takes the definitions rather than fetching them — which is exactly what lets this synchronous local caller and the async ctx-driven caller in the engine share it. The replica can supply the whole chain because bootstrap ships **every** `workflow.defined`, not only the latest (Task 6), and `applyDefinition` keeps each version keyed `(workflow_id, version)`.
+
+**Why the fold also writes a local snapshot, which is the load-bearing half.** `refoldTicket` rebuilds confirmed state by replaying a ticket's events from its snapshot baseline with the *current* local definitions. If the fold updated only the `tickets` row, the very next event for that ticket would replay the ticket's pre-fold history against version N and undo it — or worse, throw, because `applyTicketEvent` resolves each `toStateId` in the definition it is handed and version N may have dropped that state (the same defect the coordination corollary records for the server's projection-outer rebuild). So the fold persists the folded state as the ticket's new replay baseline at its current local seq. History written in the old vocabulary is then never replayed against the new one, and everything after the publish folds on top. The transition log inside that state is carried across **unchanged** — each entry keeps the `workflowId` and `workflowVersion` it was recorded under, which is the only reason `require-different-user` can still walk it forward afterwards.
 
 - Produces (cross-plan API):
 
@@ -3207,7 +3213,7 @@ export type Replica = {
 export function createReplica(deps: { storage: SyncStorage }): Promise<Replica>;
 ```
 
-**Rules encoded (each is a test):** read model is folded by `applyTicketEvent` from snapshot + local events, never assembled from server projections (there is no code path that could — the replica only ever receives envelopes and snapshots); duplicate event ids are ignored; contests fold into the `contests` table (they are not ticket state); purge removes EVERY local trace of the entity — with one deliberate exception: the local user's OWN contested-claim stubs survive, because their `original` is what this user authored on this device and silently vanishing it would break honesty invariant 5 (harness S4 proves both halves); `searchLocal` matches titles and comment text (via `docToPlainText`).
+**Rules encoded (each is a test):** read model is folded by `applyTicketEvent` from snapshot + local events, never assembled from server projections (there is no code path that could — the replica only ever receives envelopes and snapshots); an arriving `workflow.defined` folds every local ticket on that workflow forward through domain's `foldStateIdForward` — re-categorised states get the new category, dropped states move where `stateMapping` sends them, the transition log is left exactly as recorded, and the folded state becomes the ticket's replay baseline so later events fold on top of it rather than re-deriving the old vocabulary; duplicate event ids are ignored; contests fold into the `contests` table (they are not ticket state); purge removes EVERY local trace of the entity — with one deliberate exception: the local user's OWN contested-claim stubs survive, because their `original` is what this user authored on this device and silently vanishing it would break honesty invariant 5 (harness S4 proves both halves); `searchLocal` matches titles and comment text (via `docToPlainText`).
 
 - [ ] **Step 1: Write the failing replica test**
 
@@ -3286,7 +3292,9 @@ describe('replica read model — folded by the domain reducer', () => {
     const ticket = await replica.getTicket(TICKET);
     expect(ticket?.confirmed).toMatchObject({ stateId: 'doing', stateCategory: 'active' });
     expect(ticket?.confirmed?.fields.notes?.value).toBe('hi');
-    expect(ticket?.confirmed?.transitions).toEqual([{ toStateId: 'doing', actorId: 'user_a', seq: 2, workflowVersion: 1 }]);
+    expect(ticket?.confirmed?.transitions).toEqual([
+      { toStateId: 'doing', actorId: 'user_a', seq: 2, workflowId: 'wf_basic', workflowVersion: 1 },
+    ]);
   });
 
   it('ignores a duplicate event id — at-least-once delivery is expected', async () => {
@@ -3348,6 +3356,76 @@ describe('replica read model — folded by the domain reducer', () => {
     expect(ticket?.confirmed?.stateId).toBe('doing'); // snapshot(seq 3) + tail(seq 4): only seq>3 folds
     expect(await replica.getCursor(WS)).toBe(41);
     expect(await replica.searchLocal(WS, 'dlt registration')).toEqual([{ ticketId: TICKET, title: expect.any(String) }]);
+  });
+});
+
+describe('refresh on publish — an arriving workflow.defined folds the replica forward', () => {
+  // v2 keeps every state but re-categorises one: 'doing' stops counting as active.
+  const wfV2Recategorised = {
+    id: 'wf_basic', version: 2, name: 'Basic', initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' },
+      { id: 'doing', name: 'Doing', category: 'open' }, // v1 called this 'active'
+      { id: 'done', name: 'Done', category: 'terminal' },
+    ],
+    transitions: [{ from: '*', to: 'doing', rules: [] }, { from: '*', to: 'done', rules: [] }, { from: '*', to: 'todo', rules: [] }],
+  };
+
+  // v2 drops 'doing' entirely; the mandatory stateMapping says where its tickets go.
+  const wfV2Dropped = {
+    id: 'wf_basic', version: 2, name: 'Basic', initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' },
+      { id: 'done', name: 'Done', category: 'terminal' },
+    ],
+    transitions: [{ from: '*', to: 'done', rules: [] }, { from: '*', to: 'todo', rules: [] }],
+    stateMapping: { doing: 'todo' },
+  };
+
+  async function replicaWithTicketInDoing(): Promise<Replica> {
+    const replica = await seededReplica();
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: TICKET }, 'ticket.created', { typeId: 'task', projectId: PROJECT, parentId: null, title: 'In flight' }, 1));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: TICKET }, 'ticket.transitioned', { toStateId: 'doing' }, 2));
+    return replica;
+  }
+
+  it('a re-categorised state changes category locally, without the ticket moving', async () => {
+    const replica = await replicaWithTicketInDoing();
+    expect((await replica.getTicket(TICKET))?.confirmed).toMatchObject({ stateId: 'doing', stateCategory: 'active', workflowVersion: 1 });
+
+    await replica.applyServerItem(envelope({ kind: 'workflow', id: 'wf_basic' }, 'workflow.defined', wfV2Recategorised, 2));
+
+    const ticket = await replica.getTicket(TICKET);
+    expect(ticket?.confirmed).toMatchObject({ stateId: 'doing', stateCategory: 'open', workflowVersion: 2 });
+    // The log is history, not a view of the present: every entry keeps the
+    // workflow and version whose vocabulary its toStateId is written in, which
+    // is the only thing that lets require-different-user walk it forward later.
+    expect(ticket?.confirmed?.transitions).toEqual([
+      { toStateId: 'doing', actorId: 'user_a', seq: 2, workflowId: 'wf_basic', workflowVersion: 1 },
+    ]);
+  });
+
+  it('a dropped state is moved by stateMapping, and later events fold onto the new baseline', async () => {
+    const replica = await replicaWithTicketInDoing();
+
+    await replica.applyServerItem(envelope({ kind: 'workflow', id: 'wf_basic' }, 'workflow.defined', wfV2Dropped, 2));
+
+    const folded = await replica.getTicket(TICKET);
+    expect(folded?.confirmed).toMatchObject({ stateId: 'todo', stateCategory: 'open', workflowVersion: 2 });
+
+    // Planted defect: drop the snapshot the fold writes and this next event sends
+    // refoldTicket back over the seq-2 transition into 'doing' — a state v2 no
+    // longer has — so applyTicketEvent throws instead of landing this move. The
+    // fold is only durable because history in the old vocabulary is never replayed
+    // against the new one.
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: TICKET }, 'ticket.transitioned', { toStateId: 'done' }, 3));
+
+    const after = await replica.getTicket(TICKET);
+    expect(after?.confirmed).toMatchObject({ stateId: 'done', stateCategory: 'terminal', workflowVersion: 2 });
+    expect(after?.confirmed?.transitions).toEqual([
+      { toStateId: 'doing', actorId: 'user_a', seq: 2, workflowId: 'wf_basic', workflowVersion: 1 },
+      { toStateId: 'done', actorId: 'user_a', seq: 3, workflowId: 'wf_basic', workflowVersion: 2 },
+    ]);
   });
 });
 
