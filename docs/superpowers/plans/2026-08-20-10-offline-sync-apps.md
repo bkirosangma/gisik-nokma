@@ -3601,6 +3601,83 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
     }
   }
 
+  /** Every locally-held version of one workflow, as the lookup foldStateIdForward wants. */
+  async function versionsOf(tx: SyncStorage, workflowId: string): Promise<(version: number) => WorkflowDef | null> {
+    const rows = await tx.all('SELECT version, def FROM workflows WHERE workflow_id = ?', [workflowId]);
+    const byVersion = new Map<number, WorkflowDef>(
+      rows.map((r) => [Number(r.version), JSON.parse(r.def as string) as WorkflowDef]),
+    );
+    return (version) => byVersion.get(version) ?? null;
+  }
+
+  /**
+   * An arriving `workflow.defined` folds every local ticket on that workflow
+   * forward — the replica's half of refresh-on-publish (owner decision
+   * 2026-08-26). Without it an offline client keeps the old category forever,
+   * and category is what drives its board columns, its rollups and its
+   * attention strip.
+   *
+   * The walk is domain's `foldStateIdForward`, never a local re-implementation:
+   * the engine, the server's `proj_tickets` and this replica run one walk,
+   * because an offline copy is only a copy while it rounds identically. The
+   * replica can supply the whole chain because bootstrap ships every
+   * `workflow.defined`, not only the latest.
+   */
+  async function foldTicketsOntoVersion(tx: SyncStorage, latest: WorkflowDef): Promise<void> {
+    const intermediate = await versionsOf(tx, latest.id);
+    const rows = await tx.all('SELECT state FROM tickets', []);
+
+    for (const row of rows) {
+      const state = JSON.parse(row.state as string) as TicketState;
+      if (state.workflowId !== latest.id) continue;
+      // Already at or past it: makes the fold idempotent, so a re-delivered
+      // publish and an out-of-order one are both no-ops rather than a step back.
+      if (state.workflowVersion >= latest.version) continue;
+
+      const folded = foldStateIdForward(state.stateId, state.workflowVersion, latest, intermediate);
+      if (!folded.ok) {
+        throw new Error(
+          `foldTicketsOntoVersion: ticket ${state.id} sits in "${folded.unmappedStateId}", which version ${latest.version} of "${latest.id}" drops with no stateMapping entry — publishing refuses exactly that, so this replica is holding an inconsistent copy and guessing a state would hide it`,
+        );
+      }
+      const category = stateCategoryOf(latest, folded.stateId);
+      if (category === undefined) {
+        throw new Error(`foldTicketsOntoVersion: workflow "${latest.id}" version ${latest.version} has no state "${folded.stateId}"`);
+      }
+
+      // The transition log is carried across UNCHANGED. Each entry keeps the
+      // workflowId and workflowVersion whose vocabulary its toStateId is written
+      // in, and that is the only reason require-different-user can still walk it
+      // forward afterwards. Rewriting entries into the new vocabulary would
+      // destroy the very fact the walk reads.
+      const next: TicketState = {
+        ...state, stateId: folded.stateId, stateCategory: category, workflowVersion: latest.version,
+      };
+
+      await tx.run(
+        `INSERT INTO tickets (ticket_id, workspace_id, parent_id, state) VALUES (?, ?, ?, ?)
+         ON CONFLICT(ticket_id) DO UPDATE SET state = excluded.state`,
+        [next.id, next.workspaceId, next.parentId, JSON.stringify(next)],
+      );
+
+      // The load-bearing half. If the fold updated only the `tickets` row, the
+      // next event for this ticket would send refoldTicket back over its
+      // pre-fold history and replay a toStateId this version may have dropped —
+      // undoing the fold, or throwing inside applyTicketEvent. Persisting the
+      // folded state as the new replay baseline means history written in the old
+      // vocabulary is never replayed against the new one.
+      const seqRows = await tx.all(
+        "SELECT COALESCE(MAX(seq), 0) AS seq FROM events WHERE entity_kind = 'ticket' AND entity_id = ?",
+        [next.id],
+      );
+      await tx.run(
+        `INSERT INTO snapshots (entity_kind, entity_id, seq, state) VALUES ('ticket', ?, ?, ?)
+         ON CONFLICT(entity_kind, entity_id) DO UPDATE SET seq = excluded.seq, state = excluded.state`,
+        [next.id, Number(seqRows[0]?.seq ?? 0), JSON.stringify(next)],
+      );
+    }
+  }
+
   async function applyContest(tx: SyncStorage, env: EventEnvelope): Promise<void> {
     if (env.type === 'claim.contested') {
       const p = claimContestedPayloadSchema.parse(env.payload);
@@ -3707,6 +3784,12 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
         await insertEnvelope(tx, env);
         if (env.entity.kind === 'workflow' || env.entity.kind === 'ticket-type') {
           await applyDefinition(tx, env);
+          // Storing the definition is not enough: the tickets standing in it
+          // have to move, or this replica keeps categories the workflow has
+          // stopped meaning.
+          if (env.type === 'workflow.defined') {
+            await foldTicketsOntoVersion(tx, env.payload as WorkflowDef);
+          }
         } else if ((CONTEST_EVENT_TYPES as readonly string[]).includes(env.type)) {
           await applyContest(tx, env);
         } else if (env.entity.kind === 'ticket' && (TICKET_EVENT_TYPES as readonly string[]).includes(env.type)) {
