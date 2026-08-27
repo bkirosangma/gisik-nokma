@@ -73,7 +73,13 @@ importers:
       '@gisik-nokma/domain':
         specifier: workspace:*
         version: link:../domain
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.76
     devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
       typescript:
         specifier: ^5.6.3
         version: 5.9.3

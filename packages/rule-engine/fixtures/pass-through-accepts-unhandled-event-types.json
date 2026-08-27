@@ -1,0 +1,13 @@
+{
+  "name": "an event type the engine does not handle passes through untouched",
+  "workflowDefs": [],
+  "memberships": [],
+  "priorEvents": [],
+  "candidateEvent": {
+    "type": "comment.added",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_a",
+    "payload": { "text": "just a comment" }
+  },
+  "expected": { "refused": false }
+}
