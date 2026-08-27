@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { Pool } from 'pg';
 import { newUlid, type EntityHead, type EventEnvelope } from '@gisik-nokma/domain';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { createIngestService } from '../src/ingest/ingest-service.js';
@@ -23,6 +24,40 @@ function service(overrides: Partial<Parameters<typeof createIngestService>[0]> =
     projections: buildProjectionRegistry(),
     ...overrides,
   });
+}
+
+/**
+ * Hands out clients that append 'commit-completed' to `log` the moment a COMMIT
+ * round-trip RESOLVES. Reads through a Proxy and never mutates the borrowed
+ * client, so it goes back to the pool exactly as it came out.
+ *
+ * This exists because the cross-connection read in the hook test below cannot
+ * settle the ordering on its own: ingest never awaits its listeners, so that
+ * read races the COMMIT and loses. Ordering has to be observed where it is
+ * decided — in the ingest transaction itself.
+ */
+function poolRecordingCommits(real: Pool, log: string[]): Pool {
+  return {
+    async connect() {
+      const client = await real.connect();
+      return new Proxy(client, {
+        get(target, property) {
+          if (property === 'query') {
+            return async (...args: unknown[]) => {
+              const run = target.query as unknown as (...a: unknown[]) => Promise<unknown>;
+              const result = await run.apply(target, args);
+              if (args[0] === 'COMMIT') {
+                log.push('commit-completed');
+              }
+              return result;
+            };
+          }
+          const value = Reflect.get(target, property, target) as unknown;
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    },
+  } as unknown as Pool;
 }
 
 describe('ingestBatch', () => {
@@ -106,6 +141,41 @@ describe('ingestBatch', () => {
     expect(head.rows).toEqual([{ head_seq: 1, head_event_id: event.id }]);
   });
 
+  it('SAME transaction, proved: a projection that throws takes the ledger row down with it', async () => {
+    // The head-row test above shows the projection ran; it cannot show WHERE.
+    // Moving the projection loop after COMMIT leaves it green, because the same
+    // client then writes proj_entity_heads in autocommit. Only a projection
+    // that fails mid-apply can tell the two worlds apart: if the append and the
+    // projections share one transaction, the failure erases the event too.
+    const doomed = submittedWorkspaceCreated();
+    const projections = buildProjectionRegistry();
+    // Registered after proj_entity_heads, so the head row is already written
+    // inside this transaction when the throw lands — both must roll back.
+    projections.register({
+      name: 'planted_exploding_projection',
+      tables: [],
+      async apply(event) {
+        if (event.id === doomed.id) {
+          throw new Error('planted: this projection refuses to apply');
+        }
+      },
+      async reset() {},
+    });
+
+    await expect(service({ projections }).ingestBatch([doomed])).rejects.toThrow(
+      'planted: this projection refuses to apply',
+    );
+
+    // Read back on a fresh pool connection: the ingest transaction is over.
+    const ledger = await db.pool.query('SELECT count(*)::int AS n FROM events WHERE id = $1', [doomed.id]);
+    expect(ledger.rows[0]).toEqual({ n: 0 });
+    const heads = await db.pool.query(
+      'SELECT count(*)::int AS n FROM proj_entity_heads WHERE entity_id = $1',
+      [doomed.entity.id],
+    );
+    expect(heads.rows[0]).toEqual({ n: 0 });
+  });
+
   it('the engine sees the world as of the previous event — not the one under evaluation', async () => {
     const observed: Array<number | null> = [];
     const peeking: typeof evaluateEvent = async (env, ctx) => {
@@ -127,7 +197,19 @@ describe('onEventCommitted', () => {
   it('fires after commit with the full envelope, and only for committed events', async () => {
     const ingest = service();
     const seen: EventEnvelope[] = [];
-    ingest.onEventCommitted((event) => seen.push(event));
+    // AFTER is the load-bearing word, and only another connection can see it.
+    // The listener reads the ledger through the pool, never through ingest's
+    // own client: a hook fired inside the transaction would find nothing there,
+    // because an uncommitted row is invisible outside the writer.
+    const visibleFromAnotherConnection: Array<Promise<number>> = [];
+    ingest.onEventCommitted((event) => {
+      seen.push(event);
+      visibleFromAnotherConnection.push(
+        db.pool
+          .query<{ n: number }>('SELECT count(*)::int AS n FROM events WHERE id = $1', [event.id])
+          .then((result) => result.rows[0]?.n ?? -1),
+      );
+    });
 
     const valid = submittedWorkspaceCreated();
     const invalid = { ...submittedWorkspaceCreated(), type: 'shop.opened' };
@@ -135,6 +217,23 @@ describe('onEventCommitted', () => {
 
     expect(seen).toHaveLength(1);
     expect(seen[0]).toMatchObject({ id: valid.id, seq: 1, type: 'workspace.created' });
+    expect(await Promise.all(visibleFromAnotherConnection)).toEqual([1]);
+  });
+
+  it('fires only once the COMMIT round-trip has RESOLVED, not before it is issued', async () => {
+    // The cross-connection read above states the intent but cannot enforce it:
+    // ingest does not await its listeners, so that read is dispatched a tick
+    // late and the COMMIT lands first even when the hook fired inside the
+    // transaction. Recording the commit where it happens removes the race —
+    // this ordering is decided in JavaScript, not by two racing backends.
+    const order: string[] = [];
+    const ingest = service({ pool: poolRecordingCommits(db.pool, order) });
+    ingest.onEventCommitted(() => order.push('listener'));
+
+    const results = await ingest.ingestBatch([submittedWorkspaceCreated()]);
+
+    expect(results[0]?.status).toBe('committed');
+    expect(order).toEqual(['commit-completed', 'listener']);
   });
 
   it('never fires for refused events', async () => {
