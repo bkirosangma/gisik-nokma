@@ -9,6 +9,8 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 2. Product design
 
-- ⚙️ **Product design spec** — the brainstorm's approved output: audience (non-technical operators), the honesty contract, event-sourced architecture with a shared rule engine, workflow engine and builder, offline sync with contested claims, permissions and visibility, views and search, testing discipline, and the two dogfooding targets. Awaiting owner review before an implementation plan is written. `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md`
+- ⚙️ **Product design spec** — the brainstorm's approved output: audience (non-technical operators), the honesty contract, event-sourced architecture with a shared rule engine, workflow engine and builder, offline sync with contested claims, permissions and visibility, views and search, testing discipline, and the two dogfooding targets. Approved and merged (PR #1). `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md`
+- ⚙️ **Implementation plan series** — eleven task-by-task plans covering the whole build, ledger through deployment and dogfooding, written in parallel from one pinned contract and then reconciled. Under review on `plans/server-core` (PR #2), plan by plan. `docs/superpowers/plans/`
+- ⚙️ **Series coordination document** — the single authority for cross-plan interfaces, naming, and ownership, and the record of every decision taken at review: where a plan disagrees with it, it wins. `docs/superpowers/plans/2026-08-20-00-series-coordination.md`
 
-*(Product feature sections begin once implementation starts; the brainstorm that produced the spec started from `docs/brainstorm-kickoff.md`.)*
+*(Product feature sections begin once implementation starts. Sections 3–13, and the matching `test-cases/` buckets, are already reserved one per plan by the coordination document. The brainstorm that produced the spec started from `docs/brainstorm-kickoff.md`.)*
