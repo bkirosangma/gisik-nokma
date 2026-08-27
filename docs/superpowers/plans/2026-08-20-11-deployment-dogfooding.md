@@ -958,6 +958,8 @@ CMD ["node", "apps/web/server.js"]
 
 (`NEXT_PUBLIC_*` are baked at build time — that is Next's model; the compose file and the DO spec pass them as build args. The env-var names are the pin flagged to Plan 6 in Open questions #5 — if Plan 6 landed different names, change the ARG/ENV lines here and in compose, nothing else.)
 
+**Three more web build args, added at Plan 7's walk (2026-08-27), which found this plan credited with provisioning them while it had never heard of them:** `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_GOOGLE_PICKER_API_KEY`, `NEXT_PUBLIC_GOOGLE_APP_ID` — the Google Drive picker's config (Plan 7 Task 12a; the editor package takes a `DrivePickerConfig` and never reads env; the web shell fills it at the ticket-sheet mount). Add them to the ARG/ENV lines, the compose build args, the DO spec, and `.env.example` — the completeness gate exists precisely so a variable consumed anywhere is named there. Provisioning the Picker API key itself is a console errand in the same Google Cloud project as the OAuth client; it goes in the runbook beside the other external-service setup. **All three are optional by design:** a shell that supplies no picker config renders no "Attach from Drive" control at all — a build without the key ships a product without the feature, never a control that fails on click.
+
 - [ ] **Step 5: Build both images and smoke the server one**
 
 ```bash
@@ -4235,6 +4237,21 @@ read back on every restore drill anyway), both alerting the webhook on
 failure. Manual run: `pnpm --filter @gisik-nokma/server run ops:backup-once`
 (or `node dist/ops/backup-daemon-main.js --once` in the container). The
 managed database's own daily backups are a second string, not the plan.
+
+## Orphaned uploads (monthly, with the restore drill)
+An upload whose `attachment.added` never landed — the client crashed
+between the POST and the event — leaves an object and a row that no view
+can reach and no ledger event names. Harmless to honesty, unbounded in
+storage. Sweep: `pnpm --filter @gisik-nokma/server run ops:sweep-orphans`
+(assigned at Plan 7's walk, 2026-08-27) deletes attachment rows and their
+Spaces objects that are **older than 30 days** and **referenced by no
+`attachment.added` in the ledger** — both conditions checked in one query,
+and the ledger is never touched. That constraint is the whole design: the
+sweep may only ever delete what the ledger has never heard of, so nothing
+a claim points at can vanish. It prints what it deleted; run with
+`--dry-run` first and expect single digits — a large count means clients
+are failing between upload and ingest, which is an incident, not a
+cleanup.
 
 ## Restore drill (monthly, and after any schema change)
 1. `pnpm --filter @gisik-nokma/server run ops:fetch-backup -- pg/<latest>.dump /tmp/drill.dump`
