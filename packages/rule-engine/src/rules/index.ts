@@ -20,6 +20,10 @@ export async function evaluateTransitionRules(
 }
 
 async function evaluateOneRule(rule: Rule, input: TransitionRuleInput): Promise<Accept | Refusal> {
+  // No `default:` arm — adding one would make every branch return, which
+  // retires the compile-time exhaustiveness check this switch exists for
+  // (a sixth Rule kind would then fall through to `default` instead of
+  // failing to compile).
   switch (rule.kind) {
     case 'require-comment':
       return evaluateRequireComment(rule, input);

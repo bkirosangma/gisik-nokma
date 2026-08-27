@@ -171,12 +171,16 @@ function ticket(overrides: Pick<TicketState, 'id' | 'stateId' | 'stateCategory'>
   };
 }
 
-/** A ticket.transitioned envelope moving `entityId` (default `t1`) to `to`. */
-function transitioned(to: string, entityId = 't1'): EventEnvelope {
+/**
+ * A ticket.transitioned envelope moving `entityId` (default `t1`) to `to`,
+ * with an optional payload extension (e.g. a comment) for rules that read
+ * more than `to`.
+ */
+function transitioned(to: string, entityId = 't1', payloadExtra: Record<string, unknown> = {}): EventEnvelope {
   return envelope({
     type: 'ticket.transitioned',
     entity: { kind: 'ticket', id: entityId },
-    payload: { to },
+    payload: { to, ...payloadExtra },
   });
 }
 
@@ -434,6 +438,15 @@ describe('the invariant runs before authored rules (Task 8 amendment 2)', () => 
  * pins the stop: the second rule is a kind this task deliberately leaves
  * throwing "not implemented yet," so reaching it (instead of stopping at the
  * first refusal) turns a passing assertion into a rejected promise.
+ *
+ * The refusing case alone only pins "stops at a refusal" — it cannot
+ * distinguish a genuine early-return from an unconditional `return result`
+ * that happens to return rule 1's verdict on its way past rule 2 (rule 1
+ * refuses either way here, so an unconditional-return mutant produces the
+ * identical observable result). The second case below closes that gap: rule
+ * 1 ACCEPTS a real comment, so only a loop that keeps going after an accept
+ * can ever reach rule 2's throw. Together the two cases pin both directions
+ * of "first refusal wins" — stop on refuse, continue on accept.
  */
 describe('evaluateTransitionRules — first refusal wins (Task 8)', () => {
   it('stops at the first refusing rule and never reaches a later, unimplemented one', async () => {
@@ -444,5 +457,25 @@ describe('evaluateTransitionRules — first refusal wins (Task 8)', () => {
       rule: REFUSAL_RULES.requireComment,
       reason: 'This move must carry a comment explaining it, and none was provided.',
     });
+  });
+
+  it('continues past an accepting rule to the next one — a real comment reaches the still-unimplemented require-evidence', async () => {
+    const parent = ticket({ id: 't1', stateId: 'todo', stateCategory: 'open', workflowId: 'wf_two_rules' });
+    const { ctx } = spyContext(twoRulesV1, { entity: parent });
+    // require-comment (rule 1) accepts a real comment, so a correct loop must
+    // move on to rule 2. require-evidence is not implemented yet (Task 9's
+    // job) and throws when reached — that thrown promise rejection is this
+    // test's only signal that evaluation did not stop after rule 1's accept.
+    //
+    // NOTE for Task 9: once evaluateRequireEvidence replaces this throw, the
+    // mechanism this test relies on disappears — `evidenceAttachmentId` is
+    // absent from this candidate, so the assertion must become a real
+    // require-evidence REFUSAL (`.resolves.toEqual({ refused: true, rule:
+    // REFUSAL_RULES.requireEvidence, reason: ... })`), not a rejected
+    // promise. Task 9 owns updating this test in that same change set —
+    // ledgered here, not left for a later task to rediscover.
+    await expect(
+      evaluateEvent(transitioned('done', 't1', { comment: { text: 'Shipped and verified.' } }), ctx),
+    ).rejects.toThrow('rule kind "require-evidence" is not implemented yet');
   });
 });
