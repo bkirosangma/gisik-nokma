@@ -108,6 +108,51 @@ function basicV2(stateMapping?: Record<string, string>): EventEnvelope {
   });
 }
 
+/**
+ * `basicV1`'s `review -> done` edge, but carrying a require-comment rule.
+ * Used only to prove the evaluation order between the parent-terminal
+ * invariant (Task 7) and authored transition rules (Task 8): a fixture
+ * suite that plants exactly one child and one candidate per case cannot
+ * distinguish "the invariant ran first" from "the rule happened to agree" —
+ * the same reason the stranding refusal's join and the invariant's own gate
+ * needed a unit test rather than a fixture.
+ */
+const guardedV1: WorkflowDef = {
+  id: 'wf_guarded',
+  version: 1,
+  name: 'Guarded',
+  initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'review', name: 'In review', category: 'active' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [
+    { from: 'todo', to: 'review', rules: [] },
+    { from: 'review', to: 'done', rules: [{ kind: 'require-comment' }] },
+  ],
+};
+
+/**
+ * Two rules on one edge, the first of a kind this task implements and the
+ * second of a kind it deliberately leaves throwing "not implemented yet"
+ * (Task 8's brief). Used to prove first-refusal-wins without waiting for a
+ * second real rule module to exist: reaching an implemented refusal and
+ * never reaching the unimplemented throw is exactly what "stops at the
+ * first refusal" means.
+ */
+const twoRulesV1: WorkflowDef = {
+  id: 'wf_two_rules',
+  version: 1,
+  name: 'TwoRules',
+  initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [{ from: 'todo', to: 'done', rules: [{ kind: 'require-comment' }, { kind: 'require-evidence' }] }],
+};
+
 /** A TicketState against `basicV1`, filled in enough for the transition path; every field a test doesn't care about gets a harmless default. */
 function ticket(overrides: Pick<TicketState, 'id' | 'stateId' | 'stateCategory'> & Partial<TicketState>): TicketState {
   return {
@@ -346,6 +391,58 @@ describe('the parent-terminal invariant, and what the fixture suite cannot pin',
       refused: true,
       rule: REFUSAL_RULES.parentTerminal,
       reason: 'This ticket cannot enter "Done" while 2 of its child tickets are still open.',
+    });
+  });
+});
+
+/**
+ * Task 7 carry-forward, pinned once Task 8 gives authored rules something to
+ * disagree with the invariant about. No fixture in the suite can witness
+ * this: every fixture that reaches a rule targets an edge with no open
+ * children, and every fixture that has an open child targets an edge with no
+ * rules. Only a case with BOTH can tell "invariant first" from "rules first"
+ * apart, and that case is a unit test by design (Task 8 amendment 2).
+ */
+describe('the invariant runs before authored rules (Task 8 amendment 2)', () => {
+  it('refuses parent-terminal-with-open-children even when the edge also carries a require-comment rule with no comment', async () => {
+    const parent = ticket({ id: 't1', stateId: 'review', stateCategory: 'active', workflowId: 'wf_guarded' });
+    const openChild = ticket({
+      id: 't2',
+      parentId: 't1',
+      stateId: 'todo',
+      stateCategory: 'open',
+      workflowId: 'wf_guarded',
+    });
+    const { ctx } = spyContext(guardedV1, { entity: parent, children: [openChild] });
+    // 'review' -> 'done' carries a require-comment rule, and no comment is
+    // given. Were rules to run first (or the invariant to run after them),
+    // this would refuse as require-comment instead.
+    const verdict = await evaluateEvent(transitioned('done'), ctx);
+    expect(verdict).toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.parentTerminal,
+      reason: 'This ticket cannot enter "Done" while 1 of its child tickets is still open.',
+    });
+  });
+});
+
+/**
+ * `evaluateTransitionRules` (Task 8) runs a transition's rules in definition
+ * order and stops at the first refusal. The fixture suite's single-rule
+ * fixtures cannot witness "stops," only "refuses" — a rule engine that ran
+ * every rule and returned the last refusal would pass them identically. This
+ * pins the stop: the second rule is a kind this task deliberately leaves
+ * throwing "not implemented yet," so reaching it (instead of stopping at the
+ * first refusal) turns a passing assertion into a rejected promise.
+ */
+describe('evaluateTransitionRules — first refusal wins (Task 8)', () => {
+  it('stops at the first refusing rule and never reaches a later, unimplemented one', async () => {
+    const parent = ticket({ id: 't1', stateId: 'todo', stateCategory: 'open', workflowId: 'wf_two_rules' });
+    const { ctx } = spyContext(twoRulesV1, { entity: parent });
+    await expect(evaluateEvent(transitioned('done'), ctx)).resolves.toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.requireComment,
+      reason: 'This move must carry a comment explaining it, and none was provided.',
     });
   });
 });

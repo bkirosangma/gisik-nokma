@@ -1,5 +1,6 @@
 import { ticketTransitionedPayloadSchema, type EventEnvelope } from '@gisik-nokma/domain';
 import { REFUSAL_RULES } from './refusal-rules.js';
+import { evaluateTransitionRules } from './rules/index.js';
 import { resolveCurrentStateId } from './version-map.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
 
@@ -100,6 +101,13 @@ export async function evaluateTicketTransitioned(
     }
   }
 
-  // TASK 8 replaces this acceptance with the transition-rule evaluation.
-  return { refused: false };
+  return evaluateTransitionRules(transition.rules, {
+    env,
+    ctx,
+    ticket,
+    def: latest,
+    toState,
+    fromStateId: resolved.stateId,
+    payload,
+  });
 }

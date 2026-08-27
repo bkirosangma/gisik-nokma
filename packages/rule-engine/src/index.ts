@@ -6,3 +6,5 @@ export { evaluateWorkflowDefined } from './workflow-defined.js';
 export { evaluateTicketTransitioned } from './transition.js';
 export { resolveCurrentStateId, resolveStateIdForward } from './version-map.js';
 export type { ResolvedState } from './version-map.js';
+export { evaluateTransitionRules } from './rules/index.js';
+export type { RuleEvaluator, TransitionRuleInput } from './rules/types.js';
