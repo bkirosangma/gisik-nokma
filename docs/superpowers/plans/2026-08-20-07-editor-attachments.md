@@ -2852,7 +2852,7 @@ beforeAll(async () => {
   db = await createTestDatabase();
   storeRoot = await mkdtemp(join(tmpdir(), 'gisik-upload-'));
   await seedMember(db.pool, WS, MEMBER, 'member', [{ projectId: PRJ }]);
-  await seedGuest(db.pool, WS, GUEST, PRJ);
+  await seedGuest(db.pool, WS, GUEST);
   await seedTicket(db.pool, { workspaceId: WS, projectId: PRJ, ticketId: TICKET });
   // The route also reads proj_tickets for the owning workspace; make the row
   // exist regardless of what seedTicket wrote (columns per Plan 3).
@@ -3286,7 +3286,7 @@ beforeAll(async () => {
   storeRoot = await mkdtemp(join(tmpdir(), 'gisik-download-'));
   const store = new LocalDiskStore(storeRoot);
   await seedMember(db.pool, WS, MEMBER, 'member', [{ projectId: PRJ }]);
-  await seedGuest(db.pool, WS, GUEST, PRJ);
+  await seedGuest(db.pool, WS, GUEST);
   await seedTicket(db.pool, { workspaceId: WS, projectId: PRJ, ticketId: TICKET });
 
   await store.put(`w/${WS}/a/${IMG_ID}`, Readable.from(PNG_BYTES), { mime: 'image/png', size: PNG_BYTES.length });

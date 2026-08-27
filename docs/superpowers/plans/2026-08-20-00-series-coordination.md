@@ -208,3 +208,60 @@ Every decision above is settled and recorded. These plan edits are **not yet app
 - ~~**Plan 11** — the seed CLIs re-emitting the founding events.~~ **Done.** Both seeds now emit `workspace.created` and let Plan 4's bootstrap append the workflow, the four built-in types and the founder grant inside the same transaction; each seed keeps only what is genuinely its own (the shop's errand workflow and errand type, the dev project). Their own kanban workflow ids, built-in type definitions and owner grants are gone, along with the imports and constants that fed them — a duplicate founding sequence is one that can drift, and it would have been the version everybody saw demoed.
 
 **With that, the 2026-08-26 wave is fully applied.** The only item left open is the unassigned type-versioning limit above.
+
+## Owner decisions (2026-08-27): Plan 4's open questions
+
+Settled without change: **better-auth** (already signed off); `visibleEventsFor` yielding `SyncItem` (a recorded contract amendment, and Plan 10 does consume the union); better-auth's vendor table naming as a documented exception. Plan 4's claim to own the ticket *history* endpoint was stale text — §"Contract amendments" already gives it to Plan 3 — and is corrected rather than asked about.
+
+### One way onto a project, one way off
+
+`membership.granted {userId, role, scope}` could carry `scope: {projectId}`, and `project.member_added {userId, projectAdmin}` did the roster; both wrote `proj_memberships`. **Two ways on meant two ways off** — `membership.revoked {scope:{projectId}}` and `project.member_removed` both mean "take them off this project", and unless they write the identical projection key, removing by one path leaves the other standing. An admin believes access is gone when it is not: a silent access-control failure, the same shape as the two-sources-of-truth defects found earlier on this branch.
+
+Checking what the project-scoped grant bought found that it bought nothing. The only guest in the series — the accountant in Plan 11's seed — receives a project-scoped grant and then receives their actual access from `visibility.set` explicit lists. The grant confers no reads (a guest's `canSee` is explicit-only) and no writes (guests are refused ticket creation before the project check is reached). It was inert.
+
+**Decision:**
+- `membership.granted` / `membership.revoked` are **workspace-scope only**; they carry the workspace role and nothing else. `MembershipScope` is removed from the vocabulary.
+- `project.member_added` / `project.member_removed` are the **only** project association, carrying the project-admin flag.
+- Guests reach work through `visibility.set` explicit lists, which is what spec §6 says a guest is.
+
+Project-wide guest access is given up. The spec never promised it, and it returns later as a deliberate feature rather than as an accident of two overlapping events.
+
+### Invites name an address, not a user id
+
+Spec §6 promises "Invites travel as links or QR from an admin", and the vocabulary could not express it: `MembershipGrantedPayload` names a `userId`, which somebody who has never signed in does not have. So no new person could be invited to a workspace at all — including the accountant the dogfooding plan depends on.
+
+**Decision (owner: "ask them to create an account when they land"):** a new event pair. `invite.sent { inviteId, address, channel: 'email' | 'phone', role, projectIds? }` records the attributed claim that an admin invited somebody, naming the address rather than a user. `invite.accepted { inviteId, userId }` is appended when the invitee lands, authenticates (creating an account if they have none — the existing phone-OTP / magic-link / Google paths, no new auth), and the server binds the invite to the resolved user, appending the `membership.granted` and any `project.member_added` the invite promised. An invite is a claim like everything else: attributed, dated, and visible as pending until accepted. Revocation before acceptance is `invite.revoked { inviteId }`.
+
+### The owner reads everything; an admin does not
+
+The original rule gave nobody a visibility bypass. **Owner-amended:** the workspace `owner` role bypasses read visibility across their workspace; `admin` does not and must still join a project to read its project-mode tickets. The hierarchy makes the workspace the right unit — it is the container everything else sits inside.
+
+Reads leave no event trace, so this power cannot be made honest by attribution. It is made honest **by disclosure**: the visibility controls state plainly that the workspace owner can always see. A stated power is not a lie; a hidden one is. Writing is unchanged — creating in a project still requires joining it, which is an attributed event.
+
+### Guests receive only the workflows they need to render what they can see
+
+Definitions were sent to everyone including guests, so a guest received every workflow in the workspace and with it every state name — internal process leaked to an external party. Narrowed to the workflows and ticket types actually used by tickets that guest can see. Same rendering, much smaller surface.
+
+### Purge on membership loss: per-id for members, scope-revoked for guests
+
+Per-id purges tell the recipient how many tickets existed in a scope, including ids they never held. For a member losing a project that is minor and consistent with the restricted-parent existence-leak spec §6 already accepts. For a **guest** being revoked it is an external party learning the size of work they were never shown, so guests receive a single scope-revoked instruction instead of per-id purges.
+
+### A creator may still lock themselves out, and is warned first
+
+Explicit lists stay exactly the authored list — appending the creator would be the system inventing a claim nobody made. The client warns at the moment of authoring that the author will lose access, and names the repair path (a project admin can restore it). Warning is not inventing.
+
+### Route prefix
+
+Task 8's ticket read routes were `/api/workspaces/...`, predating amendment 20. Moved to `/v1/*`: 19 occurrences in Plan 4 and six across Plans 5, 6, 9 and 10. better-auth's vendor surface stays at `/api/auth/*` — that exception is unchanged.
+
+**Plans to amend:** 4 (all of the above; definition site) · 5, 6, 9, 10 (route prefix; 5 and 10 also the guest slice and the purge split) · 11 (the accountant's now-removed project-scoped grant).
+
+### Outstanding from this wave
+
+Applied so far: the **membership collapse** end to end in Plan 4 — vocabulary, parsers, `proj_memberships`, the role gate, the purge path, the fixtures — plus the **guest definition slice** and the **purge split** in `visibleEventsFor`, and every `seedGuest` caller in Plans 4, 7 and 10. Two things were found while applying it and are now part of it: `membership.granted`/`revoked` **refuse** a `scope` rather than ignoring one (a stale client's claim means "put them on project P", and silently doing something else is the quiet acceptance the contract forbids); and `membership.revoked` deletes a person's **project** rows too, since leaving someone on a project after they are out of the workspace is the same silent-access failure in a different place.
+
+Still to apply. Delete each line as it lands:
+
+- **Plan 4** — the invite event pair and its acceptance path; the owner read bypass with its disclosure; the creator-lockout warning; the `/api/workspaces` → `/v1` move (19 occurrences); Features.md and test-case entries for all of the above.
+- **Plan 10** — consume `ScopeRevokedInstruction`: the replica must handle a scope-revoked item as a local delete by scope, which is idempotent like a purge. Until it does, a guest revocation is a wire shape nothing reads.
+- **Plans 5, 6, 9, 11** — the route prefix and the accountant's grant (in flight).

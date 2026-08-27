@@ -869,7 +869,7 @@ git commit -m "Sign-in works four ways with no passwords: phone OTP, magic link,
 
 **Interfaces:**
 - Consumes: Plan 1's `registerEventType({type, version, entityKind, parsePayload})` and `parseEvent` (unknown types are refused at ingest — registration is what makes these types legal).
-- Produces (all exported from `@gisik-nokma/domain`): `WorkspaceRole = 'owner'|'admin'|'member'|'guest'`; `MembershipScope = 'workspace' | { projectId: string }`; `VisibilityMode = 'workspace'|'project'|'explicit'|'inherit'`; payload interfaces `WorkspaceCreatedPayload {name}`, `ProjectCreatedPayload {name}`, `MembershipGrantedPayload {userId, role, scope}`, `MembershipRevokedPayload {userId, scope}`, `ProjectMemberAddedPayload {userId, projectAdmin}`, `ProjectMemberRemovedPayload {userId}`, `VisibilitySetPayload {ticketId, mode, userIds?}`; parsers `parseWorkspaceCreated`, `parseProjectCreated`, `parseMembershipGranted`, `parseMembershipRevoked`, `parseProjectMemberAdded`, `parseProjectMemberRemoved`, `parseVisibilitySet` — each `(payload: unknown) => <Payload>`, throwing `Error` with a plain message on invalid input.
+- Produces (all exported from `@gisik-nokma/domain`): `WorkspaceRole = 'owner'|'admin'|'member'|'guest'`; `VisibilityMode = 'workspace'|'project'|'explicit'|'inherit'`; payload interfaces `WorkspaceCreatedPayload {name}`, `ProjectCreatedPayload {name}`, `MembershipGrantedPayload {userId, role}`, `MembershipRevokedPayload {userId}`, `ProjectMemberAddedPayload {userId, projectAdmin}`, `ProjectMemberRemovedPayload {userId}`, `VisibilitySetPayload {ticketId, mode, userIds?}`; parsers `parseWorkspaceCreated`, `parseProjectCreated`, `parseMembershipGranted`, `parseMembershipRevoked`, `parseProjectMemberAdded`, `parseProjectMemberRemoved`, `parseVisibilitySet` — each `(payload: unknown) => <Payload>`, throwing `Error` with a plain message on invalid input.
 
 **Event → entity mapping (a modeling decision, stated once):** `workspace.created` → entity `{kind:'workspace', id: workspaceId}`; `project.created` → `{kind:'project', id: projectId}`; `membership.granted`/`membership.revoked` → `{kind:'membership', id: membershipId(workspaceId, userId)}` — `membershipId` is Plan 2's helper in `@gisik-nokma/domain` (`${workspaceId}:${userId}`), and the id is deterministic because the engine must be able to address a membership from `(workspaceId, actorId)` via `getEntityState('membership', id)` (coordination doc §5); the *scope* stays in the payload, and `proj_memberships` still keys on `(workspaceId, userId, scope)`; `project.member_added`/`project.member_removed` → `{kind:'project', id: projectId}` (they are project-roster history); `visibility.set` → `{kind:'ticket', id: ticketId}` (must equal `payload.ticketId` — Task 9 refuses mismatches).
 
@@ -907,38 +907,38 @@ describe('parseProjectCreated', () => {
 });
 
 describe('parseMembershipGranted', () => {
-  it('accepts a workspace-scope grant', () => {
-    expect(parseMembershipGranted({ userId: 'usr_1', role: 'admin', scope: 'workspace' })).toEqual({
+  it('accepts a workspace grant', () => {
+    expect(parseMembershipGranted({ userId: 'usr_1', role: 'admin' })).toEqual({
       userId: 'usr_1',
       role: 'admin',
-      scope: 'workspace',
-    });
-  });
-  it('accepts a project-scope grant', () => {
-    expect(parseMembershipGranted({ userId: 'usr_1', role: 'guest', scope: { projectId: 'prj_1' } })).toEqual({
-      userId: 'usr_1',
-      role: 'guest',
-      scope: { projectId: 'prj_1' },
     });
   });
   it('refuses an unknown role', () => {
-    expect(() => parseMembershipGranted({ userId: 'usr_1', role: 'superuser', scope: 'workspace' })).toThrow(/role/);
+    expect(() => parseMembershipGranted({ userId: 'usr_1', role: 'superuser' })).toThrow(/role/);
   });
-  it('refuses a malformed scope', () => {
-    expect(() => parseMembershipGranted({ userId: 'usr_1', role: 'member', scope: 'project' })).toThrow(/scope/);
-    expect(() => parseMembershipGranted({ userId: 'usr_1', role: 'member', scope: { projectId: '' } })).toThrow(/scope/);
+  // Planted defect for the 2026-08-27 collapse: a stale client or an old
+  // fixture can still send the scope this event used to carry. Accepting and
+  // ignoring it would take in a claim meaning "put them on project P" and do
+  // something else — the silent acceptance the honesty contract forbids — and
+  // it is how the two-ways-on/two-ways-off hole would grow back.
+  it('refuses a scope, rather than ignoring one', () => {
+    expect(() => parseMembershipGranted({ userId: 'usr_1', role: 'guest', scope: { projectId: 'prj_1' } }))
+      .toThrow(/project\.member_added/);
+    expect(() => parseMembershipGranted({ userId: 'usr_1', role: 'member', scope: 'workspace' }))
+      .toThrow(/project\.member_added/);
   });
 });
 
 describe('parseMembershipRevoked', () => {
-  it('accepts userId plus scope', () => {
-    expect(parseMembershipRevoked({ userId: 'usr_1', scope: 'workspace' })).toEqual({
-      userId: 'usr_1',
-      scope: 'workspace',
-    });
+  it('accepts a userId', () => {
+    expect(parseMembershipRevoked({ userId: 'usr_1' })).toEqual({ userId: 'usr_1' });
   });
   it('refuses a missing userId', () => {
-    expect(() => parseMembershipRevoked({ scope: 'workspace' })).toThrow(/userId/);
+    expect(() => parseMembershipRevoked({})).toThrow(/userId/);
+  });
+  it('refuses a scope, rather than ignoring one', () => {
+    expect(() => parseMembershipRevoked({ userId: 'usr_1', scope: { projectId: 'prj_1' } }))
+      .toThrow(/project\.member_removed/);
   });
 });
 
@@ -975,8 +975,24 @@ Expected: FAIL — cannot resolve `../../src/events/membership`.
 // packages/domain/src/events/membership.ts
 
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'guest';
-export type MembershipScope = 'workspace' | { projectId: string };
 
+/**
+ * Membership is workspace-scoped and nothing else (owner decision 2026-08-27).
+ * There was a `MembershipScope = 'workspace' | { projectId }` here, so a person
+ * could be put on a project two ways — this event with a project scope, or
+ * `project.member_added`. Two ways on means two ways off: `membership.revoked`
+ * with a project scope and `project.member_removed` both mean "take them off
+ * this project", and unless they wrote the identical projection key, removing
+ * by one path left the other standing and an admin believed access was gone
+ * when it was not.
+ *
+ * The project scope also bought nothing. A guest's `canSee` is explicit-only,
+ * so it granted no reads, and guests are refused ticket creation before the
+ * project check is reached, so it granted no writes. `project.member_added` /
+ * `project.member_removed` are now the ONLY project association; guests reach
+ * work through `visibility.set` explicit lists, which is what spec §6 says a
+ * guest is.
+ */
 export interface WorkspaceCreatedPayload {
   name: string;
 }
@@ -986,11 +1002,9 @@ export interface ProjectCreatedPayload {
 export interface MembershipGrantedPayload {
   userId: string;
   role: WorkspaceRole;
-  scope: MembershipScope;
 }
 export interface MembershipRevokedPayload {
   userId: string;
-  scope: MembershipScope;
 }
 export interface ProjectMemberAddedPayload {
   userId: string;
@@ -1014,14 +1028,6 @@ function requireNonEmptyString(record: Record<string, unknown>, field: string, e
   return value;
 }
 
-function parseScope(value: unknown, eventType: string): MembershipScope {
-  if (value === 'workspace') return 'workspace';
-  if (isRecord(value) && typeof value.projectId === 'string' && value.projectId.trim() !== '') {
-    return { projectId: value.projectId };
-  }
-  throw new Error(`${eventType} payload requires scope 'workspace' or {projectId}`);
-}
-
 export function parseWorkspaceCreated(payload: unknown): WorkspaceCreatedPayload {
   if (!isRecord(payload)) throw new Error('workspace.created payload requires a non-empty name');
   return { name: requireNonEmptyString(payload, 'name', 'workspace.created') };
@@ -1033,20 +1039,30 @@ export function parseProjectCreated(payload: unknown): ProjectCreatedPayload {
 }
 
 export function parseMembershipGranted(payload: unknown): MembershipGrantedPayload {
-  if (!isRecord(payload)) throw new Error('membership.granted payload requires userId, role, scope');
+  if (!isRecord(payload)) throw new Error('membership.granted payload requires userId and role');
   const userId = requireNonEmptyString(payload, 'userId', 'membership.granted');
   const role = payload.role;
   if (typeof role !== 'string' || !ROLES.has(role)) {
     throw new Error("membership.granted payload requires role 'owner'|'admin'|'member'|'guest'");
   }
-  return { userId, role: role as WorkspaceRole, scope: parseScope(payload.scope, 'membership.granted') };
+  // A `scope` is REFUSED rather than ignored. These events used to carry one,
+  // so a stale client or an old fixture can still send it — and silently
+  // dropping it would accept a claim meaning "put them on project P" while
+  // doing something else entirely, which is the quiet acceptance the honesty
+  // contract exists to prevent. Project membership is project.member_added.
+  if ('scope' in payload) {
+    throw new Error('membership.granted no longer takes a scope; use project.member_added to put someone on a project');
+  }
+  return { userId, role: role as WorkspaceRole };
 }
 
 export function parseMembershipRevoked(payload: unknown): MembershipRevokedPayload {
-  if (!isRecord(payload)) throw new Error('membership.revoked payload requires userId and scope');
+  if (!isRecord(payload)) throw new Error('membership.revoked payload requires userId');
+  if ('scope' in payload) {
+    throw new Error('membership.revoked no longer takes a scope; use project.member_removed to take someone off a project');
+  }
   return {
     userId: requireNonEmptyString(payload, 'userId', 'membership.revoked'),
-    scope: parseScope(payload.scope, 'membership.revoked'),
   };
 }
 
@@ -1296,12 +1312,22 @@ beforeEach(async () => {
   await truncateAll(pool);
 });
 
-function grant(userId: string, role: 'owner' | 'admin' | 'member' | 'guest', scope: 'workspace' | { projectId: string }) {
+function grant(userId: string, role: 'owner' | 'admin' | 'member' | 'guest') {
   return testEnvelope({
     workspaceId: WS,
     entity: { kind: 'membership', id: membershipId(WS, userId) },
     type: 'membership.granted',
-    payload: { userId, role, scope },
+    payload: { userId, role },
+    actorId: 'usr_admin',
+  });
+}
+
+function addToProject(userId: string, projectId: string, projectAdmin = false) {
+  return testEnvelope({
+    workspaceId: WS,
+    entity: { kind: 'project', id: projectId },
+    type: 'project.member_added',
+    payload: { userId, projectAdmin },
     actorId: 'usr_admin',
   });
 }
@@ -1329,15 +1355,20 @@ describe('proj_memberships apply', () => {
     ]);
   });
 
-  it('revocation deletes exactly the named scope', async () => {
-    await projMemberships.apply(grant('usr_1', 'member', 'workspace'), pool);
-    await projMemberships.apply(grant('usr_1', 'guest', { projectId: 'prj_1' }), pool);
+  // One way off each scope, matching the one way on (owner decision
+  // 2026-08-27). Taking someone off a project is project.member_removed and
+  // nothing else; membership.revoked takes them out of the workspace. When
+  // both events could mean "off this project", removing by one path left the
+  // other row standing and an admin believed access was gone when it was not.
+  it('project removal deletes the project row and leaves workspace membership', async () => {
+    await projMemberships.apply(grant('usr_1', 'member'), pool);
+    await projMemberships.apply(addToProject('usr_1', 'prj_1'), pool);
     await projMemberships.apply(
       testEnvelope({
         workspaceId: WS,
-        entity: { kind: 'membership', id: membershipId(WS, 'usr_1') },
-        type: 'membership.revoked',
-        payload: { userId: 'usr_1', scope: { projectId: 'prj_1' } },
+        entity: { kind: 'project', id: 'prj_1' },
+        type: 'project.member_removed',
+        payload: { userId: 'usr_1' },
         actorId: 'usr_admin',
       }),
       pool,
@@ -1345,6 +1376,24 @@ describe('proj_memberships apply', () => {
     expect(await rows()).toEqual([
       { user_id: 'usr_1', scope_kind: 'workspace', project_id: '', role: 'member', project_admin: false },
     ]);
+  });
+
+  it('workspace revocation deletes every row for that user, project rows included', async () => {
+    await projMemberships.apply(grant('usr_1', 'member'), pool);
+    await projMemberships.apply(addToProject('usr_1', 'prj_1'), pool);
+    await projMemberships.apply(
+      testEnvelope({
+        workspaceId: WS,
+        entity: { kind: 'membership', id: membershipId(WS, 'usr_1') },
+        type: 'membership.revoked',
+        payload: { userId: 'usr_1' },
+        actorId: 'usr_admin',
+      }),
+      pool,
+    );
+    // Leaving a project row behind for someone who is no longer in the
+    // workspace is the same silent-access failure in a different place.
+    expect(await rows()).toEqual([]);
   });
 
   it('project roster events add and remove project-scope member rows', async () => {
@@ -1391,7 +1440,7 @@ describe('proj_memberships apply', () => {
         workspaceId: WS,
         entity: { kind: 'membership', id: membershipId(WS, 'usr_2') },
         type: 'membership.revoked',
-        payload: { userId: 'usr_2', scope: 'workspace' },
+        payload: { userId: 'usr_2' },
         actorId: 'usr_1',
       }),
     ];
@@ -1472,24 +1521,26 @@ export const projMemberships = {
 
   async apply(env: EventEnvelope, db: Queryable): Promise<void> {
     switch (env.type) {
+      // Membership is workspace-scoped (owner decision 2026-08-27), so this
+      // writes the workspace row and only that. Project rows come from
+      // project.member_added below, and from nowhere else.
       case 'membership.granted': {
         const p = env.payload as MembershipGrantedPayload;
-        const scopeKind = p.scope === 'workspace' ? 'workspace' : 'project';
-        const projectId = p.scope === 'workspace' ? '' : p.scope.projectId;
         await db.query(UPSERT, [
-          env.workspaceId, p.userId, scopeKind, projectId, p.role, false,
+          env.workspaceId, p.userId, 'workspace', '', p.role, false,
           env.actorId, env.serverTime, env.seq,
         ]);
         return;
       }
       case 'membership.revoked': {
         const p = env.payload as MembershipRevokedPayload;
-        const scopeKind = p.scope === 'workspace' ? 'workspace' : 'project';
-        const projectId = p.scope === 'workspace' ? '' : p.scope.projectId;
+        // Every row, project rows included. Leaving someone on a project after
+        // they have been put out of the workspace is the same silent-access
+        // failure the scope collapse exists to remove — they would still resolve
+        // a project association while belonging to nothing.
         await db.query(
-          `DELETE FROM proj_memberships
-           WHERE workspace_id = $1 AND user_id = $2 AND scope_kind = $3 AND project_id = $4`,
-          [env.workspaceId, p.userId, scopeKind, projectId],
+          'DELETE FROM proj_memberships WHERE workspace_id = $1 AND user_id = $2',
+          [env.workspaceId, p.userId],
         );
         return;
       }
@@ -1577,30 +1628,32 @@ describe('resolveEffectiveRole', () => {
   });
 
   it('workspace role plus project rows resolve together', async () => {
-    await seed('membership.granted', membershipId(WS, 'usr_1'), { userId: 'usr_1', role: 'member', scope: 'workspace' });
+    await seed('membership.granted', membershipId(WS, 'usr_1'), { userId: 'usr_1', role: 'member' });
     await seed('project.member_added', 'prj_1', { userId: 'usr_1', projectAdmin: true }, 'project');
     const eff = await resolveEffectiveRole(pool, 'usr_1', WS);
     expect(eff.workspaceRole).toBe('member');
     expect(eff.projects.get('prj_1')).toEqual({ projectAdmin: true });
   });
 
-  it('a project-scope guest grant makes the user a guest of the workspace', async () => {
-    await seed('membership.granted', membershipId(WS, 'usr_acct'), { userId: 'usr_acct', role: 'guest', scope: { projectId: 'prj_1' } });
+  it('a guest grant makes the user a guest of the workspace, on no project', async () => {
+    await seed('membership.granted', membershipId(WS, 'usr_acct'), { userId: 'usr_acct', role: 'guest' });
     const eff = await resolveEffectiveRole(pool, 'usr_acct', WS);
     expect(eff.workspaceRole).toBe('guest');
-    expect(eff.projects.get('prj_1')).toEqual({ projectAdmin: false });
+    // A guest reaches work through visibility.set explicit lists, which is what
+    // spec §6 says a guest is — not through a project association.
+    expect(eff.projects.size).toBe(0);
   });
 });
 
 describe('hasProjectAdminRights', () => {
   it('workspace owners and admins hold management rights everywhere', async () => {
-    await seed('membership.granted', membershipId(WS, 'usr_own'), { userId: 'usr_own', role: 'owner', scope: 'workspace' });
+    await seed('membership.granted', membershipId(WS, 'usr_own'), { userId: 'usr_own', role: 'owner' });
     const eff = await resolveEffectiveRole(pool, 'usr_own', WS);
     expect(hasProjectAdminRights(eff, 'prj_anything')).toBe(true);
   });
 
   it('a project admin holds rights on that project only', async () => {
-    await seed('membership.granted', membershipId(WS, 'usr_1'), { userId: 'usr_1', role: 'member', scope: 'workspace' });
+    await seed('membership.granted', membershipId(WS, 'usr_1'), { userId: 'usr_1', role: 'member' });
     await seed('project.member_added', 'prj_1', { userId: 'usr_1', projectAdmin: true }, 'project');
     const eff = await resolveEffectiveRole(pool, 'usr_1', WS);
     expect(hasProjectAdminRights(eff, 'prj_1')).toBe(true);
@@ -1608,7 +1661,7 @@ describe('hasProjectAdminRights', () => {
   });
 
   it('a plain project member holds no management rights', async () => {
-    await seed('membership.granted', membershipId(WS, 'usr_1'), { userId: 'usr_1', role: 'member', scope: 'workspace' });
+    await seed('membership.granted', membershipId(WS, 'usr_1'), { userId: 'usr_1', role: 'member' });
     await seed('project.member_added', 'prj_1', { userId: 'usr_1', projectAdmin: false }, 'project');
     const eff = await resolveEffectiveRole(pool, 'usr_1', WS);
     expect(hasProjectAdminRights(eff, 'prj_1')).toBe(false);
@@ -1805,7 +1858,7 @@ describe('checkRolePermission — planted defects', () => {
     const e = env({
       type: 'membership.granted',
       entity: { kind: 'membership', id: membershipId(WS, 'usr_new') },
-      payload: { userId: 'usr_new', role: 'member', scope: 'workspace' },
+      payload: { userId: 'usr_new', role: 'member' },
     });
     expect(checkRolePermission(e, { sessionUserId: 'usr_actor', eff: eff('member') })).toEqual({
       refused: true,
@@ -1814,19 +1867,35 @@ describe('checkRolePermission — planted defects', () => {
     });
   });
 
-  it('allows a project admin to grant project-scope membership on their project only', () => {
-    const grant = (projectId: string) =>
+  // A project admin runs their project's roster, not the workspace's door.
+  // Before the 2026-08-27 collapse a project-scoped `membership.granted` let
+  // them do both through one event; now the two questions have two events.
+  it('lets a project admin manage their own project roster and no other', () => {
+    const add = (projectId: string) =>
       env({
-        type: 'membership.granted',
-        entity: { kind: 'membership', id: membershipId(WS, 'usr_acct') },
-        payload: { userId: 'usr_acct', role: 'guest', scope: { projectId } },
+        type: 'project.member_added',
+        entity: { kind: 'project', id: projectId },
+        payload: { userId: 'usr_acct', projectAdmin: false },
       });
     const ctx = { sessionUserId: 'usr_actor', eff: eff('member', [['prj_1', true]]) };
-    expect(checkRolePermission(grant('prj_1'), ctx)).toBeNull();
-    expect(checkRolePermission(grant('prj_2'), ctx)).toEqual({
+    expect(checkRolePermission(add('prj_1'), ctx)).toBeNull();
+    expect(checkRolePermission(add('prj_2'), ctx)).toEqual({
       refused: true,
       rule: 'permission.role',
       reason: 'Only a project admin can manage who is on this project.',
+    });
+  });
+
+  it('refuses a project admin who tries to grant workspace membership', () => {
+    const e = env({
+      type: 'membership.granted',
+      entity: { kind: 'membership', id: membershipId(WS, 'usr_acct') },
+      payload: { userId: 'usr_acct', role: 'guest' },
+    });
+    expect(checkRolePermission(e, { sessionUserId: 'usr_actor', eff: eff('member', [['prj_1', true]]) })).toEqual({
+      refused: true,
+      rule: 'permission.role',
+      reason: 'Only a workspace owner or admin can manage workspace membership.',
     });
   });
 
@@ -1859,7 +1928,7 @@ Expected: FAIL — cannot resolve `../../src/permissions/check-permission`.
 
 ```ts
 // apps/server/src/permissions/check-permission.ts
-import type { EventEnvelope, MembershipScope, Refusal } from '@gisik-nokma/domain';
+import type { EventEnvelope, Refusal } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable';
 import { hasProjectAdminRights, resolveEffectiveRole, type EffectiveRole } from './effective-role';
 
@@ -1909,14 +1978,12 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
   if (ADMIN_ONLY_TYPES.has(env.type) && role !== 'owner' && role !== 'admin') {
     return refuse('permission.role', `Only a workspace owner or admin can do this. Your role is ${role}.`);
   }
+  // Membership is workspace-scoped only now, so this is one question rather
+  // than a branch on scope: managing who is in the workspace is an owner/admin
+  // matter. Who is on a PROJECT is the next check, gated by project admin.
   if (env.type === 'membership.granted' || env.type === 'membership.revoked') {
-    const scope = (env.payload as { scope: MembershipScope }).scope;
-    if (scope === 'workspace') {
-      if (role !== 'owner' && role !== 'admin') {
-        return refuse('permission.role', 'Only a workspace owner or admin can manage workspace membership.');
-      }
-    } else if (!hasProjectAdminRights(ctx.eff, scope.projectId)) {
-      return refuse('permission.role', 'Only a project admin can manage who is on this project.');
+    if (role !== 'owner' && role !== 'admin') {
+      return refuse('permission.role', 'Only a workspace owner or admin can manage workspace membership.');
     }
   }
   if (env.type === 'project.member_added' || env.type === 'project.member_removed') {
@@ -2099,7 +2166,7 @@ export async function bootstrapWorkspace(
     serverEvent(
       { kind: 'membership', id: membershipId(founding.workspaceId, founding.actorId) },
       'membership.granted',
-      { userId: founding.actorId, role: 'owner', scope: 'workspace' },
+      { userId: founding.actorId, role: 'owner' },
     ),
   ];
 
@@ -2276,7 +2343,7 @@ describe('ingest pipeline wiring', () => {
         workspaceId: WS,
         entity: { kind: 'membership', id: membershipId(WS, 'usr_m') },
         type: 'membership.granted',
-        payload: { userId: 'usr_m', role: 'member', scope: 'workspace' },
+        payload: { userId: 'usr_m', role: 'member' },
         actorId: 'usr_admin',
       }),
       pool,
@@ -2748,7 +2815,7 @@ export async function seedMember(
       workspaceId,
       entity: { kind: 'membership', id: membershipId(workspaceId, userId) },
       type: 'membership.granted',
-      payload: { userId, role, scope: 'workspace' },
+      payload: { userId, role },
       actorId: 'usr_seed_admin',
     }),
     ...projects.map((p) =>
@@ -2764,13 +2831,19 @@ export async function seedMember(
   await applyAll(db, envs);
 }
 
-export async function seedGuest(db: Queryable, workspaceId: string, userId: string, projectId: string): Promise<void> {
+/**
+ * A guest belongs to the workspace and to no project — the `projectId`
+ * parameter is gone rather than ignored, because a caller passing one would be
+ * expressing an association this vocabulary no longer has. What a guest can
+ * reach comes from `visibility.set` explicit lists on individual tickets.
+ */
+export async function seedGuest(db: Queryable, workspaceId: string, userId: string): Promise<void> {
   await applyAll(db, [
     testEnvelope({
       workspaceId,
       entity: { kind: 'membership', id: membershipId(workspaceId, userId) },
       type: 'membership.granted',
-      payload: { userId, role: 'guest', scope: { projectId } },
+      payload: { userId, role: 'guest' },
       actorId: 'usr_seed_admin',
     }),
   ]);
@@ -2896,7 +2969,7 @@ describe('canSee — against the real projections', () => {
 
   it('walks projection state end to end: guest vs member vs outsider on one explicit ticket', async () => {
     await seedMember(pool, WS, 'usr_member', 'member', [{ projectId: PRJ }]);
-    await seedGuest(pool, WS, 'usr_guest', PRJ);
+    await seedGuest(pool, WS, 'usr_guest');
     await seedTicket(pool, { workspaceId: WS, projectId: PRJ, ticketId: 'tkt_1' });
     await applyAll(pool, [setVisibilityEnv(WS, 'tkt_1', 'explicit', ['usr_guest'])]);
 
@@ -3017,7 +3090,7 @@ describe('listVisibleTickets — server-side filtering, one SQL pass', () => {
   it('each viewer gets exactly their slice of the same workspace', async () => {
     await seedMember(pool, WS, 'usr_a', 'member', [{ projectId: 'prj_1' }]);
     await seedMember(pool, WS, 'usr_b', 'member', [{ projectId: 'prj_2' }]);
-    await seedGuest(pool, WS, 'usr_g', 'prj_1');
+    await seedGuest(pool, WS, 'usr_g');
 
     await seedTicket(pool, { workspaceId: WS, projectId: 'prj_1', ticketId: 'tkt_ws' });
     await applyAll(pool, [setVisibilityEnv(WS, 'tkt_ws', 'workspace')]);
@@ -3494,7 +3567,7 @@ function ticketEvent(type: string, ticketId: string, actorId: string, payload: u
 
 describe('checkVisibilityPermission — planted defects', () => {
   it('planted defect: a guest acting on a ticket not explicitly shared with them is refused', async () => {
-    await seedGuest(pool, WS, 'usr_guest', PRJ);
+    await seedGuest(pool, WS, 'usr_guest');
     await seedTicket(pool, { workspaceId: WS, projectId: PRJ, ticketId: 'tkt_1' }); // project-mode default
     const result = await checkPermission(
       pool,
@@ -3509,7 +3582,7 @@ describe('checkVisibilityPermission — planted defects', () => {
   });
 
   it('a guest acting on a ticket explicitly shared with them passes the gate', async () => {
-    await seedGuest(pool, WS, 'usr_guest', PRJ);
+    await seedGuest(pool, WS, 'usr_guest');
     await seedTicket(pool, { workspaceId: WS, projectId: PRJ, ticketId: 'tkt_1' });
     await applyAll(pool, [setVisibilityEnv(WS, 'tkt_1', 'explicit', ['usr_guest'])]);
     const result = await checkPermission(
@@ -3536,7 +3609,7 @@ describe('checkVisibilityPermission — planted defects', () => {
   });
 
   it('guests cannot create tickets', async () => {
-    await seedGuest(pool, WS, 'usr_guest', PRJ);
+    await seedGuest(pool, WS, 'usr_guest');
     const result = await checkPermission(
       pool,
       ticketEvent('ticket.created', 'tkt_new', 'usr_guest', { projectId: PRJ }),
@@ -3780,11 +3853,9 @@ function projectNamedBy(env: EventEnvelope): string | null {
   switch (env.type) {
     case 'ticket.created':
       return (env.payload as { projectId: string }).projectId;
-    case 'membership.granted':
-    case 'membership.revoked': {
-      const scope = (env.payload as { scope: MembershipScope }).scope;
-      return scope === 'workspace' ? null : scope.projectId;
-    }
+    // membership.granted / revoked name no project: membership is
+    // workspace-scoped (owner decision 2026-08-27). Project association is
+    // project.member_added / _removed, immediately below.
     case 'project.member_added':
     case 'project.member_removed':
       return env.entity.id;
@@ -4164,7 +4235,7 @@ describe('visibleEventsFor', () => {
   });
 
   it('definition events reach guests; membership events do not', async () => {
-    await seedGuest(pool, WS, 'usr_g', PRJ);
+    await seedGuest(pool, WS, 'usr_g');
     const wf = await record(
       testEnvelope({
         workspaceId: WS,
@@ -4179,7 +4250,7 @@ describe('visibleEventsFor', () => {
         workspaceId: WS,
         entity: { kind: 'membership', id: membershipId(WS, 'usr_new') },
         type: 'membership.granted',
-        payload: { userId: 'usr_new', role: 'member', scope: 'workspace' },
+        payload: { userId: 'usr_new', role: 'member' },
         actorId: 'usr_admin',
       }),
     );
@@ -4275,7 +4346,7 @@ Expected: FAIL — cannot resolve `../../src/visibility/visible-events-for`.
 
 ```ts
 // apps/server/src/visibility/visible-events-for.ts
-import type { EventEnvelope, MembershipScope } from '@gisik-nokma/domain';
+import type { EventEnvelope } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable';
 import type { LedgerEvent } from '../ledger/event-store';
 import { resolveEffectiveRole } from '../permissions/effective-role';
@@ -4286,7 +4357,23 @@ export interface PurgeInstruction {
   entityId: string;
 }
 
-export type SyncItem = LedgerEvent | PurgeInstruction;
+/**
+ * "Everything you held in this scope is gone" — one instruction instead of one
+ * purge per ticket (owner decision 2026-08-27). Per-id purges tell the
+ * recipient how many tickets existed in a scope, including ids they never held.
+ * For a member losing a project that is a minor count-leak, consistent with the
+ * restricted-parent existence-leak spec §6 already accepts. For a GUEST being
+ * revoked it is an external party learning the size of work they were never
+ * shown, so guests get this instead. The replica's handling is a local delete
+ * by scope, so it is idempotent like a purge.
+ */
+export interface ScopeRevokedInstruction {
+  kind: 'scope-revoked';
+  workspaceId: string;
+  projectId?: string;
+}
+
+export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction;
 
 const VISIBILITY_AFFECTING: ReadonlySet<string> = new Set(['visibility.set', 'ticket.reparented']);
 
@@ -4332,12 +4419,69 @@ async function nowInvisibleInheritSubtree(db: Queryable, userId: string, ticketI
   return out;
 }
 
+/**
+ * What a person just lost. This is NOT the old `MembershipScope` — membership
+ * is workspace-scoped now and its payload carries no scope at all. Losing a
+ * scope is a fact about a purge, computed from which event arrived
+ * (`membership.revoked` → the workspace; `project.member_removed` → that
+ * project), so the type lives here with the purge rather than in the vocabulary.
+ */
+type LostScope = 'workspace' | { projectId: string };
+
+/** Does any ticket this user can see use this definition? The guest slice. */
+async function definitionIsUsedByVisibleTicket(
+  db: Queryable,
+  userId: string,
+  env: EventEnvelope,
+): Promise<boolean> {
+  // Fixed ternary, not caller input — the column name can never be user data.
+  const column = env.entity.kind === 'workflow' ? 'workflow_id' : 'type_id';
+  const { rows } = await db.query(
+    `SELECT ticket_id FROM proj_tickets WHERE ${column} = $1 ORDER BY ticket_id`,
+    [env.entity.id],
+  );
+  for (const row of rows as Array<{ ticket_id: string }>) {
+    if (await canSee(db, userId, row.ticket_id)) return true;
+  }
+  return false;
+}
+
+/**
+ * The definitions one ticket needs, as ledger events, skipping any this stream
+ * already sent. Yielded ahead of a guest's ticket event so a status is never
+ * unrenderable: the definition may have been withheld earlier, correctly,
+ * because at that point no visible ticket used it.
+ */
+async function* definitionsFor(
+  db: Queryable,
+  ticketId: string,
+  already: Set<string>,
+): AsyncGenerator<LedgerEvent> {
+  const { rows } = await db.query(
+    'SELECT workflow_id, type_id FROM proj_tickets WHERE ticket_id = $1',
+    [ticketId],
+  );
+  const ticket = rows[0] as { workflow_id: string; type_id: string } | undefined;
+  if (ticket === undefined) return;
+  for (const definitionId of [ticket.workflow_id, ticket.type_id]) {
+    if (already.has(definitionId)) continue;
+    const { rows: defRows } = await db.query(
+      `SELECT * FROM events WHERE entity_id = $1 AND entity_kind IN ('workflow', 'ticket-type')
+       ORDER BY seq DESC LIMIT 1`,
+      [definitionId],
+    );
+    if (defRows.length === 0) continue;
+    already.add(definitionId);
+    yield envelopeFromRow(defRows[0] as Record<string, unknown>);
+  }
+}
+
 /** All tickets in the lost scope the user cannot see now. */
 async function nowInvisibleTicketsInScope(
   db: Queryable,
   userId: string,
   workspaceId: string,
-  scope: MembershipScope,
+  scope: LostScope,
 ): Promise<string[]> {
   const where = scope === 'workspace' ? 'workspace_id = $1' : 'workspace_id = $1 AND project_id = $2';
   const params = scope === 'workspace' ? [workspaceId] : [workspaceId, scope.projectId];
@@ -4372,6 +4516,7 @@ export async function* visibleEventsFor(
   if (eff.workspaceRole === null) return;
   const isGuest = eff.workspaceRole === 'guest';
   const purged = new Set<string>();
+  const sentDefinitions = new Set<string>();
 
   async function* purge(ids: string[]): AsyncGenerator<PurgeInstruction> {
     for (const id of ids) {
@@ -4380,6 +4525,27 @@ export async function* visibleEventsFor(
         yield { kind: 'purge', entityId: id };
       }
     }
+  }
+
+  /**
+   * A member is told which tickets went; a guest is told only that the scope
+   * went. The ids are the leak — per-id purges reveal how many tickets existed,
+   * including ones the recipient never held. A member already lives inside the
+   * workspace's accepted existence-leak; an external guest does not, and
+   * learning the size of work they were never shown is not something losing
+   * access should teach them. The ticket list is not even computed for a guest,
+   * so nothing counts it.
+   */
+  async function* revoke(
+    guest: boolean,
+    instruction: ScopeRevokedInstruction,
+    idsInScope: () => Promise<string[]>,
+  ): AsyncGenerator<SyncItem> {
+    if (guest) {
+      yield instruction;
+      return;
+    }
+    yield* purge(await idsInScope());
   }
 
   const { rows } = await db.query(
@@ -4395,7 +4561,17 @@ export async function* visibleEventsFor(
     const env = envelopeFromRow(row);
     switch (env.entity.kind) {
       case 'ticket': {
-        if (await canSee(db, userId, env.entity.id)) yield env;
+        if (await canSee(db, userId, env.entity.id)) {
+          // The ordering hole the guest slice would otherwise open: a workflow
+          // published BEFORE this guest could see any ticket using it was
+          // withheld at the time, correctly — and then a later `visibility.set`
+          // hands them a ticket whose status they cannot render. So a guest's
+          // ticket event carries its definitions ahead of it if this stream has
+          // not already sent them. Definitions upsert on the replica, so a
+          // re-send is a no-op rather than a correction.
+          if (isGuest) yield* definitionsFor(db, env.entity.id, sentDefinitions);
+          yield env;
+        }
         // Even when the event itself is visible, it may have flipped an
         // inheriting descendant out of this user's view.
         if (VISIBILITY_AFFECTING.has(env.type)) {
@@ -4404,16 +4580,19 @@ export async function* visibleEventsFor(
         break;
       }
       case 'membership': {
-        const p = env.payload as { userId: string; scope: MembershipScope };
+        const p = env.payload as { userId: string };
+        // Membership carries no scope now: losing it is losing the workspace.
         if (env.type === 'membership.revoked' && p.userId === userId) {
-          yield* purge(await nowInvisibleTicketsInScope(db, userId, workspaceId, p.scope));
+          yield* revoke(isGuest, { kind: 'scope-revoked', workspaceId }, () =>
+            nowInvisibleTicketsInScope(db, userId, workspaceId, 'workspace'));
         }
         if (!isGuest) yield env;
         break;
       }
       case 'project': {
         if (env.type === 'project.member_removed' && (env.payload as { userId: string }).userId === userId) {
-          yield* purge(await nowInvisibleTicketsInScope(db, userId, workspaceId, { projectId: env.entity.id }));
+          yield* revoke(isGuest, { kind: 'scope-revoked', workspaceId, projectId: env.entity.id }, () =>
+            nowInvisibleTicketsInScope(db, userId, workspaceId, { projectId: env.entity.id }));
         }
         if (!isGuest) yield env;
         break;
@@ -4424,7 +4603,14 @@ export async function* visibleEventsFor(
       }
       case 'workflow':
       case 'ticket-type': {
-        yield env; // guests need definitions to render their explicitly-shared tickets
+        // Members get every definition. A guest gets only the ones their own
+        // visible tickets need: shipping all of them hands an external party
+        // every state name in the workspace — the shape of internal process,
+        // for work they cannot see (owner decision 2026-08-27).
+        if (!isGuest || (await definitionIsUsedByVisibleTicket(db, userId, env))) {
+          sentDefinitions.add(env.entity.id);
+          yield env;
+        }
         break;
       }
     }
@@ -4510,7 +4696,7 @@ async function sessionFor(phone: string): Promise<{ token: string; userId: strin
 describe('security at the HTTP surface', () => {
   it('planted defect: a guest ingesting an event on an invisible ticket is refused with the standard shape', async () => {
     const { token, userId } = await sessionFor('+919000000201');
-    await seedGuest(pool, WS, userId, PRJ);
+    await seedGuest(pool, WS, userId);
     await seedTicket(pool, { workspaceId: WS, projectId: PRJ, ticketId: 'tkt_1' }); // not explicitly shared
 
     const env = testEnvelope({
