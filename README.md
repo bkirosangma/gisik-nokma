@@ -2,7 +2,18 @@
 
 Project management software. *Gisik* — mind, memory; *nokma* — the village custodian who holds the community's affairs in trust. **The keeper of memory**: a tool whose board structurally cannot lie about the work.
 
-**Status: pre-brainstorm.** Nothing about the product is designed yet — not the audience, not the data model, not the stack. The design session starts from `docs/brainstorm-kickoff.md`. What exists here is the base it will start from.
+**Status: building.** The product design spec is approved — `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md`. Implementation follows the plan series in `docs/superpowers/plans/`. What follows below is the base the design started from.
+
+## Workspace layout
+
+pnpm workspaces + Turborepo (Node 22, TypeScript strict, ESM, Vitest):
+
+- `packages/domain` — shared types and zod schemas: the event envelope, entity kinds, id helpers, the versioned event-type registry.
+- `packages/rule-engine` — pure validation, no I/O: `evaluateEvent` returns Accept or a Refusal that names its rule.
+- `apps/server` — Fastify server; the append-only Postgres event ledger and its projections; migrations via node-pg-migrate.
+- Later plans add `packages/ui`, `packages/sync-client`, `apps/web`, `apps/mobile`, `apps/desktop`.
+
+Dev database: `docker compose up -d` starts Postgres 16 on port 54329. Then `pnpm install` and `pnpm turbo run build test`.
 
 ## The base
 
