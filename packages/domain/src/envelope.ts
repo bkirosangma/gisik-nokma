@@ -22,8 +22,12 @@ export const ISO_DATETIME_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3
  * rolls it into a different, later instant instead of rejecting it — violating
  * "an instant survives storage exactly." Month and hour overflow already come
  * back NaN from Date.parse, so only day-of-month needs an explicit check here.
+ *
+ * Exported: ist-day.ts reuses this same predicate so "is this instant real"
+ * has one answer across the package, not a second, looser one at the day
+ * boundary.
  */
-function isRealCalendarDatetime(value: string): boolean {
+export function isRealCalendarDatetime(value: string): boolean {
   if (Number.isNaN(Date.parse(value))) return false;
   const parts = value.slice(0, 10).split('-').map(Number);
   const year = parts[0];

@@ -53,6 +53,24 @@ describe('istDayOf', () => {
       'not an ISO 8601 instant with a stated offset: 2026-08-20T18:30:00.000 — a day claim is not an instant',
     );
   });
+
+  it('planted defect: refuses day-of-month overflow instead of silently rolling forward — 2026-02-30 does not exist', () => {
+    expect(() => istDayOf('2026-02-30T09:00:00.000Z')).toThrowError(RangeError);
+    expect(() => istDayOf('2026-02-30T09:00:00.000Z')).toThrowError(
+      'not a real calendar instant: 2026-02-30T09:00:00.000Z',
+    );
+  });
+
+  it('planted defect: refuses month overflow, naming it — the Date.parse-NaN path', () => {
+    expect(() => istDayOf('2026-13-01T00:00:00.000Z')).toThrowError(RangeError);
+    expect(() => istDayOf('2026-13-01T00:00:00.000Z')).toThrowError(
+      'not a real calendar instant: 2026-13-01T00:00:00.000Z',
+    );
+  });
+
+  it('accepts 2028-02-29 — 2028 is a leap year, so the calendar gate refuses only unreal dates', () => {
+    expect(istDayOf('2028-02-29T09:00:00.000Z')).toBe('2028-02-29');
+  });
 });
 
 describe('istDayBounds', () => {

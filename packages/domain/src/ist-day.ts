@@ -1,4 +1,4 @@
-import { ISO_DATETIME_REGEX } from './envelope.js';
+import { ISO_DATETIME_REGEX, isRealCalendarDatetime } from './envelope.js';
 
 /**
  * Where a day starts, for the whole product.
@@ -41,7 +41,12 @@ export function istDayOf(instant: string): string {
     );
   }
   const ms = Date.parse(instant);
-  if (Number.isNaN(ms)) {
+  // Date.parse alone accepts day-of-month overflow (e.g. 2026-02-30) and rolls
+  // it into a later, different instant instead of rejecting it — the same
+  // failure envelope.ts's clientTime/serverTime validation already closes.
+  // Reusing isRealCalendarDatetime here means "this instant does not exist"
+  // has one answer and one error path, not a looser one at the day boundary.
+  if (Number.isNaN(ms) || !isRealCalendarDatetime(instant)) {
     throw new RangeError(`not a real calendar instant: ${instant}`);
   }
   return formatUtcDay(new Date(ms + IST_OFFSET_MINUTES * MS_PER_MINUTE));
