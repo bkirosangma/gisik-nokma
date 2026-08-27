@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newUlid, type EventEnvelope, type WorkflowDef, type WorkflowDefinedPayload } from '@gisik-nokma/domain';
+import {
+  newUlid,
+  type EntityState,
+  type EventEnvelope,
+  type TicketState,
+  type WorkflowDef,
+  type WorkflowDefinedPayload,
+} from '@gisik-nokma/domain';
 import { evaluateEvent } from '../src/evaluate.js';
 import { REFUSAL_RULES } from '../src/refusal-rules.js';
 import type { EngineContext, Refusal, Verdict } from '../src/engine.js';
@@ -34,13 +41,21 @@ function defined(payload: Omit<WorkflowDefinedPayload, 'id'> & { id?: string }):
 
 type SpyCounts = { entityState: number; childrenStates: number; workflowDef: number };
 
-function spyContext(latest: WorkflowDef | null = null): {
+/**
+ * `entity`/`children` default to Plan 1's original stubs (no ticket, no
+ * children) so every pre-existing call site is unaffected; the parent-terminal
+ * tests below are the only callers that pass them.
+ */
+function spyContext(
+  latest: WorkflowDef | null = null,
+  opts: { entity?: EntityState | null; children?: TicketState[] } = {},
+): {
   ctx: EngineContext;
   calls: () => number;
   counts: () => SpyCounts;
 } {
-  const getEntityState = vi.fn(async () => null);
-  const getChildrenStates = vi.fn(async () => []);
+  const getEntityState = vi.fn(async () => opts.entity ?? null);
+  const getChildrenStates = vi.fn(async () => opts.children ?? []);
   const getWorkflowDef = vi.fn(async () => latest);
   const counts = (): SpyCounts => ({
     entityState: getEntityState.mock.calls.length,
@@ -90,6 +105,33 @@ function basicV2(stateMapping?: Record<string, string>): EventEnvelope {
     ],
     transitions: [{ from: 'todo', to: 'done', rules: [] }],
     ...(stateMapping === undefined ? {} : { stateMapping }),
+  });
+}
+
+/** A TicketState against `basicV1`, filled in enough for the transition path; every field a test doesn't care about gets a harmless default. */
+function ticket(overrides: Pick<TicketState, 'id' | 'stateId' | 'stateCategory'> & Partial<TicketState>): TicketState {
+  return {
+    kind: 'ticket',
+    workspaceId: 'ws_1',
+    projectId: 'prj_1',
+    typeId: 'task',
+    parentId: null,
+    workflowId: 'wf_basic',
+    workflowVersion: 1,
+    assigneeId: null,
+    collaboratorIds: [],
+    fields: {},
+    transitions: [],
+    ...overrides,
+  };
+}
+
+/** A ticket.transitioned envelope moving `entityId` (default `t1`) to `to`. */
+function transitioned(to: string, entityId = 't1'): EventEnvelope {
+  return envelope({
+    type: 'ticket.transitioned',
+    entity: { kind: 'ticket', id: entityId },
+    payload: { to },
   });
 }
 
@@ -267,5 +309,43 @@ describe('REFUSAL_RULES', () => {
     } else {
       expect.unreachable('verdict must be a refusal');
     }
+  });
+});
+
+/**
+ * The parent-terminal invariant (transition.ts, Task 7) has two edges the
+ * fixture suite cannot pin, for the same reason the stranding refusal's join
+ * and its occupancy ban needed a unit test rather than a fixture: every
+ * fixture in the suite plants exactly one child and only ever targets the
+ * terminal state, so a fixture can't tell "the gate is load-bearing" from
+ * "it happens not to matter here," and can't reach the reason string's
+ * plural branch. Both are pinned here, following that precedent.
+ */
+describe('the parent-terminal invariant, and what the fixture suite cannot pin', () => {
+  it('does not consult children, and does not refuse, when the target state is not terminal', async () => {
+    const parent = ticket({ id: 't1', stateId: 'todo', stateCategory: 'open' });
+    const openChild = ticket({ id: 't2', parentId: 't1', stateId: 'todo', stateCategory: 'open' });
+    const { ctx, counts } = spyContext(basicV1, { entity: parent, children: [openChild] });
+    // 'todo' -> 'doing' is a legal edge to a non-terminal ('active') state. An
+    // open child sits in ctx ready to over-refuse if the category gate were
+    // ever dropped — the gate's own job is to mean this never even looks.
+    const verdict = await evaluateEvent(transitioned('doing'), ctx);
+    expect(verdict).toEqual({ refused: false });
+    expect(counts().childrenStates).toBe(0);
+  });
+
+  it('names both open children and renders the plural "are" once openCount is more than one', async () => {
+    const parent = ticket({ id: 't1', stateId: 'review', stateCategory: 'active' });
+    const childA = ticket({ id: 't2', parentId: 't1', stateId: 'todo', stateCategory: 'open' });
+    const childB = ticket({ id: 't3', parentId: 't1', stateId: 'doing', stateCategory: 'active' });
+    const { ctx } = spyContext(basicV1, { entity: parent, children: [childA, childB] });
+    // 'review' -> 'done' is a legal edge to the terminal state; two children,
+    // neither terminal, drive openCount to 2 and the reason's plural branch.
+    const verdict = await evaluateEvent(transitioned('done'), ctx);
+    expect(verdict).toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.parentTerminal,
+      reason: 'This ticket cannot enter "Done" while 2 of its child tickets are still open.',
+    });
   });
 });
