@@ -9,7 +9,15 @@ export async function lockEntity(client: PoolClient, kind: EntityKind, id: strin
   await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`${kind}:${id}`]);
 }
 
-/** Next per-entity sequence number; only meaningful after lockEntity in the same transaction. */
+/**
+ * Next per-entity sequence number; only meaningful after lockEntity in the same
+ * transaction.
+ *
+ * REQUIRES READ COMMITTED (Postgres' default). MAX+1 is correct only if this
+ * read sees the row committed by the transaction that just released the lock;
+ * under REPEATABLE READ the snapshot predates that commit, so the next ingest
+ * re-mints the same seq and collides on events_entity_seq_unique at once.
+ */
 export async function nextSeq(client: PoolClient, kind: EntityKind, id: string): Promise<number> {
   const result = await client.query<{ head: number }>(
     'SELECT coalesce(max(seq), 0)::bigint AS head FROM events WHERE entity_kind = $1 AND entity_id = $2',
@@ -34,7 +42,11 @@ export async function lockWorkspace(client: PoolClient, workspaceId: string): Pr
   ]);
 }
 
-/** Next workspace stream cursor; only meaningful after lockWorkspace in the same transaction. */
+/**
+ * Next workspace stream cursor; only meaningful after lockWorkspace in the same
+ * transaction. Carries the same READ COMMITTED requirement as nextSeq above,
+ * for the same reason.
+ */
 export async function nextWorkspaceSeq(client: PoolClient, workspaceId: string): Promise<number> {
   const result = await client.query<{ head: number }>(
     'SELECT coalesce(max(workspace_seq), 0)::bigint AS head FROM events WHERE workspace_id = $1',

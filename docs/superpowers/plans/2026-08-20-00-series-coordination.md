@@ -309,3 +309,84 @@ Beyond the Task 15b assignments above: questions 2, 3, 7 and 10 dissolved becaus
 ## Plan 5 walked (2026-08-27) — twelve questions, none needed a new decision
 
 Five were already settled by earlier decisions (stream cursor §18, route prefix, thresholds, epic rank, fallback column) and one — frame `workspaceId` — had been settled by amendment 19 before it was asked. The remaining six were reviewed and accepted as written, each now recording *why* it holds rather than only *that* it does: `'simple'` FTS is an honesty argument (stemming one language and not others ranks dishonestly), not tuning; the empty board answers `columns: []` because default columns would leak a restricted project's workflows to viewers who cannot see its tickets — the first-run experience is Plan 6 copy, queued for its walk; My Work stays per-workspace (cross-workspace scoping belongs to nobody yet, and the replica aggregates the same way); preferences keep full-replace PUT (the race is one person against themselves, and the loser loses an arrangement, never truth); attention reasons stay English templates with the spec's "user's language" pinned to mean *named reasons, not localisation*, structured fields carrying what localisation will need; assembler cost stands until profiling, not intuition, says otherwise. The walk also discharged the owed one-liner: the `scope-revoked` stream frame is defined, mapped in the drain, and proven by case 7.43 — one frame that never advances the cursor, so a guest revoked mid-session learns it over the socket and learns nothing else. Plan 5's citations of `getWorkflowDefFromProjection` were updated to the selector signature.
+
+## Plan 1 execution consequences (2026-08-28) — recorded where a later plan will read them
+
+Plan 1 ran with an execution ledger, and several of its deferrals were sound *on condition* that the mitigation was recorded somewhere a later session would see. That ledger is `.superpowers/sdd/…/progress.md`, which is gitignored — so every one of those conditions was, in fact, unmet: the branch changed no document at all. This section is the recording. None of it changes Plan 1's shipped behaviour; all of it is a claim on a later plan.
+
+The shape recurred often enough to name: **a correct ruling whose entire value lives in a note is worth exactly as much as the note is durable.** A ruling written only into a gitignored file has been made and then thrown away.
+
+### 1. A projection's table names are unqualified — always
+
+`verify-projections` rebuilds every projection into a shadow schema and confines it there with `search_path` **alone**: `SET search_path TO verify_shadow, public` makes each projection's unqualified `proj_*` name resolve to its shadow copy while `events`, which has no shadow copy, still resolves to `public.events`. There is no second fence. A projection that writes `public.proj_tickets` instead of `proj_tickets` would therefore **write LIVE during a verify** — a read-only freshness check silently mutating the thing it is checking.
+
+Plan 1's sole projection is unqualified throughout and the mechanism is documented at `verify-projections.ts:30-33`; the constraint now also lives on the `Projection` type in `src/projections/registry.ts`, beside the contract every later projection implements. Two neighbours ride with it there: projection table and column identifiers stay lowercase and unquoted (the verifier interpolates them into `CREATE TABLE`/`EXCEPT` SQL without quoting), and no projection column may be of type `json` — `json` has no equality operator, so `EXCEPT` cannot compare it and the diff would fail rather than pass.
+
+### 2. `verifyProjections` reads in autocommit — rule this before Plan 11 schedules it
+
+The verifier's `readLedger` and each of its per-table diffs run as separate statements outside any transaction, so they see **different snapshots**. Under concurrent ingest the CLI can report drift that never existed — the ledger read missed an event the live table already holds — and exit 1.
+
+Harmless in Plan 1, where the verifier is a manually invoked operational tool. It stops being harmless the moment **Plan 11 schedules it**, because a scheduled exit-1 is an alert, and an alert that cries drift under normal load trains its operator to ignore it. **MUST be ruled before Plan 11 wires the schedule.** Two fix shapes, either acceptable: wrap read + diff in one `REPEATABLE READ` transaction so every comparison shares a snapshot, or have the scheduler retry once on drift and alert only on a repeat.
+
+### 3. The diff uses `EXCEPT`, not `EXCEPT ALL` — so duplicate-row drift is invisible
+
+`diffTable` compares with set semantics: if live holds a row twice and the rebuild derives it once, `EXCEPT` in both directions returns nothing and the table reports clean. Plan 1's only projection has a primary key, which makes duplicates impossible, so nothing is wrong today. The consequence is a standing requirement: **every projection table must carry a primary key, or the diff must switch to `EXCEPT ALL`.** A projection whose table is a keyless append log is the case that breaks it.
+
+### 4. The verifier CLI needs DDL rights on the database it verifies
+
+`verifyProjections` does `DROP SCHEMA` / `CREATE SCHEMA` / `CREATE TABLE … (LIKE …)` on the target database. A production deployment that hands the application a read-write-but-not-DDL role cannot run it, and the failure arrives as a permission error at 3am rather than at provisioning time. Whichever plan provisions production roles owes the verifier its own credential — or an explicit decision that the verifier runs elsewhere.
+
+Related and worth stating once: the shadow schema name is a fixed constant, so **two concurrent verifies on one database collide.** Accepted for an operational CLI; a scheduler must not run two.
+
+### 5. The second both-lock production path owes a falsifiable lock-order test
+
+Ingest takes `lockWorkspace` then `lockEntity`, in that order, everywhere — one global order, so two ingests cannot deadlock by taking the pair in opposite orders. The contract is documented at `ingest-service.ts:70-72` and `event-store.ts:27-29`.
+
+It is not *tested*, and on this branch it cannot be: with ingest as the only path that takes both locks, a **uniform** swap of the order is still deadlock-free, so no test on Plan 1's code can distinguish the correct order from a uniformly wrong one. The mutant was raised at Task 10, confirmed latently dangerous, and correctly deferred. **The plan that ships the series' second both-lock production path must land the `pg_locks` test** — hold the pair in one transaction, assert the acquisition order actually observed — because at that moment a non-uniform order becomes a real deadlock and the test becomes falsifiable.
+
+### 6. Seeds for Plan 2's brief
+
+Four things Plan 1 could not test, each because Plan 2 is the first plan that makes them testable:
+
+- **Registration order is unpinned.** `ProjectionRegistry.all()` returns insertion order, and §8 above states the order later plans depend on — but Plan 1 registers exactly one projection, so nothing can fail. **The second registrant must arrive with the ordering assertion.**
+- **Determinism test 3 is currently vacuous-adjacent.** `proj_entity_heads` is order-insensitive by construction (the `head_seq` guard), so "reversed arrival derives the same bytes" is true for a weaker reason than the one it is testing for. **The first order-sensitive projection makes that test live** — and it must be re-read then, not assumed still green for the right reason.
+- **`reset()` is `TRUNCATE` today, and a DELETE-based reset changes the lock contract.** `TRUNCATE` takes ACCESS EXCLUSIVE; a projection whose reset must preserve identity/FK behaviour and switches to `DELETE` takes a weaker lock, and a concurrent rebuild-plus-ingest is no longer serialised by the reset alone. Whoever writes the first non-TRUNCATE reset owns re-deriving the contract.
+- **Fixtures need a second entity kind.** Discharged in Plan 1's fix wave (`ledger-fixture.ts` now carries a `ticket` event whose `entity.id ≠ workspaceId` and whose `seq ≠ workspaceSeq`), recorded here because the *reason* generalises: a fixture where every pair coincides cannot see a transposition, and every later plan's fixtures inherit that trap.
+
+### 7. No silent type coercion at any HTTP door — instance-wide, for the whole series
+
+The Fastify instance is built with `coerceTypes: false` and `removeAdditional: false` (`app.ts`). These are **instance-wide AJV policy, not route-local choices**, and they were chosen deliberately: coercion silently wrapped a scalar into a one-element array, violating the stated non-array→400 contract, and `removeAdditional`'s default would have silently stripped unknown keys that `additionalProperties: false` declares an intent to *refuse*.
+
+The consequence for later plans: **query and path parameters do not coerce either.** A route expecting `?limit=20` as a number gets the string `'20'` and must convert it explicitly in its schema or its handler. Every later plan that adds a door inherits this; none of them may re-enable coercion instance-wide to fix one route.
+
+### 8. `nextSeq` and `nextWorkspaceSeq` require READ COMMITTED
+
+MAX+1 under an advisory lock is correct only because the read after the lock sees rows committed by the transaction that just released it. Under REPEATABLE READ the snapshot predates that commit, both ingests compute the same number, and the second collides on `events_entity_seq_unique` immediately — proven at Task 10, not theorised. The dependency now lives as a doc comment on both functions in `src/ledger/event-store.ts`, not only in a test comment. **No later plan may raise the ingest transaction's isolation level without replacing the seq assignment mechanism.** The failure is loud, which is why this is a note rather than a code change.
+
+### 9. The Plan 3 Task 2 → Task 12 window, where role-gated transitions refuse silently
+
+`createEngineContext.getEntityState` (`apps/server/src/engine-context.ts`) returns `readEntityHead(...) as unknown as EntityState | null`. What comes back is a head **pointer** — `{kind, id, headSeq, headEventId, headEventType}` — and not per-kind entity state. The cast is a ruled Plan-1 seam and stands; `as unknown as` defeats every structural check, so the compiler cannot warn any consumer.
+
+The comment on that seam used to say the cast dies at Plan 2 Task 2. It does not: Plan 2 Task 2 replaces the domain *types*, lists `engine-context.ts` as MODIFY only to wire `getWorkflowDef`, and states verbatim that `getEntityState` and `getChildrenStates` stay Plan 1's stubs until Plan 3. **The cast dies at Plan 3 Task 12**, and the comment now says so.
+
+The gap between those two facts is a live hazard: **Plan 3 Task 2 registers `ticket.transitioned` v1 into the domain registry, and Plan 3 Task 12 is ten tasks later.** In that window `parseEvent` admits transitions at the door, ingest evaluates them, and Plan 2's `evaluateRestrictTo` calls `getEntityState('membership', …)` against this shipped context. If the membership entity has any committed event the guard passes `!== null`, `kind === 'membership'` narrows successfully, `membership.role` is `undefined` at runtime, `rule.roles.includes(undefined)` is false — and **every role-gated transition is silently refused**, with a plain-language reason naming the rule that reads entirely legitimate. TypeScript reports nothing. Plan 3's own tests in that window run against Task 4's in-memory fixture context, not this one, so the suite stays green.
+
+**Plan 3's Task 2 dispatch must know this.** Either land Task 12 before Task 2, or make this body return `null` for the kinds it cannot honestly serve.
+
+### 10. `LedgerEvent` has no hoist step, and Plan 10 imports it from a package that cannot see it
+
+`type LedgerEvent = EventEnvelope & { workspaceSeq: number }` lives in `apps/server/src/ledger/event-store.ts`, exactly where Plan 1 Task 7's Produces block pins it, under an explicit "only server-side code sees LedgerEvent." That pin is correct for Plan 1 and is not being changed.
+
+Plan 10 breaks it. `packages/sync-client` imports `type LedgerEvent` from `'@gisik-nokma/domain'`, and a package cannot import from `apps/server`. Plan 6 hit exactly this with `IngestResult` and wrote the remedy into itself: define it in domain, re-export from the barrel, replace the server's local definition with an import — *one definition, one origin*. **No equivalent step exists anywhere in the series for `LedgerEvent`**, so Plan 10 will either invent a second definition of the ledger's own event shape or stall on the import.
+
+**Owner: the first plan that introduces a client-side package needing `LedgerEvent`** — Plan 10 as the series stands — which does the `IngestResult` hoist verbatim, in its own first task, before any file imports the type.
+
+Weaker instance in the same class, recorded so it is not rediscovered: **Plan 4 sources `Refusal` from `@gisik-nokma/domain`** (lines 1762, 1931) while Plan 1's Global Constraints and the shipped code put it in `@gisik-nokma/rule-engine` (`packages/rule-engine/src/engine.ts:3`). Plan 4 is internally inconsistent about it — it imports `LedgerEvent` from the correct relative path at line 1247 — so this is almost certainly a plan typo, not an architectural need. **Plan 4's executor takes the import origin from the shipped code, not from the plan text.**
+
+### 11. Nothing binds an event's workspace to its entity, or its type to its entity kind — Plan 2 owns both refusals
+
+`commitOne` takes `lockWorkspace(submitted.workspaceId)` and mints `workspace_seq` from an entirely unvalidated claim. `submittedEventSchema` checks only that `workspaceId` is a ULID; the pass-through engine consults nothing; no projection or constraint ties an entity to one workspace. So **two events on the same entity claiming different workspaceIds both commit**: the entity's history is permanently split across two workspace streams (a client resuming workspace A's cursor never sees the event filed under B), and `proj_entity_heads.workspace_id` flips to whichever claim arrived last, because the head-advance `ON CONFLICT` overwrites it.
+
+The same absence covers type↔kind: the registry keys on `type@version` alone, so `type: 'workspace.created'` against `entity.kind: 'ticket'` is accepted at the door, and Plan 1's own tests do exactly that.
+
+This is correctly outside Plan 1's implementation scope — rule *content* is Plan 2's, and a pass-through engine that accepts everything is Plan 1's documented semantics. But the hole is only visible when the tasks are composed, and no plan document names an owner. **Plan 2 owns both refusals: entity↔workspace binding and type↔kind binding.** The cost of leaving them unowned is not recoverable: **the ledger is append-only by trigger, so a mis-filed event cannot be corrected, only superseded** — and the head row's workspace_id keeps flipping in the meantime. They must land before a second entity kind and real multi-workspace data exist, which is to say before Plan 3.

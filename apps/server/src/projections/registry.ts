@@ -12,6 +12,13 @@ import type { LedgerEvent } from '../ledger/event-store.js';
  *   canonical order (entity_kind, entity_id, seq): per-entity causality only.
  * - tables lists every table the projection writes (all prefixed proj_);
  *   reset(tx) empties them so a rebuild starts from scratch.
+ * - Every table name in a projection's SQL is UNQUALIFIED — `proj_entity_heads`,
+ *   never `public.proj_entity_heads`. The verifier confines its rebuild to a
+ *   shadow schema with `search_path` ALONE (tools/verify-projections.ts), so a
+ *   schema-qualified name escapes the fence and writes LIVE during a verify.
+ *   Table naming stays lowercase and unquoted for the same reason, and no
+ *   projection column may be `json` (it has no equality operator, and the
+ *   verifier's diff needs one).
  * - The registry applies projections in REGISTRATION order within each
  *   event's ingest transaction (all() preserves insertion order), and later
  *   plans depend on the order proj_entity_heads, proj_workflows,
