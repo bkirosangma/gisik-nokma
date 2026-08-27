@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newUlid, type EventEnvelope, type WorkflowDefinedPayload } from '@gisik-nokma/domain';
+import { newUlid, type EventEnvelope, type WorkflowDef, type WorkflowDefinedPayload } from '@gisik-nokma/domain';
 import { evaluateEvent } from '../src/evaluate.js';
 import { REFUSAL_RULES } from '../src/refusal-rules.js';
 import type { EngineContext, Refusal, Verdict } from '../src/engine.js';
@@ -32,17 +32,65 @@ function defined(payload: Omit<WorkflowDefinedPayload, 'id'> & { id?: string }):
   });
 }
 
-function spyContext(): { ctx: EngineContext; calls: () => number } {
+type SpyCounts = { entityState: number; childrenStates: number; workflowDef: number };
+
+function spyContext(latest: WorkflowDef | null = null): {
+  ctx: EngineContext;
+  calls: () => number;
+  counts: () => SpyCounts;
+} {
   const getEntityState = vi.fn(async () => null);
   const getChildrenStates = vi.fn(async () => []);
-  const getWorkflowDef = vi.fn(async () => null);
+  const getWorkflowDef = vi.fn(async () => latest);
+  const counts = (): SpyCounts => ({
+    entityState: getEntityState.mock.calls.length,
+    childrenStates: getChildrenStates.mock.calls.length,
+    workflowDef: getWorkflowDef.mock.calls.length,
+  });
   return {
     ctx: { getEntityState, getChildrenStates, getWorkflowDef },
-    calls: () =>
-      getEntityState.mock.calls.length +
-      getChildrenStates.mock.calls.length +
-      getWorkflowDef.mock.calls.length,
+    calls: () => {
+      const seen = counts();
+      return seen.entityState + seen.childrenStates + seen.workflowDef;
+    },
+    counts,
   };
+}
+
+/** A published v1 with two states a v2 can drop at once — the stranding tests plant this. */
+const basicV1: WorkflowDef = {
+  id: 'wf_basic',
+  version: 1,
+  name: 'Basic',
+  initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'doing', name: 'Doing', category: 'active' },
+    { id: 'review', name: 'In review', category: 'active' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [
+    { from: 'todo', to: 'doing', rules: [] },
+    { from: 'doing', to: 'review', rules: [] },
+    { from: 'review', to: 'done', rules: [] },
+    { from: 'done', to: 'todo', rules: [] },
+  ],
+};
+
+/** The v2 that drops `doing` and `review`; `stateMapping` is the caller's business. */
+function basicV2(stateMapping?: Record<string, string>): EventEnvelope {
+  return defined({
+    id: 'wf_basic',
+    version: 2,
+    name: 'Basic',
+    initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' },
+      { id: 'done', name: 'Done', category: 'terminal' },
+    ],
+    transitions: [{ from: 'todo', to: 'done', rules: [] }],
+    ...(stateMapping === undefined ? {} : { stateMapping }),
+  });
 }
 
 /**
@@ -138,6 +186,45 @@ describe('the structural refusal names every issue at once', () => {
       reason:
         'This workflow definition cannot be published: Two states share the id "todo"; state ids must be unique. This workflow has no terminal state, so no ticket could ever finish.',
     });
+  });
+});
+
+/**
+ * The stranding refusal has its OWN join — the dropped ids, comma-separated —
+ * and it is unpinnable by fixture for the same reason the structural one was:
+ * no fixture in the suite drops more than a single state, and a one-element
+ * join reads identically for every separator. So it is pinned here, on the
+ * only case that can tell `', '` from `''`: a v2 that drops two states at once.
+ *
+ * These two tests carry a second duty, and it is the load-bearing one. Open
+ * question 6's owner decision is that occupancy is NEVER an engine input —
+ * publish legality may not depend on who is standing where, because a
+ * visibility-scoped client replica computes a different answer than the server
+ * and one shared fixture suite could no longer bind both. The stranding branch
+ * is exactly where an occupancy check would be tempted ("only refuse if
+ * someone is actually in the dropped state"), so the ban is pinned where the
+ * temptation lives: on both the refusing and the accepting path, the engine
+ * asks for the latest definition and NOTHING else. `getEntityState` and
+ * `getChildrenStates` staying at zero is the decision made falsifiable.
+ */
+describe('the stranding refusal, and what it refuses to ask', () => {
+  it('lists two dropped states comma-separated, and consults no occupancy to do it', async () => {
+    const { ctx, counts } = spyContext(basicV1);
+    const verdict = await evaluateEvent(basicV2(), ctx);
+    expect(verdict).toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.workflowStateMapping,
+      reason:
+        'Version 2 drops state(s) "doing", "review" that version 1 has; publishing cannot see which tickets sit in which state, so every dropped state needs a stateMapping entry.',
+    });
+    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1 });
+  });
+
+  it('accepts a v2 that maps both dropped states without asking whether either is occupied', async () => {
+    const { ctx, counts } = spyContext(basicV1);
+    const verdict = await evaluateEvent(basicV2({ doing: 'todo', review: 'todo' }), ctx);
+    expect(verdict).toEqual({ refused: false });
+    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1 });
   });
 });
 
