@@ -1,10 +1,13 @@
 import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
+import type { IngestService } from './ingest/ingest-service.js';
+import { registerEventRoutes } from './routes/events.js';
 
 export type HealthDb = { query(sql: string): Promise<unknown> };
 
 export type AppDeps = {
   db: HealthDb;
+  ingest: IngestService;
 };
 
 export function buildApp(deps: AppDeps, options: { logLevel?: string } = {}): FastifyInstance {
@@ -20,6 +23,8 @@ export function buildApp(deps: AppDeps, options: { logLevel?: string } = {}): Fa
       return reply.status(503).send({ status: 'unavailable' });
     }
   });
+
+  registerEventRoutes(app, deps.ingest);
 
   return app;
 }
