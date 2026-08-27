@@ -11,13 +11,9 @@ export type EngineContext = {
 };
 
 /**
- * Plan 1 pass-through: accepts every parsed event and consults nothing.
- * Plan 2 replaces these internals with real rule evaluation (pure, no I/O —
- * all state arrives through ctx). The signature is cross-plan contract:
- * it must not change.
+ * `evaluateEvent` used to live here as Plan 1's pass-through. Plan 2 replaced
+ * it with the real dispatcher in `./evaluate.js`; the types above stayed,
+ * because they are what the server, the fixture harness and every rule module
+ * bind to. The signature Plan 1 froze is unchanged and remains cross-plan
+ * contract: pure, no I/O, all state arrives through `ctx`.
  */
-export async function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {
-  void env;
-  void ctx;
-  return { refused: false };
-}

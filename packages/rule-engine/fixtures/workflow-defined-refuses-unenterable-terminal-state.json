@@ -1,0 +1,22 @@
+{
+  "name": "a terminal state nothing leads into cannot be published",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_new" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_new", "version": 1, "name": "Locked door", "initialStateId": "done",
+      "states": [
+        { "id": "done", "name": "Done", "category": "terminal" },
+        { "id": "todo", "name": "To do", "category": "open" }
+      ],
+      "transitions": [ { "from": "done", "to": "todo", "rules": [] } ]
+    }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "workflow-structure",
+    "reason": "This workflow definition cannot be published: Terminal state \"Done\" has no transition leading into it, so no ticket could ever reach it."
+  }
+}

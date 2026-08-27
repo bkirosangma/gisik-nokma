@@ -1,0 +1,22 @@
+{
+  "name": "a workflow.defined event pointing at a non-workflow entity is refused",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "ticket", "id": "wf_new" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_new", "version": 1, "name": "Misfiled", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [ { "from": "todo", "to": "done", "rules": [] } ]
+    }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "malformed-payload",
+    "reason": "This workflow.defined event does not point at a workflow; it points at a ticket."
+  }
+}

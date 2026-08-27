@@ -1,0 +1,27 @@
+{
+  "name": "a restrict-to that names nobody cannot be published",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_new" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_new", "version": 1, "name": "Nobody", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [ { "kind": "restrict-to" } ] },
+        { "from": "done", "to": "doing", "rules": [] }
+      ]
+    }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "workflow-structure",
+    "reason": "This workflow definition cannot be published: A restrict-to rule on the transition from \"Doing\" to \"Done\" names nobody: it must allow the assignee, at least one role, or at least one named person."
+  }
+}

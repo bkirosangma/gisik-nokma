@@ -1,0 +1,23 @@
+{
+  "name": "a clean first version publishes",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_basic" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [] },
+        { "from": "done", "to": "doing", "rules": [] }
+      ]
+    }
+  },
+  "expected": { "refused": false }
+}

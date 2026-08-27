@@ -1,0 +1,41 @@
+{
+  "name": "versions are consecutive: 1 then 3 is refused",
+  "workflowDefs": [
+    {
+      "id": "wf_basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [] },
+        { "from": "done", "to": "doing", "rules": [] }
+      ]
+    }
+  ],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_basic" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_basic", "version": 3, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [] },
+        { "from": "done", "to": "doing", "rules": [] }
+      ]
+    }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "workflow-version",
+    "reason": "Workflow \"Basic\" is at version 1; the next published version must be 2, not 3."
+  }
+}

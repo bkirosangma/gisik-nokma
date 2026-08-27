@@ -1,0 +1,36 @@
+{
+  "name": "dropping a state without mapping it is refused",
+  "workflowDefs": [
+    {
+      "id": "wf_basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [] },
+        { "from": "done", "to": "doing", "rules": [] }
+      ]
+    }
+  ],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_basic" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_basic", "version": 2, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [ { "from": "todo", "to": "done", "rules": [] } ]
+    }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "workflow-state-mapping",
+    "reason": "Version 2 drops state(s) \"doing\" that version 1 has; publishing cannot see which tickets sit in which state, so every dropped state needs a stateMapping entry."
+  }
+}

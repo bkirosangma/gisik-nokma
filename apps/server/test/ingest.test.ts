@@ -109,8 +109,11 @@ describe('ingestBatch', () => {
   it('planted defect: an event filed against the wrong entity kind is refused at the door', async () => {
     // The ledger is append-only by trigger, so this event could never be taken
     // back once written — and the ticket it names would carry a workspace's
-    // creation in its history forever (coordination doc §11). The door is the
-    // only place that can still say no.
+    // creation in its history forever (coordination doc §11). On the server
+    // path this door answers first, before the engine is ever consulted; the
+    // engine carries the same check per event type for the callers that never
+    // come through here — the fixture suite and Plan 10's offline replica,
+    // which both enter at evaluateEvent.
     const misfiled = submittedWorkspaceCreated({ entity: { kind: 'ticket', id: newUlid() } });
 
     const results = await service().ingestBatch([misfiled]);

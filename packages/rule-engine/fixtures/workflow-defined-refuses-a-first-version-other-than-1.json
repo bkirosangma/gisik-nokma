@@ -1,0 +1,22 @@
+{
+  "name": "a brand-new workflow must start at version 1",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_new" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_new", "version": 2, "name": "Jumped in", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [ { "from": "todo", "to": "done", "rules": [] } ]
+    }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "workflow-version",
+    "reason": "The first published version of a workflow must be version 1; this definition claims version 2."
+  }
+}

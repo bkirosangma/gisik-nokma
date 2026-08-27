@@ -1,0 +1,23 @@
+{
+  "name": "an unreachable state cannot be published",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_new" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_new", "version": 1, "name": "Stray", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "limbo", "name": "Limbo", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [ { "from": "todo", "to": "done", "rules": [] } ]
+    }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "workflow-structure",
+    "reason": "This workflow definition cannot be published: State \"Limbo\" cannot be reached from the starting state \"To do\"."
+  }
+}

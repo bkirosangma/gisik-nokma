@@ -1,0 +1,25 @@
+{
+  "name": "a workflow with no terminal state cannot be published",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_new" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_new", "version": 1, "name": "Endless", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "todo", "rules": [] }
+      ]
+    }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "workflow-structure",
+    "reason": "This workflow definition cannot be published: This workflow has no terminal state, so no ticket could ever finish."
+  }
+}

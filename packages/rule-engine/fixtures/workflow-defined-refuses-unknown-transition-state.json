@@ -1,0 +1,27 @@
+{
+  "name": "a transition pointing at a state that does not exist cannot be published",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_new" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_new", "version": 1, "name": "Dangling", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [] },
+        { "from": "doing", "to": "blessed", "rules": [] }
+      ]
+    }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "workflow-structure",
+    "reason": "This workflow definition cannot be published: The transition from \"doing\" to \"blessed\" refers to \"blessed\", which is not a state in this workflow."
+  }
+}

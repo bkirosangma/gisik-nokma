@@ -1,0 +1,15 @@
+{
+  "name": "a workflow.defined payload that does not parse is refused",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_new" },
+    "actorId": "user_admin",
+    "payload": { "id": "wf_new" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "malformed-payload",
+    "reasonStartsWith": "This workflow.defined event's payload is malformed:"
+  }
+}

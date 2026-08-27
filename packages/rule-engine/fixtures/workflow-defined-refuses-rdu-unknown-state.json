@@ -1,0 +1,27 @@
+{
+  "name": "a four-eyes rule watching a nonexistent transition cannot be published",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_new" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_new", "version": 1, "name": "Blind reviewer", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "reviewed" } } ] },
+        { "from": "done", "to": "doing", "rules": [] }
+      ]
+    }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "workflow-structure",
+    "reason": "This workflow definition cannot be published: A require-different-user rule on the transition from \"Doing\" to \"Done\" refers to a move to \"reviewed\", but no state with that id exists."
+  }
+}
