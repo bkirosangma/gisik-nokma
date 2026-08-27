@@ -129,19 +129,31 @@ describe('events and snapshots schema', () => {
   });
 
   it('planted defect: UPDATE on events is refused — the ledger cannot be rewritten', async () => {
+    // Exact-rejection convention: pin both the SQLSTATE (P0001, plpgsql's
+    // default for an unqualified RAISE EXCEPTION) and the full message
+    // events_append_only() raises for this TG_OP — not a fragment regex.
     await expect(
       db.pool.query(`UPDATE events SET payload = '{}' WHERE id = $1`, ['01J6000000000000000000TT01']),
-    ).rejects.toThrowError(/events is append-only/);
+    ).rejects.toMatchObject({
+      code: 'P0001',
+      message: 'events is append-only: UPDATE refused',
+    });
   });
 
   it('planted defect: DELETE on events is refused', async () => {
     await expect(
       db.pool.query('DELETE FROM events WHERE id = $1', ['01J6000000000000000000TT01']),
-    ).rejects.toThrowError(/events is append-only/);
+    ).rejects.toMatchObject({
+      code: 'P0001',
+      message: 'events is append-only: DELETE refused',
+    });
   });
 
   it('planted defect: TRUNCATE on events is refused', async () => {
-    await expect(db.pool.query('TRUNCATE events')).rejects.toThrowError(/events is append-only/);
+    await expect(db.pool.query('TRUNCATE events')).rejects.toMatchObject({
+      code: 'P0001',
+      message: 'events is append-only: TRUNCATE refused',
+    });
   });
 
   it('snapshots stores state keyed by (entity_kind, entity_id, seq)', async () => {
