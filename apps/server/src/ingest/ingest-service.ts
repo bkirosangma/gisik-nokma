@@ -37,9 +37,20 @@ export type IngestDeps = {
 export type CommittedEventListener = (event: LedgerEvent) => void;
 
 export type IngestService = {
-  /** Processes a batch in order; result[i] answers rawEvents[i]. Each event
+  /**
+   * Processes a batch in order; result[i] answers rawEvents[i]. Each event
    * commits or fails independently — one bad event never rolls back its
-   * neighbours. */
+   * neighbours.
+   *
+   * One path breaks the index alignment, and the promise above would be a lie
+   * without saying so: an UNEXPECTED infrastructure error (a dead connection, a
+   * projection that throws) rejects the whole call, so no results array reaches
+   * the caller at all — including the answers already decided for events that
+   * COMMITTED. Those neighbours stay committed; the client retries the batch
+   * and they answer `duplicate-event-id`, which is a safe ack precisely because
+   * the id was client-generated. Envelope errors and rule refusals are NOT this
+   * path — they ride inside results as ordinary per-event answers.
+   */
   ingestBatch(rawEvents: unknown[]): Promise<IngestResult[]>;
   /** Broadcast hook: fires AFTER an event's transaction commits, never for
    * refused or invalid events. Returns an unsubscribe function. Plan 5 wires
@@ -65,6 +76,7 @@ export function createIngestService(deps: IngestDeps): IngestService {
 
   async function commitOne(submitted: SubmittedEvent): Promise<IngestResult> {
     const client = await deps.pool.connect();
+    let rollbackFailure: Error | undefined;
     try {
       await client.query('BEGIN');
       // Lock order is always workspace first, then entity — one global order
@@ -91,7 +103,14 @@ export function createIngestService(deps: IngestDeps): IngestService {
       notifyCommitted(envelope);
       return { status: 'committed', eventId: envelope.id, seq, serverTime };
     } catch (error) {
-      await client.query('ROLLBACK');
+      // A ROLLBACK on a dead connection throws, and an unguarded one would
+      // replace the root-cause error with its own AND skip the duplicate check
+      // below — turning a truthful duplicate-event-id answer into an opaque
+      // rejection of the whole batch. The duplicate answer stays truthful even
+      // here: a unique violation proves a prior transaction committed that id.
+      await client.query('ROLLBACK').catch((failure: unknown) => {
+        rollbackFailure = failure instanceof Error ? failure : new Error(String(failure));
+      });
       if (isUniqueViolation(error, 'events_pkey')) {
         return {
           status: 'invalid',
@@ -102,7 +121,10 @@ export function createIngestService(deps: IngestDeps): IngestService {
       }
       throw error;
     } finally {
-      client.release();
+      // Releasing with the error destroys the connection instead of returning
+      // it to the pool: a client whose ROLLBACK failed is still inside an
+      // aborted transaction, and the next borrower would inherit it.
+      client.release(rollbackFailure);
     }
   }
 

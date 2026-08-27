@@ -60,6 +60,35 @@ function poolRecordingCommits(real: Pool, log: string[]): Pool {
   } as unknown as Pool;
 }
 
+/**
+ * Hands out real clients whose ROLLBACK always rejects — the dead-connection
+ * case, reachable no other way against a live database. Everything else is the
+ * real client doing real work through the same Proxy shape as above; only the
+ * one statement is intercepted, and the borrowed client is never mutated.
+ */
+function poolWithFailingRollback(real: Pool): Pool {
+  return {
+    async connect() {
+      const client = await real.connect();
+      return new Proxy(client, {
+        get(target, property) {
+          if (property === 'query') {
+            return async (...args: unknown[]) => {
+              if (args[0] === 'ROLLBACK') {
+                throw new Error('planted: connection terminated unexpectedly');
+              }
+              const run = target.query as unknown as (...a: unknown[]) => Promise<unknown>;
+              return run.apply(target, args);
+            };
+          }
+          const value = Reflect.get(target, property, target) as unknown;
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    },
+  } as unknown as Pool;
+}
+
 describe('ingestBatch', () => {
   it('answers per event, in order: committed, unknown type, invalid payload', async () => {
     const valid = submittedWorkspaceCreated();
@@ -129,6 +158,27 @@ describe('ingestBatch', () => {
     if (results[0]?.status === 'invalid') {
       expect(results[0].message).toContain(event.id);
     }
+  });
+
+  it('planted defect: a ROLLBACK that throws cannot swallow the duplicate-event-id answer', async () => {
+    // The dead connection is exactly the case where the original error matters
+    // most, and an unguarded ROLLBACK in the catch throws its own error over it
+    // — skipping the duplicate check below it and rejecting the whole batch
+    // with something opaque. The duplicate answer stays truthful even here: a
+    // unique violation proves a prior transaction committed that id.
+    const event = submittedWorkspaceCreated();
+    expect((await service().ingestBatch([event]))[0]?.status).toBe('committed');
+
+    const results = await service({ pool: poolWithFailingRollback(db.pool) }).ingestBatch([event]);
+
+    expect(results).toEqual([
+      {
+        status: 'invalid',
+        eventId: event.id,
+        code: 'duplicate-event-id',
+        message: `an event with id ${event.id} is already in the ledger`,
+      },
+    ]);
   });
 
   it('applies projections in the same transaction as the event', async () => {

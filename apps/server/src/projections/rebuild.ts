@@ -18,6 +18,7 @@ export async function rebuildProjection(
     throw new Error(`unknown projection: ${name}`);
   }
   const client = await deps.pool.connect();
+  let rollbackFailure: Error | undefined;
   try {
     await client.query('BEGIN');
     await projection.reset(client);
@@ -27,9 +28,15 @@ export async function rebuildProjection(
     }
     await client.query('COMMIT');
   } catch (error) {
-    await client.query('ROLLBACK');
+    // Guarded so a ROLLBACK that itself throws — the dead-connection case,
+    // where the original error matters most — cannot replace it.
+    await client.query('ROLLBACK').catch((failure: unknown) => {
+      rollbackFailure = failure instanceof Error ? failure : new Error(String(failure));
+    });
     throw error;
   } finally {
-    client.release();
+    // Release with the error to destroy a connection still inside an aborted
+    // transaction rather than handing it to the next borrower.
+    client.release(rollbackFailure);
   }
 }

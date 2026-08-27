@@ -18,9 +18,24 @@ import { readEntityHead } from './projections/entity-heads.js';
 export function createEngineContext(client: PoolClient): EngineContext {
   return {
     async getEntityState(kind, id) {
-      // Plan-1 seam: the only entity state this world holds is the head pointer.
-      // Plan 2 Task 2 lands the authoritative EntityState and the real context
-      // bodies — this cast dies there.
+      // Plan-1 seam. READ THIS BEFORE RELYING ON THE RETURN VALUE: what comes
+      // back is an EntityHead — a head POINTER ({kind, id, headSeq,
+      // headEventId, headEventType}) — and NOT per-kind entity state. It has no
+      // `role`, no `stateId`, no domain fields of any kind. `as unknown as`
+      // defeats every structural check, so the compiler will not tell you.
+      //
+      // The cast dies at PLAN 3 TASK 12, which replaces this body with one that
+      // returns real state for 'ticket'/'ticket-type' and null for everything
+      // else. Not Plan 2 Task 2: that task replaces the domain TYPES and never
+      // touches this file's getEntityState (Plan 2 states it verbatim —
+      // "getEntityState and getChildrenStates stay Plan 1's stubs until Plan 3").
+      //
+      // The window that matters is Plan 3 Task 2 → Task 12: once ticket
+      // vocabulary is registered, the door admits transitions and a role gate
+      // reading `membership.role` off this value finds `undefined`, so every
+      // role-gated transition is silently refused with a reason that looks
+      // entirely legitimate. Either land Task 12 first, or make this body
+      // return null for the kinds it cannot honestly serve.
       return (await readEntityHead(client, kind, id)) as unknown as EntityState | null;
     },
     async getChildrenStates(ticketId) {
