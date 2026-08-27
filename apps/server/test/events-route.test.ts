@@ -104,4 +104,21 @@ describe('POST /v1/events', () => {
     expect(response.json()).toMatchObject({ error: 'Bad Request', message: 'body/events must be array' });
     await server.close();
   });
+
+  it('planted defect: an unknown top-level key is a 400, not a silently stripped extra', async () => {
+    const server = app();
+    const response = await server.inject({
+      method: 'POST',
+      url: '/v1/events',
+      payload: { events: [submittedWorkspaceCreated()], tenantId: 'evil' },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      statusCode: 400,
+      code: 'FST_ERR_VALIDATION',
+      error: 'Bad Request',
+      message: 'body must NOT have additional properties',
+    });
+    await server.close();
+  });
 });

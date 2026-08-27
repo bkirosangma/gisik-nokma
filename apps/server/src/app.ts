@@ -14,7 +14,8 @@ export function buildApp(deps: AppDeps, options: { logLevel?: string } = {}): Fa
   const app = Fastify({
     logger: options.logLevel === undefined ? false : { level: options.logLevel },
     // The events door refuses what it does not understand: silent scalar→array wrapping violated the stated non-array→400 contract.
-    ajv: { customOptions: { coerceTypes: false } },
+    // Unknown keys are refused, not silently dropped: `additionalProperties: false` declares reject-intent; AJV's removeAdditional default would have silently stripped them instead.
+    ajv: { customOptions: { coerceTypes: false, removeAdditional: false } },
   });
 
   app.get('/healthz', async (_request, reply) => {
