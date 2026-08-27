@@ -25,11 +25,13 @@ describe('loadConfig', () => {
 
   it('planted defect: a missing DATABASE_URL is refused with the variable named', () => {
     expect(() => loadConfig({})).toThrowError(ConfigError);
-    expect(() => loadConfig({})).toThrowError(/DATABASE_URL/);
+    expect(() => loadConfig({})).toThrowError('invalid server configuration — check: DATABASE_URL');
   });
 
   it('planted defect: a non-numeric PORT is refused with the variable named', () => {
     expect(() => loadConfig({ ...VALID_ENV, PORT: 'not-a-port' })).toThrowError(ConfigError);
-    expect(() => loadConfig({ ...VALID_ENV, PORT: 'not-a-port' })).toThrowError(/PORT/);
+    expect(() => loadConfig({ ...VALID_ENV, PORT: 'not-a-port' })).toThrowError(
+      'invalid server configuration — check: PORT',
+    );
   });
 });
