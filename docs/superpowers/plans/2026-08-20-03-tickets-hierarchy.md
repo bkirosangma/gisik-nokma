@@ -2242,6 +2242,42 @@ import { checkTicketWorkflowRebound } from './checks/workflow-rebind';
 
 **Who may emit it** is Plan 4's to enforce, alongside its other pre-engine permission gates: migration re-homes work that other people are doing, so it belongs with the admin-gated actions rather than with ordinary ticket edits. Recorded here so the ownership is explicit rather than assumed.
 
+- [ ] **Step 4c: The built-in rank lock, enforced where locks are real — `ticket-type.defined`**
+
+Added at Plan 8's walk (2026-08-27), closing the half of its Open question 6 that stayed open: the builder locks the built-in types' ranks **in the UI**, and the server's last-definition-wins accepted a re-rank anyway — a lock the server does not hold is a description of a rule, not a rule. The stakes are concrete: `DEEPEST_RANK` is the constant 4 *because* it is the built-in sub-task's rank; re-rank `sub-task` to 3 and every sub-task escapes the parent requirement while the builder still displays the lock. The board describing a rule the server does not enforce is the exact dishonesty class this product exists to remove.
+
+Create `packages/rule-engine/src/checks/ticket-type.ts`:
+
+```ts
+import { BUILTIN_TICKET_TYPE_SEEDS, ticketTypeDefSchema } from '@gisik-nokma/domain';
+import type { EngineContext, EngineVerdict } from '../types';
+import { ACCEPT, refuse } from './shared';
+
+export async function checkTicketTypeDefined(
+  env: EventEnvelope,
+  _ctx: EngineContext,
+): Promise<EngineVerdict> {
+  const def = ticketTypeDefSchema.parse(env.payload);
+  const seed = BUILTIN_TICKET_TYPE_SEEDS.find((builtin) => builtin.id === def.id);
+  // Name, icon and workflow binding of a built-in are an admin's to change
+  // (Plan 8 decision 7); the RANK is the ladder itself. Custom types may
+  // re-rank — the cycle check is load-bearing for exactly that case (design
+  // decision 6) — but the four built-ins are the fixed points the ladder
+  // hangs on, DEEPEST_RANK above all.
+  if (seed !== undefined && def.rank !== seed.rank) {
+    return refuse(
+      'type.builtin-rank',
+      `"${def.name}" is the built-in ${seed.id} type; its rank is ${seed.rank} and cannot be changed. Define a custom type for differently-ranked work.`,
+    );
+  }
+  return ACCEPT;
+}
+```
+
+and extend the dispatch: `case 'ticket-type.defined': return checkTicketTypeDefined(env, ctx);`
+
+Fixture `type-defined-refuses-builtin-rerank.json` plants the sharp case: `sub-task` re-defined at rank 3 is refused `type.builtin-rank` — before this check, that event was accepted and every sub-task quietly escaped `hierarchy.deepest-rank-parent-required`. A companion case proves the lock is only the lock: the same `sub-task` re-defined with a new icon and workflow at rank 4 is accepted, and a *custom* type re-ranked is accepted (the cycle check's territory, not this refusal's).
+
 - [ ] **Step 5: Run the tests to verify they pass, then the whole rule-engine suite**
 
 Run: `pnpm --filter @gisik-nokma/rule-engine exec vitest run src/checks/reparent.test.ts`
@@ -5009,6 +5045,7 @@ Mirrors `Features.md` §5. Status: `❌` not covered · `✅` covered · `🟡` 
 - 5.33 ✅ `ticket.workflow_rebound` moves the one ticket it names onto the target workflow at the named state, stamping the target's version and category, and leaves siblings on the old workflow untouched. (`proj-tickets.test.ts`)
 - 5.34 ✅ A rebound naming a state the target workflow does not have is refused (`ticket.rebound-unknown-state`), and one naming an undefined workflow is refused (`ticket.workflow-undefined`). (`workflow-rebind.test.ts`)
 - 5.35 ✅ A rebound to the ticket's **own** workflow is refused (`ticket.rebound-same-workflow`) — the planted defect is an actor using it to reach a state whose transition carries `restrict-to` and `require-comment`, which would otherwise succeed with neither satisfied and leave no entry in the log four-eyes reads. (`workflow-rebind.test.ts`)
+- 5.36 ✅ A built-in type's rank is locked at the server, not only in the builder's UI: `sub-task` re-defined at rank 3 is refused `type.builtin-rank` — before this, the event was accepted and every sub-task quietly escaped the parent requirement while the builder still displayed the lock. Name, icon and workflow of a built-in stay editable; custom types stay re-rankable. (`ticket-type.test.ts`, fixture `type-defined-refuses-builtin-rerank.json`)
 ```
 
 - [ ] **Step 3: Run the full suite one last time**
