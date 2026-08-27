@@ -93,7 +93,9 @@ describe('parseEvent', () => {
   it('planted defect: refuses a workspace.created filed against a ticket, naming both kinds', () => {
     // The ledger is append-only by trigger: a mis-filed event can never be
     // corrected, only superseded, and until then the ticket's head row says a
-    // workspace was created on it (coordination doc §11).
+    // workspace was created on it (coordination doc §11). The sentence is the
+    // engine's canonical kind-refusal copy, generic over the registration —
+    // the same condition refused at either layer reads the same either way.
     const raw: Record<string, unknown> = {
       ...rawWorkspaceCreated(),
       entity: { kind: 'ticket', id: newUlid() },
@@ -102,8 +104,7 @@ describe('parseEvent', () => {
     expect(result).toEqual({
       ok: false,
       code: 'entity-kind-mismatch',
-      message:
-        "event type 'workspace.created' records what happens to a workspace, but this envelope points at a ticket",
+      message: 'This workspace.created event does not point at a workspace; it points at a ticket.',
       eventId: raw['id'],
     });
   });

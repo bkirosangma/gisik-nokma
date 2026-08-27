@@ -57,10 +57,13 @@ export const stateMappingSchema = z.record(z.string(), z.string());
  * which tickets sit in which state, so the mapping is required for every
  * dropped state whether or not anything is standing in it.
  *
- * Deliberately NOT `.strict()`, unlike the seed vocabulary's payloads: what is
- * stored and served back is this whole object, so a key silently dropped at
- * the door is a key `hasStateMapping` and the proj_workflows round-trip would
- * never see again.
+ * Deliberately NOT `.strict()`, unlike the seed vocabulary's payloads. Not
+ * strict means strip, not permissive: a key this schema does not declare is
+ * dropped here rather than refused, so a newer client's additive field costs
+ * that one field instead of the whole publish. What keeps `stateMapping` is
+ * that it is DECLARED in the `.extend()` below — that, and not the absent
+ * `.strict()`, is what `hasStateMapping` and the proj_workflows round-trip
+ * rest on.
  */
 export const workflowDefinedPayloadSchema = workflowDefSchema.extend({
   stateMapping: stateMappingSchema.optional(),

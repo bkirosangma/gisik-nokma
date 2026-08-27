@@ -68,12 +68,18 @@ export function parseEvent(
   // head row and every kind-scoped read are wrong about what this event was.
   // A type that declares its kind is refused here rather than in each rule
   // module, so no later event type inherits the hole (coordination doc §11).
+  //
+  // Two layers, by design: on the server this door answers first, and the
+  // engine's per-type kind checks stay because the fixture suite and the
+  // offline replica enter at evaluateEvent and never pass through here. Same
+  // condition, and deliberately the same sentence — a person who meets this
+  // refusal twice should not have to work out whether it is the same refusal.
   const kind = envelope.data.entity.kind;
   if (registration.entityKind !== undefined && registration.entityKind !== kind) {
     return {
       ok: false,
       code: 'entity-kind-mismatch',
-      message: `event type '${type}' records what happens to a ${registration.entityKind}, but this envelope points at a ${kind}`,
+      message: `This ${type} event does not point at a ${registration.entityKind}; it points at a ${kind}.`,
       eventId: envelope.data.id,
     };
   }

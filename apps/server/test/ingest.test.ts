@@ -119,8 +119,7 @@ describe('ingestBatch', () => {
       status: 'invalid',
       eventId: misfiled.id,
       code: 'entity-kind-mismatch',
-      message:
-        "event type 'workspace.created' records what happens to a workspace, but this envelope points at a ticket",
+      message: 'This workspace.created event does not point at a workspace; it points at a ticket.',
     });
     const ledger = await db.pool.query('SELECT count(*)::int AS n FROM events WHERE id = $1', [misfiled.id]);
     expect(ledger.rows[0]).toEqual({ n: 0 });
