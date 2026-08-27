@@ -5094,12 +5094,43 @@ Register it where Task 8's ticket routes are registered, in `apps/server/src/app
 Run (from `apps/server/`): `pnpm vitest run test/routes/workspaces.test.ts`
 Expected: PASS (4 tests).
 
+- [ ] **Step 4b: The workspace directory — `GET /v1/me/workspaces`**
+
+Added at Plan 6's walk (2026-08-27), which found the gap the hard way: Plan 6's navigation codes against this route, its Playwright smoke *mocks* it — and no plan served it. A signed-in person could found a workspace and then have no way to be told they belong to it.
+
+In the same `routes/workspaces.ts`:
+
+```ts
+// GET /v1/me/workspaces → { workspaces: [{ workspaceId, name, role }] }
+// proj_memberships holds the person's workspace-scope rows; the name comes
+// from workspaceNameFromLedger (Task 14's helper — latest workspace.created/
+// renamed), which collapses into a workspace projection if one ever grows.
+app.get('/v1/me/workspaces', { preHandler: requireSession }, async (request) => {
+  const { rows } = await deps.pool.query(
+    `SELECT workspace_id, role FROM proj_memberships
+     WHERE user_id = $1 AND scope_kind = 'workspace' ORDER BY workspace_id`,
+    [request.currentUserId],
+  );
+  const workspaces = [];
+  for (const row of rows as Array<{ workspace_id: string; role: string }>) {
+    workspaces.push({
+      workspaceId: row.workspace_id,
+      name: await workspaceNameFromLedger(deps.pool, row.workspace_id),
+      role: row.role,
+    });
+  }
+  return { workspaces };
+});
+```
+
+Tests: a member of two workspaces lists both with names and roles; a guest lists their guest workspace (a guest is *told where they are a guest* — that is their own membership, not somebody else's data); no session → 401; and a revoked membership disappears from the directory on the next call, because the read is `proj_memberships` and revocation deletes the row.
+
 - [ ] **Step 5: Record it — Features.md and test-cases, same change set**
 
 Append to `Features.md` §6:
 
 ```markdown
-- ✅ **Founding a workspace** — `POST /v1/workspaces` takes a name from any signed-in person and returns a workspace that already works: the simple-Kanban default workflow, all four built-in ticket types bound to it, and the founder recorded as owner — appended in that order, because a ticket type naming an undefined workflow is refused. The template is a starting point, not a commitment: an admin may publish another workflow and re-point the types immediately. `apps/server/src/routes/workspaces.ts`, `apps/server/src/workspaces/bootstrap-workspace.ts`
+- ✅ **Founding a workspace** — `POST /v1/workspaces` takes a name from any signed-in person and returns a workspace that already works: the simple-Kanban default workflow, all four built-in ticket types bound to it, and the founder recorded as owner — appended in that order, because a ticket type naming an undefined workflow is refused. The template is a starting point, not a commitment: an admin may publish another workflow and re-point the types immediately. Beside it, `GET /v1/me/workspaces` is the directory: the workspaces this person belongs to, with names and roles, straight from `proj_memberships`. `apps/server/src/routes/workspaces.ts`, `apps/server/src/workspaces/bootstrap-workspace.ts`
 ```
 
 Append to `test-cases/06-auth-visibility.md`:
@@ -5219,6 +5250,8 @@ export const projInvites = {
 
 `invite.revoked` needs no route: an admin submits it through `POST /v1/events` like any other claim, and the projection flips the status, which kills the link (the GET refuses non-pending invites; the token row is deleted by a sweep-free rule — the accept route checks status before the token, so a revoked invite's surviving token row opens nothing).
 
+**One more read, added at Plan 6's walk (2026-08-27): `GET /v1/workspaces/:workspaceId/invites`** — admin-only, the pending list for the invite-mint screen. An admin who can send invitations but cannot see which are outstanding will send the same one twice and cannot revoke what they cannot list. Answers `{ invites: [{ inviteId, address, channel, role, projectIds, invitedBy, invitedAt }] }` from `proj_invites WHERE status = 'pending'`, newest first. No tokens in the response — the token's one copy went to whoever minted it, and a list that re-served credentials would turn a read into an issuance. Test: pending invites list with their addresses; accepted and revoked ones do not; a plain member is refused `permission.role` — the addresses are PII and the sync-down rule (owners/admins only) applies to the read path identically.
+
 - [ ] **Steps 1–4: failing tests, then the implementation above** — the domain tests first (each parser rule, including the two refusals with their exact messages), then the route tests. **Planted defects, each proven before trusted:** a plain member calling the invite route is refused `permission.role` · client-submitted `invite.accepted` is refused even from an admin (the token-bypass defect above) · `GET` with a valid-shaped but unknown token, a revoked token and a spent token all answer the identical 404 body · accepting twice: the second answers `410` and appends nothing (assert the event count) · **the credential-separation defect:** take a committed `invite.sent`, use its event id and its `inviteId` as tokens — both must 404, proving that reading the ledger confers nothing · an accepted member invite lands `membership.granted` + `project.member_added` rows and the new member's very next request can read a ticket in the promised project · an accepted **guest** invite lands the grant alone, `eff.projects` empty.
 
 - [ ] **Step 5: Features.md §6 and test-cases 6.32–6.38, same change set**
@@ -5237,6 +5270,8 @@ export const projInvites = {
 - **6.38** ✅ `invite.sent` reaches owners and admins in sync-down and nobody else — the address is PII and members have no need of it. (`test/sync/visible-events.test.ts`)
 - **6.39** ✅ The owner reads everything in the workspace, including explicit lists naming only others; an admin still reads nothing they have not joined or been listed for — the split IS the planted defect, since a regression re-unifying the two roles fails one side. (Task 7 amendment, owner decision 2026-08-27; `test/visibility/can-see.test.ts`)
 - **6.40** ✅ An owner on no project and no list receives every ticket from `listVisibleTickets`, and `canSee` agrees ticket by ticket — the drift alarm between the decision table's two copies (pure function and SQL). (`test/visibility/visible-tickets.test.ts`)
+- **6.41** ✅ `GET /v1/me/workspaces` lists the caller's workspaces with names and roles; a guest is told where they are a guest; a revoked membership vanishes from the directory on the next call. Added at Plan 6's walk, which found its own navigation coded against a route no plan served. (`test/routes/workspaces.test.ts`)
+- **6.42** ✅ `GET /v1/workspaces/:workspaceId/invites` lists pending invites to admins, never re-serves a token, and refuses plain members `permission.role` — the same PII rule as sync-down, applied to the read path. (`test/routes/invites.test.ts`)
 ```
 
 - [ ] **Step 6: Commit** — `git commit -m "Invites name an address rather than a user id, and the secret that opens one is not history: the ledger records who invited whom, the token lives hashed beside the sessions, and reading a workspace's past confers nothing about entering its future."`
