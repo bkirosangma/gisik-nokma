@@ -232,6 +232,15 @@ Spec §6 promises "Invites travel as links or QR from an admin", and the vocabul
 
 **Decision (owner: "ask them to create an account when they land"):** a new event pair. `invite.sent { inviteId, address, channel: 'email' | 'phone', role, projectIds? }` records the attributed claim that an admin invited somebody, naming the address rather than a user. `invite.accepted { inviteId, userId }` is appended when the invitee lands, authenticates (creating an account if they have none — the existing phone-OTP / magic-link / Google paths, no new auth), and the server binds the invite to the resolved user, appending the `membership.granted` and any `project.member_added` the invite promised. An invite is a claim like everything else: attributed, dated, and visible as pending until accepted. Revocation before acceptance is `invite.revoked { inviteId }`.
 
+**Correction to the paragraph above, made while applying it: the client half is NOT unowned, and the server contract is already pinned.** Plan 4's Open question 10 said nobody owned invite issuance or acceptance, and this document repeated it. Plan 6 in fact owns the client half in its Task 15 — `app/invite/[token]/page.tsx`, `packages/app-core/src/online/invites.ts`, an `InviteGateway` and its tests — and it names the server gap explicitly while pinning the surface it calls:
+
+- `GET /v1/invites/:token` → `InviteSummary { workspaceId, workspaceName, role: 'admin' | 'member' | 'guest' }`, or null for a dead token.
+- `POST /v1/invites/:token/accept` → `{ workspaceId }`.
+
+Plan 4 implements exactly those two routes over the event pair above rather than inventing a third shape. Note `role` excludes `owner`: an invitation cannot make somebody the owner of a workspace they have not entered.
+
+**The token is a credential, so it is not the event id and does not live in the ledger.** Anyone who can read a workspace's history can read an event id; if that id were the link's token, any member could accept an invitation addressed to somebody else. The token is server-owned state keyed to the invite — the same line this plan already draws for identity, where sessions are better-auth's tables and not workspace history. The ledger records that an invitation was made, to what address, by whom; it does not record the secret that opens it.
+
 ### The owner reads everything; an admin does not
 
 The original rule gave nobody a visibility bypass. **Owner-amended:** the workspace `owner` role bypasses read visibility across their workspace; `admin` does not and must still join a project to read its project-mode tickets. The hierarchy makes the workspace the right unit — it is the container everything else sits inside.
@@ -264,4 +273,4 @@ Still to apply. Delete each line as it lands:
 
 - **Plan 4** — the invite event pair and its acceptance path; the owner read bypass with its disclosure; the creator-lockout warning; the `/api/workspaces` → `/v1` move (19 occurrences); Features.md and test-case entries for all of the above.
 - **Plan 10** — consume `ScopeRevokedInstruction`: the replica must handle a scope-revoked item as a local delete by scope, which is idempotent like a purge. Until it does, a guest revocation is a wire shape nothing reads.
-- **Plans 5, 6, 9, 11** — the route prefix and the accountant's grant (in flight).
+- **Plans 5, 6, 9, 10, 11** — the accountant's grant, and the route-prefix *narrations*. A correction to the plan of work: the six `/api/workspaces` mentions outside Plan 4 are **not** route declarations. Four are Open questions discussing the drift and should be rewritten to record it as settled, not substituted; Plan 6 already writes the endpoint as `/v1/...` and merely narrates that Plan 4 registered it elsewhere; and one is a client-side `apps/web` path that was never the API. The only real registrations are Plan 4's 19. A blind substitution would have mangled four discussions into nonsense — the agent doing it stopped and said so rather than complying, which is the second time today an agent has corrected one of these briefs.
