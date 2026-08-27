@@ -64,4 +64,44 @@ describe('POST /v1/events', () => {
     expect(response.statusCode).toBe(400);
     await server.close();
   });
+
+  it('planted defect: events as a plain object (not an array) is a 400', async () => {
+    const server = app();
+    const response = await server.inject({
+      method: 'POST',
+      url: '/v1/events',
+      payload: { events: { not: 'an array' } },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: 'Bad Request', message: 'body/events must be array' });
+    await server.close();
+  });
+
+  it('planted defect: events as a string is a 400, not silently wrapped into a one-event batch', async () => {
+    const server = app();
+    const response = await server.inject({
+      method: 'POST',
+      url: '/v1/events',
+      payload: { events: 'not-an-array' },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: 'Bad Request', message: 'body/events must be array' });
+    await server.close();
+  });
+
+  it('planted defect: events as a number is a 400, not silently wrapped into a one-event batch', async () => {
+    const server = app();
+    const response = await server.inject({ method: 'POST', url: '/v1/events', payload: { events: 42 } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: 'Bad Request', message: 'body/events must be array' });
+    await server.close();
+  });
+
+  it('planted defect: events as null is a 400, not silently wrapped into a one-event batch', async () => {
+    const server = app();
+    const response = await server.inject({ method: 'POST', url: '/v1/events', payload: { events: null } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: 'Bad Request', message: 'body/events must be array' });
+    await server.close();
+  });
 });

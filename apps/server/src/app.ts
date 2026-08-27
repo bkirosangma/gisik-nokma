@@ -13,6 +13,8 @@ export type AppDeps = {
 export function buildApp(deps: AppDeps, options: { logLevel?: string } = {}): FastifyInstance {
   const app = Fastify({
     logger: options.logLevel === undefined ? false : { level: options.logLevel },
+    // The events door refuses what it does not understand: silent scalar→array wrapping violated the stated non-array→400 contract.
+    ajv: { customOptions: { coerceTypes: false } },
   });
 
   app.get('/healthz', async (_request, reply) => {
