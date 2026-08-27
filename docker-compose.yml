@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    # Owner decision: time is Asia/Kolkata. The server runs in IST so an ad-hoc
+    # psql session prints the same clock the product does — the pool sets the
+    # zone for app connections, this sets it for everyone else.
+    command: ["postgres", "-c", "timezone=Asia/Kolkata"]
+    environment:
+      POSTGRES_USER: gisik
+      POSTGRES_PASSWORD: gisik
+      POSTGRES_DB: gisik_nokma
+    ports:
+      - "54329:5432"
