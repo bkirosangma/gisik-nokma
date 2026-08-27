@@ -34,4 +34,18 @@ describe('loadConfig', () => {
       'invalid server configuration — check: PORT',
     );
   });
+
+  it('planted defect: an empty HOST is refused with the variable named', () => {
+    expect(() => loadConfig({ ...VALID_ENV, HOST: '' })).toThrowError(ConfigError);
+    expect(() => loadConfig({ ...VALID_ENV, HOST: '' })).toThrowError(
+      'invalid server configuration — check: HOST',
+    );
+  });
+
+  it('planted defect: a LOG_LEVEL outside the enum is refused with the variable named', () => {
+    expect(() => loadConfig({ ...VALID_ENV, LOG_LEVEL: 'verbose' })).toThrowError(ConfigError);
+    expect(() => loadConfig({ ...VALID_ENV, LOG_LEVEL: 'verbose' })).toThrowError(
+      'invalid server configuration — check: LOG_LEVEL',
+    );
+  });
 });
