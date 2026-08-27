@@ -1,0 +1,15 @@
+{
+  "name": "a move on a ticket nobody created is refused",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t404" },
+    "actorId": "user_a",
+    "payload": { "to": "doing" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "unknown-ticket",
+    "reason": "This event moves ticket t404, but no such ticket is known."
+  }
+}

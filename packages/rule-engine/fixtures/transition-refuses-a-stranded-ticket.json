@@ -1,0 +1,41 @@
+{
+  "name": "a ticket in a state the current version dropped without a mapping is refused, not guessed about",
+  "workflowDefs": [
+    {
+      "id": "wf_basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [] },
+        { "from": "done", "to": "doing", "rules": [] }
+      ]
+    },
+    {
+      "id": "wf_basic", "version": 2, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [ { "from": "todo", "to": "done", "rules": [] } ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_basic", "workflowVersion": 1 } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "doing" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_a",
+    "payload": { "to": "done" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "stranded-state",
+    "reason": "Ticket t1 sits in state \"doing\" of workflow version 1, which no longer exists in version 2 and no state mapping covers it."
+  }
+}

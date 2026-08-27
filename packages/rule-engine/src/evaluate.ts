@@ -1,5 +1,6 @@
 import type { EventEnvelope } from '@gisik-nokma/domain';
 import { evaluateWorkflowDefined } from './workflow-defined.js';
+import { evaluateTicketTransitioned } from './transition.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
 
 /**
@@ -12,6 +13,8 @@ export async function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Pro
   switch (env.type) {
     case 'workflow.defined':
       return evaluateWorkflowDefined(env, ctx);
+    case 'ticket.transitioned':
+      return evaluateTicketTransitioned(env, ctx);
     default:
       return { refused: false };
   }

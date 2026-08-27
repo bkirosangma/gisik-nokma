@@ -1,0 +1,15 @@
+{
+  "name": "a ticket.transitioned event pointing at a non-ticket entity is refused",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "project", "id": "p1" },
+    "actorId": "user_a",
+    "payload": { "to": "doing" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "malformed-payload",
+    "reason": "This ticket.transitioned event does not point at a ticket; it points at a project."
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "a from-any edge is usable from every state",
+  "workflowDefs": [
+    {
+      "id": "wf_star", "version": 1, "name": "Star", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "blocked", "name": "Blocked", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [] },
+        { "from": "*", "to": "blocked", "rules": [] },
+        { "from": "blocked", "to": "doing", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_star" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "doing" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_a",
+    "payload": { "to": "blocked" }
+  },
+  "expected": { "refused": false }
+}

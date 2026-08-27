@@ -1,0 +1,28 @@
+{
+  "name": "a move along a declared edge is accepted",
+  "workflowDefs": [
+    {
+      "id": "wf_basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [] },
+        { "from": "done", "to": "doing", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_basic" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_a",
+    "payload": { "to": "doing" }
+  },
+  "expected": { "refused": false }
+}
