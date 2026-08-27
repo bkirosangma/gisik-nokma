@@ -17,10 +17,27 @@ export type Origin = (typeof ORIGINS)[number];
  */
 export const ISO_DATETIME_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/;
 
+/**
+ * Date.parse alone accepts day-of-month overflow (e.g. 2026-02-30) and silently
+ * rolls it into a different, later instant instead of rejecting it — violating
+ * "an instant survives storage exactly." Month and hour overflow already come
+ * back NaN from Date.parse, so only day-of-month needs an explicit check here.
+ */
+function isRealCalendarDatetime(value: string): boolean {
+  if (Number.isNaN(Date.parse(value))) return false;
+  const parts = value.slice(0, 10).split('-').map(Number);
+  const year = parts[0];
+  const month = parts[1];
+  const day = parts[2];
+  if (year === undefined || month === undefined || day === undefined) return false;
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return day >= 1 && day <= daysInMonth;
+}
+
 const isoDatetime = z
   .string()
   .regex(ISO_DATETIME_REGEX, 'must be ISO 8601 with at most millisecond precision')
-  .refine((value) => !Number.isNaN(Date.parse(value)), 'must be a real calendar datetime');
+  .refine(isRealCalendarDatetime, 'must be a real calendar datetime');
 
 const ulidString = z.string().regex(ULID_REGEX, 'must be a ULID');
 
