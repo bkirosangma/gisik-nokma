@@ -26,7 +26,7 @@ const partialEnvelopeSchema = z
   .object({
     id: z.string().optional(),
     workspaceId: z.string().optional(),
-    entity: z.object({ kind: entityKindSchema, id: z.string() }),
+    entity: z.object({ kind: entityKindSchema, id: z.string() }).strict(),
     type: z.string(),
     version: z.number().int().optional(),
     payload: z.unknown(),
@@ -39,32 +39,42 @@ const partialEnvelopeSchema = z
   .strict();
 export type PartialEnvelope = z.infer<typeof partialEnvelopeSchema>;
 
-export const fixtureSchema = z.object({
-  name: z.string().min(1),
-  workflowDefs: z.array(workflowDefinedPayloadSchema).default([]),
-  memberships: z
-    .array(z.object({ userId: z.string(), role: z.enum(['owner', 'admin', 'member', 'guest']) }))
-    .default([]),
-  priorEvents: z.array(partialEnvelopeSchema).default([]),
-  candidateEvent: partialEnvelopeSchema,
-  // Every branch is `.strict()`, and the rule-only branch is why. Left lenient,
-  // a typo'd key (`reasonStartWith`, `resaon`) or a wrong-typed one
-  // (`reason: 123`) simply falls through to the rule-only branch, which
-  // silently retires the character-for-character reason check the whole suite
-  // rests on. Strict makes the unknown key fail that branch too, so the typo
-  // refuses at load rather than downgrading the discipline in silence.
-  expected: z.union([
-    z.object({ refused: z.literal(false) }).strict(),
-    z.object({ refused: z.literal(true), rule: z.string(), reason: z.string() }).strict(),
-    z.object({ refused: z.literal(true), rule: z.string(), reasonStartsWith: z.string() }).strict(),
-    // Rule-only: the fixture asserts WHICH rule refused, and leaves the wording
-    // to the plan that owns the rule. Plans 3 and 9 ship such fixtures against
-    // rules defined here — without this branch their fixtures fail to load, and
-    // copying a reason string into a foreign plan is how two copies of one
-    // sentence start drifting.
-    z.object({ refused: z.literal(true), rule: z.string() }).strict(),
-  ]),
-});
+/**
+ * Strict at every level it owns. Three of these fields carry a `.default()`,
+ * which is exactly why: left lenient, a top-level typo like `memberhips` is not
+ * an error but a silent fallback to `[]`, and the fixture then proves whatever
+ * is left of what its author meant. The one deliberate exception is
+ * `workflowDefinedPayloadSchema` — its non-strict strip is the separately-ruled
+ * domain decision (adaptation map S1) and its subtree keeps those semantics.
+ */
+export const fixtureSchema = z
+  .object({
+    name: z.string().min(1),
+    workflowDefs: z.array(workflowDefinedPayloadSchema).default([]),
+    memberships: z
+      .array(z.object({ userId: z.string(), role: z.enum(['owner', 'admin', 'member', 'guest']) }).strict())
+      .default([]),
+    priorEvents: z.array(partialEnvelopeSchema).default([]),
+    candidateEvent: partialEnvelopeSchema,
+    // Every branch is `.strict()`, and the rule-only branch is why. Left lenient,
+    // a typo'd key (`reasonStartWith`, `resaon`) or a wrong-typed one
+    // (`reason: 123`) simply falls through to the rule-only branch, which
+    // silently retires the character-for-character reason check the whole suite
+    // rests on. Strict makes the unknown key fail that branch too, so the typo
+    // refuses at load rather than downgrading the discipline in silence.
+    expected: z.union([
+      z.object({ refused: z.literal(false) }).strict(),
+      z.object({ refused: z.literal(true), rule: z.string(), reason: z.string() }).strict(),
+      z.object({ refused: z.literal(true), rule: z.string(), reasonStartsWith: z.string() }).strict(),
+      // Rule-only: the fixture asserts WHICH rule refused, and leaves the wording
+      // to the plan that owns the rule. Plans 3 and 9 ship such fixtures against
+      // rules defined here — without this branch their fixtures fail to load, and
+      // copying a reason string into a foreign plan is how two copies of one
+      // sentence start drifting.
+      z.object({ refused: z.literal(true), rule: z.string() }).strict(),
+    ]),
+  })
+  .strict();
 export type Fixture = z.infer<typeof fixtureSchema>;
 
 const FIXTURE_TIME = '2026-08-20T00:00:00.000Z';

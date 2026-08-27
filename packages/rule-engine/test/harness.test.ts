@@ -375,6 +375,75 @@ describe('a typo in a fixture refuses at load rather than downgrading the discip
     ).toBe("expected: Unrecognized key(s) in object: 'note'");
   });
 
+  // Round 2 of the closure: the same class one level out. A top-level typo is
+  // the worst of the family, because three of the fixture's fields carry a
+  // `.default()` — `memberhips` is not an error, it is a silent `[]`, and the
+  // fixture goes on proving whatever survived the misspelling.
+  it('a misspelled top-level key refuses instead of falling back to its default', () => {
+    expect(malformedDetail({ ...wellFormed, memberhips: [{ userId: 'user_a', role: 'admin' }] })).toBe(
+      ": Unrecognized key(s) in object: 'memberhips'",
+    );
+  });
+
+  it('a singular priorEvent refuses instead of silently defaulting to no history', () => {
+    expect(
+      malformedDetail({
+        ...wellFormed,
+        priorEvent: [{ type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, payload: { workflowId: 'wf_basic' } }],
+      }),
+    ).toBe(": Unrecognized key(s) in object: 'priorEvent'");
+  });
+
+  it('a stray key on the candidate entity refuses', () => {
+    expect(
+      malformedDetail({
+        ...wellFormed,
+        candidateEvent: {
+          type: 'ticket.transitioned',
+          entity: { kind: 'ticket', id: 't1', label: 'the ticket' },
+          actorId: 'user_a',
+          payload: { to: 'doing' },
+        },
+      }),
+    ).toBe("candidateEvent.entity: Unrecognized key(s) in object: 'label'");
+  });
+
+  it('a misspelled entity kind names both the missing key and the typo', () => {
+    expect(
+      malformedDetail({
+        ...wellFormed,
+        candidateEvent: {
+          type: 'ticket.transitioned',
+          entity: { kidn: 'ticket', id: 't1' },
+          actorId: 'user_a',
+          payload: { to: 'doing' },
+        },
+      }),
+    ).toBe("candidateEvent.entity.kind: Required; candidateEvent.entity: Unrecognized key(s) in object: 'kidn'");
+  });
+
+  it('a stray key on a prior event entity refuses, and the path names which event', () => {
+    expect(
+      malformedDetail({
+        ...wellFormed,
+        priorEvents: [
+          {
+            type: 'ticket.created',
+            entity: { kind: 'ticket', id: 't1', label: 'the ticket' },
+            actorId: 'user_a',
+            payload: { workflowId: 'wf_basic' },
+          },
+        ],
+      }),
+    ).toBe("priorEvents.0.entity: Unrecognized key(s) in object: 'label'");
+  });
+
+  it('a stray key on a membership refuses', () => {
+    expect(malformedDetail({ ...wellFormed, memberships: [{ userId: 'user_a', role: 'admin', name: 'A' }] })).toBe(
+      "memberships.0: Unrecognized key(s) in object: 'name'",
+    );
+  });
+
   it('all four legitimate expected shapes still parse (backward-compat pin)', () => {
     const shapes = [
       { refused: false },
@@ -387,5 +456,33 @@ describe('a typo in a fixture refuses at load rather than downgrading the discip
     for (const expected of shapes) {
       expect(fixtureSchema.safeParse({ ...wellFormed, expected }).success).toBe(true);
     }
+  });
+
+  it('every legitimate optional field still parses under strictness (backward-compat pin)', () => {
+    // Everything a fixture author is entitled to write: the omitted-defaults
+    // form, a fully-populated envelope on both the candidate and a prior event,
+    // and a membership. If strictness ever over-reaches, this is what notices.
+    expect(fixtureSchema.safeParse({ name: 'defaults omitted', candidateEvent: wellFormed.candidateEvent, expected: { refused: false } }).success).toBe(true);
+    expect(
+      fixtureSchema.safeParse({
+        ...wellFormed,
+        memberships: [{ userId: 'user_a', role: 'admin' }],
+        priorEvents: [
+          {
+            id: 'evt_custom',
+            workspaceId: 'ws_1',
+            entity: { kind: 'ticket', id: 't1' },
+            type: 'ticket.created',
+            version: 1,
+            payload: { workflowId: 'wf_basic' },
+            actorId: 'user_a',
+            origin: 'web',
+            clientTime: '2026-08-20T01:00:00.000Z',
+            serverTime: '2026-08-20T02:00:00.000Z',
+            seq: 1,
+          },
+        ],
+      }).success,
+    ).toBe(true);
   });
 });
