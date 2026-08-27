@@ -15,19 +15,28 @@ import type { Accept, EngineContext, Refusal } from '../engine.js';
 
 const entityKindSchema = z.enum(['workspace', 'project', 'ticket', 'workflow', 'ticket-type', 'membership']);
 
-const partialEnvelopeSchema = z.object({
-  id: z.string().optional(),
-  workspaceId: z.string().optional(),
-  entity: z.object({ kind: entityKindSchema, id: z.string() }),
-  type: z.string(),
-  version: z.number().int().optional(),
-  payload: z.unknown(),
-  actorId: z.string().optional(),
-  origin: z.enum(['web', 'mobile', 'desktop', 'server']).optional(),
-  clientTime: z.string().optional(),
-  serverTime: z.string().optional(),
-  seq: z.number().int().optional(),
-});
+/**
+ * Every key is optional bar `entity` and `type`, so a legitimately partial
+ * fixture event is unaffected by `.strict()` — but a misspelled one refuses
+ * loudly at load instead of parsing clean and arriving somewhere else. Without
+ * it, `paylod` yields `payload: undefined` and surfaces later as a
+ * malformed-payload refusal indistinguishable from a real planted defect.
+ */
+const partialEnvelopeSchema = z
+  .object({
+    id: z.string().optional(),
+    workspaceId: z.string().optional(),
+    entity: z.object({ kind: entityKindSchema, id: z.string() }),
+    type: z.string(),
+    version: z.number().int().optional(),
+    payload: z.unknown(),
+    actorId: z.string().optional(),
+    origin: z.enum(['web', 'mobile', 'desktop', 'server']).optional(),
+    clientTime: z.string().optional(),
+    serverTime: z.string().optional(),
+    seq: z.number().int().optional(),
+  })
+  .strict();
 export type PartialEnvelope = z.infer<typeof partialEnvelopeSchema>;
 
 export const fixtureSchema = z.object({
@@ -38,16 +47,22 @@ export const fixtureSchema = z.object({
     .default([]),
   priorEvents: z.array(partialEnvelopeSchema).default([]),
   candidateEvent: partialEnvelopeSchema,
+  // Every branch is `.strict()`, and the rule-only branch is why. Left lenient,
+  // a typo'd key (`reasonStartWith`, `resaon`) or a wrong-typed one
+  // (`reason: 123`) simply falls through to the rule-only branch, which
+  // silently retires the character-for-character reason check the whole suite
+  // rests on. Strict makes the unknown key fail that branch too, so the typo
+  // refuses at load rather than downgrading the discipline in silence.
   expected: z.union([
-    z.object({ refused: z.literal(false) }),
-    z.object({ refused: z.literal(true), rule: z.string(), reason: z.string() }),
-    z.object({ refused: z.literal(true), rule: z.string(), reasonStartsWith: z.string() }),
+    z.object({ refused: z.literal(false) }).strict(),
+    z.object({ refused: z.literal(true), rule: z.string(), reason: z.string() }).strict(),
+    z.object({ refused: z.literal(true), rule: z.string(), reasonStartsWith: z.string() }).strict(),
     // Rule-only: the fixture asserts WHICH rule refused, and leaves the wording
     // to the plan that owns the rule. Plans 3 and 9 ship such fixtures against
     // rules defined here — without this branch their fixtures fail to load, and
     // copying a reason string into a foreign plan is how two copies of one
     // sentence start drifting.
-    z.object({ refused: z.literal(true), rule: z.string() }),
+    z.object({ refused: z.literal(true), rule: z.string() }).strict(),
   ]),
 });
 export type Fixture = z.infer<typeof fixtureSchema>;
@@ -74,7 +89,14 @@ export function completeCandidate(fx: Fixture): EventEnvelope {
   return completeEnvelope(fx.candidateEvent, fx.priorEvents.length + 1);
 }
 
-/** Load and validate every fixture JSON. A malformed fixture throws — the planted-defect discipline applies to the fixtures themselves. */
+/**
+ * Load and validate every fixture JSON. A malformed fixture throws — the
+ * planted-defect discipline applies to the fixtures themselves.
+ *
+ * Fixtures live FLAT in `fixtures/`: the scan is non-recursive, so a fixture
+ * filed into a subdirectory is silently skipped rather than refused, and
+ * Task 13's count gate is the compensating control that catches it.
+ */
 export function loadFixtures(): Fixture[] {
   const dir = fileURLToPath(new URL('../../fixtures/', import.meta.url));
   const files = readdirSync(dir)

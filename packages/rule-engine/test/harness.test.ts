@@ -275,3 +275,117 @@ describe('assertFixtureOutcome', () => {
     expect(() => assertFixtureOutcome({ refused: false }, ruleOnly)).toThrow(/expected refusal/);
   });
 });
+
+// A misspelled key that parses clean is the silent-typo class this series has
+// now refused three times. Left lenient, `reasonStartWith` / `resaon` /
+// `reason: 123` all fall through to the rule-only branch and quietly retire the
+// character-for-character reason check, and `paylod` yields `payload:
+// undefined` — which from Task 5 on looks exactly like a real planted defect.
+//
+// `loadFixtures` is the door these die at, but it reads the real `fixtures/`
+// directory and takes no directory argument, so a malformed witness cannot be
+// committed as a file: it would red the entire runner. These tests therefore
+// drive the schema `loadFixtures` parses with, and render the detail string
+// exactly as `loadFixtures` interpolates it, so the assertion lands on the
+// sentence a fixture author would actually be shown.
+function malformedDetail(raw: unknown): string {
+  const parsed = fixtureSchema.safeParse(raw);
+  if (parsed.success) {
+    throw new Error('expected this fixture to be refused at load, but it parsed clean');
+  }
+  return parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
+}
+
+describe('a typo in a fixture refuses at load rather than downgrading the discipline', () => {
+  const wellFormed = {
+    name: 'well formed',
+    workflowDefs: [wfBasic],
+    memberships: [],
+    priorEvents: [],
+    candidateEvent: {
+      type: 'ticket.transitioned',
+      entity: { kind: 'ticket', id: 't1' },
+      actorId: 'user_a',
+      payload: { to: 'doing' },
+    },
+    expected: { refused: true, rule: 'require-comment', reason: 'This move must carry a comment explaining it, and none was provided.' },
+  };
+
+  it('the well-formed original parses — the planted defects below differ from it by one key', () => {
+    expect(fixtureSchema.safeParse(wellFormed).success).toBe(true);
+  });
+
+  it('a misspelled reasonStartsWith cannot fall through to the rule-only branch', () => {
+    expect(
+      malformedDetail({ ...wellFormed, expected: { refused: true, rule: 'require-comment', reasonStartWith: 'This move' } }),
+    ).toBe("expected: Unrecognized key(s) in object: 'reasonStartWith'");
+  });
+
+  it('a misspelled reason cannot fall through to the rule-only branch', () => {
+    expect(
+      malformedDetail({ ...wellFormed, expected: { refused: true, rule: 'require-comment', resaon: 'This move' } }),
+    ).toBe("expected: Unrecognized key(s) in object: 'resaon'");
+  });
+
+  it('a wrong-typed reason cannot fall through to the rule-only branch', () => {
+    expect(
+      malformedDetail({ ...wellFormed, expected: { refused: true, rule: 'require-comment', reason: 123 } }),
+    ).toBe("expected: Unrecognized key(s) in object: 'reason'");
+  });
+
+  it('a misspelled payload key refuses instead of arriving as an undefined payload', () => {
+    expect(
+      malformedDetail({
+        ...wellFormed,
+        candidateEvent: {
+          type: 'ticket.transitioned',
+          entity: { kind: 'ticket', id: 't1' },
+          actorId: 'user_a',
+          paylod: { to: 'doing' },
+        },
+      }),
+    ).toBe("candidateEvent: Unrecognized key(s) in object: 'paylod'");
+  });
+
+  // The three rows above all die on the rule-only branch's strictness. These
+  // three make the OTHER branches' strictness load-bearing too: each is a key
+  // the author wrote on purpose that a lenient branch would silently drop,
+  // taking the author's intent with it.
+  it('a stray reason on an accepting fixture refuses rather than being dropped', () => {
+    expect(malformedDetail({ ...wellFormed, expected: { refused: false, reason: 'this fixture accepts, so why is there a reason?' } })).toBe(
+      "expected: Unrecognized key(s) in object: 'reason'",
+    );
+  });
+
+  it('a fixture demanding both an exact reason and a prefix refuses rather than silently picking one', () => {
+    expect(
+      malformedDetail({
+        ...wellFormed,
+        expected: { refused: true, rule: 'require-comment', reason: 'the exact sentence', reasonStartsWith: 'the exact' },
+      }),
+    ).toBe("expected: Unrecognized key(s) in object: 'reasonStartsWith'");
+  });
+
+  it('a stray key beside a prefix expectation refuses rather than being dropped', () => {
+    expect(
+      malformedDetail({
+        ...wellFormed,
+        expected: { refused: true, rule: 'malformed-payload', reasonStartsWith: 'This ticket.transitioned event', note: 'see plan 5' },
+      }),
+    ).toBe("expected: Unrecognized key(s) in object: 'note'");
+  });
+
+  it('all four legitimate expected shapes still parse (backward-compat pin)', () => {
+    const shapes = [
+      { refused: false },
+      { refused: true, rule: 'require-comment', reason: 'This move must carry a comment explaining it, and none was provided.' },
+      { refused: true, rule: 'malformed-payload', reasonStartsWith: 'This ticket.transitioned event' },
+      // The rule-only branch — the one strictness had to preserve while
+      // closing the typo hole that hid behind it.
+      { refused: true, rule: 'require-comment' },
+    ];
+    for (const expected of shapes) {
+      expect(fixtureSchema.safeParse({ ...wellFormed, expected }).success).toBe(true);
+    }
+  });
+});
