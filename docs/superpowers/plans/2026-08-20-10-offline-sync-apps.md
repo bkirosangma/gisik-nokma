@@ -2449,7 +2449,7 @@ Amendment 16 verbatim: offline-originated events arrive here; a sync-time refusa
 - Produces (THE wire shape `packages/sync-client` consumes — Tasks 10/11):
 
 ```ts
-export const VISIBILITY_REFUSAL_RULE = 'visibility.not-visible';
+export const VISIBILITY_REFUSAL_RULE = 'permission.visibility';
 
 export type SyncInvalidCode = IngestErrorCode | 'actor-mismatch' | 'reserved-type';
 
@@ -2650,11 +2650,11 @@ describe('POST /v1/sync', () => {
     expect(res.json().results[0]).toMatchObject({ status: 'invalid', code: 'reserved-type' });
   });
 
-  it('a claim on a ticket the user can no longer see contests with visibility.not-visible', async () => {
+  it('a claim on a ticket the user can no longer see contests with permission.visibility', async () => {
     await seedTicket(db.pool, WS, TICKET, { visibility: 'explicit', userIds: ['usr_someone_else'] });
     const e = offlineField();
     const res = await post('/v1/sync', [e]);
-    expect(res.json().results[0]).toMatchObject({ status: 'contested', rule: 'visibility.not-visible' });
+    expect(res.json().results[0]).toMatchObject({ status: 'contested', rule: 'permission.visibility' });
     await seedTicket(db.pool, WS, TICKET, { visibility: 'workspace' }); // restore for later tests
   });
 });
@@ -2684,7 +2684,7 @@ import type { IngestErrorCode, IngestService } from '../ingest/ingest-service.js
 import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
 
-export const VISIBILITY_REFUSAL_RULE = 'visibility.not-visible';
+export const VISIBILITY_REFUSAL_RULE = 'permission.visibility';
 
 export type SyncInvalidCode = IngestErrorCode | 'actor-mismatch' | 'reserved-type';
 
@@ -6211,7 +6211,7 @@ real Postgres, deterministic and CI-ready."
   - **S1 concurrent-field-set** — later stream order wins the projection; the earlier claim survives in history; both replicas converge byte-identically.
   - **S2 stale-assignee restrict-to** — passes the stale local pre-check, contests on the server with rule `restrict-to`.
   - **S3 workflow-changed-stranded** — workflow v2 removed the target state while offline; the transition contests with the exact engine rule.
-  - **S4 visibility-revoked** — purge on sync-down; outbox claim contests `visibility.not-visible`; the revoked replica holds no content, the claimant keeps an honest local stub; other viewers see the contest in the ledger.
+  - **S4 visibility-revoked** — purge on sync-down; outbox claim contests `permission.visibility`; the revoked replica holds no content, the claimant keeps an honest local stub; other viewers see the contest in the ledger.
   - **S5 offline-reopen-pair** — the world changed; BOTH halves contest coherently (reopen: `restrict-to`; child: `hierarchy.parent-terminal`).
   - **S6 duplicate-batch** — the same outbox batch lands twice; results identical, ledger unchanged, one contest only.
 
@@ -6380,7 +6380,7 @@ describe('S3 — workflow changed while offline: the stranded transition contest
 });
 
 describe('S4 — visibility revoked while offline: purge down, contest up, honest stubs', () => {
-  it('the revoked replica holds no content; the claim contests visibility.not-visible; viewers see the contest', async () => {
+  it('the revoked replica holds no content; the claim contests permission.visibility; viewers see the contest', async () => {
     const ticketId = await seedSharedTicket();
     // B offline edits
     const edit = ticketEvent('usr_b', ticketId, 'ticket.field_set', { fieldId: 'notes', value: 'B private note' });
@@ -6398,7 +6398,7 @@ describe('S4 — visibility revoked while offline: purge down, contest up, hones
     // up: the claim contested, with the visibility rule
     const contests = await h.contests();
     expect(contests).toHaveLength(1);
-    expect(contests[0]).toMatchObject({ original_event_id: edit.id, rule: 'visibility.not-visible', claimant_id: 'usr_b' });
+    expect(contests[0]).toMatchObject({ original_event_id: edit.id, rule: 'permission.visibility', claimant_id: 'usr_b' });
 
     // down: B's replica holds NO content for the ticket (planted defect)
     expect(await b.ds.query.getTicket(ticketId)).toBeNull(); // pending gone, confirmed purged
@@ -6407,7 +6407,7 @@ describe('S4 — visibility revoked while offline: purge down, contest up, hones
     // …but the claimant keeps an honest, content-light stub of their own contested claim
     const stubs = await b.ds.query.listContests(h.workspaceId, { claimantId: 'usr_b', open: true });
     expect(stubs).toHaveLength(1);
-    expect(stubs[0]).toMatchObject({ originalEventId: edit.id, rule: 'visibility.not-visible' });
+    expect(stubs[0]).toMatchObject({ originalEventId: edit.id, rule: 'permission.visibility' });
 
     // A (who still sees the ticket) sees the contest as ledger history
     await a.syncDown();
@@ -7529,7 +7529,7 @@ Test files: packages/domain/test/{contest-events,clock-skew}.test.ts · packages
 - 12.8 ✅ the same sync batch twice: identical results, ledger unchanged, one contest — planted defect (sync-route.test.ts, S6)
 - 12.9 ✅ interactive `/v1/events` refusal records NOTHING — planted defect proving both paths side by side (sync-route.test.ts)
 - 12.10 ✅ actor mismatch and client-supplied `claim.contested` are refused at the sync door (sync-route.test.ts)
-- 12.11 ✅ a claim on a no-longer-visible ticket contests `visibility.not-visible` (sync-route.test.ts, S4)
+- 12.11 ✅ a claim on a no-longer-visible ticket contests `permission.visibility` (sync-route.test.ts, S4)
 - 12.12 ✅ bootstrap: snapshot+tail for exactly the visible tickets; invisible tickets leave no trace in the response — planted defect (bootstrap.test.ts)
 - 12.13 ✅ bootstrap backfills comments/attachments/contests older than the snapshot; guests get definitions + explicit tickets only (bootstrap.test.ts)
 - 12.14 ✅ snapshot writer: snapshot equals the reducer fold byte-for-byte; next pass folds from the previous snapshot — planted defect (snapshot-writer.test.ts)
@@ -7590,18 +7590,20 @@ named as manual instead of pretended."
 
 ## Open questions (owner / reconciliation review)
 
+**Walked 2026-08-27.** Four were already settled (1, 11, 15, 17). Two turned out to be recommendations the sibling plan had already implemented — the interactive door both visibility-checks writes and refuses forged server origin, per Plan 4's gate — with one real residue fixed here: the two doors named the visibility refusal differently, and now share `permission.visibility` (question 3). Questions 6 and 10 each carried a promise another document had to hold, and both are now held: amendment 10 records the replica's `pending` status, and Plan 11's CI carries the gate that refuses to ship the interim session plumbing. Questions 12, 2 and 4 are settled below or stand with their reasons (the derived skew flag stays derived — immutable inputs make it rebuild-safe, and a persisted flag is an additive projection if reporting ever wants one; the theoretical non-ticket contest path stays `refused` until somebody actually builds offline workflow editing). The rest — 7, 8, 9, 13, 14, 16 — are adaptation seams naming their single file, accepted as written.
+
 1. **Stream cursor — RESOLVED to coordination amendment 18, no sign-off outstanding.** An earlier draft of this plan proposed its own `events.global_seq` identity column. That is withdrawn: amendment 18 already pins `events.workspace_seq bigint` with `UNIQUE (workspace_id, workspace_seq)`, assigned inside the ingest transaction under a per-workspace advisory lock, and Plan 1 has landed the schema, `lockWorkspace` and `nextWorkspaceSeq`. Task 3 now consumes that column and finishes the one half amendment 18 still lists as pending — Plan 4's `visibleEventsFor` filtering and ordering by `workspace_seq` — with Plan 4's cursor-sensitive tests updated. Plan 5's `/v1/stream` sends `caught-up.seq` = the high-water `workspace_seq` for that workspace (`readStreamSeq`); its `visibleEventsFor` pass-through needs no other change. Two consequences worth stating: a cursor is meaningful only within its own workspace (a multi-workspace socket must keep one per subscription), and an identity/sequence column must NOT be substituted — it is assigned before COMMIT but becomes visible after it, so a reader can pass a number that later appears.
 2. **Clock-skew flag is derived, not stored.** Spec §5 says "ingest flags gross skew"; Plan 1's ingest stores both clocks and flags nothing. Since both timestamps are immutable in the envelope, this plan derives the flag (`hasGrossClockSkew`) at render — deterministic and rebuild-safe. If the owner wants an ingest-time *persisted* flag (e.g. for server-side reporting), it is an additive projection later; nothing here blocks it.
-3. **`visibility.not-visible` enforcement parity.** This plan's sync door pre-checks `canSee` for events on existing tickets. Interactive `/v1/events` (Plan 1/5) does NOT visibility-check writes today — an online user who lost visibility mid-session gets an engine-level answer only if some rule happens to catch it. Plan 5 should add the same `canSee` write-check to `/v1/events` (refusal, no contest) so the two doors agree; rule id `visibility.not-visible` is exported from `sync-service.ts` for exactly that reuse.
+3. **Visibility parity between the two doors — SETTLED at the walk (2026-08-27): the parity already existed, and the rule id is now one.** The premise this question carried ("interactive `/v1/events` does not visibility-check writes today") was checked against Plan 4 and found false: its `checkVisibilityPermission` runs in the ingest pipeline's permission gate and refuses any ticket event whose ticket the actor cannot see — `permission.visibility`, "This ticket is not visible to you." What *was* real is the smaller defect underneath: the two doors named the same fact differently — this plan's sync door contested with its own `visibility.not-visible` while the interactive door refused `permission.visibility`. Two ids for one meaning is the stale-threshold shape in miniature, so this plan's `VISIBILITY_REFUSAL_RULE` is now `'permission.visibility'`: a contested claim's stored rule and an interactive refusal's rule are the same string, and a client rendering or filtering on one cannot miss the other.
 4. **Contests on non-ticket entities respond `refused`, not `contested`** (no ticket to attach the contest to — e.g. an offline-authored `workflow.defined`). The apps do not author non-ticket events offline in this plan, so the path is theoretical; if a later plan adds offline workflow editing, decide where such contests should live.
-5. **Origin forgery at the interactive door.** `claim.contested` is refused by engine rule (`contest.server-only`, origin-based) and by the sync door (`reserved-type`). A client could still POST `/v1/events` with `origin: 'server'` on other event types — origin is a client claim. Plan 5 should decide whether `/v1/events` stamps/validates origin against the transport (recommended: refuse `origin: 'server'` on any authenticated client call).
+5. **Origin forgery at the interactive door — SETTLED at the walk (2026-08-27): the recommendation was already implemented, before it was made.** Plan 4's `checkRolePermission` opens with exactly the refusal this question recommends: `origin: 'server'` on any authenticated client call is refused (`permission.role`, "Only the server itself may record server-origin events."), and the server's own appends — the founding sequence, invite acceptance — go through the internal append path that never passes the HTTP gate, so the refusal costs them nothing. Nothing for Plan 5 to decide; the question stands as a correct instinct that the sibling plan had already acted on.
 6. **`DataSource.ingest` return type (amendment 10).** The replica implementation returns the additive `{status:'pending', eventId}` — it cannot truthfully return `committed`. Plan 6's app-core views must treat `pending` as accepted-for-now (render via badges) — flagged for the amendment-10 contract text; the online DataSource is unaffected.
 7. **`DataSource.subscribe` semantics on the replica.** Implemented as a change signal (`cb()` on every replica change; views re-query). If Plan 6 pins a payload-carrying callback, the replica adapts by passing the applied `SyncItem` — one-line change, noted in `replica-data-source.ts`.
 8. **Plan 7 editor bridge assumption.** `EDITOR_BRIDGE` frame names (`editor-ready`/`set-doc`/`doc-changed`) and `getEditorWebviewHtml(): string` are this plan's offer; the mobile fallback textarea page ships until Plan 7 lands. Reconciliation touches one file (`editor-web-view.tsx`).
 9. **Plan 9 push transport assumption.** `POST /v1/push/registrations {platform: 'expo', token}` with 404-tolerance. Plan 9 owns the server side and may rename — the stub is one file.
 10. **Interim session plumbing in the shells** (desktop localStorage token; mobile `EXPO_PUBLIC_DEV_*`; `actorId: me.assigneeId ?? 'me'` in the ticket screen) is explicitly temporary until Plan 6's session handling is the reference — each site is comment-marked. Plan 11 must not ship with these in place.
 11. **Route prefix — SETTLED by coordination amendment 20** (`/v1/*` is the whole product API; `/api/auth/*` is better-auth's vendor surface and the only `/api/` mount). Plan 4 registered its ticket reads at `/api/workspaces/…` before that amendment landed; **they were moved on 2026-08-27**, and Plan 6 already consumed the `/v1/` path. Nothing in this plan changes either way — every route it adds was already `/v1/*`. Original note, kept for provenance: this plan follows the coordination doc's `/v1` pins. The series-wide reconciliation this note deferred to Plan 5's review has happened.
-12. **Contest resolution permissions.** Anyone who can submit events on the ticket can resolve a contest (engine checks existence/aim/single-resolution; visibility gates reads). If the owner wants resolution restricted (claimant + admins, say), that is a new engine rule on `claim.contested_resolved` — additive.
+12. **Contest resolution permissions — SETTLED at review (2026-08-27): open resolution stands.** Anyone who can submit events on the ticket can resolve a contest, and that is the right bar for the same reason the spec makes resolution human in the first place: a contest is a visible disagreement on a ticket the team is already working, resolving it is an ordinary attributed act (`claim.contested_resolved` names its actor and its choice forever), and restricting it to claimant-plus-admins would leave a contest nobody senior is watching to rot on a ticket its own collaborators could have settled. The record shows who resolved and how; if a workspace ever exhibits resolution abuse, the additive engine rule this question names is the seam — on evidence, not on ceremony.
 13. **Reducer deps version pinning.** `buildLedgerDeps`/`buildLocalDeps` resolve workflow definitions latest-version-wins, matching the reducer's `getWorkflow(id)` call shape (no version argument). If Plan 3's reducer resolves by `ticket.workflowVersion` internally, both helpers must switch to keyed-by-version lookups — verify at execution against `packages/domain/src/ticket-state.ts` (marked in both files).
 14. **S3's exact rule name** (`unknown-state` vs `illegal-transition` vs `stranded-state`) is pinned to a single literal after the first green run — the scenario file carries the instruction. If the engine's answer surprises (e.g. `workflow-version`), that is a reconciliation finding for Plan 2.
 15. **`claim.contested` payload field name — RECONCILED with Plan 9, no decision outstanding.** Amendment 16 pins the event ("payload = the original event, rule, reason") but not the field names, and the two plans spelled it differently: Plan 9's notification fan-out parses `{ originalEvent: { id, type, actorId, clientTime, … }, rule, reason }` (zod `.passthrough()`); this plan's registration carried `{ original: SubmittedEvent, rule, reason }`. Taken: **`{ originalEvent: SubmittedEvent, rule, reason }`** — Plan 9's field name, this plan's richness. This plan owns the registration and needs the whole envelope (the redo path re-issues it, the convert-to-comment path renders its payload, `proj_contested` stores it for the sync-time idempotency lookup), and a full `SubmittedEvent` under the key `originalEvent` satisfies Plan 9's schema unchanged — `id`, `type`, `actorId` and `clientTime` are all envelope fields, and the extra keys pass through. **Plan 9 needs no edit**; `contestedPayloadSchema` in its `fanout.ts` already validates what this plan now emits. The `proj_contested` / local `contests` column is `original_event` to match.
