@@ -3185,7 +3185,7 @@ git commit -m "canSee is the one visibility decision, pure at its core: guests g
 
 **Interfaces:**
 - Consumes: `makeRequireSession` + `Auth` (Task 2), `canSee`/`listVisibleTickets` (Task 7), `proj_tickets` (Plan 3), the `events` ledger table (Plan 1 — see Cross-plan path assumptions).
-- Produces: `registerTicketRoutes(app: FastifyInstance, deps: { pool: Pool; auth: Auth }): void` serving `GET /api/workspaces/:workspaceId/tickets`, `GET /api/workspaces/:workspaceId/tickets/:ticketId`, `GET /api/workspaces/:workspaceId/tickets/:ticketId/events`; single-read response shape `{ ticket: <proj_tickets row>, parent: null | { kind: 'ticket', id, title } | { kind: 'restricted', id } }` (Task 10 adds `rollup`); test helper `appendTestEvent(db, env)`. Sessions come from Task 2's `signInWithPhone` in `test/helpers/session.ts`.
+- Produces: `registerTicketRoutes(app: FastifyInstance, deps: { pool: Pool; auth: Auth }): void` serving `GET /v1/workspaces/:workspaceId/tickets`, `GET /v1/workspaces/:workspaceId/tickets/:ticketId`, `GET /v1/workspaces/:workspaceId/tickets/:ticketId/events`; single-read response shape `{ ticket: <proj_tickets row>, parent: null | { kind: 'ticket', id, title } | { kind: 'restricted', id } }` (Task 10 adds `rollup`); test helper `appendTestEvent(db, env)`. Sessions come from Task 2's `signInWithPhone` in `test/helpers/session.ts`.
 
 **Honesty decisions encoded here (spec §6, exact):**
 - A direct read of an invisible ticket is `404 {error: 'not_found'}` — invisible and nonexistent are indistinguishable, so a member probing another project's ids learns nothing. The ONE deliberate existence leak is the restricted-parent placeholder, reachable only through a child the viewer can already see.
@@ -3298,12 +3298,12 @@ describe('read enforcement', () => {
 
     const invisible = await app.inject({
       method: 'GET',
-      url: `/api/workspaces/${WS}/tickets/tkt_other`,
+      url: `/v1/workspaces/${WS}/tickets/tkt_other`,
       headers: { authorization: `Bearer ${token}` },
     });
     const ghost = await app.inject({
       method: 'GET',
-      url: `/api/workspaces/${WS}/tickets/tkt_never_existed`,
+      url: `/v1/workspaces/${WS}/tickets/tkt_never_existed`,
       headers: { authorization: `Bearer ${token}` },
     });
     expect(invisible.statusCode).toBe(404);
@@ -3319,7 +3319,7 @@ describe('read enforcement', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/workspaces/${WS}/tickets`,
+      url: `/v1/workspaces/${WS}/tickets`,
       headers: { authorization: `Bearer ${token}` },
     });
     expect(res.statusCode).toBe(200);
@@ -3336,7 +3336,7 @@ describe('read enforcement', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/workspaces/${WS}/tickets/tkt_child`,
+      url: `/v1/workspaces/${WS}/tickets/tkt_child`,
       headers: { authorization: `Bearer ${token}` },
     });
     expect(res.statusCode).toBe(200);
@@ -3353,7 +3353,7 @@ describe('read enforcement', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/workspaces/${WS}/tickets/tkt_child`,
+      url: `/v1/workspaces/${WS}/tickets/tkt_child`,
       headers: { authorization: `Bearer ${token}` },
     });
     expect(res.json().parent).toEqual({ kind: 'ticket', id: 'tkt_parent', title: 'Open plan' });
@@ -3378,7 +3378,7 @@ describe('read enforcement', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/workspaces/${WS}/tickets/tkt_1/events`,
+      url: `/v1/workspaces/${WS}/tickets/tkt_1/events`,
       headers: { authorization: `Bearer ${token}` },
     });
     expect(res.statusCode).toBe(200);
@@ -3396,7 +3396,7 @@ describe('read enforcement', () => {
     await seedTicket(pool, { workspaceId: WS, projectId: 'prj_other', ticketId: 'tkt_other' });
     const res = await app.inject({
       method: 'GET',
-      url: `/api/workspaces/${WS}/tickets/tkt_other/events`,
+      url: `/v1/workspaces/${WS}/tickets/tkt_other/events`,
       headers: { authorization: `Bearer ${token}` },
     });
     expect(res.statusCode).toBe(404);
@@ -3430,14 +3430,14 @@ export function registerTicketRoutes(app: FastifyInstance, deps: { pool: Pool; a
   const requireSession = makeRequireSession(deps.auth);
   const notFound = { error: 'not_found' } as const;
 
-  app.get('/api/workspaces/:workspaceId/tickets', { preHandler: requireSession }, async (request) => {
+  app.get('/v1/workspaces/:workspaceId/tickets', { preHandler: requireSession }, async (request) => {
     const { workspaceId } = request.params as { workspaceId: string };
     const tickets = await listVisibleTickets(deps.pool, request.currentUserId, workspaceId);
     return { tickets };
   });
 
   app.get(
-    '/api/workspaces/:workspaceId/tickets/:ticketId',
+    '/v1/workspaces/:workspaceId/tickets/:ticketId',
     { preHandler: requireSession },
     async (request, reply) => {
       const { ticketId } = request.params as { workspaceId: string; ticketId: string };
@@ -3467,7 +3467,7 @@ export function registerTicketRoutes(app: FastifyInstance, deps: { pool: Pool; a
   );
 
   app.get(
-    '/api/workspaces/:workspaceId/tickets/:ticketId/events',
+    '/v1/workspaces/:workspaceId/tickets/:ticketId/events',
     { preHandler: requireSession },
     async (request, reply) => {
       const { ticketId } = request.params as { workspaceId: string; ticketId: string };
@@ -4065,7 +4065,7 @@ In `apps/server/src/routes/tickets.ts`, add the import and extend the single-tic
 ```ts
 import { rollupFor } from '../visibility/rollup';
 
-// in the GET /api/workspaces/:workspaceId/tickets/:ticketId handler,
+// in the GET /v1/workspaces/:workspaceId/tickets/:ticketId handler,
 // replace `return { ticket, parent };` with:
 const rollup = await rollupFor(deps.pool, request.currentUserId, ticketId);
 return { ticket, parent, rollup };
@@ -4087,7 +4087,7 @@ it('the single read carries the rollup with true totals and the viewer’s restr
 
   const res = await app.inject({
     method: 'GET',
-    url: `/api/workspaces/${WS}/tickets/tkt_parent`,
+    url: `/v1/workspaces/${WS}/tickets/tkt_parent`,
     headers: { authorization: `Bearer ${token}` },
   });
   expect(res.json().rollup).toEqual({ total: 2, open: 1, active: 0, terminal: 1, restrictedCount: 1 });
@@ -4642,7 +4642,7 @@ git commit -m "Sync-down never leaks and never skips: visibleEventsFor walks the
 - Create: `test-cases/06-auth-visibility.md` (this plan's own bucket, per the coordination doc §2)
 
 **Interfaces:**
-- Consumes: everything this plan built; Plan 1's ingest HTTP route (adapt its URL — assumed `POST /api/workspaces/:workspaceId/events`; the assertions on refusal bodies do not adapt).
+- Consumes: everything this plan built; Plan 1's ingest HTTP route `POST /v1/events`, body `{ events: [envelope, …] }` — the workspace travels inside each envelope, not in the path (verified against Plan 1 Task 11, not assumed).
 - Produces: end-to-end proof that the permission and visibility layers hold at the HTTP surface, plus the Features.md / test-cases entries the workspace convention demands in the same change set. (`POST /v1/workspaces` is the one route not proven here — it arrives in Task 13 with its own file, including its no-session 401.)
 
 - [ ] **Step 1: Write the failing end-to-end security tests**
@@ -4708,9 +4708,9 @@ describe('security at the HTTP surface', () => {
     });
     const res = await app.inject({
       method: 'POST',
-      url: `/api/workspaces/${WS}/events`, // adapt to Plan 1's ingest route
+      url: '/v1/events',
       headers: { authorization: `Bearer ${token}` },
-      payload: env,
+      payload: { events: [env] },
     });
     expect(res.json()).toMatchObject({
       refused: true,
@@ -4728,7 +4728,7 @@ describe('security at the HTTP surface', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/workspaces/${WS}/tickets/tkt_secret`,
+      url: `/v1/workspaces/${WS}/tickets/tkt_secret`,
       headers: { authorization: `Bearer ${token}` },
     });
     expect(res.statusCode).toBe(404);
@@ -4743,7 +4743,7 @@ describe('security at the HTTP surface', () => {
       payload: { to: 'done' },
       actorId: 'usr_nobody',
     });
-    const res = await app.inject({ method: 'POST', url: `/api/workspaces/${WS}/events`, payload: env });
+    const res = await app.inject({ method: 'POST', url: '/v1/events', payload: { events: [env] } });
     expect(res.statusCode).toBe(401);
   });
 
@@ -4869,7 +4869,7 @@ git commit -m "Route-level security proven end to end — the guest, the prober,
 
 Task 5 gave a founded workspace everything it needs to be usable. This task gives the product a door to found one through. Until the owner decision of 2026-08-26 there was **no** workspace-creation route anywhere in the series — the surface was unowned end to end, and every workspace in every test arrived by hand-appending a `workspace.created` envelope.
 
-**Route prefix, stated once because this plan is inconsistent about it:** the product API lives under `/v1/*` (coordination doc amendment 20; better-auth's vendor surface at `/api/auth/*` is the only exception). This route is therefore `POST /v1/workspaces`. Task 8's ticket read routes are written `/api/workspaces/...`, which predates amendment 20 and is drift — it is *not* the idiom to copy, and it is left alone here only because its Produces block is a contract Plans 5, 6 and 10 quote. Flag it at execution; do not propagate it.
+**Route prefix, stated once:** the whole product API lives under `/v1/*` (coordination doc amendment 20). better-auth's vendor surface at `/api/auth/*` is the only exception, and it is deliberate. Task 8's ticket read routes were written `/api/workspaces/...` before amendment 20 landed and were moved to `/v1/workspaces/...` on 2026-08-27, along with this plan's end-to-end tests. There is now one idiom in this plan and nothing to flag at execution.
 
 **Files:**
 - Create: `apps/server/src/routes/workspaces.ts`
@@ -5082,7 +5082,9 @@ git commit -m "A workspace can now be founded through the product, and it arrive
 8. **Vendor tables are not snake_case.** better-auth's generated tables keep the library's naming — a deliberate exception to CODING_STANDARDS, called out in the migration header.
 9. **Explicit lists are exactly the authored list.** Creator/assignee are not implicitly appended; a creator can lock themselves out of their own ticket (the claim is attributed, and a project admin can repair it). Confirm this is the wanted sharp edge.
 10. **The client half of workspace creation is still unowned — to be assigned when Plan 6 is walked.** The owner decision of 2026-08-26 settled the **server** surface only, and Tasks 5 and 13 build exactly that: the founding sequence and `POST /v1/workspaces`. Nobody owns the screen that founds a workspace, and nobody owns **invite issuance and acceptance** — Plan 6 has already flagged the invite half as ownerless. Deliberately not built here: this plan ships no client code, and inventing a founding screen inside a server plan would put it where no client plan would look for it. Concretely still missing, so a later reader does not have to re-derive it: a form that calls `POST /v1/workspaces` and routes to the new workspace; a way to invite someone (which today means an admin hand-submitting `membership.granted` with a `userId` they somehow already know — there is no email-an-invite path, and `membership.granted` names a `userId`, not an address, so an invite for a person who has never signed in cannot be expressed by the current vocabulary at all); and acceptance. Assign when Plan 6 is walked.
-11. **The route prefix in this plan is inconsistent, and only half of it is fixed.** `POST /v1/workspaces` (Task 13) follows coordination amendment 20; Task 8's ticket read routes are `/api/workspaces/...`, which predates it. Task 8's Produces block is quoted by Plans 5, 6 and 10, so moving it is a cross-plan change, not a rename — flagged for the same pass that walks those plans, and not done here.
+11. **Route prefix — SETTLED (owner decision 2026-08-27).** Task 8's ticket read routes were `/api/workspaces/...`, predating coordination amendment 20; they are now `/v1/workspaces/...` like everything else, with the plan's own end-to-end tests moved with them. `/api/auth/*` stays as better-auth's vendor surface, which amendment 20 names as the one exception.
+
+    Moving them turned up a second, larger error in the same tests. This plan's end-to-end cases posted events to `POST /api/workspaces/:workspaceId/events` — a route that **does not exist in any plan**, and that was recorded here as an assumption ("adapt its URL"). Plan 1 Task 11 registers `POST /v1/events`, with body `{ events: [envelope, …] }` and the workspace carried inside each envelope rather than in the path. So the tests were wrong about the URL *and* about the request shape, and would have 404'd rather than proving anything. Both are corrected against Plan 1's actual route rather than against a fresh assumption.
 
 ## Self-review (performed on the finished plan)
 
