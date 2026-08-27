@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { newUlid } from '../src/ids.js';
 import { parseEvent } from '../src/parse-event.js';
+import { createEventTypeRegistry } from '../src/registry.js';
 
 function rawWorkspaceCreated(): Record<string, unknown> {
   const workspaceId = newUlid();
@@ -80,6 +82,48 @@ describe('parseEvent', () => {
       message: 'event envelope is malformed: Expected object, received number',
       eventId: null,
     });
+  });
+
+  it('accepts a workspace event pointed at a workspace — the kinds agree', () => {
+    const raw = rawWorkspaceCreated();
+    expect(raw['entity']).toMatchObject({ kind: 'workspace' });
+    expect(parseEvent(raw).ok).toBe(true);
+  });
+
+  it('planted defect: refuses a workspace.created filed against a ticket, naming both kinds', () => {
+    // The ledger is append-only by trigger: a mis-filed event can never be
+    // corrected, only superseded, and until then the ticket's head row says a
+    // workspace was created on it (coordination doc §11).
+    const raw: Record<string, unknown> = {
+      ...rawWorkspaceCreated(),
+      entity: { kind: 'ticket', id: newUlid() },
+    };
+    const result = parseEvent(raw);
+    expect(result).toEqual({
+      ok: false,
+      code: 'entity-kind-mismatch',
+      message:
+        "event type 'workspace.created' records what happens to a workspace, but this envelope points at a ticket",
+      eventId: raw['id'],
+    });
+  });
+
+  it('a registration that declares no entity kind still admits any kind', () => {
+    // Backward compatibility, pinned: the binding is opt-in per registration,
+    // so a type that genuinely spans kinds is not refused by omission.
+    const registry = createEventTypeRegistry();
+    registry.register({
+      type: 'anything.happened',
+      version: 1,
+      payloadSchema: z.object({}).strict(),
+    });
+    const raw: Record<string, unknown> = {
+      ...rawWorkspaceCreated(),
+      entity: { kind: 'ticket', id: newUlid() },
+      type: 'anything.happened',
+      payload: {},
+    };
+    expect(parseEvent(raw, registry).ok).toBe(true);
   });
 
   it('echoes a readable claimed id even when the envelope is malformed', () => {

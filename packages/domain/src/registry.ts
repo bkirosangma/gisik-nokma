@@ -1,9 +1,19 @@
 import type { z } from 'zod';
+import type { EventEnvelope } from './envelope.js';
 
 export type EventTypeRegistration = {
   type: string;              // e.g. 'workspace.created'
   version: number;           // e.g. 1
   payloadSchema: z.ZodTypeAny;
+  /**
+   * The entity kind this type is about, when it is only ever about one:
+   * 'workspace.created' happens to a workspace and to nothing else. Declared
+   * here rather than re-checked in each rule module so the binding is stated
+   * once, beside the type it belongs to, and enforced for every event type at
+   * the door (parseEvent) — coordination doc §11. Optional: a type that
+   * genuinely spans kinds simply omits it, and then any kind is admitted.
+   */
+  entityKind?: EventEnvelope['entity']['kind'];
 };
 
 export type EventTypeRegistry = {

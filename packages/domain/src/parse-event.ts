@@ -6,6 +6,7 @@ export type EnvelopeErrorCode =
   | 'malformed-envelope'
   | 'unknown-event-type'
   | 'unknown-event-version'
+  | 'entity-kind-mismatch'
   | 'invalid-payload';
 
 export type ParsedEvent = { ok: true; event: SubmittedEvent };
@@ -19,9 +20,10 @@ export type EnvelopeError = {
 
 /**
  * Pure gatekeeper for the ledger: validates envelope shape, event-type
- * registration, version, and payload. No I/O — callable identically on
- * client and server (spec §1 invariant 2). An EnvelopeError is NOT a rule
- * refusal: it means the submission is not a well-formed claim at all.
+ * registration, version, the type↔kind binding, and payload. No I/O —
+ * callable identically on client and server (spec §1 invariant 2). An
+ * EnvelopeError is NOT a rule refusal: it means the submission is not a
+ * well-formed claim at all.
  */
 export function parseEvent(
   raw: unknown,
@@ -57,6 +59,21 @@ export function parseEvent(
       ok: false,
       code: 'unknown-event-version',
       message: `unknown version ${version} of event type '${type}'`,
+      eventId: envelope.data.id,
+    };
+  }
+
+  // The ledger is append-only by trigger, so an event filed against the wrong
+  // kind can never be corrected, only superseded — and until then the entity's
+  // head row and every kind-scoped read are wrong about what this event was.
+  // A type that declares its kind is refused here rather than in each rule
+  // module, so no later event type inherits the hole (coordination doc §11).
+  const kind = envelope.data.entity.kind;
+  if (registration.entityKind !== undefined && registration.entityKind !== kind) {
+    return {
+      ok: false,
+      code: 'entity-kind-mismatch',
+      message: `event type '${type}' records what happens to a ${registration.entityKind}, but this envelope points at a ${kind}`,
       eventId: envelope.data.id,
     };
   }

@@ -4,5 +4,6 @@ export * from './registry.js';
 export * from './vocabulary.js';
 export * from './parse-event.js';
 export * from './state.js';
-export * from './provisional.js';
+export * from './workflow.js';
+export * from './entity-state.js';
 export * from './ist-day.js';

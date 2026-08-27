@@ -5,7 +5,7 @@ import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { createIngestService } from '../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from './helpers/db.js';
-import { submittedWorkspaceCreated } from './helpers/events.js';
+import { submittedWorkflowDefined, submittedWorkspaceCreated } from './helpers/events.js';
 
 let db: TestDatabase;
 
@@ -104,6 +104,26 @@ describe('ingestBatch', () => {
     if (results[0]?.status === 'committed') {
       expect(results[0].serverTime).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     }
+  });
+
+  it('planted defect: an event filed against the wrong entity kind is refused at the door', async () => {
+    // The ledger is append-only by trigger, so this event could never be taken
+    // back once written — and the ticket it names would carry a workspace's
+    // creation in its history forever (coordination doc §11). The door is the
+    // only place that can still say no.
+    const misfiled = submittedWorkspaceCreated({ entity: { kind: 'ticket', id: newUlid() } });
+
+    const results = await service().ingestBatch([misfiled]);
+
+    expect(results[0]).toEqual({
+      status: 'invalid',
+      eventId: misfiled.id,
+      code: 'entity-kind-mismatch',
+      message:
+        "event type 'workspace.created' records what happens to a workspace, but this envelope points at a ticket",
+    });
+    const ledger = await db.pool.query('SELECT count(*)::int AS n FROM events WHERE id = $1', [misfiled.id]);
+    expect(ledger.rows[0]).toEqual({ n: 0 });
   });
 
   it('assigns consecutive seqs to one entity across batches', async () => {
@@ -371,11 +391,17 @@ describe('workspace stream cursor (coordination §18)', () => {
     // serialise them, so only the per-workspace lock keeps the cursor unique.
     // Without it all four read the same max(workspace_seq) and
     // events_workspace_seq_unique refuses the losers.
+    //
+    // The three companions are workflows rather than the workspace.created
+    // events against project/ticket/membership entities this test used to
+    // send: an event type is now bound to the kind it is about, so those three
+    // are refused at the door and would never reach the lock this test is
+    // about. Distinct (kind, id) pairs are the only property that matters here.
     const racers = [
       anchor,
-      submittedWorkspaceCreated({ workspaceId, entity: { kind: 'project', id: newUlid() } }),
-      submittedWorkspaceCreated({ workspaceId, entity: { kind: 'ticket', id: newUlid() } }),
-      submittedWorkspaceCreated({ workspaceId, entity: { kind: 'membership', id: newUlid() } }),
+      submittedWorkflowDefined(workspaceId),
+      submittedWorkflowDefined(workspaceId),
+      submittedWorkflowDefined(workspaceId),
     ];
     const results = await Promise.all(racers.map((event) => ingest.ingestBatch([event])));
     expect(results.flat().filter((result) => result.status === 'committed')).toHaveLength(4);

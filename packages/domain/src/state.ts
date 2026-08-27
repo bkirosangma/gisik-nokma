@@ -13,6 +13,7 @@ export type EntityHead = {
   headEventType: string;
 };
 
-// TicketState, WorkflowDef, WorkflowState, and StateCategory live in
-// ./provisional.ts as PROVISIONAL stubs until Plan 2's domain tasks land
-// the authoritative definitions (coordination doc §4).
+// StateCategory, WorkflowState and WorkflowDef live in ./workflow.js;
+// TicketState and the rest of the EntityState union live in
+// ./entity-state.js. Both are the authoritative definitions (coordination
+// doc §4) — the PROVISIONAL stubs they replaced are gone.
