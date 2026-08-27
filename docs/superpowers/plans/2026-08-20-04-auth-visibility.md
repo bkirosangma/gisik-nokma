@@ -2783,7 +2783,7 @@ git commit -m "proj_visibility resolves every ticket's audience: authored modes 
 | guest | **no** | **no** | only if listed |
 | member / admin / owner | yes | only if on the project | only if listed |
 
-Guests see ONLY tickets explicitly shared with them (spec §6) — a guest's project attachment scopes their guest-ship, it grants no project-mode visibility. Owners and admins get **no bypass**: an admin not on a project does not see its project-mode tickets, and an unlisted admin does not see explicit-mode tickets (Open questions). The `explicit` list is exactly the authored list — creator and assignee are not implicitly appended; locking yourself out is a legal (attributed) claim.
+Guests see ONLY tickets explicitly shared with them (spec §6) — a guest belongs to the workspace and to no project (the 2026-08-27 membership collapse), so there is no project attachment to even ask about. The **owner** reads everything in the workspace (owner decision 2026-08-27) — a disclosed power, not a hidden one; the visibility controls say so wherever they are built. **Admins** get no bypass: an admin not on a project does not see its project-mode tickets, and an unlisted admin does not see explicit-mode tickets (Open questions). The `explicit` list is exactly the authored list — creator and assignee are not implicitly appended; locking yourself out is a legal (attributed) claim, and the client warns before it is made.
 
 - [ ] **Step 1: Write the scenario seed helpers**
 
@@ -2947,10 +2947,21 @@ describe('canSeeResolved — the decision table, exactly', () => {
     expect(canSeeResolved(eff('member'), 'u', vis('explicit', ['other']))).toBe(false);
   });
 
-  it('planted defect — admins and owners get NO visibility bypass', () => {
+  // This case originally asserted no bypass for admins AND owners; the owner
+  // decision of 2026-08-27 split the two roles, so it is now two cases with
+  // opposite expectations — and the split itself is the planted defect: a
+  // regression that re-unifies them fails one side or the other.
+  it('planted defect — an ADMIN gets no visibility bypass', () => {
     expect(canSeeResolved(eff('admin'), 'u', vis('project'))).toBe(false);
-    expect(canSeeResolved(eff('owner'), 'u', vis('project'))).toBe(false);
     expect(canSeeResolved(eff('admin'), 'u', vis('explicit', ['other']))).toBe(false);
+  });
+
+  it('the OWNER reads everything in the workspace — disclosed, not hidden', () => {
+    expect(canSeeResolved(eff('owner'), 'u', vis('workspace'))).toBe(true);
+    expect(canSeeResolved(eff('owner'), 'u', vis('project'))).toBe(true);
+    // Even an explicit list that names somebody else: the owner power is total
+    // within the workspace, which is exactly why the UI must say so.
+    expect(canSeeResolved(eff('owner'), 'u', vis('explicit', ['other']))).toBe(true);
   });
 });
 
@@ -3020,6 +3031,16 @@ export interface ResolvedVisibility {
  */
 export function canSeeResolved(eff: EffectiveRole, userId: string, v: ResolvedVisibility): boolean {
   if (eff.workspaceRole === null) return false;
+  // The OWNER reads everything in their workspace (owner decision 2026-08-27).
+  // The workspace is the container everything else sits inside, and its owner
+  // owns the container. Reads leave no event trace, so this power cannot be
+  // made honest by attribution — it is made honest by DISCLOSURE: the
+  // visibility controls state plainly that the workspace owner can always see
+  // (Plan 6 carries the copy). A stated power is not a lie; a hidden one is.
+  // ADMINS get no bypass: an admin must join a project — an attributed event —
+  // to read its project-mode tickets. Writing is unchanged for everyone,
+  // owner included: creating in a project still requires joining it.
+  if (eff.workspaceRole === 'owner') return true;
   if (eff.workspaceRole === 'guest') {
     // Guests see ONLY what is explicitly shared with them (spec §6).
     return v.resolvedMode === 'explicit' && v.resolvedUserIds.includes(userId);
@@ -3028,7 +3049,7 @@ export function canSeeResolved(eff: EffectiveRole, userId: string, v: ResolvedVi
     case 'workspace':
       return true;
     case 'project':
-      return eff.projects.has(v.projectId); // no owner/admin bypass — see Open questions
+      return eff.projects.has(v.projectId); // no ADMIN bypass — deliberate, see Open questions
     case 'explicit':
       return v.resolvedUserIds.includes(userId);
   }
@@ -3068,6 +3089,7 @@ Expected: PASS (7 tests).
 // apps/server/test/visibility/visible-tickets.test.ts
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
+import { canSee } from '../../src/visibility/can-see';
 import { listVisibleTickets } from '../../src/visibility/visible-tickets';
 import { migrateTestDb, testPool, truncateAll } from '../helpers/db';
 import { applyAll, seedGuest, seedMember, seedTicket, setVisibilityEnv } from '../helpers/seed';
@@ -3107,6 +3129,24 @@ describe('listVisibleTickets — server-side filtering, one SQL pass', () => {
     expect(await ids('usr_g')).toEqual(['tkt_ex']); // guests: explicit only
     expect(await ids('usr_outsider')).toEqual([]);
   });
+
+  // The SQL is the decision table said twice; this viewer is the drift alarm.
+  // If canSeeResolved's owner bypass and this function's owner branch ever
+  // disagree, the owner sees a ticket the list omits (or the reverse) and this
+  // goes red. usr_own is on NO project and NO explicit list — everything they
+  // receive, they receive from the bypass alone.
+  it('the owner lists every ticket, from the bypass alone', async () => {
+    await seedMember(pool, WS, 'usr_own', 'owner', []);
+    await seedTicket(pool, { workspaceId: WS, projectId: 'prj_1', ticketId: 'tkt_p1' });
+    await seedTicket(pool, { workspaceId: WS, projectId: 'prj_1', ticketId: 'tkt_ex' });
+    await applyAll(pool, [setVisibilityEnv(WS, 'tkt_ex', 'explicit', ['usr_b'])]);
+
+    const listed = (await listVisibleTickets(pool, 'usr_own', WS)).map((t) => t.ticket_id).sort();
+    expect(listed).toEqual(['tkt_ex', 'tkt_p1']);
+    for (const ticketId of listed) {
+      expect(await canSee(pool, 'usr_own', ticketId)).toBe(true); // the two implementations agree
+    }
+  });
 });
 ```
 
@@ -3132,6 +3172,22 @@ export async function listVisibleTickets(
 ): Promise<Array<Record<string, unknown>>> {
   const eff = await resolveEffectiveRole(db, userId, workspaceId);
   if (eff.workspaceRole === null) return [];
+
+  // This function is the decision table SAID TWICE — once in canSeeResolved,
+  // once in SQL — which is exactly the two-sources-of-truth shape this series
+  // keeps catching. Every branch here must move when canSeeResolved moves; the
+  // owner-bypass case below exists because the 2026-08-27 decision moved it,
+  // and the list test asserts an owner viewer so the two cannot drift silently.
+  if (eff.workspaceRole === 'owner') {
+    const { rows } = await db.query(
+      `SELECT t.* FROM proj_tickets t
+       JOIN proj_visibility v ON v.ticket_id = t.ticket_id
+       WHERE v.workspace_id = $1
+       ORDER BY t.ticket_id`,
+      [workspaceId],
+    );
+    return rows;
+  }
 
   if (eff.workspaceRole === 'guest') {
     const { rows } = await db.query(
@@ -3170,7 +3226,7 @@ Run (from `apps/server/`): `pnpm vitest run` — Expected: PASS.
 
 ```bash
 git add apps/server/src/visibility apps/server/test/visibility apps/server/test/helpers/seed.ts
-git commit -m "canSee is the one visibility decision, pure at its core: guests get explicit lists only, members get their projects, admins get no bypass — and lists filter server-side through the same table in one SQL pass."
+git commit -m "canSee is the one visibility decision, pure at its core: guests get explicit lists only, members get their projects, admins get no bypass while the owner sees the whole workspace disclosed — and lists filter server-side through the same table in one SQL pass, with an owner viewer standing guard against the two copies of the decision drifting apart."
 ```
 
 ---
@@ -4815,7 +4871,7 @@ Append to `Features.md` (§6 is this plan's section, settled per the coordinatio
 - ⚙️ **Membership events & effective roles** — `workspace.created`, `project.created`, `membership.granted`/`membership.revoked`, `project.member_added`/`project.member_removed` in the ledger; `proj_memberships` resolves each user's workspace role and per-project admin flags; founding a workspace appends the default simple-Kanban workflow, the four built-in ticket types bound to it, and the founder's owner grant — in that order, on accept and never on a duplicate re-submission. `apps/server/src/projections/proj-memberships.ts`, `apps/server/src/workspaces/bootstrap-workspace.ts`
 - ⚙️ **Project existence** — `proj_projects` makes `project.created` answerable, and every event that names a project is checked against it before any membership question is asked, so a ticket can never be created into a project nobody founded and nobody is ever refused for the wrong reason. Scoped by workspace: a project id from another workspace is not found. `apps/server/src/projections/proj-projects.ts`, `apps/server/src/permissions/check-permission.ts`
 - ✅ **Permission refusals** — a pre-engine ingest gate refuses identity spoofing, borrowed server origin, and role shortfalls with the standard `{refused, rule, reason}` shape (`permission.role`, `permission.visibility`), reasons in plain language, every refusal proven against a planted defect. `apps/server/src/permissions/`
-- ✅ **Ticket visibility** — `visibility.set` claims a mode (workspace / project / explicit / inherit); `proj_visibility` resolves every ticket's audience by walking inherit chains to the nearest authored ancestor (roots default to project) and re-resolves on reparent and ancestor changes; `canSee` backs 404-enforced reads and one-pass filtered lists; guests see only explicit shares; admins get no bypass. `apps/server/src/visibility/`
+- ✅ **Ticket visibility** — `visibility.set` claims a mode (workspace / project / explicit / inherit); `proj_visibility` resolves every ticket's audience by walking inherit chains to the nearest authored ancestor (roots default to project) and re-resolves on reparent and ancestor changes; `canSee` backs 404-enforced reads and one-pass filtered lists; guests see only explicit shares; the owner reads the whole workspace (a disclosed power, never a hidden one); admins get no bypass and join projects on the record like anyone else. `apps/server/src/visibility/`
 - ✅ **Honesty under restriction** — rollup responses carry true totals over all children plus the viewer's `restrictedCount`; a visible child under a restricted parent gets `{kind: 'restricted'}` — existence, no title; ledger history goes out with provenance untouched for anyone entitled to see. `apps/server/src/visibility/rollup.ts`, `apps/server/src/routes/tickets.ts`
 - ⚙️ **Visibility-scoped sync feed** — `visibleEventsFor(userId, workspaceId, afterSeq)` walks the workspace stream in `workspace_seq` order (the per-workspace cursor, coordination §18 — never per-entity `seq`, which would skip newborn entities on resume), yields only visible-ticket events, each carrying its cursor and both clocks as absolute ISO 8601 `Z` instants, plus `{kind:'purge'}` tombstones for whatever revocation takes away; the interface the sync plan consumes. `apps/server/src/visibility/visible-events-for.ts`
 ```
@@ -5070,18 +5126,135 @@ git commit -m "A workspace can now be founded through the product, and it arrive
 
 ---
 
+### Task 14: Invites — the address-named claim, and the token that is not history
+
+Spec §6 promises "Invites travel as links or QR from an admin", and until the owner decision of 2026-08-27 the vocabulary could not express it: `membership.granted` names a `userId`, and a person who has never signed in does not have one. So no new person could be invited to a workspace at all — including the accountant guest the dogfooding plan depends on. Plan 6 already owns the client half (Task 15 there: `/invite/[token]` page, `InviteGateway`, tests) and pins the server surface it calls; this task is the half that answers it. **The routes below are Plan 6's contract, consumed verbatim — do not rename them.**
+
+**Two design lines, drawn once:**
+
+1. **The token is a credential, so it is not the event id and never enters the ledger.** Anyone who can read a workspace's history can read an event id; if that id were the link's token, any member could accept an invitation addressed to somebody else. The token is server-owned state (hashed at rest, like better-auth's own token tables) keyed to the invite — the same line this plan draws for sessions: identity machinery is not workspace history. The ledger records that an invitation was made, to what address, by whom. It does not record the secret that opens it.
+2. **An invite is a claim like everything else** — attributed, dated, visible as pending until accepted, and its revocation is itself an event. Acceptance is recorded by the *server* when the invited person opens their link and authenticates (creating an account if they have none — the existing OTP / magic-link / Google paths; no new auth); a client cannot submit `invite.accepted` directly, because acceptance without the token would let anyone who can read an invite id bind it to themselves.
+
+**Files:**
+- Create: `packages/domain/src/events/invites.ts` (payloads, parsers, registrations)
+- Create: `apps/server/migrations/<ts>_proj-invites.cjs` (the projection table **and** the server-owned `invite_tokens` table — two tables, one migration, different natures: one rebuilds from the ledger, one is deliberately unrebuildable)
+- Create: `apps/server/src/projections/proj-invites.ts`, `apps/server/src/routes/invites.ts`
+- Modify: `apps/server/src/permissions/check-permission.ts` (gates), `apps/server/src/sync/visible-events.ts` (the `invite` entity kind), `apps/server/src/app.ts`, `apps/server/src/projections/index.ts` (register `projInvites` — coordination §8 amended to slot it after `proj_memberships`)
+- Test: `packages/domain/test/events/invites.test.ts`, `apps/server/test/routes/invites.test.ts`
+
+**Interfaces:**
+- Consumes: `makeRequireSession` (Task 2), the ingest path (Task 5's wiring), `checkRolePermission` context (Task 5), `visibleEventsFor` (Task 11), `newUlid` (Plan 1), `AppConfig` — which gains `webOrigin` (`WEB_ORIGIN`; Plan 11's `.env.example` completeness gate picks it up).
+- Produces: `InviteSentPayload { inviteId, address, channel: 'email' | 'phone', role: 'admin' | 'member' | 'guest', projectIds?: string[] }`, `InviteAcceptedPayload { inviteId, userId }`, `InviteRevokedPayload { inviteId }`, their parsers, event types `invite.sent` / `invite.accepted` / `invite.revoked` v1 with `entityKind: 'invite'`, entity id = `inviteId`; `registerInviteRoutes(app, deps)` serving **`POST /v1/workspaces/:workspaceId/invites`** → `201 { inviteId, url }` (admin-only), **`GET /v1/invites/:token`** → `InviteSummary { workspaceId, workspaceName, role }` or 404 (no session required — the token is the credential), **`POST /v1/invites/:token/accept`** → `{ workspaceId }` (session required).
+
+**Payload rules, each refused with the reason named (`packages/domain/src/events/invites.ts`):**
+
+```ts
+const INVITE_ROLES = new Set(['admin', 'member', 'guest']);
+const INVITE_CHANNELS = new Set(['email', 'phone']);
+
+export function parseInviteSent(payload: unknown): InviteSentPayload {
+  if (!isRecord(payload)) throw new Error('invite.sent payload requires inviteId, address, channel, role');
+  const inviteId = requireNonEmptyString(payload, 'inviteId', 'invite.sent');
+  const address = requireNonEmptyString(payload, 'address', 'invite.sent');
+  const { channel, role } = payload;
+  if (typeof channel !== 'string' || !INVITE_CHANNELS.has(channel)) {
+    throw new Error("invite.sent payload requires channel 'email' or 'phone'");
+  }
+  if (typeof role !== 'string' || !INVITE_ROLES.has(role)) {
+    // 'owner' is refused by omission, and deliberately: an invitation cannot
+    // make somebody the owner of a workspace they have not yet entered.
+    throw new Error("invite.sent payload requires role 'admin'|'member'|'guest' — an invite cannot confer ownership");
+  }
+  let projectIds: string[] | undefined;
+  if ('projectIds' in payload) {
+    if (!Array.isArray(payload.projectIds) || payload.projectIds.some((p) => typeof p !== 'string' || p === '')) {
+      throw new Error('invite.sent projectIds must be non-empty strings');
+    }
+    if (role === 'guest') {
+      // The 2026-08-27 membership collapse removed inert associations; this
+      // refusal keeps one from growing back at the front door. A guest reaches
+      // work through visibility.set explicit lists, so a project association on
+      // a guest invite would promise something membership no longer means.
+      throw new Error('invite.sent cannot put a guest on a project; share tickets with visibility.set instead');
+    }
+    projectIds = payload.projectIds as string[];
+  }
+  return { inviteId, address, channel: channel as 'email' | 'phone', role: role as 'admin' | 'member' | 'guest', projectIds };
+}
+```
+
+`parseInviteAccepted` and `parseInviteRevoked` are shape checks (`inviteId`, `userId` non-empty). Each event registers with `entityKind: 'invite'`; the entity id **must equal** `payload.inviteId` (refused at parse otherwise, the same mismatch rule Task 9 applies to `visibility.set`).
+
+**Gates (`check-permission.ts`), three additions:** `invite.sent` and `invite.revoked` join `ADMIN_ONLY_TYPES` — inviting somebody into the workspace is managing its membership. `invite.accepted` is refused from **every** client origin with `permission.role` and the reason `Acceptance is recorded by the server when the invited person opens their link.` — planted defect: an admin who reads an inviteId from history and submits `invite.accepted { inviteId, userId: themselves }` is refused; without this gate they could bind any pending invite to any user with no token ever seen.
+
+**Sync-down (`visible-events.ts`):** a new `case 'invite':` yields only to `owner`/`admin`. An `invite.sent` carries a personal address; members and guests have no need of it, and the smaller the audience of a PII-bearing event, the better. (This is the first event kind withheld from plain members — the switch's default-deny shape already supports it.)
+
+**The projection and the token store (`proj-invites.ts` + migration):**
+
+```ts
+// proj_invites — rebuildable from the ledger like every projection:
+//   invite_id PK, workspace_id, address, channel, role, project_ids jsonb,
+//   status 'pending'|'accepted'|'revoked', invited_by, invited_at,
+//   accepted_user_id NULL, accepted_at NULL
+// invite_tokens — NOT a projection and NEVER rebuildable from the ledger,
+//   because the token is not in the ledger (that is the point):
+//   invite_id PK, token_hash text NOT NULL UNIQUE, created_at
+export const projInvites = {
+  name: 'proj_invites',
+  tables: ['proj_invites'] as const, // invite_tokens is deliberately absent: reset() must not touch it
+  async apply(env: LedgerEvent, db: Queryable): Promise<void> {
+    if (env.type === 'invite.sent') { /* INSERT ... ON CONFLICT DO NOTHING */ }
+    if (env.type === 'invite.accepted') { /* status='accepted', accepted_user_id, accepted_at */ }
+    if (env.type === 'invite.revoked') { /* status='revoked' */ }
+  },
+  async reset(db: Queryable): Promise<void> { await db.query('DELETE FROM proj_invites'); },
+};
+```
+
+**Routes (`routes/invites.ts`):**
+
+- `POST /v1/workspaces/:workspaceId/invites` `{ address, channel, role, projectIds? }` — mints `inviteId = newUlid()` and a 32-byte random token; submits `invite.sent` **through the ingest gate** as the session user (so the admin-only refusal and the parser rules above fire exactly as they would for any event); on commit, stores `sha256(token)` in `invite_tokens` in the same transaction; answers `201 { inviteId, url: `${config.webOrigin}/invite/${token}` }`. The raw token exists only in this response — never in a log line, never in the ledger, never at rest.
+- `GET /v1/invites/:token` — hashes the token, looks up the invite, joins `proj_invites`; answers the `InviteSummary` Plan 6 pinned (`workspaceId`, `workspaceName`, `role`) for a **pending** invite and `404` for anything else — unknown, revoked and accepted are indistinguishable from outside, because a dead link that explains *why* it is dead is an oracle. `workspaceName` comes from `workspaceNameFromLedger(db, workspaceId)` — the latest `workspace.created`/`workspace.renamed` name in the events table; if a later plan grows a workspace projection, this helper collapses into it.
+- `POST /v1/invites/:token/accept` — requires a session; hashes and resolves the token; refuses a non-pending invite (`410`); then appends, server-origin through the same append+project path as the founding sequence, in this order: `invite.accepted { inviteId, userId: session.userId }`, `membership.granted { userId, role }`, and one `project.member_added { userId, projectAdmin: false }` per promised project. Every appended event's `actorId` is the accepting user — the acceptance is their act; the *authorization* traces through `inviteId` to the admin's attributed `invite.sent`, which is what the history view shows when the grant unfolds. Deletes the token row in the same transaction: a spent credential does not linger. Answers `{ workspaceId }`.
+
+`invite.revoked` needs no route: an admin submits it through `POST /v1/events` like any other claim, and the projection flips the status, which kills the link (the GET refuses non-pending invites; the token row is deleted by a sweep-free rule — the accept route checks status before the token, so a revoked invite's surviving token row opens nothing).
+
+- [ ] **Steps 1–4: failing tests, then the implementation above** — the domain tests first (each parser rule, including the two refusals with their exact messages), then the route tests. **Planted defects, each proven before trusted:** a plain member calling the invite route is refused `permission.role` · client-submitted `invite.accepted` is refused even from an admin (the token-bypass defect above) · `GET` with a valid-shaped but unknown token, a revoked token and a spent token all answer the identical 404 body · accepting twice: the second answers `410` and appends nothing (assert the event count) · **the credential-separation defect:** take a committed `invite.sent`, use its event id and its `inviteId` as tokens — both must 404, proving that reading the ledger confers nothing · an accepted member invite lands `membership.granted` + `project.member_added` rows and the new member's very next request can read a ticket in the promised project · an accepted **guest** invite lands the grant alone, `eff.projects` empty.
+
+- [ ] **Step 5: Features.md §6 and test-cases 6.32–6.38, same change set**
+
+```markdown
+- ✅ **Invites** — an admin invites a person by address (email or phone), not by user id, so someone who has never signed in can be brought in: `invite.sent` is the attributed claim, the link's token is server-owned and hashed (never in the ledger — reading history confers nothing), and acceptance on landing creates the account if needed, binds the invite, and appends the membership it promised. Revocation is an event; a dead link never says why it is dead. An invite cannot confer ownership, and a guest invite cannot carry projects. `apps/server/src/routes/invites.ts`, `packages/domain/src/events/invites.ts`
+```
+
+```markdown
+- **6.32** ✅ An admin invites by address; the response carries the one copy of the raw token; the ledger, the projections and the logs carry only the claim and the hash. (`test/routes/invites.test.ts`)
+- **6.33** ✅ Planted defect: a plain member issuing an invite is refused `permission.role`; a guest invite carrying projectIds is refused at parse with the visibility.set remedy named. (`test/routes/invites.test.ts`, `test/events/invites.test.ts`)
+- **6.34** ✅ Planted defect: client-submitted `invite.accepted` is refused even from an admin — acceptance without the token would bind any pending invite to any user. (`test/permissions/check-role-permission.test.ts`)
+- **6.35** ✅ The credential-separation defect: the committed invite's event id and its inviteId both 404 as tokens. Reading the workspace's history confers nothing. (`test/routes/invites.test.ts`)
+- **6.36** ✅ Unknown, revoked and spent tokens are indistinguishable: one 404 body. Accepting twice appends nothing the second time. (`test/routes/invites.test.ts`)
+- **6.37** ✅ Acceptance appends invite.accepted, the grant, and the promised project rows in order, all actor-attributed to the acceptor, authorization tracing to the admin's invite.sent; the new member can immediately read a ticket in the promised project. (`test/routes/invites.test.ts`)
+- **6.38** ✅ `invite.sent` reaches owners and admins in sync-down and nobody else — the address is PII and members have no need of it. (`test/sync/visible-events.test.ts`)
+- **6.39** ✅ The owner reads everything in the workspace, including explicit lists naming only others; an admin still reads nothing they have not joined or been listed for — the split IS the planted defect, since a regression re-unifying the two roles fails one side. (Task 7 amendment, owner decision 2026-08-27; `test/visibility/can-see.test.ts`)
+- **6.40** ✅ An owner on no project and no list receives every ticket from `listVisibleTickets`, and `canSee` agrees ticket by ticket — the drift alarm between the decision table's two copies (pure function and SQL). (`test/visibility/visible-tickets.test.ts`)
+```
+
+- [ ] **Step 6: Commit** — `git commit -m "Invites name an address rather than a user id, and the secret that opens one is not history: the ledger records who invited whom, the token lives hashed beside the sessions, and reading a workspace's past confers nothing about entering its future."`
+
+---
+
 ## Open questions (owner review before or during execution)
 
 1. **Auth library: better-auth** (justified above). Pin the latest 1.x at execution; the exact version lands in the lockfile and PR description. Owner sign-off requested on the library choice itself.
 2. **`visibleEventsFor` return type vs the contract.** The contract types it `AsyncIterable<EventEnvelope>` but also requires revocation to yield `{kind:'purge', entityId}` — those cannot both hold. This plan implements `AsyncIterable<SyncItem>` with `SyncItem = LedgerEvent | PurgeInstruction`. Flagged, not silently resolved; Plan 10's consumption should confirm the union.
 3. **Two ways onto a project.** `membership.granted {scope:{projectId}}` and `project.member_added` overlap. This plan's modeling: `membership.granted` carries *roles* (and is how guests attach to a project); `project.member_added` is the roster path for existing workspace members (with the projectAdmin flag). Both land in `proj_memberships`. Confirm or collapse.
 4. **Non-ticket events in sync-down.** Chosen: workspace/project/membership events go to non-guest members; workflow and ticket-type definitions go to everyone including guests (they cannot render a shared ticket's status without its workflow). Confirm the guest slice.
-5. **No owner/admin visibility bypass.** Admins manage, but do not silently see: an admin not on a project cannot read its project-mode tickets, and must join a project (an attributed event) before creating tickets in it. Deliberate — the alternative is an invisible superuser, which sits badly with the provenance floor. Confirm.
+5. **Visibility bypass — SETTLED, and amended by the owner (2026-08-27): the owner reads everything; admins do not.** The plan proposed no bypass for anyone; the owner drew the line one role higher. The workspace **owner** bypasses read visibility across their workspace — the workspace is the container everything else sits inside, and its owner owns the container. Because reads leave no event trace, the power cannot be made honest by attribution, so it is made honest by **disclosure**: the visibility controls state plainly that the workspace owner can always see (Plan 6 carries the copy — `Visible to: these people — and the workspace owner, always`). **Admins** get exactly what the plan proposed: they manage but do not silently see, and must join a project (an attributed event) to read its project-mode tickets or create in it. Writing is unchanged for everyone, owner included. Implemented in `canSeeResolved` (Task 7); the sync-down filter and every read route inherit it for free, because they all defer to the one function.
 6. **Purge existence-leak on membership loss.** After `membership.revoked`/`project.member_removed`, purges are emitted for every now-invisible ticket in the lost scope — including ids the client may never have held (server-side per-client held-sets do not exist in this plan; Plan 10 owns sync state and could narrow this). A purge of an unheld id is a client no-op, but the id itself travels. Accepted here; Plan 10 may tighten.
 7. **Read endpoints live in this plan.** Plan 3 ships projections, not HTTP routes, so the minimal list/read/history endpoints are built here. If another plan also claims ticket read routes, merge at execution — the visibility enforcement in them is this plan's, regardless of file ownership.
 8. **Vendor tables are not snake_case.** better-auth's generated tables keep the library's naming — a deliberate exception to CODING_STANDARDS, called out in the migration header.
-9. **Explicit lists are exactly the authored list.** Creator/assignee are not implicitly appended; a creator can lock themselves out of their own ticket (the claim is attributed, and a project admin can repair it). Confirm this is the wanted sharp edge.
-10. **The client half of workspace creation is still unowned — to be assigned when Plan 6 is walked.** The owner decision of 2026-08-26 settled the **server** surface only, and Tasks 5 and 13 build exactly that: the founding sequence and `POST /v1/workspaces`. Nobody owns the screen that founds a workspace, and nobody owns **invite issuance and acceptance** — Plan 6 has already flagged the invite half as ownerless. Deliberately not built here: this plan ships no client code, and inventing a founding screen inside a server plan would put it where no client plan would look for it. Concretely still missing, so a later reader does not have to re-derive it: a form that calls `POST /v1/workspaces` and routes to the new workspace; a way to invite someone (which today means an admin hand-submitting `membership.granted` with a `userId` they somehow already know — there is no email-an-invite path, and `membership.granted` names a `userId`, not an address, so an invite for a person who has never signed in cannot be expressed by the current vocabulary at all); and acceptance. Assign when Plan 6 is walked.
+9. **Explicit lists are exactly the authored list — SETTLED (owner decision 2026-08-27): the sharp edge stays, and the client warns at the moment of authoring.** Creator/assignee are not implicitly appended; a creator can lock themselves out of their own ticket. Auto-appending the creator would be the system inventing a claim nobody made, so the server keeps the list exactly as authored. What the owner added: the *client* warns, at the moment a `visibility.set` would exclude its own author, that they will lose access — naming the repair path (a project admin, or the workspace owner, who always sees). Warning is not inventing: the claim submitted is still exactly the authored list. The warning is client copy and lands in Plan 6's visibility editor alongside the owner-disclosure line from question 5; nothing in this plan's server behaviour changes.
+10. **Invites — SETTLED (owner decision 2026-08-27); the founding *screen* is the one client surface still unowned.** This question originally reported that nobody owned invite issuance or acceptance, and it was wrong twice over: the vocabulary could not express an invite at all (`membership.granted` names a `userId`, which a person who has never signed in does not have), and Plan 6 in fact already owned the client half — its Task 15 builds `/invite/[token]` and an `InviteGateway`, and pins the two server routes it calls. Task 14 now supplies the vocabulary (`invite.sent` naming an *address*, `invite.accepted`, `invite.revoked`) and those two routes, plus issuance. Still genuinely unowned, and only this: the screen that founds a workspace — a form calling `POST /v1/workspaces` and routing into the result. Assign when Plan 6 is walked; everything else in this question's original list now has an owner.
 11. **Route prefix — SETTLED (owner decision 2026-08-27).** Task 8's ticket read routes were `/api/workspaces/...`, predating coordination amendment 20; they are now `/v1/workspaces/...` like everything else, with the plan's own end-to-end tests moved with them. `/api/auth/*` stays as better-auth's vendor surface, which amendment 20 names as the one exception.
 
     Moving them turned up a second, larger error in the same tests. This plan's end-to-end cases posted events to `POST /api/workspaces/:workspaceId/events` — a route that **does not exist in any plan**, and that was recorded here as an assumption ("adapt its URL"). Plan 1 Task 11 registers `POST /v1/events`, with body `{ events: [envelope, …] }` and the workspace carried inside each envelope rather than in the path. So the tests were wrong about the URL *and* about the request shape, and would have 404'd rather than proving anything. Both are corrected against Plan 1's actual route rather than against a fresh assumption.
