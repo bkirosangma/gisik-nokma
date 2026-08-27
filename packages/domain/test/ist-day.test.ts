@@ -34,18 +34,21 @@ describe('istDayOf', () => {
   });
 
   it('planted defect: refuses a date-only string — a day is not an instant', () => {
+    expect(() => istDayOf('2026-08-20')).toThrowError(RangeError);
     expect(() => istDayOf('2026-08-20')).toThrowError(
       'not an ISO 8601 instant with a stated offset: 2026-08-20 — a day claim is not an instant',
     );
   });
 
   it('planted defect: refuses an unparseable instant, naming it', () => {
+    expect(() => istDayOf('yesterday')).toThrowError(RangeError);
     expect(() => istDayOf('yesterday')).toThrowError(
       'not an ISO 8601 instant with a stated offset: yesterday — a day claim is not an instant',
     );
   });
 
   it('planted defect: refuses an instant with no offset at all — the instant would be a guess', () => {
+    expect(() => istDayOf('2026-08-20T18:30:00.000')).toThrowError(RangeError);
     expect(() => istDayOf('2026-08-20T18:30:00.000')).toThrowError(
       'not an ISO 8601 instant with a stated offset: 2026-08-20T18:30:00.000 — a day claim is not an instant',
     );
@@ -90,18 +93,23 @@ describe('istDayBounds', () => {
   });
 
   it('planted defect: refuses a non-YYYY-MM-DD day, naming it', () => {
+    expect(() => istDayBounds('2026-8-20')).toThrowError(RangeError);
     expect(() => istDayBounds('2026-8-20')).toThrowError('not a YYYY-MM-DD day claim: 2026-8-20');
+    expect(() => istDayBounds('20-08-2026')).toThrowError(RangeError);
     expect(() => istDayBounds('20-08-2026')).toThrowError('not a YYYY-MM-DD day claim: 20-08-2026');
   });
 
   it('planted defect: refuses an instant where a day claim belongs', () => {
+    expect(() => istDayBounds('2026-08-20T00:00:00.000Z')).toThrowError(RangeError);
     expect(() => istDayBounds('2026-08-20T00:00:00.000Z')).toThrowError(
       'not a YYYY-MM-DD day claim: 2026-08-20T00:00:00.000Z',
     );
   });
 
   it('planted defect: refuses a well-formed but unreal calendar day instead of silently rolling it forward', () => {
+    expect(() => istDayBounds('2026-02-30')).toThrowError(RangeError);
     expect(() => istDayBounds('2026-02-30')).toThrowError('not a real calendar day: 2026-02-30');
+    expect(() => istDayBounds('2026-13-01')).toThrowError(RangeError);
     expect(() => istDayBounds('2026-13-01')).toThrowError('not a real calendar day: 2026-13-01');
   });
 });
