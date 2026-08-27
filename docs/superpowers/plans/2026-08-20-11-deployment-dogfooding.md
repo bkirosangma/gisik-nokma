@@ -2356,10 +2356,16 @@ export async function seedConvenienceCorner(deps: CcSeedDeps, options: CcSeedOpt
 
   const guestConfigured = accountantUserId !== null;
   if (accountantUserId) {
+    // Workspace-scope grant, no project (owner decision 2026-08-27: membership
+    // is workspace-scoped only, and this event's parser now REFUSES a scope).
+    // The project scope it used to carry was inert anyway — a guest's canSee is
+    // explicit-only, so it granted no reads, and guests are refused ticket
+    // creation before any project check, so it granted no writes. The
+    // accountant's actual access is the visibility.set explicit lists below,
+    // which is what spec §6 says a guest is.
     push('cc#membership#accountant', { kind: 'membership', id: membershipId(workspaceId, accountantUserId) }, 'membership.granted', {
       userId: accountantUserId,
       role: 'guest',
-      scope: { projectId },
     });
     // Explicit visibility on exactly the tickets whose record names the
     // accountant. The owner stays listed: the explicit list is exactly the

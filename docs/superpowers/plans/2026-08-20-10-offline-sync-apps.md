@@ -60,7 +60,7 @@ From **Plan 3** (`@gisik-nokma/domain`):
 
 From **Plan 4** (`apps/server`):
 - `canSee(db: Queryable, userId, ticketId): Promise<boolean>`; `getResolvedVisibility(db, ticketId): Promise<ResolvedVisibility|null>`; `listVisibleTickets(db, userId, workspaceId): Promise<Array<Record<string, unknown>>>` (rows carry `ticket_id`).
-- `interface PurgeInstruction { kind: 'purge'; entityId: string }`; `type SyncItem = LedgerEvent | PurgeInstruction` (§18: the events a replica receives carry their stream position, so a replica can order its own ledger without asking); `visibleEventsFor(db, userId, workspaceId, afterSeq): AsyncIterable<SyncItem>` — THE sync-down filter; discriminate with `'kind' in item && item.kind === 'purge'`.
+- `interface PurgeInstruction { kind: 'purge'; entityId: string }`; `ScopeRevokedInstruction { kind: 'scope-revoked'; workspaceId; projectId? }` (what a guest receives on revocation instead of per-id purges, owner decision 2026-08-27); `type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction` (§18: the events a replica receives carry their stream position, so a replica can order its own ledger without asking); `visibleEventsFor(db, userId, workspaceId, afterSeq): AsyncIterable<SyncItem>` — THE sync-down filter; discriminate with `'kind' in item && item.kind === 'purge'`.
 - `resolveEffectiveRole(db, userId, workspaceId)` → `EffectiveRole { workspaceRole: WorkspaceRole|null; projects: Set<string> }` (as used by `visibleEventsFor`).
 - `makeRequireSession(auth)` preHandler setting `request.currentUserId: string`; `registerAuthRoutes(app, auth)`; test helper `signInWithPhone(app, sender, phone): Promise<string>` (bearer token) in `apps/server/test/helpers/session.ts`; seed helpers `seedMember`, `seedGuest`, `seedTicket`; `appendTestEvent(db, env)`.
 - Tables `proj_visibility`, `proj_memberships`.
@@ -3234,6 +3234,7 @@ import { createReplica, type Replica } from '../src/replica/replica.js';
 
 const WS = 'ws_r';
 const TICKET = newUlid();
+const OTHER_TICKET = newUlid();
 const PROJECT = newUlid();
 
 const wf = {
@@ -3463,6 +3464,68 @@ describe('purge — revocation removes every local trace', () => {
     expect(spill[0]?.n).toBe(0);
   });
 });
+
+describe('scope-revoked — the guest form of losing access', () => {
+  // A guest gets ONE instruction, not one purge per ticket: per-id purges
+  // reveal how many tickets existed in the scope, including ids this replica
+  // never held. The handler is a local delete by scope; re-delivery is a no-op.
+  it('a workspace scope-revoked empties the replica of the workspace, keeping only my own contest stubs', async () => {
+    const storage = createBetterSqliteStorage();
+    seqCounter = 0;
+    streamCounter = 0;
+    const replica = await createReplica({ storage });
+    await replica.loadBootstrap({
+      workspaceId: WS, me: { userId: 'user_a', workspaceRole: 'guest', projectIds: [] }, streamSeq: 0,
+      definitions: [
+        envelope({ kind: 'workflow', id: 'wf_basic' }, 'workflow.defined', wf, 1),
+        envelope({ kind: 'ticket-type', id: 'task' }, 'ticket-type.defined', { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf_basic', fields: [] }, 1),
+      ],
+      tickets: [],
+    });
+    seqCounter = 0;
+    streamCounter = 0;
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: TICKET }, 'ticket.created', { typeId: 'task', projectId: PROJECT, parentId: null, title: 'Shared errand' }));
+
+    const result = await replica.applyServerItem({ kind: 'scope-revoked', workspaceId: WS });
+    expect(result.applied).toBe(true);
+
+    expect(await replica.getTicket(TICKET)).toBeNull();
+    expect(await replica.listTickets(WS)).toEqual([]);
+    // The definitions went with the workspace: a replica for a workspace you
+    // are not in should hold nothing of it.
+    expect((await storage.all('SELECT count(*) AS n FROM workflows', []))[0]?.n).toBe(0);
+    expect((await storage.all('SELECT count(*) AS n FROM ticket_types', []))[0]?.n).toBe(0);
+
+    // Idempotent like a purge — a re-delivered instruction changes nothing.
+    expect((await replica.applyServerItem({ kind: 'scope-revoked', workspaceId: WS })).applied).toBe(true);
+  });
+
+  it('a project scope-revoked removes that project alone and leaves the rest standing', async () => {
+    const storage = createBetterSqliteStorage();
+    seqCounter = 0;
+    streamCounter = 0;
+    const replica = await createReplica({ storage });
+    await replica.loadBootstrap({
+      workspaceId: WS, me: { userId: 'user_a', workspaceRole: 'member', projectIds: [PROJECT, 'prj_other'] }, streamSeq: 0,
+      definitions: [
+        envelope({ kind: 'workflow', id: 'wf_basic' }, 'workflow.defined', wf, 1),
+        envelope({ kind: 'ticket-type', id: 'task' }, 'ticket-type.defined', { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf_basic', fields: [] }, 1),
+      ],
+      tickets: [],
+    });
+    seqCounter = 0;
+    streamCounter = 0;
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: TICKET }, 'ticket.created', { typeId: 'task', projectId: PROJECT, parentId: null, title: 'Going' }));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: OTHER_TICKET }, 'ticket.created', { typeId: 'task', projectId: 'prj_other', parentId: null, title: 'Staying' }));
+
+    await replica.applyServerItem({ kind: 'scope-revoked', workspaceId: WS, projectId: PROJECT });
+
+    expect(await replica.getTicket(TICKET)).toBeNull();
+    expect((await replica.getTicket(OTHER_TICKET))?.confirmed?.stateId).toBeDefined();
+    // Definitions survive a project-scope loss — the member is still in the workspace.
+    expect((await storage.all('SELECT count(*) AS n FROM workflows', []))[0]?.n).toBe(1);
+  });
+});
 ```
 
 - [ ] **Step 2: Run it to verify it fails**
@@ -3516,7 +3579,16 @@ import { buildLocalDeps } from './local-deps.js';
 
 // Wire shapes (server Task 6 / Plan 4) — re-declared client-side, structurally identical.
 export type PurgeInstruction = { kind: 'purge'; entityId: string };
-export type SyncItem = LedgerEvent | PurgeInstruction;
+/**
+ * "Everything you held in this scope is gone" — what a GUEST receives on
+ * revocation instead of per-id purges (owner decision 2026-08-27): per-id
+ * purges tell the recipient how many tickets existed in the scope, including
+ * ids they never held, and an external guest should not learn the size of work
+ * they were never shown. Members keep per-id purges. Handling is a local
+ * delete by scope, idempotent like a purge.
+ */
+export type ScopeRevokedInstruction = { kind: 'scope-revoked'; workspaceId: string; projectId?: string };
+export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction;
 export type Me = { userId: string; workspaceRole: 'owner' | 'admin' | 'member' | 'guest'; projectIds: string[] };
 export type BootstrapTicket = { ticketId: string; snapshot: { seq: number; state: TicketState } | null; events: LedgerEvent[] };
 export type BootstrapResponse = { workspaceId: string; me: Me; streamSeq: number; definitions: LedgerEvent[]; tickets: BootstrapTicket[] };
@@ -3532,6 +3604,7 @@ export type Replica = {
   loadBootstrap(data: BootstrapResponse): Promise<void>;
   applyServerItem(item: SyncItem): Promise<{ applied: boolean }>;
   purgeEntity(entityId: string): Promise<void>;
+  revokeScope(instruction: ScopeRevokedInstruction): Promise<void>;
   getTicket(ticketId: string): Promise<ReplicaTicket | null>;
   listTickets(workspaceId: string): Promise<ReplicaTicket[]>;
   listContests(workspaceId: string, filter?: { ticketId?: string; claimantId?: string; open?: boolean }): Promise<LocalContest[]>;
@@ -3777,6 +3850,10 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
         await replica.purgeEntity(item.entityId);
         return { applied: true };
       }
+      if ('kind' in item && item.kind === 'scope-revoked') {
+        await replica.revokeScope(item);
+        return { applied: true };
+      }
       const env = item as EventEnvelope;
       const applied = await storage.transaction(async (tx) => {
         const dupe = await tx.all('SELECT 1 FROM events WHERE id = ?', [env.id]);
@@ -3818,6 +3895,38 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
         else await tx.run('DELETE FROM contests WHERE ticket_id = ? AND claimant_id <> ?', [entityId, me.userId]);
         // outbox rows for the purged ticket STAY: they are the user's claims in
         // transit and must go up, contest, and surface — nothing silently vanishes.
+      });
+      notify();
+    },
+
+    async revokeScope(instruction) {
+      // One instruction, one local delete by scope — what a guest receives
+      // instead of per-id purges, so revocation teaches them nothing about how
+      // much they were never shown. Idempotent like a purge: every statement is
+      // a delete, so a re-delivered instruction is a no-op. The purge rules
+      // carry over unchanged — own contest stubs survive, outbox rows stay.
+      const me = await replica.getMe();
+      const inProject = (state: TicketState) => state.projectId === instruction.projectId;
+      await storage.transaction(async (tx) => {
+        const rows = await tx.all('SELECT ticket_id, state FROM tickets WHERE workspace_id = ?', [instruction.workspaceId]);
+        const goneIds = rows
+          .filter((row) => instruction.projectId === undefined || inProject(JSON.parse(row.state as string) as TicketState))
+          .map((row) => row.ticket_id as string);
+        for (const ticketId of goneIds) {
+          await tx.run('DELETE FROM events WHERE entity_id = ?', [ticketId]);
+          await tx.run('DELETE FROM tickets WHERE ticket_id = ?', [ticketId]);
+          await tx.run("DELETE FROM snapshots WHERE entity_id = ?", [ticketId]);
+          if (me === null) await tx.run('DELETE FROM contests WHERE ticket_id = ?', [ticketId]);
+          else await tx.run('DELETE FROM contests WHERE ticket_id = ? AND claimant_id <> ?', [ticketId, me.userId]);
+        }
+        if (instruction.projectId === undefined) {
+          // Losing the workspace loses its definitions and cursor too — a
+          // replica for a workspace you are not in should hold nothing of it
+          // beyond your own authored stubs.
+          await tx.run('DELETE FROM workflows', []);
+          await tx.run('DELETE FROM ticket_types', []);
+          await tx.run('DELETE FROM meta WHERE key = ?', [`cursor:${instruction.workspaceId}`]);
+        }
       });
       notify();
     },
@@ -4486,7 +4595,7 @@ sync door confirm, contest, or visibly fail — never silently drop."
 
 ```ts
 export type StreamHandlers = {
-  onItem(item: SyncItem): void;                  // {type:'event'} → envelope · {type:'purge'} → PurgeInstruction
+  onItem(item: SyncItem): void;                  // {type:'event'} → envelope · {type:'purge'} → PurgeInstruction · {type:'scope-revoked'} → ScopeRevokedInstruction (amendment 13 as amended 2026-08-27)
   onCaughtUp(seq: number): void;                 // amendment 19: only for THIS subscription's workspaceId
   onError(err: { code: string; message: string }): void;  // amendment 19's error frame — surfaced, never swallowed
   onClose(): void;
