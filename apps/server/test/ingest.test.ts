@@ -109,10 +109,7 @@ describe('ingestBatch', () => {
   it('the engine sees the world as of the previous event — not the one under evaluation', async () => {
     const observed: Array<number | null> = [];
     const peeking: typeof evaluateEvent = async (env, ctx) => {
-      // Plan-1 seam (controller ruling): the only entity state this world holds
-      // is the head pointer, so narrow the contract's EntityState to the
-      // EntityHead createEngineContext actually answers with. Plan 2 Task 2
-      // lands the authoritative EntityState and this narrowing dies with it.
+      // Plan-1 seam: the context answers with the head pointer; the narrowing dies with the cast in engine-context.ts.
       const state = (await ctx.getEntityState(env.entity.kind, env.entity.id)) as EntityHead | null;
       observed.push(state === null ? null : state.headSeq);
       return { refused: false };
