@@ -1735,7 +1735,7 @@ git commit -m "Plain-language rule summaries, field-picker choices, and per-code
 
 Templates are ordinary pre-authored workflows, cloned and edited like any other (spec §4 — nothing special about them). The three defs below are the complete payloads; the gallery clones one into the canvas with a fresh workflow id. `errand-with-waits` models waiting-on-counterparty as **blocked-flagged active states** (amendment 9 — the attention strip's blocked bucket reads the flag); `approval-chain` carries the four-eyes `require-different-user` rule.
 
-**Simple kanban is not declared here — it is imported.** Its canonical definition lives in `@gisik-nokma/domain` as `SIMPLE_KANBAN_TEMPLATE`, created by Plan 4 (owner decision 2026-08-26, coordination doc: "A new workspace can hold a ticket the moment it exists"). Every workspace is *founded* on a clone of it, so the server needs it before this plan exists at all, and Plan 4 executes first. The gallery's Kanban card carries that same object as its `def` — not a copy that resembles it — and a test asserts the identity. **Only Kanban moved**, and only because the server also needs it: `errand-with-waits` and `approval-chain` are gallery-only, nothing outside this package consumes them, and hoisting them into the domain package to keep the three tidy would push client authoring content into the package the rule engine depends on for no reader's benefit. Two copies of one workflow is the drift this series keeps finding; three homes for one concept is the opposite mistake.
+**Simple kanban and errand-with-waits are not declared here — they are imported.** Kanban's canonical definition lives in `@gisik-nokma/domain` as `SIMPLE_KANBAN_TEMPLATE`, created by Plan 4 (owner decision 2026-08-26): every workspace is *founded* on a clone of it, so the server needs it before this plan exists at all. **Errand-with-waits joined it at Plan 11's walk (2026-08-27), for the same reason arriving later:** Plan 11's Convenience Corner seed founds the shop's workflow from `ERRAND_WITH_WAITS_TEMPLATE` — a server consumer, so the template cannot live in a React client package — and its `checkErrandTemplate` is the **executable pin** on the shape. This plan's earlier inline payload violated that pin three ways (invented state ids, `require-evidence` into done where the pin says `require-comment`, and waiting reachable only in two hops where the one-hop rule exists so the seed never fabricates intermediate history), and the pre-agreed rule resolved it: amend the template, never the check. The gallery's Kanban **and** errand cards carry the domain objects as their `def`s — not copies that resemble them — and tests assert both identities. `approval-chain` alone stays gallery-only: nothing outside this package consumes it, and hoisting it to keep the three tidy would push client authoring content into the engine's dependency for no reader's benefit. Two copies of one workflow is the drift this series keeps finding; a home nobody needs is the opposite mistake.
 
 **Files:**
 - Create: `packages/app-core/src/workflow-builder/templates.ts`
@@ -1743,9 +1743,52 @@ Templates are ordinary pre-authored workflows, cloned and edited like any other 
 - Test: `packages/app-core/test/workflow-builder/templates.test.ts`
 
 **Interfaces:**
-- Consumes: `WorkflowDef`, `newUlid`, `validateWorkflowDef`, `adviseWorkflowDef`, **`SIMPLE_KANBAN_TEMPLATE`** (Plan 4) from `@gisik-nokma/domain`; `layoutDraft`, `WorkflowDraft` from Task 1.
+- Consumes: `WorkflowDef`, `newUlid`, `validateWorkflowDef`, `adviseWorkflowDef`, **`SIMPLE_KANBAN_TEMPLATE`** (Plan 4) and **`ERRAND_WITH_WAITS_TEMPLATE`** (declared by this plan's guard below, consumed by Plan 11's seed — `checkErrandTemplate` there is the shape's oracle) from `@gisik-nokma/domain`; `layoutDraft`, `WorkflowDraft` from Task 1.
 - Produces: `type WorkflowTemplate = { id: 'simple-kanban' | 'errand-with-waits' | 'approval-chain'; name: string; tagline: string; def: Omit<WorkflowDef, 'id' | 'version'> }`; `WORKFLOW_TEMPLATES: readonly WorkflowTemplate[]` (in that order); `cloneTemplate(template: WorkflowTemplate): WorkflowDef` (fresh ULID id, version 1); `draftFromTemplate(template: WorkflowTemplate): WorkflowDraft`.
 - **Guard step:** if `SIMPLE_KANBAN_TEMPLATE` is not yet exported from `@gisik-nokma/domain` (Plan 4 not landed), create `packages/domain/src/workflows/simple-kanban.ts` exactly as Plan 4 Task 5 Step 6 specifies and export it from the barrel — do NOT declare a local Kanban payload here and "reconcile later", which is the drift this arrangement exists to prevent.
+- **This plan declares the errand template in domain.** Create `packages/domain/src/workflows/errand-with-waits.ts` and export from the barrel:
+
+```ts
+import type { WorkflowDef } from '../workflow.js';
+
+/**
+ * The errand-with-waits template (spec §4's template gallery; spec §7's
+ * dogfooding workflow). Its shape is pinned by Plan 11's checkErrandTemplate,
+ * which is the ORACLE — the state ids are the frozen tracker's own lanes, so
+ * the Convenience Corner seed maps records onto states one-to-one; every
+ * mapped state is reachable in ONE transition from the initial state, so
+ * seeding never fabricates intermediate history; and every transition into
+ * done carries require-comment. Edit this only with that check green.
+ */
+export const ERRAND_WITH_WAITS_TEMPLATE: Omit<WorkflowDef, 'id' | 'version'> = {
+  name: 'Errand with waits',
+  initialStateId: 'later',
+  states: [
+    { id: 'later', name: 'Later', category: 'open' },
+    { id: 'next', name: 'Next', category: 'open' },
+    { id: 'in-progress', name: 'In progress', category: 'active' },
+    { id: 'waiting', name: 'Waiting', category: 'active', blocked: true },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [
+    // The seed's one-hop paths from the initial state — rule-free except into
+    // done, so a seeded record lands on its lane without invented ceremony.
+    { from: 'later', to: 'next', rules: [] },
+    { from: 'later', to: 'in-progress', rules: [] },
+    { from: 'later', to: 'waiting', rules: [] },
+    { from: 'later', to: 'done', rules: [{ kind: 'require-comment' }] },
+    // The working paths.
+    { from: 'next', to: 'in-progress', rules: [] },
+    { from: 'next', to: 'waiting', rules: [] },
+    { from: 'in-progress', to: 'waiting', rules: [{ kind: 'require-comment' }] },
+    { from: 'waiting', to: 'in-progress', rules: [] },
+    { from: 'in-progress', to: 'done', rules: [{ kind: 'require-comment' }] },
+    { from: 'done', to: 'in-progress', rules: [] },
+  ],
+};
+```
+
+In `templates.ts` below, the errand card's `def` is this object — the earlier inline payload (five invented state ids, two waiting states, evidence into done) is **gone, not preserved as a variant**: it violated the one-hop pin and the comment-into-done pin, and a gallery flavour that diverges from the workflow the shop actually runs is the drift in its Sunday clothes. The templates test asserts `errand.def === ERRAND_WITH_WAITS_TEMPLATE` beside the existing Kanban identity assertion.
 
 - [ ] **Step 1: Write the failing template test**
 
@@ -1809,10 +1852,14 @@ describe('WORKFLOW_TEMPLATES', () => {
     expect(template.def.states[0]!.name).not.toBe('Mutated');
   });
 
-  it('errand-with-waits flags exactly its two waiting states as blocked', () => {
+  it('the errand card IS the domain template, and its waiting state is blocked-flagged', () => {
     const errand = WORKFLOW_TEMPLATES.find((template) => template.id === 'errand-with-waits')!;
+    // Identity, not resemblance — the same guarantee the Kanban card carries:
+    // the shop's seeded workflow (Plan 11) and this gallery card can never
+    // drift, because they are one object.
+    expect(errand.def).toBe(ERRAND_WITH_WAITS_TEMPLATE);
     const blockedIds = errand.def.states.filter((state) => state.blocked === true).map((state) => state.id);
-    expect(blockedIds).toEqual(['waiting-counterparty', 'waiting-documents']);
+    expect(blockedIds).toEqual(['waiting']);
     for (const state of errand.def.states.filter((candidate) => candidate.blocked === true)) {
       expect(state.category).toBe('active');
     }
@@ -1845,7 +1892,7 @@ Expected: FAIL — cannot resolve `../../src/workflow-builder/templates.js`.
 Create `packages/app-core/src/workflow-builder/templates.ts`:
 
 ```ts
-import { SIMPLE_KANBAN_TEMPLATE, newUlid, type WorkflowDef } from '@gisik-nokma/domain';
+import { ERRAND_WITH_WAITS_TEMPLATE, SIMPLE_KANBAN_TEMPLATE, newUlid, type WorkflowDef } from '@gisik-nokma/domain';
 import { layoutDraft } from './layout.js';
 import type { WorkflowDraft } from './draft-store.js';
 
@@ -1860,11 +1907,12 @@ export type WorkflowTemplate = {
  * Pre-authored, ordinary workflows (spec §4). Cloned — never referenced —
  * so an edited copy can never bleed back into the gallery.
  *
- * The Kanban card's `def` is `SIMPLE_KANBAN_TEMPLATE` itself, imported from
- * `@gisik-nokma/domain`: the server founds every workspace on that same object
- * (Plan 4), and a gallery copy that merely resembled it would diverge the first
- * time either side was edited, silently. The other two are gallery-only —
- * nothing outside this package consumes them.
+ * The Kanban and errand cards' `def`s are the domain objects themselves,
+ * imported: the server founds every workspace on the Kanban template (Plan 4)
+ * and the Convenience Corner seed founds the shop's workflow on the errand
+ * template (Plan 11), and a gallery copy that merely resembled either would
+ * diverge the first time one side was edited, silently. Only approval-chain
+ * is declared here — nothing outside this package consumes it.
  */
 export const WORKFLOW_TEMPLATES: readonly WorkflowTemplate[] = [
   {
@@ -1877,27 +1925,8 @@ export const WORKFLOW_TEMPLATES: readonly WorkflowTemplate[] = [
     id: 'errand-with-waits',
     name: 'Errand with waits',
     tagline:
-      'Real-world errands that stall on other people. Waiting states are blocked-flagged so the attention strip sees them; finishing takes evidence.',
-    def: {
-      name: 'Errand with waits',
-      initialStateId: 'not-started',
-      states: [
-        { id: 'not-started', name: 'Not started', category: 'open' },
-        { id: 'in-progress', name: 'In progress', category: 'active' },
-        { id: 'waiting-counterparty', name: 'Waiting on counterparty', category: 'active', blocked: true },
-        { id: 'waiting-documents', name: 'Waiting on documents', category: 'active', blocked: true },
-        { id: 'done', name: 'Done', category: 'terminal' },
-      ],
-      transitions: [
-        { from: 'not-started', to: 'in-progress', rules: [] },
-        { from: 'in-progress', to: 'waiting-counterparty', rules: [{ kind: 'require-comment' }] },
-        { from: 'in-progress', to: 'waiting-documents', rules: [{ kind: 'require-comment' }] },
-        { from: 'waiting-counterparty', to: 'in-progress', rules: [] },
-        { from: 'waiting-documents', to: 'in-progress', rules: [] },
-        { from: 'in-progress', to: 'done', rules: [{ kind: 'require-evidence' }] },
-        { from: 'done', to: 'in-progress', rules: [] },
-      ],
-    },
+      'Real-world errands that stall on other people. The waiting state is blocked-flagged so the attention strip sees it; finishing takes a comment saying how it ended.',
+    def: ERRAND_WITH_WAITS_TEMPLATE,
   },
   {
     id: 'approval-chain',
@@ -2492,29 +2521,30 @@ describe('toFlowGraph', () => {
 
   it('carries name, category, blocked, and the initial marker in node data', () => {
     const { nodes } = graph();
-    const waiting = nodes.find((node) => node.id === 's:waiting-counterparty')!;
+    const waiting = nodes.find((node) => node.id === 's:waiting')!;
     expect(waiting.data).toEqual({
-      stateId: 'waiting-counterparty',
-      name: 'Waiting on counterparty',
+      stateId: 'waiting',
+      name: 'Waiting',
       category: 'active',
       blocked: true,
       isInitial: false,
     });
-    const start = nodes.find((node) => node.id === 's:not-started')!;
+    const start = nodes.find((node) => node.id === 's:later')!;
     expect(start.data).toMatchObject({ blocked: false, isInitial: true });
   });
 
   it('maps transitions to t:index edges with summaries, routing "*" from the any-state node', () => {
     const draft = draftFromTemplate(errand);
-    draft.def = { ...draft.def, transitions: [...draft.def.transitions, { from: '*', to: 'done', rules: [] }] };
+    draft.def = { ...draft.def, transitions: [...draft.def.transitions, { from: '*', to: 'in-progress', rules: [] }] };
     const { edges } = toFlowGraph(draft, summaryContextFor(draft.def));
-    expect(edges[1]).toMatchObject({
-      id: 't:1',
-      source: 's:in-progress',
-      target: 's:waiting-counterparty',
-      data: { index: 1, summaries: ['Must carry a comment explaining it.'] },
+    // t:3 is later→done, the template's first ruled transition (require-comment).
+    expect(edges[3]).toMatchObject({
+      id: 't:3',
+      source: 's:later',
+      target: 's:done',
+      data: { index: 3, summaries: ['Must carry a comment explaining it.'] },
     });
-    expect(edges[edges.length - 1]).toMatchObject({ source: ANY_STATE_NODE_ID, target: 's:done' });
+    expect(edges[edges.length - 1]).toMatchObject({ source: ANY_STATE_NODE_ID, target: 's:in-progress' });
   });
 
   it('drops edges whose endpoint state is missing — the issues panel names them instead', () => {
@@ -2746,14 +2776,14 @@ function renderCanvas(store: DraftStore, env = testEnv()) {
 describe('WorkflowCanvas', () => {
   it('renders every state as a node with its name', () => {
     renderCanvas(createDraftStore(draftFromTemplate(errand)));
-    for (const name of ['Not started', 'In progress', 'Waiting on counterparty', 'Waiting on documents', 'Done']) {
+    for (const name of ['Later', 'Next', 'In progress', 'Waiting', 'Done']) {
       expect(screen.getByText(name)).toBeInTheDocument();
     }
   });
 
   it('shows the initial-state marker on the start state only', () => {
     renderCanvas(createDraftStore(draftFromTemplate(errand)));
-    const start = screen.getByTestId('state-node-not-started');
+    const start = screen.getByTestId('state-node-later');
     expect(within(start).getByText('Start')).toBeInTheDocument();
     expect(within(screen.getByTestId('state-node-done')).queryByText('Start')).not.toBeInTheDocument();
   });
@@ -2761,7 +2791,7 @@ describe('WorkflowCanvas', () => {
   it('checks the blocked checkbox exactly on blocked-flagged states', () => {
     renderCanvas(createDraftStore(draftFromTemplate(errand)));
     expect(
-      within(screen.getByTestId('state-node-waiting-counterparty')).getByRole('checkbox', { name: 'Blocked' }),
+      within(screen.getByTestId('state-node-waiting')).getByRole('checkbox', { name: 'Blocked' }),
     ).toBeChecked();
     expect(
       within(screen.getByTestId('state-node-in-progress')).getByRole('checkbox', { name: 'Blocked' }),
