@@ -5,5 +5,7 @@ export * from './vocabulary.js';
 export * from './parse-event.js';
 export * from './state.js';
 export * from './workflow.js';
+export * from './validate-workflow.js';
+export * from './advise-workflow.js';
 export * from './entity-state.js';
 export * from './ist-day.js';
