@@ -86,7 +86,19 @@ export async function evaluateTicketTransitioned(
     };
   }
 
-  // TASK 7 inserts the parent-terminal invariant here.
+  // Invariant above all workflows (spec invariant 3): parents cannot outrun
+  // children. Runs before any authored rule; no definition can switch it off.
+  if (toState.category === 'terminal') {
+    const children = await ctx.getChildrenStates(ticket.id);
+    const openCount = children.filter((child) => child.stateCategory !== 'terminal').length;
+    if (openCount > 0) {
+      return {
+        refused: true,
+        rule: REFUSAL_RULES.parentTerminal,
+        reason: `This ticket cannot enter "${toState.name}" while ${openCount} of its child tickets ${openCount === 1 ? 'is' : 'are'} still open.`,
+      };
+    }
+  }
 
   // TASK 8 replaces this acceptance with the transition-rule evaluation.
   return { refused: false };
