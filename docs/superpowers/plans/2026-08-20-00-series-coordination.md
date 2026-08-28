@@ -390,3 +390,98 @@ Weaker instance in the same class, recorded so it is not rediscovered: **Plan 4 
 The same absence covers type↔kind: the registry keys on `type@version` alone, so `type: 'workspace.created'` against `entity.kind: 'ticket'` is accepted at the door, and Plan 1's own tests do exactly that.
 
 This is correctly outside Plan 1's implementation scope — rule *content* is Plan 2's, and a pass-through engine that accepts everything is Plan 1's documented semantics. But the hole is only visible when the tasks are composed, and no plan document names an owner. **Plan 2 owns both refusals: entity↔workspace binding and type↔kind binding.** The cost of leaving them unowned is not recoverable: **the ledger is append-only by trigger, so a mis-filed event cannot be corrected, only superseded** — and the head row's workspace_id keeps flipping in the meantime. They must land before a second entity kind and real multi-workspace data exist, which is to say before Plan 3.
+
+## Plan 2 execution consequences (2026-08-28) — the same lesson, learned twice
+
+Plan 2 ran with an execution ledger too, and at six separate points it wrote "routed to coordination doc at plan end." Plan end came; `git diff 569fd41..c33d94a` changed no document at all. The lesson recorded one section above — **a correct ruling whose entire value lives in a note is worth exactly as much as the note is durable** — was not a lesson Plan 2 escaped by having read it. It was routed *into the same gitignored file*, by an executor who had the Plan 1 section available the whole time. Twice is a pattern, and the pattern is that "route it at plan end" is not a mechanism; it is an intention held by a session that is about to end. **The routing must happen in the task that discovers the item, not at plan end.** Later plans: when a reviewer's finding is deferred to you, the deferral is not complete until it is committed here.
+
+This section is that recording, late. One of the six is recorded as *resolved* rather than deferred, because the fix was small enough to take in the fix wave (item 6). The rest are claims on later plans. None of it changes Plan 2's shipped behaviour.
+
+### 1. The stranded-state refusal names a state against the wrong version's vocabulary
+
+`transition.ts:65` renders the stranding refusal as `Ticket X sits in state "<unmappedStateId>" of workflow version <ticket.workflowVersion>` — asserting that the unmapped id belongs to the ticket's **origin** version. By `foldStateIdForward`'s own documented contract (`packages/domain/src/workflow.ts:99-101`, "on failure it reports the id at the point the chain broke, not the id it started from"), it does not. For a v1 ticket walking v1→v2→v3, the id reported is the one current *where the walk failed* — possibly a v2 id that the ticket's v1 vocabulary never contained. The sentence names a state and a version that never coexisted.
+
+The copy is character-exact to the plan's canonical table, so this is an inaccuracy in the pinned copy rather than an implementation slip, and it is invisible to the current suite because every stranded-state fixture is two-version, where break-point and origin coincide. **Plan 6 renders these reasons verbatim to a human**, which is where a state id belonging to no version the reader can see becomes a support ticket.
+
+The fix is a cross-plan surface change and belongs to whichever plan next touches the fold: **`FoldedState` must carry the version the chain broke on**, so the refusal can name `"<id>" of version <breakVersion>` truthfully — or drop the version clause and name only the id. Do not "fix" it by folding the id back to the origin version; there is no backward walk, and inventing one is a second set of rounding errors of exactly the kind the ONE VERSION WALK comment forbids. First plan to author a three-version fixture will observe this directly.
+
+### 2. `WorkflowDef.roles` is plain strings, so a definition can name a role that does not exist — owner needed
+
+`packages/domain/src/workflow.ts:21` types restrict-to's roles as `z.array(z.string()).optional()`, not `WorkspaceRole[]`. A definition whose restrict-to names `"wizard"` therefore validates clean, publishes, lands in `proj_workflows`, and renders in the builder as a guard — and `evaluateRestrictTo` then compares `"wizard"` against a real membership role forever, matching nobody. The transition is not guarded; it is **closed**, silently, and the refusal reason names a rule that reads entirely legitimate.
+
+This is precisely the shape `validateWorkflowDef` refuses everywhere else: `rdu-unknown-state` exists because a rule watching a state that does not exist is a declared thing that cannot function. A rule naming a role that does not exist is the same defect with no check behind it.
+
+**This needs an owner, and the choice is a real one.** Either (a) Task 3's validator gains an unknown-role check — but `validateWorkflowDef` is pure and I/O-free by design and workspace roles are a domain constant, so this only works if the role vocabulary is a closed domain enum the validator may import; or (b) it becomes a **Plan 8 builder-surface** concern, because the builder picks roles from a list and can simply never emit an unknown one — which leaves the API door open to a hand-written definition. (a) is the honesty floor; (b) is cheaper. Plan 2 declined to rule it, because either answer changes a behaviour the plan had frozen. **Whoever rules it: typing `roles` as `WorkspaceRole[]` is the same fix as (a) and is strictly better than a check, if the enum can live in domain.**
+
+### 3. `require-different-user` is fail-open on an unresolvable entry, and the comment justifying that is conditionally false
+
+`packages/rule-engine/src/rules/require-different-user.ts:56` is `if (!resolved.ok) continue;`, and the comment above it argues the skip is safe because "in such a store the ticket's own state resolution refuses first, as stranded-state, before any rule runs."
+
+**That holds only while the ticket's version and the entry's version coincide.** The ticket resolves from `ticket.workflowVersion`; each log entry resolves from its own `entry.workflowVersion`. When they are equal — as they are in every fixture on this branch — any break the entry hits, the ticket hits first, and the claim is true. **Plan 3's refresh-on-publish makes divergence routine**: a new version is published, the ticket's row is refreshed to latest, and the ticket now folds latest→latest as a no-op while a v1 log entry still walks the entire chain. From then on an entry can strand where the ticket cannot, the entry is skipped, `prior` stays undefined, and the rule returns `{refused: false}` — **four-eyes silently disarmed, for a security control, with no diagnostic anywhere**.
+
+Nothing on this branch is broken: publishing refuses unmapped drops, so an unresolvable entry only exists in a corrupted or planted store. But "only reachable through corruption" is exactly the condition under which a security control should fail *closed*.
+
+**Plan 3 owns the decision, and it is a decision, not a bug fix.** Fail-closed (refuse the transition when any candidate entry cannot be resolved) is the safe reading and can deny a legitimate move on a store nobody has noticed is corrupt. Diagnostics-only (skip, but surface the unresolvable entry somewhere an operator sees) keeps availability and admits the control is advisory in that state. What must not survive Plan 3 is the current arrangement: fail-open, plus a committed comment asserting a precondition Plan 3 itself removes. **Whichever is chosen, that comment gets rewritten in the same change.**
+
+### 4. `require-different-user` trusts the log's array order, not the `seq` each entry carries — Plan 3's projection brief
+
+The same rule ends with `// Iterating oldest-first and overwriting leaves the LAST match standing` (`require-different-user.ts:57-58`). That is correct today and it is correct *by convention*: `TicketState.transitions` is documented as appended oldest-first, and Plan 2's harness appends in order. Every entry carries a `seq` field (`packages/domain/src/entity-state.ts:38`) and **nothing in the monorepo reads it**.
+
+So the identity of "the last person to make this move" — the whole content of four-eyes — rests on a projection's append order rather than on the ordering field the data already carries. **A Plan 3 projection that appends out of order silently inverts latest-wins**, and the failure mode is not an error: it is the wrong person's id compared against the wrong actor, refusing legitimate moves and accepting self-approvals, with a green suite. There is no test that would catch it, because every fixture's log is built in order.
+
+**Plan 3's projection brief must either guarantee append order explicitly** (and say so where the guarantee is made, so a later refactor knows it is load-bearing) **or sort by `seq` at the point of use** — which is a one-line change in RDU and makes the field earn its place. The second is preferable: a guarantee that lives in one projection's implementation detail is the same durability problem this whole section is about.
+
+### 5. The entity↔workspace door is server-only, and Plan 10's replica must mirror it knowingly
+
+Coordination §11 gave Plan 2 both the type↔kind and entity↔workspace refusals. Type↔kind (G1) landed in `parseEvent`, in domain, so every consumer inherits it. Entity↔workspace (G2) landed in `commitOne` (`apps/server/src/ingest/ingest-service.ts:115-122`) and **could not** land in the shared engine: the check reads which workspace an entity is already bound to, and a workspace-scoped client replica cannot see a binding in a workspace it does not hold. The obligation is carried today only in a code comment at that site.
+
+**Plan 10 must mirror this door in the offline replica, spelling the refusal code `entity-workspace-mismatch` identically** (the constant sits beside `IngestErrorCode` for exactly this reason, and Plan 6's UI must spell it the same way). A replica that omits it will accept locally what the server refuses on sync, which is the worst version of this failure — the user has already done the work.
+
+Recorded with it, the coupling Plan 2 accepted deliberately, so Plan 10 inherits the reasoning rather than the conclusion: **the tenant boundary reads `proj_entity_heads`, a derived and rebuildable projection, not `events`, which is authoritative.** Normally that is backwards. It is safe here for two named reasons, and only while both hold: the head row is written in the **same transaction** as the event, so the projection cannot lag the ledger by even one commit; and `reset()` is `TRUNCATE`, which takes ACCESS EXCLUSIVE, so a rebuild cannot interleave with an ingest and expose an empty table as "not yet bound." **A projection reset that switches to `DELETE` (Plan 1 §6 already names this as a live possibility) breaks the second reason, and this door with it.** Whoever writes the first non-`TRUNCATE` reset re-derives this.
+
+### 6. The node:fs barrel hazard — resolved in this branch; the new import path is the part later plans need
+
+`packages/rule-engine/src/index.ts` re-exported the fixture harness, and the harness imports `node:fs`, `node:path` and `node:url` at module top level. Since **Plan 6's web client and Plan 10's offline replica both enter this package at `evaluateEvent`**, the package's only entry point dragged the filesystem into the browser, with no `sideEffects: false` to let a bundler drop it. Ruled a real hazard at Task 4 and routed here; taken in the branch's fix wave instead, because it was five lines.
+
+The resolution, which later plans need as fact rather than as warning:
+
+- **The root entry no longer exposes the harness.** Verified in the built output: thirteen modules are reachable from `dist/index.js` and none imports a node builtin.
+- **The harness ships as a subpath export — `@gisik-nokma/rule-engine/fixtures`.** This is a deviation from Plan 2's File Structure pin ("`src/index.ts` — export engine + fixture harness"), ruled deliberately: the pin's intent was that the harness ships from this package so server and client builds prove the same refusals against the same defects, and a subpath serves that intent exactly, without every browser consumer paying for it.
+- **`"sideEffects": false` is declared**, so a bundler may drop unused re-exports safely.
+
+**Plans 3 and 9 ship fixtures into `packages/rule-engine/fixtures/` and import the harness from `@gisik-nokma/rule-engine/fixtures`, not from the package root.** Two constraints ride with that import, both previously brief-only and now committed beside the code they constrain: fixtures live **flat** in that directory (the scan is non-recursive; a fixture in a subdirectory is silently skipped, which `fixtures.test.ts`'s exact-count assertion now catches — **bump the count in the same commit as the fixture**), and fixture candidates stay in workspace **`ws_1`** unless the harness is extended, because memberships are keyed to `ws_1` unconditionally and an overridden workspaceId yields a null membership and a legitimate-looking restrict-to refusal.
+
+Carried in the same item because it was routed with it: **`asOfWorkspaceSeq`'s same-stream precondition, for Plan 3's brief.** The docstring half is durable in code already; the half that is not is who it is for. Positions from different workspace streams are not comparable — asking for a definition as of another workspace's sequence number returns a silently *wrong* version, not an empty result. **`proj_tickets` is the intended caller**, and it must pass a position from the same workspace stream as the workflow it is asking about.
+
+### 7. Riders — smaller claims on later plans, recorded so they are not rediscovered
+
+- **The parent-terminal invariant is inert server-side until Plan 3.** `getChildrenStates` stubs `[]` in `apps/server/src/engine-context.ts`, so the one invariant no workflow author can switch off currently refuses nothing in production. It is fully proven by fixtures against the in-memory harness, which is why the suite says nothing about it. **Plan 3 makes it real when it lands the ticket projection**, and that is the moment its fixtures stop being the only thing holding it up.
+- **Evidence-id existence is unchecked by design.** `require-evidence` proves an id was supplied, not that it points at anything. Attachments are Plan 7's and the ticket projection is Plan 3's; **whichever lands second owns the existence check**, or owns recording that it stays unchecked.
+- **Dispatch hygiene: an RTK-proxied `diff` reported "identical" for files that differed**, during a Task 10 mutation sweep — a false clean on the exact operation a mutation restoration depends on. The incident was closed by sampling the tree directly, and the compensating procedure was applied for the rest of the plan and belongs in every future one: **verify mutation restorations with `git diff` or by reading the file, never with a proxied shell `diff`.** A tool that lies about equality turns a mutation sweep into theatre.
+- **`transitionSchema` admits `to: '*'`, and a dangling wildcard target publishes clean.** `packages/domain/src/workflow.ts:36` types `to` as `z.string().min(1)`, and the reference check at `packages/domain/src/validate-workflow.ts:40` is `if (ref !== '*' && !stateIds.has(ref))` — applied to **both** endpoints. The wildcard is only meaningful on `from`; on `to` it means nothing. Such an edge passes `unknown-transition-state`, contributes nothing to reachability or `terminal-no-inbound`, and can never be selected at runtime (the engine refuses `unknown-state` first), so it is inert — but it survives into `proj_workflows` and **Plan 8's builder will read it back and render an edge to nowhere**. The fix is one condition: make the check endpoint-aware, so the `'*'` exemption applies to `from` only, plus an issue code for the `to` case. Taking it or explicitly declining it both close this; leaving it unrecorded does not.
+
+### 8. Owner ruling requested: a wildcard edge voids the rule vocabulary on every other inbound edge
+
+This is a **request, not a ruling.** It is the same class as item 2 — a shape that publishes clean and silently does not do what its author drew — and Plan 2 declined to rule it because the answer changes a tier the owner scoped by hand.
+
+Rules in the closed vocabulary attach to **one transition**. A `from: '*'` transition is an edge from *every* state. So an authored `{from:'*', to:'done', rules:[]}` sitting beside a guarded `{from:'doing', to:'done', rules:[restrict-to …]}` makes the guard optional for any ticket not currently in `doing`: the author drew a guard, the engine honours it on one path, and nothing tells them.
+
+Probed against the built engine on exactly the canonical `wf_rules` "Guarded" definition that all seventeen rule-vocabulary fixtures use, with a restrict-to on doing→done naming only `user_boss`:
+
+```
+validateWorkflowDef(def) -> []            (publishes clean)
+adviseWorkflowDef(def)   -> []            (no warning)
+todo  -> done  as user_a -> {"refused":false}                <-- guard bypassed
+doing -> done  as user_a -> {"refused":true,"rule":"restrict-to", …}
+```
+
+Three things this is **not**, so the ruling is made on the real question. It is not the exact-over-wildcard precedence, which is pinned and genuinely witnessed — the bypass exists with no exact edge shadowing anything. It is not a deviation from what was ordered: the owner decision above scopes the advisory tier to "its one code is `rdu-bypassable`," and `advise-workflow.ts:28` (`if (rule.kind !== 'require-different-user') continue;`) implements exactly that, faithfully. And it is not a code bug — `validateWorkflowDef` *deliberately* blesses the coexistence (an exact edge plus a from-any edge to the same target is affirmatively not a duplicate).
+
+What the composition exposes is narrower and more uncomfortable: **the owner's own reasoning for `rdu-bypassable` — "a rule whose guarded transition is reachable without the guarded precondition is real but not structural, so warn rather than refuse" — applies verbatim to restrict-to, require-comment, require-evidence and require-field over a wildcard edge.** Only require-different-user got the warning. Against spec invariant 2 and §4's builder promise ("live validation, publish when clean"), a definition that publishes clean while its declared guard is void from the initial state is a failure of the honesty floor, not of the code.
+
+Two candidate resolutions, both coherent:
+
+1. **Generalise the advisory tier.** `adviseWorkflowDef` emits a `rule-bypassable`-style advisory for any guarded target also reachable by a lower-guard edge, for every rule kind. Consistent with the reasoning already accepted, costs one issue code and one walk, and warns at publish where the author is looking.
+2. **Make it a Plan 8 builder-surface warning.** The builder is where the two edges are drawn and is the only surface that can show *which* edge voids *which* guard, visually. Cheaper in domain, but a hand-authored definition posted to the API gets no warning at all.
+
+Whichever is chosen, one consequence follows either way: **the `wf_rules` fixture definition is itself an instance** — the J-kill wildcard edge added by the Task 8 ruling put it there — and it should stop being the unremarked example that seventeen fixtures are written against.
