@@ -4,9 +4,15 @@ import { LogMagicLinkSender } from './magic-link-sender.js';
 import { LogOtpSender } from './otp-sender.js';
 
 /**
- * Concrete instance for `pnpm exec better-auth generate --config …` and local
- * dev runs. Never imported by production assembly — that wires real deps from
- * validated configuration (`src/config.ts`).
+ * Concrete instance for `pnpm --filter @gisik-nokma/server run auth:schema`
+ * (which reads `auth.options` off this instance) and for local dev runs. Never
+ * imported by production assembly — that wires real deps from validated
+ * configuration (`src/config.ts`).
+ *
+ * Deliberately NOT `better-auth generate`: that bin ships in `@better-auth/cli`,
+ * which is not a dependency of this repo and must not become one — it pins its
+ * own better-auth 1.4.21 and emits a schema missing `account."issuer"`. The
+ * command would not even resolve. See `src/tools/auth-schema.ts`.
  *
  * The pool comes through `createPool` and not `new Pool(...)`: `src/db.ts`
  * installs the int8 parser and pins every session to Asia/Kolkata, and a second
