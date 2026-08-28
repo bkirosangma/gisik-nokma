@@ -1659,10 +1659,30 @@ a reason unrelated to what it names — arriving inside the remedy rather than t
 
 **The fix pattern** (Lane 4's, verified against the built schemas): a `.refine` on the embedded schema
 asserting `payload !== undefined`, plus stating the contracted type explicitly rather than taking
-`z.infer`. Prefer `payload !== undefined` over `'payload' in v` — the probe above shows both the absent
-and the present-but-`undefined` cases are accepted, and serialization erases the difference anyway.
+`z.infer`. Prefer `payload !== undefined` over `'payload' in v`, **for a sharper reason than the first
+draft gave.** That draft said `in` cannot tell the two cases apart; the probe above disproves it in its
+own output — absent parses to `keys: ["a"]`, present-but-`undefined` to `keys: ["a","payload"]`, so `in`
+distinguishes them perfectly. Lane 2 reproduced this independently and supplied the real argument:
+**both cases must be refused, so one predicate covers both, and reaching for `in` invites the next reader
+to believe the distinction is meaningful when the matrix says it is not.** The recommendation is
+unchanged; the reasoning behind it was wrong, and it was wrong against data printed three lines above it.
 **Boundary that must not be over-tightened:** `payload: null` and `payload: {}` both stay **accepted** —
 null is still a claim, an empty claim is still a claim. Only absence is the defect.
+
+### `envelope.ts` settles at Plan 4 T3 — the schedule fact three lanes need
+
+Lane 2 confirms **T3 is the last amendment it has planned for `packages/domain/src/envelope.ts`**; T14's
+invite work was the other one and its share was pulled forward deliberately. After T3 lands, the file
+carries all three changes together — the owner-ratified membership composite id, `'invite'` in
+`ENTITY_KINDS`, and payload presence — and **lanes may treat that landing as the point the schema
+settles.**
+
+That is the payoff of the sequencing rule rather than a coincidence: three amendments to the schema every
+event passes through, batched into one change set so three sibling lanes rebase onto it **once**. A
+separate PR for the three-line payload fix would have cost more in rebase churn across four worktrees
+than the fix is worth — and Lane 4 declining to touch the file, despite already being inside the package
+and holding the finding, is the same discipline working from the other side. **A must-not-touch list that
+holds when the fix is small and the fixer is right there is the list doing its job, not a gap in it.**
 
 ### Byte-identical instructions target the repo file, not the plan text
 
