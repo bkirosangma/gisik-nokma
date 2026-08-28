@@ -65,6 +65,55 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
     editor.destroy();
   });
 
+  /**
+   * `orderedList` and `horizontalRule` are in the v1 node set and were in no
+   * case here. Their pinning strength differs and it is worth being straight
+   * about which is which.
+   *
+   * `orderedList` is load-bearing the same way `bulletList` is — its numbering
+   * is presentational, so the plain text must carry the item text and nothing
+   * else, and dropping `paragraph` from the walker's block set fails this case
+   * along with the others.
+   *
+   * `horizontalRule` is pinned from the other direction, and it took a moment
+   * to see that it was pinned at all. DELETING something cannot break it — an
+   * `hr` has no content, so it contributes nothing whether or not the walker
+   * calls it a block. ADDING something can: teaching the walker to render it
+   * as a '---' separator fails this case, which was run and does fail. That is
+   * the change worth guarding against, because it is the plausible one — a
+   * later hand deciding a rule should be visible in plain text would start
+   * injecting punctuation into every indexed document and every notification,
+   * and would otherwise find out from a user.
+   */
+  it('renders an ordered list as its items and a horizontal rule as nothing', () => {
+    const editor = createTestEditor(undefined, {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'before' }] },
+        { type: 'horizontalRule' },
+        {
+          type: 'orderedList',
+          content: [
+            {
+              type: 'listItem',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'file GSTR-1' }] }],
+            },
+            {
+              type: 'listItem',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'file GSTR-3B' }] }],
+            },
+          ],
+        },
+        { type: 'horizontalRule' },
+        { type: 'paragraph', content: [{ type: 'text', text: 'after' }] },
+      ],
+    });
+    // No separator, no blank line, no numbering: two rules between three
+    // blocks leave no trace at all in the indexed text.
+    expect(docToPlainText(editor.getJSON())).toBe('before\nfile GSTR-1\nfile GSTR-3B\nafter');
+    editor.destroy();
+  });
+
   it('renders hardBreak as a newline and marks as their bare text', () => {
     const editor = createTestEditor(undefined, {
       type: 'doc',
