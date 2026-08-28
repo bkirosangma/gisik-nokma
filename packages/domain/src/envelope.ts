@@ -43,7 +43,14 @@ const isoDatetime = z
   .regex(ISO_DATETIME_REGEX, 'must be ISO 8601 with at most millisecond precision')
   .refine(isRealCalendarDatetime, 'must be a real calendar datetime');
 
-const ulidString = z.string().regex(ULID_REGEX, 'must be a ULID');
+/**
+ * The one ULID string schema. Exported rather than kept local because every
+ * event payload carrying an id (`parentId`, `attachmentId`, …) needs exactly
+ * this check: a second `z.string().regex(...)` spelled out beside a payload
+ * schema is a second statement of what a ULID is, and the two are free to
+ * drift. `ULID_REGEX` in ids.ts stays the single origin of the pattern.
+ */
+export const ulidString = z.string().regex(ULID_REGEX, 'must be a ULID');
 
 export type EventEnvelope = {
   id: string;              // ULID, client-generated

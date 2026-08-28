@@ -580,9 +580,13 @@ describe('evaluateTransitionRules is lazy: a later ctx-reading rule is never con
  * observable verdict would be identical — the mutation is unfalsifiable
  * through the type system alone. It matters for exactly the seam
  * `apps/server/src/engine-context.ts`'s `getEntityState` names in its own
- * ruled comment (adaptation map S9): that implementation ends in
- * `as unknown as EntityState | null`, an unsafe cast that a real bug could
- * make return a wrongly-kinded value. This plants that scenario directly —
+ * ruled comment (adaptation map S9). That implementation used to end in
+ * `as unknown as EntityState | null`; Plan 3's keystone removed the cast and
+ * made the body answer null for the kinds it cannot serve, so the shipped
+ * server no longer produces a wrongly-kinded value. The check stays, because
+ * the class of bug does: Plan 3 Task 12 and Plan 4 give this seam real bodies
+ * per kind, and Plan 10's replica writes a second implementation of the same
+ * interface. This plants that scenario directly —
  * a value with `kind: 'ticket'` that happens to carry a `role` field
  * matching the rule's allowed list — the only way to make the check
  * observable, and the only way that mirrors why it exists.
