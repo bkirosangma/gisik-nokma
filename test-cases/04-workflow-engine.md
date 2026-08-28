@@ -15,6 +15,7 @@ Fixture names refer to `packages/rule-engine/fixtures/`; unit tests to `packages
 - **4.7** ✅ A terminal state with no way in is refused; a self-loop is not a way in. — `workflow-defined-refuses-unenterable-terminal-state`, `packages/domain/test/validate-workflow.test.ts`
 - **4.8** ✅ A restrict-to naming nobody is refused at publish. — `workflow-defined-refuses-empty-restrict-to`
 - **4.9** ✅ A require-different-user watching a nonexistent transition is refused at publish. — `workflow-defined-refuses-rdu-unknown-state`
+- **4.43** ✅ An `initialStateId` naming no declared state is refused at publish as `unknown-initial-state`; the reachability walk never runs, so this is a separate refusal from 4.6. — `packages/domain/test/validate-workflow.test.ts`
 
 ## Versioning and stranding
 

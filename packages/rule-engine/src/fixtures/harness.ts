@@ -163,6 +163,12 @@ export function buildInMemoryContext(fx: Fixture): EngineContext {
 
   const memberships = new Map<string, EntityState>();
   for (const member of fx.memberships) {
+    // Memberships are keyed to `ws_1` unconditionally, while `completeEnvelope`
+    // only DEFAULTS workspaceId to 'ws_1'. A fixture that overrides workspaceId
+    // on its candidate makes restrict-to look up a key never inserted, get null,
+    // and refuse with a reason that reads entirely legitimate — so the fixture
+    // proves a refusal, just not the one it was written to prove. Keep fixture
+    // candidates in ws_1, or extend the harness knowingly.
     const id = membershipId('ws_1', member.userId);
     memberships.set(id, { kind: 'membership', id, workspaceId: 'ws_1', userId: member.userId, role: member.role });
   }
