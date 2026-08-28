@@ -1586,3 +1586,66 @@ would put words in the actor's mouth; the ledger stores the claim as it was made
 `packages/rule-engine`: every `workspace.created` / `workspace.renamed` payload in the repo carries a
 real name (`'Convenience Corner'`, `'Gisik Nokma Build'`, `'Personal'`, `'CC HQ'`, …) and there are no
 `project.created` fixtures at all. What a sibling lane inherits on rebase is the door, not a breakage.
+
+
+## `z.unknown()` makes a key optional, and the sweep for who inherits it (2026-08-28, controller)
+
+Found by Lane 4's T1 review, swept centrally because the hole is in a **shared** schema and propagates
+by **embedding** — the shape where no single lane can see all the consumers.
+
+**The defect, proven rather than argued.** `z.unknown()` does not require the key. Probed against the
+repo's own zod build:
+
+```
+z.object({ a: z.string(), payload: z.unknown() })
+  { a: 'x' }                  -> ACCEPTED, parsed keys: ["a"]     <-- payload absent entirely
+  { a: 'x', payload: undefined } -> ACCEPTED
+  { a: 'x', payload: null }      -> ACCEPTED
+  { a: 'x', payload: {} }        -> ACCEPTED
+```
+
+`submittedEventSchema` (`packages/domain/src/envelope.ts:72`) declares `payload: z.unknown()`. So any
+schema embedding it admits an event with **no payload key at all**, and `JSON.stringify` drops absent
+and `undefined` values alike, so the wire form loses it silently. In Lane 4's instance the renderer then
+writes a literal `undefined` into a comment body that lands in an append-only table permanently.
+
+**There is a compile-time half with the same root:** `z.infer` yields `payload?: unknown`, which is not
+assignable to `SubmittedEvent`. The natural downstream unblock is a cast, and the cast erases the
+guarantee silently instead of failing. The repo already met this quirk once and handled it by hand —
+`parse-event.ts:99` reconstructs the event as `{ ...envelope.data, payload: payload.data as unknown }`
+rather than passing the inferred object through. That is the precedent; there is none for shipping the
+loose inferred type as a cross-plan contract.
+
+### The sweep: exactly two embedders, and Plan 6 is exposed to a different half
+
+Grepped across shipped code and all eleven plans.
+
+| Embedder | Where | Status |
+|---|---|---|
+| `eventEnvelopeSchema` | shipped, `envelope.ts:84`, `submittedEventSchema.extend({serverTime, seq})` | **inherits the hole.** Consumed today only by `envelope.ts` and its own test, so no live exploit path — but it is a shared export and the next consumer inherits it silently. |
+| `claimContestedPayloadSchema` | Plan 10 line 309, `originalEvent: submittedEventSchema` | Lane 4's instance, in its current scope, being fixed there. |
+
+`parse-event.ts` uses the schema but is **safe**: it reconstructs with `payload` explicitly set (line 99).
+
+**Plan 6 names `submittedEventSchema` zero times** — worth stating because it was the suspected third
+consumer. Its client builds `SubmittedEvent` through `makeSubmittedFactory`, i.e. it is exposed to the
+**type** half (`payload?: unknown` and the tempting cast), not the schema-embedding half. Different
+remedy: state the contracted type explicitly rather than adding a `.refine`.
+
+**The fix pattern** (Lane 4's, verified against the built schemas): a `.refine` on the embedded schema
+asserting `payload !== undefined`, plus stating the contracted type explicitly rather than taking
+`z.infer`. Prefer `payload !== undefined` over `'payload' in v` — the probe above shows both the absent
+and the present-but-`undefined` cases are accepted, and serialization erases the difference anyway.
+**Boundary that must not be over-tightened:** `payload: null` and `payload: {}` both stay **accepted** —
+null is still a claim, an empty claim is still a claim. Only absence is the defect.
+
+### Byte-identical instructions target the repo file, not the plan text
+
+Recorded by Lane 4 against its own two partitions, and general. Plan 6 T6's precondition says to create
+`clock-skew.ts` from Plan 10 T1 Step 5 **verbatim**. Lane 4's implementation is about to deviate from
+that pinned text deliberately — the plan's formatter throws on two exotic ISO shapes, silently rolls
+`2026-02-30` instead of returning it verbatim, and reads non-ISO strings in the device's zone, giving
+four timezones four answers on two different days. Not reachable through the envelope door today.
+**So any byte-identical check between two plans must target the shipped repo file, never the plan text**
+— otherwise the check pins a version that was deliberately corrected. Both ends are Lane 4's here, which
+is the only reason it is cheap to notice.
