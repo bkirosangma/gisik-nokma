@@ -20,12 +20,18 @@ import { typeText } from './helpers/type-text.js';
  *
  * WHAT THESE CASES DO AND DO NOT PIN, established by deleting each entry from
  * the walker's block set and re-running: `paragraph`, `heading` and `codeBlock`
- * each kill a case. `doc`, `blockquote`, `bulletList` and `listItem` survive,
- * and no schema-v1 document can change that — every one of them contains only
- * other blocks, so the newline is emitted by the child regardless and the
- * walker's `\n{2,}` collapse hides the duplicate. Their entries are inert for
- * this editor's output. Stated here so a later reader does not mistake these
- * cases for whole-set coverage and build on a guarantee they do not give.
+ * each kill a case. `doc`, `blockquote`, `bulletList`, `orderedList` and
+ * `listItem` survive, and no schema-v1 document can change that — every one of
+ * them contains only other blocks, so the newline is emitted by the child
+ * regardless and the walker's `\n{2,}` collapse hides the duplicate. Their
+ * entries are inert for this editor's output. Stated here so a later reader
+ * does not mistake these cases for whole-set coverage and build on a guarantee
+ * they do not give.
+ *
+ * Only the three TEXTBLOCK entries are load-bearing, and that is the general
+ * shape rather than a coincidence: an entry earns its keep exactly when its
+ * node holds text directly. Every container's newline is already paid for by
+ * the block inside it.
  */
 describe('schema v1 output conforms to the shipped plain-text walker', () => {
   it('renders every block node the schema names as its own line', () => {
@@ -70,10 +76,14 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
    * case here. Their pinning strength differs and it is worth being straight
    * about which is which.
    *
-   * `orderedList` is load-bearing the same way `bulletList` is — its numbering
-   * is presentational, so the plain text must carry the item text and nothing
-   * else, and dropping `paragraph` from the walker's block set fails this case
-   * along with the others.
+   * `orderedList`'s OWN entry is inert, exactly like `bulletList`'s — deleting
+   * `orderedList`, `listItem`, `bulletList` or `doc` from the walker's block
+   * set all leave this case green, because a list item's newline comes from
+   * the paragraph inside it. What this case does pin is that the numbering is
+   * presentational: the plain text carries the item text and no digits, no
+   * '1.' markers, no separators. Deleting `paragraph` is the mutation that
+   * kills it, and it does — this case joined that mutant's kill set, taking it
+   * from two conformance failures to three.
    *
    * `horizontalRule` is pinned from the other direction, and it took a moment
    * to see that it was pinned at all. DELETING something cannot break it — an

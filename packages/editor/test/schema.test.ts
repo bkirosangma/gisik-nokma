@@ -199,6 +199,18 @@ describe('document schema v1', () => {
 describe('behavioural options that spec §2 constrains', () => {
   const PASTED_URL = 'https://gst.gov.in';
 
+  function linkHrefsIn(doc: unknown): string[] {
+    const hrefs: string[] = [];
+    JSON.stringify(doc, (_key, value) => {
+      const mark = value as { type?: unknown; attrs?: { href?: unknown } };
+      if (mark && typeof mark === 'object' && mark.type === 'link') {
+        if (typeof mark.attrs?.href === 'string') hrefs.push(mark.attrs.href);
+      }
+      return value;
+    });
+    return hrefs;
+  }
+
   function selectAllOf(text: string) {
     const editor = createTestEditor(undefined, {
       type: 'doc',
@@ -221,7 +233,32 @@ describe('behavioural options that spec §2 constrains', () => {
     editor.destroy();
   });
 
-  it('leaves a URL pasted over a selection as literal text', () => {
+  /**
+   * Replicates `doPaste` from prosemirror-view@1.42.3 in full: consult
+   * `handlePaste` first, and if it declines, dispatch the replacement with
+   * `.setMeta('paste', true).setMeta('uiEvent', 'paste')`.
+   *
+   * BOTH HALVES ARE LOAD-BEARING and the second is the one an earlier version
+   * of this test omitted. `handlePaste` is a synchronous prop; paste RULES run
+   * from `pasteRulesPlugin`'s `appendTransaction`, gated on that `uiEvent`
+   * meta, which `doPaste` sets only AFTER `handlePaste` declines. A test that
+   * calls `someProp('handlePaste')` alone therefore cannot observe a paste
+   * rule at all — it will report "no link was created" no matter what the
+   * product does on that same keystroke.
+   */
+  function pasteInto(editor: ReturnType<typeof createTestEditor>, text: string): void {
+    const { view } = editor;
+    const slice = new Slice(Fragment.from(view.state.schema.text(text)), 0, 0);
+    const handled = view.someProp('handlePaste', (handler) =>
+      handler(view, new Event('paste') as ClipboardEvent, slice),
+    );
+    if (handled) return;
+    view.dispatch(
+      view.state.tr.replaceSelection(slice).setMeta('paste', true).setMeta('uiEvent', 'paste'),
+    );
+  }
+
+  it('declines the paste in handlePaste — the linkOnPaste path really is shut', () => {
     const editor = selectAllOf('the portal');
     const { view } = editor;
     const slice = new Slice(Fragment.from(view.state.schema.text(PASTED_URL)), 0, 0);
@@ -229,8 +266,70 @@ describe('behavioural options that spec §2 constrains', () => {
       handler(view, new Event('paste') as ClipboardEvent, slice),
     );
     expect(handled).toBeFalsy();
-    expect(JSON.stringify(editor.getJSON())).not.toContain('"link"');
     editor.destroy();
+  });
+
+  /**
+   * DOCUMENTS CURRENT BEHAVIOUR, WHICH SPEC §2 DOES NOT WANT. Pending Task 5
+   * (the escape-suggestion mechanic), which owns this decision.
+   *
+   * This case asserts that a pasted URL DOES become a link, because that is
+   * what the product does. Its predecessor asserted the opposite and passed,
+   * by driving an entry point that structurally cannot see the behaviour —
+   * a green check certifying a property the product does not have, which is
+   * this branch's named defect class with our own name on it.
+   *
+   * `Link.addPasteRules()` returns a plain-URL `markPasteRule`
+   * unconditionally when `markdownLinks` is false, and no option here gates
+   * it. When Task 5 closes this path, this test fails — and that failure is
+   * the notification that the fix landed, which is exactly what it is for.
+   * Flip the expectations then; do not delete the case.
+   */
+  it('CURRENT BEHAVIOUR pending Task 5: a pasted URL becomes a link anyway', () => {
+    const overSelection = selectAllOf('the portal');
+    pasteInto(overSelection, PASTED_URL);
+    expect(linkHrefsIn(overSelection.getJSON())).toEqual([PASTED_URL]);
+    overSelection.destroy();
+
+    // Broader than the round-1 defect: `pasteHandler` returned early on an
+    // empty selection, so this path catches a plain cursor that one missed.
+    const bareCursor = createTestEditor(undefined, emptyDoc());
+    pasteInto(bareCursor, PASTED_URL);
+    expect(linkHrefsIn(bareCursor.getJSON())).toEqual([PASTED_URL]);
+    bareCursor.destroy();
+
+    // And a bare domain acquires a protocol it was never given. The `http`
+    // comes from linkifyjs's own `find()` default inside `findPlainUrls`, not
+    // from Link's `defaultProtocol` option.
+    const bareDomain = createTestEditor(undefined, emptyDoc());
+    pasteInto(bareDomain, 'gst.gov.in');
+    expect(linkHrefsIn(bareDomain.getJSON())).toEqual(['http://gst.gov.in']);
+    bareDomain.destroy();
+  });
+
+  /**
+   * The same path, and the reason Task 5's decision is bigger than links:
+   * five configured extensions register seven paste rules between them
+   * (`bold` 2, `italic` 2, `code` 1, `strike` 1, `link` 1). Also pending
+   * Task 5; also flip rather than delete.
+   */
+  it('CURRENT BEHAVIOUR pending Task 5: pasted markdown syntax becomes marks', () => {
+    for (const [pasted, mark, text] of [
+      ['**due soon**', 'bold', 'due soon'],
+      ['*soon*', 'italic', 'soon'],
+      ['`npm run gst`', 'code', 'npm run gst'],
+      ['~~gone~~', 'strike', 'gone'],
+    ] as const) {
+      const editor = createTestEditor(undefined, emptyDoc());
+      pasteInto(editor, pasted);
+      const json = editor.getJSON() as {
+        content?: Array<{ content?: Array<{ text?: string; marks?: Array<{ type?: string }> }> }>;
+      };
+      const leaf = json.content?.[0]?.content?.[0];
+      expect(leaf?.text, `${pasted} should have lost its delimiters`).toBe(text);
+      expect(leaf?.marks?.[0]?.type, `${pasted} should have become ${mark}`).toBe(mark);
+      editor.destroy();
+    }
   });
 
   it('keeps openOnClick and resizable at the values the schema origin chose', () => {
