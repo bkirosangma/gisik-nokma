@@ -2084,11 +2084,33 @@ question *"does this claim have a referent anywhere in the repo"* — which is t
 cross-plan negative traded in this document. Lane 2 hit it on a sentence claiming a fixture now fails,
 which was false.
 
-**Audited rather than assumed:** every sweep reported in this document this session — `z.unknown()`,
-`?? null`, hand-written ULID regexes, `better-auth` subpaths, `origin`, `submittedEventSchema` embedders,
-`@better-auth/cli` across eleven plans — used `find … | xargs grep` or per-file enumeration. The clean
-negatives stand. **Any negative arrived at by `grep -r <dir>` returning empty should be re-run before it
-is relied on.**
+**The technique alone is not the fix, and Lane 4 supplied the part that is: run a POSITIVE CONTROL.**
+Search for something you *know* is present, in the same directory, with the same invocation. That
+converts *"I found nothing"* into *"the instrument works and found nothing."* Without it, `find | xargs`
+is just a different way to get an unverified empty.
+
+**Lane 4's near-miss is the argument.** Its `process.env` sweep with a bare `grep -rn` over two
+directories returned nothing; redone with `find | xargs` it found **two files — and those two files are
+what exposed Plan 11's `check:env` gate as vacuous.** Had it trusted the empty result, it would have
+concluded the codebase reads no environment variables at all and shipped the plan's broken checker
+unchanged. So the failure mode is worse than missing a hit: **an empty result can look like confirmation
+of the very thing you are investigating.**
+
+> **An empty result without a positive control is not evidence of absence.** The control costs one
+> command.
+
+**Audited under that standard, not merely by technique.** Every sweep reported in this document this
+session used `find … | xargs grep` or per-file enumeration, and the pure-negative ones have now been
+re-run with positive controls beside them:
+
+| Negative claimed | Positive control, same invocation | Result |
+|---|---|---|
+| `@better-auth/cli` absent from Plan 11 and nine others | `ticket` across the same plan files → 104 / 23 / 301 hits | control passes; negative **stands** (only Plan 4 and this doc) |
+| No `origin` validation in `apps/server/src` + `packages/` | `workspaceId` over the same file set → 28 files | control passes; negative **stands** (0) |
+| `submittedEventSchema` absent from Plan 6 | `makeSubmittedFactory` in Plan 6 → 18 hits | control passes; negative **stands** (0) |
+
+The remaining sweeps (`z.unknown()`, `?? null`, hand-spelled ULID regexes, `better-auth` subpaths,
+schema embedders) **returned hits**, and a sweep that returns hits validates its own instrument.
 
 ### The prose is the deliverable, so run the sentence
 
