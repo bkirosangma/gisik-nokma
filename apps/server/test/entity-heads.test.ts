@@ -43,6 +43,7 @@ describe('proj_entity_heads', () => {
     await expect(readEntityHead(db.pool, 'workspace', base.entity.id)).resolves.toEqual({
       kind: 'workspace',
       id: base.entity.id,
+      workspaceId: base.workspaceId,
       headSeq: 2,
       headEventId: renameId,
       headEventType: 'workspace.renamed',
@@ -81,6 +82,9 @@ describe('proj_entity_heads', () => {
 
   it('buildProjectionRegistry registers exactly the known projections', () => {
     const registry = buildProjectionRegistry();
-    expect(registry.all().map((projection) => projection.name)).toEqual(['proj_entity_heads']);
+    expect(registry.all().map((projection) => projection.name)).toEqual([
+      'proj_entity_heads',
+      'proj_workflows',
+    ]);
   });
 });

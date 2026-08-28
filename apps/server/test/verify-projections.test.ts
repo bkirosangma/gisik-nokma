@@ -4,7 +4,7 @@ import { createIngestService } from '../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../src/projections/index.js';
 import { formatReport, verifyProjections } from '../src/tools/verify-projections.js';
 import { createTestDatabase, type TestDatabase } from './helpers/db.js';
-import { submittedWorkspaceCreated } from './helpers/events.js';
+import { submittedWorkflowDefined, submittedWorkspaceCreated } from './helpers/events.js';
 
 let db: TestDatabase;
 
@@ -15,10 +15,15 @@ beforeAll(async () => {
     evaluate: evaluateEvent,
     projections: buildProjectionRegistry(),
   });
+  const home = submittedWorkspaceCreated();
   const results = await ingest.ingestBatch([
+    home,
     submittedWorkspaceCreated(),
-    submittedWorkspaceCreated(),
-    submittedWorkspaceCreated(),
+    // A workflow, so proj_workflows is not verified empty. Its definition
+    // column is jsonb and not json exactly so the shadow-rebuild diff can
+    // compare rows at all — json has no equality operator, and a projection
+    // the verifier only ever meets with zero rows would never have said so.
+    submittedWorkflowDefined(home.workspaceId),
   ]);
   if (results.some((result) => result.status !== 'committed')) {
     throw new Error('seeding failed — verifier tests need an honest baseline');

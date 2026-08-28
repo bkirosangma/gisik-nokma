@@ -8,6 +8,7 @@ import type { EntityKind } from './envelope.js';
 export type EntityHead = {
   kind: EntityKind;
   id: string;
+  workspaceId: string;    // the workspace of the head event; ingest refuses any event naming a different one
   headSeq: number;        // seq of the newest committed event for this entity
   headEventId: string;
   headEventType: string;

@@ -17,6 +17,7 @@ import {
   nextWorkspaceSeq,
   type LedgerEvent,
 } from '../ledger/event-store.js';
+import { readEntityHead } from '../projections/entity-heads.js';
 import type { ProjectionRegistry } from '../projections/registry.js';
 
 export type IngestErrorCode = EnvelopeErrorCode | 'duplicate-event-id';
@@ -88,6 +89,38 @@ export function createIngestService(deps: IngestDeps): IngestService {
       const seq = await nextSeq(client, submitted.entity.kind, submitted.entity.id);
       const serverTime = now().toISOString();
       const envelope: LedgerEvent = { ...submitted, serverTime, seq, workspaceSeq };
+
+      // An entity belongs to one workspace. Nothing before this point says so:
+      // the envelope carries workspaceId per event, so a second event on the
+      // same entity naming a different workspace parses cleanly and commits,
+      // and the head row's workspace_id — the tenant boundary every scoped read
+      // trusts — flips with it. The ledger is append-only, so a mis-filed event
+      // can never be taken back, only superseded (coordination doc §11).
+      //
+      // Placed after lockWorkspace + lockEntity and before deps.evaluate: the
+      // entity lock is what makes the read race-safe under READ COMMITTED (any
+      // concurrent ingest for this entity has already committed or is still
+      // waiting), and refusing before the engine keeps the rules judging only
+      // events that are honestly about this entity.
+      //
+      // This is a SERVER-SIDE refusal, deliberately not an engine rule, and it
+      // is not in the shared fixture suite. Client replicas are workspace-
+      // scoped: a replica holds one workspace's events and cannot see that an
+      // entity id is already bound elsewhere, so an engine check would make
+      // client and server disagree by construction — the same argument that
+      // settled the state-mapping occupancy question. Plan 10's offline replica
+      // therefore mirrors this KNOWINGLY, as a server-only door, rather than
+      // finding it in the fixtures.
+      const head = await readEntityHead(client, envelope.entity.kind, envelope.entity.id);
+      if (head !== null && head.workspaceId !== envelope.workspaceId) {
+        await client.query('ROLLBACK');
+        return {
+          status: 'refused',
+          eventId: envelope.id,
+          rule: 'entity-workspace-mismatch',
+          reason: `This ${envelope.entity.kind} belongs to workspace ${head.workspaceId}; this event files it under workspace ${envelope.workspaceId}. An entity cannot move between workspaces.`,
+        };
+      }
 
       const verdict = await deps.evaluate(envelope, createEngineContext(client));
       if (verdict.refused) {

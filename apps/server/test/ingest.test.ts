@@ -128,6 +128,117 @@ describe('ingestBatch', () => {
     expect(ledger.rows[0]).toEqual({ n: 0 });
   });
 
+  it('planted defect: the version rule is judged against proj_workflows, not against a stub', async () => {
+    // createEngineContext.getWorkflowDef used to return null unconditionally,
+    // and every test above stays green with it back: they publish version 1
+    // only, which a null answer accepts. So this is the test that holds the
+    // wiring — the projection is read through the ingest transaction's own
+    // client, which is the only way a publish can be judged against every
+    // version committed before it and none of itself.
+    //
+    // Version 2 committing proves the read finds version 1. The second version
+    // 2 proves what it FOUND: a stubbed null would refuse it too, but with
+    // "the first published version must be version 1", so the reason is the
+    // assertion that tells the two worlds apart.
+    const ingest = service();
+    const home = submittedWorkspaceCreated();
+    const v1 = submittedWorkflowDefined(home.workspaceId);
+    const republish = (version: number) => ({
+      ...v1,
+      id: newUlid(),
+      payload: {
+        id: v1.entity.id,
+        version,
+        name: 'Basic',
+        initialStateId: 'todo',
+        states: [
+          { id: 'todo', name: 'To do', category: 'open' },
+          { id: 'done', name: 'Done', category: 'terminal' },
+        ],
+        transitions: [{ from: 'todo', to: 'done', rules: [] }],
+      },
+    });
+
+    const opening = await ingest.ingestBatch([home, v1, republish(2)]);
+    expect(opening.map((result) => result.status)).toEqual(['committed', 'committed', 'committed']);
+
+    const stale = republish(2);
+    const results = await ingest.ingestBatch([stale]);
+
+    expect(results[0]).toEqual({
+      status: 'refused',
+      eventId: stale.id,
+      rule: 'workflow-version',
+      reason: 'Workflow "Basic" is at version 2; the next published version must be 3, not 2.',
+    });
+  });
+
+  it('planted defect: an entity already bound to one workspace cannot be re-filed under another', async () => {
+    // The other half of coordination doc §11. `workspaceId` is a per-event
+    // claim that nothing validated: a second event on this entity naming a
+    // different workspace parsed cleanly and committed, splitting the entity's
+    // history across two streams — a client resuming workspace A's cursor
+    // never sees the event filed under B — and flipping
+    // proj_entity_heads.workspace_id, the tenant boundary every scoped read
+    // trusts, because the head advance's ON CONFLICT overwrites it. The ledger
+    // is append-only by trigger, so a mis-filed event can never be taken back.
+    //
+    // This is a SERVER-side refusal, deliberately not an engine rule, so it has
+    // no shared fixture: a client replica holds one workspace's events and
+    // cannot see that an entity id is already bound elsewhere, so an engine
+    // check would make client and server disagree by construction. Plan 10's
+    // offline replica mirrors this KNOWINGLY, as a server-only door.
+    //
+    // The re-filed event is a LEGAL version 2, not a repeat of version 1. The
+    // version rule reads proj_workflows by workflow_id alone — no workspace
+    // scope — so without this door the event passes every engine rule, commits,
+    // and flips the head row. A repeat v1 would be refused by the version rule
+    // instead, and this test would stay green with the door taken out.
+    const ingest = service();
+    const home = submittedWorkspaceCreated();
+    const first = submittedWorkflowDefined(home.workspaceId);
+    const opening = await ingest.ingestBatch([home, first]);
+    expect(opening.map((result) => result.status)).toEqual(['committed', 'committed']);
+
+    const otherWorkspaceId = newUlid();
+    const reFiled = {
+      ...first,
+      id: newUlid(),
+      workspaceId: otherWorkspaceId,
+      payload: {
+        id: first.entity.id,
+        version: 2,
+        name: 'Basic',
+        initialStateId: 'todo',
+        states: [
+          { id: 'todo', name: 'To do', category: 'open' },
+          { id: 'done', name: 'Done', category: 'terminal' },
+        ],
+        transitions: [{ from: 'todo', to: 'done', rules: [] }],
+      },
+    };
+
+    const results = await ingest.ingestBatch([reFiled]);
+
+    expect(results[0]).toEqual({
+      status: 'refused',
+      eventId: reFiled.id,
+      rule: 'entity-workspace-mismatch',
+      reason:
+        `This workflow belongs to workspace ${home.workspaceId}; ` +
+        `this event files it under workspace ${otherWorkspaceId}. ` +
+        'An entity cannot move between workspaces.',
+    });
+    // The head row did NOT flip: the workflow still belongs where it was born.
+    const head = await db.pool.query<{ workspace_id: string }>(
+      'SELECT workspace_id FROM proj_entity_heads WHERE entity_kind = $1 AND entity_id = $2',
+      ['workflow', first.entity.id],
+    );
+    expect(head.rows).toEqual([{ workspace_id: home.workspaceId }]);
+    const ledger = await db.pool.query('SELECT count(*)::int AS n FROM events WHERE id = $1', [reFiled.id]);
+    expect(ledger.rows[0]).toEqual({ n: 0 });
+  });
+
   it('assigns consecutive seqs to one entity across batches', async () => {
     const ingest = service();
     const base = submittedWorkspaceCreated();

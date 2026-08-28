@@ -46,8 +46,13 @@ export async function readEntityHead(
   kind: EntityKind,
   id: string,
 ): Promise<EntityHead | null> {
-  const result = await client.query<{ head_seq: number; head_event_id: string; head_event_type: string }>(
-    'SELECT head_seq, head_event_id, head_event_type FROM proj_entity_heads WHERE entity_kind = $1 AND entity_id = $2',
+  const result = await client.query<{
+    workspace_id: string;
+    head_seq: number;
+    head_event_id: string;
+    head_event_type: string;
+  }>(
+    'SELECT workspace_id, head_seq, head_event_id, head_event_type FROM proj_entity_heads WHERE entity_kind = $1 AND entity_id = $2',
     [kind, id],
   );
   const row = result.rows[0];
@@ -57,6 +62,7 @@ export async function readEntityHead(
   return {
     kind,
     id,
+    workspaceId: row.workspace_id,
     headSeq: row.head_seq,
     headEventId: row.head_event_id,
     headEventType: row.head_event_type,

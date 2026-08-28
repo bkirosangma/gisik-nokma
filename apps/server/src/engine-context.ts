@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import type { EntityState } from '@gisik-nokma/domain';
 import type { EngineContext } from '@gisik-nokma/rule-engine';
 import { readEntityHead } from './projections/entity-heads.js';
+import { getWorkflowDefFromProjection } from './projections/workflows.js';
 
 /**
  * EngineContext over the ingest transaction's client. The event under
@@ -9,11 +10,15 @@ import { readEntityHead } from './projections/entity-heads.js';
  * the previously committed events — which is exactly what rules must judge
  * against.
  *
- * getChildrenStates and getWorkflowDef answer for a world in which no
- * hierarchy or workflow events can exist (their types are not in the Plan-1
- * vocabulary): the empty answers are true answers, not stubs. The plans that
- * introduce ticket hierarchy and workflow.defined replace these bodies with
- * real queries.
+ * getWorkflowDef reads proj_workflows through the ingest transaction's own
+ * client, so a publish sees every version committed before it and none of
+ * itself — which is what the version rule ("the next version must be exactly
+ * one past the latest") has to be judged against.
+ *
+ * getChildrenStates still answers for a world in which no hierarchy events can
+ * exist (ticket types are not yet in the vocabulary): the empty answer is a
+ * true answer, not a stub. The plan that introduces ticket hierarchy replaces
+ * that body with a real query.
  */
 export function createEngineContext(client: PoolClient): EngineContext {
   return {
@@ -43,9 +48,7 @@ export function createEngineContext(client: PoolClient): EngineContext {
       return [];
     },
     async getWorkflowDef(workflowId, version) {
-      void workflowId;
-      void version;
-      return null;
+      return await getWorkflowDefFromProjection(client, workflowId, version);
     },
   };
 }
