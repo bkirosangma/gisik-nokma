@@ -1004,21 +1004,39 @@ times, so Plan 11 cannot own the risk of it being *added*.
   regress.** (Lane 4's formulation, and a better check than the one the original framing would have
   produced.)
 
-  **Write that assertion against the lockfile FILE, never against install output.** Lane 2 found that
-  `pnpm` prints no peer warnings at all under `--frozen-lockfile` — resolution is skipped entirely — so a
-  check that greps the install's *output* inside a Docker build reads clean **for the wrong reason**, and
-  reads clean forever. Same shape as everything else in this section: the easy check confirms the command
+  **Write that assertion against the lockfile FILE, never against install output.** Lane 2 observed that
+  the peer warning it was tracking **was not printed** under `--frozen-lockfile` (its sources say "the
+  peer warning", about the specific `better-call`/zod one — the general claim that pnpm prints *no* peer
+  warnings under frozen installs is **not** independently verified here and should not be relied on
+  beyond the observed case). Either way the conclusion holds and does not depend on the general form: a
+  check that greps the install's *output* inside a Docker build can read clean **for a reason unrelated
+  to what it asserts**, and would then read clean forever. Same shape as everything else in this section: the easy check confirms the command
   ran, not that it looked where the answer is.
 
-**State of the ban as of 2026-08-28, verified rather than assumed** (the controller asserted the opposite
-and was corrected): `@better-auth/cli` is in **no** lockfile and **no** `package.json` — Step 1's install
-was never executed, because Lane 2's implementer discovered the version pin while evaluating the tool and
-declined to install it. So the check above passes today, and is worth writing precisely because "never
-installed" is a fact about today that nothing currently enforces. Line 403 is killed by `auth:schema`;
-line 299's comment is the last live reference and is being fixed — it names
-`pnpm exec better-auth generate`, **a command that does not exist**, since the `generate` bin ships in
-the CLI package rather than the library. A dead precondition asserted in the one place a maintainer looks
-to learn what that instance is for.
+**State of the ban as of 2026-08-28, and the history is the load-bearing half.** Current state:
+`@better-auth/cli` is in **no** lockfile and **no** `package.json`. But it was **not** "never installed"
+— an earlier draft of this section said so, and that erased the fact that justifies the check.
+
+What actually happened, from Lane 2's T1 report: the CLI **was** installed and run (`generate --config`
+executed successfully), its output was found wrong for the installed library, and it was removed. **And
+`pnpm remove` did not clean the lockfile.** The CLI's optional peers stayed baked in as resolution keys —
+`better-auth@1.7.2(@prisma/client@5.22.0)(better-sqlite3@12.11.1)(pg…)` — so a `--frozen-lockfile` CI
+install would still have fetched prisma and compiled a native `better-sqlite3`, dragging ~150 packages
+into every image, to support a tool nobody was using. The lockfile had to be **reset to `HEAD` and
+re-resolved from `package.json`** before it was actually clean.
+
+**That is the whole argument for Lane 4's check, and "we removed it" is not evidence the lockfile is
+clean.** A lane that later adds a banned package, runs `pnpm remove`, and trusts the removal will ship
+the residue. The assertion against the lockfile file is what catches it; nothing else in the pipeline
+would.
+
+Line 403 is killed by `auth:schema`. **Two distinct artifacts carried the comment problem and an earlier
+draft merged them into one sentence**: plan-4 line 299 is *plan text* reading "Concrete instance for
+`npx @better-auth/cli generate` and local dev", while the *shipped* `apps/server/src/auth/auth-dev.ts:7`
+carried a different variant naming `pnpm exec better-auth generate` — a command that never existed, since
+the `generate` bin ships in the CLI package under the name `better-auth`, not in the library. Lane 2 has
+since fixed the shipped file; it now names `auth:schema`. The plan line stands as plan text and is void
+along with the other two.
 
 **DO NOT TIDY: `auth-schema.ts:11` and `auth-tables.test.ts:64` stay.** They reference
 `@better-auth/cli` in order to explain *why it is banned*, which means they look exactly like the stale
@@ -1116,21 +1134,33 @@ resolving, every named export present, every binding form correct.
 ### The controller's own failure class, named by the lanes that kept catching it
 
 Recorded because it is a property of this role rather than of one session, and the next controller
-inherits it. Across a full day of cross-lane work, **every correction to the controller's claims was an
-ownership or location claim — never a technical one.** The specifier table, the payload shapes, the
-append-only trigger names, the exact fix for Plan 6 line 7887: all correct. What kept slipping was
-*which plan owns a thing* and *which line does it* — `schedule.ts` mistaken for the verifier's,
+inherits it. Across a full day of cross-lane work, the corrections that reached the controller were
+**overwhelmingly ownership and location claims** — which plan owns a thing, which line does it,
+which task it sits in. The specifier table, the payload shapes, the append-only trigger names, the exact
+fix for Plan 6 line 7887: all correct. What kept slipping was `schedule.ts` mistaken for the verifier's,
 `CONTEST_EVENT_TYPES` filed under the wrong task, the CLI ban addressed to the wrong plan, a rule's
 example attached to a vocabulary that does not reach the ledger.
+
+**An earlier draft of this paragraph said "every … never a technical one", and the same commit series
+falsified it.** The "never installed" claim corrected above is neither ownership nor location — it is a
+claim about **repo state and history**, and it carried this section's strongest confidence marker while
+being contradicted by a primary source in the very lane it credited. Worse, the rule drawn from it did
+not cover it: **a grep proves current absence, and current absence is exactly compatible with
+installed-then-removed.** The evidence for "never installed" is git history, not a grep — so the guard as
+first written would have passed the claim it needed to catch. A section warning against overreach that
+closes on an overreach is the day's own lesson arriving one more time.
 
 Lane 4's diagnosis is the useful part: **that is the class where plan text and repo diverge fastest under
 parallel execution, and it is also the cheapest class to check** — one grep answers it — which is
 presumably why it keeps getting asserted instead. A controller synthesising across eleven plans it has
 not read end-to-end is structurally most confident exactly where it is least entitled to be.
 
-**So the rule the controller runs under, stricter than the one it gives the lanes:** a claim about *who
-owns* something or *where* it lives ships with the grep that proves it, or it ships as a question. The
-technical claims were already surviving review; these are the ones that were not.
+**So the rule the controller runs under, stricter than the one it gives the lanes, and widened by the
+failure that escaped its first form:** any claim about repo **state or history** — who owns a thing,
+where it lives, *and whether something ever happened* — ships with the artifact that proves it, or it
+ships as a question. With the discriminator that first form missed: **absence now does not establish
+never-present.** A grep answers "is it here"; only history answers "was it ever". The technical claims
+were already surviving review; this class is the one that was not.
 
 ### The one shape under all of it
 
