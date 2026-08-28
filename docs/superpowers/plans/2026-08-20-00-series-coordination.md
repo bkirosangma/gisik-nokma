@@ -1731,9 +1731,21 @@ enforced.
 `ticket-state.ts:201`. So a fixture omitting `value` is accepted by the harness, records the identical
 fabricated null clearing claim, and therefore **agrees with production while both are wrong together.**
 That is "a fixture that agrees with the implementation without constraining it" in its purest form, and
-it is why the fix order is a floor rather than a convenience: **T7 fixes `ticket-events.ts:33` and proves
-it with unit tests** (which do not run through the harness and so are capable of failing), and **T8 fixes
-the harness pair before authoring any fixture meant to prove door behaviour.**
+it is why the fix order matters.
+
+**The floor is narrower than first stated here, and Lane 1 checked rather than reasoned.**
+`fixtures.test.ts:19` is `evaluateEvent(completeCandidate(fx), buildInMemoryContext(fx))`, and
+`applyPriorEvent` (`harness.ts:201`, called from `:170`) handles **priors only**. So a **candidate-position**
+event is judged by the **real domain schema** and never by a harness payload schema — a fixture whose
+candidate is a `ticket.field_set` omitting `value` *can* prove T7's matrix today, because it reaches
+`checkTicketFieldSet` and the production door. The harness schemas gate **prior-event staging**, and that
+is where looseness actually bites: a prior can stage a world the real server could not have produced.
+
+So "a fixture cannot be the thing that proves the fix" is **true for prior-position and false for
+candidate-position**. The harness fix is still required on its own terms — a prior door looser than the
+real door is a defect regardless — but it does **not** block T7's end-to-end proof. **T7** fixes
+`ticket-events.ts:33` and proves it with unit tests *and* a candidate-position fixture; **T8** fixes the
+harness pair for the prior-staging reason, not as a precondition.
 
 **The mutation must kill the right case.** Revert to bare `z.unknown()` and watch the **absent** case fail
 specifically. A mutation that only kills present-but-`undefined` has proven a side effect of the fix
@@ -1766,9 +1778,36 @@ while the shipped `ticketCreatedPayload` (`ticket-events.ts:19`) declares `paren
 — **required, not optional.** So a fixture may omit `parentId` and be accepted, where a real event
 omitting it is refused at the door. Independent of `z.unknown()`, same consequence: the fixture door is
 looser than the door it stands in for, so a fixture cannot witness a refusal the real door would make.
-Three such divergences are now known (`harness.ts:32`, `:155`, `:140`), all in one file, all Lane 1's at
-T8. **Worth a deliberate pass rather than three point fixes: the question is not "is this line loose" but
-"where else does the harness schema disagree with the domain schema it mirrors."**
+Lane 1 then ran the deliberate pass this argued for, over all eleven mirrored fields, and found a
+**fourth** presence defect plus the discriminator that sorts the whole class.
+
+**`ticketCreatedFixturePayloadSchema` omits `typeId`, `projectId` and `title` entirely**, while all three
+are required in `ticketCreatedPayload` (`ticket-events.ts:17,18,20`). Worse, the existing instruction to
+T8 said to add them as **optional** keys — which would have reproduced the `parentId` presence defect
+three more times *in the act of fixing something else*. Corrected: they land **required**.
+
+#### The rule that sorts harness-versus-domain divergence in one pass
+
+> **A harness schema may diverge from its domain twin in VALUE FORMAT. It may not diverge in PRESENCE.**
+
+Format divergence is deliberate and load-bearing: fixtures use `t1`/`ws_1` because they enter at
+`evaluateEvent` and never pass `parseEvent`'s door, and tightening `z.string()` to `ulidString` would
+invalidate all 62 shipped fixtures for no gain. **Presence divergence has no purpose at all** — it only
+lets a fixture stage a prior state the real door would refuse. That settles the
+`ulidString`-versus-`z.string()` axis raised earlier: **format, therefore deliberate, therefore keep.**
+
+Applied across eleven mirrored fields without running anything: **four presence defects** (`parentId`
+optional; `typeId`/`projectId`/`title` absent; the partial envelope's `payload`; `ticketFieldSet.value`),
+**three deliberate format divergences** (assignee `min(1)`, rebound `min(1)`, short ids), **three
+deliberate harness-only affordances** (`workflowId`, the `stateId`/`stateCategory` planting overrides,
+the `field`/`fieldId` split), and **one schema still to be added** — `ticketReparented`, which must mirror
+presence as required-nullable rather than optional.
+
+**And the `?? null` discriminator prevents an over-correction inside this fix.** A T8 implementer
+tightening presence could easily "fix" `harness.ts:226`/`:231` into refusals. It must not: a ticket
+created with no parent *is* a root ticket, one with no assignee *is* unassigned. Only `value` is an act.
+The two rules are twins and are needed together — **presence, not format** decides what to tighten;
+**act, not default** decides where `?? null` is a fabrication.
 
 #### The positional rule, so a reader knows which grep hits to open
 
