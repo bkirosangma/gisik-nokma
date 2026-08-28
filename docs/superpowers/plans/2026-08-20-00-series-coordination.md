@@ -1684,6 +1684,46 @@ than the fix is worth — and Lane 4 declining to touch the file, despite alread
 and holding the finding, is the same discipline working from the other side. **A must-not-touch list that
 holds when the fix is small and the fixer is right there is the list doing its job, not a gap in it.**
 
+### The sweep was scoped to the wrong question — `z.unknown()` is a type assertion, not a presence assertion
+
+The sweep above asked *"who embeds `submittedEventSchema`?"* That is narrower than the defect. Lane 1
+asked the right question — *"where is `z.unknown()` used at all?"* — and found a second instance. Widening
+it again, across `packages/` **and** `apps/` rather than `packages/domain/src`, found two more. **Five
+sites, four of them the defect:**
+
+| Site | Shape | Verdict |
+|---|---|---|
+| `packages/domain/src/envelope.ts:78` | `payload: z.unknown()` | **defect** — routed to Lane 2 with Plan 4 T3 |
+| `packages/domain/src/events/ticket-events.ts:33` | `ticketFieldSetPayload.value` | **defect, and the worst of them** — see below |
+| `packages/rule-engine/src/fixtures/harness.ts:32` | the fixture envelope's `payload` | **defect** — the fixture door has the same hole as the real one |
+| `packages/rule-engine/src/fixtures/harness.ts:155` | `ticketFieldSetFixturePayloadSchema.value` | **defect** — exact twin of the `ticket-events` one |
+| `packages/domain/src/events/ticket-events.ts:38` | `commentAddedPayload.body: z.record(z.string(), z.unknown())` | **cleared** — the record itself is required; only its values are unconstrained |
+
+**The `ticketFieldSetPayload` instance fabricates a claim rather than dropping one, which is worse.**
+Plan 3's reducer does `claim(p.value ?? null, env)` (`ticket-state.ts:201`, brief-mandated). So an omitted
+`value` does not go missing — it **records a null clearing claim nobody made**, wiping a field under
+someone's name and both their clocks, into an append-only table. That is spec invariant 4 ("nothing is
+invented") violated *by the door* rather than by a renderer. `title` is masked by the follow-on
+`field.title-required`; every other field clears silently. Lane 4's instance wrote a literal `undefined`
+into permanent storage; this one writes an **attributed erasure**.
+
+**The two harness instances matter for a reason of their own.** That harness is what all 61 fixtures run
+through, so **the fixture door is currently exactly as loose as the production door** — which means no
+fixture can witness the difference between them. A falsifiability substrate that shares the defect it is
+meant to catch cannot catch it. Lane 1 owns both (it authors fixtures through that harness at T8).
+
+**The class, stated once:** `z.unknown()` says *this value may be anything*. It does **not** say *this
+value is present*. Any schema meaning "some value, contents unconstrained" must state presence
+separately. The grep is one line — `grep -rn 'z\.unknown()' packages/ apps/` — and worth running
+wherever a payload schema is authored.
+
+**All four defects take the same four-case matrix**, so the doors answer alike instead of diverging by a
+hair: absent refused, present-but-`undefined` refused, `null` accepted, `{}` accepted. Lane 1 is pinning
+its T7 to it explicitly and citing the envelope matrix as the precedent it matches. For `ticketFieldSet`
+it also lands cleanly on Plan 3's design decision 3, which already sanctions `value: null` as an explicit
+clearing claim with provenance retained — so the matrix is not a new rule there, it is the existing one
+enforced.
+
 ### Byte-identical instructions target the repo file, not the plan text
 
 Recorded by Lane 4 against its own two partitions, and general. Plan 6 T6's precondition says to create
