@@ -1,0 +1,29 @@
+{
+  "name": "four-eyes: a second person may approve",
+  "workflowDefs": [
+    {
+      "id": "wf_review", "version": 1, "name": "Review", "initialStateId": "draft",
+      "states": [
+        { "id": "draft", "name": "Draft", "category": "open" },
+        { "id": "review", "name": "In review", "category": "active" },
+        { "id": "approved", "name": "Approved", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "draft", "to": "review", "rules": [] },
+        { "from": "review", "to": "draft", "rules": [] },
+        { "from": "review", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "review" } } ] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_review" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "review" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_b",
+    "payload": { "to": "approved" }
+  },
+  "expected": { "refused": false }
+}

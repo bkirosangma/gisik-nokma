@@ -1,0 +1,41 @@
+{
+  "name": "four-eyes ignores a log entry recorded under a workflow the ticket has since been migrated off",
+  "workflowDefs": [
+    {
+      "id": "wf_intake", "version": 1, "name": "Intake", "initialStateId": "new",
+      "states": [
+        { "id": "new", "name": "New", "category": "open" },
+        { "id": "review", "name": "With the requester", "category": "active" }
+      ],
+      "transitions": [
+        { "from": "new", "to": "review", "rules": [] },
+        { "from": "review", "to": "new", "rules": [] }
+      ]
+    },
+    {
+      "id": "wf_review", "version": 1, "name": "Review", "initialStateId": "draft",
+      "states": [
+        { "id": "draft", "name": "Draft", "category": "open" },
+        { "id": "review", "name": "In review", "category": "active" },
+        { "id": "approved", "name": "Approved", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "draft", "to": "review", "rules": [] },
+        { "from": "review", "to": "draft", "rules": [] },
+        { "from": "review", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "review" } } ] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_intake" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "review" } },
+    { "type": "ticket.workflow_rebound", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_admin", "payload": { "toWorkflowId": "wf_review", "toStateId": "review" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_a",
+    "payload": { "to": "approved" }
+  },
+  "expected": { "refused": false }
+}

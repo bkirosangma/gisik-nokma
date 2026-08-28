@@ -1,5 +1,6 @@
 import type { Rule } from '@gisik-nokma/domain';
 import { evaluateRequireComment } from './require-comment.js';
+import { evaluateRequireDifferentUser } from './require-different-user.js';
 import { evaluateRequireEvidence } from './require-evidence.js';
 import { evaluateRequireField } from './require-field.js';
 import { evaluateRestrictTo } from './restrict-to.js';
@@ -37,6 +38,6 @@ async function evaluateOneRule(rule: Rule, input: TransitionRuleInput): Promise<
     case 'require-field':
       return evaluateRequireField(rule, input);
     case 'require-different-user':
-      throw new Error('rule kind "require-different-user" is not implemented yet');
+      return evaluateRequireDifferentUser(rule, input);
   }
 }

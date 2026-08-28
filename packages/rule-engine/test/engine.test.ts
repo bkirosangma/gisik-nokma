@@ -623,6 +623,56 @@ describe("restrict-to's membership kind-check, and what no well-typed fixture ca
 });
 
 /**
+ * Task 11 controller obligation, carried forward from Task 10: restrict-to
+ * renders three lists, and only two of them are falsifiable through the
+ * fixture suite. `allowed.join(', or ')` is pinned by
+ * rule-restrict-to-refuses-when-no-criterion-matches.json (two criteria) and
+ * `userIds.join(', ')` by rule-restrict-to-refuses-unlisted-user.json (two
+ * ids) — but every fixture that names a role names exactly ONE, and a
+ * one-element join renders identically under any separator whatsoever. The
+ * `' or '` in `rule.roles.join(' or ')` was therefore unpinned: swapping it
+ * for `', '`, `' and '`, or `''` left all ten Task 10 fixtures green. Two
+ * roles is the smallest input that can tell them apart, and the wording
+ * matters — "admin or owner" tells a reader either role suffices, which is
+ * exactly restrict-to's OR semantics; "admin and owner" would describe a
+ * conjunction the rule does not implement. A unit test rather than an
+ * eleventh fixture, per the standing count-neutral ruling (fixture count
+ * stays 59, gate stays 59): this pins a rendering, not a new behaviour.
+ */
+describe("restrict-to's role list joins with ' or ', which no single-role fixture can witness", () => {
+  it('names both allowed roles in one OR-phrase when the rule carries two', async () => {
+    const parent = ticket({ id: 't1', stateId: 'todo', stateCategory: 'open', workflowId: 'wf_two_rules' });
+    // No membership at all: the role branch cannot short-circuit into an
+    // acceptance, so the rendered `allowed` phrase reaches the refusal.
+    const { ctx } = spyContext(null, { entity: null });
+    const env = envelope({
+      type: 'ticket.transitioned',
+      entity: { kind: 'ticket', id: 't1' },
+      payload: { to: 'done' },
+      actorId: 'user_a',
+    });
+    const input: TransitionRuleInput = {
+      env,
+      ctx,
+      ticket: parent,
+      def: twoRulesV1,
+      toState: twoRulesV1.states.find((state) => state.id === 'done')!,
+      fromStateId: 'todo',
+      payload: { to: 'done' },
+    };
+    const verdict = await evaluateTransitionRules([{ kind: 'restrict-to', roles: ['admin', 'owner'] }], input);
+    // Character-for-character: the separator between the two roles is the
+    // whole point, and the surrounding sentence is asserted with it so a
+    // rewording cannot slip past under cover of the separator check.
+    expect(verdict).toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.restrictTo,
+      reason: 'Only anyone with the role admin or owner may make this move, and user_a is not among them.',
+    });
+  });
+});
+
+/**
  * Task 9's require-field and require-evidence each have a blank-value branch
  * no fixture witnesses (task-9-report.md, Falsifiability): the six Task 9
  * fixtures only ever leave a value unset or set it to a genuine one, never

@@ -1,0 +1,47 @@
+{
+  "name": "four-eyes survives a state being dropped and remapped in a later version",
+  "workflowDefs": [
+    {
+      "id": "wf_review", "version": 1, "name": "Review", "initialStateId": "draft",
+      "states": [
+        { "id": "draft", "name": "Draft", "category": "open" },
+        { "id": "review", "name": "In review", "category": "active" },
+        { "id": "approved", "name": "Approved", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "draft", "to": "review", "rules": [] },
+        { "from": "review", "to": "draft", "rules": [] },
+        { "from": "review", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "review" } } ] }
+      ]
+    },
+    {
+      "id": "wf_review", "version": 2, "name": "Review", "initialStateId": "draft",
+      "stateMapping": { "review": "checking" },
+      "states": [
+        { "id": "draft", "name": "Draft", "category": "open" },
+        { "id": "checking", "name": "Being checked", "category": "active" },
+        { "id": "approved", "name": "Approved", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "draft", "to": "checking", "rules": [] },
+        { "from": "checking", "to": "draft", "rules": [] },
+        { "from": "checking", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "checking" } } ] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_review", "workflowVersion": 1 } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "review" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_a",
+    "payload": { "to": "approved" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "require-different-user",
+    "reason": "This step needs a second person: user_a already performed the move to \"checking\" on this ticket."
+  }
+}
