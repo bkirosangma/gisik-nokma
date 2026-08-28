@@ -2012,6 +2012,34 @@ the lane checked the identity library's defaults against the door rather than as
 
 That is the same trap recorded twice already (fixture entity ids, seed `actorId`s), now in a third field
 and from a new direction: not a test dialect meeting a real door, but a **third-party library's** default
-meeting it. The general form is worth stating with the others: **anything that mints an id which will
-ride an envelope must be checked against `ULID_REGEX` at the point it is configured** — fixtures,
-seed builders, and identity providers alike.
+meeting it.
+
+**Lane 4's note on why this instance is the worst of the four is worth keeping:** the first three were
+ours to get wrong. This one was a dependency's *default* silently failing to meet a contract nobody had
+thought to check it against — **the only one that no amount of care with our own code would have
+caught.** The check that finds it is not review; it is testing the library's output against our door.
+
+**A fourth instance, and it widens the rule.** Lane 4 found it in code that had already passed a *clean*
+review, and it is not a mint site at all. `newSubmittedEvent` mints correctly via `newUlid()`. The defect
+is the **test**: `packages/domain/test/contest-events.test.ts:162` asserts
+`toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/)` — 26 Crockford characters, **missing the leading `[0-7]`** that
+`ids.ts:9`'s `ULID_REGEX` requires. So it pins *"looks ULID-ish"*, not *"passes the door"*, and an id the
+test accepts while the envelope refuses is expressible. Unreachable in practice — `ulid()`'s first
+character is timestamp-bounded below `8` until the year 10889 — but it is the day's shape again: **a
+check that does not check the property it names.**
+
+**So the rule is not about mint sites; it is about mint sites AND every assertion about a minted id.** A
+hand-written regex approximating `ULID_REGEX` is a **second definition of the format**, and second
+definitions drift silently. That is the same disease as the two copies of `formatIstInstant` the
+byte-identical rule exists to prevent, and as `@better-auth/cli` pinning the 1.4 schema whatever the
+server imports. Stated generally:
+
+> **Where a format has one authority, tests assert through the authority, not alongside it.**
+
+The domain exports `isUlid` (`ids.ts:17`) for exactly this, and asserting through it also means the test
+cannot drift when the door changes.
+
+**Swept, so nobody re-runs it:** across `main` and all four lane worktrees, `packages/` and `apps/`,
+there is **exactly one** hand-written ULID-shaped regex outside `ids.ts` — the one above, which Lane 4 is
+fixing. Everywhere else asserts through the authority or not at all. A clean negative, and evidence that
+the check ran rather than that nobody looked.
