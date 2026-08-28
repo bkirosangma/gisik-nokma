@@ -20,7 +20,7 @@
 | 10 | Offline sync & the apps | `2026-08-20-10-offline-sync-apps.md` | written in parallel |
 | 11 | Deployment & dogfooding | `2026-08-20-11-deployment-dogfooding.md` | written in parallel |
 
-Execution order: 1 → 2 → 3 → 4 → 5, then 6/7/8/9 in parallel, then 10, then 11. Each plan's Interfaces blocks are the contract for its successors. Features.md/test-cases numbering: Plan 5 → §7/`07-api-realtime-search` · 6 → §8/`08-web-client` · 7 → §9/`09-editor-attachments` · 8 → §10/`10-workflow-builder` · 9 → §11/`11-calendar-notifications` · 10 → §12/`12-offline-sync-apps` · 11 → §13/`13-deployment-dogfooding`.
+Execution order: 1 → 2 → 3 → 4 → 5, then 6/7/8/9 in parallel, then 10, then 11 — **superseded for Plans 3–11 by the owner decision of 2026-08-28 (parallel waves), at the end of this document.** Each plan's Interfaces blocks are the contract for its successors. Features.md/test-cases numbering: Plan 5 → §7/`07-api-realtime-search` · 6 → §8/`08-web-client` · 7 → §9/`09-editor-attachments` · 8 → §10/`10-workflow-builder` · 9 → §11/`11-calendar-notifications` · 10 → §12/`12-offline-sync-apps` · 11 → §13/`13-deployment-dogfooding`.
 
 ## Reconciliation decisions
 
@@ -494,3 +494,62 @@ The amendment lands in **the plan that next touches `advise-workflow.ts` — Pla
 2. The silencing behaviour is witnessed in **both** directions: an uncovered wildcard edge warns; a covering one does not.
 3. Wildcard-edge rule *enforcement* gets its first witness. As of 2026-08-28 no fixture in the suite carries a wildcard edge with non-empty rules — the enforcement is structural but unproven. A planted-defect fixture (a wildcard edge carrying `restrict-to`, refused through it) lands with the amendment.
 4. The `wf_rules` fixture definition stops being the unremarked instance: its wildcard edge either gains a covering guard or a comment naming it as the deliberately-warned example once the advisory exists.
+
+## Owner decision (2026-08-28): Plans 3–11 execute in parallel waves
+
+The declared order (3 → 4 → 5 serial, then 6/7/8/9, then 10, then 11) was written at plan granularity. A task-level extraction of all nine remaining plans — nine agents, one per document, every load-bearing claim verified against `main` at `faca8b2` rather than taken from plan text — found that the real gates are narrow, named artifacts, not whole plans. This section is the restructured schedule and the rulings that make it safe. Honest expectation, stated so nobody audits against a number that was never promised: **~3× versus continuing one-plan-at-a-time (how Plans 1–2 actually ran), ~2× versus the declared order if its 6–9 wave would genuinely have run four-wide.** What caps it is not dependency structure but the owner's review bandwidth (3–4 concurrent PR streams), merge churn on shared files, and the per-plan review machinery — all priced below.
+
+### The three findings the schedule stands on
+
+1. **Plan 3 Tasks 1–2 are the keystone.** Pure domain work (ticket type module + event vocabulary, no database). They alone unblock Plan 4's workspace bootstrap (`builtinTicketTypeDefs` + `ticket-type.defined`), ~10 of Plan 8's 15 tasks (everything downstream of `TicketTypeDef`), Plan 5 Task 6's vocabulary shapes, and Plan 7's server gates. They therefore merge to `main` as an early micro-PR the moment they are green — not at Plan 3's end. **Mandatory rider (Plan 1 consequences §9):** registering `ticket.transitioned` opens the Task 2→12 hazard window, and early-merging makes it *worse* than the plan's own serial order — the type becomes ingestible on `main` exactly while Plan 4's lane runs ingest tests against that `main`. The micro-PR carries the recorded remedy **in the same commit**: `engine-context.ts`'s `getEntityState`/`getChildrenStates` return `null` for the kinds they cannot honestly serve, until Plan 3 Task 12 replaces the stubs.
+
+2. **Plan 4 is mostly Plan-3-independent.** Its partition A — better-auth identity (T1), sessions/routes (T2), membership+visibility domain events (T3), `proj_memberships` (T4), the role gate without bootstrap (T5 steps 1–5) plus `simple-kanban.ts`, `proj_visibility` (T6, payloads destructured inline, no Plan 3 import), and `proj_projects` + the honest project-existence refusal (T9 step 3b) — runs on today's `main`. Its Plan 3 needs collapse to exactly two seams: Tasks 1–2 (bootstrap, T13 runtime) and the `proj_tickets`/`proj_rollups` migrations (read paths T7/T8/T9/T10 and test seeding).
+
+3. **The tail is fatter than declared.** Plan 10 needs Plan 5 for *nothing structural* (tests use scripted fake transports; the dual-client rig deliberately bypasses the WS and pipes `visibleEventsFor` straight into `applyServerItem`). Plan 6 splits at the `DataSource` seam: **6a** (ui tokens, the `DataSource` contract + view types, domain guards, claims machinery, all views over the fake source — 12 of 17 units, containing everything Plan 10 consumes) runs on `main` today; only **6b** (online HTTP/WS transport, shell, invite pages, the doors) waits on Plans 4/5. Plan 7's client half (~12 tasks — the whole editor package, Drive picker, evidence picker, RN webview bundle) runs today. Plan 8 needs Plan 5 for **zero** authoring tasks (the fake gateway is the seam and Plan 5 Task 9b serves its pinned interface verbatim). Plan 11's infra scaffold (env contract, alerting, rate limiter, server Dockerfile, backup modules, CI skeleton, DB/DNS provisioning docs, `.env.example` + `check:env` gate) runs today.
+
+### Pre-work — standalone micro-PRs before any lane dispatches
+
+- **The F5 advisory amendment** (§ ruling above). The extraction found it is absorbed by *no* task in any plan — Plan 8 only consumes `adviseWorkflowDef`, never modifies it. It is pure `packages/domain` + fixtures work, executable now; the schedule pulls it forward as its own PR, all four travelling requirements included. "Plan 8 at the latest" stands satisfied early rather than reassigned.
+- **The type hoist** (Plan 1 consequences §10): `LedgerEvent`, `IngestResult`, `IngestErrorCode`, and `ENTITY_WORKSPACE_MISMATCH_RULE` move to `@gisik-nokma/domain` in one PR. Plan 6 T5 and Plan 10's first task each claim half of this; done once here, both claims are discharged and the barrel conflict never happens.
+- **`docToPlainText`** (Plan 5 Task 1 — consumes nothing) lands as a micro-PR in Wave 1, so Plan 9 T2's and Plan 7 T6's create-if-absent guards never fire.
+
+### Seven pre-rulings — collision ownership under concurrency
+
+The plans' create-if-absent guards and overlapping claims were written assuming serial execution, where "absent" meant "the owner hasn't run yet." Under parallel lanes it can mean "the owner is running right now in another worktree." Ownership is therefore pinned:
+
+1. **Ticket read routes.** The earlier ruling stands (Plan 3 owns `GET /v1/tickets/:id/history`; Plan 4 owns ticket read endpoints and wraps enforcement around both) — but both plan *texts* still claim overlapping surface (Plan 4 line 5289 vs Plan 3 Task 13). Executors: Plan 3 T13 ships `routes/ticket-history.ts`; Plan 4 T8 creates `routes/tickets.ts`; Plan 4 adapts at merge and cites this line.
+2. **`simple-kanban.ts`**: Plan 4 lands it (partition A). Plan 8 T3's guard must NOT create it — if absent, the lane waits.
+3. **`clock-skew.ts`**: Plan 10 T1 owns it. Plan 6 T6's guard defers.
+4. **`docToPlainText`**: pre-work micro-PR above; no guard creates it.
+5. **Evidence-existence gate**: Plan 7 owns it unconditionally (its Task 11 already implements it with no conditional branch); the "whichever lands second" clause in Plan 2's consequences is resolved.
+6. **`projections/index.ts` + the projection-order test**: §8's order is the single source; whichever plan merges second updates the array to the full §8 order (the pin on `main` today omits `proj_projects` and mis-slots `proj_tickets`). `fixtures.test.ts`'s exact count merges arithmetically — every colliding branch states its delta, the merger sums them.
+7. **`packages/app-core` + `packages/ui` scaffolds**: Plan 6a owns both and merges the scaffold early (same micro-PR pattern as the keystone). Plan 8 T1's and Plan 9 T8 Step 0's guards wait for it rather than exercise.
+
+### The waves (3–4 worktree lanes; one shared Postgres — per-test-file databases already isolate them)
+
+**Wave 1 (now).** Lane 1: Plan 3 in full (keystone micro-PR first; internally two independent chains — domain/rule-engine T3–T8 needing no database, server T9–T13 — which may be two sub-lanes). Lane 2: Plan 4 partition A → B2 (bootstrap, after the keystone merges) → B1 (read paths, after Plan 3's T10/T11 migrations merge). Lane 3: Plan 7 client half + Plan 8 pre-Plan-3 tasks (T1, T2's summaries/anchoring, T3 minus the kanban guard); Plan 7's server T7/T8 once Plan 4 T1 lands `Queryable`. Lane 4 (periphery): Plan 6a; Plan 11 infra scaffold; Plan 5's zero-dependency micro-tasks (T1, T2, T3/T13/T14 domain halves); Plan 10's prefix (T1 contest vocabulary, T2 contest evaluators, T8 `SyncStorage`, T3a `stream-seq`); Plan 9's T2/T3.
+
+**Wave 2 (Plans 3+4 on `main`).** Plan 5's spine (T4→T5→T6→T7→T8→routes→T9b→T13→T14/T15). Plan 9's middle (T1 with the fixture-count sum, T4, T5, T7, client chain T8–T13). Plan 10's core (T3b–T7 server side, T9–T12 replica, then T14/T15 dual-client). Plan 8's A′ (T4–T12, everything `TicketTypeDef`-gated) + Plan 7's server remainder (T9/9a/10/11/11a) + Plan 7 T6.
+
+**Wave 3 (Plan 5 on `main`).** Plan 6b (T7/T8 transport, T14 shell, T15/15b invite pages and doors). Plan 9 T6 — the attention sweep, the one task in the series genuinely needing the full 3→4→5 chain, with its explicit no-stub instruction honoured. Plan 8 T13.
+
+**Wave 4 (Plan 6 on `main`).** Plan 10 T13/T16/T17 (contest UX, Tauri, Expo). Plan 9 T14, Plan 8 T14. Plan 11's remainder: web Dockerfile + full compose + seeds (needs Plans 3/4/8) + full CI + deployed-stack E2E + provisioning + dogfooding. Each plan's catalogue task closes its own plan, same change set as ever.
+
+**Critical path:** Plan 3 → Plan 4 remainder → Plan 5 spine → Plan 6b → Plan 10 shells → Plan 11 close. Plan 3 heads it; its two-chain split is the next lever if more compression is wanted.
+
+### Parallel-execution discipline (binding on every lane dispatch)
+
+- **Unblocking artifacts merge as micro-PRs when green.** A keystone sitting unmerged in a lane branch blocks three other lanes exactly as if it were unwritten.
+- **Adaptation maps get staler faster under parallelism.** Every dispatch carries the sibling lanes' current branch heads; maps re-run at each wave boundary; import origins come from shipped code, never plan text (standing law, now load-bearing across lanes).
+- **The mocked-contract law gains a checkpoint.** The fakes the early lanes build against (6a's fake `DataSource`, 8's fake gateway, 9's abstract gateways) are the plans' own sanctioned seams, and every one now has a named plan+task serving the real contract. What parallelism adds: at each wave boundary, one live-integration pass proves the seams against the real server before the next wave builds on them. Separately and regardless of this schedule: Plan 6's Playwright smoke stubs every server call and can pass with no API server running — it gains a live-server variant when Plan 6b lands.
+- **Review machinery is unchanged per plan** — full SDD, per-task review, pre-flight scan, final whole-branch review. **Open question for the owner, deliberately not decided here:** whether "faster" also means trimming any of that per lane. Four lanes at full depth cost ~4× the compute and review attention; the machinery is also what caught every recorded defect class in Plans 1–2.
+
+### By-catch — plan defects found by the extraction, recorded so they are not rediscovered
+
+- **Plan 11's CI YAML omits the interim-plumbing gate** its own Produces bullet promises (the failing grep for Plan 10's session shortcuts). An executor following the YAML literally ships without it.
+- **`ops:sweep-orphans` exists only as runbook prose** — no task, no Files entry, no steps anywhere in Plan 11. Needs a task added before Plan 11 executes.
+- **Plan 1 consequences §2 (verifier autocommit snapshot) and §4 (verifier DDL credential) are discharged by no Plan 11 step** — §2 says MUST be ruled before Plan 11 wires a schedule; as written Plan 11 wires none, but the restore-drill cadence and production role provisioning still meet §4. Rule both at Plan 11's pre-flight.
+- **Plan 11's web Dockerfile ARG block** lists only the two API/WS args; the three Drive-picker args are prose-only — an executor trap its own walk created.
+- **Plan 9 Task 1 cites `src/fixtures.test.ts`**; the file lives at `packages/rule-engine/test/fixtures.test.ts`. Mechanical adapt.
+- **Plan 4 is internally inconsistent about the sync path** (T14 modifies `src/sync/visible-events.ts`; T11 creates `src/visibility/visible-events-for.ts`). The T11 path governs.
+- **Stale claude-mem note, corrected:** the `attachment.added` discriminated-union amendment to Plan 3 was verified applied at Plan 7's walk; observation 19160 describing it as pending is superseded.
