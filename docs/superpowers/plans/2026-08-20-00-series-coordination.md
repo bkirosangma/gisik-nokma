@@ -892,6 +892,17 @@ Found by Lane 2's pre-flight, verified by execution rather than by reading, and 
 the seven pre-rulings pinned ownership of every collision anyone anticipated and this is not among them.
 Every lane imports this file.
 
+**Owner ruling (2026-08-28): the membership entity-id exception is RATIFIED.** Lane 2's kind-aware
+check is the decision, not a conservative default awaiting review — `membership` admits the composite
+`${workspaceId}:${userId}`, every other kind keeps `ulidString` byte-for-byte, and the `EventEnvelope`
+type is untouched. Recorded here so no later lane re-opens it as an open question.
+
+Two things the ruling does **not** cover, stated so they are not read into it. `'invite'` joining
+`ENTITY_KINDS` was never put to the owner and did not need to be — a member added to a closed set is
+inert until an event type declares it. And the ruling settles the *exception*, not the test design that
+proves it: the three-direction assertion below is Lane 2's own and is what keeps "every other kind
+unchanged" a proof rather than a claim.
+
 **Two independent amendments are owed to it, both by Plan 4.**
 
 1. **Decision §5's composite membership id cannot be submitted.** §5 pins `membershipId(workspaceId,
