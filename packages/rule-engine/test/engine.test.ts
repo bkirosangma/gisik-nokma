@@ -41,7 +41,12 @@ function defined(payload: Omit<WorkflowDefinedPayload, 'id'> & { id?: string }):
   });
 }
 
-type SpyCounts = { entityState: number; childrenStates: number; workflowDef: number };
+type SpyCounts = {
+  entityState: number;
+  childrenStates: number;
+  workflowDef: number;
+  ticketTypeDef: number;
+};
 
 /**
  * `entity`/`children` default to Plan 1's original stubs (no ticket, no
@@ -59,18 +64,24 @@ function spyContext(
   const getEntityState = vi.fn(async () => opts.entity ?? null);
   const getChildrenStates = vi.fn(async () => opts.children ?? []);
   const getWorkflowDef = vi.fn(async () => latest);
+  // Counted from Plan 3 Task 5, which is the first caller: `checkTicketCreated`
+  // reads a ticket type's rank and name. Leaving it out was correct while
+  // nothing called it — and would stop being correct silently, because every
+  // "N context calls" assertion in this file would go on passing while no
+  // longer being total. A spy that is not summed is a spy that has been
+  // switched off.
+  const getTicketTypeDef = vi.fn(async () => null);
   const counts = (): SpyCounts => ({
     entityState: getEntityState.mock.calls.length,
     childrenStates: getChildrenStates.mock.calls.length,
     workflowDef: getWorkflowDef.mock.calls.length,
+    ticketTypeDef: getTicketTypeDef.mock.calls.length,
   });
   return {
-    // getTicketTypeDef is not counted: no rule reads a type definition yet
-    // (Plan 3 Tasks 5–7 add the first), so a spy on it would pin nothing.
-    ctx: { getEntityState, getChildrenStates, getWorkflowDef, getTicketTypeDef: vi.fn(async () => null) },
+    ctx: { getEntityState, getChildrenStates, getWorkflowDef, getTicketTypeDef },
     calls: () => {
       const seen = counts();
-      return seen.entityState + seen.childrenStates + seen.workflowDef;
+      return seen.entityState + seen.childrenStates + seen.workflowDef + seen.ticketTypeDef;
     },
     counts,
   };
@@ -247,6 +258,37 @@ describe('evaluateEvent — the dispatcher', () => {
     expect(calls()).toBe(0);
   });
 
+  /**
+   * The `ticket.created` arm, and the same claim in its other half: the
+   * dispatcher routes it, and the spy ledger above is TOTAL. `getTicketTypeDef`
+   * answers null here, so the check refuses `ticket.unknown-type` — the point
+   * is not the verdict but the two lookups it took to reach it. Drop
+   * `ticketTypeDef` from `counts()` and this assertion fails; that is the whole
+   * reason it is written as a whole-object comparison rather than a sum.
+   */
+  it('routes ticket.created to the hierarchy check, and the call ledger counts the type lookup', async () => {
+    const { ctx, counts } = spyContext();
+    const env = envelope({
+      type: 'ticket.created',
+      entity: { kind: 'ticket', id: '01J9GNEW000000000000000000' },
+      payload: {
+        typeId: 'task',
+        projectId: '01J9GPRJ000000000000000000',
+        parentId: null,
+        title: 'Reconcile the till',
+      },
+    });
+    await expect(evaluateEvent(env, ctx)).resolves.toEqual({
+      refused: true,
+      rule: 'ticket.unknown-type',
+      reason: "This ticket's type is not defined in this workspace.",
+    });
+    // One `getEntityState` for "does this ticket already exist", one
+    // `getTicketTypeDef` for the type. No workflow, no children: neither
+    // question is reachable once the type is unknown.
+    expect(counts()).toEqual({ entityState: 1, childrenStates: 0, workflowDef: 0, ticketTypeDef: 1 });
+  });
+
   it('routes workflow.defined to its rule module rather than passing it through', async () => {
     const { ctx, calls } = spyContext();
     const verdict = await evaluateEvent(
@@ -350,14 +392,14 @@ describe('the stranding refusal, and what it refuses to ask', () => {
       reason:
         'Version 2 drops state(s) "doing", "review" that version 1 has; publishing cannot see which tickets sit in which state, so every dropped state needs a stateMapping entry.',
     });
-    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1 });
+    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1, ticketTypeDef: 0 });
   });
 
   it('accepts a v2 that maps both dropped states without asking whether either is occupied', async () => {
     const { ctx, counts } = spyContext(basicV1);
     const verdict = await evaluateEvent(basicV2({ doing: 'todo', review: 'todo' }), ctx);
     expect(verdict).toEqual({ refused: false });
-    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1 });
+    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1, ticketTypeDef: 0 });
   });
 });
 
