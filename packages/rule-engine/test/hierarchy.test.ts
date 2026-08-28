@@ -283,3 +283,79 @@ describe('checkTicketCreated', () => {
     });
   });
 });
+
+/**
+ * The check ORDER, which `checkTicketCreated`'s docstring pins and which every
+ * test above leaves free. Each case above stages exactly ONE available
+ * refusal — the cross-project parent also has a legal rank, the rank cases sit
+ * in one project under an open parent, the terminal-parent case is
+ * rank-legal — so a check that answered them in any order at all would pass the
+ * whole suite. Order is a property of its own, and a property nothing can
+ * falsify is a property that is not being tested.
+ *
+ * Every case here stages TWO simultaneous defects and asserts which one names
+ * the event: the most fundamental truth, so that the person told "no" is sent
+ * to fix the thing that was actually in the way.
+ */
+describe('checkTicketCreated — which refusal names the event when two are available', () => {
+  it('an undefined workflow outranks the deepest-rank rule: a ticket with no possible status has no hierarchy question yet', async () => {
+    // Sub-task at project root (deepest-rank violation) whose workflow was
+    // never published. Telling this actor to pick a parent would send them to
+    // do work that still could not produce a ticket.
+    const ctx = buildMemoryContext([], [typeDefined(SUBTASK)]);
+    expect(await checkTicketCreated(created(NEW, 'sub-task', null), ctx)).toEqual({
+      refused: true,
+      rule: 'ticket.workflow-undefined',
+      reason: "This ticket type's workflow has not been defined yet, so the ticket would have no status.",
+    });
+  });
+
+  it('an undefined workflow outranks an unknown parent, for the same reason', async () => {
+    const ctx = buildMemoryContext([], [typeDefined(TASK)]);
+    expect(await checkTicketCreated(created(NEW, 'task', GHOST), ctx)).toEqual({
+      refused: true,
+      rule: 'ticket.workflow-undefined',
+      reason: "This ticket type's workflow has not been defined yet, so the ticket would have no status.",
+    });
+  });
+
+  it('a cross-project parent outranks a rank violation: the wrong parent is not a rank problem', async () => {
+    // An epic (rank 1) under a story (rank 2) IS a rank violation — and the
+    // story is in another project entirely. Naming the rank would send the
+    // actor to pick a bigger parent inside a project they were never entitled
+    // to reach into.
+    const ctx = buildMemoryContext(
+      [WF],
+      [typeDefined(EPIC), typeDefined(STORY), created(PARENT, 'story', null, PROJECT_B)],
+    );
+    expect(await checkTicketCreated(created(NEW, 'epic', PARENT, PROJECT), ctx)).toEqual({
+      refused: true,
+      rule: 'hierarchy.cross-project',
+      reason: 'The parent is in a different project. Pick a parent from the same project.',
+    });
+  });
+
+  it('a rank violation outranks a finished parent: the remediable contradiction comes last', async () => {
+    // The parent is finished AND too small to hold an epic. Offering the reopen
+    // first would offer a remedy that does not work: reopen the story and the
+    // create is still refused, now for the reason nobody mentioned.
+    const ctx = buildMemoryContext(
+      [WF],
+      [
+        typeDefined(EPIC),
+        typeDefined(STORY),
+        created(PARENT, 'story', null),
+        makeEnvelope({
+          type: 'ticket.transitioned',
+          entity: { kind: 'ticket', id: PARENT },
+          payload: { to: 'done' },
+        }),
+      ],
+    );
+    expect(await checkTicketCreated(created(NEW, 'epic', PARENT), ctx)).toEqual({
+      refused: true,
+      rule: 'hierarchy.rank',
+      reason: '"Epic" cannot go under "Story": a ticket\'s parent must be a bigger kind of work.',
+    });
+  });
+});
