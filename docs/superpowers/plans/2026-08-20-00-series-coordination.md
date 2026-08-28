@@ -536,7 +536,7 @@ The plans' create-if-absent guards and overlapping claims were written assuming 
 3. **`clock-skew.ts`**: Plan 10 T1 owns it. Plan 6 T6's guard defers.
 4. **`docToPlainText`**: pre-work micro-PR above; no guard creates it.
 5. **Evidence-existence gate**: Plan 7 owns it unconditionally (its Task 11 already implements it with no conditional branch); the "whichever lands second" clause in Plan 2's consequences is resolved.
-6. **`projections/index.ts` + the projection-order test**: §8's order is the single source; whichever plan merges second updates the array to the full §8 order (the pin on `main` today omits `proj_projects` and mis-slots `proj_tickets`). `fixtures.test.ts`'s exact count merges arithmetically — every colliding branch states its delta, the merger sums them.
+6. **`projections/index.ts` + the projection-order test**: §8's order is the single source; whichever plan merges second updates the array to the full §8 order. *(Corrected 2026-08-28 by the cross-lane controller: this parenthetical previously read "the pin on `main` today omits `proj_projects` and mis-slots `proj_tickets`." Nothing was mis-slotted — the registry held exactly two projections and the assertion pinned exactly those two, so there was no third to mis-slot. What omitted `proj_projects` was the **doc comment** above the assertion, reciting the pre-2026-08-26 order. Lane 2's brief inherited the original wording; no other brief carries it.)* `fixtures.test.ts`'s exact count merges arithmetically — every colliding branch states its delta, the merger sums them.
 7. **`packages/app-core` + `packages/ui` scaffolds**: Plan 6a owns both and merges the scaffold early (same micro-PR pattern as the keystone). Plan 8 T1's and Plan 9 T8 Step 0's guards wait for it rather than exercise.
 
 ### The waves (3–4 worktree lanes; one shared Postgres — per-test-file databases already isolate them)
@@ -722,99 +722,143 @@ pre-mutation blob hash, with `git diff` against the index, or by reading the fil
 Python `difflib`. This matters to every lane, because a tool that lies about equality turns a mutation
 sweep into theatre, and the whole falsifiability discipline rests on those restorations being real.
 
-## Wave 1 cross-lane watch (2026-08-28, controller) — three obligations assigned by position, and why the decision-6 drift will not fail loudly
+## Wave 1 cross-lane watch (2026-08-28, controller) — where the decision-6 drift is loud, where it is silent, and two obligations assigned by position
 
-Recorded by the cross-lane controller during Wave 1, while all four lanes were still in pre-flight
-and none of the work below had been written. Everything here is verified against shipped `main` at
-`f363b2f` or against the plan text at the cited line — not inferred from a summary.
+Recorded by the cross-lane controller during Wave 1. Everything here is verified against shipped code or
+read at the cited plan line. **This section was substantially wrong on first writing and was corrected
+before merge** — the review that corrected it is described at the end, because the corrections are more
+instructive than the claims.
 
-### The decision-6 amendment is worse than "adapt at transcription" implies, and Plan 6 is where
+### The decision-6 drift: T6 fails loudly, T12 and T13 do not
 
-Decision 6's amendment tells later plans to adapt ~36 stale `toStateId` literals and calls Plan 6's
-"the dangerous ones because they are client *logic*, not fixtures." That framing understates it in one
-specific way, and the difference decides whether a lane's own machinery can catch the drift.
+Decision 6's amendment tells later plans to adapt ~36 stale `toStateId` literals and calls Plan 6's "the
+dangerous ones because they are client *logic*, not fixtures." Correct. The refinement that matters for a
+lane planning its work is **which** of Plan 6's sites announce themselves and which do not.
 
-The ordinary reason a stale fixture is recoverable is that it fails loudly. **In Plan 6 it does not**,
-because the plan's production code and the plan's tests carry the same misspelling and agree with each
-other. A lane that transcribes Plan 6 faithfully gets a green suite over a broken wire format:
+The three production sites carry the wrong wire format (`toStateId` where shipped
+`ticketTransitionedPayloadSchema` requires `to`):
 
-- `packages/app-core/src/precheck.ts` (Plan 6 T6, `restrictToNeedsMembership`) reads the field through
-  an explicit cast — `(submitted.payload as { toStateId?: string } | null)?.toStateId` (plan line 2758)
-  — and returns `true` when it is `undefined`. Against real `to`-keyed payloads that is *always*. Note
-  the direction, because it is the safe one: `true` means "this restrict-to resolves against memberships
-  only the server holds," and the caller (plan line 2707) turns a local `refused` verdict into
-  `not-evaluated` on it. So the client stops deciding restrict-to locally and defers every such
-  transition to the server — degraded precheck UX, a round trip where there should have been instant
-  feedback, and **not** a bypassed guard. The cast is what defeats the compiler; without it this would
-  be a typecheck failure.
-- `submitTransition` (Plan 6 T12, plan lines 6426-6427) builds the wire payload as
-  `const transitionPayload: Record<string, unknown> = { toStateId: submission.toStateId }` and then
-  assigns `comment` as a **bare string**. `Record<string, unknown>` defeats the compiler a second time,
-  and the bare `comment` is an independent divergence layered on the field name.
-- `reopenAndProceed` (Plan 6 T13, plan lines 7105-7113) submits `{ toStateId, cause }`. Its `cause`
-  shape already matches the amended contract exactly; only the field name is wrong.
-- The tests that would catch all three assert the same wrong shape — `TicketSheet.test.tsx` at plan
-  line 6309 asserts `batch[0].payload` equals `{ toStateId: 'done', comment: 'filed at the portal' }`,
-  and `reopen.test.ts` at 6971-6974 does the equivalent. They pass unmodified.
+- `packages/app-core/src/precheck.ts` (T6, `restrictToNeedsMembership`, plan line 2758) reads the field
+  through an explicit cast — `(submitted.payload as { toStateId?: string } | null)?.toStateId` — and
+  returns `true` when it is `undefined`, which against real payloads is always. **This cast is the one
+  genuine compiler-defeat of the three.** Note the direction, because it is the safe one: `true` means
+  "this restrict-to resolves against memberships only the server holds," and the caller at plan line 2707
+  turns a local `refused` verdict into `not-evaluated` on it. The client stops deciding restrict-to
+  locally and defers to the server — degraded precheck UX, not a bypassed guard.
+- `submitTransition` (T12, plan lines 6426-6427) builds the payload as
+  `Record<string, unknown> = { toStateId: … }` and assigns `comment` as a **bare string**.
+- `reopenAndProceed` (T13, plan lines 7105-7113) submits `{ toStateId, cause }`; its `cause` shape
+  already matches the amended contract exactly.
 
-Three nets are therefore absent at once: no typecheck error (two deliberate casts), no failing test
-(self-consistent assertions), and no runtime refusal (Plan 6a submits to `createFakeDataSource`, which
-validates nothing; the real door is Wave 3's T7/T8 transport). This is the mocked-contract law's own
-failure mode — the fake excusing the contract from existing — arriving inside the plan that the law's
-worst instance was already recorded against.
+**T6 fails loudly, and this is the correction that matters most.** Plan 6's own text at line 2564 states
+the pre-check "runs the REAL `@gisik-nokma/rule-engine` in the browser build." Shipped
+`packages/rule-engine/src/transition.ts` does `ticketTransitionedPayloadSchema.safeParse(env.payload)`
+and refuses with `malformed-payload` when it fails. So the `transitionTo()` helper at plan lines
+2578-2583 produces a `malformed-payload` refusal while the tests at 2592 and 2604 assert
+`require-comment` and a pass — **those tests fail.** The drift announces itself in the first task that
+touches it. An earlier draft of this section claimed the opposite.
 
-**Two independent shape errors travel together, and that changes what "fixed" looks like** (sharpened
-by Lane 4, which verified all five sites against shipped `workflow.ts` before adopting them). The field
-name is one error; `comment` as a bare string where the door requires `{ text }` is a second. A
-transcription that corrects only `toStateId` is still refused — with a *different* error, arriving
-later, at a point where the first fix appears to have worked. Correct both or neither.
+**T12 and T13 are where a wrong shape can be locked in by a passing test.** `TicketSheet.test.tsx` at
+plan line 6309 asserts `batch[0].payload` equals `{ toStateId: 'done', comment: 'filed at the portal' }`,
+and `reopen.test.ts` at 6971-6974 does the equivalent. Both assert what the **fake** `DataSource`
+received, with no engine in the path and no schema consulted, so both pass unmodified. That is the real
+instance of the mocked-contract failure mode here, and it is narrower than "the whole plan ships green."
 
-**What the owning lane does about it:** before trusting any test transcribed from Plan 6 T6/T12/T13,
-write one assertion against the exported `ticketTransitionedPayloadSchema` itself
-(`packages/domain/src/workflow.ts` — `to` required, `comment: { text }`). A test that parses the payload
-the client actually builds is the only one of these that can fail.
+**Two independent shape errors travel together** (sharpened by Lane 4, which verified all five sites
+against shipped `workflow.ts` before adopting them). The field name is one; `comment` as a bare string
+where the door requires `{ text }` is a second. A transcription correcting only `toStateId` is still
+refused — with a *different* error, arriving later, where the first fix appears to have worked.
 
-Plan 3's own reducer text has the same read (`p.toStateId`, plan-3 lines 1123-1129), and it is loud
-**only on a condition worth stating**: the plan calls the schema `ticketTransitionedPayload` while the
-shipped export is `ticketTransitionedPayloadSchema`, so the implementer must adapt the name. Adapt it by
-importing from `@gisik-nokma/domain` and `p` is typed `{ to, comment?, … }`, making `p.toStateId` a
-compile error. Re-declare a plan-local zod schema instead — the other way to make that line compile —
-and the compiler net disappears there too, exactly as it has in Plan 6. Import origins come from shipped
-code: the standing law, and here it is what keeps the failure loud.
+**The enumeration above is not the whole set, and the remainder creates two bad partial fixes.** Two more
+`toStateId` builders exist: the precheck *candidate* at plan line 6417 (production, same task as T12) and
+the T6 test helper at 2578-2583. As Plan 6 is written those make the 2758 cast **self-consistent** — the
+payload it reads genuinely does carry `toStateId`, so the cast is not yet wrong. It becomes always-true
+only once the builders are adapted. So there are two ways to half-fix this and be worse off than either
+extreme:
+
+- Adapt 6426/7105/6417 but leave the 2758 cast → the wire format is now correct and the cast silently
+  reads `undefined` forever, which is the degraded-precheck state described above, with no test red.
+- Adapt 2758 but leave 6417 → the precheck candidate still speaks the old spelling.
+
+Fix all five sites (2758, 6417, 6426-6427, 7105-7113, and the 2578-2583 helper) in one change, or none.
+
+**What the owning lane does:** at T12 and T13 specifically, write one assertion that parses the payload
+the client actually builds against the exported `ticketTransitionedPayloadSchema`
+(`packages/domain/src/workflow.ts`). T6 needs no such help; its own tests will go red.
+
+**And a general fact that resets what "compiler net" means here:** `EventEnvelope.payload` is typed
+`unknown` (`packages/domain/src/envelope.ts:61`), so **no client-built payload is typechecked anywhere in
+the series** — every net is a runtime parse. The 2758 cast is not one net among several; it is the single
+place a compiler check was actively suppressed. A lane that tries to restore type-safety at T12 by
+removing the `Record<string, unknown>` annotation will get nothing for it.
+
+**Plan 3's reducer is loud for a different reason, and the remedy is not the obvious one.** Plan 3 T3
+reads `p.toStateId` (plan-3 lines 1123-1129) after parsing with a schema it imports from
+`./events/ticket-events` (plan-3 lines 1038-1041). Shipped `packages/domain/src/events/ticket-events.ts`
+deliberately does **not** define that schema and says so in its header: `ticket.transitioned`'s schema
+lives in `../workflow.ts` because the engine parses it, and the vocabulary registers that one. So the
+plan's import does not resolve and the failure is a build error — loud, and arriving before any test.
+The fix is `import { ticketTransitionedPayloadSchema } from './workflow.js'` — a **relative** import,
+because `packages/domain` cannot import from `@gisik-nokma/domain`, which is itself. Re-declaring a
+plan-local schema is the one path that compiles and removes the net.
 
 Two spellings remain correct and are not drift: the transition-**log entry**
 (`TicketState.transitions[]`) keeps `toStateId`, and `ticket.workflow_rebound`'s own payload has a
 `toStateId` field of its own.
 
-### Obligations assigned by position, which no lane brief names
+### One obligation assigned by position, which no lane brief names
 
-Both are assigned in this document by phrases like "whichever plan next touches X" rather than to a
-numbered task, so they belong to whoever arrives first and appear in no plan's task list.
+**`FoldedState` must carry the break version — Lane 1, Plan 3 T3.** Plan 2 consequences §1 assigns it to
+"whichever plan next touches the fold." Plan 3 T3 is the fold, and it is a floor-list task. Lane 1's
+brief lists five claims recorded against Plan 3 and this is not among them, so the list reads complete
+when it is not. The stranding refusal names a state id against the ticket's origin version while
+`foldStateIdForward` reports the id at the point the chain broke; for a three-version walk those differ,
+and Plan 6 renders the sentence to a human verbatim.
 
-1. **`FoldedState` must carry the break version — Lane 1, Plan 3 T3.** Plan 2 consequences §1 assigns
-   it to "whichever plan next touches the fold." Plan 3 T3 is the fold, and it is a floor-list task.
-   Lane 1's brief lists four claims recorded against Plan 3 and this is not among them, which makes
-   the list read as complete when it is not. The stranding refusal names a state id against the
-   ticket's origin version while `foldStateIdForward` reports the id at the point the chain broke;
-   for a three-version walk those differ, and Plan 6 renders the sentence to a human verbatim.
+*Discharged 2026-08-28 by Lane 1 as its ruling P2, taking the fix rather than deferring it:* the version
+clause is dropped rather than the `FoldedState` surface changed — §1 sanctions both, and this one avoids
+cross-plan churn with four lanes in flight while leaving the fuller sentence available later. Lane 1's
+reasoning for not deferring is worth keeping: Plan 3 does not merely inherit the inaccuracy, it **arms**
+it, because refresh-on-publish is exactly what makes ticket-version and break-version diverge routinely.
 
-2. **The verifier's autocommit ruling is a MUST that lands in Lane 4's current pre-flight.** Plan 1
-   consequences §2 says `verifyProjections` reads outside any transaction and **"MUST be ruled before
-   Plan 11 wires the schedule."** Lane 4's Wave-1 scope includes Plan 11 T11's `schedule.ts`. Under the
-   autonomous execution protocol a lane blocks only on a stated MUST — this is one of the few, and the
-   by-catch already routes it plus §4 to "Plan 11's pre-flight," which is the pre-flight Lane 4 is
-   running now. Two fix shapes are pre-approved (one `REPEATABLE READ` transaction over read + diff, or
-   retry-once-then-alert). §4 rides with it: the verifier does DDL and needs its own credential, or an
-   explicit decision that it runs elsewhere — Lane 4 owns `deploy/do/app.yaml` and the provisioning
-   notes, which is where that decision lives.
+### The verifier's autocommit MUST does NOT fire in Wave 1 — checked, not ruled
 
-### A correction to what three briefs say about the projection-order pin
+Plan 1 consequences §2 says `verifyProjections` reads outside any transaction and "MUST be ruled before
+Plan 11 wires the schedule." An earlier draft of this section routed that MUST to Lane 4 on the grounds
+that it owns `schedule.ts`. **That was wrong.** Plan 11 Task 11's `apps/server/src/ops/schedule.ts` is
+the *backup daemon's* schedule — nightly `pg_dump`, weekly ledger export — and wires no verifier. The
+by-catch already said as much ("as written Plan 11 wires none"); §2's MUST is conditioned on a schedule
+that does not exist. Recorded here as **checked and not applicable** so the next lane inherits a
+discharged item rather than an open one, and so the condition is stated for whoever does wire one.
 
-The lane briefs state that the pin on `main` "omits `proj_projects` and mis-slots `proj_tickets`."
-Half of that is false in a way that could send a lane hunting a defect that is not there. On `main`
-today `apps/server/src/projections/index.ts` registers exactly two projections, and the executable
-assertion in `apps/server/test/projection-order.test.ts` pins exactly those two — nothing is mis-slotted
-because nothing else is registered yet. What genuinely omits `proj_projects` is the **doc comment**
-above that assertion, which recites the pre-2026-08-26 order. Pre-ruling 6 is unaffected: §8 remains the
-single source, and the second lane to merge writes the full order into both the array and that comment.
+**§4 does land with Lane 4, and stands.** The verifier does `DROP SCHEMA` / `CREATE SCHEMA` /
+`CREATE TABLE (LIKE …)`, so a production role without DDL cannot run it. Lane 4 owns `deploy/do/app.yaml`
+and the provisioning notes: the verifier gets its own credential there, or an explicit recorded decision
+that it runs elsewhere.
 
+### The "mis-slots `proj_tickets`" phrase is this document's own error, now fixed at source
+
+Pre-ruling 6 above stated that the pin on `main` "omits `proj_projects` and mis-slots `proj_tickets`."
+Nothing was mis-slotted: `apps/server/src/projections/index.ts` registered exactly two projections and
+`apps/server/test/projection-order.test.ts` pinned exactly those two, so there was no third to mis-slot.
+What omitted `proj_projects` was the **doc comment** above that assertion, reciting the pre-2026-08-26
+order. Pre-ruling 6 has been corrected in place rather than only annotated here, because a lane reading
+the ruling would not have found the correction. Lane 2's brief inherited the phrase from this document
+and should be read with that in mind. The ruling itself is unchanged: §8 is the single source, and the
+second lane to merge writes the full order into both the array and the comment.
+
+### What the review of this section caught, recorded because it generalises
+
+This section was reviewed before merge by a single opus reviewer instructed to verify every claim against
+primary sources. It found four material errors in the first draft: the "green suite" claim (false for T6,
+which runs the real engine); the `schedule.ts` MUST (a file-name match mistaken for a scope match); the
+`Record<string, unknown>` compiler-defeat claim (`EventEnvelope.payload` is already `unknown`, so there
+was no net at that site to defeat); and a remedy that told Plan 3 to import from `@gisik-nokma/domain`
+while the code in question lives *inside* that package.
+
+The generalisable part: every one of those was a **plausible inference from a real fact** — the fake
+DataSource is real, `schedule.ts` is real and is Lane 4's, the cast at 2758 really does defeat the
+compiler, and the import law really is standing. None was invented. What failed was checking the
+inference one step further: what the schedule actually schedules, what the test actually calls, what the
+envelope's payload type already is. A finding that names a file and a line is not yet a finding that has
+been verified to *do* what the name suggests, and this document is acted on by four lanes at once.
