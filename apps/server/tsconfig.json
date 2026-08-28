@@ -5,12 +5,20 @@
     "rootDir": "src",
     "types": ["node"],
     // apps/server is a private leaf app — nothing imports its .d.ts, so it emits
-    // none. Declaration emit would otherwise fail with TS2742 on better-auth:
-    // `betterAuth(...)`'s inferred type reaches into @simplewebauthn/server and
-    // zod 4, both nested under better-auth in the pnpm store and therefore not
-    // nameable from here. The alternatives were worse — hoisting a second zod
-    // major into this package, or hand-writing a facade type that would silently
-    // narrow the auth API Task 2 builds on.
+    // none. This overrides tsconfig.base.json:9's `"declaration": true`; it is
+    // not a restatement of a default, and deleting it restores the inherited
+    // `true` rather than leaving the flag unset.
+    //
+    // Declaration emit fails with TS2742 on every export whose type touches the
+    // auth instance — `createAuth` and `type Auth` included: `betterAuth(...)`'s
+    // inferred type reaches into @simplewebauthn/server and zod 4, both nested
+    // under better-auth in the pnpm store and so unnameable from here. The
+    // alternatives were worse: hoisting a second zod major into a package that
+    // already depends on zod 3, or hand-writing a facade type that would
+    // silently narrow the auth API later tasks build on.
+    //
+    // tsconfig.typecheck.json needs the same line for a reason that is not
+    // obvious: `noEmit` does not switch the declaration-emit check off.
     "declaration": false
   },
   "include": ["src"]
