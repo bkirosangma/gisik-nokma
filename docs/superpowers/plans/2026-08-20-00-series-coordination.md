@@ -1004,6 +1004,22 @@ times, so Plan 11 cannot own the risk of it being *added*.
   regress.** (Lane 4's formulation, and a better check than the one the original framing would have
   produced.)
 
+  **Write that assertion against the lockfile FILE, never against install output.** Lane 2 found that
+  `pnpm` prints no peer warnings at all under `--frozen-lockfile` — resolution is skipped entirely — so a
+  check that greps the install's *output* inside a Docker build reads clean **for the wrong reason**, and
+  reads clean forever. Same shape as everything else in this section: the easy check confirms the command
+  ran, not that it looked where the answer is.
+
+**State of the ban as of 2026-08-28, verified rather than assumed** (the controller asserted the opposite
+and was corrected): `@better-auth/cli` is in **no** lockfile and **no** `package.json` — Step 1's install
+was never executed, because Lane 2's implementer discovered the version pin while evaluating the tool and
+declined to install it. So the check above passes today, and is worth writing precisely because "never
+installed" is a fact about today that nothing currently enforces. Line 403 is killed by `auth:schema`;
+line 299's comment is the last live reference and is being fixed — it names
+`pnpm exec better-auth generate`, **a command that does not exist**, since the `generate` bin ships in
+the CLI package rather than the library. A dead precondition asserted in the one place a maintainer looks
+to learn what that instance is for.
+
 The falsifiability shape is worth keeping as a worked example of plant-in-production-shape: planting
 *exactly the CLI's output* makes the drift check fail naming `account.issuer`, while a "five tables
 exist" check and a "columns are camelCase" check both still pass. Those two are the obvious tests to
