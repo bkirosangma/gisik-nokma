@@ -54,20 +54,47 @@ describe('better-auth vendor schema', () => {
   /**
    * The check that makes the vendor schema honest, and the one that survives a
    * better-auth upgrade. `getMigrations` reads the live database through the
-   * library's own adapter and reports what it would still have to create. A
-   * handwritten migration that is missing a table, a column, or an index leaves
-   * something in `toBeCreated`/`toBeAdded`/`toBeAddedIndexes` — which is exactly
-   * how the omission that a version-skewed generator produced (@better-auth/cli
-   * 1.4.21 emits no `account."issuer"` and no `account_issuer_accountId_uidx`)
-   * would have surfaced here rather than on the first Google sign-in.
+   * library's own adapter and reports what it would still have to do.
+   *
+   * It reports in TWO channels, and asserting on only one of them is how a
+   * drift check comes to look green while the schema is wrong:
+   *
+   *  - **Presence** — a missing table, column or index lands in `toBeCreated`,
+   *    `toBeAdded` or `toBeAddedIndexes`. This is how the omission a
+   *    version-skewed generator produces (@better-auth/cli 1.4.21 emits no
+   *    `account."issuer"` and no `account_issuer_accountId_uidx`) would have
+   *    surfaced here rather than on the first Google sign-in.
+   *  - **Shape** — a column that EXISTS but has the wrong type, or is nullable
+   *    where the schema declares the field required, reaches neither of those
+   *    arrays. It is only ever a `logger.warn`
+   *    (`better-auth/dist/db/get-migration.mjs`, the `column.isNullable` and
+   *    `matchType` branches). Asserting on the arrays alone therefore passes
+   *    happily on `"emailVerified" boolean NULL` or `"counter" text NOT NULL`.
+   *
+   * So the planner is handed a capturing logger and the warnings are asserted
+   * empty too. Both channels, or the name of this test would be a lie.
    */
-  it('the installed better-auth finds nothing left to create — the schema has not drifted', async () => {
-    const plan = await getMigrations(authForTestDb().options, { throwOnUnsafe: false });
+  it('the installed better-auth finds nothing left to create and warns about nothing — no drift in presence or in shape', async () => {
+    const warnings: string[] = [];
+    const plan = await getMigrations(
+      {
+        ...authForTestDb().options,
+        logger: {
+          disabled: false,
+          level: 'debug',
+          log: (level, message) => {
+            if (level === 'warn' || level === 'error') warnings.push(`${level}: ${message}`);
+          },
+        },
+      },
+      { throwOnUnsafe: false },
+    );
     expect(plan.toBeCreated.map((entry) => entry.table)).toEqual([]);
     expect(
       plan.toBeAdded.map((entry) => `${entry.table}.${Object.keys(entry.fields).join('+')}`),
     ).toEqual([]);
     expect(plan.toBeAddedIndexes.map((entry) => entry.name)).toEqual([]);
+    expect(warnings).toEqual([]);
   });
 
   /**
