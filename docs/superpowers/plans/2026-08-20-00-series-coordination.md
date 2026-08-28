@@ -998,6 +998,41 @@ left better-auth core**: 1.7.2 exposes 54 export subpaths, none containing `pass
 `PasskeyOptions` still takes `rpID`/`rpName`, so only the specifier moves — any plan text naming
 `better-auth/plugins/passkey` is wrong.
 
+### The complete better-auth specifier triage, run across all eleven plans — and why "the subpath exists" is not the test
+
+Lane 3 proposed the right triage and it is cheap: **a plan that consumes a *type* is insulated from its
+provider's packaging; a plan that names a *subpath* is not**, so grepping for `from 'better-auth/...'` is a
+complete test needing no judgment. Run across all eleven plans, exactly two carry such imports:
+
+| Plan | Line | Import | Verdict (checked against the installed 1.7.2 tree) |
+|---|---|---|---|
+| 4 | 234 | `{ bearer, magicLink, phoneNumber } from 'better-auth/plugins'` | subpath present — **fine** |
+| 4 | 235 | `{ passkey } from 'better-auth/plugins/passkey'` | subpath **absent** — move to `@better-auth/passkey` |
+| 4 | 685 | `{ fromNodeHeaders } from 'better-auth/node'` | subpath present — **fine** |
+| 6 | 7885 | `{ createAuthClient } from 'better-auth/react'` | subpath present — **fine** |
+| 6 | 7886 | `{ magicLinkClient, phoneNumberClient } from 'better-auth/client/plugins'` | subpath present — **fine** |
+| 6 | 7887 | `{ passkeyClient } from 'better-auth/client/plugins'` | **subpath present, export ABSENT** — see below |
+
+Plan 7 is a clean negative and the reason is the rule working: its two `better-auth` mentions are prose,
+it consumes `Auth` as a type from Plan 4, and it stubs sessions as `Bearer <userId>` by its own sanction.
+It survives better-auth being repackaged entirely.
+
+**The refinement the triage needs, found by running it.** Plan 6 line 7887 is the dangerous row, and a
+subpath grep marks it clean: `better-auth/client/plugins` **does** exist in 1.7.2. What no longer exists
+is the *named export*. `passkeyClient` appears nowhere in better-auth core's `dist`; it ships in
+`@better-auth/passkey/dist/client.mjs`, reachable at that package's `./client` subpath (its only two
+subpaths are `.` and `./client`).
+
+So a specifier move splits into two failure shapes with different detection costs. **A missing subpath
+fails at resolution — loud, immediate, unmissable. A present subpath missing a named export fails at
+the import site**, and under a bundler or a loose `tsconfig` it can fail later and further away than the
+line that caused it. **The complete test is therefore two greps, not one: the subpath must exist AND the
+named import must still be exported from it.** Lane 3's rule stands; this is the second half of it.
+
+Nothing here is Wave 1 work — Plan 6's client transport is 6b, deferred to Wave 3 — but it is recorded
+now because the tree that proves it is installed today in Lane 2's worktree, and by Wave 3 the cheap
+check will require re-deriving what someone already ran.
+
 ### Two blind spots in how tests are written, both found on first contact
 
 Both from Lane 3's Plan 7 T1, both the same family as the fixture and checker findings above.
