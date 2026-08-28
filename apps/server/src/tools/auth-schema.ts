@@ -1,9 +1,10 @@
+import { pathToFileURL } from 'node:url';
 import { getMigrations } from 'better-auth/db/migration';
 import { auth } from '../auth/auth-dev.js';
 
 /**
  * Prints the vendor schema the INSTALLED better-auth requires, so
- * `migrations/1787900000000_auth-tables.sql` can be diffed against it after
+ * `migrations/1787927101493_auth-tables.sql` can be diffed against it after
  * every better-auth upgrade. A drifted vendor schema fails at runtime, not at
  * migrate time — this is the check that catches it at upgrade time instead.
  *
@@ -25,7 +26,15 @@ export async function authSchemaSql(): Promise<string> {
   return compileMigrations();
 }
 
-if (process.argv[1] !== undefined && import.meta.url === `file://${process.argv[1]}`) {
+// `pathToFileURL`, not a `file://` template string, and for a reason this tool
+// cannot afford: the two disagree the moment the checkout path holds a space,
+// a `#`, or a non-ASCII character, because only `pathToFileURL` percent-encodes.
+// The guard would then be false and `pnpm run auth:schema` would print nothing
+// and exit 0 — a tool whose whole job is emitting text for a human to diff,
+// succeeding silently while emitting none. Matches `verify-projections.ts`.
+const executedDirectly =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (executedDirectly) {
   authSchemaSql()
     .then((sql) => {
       process.stdout.write(sql);
