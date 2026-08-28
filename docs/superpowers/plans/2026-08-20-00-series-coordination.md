@@ -1724,6 +1724,60 @@ it also lands cleanly on Plan 3's design decision 3, which already sanctions `va
 clearing claim with provenance retained — so the matrix is not a new rule there, it is the existing one
 enforced.
 
+### The harness reproduces the fabrication, and two further sweeps that fall out of it
+
+**The harness does not merely share the hole — it reproduces the fabrication character-for-character.**
+`harness.ts:294` is `value: payload.value ?? null`, the same construction as the production reducer at
+`ticket-state.ts:201`. So a fixture omitting `value` is accepted by the harness, records the identical
+fabricated null clearing claim, and therefore **agrees with production while both are wrong together.**
+That is "a fixture that agrees with the implementation without constraining it" in its purest form, and
+it is why the fix order is a floor rather than a convenience: **T7 fixes `ticket-events.ts:33` and proves
+it with unit tests** (which do not run through the harness and so are capable of failing), and **T8 fixes
+the harness pair before authoring any fixture meant to prove door behaviour.**
+
+**The mutation must kill the right case.** Revert to bare `z.unknown()` and watch the **absent** case fail
+specifically. A mutation that only kills present-but-`undefined` has proven a side effect of the fix
+rather than the fix — the distinction is the whole reason the matrix has four rows rather than two.
+
+#### Sweep 1 — `?? null` is a separate defect from `z.unknown()`, and only sometimes a fabrication
+
+Lane 1's point, and correct: the two co-occur here but are independent. `z.unknown()` lets the key
+vanish; `?? null` turns the vanishing into a claim. A schema could be tightened while a downstream
+`?? null` still invents from a legitimately-absent optional. Swept across `packages/` and `apps/` — ten
+sites, and the discriminator is **what `null` means in that position**:
+
+- **Seven are `Map.get(…) ?? null`** — the ordinary not-found idiom. Not claims at all.
+- **`harness.ts:226` `parentId ?? null` and `:231` `assigneeId ?? null`** — the fixture created-schema
+  declares both `.nullable().optional()`, so absent really does become null. **But that is correct
+  semantics, not fabrication:** a ticket created with no parent *is* a root ticket, one with no assignee
+  *is* unassigned. Null is the natural default of a state field there.
+- **`harness.ts:294` `value ?? null`** — the defect, because in `ticket.field_set` **null is not a default,
+  it is an act**: the clearing claim, sanctioned by design decision 3 and carrying provenance.
+
+**The rule that makes the grep usable:** `?? null` fabricates only where `null` carries the meaning of a
+**deliberate act**. Where `null` is a state field's natural absence-default, converting absent to null is
+the intended reading. That is the question to ask of each hit, and it is answerable without running
+anything.
+
+#### Sweep 2 — a third divergence between the fixture door and the real one, found in passing
+
+`ticketCreatedFixturePayloadSchema` (`harness.ts:140`) declares `parentId: z.string().nullable().optional()`
+while the shipped `ticketCreatedPayload` (`ticket-events.ts:19`) declares `parentId: ulidString.nullable()`
+— **required, not optional.** So a fixture may omit `parentId` and be accepted, where a real event
+omitting it is refused at the door. Independent of `z.unknown()`, same consequence: the fixture door is
+looser than the door it stands in for, so a fixture cannot witness a refusal the real door would make.
+Three such divergences are now known (`harness.ts:32`, `:155`, `:140`), all in one file, all Lane 1's at
+T8. **Worth a deliberate pass rather than three point fixes: the question is not "is this line loose" but
+"where else does the harness schema disagree with the domain schema it mirrors."**
+
+#### The positional rule, so a reader knows which grep hits to open
+
+Lane 1's correction to its own earlier framing, and it generalises better than the instance did:
+`z.unknown()` is dangerous **exactly where it stands as an object property's schema**, and harmless where
+it describes a container's contents. `z.record(K, z.unknown())` is safe because the *record* is the
+required thing and `z.unknown()` sits only in value position — which is why `commentAddedPayload.body`
+is cleared rather than being a fifth instance.
+
 ### Byte-identical instructions target the repo file, not the plan text
 
 Recorded by Lane 4 against its own two partitions, and general. Plan 6 T6's precondition says to create
