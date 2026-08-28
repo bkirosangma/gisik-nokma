@@ -931,6 +931,67 @@ Amendment 1 was raised as a ruling-request and is now **ratified** by the owner 
 top of this section); amendment 2 needed no ruling, being inert until an event type declares the kind.
 Neither ever blocked.
 
+**A third amendment, found while the file was open, and landed with the other two.**
+`submittedEventSchema` declared `payload: z.unknown()`, and `z.unknown()` does not require the key.
+Probed against this repo's own zod rather than reasoned about:
+
+| payload | before | after |
+|---|---|---|
+| absent | ACCEPTED — the claim erased entirely | REFUSED |
+| present-but-undefined | ACCEPTED | REFUSED |
+| `null` | ACCEPTED | ACCEPTED |
+| `{}` | ACCEPTED | ACCEPTED |
+
+**Only absence was the defect**, and the two acceptances are pinned by tests as deliberate: an empty
+claim is still a claim and a null payload is still a claim, so a "fix" that also refused them would look
+correct and quietly refuse legitimate events. The check is `!== undefined`, not `'payload' in v`, because
+both absent and present-but-undefined must go and `JSON.stringify` erases the difference between them on
+the wire anyway. `eventEnvelopeSchema` inherited the hole through `.extend()` and inherits the fix the
+same way. There was no live exploit path — `parse-event.ts` reconstructs the event explicitly rather than
+passing the inferred object through — so this is recorded for the next person to add a field to that
+schema, not as an incident. Not fixed here and not Plan 4's: `z.infer` on the fixed schema yields
+`payload?: unknown`, which is not assignable to `SubmittedEvent`, so a downstream consumer's natural
+unblock is a cast that erases the guarantee; that half belongs to the app-core factory's lane.
+
+**LANDED 2026-08-28 by Lane 2 (Plan 4 Task 3), all three in one commit.** What shipped, so no lane has to
+read the diff to know:
+
+- `ids.ts` gains `MEMBERSHIP_ID_REGEX`, **composed from `ULID_REGEX.source`** rather than hand-spelled —
+  a second spelling of what a ULID is would be free to drift from the first, which is the discipline
+  `ulidString` already states about itself. (The adaptation map's sketch hand-spelled it; the composition
+  is the version that shipped.)
+- `envelope.ts`: the entity schema is a `superRefine` that branches on `kind`. `membership` takes
+  `MEMBERSHIP_ID_REGEX`; every other kind takes `ULID_REGEX` with the message `'must be a ULID'`
+  byte-for-byte. `EventEnvelope` the TYPE is untouched.
+- **The coherence check is in TWO halves, and half of it is not in `envelope.ts`.** The regex alone admits
+  `entity.id = wsB:userC` on an event whose `workspaceId` is `wsA` granting `userD`, and that is not a
+  harmless mis-address: `ingest-service.ts`'s entity↔workspace guard only fires once a head row exists, so
+  the first mis-filed event commits cleanly and a later, correctly-addressed revoke opens a SECOND stream
+  at seq 1 — the split membership stream decision 5 exists to prevent, re-created by its own fix. The
+  **workspace** half is a cross-field `superRefine` in `envelope.ts`; the **user** half needs the parsed
+  payload and lives in `parse-event.ts`, after payload validation, returning `malformed-envelope` (the
+  code union is unchanged — nothing downstream has to widen `IngestErrorCode`). Reading `userId` off raw
+  JSON instead would report an id mismatch when the real complaint is that `userId` is not a ULID.
+- Because both exported schemas now carry a cross-field refinement, they are built from a shared private
+  `z.object` and each `.superRefine`d — a ZodEffects has no `.extend`. `eventEnvelopeSchema` is still
+  derived from the same shape; only the route changed. Both remain `safeParse`-only consumers' concern.
+- `'invite'` is appended to `ENTITY_KINDS` (seventh member, at the end). Inert: every registration names
+  its `entityKind` and `parseEvent` refuses a type filed against a kind it did not declare, so no event
+  can carry it until Plan 4 T14 registers the three invite types. The Global Constraints entity-kind line
+  in `2026-08-20-04-auth-visibility.md` moved with it.
+- **A consequence every lane will meet:** a user id is now a ULID at the door. A membership is addressed
+  as `${workspaceId}:${userId}` and the door admits only `^<ULID>:<ULID>$`, so `membership.granted`,
+  `membership.revoked`, `project.member_added`, `project.member_removed` and `visibility.set`'s explicit
+  `userIds` all type their user ids as `ulidString`. This is the dialect trap below, arriving in payloads
+  as predicted — `usr_1` and `usr_founder` are refused `invalid-payload`. better-auth must therefore mint
+  ULID user ids; that is now a constraint on Task 1, not a preference.
+- **The test design, which the ruling explicitly did not settle:** three directions for the regex
+  (`membership` composite accepted; `membership` bare ULID refused; a non-`membership` kind still refusing
+  a composite with `'must be a ULID'` byte-for-byte), and the two coherence halves are asserted through
+  DIFFERENT doors on purpose — the workspace half against `submittedEventSchema` directly, the user half
+  through `parseEvent` with a prefix-CORRECT, user-wrong id. Full equality subsumes the prefix, so
+  asserting both through `parseEvent` would let either check be deleted with nothing noticing.
+
 **The dialect trap that rides with this file, found twice in one day in two different fields.** Shipped
 `envelope.ts:53` defines `ulidString` as `z.string().regex(ULID_REGEX, 'must be a ULID')`, and `ids.ts:9`
 pins `ULID_REGEX = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/`. So `t1` and `ws_1` are not ULIDs.

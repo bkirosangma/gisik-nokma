@@ -14,4 +14,6 @@ export * from './ist-day.js';
 export * from './doc-text.js';
 export * from './ticket-types.js';
 export * from './events/ticket-events.js';
+export * from './events/membership.js';
+export * from './events/visibility.js';
 export { makeEnvelope } from './testing.js';
