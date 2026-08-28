@@ -1,0 +1,37 @@
+{
+  "name": "discarding a contested claim is a recorded, accepted resolution",
+  "notes": "The accepting twin of contest-resolved-refuses-double-resolution: same contest, same candidate, and the ONLY difference is that no prior resolution exists. Its target id fx_evt_1 is derived from position too, so complete-then-filter is load-bearing here as well.",
+  "workflowDefs": [],
+  "memberships": [],
+  "priorEvents": [
+    {
+      "type": "claim.contested",
+      "entity": { "kind": "ticket", "id": "t1" },
+      "actorId": "user_b",
+      "origin": "server",
+      "payload": {
+        "originalEvent": {
+          "id": "01J9GORG000000000000000000",
+          "workspaceId": "ws_1",
+          "entity": { "kind": "ticket", "id": "t1" },
+          "type": "ticket.transitioned",
+          "version": 1,
+          "payload": { "to": "done" },
+          "actorId": "user_b",
+          "origin": "mobile",
+          "clientTime": "2026-08-20T00:00:00.000Z"
+        },
+        "rule": "restrict-to",
+        "reason": "Only the assignee may do this."
+      }
+    }
+  ],
+  "candidateEvent": {
+    "type": "claim.contested_resolved",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_b",
+    "origin": "desktop",
+    "payload": { "contestedEventId": "fx_evt_1", "resolution": "discarded" }
+  },
+  "expected": { "refused": false }
+}

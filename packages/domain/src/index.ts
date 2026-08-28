@@ -16,4 +16,7 @@ export * from './ticket-types.js';
 export * from './events/ticket-events.js';
 export * from './events/membership.js';
 export * from './events/visibility.js';
+export * from './events/contest-events.js';
+export * from './clock-skew.js';
+export * from './submit.js';
 export { makeEnvelope } from './testing.js';

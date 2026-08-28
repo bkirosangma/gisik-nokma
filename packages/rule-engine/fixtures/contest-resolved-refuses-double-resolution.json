@@ -1,0 +1,48 @@
+{
+  "name": "a contested claim cannot be resolved twice",
+  "notes": "Shape is load-bearing beyond the outcome. The harness derives each prior event's id from its POSITION (fx_evt_<seq>), so the contest recorded first is fx_evt_1, and both the prior resolution and the candidate must name it. Complete-then-filter in buildInMemoryContext is what keeps that true. Filter first and the contests are REMOVED before they are ever given ids, so getContest can never find one; in the sibling shape, where a two-list implementation keeps the contests but numbers them off a filtered enumeration, the surviving ids are RENUMBERED instead. Removed or renumbered, this fixture stops finding fx_evt_1 either way and refuses contest.unknown — still refused, wrong rule.",
+  "workflowDefs": [],
+  "memberships": [],
+  "priorEvents": [
+    {
+      "type": "claim.contested",
+      "entity": { "kind": "ticket", "id": "t1" },
+      "actorId": "user_b",
+      "origin": "server",
+      "payload": {
+        "originalEvent": {
+          "id": "01J9GORG000000000000000000",
+          "workspaceId": "ws_1",
+          "entity": { "kind": "ticket", "id": "t1" },
+          "type": "ticket.transitioned",
+          "version": 1,
+          "payload": { "to": "done" },
+          "actorId": "user_b",
+          "origin": "mobile",
+          "clientTime": "2026-08-20T00:00:00.000Z"
+        },
+        "rule": "restrict-to",
+        "reason": "Only the assignee may do this."
+      }
+    },
+    {
+      "type": "claim.contested_resolved",
+      "entity": { "kind": "ticket", "id": "t1" },
+      "actorId": "user_b",
+      "origin": "desktop",
+      "payload": { "contestedEventId": "fx_evt_1", "resolution": "discarded" }
+    }
+  ],
+  "candidateEvent": {
+    "type": "claim.contested_resolved",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_b",
+    "origin": "desktop",
+    "payload": { "contestedEventId": "fx_evt_1", "resolution": "discarded" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "contest.already-resolved",
+    "reason": "This contested claim is already resolved; a second resolution would rewrite history."
+  }
+}

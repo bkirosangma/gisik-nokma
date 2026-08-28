@@ -1,6 +1,7 @@
 import type { EventEnvelope } from '@gisik-nokma/domain';
 import { evaluateWorkflowDefined } from './workflow-defined.js';
 import { evaluateTicketTransitioned } from './transition.js';
+import { evaluateClaimContested, evaluateClaimContestedResolved } from './contests.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
 
 /**
@@ -15,6 +16,10 @@ export async function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Pro
       return evaluateWorkflowDefined(env, ctx);
     case 'ticket.transitioned':
       return evaluateTicketTransitioned(env, ctx);
+    case 'claim.contested':
+      return evaluateClaimContested(env, ctx);
+    case 'claim.contested_resolved':
+      return evaluateClaimContestedResolved(env, ctx);
     default:
       return { refused: false };
   }
