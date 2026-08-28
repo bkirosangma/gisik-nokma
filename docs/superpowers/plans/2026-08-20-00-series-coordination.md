@@ -892,14 +892,25 @@ Found by Lane 2's pre-flight, verified by execution rather than by reading, and 
 the seven pre-rulings pinned ownership of every collision anyone anticipated and this is not among them.
 Every lane imports this file.
 
+**Owner ruling (2026-08-28): the membership entity-id exception is RATIFIED.** Lane 2's kind-aware
+check is the decision, not a conservative default awaiting review — `membership` admits the composite
+`${workspaceId}:${userId}`, every other kind keeps `ulidString` byte-for-byte, and the `EventEnvelope`
+type is untouched. Recorded here so no later lane re-opens it as an open question.
+
+Two things the ruling does **not** cover, stated so they are not read into it. `'invite'` joining
+`ENTITY_KINDS` was never put to the owner and did not need to be — a member added to a closed set is
+inert until an event type declares it. And the ruling settles the *exception*, not the test design that
+proves it: the three-direction assertion below is Lane 2's own and is what keeps "every other kind
+unchanged" a proof rather than a claim.
+
 **Two independent amendments are owed to it, both by Plan 4.**
 
 1. **Decision §5's composite membership id cannot be submitted.** §5 pins `membershipId(workspaceId,
    userId)` = `` `${workspaceId}:${userId}` ``. Shipped `envelope.ts:75` is
    `entity: z.object({ kind: z.enum(ENTITY_KINDS), id: ulidString })` — *every* entity id must be a bare
    ULID — so a membership event is refused `malformed-envelope` at `parse-event.ts` before any Plan 4
-   code runs. §5 and the envelope schema cannot both stand as written. Lane 2's conservative default is
-   a kind-aware check: `membership` admits `^<ULID>:<ULID>$`, every other kind keeps `ulidString`
+   code runs. §5 and the envelope schema cannot both stand as written. Lane 2's kind-aware check —
+   its conservative default at the time, **ratified by the owner 2026-08-28** (above) — is: `membership` admits `^<ULID>:<ULID>$`, every other kind keeps `ulidString`
    byte-for-byte, and the `EventEnvelope` *type* is untouched. Four alternatives (composite as lookup
    key only, filing under `kind:'workspace'`, a hashed pseudo-ULID, relaxing `ulidString` generally)
    were each refuted on stream identity: `seq`, `lockEntity`, snapshots, `readEntityEvents` and
@@ -916,8 +927,9 @@ early, separate, additive changes, and any other lane needing `envelope.ts` reba
 editing in parallel.** Merge-resolving a schema that governs every event's identity is the one place in
 this series where a textual merge is more expensive than waiting.
 
-Both are raised to the owner as ruling-requests by the tasks that make them. Neither blocks: the
-conservative defaults stand under the autonomous execution protocol until the owner rules.
+Amendment 1 was raised as a ruling-request and is now **ratified** by the owner (see the ruling at the
+top of this section); amendment 2 needed no ruling, being inert until an event type declares the kind.
+Neither ever blocked.
 
 **The dialect trap that rides with this file, found twice in one day in two different fields.** Shipped
 `envelope.ts:53` defines `ulidString` as `z.string().regex(ULID_REGEX, 'must be a ULID')`, and `ids.ts:9`
@@ -951,6 +963,303 @@ path, both consume it from the `@gisik-nokma/domain` barrel. So the file *path* 
 contract and no Plan 8 guard can be waiting on one. What actually binds is the two export names,
 `SIMPLE_KANBAN_TEMPLATE` and `simpleKanbanWorkflowDef(workflowId)`. The ruling's intent stands — Plan 4
 owns it — but a lane keying a guard on the path is guarding the wrong thing.
+
+### `@better-auth/cli` is BANNED in this repo, and Plan 4's Step 10 told the executor to use it
+
+Found by Lane 2's T1 and verified independently at the installed tree, because it is a
+production-failure claim.
+
+`@better-auth/cli`'s latest release is **1.4.21**, and it pins `"better-auth": "1.4.21"` as an exact
+hard dependency — so it reports the **1.4 schema regardless of which version the server imports.** This
+repo imports 1.7.2. Run against this repo's real config it emitted an `account` table with **no
+`issuer` column and no `account_issuer_accountId_uidx` index**, both of which 1.7.2 writes on every
+account link. That migration applies cleanly and then **fails on the first Google sign-in.**
+
+What makes it worth a section rather than a bullet: **Plan 4 Step 10 instructed the executor to
+reconcile the handwritten migration against exactly that tool.** Following the plan text literally ships
+the broken schema, and the reconciliation step that exists to catch schema drift is the thing that
+introduces it. A check that does not merely miss the defect but manufactures it.
+
+**Plan 4 names the banned CLI three times, and a ban naming only the last one is unenforceable.**
+Line 116 (Step 1) **installs** it — `pnpm add -D @better-auth/cli` — so a lane executing partition A
+step-by-step adds the banned package to the lockfile long before it reaches any warning. Line 299's doc
+comment on the exported `auth` instance re-motivates it ("Concrete instance for `npx @better-auth/cli
+generate` and local dev") at the very site the replacement reads. Line 403 (Step 10) runs it. **All three
+are void: the dependency is not to be added.**
+
+**The replacement, already shipped by Lane 2:** `pnpm --filter @gisik-nokma/server run auth:schema`,
+which reads the *installed* library's own `getMigrations`, plus a test asserting the live database leaves
+that planner nothing to create — so the next better-auth upgrade turns the suite red rather than
+production. **Ownership splits in two, and the first draft of this section put both halves in the wrong place.**
+Grepped across all eleven plans, `@better-auth/cli` appears in **Plan 4 only** — Plan 11 names it zero
+times, so Plan 11 cannot own the risk of it being *added*.
+
+- **Risk of addition — Plan 4's, i.e. Lane 2's**, enforced at its own Step 1 (line 116). That is where
+  the dependency enters.
+- **Risk of shipping — Plan 11's, i.e. Lane 4's**, and it is real even though the plan never names the
+  tool: Plan 11's Dockerfile runs `pnpm install --frozen-lockfile` (lines 915 and 943), so a lockfile
+  entry created by Plan 4 becomes a **shipped artifact** through packaging. The right check there is
+  therefore not "grep my plan text for the tool" — it is not there to find — but **assert the lockfile
+  does not carry it before building the image, and keep that assertion inside the build so it cannot
+  regress.** (Lane 4's formulation, and a better check than the one the original framing would have
+  produced.)
+
+  **Write that assertion against the lockfile FILE, never against install output.** Lane 2 observed that
+  the peer warning it was tracking **was not printed** under `--frozen-lockfile` (its sources say "the
+  peer warning", about the specific `better-call`/zod one — the general claim that pnpm prints *no* peer
+  warnings under frozen installs is **not** independently verified here and should not be relied on
+  beyond the observed case). Either way the conclusion holds and does not depend on the general form: a
+  check that greps the install's *output* inside a Docker build can read clean **for a reason unrelated
+  to what it asserts**, and would then read clean forever. Same shape as everything else in this section: the easy check confirms the command
+  ran, not that it looked where the answer is.
+
+**State of the ban as of 2026-08-28, and the history is the load-bearing half.** Current state:
+`@better-auth/cli` is in **no** lockfile and **no** `package.json`. But it was **not** "never installed"
+— an earlier draft of this section said so, and that erased the fact that justifies the check.
+
+What actually happened, from Lane 2's T1 report: the CLI **was** installed and run (`generate --config`
+executed successfully), its output was found wrong for the installed library, and it was removed. **And
+`pnpm remove` did not clean the lockfile.** The CLI's optional peers stayed baked in as resolution keys —
+`better-auth@1.7.2(@prisma/client@5.22.0)(better-sqlite3@12.11.1)(pg…)` — so a `--frozen-lockfile` CI
+install would still have fetched prisma and compiled a native `better-sqlite3`, dragging ~150 packages
+into every image, to support a tool nobody was using. The lockfile had to be **reset to `HEAD` and
+re-resolved from `package.json`** before it was actually clean.
+
+**Key the gate on the banned package itself, never on the residue fingerprint.** The residue names
+above (`@prisma/client`, `better-sqlite3`) are what the leftovers looked like *for Lane 2*. A gate
+written against that fingerprint would be correct today, stay green through Plan 10's T1/T2/T3a — and
+then **fail on Plan 10 Task 8, which legitimately adds `better-sqlite3` as the sync-client's storage
+adapter** (plan-10 line 2856 creates `storage/better-sqlite3.ts`, line 2897 declares
+`"better-sqlite3": "^11.10.0"`). At that point it looks like a false positive from a gate nobody
+remembers the reason for, and the reasonable response is to weaken or delete it. So the assertion targets
+`better-auth` and `@better-auth/cli` by name and nothing transitive.
+
+Worth naming as its own direction of the day's shape: the other three instances were checks that **pass
+when they should fail**; this one is a check that **fails when it should pass**. Both end the same way —
+deleted by someone reasonable — which is why "would this ever fire for a reason unrelated to its name?"
+has to be asked in both directions. (Found by Lane 4 while adopting the corrected justification; it
+generalises past lockfiles to anything where a cleanup is partial — migrations, generated files, a
+projection reset.)
+
+**That is the whole argument for Lane 4's check, and "we removed it" is not evidence the lockfile is
+clean.** A lane that later adds a banned package, runs `pnpm remove`, and trusts the removal will ship
+the residue. The assertion against the lockfile file is what catches it; nothing else in the pipeline
+would.
+
+Line 403 is killed by `auth:schema`. **Two distinct artifacts carried the comment problem and an earlier
+draft merged them into one sentence**: plan-4 line 299 is *plan text* reading "Concrete instance for
+`npx @better-auth/cli generate` and local dev", while the *shipped* `apps/server/src/auth/auth-dev.ts:7`
+carried a different variant naming `pnpm exec better-auth generate` — a command that never existed, since
+the `generate` bin ships in the CLI package under the name `better-auth`, not in the library. Lane 2 has
+since fixed the shipped file; it now names `auth:schema`. The plan line stands as plan text and is void
+along with the other two.
+
+**DO NOT TIDY: `auth-schema.ts:11` and `auth-tables.test.ts:64` stay.** They reference
+`@better-auth/cli` in order to explain *why it is banned*, which means they look exactly like the stale
+references this section exists to remove. A reviewer sweeping for mentions of a banned tool — especially
+during Plan 11's packaging work, which touches these files — would helpfully delete the only surviving
+explanation of the ban, leaving a prohibition with no reachable reasoning behind it. The hazard is
+general: **a comment warning about X necessarily contains X, so any grep-and-remove pass over X destroys
+its own documentation first.** Lane 4 has recorded it as a do-not-tidy on its side.
+
+### The actionable form of all of it, from Lane 4's three instances
+
+Lane 4 hit this shape three times in its own scope in one day — Plan 11's `check:env` grepping
+`process.env.X` against a codebase that declares config as zod schema keys; Plan 10 T8's conformance
+assertion whose array contains the value under test as its own first element, so no interleaving can fail
+it; and the lockfile assertion it was about to write against install output. **The tell is identical every
+time: the check passes for a reason unrelated to the property it names, and the wrong version is the one
+that is easier to write.**
+
+So the rule it now puts on every gate it lands, which is the operational form of this whole section:
+
+> **State what would make it fail, then make it fail once, before trusting it.**
+
+Its env gate carries two guards built exactly that way, both proven to fire rather than assumed to. This
+is the same discipline as the mutation-proof requirement on fixtures, applied to gates and assertions
+rather than to tests — and it is cheap precisely because it is done once, at authoring time, by the
+person who still remembers what the check was for.
+
+The falsifiability shape is worth keeping as a worked example of plant-in-production-shape: planting
+*exactly the CLI's output* makes the drift check fail naming `account.issuer`, while a "five tables
+exist" check and a "columns are camelCase" check both still pass. Those two are the obvious tests to
+write and neither catches it.
+
+**Two adjacent facts verified at the same tree, so no lane re-derives them.** `better-auth@1.7.2`
+declares **no zod peer dependency** — zod `^4.3.6` is its own direct dep, nested, and the monorepo's
+3.25.76 is untouched; the `better-call ✕ unmet peer zod@^4.0.0` warning is cosmetic. And **passkey has
+left better-auth core**: 1.7.2 exposes 54 export subpaths, none containing `passkey`, and carries no
+`@simplewebauthn/*` dependency. It ships as `@better-auth/passkey@1.7.2`, a separate package.
+`PasskeyOptions` still takes `rpID`/`rpName`, so only the specifier moves — any plan text naming
+`better-auth/plugins/passkey` is wrong.
+
+### The complete better-auth specifier triage, run across all eleven plans — and why "the subpath exists" is not the test
+
+Lane 3 proposed the right triage and it is cheap: **a plan that consumes a *type* is insulated from its
+provider's packaging; a plan that names a *subpath* is not**, so grepping for `from 'better-auth/...'` is a
+complete test needing no judgment. Run across all eleven plans, exactly two carry such imports:
+
+| Plan | Line | Import | Verdict (checked against the installed 1.7.2 tree) |
+|---|---|---|---|
+| 4 | 234 | `{ bearer, magicLink, phoneNumber } from 'better-auth/plugins'` | subpath present — **fine** |
+| 4 | 235 | `{ passkey } from 'better-auth/plugins/passkey'` | subpath **absent** — move to `@better-auth/passkey` |
+| 4 | 685 | `{ fromNodeHeaders } from 'better-auth/node'` | subpath present — **fine** |
+| 6 | 7885 | `{ createAuthClient } from 'better-auth/react'` | subpath present — **fine** |
+| 6 | 7886 | `{ magicLinkClient, phoneNumberClient } from 'better-auth/client/plugins'` | subpath present — **fine** |
+| 6 | 7887 | `{ passkeyClient } from 'better-auth/client/plugins'` | **subpath present, export ABSENT** — see below |
+
+Plan 7 is a clean negative and the reason is the rule working: its two `better-auth` mentions are prose,
+it consumes `Auth` as a type from Plan 4, and it stubs sessions as `Bearer <userId>` by its own sanction.
+It survives better-auth being repackaged entirely.
+
+**The refinement the triage needs, found by running it.** Plan 6 line 7887 is the dangerous row, and a
+subpath grep marks it clean: `better-auth/client/plugins` **does** exist in 1.7.2. What no longer exists
+is the *named export*. `passkeyClient` appears nowhere in better-auth core's `dist`; it ships in
+`@better-auth/passkey/dist/client.mjs`, reachable at that package's `./client` subpath (its only two
+subpaths are `.` and `./client`).
+
+**The fix, confirmed independently by Lane 4 against the same tree:**
+`import { passkeyClient } from '@better-auth/passkey/client'`, with `@better-auth/passkey` declared as a
+dependency. Recorded against 6b T14 so Wave 3 does not re-derive it. Lane 4 also verified the negative
+half — `passkeyClient` has zero hits across every file in core's `dist`, while `magicLinkClient` and
+`phoneNumberClient` are both present in `dist/client`, so lines 7885-7886 are genuinely fine.
+
+So a specifier move splits into two failure shapes with different detection costs. **A missing subpath
+fails at resolution — loud, immediate, and the same way for everyone. A present subpath missing a named
+export fails at the import site**, which means — Lane 4's sharpening, and it is the load-bearing part —
+**how loudly it fails depends on the consumer's build config, not on the defect.** A strict `tsconfig`
+catches it at typecheck; a bundler with loose interop hands back `undefined` and defers the failure to
+first call. The same defect therefore has a different blast radius in every package that imports it,
+which is precisely why this belongs in one repo-wide sweep rather than in each lane's local judgment.
+**The complete test is three checks, not one** — Lane 3 found the third by running the rule *forward*
+over its eleven undispatched tasks rather than backward over what shipped:
+
+1. **The subpath resolves.** Missing → fails at resolution, loudly, identically for everyone.
+2. **The named export exists in it.** Missing → fails at the import site, at whatever volume the
+   consumer's build config decides.
+3. **The binding form matches.** `@vitejs/plugin-react` exports **only** `default`, so a named import of
+   it fails exactly like an absent export — and a grep for the name marks it clean *twice over*, since
+   both the subpath and the identifier are present. Plan 7 happens to get it right at line 6955
+   (`import react from '@vitejs/plugin-react'`), so this is a clean negative rather than a catch.
+   `@tiptap/suggestion` is the control case worth knowing: it publishes both a named `Suggestion` and a
+   default, so either style works and nothing distinguishes a lucky guess from a checked one.
+
+Lane 3's forward sweep over Plan 7's remaining tasks is clean on all three: eleven specifiers, all
+resolving, every named export present, every binding form correct.
+
+### The controller's own failure class, named by the lanes that kept catching it
+
+Recorded because it is a property of this role rather than of one session, and the next controller
+inherits it. Across a full day of cross-lane work, the corrections that reached the controller were
+**overwhelmingly ownership and location claims** — which plan owns a thing, which line does it,
+which task it sits in. The specifier table, the payload shapes, the append-only trigger names, the exact
+fix for Plan 6 line 7887: all correct. What kept slipping was `schedule.ts` mistaken for the verifier's,
+`CONTEST_EVENT_TYPES` filed under the wrong task, the CLI ban addressed to the wrong plan, a rule's
+example attached to a vocabulary that does not reach the ledger.
+
+**An earlier draft of this paragraph said "every … never a technical one", and the same commit series
+falsified it.** The "never installed" claim corrected above is neither ownership nor location — it is a
+claim about **repo state and history**, and it carried this section's strongest confidence marker while
+being contradicted by a primary source in the very lane it credited. Worse, the rule drawn from it did
+not cover it: **a grep proves current absence, and current absence is exactly compatible with
+installed-then-removed.** The evidence for "never installed" is git history, not a grep — so the guard as
+first written would have passed the claim it needed to catch. A section warning against overreach that
+closes on an overreach is the day's own lesson arriving one more time.
+
+Lane 4's diagnosis is the useful part: **that is the class where plan text and repo diverge fastest under
+parallel execution, and it is also the cheapest class to check** — one grep answers it — which is
+presumably why it keeps getting asserted instead. A controller synthesising across eleven plans it has
+not read end-to-end is structurally most confident exactly where it is least entitled to be.
+
+**So the rule the controller runs under, stricter than the one it gives the lanes, and widened by the
+failure that escaped its first form:** any claim about repo **state or history** — who owns a thing,
+where it lives, *and whether something ever happened* — ships with the artifact that proves it, or it
+ships as a question. With the discriminator that first form missed: **absence now does not establish
+never-present.** A grep answers "is it here"; only history answers "was it ever". The technical claims
+were already surviving review; this class is the one that was not.
+
+### The one shape under all of it
+
+Stated once, because today produced three independent instances and they are the same defect:
+
+> **The check that is easy to write asks whether something is present. The check that is correct asks
+> whether it is present *in the form you are about to use it*.**
+
+`toContain` versus set-equality. Subpath versus export. Export versus binding form. Each easy version
+returns green over the failing case, and each correct version costs the same to write once someone has
+noticed the difference. The corollary that makes it actionable: **an inclusion check is never a
+sufficient test of a closed set** — and when the set is one the ledger persists, the asymmetry becomes
+unrecoverable rather than merely weak. Lane 4's statement of it is the one to keep: a *missing* member of
+a closed vocabulary fails at the door, while an *extra* member commits and is permanent, because the
+ledger is append-only by trigger. That is not a test that could be stronger; it is an unrecoverable
+write. Set-equality is therefore **mandatory, not preferable**, for any vocabulary reaching the ledger.
+
+**The two vocabularies named when this rule was first written are already compliant, and the check that
+established that is the point.** `CONTEST_EVENT_TYPES` (Plan 10 **Task 1**, not T2 — the wave schedule
+above has it right) is pinned at plan-10 line 196 with
+`expect(CONTEST_EVENT_TYPES).toEqual(['claim.contested', 'claim.contested_resolved'])`, and
+`NOTIFICATION_KINDS` at plan-9 line 625 with `toEqual` over its five kinds. Neither needs fixing; the
+mandate is that they **stay** that way, and that any vocabulary added later starts there.
+
+One distinction the first draft of this paragraph collapsed: **`NOTIFICATION_KINDS` does not reach the
+ledger.** Plan 9 Task 4 puts notifications in an ordinary mutable table, so the unrecoverability argument
+does not apply to it — it gets the softer landing, like Lane 3's `underline` mark, where a wrong value is
+at least migratable. The append-only trigger is real (`events_append_only` /
+`events_no_update_no_delete` / `events_no_truncate`) and it is what makes the argument bite for
+`CONTEST_EVENT_TYPES`, which does reach the ledger. A rule stated with an example that does not support
+it teaches the wrong boundary.
+
+**Why this one was found centrally, recorded because it argues for how the remaining sweeps run.** Three
+lanes each held one piece — Lane 3 had the type-versus-subpath insight, Lane 2 had the installed tree,
+Lane 4 had the Plan 6 lines — and no lane held all three. Every per-lane check would have marked line
+7887 clean, because a subpath grep passes it. **Cross-plan sweeps against installed reality are the
+controller's to run once, not the lanes' to run four times**, and the argument is not effort but
+completeness: a lane can only check what it can see.
+
+Nothing here is Wave 1 work — Plan 6's client transport is 6b, deferred to Wave 3 — but it is recorded
+now because the tree that proves it is installed today in Lane 2's worktree, and by Wave 3 the cheap
+check will require re-deriving what someone already ran.
+
+### Two blind spots in how tests are written, both found on first contact
+
+Both from Lane 3's Plan 7 T1, both the same family as the fixture and checker findings above.
+
+**1. `toContain` is silent about "and nothing else", and a bundled preset is where the extra arrives.**
+StarterKit v3.30.5 bundles an `underline` mark that Plan 7's schema v1 does not name. Nothing in the plan
+disables it, and the plan's own vocabulary test uses `toContain` — which cannot notice a *sixth* mark.
+All three clients would have stored a mark no spec text names, and the test written to cover exactly that
+risk would have stayed green. Fixed with `underline: false` and set-equality pinning in both directions.
+**Generalises past tiptap: any assertion of the form "the vocabulary includes X" says nothing about what
+else is in it, and any preset dependency — a component library, a lint config, a zod `.extend` — is
+precisely where the unnamed extra comes from.**
+
+**2. A `typecheck` config that excludes `test/` cannot see a broken test helper.** Plan 7 shipped only a
+build config, which includes `src` but not `test`. Lane 3 carried an adaptation adding
+`tsconfig.typecheck.json`, and it paid immediately: the plan's own `typeText` helper **does not compile**
+— prosemirror-view's `handleTextInput` takes five arguments and the plan passes four. That error lives in
+`test/`, so a single-tsconfig `typecheck` would never have read it, and the helper would have shipped
+into eleven downstream tasks silently failing to drive input rules. **Any client-package plan pointing
+`typecheck` at a config that excludes `test/` has the same blind spot**, and it presents as a runtime
+mystery in whatever task first depends on a test helper's behaviour rather than as a type error. Worth a
+check in Plans 6 and 9 before their client tasks dispatch.
+
+### Merge rule for this document: resolve by heading nesting, never by arrival order
+
+Found by Lane 4 resolving its own collision with this section, and worth pinning because it will recur
+every time two lanes append here — which under parallel waves is constantly.
+
+Two lanes appending at end-of-file produce a conflict git describes as "both sides added at EOF". Taking
+both sides in arrival order is textually correct and **structurally wrong**: Lane 4's addition was a
+`### 7.` written under its own `## Lane 4 (periphery) execution consequences` heading, and arrival order
+would have parked it after the `## Wave 1 cross-lane watch` heading that follows — silently reparenting a
+Plan 11 env-gate limit as a cross-lane watch item. **Markdown raises no error when a `###` lands under
+the wrong `##`,** and nothing downstream ever complains; the only symptom is a reader finding a claim
+filed under a heading that misdescribes it.
+
+**The rule: when this file conflicts at EOF, place each `###` back inside the `##` it was written under,
+then order the `##` sections by merge order.** A `###` in an EOF conflict almost always belongs to the
+`##` above it on its own side, not to whatever heading happens to precede it after the merge. Cheap to
+get wrong, invisible afterwards, and it corrupts the one document four lanes treat as authority.
 
 ### What the review of this section caught, recorded because it generalises
 
