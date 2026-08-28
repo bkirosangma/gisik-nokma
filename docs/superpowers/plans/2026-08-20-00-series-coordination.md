@@ -847,6 +847,47 @@ the ruling would not have found the correction. Lane 2's brief inherited the phr
 and should be read with that in mind. The ruling itself is unchanged: §8 is the single source, and the
 second lane to merge writes the full order into both the array and the comment.
 
+### `packages/domain/src/envelope.ts` is Wave 1's real collision surface, and no pre-ruling covers it
+
+Found by Lane 2's pre-flight, verified by execution rather than by reading, and recorded here because
+the seven pre-rulings pinned ownership of every collision anyone anticipated and this is not among them.
+Every lane imports this file.
+
+**Two independent amendments are owed to it, both by Plan 4.**
+
+1. **Decision §5's composite membership id cannot be submitted.** §5 pins `membershipId(workspaceId,
+   userId)` = `` `${workspaceId}:${userId}` ``. Shipped `envelope.ts:75` is
+   `entity: z.object({ kind: z.enum(ENTITY_KINDS), id: ulidString })` — *every* entity id must be a bare
+   ULID — so a membership event is refused `malformed-envelope` at `parse-event.ts` before any Plan 4
+   code runs. §5 and the envelope schema cannot both stand as written. Lane 2's conservative default is
+   a kind-aware check: `membership` admits `^<ULID>:<ULID>$`, every other kind keeps `ulidString`
+   byte-for-byte, and the `EventEnvelope` *type* is untouched. Four alternatives (composite as lookup
+   key only, filing under `kind:'workspace'`, a hashed pseudo-ULID, relaxing `ulidString` generally)
+   were each refuted on stream identity: `seq`, `lockEntity`, snapshots, `readEntityEvents` and
+   canonical replay all key on `(entity_kind, entity_id)`, so grant → revoke → re-grant must share one
+   id and a replica must mint it without a read-before-write.
+2. **`ENTITY_KINDS` is a closed six-member set and Plan 4 T14 registers three event types with
+   `entityKind: 'invite'`.** That member has to join it, and the Global Constraints' entity-kind line
+   moves with it. T14's own Files list does not mention `envelope.ts`.
+
+**Who else touches this file, so the sequencing is known rather than discovered at merge:** Plan 3 refers
+to it once, Plan 9 twice, and Plan 10 references `ENTITY_KINDS`. None of those is in Wave 1's Plan 4
+window except Plan 3 (Lane 1). **Sequencing rule for this wave: Plan 4 lands both envelope amendments as
+early, separate, additive changes, and any other lane needing `envelope.ts` rebases onto them rather than
+editing in parallel.** Merge-resolving a schema that governs every event's identity is the one place in
+this series where a textual merge is more expensive than waiting.
+
+Both are raised to the owner as ruling-requests by the tasks that make them. Neither blocks: the
+conservative defaults stand under the autonomous execution protocol until the owner rules.
+
+**A related correction to pre-ruling 2, from the same scan.** The ruling says Plan 8 T3's guard "must NOT
+create" `simple-kanban.ts` and must wait if it is absent. Checked rather than assumed: grepping Plans 8
+and 11 for `simple-kanban` / `SIMPLE_KANBAN` / `simpleKanban` returns **nothing** — neither plan names a
+path, both consume it from the `@gisik-nokma/domain` barrel. So the file *path* is not a cross-plan
+contract and no Plan 8 guard can be waiting on one. What actually binds is the two export names,
+`SIMPLE_KANBAN_TEMPLATE` and `simpleKanbanWorkflowDef(workflowId)`. The ruling's intent stands — Plan 4
+owns it — but a lane keying a guard on the path is guarding the wrong thing.
+
 ### What the review of this section caught, recorded because it generalises
 
 This section was reviewed before merge by a single opus reviewer instructed to verify every claim against
@@ -862,3 +903,60 @@ compiler, and the import law really is standing. None was invented. What failed 
 inference one step further: what the schedule actually schedules, what the test actually calls, what the
 envelope's payload type already is. A finding that names a file and a line is not yet a finding that has
 been verified to *do* what the name suggests, and this document is acted on by four lanes at once.
+
+Lane 1 named the operative asymmetry more precisely, and it is worth adopting as a rule: **the inference
+was always about a file that had not been opened.** A plausible inference about unread code is
+indistinguishable from knowledge until someone opens the file. Its pre-flight already forbids an
+adaptation-map entry without a `file:line` citation for exactly this reason. Extended to this document:
+**a cross-lane claim about another lane's code carries the `file:line` that proves it, or it ships as a
+question rather than a finding.**
+
+### Three findings of one shape, and the rule that catches all of them
+
+Independently, in one day, three lanes found checks that pass without checking:
+
+- **Lane 3** mutated fixtures Plan 7 Task 2 ships as pinned text and found four surviving mutants,
+  including a `type === 'image'` discriminator deletable with all seven cases still green — so a walker
+  that also harvested mention ids would change what a server gate checks, silently.
+- **Lane 4** found Plan 11's `check:env` gate greps for `process.env.X` while this codebase reads config
+  through a zod schema and passes `process.env` in wholesale, so it finds zero variables and passes
+  vacuously — and its planted-defect proof plants a `process.env.X`, the one pattern it can see.
+- **Lane 4** also found the colour-discipline scanner matches hex and colour functions but not bare
+  named colours, so `color: red` passes; proven both ways with plants.
+
+Lane 3's name for the shared disease is the sharpest available: **an artifact whose planted-defect proof
+is drawn from the same assumption as the artifact.** The checker's plant confirms the mechanism works,
+not that the mechanism looks where the variables are; the fixture's cases confirm the walker finds, not
+that it discriminates. In every instance the defect was invisible from inside the artifact and appeared
+only when someone mutated the *implementation* rather than extending the *test*.
+
+**The rule, binding on every planted check in the series:** *mutate the implementation, not the fixture.*
+A plant drawn from the same assumption as the check will always pass. And for transcribed fixtures
+specifically, which read authoritative and are therefore least likely to be interrogated: confirm the
+mutation goes red **at the fixture's own expected outcome** rather than at setup or parse, and for a
+refusal fixture confirm it fails for the *named* rule — one that still refuses after the check under
+test is deleted is pinning something else.
+
+**A corollary Lane 3 raised that the deferral above needs:** a widened check that only ever scans trees
+authored after it silently exempts everything predating it. `packages/editor/src/styles/editor.css` lands
+inside the named-colour gap window, so Plan 6 Task 2's executor must re-scan what already exists when the
+keyword check arrives, not only what arrives after.
+
+**A fourth instance, from Lane 2, where the pressure runs the other way.** Plan 4's text carries four
+test-count drifts — it states 13 tests where 14 `it` blocks are written, 7 where 8 are, "1 test" where 2
+are, and a header saying cases 6.1–6.20 over a list running to 6.22. Individually trivial; dangerous in
+aggregate because of the repair they invite. An executor who trusts the stated total and finds one test
+more than expected has an obvious tidy-up available: delete the extra so the count matches the number the
+plan pinned. **Standing ruling, adopted from Lane 2 and generalised to the series: resolve every count
+discrepancy by literal count and correct the plan's number, never the reverse.** "Make the count match"
+is how deliberately-written coverage gets deleted by someone being tidy. Any lane whose plan carries the
+same drift takes the same ruling.
+
+**And a diagnostics corollary, from Lane 4's scanner.** `colour-scan.ts` reports hits as
+`relative(root, path)` — relative to each individual source root — so once a second package exists, a hit
+in `packages/editor/src/styles/editor.css` prints as `styles/editor.css` with nothing naming the package,
+and two roots each holding an `index.css` produce two indistinguishable lines. This is the series' own
+"a refusal that fires for the wrong reason is not coverage" applied to diagnostics: a check that fires
+correctly but cannot say *where* sends its red to the wrong owner. Invisible while one lane owns every
+scanned tree; it bites the moment a second lane's tree enters the walk. Fix is `relative(REPO_ROOT, path)`
+and Lane 4 is landing it ahead of Lane 3's rebase.
