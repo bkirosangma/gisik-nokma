@@ -909,8 +909,8 @@ unchanged" a proof rather than a claim.
    userId)` = `` `${workspaceId}:${userId}` ``. Shipped `envelope.ts:75` is
    `entity: z.object({ kind: z.enum(ENTITY_KINDS), id: ulidString })` — *every* entity id must be a bare
    ULID — so a membership event is refused `malformed-envelope` at `parse-event.ts` before any Plan 4
-   code runs. §5 and the envelope schema cannot both stand as written. Lane 2's conservative default is
-   a kind-aware check: `membership` admits `^<ULID>:<ULID>$`, every other kind keeps `ulidString`
+   code runs. §5 and the envelope schema cannot both stand as written. Lane 2's kind-aware check —
+   its conservative default at the time, **ratified by the owner 2026-08-28** (above) — is: `membership` admits `^<ULID>:<ULID>$`, every other kind keeps `ulidString`
    byte-for-byte, and the `EventEnvelope` *type* is untouched. Four alternatives (composite as lookup
    key only, filing under `kind:'workspace'`, a hashed pseudo-ULID, relaxing `ulidString` generally)
    were each refuted on stream identity: `seq`, `lockEntity`, snapshots, `readEntityEvents` and
@@ -927,8 +927,9 @@ early, separate, additive changes, and any other lane needing `envelope.ts` reba
 editing in parallel.** Merge-resolving a schema that governs every event's identity is the one place in
 this series where a textual merge is more expensive than waiting.
 
-Both are raised to the owner as ruling-requests by the tasks that make them. Neither blocks: the
-conservative defaults stand under the autonomous execution protocol until the owner rules.
+Amendment 1 was raised as a ruling-request and is now **ratified** by the owner (see the ruling at the
+top of this section); amendment 2 needed no ruling, being inert until an event type declares the kind.
+Neither ever blocked.
 
 **The dialect trap that rides with this file, found twice in one day in two different fields.** Shipped
 `envelope.ts:53` defines `ulidString` as `z.string().regex(ULID_REGEX, 'must be a ULID')`, and `ids.ts:9`
@@ -978,6 +979,13 @@ What makes it worth a section rather than a bullet: **Plan 4 Step 10 instructed 
 reconcile the handwritten migration against exactly that tool.** Following the plan text literally ships
 the broken schema, and the reconciliation step that exists to catch schema drift is the thing that
 introduces it. A check that does not merely miss the defect but manufactures it.
+
+**Plan 4 names the banned CLI three times, and a ban naming only the last one is unenforceable.**
+Line 116 (Step 1) **installs** it — `pnpm add -D @better-auth/cli` — so a lane executing partition A
+step-by-step adds the banned package to the lockfile long before it reaches any warning. Line 299's doc
+comment on the exported `auth` instance re-motivates it ("Concrete instance for `npx @better-auth/cli
+generate` and local dev") at the very site the replacement reads. Line 403 (Step 10) runs it. **All three
+are void: the dependency is not to be added.**
 
 **The replacement, already shipped by Lane 2:** `pnpm --filter @gisik-nokma/server run auth:schema`,
 which reads the *installed* library's own `getMigrations`, plus a test asserting the live database leaves
@@ -1066,10 +1074,22 @@ sufficient test of a closed set** — and when the set is one the ledger persist
 unrecoverable rather than merely weak. Lane 4's statement of it is the one to keep: a *missing* member of
 a closed vocabulary fails at the door, while an *extra* member commits and is permanent, because the
 ledger is append-only by trigger. That is not a test that could be stronger; it is an unrecoverable
-write. Set-equality is therefore **mandatory, not preferable**, for any vocabulary reaching the ledger —
-`CONTEST_EVENT_TYPES` (Plan 10 T2) and `NOTIFICATION_KINDS` (Plan 9 T3) named specifically. Lane 3's
-`underline` mark is the same defect with a softer landing: a stored mark is at least migratable, a
-committed event is not.
+write. Set-equality is therefore **mandatory, not preferable**, for any vocabulary reaching the ledger.
+
+**The two vocabularies named when this rule was first written are already compliant, and the check that
+established that is the point.** `CONTEST_EVENT_TYPES` (Plan 10 **Task 1**, not T2 — the wave schedule
+above has it right) is pinned at plan-10 line 196 with
+`expect(CONTEST_EVENT_TYPES).toEqual(['claim.contested', 'claim.contested_resolved'])`, and
+`NOTIFICATION_KINDS` at plan-9 line 625 with `toEqual` over its five kinds. Neither needs fixing; the
+mandate is that they **stay** that way, and that any vocabulary added later starts there.
+
+One distinction the first draft of this paragraph collapsed: **`NOTIFICATION_KINDS` does not reach the
+ledger.** Plan 9 Task 4 puts notifications in an ordinary mutable table, so the unrecoverability argument
+does not apply to it — it gets the softer landing, like Lane 3's `underline` mark, where a wrong value is
+at least migratable. The append-only trigger is real (`events_append_only` /
+`events_no_update_no_delete` / `events_no_truncate`) and it is what makes the argument bite for
+`CONTEST_EVENT_TYPES`, which does reach the ledger. A rule stated with an example that does not support
+it teaches the wrong boundary.
 
 **Why this one was found centrally, recorded because it argues for how the remaining sweeps run.** Three
 lanes each held one piece — Lane 3 had the type-versus-subpath insight, Lane 2 had the installed tree,
