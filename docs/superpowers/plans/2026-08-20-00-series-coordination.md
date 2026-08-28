@@ -575,9 +575,11 @@ The tier follows the **failure cost** of the task, not its size. "Optimised" cut
 | Per-task reviewers | opus | high |
 | Final whole-branch review lenses | top tier (Fable-class) | xhigh |
 | Adversarial refuters; the mocked-contract lens | top tier | xhigh–max |
-| Lane controllers / orchestrators | top tier | — |
+| Lane controllers / orchestrators | Opus 5 (owner amendment, below) | — |
 
-Controllers are top-tier deliberately: the autonomy protocol delegates conservative-default rulings and merge judgment to them, and a mid-tier controller is a false economy — the whole schedule flows through its decisions.
+**Owner amendment (2026-08-28, second ruling on this table): controller sessions run Opus 5, and "top tier" in this table means an explicit `fable` dispatch, never "the session's own model."** The original line ("controllers are top-tier deliberately") is amended on the owner's direction, with the account's weekly usage pool as the stated reason: controller sessions carry the bulk of every lane's tokens, and Fable-class spend there exhausts the shared pool fastest for the least marginal judgment. What does NOT move down: final whole-branch review lenses, adversarial refuters, and floor-list task reviewers are dispatched with `model: fable` explicitly — bounded fan-outs where the top tier's judgment is the product. If a session cannot dispatch fable, the fallback is opus at max effort, recorded in the ledger as a deviation.
+
+**Budget pressure is never grounds to thin a gate.** When the weekly pool nears its cap, the sanctioned response is to DEFER work — pause non-critical-path lanes, hold a wave until the reset — never to skip a review, drop a refuter, or de-escalate below a class floor. A lane that cannot afford its machinery does not run until it can.
 
 **The floor list** — tasks the extraction flagged as subtle enough that the implementer floor is opus-high AND the reviewer is top-tier, non-negotiable: Plan 3 T3 (reducer + fold), T10 (as-of resolution), T12 (engine-context hazard closure), and the RDU fail-closed decision · Plan 4 T5 (permission gate + bootstrap), T7 (canSee + the SQL twin that must not disagree), T11 (visibleEventsFor + purge split), T14 (invite token custody) · Plan 5 T5 (visibleTicketsWhere), T9b (all-or-nothing migrate), T14/T15 (stream hub + WS) · Plan 6 T6 (claims machinery/precheck) · Plan 7 T9 (sniffing + upload permission), T11 (ingest-transaction gates) · Plan 8's F5 amendment (the "cover" semantics are a design call) · Plan 9 T6 (the four-plan sweep) · Plan 10 T7 (sync idempotency + contests), T9 (replica fold + baseline rewrite), T14/T15 (dual-client rig + scenarios) · Plan 11 T8/T9 (the CC mapping — invariant 4, no fabricated history) and T12 (restore drill).
 
