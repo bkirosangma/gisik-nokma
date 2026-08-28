@@ -611,3 +611,113 @@ The tier follows the **failure cost** of the task, not its size. "Optimised" cut
 - **Plan 9 Task 1 cites `src/fixtures.test.ts`**; the file lives at `packages/rule-engine/test/fixtures.test.ts`. Mechanical adapt.
 - **Plan 4 is internally inconsistent about the sync path** (T14 modifies `src/sync/visible-events.ts`; T11 creates `src/visibility/visible-events-for.ts`). The T11 path governs.
 - **Stale claude-mem note, corrected:** the `attachment.added` discriminated-union amendment to Plan 3 was verified applied at Plan 7's walk; observation 19160 describing it as pending is superseded.
+
+## Lane 4 (periphery) execution consequences (2026-08-28) — recorded at the scaffold, not at plan end
+
+Lane 4's first artifact is the `packages/ui` + `packages/app-core` scaffold (pre-ruling 7), merged
+early because Lane 3 is blocked on it. Its review turned up six items that are claims on later
+plans. They are recorded **here, in the same change set as the code**, because Plans 1 and 2 each
+proved that "route it at plan end" is an intention held by a session that is about to end.
+
+### 1. Amendment 10's `pending` ingest result has no home, and this PR is where it became consumed code
+
+Amendment 10 states that the replica "returns `{status:'pending', eventId}` where the online source
+returns `committed`," and that `IngestResult` "is additive across the two." Shipped
+`packages/domain/src/ingest-result.ts` is a **three**-variant union — `committed` / `invalid` /
+`refused` — with no `pending`. The hoist that moved it into domain (pre-work PR #9) moved the
+server's definition verbatim, which was correct for the server and silently dropped the additive
+member the amendment had already decided on.
+
+`DataSource.ingest(): Promise<IngestResult[]>` is now pinned in `packages/app-core/src/data-source.ts`
+and byte-identical to Plan 6's text. So as things stand **Plan 10's replica cannot implement the
+interface it is contracted to implement**, and every `switch (result.status)` written between now and
+then will be missing a case the decision already promised.
+
+Not fixed here, deliberately: adding an unproduced variant would oblige `apps/server`'s existing
+consumers to handle a status nothing emits, which is noise until the replica exists. **Owner: whichever
+lands first of Plan 6 Task 7 (the online DataSource, the first real `switch (result.status)`) and
+Plan 10 Task 10 (the outbox, the first producer of `pending`).** It is one union member plus the
+consumers' new case — small, and much smaller now than after four plans have written switches.
+
+### 2. The colour-discipline scanner does not see bare named CSS colours
+
+Amendment 11 says no colour literal outside `tokens.ts`, enforced by a test. The test enforces most of
+it. `packages/ui/test/helpers/colour-scan.ts`'s `COLOUR_LITERAL` matches hex and colour *functions*
+(`rgb(`, `hsl(`, `oklch(`, `color-mix(`, …) and **not** bare keywords, so `color: red` in a client CSS
+file passes the gate. Proven both ways rather than assumed: a planted `color: red; background: tomato`
+in `ui.css` passes 31/31, while a planted `#c0ffee` in the same file fails — so `.css` is genuinely
+scanned and the keyword class is genuinely the blind spot.
+
+Plan 6 Task 2's own pinned test forecloses the obvious fix: it asserts
+`findColourLiterals('color: color-mix(in srgb, red, blue)')` equals **exactly** `['color-mix(']`, which
+a widened regex would break. The resolution that satisfies both is **additive** — a second exported
+check for bare named colours, scoped to `.css` declaration values only, wired into the same walk,
+leaving `findColourLiterals` byte-identical to its pin, with its own planted-defect test. The
+`.ts`/`.tsx` exclusion is deliberate: `red`, `tan`, `plum` and `gold` occur constantly in ordinary
+identifiers and strings, and a false positive in the one test that gates every client package costs
+more than the hole.
+
+Carried rather than fixed at the scaffold because there is **no live violation** (every declaration in
+`ui.css` takes its colour from `var(--gn-*)`) and the next client CSS arrives in Wave 3. The gap is
+disclosed in `Features.md`'s own bullet rather than only in a review. **Owner: Plan 6 Task 2, at its
+next opening.**
+
+### 3. `CONTRAST_PAIRS` states its text guarantees and is silent about its non-text ones
+
+`packages/ui/src/tokens.ts` declares seven contrast pairs × two themes, and all fourteen verify at
+≥ 4.5:1 (tightest: light `successText` on `success` at 5.40). All fourteen were re-derived
+independently at review from the raw primitives, not by re-running the suite.
+
+Every declared pair is a **text** pair. WCAG 1.4.11 (non-text contrast, 3.0:1) is undeclared, and two
+roles that draw control boundaries fall short of it: `borderStrong` on `surfaceRaised` is **2.49**
+light / **2.08** dark, and `border` on `surfaceRaised` is **1.45** / **1.34**. `ui.css`'s `.gn-button`
+uses `border: 1px solid var(--gn-border-strong)` over `background: var(--gn-surface-raised)`, so for
+the ghost variant that border is the control's only visual boundary. (The focus ring is fine at
+5.76 / 6.32; the chip category dots are ≥ 5.6 and carry a text label besides.)
+
+Nothing renders yet, so this is free to fix. The fix that matters is not the hex values but
+**declaring the non-text pairs in `CONTRAST_PAIRS`**, so the colour origin keeps stating its own
+guarantees instead of leaving them in a review. Recorded here with the numbers so the next editor
+does not have to re-derive them.
+
+*Context for whoever picks it up:* the workspace convention pairing UI work with the `ui-ux-pro-max`
+skill could not be honoured — the skill is not installed on this machine. Numeric WCAG verification
+was substituted, which is why the text pairs are proven and the non-text ones were the thing a
+design review would have caught.
+
+### 4. Two Plan 6 defects were transcribed faithfully, and later lanes should not re-inherit them
+
+Both were verified as the plan's, not the executor's, by hash-comparing the shipped files against the
+plan's pinned blocks:
+
+- **Plan 6 Task 3 pins a `components.test.tsx` that never exercises `Card`**, though Task 3's own Files
+  and Interfaces blocks specify it. Six of seven components are covered. `Card` is a `div` with a
+  className join and no behaviour, so the risk is not the component — it is the precedent.
+- **Plan 6 Task 1 pins a type-tautological `it()` block in `tokens.test.ts`.** "Every role in both
+  themes resolves to a declared primitive" cannot fail while the file compiles, because `themes` is
+  typed `Record<ThemeName, Record<TokenRole, PrimitiveName>>`; the sibling assertion in the same block
+  restates `colorOf`'s one-line body. The block as a whole is inert. That file's real teeth are its
+  primitive-shape regex (which is also what makes the contrast math's `hex.slice()` parsing safe), the
+  fourteen contrast assertions, the kebab-case variable-name cases, and the stylesheet
+  selector/precedence assertions.
+
+### 5. The app-core seed builders use non-ULID actor ids
+
+`packages/app-core/test/helpers/seed.ts` uses `actorId: 'user_kiro'` / `'user_anselma'`, as Plan 6
+pins them, while shipped `submittedEventSchema` requires `actorId: ulidString`. Harmless where they
+live — the fake `DataSource` validates nothing — and latent everywhere else: **the first task that
+pipes a seed through `parseEvent` or the real door gets `invalid-payload`.** A claim on Plan 6 Task 7
+and on Plan 10, whichever first sends a seeded event somewhere that checks it.
+
+### 6. `git diff --no-index` is unreliable here too — Plan 2's rider needs widening
+
+Plan 2 consequences §7 records that an RTK-proxied shell `diff` reported "identical" for files that
+differed, and prescribes `git diff` or reading the file instead. **`git diff --no-index` is also
+affected.** At this review it printed no output for two files that differ by seven lines, while
+`git hash-object` gave `3d95ab65…` and `e166f5bf…`.
+
+So the prescription tightens: **verify a mutation restoration with `git hash-object` against the
+pre-mutation blob hash, with `git diff` against the index, or by reading the file — never with any
+`diff` invocation, `--no-index` included.** Every comparison in this review used `git hash-object` or
+Python `difflib`. This matters to every lane, because a tool that lies about equality turns a mutation
+sweep into theatre, and the whole falsifiability discipline rests on those restorations being real.
