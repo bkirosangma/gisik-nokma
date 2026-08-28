@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { newUlid, type EntityHead, type EventEnvelope } from '@gisik-nokma/domain';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
-import { createIngestService } from '../src/ingest/ingest-service.js';
+import { createIngestService, ENTITY_WORKSPACE_MISMATCH_RULE } from '../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from './helpers/db.js';
 import { submittedWorkflowDefined, submittedWorkspaceCreated } from './helpers/events.js';
@@ -220,10 +220,15 @@ describe('ingestBatch', () => {
 
     const results = await ingest.ingestBatch([reFiled]);
 
+    // The assertion below names the constant, so on its own a rename would
+    // move producer and expectation together and half-land silently. This is
+    // the one place the wire value itself is pinned: Plan 10's replica and
+    // Plan 6's UI bind to this exact string, not to the identifier.
+    expect(ENTITY_WORKSPACE_MISMATCH_RULE).toBe('entity-workspace-mismatch');
     expect(results[0]).toEqual({
       status: 'refused',
       eventId: reFiled.id,
-      rule: 'entity-workspace-mismatch',
+      rule: ENTITY_WORKSPACE_MISMATCH_RULE,
       reason:
         `This workflow belongs to workspace ${home.workspaceId}; ` +
         `this event files it under workspace ${otherWorkspaceId}. ` +

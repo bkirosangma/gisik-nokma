@@ -63,6 +63,11 @@ export const workflowsProjection: Projection = {
  * A union rather than a fourth parameter, because "version 3" and "as of
  * position 3" are different questions and a call site must not be able to
  * blur them.
+ *
+ * PRECONDITION on asOfWorkspaceSeq: the position must come from the same
+ * workspace stream as the workflow. Cursors restart at 1 per workspace, so
+ * positions from different streams are not comparable, and passing one
+ * silently returns a wrong version rather than nothing.
  */
 export type WorkflowDefSelector = number | { asOfWorkspaceSeq: number };
 

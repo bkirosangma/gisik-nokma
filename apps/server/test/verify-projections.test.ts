@@ -19,10 +19,9 @@ beforeAll(async () => {
   const results = await ingest.ingestBatch([
     home,
     submittedWorkspaceCreated(),
-    // A workflow, so proj_workflows is not verified empty. Its definition
-    // column is jsonb and not json exactly so the shadow-rebuild diff can
-    // compare rows at all — json has no equality operator, and a projection
-    // the verifier only ever meets with zero rows would never have said so.
+    // A workflow, so proj_workflows is compared with a real row in it rather
+    // than empty — an empty table diffs clean without proving that live
+    // application and ledger re-derivation produce the same jsonb.
     submittedWorkflowDefined(home.workspaceId),
   ]);
   if (results.some((result) => result.status !== 'committed')) {
