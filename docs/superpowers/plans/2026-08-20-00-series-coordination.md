@@ -963,6 +963,64 @@ contract and no Plan 8 guard can be waiting on one. What actually binds is the t
 `SIMPLE_KANBAN_TEMPLATE` and `simpleKanbanWorkflowDef(workflowId)`. The ruling's intent stands — Plan 4
 owns it — but a lane keying a guard on the path is guarding the wrong thing.
 
+### `@better-auth/cli` is BANNED in this repo, and Plan 4's Step 10 told the executor to use it
+
+Found by Lane 2's T1 and verified independently at the installed tree, because it is a
+production-failure claim.
+
+`@better-auth/cli`'s latest release is **1.4.21**, and it pins `"better-auth": "1.4.21"` as an exact
+hard dependency — so it reports the **1.4 schema regardless of which version the server imports.** This
+repo imports 1.7.2. Run against this repo's real config it emitted an `account` table with **no
+`issuer` column and no `account_issuer_accountId_uidx` index**, both of which 1.7.2 writes on every
+account link. That migration applies cleanly and then **fails on the first Google sign-in.**
+
+What makes it worth a section rather than a bullet: **Plan 4 Step 10 instructed the executor to
+reconcile the handwritten migration against exactly that tool.** Following the plan text literally ships
+the broken schema, and the reconciliation step that exists to catch schema drift is the thing that
+introduces it. A check that does not merely miss the defect but manufactures it.
+
+**The replacement, already shipped by Lane 2:** `pnpm --filter @gisik-nokma/server run auth:schema`,
+which reads the *installed* library's own `getMigrations`, plus a test asserting the live database leaves
+that planner nothing to create — so the next better-auth upgrade turns the suite red rather than
+production. **Plan 11 owns the risk of this being undone**, because packaging and dependency work is
+where someone re-adds a CLI that plan text still names.
+
+The falsifiability shape is worth keeping as a worked example of plant-in-production-shape: planting
+*exactly the CLI's output* makes the drift check fail naming `account.issuer`, while a "five tables
+exist" check and a "columns are camelCase" check both still pass. Those two are the obvious tests to
+write and neither catches it.
+
+**Two adjacent facts verified at the same tree, so no lane re-derives them.** `better-auth@1.7.2`
+declares **no zod peer dependency** — zod `^4.3.6` is its own direct dep, nested, and the monorepo's
+3.25.76 is untouched; the `better-call ✕ unmet peer zod@^4.0.0` warning is cosmetic. And **passkey has
+left better-auth core**: 1.7.2 exposes 54 export subpaths, none containing `passkey`, and carries no
+`@simplewebauthn/*` dependency. It ships as `@better-auth/passkey@1.7.2`, a separate package.
+`PasskeyOptions` still takes `rpID`/`rpName`, so only the specifier moves — any plan text naming
+`better-auth/plugins/passkey` is wrong.
+
+### Two blind spots in how tests are written, both found on first contact
+
+Both from Lane 3's Plan 7 T1, both the same family as the fixture and checker findings above.
+
+**1. `toContain` is silent about "and nothing else", and a bundled preset is where the extra arrives.**
+StarterKit v3.30.5 bundles an `underline` mark that Plan 7's schema v1 does not name. Nothing in the plan
+disables it, and the plan's own vocabulary test uses `toContain` — which cannot notice a *sixth* mark.
+All three clients would have stored a mark no spec text names, and the test written to cover exactly that
+risk would have stayed green. Fixed with `underline: false` and set-equality pinning in both directions.
+**Generalises past tiptap: any assertion of the form "the vocabulary includes X" says nothing about what
+else is in it, and any preset dependency — a component library, a lint config, a zod `.extend` — is
+precisely where the unnamed extra comes from.**
+
+**2. A `typecheck` config that excludes `test/` cannot see a broken test helper.** Plan 7 shipped only a
+build config, which includes `src` but not `test`. Lane 3 carried an adaptation adding
+`tsconfig.typecheck.json`, and it paid immediately: the plan's own `typeText` helper **does not compile**
+— prosemirror-view's `handleTextInput` takes five arguments and the plan passes four. That error lives in
+`test/`, so a single-tsconfig `typecheck` would never have read it, and the helper would have shipped
+into eleven downstream tasks silently failing to drive input rules. **Any client-package plan pointing
+`typecheck` at a config that excludes `test/` has the same blind spot**, and it presents as a runtime
+mystery in whatever task first depends on a test helper's behaviour rather than as a type error. Worth a
+check in Plans 6 and 9 before their client tasks dispatch.
+
 ### Merge rule for this document: resolve by heading nesting, never by arrival order
 
 Found by Lane 4 resolving its own collision with this section, and worth pinning because it will recur
