@@ -206,6 +206,25 @@ const submittedEventObject = z.object({
  */
 export const submittedEventSchema = submittedEventObject.superRefine(refuseMisfiledMembership);
 
+/**
+ * HALF a check, exactly as `submittedEventSchema` above — and the note is
+ * repeated rather than referenced because a doc comment binds to the ONE
+ * declaration beneath it. In the emitted `.d.ts` the whole inlined shape of the
+ * first export sits between them, so they are nowhere near each other, and
+ * hover or jump-to-definition on this one would otherwise show nothing.
+ *
+ * Enforced here: a membership `entity.id` is `^<ULID>:<ULID>$` and its left half
+ * is this event's own `workspaceId`. NOT enforced here: that it names the user
+ * the payload is about — that needs the payload parsed, which needs the type,
+ * the version and the registered schema, none of them knowable where `payload`
+ * is `unknown` by design. An envelope in workspace A, filed at `A:userC`, whose
+ * payload grants `userD`, is `success: true` here and `malformed-envelope`
+ * through `parseEvent`.
+ *
+ * **If you are validating an event, call `parseEvent`.** This is the shape layer
+ * underneath it, not a substitute for it — and this is the export a sync-down
+ * reader reaches for first.
+ */
 export const eventEnvelopeSchema = submittedEventObject
   .extend({
     serverTime: isoDatetime,

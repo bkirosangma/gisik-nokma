@@ -1521,10 +1521,14 @@ before touching this code, and the durable record is the only place they can loo
 
 **`submittedEventSchema` and `eventEnvelopeSchema` carry only the WORKSPACE half of the check.** The
 membership coherence check has two halves (see the envelope-collision section above). The workspace half
-is a cross-field refinement inside both exported schemas; the user half compares `entity.id`'s right half
-against `payload.userId` and therefore needs the payload PARSED — which needs the event's type, version
-and registered schema, none of them knowable inside a schema whose `payload` is `unknown` by design. So
-it lives in `parseEvent`. Verified rather than reasoned about:
+is a cross-field refinement inside both exported schemas; the user half compares `entity.id` in FULL
+against `membershipId(workspaceId, payload.userId)` (`parse-event.ts` — not the right half alone, so it
+re-proves the workspace half as a by-product) and therefore needs the payload PARSED, which needs the
+event's type, version and registered schema, none of them knowable inside a schema whose `payload` is
+`unknown` by design. So it lives in `parseEvent`. That full-equality shape is exactly why the two halves
+are asserted through DIFFERENT doors — see the test-design bullet in the envelope-collision section
+above; asserting both through `parseEvent` would let either be deleted with nothing noticing. Verified
+rather than reasoned about:
 
 | input | `submittedEventSchema` | `eventEnvelopeSchema` | `parseEvent` |
 |---|---|---|---|
@@ -1537,14 +1541,28 @@ Note the first row is `true` for **both** schemas, not only the full-envelope on
 envelope today** (`parse-event.ts` is the only caller; everything else is tests), so nothing is broken
 now. The hazard is the first consumer that does: it would inherit half a check with no way to tell. The
 rule, stated once: **to validate an event, call `parseEvent`** — these schemas are the shape layer
-underneath it, not a substitute for it. A comment at the export site in `envelope.ts` says the same
-thing, because that is where someone reaching for the schema actually looks.
+underneath it, not a substitute for it. `envelope.ts` carries that note **twice, once above each export**,
+and the duplication is deliberate rather than sloppy: a doc comment binds to the single declaration
+beneath it, so a note written only above `submittedEventSchema` reaches nobody hovering
+`eventEnvelopeSchema` — in the emitted `envelope.d.ts` the whole inlined shape of the first export sits
+between the two declarations, putting them ~100 lines apart. That was the round-1 defect: one comment,
+one export covered, and the uncovered one was the export the finding was about. Checked in
+`dist/envelope.d.ts` after a rebuild, both before and after, not assumed from the source layout.
 
 **Any future `membership`-kind event type must carry a top-level string `userId`.** The user half is
 written against the entity KIND, not against the two types that exist — `if (entity.kind ===
 'membership')`, then read `userId` off the parsed payload. A membership-kind event whose payload has no
-top-level string `userId` is refused `malformed-envelope` with *"…its payload names no user…"*, whatever
-its type. That is deliberate: a membership's entity id IS `${workspaceId}:${userId}`, so an event that
+top-level string `userId` is refused `malformed-envelope` with *"…its payload names no user…"*.
+
+**Which refusal a caller actually meets depends on the type's own schema, and for the two shipped types
+it is NOT that one** — run, not reasoned: `membership.granted` with `{role}` and `membership.revoked`
+with `{}` both answer `invalid-payload` — *"payload for '…' v1 is invalid at userId: Required"* — because
+their payload schemas require `userId: ulidString` and the payload gate runs first. The
+`malformed-envelope` sentence is exact only for a **future** membership-kind type whose own schema does
+not require `userId`, which is precisely the case the by-kind check exists for. Both refusals are
+correct; a later author should expect the payload one while the shipped types are the only two.
+
+The by-kind design is deliberate: a membership's entity id IS `${workspaceId}:${userId}`, so an event that
 does not say who it is about cannot be addressed at all, and a per-type check would let the next
 membership type inherit the hole instead of meeting the refusal. **Consequence for T14, Plan 10, and
 anyone else adding one:** name the user in a top-level `userId`, or file the event against a different
@@ -1552,11 +1570,19 @@ kind. It is not enough to satisfy the entity-id regex. (The branch is reachable 
 `parse-event.test.ts`, which registers a userId-less membership type through `parseEvent`'s injectable
 registry rather than leaving a check that cannot fail.)
 
-**`workspace.created` and `workspace.renamed` now refuse a blank name, and refuse rather than trim.**
-Taking over Plan 1's provisional seeds meant adopting Plan 4's stricter shape: `z.string().min(1)`
-accepted `'   '`, which names nothing while looking like a name everywhere it is displayed, so a
-`.trim() !== ''` refinement was added (`project.created` shares it). **The interesting half is that it
-REFUSES rather than trims** — `'  Corner  '` is stored exactly as claimed, and a test pins that. Trimming
-would have been the obvious implementation and would put words in the actor's mouth; the ledger stores
-the claim as it was made. Sibling lanes rebasing onto `envelope.ts` inherit this door too, and a fixture
-with a padded workspace name now fails where it used to pass.
+**`workspace.created`, `workspace.renamed` and `project.created` now refuse a WHITESPACE-ONLY name, and
+refuse rather than trim.** Taking over Plan 1's provisional seeds meant adopting Plan 4's stricter shape:
+`z.string().min(1)` accepted `'   '`, which names nothing while looking like a name everywhere it is
+displayed. The door is the shared `displayName` schema at **`packages/domain/src/events/membership.ts`**,
+bound to all three types through `vocabulary.ts` — not in `envelope.ts`, which has nothing to do with it.
+
+**The interesting half is that it REFUSES rather than trims.** Run, not reasoned: `'   '` is refused
+*"must not be blank — a name of only spaces names nothing"*, `''` is refused
+*"String must contain at least 1 character(s)"*, and **`'  Corner  '` is ACCEPTED and stored verbatim** —
+padding is not the defect and a test pins that. Trimming would have been the obvious implementation and
+would put words in the actor's mouth; the ledger stores the claim as it was made.
+
+**No existing fixture is affected**, checked across `apps/server/test`, `packages/domain/test` and
+`packages/rule-engine`: every `workspace.created` / `workspace.renamed` payload in the repo carries a
+real name (`'Convenience Corner'`, `'Gisik Nokma Build'`, `'Personal'`, `'CC HQ'`, …) and there are no
+`project.created` fixtures at all. What a sibling lane inherits on rebase is the door, not a breakage.
