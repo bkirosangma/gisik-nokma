@@ -65,7 +65,14 @@ function walk(directory: string, root: string, hits: ColourHit[]): void {
     const lines = readFileSync(path, 'utf8').split('\n');
     lines.forEach((line, index) => {
       for (const match of findColourLiterals(line)) {
-        hits.push({ file: relative(root, path), line: index + 1, match });
+        // Repo-relative, NOT root-relative. The test flatMaps this walk across
+        // every client source root, so a root-relative path cannot say which
+        // package a hit came from — two roots each holding an `index.css`
+        // produce two indistinguishable lines. That was harmless while this
+        // package owned every scanned tree; it stops being harmless the moment
+        // another lane's package is scanned by a test living here, because the
+        // red surfaces in THIS suite and has to name someone else's file.
+        hits.push({ file: relative(REPO_ROOT, path), line: index + 1, match });
       }
     });
   }
