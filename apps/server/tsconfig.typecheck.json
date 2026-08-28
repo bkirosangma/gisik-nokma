@@ -3,8 +3,15 @@
   "compilerOptions": {
     "noEmit": true,
     "types": ["node"],
-    // Same reason as tsconfig.json: no declarations from this app, so
-    // better-auth's unnameable inferred types are not a portability problem.
+    // Load-bearing, verified by removing it: `noEmit` suppresses the OUTPUT of
+    // declaration files, not the declaration-emit CHECK, so TS2742 still fires
+    // here on `createAuth` and `auth` without this line. It overrides
+    // tsconfig.base.json:9's `"declaration": true` — deleting it does not leave
+    // the flag unset, it restores the inherited `true`.
+    //
+    // Without it `build` stays green while `typecheck` fails, and the two
+    // configs read as gratuitously inconsistent to whoever is diagnosing that.
+    // The reason is in tsconfig.json.
     "declaration": false
   },
   "include": ["src", "test"]
