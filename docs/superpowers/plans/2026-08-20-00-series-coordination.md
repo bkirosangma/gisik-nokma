@@ -763,6 +763,12 @@ validates nothing; the real door is Wave 3's T7/T8 transport). This is the mocke
 failure mode — the fake excusing the contract from existing — arriving inside the plan that the law's
 worst instance was already recorded against.
 
+**Two independent shape errors travel together, and that changes what "fixed" looks like** (sharpened
+by Lane 4, which verified all five sites against shipped `workflow.ts` before adopting them). The field
+name is one error; `comment` as a bare string where the door requires `{ text }` is a second. A
+transcription that corrects only `toStateId` is still refused — with a *different* error, arriving
+later, at a point where the first fix appears to have worked. Correct both or neither.
+
 **What the owning lane does about it:** before trusting any test transcribed from Plan 6 T6/T12/T13,
 write one assertion against the exported `ticketTransitionedPayloadSchema` itself
 (`packages/domain/src/workflow.ts` — `to` required, `comment: { text }`). A test that parses the payload
