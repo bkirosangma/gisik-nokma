@@ -1020,6 +1020,32 @@ line 299's comment is the last live reference and is being fixed — it names
 the CLI package rather than the library. A dead precondition asserted in the one place a maintainer looks
 to learn what that instance is for.
 
+**DO NOT TIDY: `auth-schema.ts:11` and `auth-tables.test.ts:64` stay.** They reference
+`@better-auth/cli` in order to explain *why it is banned*, which means they look exactly like the stale
+references this section exists to remove. A reviewer sweeping for mentions of a banned tool — especially
+during Plan 11's packaging work, which touches these files — would helpfully delete the only surviving
+explanation of the ban, leaving a prohibition with no reachable reasoning behind it. The hazard is
+general: **a comment warning about X necessarily contains X, so any grep-and-remove pass over X destroys
+its own documentation first.** Lane 4 has recorded it as a do-not-tidy on its side.
+
+### The actionable form of all of it, from Lane 4's three instances
+
+Lane 4 hit this shape three times in its own scope in one day — Plan 11's `check:env` grepping
+`process.env.X` against a codebase that declares config as zod schema keys; Plan 10 T8's conformance
+assertion whose array contains the value under test as its own first element, so no interleaving can fail
+it; and the lockfile assertion it was about to write against install output. **The tell is identical every
+time: the check passes for a reason unrelated to the property it names, and the wrong version is the one
+that is easier to write.**
+
+So the rule it now puts on every gate it lands, which is the operational form of this whole section:
+
+> **State what would make it fail, then make it fail once, before trusting it.**
+
+Its env gate carries two guards built exactly that way, both proven to fire rather than assumed to. This
+is the same discipline as the mutation-proof requirement on fixtures, applied to gates and assertions
+rather than to tests — and it is cheap precisely because it is done once, at authoring time, by the
+person who still remembers what the check was for.
+
 The falsifiability shape is worth keeping as a worked example of plant-in-production-shape: planting
 *exactly the CLI's output* makes the drift check fail naming `account.issuer`, while a "five tables
 exist" check and a "columns are camelCase" check both still pass. Those two are the obvious tests to
