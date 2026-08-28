@@ -8,7 +8,8 @@
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "check:env": "node scripts/check-env-example.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.0"

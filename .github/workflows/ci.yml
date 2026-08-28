@@ -64,12 +64,22 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # The env contract gate (Plan 11 Task 6): fails if code reads a
+      # configuration variable `.env.example` does not document. It reads
+      # source text and needs no build, so it runs before `turbo run` --
+      # a stray variable is named in seconds instead of after the suite.
+      - run: pnpm check:env
+
       # Job layout: a single job, not Task 14's six-job split. What the plan
       # splits into separate jobs either doesn't exist on `main` yet or
       # doesn't apply to the packages that do:
       #   - lint: no root "lint" script exists yet (Plans 1-2 only wired
-      #     build/test/typecheck) and its own gate step, `pnpm run
-      #     check:env`, needs the env contract Plan 11 Task 6 hasn't landed.
+      #     build/test/typecheck). That is now the WHOLE of the reason. The
+      #     other half of it is spent: Plan 11 Task 6's env contract
+      #     (`.env.example` + `scripts/check-env-example.mjs`) has landed,
+      #     and its gate step `pnpm check:env` runs above as a step of THIS
+      #     job rather than waiting on a lint job that does not exist. What
+      #     a future lint job inherits is linting, not check:env.
       #   - fixtures (client half): `test:fixtures` proves the shared rule-
       #     engine fixture suite agrees across the server build AND a
       #     client build. `packages/app-core` now EXISTS (Plan 6 Task 4

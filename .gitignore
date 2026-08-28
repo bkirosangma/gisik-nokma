@@ -6,6 +6,10 @@ __pycache__/
 *.pyc
 .env
 .env.*
+# ...except the contract itself. .env.example documents every variable and
+# is what scripts/check-env-example.mjs checks code against; the .env.* rule
+# above would otherwise silently keep it out of the repo.
+!.env.example
 .turbo/
 *.tsbuildinfo
 coverage/
