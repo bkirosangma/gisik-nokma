@@ -2,7 +2,10 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    // Same reason as tsconfig.json: no declarations from this app, so
+    // better-auth's unnameable inferred types are not a portability problem.
+    "declaration": false
   },
   "include": ["src", "test"]
 }

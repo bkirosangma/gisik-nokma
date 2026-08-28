@@ -1383,3 +1383,28 @@ correctly but cannot say *where* sends its red to the wrong owner. Invisible whi
 scanned tree; it bites the moment a second lane's tree enters the walk. Fix is `relative(REPO_ROOT, path)`
 and Lane 4 is landing it ahead of Lane 3's rebase.
 
+---
+
+## Plan 4 execution consequences (2026-08-28) — recorded by the task that acted on each
+
+Same discipline as Plan 1's and Plan 2's sections, and for the same reason: the lane's adaptation map is gitignored, so a ruling that lives only there has been made and then thrown away. Each entry below is written by the task that acted on it, in that task's own commit.
+
+### 1. `Queryable` lives at `apps/server/src/db/queryable.ts` — Plan 7's blocker, discharged (Task 1)
+
+`export type Queryable = Pool | PoolClient;` ships at `apps/server/src/db/queryable.ts`, imported as `'../db/queryable.js'`. The alternative the adaptation map offered — folding it into the existing `src/db.ts`, which owns `createPool` — was declined because the Wave-1 schedule reads *"Plan 7's server T7/T8 once Plan 4 T1 lands `Queryable`"*, and Plan 7's tasks were written against the `src/db/queryable` specifier. A file and a directory of the same stem coexist fine under NodeNext; `src/db.ts` keeps `createPool` and gains nothing.
+
+It is deliberately **not** retro-fitted onto `Projection.apply`, whose `tx: PoolClient` parameter is a design decision (`src/projections/registry.ts`), not an oversight: a projection may only ever write inside the ingest transaction.
+
+### 2. `@better-auth/cli` is NOT a dependency of this repo, and must not be reintroduced (Task 1)
+
+better-auth is pinned at **1.7.2**; `@better-auth/cli`'s latest release is **1.4.21** and it pins its own `better-auth@1.4.21` as a hard dependency, so `better-auth generate` reports the **1.4** schema no matter which version the server imports. Run against this repo's own config it emitted an `account` table with **no `"issuer"` column and no `account_issuer_accountId_uidx` unique index** — both of which 1.7.2 writes on every account link. A vendor schema drifted that way fails on the first Google sign-in, not at migrate time.
+
+What replaces it: `pnpm --filter @gisik-nokma/server run auth:schema` (`src/tools/auth-schema.ts`) prints the schema of the **installed** better-auth via its own `getMigrations(auth.options).compileMigrations()`. `apps/server/test/auth/auth-tables.test.ts` then asserts the live migrated database leaves that planner with nothing to create, add, or index — so a better-auth upgrade that changes the vendor schema turns the suite red instead of production. Plan 11, which packages and deploys the server, inherits both: do not add the CLI to get a schema, and treat a red anti-drift test as a required migration, not a flake.
+
+### 3. `apps/server` emits no declarations (Task 1)
+
+`declaration` is `false` in both `apps/server/tsconfig.json` and `tsconfig.typecheck.json`. `betterAuth(...)`'s inferred type reaches into `@simplewebauthn/server` and zod 4, both nested under better-auth in the pnpm store and therefore unnameable from this package — declaration emit fails with TS2742 on any export whose type touches the auth instance, `createAuth` and `type Auth` included. `apps/server` is a private leaf app that nothing imports, so it loses nothing. The two alternatives were worse: hoisting a second zod major into a package that already depends on zod 3, or hand-writing a facade type that would silently narrow the auth API. Any later plan adding server code inherits this; `packages/*` are unaffected and still emit declarations.
+
+### 4. zod 3 stands — better-auth brings its own zod 4, nested (Task 1)
+
+better-auth 1.7.2 declares **no zod peer range**; zod `^4.3.6` is a direct dependency, resolved to `zod@4.4.3` inside better-auth's own subtree. `apps/server` keeps `zod ^3.25.0` and no package in the monorepo was upgraded. `pnpm install` prints one cosmetic warning — `better-call 1.4.0 ✕ unmet peer zod@^4.0.0: found 3.25.76` — which the installed graph contradicts: the store holds exactly one `better-call`, keyed `better-call@1.4.0_zod@4.4.3`, so `better-call` did resolve zod 4. The warning is pnpm reporting the workspace importer's zod, not the one in force. Do not "fix" it by upgrading zod.
