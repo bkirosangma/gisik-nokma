@@ -9,3 +9,4 @@ export * from './validate-workflow.js';
 export * from './advise-workflow.js';
 export * from './entity-state.js';
 export * from './ist-day.js';
+export * from './doc-text.js';
