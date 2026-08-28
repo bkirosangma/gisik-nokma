@@ -892,8 +892,13 @@ pins `ULID_REGEX = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/`. So `t1` and `ws_1` are not 
   schema's `actorId: ulidString`, harmless against `createFakeDataSource` because it validates nothing,
   and `invalid-payload` at the first real door.
 
-One fixture dialect, one door dialect, and the gap is invisible until something crosses. Note the
-interaction with the amendment above: a kind-aware entity-id check makes the door's behaviour
+One fixture dialect, one door dialect, and the gap is invisible until something crosses. Two fields found
+it in one day, so expect a third: **state it as a class, not as two instances.** The detection is
+mechanical and does not require reading the tests — for any test that crosses `parseEvent`/ingest, every
+field the schema types as `ulidString` must match `ids.ts:9`'s regex: entity id, actor id, and payload
+ids alike. A grep for short quoted ids in server-test files finds it.
+
+Note the interaction with the amendment above: a kind-aware entity-id check makes the door's behaviour
 **non-uniform across kinds for the first time**, so whether a given id passes will depend on the `kind`
 it declares as well as its shape. Whatever proves that check should assert all three directions — a
 `membership` composite accepted, a non-`membership` kind still refusing a composite byte-for-byte, and
@@ -957,10 +962,15 @@ mutation goes red **at the fixture's own expected outcome** rather than at setup
 refusal fixture confirm it fails for the *named* rule — one that still refuses after the check under
 test is deleted is pinning something else.
 
-**A corollary Lane 3 raised that the deferral above needs:** a widened check that only ever scans trees
-authored after it silently exempts everything predating it. `packages/editor/src/styles/editor.css` lands
-inside the named-colour gap window, so Plan 6 Task 2's executor must re-scan what already exists when the
-keyword check arrives, not only what arrives after.
+**A corollary Lane 3 raised that the deferral above needs, in the narrower form Lane 4's check makes
+correct.** The general worry — a widened check that only ever scans trees authored after it silently
+exempts everything predating it — does not fire against this scanner, because `walk()` enumerates every
+*existing* root on every run, so a bare-keyword check wired into the same walk covers
+`packages/editor/src` the moment that tree exists, with no re-scan step for anyone to remember. The
+constraint that actually needs to travel to Plan 6 Task 2 is therefore narrower and structural:
+**put the keyword check inside `walk()`; do not invent a changed-files mechanism for it.** A check that
+enumerates gets this property for free; a check that watches a diff has to be told about history, and
+will not be.
 
 **A fourth instance, from Lane 2, where the pressure runs the other way.** Plan 4's text carries four
 test-count drifts — it states 13 tests where 14 `it` blocks are written, 7 where 8 are, "1 test" where 2
@@ -995,6 +1005,17 @@ have 6, delete two") is precisely the coverage deletion this ruling exists to pr
 **Operative form, therefore: resolve by literal block count *per file*, not per task, and correct the
 plan's number rather than the tests.** A task that appends cases to another package's suite is the
 false-positive shape to expect.
+
+**Run against Plan 3 T10, the clause clears it as a real drift — and the instance is the best argument
+the rule has.** One test file named (`task-10-brief.md:6, :74, :393, :585`), ten `it` blocks all in it
+(`:238, :249, :263, :269, :284, :296, :321, :336, :346, :359`), one stated expectation
+`Expected: PASS (8 tests)` at `:586`. No second package, no separately-stated half — the split-task
+signature does not apply, so the stated-BELOW warning stands: write all ten, correct the number, delete
+nothing. What makes it worth recording is *which* two an executor would most plausibly delete: `:346`
+("the fold leaves the transition log alone — entries keep the version their state ids are written in")
+and `:359` (the planted-defect projection-outer replay). **Those two pin decision 10 — the monotone fold
+guard and as-of resolution — which is the entire reason T10 is on the floor list.** The naive repair does
+not remove two arbitrary tests; it removes precisely the coverage the task exists for.
 
 **Stated once, because it is the same rule as the fixture finding above seen from the other side.** There
 the danger is a test that cannot fail; here it is a test that gets deleted for being unexpected. Both
