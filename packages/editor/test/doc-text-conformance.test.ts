@@ -19,19 +19,28 @@ import { typeText } from './helpers/type-text.js';
  * walker while the editor disagreed with both.
  *
  * WHAT THESE CASES DO AND DO NOT PIN, established by deleting each entry from
- * the walker's block set and re-running: `paragraph`, `heading` and `codeBlock`
- * each kill a case. `doc`, `blockquote`, `bulletList`, `orderedList` and
- * `listItem` survive, and no schema-v1 document can change that — every one of
- * them contains only other blocks, so the newline is emitted by the child
- * regardless and the walker's `\n{2,}` collapse hides the duplicate. Their
- * entries are inert for this editor's output. Stated here so a later reader
- * does not mistake these cases for whole-set coverage and build on a guarantee
- * they do not give.
+ * the walker's block set and re-running. The set has TWELVE entries. Three are
+ * load-bearing — `paragraph`, `heading` and `codeBlock` each kill a case. The
+ * other NINE are inert for this editor's output, and here they all are, so the
+ * list cannot be mistaken for a partial one:
  *
- * Only the three TEXTBLOCK entries are load-bearing, and that is the general
- * shape rather than a coincidence: an entry earns its keep exactly when its
- * node holds text directly. Every container's newline is already paid for by
- * the block inside it.
+ *   `doc`, `blockquote`, `bulletList`, `orderedList`, `listItem` — each
+ *      contains only other blocks, so the newline is emitted by the child
+ *      regardless and the walker's `\n{2,}` collapse hides the duplicate. No
+ *      schema-v1 document can change that.
+ *   `code_block`, `bullet_list`, `ordered_list`, `list_item` — the snake_case
+ *      aliases. Unreachable from THIS editor at all: schema v1 emits camelCase
+ *      only, so nothing here can ever hit them. The walker carries them for
+ *      documents from other producers.
+ *
+ * Two different reasons for inertness, which is why no single rule covers it.
+ * `code_block` is the case that kills the tempting generalisation: it holds
+ * text directly, exactly as `codeBlock` does, and is still inert here — not
+ * because of what the node contains but because this editor never spells it
+ * that way. Containment explains the first group; spelling explains the second.
+ *
+ * Stated at this length so a later reader does not mistake these cases for
+ * whole-set coverage and build on a guarantee they do not give.
  */
 describe('schema v1 output conforms to the shipped plain-text walker', () => {
   it('renders every block node the schema names as its own line', () => {

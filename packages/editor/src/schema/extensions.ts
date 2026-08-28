@@ -54,41 +54,61 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     }),
     VersionedDocument,
     // SPEC §2 SAYS "NOTHING SILENTLY BECOMES MARKUP". THESE OPTIONS DO NOT
-    // ACHIEVE THAT, AND THIS COMMENT USED TO CLAIM THEY DID. There are FOUR
-    // paths from text to link markup. Three are closed here by option:
-    //   - `autolink` — a URL typed and then left. Off.
-    //   - `linkOnPaste` — a URL pasted over a selection. Off. The library
-    //     defaults it TRUE and the plan's config omits it, so a URL pasted
-    //     over selected text became link markup. Deviation from the plan's
-    //     verbatim config, ruled by the controller in review round 1.
-    //   - `markdownLinks` — pasted `[text](url)` syntax. Already false by
-    //     default; stated so the path is visibly checked, not accidentally
-    //     correct.
+    // ACHIEVE THAT. Two earlier versions of this comment claimed otherwise —
+    // the first by naming three paths, the second by naming four — so this one
+    // describes the mechanism and deliberately does NOT count. Counting is what
+    // kept recreating the defect: a total is a claim of completeness, and it was
+    // false both times.
     //
-    // THE FOURTH IS NOT AN OPTION AND IS STILL LIVE. `Link.addPasteRules()`
-    // returns a plain-URL `markPasteRule` UNCONDITIONALLY whenever
-    // `markdownLinks` is false (extension-link@3.30.5 dist:445-482), core
-    // registers it, and it fires from `pasteRulesPlugin`'s `appendTransaction`
-    // gated only on `transaction.getMeta('uiEvent') === 'paste'` — which
-    // prosemirror-view's `doPaste` sets AFTER `handlePaste` declines. None of
-    // the three options above gates it. Setting `markdownLinks: false` in fact
-    // routes INTO this branch rather than away from it.
+    // Line references are to the installed 3.30.5 dists, verified there.
     //
-    // So today a pasted URL becomes a link at a bare cursor as well as over a
-    // selection — broader than the round-1 defect, which at least returned
-    // early on an empty selection — and a bare `gst.gov.in` becomes
-    // `http://gst.gov.in`. It is not link-only: five configured extensions
+    // WHAT IS CLOSED HERE, BY OPTION:
+    //   - `autolink` (off) — a URL typed and then left.
+    //   - `linkOnPaste` (off) — extension-link dist:502 registers the
+    //     `handlePasteLink` plugin only when true. Its handler returns early on
+    //     an empty selection, so it only ever covered pastes over a selection.
+    //   - `markdownLinks` (off) — gates TWO mechanisms, not one:
+    //     `addInputRules()` at dist:434-435, a TYPED `[text](url)` rule, and
+    //     the shape of the paste rule below. With it false, typing markdown
+    //     link syntax stays literal text.
+    //
+    // WHAT IS NOT CLOSED, AND CANNOT BE FROM THIS FUNCTION: the plain-URL paste
+    // rule. `addPasteRules()` (dist:445-482) returns a `markPasteRule` over
+    // `findPlainUrls` when `markdownLinks` is false — and when it is TRUE it
+    // returns `markdownLinkPasteRule`, which merges `findPlainUrls` matches in
+    // alongside the markdown ones (dist:225-237, and the library's own comment
+    // there says "and links the plain URLs from findPlainUrls"). Both branches
+    // link plain URLs. Verified empirically on this extension list: with
+    // `markdownLinks` true and false alike, a pasted URL becomes a link and a
+    // bare `gst.gov.in` becomes `http://gst.gov.in`.
+    //
+    // THAT IS THE LESSON WORTH CARRYING, and it is narrower than "an unaudited
+    // default got in": AN OPTION THAT LOOKS LIKE IT SELECTS BETWEEN A SAFE AND
+    // AN UNSAFE BRANCH MAY BE SELECTING BETWEEN TWO IMPLEMENTATIONS OF THE SAME
+    // BEHAVIOUR. Flipping `markdownLinks` does not avoid this path; it only
+    // changes which rule object implements it.
+    //
+    // TRIGGERS ARE NOT PASTE-ONLY. core dist:5119-5125 runs these rules from
+    // `pasteRulesPlugin`'s `appendTransaction` on any of:
+    //   - `uiEvent === 'paste'` AND not pasted from ProseMirror (dist:5121);
+    //   - `uiEvent === 'drop'` AND not dropped from ProseMirror (dist:5122) —
+    //     prosemirror-view dist:3902 dispatches it, so DRAGGING TEXT IN is a
+    //     live route, confirmed here to produce the same links as pasting;
+    //   - an `applyPasteRules` meta (dist:5123), Tiptap's simulated paste.
+    //
+    // Nothing live is left unnamed above. Everything not closed by option is
+    // the same rule set under a different trigger, so one lever covers all of
+    // it — `enablePasteRules`, an `Editor` option this function structurally
+    // cannot reach. It is also not link-only: five configured extensions
     // register seven paste rules between them (`bold` 2, `italic` 2, `code` 1,
-    // `strike` 1, `link` 1), so `**due soon**` pastes as bold, `*soon*` as
-    // italic, `` `npm run gst` `` as code and `~~gone~~` as strike.
+    // `strike` 1, `link` 1), so `**due soon**` arrives bold, `*soon*` italic,
+    // `` `npm run gst` `` code and `~~gone~~` strike.
     //
-    // NOT DECIDED HERE, DELIBERATELY. Switching paste rules off is
-    // `enablePasteRules`, an `Editor` option this function structurally cannot
-    // reach, it spans five extensions, and it is a product judgement about how
-    // §2 should be honoured. TASK 5 — the escape-suggestion mechanic — owns
-    // that decision; the plan created it for this requirement. A test in
-    // test/schema.test.ts records the current behaviour truthfully so that
-    // Task 5's change is what makes it fail.
+    // NOT DECIDED HERE, DELIBERATELY. How §2 should be honoured across five
+    // extensions is a product judgement, and TASK 5 — the escape-suggestion
+    // mechanic — owns it; the plan created that task for this requirement.
+    // Tests in test/schema.test.ts record the current behaviour truthfully, so
+    // Task 5's change is what makes them fail.
     //
     // `openOnClick: false` keeps a click editing the link, not following it.
     Link.configure({

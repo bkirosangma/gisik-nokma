@@ -234,9 +234,19 @@ describe('behavioural options that spec §2 constrains', () => {
   });
 
   /**
-   * Replicates `doPaste` from prosemirror-view@1.42.3 in full: consult
-   * `handlePaste` first, and if it declines, dispatch the replacement with
+   * Replicates the META-SETTING TAIL of `doPaste` (prosemirror-view@1.42.3
+   * dist:3754-3765) — NOT the whole function. It consults `handlePaste` first
+   * and, if that declines, dispatches the replacement with
    * `.setMeta('paste', true).setMeta('uiEvent', 'paste')`.
+   *
+   * What is skipped, deliberately: the real `doPaste` takes
+   * `sliceSingleNode(slice)` and uses `replaceSelectionWith(singleNode,
+   * preferPlain)` where that yields a node, and adds `scrollIntoView()`. This
+   * helper always uses `replaceSelection(slice)` and never scrolls. Both are
+   * outcome-equivalent for the single-text-node slices used here, and
+   * `scrollIntoView` is a no-op in jsdom — but the difference is written down
+   * rather than papered over with the word "full", because the meta is the only
+   * part these tests actually depend on.
    *
    * BOTH HALVES ARE LOAD-BEARING and the second is the one an earlier version
    * of this test omitted. `handlePaste` is a synchronous prop; paste RULES run
