@@ -722,7 +722,7 @@ pre-mutation blob hash, with `git diff` against the index, or by reading the fil
 Python `difflib`. This matters to every lane, because a tool that lies about equality turns a mutation
 sweep into theatre, and the whole falsifiability discipline rests on those restorations being real.
 
-## Wave 1 cross-lane watch (2026-08-28, controller) — where the decision-6 drift is loud, where it is silent, and two obligations assigned by position
+## Wave 1 cross-lane watch (2026-08-28, controller) — where the decision-6 drift is loud, where it is silent, one obligation assigned by position, and one MUST that does not fire
 
 Recorded by the cross-lane controller during Wave 1. Everything here is verified against shipped code or
 read at the cited plan line. **This section was substantially wrong on first writing and was corrected
