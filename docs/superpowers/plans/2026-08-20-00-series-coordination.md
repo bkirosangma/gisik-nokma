@@ -722,6 +722,45 @@ pre-mutation blob hash, with `git diff` against the index, or by reading the fil
 Python `difflib`. This matters to every lane, because a tool that lies about equality turns a mutation
 sweep into theatre, and the whole falsifiability discipline rests on those restorations being real.
 
+### 7. The env-contract gate ships with three known limits, all inherited from Plan 11 Task 6's own checker
+
+The gate landed early (Plan 11 Task 6's env-contract slice only — the dev stack stays in Wave 4)
+because it is what forces every later plan to document its variables, and it is worth more the
+earlier it exists. Landing it exposed that **the plan's checker cannot fail on this codebase**:
+it greps `process.env.NAME`, while `apps/server` hands the whole environment to `loadConfig` and
+declares its contract as **zod schema keys** in `config.ts`. The plan's gate would have reported
+`0 referenced in code` and passed vacuously forever — and its own planted-defect proof writes a
+`process.env.X` file, the single shape the checker can see, so the plant passes while real
+coverage is nil. **A planted-defect proof that plants the shape the checker already detects
+proves nothing about coverage.**
+
+The shipped gate reads three shapes (`process.env.X`, destructuring, and UPPER_SNAKE object keys
+in files that mention `process.env`/`ProcessEnv`) and carries two guards that were themselves
+proven to fire: it fails if it finds **no** variables at all, and it fails if the contract site is
+missing or contributes nothing. Whoever extends it inherits three limits:
+
+- **A commented-out variable still counts as documented.** The documented-side regex is `^#?\s*
+  ([A-Z][A-Z0-9_]*)=`, so `# PORT=3000` satisfies the gate exactly as `PORT=3000` does. Verified
+  by plant. Defensible for a `.example` file where optional variables are conventionally
+  commented — but it means **"documented" and "enabled" are different predicates**, and the
+  live-versus-documented-ahead distinction in that file is carried by section prose, not by
+  comment status.
+- **`apps/server/test/` and `scripts/` are outside the scanned roots**, and the walker skips any
+  `*.test.*` file. Two test helpers read `TEST_DATABASE_ADMIN_URL` and are invisible to the gate
+  (harmless — that name is both ignored and documented). A future test helper or ops script
+  reading an undocumented variable would not be caught.
+- **`IGNORE` is a permanent unaudited exemption list.** Kept verbatim from the plan. Worth
+  revisiting when Plan 11's remainder lands, because an exemption nobody re-reads is how a real
+  variable stops being checked.
+
+The `.env.example` header states the honesty convention this file needs in order not to mislead:
+each section names the plan that reads its variables, and a variable whose plan has not landed is
+**documented ahead of its reader, not live** — setting it today changes nothing, because no
+shipped code looks at it. Only the Core (Plan 1) group is live. Two forward references
+transcribed from the plan (`deploy/do/README.md` and `pnpm check:db-tz`) were annotated at the
+same time: both land with Plan 11 and neither is a command an operator can run today, which the
+convention covered for variables and not for commands.
+
 ## Wave 1 cross-lane watch (2026-08-28, controller) — where the decision-6 drift is loud, where it is silent, one obligation assigned by position, and one MUST that does not fire
 
 Recorded by the cross-lane controller during Wave 1. Everything here is verified against shipped code or
@@ -1034,3 +1073,4 @@ and two roots each holding an `index.css` produce two indistinguishable lines. T
 correctly but cannot say *where* sends its red to the wrong owner. Invisible while one lane owns every
 scanned tree; it bites the moment a second lane's tree enters the walk. Fix is `relative(REPO_ROOT, path)`
 and Lane 4 is landing it ahead of Lane 3's rebase.
+
