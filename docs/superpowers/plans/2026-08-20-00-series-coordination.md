@@ -1036,8 +1036,40 @@ export fails at the import site**, which means — Lane 4's sharpening, and it i
 catches it at typecheck; a bundler with loose interop hands back `undefined` and defers the failure to
 first call. The same defect therefore has a different blast radius in every package that imports it,
 which is precisely why this belongs in one repo-wide sweep rather than in each lane's local judgment.
-**The complete test is two greps, not one: the subpath must exist AND the named import must still be
-exported from it.** Lane 3's rule stands; this is the second half of it.
+**The complete test is three checks, not one** — Lane 3 found the third by running the rule *forward*
+over its eleven undispatched tasks rather than backward over what shipped:
+
+1. **The subpath resolves.** Missing → fails at resolution, loudly, identically for everyone.
+2. **The named export exists in it.** Missing → fails at the import site, at whatever volume the
+   consumer's build config decides.
+3. **The binding form matches.** `@vitejs/plugin-react` exports **only** `default`, so a named import of
+   it fails exactly like an absent export — and a grep for the name marks it clean *twice over*, since
+   both the subpath and the identifier are present. Plan 7 happens to get it right at line 6955
+   (`import react from '@vitejs/plugin-react'`), so this is a clean negative rather than a catch.
+   `@tiptap/suggestion` is the control case worth knowing: it publishes both a named `Suggestion` and a
+   default, so either style works and nothing distinguishes a lucky guess from a checked one.
+
+Lane 3's forward sweep over Plan 7's remaining tasks is clean on all three: eleven specifiers, all
+resolving, every named export present, every binding form correct.
+
+### The one shape under all of it
+
+Stated once, because today produced three independent instances and they are the same defect:
+
+> **The check that is easy to write asks whether something is present. The check that is correct asks
+> whether it is present *in the form you are about to use it*.**
+
+`toContain` versus set-equality. Subpath versus export. Export versus binding form. Each easy version
+returns green over the failing case, and each correct version costs the same to write once someone has
+noticed the difference. The corollary that makes it actionable: **an inclusion check is never a
+sufficient test of a closed set** — and when the set is one the ledger persists, the asymmetry becomes
+unrecoverable rather than merely weak. Lane 4's statement of it is the one to keep: a *missing* member of
+a closed vocabulary fails at the door, while an *extra* member commits and is permanent, because the
+ledger is append-only by trigger. That is not a test that could be stronger; it is an unrecoverable
+write. Set-equality is therefore **mandatory, not preferable**, for any vocabulary reaching the ledger —
+`CONTEST_EVENT_TYPES` (Plan 10 T2) and `NOTIFICATION_KINDS` (Plan 9 T3) named specifically. Lane 3's
+`underline` mark is the same defect with a softer landing: a stored mark is at least migratable, a
+committed event is not.
 
 **Why this one was found centrally, recorded because it argues for how the remaining sweeps run.** Three
 lanes each held one piece — Lane 3 had the type-versus-subpath insight, Lane 2 had the installed tree,
