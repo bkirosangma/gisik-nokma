@@ -444,6 +444,20 @@ describe('a typo in a fixture refuses at load rather than downgrading the discip
     );
   });
 
+  // 4.51 — the annotation field. JSON has no comments, and a fixture whose
+  // SHAPE carries meaning beyond the outcome it asserts (the wf_rules
+  // definition's deliberately-uncovered wildcard edge) had nowhere to say so.
+  // A note nested inside the def would have been stripped in silence by
+  // workflowDefinedPayloadSchema's non-strict parse, so it lives at the top
+  // level, where strictness applies and a typo dies like any other.
+  it('4.51 notes is prose the loader keeps, and a misspelled note still refuses', () => {
+    const annotated = fixtureSchema.safeParse({ ...wellFormed, notes: 'why this shape matters' });
+    expect(annotated.success ? annotated.data.notes : null).toBe('why this shape matters');
+    expect(malformedDetail({ ...wellFormed, note: 'why this shape matters' })).toBe(
+      ": Unrecognized key(s) in object: 'note'",
+    );
+  });
+
   it('all four legitimate expected shapes still parse (backward-compat pin)', () => {
     const shapes = [
       { refused: false },

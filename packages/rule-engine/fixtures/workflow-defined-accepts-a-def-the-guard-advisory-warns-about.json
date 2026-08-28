@@ -1,0 +1,24 @@
+{
+  "name": "a definition whose guard can be walked around still publishes — rule-bypassable is a warning too",
+  "notes": "Case 4.49. The twin of workflow-defined-accepts-a-def-the-advisory-warns-about, for the generalised advisory code. This def trips rule-bypassable and nothing else: a guarded \"Doing\" → \"Done\" edge sits beside an unguarded any-state → \"Done\". The engine never calls adviseWorkflowDef, and no advisory may ever enter validateWorkflowDef's array, because publish gates on that array being empty — an advisory that leaked into it would become a refusal without anyone editing a word of it.",
+  "workflowDefs": [],
+  "candidateEvent": {
+    "type": "workflow.defined",
+    "entity": { "kind": "workflow", "id": "wf_guarded" },
+    "actorId": "user_admin",
+    "payload": {
+      "id": "wf_guarded", "version": 1, "name": "Guarded", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [ { "kind": "restrict-to", "userIds": ["user_b"] } ] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  },
+  "expected": { "refused": false }
+}
