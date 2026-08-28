@@ -1,0 +1,158 @@
+/* @gisik-nokma/ui — component styles. BEM classes; every colour is a token
+   variable from tokens.ts (the one origin). No literal colours here: the
+   token-discipline test scans this file. */
+
+.gn-button {
+  font: inherit;
+  border-radius: 6px;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--gn-border-strong);
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  cursor: pointer;
+}
+.gn-button:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+.gn-button--primary {
+  background: var(--gn-accent);
+  border-color: var(--gn-accent);
+  color: var(--gn-accent-text);
+}
+.gn-button--danger {
+  background: var(--gn-danger);
+  border-color: var(--gn-danger);
+  color: var(--gn-danger-text);
+}
+.gn-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.gn-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.8rem;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+}
+.gn-chip__dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--gn-text-muted);
+}
+.gn-chip--open .gn-chip__dot { background: var(--gn-category-open); }
+.gn-chip--active .gn-chip__dot { background: var(--gn-category-active); }
+.gn-chip--terminal .gn-chip__dot { background: var(--gn-category-terminal); }
+.gn-chip--blocked .gn-chip__dot { background: var(--gn-blocked); }
+.gn-chip--pending .gn-chip__dot { background: var(--gn-pending); }
+.gn-chip--restricted .gn-chip__dot { background: var(--gn-restricted); }
+.gn-chip--contested .gn-chip__dot { background: var(--gn-contested); }
+
+.gn-card {
+  background: var(--gn-surface-raised);
+  border: 1px solid var(--gn-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  box-shadow: 0 1px 2px var(--gn-shadow);
+}
+
+.gn-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--gn-surface-sunken);
+  color: var(--gn-text);
+  border: 1px solid var(--gn-border);
+  font-weight: 600;
+}
+.gn-avatar--medium { width: 2rem; height: 2rem; font-size: 0.8rem; }
+.gn-avatar--small { width: 1.5rem; height: 1.5rem; font-size: 0.65rem; }
+
+.gn-dialog__scrim,
+.gn-sheet__scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--gn-surface-overlay);
+  display: flex;
+  z-index: 40;
+}
+.gn-dialog__scrim { align-items: center; justify-content: center; }
+.gn-sheet__scrim { justify-content: flex-end; }
+
+.gn-dialog,
+.gn-sheet {
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  border: 1px solid var(--gn-border);
+  box-shadow: 0 8px 24px var(--gn-shadow);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+.gn-dialog {
+  border-radius: 10px;
+  width: min(34rem, 92vw);
+}
+.gn-sheet {
+  width: min(40rem, 94vw);
+  height: 100%;
+  max-height: none;
+}
+.gn-dialog__header,
+.gn-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--gn-border);
+}
+.gn-dialog__title,
+.gn-sheet__title { font-size: 1.05rem; margin: 0; }
+.gn-dialog__close,
+.gn-sheet__close {
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  border: none;
+  background: none;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.gn-dialog__body,
+.gn-sheet__body { padding: 1rem 1.1rem; overflow-y: auto; }
+
+.gn-table__scroll { overflow-x: auto; }
+.gn-table {
+  border-collapse: collapse;
+  width: 100%;
+  color: var(--gn-text);
+}
+.gn-table__caption {
+  text-align: left;
+  color: var(--gn-text-muted);
+  padding: 0.4rem 0;
+}
+.gn-table__header {
+  text-align: left;
+  font-weight: 600;
+  color: var(--gn-text-muted);
+  border-bottom: 2px solid var(--gn-border-strong);
+  padding: 0.45rem 0.6rem;
+  white-space: nowrap;
+}
+.gn-table__cell {
+  border-bottom: 1px solid var(--gn-border);
+  padding: 0.45rem 0.6rem;
+  vertical-align: top;
+}
+.gn-table__row--clickable { cursor: pointer; }
+.gn-table__row--clickable:hover { background: var(--gn-surface-sunken); }

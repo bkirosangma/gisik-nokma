@@ -72,9 +72,13 @@ jobs:
       #     check:env`, needs the env contract Plan 11 Task 6 hasn't landed.
       #   - fixtures (client half): `test:fixtures` proves the shared rule-
       #     engine fixture suite agrees across the server build AND a
-      #     client build; there is no client package yet (`packages/app-
-      #     core` is Plan 6a). The server-side half already runs as a
-      #     normal part of `packages/rule-engine`'s own `test` script,
+      #     client build. `packages/app-core` now EXISTS (Plan 6 Task 4
+      #     landed the DataSource/view-types scaffold), so the old "there
+      #     is no client package yet" reason is spent -- but the scaffold
+      #     does not yet run the fixture harness against a client build,
+      #     which is what this job would gate. Plan 6's own fixtures task
+      #     still owns the exclusion. The server-side half already runs as
+      #     a normal part of `packages/rule-engine`'s own `test` script,
       #     which this job already executes via `turbo run test`.
       #   - dual-client: Plan 10's harness (`test:dual-client`) doesn't
       #     exist.
@@ -87,7 +91,8 @@ jobs:
       #     its Produces bullet is the authority when Plan 11 lands it,
       #     not its own Step 2 draft.)
       # What's left of the plan's split -- typecheck gating unit, both
-      # against packages that do exist (domain, rule-engine, server) -- is
+      # against packages that do exist (domain, rule-engine, server, and
+      # now the two client packages ui and app-core) -- is
       # exactly what `turbo run build test typecheck` already orders via
       # its own task graph; splitting it into two CI jobs would just pay
       # for a second install + build from scratch (no turbo remote cache is
