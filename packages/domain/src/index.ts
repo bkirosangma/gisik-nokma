@@ -23,3 +23,4 @@ export { makeEnvelope } from './testing.js';
 export * from './ticket-state.js';
 export * from './workflow-helpers.js';
 export * from './doc-embeds.js';
+export * from './attachment-kinds.js';
