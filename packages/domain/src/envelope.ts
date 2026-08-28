@@ -183,6 +183,27 @@ const submittedEventObject = z.object({
   clientTime: isoDatetime,
 });
 
+/**
+ * BOTH schemas below carry only HALF of the membership coherence check, and
+ * this is the note for whoever reaches for one of them.
+ *
+ * What they enforce: a membership `entity.id` is `^<ULID>:<ULID>$` and its
+ * left half is this event's own `workspaceId`.
+ *
+ * What they do NOT enforce: that its right half is the user the payload is
+ * actually about. That comparison needs the payload PARSED — which needs the
+ * event's type, its version and its registered schema — and none of that is
+ * knowable here, where `payload` is `unknown` by design. So it lives in
+ * `parseEvent`, which has all three.
+ *
+ * The gap is real and passes silently. An envelope in workspace A, filed at
+ * `A:userC`, whose payload grants `userD`, is `success: true` here and
+ * `malformed-envelope` through `parseEvent`. Nothing in production validates a
+ * bare envelope today, so nothing is wrong now — but the first consumer that
+ * does (a sync-down reader is the obvious shape) would inherit half a check and
+ * have no way to tell. **If you are validating an event, call `parseEvent`.**
+ * These schemas are the shape layer underneath it, not a substitute for it.
+ */
 export const submittedEventSchema = submittedEventObject.superRefine(refuseMisfiledMembership);
 
 export const eventEnvelopeSchema = submittedEventObject
