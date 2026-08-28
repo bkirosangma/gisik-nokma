@@ -1,8 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
-import { newUlid, type EntityHead, type EventEnvelope } from '@gisik-nokma/domain';
+import {
+  newUlid,
+  ENTITY_WORKSPACE_MISMATCH_RULE,
+  type EntityHead,
+  type EventEnvelope,
+} from '@gisik-nokma/domain';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
-import { createIngestService, ENTITY_WORKSPACE_MISMATCH_RULE } from '../src/ingest/ingest-service.js';
+import { createIngestService } from '../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from './helpers/db.js';
 import { submittedWorkflowDefined, submittedWorkspaceCreated } from './helpers/events.js';

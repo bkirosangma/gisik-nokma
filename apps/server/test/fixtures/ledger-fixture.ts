@@ -1,5 +1,4 @@
-import type { EntityKind } from '@gisik-nokma/domain';
-import type { LedgerEvent } from '../../src/ledger/event-store.js';
+import type { EntityKind, LedgerEvent } from '@gisik-nokma/domain';
 
 /**
  * A fixed ledger: three workspaces, one ticket, eleven events, hand-built

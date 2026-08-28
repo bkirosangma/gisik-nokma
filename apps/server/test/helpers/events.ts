@@ -1,5 +1,4 @@
-import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
-import type { LedgerEvent } from '../../src/ledger/event-store.js';
+import { newUlid, type LedgerEvent, type SubmittedEvent } from '@gisik-nokma/domain';
 
 /** A valid workspace.created submission; each call invents a fresh workspace. */
 export function submittedWorkspaceCreated(overrides: Partial<SubmittedEvent> = {}): SubmittedEvent {

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PoolClient } from 'pg';
-import { newUlid } from '@gisik-nokma/domain';
-import { insertEvent, type LedgerEvent } from '../src/ledger/event-store.js';
+import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { insertEvent } from '../src/ledger/event-store.js';
 import { buildProjectionRegistry } from '../src/projections/index.js';
 import { rebuildProjection } from '../src/projections/rebuild.js';
 import { getWorkflowDefFromProjection, workflowsProjection } from '../src/projections/workflows.js';
