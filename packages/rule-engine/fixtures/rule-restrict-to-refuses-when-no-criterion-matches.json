@@ -1,0 +1,37 @@
+{
+  "name": "when no criterion matches, the refusal names everyone who was allowed",
+  "workflowDefs": [
+    {
+      "id": "wf_rules", "version": 1, "name": "Guarded", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [ { "kind": "restrict-to", "assignee": true, "roles": ["admin"] } ] },
+        { "from": "done", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "memberships": [
+    { "userId": "user_a", "role": "member" }
+  ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_rules", "assigneeId": "user_b" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "doing" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_a",
+    "payload": { "to": "done" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "restrict-to",
+    "reason": "Only the ticket's assignee, or anyone with the role admin may make this move, and user_a is not among them."
+  }
+}

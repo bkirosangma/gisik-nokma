@@ -9,7 +9,9 @@ import {
 } from '@gisik-nokma/domain';
 import { evaluateEvent } from '../src/evaluate.js';
 import { REFUSAL_RULES } from '../src/refusal-rules.js';
+import { evaluateTransitionRules } from '../src/rules/index.js';
 import type { EngineContext, Refusal, Verdict } from '../src/engine.js';
+import type { TransitionRuleInput } from '../src/rules/types.js';
 
 function envelope(overrides: Partial<EventEnvelope> = {}): EventEnvelope {
   const workspaceId = newUlid();
@@ -470,26 +472,29 @@ describe('the invariant runs before authored rules (Task 8 amendment 2)', () => 
 
 /**
  * `evaluateTransitionRules` (Task 8) runs a transition's rules in definition
- * order and stops at the first refusal. The fixture suite's single-rule
- * fixtures cannot witness "stops," only "refuses" — a rule engine that ran
- * every rule and returned the last refusal would pass them identically. This
- * pins the stop with two real rules (both implemented as of Task 9):
- * require-comment then require-evidence on the same edge.
+ * order and returns the first refusal. The fixture suite's single-rule
+ * fixtures cannot witness this at all — a rule engine that ran every rule and
+ * returned the last refusal would pass them identically. This pins it with
+ * two real rules (both implemented as of Task 9): require-comment then
+ * require-evidence on the same edge.
  *
- * The refusing case alone only pins "stops at a refusal" — it cannot
- * distinguish a genuine early-return from an unconditional `return result`
- * that happens to return rule 1's verdict on its way past rule 2 (rule 1
- * refuses either way here, so an unconditional-return mutant produces the
- * identical observable result). The second case below closes that gap: rule
- * 1 ACCEPTS a real comment, so only a loop that keeps going after an accept
- * can ever reach rule 2 — and rule 2 must then genuinely refuse (no
- * evidenceAttachmentId is given), which an unconditional-return mutant
- * cannot produce (it would stop at rule 1's accept instead). Together the
- * two cases pin both directions of "first refusal wins" — stop on refuse,
- * continue on accept.
+ * Neither case below can tell a genuine short-circuiting loop (never touches
+ * rule 2 once rule 1 has refused) apart from an eager evaluate-all variant
+ * (awaits every rule regardless, then picks the first one that refused):
+ * both produce the identical verdict on both cases here, because neither
+ * require-comment nor require-evidence reads `ctx`. What these two cases DO
+ * pin: the returned refusal is rule 1's, not rule 2's, when rule 1 refuses
+ * (first case); and rule 2 is genuinely reached and its own refusal
+ * surfaces when rule 1 instead accepts (second case) — ruling out an
+ * unconditional "return rule 1's verdict regardless" mutant, which the
+ * second case alone would fail (it would resolve to rule 1's accept and
+ * never reach rule 2). Task 10 closes the eager-vs-lazy gap those two leave
+ * open, in the next describe block: `restrict-to` reads `ctx` for its
+ * membership lookup, so counting `ctx` calls after a rule-1 refusal can tell
+ * "stopped" from "evaluated anyway."
  */
 describe('evaluateTransitionRules — first refusal wins (Task 8)', () => {
-  it('stops at the first refusing rule and never reaches a later one', async () => {
+  it("refuses with the first authored rule's refusal, not a later one", async () => {
     const parent = ticket({ id: 't1', stateId: 'todo', stateCategory: 'open', workflowId: 'wf_two_rules' });
     const { ctx } = spyContext(twoRulesV1, { entity: parent });
     await expect(evaluateEvent(transitioned('done'), ctx)).resolves.toEqual({
@@ -517,6 +522,102 @@ describe('evaluateTransitionRules — first refusal wins (Task 8)', () => {
       refused: true,
       rule: REFUSAL_RULES.requireEvidence,
       reason: 'This move must carry an attachment as evidence, and none was provided.',
+    });
+  });
+});
+
+/**
+ * Task 10 controller obligation: the two tests above cannot distinguish a
+ * genuine short-circuiting loop from an eager evaluate-all-then-pick-first
+ * variant, because neither require-comment nor require-evidence ever reads
+ * `ctx` — an eager variant is observationally identical to a lazy one when
+ * no rule has a side channel to witness being asked. `restrict-to` does: its
+ * role branch calls `ctx.getEntityState('membership', ...)`. Pairing it as
+ * rule 2 behind a refusing require-comment makes the eager/lazy difference
+ * observable — an eager (e.g. `Promise.all` then find-first-refusal) mutant
+ * would still return rule 1's refusal (same verdict as today), but it would
+ * also have called `ctx.getEntityState` for rule 2's membership lookup on
+ * the way there. Calling `evaluateTransitionRules` directly (rather than
+ * through `evaluateEvent`) keeps the count clean of the dispatcher's own
+ * ticket lookup, so `entityState` counts only what the rules themselves ask.
+ */
+describe('evaluateTransitionRules is lazy: a later ctx-reading rule is never consulted after an earlier refusal', () => {
+  it("refuses with require-comment's verdict without ever consulting restrict-to's membership lookup", async () => {
+    const parent = ticket({ id: 't1', stateId: 'todo', stateCategory: 'open', workflowId: 'wf_two_rules' });
+    const { ctx, counts } = spyContext(twoRulesV1, { entity: parent });
+    const input: TransitionRuleInput = {
+      env: transitioned('done'),
+      ctx,
+      ticket: parent,
+      def: twoRulesV1,
+      toState: twoRulesV1.states.find((state) => state.id === 'done')!,
+      fromStateId: 'todo',
+      payload: { to: 'done' },
+    };
+    const verdict = await evaluateTransitionRules(
+      [{ kind: 'require-comment' }, { kind: 'restrict-to', roles: ['admin'] }],
+      input,
+    );
+    expect(verdict).toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.requireComment,
+      reason: 'This move must carry a comment explaining it, and none was provided.',
+    });
+    // require-comment refused without touching ctx at all; restrict-to's
+    // role branch is the only thing in this pairing that would call
+    // getEntityState. Zero calls is the lazy loop's signature — an eager
+    // evaluate-all variant would show at least one.
+    expect(counts().entityState).toBe(0);
+  });
+});
+
+/**
+ * restrict-to's role branch narrows the membership lookup's result with
+ * `membership.kind === 'membership'` before trusting `.role`. No well-typed
+ * fixture can make that check matter: every EntityState variant besides
+ * MembershipState (TicketState, OtherEntityState) has no `role` field at
+ * all, so an absent kind check would read `undefined` either way and the
+ * observable verdict would be identical — the mutation is unfalsifiable
+ * through the type system alone. It matters for exactly the seam
+ * `apps/server/src/engine-context.ts`'s `getEntityState` names in its own
+ * ruled comment (adaptation map S9): that implementation ends in
+ * `as unknown as EntityState | null`, an unsafe cast that a real bug could
+ * make return a wrongly-kinded value. This plants that scenario directly —
+ * a value with `kind: 'ticket'` that happens to carry a `role` field
+ * matching the rule's allowed list — the only way to make the check
+ * observable, and the only way that mirrors why it exists.
+ */
+describe("restrict-to's membership kind-check, and what no well-typed fixture can pin", () => {
+  it('refuses honestly when the value at a membership id is not actually a membership, even if it coincidentally carries a matching role field', async () => {
+    const parent = ticket({ id: 't1', stateId: 'todo', stateCategory: 'open', workflowId: 'wf_two_rules' });
+    // Only reachable via an unsafe cast in a real ctx implementation, never
+    // through the harness or through well-typed test data: `kind: 'ticket'`
+    // paired with a `role` property that coincidentally matches the rule.
+    const wronglyKinded = { kind: 'ticket', role: 'admin' } as unknown as EntityState;
+    const { ctx } = spyContext(null, { entity: wronglyKinded });
+    const env = envelope({
+      type: 'ticket.transitioned',
+      entity: { kind: 'ticket', id: 't1' },
+      payload: { to: 'done' },
+      actorId: 'user_a',
+    });
+    const input: TransitionRuleInput = {
+      env,
+      ctx,
+      ticket: parent,
+      def: twoRulesV1,
+      toState: twoRulesV1.states.find((state) => state.id === 'done')!,
+      fromStateId: 'todo',
+      payload: { to: 'done' },
+    };
+    const verdict = await evaluateTransitionRules([{ kind: 'restrict-to', roles: ['admin'] }], input);
+    // A buggy narrowing (or none at all) would read the coincidental `role:
+    // 'admin'` field and wrongly accept. The kind check must reject it and
+    // fall through to the honest refusal.
+    expect(verdict).toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.restrictTo,
+      reason: 'Only anyone with the role admin may make this move, and user_a is not among them.',
     });
   });
 });
