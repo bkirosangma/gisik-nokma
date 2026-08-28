@@ -50,6 +50,15 @@ export type PartialEnvelope = z.infer<typeof partialEnvelopeSchema>;
 export const fixtureSchema = z
   .object({
     name: z.string().min(1),
+    /**
+     * Prose for the next reader, and the only comment JSON allows. Nothing
+     * executes it — it exists because a fixture whose SHAPE is load-bearing
+     * beyond the outcome it asserts has no other way to say so, and the
+     * alternative (a note nested inside the def) would be stripped in silence
+     * by `workflowDefinedPayloadSchema`'s deliberately non-strict parse and
+     * never reach a reader who was looking at the parsed fixture.
+     */
+    notes: z.string().min(1).optional(),
     workflowDefs: z.array(workflowDefinedPayloadSchema).default([]),
     memberships: z
       .array(z.object({ userId: z.string(), role: z.enum(['owner', 'admin', 'member', 'guest']) }).strict())

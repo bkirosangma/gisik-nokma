@@ -45,7 +45,7 @@ Fixture names refer to `packages/rule-engine/fixtures/`; unit tests to `packages
 - **4.24** ✅ require-comment refuses bare and whitespace-only comments; a real comment passes. — `rule-require-comment-*`
 - **4.25** ✅ require-evidence refuses without an attachment id; with one it passes. — `rule-require-evidence-*`
 - **4.26** ✅ require-field wants the field set before the move, not with it. — `rule-require-field-*`
-- **4.27** ✅ restrict-to: assignee, roles (via membership), and named people OR-combine; missing membership refuses; a planted empty restriction refuses everyone. — `rule-restrict-to-*` (10 fixtures)
+- **4.27** ✅ restrict-to: assignee, roles (via membership), and named people OR-combine; missing membership refuses; a planted empty restriction refuses everyone. — `rule-restrict-to-*` (11 fixtures; the eleventh belongs to case 4.50)
 - **4.28** ✅ require-different-user: the last performer of the named move cannot act; a second person can; vacuous acceptance when nobody performed it; only the latest performer counts. — `rule-rdu-*` (6 fixtures)
 - **4.29** ✅ Rules run in authored order and the first refusal wins — proven with the same violated pair in both orders. — `rules-first-refusal-wins`, `rules-order-comes-from-the-definition`
 
@@ -64,6 +64,17 @@ Fixture names refer to `packages/rule-engine/fixtures/`; unit tests to `packages
 - **4.37** ✅ A transition-log entry recorded under a workflow the ticket has since been migrated off is ignored, even when both workflows spell the watched state the same way — four-eyes answers only for the workflow the ticket is on. — `rule-rdu-ignores-an-entry-from-a-workflow-the-ticket-has-left`
 - **4.38** ✅ The version walk lives once, in `@gisik-nokma/domain`: it follows mappings through every intermediate version, reports the id at the point the chain broke, and refuses a state the latest definition no longer has. — `packages/domain/test/workflow-schema.test.ts` (`foldStateIdForward`)
 - **4.39** ✅ `getWorkflowDefFromProjection` answers as of a ledger position: the version in force at that `workspace_seq`, not the newest one — v1 before v2 was published, v2 after. — `apps/server/test/proj-workflows.test.ts` (integration, live Postgres)
+
+## The generalised advisory: a lower-guard edge voids a guard (owner ruling, coordination §8)
+
+- **4.44** ✅ `rule-bypassable` warns for every kind in the closed vocabulary — restrict-to, require-comment, require-evidence, require-field, require-different-user — when another edge enters the guarded state carrying no rule of that kind; a plain fast-track edge trips it exactly as a from-any edge does, so nothing in the code is special about the wildcard. — `packages/domain/test/advise-workflow.test.ts`
+- **4.45** ✅ The silencing codicil, witnessed in both directions: an uncovered from-any edge warns, and one carrying a rule of the same kind does not. Cover is same-kind-present, so the covering case's parameters deliberately disagree (assignee-only beside named-people) and still cover; it cuts both ways, so two edges guarded by different kinds each void the other. — `packages/domain/test/advise-workflow.test.ts`
+- **4.46** ✅ `rdu-bypassable` and `rule-bypassable` answer different questions: each fires alone where the other is silent, and both fire on one rule whose geometry is wrong in both ways. This is the evidence for keeping the four-eyes code distinct rather than subsuming it. — `packages/domain/test/advise-workflow.test.ts`
+- **4.47** ✅ Advisory sweep hygiene: two rules of one kind on an edge yield one advisory, not two; a self-loop is not a way in and so cannot be the path that voids a guard; a transition whose target is not a declared state (the inert `to: '*'` the coordination rider names) is skipped rather than described. — `packages/domain/test/advise-workflow.test.ts`
+- **4.48** ✅ No cross-tier suppression: `empty-restrict-to` and `rule-bypassable` both speak about the same definition, because a guard that names nobody and a path around the guard are two separate things to fix — unlike the two four-eyes suppressions, which stop one broken watch target being described twice. — `packages/domain/test/advise-workflow.test.ts`
+- **4.49** ✅ Advisories still never gate publish under the generalised code: a definition that trips only `rule-bypassable` is accepted by the engine. — `workflow-defined-accepts-a-def-the-guard-advisory-warns-about`
+- **4.50** ✅ Rules on a from-any edge are enforced, not merely legal: with no exact edge to the target the wildcard edge is the one that resolves, and its own restrict-to refuses the move. The suite's first witness of wildcard-edge rule enforcement. — `rule-restrict-to-refuses-through-a-from-any-edge`
+- **4.51** ✅ A fixture may carry a `notes` string — the only comment JSON allows — which survives the strict parse, while a misspelled `note` still refuses at load. It is where the `wf_rules` "Guarded" definition records that its uncovered wildcard edge is the deliberately-warned example. — `packages/rule-engine/test/harness.test.ts`
 
 ## Cross-plan binding doors (controller rulings G1–G3)
 

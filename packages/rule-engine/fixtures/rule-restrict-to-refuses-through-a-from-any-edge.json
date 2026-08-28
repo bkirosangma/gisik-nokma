@@ -1,0 +1,35 @@
+{
+  "name": "a from-any edge's own restrict-to refuses the move it resolves",
+  "notes": "Case 4.50. The suite's first witness that rules on a from-any edge are ENFORCED and not merely legal (coordination doc §8, requirement 3). The ticket sits in \"To do\", which has no exact edge to \"Done\", so the wildcard edge is the one that resolves and its own restrict-to is the guard that answers. This is the shape the owner sanctioned for closing a bypass: the anywhere arrow carrying its own guard.",
+  "workflowDefs": [
+    {
+      "id": "wf_star_guard", "version": 1, "name": "Guarded anywhere", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [ { "kind": "restrict-to", "roles": ["admin"] } ] }
+      ]
+    }
+  ],
+  "memberships": [
+    { "userId": "user_a", "role": "member" }
+  ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_star_guard" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_a",
+    "payload": { "to": "done" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "restrict-to",
+    "reason": "Only anyone with the role admin may make this move, and user_a is not among them."
+  }
+}
