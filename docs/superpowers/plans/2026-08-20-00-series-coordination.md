@@ -1148,7 +1148,12 @@ write and neither catches it.
 
 **Two adjacent facts verified at the same tree, so no lane re-derives them.** `better-auth@1.7.2`
 declares **no zod peer dependency** — zod `^4.3.6` is its own direct dep, nested, and the monorepo's
-3.25.76 is untouched; the `better-call ✕ unmet peer zod@^4.0.0` warning is cosmetic. And **passkey has
+3.25.76 is untouched. ~~The `better-call ✕ unmet peer zod@^4.0.0` warning is cosmetic.~~ **Struck
+2026-08-28: that warning is ACCURATE**, and Plan 4's execution consequences below prove it from the
+lockfile — there is exactly one `better-call` snapshot, `better-call@1.4.0(zod@3.25.76)`, so it resolved
+its optional zod peer *outside* its declared `^4.0.0`, which is precisely what pnpm reported. The claim
+here was inherited from a lane summary and was never checked against the lockfile; the corrected entry
+below is the authority. And **passkey has
 left better-auth core**: 1.7.2 exposes 54 export subpaths, none containing `passkey`, and carries no
 `@simplewebauthn/*` dependency. It ships as `@better-auth/passkey@1.7.2`, a separate package.
 `PasskeyOptions` still takes `rpID`/`rpName`, so only the specifier moves — any plan text naming
