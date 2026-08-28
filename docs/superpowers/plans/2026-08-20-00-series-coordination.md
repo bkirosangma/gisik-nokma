@@ -1912,3 +1912,66 @@ rules never populate. Executed as briefed it would go green, the tripwire tests 
 path would ship unnoticed. The assignment read right and did not hold. Corrected: Task 5's dispatch is
 widened and **Task 12** named as the implementation site, since `enablePasteRules` is an `Editor` option
 and `TicketEditor` is where the `Editor` is constructed.
+
+
+## A forgeable `origin`, and the window Lane 4's merge opens (2026-08-28, controller ruling)
+
+Found by Lane 4 implementing Plan 10 T2. **Verified independently at the shipped tree**, because it is
+security-adjacent and a relayed security claim is worth nothing.
+
+**The gap.** `contest.server-only` refuses a `claim.contested` whose `origin` is not `'server'` — it is
+the rule stopping a client forging the system's own record of a refusal. **But nothing validates
+`origin`.** `submittedEventSchema` checks only that it is one of the four enum members
+(`envelope.ts:80`, `ORIGINS` at `:7` — and `'server'` is one of them), and `apps/server/src` merely
+**stores** it: `event-store.ts:61` in the insert column list, `:72` binding it, `:119` reading it back.
+Swept the whole of `apps/server/src` and `packages/` for any validate / overwrite / compare of `origin`:
+**zero hits.** A client that sets `origin: 'server'` walks straight past the rule.
+
+**The rule is correct and is not what changes.** The engine is shared between server and replica and
+genuinely cannot know provenance, so the check belongs at the door, not in the evaluator. This document
+already records that Plan 4's permission gate refuses forged server-origin at the gate's first lines.
+That remains the fix.
+
+**Reachability today is nil, and Lane 4's merge is exactly what changes it.** Verified: `claim.contested`
+is **not** registered in `vocabulary.ts` on `main` (zero occurrences), and **no shipped rule reads
+`origin` at all** — the only reference in `packages/rule-engine/src` is the fixture harness defaulting it
+to `'server'` (`harness.ts:100`). So a forged origin has nothing to attach to. Lane 4's T1 registers
+`claim.contested`, at which point `parseEvent` admits it and `contest.server-only` starts reading a field
+the door never checked.
+
+**Controller ruling: Lane 4 merges; the window is recorded with a named closer; Lane 2 is asked to land
+the origin check inside Plan 4 T5 rather than as a follow-up.** Reasoning, since a security window ruled
+open needs its argument written down:
+
+- Nothing is deployed and there are no users; the exposure is theoretical inside a pre-release repo, and
+  it is closed by work already scheduled in the same wave.
+- Holding Lane 4 would stall Plan 10's prefix on Plan 4's partition-A timing, for a window nobody can
+  reach.
+- **This is exactly the Plan 1 §9 shape** — register-then-gap — and the series' settled answer there was
+  a rider making the unsafe path honest, **not** a held merge. The rider is unavailable here for a good
+  reason: the fix lives in `apps/server` ingest, which is Lane 2's pending surface, and Lane 4 editing it
+  in parallel is the collision class that discipline exists to prevent.
+- So the §9 remedy applies in its other form: **name the closer, record the window, and make sure the
+  closing lane knows it is closing something rather than adding something.** Plan 4 T5 is the closer.
+
+**A second window in the same family, deliberately left open by Lane 4, and its reasoning is the
+important half.** `claim.contested_resolved` is reachable at the ingest door once T1 merges and will
+**500** until Plan 10 T4, because `createEngineContext` has no `getContest` and the evaluator throws by
+design. The attractive fix — have `getContest` return `null` — is **worse**, and Lane 4's implementer
+proved it by mutation rather than arguing it: it converts a wiring bug into a legitimate-reading refusal
+that tells a user *"no contested claim is recorded"* when the truth is that the context cannot see
+contests at all. **A loud 500 on an event nothing submits yet beats a quiet lie.** That is §9's lesson
+exactly — the silent-wrong-refusal hazard — and T4 is named as the closer.
+
+### Negative space: two fixtures are the entire net for one defect class
+
+Lane 4 had its implementer build the harness fold **the wrong way round on purpose** — filter-then-complete,
+the order the plan text invites — and ran the package. **All 61 pre-existing fixtures stayed green, and
+both unit-test files stayed 100% green.** Only the two new fixtures caught it, and the symptom was
+"still refused, wrong rule".
+
+The finding is the negative space rather than the catch: **two fixtures are the entire net in this
+repository for that defect class.** A suite of 61 that survives an inverted fold is not thereby a suite
+that tests folding. Worth doing deliberately elsewhere — mutate the thing, run everything, and count what
+actually goes red — because the number is usually smaller than the suite size suggests, and it is the
+only way to learn which parts of a suite are load-bearing.
