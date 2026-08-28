@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { EventEnvelope, TicketState, TicketTypeDef } from '@gisik-nokma/domain';
+import type { TicketState, TicketTypeDef } from '@gisik-nokma/domain';
 import { makeEnvelope } from '@gisik-nokma/domain';
 import { buildMemoryContext } from '../src/memory-context.js';
 import { checkTicketCreated } from '../src/checks/hierarchy.js';
@@ -7,6 +7,7 @@ import { parentTerminalRefusal } from '../src/checks/refusals.js';
 import type { EngineContext } from '../src/engine.js';
 import {
   EPIC,
+  OTHER_WS,
   PROJECT,
   PROJECT_B,
   STORY,
@@ -14,24 +15,13 @@ import {
   TASK,
   WF,
   created,
+  createdIn,
   typeDefined,
 } from '../src/checks/test-support.js';
 
 const PARENT = '01J9GPAR000000000000000000';
 const NEW = '01J9GNEW000000000000000000';
 const GHOST = '01J9GGHT000000000000000000';
-/** A second workspace, for the parent this one is not allowed to see. */
-const OTHER_WS = '01J9GWSB000000000000000000';
-
-/** `created()` files everything under WS; the tenancy cases need the other one. */
-function createdIn(workspaceId: string, id: string, typeId: string, projectId: string): EventEnvelope {
-  return makeEnvelope({
-    type: 'ticket.created',
-    entity: { kind: 'ticket', id },
-    workspaceId,
-    payload: { typeId, projectId, parentId: null, title: `ticket ${id.slice(4, 8)}` },
-  });
-}
 
 const baseCtx = () =>
   buildMemoryContext(
@@ -414,6 +404,54 @@ describe('checkTicketCreated — which refusal names the event when two are avai
       refused: true,
       rule: 'hierarchy.unknown-parent',
       reason: 'The chosen parent ticket does not exist in this workspace.',
+    });
+  });
+
+  /**
+   * The one chain position Task 5 left prose-pinned (pre-flight addendum 9a,
+   * routed to Task 6): a mutation hoisting the parent-type guard above the
+   * cross-project check passed the ENTIRE suite, because no case staged
+   * `cross-project` and `parent-type-unknown` at once. Both are staged here.
+   *
+   * Cross-project wins because it is the more fundamental truth about the same
+   * parent: telling the actor the parent's type is unreadable would send them to
+   * an admin to define a type in a project they were never entitled to reach
+   * into, and the parent would still be the wrong parent afterwards.
+   *
+   * Hand-built for the same reason the parent's-type test above is: no sequence
+   * of events produces a ticket whose type is undefined.
+   *
+   * (The `parent-type` ↔ `rank` pair is unstageable by construction — the rank
+   * check reads `parentType`, which is exactly what is missing — so this is the
+   * whole of the gap.)
+   */
+  it('a cross-project parent outranks an unreadable parent TYPE', async () => {
+    const foreignOrphan: TicketState = {
+      kind: 'ticket',
+      id: PARENT,
+      workspaceId: '01J9GWS0000000000000000000',
+      projectId: PROJECT_B,
+      typeId: 'retired-type',
+      parentId: null,
+      workflowId: 'wf-basic',
+      workflowVersion: 1,
+      stateId: 'todo',
+      stateCategory: 'open',
+      assigneeId: null,
+      collaboratorIds: [],
+      fields: {},
+      transitions: [],
+    };
+    const ctx: EngineContext = {
+      getEntityState: async (kind, id) => (kind === 'ticket' && id === PARENT ? foreignOrphan : null),
+      getChildrenStates: async () => [],
+      getWorkflowDef: async () => WF,
+      getTicketTypeDef: async (typeId) => (typeId === 'task' ? TASK : null),
+    };
+    expect(await checkTicketCreated(created(NEW, 'task', PARENT, PROJECT), ctx)).toEqual({
+      refused: true,
+      rule: 'hierarchy.cross-project',
+      reason: 'The parent is in a different project. Pick a parent from the same project.',
     });
   });
 });

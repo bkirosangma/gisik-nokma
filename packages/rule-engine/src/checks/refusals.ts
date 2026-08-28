@@ -91,6 +91,57 @@ export function fieldKindRefusal(fieldName: string, needsPhrase: string): string
 }
 
 /**
+ * `ticket.workflow_rebound` to the workflow the ticket is already on.
+ *
+ * NOT a tidiness rule, which is why the reason names the mechanism rather than
+ * the redundancy. The event sets `stateId` DIRECTLY: it evaluates no transition
+ * and checks no transition rule, because across two unrelated graphs there is no
+ * transition to check — the ticket is being placed, not moved. Allowed inside a
+ * single workflow that becomes a universal bypass: any actor who can emit it
+ * reaches any state without satisfying `restrict-to`, `require-comment`,
+ * `require-evidence`, `require-field` or `require-different-user`, and without
+ * the move ever appearing in the transition log four-eyes reads. Moving inside
+ * one workflow already has a mechanism that honours all of those, and the reason
+ * says so, because "you are already on this workflow" would read as pedantry.
+ */
+export function reboundSameWorkflowRefusal(ticketId: string): string {
+  return `Ticket ${ticketId} is already on this workflow. Moving within a workflow is a transition, so that it can be checked against the workflow's own rules.`;
+}
+
+/**
+ * The destination is named, never inferred: the outgoing and incoming workflows
+ * are unrelated graphs with unrelated state ids, and `stateMapping` cannot help
+ * — it is keyed inside a single workflow's version chain
+ * (`events/ticket-events.ts:90-95`). Guessing where a ticket lands would be
+ * inventing its status, which invariant 4 forbids. So the claim says where it
+ * goes, and this is the refusal when the target workflow has no such place.
+ */
+export function reboundUnknownStateRefusal(workflowName: string, stateId: string, ticketId: string): string {
+  return `The workflow "${workflowName}" has no state "${stateId}", so ticket ${ticketId} cannot be placed there.`;
+}
+
+/**
+ * The built-in rank lock, enforced where locks are real (Plan 8's walk,
+ * 2026-08-27, closing the half of its Open question 6 that stayed open). The
+ * type builder locked the four built-ins' ranks in the UI while the server's
+ * last-definition-wins accepted a re-rank anyway — and a lock the server does
+ * not hold is a description of a rule, not a rule.
+ *
+ * The stakes are concrete rather than tidy: `DEEPEST_RANK` is 4 *because* the
+ * built-in sub-task's rank is, so re-ranking `sub-task` to 3 releases every
+ * sub-task in the workspace from `hierarchy.deepest-rank-parent-required` while
+ * the builder still displays the lock — the board describing a rule the server
+ * does not enforce.
+ *
+ * The reason names the seed's own id and rank, and it names the remedy that
+ * actually exists: a custom type. Name, icon and workflow binding of a built-in
+ * stay an admin's to change (Plan 8 decision 7); only the rank is the ladder.
+ */
+export function builtinRankRefusal(typeName: string, seedId: string, seedRank: number): string {
+  return `"${typeName}" is the built-in ${seedId} type; its rank is ${seedRank} and cannot be changed. Define a custom type for differently-ranked work.`;
+}
+
+/**
  * One argument for a refusal whose reason is fixed; two when the reason names
  * something from the event (a type name, a parent's title) and therefore has to
  * be built. The overloads keep the fixed-reason call honest: `refuse('…')` only

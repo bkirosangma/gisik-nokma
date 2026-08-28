@@ -1,5 +1,5 @@
-import type { EventEnvelope } from '@gisik-nokma/domain';
-import { DEEPEST_RANK, ticketCreatedPayload } from '@gisik-nokma/domain';
+import type { EventEnvelope, TicketState } from '@gisik-nokma/domain';
+import { DEEPEST_RANK, ticketCreatedPayload, ticketReparentedPayload } from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
 import { REFUSAL_RULES } from '../refusal-rules.js';
 import { getTicketState, getTicketTypeDef } from './context-helpers.js';
@@ -144,6 +144,151 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
     const titleClaim = parent.fields['title']?.value;
     const parentTitle = typeof titleClaim === 'string' ? titleClaim : parent.id;
     return refuse('hierarchy.parent-terminal', parentTerminalRefusal(parentTitle, stateName, 'add'));
+  }
+
+  return ACCEPT;
+}
+
+/**
+ * Walking more ancestors than this means the ledger itself is broken — this
+ * check is the thing that keeps the tree acyclic, so a cycle already standing
+ * in it was never accepted here.
+ */
+const MAX_ANCESTOR_HOPS = 1000;
+
+/**
+ * Hierarchy sanity for ticket.reparented. Same questions as creation, asked of
+ * a ticket that already exists — plus the one creation cannot raise, because a
+ * ticket being created has no descendants yet:
+ *
+ *   unknown ticket → unknown type
+ *     → (to root) deepest-rank rule
+ *     → self/cycle → unknown parent (a parent in another WORKSPACE is one of
+ *       these) → cycle by ancestry
+ *     → cross-project → parent's type unknown → rank → parent-terminal
+ *
+ * **A LOOP IS NAMED AS A LOOP even when rank or project is also violated.** The
+ * cycle walk sits above both for the reason the whole order exists: a person
+ * told "the ranks are wrong" fixes the ranks and meets the loop, which was the
+ * thing actually in the way. It is also the refusal a rank re-definition can
+ * make reachable — see below.
+ *
+ * **Why the cycle check is load-bearing at all.** Under strict rank ordering a
+ * loop looks unreachable: every parent outranks its child, so no chain can bend
+ * back on itself. But `ticket-type.defined` is last-definition-wins
+ * (`memory-context.ts:132-137`), so a workspace can move a type's rank UNDER
+ * the rank of a type it already contains — after which a reparent that closes a
+ * loop is rank-legal, and nothing but this walk refuses it. That is the planted
+ * defect in `test/reparent.test.ts`, and it is why deleting the walk as
+ * "unreachable" would be wrong.
+ *
+ * Parent-terminal comes last for the same reason it does on creation: it is the
+ * only refusal whose remedy is an OFFER rather than a correction.
+ */
+export async function checkTicketReparented(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {
+  // Two layers, exactly as `checkTicketCreated` above (pre-flight A19).
+  if (env.entity.kind !== 'ticket') {
+    return {
+      refused: true,
+      rule: REFUSAL_RULES.malformedPayload,
+      reason: `This ticket.reparented event does not point at a ticket; it points at a ${env.entity.kind}.`,
+    };
+  }
+
+  // `safeParse`: `evaluateEvent`'s frozen signature is `Promise<Accept | Refusal>`
+  // and a throw is neither. The callers that reach here without ingest's door in
+  // front of them are the ones with no other net.
+  const parsed = ticketReparentedPayload.safeParse(env.payload);
+  if (!parsed.success) {
+    const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
+    return {
+      refused: true,
+      rule: REFUSAL_RULES.malformedPayload,
+      reason: `This ticket.reparented event's payload is malformed: ${detail}`,
+    };
+  }
+  const p = parsed.data;
+
+  const ticket = await getTicketState(ctx, env.entity.id);
+  if (!ticket) return refuse('ticket.unknown');
+
+  const type = await getTicketTypeDef(ctx, ticket.typeId);
+  if (!type) return refuse('ticket.unknown-type');
+
+  if (p.newParentId === null) {
+    // The same rank rule as creation, and deliberately the same sentence: a
+    // person who meets this refusal twice should not have to work out whether
+    // it is the same refusal. `>=` and the fixed `DEEPEST_RANK` carry the same
+    // reasoning documented on `checkTicketCreated` — the floor never moves, and
+    // nothing slips underneath it.
+    if (type.rank >= DEEPEST_RANK) {
+      return refuse('hierarchy.deepest-rank-parent-required', deepestRankParentRefusal(type.name));
+    }
+    return ACCEPT;
+  }
+
+  // The degenerate loop, answered before the parent is even looked up: a ticket
+  // named as its own parent is a loop of length one, and the walk below would
+  // say the same thing one lookup later.
+  if (p.newParentId === ticket.id) return refuse('hierarchy.cycle');
+
+  // ONE refusal, two ways of not existing here (controller ruling P12), and it
+  // matters MORE here than on creation. `getTicketState` is an id lookup with no
+  // workspace predicate over a projection keyed `(entity_kind, entity_id)` —
+  // global, not per-tenant — so a parent this workspace does not hold resolves.
+  // A create that resolved a foreign parent merely failed to make a new ticket;
+  // a REPARENT grafts an EXISTING ticket under it, moving live work into another
+  // workspace's hierarchy, and left to fall through it was refused (if at all)
+  // with a sentence about projects. The ingest door's tenancy check does not
+  // cover this: it guards the event's own entity, never the parent the payload
+  // names.
+  const newParent = await getTicketState(ctx, p.newParentId);
+  if (!newParent || newParent.workspaceId !== env.workspaceId) return refuse('hierarchy.unknown-parent');
+
+  // Is this ticket an ANCESTOR of its proposed parent? Walk up from the parent;
+  // meeting ourselves means the move would put the ticket inside its own
+  // sub-tree.
+  let cursor: TicketState | null = newParent;
+  let hops = 0;
+  while (cursor !== null) {
+    if (cursor.id === ticket.id) return refuse('hierarchy.cycle');
+    hops += 1;
+    if (hops > MAX_ANCESTOR_HOPS) {
+      // A THROW, not a refusal, and the distinction is the same one `safeParse`
+      // above rests on: a malformed payload is the ACTOR's claim and is
+      // refusable in the actor's language, while a chain this long is the
+      // STORE's state — a cycle already standing in the tree, which this check
+      // is what prevents. There is no true sentence to tell the actor, and
+      // `hierarchy.cycle` would name a loop that is not the one they proposed.
+      throw new Error(
+        `checkTicketReparented: ancestor chain of ${p.newParentId} exceeds ${MAX_ANCESTOR_HOPS} — ledger integrity is broken`,
+      );
+    }
+    cursor = cursor.parentId === null ? null : await getTicketState(ctx, cursor.parentId);
+  }
+
+  if (newParent.projectId !== ticket.projectId) return refuse('hierarchy.cross-project');
+
+  // The PARENT's type, and the parent is the subject. Not `ticket.unknown-type`
+  // — that sentence is false on every path that reaches here, because this
+  // ticket's own type resolved above (controller ruling P11).
+  const parentType = await getTicketTypeDef(ctx, newParent.typeId);
+  if (!parentType) return refuse('hierarchy.parent-type-unknown');
+  if (type.rank <= parentType.rank) {
+    return refuse('hierarchy.rank', rankRefusal(type.name, parentType.name));
+  }
+
+  // Owner decision (2026-08-20): only LIVE work under a finished parent
+  // contradicts — a terminal child moving under a terminal parent reopens
+  // nothing and is legal. The decision keys off the denormalized
+  // `stateCategory`; the def lookup only NAMES the state for the reason, so a
+  // missing definition degrades to raw ids rather than blocking the refusal.
+  if (newParent.stateCategory === 'terminal' && ticket.stateCategory !== 'terminal') {
+    const parentDef = await ctx.getWorkflowDef(newParent.workflowId, newParent.workflowVersion);
+    const stateName = parentDef?.states.find((s) => s.id === newParent.stateId)?.name ?? newParent.stateId;
+    const titleClaim = newParent.fields['title']?.value;
+    const parentTitle = typeof titleClaim === 'string' ? titleClaim : newParent.id;
+    return refuse('hierarchy.parent-terminal', parentTerminalRefusal(parentTitle, stateName, 'move'));
   }
 
   return ACCEPT;

@@ -16,6 +16,12 @@ import { makeEnvelope } from '@gisik-nokma/domain';
  */
 
 export const WS = '01J9GWS0000000000000000000';
+/**
+ * A SECOND workspace, for the parent this one is not allowed to see. Ticket
+ * lookup carries no workspace predicate (controller ruling P12), so every
+ * tenancy case needs an id that resolves and is still not ours.
+ */
+export const OTHER_WS = '01J9GWSB000000000000000000';
 export const PROJECT = '01J9GPRJ000000000000000000';
 export const PROJECT_B = '01J9GPRB000000000000000000';
 
@@ -81,5 +87,30 @@ export function created(
     entity: { kind: 'ticket', id },
     workspaceId: WS,
     payload: { typeId, projectId, parentId, title: `ticket ${id.slice(4, 8)}` },
+  });
+}
+
+/**
+ * The same creation filed under an EXPLICIT workspace. `created()` puts
+ * everything in `WS`, which is what every hierarchy case wants and exactly what
+ * the tenancy cases cannot use: the foreign parent has to be created somewhere
+ * else and still resolve, because `getTicketState` looks a ticket up by id with
+ * no workspace predicate.
+ *
+ * Hoisted here from `test/hierarchy.test.ts` when Task 6 needed the identical
+ * helper for the reparent side (pre-flight Addendum 9a). Two copies of one
+ * builder is how two suites start describing different tenancy.
+ */
+export function createdIn(
+  workspaceId: string,
+  id: string,
+  typeId: string,
+  projectId: string,
+): EventEnvelope {
+  return makeEnvelope({
+    type: 'ticket.created',
+    entity: { kind: 'ticket', id },
+    workspaceId,
+    payload: { typeId, projectId, parentId: null, title: `ticket ${id.slice(4, 8)}` },
   });
 }

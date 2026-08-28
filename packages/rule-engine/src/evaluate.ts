@@ -3,6 +3,9 @@ import { evaluateWorkflowDefined } from './workflow-defined.js';
 import { evaluateTicketTransitioned } from './transition.js';
 import { evaluateClaimContested, evaluateClaimContestedResolved } from './contests.js';
 import { checkTicketCreated } from './checks/hierarchy.js';
+import { checkTicketCreated, checkTicketReparented } from './checks/hierarchy.js';
+import { checkTicketTypeDefined } from './checks/ticket-type.js';
+import { checkTicketWorkflowRebound } from './checks/workflow-rebind.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
 
 /**
@@ -28,6 +31,12 @@ export async function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Pro
       return evaluateClaimContestedResolved(env, ctx);
     case 'ticket.created':
       return checkTicketCreated(env, ctx);
+    case 'ticket.reparented':
+      return checkTicketReparented(env, ctx);
+    case 'ticket.workflow_rebound':
+      return checkTicketWorkflowRebound(env, ctx);
+    case 'ticket-type.defined':
+      return checkTicketTypeDefined(env, ctx);
     default:
       return { refused: false };
   }

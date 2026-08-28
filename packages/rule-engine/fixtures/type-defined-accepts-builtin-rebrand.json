@@ -1,0 +1,20 @@
+{
+  "name": "the built-in lock is only the rank: a re-brand and a re-binding of the same built-in are accepted",
+  "notes": "The companion that keeps the lock from becoming 'built-ins are frozen'. Name, icon, workflow binding and custom fields of a built-in are an admin's to change (Plan 8 decision 7) — and re-binding is how built-ins are seeded per workspace in the first place (builtinTicketTypeDefs(defaultWorkflowId)). Same id, same rank 4, everything else different.",
+  "workflowDefs": [],
+  "memberships": [],
+  "priorEvents": [],
+  "candidateEvent": {
+    "type": "ticket-type.defined",
+    "entity": { "kind": "ticket-type", "id": "sub-task" },
+    "payload": {
+      "id": "sub-task",
+      "name": "Checklist item",
+      "icon": "check-square",
+      "rank": 4,
+      "workflowId": "wf_ops",
+      "fields": [{ "id": "effort", "name": "Effort", "type": "number" }]
+    }
+  },
+  "expected": { "refused": false }
+}

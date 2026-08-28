@@ -1,0 +1,24 @@
+{
+  "name": "a built-in type re-ranked at the server is refused, not merely locked in the builder",
+  "notes": "The sharp case. DEEPEST_RANK is 4 BECAUSE the built-in sub-task's rank is 4, so accepting this definition releases every sub-task in the workspace from hierarchy.deepest-rank-parent-required while the type builder goes on displaying a lock the server does not hold. Before this check the event was accepted. workspaceId is deliberately omitted so completeEnvelope defaults it to ws_1 (ruling P5).",
+  "workflowDefs": [],
+  "memberships": [],
+  "priorEvents": [],
+  "candidateEvent": {
+    "type": "ticket-type.defined",
+    "entity": { "kind": "ticket-type", "id": "sub-task" },
+    "payload": {
+      "id": "sub-task",
+      "name": "Sub-task",
+      "icon": "list",
+      "rank": 3,
+      "workflowId": "wf_basic",
+      "fields": []
+    }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "type.builtin-rank",
+    "reason": "\"Sub-task\" is the built-in sub-task type; its rank is 4 and cannot be changed. Define a custom type for differently-ranked work."
+  }
+}
