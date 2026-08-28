@@ -1622,15 +1622,40 @@ Grepped across shipped code and all eleven plans.
 
 | Embedder | Where | Status |
 |---|---|---|
-| `eventEnvelopeSchema` | shipped, `envelope.ts:84`, `submittedEventSchema.extend({serverTime, seq})` | **inherits the hole.** Consumed today only by `envelope.ts` and its own test, so no live exploit path — but it is a shared export and the next consumer inherits it silently. |
+| `eventEnvelopeSchema` | shipped, `envelope.ts:84`, `submittedEventSchema.extend({serverTime, seq})` | **inherits the hole. Owner: Lane 2 / Plan 4**, as a ride-along with the two `envelope.ts` amendments it is already landing in T3. Consumed today only by `envelope.ts` and its own test, so no live exploit path and not urgent — but it is a shared export and the next consumer inherits it silently. |
 | `claimContestedPayloadSchema` | Plan 10 line 309, `originalEvent: submittedEventSchema` | Lane 4's instance, in its current scope, being fixed there. |
 
 `parse-event.ts` uses the schema but is **safe**: it reconstructs with `payload` explicitly set (line 99).
 
 **Plan 6 names `submittedEventSchema` zero times** — worth stating because it was the suspected third
-consumer. Its client builds `SubmittedEvent` through `makeSubmittedFactory`, i.e. it is exposed to the
-**type** half (`payload?: unknown` and the tempting cast), not the schema-embedding half. Different
-remedy: state the contracted type explicitly rather than adding a `.refine`.
+consumer. Its client builds `SubmittedEvent` through `makeSubmittedFactory` (18 occurrences), i.e. it is
+exposed to the **type** half (`payload?: unknown` and the tempting cast), not the schema-embedding half.
+**The remedy there is different and the difference is load-bearing:** state the contracted type
+explicitly, and specifically do *not* reach for a `.refine` (there is no embedded schema to refine) or a
+cast (**the cast is the failure**). Lane 4 records that arriving at Plan 6 T6 with "apply the T1 fix" in
+mind would have produced exactly the cast — which is why a zero-count is worth reporting rather than
+treating as an absence of news.
+
+**Ownership, stated because a sweep result reads like an action item and this one is not everybody's.**
+Lane 4 found the defect and **correctly declined to fix the shipped half**: `packages/domain/src/envelope.ts`
+is on its MUST-not-touch list precisely because Plan 4 owes that file two amendments, and editing another
+lane's pending file in parallel is the collision class this document exists to prevent. Being already
+inside the package is not a licence to fix a neighbour's file. So the shipped half is **Lane 2's**, routed
+there explicitly rather than left to whoever noticed it; Lane 4 owns only its own embed and the Plan 6
+type half.
+
+**The test matrix, which is the part most worth a reviewer's attention** (Lane 4's formulation):
+
+```
+absent                -> REFUSED
+present-but-undefined -> REFUSED
+null                  -> ACCEPTED
+{}                    -> ACCEPTED
+```
+
+**A fix that also refuses `null` or `{}` would look correct, pass a careless review, and quietly refuse
+legitimate claims.** That is the same shape as everything else in this document — a check that fails for
+a reason unrelated to what it names — arriving inside the remedy rather than the defect.
 
 **The fix pattern** (Lane 4's, verified against the built schemas): a `.refine` on the embedded schema
 asserting `payload !== undefined`, plus stating the contracted type explicitly rather than taking
