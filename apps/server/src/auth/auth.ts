@@ -1,3 +1,4 @@
+import { newUlid } from '@gisik-nokma/domain';
 import { betterAuth } from 'better-auth';
 import { bearer, magicLink, phoneNumber } from 'better-auth/plugins';
 import { passkey } from '@better-auth/passkey';
@@ -40,6 +41,39 @@ export function createAuth(deps: AuthDeps) {
     baseURL: deps.baseUrl,
     secret: deps.secret,
     emailAndPassword: { enabled: false }, // the spec forbids passwords
+    advanced: {
+      database: {
+        /**
+         * Every id better-auth mints is a ULID, because a user's id is not only
+         * better-auth's business: it becomes `actorId` on every event that user
+         * authors, and `packages/domain/src/envelope.ts` declares
+         * `actorId: ulidString`. better-auth's default is a 32-character
+         * mixed-case random string (`@better-auth/core/dist/utils/id.mjs`), which
+         * that schema refuses — so without this line no user this server creates
+         * could author any event, and the door would refuse every submission as
+         * `malformed-envelope`: a refusal naming the envelope for a fault in the
+         * identity layer. The ratified membership entity id
+         * `${workspaceId}:${userId}` needs it for the same reason.
+         *
+         * Applied to EVERY model, not just `user`. Session, account, verification
+         * and passkey ids never enter the ledger and carry no ULID requirement,
+         * but one unconditional rule has no branch to get wrong, needs no vendor
+         * internal as a fallback for the other models (returning `false` would
+         * ask Postgres for a default our vendor schema does not define), and
+         * makes any table a future plugin adds conform by default.
+         *
+         * `size` is deliberately ignored: a ULID is fixed at 26 characters. This
+         * hook does not touch session *tokens* — those call better-auth's own
+         * `generateId(32)` directly (`db/internal-adapter.mjs`), so token entropy
+         * is unchanged.
+         *
+         * `newUlid()` rather than a local `ulid()` call: `ids.ts` is the single
+         * origin of what a ULID is in this repo, the same discipline
+         * `envelope.ts` states for `ULID_REGEX`.
+         */
+        generateId: () => newUlid(),
+      },
+    },
     socialProviders: {
       google: {
         clientId: process.env['GOOGLE_CLIENT_ID'] ?? '',
