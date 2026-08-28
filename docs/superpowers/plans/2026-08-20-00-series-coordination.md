@@ -1975,3 +1975,43 @@ repository for that defect class.** A suite of 61 that survives an inverted fold
 that tests folding. Worth doing deliberately elsewhere — mutate the thing, run everything, and count what
 actually goes red — because the number is usually smaller than the suite size suggests, and it is the
 only way to learn which parts of a suite are load-bearing.
+
+
+### The gate's placement was contradicted by a brief, and Plan 10 inherits the answer
+
+Found by Lane 2 while checking the origin gap. **Plan 4 T5's brief (line 292) states the bootstrap's
+server-origin appends bypass `checkPermission` because "the gate is the HTTP door (Step 5)".** Lane 2's
+own earlier ruling put the gate inside `commitOne` with the session threaded in. Those are different
+designs, and **this document already settled it in the other direction**: decision 15 (line 105) records
+that `IngestDeps.gates` run **inside `ingestBatch`'s transaction**, and states the consequence outright —
+*"Plan 10's `POST /v1/sync` wraps the same ingest, so a sync-refused gate violation becomes a contested
+claim with no extra wiring."*
+
+**If the gate lived only at the HTTP door, `POST /v1/sync` would bypass it entirely** and a permission
+violation arriving over the sync path would never become a contested claim — contradicting the sentence
+above and silently removing the sync-path enforcement that Plan 10's amendment 16 depends on. So: **the
+gate goes inside the ingest path; the session originates at the door and is threaded in.** Lane 2 is
+carrying the reconciliation into T5's dispatch. This is not a new decision — it is the brief being
+corrected against the document.
+
+Note the brief was already internally tensioned: three lines below the disputed sentence it says *"the
+hook lives in the shared ingest path, not in the route,"* about the bootstrap hook, for exactly the
+reason that both `POST /v1/workspaces` and Plan 11's seed CLIs go through the ingest service. The same
+argument applies to the gate and the brief did not make it.
+
+**Plan 10's lane inherits the answer** rather than re-deriving it at T7: the sync ingress is covered by
+the permission gate because the gate is in the ingest path, and `claim.contested` on a sync-path refusal
+therefore includes permission refusals, not only rule refusals.
+
+### The ULID dialect trap, third field, at the identity layer
+
+Also from Lane 2's T1: **`createAuth` never configured an id generator**, and `envelope.ts:79` has
+required `actorId: ulidString` since Plan 1. So better-auth's default user ids — which are not ULIDs —
+**would have made every event unauthorable.** Not a subtle failure; a total one, discovered only because
+the lane checked the identity library's defaults against the door rather than assuming they met it.
+
+That is the same trap recorded twice already (fixture entity ids, seed `actorId`s), now in a third field
+and from a new direction: not a test dialect meeting a real door, but a **third-party library's** default
+meeting it. The general form is worth stating with the others: **anything that mints an id which will
+ride an envelope must be checked against `ULID_REGEX` at the point it is configured** — fixtures,
+seed builders, and identity providers alike.
