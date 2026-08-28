@@ -880,6 +880,26 @@ this series where a textual merge is more expensive than waiting.
 Both are raised to the owner as ruling-requests by the tasks that make them. Neither blocks: the
 conservative defaults stand under the autonomous execution protocol until the owner rules.
 
+**The dialect trap that rides with this file, found twice in one day in two different fields.** Shipped
+`envelope.ts:53` defines `ulidString` as `z.string().regex(ULID_REGEX, 'must be a ULID')`, and `ids.ts:9`
+pins `ULID_REGEX = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/`. So `t1` and `ws_1` are not ULIDs.
+
+- **Entity ids** (Lane 1): the rule-engine fixtures use exactly that short dialect and are fine, because
+  the harness enters at `evaluateEvent` and never passes the envelope door. A **server** test that
+  ingests with a short id is refused at the door **for a reason unrelated to what it is proving**, and
+  the refusal reads as the thing under test failing. Live for Plan 3's T9–T13.
+- **Actor ids** (Lane 4): `packages/app-core`'s seed builders use `actorId: 'user_kiro'` against the same
+  schema's `actorId: ulidString`, harmless against `createFakeDataSource` because it validates nothing,
+  and `invalid-payload` at the first real door.
+
+One fixture dialect, one door dialect, and the gap is invisible until something crosses. Note the
+interaction with the amendment above: a kind-aware entity-id check makes the door's behaviour
+**non-uniform across kinds for the first time**, so whether a given id passes will depend on the `kind`
+it declares as well as its shape. Whatever proves that check should assert all three directions — a
+`membership` composite accepted, a non-`membership` kind still refusing a composite byte-for-byte, and
+the unchanged kinds unchanged — because the third is the only thing keeping "every other kind is
+byte-identical" honest.
+
 **A related correction to pre-ruling 2, from the same scan.** The ruling says Plan 8 T3's guard "must NOT
 create" `simple-kanban.ts` and must wait if it is absent. Checked rather than assumed: grepping Plans 8
 and 11 for `simple-kanban` / `SIMPLE_KANBAN` / `simpleKanban` returns **nothing** — neither plan names a
