@@ -36,7 +36,15 @@ Execution order: 1 → 2 → 3 → 4 → 5, then 6/7/8/9 in parallel, then 10, t
 
 5. **Membership entity id is deterministic:** `membershipId(workspaceId, userId)` = `` `${workspaceId}:${userId}` `` (Plan 2's helper in domain). Plan 4's fresh-ULID-per-event mapping was drift — the engine must address a membership from `(workspaceId, actorId)` via `getEntityState('membership', id)`, which an opaque ULID cannot do. Scope stays in the payload; `proj_memberships` keys as Plan 4 designed.
 
-6. **`ticket.transitioned` is registered exactly once, by Plan 3** (Task 2, contracted payload `{toStateId, comment?, evidenceAttachmentId?}`). Plan 2's registration is provisional for its own tests and is deleted when Plan 3 lands. `workflow.defined` belongs to Plan 2; the remaining ticket vocabulary to Plan 3; workspace/project/membership/visibility events to Plan 4; Plan 1's `workspace.created`/`workspace.renamed` seeds are provisional until Plan 4 lands.
+6. **`ticket.transitioned` is registered exactly once, by Plan 3** (Task 2, ~~contracted payload `{toStateId, comment?, evidenceAttachmentId?}`~~ — **superseded 2026-08-28 by the keystone; see the amendment immediately below**). ~~Plan 2's registration is provisional for its own tests and is deleted when Plan 3 lands.~~ **Verified at the keystone: Plan 2 registered nothing, so there was nothing to delete.**
+
+   **Amendment (2026-08-28, recorded by the change set that discovered it — Plan 3's keystone micro-PR).** The registered payload is **Plan 2's shipped `ticketTransitionedPayloadSchema`** (`packages/domain/src/workflow.ts`), not the literal this decision named when it was written — which predates Plan 2's execution. Four consequences, all load-bearing for the lanes running in parallel:
+   - **The field is `to`, not `toStateId`.** The engine reads `payload.to` (`packages/rule-engine/src/transition.ts`) and every fixture on `main` already speaks it. Shipped code beats plan text; this is that law applied, not a new decision.
+   - **`comment` is `{ text }`, not a bare string.**
+   - **`evidenceAttachmentId` and `cause.childTicketId` are not ULID-checked at the door.** Plan 7's evidence gates own existence and kind; the door proves shape only.
+   - **`toStateId` remains correct for the transition-log ENTRY** (decision 4, unchanged). The payload and the log entry are two layers that happen to describe the same move — both spellings are right in their own place, and this is not a fork.
+
+   **What every later plan must do with this:** Plans 5, 6, 10 and 11 carry ~36 `payload: { toStateId: … }` literals, and Plans 6 and 10 additionally carry `comment: '<string>'`. Plan 6's are the dangerous ones because they are client *logic*, not fixtures — a client transcribed verbatim from that plan submits payloads the shipped door refuses as `invalid-payload`. Adapt them at transcription, per the adaptation-map law, and do not "correct" the shipped schema to match a plan written before it existed. `workflow.defined` belongs to Plan 2; the remaining ticket vocabulary to Plan 3; workspace/project/membership/visibility events to Plan 4; Plan 1's `workspace.created`/`workspace.renamed` seeds are provisional until Plan 4 lands.
 
 7. **Parent-terminal rule id is `parent-terminal-with-open-children`** (Plan 2 owns the rule and its reason string; Plan 3's `invariant.parent-open-children` was drift).
 
