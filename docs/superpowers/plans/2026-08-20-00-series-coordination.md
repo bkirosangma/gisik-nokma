@@ -1023,11 +1023,28 @@ is the *named export*. `passkeyClient` appears nowhere in better-auth core's `di
 `@better-auth/passkey/dist/client.mjs`, reachable at that package's `./client` subpath (its only two
 subpaths are `.` and `./client`).
 
+**The fix, confirmed independently by Lane 4 against the same tree:**
+`import { passkeyClient } from '@better-auth/passkey/client'`, with `@better-auth/passkey` declared as a
+dependency. Recorded against 6b T14 so Wave 3 does not re-derive it. Lane 4 also verified the negative
+half — `passkeyClient` has zero hits across every file in core's `dist`, while `magicLinkClient` and
+`phoneNumberClient` are both present in `dist/client`, so lines 7885-7886 are genuinely fine.
+
 So a specifier move splits into two failure shapes with different detection costs. **A missing subpath
-fails at resolution — loud, immediate, unmissable. A present subpath missing a named export fails at
-the import site**, and under a bundler or a loose `tsconfig` it can fail later and further away than the
-line that caused it. **The complete test is therefore two greps, not one: the subpath must exist AND the
-named import must still be exported from it.** Lane 3's rule stands; this is the second half of it.
+fails at resolution — loud, immediate, and the same way for everyone. A present subpath missing a named
+export fails at the import site**, which means — Lane 4's sharpening, and it is the load-bearing part —
+**how loudly it fails depends on the consumer's build config, not on the defect.** A strict `tsconfig`
+catches it at typecheck; a bundler with loose interop hands back `undefined` and defers the failure to
+first call. The same defect therefore has a different blast radius in every package that imports it,
+which is precisely why this belongs in one repo-wide sweep rather than in each lane's local judgment.
+**The complete test is two greps, not one: the subpath must exist AND the named import must still be
+exported from it.** Lane 3's rule stands; this is the second half of it.
+
+**Why this one was found centrally, recorded because it argues for how the remaining sweeps run.** Three
+lanes each held one piece — Lane 3 had the type-versus-subpath insight, Lane 2 had the installed tree,
+Lane 4 had the Plan 6 lines — and no lane held all three. Every per-lane check would have marked line
+7887 clean, because a subpath grep passes it. **Cross-plan sweeps against installed reality are the
+controller's to run once, not the lanes' to run four times**, and the argument is not effort but
+completeness: a lane can only check what it can see.
 
 Nothing here is Wave 1 work — Plan 6's client transport is 6b, deferred to Wave 3 — but it is recorded
 now because the tree that proves it is installed today in Lane 2's worktree, and by Wave 3 the cheap
