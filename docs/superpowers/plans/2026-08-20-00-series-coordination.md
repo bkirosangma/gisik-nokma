@@ -1694,3 +1694,55 @@ four timezones four answers on two different days. Not reachable through the env
 **So any byte-identical check between two plans must target the shipped repo file, never the plan text**
 — otherwise the check pins a version that was deliberately corrected. Both ends are Lane 4's here, which
 is the only reason it is cheap to notice.
+
+
+## The validating fake, the over-strict blind spot, and a fourth shape (2026-08-28, from Lane 3)
+
+### Make the fakes refuse what the real door refuses
+
+Lane 3's ruling for Plan 8, recorded here because it generalises past its lane and is probably the
+highest-leverage application of the mocked-contract law currently available: **`createFakeGateway` will
+run every submitted event through the shipped `submittedEventSchema` before accepting it.**
+
+The reasoning is the payload-presence diagnosis turned into a remedy. That defect stayed invisible
+because **a fake validates nothing, so a wrong shape only fails at a real door** — and Plan 8's fake is
+the series' most exposed seam, since every authoring test runs through it and its real server (Plan 5
+T9b) is a full wave away. The validator is a pure domain function needing no server and no database, so
+sharing it costs nothing.
+
+**This converts a fake from "the thing that excuses the server from existing" into "a local copy of the
+door."** It is the `safeParse` pin one level up, and strictly stronger: a pin only checks the payloads a
+test author remembered to check, while a validating fake checks every event it ever sees.
+
+**Verified, and it applies immediately elsewhere:** `packages/app-core/test/helpers/fake-data-source.ts`
+— shipped, Lane 4's — has an `ingest` that pushes to an array and optionally runs a script. **It
+validates nothing.** Its own header calls itself "a sanctioned mocked-contract seam" that "must never
+become the only thing that proves the contract works" — and as written it cannot refuse anything the real
+door refuses. That is the fake through which both the `toStateId` payload drift and the non-ULID seed
+`actorId`s pass silently today. **Owner: Lane 4**, as a candidate for the same treatment.
+
+### An over-strict remedy is harder to catch than an under-strict check
+
+Lane 3's observation on the four-case boundary, and it is a genuinely new axis. Every instance catalogued
+so far is a check **weaker** than its claim — it passes when it should fail, and shows up eventually as a
+production defect. The payload fix invites the opposite error: a remedy that also refuses `null` or `{}`
+**would look more rigorous and pass a careless review.**
+
+> **An over-strict remedy is harder to catch than an under-strict check, because it fails closed, and
+> failing closed looks like working.**
+
+The under-strict version surfaces as a bug. The over-strict version surfaces as a user being refused
+something legitimate — **which nobody reports as a bug in the validator.** It is diagnosed, if ever, at
+the far end of a support conversation. So "would this ever refuse something it should accept?" has to be
+asked with the same seriousness as its opposite, and the four-case matrix exists to force it.
+
+### A fourth shape: the guard implements the thing it forbids
+
+The three shapes above are all *the check is weaker than the claim*. Lane 3's Plan 7 T1 round-2 review
+found one that is not: `markdownLinks: false`, added in round 1 **as a guard**, turned out to be the very
+condition selecting the unguarded paste-rule branch. **The guard enabled what it claimed to prevent.**
+
+Distinct from a weak check, and worse in one specific way: a weak check leaves the hazard where it was,
+while this one *creates* it and puts a reassuring name on it. Anyone auditing later reads the flag, sees
+the intent, and stops. The only thing that catches it is exercising the guarded path with the guard on —
+which is the mutation discipline already required elsewhere, applied to guards rather than to tests.
