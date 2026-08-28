@@ -721,3 +721,84 @@ pre-mutation blob hash, with `git diff` against the index, or by reading the fil
 `diff` invocation, `--no-index` included.** Every comparison in this review used `git hash-object` or
 Python `difflib`. This matters to every lane, because a tool that lies about equality turns a mutation
 sweep into theatre, and the whole falsifiability discipline rests on those restorations being real.
+
+## Wave 1 cross-lane watch (2026-08-28, controller) — three obligations assigned by position, and why the decision-6 drift will not fail loudly
+
+Recorded by the cross-lane controller during Wave 1, while all four lanes were still in pre-flight
+and none of the work below had been written. Everything here is verified against shipped `main` at
+`f363b2f` or against the plan text at the cited line — not inferred from a summary.
+
+### The decision-6 amendment is worse than "adapt at transcription" implies, and Plan 6 is where
+
+Decision 6's amendment tells later plans to adapt ~36 stale `toStateId` literals and calls Plan 6's
+"the dangerous ones because they are client *logic*, not fixtures." That framing understates it in one
+specific way, and the difference decides whether a lane's own machinery can catch the drift.
+
+The ordinary reason a stale fixture is recoverable is that it fails loudly. **In Plan 6 it does not**,
+because the plan's production code and the plan's tests carry the same misspelling and agree with each
+other. A lane that transcribes Plan 6 faithfully gets a green suite over a broken wire format:
+
+- `packages/app-core/src/precheck.ts` (Plan 6 T6, `restrictToNeedsMembership`) reads the field through
+  an explicit cast — `(submitted.payload as { toStateId?: string } | null)?.toStateId` (plan line 2758)
+  — and returns `true` when it is `undefined`. Against real `to`-keyed payloads that is *always*, so
+  every restrict-to precheck silently degrades to "no membership needed." The cast is what defeats the
+  compiler; without it this would be a typecheck failure.
+- `submitTransition` (Plan 6 T12, plan lines 6426-6427) builds the wire payload as
+  `const transitionPayload: Record<string, unknown> = { toStateId: submission.toStateId }` and then
+  assigns `comment` as a **bare string**. `Record<string, unknown>` defeats the compiler a second time,
+  and the bare `comment` is an independent divergence layered on the field name.
+- `reopenAndProceed` (Plan 6 T13, plan lines 7105-7113) submits `{ toStateId, cause }`. Its `cause`
+  shape already matches the amended contract exactly; only the field name is wrong.
+- The tests that would catch all three assert the same wrong shape — `TicketSheet.test.tsx` at plan
+  line 6309 asserts `batch[0].payload` equals `{ toStateId: 'done', comment: 'filed at the portal' }`,
+  and `reopen.test.ts` at 6971-6974 does the equivalent. They pass unmodified.
+
+Three nets are therefore absent at once: no typecheck error (two deliberate casts), no failing test
+(self-consistent assertions), and no runtime refusal (Plan 6a submits to `createFakeDataSource`, which
+validates nothing; the real door is Wave 3's T7/T8 transport). This is the mocked-contract law's own
+failure mode — the fake excusing the contract from existing — arriving inside the plan that the law's
+worst instance was already recorded against.
+
+**What the owning lane does about it:** before trusting any test transcribed from Plan 6 T6/T12/T13,
+write one assertion against the exported `ticketTransitionedPayloadSchema` itself
+(`packages/domain/src/workflow.ts` — `to` required, `comment: { text }`). A test that parses the payload
+the client actually builds is the only one of these that can fail. Plan 3's own reducer text has the
+same read (`p.toStateId` at plan-3 line 1123-1129) but is typed against the shipped payload type, so
+there it surfaces as a compile error rather than silence.
+
+Two spellings remain correct and are not drift: the transition-**log entry**
+(`TicketState.transitions[]`) keeps `toStateId`, and `ticket.workflow_rebound`'s own payload has a
+`toStateId` field of its own.
+
+### Obligations assigned by position, which no lane brief names
+
+Both are assigned in this document by phrases like "whichever plan next touches X" rather than to a
+numbered task, so they belong to whoever arrives first and appear in no plan's task list.
+
+1. **`FoldedState` must carry the break version — Lane 1, Plan 3 T3.** Plan 2 consequences §1 assigns
+   it to "whichever plan next touches the fold." Plan 3 T3 is the fold, and it is a floor-list task.
+   Lane 1's brief lists four claims recorded against Plan 3 and this is not among them, which makes
+   the list read as complete when it is not. The stranding refusal names a state id against the
+   ticket's origin version while `foldStateIdForward` reports the id at the point the chain broke;
+   for a three-version walk those differ, and Plan 6 renders the sentence to a human verbatim.
+
+2. **The verifier's autocommit ruling is a MUST that lands in Lane 4's current pre-flight.** Plan 1
+   consequences §2 says `verifyProjections` reads outside any transaction and **"MUST be ruled before
+   Plan 11 wires the schedule."** Lane 4's Wave-1 scope includes Plan 11 T11's `schedule.ts`. Under the
+   autonomous execution protocol a lane blocks only on a stated MUST — this is one of the few, and the
+   by-catch already routes it plus §4 to "Plan 11's pre-flight," which is the pre-flight Lane 4 is
+   running now. Two fix shapes are pre-approved (one `REPEATABLE READ` transaction over read + diff, or
+   retry-once-then-alert). §4 rides with it: the verifier does DDL and needs its own credential, or an
+   explicit decision that it runs elsewhere — Lane 4 owns `deploy/do/app.yaml` and the provisioning
+   notes, which is where that decision lives.
+
+### A correction to what three briefs say about the projection-order pin
+
+The lane briefs state that the pin on `main` "omits `proj_projects` and mis-slots `proj_tickets`."
+Half of that is false in a way that could send a lane hunting a defect that is not there. On `main`
+today `apps/server/src/projections/index.ts` registers exactly two projections, and the executable
+assertion in `apps/server/test/projection-order.test.ts` pins exactly those two — nothing is mis-slotted
+because nothing else is registered yet. What genuinely omits `proj_projects` is the **doc comment**
+above that assertion, which recites the pre-2026-08-26 order. Pre-ruling 6 is unaffected: §8 remains the
+single source, and the second lane to merge writes the full order into both the array and that comment.
+
