@@ -963,6 +963,24 @@ contract and no Plan 8 guard can be waiting on one. What actually binds is the t
 `SIMPLE_KANBAN_TEMPLATE` and `simpleKanbanWorkflowDef(workflowId)`. The ruling's intent stands — Plan 4
 owns it — but a lane keying a guard on the path is guarding the wrong thing.
 
+### Merge rule for this document: resolve by heading nesting, never by arrival order
+
+Found by Lane 4 resolving its own collision with this section, and worth pinning because it will recur
+every time two lanes append here — which under parallel waves is constantly.
+
+Two lanes appending at end-of-file produce a conflict git describes as "both sides added at EOF". Taking
+both sides in arrival order is textually correct and **structurally wrong**: Lane 4's addition was a
+`### 7.` written under its own `## Lane 4 (periphery) execution consequences` heading, and arrival order
+would have parked it after the `## Wave 1 cross-lane watch` heading that follows — silently reparenting a
+Plan 11 env-gate limit as a cross-lane watch item. **Markdown raises no error when a `###` lands under
+the wrong `##`,** and nothing downstream ever complains; the only symptom is a reader finding a claim
+filed under a heading that misdescribes it.
+
+**The rule: when this file conflicts at EOF, place each `###` back inside the `##` it was written under,
+then order the `##` sections by merge order.** A `###` in an EOF conflict almost always belongs to the
+`##` above it on its own side, not to whatever heading happens to precede it after the merge. Cheap to
+get wrong, invisible afterwards, and it corrupts the one document four lanes treat as authority.
+
 ### What the review of this section caught, recorded because it generalises
 
 This section was reviewed before merge by a single opus reviewer instructed to verify every claim against
