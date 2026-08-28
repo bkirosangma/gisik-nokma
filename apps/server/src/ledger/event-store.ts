@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
-import type { EntityKind, EventEnvelope, Origin } from '@gisik-nokma/domain';
+import type { EntityKind, LedgerEvent, Origin } from '@gisik-nokma/domain';
 
 /**
  * Serialises all seq assignment for one entity within the current transaction.
@@ -54,13 +54,6 @@ export async function nextWorkspaceSeq(client: PoolClient, workspaceId: string):
   );
   return (result.rows[0]?.head ?? 0) + 1;
 }
-
-/**
- * What the ledger stores: the contract-frozen domain envelope plus the
- * server-assigned workspace stream cursor. `EventEnvelope` itself does not
- * gain the field — clients never author it and treat it as opaque.
- */
-export type LedgerEvent = EventEnvelope & { workspaceSeq: number };
 
 export async function insertEvent(client: PoolClient, event: LedgerEvent): Promise<void> {
   await client.query(

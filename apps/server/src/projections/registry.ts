@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import type { LedgerEvent } from '../ledger/event-store.js';
+import type { LedgerEvent } from '@gisik-nokma/domain';
 
 /**
  * A projection is a deterministic read model over the ledger.
