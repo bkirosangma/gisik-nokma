@@ -1513,3 +1513,50 @@ The ratified membership entity id `${workspaceId}:${userId}` needs it for the sa
 **No migration change was needed and this was checked, not assumed:** every id column in the vendor schema is unbounded `text` (`user.id`, and the `userId` foreign keys on `session`, `account`, `passkey`), with no `varchar(n)` or `char(n)` anywhere, so 26 characters fit where 32 did. better-auth's own migration planner agrees — a function-valued `generateId` is not `"uuid"` or `"serial"`, so it still expects `text`, and the anti-drift test (§2) stays green with the option in place.
 
 **Any later plan that swaps the auth provider inherits this constraint.** The requirement belongs to the ledger, not to better-auth: whatever mints user ids must mint ULIDs, or `envelope.ts` must change — and it should not, because `actorId: ulidString` is the contract every other id in the series is held to. Covered by `apps/server/test/auth/user-ids.test.ts`, which signs a user up through the real phone-OTP path and puts the id better-auth actually stored through the real door.
+
+### 6. Three constraints the membership coherence check creates, which exist in code and nowhere else (Task 3)
+
+All three were found by review, not by execution. None is a defect; each is a fact a later author needs
+before touching this code, and the durable record is the only place they can look.
+
+**`submittedEventSchema` and `eventEnvelopeSchema` carry only the WORKSPACE half of the check.** The
+membership coherence check has two halves (see the envelope-collision section above). The workspace half
+is a cross-field refinement inside both exported schemas; the user half compares `entity.id`'s right half
+against `payload.userId` and therefore needs the payload PARSED — which needs the event's type, version
+and registered schema, none of them knowable inside a schema whose `payload` is `unknown` by design. So
+it lives in `parseEvent`. Verified rather than reasoned about:
+
+| input | `submittedEventSchema` | `eventEnvelopeSchema` | `parseEvent` |
+|---|---|---|---|
+| membership in wsA, filed `A:userC`, payload grants **userD** | **accepts** | **accepts** | `malformed-envelope` |
+| membership in wsA, filed **wsB**`:userD`, payload grants userD | refuses | refuses | `malformed-envelope` |
+
+Note the first row is `true` for **both** schemas, not only the full-envelope one — the review named
+`eventEnvelopeSchema` because that is the one a sync-down reader reaches for, but a consumer of
+`submittedEventSchema` inherits exactly the same gap. **Zero production consumers validate a bare
+envelope today** (`parse-event.ts` is the only caller; everything else is tests), so nothing is broken
+now. The hazard is the first consumer that does: it would inherit half a check with no way to tell. The
+rule, stated once: **to validate an event, call `parseEvent`** — these schemas are the shape layer
+underneath it, not a substitute for it. A comment at the export site in `envelope.ts` says the same
+thing, because that is where someone reaching for the schema actually looks.
+
+**Any future `membership`-kind event type must carry a top-level string `userId`.** The user half is
+written against the entity KIND, not against the two types that exist — `if (entity.kind ===
+'membership')`, then read `userId` off the parsed payload. A membership-kind event whose payload has no
+top-level string `userId` is refused `malformed-envelope` with *"…its payload names no user…"*, whatever
+its type. That is deliberate: a membership's entity id IS `${workspaceId}:${userId}`, so an event that
+does not say who it is about cannot be addressed at all, and a per-type check would let the next
+membership type inherit the hole instead of meeting the refusal. **Consequence for T14, Plan 10, and
+anyone else adding one:** name the user in a top-level `userId`, or file the event against a different
+kind. It is not enough to satisfy the entity-id regex. (The branch is reachable and tested — see
+`parse-event.test.ts`, which registers a userId-less membership type through `parseEvent`'s injectable
+registry rather than leaving a check that cannot fail.)
+
+**`workspace.created` and `workspace.renamed` now refuse a blank name, and refuse rather than trim.**
+Taking over Plan 1's provisional seeds meant adopting Plan 4's stricter shape: `z.string().min(1)`
+accepted `'   '`, which names nothing while looking like a name everywhere it is displayed, so a
+`.trim() !== ''` refinement was added (`project.created` shares it). **The interesting half is that it
+REFUSES rather than trims** — `'  Corner  '` is stored exactly as claimed, and a test pins that. Trimming
+would have been the obvious implementation and would put words in the actor's mouth; the ledger stores
+the claim as it was made. Sibling lanes rebasing onto `envelope.ts` inherit this door too, and a fixture
+with a padded workspace name now fails where it used to pass.
