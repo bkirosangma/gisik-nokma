@@ -2044,6 +2044,22 @@ server imports. Stated generally:
 The domain exports `isUlid` (`ids.ts:17`) for exactly this, and asserting through it also means the test
 cannot drift when the door changes.
 
+**Lane 2's addition, which lane 4's instance does not show: composition must be ASSERTED, not merely
+performed.** `MEMBERSHIP_ID_REGEX` is built as `new RegExp(\`^${ULID_BODY}:${ULID_BODY}$\`)`
+(`ids.ts:27`), and `ids.test.ts` carries a test named *"is composed from `ULID_REGEX` rather than
+re-spelled — one origin for what a ULID is"* which compares `MEMBERSHIP_ID_REGEX.source` against the
+composed string. So **a later hand-spelling that behaves identically still fails.** Without that
+assertion the composition is a convention rather than a guarantee: someone "simplifying" the construction
+back into a literal gets a green suite, and the second definition is reintroduced silently. This is
+"state what would make it fail, then make it fail once" applied to a *convention* rather than to a check
+— and conventions are the things most likely to be tidied away by someone being helpful.
+
+**Convergence, not compliance, and worth recording as such:** Lane 2 wrote its version into T3's dispatch
+before seeing the rule recorded here. Its reasoning was "a second spelling of what a ULID is would be
+free to drift from the first"; the recorded form covers the assertion side as well as the definition
+side. Two lanes and the controller reached the same rule from three directions in one day — from a
+production regex, from a test regex, and from a swept negative.
+
 **Swept, so nobody re-runs it:** across `main` and all four lane worktrees, `packages/` and `apps/`,
 there is **exactly one** hand-written ULID-shaped regex outside `ids.ts` — the one above, which Lane 4 is
 fixing. Everywhere else asserts through the authority or not at all. A clean negative, and evidence that
@@ -2090,3 +2106,20 @@ code, and it is the rule the controller has broken most often: the corrections t
 overwhelmingly prose claims about state, ownership and history that were plausible, unchecked, and cheap
 to check. The four-instances-in-one-branch count is what makes it a rule rather than an exhortation —
 **a documentation round is a change set like any other, and its assertions are as falsifiable as code.**
+
+
+### better-auth's runtime surface is plan text until Plan 4 T2 records it
+
+Flagged by Lane 2, and it binds two other plans. **Task 1 deliberately left better-auth's *runtime*
+surface unverified** — endpoint paths, cookie name, bearer header — because establishing them needs a
+live request rather than a `.d.ts` read. T1 verified the type surface and stopped there, honestly.
+
+**Plan 6's client and Plan 10's sync both code against those exact strings**, and **until T2 lands they
+are plan text rather than fact.** Given this series' record with plan text versus shipped reality — the
+`better-auth/plugins/passkey` subpath that does not exist, the CLI pinned to a schema two minors old, an
+id generator that was never configured — a string copied from a plan into a client is exactly the shape
+that fails at the first live request and nowhere earlier.
+
+**So: no lane hard-codes an auth endpoint path, cookie name or bearer header from plan text.** Wait for
+T2's recorded values, or route through whatever T2 exports. T2 will record the verified strings in this
+document.
