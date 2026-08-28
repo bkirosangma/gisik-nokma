@@ -1869,13 +1869,46 @@ something legitimate — **which nobody reports as a bug in the validator.** It 
 the far end of a support conversation. So "would this ever refuse something it should accept?" has to be
 asked with the same seriousness as its opposite, and the four-case matrix exists to force it.
 
-### A fourth shape: the guard implements the thing it forbids
+### RETRACTED: there is no fourth shape — and how a false one travelled
 
-The three shapes above are all *the check is weaker than the claim*. Lane 3's Plan 7 T1 round-2 review
-found one that is not: `markdownLinks: false`, added in round 1 **as a guard**, turned out to be the very
-condition selecting the unguarded paste-rule branch. **The guard enabled what it claimed to prevent.**
+An earlier draft of this section carried a "fourth shape": `markdownLinks: false`, added as a guard, said
+to be the very condition selecting the unguarded paste-rule branch — *a guard that enables what it
+forbids*. **Lane 3 retracted it and the retraction is right.** `markdownLinkPasteRule` **also** links
+plain URLs through its own `findPlainUrls` (extension-link@3.30.5 dist:225, 233), verified empirically
+with the option set both ways: plain URL still becomes a link either way. **No value of that option
+escapes the defect** — it selects which rule *object* implements the same behaviour. The literal sentence
+about branch selection was accurate; the reading built on it was not.
 
-Distinct from a weak check, and worse in one specific way: a weak check leaves the hazard where it was,
-while this one *creates* it and puts a reassuring name on it. Anyone auditing later reads the flag, sees
-the intent, and stops. The only thing that catches it is exercising the guarded path with the guard on —
-which is the mutation discipline already required elsewhere, applied to guards rather than to tests.
+The narrower thing that *is* true, recorded as a variant rather than a species: **an option that appears
+to select between a safe branch and an unsafe one may be selecting between two implementations of the
+same behaviour.** The trap is that reading the branch condition *confirms the story* — you see
+`if (opt) … else <the bad rule>` and stop, because the code agrees with you. Checking the other branch is
+what breaks it.
+
+**Why this is recorded rather than quietly deleted.** It is the day's own failure mode pointed at the
+people cataloguing it. Lane 3's implementer produced the claim, Lane 3 found it striking and forwarded it
+on that strength, and the controller amplified it into this document — **three sessions, no one spending
+the two minutes it would have taken to check.** Lane 3's statement of it is the one to keep:
+
+> **A finding that is interesting is not thereby verified, and interestingness is precisely what makes it
+> travel.**
+
+It was caught only because Lane 3 had instructed its re-reviewer to re-derive the implementer's headline
+claims independently — luck of instruction rather than a systematic guard. The systematic version, and
+the reason the review-depth ruling exists: **a claim's velocity through the lanes is not evidence, and
+the more quotable a finding is the more it needs the check nobody wanted to spend on it.**
+
+**Still true and unaffected by the retraction:** the paste path itself is real and independently
+confirmed — `addPasteRules` fires from `appendTransaction` on `uiEvent === 'paste'`, gated by none of the
+three options, live across five extensions, and it **also fires on drop**. And Lane 3's round-1 lesson
+stands: that commit closed a real hole and minted a false green check in the same breath, which is worse
+than the hole — a hole is merely open, while a false check tells the next person to stop looking.
+
+**One more ownership claim that did not hold, same species as the rest.** Lane 3 had assigned the
+paste-path decision to Plan 7 Task 5, on the grounds that Task 5 owns spec §2's "nothing silently becomes
+markup". **Task 5's brief contains zero occurrences of "paste"** — its trigger table is explicitly input
+rules, its contract is typed sequences, and its mechanism reads `undoInputRule`'s store, which paste
+rules never populate. Executed as briefed it would go green, the tripwire tests would stay green, and the
+path would ship unnoticed. The assignment read right and did not hold. Corrected: Task 5's dispatch is
+widened and **Task 12** named as the implementation site, since `enablePasteRules` is an `Editor` option
+and `TicketEditor` is where the `Editor` is constructed.
