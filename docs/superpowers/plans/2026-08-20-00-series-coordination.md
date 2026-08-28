@@ -952,6 +952,39 @@ discrepancy by literal count and correct the plan's number, never the reverse.**
 is how deliberately-written coverage gets deleted by someone being tidy. Any lane whose plan carries the
 same drift takes the same ruling.
 
+**Direction is what decides whether a drift is dangerous, and Lane 1's per-task pass proves it.** Six of
+Plan 3's twelve tasks carry a count mismatch, but only two carry the dangerous direction. Where the plan
+states a number *above* the blocks actually written (Plan 3 T3, T5, T6, T7 — 14/10/8/10 stated against
+13/8/7/8 written) the invitation is to write more, which is harmless. Where it states a number *below*
+(T10: 8 stated, 9–10 written — a floor-list task; T14: 31 scenarios stated, 36 case ids written) the
+invitation is to delete. **T14's is the sharp instance and is worse than a count**: reaching "thirty-one"
+by deleting case ids would break live cross-plan citations — 5.27 and 5.30 are cited by Plan 5
+(`2026-08-20-05-api-realtime-search.md:6158`) and by this document at line 213, and 5.36 is cited at line
+303. So a tidy-up inside one plan silently breaks two other documents' references. Lanes should sort
+their own count drifts by direction and warn only the dispatches where deletion is the tempting repair.
+
+**The rule needs a second clause, or it manufactures the harm it prevents — found by Lane 3 running the
+check over Plan 7 before anyone tripped on it.** Plan 7 has no real instance (fourteen in-scope tasks,
+counts exact where stated), but T11a *looks* like one: 6 `it` blocks against a stated 4. It is not a
+defect. That task is split across two packages — 4 domain cases in `attachment-kinds.test.ts` and 2
+server cases appended to `evidence-gate.test.ts` — and the plan states them separately and correctly
+further down. A task-range count flags it; reading the range clears it. The danger is that a split task
+produces **the same arithmetic signature as a real drift**, and the naive resolution ("the plan says 4, I
+have 6, delete two") is precisely the coverage deletion this ruling exists to prevent.
+
+**Operative form, therefore: resolve by literal block count *per file*, not per task, and correct the
+plan's number rather than the tests.** A task that appends cases to another package's suite is the
+false-positive shape to expect.
+
+**Stated once, because it is the same rule as the fixture finding above seen from the other side.** There
+the danger is a test that cannot fail; here it is a test that gets deleted for being unexpected. Both
+arrive out of authoritative-looking plan text, and both resolve identically: **the literal file is the
+authority; the plan's number is a claim about it.**
+
+**A note on the evidence, since the series keeps re-learning it:** Lane 3 reported a clean negative on
+Plan 7 rather than staying silent, and that is the right behaviour — a clean negative is evidence that
+the check ran, and silence is indistinguishable from not having looked.
+
 **And a diagnostics corollary, from Lane 4's scanner.** `colour-scan.ts` reports hits as
 `relative(root, path)` — relative to each individual source root — so once a second package exists, a hit
 in `packages/editor/src/styles/editor.css` prints as `styles/editor.css` with nothing naming the package,
