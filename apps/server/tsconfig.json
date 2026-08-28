@@ -3,7 +3,15 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "types": ["node"],
+    // apps/server is a private leaf app — nothing imports its .d.ts, so it emits
+    // none. Declaration emit would otherwise fail with TS2742 on better-auth:
+    // `betterAuth(...)`'s inferred type reaches into @simplewebauthn/server and
+    // zod 4, both nested under better-auth in the pnpm store and therefore not
+    // nameable from here. The alternatives were worse — hoisting a second zod
+    // major into this package, or hand-writing a facade type that would silently
+    // narrow the auth API Task 2 builds on.
+    "declaration": false
   },
   "include": ["src"]
 }
