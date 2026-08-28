@@ -8,6 +8,10 @@ import {
   workspaceRenamedPayload,
 } from './events/membership.js';
 import {
+  claimContestedPayloadSchema,
+  claimContestedResolvedPayloadSchema,
+} from './events/contest-events.js';
+import {
   attachmentAddedPayload,
   commentAddedPayload,
   ticketAssignedPayload,
@@ -155,6 +159,7 @@ domainRegistry.register({
 });
 
 /**
+/**
  * The membership and visibility vocabulary (Plan 4 Task 3). Six types, all
  * version 1.
  *
@@ -214,4 +219,34 @@ domainRegistry.register({
   version: 1,
   entityKind: 'ticket',
   payloadSchema: visibilitySetPayload,
+});
+
+/**
+ * The contest vocabulary (Plan 10 Task 1). A sync-time refusal is appended to
+ * the ledger as a contested claim on the TICKET the refused claim touched, and
+ * its resolution is another event on the same ticket — so both bind
+ * `entityKind: 'ticket'`.
+ *
+ * The binding is not decorative. `parseEvent` short-circuits its type-kind
+ * check when a registration omits `entityKind`, so leaving it off here would
+ * silently admit a `claim.contested` filed against a workflow or a workspace,
+ * and the ledger is append-only by trigger — that event could never be
+ * corrected, only superseded.
+ *
+ * Registered here rather than as an import side-effect in
+ * `events/contest-events.ts`: `register` throws on a duplicate key, so exactly
+ * one file may own the call, and in this package that file is this one.
+ */
+domainRegistry.register({
+  type: 'claim.contested',
+  version: 1,
+  entityKind: 'ticket',
+  payloadSchema: claimContestedPayloadSchema,
+});
+
+domainRegistry.register({
+  type: 'claim.contested_resolved',
+  version: 1,
+  entityKind: 'ticket',
+  payloadSchema: claimContestedResolvedPayloadSchema,
 });

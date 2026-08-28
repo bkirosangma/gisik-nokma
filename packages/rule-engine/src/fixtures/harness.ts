@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import {
+  CONTEST_EVENT_TYPES,
   membershipId,
   stateCategorySchema,
   workflowDefinedPayloadSchema,
@@ -165,10 +166,36 @@ export function buildInMemoryContext(fx: Fixture): EngineContext {
     return latest;
   };
 
+  /**
+   * COMPLETE FIRST, FILTER SECOND — the order is load-bearing, not style.
+   * `completeEnvelope` derives the default id `fx_evt_<seq>` from POSITION, and
+   * `completeCandidate` independently numbers the candidate `priorEvents.length + 1`.
+   * Filter the partials before completing them and the contests are REMOVED
+   * before they are ever given ids, so `getContest` below can never find one —
+   * and in the sibling shape, where a two-list implementation keeps the contests
+   * but numbers them off a filtered enumeration, every event after a dropped one
+   * is RENUMBERED instead. Removed or renumbered, the outcome is identical: a
+   * fixture naming `fx_evt_1` addresses nothing, and a resolution refuses
+   * `contest.unknown` where it meant `contest.already-resolved` — still refused,
+   * wrong rule, and in a suite without an exact-rule assertion, green.
+   */
+  const completedPriorEvents = fx.priorEvents.map((partial, index) => completeEnvelope(partial, index + 1));
+
+  /**
+   * Contest events attach to the ticket entity but are NOT ticket state — the
+   * server's ticket projection ignores them the same way. The filter is
+   * mandatory rather than hygiene: `applyPriorEvent`'s `default:` branch throws
+   * on any type it does not fold, so an unfiltered contest kills the fixture at
+   * setup instead of reaching the rule it was written to prove.
+   */
+  const foldable = completedPriorEvents.filter(
+    (event) => !(CONTEST_EVENT_TYPES as readonly string[]).includes(event.type),
+  );
+
   const tickets = new Map<string, TicketState>();
-  fx.priorEvents.forEach((partial, index) => {
-    applyPriorEvent(tickets, defs, latestOf, completeEnvelope(partial, index + 1));
-  });
+  for (const event of foldable) {
+    applyPriorEvent(tickets, defs, latestOf, event);
+  }
 
   const memberships = new Map<string, EntityState>();
   for (const member of fx.memberships) {
@@ -194,6 +221,23 @@ export function buildInMemoryContext(fx: Fixture): EngineContext {
     async getWorkflowDef(workflowId, version) {
       if (version !== undefined) return defs.get(`${workflowId}@${version}`) ?? null;
       return latestOf(workflowId);
+    },
+    /**
+     * Contests are read back off the SAME completed prior events the fold
+     * skipped — the fixture's ledger is the only source, so the harness cannot
+     * disagree with itself about which contests exist.
+     */
+    async getContest(contestedEventId) {
+      const contested = completedPriorEvents.find(
+        (event) => event.type === 'claim.contested' && event.id === contestedEventId,
+      );
+      if (contested === undefined) return null;
+      const resolved = completedPriorEvents.some(
+        (event) =>
+          event.type === 'claim.contested_resolved' &&
+          (event.payload as { contestedEventId?: string }).contestedEventId === contestedEventId,
+      );
+      return { ticketId: contested.entity.id, resolved };
     },
   };
 }

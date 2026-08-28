@@ -1,0 +1,32 @@
+{
+  "name": "a client cannot forge the system's record of a refusal",
+  "workflowDefs": [],
+  "memberships": [],
+  "priorEvents": [],
+  "candidateEvent": {
+    "type": "claim.contested",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_b",
+    "origin": "mobile",
+    "payload": {
+      "originalEvent": {
+        "id": "01J9GORG000000000000000000",
+        "workspaceId": "ws_1",
+        "entity": { "kind": "ticket", "id": "t1" },
+        "type": "ticket.transitioned",
+        "version": 1,
+        "payload": { "to": "done" },
+        "actorId": "user_b",
+        "origin": "mobile",
+        "clientTime": "2026-08-20T00:00:00.000Z"
+      },
+      "rule": "restrict-to",
+      "reason": "Only the assignee may do this."
+    }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "contest.server-only",
+    "reason": "A contested claim is the system’s record of a refusal; only the server may append one."
+  }
+}

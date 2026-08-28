@@ -761,6 +761,176 @@ transcribed from the plan (`deploy/do/README.md` and `pnpm check:db-tz`) were an
 same time: both land with Plan 11 and neither is a command an operator can run today, which the
 convention covered for variables and not for commands.
 
+### 8. Plan 10 Task 1's pinned code does not compile, then crashes — and its test count is wrong
+
+Recorded at execution of Plan 10 Task 1 (lane 4), verified against shipped code.
+
+Step 3's pinned `events/contest-events.ts` does `import { domainRegistry } from '../registry.js'` and
+self-registers both contest types as a module side-effect. Two independent failures in one
+instruction. `registry.ts` exports `createEventTypeRegistry`, `EventTypeRegistry` and
+`EventTypeRegistration` and **not** `domainRegistry` — that is created in `vocabulary.ts` — so the
+import does not compile. And had it compiled, `register` throws `event type already registered`
+(`registry.ts:31-33`) the moment `vocabulary.ts` registers the same two types, so the package would
+crash at first import. The local pattern is the opposite of what the step describes: `events/*.ts`
+state schemas and register nothing, and all registrations live centrally in `vocabulary.ts`.
+
+**As landed:** schemas in `events/contest-events.ts` with no registration; both
+`domainRegistry.register({... entityKind: 'ticket'})` calls in `vocabulary.ts` beside the other
+fourteen; a plain `export * from './events/contest-events.js'` in `index.ts`. The step's
+side-effect-import instruction was dropped. Note the `entityKind` too: the plan's registrations omit
+it, and `parse-event.ts:79` short-circuits its type-kind check when a registration does, so an
+omitted field would have silently admitted a `claim.contested` filed against a workflow or a
+workspace — into a table that is append-only by trigger.
+
+Step 4 states `Expected: PASS (10 tests)` for a body containing **11** `it` blocks (13 shipped, with
+the entity-kind guard and the missing-payload guard added). **Resolve test counts by literal
+per-file `it` count and correct the plan's number — never author a filler test to reach a stated
+number, and never delete one to match it.** The same caution applies wherever a plan in this series
+states a count beside a pinned body; the two are written at different times and only one of them is
+executable.
+
+### 9. `packages/domain/src/clock-skew.ts` DEVIATES from Plan 10 Task 1 Step 5, and Plan 6 Task 6 must check the repo file, not the plan text
+
+**Load-bearing. Read this before executing Plan 6 Task 6.**
+
+Plan 6 Task 6's precondition says to create `clock-skew.ts` from Plan 10 Task 1 Step 5 **verbatim**,
+and Plan 10 Task 1's own file list tells whichever plan runs second to leave the other's copy
+byte-identical rather than rewriting it — the whole point being that a formatter which differs
+between two copies is exactly the second clock the amendment exists to prevent.
+
+Plan 10 Task 1 has now landed `clock-skew.ts`, and it is **deliberately not** Step 5's text.
+`formatIstInstant` as pinned guards the NORMALISED string — it calls `istDayOf` on
+`new Date(ms).toISOString()` — so `isRealCalendarDatetime` never sees the overflow it exists to
+catch. Three verified consequences, all contradicting the function's own docblock:
+`'+275760-09-13T00:00:00.000Z'` and `'-000001-01-01T00:00:00.000Z'` **throw `RangeError`** where the
+docblock promises verbatim; `'2026-02-30T00:00:00.000Z'` is silently rolled and prints
+`'2 Mar 2026, 05:30 IST'`, a date nobody claimed; and a non-ISO but `Date.parse`-able string such as
+`'Aug 20, 2026'` is read in the **device's** zone. Measured, printing what `formatIstInstant`
+actually returned: UTC `20 Aug 2026, 05:30 IST`, `Asia/Kolkata` `20 Aug 2026, 00:00 IST`,
+`America/Los_Angeles` `20 Aug 2026, 12:30 IST`, `Pacific/Kiritimati` `19 Aug 2026, 15:30 IST` —
+four zones, four answers, and two different calendar days. That is precisely the device-zone
+fallback the docblock says does not happen. The shipped file guards the INPUT instead, with the two predicates `envelope.ts` already
+exports and `istDayOf` itself applies:
+
+```ts
+if (IST_DAY_REGEX.test(instant)) return instant;
+if (!ISO_DATETIME_REGEX.test(instant) || !isRealCalendarDatetime(instant)) return instant;
+```
+
+None of this is reachable through the product today: `ISO_DATETIME_REGEX` **and** the
+`isRealCalendarDatetime` refine on the same schema together stop all four inputs from ever becoming
+a stored `clientTime`. (Corrected 2026-08-31 — this sentence previously credited the regex alone,
+and the calendar-overflow case is the refine's, not the regex's. Both clauses are load-bearing:
+dropping either one leaves an input the other admits.) It was fixed at Plan 10 Task 1
+because that was the last moment one copy of the formatter existed.
+
+**Therefore: any byte-identical check for `clock-skew.ts` must be run against
+`packages/domain/src/clock-skew.ts` as it stands in the repo, NOT against the plan's Step 5 text.**
+A lane that diffs the repo file against the plan will find a difference, and the plan is the side
+that is wrong. If Plan 6 Task 6 finds the file already present — it will — it should add only what is
+missing and change nothing that is there.
+
+### 10. Plan 10 Task 2 — two live windows the contest evaluators opened, one interim fix that is FORBIDDEN, one plan-vs-repo trap, and a count
+
+**Load-bearing. Read this before executing Plan 10 Task 4 (`proj_contested` + engine lookup),
+Plan 10 Task 10 (outbox + local pre-check), or Plan 4 Task 5 (pre-engine permission gate).**
+
+Recorded at execution of Plan 10 Task 2 (lane 4). Every line below is verified against shipped
+code; window A was additionally reproduced over real HTTP by the reviewer.
+
+**A. `claim.contested_resolved` reaches the ingest door and 500s the WHOLE BATCH until Plan 10
+Task 4.** Plan 10 Task 1 registered both contest types (`vocabulary.ts:241,248`), so `parseEvent`
+now admits them; `evaluate.ts:19-22` dispatches them; `contests.ts:55` **throws** when
+`ctx.getContest` is `undefined`; and `createEngineContext` (`apps/server/src/engine-context.ts:38`)
+does not implement it. The throw is raised inside `commitOne`'s `try` (`deps.evaluate`,
+`ingest-service.ts:120`); the `catch` at `:133` does its ROLLBACK and duplicate-id check and then
+**rethrows at `:150`**; `app.ts:46` answers `INTERNAL_ERROR_BODY`.
+
+State the blast radius truthfully, because it is wider than "that event 500s". Reproduced over
+real HTTP with a batch of `[workspace.created, claim.contested_resolved]`: the call returns 500
+with the fixed body, the ledger afterwards holds `["workspace.created"]`, and **the caller
+receives no `results` array at all** — a committed neighbour is silently unacknowledged.
+`ingestBatch`'s own docblock (`ingest-service.ts:40-47`) documents exactly this as the
+rejects-the-whole-call path, and the client's recovery is a batch retry that answers
+`duplicate-event-id` for the committed neighbour. This is **materially wider than the Plan 1 §9
+precedent it resembles**, where the degraded case was a per-event refusal that still rode inside
+`results`.
+
+The throw itself is correct and deliberate (Plan 10 Task 2 semantics 5): a context that cannot see
+contests has made no claim about the world, and a wiring bug must not be dressed as a verdict.
+**Closer: Plan 10 Task 4**, whose own file list pins it —
+`2026-08-20-10-offline-sync-apps.md:100`: `src/engine-context.ts  # (modify) additive getContest
+over proj_contested`.
+
+**B. The attractive interim fix is FORBIDDEN: `getContest: async () => null` is not permitted**, in
+the server context, in the replica context, or in any test double that stands in for either.
+Measured by mutation at execution: delete the guard, degrade a missing lookup to `null`, and the
+wiring bug resolves to `{ refused: true, rule: 'contest.unknown', reason: 'No contested claim … is
+recorded.' }` — a refusal that reads entirely legitimate and blames the caller for the server's own
+mis-wiring. The sharper consequence lands once Task 4's refusal-to-contest pipeline exists: a
+`null` lookup would have the server **append a FABRICATED `claim.contested` to a trigger-protected
+append-only table on the strength of a wiring bug** — a record nobody can delete and nobody can
+correct, only contest again. A 500 that names the wiring is honest; a refusal that invents history
+is not. Leave the throw.
+
+**C. Origin provenance is unguarded at the ingest door until Plan 4 — and Task 2 NARROWS this
+window rather than widening it.** `contest.server-only` (`contests.ts:12`) trusts `env.origin`, and
+`origin` arrives from the client: `submittedEventSchema` (`packages/domain/src/envelope.ts:182`)
+accepts it verbatim, and nothing in `apps/server/src` validates or overwrites it:
+`event-store.ts:61,72` write it and `:95,119` only type the row and read it back; a repo-wide
+`grep -rn "origin" apps/server/src` returns **six** hits, and the two that are not `event-store.ts`
+are both prose — the word "original" at `projections/rebuild.ts:32`, and a comment at
+`auth/auth.ts:71` that Plan 4 added after this section was first written. (Re-verified 2026-08-31
+after the rebase. The count moved because another lane landed; a quoted command in this document is
+a claim that decays when the tree does, and is worth re-running rather than trusting.) A client that sets `origin: 'server'` walks
+past the rule today.
+
+Record the direction honestly: **before this delta, `evaluateEvent`'s `default:` branch silently
+ACCEPTED both contest types regardless of origin.** Task 2 turns "always accepted" into "accepted
+only when the claim says server", which is strictly narrower. The rule is right as written — the
+shared engine runs in a browser and cannot know provenance. **Closer: Plan 4 Task 5's
+`checkRolePermission`** (`2026-08-20-04-auth-visibility.md:1968`), which refuses `permission.role`
+on `env.origin === 'server'` *before* `evaluateEvent` runs. **Do not expose a reachable ingest door
+to untrusted callers before Plan 4 lands it:** a forged contest lands in an append-only table
+protected by trigger and cannot be corrected afterwards.
+
+**D. Task 2's fixtures DEVIATE from the plan's pinned JSON, and the repo file is the correct
+side.** The plan writes `originalEvent.payload` as `{ "toStateId": "done" }`; the shipped fixtures
+write `{ "to": "done" }`. `toStateId` is the retired pre-Plan-2 shape — the shipped
+`ticket.transitioned` payload is `{ to, comment?, … }`. Harmless on this path either way, which is
+the danger: `submittedEventSchema.payload` is `z.unknown()` and nothing checks the nested claim
+against the registry inside a fixture, so the retired shape ships green and a later byte-identical
+check against plan text would "fix" it back. **Same trap §9 records for `clock-skew.ts`: any such
+check runs against the repo file, and the plan is the side that is wrong.**
+
+**E. Plan count.** Task 2 Step 4 states `Expected: PASS (8 tests)`; the pinned body contains
+**7** `it` blocks, the shipped `test/contests.test.ts` has 7, and the gate prints `(7 tests)`.
+Second instance inside this plan after §8's `(10 tests)` for an 11-block body. Resolve by literal
+per-file `it` count; never author a filler test to reach a stated number, never delete one to match
+it.
+
+### 11. Nothing binds a contest's embedded claim to the envelope it arrives in — Plan 10 Task 4 owns the check
+
+Found at Lane 4 P2's final whole-branch review, and **committed end to end over the shipped door**
+rather than argued: a `claim.contested` filed on ticket `t2` in workspace B, `origin: 'server'`,
+embedding a fabricated refused claim naming ticket `t1` in workspace A, returns **HTTP 200,
+committed** — and the append-only trigger makes it permanent.
+
+Every layer is individually correct and none of them asks the question.
+`claimContestedPayloadSchema` validates the embedded event's internal shape; `parseEvent` reads the
+OUTER envelope; `evaluateClaimContested` reads `origin` and nothing else. So the coherence between
+"the ticket this contest is filed on" and "the ticket the refused claim touched" is asserted by
+three separate comments and enforced by nobody.
+
+`contests.ts`'s docblock previously implied the opposite — *"the only question left for a rule is
+who is allowed to say it"* — and has been re-trued at the site to state the gap plainly.
+
+**Owner: Plan 10 Task 4**, which builds contests server-side and is the only place that can compare
+the embedded claim against the envelope before appending. Recorded here rather than fixed in P2
+because enforcement is T4's constructor, not this partition's — and recorded at all because unlike
+this branch's other two live windows (the `getContest` 500, the origin-provenance gap) this one had
+no owner and appeared in no section.
+
 ## Wave 1 cross-lane watch (2026-08-28, controller) — where the decision-6 drift is loud, where it is silent, one obligation assigned by position, and one MUST that does not fire
 
 Recorded by the cross-lane controller during Wave 1. Everything here is verified against shipped code or
@@ -1617,7 +1787,7 @@ writes a literal `undefined` into a comment body that lands in an append-only ta
 **There is a compile-time half with the same root:** `z.infer` yields `payload?: unknown`, which is not
 assignable to `SubmittedEvent`. The natural downstream unblock is a cast, and the cast erases the
 guarantee silently instead of failing. The repo already met this quirk once and handled it by hand —
-`parse-event.ts:99` reconstructs the event as `{ ...envelope.data, payload: payload.data as unknown }`
+`parse-event.ts:138` reconstructs the event as `{ ...envelope.data, payload: payload.data as unknown }`
 rather than passing the inferred object through. That is the precedent; there is none for shipping the
 loose inferred type as a cross-plan contract.
 
@@ -1664,7 +1834,12 @@ a reason unrelated to what it names — arriving inside the remedy rather than t
 
 **The fix pattern** (Lane 4's, verified against the built schemas): a `.refine` on the embedded schema
 asserting `payload !== undefined`, plus stating the contracted type explicitly rather than taking
-`z.infer`. Prefer `payload !== undefined` over `'payload' in v`, **for a sharper reason than the first
+`z.infer`. **Superseded for `claimContestedPayloadSchema` on 2026-08-31**: Plan 4's envelope amendment
+landed the same rule at the door, so Lane 4 REMOVED its local refine rather than keeping it as
+belt-and-braces — two schemas stating one rule is a second definition that drifts the moment either
+moves. The test stayed and now guards the door across a package boundary (proven by neutering the
+door's refine and watching that test go red). The pattern below still applies to any embedder the
+door does not cover; the explicit-type half is unaffected. Prefer `payload !== undefined` over `'payload' in v`, **for a sharper reason than the first
 draft gave.** That draft said `in` cannot tell the two cases apart; the probe above disproves it in its
 own output — absent parses to `keys: ["a"]`, present-but-`undefined` to `keys: ["a","payload"]`, so `in`
 distinguishes them perfectly. Lane 2 reproduced this independently and supplied the real argument:

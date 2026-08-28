@@ -1,0 +1,41 @@
+{
+  "name": "a resolution aimed from another ticket is refused",
+  "notes": "The fourth CONTEST_RULES path, and the only one whose verdict is read out of ContestLookup.ticketId — the field the server context, this harness and the offline replica each derive INDEPENDENTLY, so it is the rule most exposed to the divergence this corpus exists to catch. The contest is recorded on t1 (id fx_evt_1, derived from position); the candidate resolves it from t2. Without this fixture, deleting the wrong-ticket branch produces ZERO fixture failures, and a harness whose getContest returns the wrong field leaves the unit test entirely green: neither artifact covers the other's failure mode.",
+  "workflowDefs": [],
+  "memberships": [],
+  "priorEvents": [
+    {
+      "type": "claim.contested",
+      "entity": { "kind": "ticket", "id": "t1" },
+      "actorId": "user_b",
+      "origin": "server",
+      "payload": {
+        "originalEvent": {
+          "id": "01J9GORG000000000000000000",
+          "workspaceId": "ws_1",
+          "entity": { "kind": "ticket", "id": "t1" },
+          "type": "ticket.transitioned",
+          "version": 1,
+          "payload": { "to": "done" },
+          "actorId": "user_b",
+          "origin": "mobile",
+          "clientTime": "2026-08-20T00:00:00.000Z"
+        },
+        "rule": "restrict-to",
+        "reason": "Only the assignee may do this."
+      }
+    }
+  ],
+  "candidateEvent": {
+    "type": "claim.contested_resolved",
+    "entity": { "kind": "ticket", "id": "t2" },
+    "actorId": "user_b",
+    "origin": "desktop",
+    "payload": { "contestedEventId": "fx_evt_1", "resolution": "discarded" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "contest.wrong-ticket",
+    "reason": "This contested claim belongs to a different ticket."
+  }
+}
