@@ -1,0 +1,50 @@
+{
+  "name": "four-eyes refuses when a transition-log entry cannot be read against the current workflow, instead of skipping it",
+  "notes": "A PLANTED store, and the plant is the point: v2 drops `hold` and maps nothing to it, which publishing refuses (unmapped-drop) — so this arrangement only exists through corruption, which is exactly the condition under which a security control fails closed. The ticket itself does NOT strand: it sits in `review`, which v2 still has, so the stranded-state refusal never fires and the refusal below is four-eyes' own. Two mutants both turn this fixture green with an ACCEPTANCE: skipping the unreadable entry (the old `if (!resolved.ok) continue`), and finishing the loop to refuse only when nothing matched — user_b is a genuine second person, so both let the move through.",
+  "workflowDefs": [
+    {
+      "id": "wf_audit", "version": 1, "name": "Audit", "initialStateId": "draft",
+      "states": [
+        { "id": "draft", "name": "Draft", "category": "open" },
+        { "id": "hold", "name": "On hold", "category": "active" },
+        { "id": "review", "name": "In review", "category": "active" },
+        { "id": "approved", "name": "Approved", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "draft", "to": "hold", "rules": [] },
+        { "from": "hold", "to": "draft", "rules": [] },
+        { "from": "draft", "to": "review", "rules": [] },
+        { "from": "review", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "review" } } ] }
+      ]
+    },
+    {
+      "id": "wf_audit", "version": 2, "name": "Audit", "initialStateId": "draft",
+      "states": [
+        { "id": "draft", "name": "Draft", "category": "open" },
+        { "id": "review", "name": "In review", "category": "active" },
+        { "id": "approved", "name": "Approved", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "draft", "to": "review", "rules": [] },
+        { "from": "review", "to": "approved", "rules": [ { "kind": "require-different-user", "thanActorOf": { "to": "review" } } ] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_audit", "workflowVersion": 1 } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "hold" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "draft" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "review" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_b",
+    "payload": { "to": "approved" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "require-different-user",
+    "reason": "This step needs a second person, and this ticket's history cannot be read against its current workflow, so who last performed the move to \"review\" is unknown. Ask an admin to check this workflow's version history."
+  }
+}
