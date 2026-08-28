@@ -134,12 +134,14 @@ const guardedV1: WorkflowDef = {
 };
 
 /**
- * Two rules on one edge, the first of a kind this task implements and the
- * second of a kind it deliberately leaves throwing "not implemented yet"
- * (Task 8's brief). Used to prove first-refusal-wins without waiting for a
- * second real rule module to exist: reaching an implemented refusal and
- * never reaching the unimplemented throw is exactly what "stops at the
- * first refusal" means.
+ * Two rules on one edge: require-comment then require-evidence (both real,
+ * as of Task 9). The bare candidate below violates both, so this proves
+ * first-refusal-wins directly — the returned refusal must be rule 1's
+ * (require-comment), never rule 2's (require-evidence), because a correct
+ * loop stops at the first refusal instead of evaluating every rule and
+ * picking one. The second test below reuses this same pair the other way:
+ * rule 1 accepts, so only a loop that keeps going after an accept can ever
+ * reach — and genuinely refuse on — rule 2.
  */
 const twoRulesV1: WorkflowDef = {
   id: 'wf_two_rules',
@@ -435,9 +437,8 @@ describe('the invariant runs before authored rules (Task 8 amendment 2)', () => 
  * order and stops at the first refusal. The fixture suite's single-rule
  * fixtures cannot witness "stops," only "refuses" — a rule engine that ran
  * every rule and returned the last refusal would pass them identically. This
- * pins the stop: the second rule is a kind this task deliberately leaves
- * throwing "not implemented yet," so reaching it (instead of stopping at the
- * first refusal) turns a passing assertion into a rejected promise.
+ * pins the stop with two real rules (both implemented as of Task 9):
+ * require-comment then require-evidence on the same edge.
  *
  * The refusing case alone only pins "stops at a refusal" — it cannot
  * distinguish a genuine early-return from an unconditional `return result`
@@ -445,11 +446,14 @@ describe('the invariant runs before authored rules (Task 8 amendment 2)', () => 
  * refuses either way here, so an unconditional-return mutant produces the
  * identical observable result). The second case below closes that gap: rule
  * 1 ACCEPTS a real comment, so only a loop that keeps going after an accept
- * can ever reach rule 2's throw. Together the two cases pin both directions
- * of "first refusal wins" — stop on refuse, continue on accept.
+ * can ever reach rule 2 — and rule 2 must then genuinely refuse (no
+ * evidenceAttachmentId is given), which an unconditional-return mutant
+ * cannot produce (it would stop at rule 1's accept instead). Together the
+ * two cases pin both directions of "first refusal wins" — stop on refuse,
+ * continue on accept.
  */
 describe('evaluateTransitionRules — first refusal wins (Task 8)', () => {
-  it('stops at the first refusing rule and never reaches a later, unimplemented one', async () => {
+  it('stops at the first refusing rule and never reaches a later one', async () => {
     const parent = ticket({ id: 't1', stateId: 'todo', stateCategory: 'open', workflowId: 'wf_two_rules' });
     const { ctx } = spyContext(twoRulesV1, { entity: parent });
     await expect(evaluateEvent(transitioned('done'), ctx)).resolves.toEqual({
@@ -459,23 +463,24 @@ describe('evaluateTransitionRules — first refusal wins (Task 8)', () => {
     });
   });
 
-  it('continues past an accepting rule to the next one — a real comment reaches the still-unimplemented require-evidence', async () => {
+  it('continues past an accepting rule to the next one — a real comment reaches the now-implemented require-evidence', async () => {
     const parent = ticket({ id: 't1', stateId: 'todo', stateCategory: 'open', workflowId: 'wf_two_rules' });
     const { ctx } = spyContext(twoRulesV1, { entity: parent });
     // require-comment (rule 1) accepts a real comment, so a correct loop must
-    // move on to rule 2. require-evidence is not implemented yet (Task 9's
-    // job) and throws when reached — that thrown promise rejection is this
-    // test's only signal that evaluation did not stop after rule 1's accept.
-    //
-    // NOTE for Task 9: once evaluateRequireEvidence replaces this throw, the
-    // mechanism this test relies on disappears — `evidenceAttachmentId` is
-    // absent from this candidate, so the assertion must become a real
-    // require-evidence REFUSAL (`.resolves.toEqual({ refused: true, rule:
-    // REFUSAL_RULES.requireEvidence, reason: ... })`), not a rejected
-    // promise. Task 9 owns updating this test in that same change set —
-    // ledgered here, not left for a later task to rediscover.
+    // move on to rule 2. require-evidence is implemented (Task 9) and this
+    // candidate carries no `evidenceAttachmentId`, so rule 2 genuinely
+    // refuses. That require-evidence refusal — rather than rule 1's
+    // require-comment refusal, and rather than acceptance — is this test's
+    // only signal that evaluation did not stop after rule 1's accept: an
+    // unconditional "return the first verdict" mutant would instead resolve
+    // to rule 1's `{ refused: false }`-shaped accept-or-refuse, never reach
+    // rule 2, and fail this assertion.
     await expect(
       evaluateEvent(transitioned('done', 't1', { comment: { text: 'Shipped and verified.' } }), ctx),
-    ).rejects.toThrow('rule kind "require-evidence" is not implemented yet');
+    ).resolves.toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.requireEvidence,
+      reason: 'This move must carry an attachment as evidence, and none was provided.',
+    });
   });
 });

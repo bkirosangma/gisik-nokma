@@ -1,0 +1,31 @@
+{
+  "name": "a field set before the move satisfies require-field",
+  "workflowDefs": [
+    {
+      "id": "wf_rules", "version": 1, "name": "Guarded", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "todo", "to": "doing", "rules": [] },
+        { "from": "doing", "to": "done", "rules": [ { "kind": "require-field", "field": "due_date" } ] },
+        { "from": "done", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_rules" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "doing" } },
+    { "type": "ticket.field_set", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "field": "due_date", "value": "2026-09-01" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned",
+    "entity": { "kind": "ticket", "id": "t1" },
+    "actorId": "user_a",
+    "payload": { "to": "done" }
+  },
+  "expected": { "refused": false }
+}

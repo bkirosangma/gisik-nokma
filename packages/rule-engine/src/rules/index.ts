@@ -1,5 +1,7 @@
 import type { Rule } from '@gisik-nokma/domain';
 import { evaluateRequireComment } from './require-comment.js';
+import { evaluateRequireEvidence } from './require-evidence.js';
+import { evaluateRequireField } from './require-field.js';
 import type { Accept, Refusal } from '../engine.js';
 import type { TransitionRuleInput } from './types.js';
 
@@ -30,9 +32,9 @@ async function evaluateOneRule(rule: Rule, input: TransitionRuleInput): Promise<
     case 'restrict-to':
       throw new Error('rule kind "restrict-to" is not implemented yet');
     case 'require-evidence':
-      throw new Error('rule kind "require-evidence" is not implemented yet');
+      return evaluateRequireEvidence(rule, input);
     case 'require-field':
-      throw new Error('rule kind "require-field" is not implemented yet');
+      return evaluateRequireField(rule, input);
     case 'require-different-user':
       throw new Error('rule kind "require-different-user" is not implemented yet');
   }
