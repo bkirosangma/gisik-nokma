@@ -1,6 +1,6 @@
 {
   "name": "a planted empty restriction refuses everyone honestly",
-  "notes": "The wf_rules \"Guarded\" definition is the advisory tier's deliberately-warned example: its any-state → \"Done\" edge carries no rules, so adviseWorkflowDef reports rule-bypassable on this def and publish accepts it anyway (coordination doc §8, requirement 4). The wildcard is left uncovered on purpose — an empty wildcard beside the guarded \"Doing\" → \"Done\" edge is what makes these fixtures depend on exact-over-wildcard precedence, and a covering guard would retire that witness while leaving every one of them green.",
+  "notes": "The wf_rules \"Guarded\" definition is the advisory tier's deliberately-warned example: its any-state → \"Done\" edge carries no rules, so adviseWorkflowDef reports rule-bypassable on this def (coordination doc §8, requirement 4). Unlike its eighteen siblings this copy would NOT publish — the planted restrict-to names nobody, which is an empty-restrict-to error — and the advisory speaks about it anyway, because a guard that names nobody and a path around the guard are two separate things to fix (case 4.48). The wildcard is left uncovered on purpose — an empty wildcard beside the guarded \"Doing\" → \"Done\" edge is what makes these fixtures depend on exact-over-wildcard precedence, and a covering guard would retire that witness while leaving every one of them green.",
   "workflowDefs": [
     {
       "id": "wf_rules", "version": 1, "name": "Guarded", "initialStateId": "todo",
