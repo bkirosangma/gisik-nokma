@@ -1,7 +1,26 @@
 import { z } from 'zod';
-import { ULID_REGEX } from './ids.js';
+import { MEMBERSHIP_ID_REGEX, ULID_REGEX } from './ids.js';
 
-export const ENTITY_KINDS = ['workspace', 'project', 'ticket', 'workflow', 'ticket-type', 'membership'] as const;
+/**
+ * The closed set of things an event can be about. `invite` joins the original
+ * six for Plan 4's invitation vocabulary (`invite.sent` / `invite.accepted` /
+ * `invite.revoked`, registered in a later task of that plan). Adding a member
+ * is additive and INERT until an event type declares it: every registration
+ * names its `entityKind`, and `parseEvent` refuses a type filed against a kind
+ * it did not declare, so no event can carry `invite` before the types exist.
+ * It lands here, early, because `envelope.ts` is the file every lane imports
+ * and a second amendment to it late in the wave would make three sibling lanes
+ * rebase onto the same schema twice.
+ */
+export const ENTITY_KINDS = [
+  'workspace',
+  'project',
+  'ticket',
+  'workflow',
+  'ticket-type',
+  'membership',
+  'invite',
+] as const;
 export type EntityKind = (typeof ENTITY_KINDS)[number];
 
 export const ORIGINS = ['web', 'mobile', 'desktop', 'server'] as const;
@@ -52,6 +71,81 @@ const isoDatetime = z
  */
 export const ulidString = z.string().regex(ULID_REGEX, 'must be a ULID');
 
+/**
+ * Entity ids are bare ULIDs for every kind but one. `membership` admits the
+ * composite `${workspaceId}:${userId}` — coordination decision 5, ratified by
+ * the owner 2026-08-28 — because the engine must address a membership from
+ * `(workspaceId, actorId)` via `getEntityState('membership', id)`, and grant →
+ * revoke → re-grant must land on one entity stream. `seq`, `lockEntity`,
+ * snapshots and canonical replay all key on `(entity_kind, entity_id)`, so a
+ * fresh ULID per grant would split one person's membership into several
+ * histories. Four alternatives (composite as a lookup key only, filing under
+ * `kind:'workspace'`, a hashed pseudo-ULID, relaxing `ulidString` generally)
+ * were refuted on exactly that.
+ *
+ * The exception is kind-scoped on purpose: EVERY other kind keeps `ulidString`
+ * byte-for-byte, message included, and the `EventEnvelope` TYPE is untouched
+ * (`entity: { kind; id: string }`). Only the door's runtime shape check knows
+ * the difference. This is the first time the door behaves differently per kind,
+ * so the test beside it asserts all three directions — composite admitted for
+ * `membership`, bare ULID refused for `membership`, composite still refused for
+ * a non-membership kind — because the third is the only thing that keeps
+ * "every other kind is unchanged" a proof rather than a claim.
+ */
+const entitySchema = z.object({ kind: z.enum(ENTITY_KINDS), id: z.string() }).superRefine((entity, ctx) => {
+  const ok = entity.kind === 'membership' ? MEMBERSHIP_ID_REGEX.test(entity.id) : ULID_REGEX.test(entity.id);
+  if (ok) return;
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['id'],
+    message:
+      entity.kind === 'membership'
+        ? 'must be a membership entity id — workspaceId:userId, two ULIDs joined by a colon'
+        : 'must be a ULID',
+  });
+});
+
+/**
+ * `z.unknown()` alone does NOT require the key: probed against this repo's zod,
+ * an object with no `payload` at all parses clean, and so does one with an
+ * explicit `undefined`. `JSON.stringify` erases the two alike, so the wire form
+ * cannot tell them apart either — an event could reach an append-only table
+ * with its claim missing entirely and nothing would have objected.
+ *
+ * Only ABSENCE is the defect. `null` and `{}` stay accepted, deliberately and
+ * with tests pinning them: an empty claim is still a claim, and a null payload
+ * is still a claim. The check is `!== undefined` rather than `'payload' in v`
+ * because both absent and present-but-undefined must be refused and
+ * serialisation loses the distinction anyway — writing it the other way would
+ * invite a reader to think the distinction meant something.
+ */
+const requiredPayload = z
+  .unknown()
+  .refine((value) => value !== undefined, 'is required — an event with no payload is not a claim');
+
+/**
+ * The regex above proves a membership entity id's SHAPE; it cannot see the
+ * workspace the event is filed under. Without this, `entity.id = wsB:userC` on
+ * an event whose `workspaceId` is `wsA` parses clean. The server's mismatch
+ * guard only fires once a head row exists, so the first mis-filed event commits
+ * and a later, correctly-addressed revoke starts a SECOND stream at seq 1 —
+ * the split membership stream decision 5 exists to prevent, reintroduced by its
+ * own fix. This is the workspace half of that coherence check; the user half
+ * needs the parsed payload and lives in parse-event.ts.
+ */
+function refuseMisfiledMembership(
+  value: { workspaceId: string; entity: { kind: EntityKind; id: string } },
+  ctx: z.RefinementCtx,
+): void {
+  if (value.entity.kind !== 'membership') return;
+  if (value.entity.id.startsWith(`${value.workspaceId}:`)) return;
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['entity', 'id'],
+    message: "must name this event's own workspace — a membership entity id is workspaceId:userId",
+  });
+}
+
 export type EventEnvelope = {
   id: string;              // ULID, client-generated
   workspaceId: string;
@@ -69,19 +163,31 @@ export type EventEnvelope = {
 /** What a client submits: the envelope minus the two fields the server assigns at ingest. */
 export type SubmittedEvent = Omit<EventEnvelope, 'serverTime' | 'seq'>;
 
-export const submittedEventSchema = z.object({
+/**
+ * The plain object both exported schemas are built from. It exists because a
+ * cross-field check (`refuseMisfiledMembership`, which needs `workspaceId` and
+ * `entity` together) makes the exported schema a ZodEffects, and ZodEffects has
+ * no `.extend`. Extending the OBJECT and refining each result keeps
+ * `eventEnvelopeSchema` derived from the same shape it always was, and keeps it
+ * inheriting the entity and payload checks the way it used to inherit them.
+ */
+const submittedEventObject = z.object({
   id: ulidString,
   workspaceId: ulidString,
-  entity: z.object({ kind: z.enum(ENTITY_KINDS), id: ulidString }),
+  entity: entitySchema,
   type: z.string().min(1),
   version: z.number().int().positive(),
-  payload: z.unknown(),
+  payload: requiredPayload,
   actorId: ulidString,
   origin: z.enum(ORIGINS),
   clientTime: isoDatetime,
 });
 
-export const eventEnvelopeSchema = submittedEventSchema.extend({
-  serverTime: isoDatetime,
-  seq: z.number().int().positive(),
-});
+export const submittedEventSchema = submittedEventObject.superRefine(refuseMisfiledMembership);
+
+export const eventEnvelopeSchema = submittedEventObject
+  .extend({
+    serverTime: isoDatetime,
+    seq: z.number().int().positive(),
+  })
+  .superRefine(refuseMisfiledMembership);

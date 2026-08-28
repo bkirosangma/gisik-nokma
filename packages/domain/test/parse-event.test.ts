@@ -139,3 +139,120 @@ describe('parseEvent', () => {
     });
   });
 });
+
+/**
+ * The USER half of the membership coherence check (coordination decision 5).
+ *
+ * It is asserted HERE, through `parseEvent`, and its fixtures are all
+ * prefix-CORRECT: the envelope schema's own workspace check would otherwise
+ * mask it, and a masked check is one that can be deleted without any assertion
+ * noticing. Everything below differs from a valid membership event in the user
+ * alone.
+ */
+describe('parseEvent — a membership event must be filed at its own (workspace, user)', () => {
+  function rawMembershipGranted(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    const workspaceId = newUlid();
+    const userId = newUlid();
+    return {
+      id: newUlid(),
+      workspaceId,
+      entity: { kind: 'membership', id: `${workspaceId}:${userId}` },
+      type: 'membership.granted',
+      version: 1,
+      payload: { userId, role: 'member' },
+      actorId: newUlid(),
+      origin: 'web',
+      clientTime: '2026-08-20T09:00:00.000Z',
+      ...overrides,
+    };
+  }
+
+  it('accepts a membership.granted addressed as membershipId() writes it', () => {
+    const result = parseEvent(rawMembershipGranted());
+    expect(result.ok).toBe(true);
+  });
+
+  it('planted defect: refuses an id naming a DIFFERENT user than the payload grants', () => {
+    // Right workspace, right shape, wrong person. Nothing else in the system
+    // catches this: the server's entity↔workspace guard only fires once a head
+    // row exists, so this event would commit and a later, correctly-addressed
+    // revoke would open a second stream at seq 1 for the same person.
+    const workspaceId = newUlid();
+    const grantedUser = newUlid();
+    const otherUser = newUlid();
+    const raw = rawMembershipGranted({
+      workspaceId,
+      entity: { kind: 'membership', id: `${workspaceId}:${otherUser}` },
+      payload: { userId: grantedUser, role: 'admin' },
+    });
+    const result = parseEvent(raw);
+    expect(result).toEqual({
+      ok: false,
+      code: 'malformed-envelope',
+      message: `This membership event is filed at entity '${workspaceId}:${otherUser}', but it is about user '${grantedUser}' in workspace '${workspaceId}' — a membership's entity id is workspaceId:userId. Filing it anywhere else starts a second stream for the same person.`,
+      eventId: raw['id'],
+    });
+  });
+
+  it('planted defect: refuses membership.revoked filed at the wrong user just as it refuses a grant', () => {
+    const workspaceId = newUlid();
+    const revokedUser = newUlid();
+    const otherUser = newUlid();
+    const raw = rawMembershipGranted({
+      workspaceId,
+      entity: { kind: 'membership', id: `${workspaceId}:${otherUser}` },
+      type: 'membership.revoked',
+      payload: { userId: revokedUser },
+    });
+    const result = parseEvent(raw);
+    expect(result).toEqual({
+      ok: false,
+      code: 'malformed-envelope',
+      message: `This membership event is filed at entity '${workspaceId}:${otherUser}', but it is about user '${revokedUser}' in workspace '${workspaceId}' — a membership's entity id is workspaceId:userId. Filing it anywhere else starts a second stream for the same person.`,
+      eventId: raw['id'],
+    });
+  });
+
+  it('planted defect: refuses a membership event whose payload names no user at all', () => {
+    // Reachable only through an injected registry today, because both shipped
+    // membership types require `userId` — but the check is written for the KIND,
+    // not for the two types, so a future membership type that forgot its user
+    // meets a refusal rather than an unaddressable stream. Asserting it here is
+    // what keeps that branch from being a check that cannot fail.
+    const registry = createEventTypeRegistry();
+    registry.register({
+      type: 'membership.something',
+      version: 1,
+      entityKind: 'membership',
+      payloadSchema: z.object({ note: z.string() }).strict(),
+    });
+    const workspaceId = newUlid();
+    const entityId = `${workspaceId}:${newUlid()}`;
+    const raw = rawMembershipGranted({
+      workspaceId,
+      entity: { kind: 'membership', id: entityId },
+      type: 'membership.something',
+      payload: { note: 'no user here' },
+    });
+    const result = parseEvent(raw, registry);
+    expect(result).toEqual({
+      ok: false,
+      code: 'malformed-envelope',
+      message: `This membership event is filed at entity '${entityId}' but its payload names no user — a membership's entity id is workspaceId:userId, so an event that does not say who it is about cannot be addressed at all.`,
+      eventId: raw['id'],
+    });
+  });
+
+  it('leaves every non-membership kind alone — a ticket payload may carry any userId it likes', () => {
+    // The regression guard for this check: it is scoped to `kind === membership`
+    // and must not start inspecting ids on kinds that never had a composite.
+    const ticketId = newUlid();
+    const raw: Record<string, unknown> = {
+      ...rawWorkspaceCreated(),
+      entity: { kind: 'ticket', id: ticketId },
+      type: 'ticket.collaborator_added',
+      payload: { userId: newUlid() },
+    };
+    expect(parseEvent(raw).ok).toBe(true);
+  });
+});

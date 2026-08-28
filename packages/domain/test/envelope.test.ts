@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import { describe, expect, it } from 'vitest';
 import { newUlid } from '../src/ids.js';
-import { eventEnvelopeSchema, submittedEventSchema } from '../src/envelope.js';
+import { ENTITY_KINDS, eventEnvelopeSchema, submittedEventSchema } from '../src/envelope.js';
 
 function validSubmitted(): Record<string, unknown> {
   const workspaceId = newUlid();
@@ -67,7 +67,7 @@ describe('submittedEventSchema', () => {
     expect(rejectionIssues(result)).toContainEqual({
       path: ['entity', 'kind'],
       message:
-        "Invalid enum value. Expected 'workspace' | 'project' | 'ticket' | 'workflow' | 'ticket-type' | 'membership', received 'shop'",
+        "Invalid enum value. Expected 'workspace' | 'project' | 'ticket' | 'workflow' | 'ticket-type' | 'membership' | 'invite', received 'shop'",
     });
   });
 
@@ -204,6 +204,158 @@ describe('eventEnvelopeSchema', () => {
     expect(rejectionIssues(result)).toContainEqual({
       path: ['serverTime'],
       message: 'must be ISO 8601 with at most millisecond precision',
+    });
+  });
+});
+
+/**
+ * Amendment 1 (coordination decision 5, owner-ratified 2026-08-28). The door
+ * behaves differently per entity kind for the first time, so all THREE
+ * directions are asserted: the composite admitted for `membership`, a bare ULID
+ * refused for `membership`, and — the one that makes "every other kind is
+ * unchanged" a proof rather than a claim — a non-membership kind still refusing
+ * the composite with the byte-identical `must be a ULID`.
+ */
+describe('entity id, kind by kind', () => {
+  function membershipEvent(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    const workspaceId = newUlid();
+    const userId = newUlid();
+    return {
+      ...validSubmitted(),
+      workspaceId,
+      entity: { kind: 'membership', id: `${workspaceId}:${userId}` },
+      type: 'membership.granted',
+      payload: { userId, role: 'member' },
+      ...overrides,
+    };
+  }
+
+  it("accepts a membership's composite entity id — `${workspaceId}:${userId}`", () => {
+    expect(submittedEventSchema.safeParse(membershipEvent()).success).toBe(true);
+  });
+
+  it('planted defect: refuses a membership entity id that is a bare ULID — the composite IS the addressing', () => {
+    const event = membershipEvent({ entity: { kind: 'membership', id: newUlid() } });
+    const result = submittedEventSchema.safeParse(event);
+    expect(result.success).toBe(false);
+    expect(rejectionIssues(result)).toContainEqual({
+      path: ['entity', 'id'],
+      message: 'must be a membership entity id — workspaceId:userId, two ULIDs joined by a colon',
+    });
+  });
+
+  it('planted defect: every OTHER kind still refuses a composite, byte-for-byte as before', () => {
+    // The regression guard for the whole amendment. Delete the kind test in
+    // envelope.ts and this is the assertion that notices.
+    for (const kind of ['workspace', 'project', 'ticket', 'workflow', 'ticket-type', 'invite'] as const) {
+      const event = { ...validSubmitted(), entity: { kind, id: `${newUlid()}:${newUlid()}` } };
+      const result = submittedEventSchema.safeParse(event);
+      expect(result.success).toBe(false);
+      expect(rejectionIssues(result)).toContainEqual({ path: ['entity', 'id'], message: 'must be a ULID' });
+    }
+  });
+
+  it('planted defect: refuses a composite naming a DIFFERENT workspace — the shape is right and the claim is not', () => {
+    // Shape-valid on purpose, so only the cross-field check can fail here: if
+    // this asserted a malformed composite instead, the regex above would mask a
+    // deleted workspace check and the test would stay green without it.
+    const event = membershipEvent({ entity: { kind: 'membership', id: `${newUlid()}:${newUlid()}` } });
+    const result = submittedEventSchema.safeParse(event);
+    expect(result.success).toBe(false);
+    expect(rejectionIssues(result)).toContainEqual({
+      path: ['entity', 'id'],
+      message: "must name this event's own workspace — a membership entity id is workspaceId:userId",
+    });
+  });
+
+  it('eventEnvelopeSchema inherits both membership checks from the shared base object', () => {
+    const full = {
+      ...membershipEvent({ entity: { kind: 'membership', id: `${newUlid()}:${newUlid()}` } }),
+      serverTime: '2026-08-20T09:00:01.000Z',
+      seq: 1,
+    };
+    const result = eventEnvelopeSchema.safeParse(full);
+    expect(result.success).toBe(false);
+    expect(rejectionIssues(result)).toContainEqual({
+      path: ['entity', 'id'],
+      message: "must name this event's own workspace — a membership entity id is workspaceId:userId",
+    });
+  });
+});
+
+/**
+ * Amendment 2. `'invite'` is inert until Plan 4's invite types are registered:
+ * the envelope admits the kind, and `parseEvent` still has nothing to file
+ * against it. Both halves are asserted so "additive and inert" is checked, not
+ * assumed.
+ */
+describe("ENTITY_KINDS admits 'invite'", () => {
+  it('accepts an invite entity with a bare ULID id', () => {
+    const event = { ...validSubmitted(), entity: { kind: 'invite', id: newUlid() } };
+    expect(submittedEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('lists exactly the seven kinds', () => {
+    expect([...ENTITY_KINDS]).toEqual([
+      'workspace',
+      'project',
+      'ticket',
+      'workflow',
+      'ticket-type',
+      'membership',
+      'invite',
+    ]);
+  });
+});
+
+/**
+ * Amendment 3. `z.unknown()` does not require the key, so an event could carry
+ * no claim at all into an append-only table. ONLY absence is the defect: the
+ * two acceptances below are pinned deliberately, because a fix that also
+ * refused `null` or `{}` would look correct and quietly refuse legitimate
+ * claims — an empty claim is still a claim.
+ */
+describe('payload is required', () => {
+  it('planted defect: refuses an absent payload — an event with no claim is not an event', () => {
+    const event = validSubmitted();
+    delete event['payload'];
+    const result = submittedEventSchema.safeParse(event);
+    expect(result.success).toBe(false);
+    expect(rejectionIssues(result)).toContainEqual({
+      path: ['payload'],
+      message: 'is required — an event with no payload is not a claim',
+    });
+  });
+
+  it('planted defect: refuses an explicitly undefined payload — JSON erases the difference from absence', () => {
+    const result = submittedEventSchema.safeParse({ ...validSubmitted(), payload: undefined });
+    expect(result.success).toBe(false);
+    expect(rejectionIssues(result)).toContainEqual({
+      path: ['payload'],
+      message: 'is required — an event with no payload is not a claim',
+    });
+  });
+
+  it('accepts a null payload — a null claim is still a claim', () => {
+    expect(submittedEventSchema.safeParse({ ...validSubmitted(), payload: null }).success).toBe(true);
+  });
+
+  it('accepts an empty-object payload — an empty claim is still a claim', () => {
+    expect(submittedEventSchema.safeParse({ ...validSubmitted(), payload: {} }).success).toBe(true);
+  });
+
+  it('eventEnvelopeSchema inherits the requirement', () => {
+    const full: Record<string, unknown> = {
+      ...validSubmitted(),
+      serverTime: '2026-08-20T09:00:01.000Z',
+      seq: 1,
+    };
+    delete full['payload'];
+    const result = eventEnvelopeSchema.safeParse(full);
+    expect(result.success).toBe(false);
+    expect(rejectionIssues(result)).toContainEqual({
+      path: ['payload'],
+      message: 'is required — an event with no payload is not a claim',
     });
   });
 });

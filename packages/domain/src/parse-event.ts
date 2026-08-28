@@ -1,3 +1,4 @@
+import { membershipId } from './entity-state.js';
 import { submittedEventSchema, type SubmittedEvent } from './envelope.js';
 import type { EventTypeRegistry } from './registry.js';
 import { domainRegistry } from './vocabulary.js';
@@ -96,8 +97,57 @@ export function parseEvent(
     };
   }
 
+  // The USER half of the membership coherence check (coordination decision 5).
+  // The envelope schema proves the id's shape and that it names this event's own
+  // workspace; neither can see the payload, so neither can tell that
+  // `wsA:userC` is filed on an event that grants userD. The regex alone would
+  // admit exactly that, and it is not a harmless mis-address: the server's
+  // entity↔workspace guard only fires once a head row exists, so the first
+  // mis-filed event commits cleanly and a later, correctly-addressed revoke
+  // opens a SECOND stream at seq 1 for the same person — the split membership
+  // stream decision 5 exists to prevent, re-created by its own fix.
+  //
+  // It sits here, after payload validation, because it needs the PARSED
+  // payload: reading `userId` off raw JSON would report an id mismatch when the
+  // real complaint is that `userId` is not a ULID, and the honest refusal is
+  // the one that names the actual fault. Two layers, deliberately — this door
+  // answers for client and server alike, and Task 9's identical check on
+  // `visibility.set` is a permission-layer answer the offline replica never
+  // reaches.
+  const { entity, workspaceId } = envelope.data;
+  if (entity.kind === 'membership') {
+    const userId = readUserId(payload.data);
+    if (userId === null) {
+      return {
+        ok: false,
+        code: 'malformed-envelope',
+        message: `This membership event is filed at entity '${entity.id}' but its payload names no user — a membership's entity id is workspaceId:userId, so an event that does not say who it is about cannot be addressed at all.`,
+        eventId: envelope.data.id,
+      };
+    }
+    if (entity.id !== membershipId(workspaceId, userId)) {
+      return {
+        ok: false,
+        code: 'malformed-envelope',
+        message: `This membership event is filed at entity '${entity.id}', but it is about user '${userId}' in workspace '${workspaceId}' — a membership's entity id is workspaceId:userId. Filing it anywhere else starts a second stream for the same person.`,
+        eventId: envelope.data.id,
+      };
+    }
+  }
+
   const event: SubmittedEvent = { ...envelope.data, payload: payload.data as unknown };
   return { ok: true, event };
+}
+
+/** The `userId` a validated payload claims, or null when it names none. */
+function readUserId(payload: unknown): string | null {
+  if (typeof payload === 'object' && payload !== null && 'userId' in payload) {
+    const userId = (payload as { userId: unknown }).userId;
+    if (typeof userId === 'string') {
+      return userId;
+    }
+  }
+  return null;
 }
 
 function extractClaimedId(raw: unknown): string | null {

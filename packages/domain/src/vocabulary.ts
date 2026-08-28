@@ -1,4 +1,12 @@
-import { z } from 'zod';
+import {
+  membershipGrantedPayload,
+  membershipRevokedPayload,
+  projectCreatedPayload,
+  projectMemberAddedPayload,
+  projectMemberRemovedPayload,
+  workspaceCreatedPayload,
+  workspaceRenamedPayload,
+} from './events/membership.js';
 import {
   attachmentAddedPayload,
   commentAddedPayload,
@@ -9,16 +17,22 @@ import {
   ticketReparentedPayload,
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
+import { visibilitySetPayload } from './events/visibility.js';
 import { createEventTypeRegistry } from './registry.js';
 import { ticketTypeDefSchema } from './ticket-types.js';
 import { ticketTransitionedPayloadSchema, workflowDefinedPayloadSchema } from './workflow.js';
 
 /**
- * The shared event-type registry. The two workspace types below are
- * PROVISIONAL: they exist so the ledger, projections, and fixtures have
- * something real to carry in Plan 1. They may still be revised before any
- * production data exists; the ticket vocabulary beneath them is the closed
- * vocabulary of spec §3 and is contracted.
+ * The shared event-type registry.
+ *
+ * The two workspace types below were PROVISIONAL under Plan 1 — they existed so
+ * the ledger, projections and fixtures had something real to carry. Plan 4 has
+ * now landed the workspace/membership vocabulary they were standing in for, so
+ * they are provisional no longer: they are the contracted `workspace.created`
+ * and `workspace.renamed`, and their shapes have moved to `events/membership.ts`
+ * beside their siblings. Taking them over is a re-point, never a re-register —
+ * `register` throws on a duplicate `type@version`, so a second registration
+ * would crash at module load (coordination decision 6).
  *
  * Every registration names the entity kind its events are about, so the door
  * refuses a type filed against the wrong kind (coordination doc §11).
@@ -29,14 +43,14 @@ domainRegistry.register({
   type: 'workspace.created',
   version: 1,
   entityKind: 'workspace',
-  payloadSchema: z.object({ name: z.string().min(1) }).strict(),
+  payloadSchema: workspaceCreatedPayload,
 });
 
 domainRegistry.register({
   type: 'workspace.renamed',
   version: 1,
   entityKind: 'workspace',
-  payloadSchema: z.object({ name: z.string().min(1) }).strict(),
+  payloadSchema: workspaceRenamedPayload,
 });
 
 domainRegistry.register({
@@ -138,4 +152,66 @@ domainRegistry.register({
   version: 1,
   entityKind: 'ticket',
   payloadSchema: attachmentAddedPayload,
+});
+
+/**
+ * The membership and visibility vocabulary (Plan 4 Task 3). Six types, all
+ * version 1.
+ *
+ * The two membership types are the only ones in the whole registry whose entity
+ * id is not a bare ULID: a membership is addressed as
+ * `${workspaceId}:${userId}` so grant → revoke → re-grant share one stream
+ * (coordination decision 5, owner-ratified 2026-08-28). `envelope.ts` admits
+ * that shape for `kind: 'membership'` alone, and `parse-event.ts` refuses an id
+ * that names a different workspace or a different user than the event itself
+ * does.
+ *
+ * `project.member_added` / `project.member_removed` are filed against the
+ * PROJECT, not against a membership: they are the project's roster history, and
+ * since the 2026-08-27 collapse they are the only way anyone joins or leaves a
+ * project.
+ *
+ * `visibility.set` is filed against the TICKET whose audience it changes — a
+ * claim on that ticket's own history, exactly as `comment.added` is.
+ */
+domainRegistry.register({
+  type: 'project.created',
+  version: 1,
+  entityKind: 'project',
+  payloadSchema: projectCreatedPayload,
+});
+
+domainRegistry.register({
+  type: 'membership.granted',
+  version: 1,
+  entityKind: 'membership',
+  payloadSchema: membershipGrantedPayload,
+});
+
+domainRegistry.register({
+  type: 'membership.revoked',
+  version: 1,
+  entityKind: 'membership',
+  payloadSchema: membershipRevokedPayload,
+});
+
+domainRegistry.register({
+  type: 'project.member_added',
+  version: 1,
+  entityKind: 'project',
+  payloadSchema: projectMemberAddedPayload,
+});
+
+domainRegistry.register({
+  type: 'project.member_removed',
+  version: 1,
+  entityKind: 'project',
+  payloadSchema: projectMemberRemovedPayload,
+});
+
+domainRegistry.register({
+  type: 'visibility.set',
+  version: 1,
+  entityKind: 'ticket',
+  payloadSchema: visibilitySetPayload,
 });

@@ -19,7 +19,7 @@ Copied verbatim from the series engineering contract and the spec; every task's 
 - MONOREPO: pnpm workspaces + Turborepo, TypeScript strict, Node 22 LTS, pnpm 9.
 - TESTING: Vitest.
 - IDS: ULID via `ulidx`.
-- EVENT ENVELOPE (exact): entity.kind ∈ 'workspace'|'project'|'ticket'|'workflow'|'ticket-type'|'membership'; fields id, workspaceId, entity, type, version, payload, actorId, origin('web'|'mobile'|'desktop'|'server'), clientTime, serverTime, seq.
+- EVENT ENVELOPE (exact): entity.kind ∈ 'workspace'|'project'|'ticket'|'workflow'|'ticket-type'|'membership'|'invite'; fields id, workspaceId, entity, type, version, payload, actorId, origin('web'|'mobile'|'desktop'|'server'), clientTime, serverTime, seq. ('invite' joined the set in Task 3 rather than Task 14, so the file every lane imports is amended once, early — see the coordination doc's envelope-collision section. A membership's entity.id is the composite `${workspaceId}:${userId}`; every other kind's is a bare ULID.)
 - Refusal shape (exact): `{refused: true; rule: string; reason: string}` — plain-language reason.
 - Every refusal is proven against planted defects before it is trusted (spec §1 invariant 6).
 - Provenance is never redacted from someone who can see the ticket (spec §6).
@@ -1084,7 +1084,10 @@ export function parseProjectMemberRemoved(payload: unknown): ProjectMemberRemove
 - [ ] **Step 4: Run the membership tests to verify they pass**
 
 Run (from `packages/domain/`): `pnpm vitest run test/events/membership.test.ts`
-Expected: PASS (13 tests).
+Expected: PASS. (The plan said 13; Step 1 above literally contains 14 `it` blocks, so 13 was wrong and the
+block count governs. As executed the file holds 23 — the extra nine cover the ULID user id, the blank-name
+refusal, the role vocabulary in both directions, `.strict()`'s generic message staying generic, and the
+registrations themselves. No written test was deleted to reach any stated total.)
 
 - [ ] **Step 5: Write the failing visibility parser tests**
 
@@ -1210,7 +1213,7 @@ export * from './events/visibility';
 - [ ] **Step 8: Run the full domain suite**
 
 Run (from `packages/domain/`): `pnpm vitest run`
-Expected: PASS — Plan 1's registry/parseEvent tests still green (proving the seven registrations are well-formed), plus the 19 new tests.
+Expected: PASS — Plan 1's registry/parseEvent tests still green (proving the registrations are well-formed), plus the new tests. Six registrations are added, not seven: `workspace.created` was already registered by Plan 1 and is TAKEN OVER here, not re-registered (`register` throws on a duplicate `type@version`). Counted as executed: 23 in `test/events/membership.test.ts`, 10 in `test/events/visibility.test.ts`, and 20 more for the three envelope amendments across `envelope.test.ts`, `parse-event.test.ts` and `ids.test.ts` — domain goes 152 → 205.
 
 - [ ] **Step 9: Commit**
 
