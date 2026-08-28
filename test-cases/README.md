@@ -6,6 +6,6 @@ Status markers: `❌` not covered · `✅` covered · `🟡` partial · `🧪` m
 
 Rules: never renumber existing IDs; flip status in the same commit as the covering test; cross-reference tests by case ID; prose only — no test code here.
 
-Buckets so far: `03-foundation-ledger.md` (Features.md §3), `04-workflow-engine.md` (Features.md §4). Sections 1–2 are reference/spec material and carry no runnable scenarios. (`reference/` is frozen upstream code and carries its own upstream test catalogue; it gets no bucket here.)
+Buckets so far: `03-foundation-ledger.md` (Features.md §3), `04-workflow-engine.md` (Features.md §4), `05-tickets-hierarchy.md` (Features.md §5 — opened by Plan 3's keystone and extended by the rest of that plan's lane; its reserved id range is stated in the file). Sections 1–2 are reference/spec material and carry no runnable scenarios. (`reference/` is frozen upstream code and carries its own upstream test catalogue; it gets no bucket here.)
 
 Numbering is already reserved, so claim from the table rather than renumbering: `Features.md` §3–§13 and the matching `03-foundation-ledger.md` … `13-deployment-dogfooding.md` buckets are assigned one per implementation plan by `docs/superpowers/plans/2026-08-20-00-series-coordination.md`. (`reference/` is frozen upstream code and carries its own upstream test catalogue; it gets no bucket here.)
