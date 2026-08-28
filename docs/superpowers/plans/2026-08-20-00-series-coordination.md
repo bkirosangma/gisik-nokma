@@ -485,3 +485,12 @@ Two candidate resolutions, both coherent:
 2. **Make it a Plan 8 builder-surface warning.** The builder is where the two edges are drawn and is the only surface that can show *which* edge voids *which* guard, visually. Cheaper in domain, but a hand-authored definition posted to the API gets no warning at all.
 
 Whichever is chosen, one consequence follows either way: **the `wf_rules` fixture definition is itself an instance** — the J-kill wildcard edge added by the Task 8 ruling put it there — and it should stop being the unremarked example that seventeen fixtures are written against.
+
+**Owner ruling (2026-08-28): option 1 — generalise the advisory tier.** And a codicil the request underspecified, stated in the owner's own words: *"we should be able to have the anywhere arrow carry its own guard."* A `{from:'*', to, rules:[…]}` edge is already structurally legal, and the engine already enforces whatever rules the resolved edge carries — the evaluation path does not care which edge shape resolved. That guarded-wildcard shape is the **sanctioned way to close the hole**: the generalised advisory must NOT fire when the wildcard edge's own rules cover the guard on the exact edge. What "cover" means precisely — same-kind-present as the floor, or full rule-set equivalence — is the implementer's design call, argued in the amendment's own brief rather than pinned here.
+
+The amendment lands in **the plan that next touches `advise-workflow.ts` — Plan 8 at the latest** (the builder then gets the which-edge-voids-which-guard visual for free from the same advisory data). Four requirements travel with it:
+
+1. A `rule-bypassable`-family advisory for every rule kind; whether `rdu-bypassable` stays distinct or is subsumed is the implementer's call, with the copy-table discipline either way.
+2. The silencing behaviour is witnessed in **both** directions: an uncovered wildcard edge warns; a covering one does not.
+3. Wildcard-edge rule *enforcement* gets its first witness. As of 2026-08-28 no fixture in the suite carries a wildcard edge with non-empty rules — the enforcement is structural but unproven. A planted-defect fixture (a wildcard edge carrying `restrict-to`, refused through it) lands with the amendment.
+4. The `wf_rules` fixture definition stops being the unremarked instance: its wildcard edge either gains a covering guard or a comment naming it as the deliberately-warned example once the advisory exists.
