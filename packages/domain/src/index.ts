@@ -13,3 +13,5 @@ export * from './entity-state.js';
 export * from './ist-day.js';
 export * from './doc-text.js';
 export * from './ticket-types.js';
+export * from './events/ticket-events.js';
+export { makeEnvelope } from './testing.js';

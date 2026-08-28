@@ -1,11 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
-import {
-  newUlid,
-  ENTITY_WORKSPACE_MISMATCH_RULE,
-  type EntityHead,
-  type EventEnvelope,
-} from '@gisik-nokma/domain';
+import { newUlid, ENTITY_WORKSPACE_MISMATCH_RULE, type EventEnvelope } from '@gisik-nokma/domain';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { createIngestService } from '../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../src/projections/index.js';
@@ -370,19 +365,47 @@ describe('ingestBatch', () => {
   });
 
   it('the engine sees the world as of the previous event — not the one under evaluation', async () => {
-    const observed: Array<number | null> = [];
+    // Two probes, because the seam this asks through changed shape when the
+    // ticket vocabulary landed (Plan 1 consequences §9): getEntityState no
+    // longer hands back the head POINTER it was casting to EntityState, so
+    // `headSeq` is not a thing the engine can be told any more. What it can
+    // still be asked — and what the rules actually judge against — is whether
+    // the entity EXISTS, and which workflow version is in force. Both must
+    // answer for the previously committed world and never for the event under
+    // evaluation, so both are pinned here.
+    const existence: Array<string | null> = [];
+    const versions: Array<number | null> = [];
     const peeking: typeof evaluateEvent = async (env, ctx) => {
-      const state = (await ctx.getEntityState(env.entity.kind, env.entity.id)) as EntityHead | null;
-      observed.push(state === null ? null : state.headSeq);
+      const state = await ctx.getEntityState(env.entity.kind, env.entity.id);
+      existence.push(state === null ? null : state.kind);
+      if (env.entity.kind === 'workflow') {
+        const def = await ctx.getWorkflowDef(env.entity.id);
+        versions.push(def === null ? null : def.version);
+      }
       return { refused: false };
     };
     const ingest = service({ evaluate: peeking });
+
     const base = submittedWorkspaceCreated();
     await ingest.ingestBatch([base]);
     await ingest.ingestBatch([
       { ...base, id: newUlid(), type: 'workspace.renamed', payload: { name: 'CC HQ' } },
     ]);
-    expect(observed).toEqual([null, 1]);
+
+    const v1 = submittedWorkflowDefined(base.workspaceId);
+    const v2 = {
+      ...v1,
+      id: newUlid(),
+      payload: { ...(v1.payload as Record<string, unknown>), version: 2, name: 'Basic, revised' },
+    };
+    await ingest.ingestBatch([v1]);
+    await ingest.ingestBatch([v2]);
+
+    // The workspace did not exist when its own creation was judged; it did when
+    // the rename was. The workflow's v2 publish saw v1 and not itself — which
+    // is the world the "exactly one past the latest" version rule is judged in.
+    expect(existence).toEqual([null, 'workspace', null, 'workflow']);
+    expect(versions).toEqual([null, 1]);
   });
 });
 
