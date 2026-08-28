@@ -109,6 +109,32 @@ export function reboundSameWorkflowRefusal(ticketId: string): string {
 }
 
 /**
+ * `ticket.workflow_rebound` naming a target workflow this workspace has not
+ * defined.
+ *
+ * NOT `ticket.workflow-undefined`, which is the refusal this used to give and
+ * which was false on the path that reached it (controller ruling P13). That
+ * sentence — "This ticket type's workflow has not been defined yet, so the
+ * ticket would have no status." — makes the ticket TYPE's binding its subject,
+ * and it is exactly right where the type's binding really is the subject:
+ * `ticket.created`, where the ticket has no workflow except the one its type
+ * names. On a rebound the type's binding may be perfectly well defined and
+ * entirely beside the point; what is missing is the workflow the PAYLOAD names.
+ * Borrowing the sentence sent an admin to inspect a binding that was not broken.
+ *
+ * Third instance of one defect class in this plan, after P11 and P12: a refusal
+ * id is correct for the subject it was written about, and pointing it at a
+ * neighbouring path inherits a sentence that is false there.
+ *
+ * The subject is the target workflow, and both remedies are ones the actor can
+ * act on alone — a rebound is admin-gated (Plan 4's `ADMIN_ONLY_TYPES`), so
+ * publishing the workflow is as available to them as picking another.
+ */
+export function reboundUnknownWorkflowRefusal(workflowId: string): string {
+  return `The workflow "${workflowId}" is not defined in this workspace, so there is nowhere to move this ticket to. Pick a workflow that has been published, or publish that one first.`;
+}
+
+/**
  * The destination is named, never inferred: the outgoing and incoming workflows
  * are unrelated graphs with unrelated state ids, and `stateMapping` cannot help
  * — it is keyed inside a single workflow's version chain

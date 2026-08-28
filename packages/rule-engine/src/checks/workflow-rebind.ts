@@ -3,7 +3,13 @@ import { ticketWorkflowReboundPayload } from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
 import { REFUSAL_RULES } from '../refusal-rules.js';
 import { getTicketState } from './context-helpers.js';
-import { ACCEPT, reboundSameWorkflowRefusal, reboundUnknownStateRefusal, refuse } from './refusals.js';
+import {
+  ACCEPT,
+  reboundSameWorkflowRefusal,
+  reboundUnknownStateRefusal,
+  reboundUnknownWorkflowRefusal,
+  refuse,
+} from './refusals.js';
 
 /**
  * The migration check — `ticket.workflow_rebound`.
@@ -14,7 +20,8 @@ import { ACCEPT, reboundSameWorkflowRefusal, reboundUnknownStateRefusal, refuse 
  * one. Its own file, because a workflow migration is not hierarchy.
  *
  * Order: unknown ticket → same workflow → target workflow undefined → target
- * state unknown.
+ * state unknown. Each names its own subject: the ticket, the ticket's current
+ * workflow, the workflow the payload names, and that workflow's states.
  *
  * **The payload's destination field genuinely IS `toStateId`** — the one place
  * in this vocabulary where that spelling is correct (`events/ticket-events.ts:97-100`,
@@ -71,8 +78,14 @@ export async function checkTicketWorkflowRebound(
     return refuse('ticket.rebound-same-workflow', reboundSameWorkflowRefusal(ticket.id));
   }
 
+  // The subject is the workflow the PAYLOAD names, not the ticket type's
+  // binding — which may be perfectly well defined and is beside the point here.
+  // This used to answer `ticket.workflow-undefined` ("This ticket type's
+  // workflow has not been defined yet…"), which sent an admin to inspect a
+  // binding that was not broken. Controller ruling P13; same defect class as
+  // P11 and P12, third instance.
   const target = await ctx.getWorkflowDef(p.toWorkflowId);
-  if (!target) return refuse('ticket.workflow-undefined');
+  if (!target) return refuse('ticket.rebound-unknown-workflow', reboundUnknownWorkflowRefusal(p.toWorkflowId));
 
   // "The ledger accepts only what it can later replay" (spec §3): the reducer
   // throws on a rebound whose destination state the target workflow does not

@@ -3265,3 +3265,65 @@ that fails at the first live request and nowhere earlier.
 **So: no lane hard-codes an auth endpoint path, cookie name or bearer header from plan text.** Wait for
 T2's recorded values, or route through whatever T2 exports. T2 will record the verified strings in this
 document.
+
+---
+
+---
+
+## Ruling P13 (2026-08-28, controller) — a refusal id is correct for the SUBJECT it was written about, and this plan borrowed one three times
+
+Raised by Plan 3's Task 6 during execution, ruled before review because it is a correctness concern.
+
+**The ruling.** `checkTicketWorkflowRebound` must not refuse an undefined **target** workflow with
+`ticket.workflow-undefined`. That reason — *"This ticket type's workflow has not been defined yet, so the
+ticket would have no status."* — makes the ticket TYPE's binding its subject. On a migration the type's
+binding may be perfectly well defined and is beside the point; what is missing is the workflow the
+**payload** names. The sentence is false on the path, and it sends an admin to inspect a thing that is
+not broken. The branch now raises **`ticket.rebound-unknown-workflow`**, joining
+`ticket.rebound-same-workflow` and `ticket.rebound-unknown-state`, with the target workflow as its
+subject and two remedies an admin can take alone (a rebound is already in Plan 4's `ADMIN_ONLY_TYPES`).
+
+**Three authorities said otherwise and are overruled, on a distinction worth keeping.** Plan 3's canonical
+refusal table (line 77), its own body (line 2221) and its case 5.34 all specify `ticket.workflow-undefined`
+here. The **id is not wrong** — it is exactly right on `ticket.created`, where a ticket has no workflow
+except the one its type names. What is wrong is its **application** to a neighbouring path, precisely as
+the table's `ticket.unknown-type` was right until Task 5's brief pointed it at a *parent's* type. The plan
+is the argument; the spec is the authority (invariant 2, and this document's own line 204: *"a refusal that
+happens to fire for the wrong reason is not coverage"*).
+
+**The citation objection dissolved on inspection, and inspecting it is the transferable part.** The
+implementer declined to mint an id partly because case 5.34 looked externally cited. It is not: 5.34 is
+referenced only inside `2026-08-20-03-tickets-hierarchy.md:5046`. The externally-cited ids are **5.27 and
+5.30** (Plan 5, `2026-08-20-05-api-realtime-search.md:6158`) and **5.36** (this document, line 303). So the
+number stays and its description changes; nothing outside Plan 3 moves. **Check which ids are actually cited
+before treating a catalogue number as immovable** — the never-renumber rule protects three ids in this
+section, not all thirty-three.
+
+**The pattern, stated because it is now three-for-three in one plan and the lanes still transcribing plan
+text will meet it again.** P11 (a parent's undefined type answered with the *ticket's* unknown-type
+sentence), P12 (a foreign-workspace parent answered with a sentence about *projects*), and now P13 (a
+missing target workflow answered with a sentence about the *type's binding*) are one defect wearing three
+costumes:
+
+> **A refusal id carries a subject, and the subject is part of the copy.** Reusing an id for a
+> structurally similar check on a neighbouring path silently inherits a sentence that is true of something
+> and false of the path that reached it. The reader is told a fact about the wrong noun and sent to fix
+> the one thing that was never the problem.
+
+The tell is cheap and mechanical: **read the reason aloud at the line that raises it, and name the noun it
+is about.** If that noun is not what the check just failed to resolve, the id is borrowed. All three
+instances in this plan were visible that way, and all three shipped in plan text that read authoritative.
+
+**Two findings from the same task, recorded so they are not rediscovered.**
+
+- **Fixture-count arithmetic: the directory, never the plan.** Pre-flight ruling 6 tracked `61 → 63 after
+  T6`; it assumed Task 4b would add no fixture, and Task 4b added one. The base at Task 6's dispatch was
+  **62**, so the correct running total is **62 → 64 after T6**. The count-from-the-directory rule is what
+  caught it — an absolute number copied from the plan would have shipped wrong and failed the gate in
+  whichever lane merged second.
+- **A dispatch nobody tested.** Every Plan 3 check test called its function directly, so deleting a `case`
+  from `packages/rule-engine/src/evaluate.ts` left a fully mutation-proven, **unreachable** check while
+  `evaluateEvent`'s pass-through default accepted every reparent and every same-workflow rebind. Task 6
+  added three assertions that enter at `evaluateEvent`. **Task 7 appends to the same switch and inherits
+  the obligation.** The shape generalises: a lane can prove every branch of a check falsifiable and still
+  never touch the one line that decides whether the check runs.

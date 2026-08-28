@@ -100,12 +100,26 @@ describe('checkTicketWorkflowRebound', () => {
     });
   });
 
-  it('planted defect: a rebound onto a workflow nobody defined', async () => {
+  /**
+   * The subject is the workflow the PAYLOAD names. This used to answer
+   * `ticket.workflow-undefined` — "This ticket type's workflow has not been
+   * defined yet, so the ticket would have no status." — which is false on this
+   * path: the ticket's type is `task`, bound to `wf-basic`, which IS defined in
+   * this very context. The borrowed sentence sent an admin to inspect a binding
+   * that was not broken. Controller ruling P13, the third instance of the
+   * defect class P11 and P12 closed.
+   */
+  it('planted defect: a rebound onto a workflow nobody defined names THAT workflow, not the type\'s binding', async () => {
     expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ghost', 'shipped'), ctx())).toEqual({
       refused: true,
-      rule: 'ticket.workflow-undefined',
-      reason: "This ticket type's workflow has not been defined yet, so the ticket would have no status.",
+      rule: 'ticket.rebound-unknown-workflow',
+      reason:
+        'The workflow "wf-ghost" is not defined in this workspace, so there is nowhere to move this ticket to. Pick a workflow that has been published, or publish that one first.',
     });
+    // The premise the refusal rests on, asserted rather than assumed: the
+    // ticket's own type binding resolves in this same context, so the sentence
+    // the old refusal told was false of the world it was told in.
+    expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ops', 'shipped'), ctx())).toEqual({ refused: false });
   });
 
   /**
