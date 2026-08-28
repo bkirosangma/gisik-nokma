@@ -31,8 +31,8 @@ export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
  * without taking zod. The WIRE half is `attachmentDriveReferencePayload` in
  * `events/ticket-events.ts`, and it is the only thing that validates a claim
  * at the door: it additionally requires `kind` and a ULID `attachmentId`,
- * real URLs for `webViewLink`/`iconLink`, and an ISO-8601 `capturedAt` that
- * is a real calendar datetime. Passing the guard here is therefore NOT
+ * real URLs for `webViewLink`/`iconLink`, a `mimeType` matching the shared
+ * MIME regex, and an ISO-8601 `capturedAt` that is a real calendar datetime. Passing the guard here is therefore NOT
  * evidence a payload would be accepted. The two are pinned against each
  * other in `test/attachment-kinds.test.ts` so a rename on either side breaks
  * loudly instead of drifting.

@@ -7,6 +7,7 @@ import {
 
 const IMG_A = '01J9GIMA000000000000000000';
 const IMG_B = '01J9GIMB000000000000000000';
+const IMG_C = '01J9GIMC000000000000000000';
 
 describe('isEmbeddableImageMime', () => {
   it('accepts exactly the embeddable set', () => {
@@ -43,18 +44,26 @@ describe('collectImageAttachmentIds', () => {
     const doc = {
       type: 'doc',
       content: [
-        { type: 'image', attrs: { attachmentId: IMG_A, wrap: 'block', alt: '' } },
+        // A non-image node that DOES carry attrs.attachmentId. Without it the
+        // word "image" in this test's name is unproven: deleting the
+        // `type === 'image'` discriminator passed every other case here,
+        // because nothing else in the document had an `attrs` at all.
+        { type: 'fileChip', attrs: { attachmentId: IMG_C } },
+        { type: 'image', attrs: { attachmentId: IMG_B, wrap: 'block', alt: '' } },
         {
           type: 'blockquote',
           content: [
             { type: 'paragraph', content: [{ type: 'text', text: 'x' }] },
-            { type: 'image', attrs: { attachmentId: IMG_B, wrap: 'inline-left', alt: '' } },
+            { type: 'image', attrs: { attachmentId: IMG_A, wrap: 'inline-left', alt: '' } },
           ],
         },
-        { type: 'image', attrs: { attachmentId: IMG_A, wrap: 'block', alt: 'dup' } },
+        { type: 'image', attrs: { attachmentId: IMG_B, wrap: 'block', alt: 'dup' } },
       ],
     };
-    expect(collectImageAttachmentIds(doc)).toEqual([IMG_A, IMG_B]);
+    // B before A on purpose: these ids sort the other way, so a walker that
+    // returned ids.sort() would satisfy the original A-then-B expectation and
+    // "first-seen order" would be a claim no case could falsify.
+    expect(collectImageAttachmentIds(doc)).toEqual([IMG_B, IMG_A]);
   });
 
   it('ignores non-image nodes and images without a string attachmentId', () => {

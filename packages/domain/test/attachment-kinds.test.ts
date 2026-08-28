@@ -9,7 +9,7 @@ import {
 import { attachmentDriveReferencePayload } from '../src/events/ticket-events.js';
 import { newUlid } from '../src/ids.js';
 
-const REFERENCE = {
+const REFERENCE: DriveReference = {
   driveFileId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456',
   name: 'GST filing Aug 2026.pdf',
   mimeType: 'application/pdf',
@@ -46,6 +46,10 @@ describe('attachment kinds', () => {
       { ...REFERENCE, capturedAt: undefined },
       { ...REFERENCE, webViewLink: 42 },
       { ...REFERENCE, iconLink: 7 },
+      // name and mimeType had no killing case: deleting either conjunct from
+      // the guard survived every entry above.
+      { ...REFERENCE, name: '' },
+      { ...REFERENCE, mimeType: 42 },
     ]) {
       expect(isDriveReference(broken), `${JSON.stringify(broken)} must not pass`).toBe(false);
     }
@@ -60,7 +64,11 @@ describe('attachment kinds', () => {
  * duplication is the design; drift between the two halves is the hazard, so it
  * is pinned here rather than left to a reviewer to notice. A rename on either
  * side fails this block — the wire half at runtime, the guard half at compile
- * time, since the fixture is typed `Required<DriveReference>`.
+ * time, since REFERENCE is annotated `DriveReference` and the complete fixture
+ * is `Required<DriveReference>`. The annotation is what catches a REMOVAL:
+ * without it the fixture's runtime keys came from an untyped literal, so a
+ * field dropped from the type would keep appearing in `Object.keys` and the
+ * key sets would still agree.
  */
 describe('the guard and the wire schema describe one concept', () => {
   it('agrees with attachmentDriveReferencePayload field for field', () => {
