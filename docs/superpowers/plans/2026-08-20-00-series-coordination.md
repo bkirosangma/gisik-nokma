@@ -990,8 +990,19 @@ are void: the dependency is not to be added.**
 **The replacement, already shipped by Lane 2:** `pnpm --filter @gisik-nokma/server run auth:schema`,
 which reads the *installed* library's own `getMigrations`, plus a test asserting the live database leaves
 that planner nothing to create — so the next better-auth upgrade turns the suite red rather than
-production. **Plan 11 owns the risk of this being undone**, because packaging and dependency work is
-where someone re-adds a CLI that plan text still names.
+production. **Ownership splits in two, and the first draft of this section put both halves in the wrong place.**
+Grepped across all eleven plans, `@better-auth/cli` appears in **Plan 4 only** — Plan 11 names it zero
+times, so Plan 11 cannot own the risk of it being *added*.
+
+- **Risk of addition — Plan 4's, i.e. Lane 2's**, enforced at its own Step 1 (line 116). That is where
+  the dependency enters.
+- **Risk of shipping — Plan 11's, i.e. Lane 4's**, and it is real even though the plan never names the
+  tool: Plan 11's Dockerfile runs `pnpm install --frozen-lockfile` (lines 915 and 943), so a lockfile
+  entry created by Plan 4 becomes a **shipped artifact** through packaging. The right check there is
+  therefore not "grep my plan text for the tool" — it is not there to find — but **assert the lockfile
+  does not carry it before building the image, and keep that assertion inside the build so it cannot
+  regress.** (Lane 4's formulation, and a better check than the one the original framing would have
+  produced.)
 
 The falsifiability shape is worth keeping as a worked example of plant-in-production-shape: planting
 *exactly the CLI's output* makes the drift check fail naming `account.issuer`, while a "five tables
@@ -1059,6 +1070,25 @@ over its eleven undispatched tasks rather than backward over what shipped:
 
 Lane 3's forward sweep over Plan 7's remaining tasks is clean on all three: eleven specifiers, all
 resolving, every named export present, every binding form correct.
+
+### The controller's own failure class, named by the lanes that kept catching it
+
+Recorded because it is a property of this role rather than of one session, and the next controller
+inherits it. Across a full day of cross-lane work, **every correction to the controller's claims was an
+ownership or location claim — never a technical one.** The specifier table, the payload shapes, the
+append-only trigger names, the exact fix for Plan 6 line 7887: all correct. What kept slipping was
+*which plan owns a thing* and *which line does it* — `schedule.ts` mistaken for the verifier's,
+`CONTEST_EVENT_TYPES` filed under the wrong task, the CLI ban addressed to the wrong plan, a rule's
+example attached to a vocabulary that does not reach the ledger.
+
+Lane 4's diagnosis is the useful part: **that is the class where plan text and repo diverge fastest under
+parallel execution, and it is also the cheapest class to check** — one grep answers it — which is
+presumably why it keeps getting asserted instead. A controller synthesising across eleven plans it has
+not read end-to-end is structurally most confident exactly where it is least entitled to be.
+
+**So the rule the controller runs under, stricter than the one it gives the lanes:** a claim about *who
+owns* something or *where* it lives ships with the grep that proves it, or it ships as a question. The
+technical claims were already surviving review; these are the ones that were not.
 
 ### The one shape under all of it
 
