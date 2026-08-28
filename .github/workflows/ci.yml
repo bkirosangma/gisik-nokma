@@ -1,0 +1,97 @@
+name: ci
+
+# The independent-CI precondition for the coordination doc's auto-merge
+# protocol (docs/superpowers/plans/2026-08-20-00-series-coordination.md,
+# "Autonomous execution protocol", ruling 1): without a check that isn't a
+# lane's own word, "green" is self-certification. This is the skeleton —
+# Plan 11 Task 14's full six-job pipeline (lint -> typecheck -> unit ->
+# fixtures -> dual-client -> e2e, plus the interim-plumbing gate) scoped down
+# to what actually exists on `main` today. See the single `gate` job below
+# for exactly what's excluded and why; each exclusion names the plan that
+# owns it so that plan's executor extends this file instead of rewriting it.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gisik
+          POSTGRES_PASSWORD: gisik
+          POSTGRES_DB: gisik_nokma
+          # Best-effort container-level parity with docker-compose.yml's
+          # `command: ["postgres", "-c", "timezone=Asia/Kolkata"]` (GitHub
+          # Actions service containers have no `command:` override, so this
+          # can't be replicated exactly). It doesn't need to be: the owner's
+          # IST decision is actually enforced at the application layer, not
+          # the server default -- apps/server/test/helpers/db.ts runs
+          # `ALTER DATABASE ... SET timezone TO 'Asia/Kolkata'` on every
+          # per-test database it creates, and apps/server/src/db.ts's
+          # createPool sets the session timezone for the app pool. Both run
+          # unmodified in this job, so CI converges on the same clock local
+          # dev does regardless of what the service container's own GUC
+          # default is.
+          TZ: Asia/Kolkata
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U gisik" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_ADMIN_URL: postgres://gisik:gisik@localhost:54329/postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # No version pinned here: reads root package.json's
+        # `"packageManager": "pnpm@9.15.0"` pin.
+
+      - uses: actions/setup-node@v4
+        with:
+          # No .nvmrc in the repo; root package.json pins
+          # `"engines": { "node": ">=22.0.0 <23" }`.
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Job layout: a single job, not Task 14's six-job split. What the plan
+      # splits into separate jobs either doesn't exist on `main` yet or
+      # doesn't apply to the packages that do:
+      #   - lint: no root "lint" script exists yet (Plans 1-2 only wired
+      #     build/test/typecheck) and its own gate step, `pnpm run
+      #     check:env`, needs the env contract Plan 11 Task 6 hasn't landed.
+      #   - fixtures (client half): `test:fixtures` proves the shared rule-
+      #     engine fixture suite agrees across the server build AND a
+      #     client build; there is no client package yet (`packages/app-
+      #     core` is Plan 6a). The server-side half already runs as a
+      #     normal part of `packages/rule-engine`'s own `test` script,
+      #     which this job already executes via `turbo run test`.
+      #   - dual-client: Plan 10's harness (`test:dual-client`) doesn't
+      #     exist.
+      #   - e2e: needs a deployable stack (Plans 4/6) and Playwright infra
+      #     that isn't wired yet.
+      #   - the interim-plumbing gate: guards against Plan 10's own marked
+      #     shortcuts, which don't exist on `main` yet either. (NB: the
+      #     coordination doc's by-catch notes Plan 11's own draft YAML
+      #     omits this gate despite its Produces bullet promising it --
+      #     its Produces bullet is the authority when Plan 11 lands it,
+      #     not its own Step 2 draft.)
+      # What's left of the plan's split -- typecheck gating unit, both
+      # against packages that do exist (domain, rule-engine, server) -- is
+      # exactly what `turbo run build test typecheck` already orders via
+      # its own task graph; splitting it into two CI jobs would just pay
+      # for a second install + build from scratch (no turbo remote cache is
+      # configured here) for no fail-fast benefit at this repo's size.
+      # Extend this job list when a plan lands the piece it owns; don't
+      # replace it wholesale.
+      - run: pnpm turbo run build test typecheck
