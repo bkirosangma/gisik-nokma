@@ -2048,3 +2048,45 @@ cannot drift when the door changes.
 there is **exactly one** hand-written ULID-shaped regex outside `ids.ts` — the one above, which Lane 4 is
 fixing. Everywhere else asserts through the authority or not at all. A clean negative, and evidence that
 the check ran rather than that nobody looked.
+
+
+## Two findings about method, from Lane 2's T3 review (2026-08-28)
+
+Both are about *how* defects were caught rather than what they were, and both bind the controller harder
+than they bind any lane.
+
+### `grep -r` over a directory is unreliable here — and a silent empty result is not a negative
+
+Lane 2's T3 reviewer had an early directory grep **silently return nothing**, and redid every sweep with
+`find … | xargs grep` and explicit file enumeration. **Second independent confirmation this session**
+(the first is recorded in this session's own tooling notes), so it is a property of the environment
+rather than one bad invocation.
+
+Why it matters more than a tooling annoyance, in Lane 2's framing: **a silent empty result is
+indistinguishable from a true negative.** That makes directory grep exactly the wrong instrument for the
+question *"does this claim have a referent anywhere in the repo"* — which is the shape of nearly every
+cross-plan negative traded in this document. Lane 2 hit it on a sentence claiming a fixture now fails,
+which was false.
+
+**Audited rather than assumed:** every sweep reported in this document this session — `z.unknown()`,
+`?? null`, hand-written ULID regexes, `better-auth` subpaths, `origin`, `submittedEventSchema` embedders,
+`@better-auth/cli` across eleven plans — used `find … | xargs grep` or per-file enumeration. The clean
+negatives stand. **Any negative arrived at by `grep -r <dir>` returning empty should be re-run before it
+is relied on.**
+
+### The prose is the deliverable, so run the sentence
+
+Lane 2's branch produced **four separate prose claims explaining why something was safe, all false**: the
+`noEmit` assertion, a lockfile resolution key misread as a dependency edge, a caveat naming a trigger
+that cannot fire, and a sentence claiming a fixture now fails. Every one was written confidently, every
+one sat in or was headed for this durable record, and every one was caught only because a reviewer **ran
+the mechanism instead of reading it**. **The fourth was introduced by the fix for the third.**
+
+> **For every sentence asserting that something happens, is inherited, or now fails — run it. If you
+> cannot run it, do not assert it.**
+
+That is the operational form of everything else in this document, pointed at documentation rather than at
+code, and it is the rule the controller has broken most often: the corrections to this section have been
+overwhelmingly prose claims about state, ownership and history that were plausible, unchecked, and cheap
+to check. The four-instances-in-one-branch count is what makes it a rule rather than an exhortation —
+**a documentation round is a change set like any other, and its assertions are as falsifiable as code.**
