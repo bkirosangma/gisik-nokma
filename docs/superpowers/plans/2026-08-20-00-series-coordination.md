@@ -740,9 +740,13 @@ other. A lane that transcribes Plan 6 faithfully gets a green suite over a broke
 
 - `packages/app-core/src/precheck.ts` (Plan 6 T6, `restrictToNeedsMembership`) reads the field through
   an explicit cast — `(submitted.payload as { toStateId?: string } | null)?.toStateId` (plan line 2758)
-  — and returns `true` when it is `undefined`. Against real `to`-keyed payloads that is *always*, so
-  every restrict-to precheck silently degrades to "no membership needed." The cast is what defeats the
-  compiler; without it this would be a typecheck failure.
+  — and returns `true` when it is `undefined`. Against real `to`-keyed payloads that is *always*. Note
+  the direction, because it is the safe one: `true` means "this restrict-to resolves against memberships
+  only the server holds," and the caller (plan line 2707) turns a local `refused` verdict into
+  `not-evaluated` on it. So the client stops deciding restrict-to locally and defers every such
+  transition to the server — degraded precheck UX, a round trip where there should have been instant
+  feedback, and **not** a bypassed guard. The cast is what defeats the compiler; without it this would
+  be a typecheck failure.
 - `submitTransition` (Plan 6 T12, plan lines 6426-6427) builds the wire payload as
   `const transitionPayload: Record<string, unknown> = { toStateId: submission.toStateId }` and then
   assigns `comment` as a **bare string**. `Record<string, unknown>` defeats the compiler a second time,
@@ -762,9 +766,15 @@ worst instance was already recorded against.
 **What the owning lane does about it:** before trusting any test transcribed from Plan 6 T6/T12/T13,
 write one assertion against the exported `ticketTransitionedPayloadSchema` itself
 (`packages/domain/src/workflow.ts` — `to` required, `comment: { text }`). A test that parses the payload
-the client actually builds is the only one of these that can fail. Plan 3's own reducer text has the
-same read (`p.toStateId` at plan-3 line 1123-1129) but is typed against the shipped payload type, so
-there it surfaces as a compile error rather than silence.
+the client actually builds is the only one of these that can fail.
+
+Plan 3's own reducer text has the same read (`p.toStateId`, plan-3 lines 1123-1129), and it is loud
+**only on a condition worth stating**: the plan calls the schema `ticketTransitionedPayload` while the
+shipped export is `ticketTransitionedPayloadSchema`, so the implementer must adapt the name. Adapt it by
+importing from `@gisik-nokma/domain` and `p` is typed `{ to, comment?, … }`, making `p.toStateId` a
+compile error. Re-declare a plan-local zod schema instead — the other way to make that line compile —
+and the compiler net disappears there too, exactly as it has in Plan 6. Import origins come from shipped
+code: the standing law, and here it is what keeps the failure loud.
 
 Two spellings remain correct and are not drift: the transition-**log entry**
 (`TicketState.transitions[]`) keeps `toStateId`, and `ticket.workflow_rebound`'s own payload has a
