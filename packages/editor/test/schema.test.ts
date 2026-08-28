@@ -318,10 +318,15 @@ describe('behavioural options that spec §2 constrains', () => {
   });
 
   /**
-   * The same path, and the reason Task 5's decision is bigger than links:
+   * The same path, and part of why Task 5's decision is bigger than links:
    * five configured extensions register seven paste rules between them
-   * (`bold` 2, `italic` 2, `code` 1, `strike` 1, `link` 1). Also pending
-   * Task 5; also flip rather than delete.
+   * (`bold` 2, `italic` 2, `code` 1, `strike` 1, `link` 1). Its TYPED
+   * sibling — eighteen input rules across ten extensions, behind
+   * `enableInputRules` rather than `enablePasteRules` — is a disjoint rule
+   * set: disabling either lever was verified to leave the other set firing,
+   * so no single lever settles Task 5's decision. Census and dist citations
+   * in src/schema/extensions.ts. Also pending Task 5; also flip rather than
+   * delete.
    */
   it('CURRENT BEHAVIOUR pending Task 5: pasted markdown syntax becomes marks', () => {
     for (const [pasted, mark, text] of [
