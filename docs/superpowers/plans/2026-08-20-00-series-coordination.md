@@ -554,6 +554,29 @@ The owner answered the three authority questions that would otherwise make them 
 
 Mechanics that ride with the protocol: lane sessions run in per-lane git worktrees with pre-approved permissions so no tool prompt stalls them; the session-limit resumer (already enabled) covers session death; true blockers push-notify rather than waiting silently. The irreducible owner touchpoints — the two things no protocol can delegate — are DigitalOcean credentials/DNS at Plan 11's deploy, and the dogfooding itself.
 
+### Model and effort policy (owner-directed 2026-08-28) — right-sized in both directions
+
+The tier follows the **failure cost** of the task, not its size. "Optimised" cuts both ways: no top-tier tokens spent transcribing code the plan already contains, and no mid-tier tokens spent on tenancy or security semantics where a plausible-looking wrong answer ships silently. This generalises the map Plans 1–2 proved (sonnet transcription / opus semantics / top-tier final review) to the whole parallel run.
+
+| Work class | Model | Effort |
+|---|---|---|
+| Transcription implementers (plan text carries complete code; adapt spellings per the adaptation map) | sonnet | medium |
+| Mechanical: scaffolds, Dockerfiles, CI YAML, barrel exports, migrations from pinned schemas, Features.md/test-cases catalogue tasks | sonnet | low–medium |
+| Pre-flight task extractors, grep verifiers, pure search | sonnet (haiku acceptable for pure search) | low |
+| The adaptation-map agent (binding over the briefs — it caught ~a dozen collisions in Plan 2) | opus | high |
+| Core-semantics implementers: reducers, projections, engine checks, folds, stream/sync logic, view-models carrying honesty semantics | opus | high |
+| Fixture authoring and planted-defect design (falsifiability-load-bearing) | opus | high |
+| Per-task reviewers | opus | high |
+| Final whole-branch review lenses | top tier (Fable-class) | xhigh |
+| Adversarial refuters; the mocked-contract lens | top tier | xhigh–max |
+| Lane controllers / orchestrators | top tier | — |
+
+Controllers are top-tier deliberately: the autonomy protocol delegates conservative-default rulings and merge judgment to them, and a mid-tier controller is a false economy — the whole schedule flows through its decisions.
+
+**The floor list** — tasks the extraction flagged as subtle enough that the implementer floor is opus-high AND the reviewer is top-tier, non-negotiable: Plan 3 T3 (reducer + fold), T10 (as-of resolution), T12 (engine-context hazard closure), and the RDU fail-closed decision · Plan 4 T5 (permission gate + bootstrap), T7 (canSee + the SQL twin that must not disagree), T11 (visibleEventsFor + purge split), T14 (invite token custody) · Plan 5 T5 (visibleTicketsWhere), T9b (all-or-nothing migrate), T14/T15 (stream hub + WS) · Plan 6 T6 (claims machinery/precheck) · Plan 7 T9 (sniffing + upload permission), T11 (ingest-transaction gates) · Plan 8's F5 amendment (the "cover" semantics are a design call) · Plan 9 T6 (the four-plan sweep) · Plan 10 T7 (sync idempotency + contests), T9 (replica fold + baseline rewrite), T14/T15 (dual-client rig + scenarios) · Plan 11 T8/T9 (the CC mapping — invariant 4, no fabricated history) and T12 (restore drill).
+
+**Escalation, never silent de-escalation:** a task that fails two fix rounds escalates its implementer one tier for the retry, recorded in the ledger with the reason. De-escalating below a class floor is forbidden on the same grounds as the review-depth ruling — throughput is never grounds to thin a check.
+
 ### By-catch — plan defects found by the extraction, recorded so they are not rediscovered
 
 - **Plan 11's CI YAML omits the interim-plumbing gate** its own Produces bullet promises (the failing grep for Plan 10's session shortcuts). An executor following the YAML literally ships without it.
