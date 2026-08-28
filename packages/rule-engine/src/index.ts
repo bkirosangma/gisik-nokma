@@ -12,5 +12,6 @@ export { evaluateTicketTransitioned } from './transition.js';
 export { CONTEST_RULES, evaluateClaimContested, evaluateClaimContestedResolved } from './contests.js';
 export { resolveCurrentStateId, resolveStateIdForward } from './version-map.js';
 export type { ResolvedState } from './version-map.js';
+export { buildMemoryContext, type MemoryContext } from './memory-context.js';
 export { evaluateTransitionRules } from './rules/index.js';
 export type { RuleEvaluator, TransitionRuleInput } from './rules/types.js';

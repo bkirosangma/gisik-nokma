@@ -65,7 +65,9 @@ function spyContext(
     workflowDef: getWorkflowDef.mock.calls.length,
   });
   return {
-    ctx: { getEntityState, getChildrenStates, getWorkflowDef },
+    // getTicketTypeDef is not counted: no rule reads a type definition yet
+    // (Plan 3 Tasks 5–7 add the first), so a spy on it would pin nothing.
+    ctx: { getEntityState, getChildrenStates, getWorkflowDef, getTicketTypeDef: vi.fn(async () => null) },
     calls: () => {
       const seen = counts();
       return seen.entityState + seen.childrenStates + seen.workflowDef;

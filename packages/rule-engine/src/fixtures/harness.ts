@@ -239,6 +239,20 @@ export function buildInMemoryContext(fx: Fixture): EngineContext {
       );
       return { ticketId: contested.entity.id, resolved };
     },
+    async getTicketTypeDef(typeId) {
+      // NOT null, deliberately. This dialect has no `ticket-type.defined` yet —
+      // Plan 3 Task 8 adds it to `applyPriorEvent` and gives this method a
+      // ticketTypes map to answer from (pre-flight A14). Until then a fixture
+      // reaching a rank check has no type definition to be judged against, and
+      // answering null would make the check refuse for a reason that reads
+      // entirely legitimate — the same silent-wrong-verdict failure the
+      // memberships comment above warns about, which is why that one is a
+      // warning and this one is an exception. Nothing calls this today: the
+      // 61 shipped fixtures and 30 harness tests never reach it.
+      throw new Error(
+        `buildInMemoryContext: no ticket type definition for "${typeId}" — the fixture harness does not fold ticket-type.defined yet (Plan 3 Task 8). Extend applyPriorEvent rather than letting a rank check judge against a missing type.`,
+      );
+    },
   };
 }
 
