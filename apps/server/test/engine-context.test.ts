@@ -89,10 +89,19 @@ beforeAll(async () => {
   // and committed unjudged; nothing consumed it, because proj_tickets does not
   // exist yet either.
   //
-  // TASK 12 REVERTS THIS PAIR: once getTicketTypeDef reads proj_ticket_types,
-  // a workspace that has defined `task` commits this create, the planted head
-  // row below goes away, and this expectation becomes ['committed','committed']
-  // again. It joins the two assertions A12/BA-3 already assigns that task.
+  // TASK 12'S REVERT, in full, so it is mechanical rather than inferential.
+  // Once getTicketTypeDef reads proj_ticket_types, all FOUR of these move
+  // together and none may land without the others:
+  //
+  //   1. ADD a `ticket-type.defined` event for `task` to this batch, ahead of
+  //      the create. Without one, proj_ticket_types has no row to serve and the
+  //      create is still refused for the same reason — a context that can read
+  //      the table is not the same thing as a table with the type in it.
+  //   2. This expectation becomes ['committed', 'committed', 'committed'].
+  //   3. DELETE the refusal-object assertion immediately below.
+  //   4. DELETE the planted ticket head row further down; the create writes it.
+  //
+  // Those four join the two assertions A12/BA-3 already assigns that task.
   expect(results.map((result) => result.status)).toEqual(['committed', 'refused']);
   expect(results[1]).toEqual({
     status: 'refused',
@@ -101,7 +110,8 @@ beforeAll(async () => {
     reason: "This ticket's type is not defined in this workspace.",
   });
 
-  // The ticket head row the create would have written, planted for the same
+  // Deleted by Task 12, step 4 above. The ticket head row the create would have
+  // written, planted for the same
   // reason the membership row below is: the assertion it serves is about what
   // `getEntityState` does with a head row that EXISTS. Against the
   // `as unknown as EntityState` body this file was written to kill, a ticket

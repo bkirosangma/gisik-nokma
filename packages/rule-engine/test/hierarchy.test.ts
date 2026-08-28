@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { TicketState, TicketTypeDef } from '@gisik-nokma/domain';
+import type { EventEnvelope, TicketState, TicketTypeDef } from '@gisik-nokma/domain';
 import { makeEnvelope } from '@gisik-nokma/domain';
 import { buildMemoryContext } from '../src/memory-context.js';
 import { checkTicketCreated } from '../src/checks/hierarchy.js';
+import { parentTerminalRefusal } from '../src/checks/refusals.js';
 import type { EngineContext } from '../src/engine.js';
 import {
   EPIC,
@@ -19,6 +20,18 @@ import {
 const PARENT = '01J9GPAR000000000000000000';
 const NEW = '01J9GNEW000000000000000000';
 const GHOST = '01J9GGHT000000000000000000';
+/** A second workspace, for the parent this one is not allowed to see. */
+const OTHER_WS = '01J9GWSB000000000000000000';
+
+/** `created()` files everything under WS; the tenancy cases need the other one. */
+function createdIn(workspaceId: string, id: string, typeId: string, projectId: string): EventEnvelope {
+  return makeEnvelope({
+    type: 'ticket.created',
+    entity: { kind: 'ticket', id },
+    workspaceId,
+    payload: { typeId, projectId, parentId: null, title: `ticket ${id.slice(4, 8)}` },
+  });
+}
 
 const baseCtx = () =>
   buildMemoryContext(
@@ -214,7 +227,7 @@ describe('checkTicketCreated', () => {
 
   /**
    * Routed here by Task 3's review, and NOT in this task's brief. The reducer
-   * handles `ticket.created` unconditionally (`ticket-state.ts:95` — it returns
+   * handles `ticket.created` unconditionally (`ticket-state.ts:94` — it returns
    * a fresh state without ever consulting the `state` it was handed), which is
    * what the brief that wrote it asked for. So a SECOND accepted
    * `ticket.created` for a ticket that exists does not error and does not merge:
@@ -251,6 +264,12 @@ describe('checkTicketCreated', () => {
    * different projections that can disagree. Rather than delete the guard (the
    * alternative this lane allows) it is pinned against a hand-built context,
    * which is the only thing that can hold the contradiction.
+   *
+   * The refusal names the PARENT. It used to answer `ticket.unknown-type` —
+   * "This ticket's type is not defined in this workspace." — and this test
+   * asserted that sentence as a literal, so the suite certified copy that is
+   * false on the only path that reaches it: the candidate's own type
+   * (`task`) resolves in this very context. Controller ruling P11.
    */
   it('refuses when the PARENT exists but its type does not — the guard the reducer cannot stage', async () => {
     const orphanParent: TicketState = {
@@ -278,8 +297,29 @@ describe('checkTicketCreated', () => {
     };
     expect(await checkTicketCreated(created(NEW, 'task', PARENT), ctx)).toEqual({
       refused: true,
-      rule: 'ticket.unknown-type',
-      reason: "This ticket's type is not defined in this workspace.",
+      rule: 'hierarchy.parent-type-unknown',
+      reason:
+        "The parent ticket's type is not defined in this workspace, so there is no way to tell whether this ticket belongs under it. Pick a different parent.",
+    });
+  });
+
+  /**
+   * Tenancy. `getTicketState` looks a ticket up by id with NO workspace
+   * predicate, over a projection keyed `(entity_kind, entity_id)` — global, not
+   * per-tenant (`migrations/1787847393435_proj-entity-heads.sql:11`) — so a
+   * parent belonging to somebody else's workspace resolves rather than coming
+   * back null. The ingest door's entity↔workspace check does not cover this: it
+   * guards the event's OWN entity, never the parent its payload names.
+   */
+  it('planted defect: a parent in another workspace does not exist as far as this one is concerned', async () => {
+    const ctx = buildMemoryContext(
+      [WF],
+      [typeDefined(STORY), typeDefined(TASK), createdIn(OTHER_WS, PARENT, 'story', PROJECT)],
+    );
+    expect(await checkTicketCreated(created(NEW, 'task', PARENT), ctx)).toEqual({
+      refused: true,
+      rule: 'hierarchy.unknown-parent',
+      reason: 'The chosen parent ticket does not exist in this workspace.',
     });
   });
 });
@@ -357,5 +397,45 @@ describe('checkTicketCreated — which refusal names the event when two are avai
       rule: 'hierarchy.rank',
       reason: '"Epic" cannot go under "Story": a ticket\'s parent must be a bigger kind of work.',
     });
+  });
+
+  it('a foreign WORKSPACE outranks a foreign project: the more specific answer would be false, and would leak', async () => {
+    // The parent is in another workspace AND another project, so both refusals
+    // are available. `hierarchy.cross-project` — "The parent is in a different
+    // project. Pick a parent from the same project." — is the wrong one twice
+    // over: it is false (the parent is in a different WORKSPACE, and its
+    // project is unreachable either way), and it confirms to an actor that this
+    // ticket id exists somewhere they cannot see. Controller ruling P12.
+    const ctx = buildMemoryContext(
+      [WF],
+      [typeDefined(STORY), typeDefined(TASK), createdIn(OTHER_WS, PARENT, 'story', PROJECT_B)],
+    );
+    expect(await checkTicketCreated(created(NEW, 'task', PARENT, PROJECT), ctx)).toEqual({
+      refused: true,
+      rule: 'hierarchy.unknown-parent',
+      reason: 'The chosen parent ticket does not exist in this workspace.',
+    });
+  });
+});
+
+/**
+ * The copy builders' branches that no check in THIS task reaches. Refusal copy
+ * is a deliverable of this plan, so a branch of it that ships with no assertion
+ * ships unverified — the same "add the test or delete the branch" rule the
+ * parent's-type guard was held to. The branch stays (C-22 pins it as Task 6's
+ * import contract); this is what makes it something Task 6 imports already
+ * falsifiable rather than merely present.
+ */
+describe('parentTerminalRefusal — the branch Task 6 will call', () => {
+  it("renders the 'move' verb pair, which no ticket.created path reaches", () => {
+    expect(parentTerminalRefusal('Quarterly filings', 'Done', 'move')).toBe(
+      '"Quarterly filings" is finished (Done). Moving live work under it reopens it — choose a state to reopen it to, then move this ticket.',
+    );
+  });
+
+  it("renders the 'add' verb pair — the pair that IS reached, so the two cannot be swapped unnoticed", () => {
+    expect(parentTerminalRefusal('Quarterly filings', 'Done', 'add')).toBe(
+      '"Quarterly filings" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.',
+    );
   });
 });

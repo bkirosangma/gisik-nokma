@@ -7,16 +7,30 @@ import { ACCEPT, deepestRankParentRefusal, parentTerminalRefusal, rankRefusal, r
 
 /**
  * Hierarchy sanity for ticket.created. Check order is deliberate — the most
- * fundamental truth names the refusal: already exists → unknown type →
- * workflow undefined → (root: deepest-rank rule) → unknown parent →
- * cross-project → rank → parent-terminal (the remediable contradiction comes
- * last: it is the only one whose remedy is an offer rather than a correction).
+ * fundamental truth names the refusal:
+ *
+ *   already exists → unknown type → workflow undefined
+ *     → (root) deepest-rank rule
+ *     → unknown parent (a parent in another WORKSPACE is one of these)
+ *     → cross-project → parent's type unknown → rank → parent-terminal
+ *
+ * Parent-terminal comes last because it is the only refusal whose remedy is an
+ * OFFER rather than a correction: put it earlier and it offers a reopen that
+ * does not work, because the thing actually in the way is still in the way
+ * afterwards.
  *
  * `already exists` leads because it is the only question about the event's own
  * target rather than about what the payload points at. A create for a ticket
  * that exists is refused whatever its type or parent would have been — and
  * telling that actor their type is undefined would send them to fix the one
  * thing that was never the problem.
+ *
+ * The same doctrine is why the parent's-type guard has a refusal of its own
+ * (`hierarchy.parent-type-unknown`, controller ruling P11) rather than reusing
+ * `ticket.unknown-type`: by the time it fires, THIS ticket's type has already
+ * resolved, so the borrowed sentence sent the actor to define a type that is
+ * already defined. Every refusal in the chain above must be true on the path
+ * that reaches it, not merely true of something.
  *
  * The project this ticket is created INTO is not checked here: Plan 4 owns
  * `proj_projects` and the "the project does not exist" refusal (coordination
@@ -58,7 +72,7 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
   const p = parsed.data;
 
   // Routed here by Task 3's review; not in this task's brief. The reducer folds
-  // `ticket.created` unconditionally (`ticket-state.ts:95`), so a second
+  // `ticket.created` unconditionally (`ticket-state.ts:94`), so a second
   // accepted create for an existing ticket does not error and does not merge —
   // it RESETS the fold, erasing the ticket's status, its collaborators, its
   // field claims and its transition log, which is the evidence four-eyes reads.
@@ -97,12 +111,25 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
     return ACCEPT;
   }
 
+  // ONE refusal, two ways of not existing here (controller ruling P12). A
+  // parent this workspace does not hold resolves anyway: `getTicketState` is an
+  // id lookup with no workspace predicate, over a projection whose primary key
+  // is `(entity_kind, entity_id)` — global, not per-tenant. Left to fall
+  // through, a foreign parent was refused `hierarchy.cross-project`, which said
+  // something false ("a different project" — it is a different WORKSPACE) and
+  // confirmed to the actor that the id exists somewhere they cannot see. The
+  // ingest door's tenancy check does not cover this: it guards the event's own
+  // entity, never the parent the payload names.
   const parent = await getTicketState(ctx, p.parentId);
-  if (!parent) return refuse('hierarchy.unknown-parent');
+  if (!parent || parent.workspaceId !== env.workspaceId) return refuse('hierarchy.unknown-parent');
   if (parent.projectId !== p.projectId) return refuse('hierarchy.cross-project');
 
+  // The PARENT's type, and the parent is the subject of the refusal. This used
+  // to answer `ticket.unknown-type` — "This ticket's type is not defined in
+  // this workspace." — which is false the moment it can fire: this ticket's
+  // type resolved above, or we never got here. Controller ruling P11.
   const parentType = await getTicketTypeDef(ctx, parent.typeId);
-  if (!parentType) return refuse('ticket.unknown-type');
+  if (!parentType) return refuse('hierarchy.parent-type-unknown');
   if (type.rank <= parentType.rank) {
     return refuse('hierarchy.rank', rankRefusal(type.name, parentType.name));
   }

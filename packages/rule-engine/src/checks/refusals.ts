@@ -31,7 +31,7 @@ export const REFUSALS = {
   /**
    * The mirror of `ticket.unknown`, and it is not in Plan 3's table: it was
    * routed here by Task 3's review. `applyTicketEvent` folds a `ticket.created`
-   * UNCONDITIONALLY (`packages/domain/src/ticket-state.ts:95`, which is what
+   * UNCONDITIONALLY (`packages/domain/src/ticket-state.ts:94`, which is what
    * Task 3's brief asked for), so a second accepted create for a ticket that
    * already exists does not error and does not merge — it resets the fold,
    * erasing the ticket's status, collaborators, field claims and transition
@@ -42,7 +42,29 @@ export const REFUSALS = {
     'This ticket already exists. Creating it again would erase everything recorded on it — open the existing ticket instead.',
   'ticket.workflow-undefined':
     "This ticket type's workflow has not been defined yet, so the ticket would have no status.",
+  /**
+   * Also the answer for a parent in ANOTHER WORKSPACE, and deliberately the
+   * same sentence. `getTicketState` looks a ticket up by id with no workspace
+   * predicate — `proj_entity_heads`' primary key is `(entity_kind, entity_id)`,
+   * global rather than per-tenant (`migrations/1787847393435_proj-entity-heads.sql:11`)
+   * — so a foreign parent RESOLVES. Answering anything more specific than this
+   * would confirm to an actor that a ticket id exists somewhere they cannot
+   * see, and from this workspace's point of view "does not exist here" is not a
+   * euphemism: it is the whole truth available (controller ruling P12).
+   */
   'hierarchy.unknown-parent': 'The chosen parent ticket does not exist in this workspace.',
+  /**
+   * NOT `ticket.unknown-type`, which is the refusal this used to give and which
+   * was false on every path that reached it: the ticket's OWN type resolved
+   * twenty lines earlier, so "This ticket's type is not defined" sent the actor
+   * to define a type that is already defined (controller ruling P11). The
+   * subject of the sentence is the PARENT, because the parent is what is
+   * unreadable, and the remedy is the only one the actor can act on alone —
+   * they cannot define somebody else's ticket type, but they can choose a
+   * different parent.
+   */
+  'hierarchy.parent-type-unknown':
+    "The parent ticket's type is not defined in this workspace, so there is no way to tell whether this ticket belongs under it. Pick a different parent.",
   'hierarchy.cross-project': 'The parent is in a different project. Pick a parent from the same project.',
   'hierarchy.cycle':
     'This move would put the ticket inside one of its own sub-items, making a loop. A ticket cannot contain itself.',
