@@ -155,6 +155,42 @@ const twoRulesV1: WorkflowDef = {
   transitions: [{ from: 'todo', to: 'done', rules: [{ kind: 'require-comment' }, { kind: 'require-evidence' }] }],
 };
 
+/**
+ * A single-edge workflow carrying only require-field, for the
+ * whitespace-only-value unit test the fixture suite cannot express: Task 9's
+ * six fixtures only ever leave `due_date` unset or set it to a genuine date
+ * string, never to a value that exists but is blank.
+ */
+const fieldGuardedV1: WorkflowDef = {
+  id: 'wf_field_guarded',
+  version: 1,
+  name: 'FieldGuarded',
+  initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [{ from: 'todo', to: 'done', rules: [{ kind: 'require-field', field: 'due_date' }] }],
+};
+
+/**
+ * A single-edge workflow carrying only require-evidence, for the
+ * whitespace-only `evidenceAttachmentId` unit test the fixture suite cannot
+ * express: Task 9's six fixtures only ever omit the id or set it to a
+ * genuine one, never to a value that exists but is blank.
+ */
+const evidenceGuardedV1: WorkflowDef = {
+  id: 'wf_evidence_guarded',
+  version: 1,
+  name: 'EvidenceGuarded',
+  initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [{ from: 'todo', to: 'done', rules: [{ kind: 'require-evidence' }] }],
+};
+
 /** A TicketState against `basicV1`, filled in enough for the transition path; every field a test doesn't care about gets a harmless default. */
 function ticket(overrides: Pick<TicketState, 'id' | 'stateId' | 'stateCategory'> & Partial<TicketState>): TicketState {
   return {
@@ -477,6 +513,59 @@ describe('evaluateTransitionRules — first refusal wins (Task 8)', () => {
     // rule 2, and fail this assertion.
     await expect(
       evaluateEvent(transitioned('done', 't1', { comment: { text: 'Shipped and verified.' } }), ctx),
+    ).resolves.toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.requireEvidence,
+      reason: 'This move must carry an attachment as evidence, and none was provided.',
+    });
+  });
+});
+
+/**
+ * Task 9's require-field and require-evidence each have a blank-value branch
+ * no fixture witnesses (task-9-report.md, Falsifiability): the six Task 9
+ * fixtures only ever leave a value unset or set it to a genuine one, never
+ * to a value that exists but is all whitespace. Both rules treat a
+ * whitespace-only value as equivalent to absent — "set" means "set to
+ * something," not merely "present" — and that distinction is pinned here
+ * rather than by a seventh/eighth fixture (controller ruling: count-neutral
+ * unit tests, fixture count stays 43, gate stays 59).
+ */
+describe('require-field and require-evidence refuse a blank value, not only an absent one', () => {
+  it('refuses require-field when the field is set to a whitespace-only string', async () => {
+    const parent = ticket({
+      id: 't1',
+      stateId: 'todo',
+      stateCategory: 'open',
+      workflowId: 'wf_field_guarded',
+      fields: {
+        due_date: {
+          value: '   ',
+          actorId: 'user_a',
+          clientTime: '2026-08-20T09:00:00.000Z',
+          serverTime: '2026-08-20T09:00:01.000Z',
+        },
+      },
+    });
+    const { ctx } = spyContext(fieldGuardedV1, { entity: parent });
+    // The field claim exists — a bug that only checked `value !== undefined`
+    // would call this "set" and accept. Only the trim-and-check the rule
+    // actually does refuses here.
+    await expect(evaluateEvent(transitioned('done'), ctx)).resolves.toEqual({
+      refused: true,
+      rule: REFUSAL_RULES.requireField,
+      reason: 'This move needs the field "due_date" to be set first, and it is not.',
+    });
+  });
+
+  it('refuses require-evidence when evidenceAttachmentId is a whitespace-only string', async () => {
+    const parent = ticket({ id: 't1', stateId: 'todo', stateCategory: 'open', workflowId: 'wf_evidence_guarded' });
+    const { ctx } = spyContext(evidenceGuardedV1, { entity: parent });
+    // The id is present on the payload — a bug that only checked
+    // `attachmentId.length > 0` would call this "an attachment" and accept.
+    // Only the trim the rule actually does refuses here.
+    await expect(
+      evaluateEvent(transitioned('done', 't1', { evidenceAttachmentId: '   ' }), ctx),
     ).resolves.toEqual({
       refused: true,
       rule: REFUSAL_RULES.requireEvidence,
