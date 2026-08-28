@@ -1025,6 +1025,22 @@ install would still have fetched prisma and compiled a native `better-sqlite3`, 
 into every image, to support a tool nobody was using. The lockfile had to be **reset to `HEAD` and
 re-resolved from `package.json`** before it was actually clean.
 
+**Key the gate on the banned package itself, never on the residue fingerprint.** The residue names
+above (`@prisma/client`, `better-sqlite3`) are what the leftovers looked like *for Lane 2*. A gate
+written against that fingerprint would be correct today, stay green through Plan 10's T1/T2/T3a — and
+then **fail on Plan 10 Task 8, which legitimately adds `better-sqlite3` as the sync-client's storage
+adapter** (plan-10 line 2856 creates `storage/better-sqlite3.ts`, line 2897 declares
+`"better-sqlite3": "^11.10.0"`). At that point it looks like a false positive from a gate nobody
+remembers the reason for, and the reasonable response is to weaken or delete it. So the assertion targets
+`better-auth` and `@better-auth/cli` by name and nothing transitive.
+
+Worth naming as its own direction of the day's shape: the other three instances were checks that **pass
+when they should fail**; this one is a check that **fails when it should pass**. Both end the same way —
+deleted by someone reasonable — which is why "would this ever fire for a reason unrelated to its name?"
+has to be asked in both directions. (Found by Lane 4 while adopting the corrected justification; it
+generalises past lockfiles to anything where a cleanup is partial — migrations, generated files, a
+projection reset.)
+
 **That is the whole argument for Lane 4's check, and "we removed it" is not evidence the lockfile is
 clean.** A lane that later adds a banned package, runs `pnpm remove`, and trusts the removal will ship
 the residue. The assertion against the lockfile file is what catches it; nothing else in the pipeline
