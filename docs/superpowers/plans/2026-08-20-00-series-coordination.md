@@ -975,6 +975,120 @@ is a class of evidence, not a test: any clock-sensitive assertion must vary `TZ`
 is a pattern applied to Plan 1's `ist-day.ts`, Plan 9's Calendar and Timeline, and anything reasoning
 about a day boundary.
 
+## Owner ruling (2026-08-31, second and stronger): Fable out entirely, opus by exception, and the machinery gets thinner
+
+**This supersedes the earlier same-day narrowing and overrides "budget pressure is never grounds to thin a
+gate" a second time, further.** The owner has weighed it twice; it is their call and it is recorded here
+in the open rather than worked around. The controller argued against the first narrowing and was
+overruled; it is not re-arguing, and the argument below is a cost statement, not an objection.
+
+**The number that forced it.** Measured across the parallel window and the serial start: **$113 per task
+at 17.6 subagents per task**, with **opus 85% of spend, fable 15%, sonnet 0%**. The 109 remaining tasks at
+that shape project to **~$12,400 — 3.3x everything spent on the project to date.** At 31% of a weekly
+quota consumed in two sessions, it does not finish. **Removing Fable entirely saves 15% and leaves ~$10,500,
+so the tier change alone does not solve this.** The multiplier is agent count, and agent count is why opus
+dominates: nearly every one of those 17.6 agents was opus.
+
+### Tier: Fable is out, with no exception clause
+
+| Work class | Model | Effort |
+|---|---|---|
+| Transcription implementers (plan carries the code) | sonnet | medium |
+| Mechanical: scaffolds, Dockerfiles, CI YAML, barrel exports, migrations, catalogue tasks | sonnet | low |
+| Pre-flight extraction, grep verification, search | sonnet | low |
+| Per-task reviewers where the plan text is complete | sonnet | medium |
+| **Everything else not named below** | **sonnet** | medium |
+| Core semantics: reducers, projections, engine checks, folds, stream/sync, honesty-carrying view-models | opus | high |
+| Fixture authoring and planted-defect design | opus | high |
+| Floor-list task reviewers | opus | high |
+| Final whole-branch review (one reviewer, see below) | opus | high |
+| Adversarial refuter, when one is run at all | opus | max |
+
+**Fable is not dispatched.** Not for refuters, not for the mocked-contract lens, not for floor-list
+reviewers — the three the earlier narrowing preserved. The deviation-ledger path is no longer a deviation;
+opus at the stated effort is the ceiling.
+
+**Sonnet is the default and opus is the exception**, which inverts the previous table's posture. A
+dispatch goes to opus only if its work class is named in an opus row above. **If you are unsure, it is
+sonnet** — the previous inversion produced 2.9% sonnet against a table that had assigned it far more.
+
+### Machinery depth — the larger lever, and where "more work for fewer tokens" actually comes from
+
+- **One fan-out per plan, not two.** The pre-flight scan is retired: its cross-lane half died with
+  parallelism, and the adaptation map becomes **one sonnet agent**, not a fan-out.
+- **The final whole-branch review is ONE opus reviewer**, not four lenses plus refuters plus triage plus
+  synthesis. Measured, that fan-out was ~$117 each; there are nine plans left.
+- **Judgment fan-outs are withdrawn.** The "would a second independent look plausibly reverse this?" clause
+  is revoked as a standing authorization — it is what let a single rebase collision draw eight agents.
+  A collision gets **one** analyst.
+- **Per-task machinery is implementer → reviewer.** A fix round runs only if the reviewer returned an
+  Important or worse; a scoped re-review runs only if the fix round touched more than it was scoped to.
+- **Batch the PRs.** Group each phase's plans into as few PRs as coherence allows — one final review per
+  PR, not per plan.
+- **Hard cap: 6 subagents per task.** Exceeding it requires an owner ask, not a judgment call.
+
+Target shape: **~6 agents per task at sonnet-default**, which projects to roughly **$25-30 per task and
+~$3,000 for the remaining 109** — inside the budget rather than triple it.
+
+### Chunk the SESSION, batch the REVIEWS — they are different axes and they pull opposite ways
+
+Measured on the executor's first task: its own session context ran **98K → 143K → 201K → 282K per
+request** across four quarters of a single task. **It nearly tripled inside one task.** Its subagents
+averaged 86K — less than half — because each starts fresh carrying only its dispatch.
+
+That decides the shape, because the two obvious economies conflict:
+
+- **Smaller PRs** would cut the delta each review must read, but multiply the number of reviews, and every
+  review pays full agent-startup context. **Rejected — keep batching PRs per phase.**
+- **Smaller SESSIONS** cut the compounding carriage that is 66% of all spend. **Adopted.**
+
+**The rule: the controller restarts the executor at every task boundary.** Not at plan boundaries — task
+boundaries. At 282K/request and climbing, every request late in a task costs roughly three times an early
+one, and the tail is where most requests are. A restart returns it to ~98K.
+
+This is the largest single lever available and the controller can execute it without the owner, because a
+restart-from-brief is not a `/clear` — see the clearing protocol above. Its preconditions are unchanged
+and non-negotiable: **the handoff must be current, tracked, pushed, and its anchors verified reachable
+rather than merely resolvable.** A restart against a stale handoff destroys exactly what it was meant to
+preserve.
+
+**Consequences for how work is sized.** A task is the chunk. If a plan task is large enough that its
+context triples before it completes, it is split at a coherent internal boundary and the handoff carries
+the seam. **Wall-clock cost of a restart is accepted deliberately** — the owner has stated the trade:
+slower is fine, expensive is not.
+
+**Dispatch prompts stay lean.** A subagent at 86K is cheap only while its dispatch is small; a fan-out
+brief that inlines whole documents rebuilds the problem inside every agent it spawns.
+
+### What this costs, stated once so nobody has to rediscover it
+
+The two most valuable findings of 2026-08-31 came from exactly what is being removed. **The §11
+cross-workspace forgery was found by a fable refuter that committed the forgery end to end over the shipped
+door** rather than reasoning about whether it was possible — reading does not produce that finding. **Plan
+6 T6's version-chain asymmetry was found by a fable floor-list reviewer** after three parties missed it.
+Neither would have been found under this ruling.
+
+**A third instance, filed by the executor as evidence rather than as an argument, hours after the first
+two.** Ruling P16's load-bearing half — that `precheckParentTerminal`'s three `passed` exits had to become
+`not-evaluated` — was **missed by two of the four opus lenses**, both of which wanted to scope it out as
+Plan 6a's problem, and **caught by the refuters**. Under this ruling that collision gets one analyst and no
+refuter. On this session's own evidence the downgrade would plausibly have shipped a known-false `passed`
+— a client asserting a verdict it had not computed, which is the failure class this series is built to
+refuse.
+
+**Any further instance goes in this list.** The trade was priced twice by the owner and is not being
+re-opened; the list exists so that when it is next reviewed, it is reviewed against evidence rather than
+against recollection.
+
+The expected consequence is a **higher defect-escape rate at the last gate before `main`**, and in this
+series an escaped defect has repeatedly cost a follow-up PR. That cost lands in a different column from
+the saving, which is why it is written here.
+
+**What does NOT change.** Class floors still exist — they are simply lower. Escalation still runs upward:
+a task failing two fix rounds escalates its implementer one tier, recorded. Deferral is still the answer
+when the pool cannot fund the work. Direct pushes to `main` remain forbidden, every change still travels
+branch → PR → controller merge, and no ruling here permits skipping a review — only running a smaller one.
+
 ### By-catch — plan defects found by the extraction, recorded so they are not rediscovered
 
 - **Plan 11's CI YAML omits the interim-plumbing gate** its own Produces bullet promises (the failing grep for Plan 10's session shortcuts). An executor following the YAML literally ships without it.
