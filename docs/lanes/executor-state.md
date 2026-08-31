@@ -186,3 +186,22 @@ measurement, and chasing it is unwinnable. So the anchor table no longer names t
 composition measured at that code sha. **What must always be re-measured:** `HEAD`, the ahead-count,
 and anything counted from the directory. An absolute is a fact about a moment, and nobody holds the
 moment — including this file.
+
+### Two loose ends closed after PR #38 opened
+
+- **PR body arithmetic corrected.** The task table credited T8 with "fixture gate 67 → 84". That is
+  the BRANCH's delta (17 fixtures vs `main`) attributed to one task; **T8's own delta is 14 (70 →
+  84)**. Exactly the class this series keeps catching, sitting in the artifact the controller reads to
+  decide a merge. Fixed in place with the reconciliation stated rather than silently.
+- **`test-cases/` needed no change, verified rather than assumed.** The P16 behaviour change is
+  user-observable, and the workspace rule is same-change-set. But the catalogue holds only `03`, `04`
+  and `05` — there is **no app-core/client file**, because Plan 6a has not created one. Swept
+  `test-cases/` for `precheck`, `parent-terminal`, `passed`, `grandchild`: no case asserts the
+  inverted behaviour, so nothing went stale. **Recorded: `packages/app-core`'s precheck is described
+  in `Features.md` with no owning `test-cases/` file. Owner: Plan 6a.**
+
+### Step 2 note, before it costs a round
+
+`exec/06a-client-core` is **already checked out** at `~/my_projects/gisik-nokma-lanes/lane4-periphery`
+(at `30e3db4`). A `git checkout` of it from this worktree will refuse. Either work in that worktree,
+remove it first, or review from a detached checkout — decide before dispatching, not mid-flight.
