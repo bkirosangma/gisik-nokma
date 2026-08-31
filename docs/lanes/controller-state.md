@@ -14,8 +14,9 @@ decision boundary.
 
 | what | value |
 |---|---|
-| `main` | `c93c910` — PR #43 (Plan 6a T9) squash-merged |
-| last forced gate | `c93c910` — 18/18, 0 cached, **853 tests**, `TURBO_EXIT=0` |
+| `main` | `f40a850` — PR #43 (Plan 6a T9) then PR #45 (P17 doc discharge) |
+| last forced gate | `c93c910` — 18/18, 0 cached, **853 tests**, `TURBO_EXIT=0`. **Still valid at
+  `f40a850`:** the delta is 3 files, all `.md`, **0 code** — verified with `git diff --stat`, not assumed |
 | gate composition | domain 263 · rule-engine 278 · server 143 · app-core **130** · ui 31 · sync-client 8 |
 | **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
 | collision surfaces | fixtures **84/84** · projections **2** (`proj_entity_heads`, `proj_workflows`) |
@@ -81,7 +82,9 @@ superseded (see the coordination doc's serial-execution section).
 ## Position in the serial sequence
 
 **Phase 0 step 1 CLOSED** — Chain A merged (`6b2fc76`).
-**Phase 0 step 2 CLOSED** — `exec/06a-client-core` merged as `c93c910` (PR #43). T9 reviewed, F1–F4 fixed,
+**Phase 0 step 2 CLOSED** — `exec/06a-client-core` merged as `c93c910` (PR #43), and P17's stale plan
+text discharged in `f40a850` (PR #45: nine call sites marked, 0 unmarked, marker string counted as a
+control). T9 reviewed, F1–F4 fixed,
 scoped re-review run, its one "Critical" refuted with four experiments and the refutation independently
 assessed before merge.
 
@@ -95,7 +98,12 @@ assessed before merge.
 - `git merge-tree` reports **TWO** conflicts, not one: the coordination doc **and
   `packages/domain/src/index.ts`. The second is code.**
 - Its **T4 scoped re-review was never dispatched**, so every surface says complete except the gate.
-  Review first, then merge.
+  **Controller ruling: rebase FIRST, review the rebased tree.** T8's re-review had to be re-run for
+  exactly this reason — a review of a tip 23 commits and two conflicts from what merges is a review of
+  something else. In progress as of 17:35 IST.
+- The branch is checked out in `gisik-nokma-lanes/lane3-plan7-8`, so it cannot be checked out in the exec
+  worktree — work it in place. **Two `--delete-branch` failures today were this same rule**; a branch held
+  by another worktree is refused.
 
 Full sequence in the coordination doc's `## Serial execution` section, which is the authority.
 
