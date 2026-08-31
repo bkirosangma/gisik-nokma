@@ -682,10 +682,16 @@ of stating it unconditionally, and the first ratifies something that is not yet 
 Swept `apps/server/src` file-by-file: **no `sameSite` setting exists anywhere.** The entire defence being
 proposed for ratification is an unwritten default of a dependency. If better-auth changes its default, or
 a later task sets `SameSite=None` because some cross-site client needs it, the defence vanishes and
-nothing in this repo fails. **Pin it explicitly, with a test that fails if it changes.** This is cheap,
-immediate, affects no caller, and is the falsifiability law applied to a security property: a defence
-nobody can break on purpose is a defence nobody knows they have. Ratifying Lax-only without this would be
-ratifying an accident.
+nothing in this repo fails. **Pin it explicitly.** Cheap, immediate, affects no caller.
+
+**The test already exists — Lane 2's correction, and it makes item 1 smaller and sharper than first
+costed.** `sign-in-flows.test.ts:148` already asserts the exact attribute list
+`['Max-Age=604800', 'Path=/', 'HttpOnly', 'SameSite=Lax']`, so the value already goes red if better-auth
+changes its default. The remaining work is the **setting**, not the test. And the reason to do it is not
+that the value would otherwise go unnoticed — it would — but Lane 2's distinction, which is the useful
+one: **that assertion currently guards a dependency's default; once the value is set explicitly it guards
+a decision. Same test, same line, different meaning, and only the second is a security property this
+repository owns.**
 
 **2. The Origin requirement is scoped to COOKIE-authenticated requests, and the stated cost disappears.**
 CSRF is a problem about **ambient credentials**. A cookie is ambient — the browser attaches it whether or
@@ -696,14 +702,27 @@ Lane 2's objection — that every non-browser caller must then send an `Origin` 
 is true of the unconditional form and false of this one. The desktop and mobile clients are bearer-
 authenticated and are untouched.
 
-**3. Why not simply ratify Lax, given `/v1/events` is `app.post` and Lax does block cross-site POST.**
-Verified: it is POST-only (`routes/events.ts:12`), so Lax's top-level-GET gap does not reach it, and Lax
-genuinely is a real defence rather than a fig leaf. The reason it is not sufficient alone is
-**same-site-cross-origin**: `SameSite` is scoped to the registrable domain, so a sibling subdomain is
-same-site and Lax does nothing between them. That turns a deployment decision recorded nowhere — what
-domain this ships on, and what else shares it — into a silent determinant of whether the product has CSRF
-protection. **A security property that depends on an unrecorded hosting choice is not a property, it is a
-coincidence.** Plan 11 owns the domain and currently names none.
+**3. Why not simply ratify Lax — and the hosting fact is SETTLED ADVERSE, not open.** Verified:
+`/v1/events` is POST-only (`routes/events.ts:12`), so Lax's top-level-GET gap does not reach it, and Lax
+is a real defence rather than a fig leaf. It is nonetheless insufficient here, and **an earlier draft of
+this ruling wrongly left that conditional on a hosting decision it called unestablished. Lane 2 found the
+decision, at line 83 of this document, in the owner sign-off table.**
+
+The product is **`pm.artsourced.in`** and the API is **`pm-api.artsourced.in`** — two sibling subdomains
+of `artsourced.in`. Line 84 puts the magic-link sender at the apex, `sign-in@artsourced.in`, explicitly
+because it is *"the established zone"* — so this is not a fresh domain bought for this product; other
+things already live on it. `SameSite` is scoped to the **registrable domain**, and `artsourced.in` is the
+registrable domain. Everything on that zone is same-site with the product, and **Lax does nothing between
+them.**
+
+**And it is worse than "the deployment happens to be adverse": the architecture REQUIRES the relaxation
+that removes the protection.** The web client at `pm.artsourced.in` calls the API at
+`pm-api.artsourced.in`. Those are cross-origin, and the session cookie must reach the API for the product
+to function at all — which works precisely because they are same-site. So the same-site relaxation is
+load-bearing for the product, cannot be tightened without breaking the web client, and any other subdomain
+of `artsourced.in` inherits it. **Lax was never going to protect this deployment, and no future hosting
+decision can rescue it short of moving the API to a different registrable domain.** Item 2 is therefore
+the only CSRF defence available on cookie-authenticated product routes — not defence-in-depth.
 
 **Owner touchpoint, flagged rather than assumed:** if the product ever ships on a domain sharing a
 registrable domain with anything untrusted — including a platform's default `*.provider.app` subdomain
@@ -717,12 +736,20 @@ envelope-origin closer, which remains the nearer priority. **Note the term colli
 item 2 is HTTP-Origin. The micro-PR is envelope-origin. They are different fixes and this ruling asks for
 both.**
 
-**Confidence, stated because this is a security ruling made under delegation.** Item 1 is unambiguous — an
-unpinned default is not a decision, and pinning costs nothing. Item 2 is standard practice and its cost
-objection is dissolved by scoping. Item 3's same-site-cross-origin reasoning is sound in general but its
-*bite* here depends on a hosting fact nobody has established yet; if Plan 11 lands on a dedicated domain
-with nothing untrusted beside it, Lax-only would have been defensible after all. That is the part a later
-reader should re-examine rather than inherit.
+**Confidence, restated after Lane 2's corrections — and the stated-uncertainty is what made them
+findable.** Item 1 unambiguous, and now smaller: the test exists, only the setting is missing. Item 2
+standard practice, cost objection dissolved by scoping. **Item 3 is now the MOST certain of the three, not
+the least** — the first draft marked its bite conditional on an unestablished hosting fact, Lane 2 went
+and found the fact at line 83 of this document, and it is adverse. There is nothing left to re-examine
+there; a later reader should treat it as settled and, if anything, check only whether the API has since
+moved to a different registrable domain, which is the one change that would alter it.
+
+**Recorded because the process point outlives the ruling:** a ruling that had asserted uniform confidence
+would have buried the single paragraph that needed checking, and the reviewer would have had no reason to
+look. Stating per-item confidence is what let a lane overturn the weakest part within the hour. It also
+produced a reasoning failure worth naming, from Lane 2: **an option priced as unacceptable is sometimes an
+option scoped too widely** — it rejected a correct control because it had described that control more
+broadly than anyone had proposed it.
 
 ### By-catch — plan defects found by the extraction, recorded so they are not rediscovered
 
