@@ -14,11 +14,11 @@ decision boundary.
 
 | what | value |
 |---|---|
-| `main` | `40c5219` **as of 21:20 IST — this row goes stale by design.** Phase 1 steps 4 (#51) and 5 (#52) merged |
-| last forced gate | **`40c5219`** — 21/21, 0 cached, **1032 tests**, `TURBO_EXIT=0`, node **v22.22.2** |
-| gate composition | domain 276 · rule-engine 278 · server **237** · app-core 130 · editor 72 · ui 31 · sync-client 8 |
+| `main` | `33538be` **as of 22:05 IST — this row goes stale by design.** Phase 1 steps 4/5/6 merged (#51/#52/#53) |
+| last forced gate | **`33538be`** — 21/21, 0 cached, **1070 tests**, `TURBO_EXIT=0`, node **v22.22.2** |
+| gate composition | domain 276 · rule-engine 278 · server **275** · app-core 130 · editor 72 · ui 31 · sync-client 8 |
 | **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
-| collision surfaces | fixtures **84** · projections **4** (`entity_heads`, `memberships`, `visibility`, `workflows`) · packages 6 |
+| collision surfaces | fixtures **84** · projections **5** (`contested`, `entity_heads`, `memberships`, `visibility`, `workflows`) · packages 6 |
 | open PRs | none at time of writing — **re-measure** |
 
 **Re-measure everything above on resume.** Recount at the sha you report; do not carry a composition
@@ -91,9 +91,13 @@ discharged in `f40a850`.
 > *"at `8209397`, not at the branch tip"* is **SUPERSEDED** — T9 was reviewed and its fixes applied, and
 > the branch merged at its tip.
 
-**Steps 4 and 5 are CLOSED** — `45c83eb` (#51) and `40c5219` (#52). **Step 6 is next: the LIFTED Plan 10
-T4**, the §11 envelope-origin closer — it extends two registration pins and obeys §8's *insert, don't
-append* rule for projection order.
+**Steps 4, 5 and 6 are CLOSED** — `45c83eb` (#51), `40c5219` (#52), `33538be` (#53).
+**The §11 envelope-origin window is CLOSED at the constructor** (`fc904f4` had closed only the client
+door). **Step 7 is next: Plan 4 T8–T14**, with **T11 and T14 floor-list**.
+
+**Three privilege/forgery defects were found and closed in Phase 1, none by a pre-existing test:** a
+founding bypass that made strangers owners of workspaces they were never in; a role chain whose
+unenumerated direction was *grant*; and the embedded-claim window. All three were caught by review.
 
 **Seven gaps carried with named owners, none folded in opportunistically.** The two that bite hardest:
 **P19 guest admissions (T9)** — a guest is admitted TODAY for `ticket.created`, `visibility.set`,
