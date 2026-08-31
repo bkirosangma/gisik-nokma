@@ -296,27 +296,56 @@ function ingestService(): IngestService {
  */
 function poolAllowingOneClient(real: Pool): Pool {
   let outstanding = 0;
+  const connect = async () => {
+    if (outstanding > 0) {
+      throw new Error(
+        'planted: something asked for a second connection while the ingest transaction held one',
+      );
+    }
+    outstanding += 1;
+    const client = await real.connect();
+    return new Proxy(client, {
+      get(target, property) {
+        if (property === 'release') {
+          return (...args: unknown[]) => {
+            outstanding -= 1;
+            return (target.release as (...a: unknown[]) => void).apply(target, args);
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  };
   return {
-    async connect() {
-      if (outstanding > 0) {
-        throw new Error(
-          'planted: something asked for a second connection while the ingest transaction held one',
-        );
+    connect,
+    /**
+     * Checkout, run, release — what `pg.Pool.query` actually does, and the
+     * reason this method exists rather than being left off as "nothing calls
+     * it".
+     *
+     * The proxy had no `query` at all, so the mutation below died of
+     * `TypeError: db.query is not a function` and the planted error string
+     * occurred ZERO times in the run (measured at 6a6203c). The counter, the
+     * release hook and the named error took no part in the kill: the test
+     * reddened because the fake was incomplete, not because a second connection
+     * was asked for, which is a different property from the one its name
+     * claims. Routing through `connect` is what makes the kill mean what the
+     * title says.
+     *
+     * It cannot change the unmutated result: nothing on the green path calls
+     * `query` on this pool — if anything did, this test would already have been
+     * dying of that same TypeError. `connect()` is awaited OUTSIDE the `try` so
+     * a refused checkout never reaches a `release` that would decrement a
+     * counter it never incremented.
+     */
+    async query(...args: unknown[]) {
+      const client = await connect();
+      try {
+        return await (client.query as (...a: unknown[]) => Promise<unknown>)(...args);
+      } finally {
+        client.release();
       }
-      outstanding += 1;
-      const client = await real.connect();
-      return new Proxy(client, {
-        get(target, property) {
-          if (property === 'release') {
-            return (...args: unknown[]) => {
-              outstanding -= 1;
-              return (target.release as (...a: unknown[]) => void).apply(target, args);
-            };
-          }
-          const value = Reflect.get(target, property, target) as unknown;
-          return typeof value === 'function' ? value.bind(target) : value;
-        },
-      });
     },
   } as unknown as Pool;
 }
@@ -815,7 +844,13 @@ describe('the gate at the client door — refusals before the rule engine', () =
     });
 
     // Mutation: `{ db: deps.pool, ... }` at the gate call site in `commitOne`.
-    // This then rejects with the planted error above instead of committing.
+    // This then rejects with the planted error above instead of committing —
+    // verified by running it, and verified for the MECHANISM and not only the
+    // colour: the planted sentence appears in the mutated run's output and
+    // `db.query is not a function` does not. Before `poolAllowingOneClient`
+    // grew a faithful `query` those two counts were the other way round, and
+    // the test was red for a reason that had nothing to do with a second
+    // connection.
     expectCommitted(await constrained.ingestClientBatch([event], member));
   });
 

@@ -149,18 +149,54 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
  * The coordination doc's ruling asks this module to name the checks it does not
  * yet perform rather than to label itself partial, because "deliberately
  * partial" ages into background noise while a list of absences stays
- * actionable. As of Task 5 exactly one absence remains:
+ * actionable. What follows is that register, and it lists ABSENCES — questions
+ * nothing here asks — not degrees of doneness.
+ *
+ * What Task 5 closed, precisely, is checks 1–5 above: actor identity (1),
+ * envelope-origin (2), the founding bypass bounded by `workspaceExists` (3),
+ * workspace membership (4), and inside the role check (5) three questions and
+ * exactly three — admin-only event TYPES, workspace-membership management, and
+ * project-roster management. "Role" as a whole is NOT closed, and saying it was
+ * is the trap this list previously set: role is several questions, and an
+ * implementer who reads it as one goes looking for somewhere other than
+ * `checkRolePermission` to put the ones still missing.
+ *
+ * - **Write authority on a project, and a guest's write ceiling.** Nothing here
+ *   asks who may CREATE a ticket or who may RETARGET one's audience. Plan 4
+ *   Task 9's own check list
+ *   (`docs/superpowers/plans/2026-08-20-04-auth-visibility.md`, "The checks
+ *   (exact)") assigns three refusals to `permission.role`, and a
+ *   `permission.role` refusal has to be made by the function that owns that
+ *   rule id: these belong INSIDE `checkRolePermission`, added to check 5's
+ *   sequence. A visibility pass running after it cannot supply them.
+ *   5a. Nothing asks whether the actor is a GUEST when `env.type` is
+ *       `ticket.created` (Task 9 check 2 — "Guests cannot create tickets.").
+ *   5b. Nothing asks whether a non-guest is ON the target project when
+ *       `env.type` is `ticket.created` (Task 9 check 2, and deliberately with
+ *       no admin shortcut: an admin joins the project first, attributed, and
+ *       creates afterwards).
+ *   5c. Nothing asks whether the actor holds project-admin rights on the
+ *       ticket's project, or created the ticket, when `env.type` is
+ *       `visibility.set` (Task 9 check 5). Nothing here stands between such an
+ *       event and a widened audience, and the ledger is append-only by trigger:
+ *       a widening can be superseded, never removed.
  *
  * - **Visibility.** Nothing asks whether the actor may SEE the entity the event
  *   touches. A member of the workspace who is on no project, or who is a guest
  *   outside every explicit audience, is still admitted here for ordinary ticket
  *   work; `permission.visibility` does not exist yet (Task 9), and
  *   `checkVisibilityPermission` will run after `checkRolePermission` inside
- *   `checkPermission` when it does.
+ *   `checkPermission` when it does — along with Task 9's check 3, the
+ *   `visibility.set` whose `payload.ticketId` disagrees with `entity.id`, which
+ *   is a coherence question rather than a seeing one but answers with
+ *   `permission.visibility` and so belongs to the same pass. What that pass
+ *   does NOT cover is 5a–5c above: those are write-authority questions, they
+ *   answer with `permission.role`, and nothing that runs after the role check
+ *   can make a refusal the role check owed.
  *
- * Task 5 closed the other three that stood here — actor identity, role and
- * membership — and each is now numbered above rather than deleted silently, so
- * the diff between "absent" and "present" stays legible.
+ * Each closed check is numbered above rather than deleted silently, and each
+ * open one is numbered into the sequence it belongs to, so the diff between
+ * "absent" and "present" stays legible in both directions.
  *
  * ## Which doors this closes
  *
