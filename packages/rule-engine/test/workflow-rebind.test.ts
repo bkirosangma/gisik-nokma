@@ -119,6 +119,16 @@ describe('checkTicketWorkflowRebound', () => {
     // The premise the refusal rests on, asserted rather than assumed: the
     // ticket's own type binding resolves in this same context, so the sentence
     // the old refusal told was false of the world it was told in.
+    //
+    // This line is the premise ITSELF — `task`'s workflow, looked up by the
+    // binding on the type, answering non-null. The line below it is a NEIGHBOUR
+    // of the premise: a different workflow being accepted says the check works,
+    // not that the type's binding resolves. The premise happens to be true by
+    // construction here (`buildMemoryContext`'s reducer throws on a
+    // `ticket.created` whose type's workflow is undefined, `ticket-state.ts:103-107`),
+    // which is exactly why asserting it costs one line and leaving it implicit
+    // cost the claim its evidence.
+    expect(await ctx().getWorkflowDef(TASK.workflowId)).not.toBeNull();
     expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ops', 'shipped'), ctx())).toEqual({ refused: false });
   });
 

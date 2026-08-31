@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseEvent } from '../src/parse-event.js';
+import { ticketFieldSetPayload } from '../src/events/ticket-events.js';
 import { makeEnvelope } from '../src/testing.js';
 
 const TICKET = '01J9GTKA000000000000000000';
@@ -125,5 +126,56 @@ describe('ticket event vocabulary', () => {
     expect(refuses('ticket-type.defined', 'ticket', {
       id: 'invoice', name: 'Invoice', icon: 'receipt', rank: 3, workflowId: 'wf-basic', fields: [],
     })).toBe('entity-kind-mismatch');
+  });
+});
+
+/**
+ * The presence hole, closed. `z.unknown()` alone does NOT require the key, so
+ * `{ fieldId: 'title' }` — no `value` at all — parsed clean, and the reducer's
+ * `p.value ?? null` (`src/ticket-state.ts:201`) folded that absence into a null
+ * CLEARING claim: a field wiped under the actor's name and both their clocks,
+ * into an append-only table, on the strength of a claim nobody made.
+ *
+ * FOUR assertions rather than one "the field is required", because two of the
+ * four are ACCEPTANCES and they are the half a careless fix breaks. A schema
+ * that also refused `null` or `{}` would look correct and would quietly start
+ * refusing legitimate claims — `null` is the explicit clearing claim, and an
+ * empty claim is still a claim.
+ *
+ * The same matrix, in the same words, as `envelope.test.ts`'s "payload is
+ * required" block: two doors, one answer.
+ */
+describe('ticket.field_set value is required', () => {
+  function issues(payload: Record<string, unknown>): Array<{ path: (string | number)[]; message: string }> {
+    const result = ticketFieldSetPayload.safeParse(payload);
+    if (result.success) throw new Error('expected safeParse to fail, but it succeeded');
+    return result.error.issues.map((issue) => ({ path: issue.path, message: issue.message }));
+  }
+
+  it('planted defect: refuses an ABSENT value — the reducer would fold it into a clearing nobody claimed', () => {
+    expect(ticketFieldSetPayload.safeParse({ fieldId: 'title' }).success).toBe(false);
+    expect(issues({ fieldId: 'title' })).toContainEqual({
+      path: ['value'],
+      message: 'is required — a field claim with no value would record a clearing nobody made',
+    });
+  });
+
+  it('planted defect: refuses an explicitly undefined value — JSON erases the difference from absence', () => {
+    expect(issues({ fieldId: 'title', value: undefined })).toContainEqual({
+      path: ['value'],
+      message: 'is required — a field claim with no value would record a clearing nobody made',
+    });
+  });
+
+  it('accepts value: null — the clearing claim is a claim, made by somebody, at a time', () => {
+    expect(ticketFieldSetPayload.safeParse({ fieldId: 'amount', value: null }).success).toBe(true);
+  });
+
+  it('accepts an empty-object value — an empty claim is still a claim', () => {
+    expect(ticketFieldSetPayload.safeParse({ fieldId: 'description', value: {} }).success).toBe(true);
+  });
+
+  it('the door inherits it: parseEvent refuses a field_set carrying no value', () => {
+    expect(refuses('ticket.field_set', 'ticket', { fieldId: 'title' })).toBe('invalid-payload');
   });
 });

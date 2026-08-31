@@ -29,8 +29,36 @@ export const ticketCollaboratorPayload = z.object({ userId: z.string().min(1) })
  * does the value fit its kind) are the engine's job — see checkTicketFieldSet.
  * value: null is the clearing claim; built-ins title/description/dueDate/startDate ride
  * this same event, and a due date value is always { date, note? } — a claim.
+ *
+ * `value` is REQUIRED, and `z.unknown()` alone does not make it so: probed
+ * against this repo's zod, `{ fieldId: 'title' }` with no `value` key at all
+ * parses clean, and so does one carrying an explicit `undefined`. That is not
+ * a harmless permissiveness here. The reducer reads `p.value ?? null`
+ * (`../ticket-state.ts:201`), so an omitted `value` is folded into a null
+ * CLEARING CLAIM — a field wiped under the actor's name and both their clocks,
+ * into an append-only table, on the strength of a claim nobody made. Invariant
+ * 4 ("nothing is invented"), violated by the door.
+ *
+ * Only ABSENCE is the defect, and the two acceptances are pinned by their own
+ * tests rather than left to fall out of the fix: `null` is the explicit
+ * clearing claim design decision 3 sanctions, and any other value — `{}`
+ * included — is a claim like any other. The check is `!== undefined` rather
+ * than `'value' in payload` because absent and present-but-`undefined` must
+ * both be refused and `JSON.stringify` erases the difference on the wire
+ * anyway; writing it the other way would invite a reader to think the
+ * distinction meant something.
+ *
+ * Same defect, same shape, same answer as `envelope.ts`'s `requiredPayload`
+ * (an event with no payload at all). The two doors are deliberately proven
+ * alike — four assertions each, and both mutated back to bare `z.unknown()` to
+ * watch the ABSENT case fail specifically.
  */
-export const ticketFieldSetPayload = z.object({ fieldId: z.string().min(1), value: z.unknown() });
+export const ticketFieldSetPayload = z.object({
+  fieldId: z.string().min(1),
+  value: z
+    .unknown()
+    .refine((value) => value !== undefined, 'is required — a field claim with no value would record a clearing nobody made'),
+});
 
 export const ticketReparentedPayload = z.object({ newParentId: ulidString.nullable() });
 

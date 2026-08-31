@@ -3,6 +3,7 @@ import type { TicketTypeDef } from '@gisik-nokma/domain';
 import { BUILTIN_TICKET_TYPE_SEEDS, DEEPEST_RANK, makeEnvelope } from '@gisik-nokma/domain';
 import { buildMemoryContext } from '../src/memory-context.js';
 import { checkTicketTypeDefined } from '../src/checks/ticket-type.js';
+import { evaluateEvent } from '../src/evaluate.js';
 import { PROJECT, WF, WS, typeDefined } from '../src/checks/test-support.js';
 
 /** Nothing this check asks is a question about workspace state; any context does. */
@@ -147,5 +148,28 @@ describe('checkTicketTypeDefined', () => {
   it("the locked sub-task rank IS DEEPEST_RANK — the reason this refusal is not tidiness", () => {
     const subTask = BUILTIN_TICKET_TYPE_SEEDS.find((seed) => seed.id === 'sub-task');
     expect(subTask?.rank).toBe(DEEPEST_RANK);
+  });
+});
+
+/**
+ * The dispatch, which every test above bypasses by calling the check directly.
+ *
+ * Until now `ticket-type.defined`'s routing was pinned ONLY by its two
+ * fixtures. That is real coverage — the fixture suite enters at `evaluateEvent`
+ * (`test/fixtures.test.ts:19`) — but it lives in another file, and a future
+ * task relocating or rewriting those two fixtures would silently reopen exactly
+ * the gap Task 6 was credited with finding: a fully mutation-proven check that
+ * nothing reaches, and a built-in rank lock quietly released through the
+ * pass-through default.
+ */
+describe('evaluateEvent dispatches ticket-type.defined', () => {
+  it('routes the event to checkTicketTypeDefined rather than passing it through', async () => {
+    const env = typeDefined(def({ id: 'sub-task', name: 'Sub-task', rank: 3 }));
+    expect(await evaluateEvent(env, ctx())).toEqual({
+      refused: true,
+      rule: 'type.builtin-rank',
+      reason:
+        '"Sub-task" is the built-in sub-task type; its rank is 4 and cannot be changed. Define a custom type for differently-ranked work.',
+    });
   });
 });

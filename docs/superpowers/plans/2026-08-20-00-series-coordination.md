@@ -3324,6 +3324,72 @@ instances in this plan were visible that way, and all three shipped in plan text
 - **A dispatch nobody tested.** Every Plan 3 check test called its function directly, so deleting a `case`
   from `packages/rule-engine/src/evaluate.ts` left a fully mutation-proven, **unreachable** check while
   `evaluateEvent`'s pass-through default accepted every reparent and every same-workflow rebind. Task 6
-  added three assertions that enter at `evaluateEvent`. **Task 7 appends to the same switch and inherits
-  the obligation.** The shape generalises: a lane can prove every branch of a check falsifiable and still
-  never touch the one line that decides whether the check runs.
+  added **two** assertions that enter at `evaluateEvent` — `ticket.reparented` in `test/reparent.test.ts`
+  and `ticket.workflow_rebound` in `test/workflow-rebind.test.ts` — plus two `ticket-type.defined`
+  fixtures, which enter there too because `test/fixtures.test.ts:19` is `evaluateEvent(...)`.
+  *(Corrected by Task 7, which counted the shipped files. The earlier "three" conflated the two unit
+  assertions with the fixture-carried third; `test/ticket-type.test.ts` had no `evaluateEvent` entry of
+  its own, so `ticket-type.defined`'s routing rested entirely in another file and a task relocating those
+  two fixtures would have silently reopened the gap. Task 7 added that third describe and a fourth for
+  `ticket.field_set`, so the sentence is now true of the repo as well as of the intent.)*
+  **Task 7 appended to the same switch and inherited the obligation.** The shape generalises: a lane can
+  prove every branch of a check falsifiable and still never touch the one line that decides whether the
+  check runs — and a dispatch pinned only from another file is one relocation away from unpinned.
+
+---
+
+## Ruling P14 (2026-08-31, controller) — an actor-supplied id resolved with no workspace predicate, and this one is ACCEPTED rather than mislabelled
+
+Found by Plan 3 Task 6's review; **recorded here by Task 7**, the next change set, rather than at plan end —
+this series has lost rulings twice to a gitignored ledger. **Task 7 does not implement it. Task 12 does.**
+
+**P12 closed a tenancy hole on the parent. The same hole is open on the target workflow, and there it admits
+a write.** `packages/rule-engine/src/checks/workflow-rebind.ts:87` calls `ctx.getWorkflowDef(p.toWorkflowId)`
+on an id the ACTOR supplied, and there is no workspace predicate anywhere on the server path:
+
+- `apps/server/migrations/1787896601515_proj-workflows.sql:4-13` — `workspace_id` is a plain column; the PK
+  is `(workflow_id, version)`, global.
+- `apps/server/src/projections/workflows.ts:80-83` — `WHERE workflow_id = $1 ORDER BY version DESC LIMIT 1`.
+  No tenancy filter in any of the three selector branches.
+- `apps/server/src/engine-context.ts:92` — passes straight through.
+
+So a foreign workflow id RESOLVES, the target-state check runs against another workspace's state graph, and
+the event is accepted: a live ticket bound to a workflow its workspace cannot see, standing in one of that
+workflow's states. `ticket.workflow_rebound` is the first check in this plan where an actor-supplied id is
+resolved directly — creation reads the type's binding, a transition reads the ticket's own — which is why
+the class did not appear until now. P12's own shipped comment indicts it verbatim once the noun is
+substituted (`checks/hierarchy.ts:242-244`): *"The ingest door's tenancy check does not cover this: it
+guards the event's own entity, never the parent the payload names."*
+
+**Severity, against the two rulings it extends.** P11 told the actor a false sentence. P12 mislabelled a
+refusal and confirmed that an id exists somewhere they cannot see. **P14 admits the write** — the worst of
+the three, and a boundary the spec makes explicit (§6: *"Enforcement is server-side on every read and every
+sync-down"*).
+
+**Latent today, live in one specific commit.** `apps/server/src/engine-context.ts:74-76` returns null for
+every kind outside `KINDS_WHOSE_STATE_IS_ONLY_IDENTITY`, `'ticket'` among them, so `ticket.unknown` fires
+first at `workflow-rebind.ts:64` and the workflow lookup is never reached on the server. (Addendum 10 cited
+`:76-78` for this; the branch is at `:74-76` in the shipped file — checked, not inherited.) **It goes live in the same commit Task 12 lands** — the same commit
+Addendum 9 already flags for the `rowToTicketState` `workspaceId` trap, where a missing field refuses every
+parented `ticket.created`. Two independent tenancy hazards converge there; Task 12 meets both or neither.
+
+**The ruling: close it fail-closed, in Task 12.** The conservative option under the autonomous protocol is
+to refuse. The DESIGN is Task 12's — either a workspace predicate on the `EngineContext` lookups at all
+three implementations, or an equivalent that keeps the comparison inside the check — because Task 12 is
+what backs those lookups with real projections. **No unit test can pin the fix:** `buildMemoryContext` has
+no workspace notion for workflows at all, so the test home is Task 12's `apps/server/test/engine-context.test.ts`
+suite. Cost if wrong: a workspace predicate on a lookup that is already per-workspace in every legitimate
+call.
+
+**The class extends one step further, and Task 12 owns that end too.** `getTicketTypeDef(ctx, p.typeId)` on
+the create path (`checks/hierarchy.ts:84`) has the identical shape the moment Task 12 backs it with
+`proj_ticket_types` — a type id the actor supplies, resolved with no tenancy filter. Addendum 9a recorded
+the *own-entity* sibling of P12 (`hierarchy.ts:82`, `ticket.already-exists`) and ruled it non-blocking
+because both real consumers are workspace-scoped before the engine; the **actor-supplied-id** siblings were
+not considered then. They are this ruling.
+
+**The transferable tell, alongside P11–P13's.** Those three ask *"read the reason aloud — is its noun what
+the check just failed to resolve?"* This one asks a different question of the same line: **whose id is
+this?** An id the ACTOR chose, resolved through a lookup with no tenancy predicate, is a tenancy hole
+whatever the answer looks like — and it is worst where the lookup succeeding leads to an ACCEPT rather than
+to a refusal, because nothing downstream will ever mention it.
