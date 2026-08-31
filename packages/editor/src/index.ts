@@ -4,3 +4,9 @@ export {
   type EditorSchemaOptions,
   type MentionCandidate,
 } from './schema/extensions.js';
+export {
+  IMAGE_WRAP_MODES,
+  TicketImage,
+  type ImageWrapMode,
+  type TicketImageOptions,
+} from './extensions/ticket-image.js';

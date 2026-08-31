@@ -1,0 +1,34 @@
+/* @gisik-nokma/editor — document styles. BEM classes, STRUCTURAL ONLY: no
+   colour of any kind lives here — no hex, no colour function, and no bare
+   keyword such as `red` either. Amendment 11's scanner
+   (packages/ui/test/helpers/colour-scan.ts) already names packages/editor/src
+   among its roots and catches the first two kinds; the third it does not yet
+   match, which is why it is written down rather than left to the machine.
+   That scanner is line-based and does not skip CSS comments, so this note
+   deliberately spells none of the forms it prohibits — naming them here would
+   fail a test in a package this one does not own.
+
+   Anything needing a visible edge draws it with `currentColor`, which inherits
+   the surrounding text colour and is therefore already contrast-proven.
+   packages/editor must not depend on packages/ui, so a token variable from
+   tokens.ts is not reachable from here. */
+
+/* Image embedding: the three wrap modes of spec §2. */
+.editor-image {
+  max-width: 100%;
+  height: auto;
+}
+.editor-image--block {
+  display: block;
+  margin: 0.5rem 0;
+}
+.editor-image--inline-left {
+  float: left;
+  margin: 0 1rem 0.5rem 0;
+  max-width: 50%;
+}
+.editor-image--inline-right {
+  float: right;
+  margin: 0 0 0.5rem 1rem;
+  max-width: 50%;
+}

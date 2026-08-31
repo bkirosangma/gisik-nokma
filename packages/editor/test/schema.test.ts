@@ -11,9 +11,10 @@ import { createTestEditor } from './helpers/create-editor.js';
  * (v3.30.5 bundles `underline`), and a `toContain` check would let every one
  * of them into the stored document while staying green.
  *
- * Tasks 3 and 4 add `image` and `mention` here when they add them to the
- * schema. That edit is the point — a closed vocabulary should cost one line
- * to widen and should be impossible to widen by accident.
+ * `image` arrived with Task 3 and was added here in the same change set;
+ * Task 4 adds `mention` the same way. That edit is the point — a closed
+ * vocabulary should cost one line to widen and should be impossible to widen
+ * by accident.
  */
 const SCHEMA_V1_NODES = [
   'doc',
@@ -31,6 +32,7 @@ const SCHEMA_V1_NODES = [
   'tableRow',
   'tableHeader',
   'tableCell',
+  'image',
 ];
 
 const SCHEMA_V1_MARKS = ['bold', 'italic', 'strike', 'code', 'link'];

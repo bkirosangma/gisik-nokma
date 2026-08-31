@@ -7,6 +7,7 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { VersionedDocument } from './versioned-document.js';
+import { TicketImage } from '../extensions/ticket-image.js';
 
 export type MentionCandidate = { userId: string; name: string };
 
@@ -109,6 +110,18 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     TableRow,
     TableHeader,
     TableCell,
+    // The image node of schema v1 (spec §2: only images embed inline). The
+    // default attachment route is stated ONCE, in TicketImage's `addOptions`,
+    // and is not restated here: `configure` merges with `mergeDeep` (core
+    // dist:4654-4661), which copies every key of its source with
+    // `Object.keys(...).forEach` — so an explicitly-passed `undefined` REPLACES
+    // the default rather than falling back to it, and `exactOptionalPropertyTypes`
+    // is off, so `{ resolveAttachmentUrl: props.maybeUndefined }` type-checks
+    // its way into that. Hence the conditional: the option travels only when
+    // the caller actually has one. A test drives both shapes.
+    TicketImage.configure(
+      options.resolveAttachmentUrl ? { resolveAttachmentUrl: options.resolveAttachmentUrl } : {},
+    ),
     // HEADING LEVELS ARE NOT VALIDATED, AND CANNOT BE HERE. Heading resolves
     // to `levels: [1,2,3,4,5,6]`, which governs which levels the toolbar and
     // input rules OFFER — it is not a constraint on stored documents.
