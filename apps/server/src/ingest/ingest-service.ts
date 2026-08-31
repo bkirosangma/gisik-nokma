@@ -20,6 +20,7 @@ import {
   nextWorkspaceSeq,
 } from '../ledger/event-store.js';
 import { checkPermission, type SubmissionGate } from '../permissions/check-permission.js';
+import { checkContestCoherence } from '../sync/contest-coherence.js';
 import { bootstrapWorkspace } from '../workspaces/bootstrap-workspace.js';
 import { readEntityHead } from '../projections/entity-heads.js';
 import type { ProjectionRegistry } from '../projections/registry.js';
@@ -231,6 +232,42 @@ export function createIngestService(deps: IngestDeps): IngestService {
         await client.query('ROLLBACK');
         return {
           result: { status: 'refused', eventId: envelope.id, rule: refusal.rule, reason: refusal.reason },
+          committed: null,
+        };
+      }
+
+      // The §11 envelope-coherence closer (Plan 10 Task 4). A `claim.contested`
+      // embeds the refused claim WHOLE, and until this line nothing compared the
+      // embedded claim against the envelope carrying it: a contest filed on a
+      // real ticket in its real workspace could embed a fabricated claim naming
+      // any other ticket in any other workspace, and every layer accepted it.
+      // See ../sync/contest-coherence.ts for exactly what is bound and what is
+      // deliberately not.
+      //
+      // UNCONDITIONAL — it runs on BOTH doors, and that is the difference
+      // between this check and the envelope-origin gate above. The gate must
+      // distinguish doors because the server's own appends are legitimately
+      // server-origin; there is no legitimate append, from any door, of a
+      // contest whose embedded claim is about a different ticket. So it is not
+      // carried in `door` and it is not `IngestDeps.gates` either (decision 15's
+      // gates are construction-time and unconditional, which is right here, but
+      // Plan 7 owns that field's contract and this predates it).
+      //
+      // Placed AFTER the permission gate and before `deps.evaluate`: a client
+      // that has forged its provenance is told that first — the refusal that
+      // names the fault it can actually fix — and this sits beside
+      // `contest.server-only`, the engine rule it complements. server-only says
+      // who may file a contest; this says what a filing must be about.
+      const incoherent = checkContestCoherence(envelope);
+      if (incoherent !== null) {
+        await client.query('ROLLBACK');
+        return {
+          result: {
+            status: 'refused',
+            eventId: envelope.id,
+            rule: incoherent.rule,
+            reason: incoherent.reason,
+          },
           committed: null,
         };
       }

@@ -5,6 +5,8 @@ import { registerAuthRoutes } from './auth/routes.js';
 import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
 import { registerEventRoutes } from './routes/events.js';
+import { registerContestsRoute } from './sync/contests-route.js';
+import type { Queryable } from './db/queryable.js';
 
 export type HealthDb = { query(sql: string): Promise<unknown> };
 
@@ -21,6 +23,15 @@ export const INTERNAL_ERROR_BODY = {
 
 export type AppDeps = {
   db: HealthDb;
+  /**
+   * The query handle the READ routes use. Separate from `db` rather than a
+   * widening of it: `HealthDb` is deliberately the narrowest thing /healthz can
+   * ask for — one string, no parameters — and app.test.ts hands it a hand-rolled
+   * object so that file can stay database-free while proving /healthz answers
+   * 503 when the database is down. A read route needs parameterised queries and
+   * a real driver, so it gets its own field with its own type.
+   */
+  pool: Queryable;
   /**
    * The GATED door only (`ClientIngest`), never the full `IngestService`: an
    * assembled HTTP app has no business reaching the internal append path, and
@@ -83,7 +94,12 @@ export function buildApp(deps: AppDeps, options: { logLevel?: string } = {}): Fa
   // preHandler that writes it — the rule `require-session.ts` states, made
   // structural: `registerEventRoutes` takes the preHandler as an argument, so
   // there is no version of this line that forgets it and still compiles.
-  registerEventRoutes(app, deps.ingest, makeRequireSession(deps.auth));
+  const requireSession = makeRequireSession(deps.auth);
+  registerEventRoutes(app, deps.ingest, requireSession);
+  // The contests read surface (Plan 10 Task 4). It takes the same preHandler by
+  // parameter for the same reason the events door does: a route that reads
+  // `request.currentUserId` cannot be assembled without the thing that sets it.
+  registerContestsRoute(app, { pool: deps.pool }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;

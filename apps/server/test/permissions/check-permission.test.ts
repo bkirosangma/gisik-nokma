@@ -110,7 +110,7 @@ async function signedInApp(ingest: IngestService = ingestService()) {
     baseUrl: 'http://localhost:3000',
     secret: 'test-secret-not-used-anywhere-real',
   });
-  const app = buildApp({ db: db.pool, ingest, auth });
+  const app = buildApp({ db: db.pool, pool: db.pool, ingest, auth });
   phoneCounter += 1;
   const user = await signInWithPhone(app, otp, `+9197000${String(phoneCounter).padStart(5, '0')}`);
   return { app, user, headers: { authorization: `Bearer ${user.token}` } };
@@ -147,22 +147,49 @@ async function signedInFounder(ingest: IngestService = ingestService()) {
 }
 
 /**
- * The reachable forgery, exactly as the coordination doc describes it: a
- * `claim.contested` whose OUTER envelope is honest — a real ticket filed under
- * its own workspace, so `ENTITY_WORKSPACE_MISMATCH_RULE` has nothing to catch —
- * carrying a fabricated claim inside `payload`, attributed to a victim actor in
- * a different workspace. Nothing binds the embedded event to the outer
- * envelope, so the only thing standing between this and a permanent
- * un-deletable ledger entry is `contest.server-only`, which reads envelope-origin.
+ * The reachable forgery: a `claim.contested` whose OUTER envelope is honest — a
+ * real ticket filed under its own workspace, so `ENTITY_WORKSPACE_MISMATCH_RULE`
+ * has nothing to catch — carrying a fabricated claim inside `payload`,
+ * attributed to a victim actor. The one lie left in it is envelope-origin: the
+ * client wears the server's own provenance to walk past `contest.server-only`.
+ *
+ * ## The embedded claim used to name a DIFFERENT ticket in a DIFFERENT
+ * workspace, and it deliberately no longer does
+ *
+ * That second fault was §11's forgery — nothing bound a contest's embedded
+ * claim to the envelope carrying it — and it is now refused by the §11 closer
+ * (`src/sync/contest-coherence.ts`, Plan 10 Task 4), UNCONDITIONALLY, on both
+ * doors. Leaving it in would make every case below pass for a reason unrelated
+ * to the property this file is named after: the client-door cases would draw
+ * `contest.incoherent-original` instead of the envelope-origin refusal, and the
+ * internal-door case — whose whole point is that a legitimate server-origin
+ * contest COMMITS through `ingestBatch` — could no longer commit at all.
+ *
+ * So the extra fault is removed from the fixture rather than the assertions
+ * loosened, which is exactly what this file's own note below prescribes for the
+ * identity and membership faults it removed before. What is left is one lie,
+ * and every case here is now about that one lie. §11's own refusal is pinned
+ * where it lives, in `test/sync/contest-coherence-door.test.ts`.
  */
 function forgedContest(overrides: Partial<SubmittedEvent> = {}): SubmittedEvent {
-  const workspaceId = newUlid();
-  const victimWorkspaceId = newUlid();
+  // The outer envelope FIRST, overrides applied, because the embedded claim has
+  // to be built from the workspace and ticket the caller actually ended up
+  // with: `forgedContest({ workspaceId })` is how the client-door cases file
+  // the forgery into the caller's own workspace, and a payload built before
+  // that override would silently be incoherent again.
+  const outer = {
+    id: newUlid(),
+    workspaceId: newUlid(),
+    entity: { kind: 'ticket', id: newUlid() } as SubmittedEvent['entity'],
+    actorId: newUlid(),
+    clientTime: '2026-08-20T09:00:00.000Z',
+    ...overrides,
+  };
   const victimActorId = newUlid();
   const fabricatedClaim: SubmittedEvent = {
     id: newUlid(),
-    workspaceId: victimWorkspaceId,
-    entity: { kind: 'ticket', id: newUlid() },
+    workspaceId: outer.workspaceId,
+    entity: outer.entity,
     type: 'ticket.transitioned',
     version: 1,
     payload: { toStateId: 'done' },
@@ -171,9 +198,6 @@ function forgedContest(overrides: Partial<SubmittedEvent> = {}): SubmittedEvent 
     clientTime: '2026-08-20T09:00:00.000Z',
   };
   return {
-    id: newUlid(),
-    workspaceId,
-    entity: { kind: 'ticket', id: newUlid() },
     type: 'claim.contested',
     version: 1,
     payload: {
@@ -181,9 +205,8 @@ function forgedContest(overrides: Partial<SubmittedEvent> = {}): SubmittedEvent 
       rule: 'workflow.transition-not-allowed',
       reason: 'this refusal never happened',
     },
-    actorId: newUlid(),
     origin: 'server', // the forgery: the client wears the server's provenance
-    clientTime: '2026-08-20T09:00:00.000Z',
+    ...outer,
     ...overrides,
   };
 }

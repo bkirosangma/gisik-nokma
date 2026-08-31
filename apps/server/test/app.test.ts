@@ -28,9 +28,11 @@ function fakeIngest(): IngestService {
  * pool, whose port nothing listens on, it returns in ~2ms. Nothing here requests
  * an /api/auth/* path, so the pool is never asked for a client.
  */
+const offlinePool = createPool('postgres://unused:unused@127.0.0.1:1/unused');
+
 function offlineAuth(): ReturnType<typeof createAuth> {
   return createAuth({
-    pool: createPool('postgres://unused:unused@127.0.0.1:1/unused'),
+    pool: offlinePool,
     otpSender: new LogOtpSender(() => {}),
     magicLinkSender: new LogMagicLinkSender(() => {}),
     baseUrl: 'http://localhost:3000',
@@ -40,7 +42,7 @@ function offlineAuth(): ReturnType<typeof createAuth> {
 
 describe('GET /healthz', () => {
   it('answers ok when the database responds', async () => {
-    const app = buildApp({ db: healthyDb, ingest: fakeIngest(), auth: offlineAuth() });
+    const app = buildApp({ db: healthyDb, pool: offlinePool, ingest: fakeIngest(), auth: offlineAuth() });
     const response = await app.inject({ method: 'GET', url: '/healthz' });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: 'ok' });
@@ -48,7 +50,7 @@ describe('GET /healthz', () => {
   });
 
   it('planted defect: answers 503 unavailable when the database is down — never a fake ok', async () => {
-    const app = buildApp({ db: brokenDb, ingest: fakeIngest(), auth: offlineAuth() });
+    const app = buildApp({ db: brokenDb, pool: offlinePool, ingest: fakeIngest(), auth: offlineAuth() });
     const response = await app.inject({ method: 'GET', url: '/healthz' });
     expect(response.statusCode).toBe(503);
     expect(response.json()).toEqual({ status: 'unavailable' });

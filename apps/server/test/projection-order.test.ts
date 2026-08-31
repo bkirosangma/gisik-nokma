@@ -7,7 +7,7 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  * later plans depend on the pinned order
  *
  *   proj_entity_heads, proj_workflows, proj_ticket_types, proj_tickets,
- *   proj_rollups, proj_memberships, proj_visibility
+ *   proj_rollups, proj_memberships, proj_visibility, proj_contested
  *
  * because a projection may read a table an earlier one wrote in the same
  * transaction (Plan 3's proj_rollups reads proj_tickets). A guarantee nothing
@@ -25,13 +25,17 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  * make this ordering contract skippable when Postgres is not running.
  */
 describe('projection registration order (coordination §8)', () => {
-  it('buildProjectionRegistry registers the pinned order: heads, workflows, memberships, visibility', () => {
+  it('buildProjectionRegistry registers the pinned order: heads, workflows, memberships, visibility, contested', () => {
     const registry = buildProjectionRegistry();
     expect(registry.all().map((projection) => projection.name)).toEqual([
       'proj_entity_heads',
       'proj_workflows',
       'proj_memberships',
       'proj_visibility',
+      // Plan 10 Task 4. §8's order gains one TAIL entry, so appending is its §8
+      // position here — a coincidence of where it falls, not an exception to
+      // the insert-at-your-position rule above.
+      'proj_contested',
     ]);
   });
 
@@ -53,6 +57,7 @@ describe('projection registration order (coordination §8)', () => {
       ['proj_workflows', ['proj_workflows']],
       ['proj_memberships', ['proj_memberships']],
       ['proj_visibility', ['proj_visibility']],
+      ['proj_contested', ['proj_contested']],
     ]);
   });
 });
