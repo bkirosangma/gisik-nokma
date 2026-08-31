@@ -8,11 +8,16 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { VersionedDocument } from './versioned-document.js';
 import { TicketImage } from '../extensions/ticket-image.js';
-
-export type MentionCandidate = { userId: string; name: string };
+import { Mention, type MentionCandidate } from '../extensions/mention.js';
 
 export type EditorSchemaOptions = {
-  /** Mention picker data source (Task 4). Absent → mentions render but the picker offers nobody. */
+  /**
+   * Mention picker data source (Task 4). Absent → mentions render but the
+   * picker offers nobody. `MentionCandidate` has ONE origin and it is
+   * `../extensions/mention.js`, which is also where the rule that turns a
+   * candidate into a stored label lives; this file names the type and does not
+   * re-export it, so the barrel exports it exactly once.
+   */
   queryUsers?: (query: string) => Promise<MentionCandidate[]>;
   /** Maps an image node's attachmentId to a URL (Task 3). Defaults to the server route. */
   resolveAttachmentUrl?: (attachmentId: string) => string;
@@ -122,6 +127,16 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     TicketImage.configure(
       options.resolveAttachmentUrl ? { resolveAttachmentUrl: options.resolveAttachmentUrl } : {},
     ),
+    // The mention node of schema v1. `queryUsers` is spelled with `??` rather
+    // than passed conditionally the way TicketImage's option is, and the
+    // difference is not an inconsistency: TicketImage's default lives in its
+    // own `addOptions` and `mergeDeep` would let an explicit `undefined`
+    // REPLACE it (core dist:4654-4661), so that option must travel only when
+    // the caller has one. Here the fallback is a value, not a default being
+    // protected, so stating it at the call site is the shorter honest form —
+    // and `Mention.addOptions` still carries its own, for a host that
+    // configures the extension directly.
+    Mention.configure({ queryUsers: options.queryUsers ?? (async () => []) }),
     // HEADING LEVELS ARE NOT VALIDATED HERE. Heading resolves to
     // `levels: [1,2,3,4,5,6]`, which governs which levels the toolbar and
     // input rules OFFER — it is not a constraint on stored documents, and it

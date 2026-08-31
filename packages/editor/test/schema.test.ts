@@ -33,6 +33,7 @@ const SCHEMA_V1_NODES = [
   'tableHeader',
   'tableCell',
   'image',
+  'mention',
 ];
 
 const SCHEMA_V1_MARKS = ['bold', 'italic', 'strike', 'code', 'link'];

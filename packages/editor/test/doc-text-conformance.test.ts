@@ -223,6 +223,59 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
     editor.destroy();
   });
 
+  /**
+   * THE MENTION NODE IS THE ONE SHAPE THIS WALKER NAMES OUT LOUD. Its header
+   * says Plan 7's editor conforms to `{ type: 'mention', attrs: { userId,
+   * label? } }`, and until Task 4 there was no node to check that against — the
+   * conformance ran in the other direction only, block nodes the walker knows.
+   *
+   * Two halves, and the second is the one with teeth. The walker renders
+   * `@label`, so the mention has to arrive inline with no line break and with
+   * the display name, not the id — that is the first expectation. The second is
+   * the fallback: the walker takes `label` only when it is a string of NON-ZERO
+   * length and otherwise prints `attrs.userId`, a ULID. Both are driven on a
+   * document this editor actually produced, because a hand-written one could
+   * agree with the walker while the editor disagreed with both.
+   */
+  it('renders an editor-produced mention as @label, inline, with no id in sight', () => {
+    const editor = createTestEditor(undefined, {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'ask ' },
+            {
+              type: 'mention',
+              attrs: { userId: '01J9GUSA000000000000000000', label: 'Anselma' },
+            },
+            { type: 'text', text: ' about the GST receipt' },
+          ],
+        },
+      ],
+    });
+    expect(docToPlainText(editor.getJSON())).toBe('ask @Anselma about the GST receipt');
+    editor.destroy();
+  });
+
+  it('and falls back to the ULID when the label is empty — why the insert path guards it', () => {
+    const editor = createTestEditor(undefined, {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'mention', attrs: { userId: '01J9GUSA000000000000000000', label: '' } }],
+        },
+      ],
+    });
+    // Not the behaviour anyone wants in a search index or a notification, and
+    // not a defect in the walker either: it is the honest thing to print when
+    // the document carries no name. The refusal that keeps documents out of
+    // this state lives in src/extensions/mention.ts and is tested there.
+    expect(docToPlainText(editor.getJSON())).toBe('@01J9GUSA000000000000000000');
+    editor.destroy();
+  });
+
   it('is unbothered by the doc attrs this schema stamps and the paragraph typing appends', () => {
     // schemaVersion lives on the doc node's attrs, which the walker ignores
     // entirely; trailingNode appends an empty paragraph after a heading the

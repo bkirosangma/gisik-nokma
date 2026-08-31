@@ -32,3 +32,32 @@
   margin: 0 0 0.5rem 1rem;
   max-width: 50%;
 }
+
+/* Mention picker popup and the mention node itself (spec §2's one non-input-rule
+   trigger). Structure only, under the same rule as everything above: the edges
+   are drawn with `currentColor`, and the surface the popup sits on is the
+   host's to supply from the one origin named at the top of this file. */
+.mention-popup {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 10rem;
+  border: 1px solid currentColor;
+}
+.mention-popup__item {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+.mention-popup__item--selected {
+  outline: 1px solid currentColor;
+  outline-offset: -1px;
+}
+.editor-mention {
+  white-space: nowrap;
+}
