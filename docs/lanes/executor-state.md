@@ -16,10 +16,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | Anchor | Value | How verified |
 |---|---|---|
 | Branch | `exec/03-tickets-hierarchy` | `git rev-parse --abbrev-ref HEAD` |
-| HEAD | `8601b02` | reachable, verified with `git branch -a --contains` (not `cat-file`) |
-| Merge-base with `origin/main` | `308ee6e` — i.e. HEAD is a direct descendant | `git rev-list --left-right --count origin/main...HEAD` → `0 24` |
-| Ahead / behind | **24 ahead, 0 behind** | same command |
-| Remote | `origin/exec/03-tickets-hierarchy` = `8601b02` | pushed; **PR #38 OPEN** |
+| HEAD | **do not trust any sha printed here** — run `git rev-parse HEAD`. It cannot be recorded correctly: the commit that records it changes it. | — |
+| Merge-base with `origin/main` | `308ee6e` — i.e. HEAD is a direct descendant | `git rev-list --left-right --count origin/main...HEAD`, left half 0 |
+| Ahead / behind | **0 behind** is the stable half and is what matters. The ahead-count moves with every commit including this file's; re-measure. | `git rev-list --left-right --count origin/main...HEAD` |
+| Remote | `origin/exec/03-tickets-hierarchy`, in sync with local | **PR #38 OPEN** against `main` |
 | Tree state | **clean** | `git status --porcelain` empty; verified byte-identical to the pinned baseline after the review fan-out |
 | Pre-rebase HEAD | `a7388ae` — **orphaned, do not cite** | superseded by the rebase |
 
@@ -34,7 +34,7 @@ The coordination doc was the one file both sides changed. Post-rebase it is **34
 and the branch's `## Ruling P13` (3273), `## Ruling P14` (3341) and
 `## A mutation that crosses a package boundary is inert…` (3399).
 
-## Gate composition — recounted at `c6b4e59` (code sha; `8601b02` on top is docs-only)
+## Gate composition — recounted at `c6b4e59`, the last CODE commit
 
 **Status: GREEN** after the P16 fix (below). It was RED on the bare rebase — not a flake, and not
 present before it: a semantic collision the textual merge could not see.
@@ -176,8 +176,13 @@ differ here (the doc says merge at `8209397`); the brief is the later fact and T
 
 ---
 
-**Self-correction, left in deliberately as an instance of the rule above.** The first version of this
-file recorded `c6b4e59` / 23-ahead — numbers that were true when written and false one commit later,
-because the commit that wrote them changed them. An absolute is a fact about a moment and nobody
-holds the moment. Anything a resumer relies on must be re-measured from the directory at the sha
-being reported, including everything in this file.
+**Self-correction, left in deliberately, because the fix is structural and worth the space.** Two
+successive versions of this file recorded a HEAD sha and an ahead-count, and each was falsified by
+the very commit that made it durable. That is not carelessness twice; it is a self-referential
+measurement, and chasing it is unwinnable. So the anchor table no longer names them.
+
+**What is safe to record is what does not move:** the branch name, `0 behind`, the last CODE commit
+(`c6b4e59` — everything after it on this branch is documentation), the PR number, and the gate
+composition measured at that code sha. **What must always be re-measured:** `HEAD`, the ahead-count,
+and anything counted from the directory. An absolute is a fact about a moment, and nobody holds the
+moment — including this file.
