@@ -14,9 +14,12 @@ decision boundary.
 
 | what | value |
 |---|---|
-| `main` | `f40a850` — PR #43 (Plan 6a T9) then PR #45 (P17 doc discharge) |
-| last forced gate | `c93c910` — 18/18, 0 cached, **853 tests**, `TURBO_EXIT=0`. **Still valid at
-  `f40a850`:** the delta is 3 files, all `.md`, **0 code** — verified with `git diff --stat`, not assumed |
+| `main` | `6c1f316` **as of 17:35 IST — this row goes stale by design.** #43 (Plan 6a T9) → #45 (P17 doc
+  discharge) → #46 (step-3 rebase landed). The two after #43 are doc-only, which is *why* the gate anchor
+  below survives them; check that before assuming it still does |
+| last forced gate | `c93c910` — 18/18, 0 cached, **853 tests**, `TURBO_EXIT=0`. **This is the durable
+  row; `main` above is not.** Still valid at `6c1f316`: the whole delta since is `.md`, **0 code**,
+  verified with `git diff --stat` at each merge rather than assumed once |
 | gate composition | domain 263 · rule-engine 278 · server 143 · app-core **130** · ui 31 · sync-client 8 |
 | **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
 | collision surfaces | fixtures **84/84** · projections **2** (`proj_entity_heads`, `proj_workflows`) |
@@ -102,8 +105,13 @@ assessed before merge.
   exactly this reason — a review of a tip 23 commits and two conflicts from what merges is a review of
   something else. In progress as of 17:35 IST.
 - The branch is checked out in `gisik-nokma-lanes/lane3-plan7-8`, so it cannot be checked out in the exec
-  worktree — work it in place. **Two `--delete-branch` failures today were this same rule**; a branch held
-  by another worktree is refused.
+  worktree — work it in place. **Three `--delete-branch` failures today were this same rule**; a branch
+  held by another worktree is refused.
+- **Rebase DONE and merged-adjacent**: `exec/07-editor-client` is `72a7e3e`, **0 behind / 17 ahead**, gate
+  **21/21, 934 tests** under node v22.22.2 (853 main + 70 `editor` + 11 domain), range-diff 17 rows /
+  14 `=` / 3 `!` differing in context only. Baseline gate run *before* the rebase at `52520b0` so a
+  post-rebase red would be attributable. **T4's scoped re-review is the remaining gate** — dispatched
+  after the 18:00 quota reset, against the rebased tree.
 
 Full sequence in the coordination doc's `## Serial execution` section, which is the authority.
 
