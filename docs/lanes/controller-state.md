@@ -63,8 +63,23 @@ superseded (see the coordination doc's serial-execution section).
   without a per-PR ask. `gh pr checks <n>` — **pending is not green.** Prefer
   `gh api repos/<o>/<r>/commits/<head-sha>/check-runs` — it names the conclusion at the exact sha.
 - The controller does **not** implement plan tasks, and does not re-review the executor's work.
-- **Restart the executor at task boundaries.** This is a kill-and-relaunch from its brief, NOT a `/clear`,
-  which is user-typed and cannot be issued to another session.
+- ~~**Restart the executor at task boundaries.**~~ **WRONG — that boundary cannot meet its own
+  precondition.** The precondition is *"handoff current on `main`"*, and the handoff only reaches `main`
+  when the **step's PR merges**. Within a step no such moment exists: mid-step, `main`'s handoff is a full
+  step behind, so a relaunched session does not know which tasks have landed or which branch carries them.
+
+  **THE RULE: restart the executor immediately after merging its step PR, BEFORE dispatching the next
+  step.** That is the only instant where every precondition holds at once — handoff just merged, nothing
+  in flight, no branch name to hand over, no fan-out to interrupt. It is a fixed point in the loop, not a
+  judgment call, and **it is not optional because the executor did not ask.**
+
+  It is a kill-and-relaunch from the brief, NOT a `/clear` (user-typed, cannot be issued to another
+  session). Measured cost of skipping it: three consecutive opportunities missed (#51, #52, #53), context
+  7% → 54%, and the only restart that did happen was one the executor requested.
+
+  **Note the conflict, because it is live:** the brief's "KEEP GOING / do not end a turn" rule removes the
+  natural pause a restart used to occupy. The two are reconciled *only* by the step-PR trigger — chaining
+  is correct WITHIN a step, and the restart happens BETWEEN steps.
 
 ## The executor
 
