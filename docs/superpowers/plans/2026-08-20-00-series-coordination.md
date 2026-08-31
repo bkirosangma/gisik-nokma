@@ -2193,12 +2193,69 @@ exposure remains theoretical inside a pre-release repo — the Aug 28 reasoning 
 not being reopened. What changed is that the closer is no longer "work already scheduled in the same
 wave" running on time; it is now the last thing standing between `main` and a defect of this shape.
 
-**Controller ruling: Plan 4 T5 is elevated to Lane 2's next task and is now closing TWO windows, not one.**
-T5's origin check at the gate closes the forgery vector; §11's envelope-coherence check remains Plan 10 T4
-as recorded, but T4 stops being sufficient on its own the moment `origin` is trusted anywhere. The lane
-landing T5 must know it is closing something, not adding something — the §9 remedy in the form this series
-settled on. **Escalated to the owner** as a security-relevant default that should not stand, per the
-autonomous execution protocol's escalation clause: this is recorded and assigned, not silently carried.
+**Controller ruling, CORRECTED 2026-08-31 by Lane 2 — the closer is an extracted micro-PR, not T5.**
+The original ruling said "T5 is elevated to Lane 2's next task." That was wrong on sequencing and Lane 2
+caught it by reading T5's own dependencies, which the controller had not: `checkPermission` calls
+`resolveEffectiveRole` and `PermissionContext` embeds `EffectiveRole` — both **Task 4** deliverables. So
+"T5 next" means waiting for T4 regardless, and then taking the whole gate as one large task at the end of
+it. It would have held the window open LONGER than the alternative.
+
+**The closer is the origin refusal, extracted.** It is `checkRolePermission`'s first branch, reads only
+`env.origin`, and touches `ctx` not at all — separable on the merits rather than carved out for
+scheduling. Lane 2 lands it as its own micro-PR the moment T2 merges: a `check-permission` module holding
+the server-origin refusal and nothing else, wired into `commitOne` between the entity↔workspace guard and
+`deps.evaluate`. Then T4, then T5 fills in role logic on top — the additive layering the plan already uses
+where T9 extends T5's gate. Order: **T2 → origin micro-PR → T4 → T5.**
+
+The split's one real risk is a one-branch gate misread as a complete one, and the mitigation is in the
+rule below: the module names the checks it does **not** yet perform, rather than labelling itself partial.
+§11's envelope-coherence check remains Plan 10 T4 as recorded, but T4 stops being sufficient on its own
+the moment `origin` is trusted anywhere. **Escalated to the owner** as a security-relevant default that
+should not stand: recorded and assigned, not silently carried.
+
+### Verification-method rules (2026-08-31) — four, each earned by a wrong claim this wave
+
+These are not about what the code must do; they are about how a lane establishes that a claim is true.
+All four were produced during a single exchange between the controller and Lanes 1 and 2, and **each one
+is named by whoever was wrong, not whoever was right** — three of the four caught the controller.
+
+**A delta is a fact about a commit; an absolute is a fact about a moment, and nobody holds the moment.**
+Lane 1's Ruling P6, generalised past its lane because it caught the controller in the same message where
+the controller warned Lane 1 about the identical error. Both parties computed the fixture gate's absolute
+by adding a remembered delta to a remembered base; both were wrong, in different directions, within one
+exchange — controller said 80, Lane 1's own tracker would have said 79, the counted answer is 83. **Each
+task bumps by its own delta, in its own commit, computing the absolute from the directory at that moment,
+and no task writes a number it did not count.** Every dispatch brief's arithmetic is advisory.
+
+**A partial-implementation marker enumerates the absences; it does not assert the partiality.** Lane 2's,
+arising from the origin micro-PR above. "Deliberately partial" ages into background noise within a week
+and tells a cold reader nothing actionable; *"does not yet check role, membership, or visibility"* tells
+them exactly which questions the module has not answered, which is what they need in order not to trust
+it. Same family as the documentation rule: a sentence claiming a property is worth less than a sentence
+naming what would falsify it.
+
+**Any claim of the form "X appears nowhere" must be confirmed by a second independent sweep, or by
+file-by-file enumeration rather than a directory scan — and every null result prints a positive control
+from the same run.** Lane 2's, with the controller supplying two corroborating failures from the same
+hour. The hazard is specific and local: the search proxy on this machine silently turns some directory
+searches into empty results, and an empty result is indistinguishable from a true negative from inside
+the run. The instructive instance is the second — verifying Lane 1's fixture count, the controller diffed
+the wrong directory and got `only in lane1: [] / only in main: []`, a well-formed answer whose meaning is
+"the trees are identical." It was caught only because the counts printed beside it read `main=0` against a
+known 67. **Printed alone, that diff would have told the owner Lane 1 had shipped no fixtures.** Hence the
+positive control: `main=67` beside "no differences" is visibly incoherent; "no differences" alone is not.
+The control makes the failure self-announcing instead of requiring a second lane to notice it.
+
+**When one rule ends up stated in two schemas, delete the duplicate implementation and keep the test.**
+Lane 2's reading of Lane 4's `contest-events.ts`, recorded because the tempting move is the wrong one.
+That module dropped its own `.refine` asserting `payload !== undefined` once the envelope amendment
+enforced it at the door, and kept the test. Two schemas stating one rule is a second definition that
+drifts the moment either moves — but deleting the test alongside the refine removes the witness. The
+symmetric move looks tidy and destroys the evidence. **Drop the duplicate mechanism, keep the guarantee
+pinned** — and the test is then the better artifact, since it pins behaviour across a package boundary
+rather than re-implementing it.
+
+
 
 ### Negative space: two fixtures are the entire net for one defect class
 
