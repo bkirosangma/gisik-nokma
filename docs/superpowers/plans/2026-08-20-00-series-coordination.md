@@ -3754,3 +3754,28 @@ is exactly the trap. Afterwards the tree was verified byte-identical to the pinn
 ran at 14:52, before the fan-out started, so it is uncontaminated — and was re-run afterwards on the
 verified-restored tree anyway.** Standing correction: any fan-out permitted to mutate gets a worktree per
 agent, and "read-only" in a prompt is not read-only if the same prompt also explains how to restore.
+
+## A handoff can be tracked, pushed, and unreachable (2026-08-31, serial executor)
+
+The executor's handoff protocol says the file must be **tracked and pushed**. Both were true of
+`docs/lanes/executor-state.md` and it still failed its purpose. It reached `main` inside the Chain A
+squash (`6b2fc76`); every update after that merge went onto `exec/03-tickets-hierarchy`, which was
+already merged. Seven commits, tracked and pushed, on a branch nobody would read again — while
+`main`'s copy sat 70 lines behind, predating both the hazard record and the cost ruling.
+
+**The missing clause is "reachable from where a restart reads."** This is the orphaned-sha finding at
+a different layer: an artifact satisfying its stated precondition while failing the thing the
+precondition exists to guarantee, with nothing in the check able to tell the difference. `git
+branch --contains` was already the rule for shas; nothing applied the same test to the file.
+
+**RULE: once the branch carrying the handoff merges, the next handoff update opens its own branch off
+`main`.** Do not keep committing to the merged branch. Verify by reading the copy **on `main`**, not
+the copy in the working tree.
+
+**And the reason the author cannot self-check this.** The executor first reported that `main`'s copy
+"still carried the superseded policy block" — describing what it had last WRITTEN to the file rather
+than what the file contained. The controller grepped `main` and found the opposite, and worse. This is
+the third instance of one shape today: a lane reported T8's review had returned while its own doc said
+it had not; a brief pointed at a superseded table its author had just replaced; and here. **An
+artifact's author is the worst-placed party to say what that artifact currently contains — the
+artifact does not get to be checked by the person who wrote it.**
