@@ -34,6 +34,7 @@ over a failed turbo run.
 
 | Measure | Value | How counted |
 |---|---|---|
+| **Node** | **v22.22.2** — every gate figure in this file was produced under it | `node -v` inside the same `export PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH"` the brief mandates. **Checked, not assumed:** this machine's *default* `node` is **v24.11.1**, outside the declared range, so a gate run without that export is a different configuration wearing the same numbers. |
 | Gate exit code | **0** | the run itself |
 | Turbo tasks | **18 successful of 18**, 0 cached | same run |
 | Tests | **853** = domain 263 + rule-engine 278 + server 143 + app-core **130** + ui 31 + sync-client 8 | summed from the six per-package lines in the same run |
@@ -114,6 +115,38 @@ It has now passed all four.
 - **Auto-merge eligibility is the controller's call.** The PR is offered as a review ledger with the
   fixes-applied and recorded-with-owner split stated explicitly.
 
+## RECORDED, owner Plan 11 (infra) — the Node version is declared and enforced by nothing
+
+Raised by the controller after it cost a round, then verified here rather than adopted:
+
+| Fact | Evidence |
+|---|---|
+| `package.json` declares `"engines": { "node": ">=22.0.0 <23" }` | read at `c93c910` |
+| CI pins `node-version: 22` | `.github/workflows/ci.yml:62` |
+| This machine's default `node` is **v24.11.1** — outside that range | `node -v` with no PATH export |
+| **Nothing pins a shell** | `.nvmrc`, `.node-version`, `.tool-versions` all **ABSENT** |
+| **Nothing enforces the declaration either** | no `.npmrc`, so `engine-strict` is off by default. Tested: under v24.11.1, `pnpm exec node -v` and `pnpm run` both **succeed with no refusal and not even a warning**. Control: the same commands under v22.22.2 behave identically, so the silence is not a broken probe. |
+
+**Why this is the same class as the TZ finding, and worse.** Each worktree carries its own
+`node_modules`, and a native binding (`better-sqlite3@11.10.0`) matches whichever Node last rebuilt
+it. So **two sessions can certify the same commit under different Node majors and both report
+green**, with nothing in either report saying which. The controller met the loud half — a *false red*
+at `@gisik-nokma/sync-client#test`, ABI 137 runtime against an ABI 127 binding. The quiet half is a
+**false green**, and this repo has no way to notice it.
+
+**A gate result is not evidence unless it names its Node.** This file now does.
+
+**The fix is not mine to make and is named so it is not lost:** an `.nvmrc` (or `.node-version`)
+pinning 22, and `engine-strict=true` in `.npmrc` so an unsupported Node is a loud refusal rather than
+a silent success — *prefer the check whose failure is loud* applied to the toolchain itself. Not done
+here: it is Plan 11's infra surface, `engine-strict` needs a CI run to prove it does not break the
+pipeline, and it does not belong in a doc-only PR. The controller's PR #44 already carries the Node
+finding and is the natural home.
+
+**Rebuilding a stale binding takes `nvm use 22 && pnpm rebuild better-sqlite3`** — the bare rebuild
+compiles against whatever Node the shell has, which on this machine's default is 24, i.e. it
+reproduces the problem while looking like the cure.
+
 ## Method notes earned here — cheap to re-learn, expensive to rediscover
 
 - **`process.env.TZ` assignment does nothing inside a worker thread.** Verified with `new Worker(...)`:
@@ -139,7 +172,9 @@ It has now passed all four.
 - **This machine's Node was upgraded to v24.11.1 (ABI 137) mid-series**, while `better-sqlite3@11.10.0`
   bindings built under Node 22 are ABI 127. **Any worktree whose `node_modules` predates the upgrade
   shows a false RED at `@gisik-nokma/sync-client#test` that is not a code defect.** Fix:
-  `pnpm rebuild better-sqlite3` in that worktree. Reported by the controller after it cost a round.
+  **`nvm use 22 && pnpm rebuild better-sqlite3`** — the bare rebuild builds against the shell's Node,
+  which defaults to 24 here, so it reproduces the fault while looking like the fix. Reported by the
+  controller after it cost a round, and corrected by it before this file was pushed.
 - **A trailing command makes the harness report the gate's exit code as its own.** The piped-gate trap
   (`| tail` returning 0 over a failed turbo run) is the special case; the general rule is that ANY
   command after the gate in the same chain — including a bare `echo` — becomes the status you are
