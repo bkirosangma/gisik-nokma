@@ -2314,6 +2314,24 @@ different package sets — one tree has `editor`, the other has `sync-client`. H
 corroboration, a coincidence would have been laundered into a cross-check that survived both parties being
 careful. This is the absolute-versus-delta rule at a second axis: same failure, different dimension.
 
+**Prefer the check whose failure is loud, even when it is slower.** Lane 3's, and it belongs above the
+individual instrument rules rather than beside them, because it is the property they all share. Four
+instruments recorded on one branch — the proxied directory search, the wrong-directory enumeration, the
+reformatted diff markers, the mid-rebase count — fail by returning a **confident, well-formed, wrong
+answer**, and not one of them announces itself. A slower check that errors is worth more than a fast one
+that lies, and the choice between them is usually made before anyone is thinking about failure modes at
+all. Make it deliberately.
+
+**An echo is not a source: a number that comes back to you carries no more evidence than when it left.**
+Recorded from a round trip neither party noticed at the time. Lane 3 wrote "the one fable dispatch"; the
+controller repeated it back as "your single fable dispatch"; Lane 3 then read its own unverified figure as
+established and answered from it. Counted, it was two — an escalation that stays and a reading lens that
+was over-tiered. The direction is the trap: the controller had no way to count another lane's dispatches,
+so the number was always that lane's to verify, and it returned wearing the authority of an outside
+confirmation. **A count laundered through someone else comes back with nothing added but confidence.**
+The related half, which Lane 3 named: echoing a count IS asserting it — repeating a number in a reply
+feels like agreement and is a claim.
+
 **Naming the commit is not sufficient — confirm no operation is in flight and the tree is clean before a
 count means anything.** Lane 3's refinement, and it is a refinement rather than an instance because the
 failure satisfies the rule as previously written. Mid-rebase on a lockfile conflict, Lane 3 ran a forced
