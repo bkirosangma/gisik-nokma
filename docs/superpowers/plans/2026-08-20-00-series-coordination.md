@@ -2620,6 +2620,37 @@ different package sets — one tree has `editor`, the other has `sync-client`. H
 corroboration, a coincidence would have been laundered into a cross-check that survived both parties being
 careful. This is the absolute-versus-delta rule at a second axis: same failure, different dimension.
 
+**A fifth silent-wrong-answer instrument, and the one that hides inside the recovery set: an orphaned sha
+in a rebased repo does not behave like a dead link. It behaves like a live one pointing somewhere else.**
+Lane 1's, found by auditing its ledger for the survivable-clear property rather than by using it. Of 32
+shas cited across its ledger, **17 are orphaned** after four rebases — unreachable from both `HEAD` and
+`origin/main`. They still `git cat-file -e` clean and `git show` successfully, returning **pre-rebase
+content**. A resumer checking one is not handed an error; it is handed a stale tree that looks correct.
+Verified independently by the controller on four of them: all four resolve, all four fail ancestry, and a
+live HEAD passes both.
+
+**"Does it resolve" is the test that lies. The test that works is reachability:**
+`git merge-base --is-ancestor <sha> HEAD`.
+
+Two things make this worse than the other four instruments. First, it lives in the **recovery set** — the
+artifact whose entire purpose is to be correct when everything else is gone, and which is consulted only
+when nobody has the context to notice it is wrong. Second, it rots on a schedule nobody watches: every
+rebase orphans another batch, silently. Lane 3 hit the same class with a luckier outcome — its ledger
+header named the original base after three rebases, which happened to stay reachable from `main`, so it
+was accurate **by luck rather than design** and would not have been caught by inspection either.
+
+**Remedy, and both lanes have shipped it:** a validity block at the head of the ledger carrying live
+anchors (merge-base, HEAD, ahead-count, tree state, gate, fixture count), a task-to-commit table rebuilt
+from `git log --reverse --oneline origin/main..HEAD`, an explicit instruction not to `git show` anything
+below it, and **the regeneration command**, because this will rot again at the next rebase.
+
+**The general form, which is the reason this is recorded above the instrument rules rather than beside
+them: durable state that nobody has tested is not durable state.** Lane 1 had asserted its ledger's
+recoverability twice before testing it, and lanes 2 and 3 asserted the same property about theirs. The
+assertion is free and the test is one command. **Before any lane session is cleared, its ledger's anchors
+must be verified reachable — clearing a lane whose recovery set has rotted destroys exactly the state the
+clear was meant to preserve.**
+
 **Prefer the check whose failure is loud, even when it is slower.** Lane 3's, and it belongs above the
 individual instrument rules rather than beside them, because it is the property they all share. Four
 instruments recorded on one branch — the proxied directory search, the wrong-directory enumeration, the
