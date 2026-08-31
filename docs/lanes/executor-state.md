@@ -13,7 +13,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Step-3 branch | `exec/07-editor-client` at **`72a7e3e`**, pushed, 0 behind `f40a850` | `git rev-list --left-right --count`; reachability by `git branch --contains` |
+| Step-3 branch | `exec/07-editor-client`, pushed, **0 behind `69b7dfe`**. **No sha is recorded here on purpose** — this branch has now been rebased twice and each rebase orphaned the tip the previous version of this row named (`52520b0`, then `72a7e3e`, both `--contains`-empty). Run `git rev-parse HEAD`. | `git rev-list --left-right --count`; reachability by `git branch --contains`, empty meaning orphaned |
 | Worktree | `~/my_projects/gisik-nokma-exec` — a doc-only change, so it does not need lane 4's tree | `git worktree list` |
 | Base | `c93c910` — **Plan 6a T9 MERGED (PR #43)** | `git log --oneline -1 origin/main` |
 | HEAD | **do not trust any sha printed here.** It cannot be recorded correctly: the commit that records it changes it. | — |
@@ -51,30 +51,57 @@ historical in `docs/lanes/lane4-periphery-state.md`.
 **Steps 1 and 2 — CLOSED.** Plan 3 Chain A `6b2fc76` (PR #38); Plan 6a T9 `c93c910` (PR #43);
 P17 obligation 1 `f40a850` (PR #45).
 
-**Step 3 — THE REBASE IS DONE. Do not redo it.** `exec/07-editor-client` is rebased onto `f40a850`,
+**Step 3 — THE REBASE IS DONE. Do not redo it.** `exec/07-editor-client` is rebased onto `69b7dfe`
+(twice: first onto `f40a850`, then forward again after #44 and #46 landed),
 force-pushed, and sits at **0 behind / 17 ahead**, tree clean. Its worktree is
 `~/my_projects/gisik-nokma-lanes/lane3-plan7-8`.
 
 | Fact | Value | How verified |
 |---|---|---|
 | Node | **v22.22.2** | `node -v` in the same shell as the gate; the machine default is v24.11.1 |
-| Gate BEFORE the rebase | `Tasks: 21 successful, 21 total`, **589 tests** | run at `52520b0` so a post-rebase red would be attributable |
+| Gate BEFORE the rebase | `Tasks: 21 successful, 21 total`, **589 tests** | run at `52520b0` — **ORPHANED by the rebase that followed; do not cite it as a live sha** — so that a post-rebase red would be attributable |
 | Gate AFTER the rebase | `Tasks: 21 successful, 21 total`, 0 cached, **934 tests** — domain 274 · rule-engine 278 · server 143 · app-core 130 · editor 70 · ui 31 · sync-client 8 | forced, redirected, **summary line read, not the exit code** |
 | Reconciliation | 853 (`main`) + 70 (`@gisik-nokma/editor`, this branch's package) + 11 (domain 263→274) = **934** | recounted from the run |
 | range-diff | **17 rows: 14 `=`, 3 `!`** | the three `!` are the two `packages/domain/src/index.ts` commits and the coordination-doc commit; each differs **in context lines only** — inspected, no content changed |
 | Conflicts resolved | 2 | `packages/domain/src/index.ts` (append/append barrel: union kept, after checking the four modules share **no** exported name, since `export *` collisions are a compile error not a silent merge) and the coordination doc (union: 9 `main` sections + 1 lane section, heading census before == after) |
 
-**NEXT ACTION: dispatch T4's scoped re-review against the REBASED tree.** It was never dispatched;
-T4 is implemented with its fix round landed, so every surface says complete except that gate. The
-review runs after the rebase deliberately — reviewing the old tip would review something 23 commits
-and two conflicts away from what lands, which is exactly why T8's re-review had to be re-run.
+**T4's scoped re-review is DONE.** Three lenses (1 opus, 2 sonnet; 3 against a cap of 6), mutations
+serialised so no two agents shared the tree, read-only lens first. **No Critical.** Fixes applied on
+this branch.
 
-**What the reviewer needs to know**, from the branch's own `## Plan 7 client half` section in the
-coordination doc: T4's node-level `parseHTML().getAttrs` was a **person-substitution forgery** —
-Tiptap spreads per-attribute results after a node-level `getAttrs`, so validation there is dead code,
-and a crafted `<span>` parsed to a *different* `userId` than the one displayed, in the field
-notifications read. Fixed on the branch by validating per-attribute. T4's "planted defect: Escape"
-is separately recorded as **vacuous** (`@tiptap/suggestion` calls `dispatchExit` unconditionally).
+**The forgery fix is REAL and it reproduces** — which was the point of running this at all. M2
+(remove the `userId` attribute's `parseHTML`/`renderHTML`) reddens exactly the three two-spellings
+tests; N1 reddens three cases and N2 four, the counts `bdd3b46` claims and the names it predicts; M4
+is an explained survivor exactly as its own code comment says; the outward direction is closed over
+seven label shapes; uppercase-attribute and round-trip attacks are closed. The Tiptap mechanism was
+read out of `@tiptap/core`'s dist by the reviewer, not inherited from the commit message describing it.
+
+| Finding | Sev | Disposition |
+|---|---|---|
+| The HTML parse door admits a **blank** `userId` — the exact defect `bdd3b46` closes on the insert path, arriving by a door it never touched | Important | **FIXED.** Refused at the node level, where `false` short-circuits *before* the per-attribute merge — the one verdict a node-level `getAttrs` can still deliver after this file's own forgery fix. Two tests pin it; dropping the refusal kills both. |
+| The coordination doc's **"Escape defect is vacuous"** verdict | Important | **CORRECTED there.** The suggestion-plugin half is unconstrained; the renderer's teardown is not — deleting `container?.remove()` reddens that test's `toBeNull()`. The test earns its place; one assertion in it cannot fail. |
+| The BEM docblock's "equality in both directions" checked **three of six** classes | Important | **FIXED.** Renaming `mention-popup__status` used to leave both BEM tests green. One shared `BEM_CONTRACT`, and the emit side now collects every class the popup puts in the DOM. |
+
+**Recorded, NOT fixed — with owners:**
+
+- **`packages/editor` has no `Features.md` section and no `test-cases/` bucket at all.** `Features.md`
+  stops at §5; `test-cases/` holds only `03`, `04`, `05`. T4's mention node, its picker and the
+  blank-userId refusal are described nowhere, and no test cites a case id. Same shape as `app-core`'s
+  recorded gap. **Owner: Plan 7** (its T16 pins the case numbering). Swept with a positive control —
+  §§3/4/5 do have full coverage, so the method finds content where it exists.
+- **Three Minor test-quality observations in `mention.test.ts`**, none false today: a fixture-count
+  gate at `:332` that discriminates before the assertions under it get a chance; two candidates
+  sharing a display name at `:270-277`, so the assertion discriminates on count rather than on *which*
+  candidate was filtered; and `:236-247`, reddenable by no mutation of `packages/editor` because it
+  exercises only `docToPlainText`, imported by package name from the frozen `@gisik-nokma/domain` —
+  scope, not a defect. **Owner: Plan 7.**
+- **`rule-census.test.ts` genuinely constrains** (per-extension `toEqual`, not a total-only
+  tautology), but the read-only lens could not re-run the M1 mutation the commit claims reddens it.
+  **Unverified by this review**, said plainly rather than inherited.
+
+**NEXT ACTION: open the step-3 PR as a review ledger.** After that, step 4 — Plan 4 T4 → T5, where T5
+carries the CSRF ruling's three items and the HTTP-Origin / envelope-origin distinction that the brief
+warns is two unrelated things meeting in one task.
 
 Remaining order is the coordination doc's `## Serial execution` section, which is the authority; the
 dispatch brief is advisory where they differ — **except on model and effort policy, where the brief

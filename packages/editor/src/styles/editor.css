@@ -1,0 +1,79 @@
+/* @gisik-nokma/editor — document styles. BEM classes, STRUCTURAL ONLY: no
+   colour of any kind lives here — no hex, no colour function, and no bare
+   colour keyword either. Amendment 11's scanner
+   (packages/ui/test/helpers/colour-scan.ts) already names packages/editor/src
+   among its roots and catches the first two kinds; the third it does not yet
+   match, which is why it is written down rather than left to the machine.
+   That scanner is line-based and does not skip CSS comments, so this note
+   deliberately spells none of the forms it prohibits — naming them here would
+   fail a test in a package this one does not own.
+
+   Anything needing a visible edge draws it with `currentColor`, which inherits
+   the surrounding text colour and is therefore already contrast-proven.
+   packages/editor must not depend on packages/ui, so a token variable from
+   tokens.ts is not reachable from here. */
+
+/* Image embedding: the three wrap modes of spec §2. */
+.editor-image {
+  max-width: 100%;
+  height: auto;
+}
+.editor-image--block {
+  display: block;
+  margin: 0.5rem 0;
+}
+.editor-image--inline-left {
+  float: left;
+  margin: 0 1rem 0.5rem 0;
+  max-width: 50%;
+}
+.editor-image--inline-right {
+  float: right;
+  margin: 0 0 0.5rem 1rem;
+  max-width: 50%;
+}
+
+/* Mention picker popup and the mention node itself (spec §2's one non-input-rule
+   trigger). Structure only, under the same rule as everything above: the edges
+   are drawn with `currentColor`, and the surface the popup sits on is the
+   host's to supply from the one origin named at the top of this file. */
+.mention-popup {
+  position: absolute;
+  z-index: 30;
+  min-width: 10rem;
+  border: 1px solid currentColor;
+}
+.mention-popup__list {
+  display: flex;
+  flex-direction: column;
+}
+/* The result count, for screen readers only. Removed from the visual flow
+   without `display: none`, which would take it out of the accessibility tree
+   too and announce nothing. */
+.mention-popup__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.mention-popup__item {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+.mention-popup__item--selected {
+  outline: 1px solid currentColor;
+  outline-offset: -1px;
+}
+.editor-mention {
+  white-space: nowrap;
+}
