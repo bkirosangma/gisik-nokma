@@ -77,8 +77,11 @@ superseded (see the coordination doc's serial-execution section).
   `claude --model opus --permission-mode bypassPermissions "$(cat <brief>)"`.
 - **Before restarting: the executor's handoff must be current on `main` and its anchors reachable.**
   Restarting against a stale handoff destroys what the restart was meant to preserve.
-- Note `exec/06a-client-core` is checked out in `gisik-nokma-lanes/lane4-periphery`, not in the exec
-  worktree. A branch checked out in another worktree cannot be deleted or checked out from here.
+- **A branch checked out in ANY worktree cannot be checked out or deleted from another.** Four failures in
+  one session: three `--delete-branch`, plus `git -C <exec-worktree> checkout main`, which refuses because
+  `main` is held by the primary worktree. **So the exec worktree can never sit on `main`** — leave it on
+  whatever branch it holds and let the fresh session check out its own target. `exec/06a-client-core` is
+  held by `gisik-nokma-lanes/lane4-periphery`; work such a branch in place.
 
 ## Position in the serial sequence
 
@@ -205,6 +208,12 @@ idle when it should be working."**
 **including for a dead session.** An idle detector structurally incapable of detecting idleness.
 A workable signal is hashing `capture-pane` output (a working pane animates, an idle prompt does not);
 unbuilt, because the threshold needs tuning against how long a legitimate fan-out stays quiet.
+
+**Second blind spot, demonstrated by the monitor itself.** The controller killed the `exec` window and
+relaunched a fresh session into a new window of the same name. The monitor reported **no** `LANE PANES
+CHANGED` — it compares the sorted pane-NAME set, which was `exec,main` before and `exec,main` after. **It
+cannot see a session being replaced, nor one dying if anything takes the name back.** Combined with the
+idle gap: the monitor answers *"did the repo move"* well and *"is anyone home"* not at all.
 
 **Until then the controller tracks boundaries itself.** If you approve a hold-until-time, you own the
 clock; do not approve one and then stop watching, which is exactly what happened here.
