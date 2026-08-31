@@ -585,7 +585,7 @@ The tier follows the **failure cost** of the task, not its size. "Optimised" cut
 | Per-task reviewers | opus | high |
 | Final whole-branch review lenses — the three reading lenses | opus (owner ruling 2026-08-31, below) | max |
 | The mocked-contract lens | top tier (Fable-class) | xhigh–max |
-| Adversarial refuters; the mocked-contract lens | top tier | xhigh–max |
+| Adversarial refuters | top tier (Fable-class) | xhigh–max |
 | Lane controllers / orchestrators | Opus 5 (owner amendment, below) | — |
 
 **Owner amendment (2026-08-28, second ruling on this table): controller sessions run Opus 5, and "top tier" in this table means an explicit `fable` dispatch, never "the session's own model."** The original line ("controllers are top-tier deliberately") is amended on the owner's direction, with the account's weekly usage pool as the stated reason: controller sessions carry the bulk of every lane's tokens, and Fable-class spend there exhausts the shared pool fastest for the least marginal judgment. What does NOT move down: final whole-branch review lenses, adversarial refuters, and floor-list task reviewers are dispatched with `model: fable` explicitly — bounded fan-outs where the top tier's judgment is the product. If a session cannot dispatch fable, the fallback is opus at max effort, recorded in the ledger as a deviation.
