@@ -19,7 +19,7 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/04-t4-t5-permissions`**, cut from `origin/main` at `91df593`. Tree identical to main at creation (`git diff --stat origin/main HEAD` empty) | `git rev-parse`, `git diff` |
+| Branch in flight | **`exec/04-t4-t5-permissions`**, cut from `origin/main` at `91df593`. **T4 is committed at `c0e3fe0`** (2 commits ahead: handoff + T4). No PR yet — step 4 opens one PR after T5 | `git log`, `git rev-parse` |
 | `main` | **`91df593`** (PR #48, docs-only). Moved from `452baa6` mid-session — refetch before trusting any main sha in this file | `git log origin/main --oneline -4` |
 | `exec/04-auth-visibility` | **REDUNDANT — safe to delete.** Its 4 commits landed on main as `31df85b`, `24fba16`, `8c4216a`, `51aba55` | `git cherry -v` → 4 × `-` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
@@ -45,29 +45,39 @@ measured a tree strictly *behind* main and is **a control for nothing**. Do not 
 main-derived total: they are different trees, and a total that rises without decomposing is exactly what
 the coordination doc warns against.
 
-## Gate composition — recounted at the sha being reported, `main @ 91df593`
+## Gate composition — recounted at the sha being reported, `c0e3fe0` (T4 landed)
 
 **Status: GREEN.** `pnpm turbo run build test typecheck --force`, redirected to a file, **never piped**
 — a piped gate reports the pipe's exit code, and this repo has already seen `| tail` return 0 over a
 failed turbo run. The general rule is broader: **ANY command after the gate in the same chain becomes
 the status you are shown**, a bare `echo` included. The summary line is the only honest signal.
 
-| Measure | Value | How counted |
+| Measure | `main @ 91df593` (baseline) | `c0e3fe0` (T4) |
 |---|---|---|
-| **Node** | **v22.22.2** | `node -v` inside the brief's PATH export, printed into the log's first line before the run. The machine default is v24.11.1 — a different configuration wearing the same numbers |
-| Gate exit code | **0** (`TURBO_EXIT=0`, written into the log immediately after the gate) | the run itself |
-| Turbo tasks | **21 successful of 21**, 0 cached | same run |
-| **Tests** | **936** | summed from the seven per-package lines in the same run |
-| Decomposition | domain **274** + rule-engine **278** + server **143** + app-core **130** + editor **72** + sync-client **8** + ui **31** = **936** | a total that only *rises* tells you nothing; one that decomposes into named parts is checkable by the next reader |
+| **Node** | **v22.22.2** | **v22.22.2** |
+| Gate exit code | **0** | **0** |
+| Turbo tasks | **21 of 21**, 0 cached | **21 of 21**, 0 cached |
+| **Tests** | **936** | **960** |
+| domain | 274 | 274 |
+| rule-engine | 278 | 278 |
+| **server** | 143 | **167** |
+| app-core | 130 | 130 |
+| editor | 72 | 72 |
+| sync-client | 8 | 8 |
+| ui | 31 | 31 |
 
-**This is the baseline T4's and T5's deltas are stated against.** It was measured on
-`exec/04-t4-t5-permissions` at the moment of branching, when its tree was byte-identical to `origin/main`
-(`git diff --stat origin/main HEAD` empty) — so it is a fact about main, obtained without touching the
-main worktree.
+**The delta decomposes, which is the only thing that makes it checkable:** +24, entirely in `server`
+(143 → 167) = **12** (`proj-memberships.test.ts`) + **11** (`effective-role.test.ts`) + **1** (the new
+DB-free `tables` pin added to `projection-order.test.ts`). Every other package is unchanged, as it must
+be — T4 touches only `apps/server`. A total that only rises tells you nothing; one that decomposes into
+named, expected parts is checkable by the next reader.
 
-**Do not carry forward 853, or 631/658.** Those were measured on trees that no longer exist. And **do not
-place the 488 from the abandoned branch's pre-rebase gate beside this figure**: different tree, not a
-control, footnote only.
+**Both figures measured under Node v22.22.2**, stated because each worktree carries its own
+`node_modules` and a native binding matches whichever Node last rebuilt it — two sessions can certify
+the same commit under different Node majors and both report green.
+
+**Do not carry forward 853, or 631/658, or the 488** from the abandoned branch's pre-rebase gate.
+Different trees; the 488 in particular is a control for nothing.
 
 ## What was verified about step 4's surface, so the next session does not re-pay for it
 
@@ -82,62 +92,113 @@ control, footnote only.
 
 ## Where I am in the serial sequence
 
-**PHASE 0 IS COMPLETE.** Step 1 Plan 3 Chain A (`6b2fc76`, #38) · step 2 Plan 6a T9 (`c93c910`, #43) ·
-step 3 Plan 7 T4 (`a3746fb`, #47).
+**PHASE 0 COMPLETE.** Step 1 (`6b2fc76`, #38) · step 2 (`c93c910`, #43) · step 3 (`a3746fb`, #47).
 
-**STEP 4 IS IN PROGRESS: Plan 4 T4 → T5, on `exec/04-t4-t5-permissions`, cut fresh from `main`.**
-T5 is **floor-list** — opus implementer AND opus reviewer. **T4 is opus implementer + sonnet reviewer:**
-not because it is floor-list (it is not), but because `proj_memberships` is a **projection**, and the
-model table puts core semantics — reducers, projections, engine checks, folds — at opus/high.
-**Floor-list and work-class are independent axes; a task can be opus by either.**
+**STEP 4 IN PROGRESS on `exec/04-t4-t5-permissions`. T4 IS DONE AND COMMITTED (`c0e3fe0`), GATE GREEN.
+T5 IS NEXT AND NOTHING IS IN FLIGHT.** One PR opens after T5, not after T4.
 
-### What T4 must do, from main's own text rather than from the plan alone
+### T4 — done. What it landed, and the plan-text defect it had to refuse
 
-- **`proj_memberships`** — the projection. Plan 4 text at `docs/superpowers/plans/2026-08-20-04-auth-visibility.md`
-  line 1227 (T5 at 1754).
-- **`resolveEffectiveRole`** — named by `check-permission.ts`'s comment on main: *"Task 4 lands
-  `resolveEffectiveRole`, then Task 5 fills in the role logic on top of this function."*
-- **`getEntityState('membership')` in `engine-context.ts`** — that file says Plan 4 owns `'membership'`
-  via `proj_memberships`, and its ticket analogue is explicit that projection and context method
-  *"none may land without the others."* **A `proj_memberships` that nothing reads is the
-  mocked-contract shape in miniature** — this series' signature failure, at small scale.
+`proj_memberships` (+ migration), `resolveEffectiveRole`, the order pins, a fixture helper.
+**Reviewed with ZERO findings**, by a reviewer that re-ran three of the nine mutations itself rather
+than reading the report.
 
-### The registration-order trap, and the one-line fix that defuses it for step 8
+**The plan text's `membership.revoked` handler could not land as written, and this is the reusable
+part.** It says to delete every row for that user, project rows included. But `membership.granted`/
+`revoked` are filed against the **membership** entity and `project.member_added`/`removed` against the
+**project** entity, and `readLedger` replays in `(entity_kind, entity_id, seq)` order — so a rebuild
+applies every membership event before any roster event. Arrival `grant → member_added → revoked` leaves
+`{}` live and `{project row}` on rebuild. `diffTable` uses `EXCEPT`, so **`verify-projections` would
+have reported drift on a table nobody had corrupted.** `registry.ts` states the binding rule verbatim —
+*table contents must be a pure function of the ledger's rows, never of cross-entity arrival
+interleaving* — and **where the plan text and `registry.ts` disagree, `registry.ts` wins.**
 
-`projections/index.ts` on main says *"every new registrant **appends**"*. That is true for T4 by luck:
-§8's order is
+What landed instead is **disjoint key ownership**: one totally-ordered writer per key, so no
+interleaving can change the final set. The safety property the plan wanted moved to
+`resolveEffectiveRole` (no workspace row ⇒ no projects), which is a *stronger* placement — it also
+covers the roster row a legitimate rebuild leaves standing, which a table-level delete could not.
 
-> `proj_entity_heads, proj_workflows, proj_ticket_types, proj_tickets, proj_rollups, proj_memberships, proj_visibility`
+**`index.ts`'s "every new registrant appends" comment is corrected to "inserts at its §8 position."**
+Appending is right today only because the three projections sorting before `proj_memberships` do not
+exist yet. **Plan 3 Chain B — step 8 — adds them and MUST INSERT.**
 
-(plus `proj_projects` **before** `proj_tickets`, per the coordination doc's amendment), and since only
-the first two exist, `proj_memberships` does land at the end. **But Plan 3 Chain B — step 8 of this
-sequence — adds `proj_ticket_types`, `proj_tickets`, `proj_rollups`, which must be INSERTED BEFORE
-`proj_memberships`, not appended.** An implementer who obeys that comment breaks §8 silently.
-**T4 corrects the comment to say "inserts at its §8 position" in the same commit** that extends the
-order assertion in `test/projection-order.test.ts`. Coordination doc line 557 already anticipates this
-collision; this is the one-line change that stops it biting.
+### Carried out of T4 with named owners — recorded, deliberately not fixed
 
-### Carried into T5 — do not rediscover
+1. **RULING P18 (coordination doc): `proj_memberships` has landed and nothing reads it through the
+   engine.** `engine-context.ts`'s `getEntityState('membership')` still returns `null`, and **no task in
+   Plan 4 owns the wiring** — established by two sweeps with positive controls, one for the identifier
+   (`getEntityState` → 1 hit, in *Task 3*; control `proj_memberships` → 32) and one for the **capability
+   in prose** across Tasks 6–14 (no hit; control: 4 hits in Tasks 1–5).
+   **It fails CLOSED** — `restrict-to` refuses when membership is null, and that case has its own
+   fixture — so it is a **functionality gap, not a forgery window**. Report it that way or it provokes a
+   mis-sequencing ruling.
+   **It is reachable, not dormant.** T4's own implementation report claimed "the engine has no caller
+   today"; that is **false**, and the ruling corrects it. Enumerating every call site in
+   `packages/rule-engine/src` finds two in production reading *different kinds*: `transition.ts:41`
+   (`'ticket'`) and **`restrict-to.ts:25` (`'membership'`)**, dispatched from `rules/index.ts:34`.
+   The adapter is *trivial* — `resolveEffectiveRole(db, userId, workspaceId)` is **scopeless**, exactly
+   the pair `membershipId()` encodes — and it was still not done, because it flips rule-evaluation
+   outcomes and would ship unreviewed inside a reviewed diff.
+   **Owner: whoever dispatches Plan 4 Task 6 or the step-10 integration checkpoint, whichever is first.**
+2. **`entity-heads.test.ts` holds a SECOND, undocumented registration pin** the plan's Files list does
+   not name — so T4 came back red on a file the plan never mentions. Updated, and it now points at
+   `projection-order.test.ts` as the pin of record. **The duplicate sits in a DB-backed file, so it goes
+   quiet exactly when Postgres is down** — which is what the DB-free pin exists to prevent.
+   *Owner: Plan 3 Chain B, which is the next registrant and hits this first.*
+3. **`verify-projections.test.ts` now asserts "clean" over a projection it never populates** — it seeds
+   only `workspace.created` and `workflow.defined`, so `proj_memberships` diffs empty-against-empty.
+   Not a correctness gap (T4's own fence test covers the real property). *Owner: whoever next extends
+   that seed.*
+4. **A fourth RENAMED entry, and it is the implementer's own:** the export is **`membershipsProjection`**
+   (repo convention), not the plan text's `projMemberships`. **T5's plan-text code imports the old name
+   and must apply this rename**, alongside the three the adaptation map found.
 
-- **Widening `SubmissionGate` to `(env, session)` is a breaking signature change.** **Ruling P17 is the
-  precedent:** it owes a sweep of call sites **in the plan text**, not only in code.
-- **The three CSRF items, and the sentence that unites them.** HTTP-Origin on cookie-authenticated
-  product requests · `sameSite` set **explicitly** (check the config, not the emitted header — observed
-  output is not a setting) · a sentence at `sign-in-flows.test.ts:148`. **All three are already true, and
-  all three are true for the wrong reason.** `Domain` is forbidden by the exactness of a `toEqual` nobody
-  chose for that purpose; `SameSite=Lax` is a library default, not a decision. A property that holds by
-  accident holds until someone tidies it. **T5's job is to convert accident into intent** — pinned, so
-  the next edit that would undo it fails loudly instead of succeeding quietly. A `Domain=.artsourced.in`
-  would send the session cookie to every subdomain of the zone.
-- **THE NAMING TRAP.** The HTTP `Origin` **header** (CSRF) and the event-envelope `origin` **field**
-  (provenance enum) are unrelated and they meet in T5. Say **HTTP-Origin** or **envelope-origin** in
-  every task, commit, review and message. `check-permission.ts` on main already models this — its
-  header comment spends a paragraph on the distinction. Main also carries a coordination-doc section
-  **§8 "The envelope-origin gate has landed"**; it is about the *field*, not the header.
-- **Also owned by step 4: `Features.md` §6 and `test-cases/06-auth-visibility.md`**, created in the
-  **same change set** — the rule PR #47 was blocked on. Author them at the **end of T5** covering T4+T5's
-  surface, because every ✅ must be sourced from an assertion that exists, not from implementation.
-  **§6 is a *section* number; the never-renumber rule applies to case numbers, not section numbers.**
+### T5 — floor-list. Opus implementer AND opus reviewer
+
+**The adaptation map's corrections, which are the difference between T5 working and T5 inventing files:**
+
+| Plan text says | Reality on `main` |
+|---|---|
+| Modify `apps/server/src/ingest/pipeline.ts` | **No such file.** It is `ingest/ingest-service.ts` |
+| `import type { Refusal } from '@gisik-nokma/domain'` | **Not exported there.** `Refusal` lives in `@gisik-nokma/rule-engine`. **Coordination doc §10 already ruled this**: *"Plan 4's executor takes the import origin from the shipped code, not from the plan text"* |
+| Create `packages/domain/src/workflows/simple-kanban.ts` | **No `workflows/` directory.** Flat: `src/simple-kanban.ts`, importing `./workflow.js` and `./validate-workflow.js` |
+| `projMemberships` | **`membershipsProjection`** (see above) |
+
+**The insertion point is not a linear insert.** `ingest-service.ts` already anticipates the widening —
+two doors (`ingestBatch` ungated / `ingestClientBatch` gated), a `SubmissionGate` threaded through
+`commitOne`, and a comment at lines 63–72 saying Task 5 widens the signature to carry the session. The
+real shape is: widen `SubmissionGate` to async carrying `sessionUserId`, thread it through
+`ingestClientBatch`, and `await` the `gate(envelope, …)` call inside `commitOne` (~line 180).
+
+**Widening `SubmissionGate` is a breaking signature change → RULING P17 IS THE PRECEDENT:** it owes a
+sweep of call sites **in the plan text**, not only in code. Note `test/permissions/check-permission.test.ts`
+(249 lines, on main) exercises the old sync signature end-to-end and will need updating.
+
+**The three CSRF items, and the sentence that unites them.** HTTP-Origin on cookie-authenticated product
+requests · `sameSite` set **explicitly** (check the config, not the emitted header — observed output is
+not a setting) · a sentence at **`apps/server/test/auth/sign-in-flows.test.ts:148`**, verified at that
+line on `main`. **All three are already true, and all three are true for the wrong reason.** `Domain` is
+forbidden by the exactness of a `toEqual` nobody chose for that purpose; `SameSite=Lax` is a library
+default, not a decision. A property that holds by accident holds until someone tidies it — a `toEqual`
+relaxed to `toContain`, a default that moves in a library upgrade — and nothing says a security property
+just changed. **T5 converts accident into intent**: pinned, so the next edit that would undo it fails
+loudly instead of succeeding quietly. A `Domain=.artsourced.in` would send the session cookie to every
+subdomain of the zone.
+
+**THE NAMING TRAP.** HTTP `Origin` **header** (CSRF) vs event-envelope `origin` **field** (provenance
+enum) are unrelated and meet in T5. Say **HTTP-Origin** or **envelope-origin** everywhere.
+`check-permission.ts` on main already models this, and main carries a coordination-doc section
+*"The envelope-origin gate has landed"* which is about the **field**, not the header.
+
+### Features.md §6 / test-cases 06 — the brief and the plan text DISAGREE, and the plan text wins
+
+The dispatch brief says step 4 owns `Features.md` §6 and `test-cases/06-auth-visibility.md` in the same
+change set. **Plan 4's own text does not put them in T4 or T5.** Enumerated: its Features.md steps sit at
+lines **4922, 4936, 5131, 5260** — inside Tasks 12/13/14, far past T5 (which ends at 2386). T5 has **no**
+Features.md step of its own. Per the precedence rule (*the document wins except on model/effort policy*),
+**§6 lands with Plan 4's later tasks — step 7 of the sequence, not step 4.** T4 correctly left both
+untouched and the reviewer confirmed it. Recorded so the next session does not "fix" a false omission.
+**§6 is a *section* number; the never-renumber rule applies to case numbers, not section numbers.**
 
 ## What step 2 actually contained
 
