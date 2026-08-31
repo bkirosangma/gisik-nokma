@@ -45,8 +45,17 @@ export function registerAuthRoutes(app: FastifyInstance, auth: Auth): void {
     // better-auth wants the request body as bytes, and Fastify's JSON parser
     // would hand over an object we could only re-serialise. This is load-bearing
     // rather than tidy: removed, `request.body` is no longer a Buffer, every
-    // POST reaches better-auth with no body, and 12 of the 17 checks in
-    // `test/auth/sign-in-flows.test.ts` fail. Run, not reasoned.
+    // POST reaches better-auth with no body, and every check in
+    // `test/auth/sign-in-flows.test.ts` that puts a JSON body through this mount
+    // fails — every sign-in route the product offers, plus the bearer token, the
+    // passkey options and the Google authorization URL. Run, not reasoned.
+    //
+    // Named as WHAT fails rather than HOW MANY on purpose. The sentence here
+    // used to read "12 of the 17 checks", which was measured and true, and then
+    // three tests were added to that file in a later commit and both numbers
+    // were false — inside a comment whose last three words claim it was run. A
+    // count in prose has a shelf life that ends at the next test; the set it
+    // describes does not.
     //
     // It also decides WHO answers a request the vendor should be judging. Both
     // ways, measured: a POST with `content-type: application/json` and an EMPTY
