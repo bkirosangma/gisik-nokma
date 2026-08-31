@@ -13,7 +13,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch | `docs/p17-plan6-stale-signature`, branched off `origin/main` | `git rev-parse --abbrev-ref HEAD` |
+| Step-3 branch | `exec/07-editor-client` at **`72a7e3e`**, pushed, 0 behind `f40a850` | `git rev-list --left-right --count`; reachability by `git branch --contains` |
 | Worktree | `~/my_projects/gisik-nokma-exec` — a doc-only change, so it does not need lane 4's tree | `git worktree list` |
 | Base | `c93c910` — **Plan 6a T9 MERGED (PR #43)** | `git log --oneline -1 origin/main` |
 | HEAD | **do not trust any sha printed here.** It cannot be recorded correctly: the commit that records it changes it. | — |
@@ -48,29 +48,37 @@ historical in `docs/lanes/lane4-periphery-state.md`.
 
 ## Where I am in the serial sequence
 
-**Phase 0 step 1 — CLOSED.** Plan 3 Chain A merged as `6b2fc76` (PR #38).
-**Phase 0 step 2 — CLOSED.** Plan 6a T9 merged as `c93c910` (PR #43), CI green, controller-verified.
+**Steps 1 and 2 — CLOSED.** Plan 3 Chain A `6b2fc76` (PR #38); Plan 6a T9 `c93c910` (PR #43);
+P17 obligation 1 `f40a850` (PR #45).
 
-**IN FLIGHT: a doc-only PR discharging Ruling P17's obligation 1** — the Plan 6 text still documented
-the dead 3-argument `useLiveQuery`, and T10–T13 are transcribed from that text. Marked at every entry
-point a transcriber actually uses: a DEAD banner at the contract line, a SUPERSEDED note in the
-definition's own docblock, and an inline `P17: STALE` marker on **all nine** call sites.
+**Step 3 — THE REBASE IS DONE. Do not redo it.** `exec/07-editor-client` is rebased onto `f40a850`,
+force-pushed, and sits at **0 behind / 17 ahead**, tree clean. Its worktree is
+`~/my_projects/gisik-nokma-lanes/lane3-plan7-8`.
 
-> **Recount, not transcription.** The controller's message named four call sites (`~4460`, `~5121`,
-> `~5122`, `~5419`). There are **nine** — `5514`, `6390`, `6391`, `6395` and `6396` were not in that
-> list. Marking only the named four would have left five stale in exactly the tasks that have not been
-> written yet, and the sweep would have reported success. Verified after the edit: 9 call sites found,
-> 9 marked, 0 unmarked, with the marker string itself counted as a control.
+| Fact | Value | How verified |
+|---|---|---|
+| Node | **v22.22.2** | `node -v` in the same shell as the gate; the machine default is v24.11.1 |
+| Gate BEFORE the rebase | `Tasks: 21 successful, 21 total`, **589 tests** | run at `52520b0` so a post-rebase red would be attributable |
+| Gate AFTER the rebase | `Tasks: 21 successful, 21 total`, 0 cached, **934 tests** — domain 274 · rule-engine 278 · server 143 · app-core 130 · editor 70 · ui 31 · sync-client 8 | forced, redirected, **summary line read, not the exit code** |
+| Reconciliation | 853 (`main`) + 70 (`@gisik-nokma/editor`, this branch's package) + 11 (domain 263→274) = **934** | recounted from the run |
+| range-diff | **17 rows: 14 `=`, 3 `!`** | the three `!` are the two `packages/domain/src/index.ts` commits and the coordination-doc commit; each differs **in context lines only** — inspected, no content changed |
+| Conflicts resolved | 2 | `packages/domain/src/index.ts` (append/append barrel: union kept, after checking the four modules share **no** exported name, since `export *` collisions are a compile error not a silent merge) and the coordination doc (union: 9 `main` sections + 1 lane section, heading census before == after) |
 
-**Step 3 is next:** `exec/07-editor-client`, whose T4 scoped re-review was never dispatched. Recon,
-done so the next session does not pay for it: **21 behind** as of the controller's last count (the
-brief's "13+" is stale and the number is still moving), and `git merge-tree --write-tree` reports
-**two** conflicts — `docs/superpowers/plans/2026-08-20-00-series-coordination.md` and
-`packages/domain/src/index.ts`. **The second is code.** Budget for it.
+**NEXT ACTION: dispatch T4's scoped re-review against the REBASED tree.** It was never dispatched;
+T4 is implemented with its fix round landed, so every surface says complete except that gate. The
+review runs after the rebase deliberately — reviewing the old tip would review something 23 commits
+and two conflicts away from what lands, which is exactly why T8's re-review had to be re-run.
+
+**What the reviewer needs to know**, from the branch's own `## Plan 7 client half` section in the
+coordination doc: T4's node-level `parseHTML().getAttrs` was a **person-substitution forgery** —
+Tiptap spreads per-attribute results after a node-level `getAttrs`, so validation there is dead code,
+and a crafted `<span>` parsed to a *different* `userId` than the one displayed, in the field
+notifications read. Fixed on the branch by validating per-attribute. T4's "planted defect: Escape"
+is separately recorded as **vacuous** (`@tiptap/suggestion` calls `dispatchExit` unconditionally).
 
 Remaining order is the coordination doc's `## Serial execution` section, which is the authority; the
-dispatch brief is a copy and is advisory where they differ — **except on model and effort policy,
-where the brief is later and wins.**
+dispatch brief is advisory where they differ — **except on model and effort policy, where the brief
+is later and wins.**
 
 ## What step 2 actually contained
 
