@@ -403,8 +403,36 @@ describe('a malformed payload names the field it is about', () => {
       reason: "This workflow.defined event's payload is malformed: Expected object, received string",
     });
   });
-});
 
+  /**
+   * The SEPARATOR, pinned for the same reason and by the same argument as the
+   * structural refusal's below: every other assertion in this suite fires
+   * exactly one issue, and a one-element join is identical for any separator
+   * (`['x'].join('; ') === ['x'].join('')`), so `'; '` would otherwise be
+   * unfalsifiable in brand-new code. `ticketCreatedPayload` is the one payload
+   * here that can fire two independent issues from one candidate — an empty
+   * `typeId` and a `projectId` that is not a ULID — in the order zod reports
+   * them, which is the schema's own key order. Change the join and this dies;
+   * delete this and the join is unpinned again.
+   *
+   * It also proves the path clause is per-issue rather than appended once: both
+   * fields are named, each beside its own message.
+   */
+  it('ticket.created: two issues are joined with a semicolon, each carrying its own path', async () => {
+    const { ctx } = spyContext();
+    const env = envelope({
+      type: 'ticket.created',
+      entity: { kind: 'ticket', id: newUlid() },
+      payload: { typeId: '', projectId: 'not-a-ulid', parentId: null, title: 'Two things wrong' },
+    });
+    await expect(evaluateEvent(env, ctx)).resolves.toEqual({
+      refused: true,
+      rule: 'malformed-payload',
+      reason:
+        "This ticket.created event's payload is malformed: at typeId: String must contain at least 1 character(s); at projectId: must be a ULID",
+    });
+  });
+});
 
 /**
  * The structural refusal joins EVERY issue into one reason, separated by a
