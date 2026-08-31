@@ -90,7 +90,8 @@ assessed before merge.
 > now reviewed and its fixes applied, and the branch merged at its tip. Do not re-read that line as live.
 
 **Step 3 is next: `exec/07-editor-client`.** Recon already paid for, do not pay again:
-- **21 behind `origin/main`** — the brief's "13+ behind" is stale and understates it.
+- **23 behind `origin/main` as of 2026-08-31 17:26 IST, and still moving** (20 → 21 → 23 in one session).
+  The brief's "13+ behind" is stale. Re-measure; do not cite this digit.
 - `git merge-tree` reports **TWO** conflicts, not one: the coordination doc **and
   `packages/domain/src/index.ts`. The second is code.**
 - Its **T4 scoped re-review was never dispatched**, so every surface says complete except the gate.
@@ -149,6 +150,14 @@ Every one below was violated by a controller that had just written it. **Assume 
 - Over-caution has a price here. Blocking a restart on a documentation merge spends session carriage —
   66% of all spend — to protect against a risk already closed.
 - **A pointer from a correct document to a stale one does not drift; it reverses, deterministically.**
+- **A control must be on the fact you are claiming, not merely in the same file.** Blocked a restart on
+  "main's handoff has zero matches for `21 behind`", with `editor-client` hitting 3 as the control. The
+  control was sound and the conclusion was false: main said **20**, and carried the whole recon. **A
+  working search for the wrong term is still the wrong test** — it proves the probe is alive, not that the
+  fact is absent. Search for the fact (`packages/domain/src/index.ts`), never for your own number.
+- **Delta counts are not facts, they are readings.** That branch went 20 → 21 → 23 behind inside one
+  session. Write "N as of <when>, and still moving", never a bare digit. Note also that `**two**
+  conflicts` will not match a search for `two conflicts` — bold markers sit inside the phrase.
 - **Verify a count by enumerating and marking, with the marker string counted as a control** so a zero
   cannot come from a sweep that matched nothing. Method from the executor, after the controller and
   Ruling P17 asserted two different wrong counts for the same thing.
@@ -175,12 +184,10 @@ Note its wording is one-directional: a pane being ADDED also reports "a lane may
 
 ## Pending owner decisions
 
-1. **The executor's advisor is running on Fable.** Its status line reads `advisor: fable`. The ruling says
-   *"Fable is not dispatched"* and names three **dispatch** roles; `advisor:` is harness session config the
-   executor never chose (the relaunch command passes no advisor flag, and there is no `advisor` key in
-   `settings.json` or the environment). **Scope question for the owner, not the controller** — trap #5 is
-   deciding a ruling's scope yourself. Not blocking; killing a productive mid-task session over an
-   ambiguity is the over-caution the ruling exists to prevent.
+1. ~~**The executor's advisor is running on Fable.**~~ **RESOLVED, no owner action needed** — its status
+   line now reads `advisor: opus`. Recorded only so the question is not re-raised: `advisor:` is harness
+   session config, not a dispatch, and the ruling's three named roles are all dispatch roles. Had it still
+   been fable it would have been an owner scope call, not a controller one (trap #5).
 2. **The declared Node engine is unenforced.** `engines` demands `>=22 <23`, the machine defaults to 24,
    and there is no `.nvmrc` *and no `.npmrc`* — so without `engine-strict=true` pnpm accepts the wrong
    Node silently. The fix is two lines (`.nvmrc` + `engine-strict=true`), but it turns an unsupported Node
