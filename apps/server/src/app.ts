@@ -1,5 +1,7 @@
 import Fastify from 'fastify';
 import type { FastifyError, FastifyInstance } from 'fastify';
+import type { Auth } from './auth/auth.js';
+import { registerAuthRoutes } from './auth/routes.js';
 import type { IngestService } from './ingest/ingest-service.js';
 import { registerEventRoutes } from './routes/events.js';
 
@@ -19,6 +21,21 @@ export const INTERNAL_ERROR_BODY = {
 export type AppDeps = {
   db: HealthDb;
   ingest: IngestService;
+  /**
+   * Required, not optional, and deliberately so: an assembled app with no
+   * identity surface is not a degraded product, it is a different one, and the
+   * only way to get it should be to write a different builder. Constructing it
+   * costs a caller nothing it does not already have — `createAuth` opens no
+   * connection (checked: it returns in ~2ms over a pool pointed at a port
+   * nothing listens on), so a test that never signs anyone in still needs no
+   * database.
+   *
+   * The instance is built by the caller rather than here, which is what keeps
+   * `buildApp` synchronous: `createAuth` is itself synchronous, so nothing here
+   * forces the return type to a Promise that every call site would have to
+   * await.
+   */
+  auth: Auth;
 };
 
 export function buildApp(deps: AppDeps, options: { logLevel?: string } = {}): FastifyInstance {
@@ -56,6 +73,7 @@ export function buildApp(deps: AppDeps, options: { logLevel?: string } = {}): Fa
   });
 
   registerEventRoutes(app, deps.ingest);
+  registerAuthRoutes(app, deps.auth);
 
   return app;
 }

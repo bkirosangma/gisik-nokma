@@ -1823,6 +1823,97 @@ real name (`'Convenience Corner'`, `'Gisik Nokma Build'`, `'Personal'`, `'CC HQ'
 `project.created` fixtures at all. What a sibling lane inherits on rebase is the door, not a breakage.
 
 
+### 7. The auth HTTP surface, measured rather than read — cookie, bearer, session shape, and the CSRF rule (Task 2)
+
+Task 1 verified better-auth's compile-time API and deliberately stopped short of the runtime surface.
+Task 2 mounted the handler and ran it. Everything below came off a live request against better-auth
+**1.7.2**; where plan text disagreed, the observation is what is recorded. Plan 6's client and Plan 10's
+sync code against these exact strings.
+
+| Fact | Value | Where it is pinned |
+|---|---|---|
+| session cookie, http baseURL | `better-auth.session_token`; `Max-Age=604800; Path=/; HttpOnly; SameSite=Lax` — **no `Secure`** | `test/auth/sign-in-flows.test.ts` |
+| session cookie, **https** baseURL | `__Secure-better-auth.session_token`, same attributes **plus `Secure`** | same file |
+| bearer token | response header `set-auth-token`, echoed in `access-control-expose-headers` | same file |
+| session object | `{ session: {id, token, userId, expiresAt, createdAt, updatedAt, ipAddress, userAgent}, user: {id, name, email, emailVerified, image, phoneNumber, phoneNumberVerified, createdAt, updatedAt} }`; `getSession` answers **`null`** for absent, forged and signed-out alike | same file |
+| other cookies seen | `better-auth.session_data`, `better-auth.dont_remember` (cleared on sign-out), `better-auth.state` (OAuth, `Max-Age=300`), `better-auth.better-auth-passkey` (challenge, `Max-Age=300`) | observed, not pinned |
+
+**The https name is a DIFFERENT NAME, not a flag.** `__Secure-` is a browser-enforced prefix. A client
+matching on `better-auth.session_token` finds nothing in production. Both are pinned by test so a
+better-auth upgrade that renames either turns the suite red.
+
+**The CSRF rule every later plan has to live with.** better-auth refuses any non-GET request that
+**carries a `Cookie` header** unless it also carries a trusted `Origin` (or `Referer`):
+403 `{"message":"Missing or null Origin","code":"MISSING_OR_NULL_ORIGIN"}` for none,
+403 `{"message":"Invalid origin","code":"INVALID_ORIGIN"}` for an untrusted one. The gate is
+`headers.has("cookie")` in `validateOrigin` (`api/middlewares/origin-check.mjs`), so a **bearer-only**
+request — no cookie — is exempt. Browsers always send `Origin`, so nothing about the product changes;
+`server.inject` sends neither unless told to. **Consequence for Tasks 5/8/12/13, Plan 6 and Plan 10:**
+authenticate route tests with the bearer token `signInWithPhone` returns (one header, no origin needed),
+or send `origin: <baseUrl>` alongside the cookie. `trustedOrigins` is left at better-auth's default — the
+origin of `baseUrl` — so **when T14's `WEB_ORIGIN` lands and the web app is served from a different
+origin than this server, that origin must be added to `trustedOrigins` or every browser cookie POST
+403s.** That wiring is not done here.
+
+**`createAuth` now sets `advanced.disableOriginCheck: false`, and this is load-bearing.** better-auth's
+default for it is `isTest() ? true : false` (`context/create-context.mjs`), and `isTest()` is
+`NODE_ENV === 'test'` — which vitest sets. Left unset, the origin check is ON in production and OFF in
+every test; and while `disableCSRFCheck` is unset, `shouldSkipCSRFForBackwardCompat` takes the whole CSRF
+middleware down with it. That is a security control whose presence depends on `NODE_ENV`, and it produces
+the worst failure mode available: a green suite in which every cookie POST passes, against a production
+that 403s them. Proven by mutation — removing the line turns the two refusal tests green-for-the-wrong-reason (both answer 200).
+**Do not remove it, and do not add `disableCSRFCheck`.**
+
+**No user-existence oracle, and one weaker split that was left alone.** A wrong OTP answers
+byte-identically for a number with an account and a number without
+(`400 {"message":"Invalid OTP","code":"INVALID_OTP"}`), and a magic-link request answers
+`200 {"status":true}` for a known and an unknown address alike — both pinned. What better-auth *does*
+distinguish is `INVALID_OTP` from `OTP_NOT_FOUND` (no code pending). That is a fact about whether a code
+was recently **requested** — which the attacker requested themselves — and it is the same either way for
+an account that exists and one that does not, so it is not the user oracle. Left as the vendor ships it:
+normalising vendor error bodies at the mount would break better-auth's own client, which Plan 6 uses.
+
+**The mount, and the one thing that must not be copied from the plan text.** `registerAuthRoutes(app,
+auth)` registers an **encapsulated** Fastify scope with `removeAllContentTypeParsers()` + a raw `'*'`
+buffer parser, then one `['GET','POST']` catch-all at `/api/auth/*` (all 46 endpoints enumerated: every
+one is GET or POST). The plan's `JSON.stringify(request.body)` sketch does not work — with Fastify's own
+JSON parser, `request.body` is an object, every POST reaches better-auth with no body, and 12 of the 17
+checks in `sign-in-flows.test.ts` fail. Encapsulation is what keeps that parser off `/v1/events`: hoisted
+to the root instance, the events door stops enforcing `additionalProperties: false`. Both directions are
+proven by mutation. A later task adding routes under a new prefix inherits nothing from this scope.
+
+**`buildApp` widened: `AppDeps` gains `auth: Auth`, required.** Still synchronous, still
+`buildApp(deps, options) -> FastifyInstance`. `pool`/`otpSender` were **not** added — nothing in
+`buildApp` needs them, and `createAuth` stays in the caller, which is what keeps the signature sync.
+`auth` is required rather than optional because an app with no identity surface should take a different
+builder to produce; the cost is nil because **`createAuth` opens no connection** — measured at ~2ms
+against a pool whose port nothing listens on, which is how `test/app.test.ts` stays database-free.
+All five shipped call sites are updated — four in tests, one in `src/index.ts`.
+
+**`AppConfig` gains `betterAuthUrl` and `betterAuthSecret`**, from required `BETTER_AUTH_URL` and
+`BETTER_AUTH_SECRET` with **no defaults**. The plan's Step 9 reached for
+`?? 'dev-only-secret-change-me'` in the production entrypoint, which would let a deploy boot signing
+every session with a key printed in this repository. `BETTER_AUTH_SECRET` is `z.string().min(32)` —
+32 is better-auth's own threshold, below which it warns and starts anyway. **T14 adds `webOrigin` to this
+same schema**; the file is now shared between the two tasks. `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`
+stay read at their site in `createAuth` (Task 1's decision) — a test that exercises `/sign-in/social` must
+set both placeholders on `process.env` **before** `createAuth`, or better-auth answers 500
+`CLIENT_ID_AND_SECRET_REQUIRED`.
+
+**`makeRequireSession(auth)` and `request.currentUserId`.** 401 body is exactly `{"error":"unauthenticated"}`
+— **deliberately not** the ledger's `{refused, rule, reason}`: a refusal is a judgement about a claim, and
+an unidentified caller has made none. The same bytes answer no header, a forged bearer, a corrupt cookie
+and a signed-out token, because every distinction is an oracle. A thrown error is **not** caught — a
+session store outage is a 5xx, not a mass sign-out. `currentUserId` is declared non-optional on
+`FastifyRequest`, which is a type lie on a route that forgot the preHandler; taken knowingly, because
+`string | undefined` would put a `!` in four later tasks. **A route that reads `currentUserId` registers
+`requireSession`.**
+
+**`signInWithPhone(app, sender, phone)` returns `{token, userId}`** (`test/helpers/session.ts`) — not the
+plan's bare token, because Tasks 8/12/13 need different halves and they must be the same person. `userId`
+comes off the verify response, so no test needs a database read to attribute an event.
+
+
 ## `z.unknown()` makes a key optional, and the sweep for who inherits it (2026-08-28, controller)
 
 Found by Lane 4's T1 review, swept centrally because the hole is in a **shared** schema and propagates

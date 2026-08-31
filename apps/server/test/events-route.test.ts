@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { buildApp } from '../src/app.js';
+import { createAuth } from '../src/auth/auth.js';
+import { LogMagicLinkSender } from '../src/auth/magic-link-sender.js';
+import { LogOtpSender } from '../src/auth/otp-sender.js';
 import { createIngestService } from '../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from './helpers/db.js';
@@ -16,13 +19,28 @@ afterAll(async () => {
   await db.drop();
 });
 
+/**
+ * `buildApp` requires an auth instance from Plan 4 Task 2. This file never signs
+ * anyone in — `/v1/events` carries no session guard yet — so the instance exists
+ * only to satisfy the assembly, over the same test database as everything else.
+ */
+function testAuth() {
+  return createAuth({
+    pool: db.pool,
+    otpSender: new LogOtpSender(() => {}),
+    magicLinkSender: new LogMagicLinkSender(() => {}),
+    baseUrl: 'http://localhost:3000',
+    secret: 'test-secret-not-used-anywhere-real',
+  });
+}
+
 function app() {
   const ingest = createIngestService({
     pool: db.pool,
     evaluate: evaluateEvent,
     projections: buildProjectionRegistry(),
   });
-  return buildApp({ db: db.pool, ingest });
+  return buildApp({ db: db.pool, ingest, auth: testAuth() });
 }
 
 describe('POST /v1/events', () => {
@@ -174,6 +192,7 @@ describe('POST /v1/events', () => {
     const server = buildApp({
       db: db.pool,
       ingest: createIngestService({ pool: db.pool, evaluate: evaluateEvent, projections }),
+      auth: testAuth(),
     });
 
     const response = await server.inject({
