@@ -484,6 +484,37 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
     expect((await workspaceStream(workspaceId)).length).toBe(7);
   });
 
+  it('planted defect: "already exists" is a question about the WORKSPACE, not about one entity id', async () => {
+    // Nothing requires a workspace's founding event to be filed against an
+    // entity whose id EQUALS the workspace id — the door admits any workspace
+    // entity — so a `proj_entity_heads` lookup keyed on the workspace id is a
+    // near-miss that passes every other test in this file, where the two always
+    // coincide. Here they do not, and the near-miss reports "no such workspace"
+    // for a workspace with a full seven-event ledger, re-opening the
+    // escalation.
+    // Mutation: read `proj_entity_heads WHERE entity_kind = 'workspace' AND
+    // entity_id = $1` instead of `events WHERE workspace_id = $1` in
+    // `workspaceHasLedger`, and this is the only test that goes red.
+    const ingest = ingestService();
+    const workspaceId = newUlid();
+    const founder = newUlid();
+    const oddlyFiled: SubmittedEvent = {
+      ...founding(workspaceId, founder),
+      entity: { kind: 'workspace', id: newUlid() },
+    };
+    expectCommitted(await ingest.ingestBatch([oddlyFiled]));
+    expect((await workspaceStream(workspaceId)).length).toBe(7);
+
+    const stranger = newUlid();
+    const attempt = founding(workspaceId, stranger);
+    expect((await ingest.ingestClientBatch([attempt], stranger))[0]).toEqual({
+      status: 'refused',
+      eventId: attempt.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: NOT_A_MEMBER_REASON,
+    });
+  });
+
   it('planted defect: the INTERNAL door does not re-found an existing workspace either', async () => {
     // The internal door has no gate BY DESIGN, and Plan 11's seed CLIs and Task
     // 13 both use it, so the refusal above protects nothing here. The bootstrap

@@ -57,10 +57,10 @@ the status you are shown**, a bare `echo` included. The summary line is the only
 | **Node** | **v22.22.2** | **v22.22.2** | **v22.22.2** |
 | Gate exit code | **0** | **0** | **0** |
 | Turbo tasks | **21 of 21**, 0 cached | **21 of 21**, 0 cached | **21 of 21**, 0 cached |
-| **Tests** | **936** | **960** | **994** |
+| **Tests** | **936** | **960** | **995** |
 | domain | 274 | 274 | **276** |
 | rule-engine | 278 | 278 | 278 |
-| **server** | 143 | **167** | **199** |
+| **server** | 143 | **167** | **200** |
 | app-core | 130 | 130 | 130 |
 | editor | 72 | 72 | 72 |
 | sync-client | 8 | 8 | 8 |
@@ -69,11 +69,11 @@ the status you are shown**, a bare `echo` included. The summary line is the only
 **T4's delta decomposed** as +24, entirely in `server` (143 → 167) = **12** (`proj-memberships.test.ts`)
 + **11** (`effective-role.test.ts`) + **1** (the DB-free `tables` pin in `projection-order.test.ts`).
 
-**T5's delta decomposes as +34 over T4**, in two packages and no others:
+**T5's delta decomposes as +35 over T4**, in two packages and no others:
 - `domain` +2 — `test/simple-kanban.test.ts`, the canonical default workflow (validates clean at
   version 1; deep-cloned).
-- `server` +32 — **+31** `test/permissions/check-role-permission.test.ts` (new: 12 pure
-  `checkRolePermission` cases, 7 founding-sequence cases, 12 client-door/gate cases) and **+1**
+- `server` +33 — **+32** `test/permissions/check-role-permission.test.ts` (new: 12 pure
+  `checkRolePermission` cases, 8 founding-sequence cases, 12 client-door/gate cases) and **+1**
   `test/events-route.test.ts` (12 → 13: the new `401 unauthenticated` pin on `/v1/events`).
 - Everything else is COUNT-STABLE and content-changed: `ingest.test.ts` stays 19,
   `check-permission.test.ts` stays 7, `sign-in-flows.test.ts` stays 20. Those files were edited, not
@@ -101,8 +101,8 @@ Different trees; the 488 in particular is a control for nothing.
 
 **PHASE 0 COMPLETE.** Step 1 (`6b2fc76`, #38) · step 2 (`c93c910`, #43) · step 3 (`a3746fb`, #47).
 
-**STEP 4: T4 AND T5 ARE BOTH DONE AND COMMITTED on `exec/04-t4-t5-permissions`, GATE GREEN at 994.
-NOTHING IS IN FLIGHT. THE NEXT ACTION IS TO OPEN THE ONE PR** (one PR for the step, not one per task). Gate green at **994**.
+**STEP 4: T4 AND T5 ARE BOTH DONE AND COMMITTED on `exec/04-t4-t5-permissions`, GATE GREEN at 995.
+NOTHING IS IN FLIGHT. THE NEXT ACTION IS TO OPEN THE ONE PR** (one PR for the step, not one per task). Gate green at **995**.
 
 ### T4 — done. What it landed, and the plan-text defect it had to refuse
 
@@ -217,11 +217,19 @@ Two guards, because two doors:
 with a FRESH id is a different path, and 28 passing tests and 11 dead mutations did not touch it. Both
 directions are pinned now.
 
-**Eleven mutations run against the first commit; ten died naming their own site on the first pass.**
-The survivor was the one that mattered: `{ db: client }` → `{ db: deps.pool }` at the gate call site
-compiled and passed the entire suite. A one-connection proxy pool now pins it (a gate needing a second
-connection deadlocks a saturated pool), and the mutation dies. **The comment was the only guard, and a
-comment is not a guard.**
+**Sixteen distinct mutations run; ALL SIXTEEN now die naming their own site.** Two survived their first
+run and both were fixed rather than excused, and both survivors were of the same species — *a docblock
+was the only guard*:
+
+| Survivor | Why it passed everything | What kills it now |
+|---|---|---|
+| `{ db: client }` → `{ db: deps.pool }` at the gate call site | a healthy pool just hands out a second connection; the read returns the same rows | a one-connection proxy pool — a gate needing a second connection deadlocks a saturated pool |
+| `workspaceHasLedger` reading `proj_entity_heads WHERE entity_id = <workspaceId>` instead of `events WHERE workspace_id` | in every other test the workspace entity's id EQUALS the workspace id, so the two reads agree | a founding filed against a workspace entity whose id differs — legal at the door — where the near-miss reports "no such workspace" for a seven-event ledger and re-opens the escalation |
+
+One more mutation is worth recording because it is now **unreachable by construction rather than
+test-guarded**: "bootstrap on duplicate" cannot be written any more. `commitOne` answers
+`{ result, committed: LedgerEvent | null }`, and a duplicate has `committed === null`, so the condition
+has nothing to fire on. The test is kept anyway — the type could be widened back.
 
 **Three things changed MEANING and are recorded so a reader does not read them as they were:**
 1. `check-permission.test.ts`'s five client-door cases used a forgery with a random `actorId`. The new
