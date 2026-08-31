@@ -172,14 +172,17 @@ export async function getResolvedVisibility(
  * BEFORE the project set is ever consulted; `resolveEffectiveRole` separately
  * hands a revoked member no projects. Deleting one at a time:
  *
- * - **Delete only the null short-circuit** → `can-see.test.ts:232`
- *   (`workspaceMode`) fails, but **`:231` (`projectMode` — the revoked member
- *   of the ruling) still PASSES**, because the emptied project set answers it.
+ * - **Neutralise only the null short-circuit** — route a null role into the
+ *   member branch, which is what DELETING it did while the role was an
+ *   if-chain; since the switch landed, deleting it outright is a TS2366 instead
+ *   → `can-see.test.ts:232` (`workspaceMode`) fails, but **`:231`
+ *   (`projectMode` — the revoked member of the ruling) still PASSES**, because
+ *   the emptied project set answers it.
  * - **Delete only `resolveEffectiveRole`'s early return** → **nothing in this
  *   file fails**, and the whole server suite stays green but for Task 4's own
  *   `test/permissions/effective-role.test.ts` case "a revoked member resolves
  *   to nothing, though the roster row survives in the table".
- * - **Delete BOTH** → `:231` fails.
+ * - **Both together** → `:231` fails — the leak.
  *
  * So on the PROJECT-mode path the two are REDUNDANT: each alone blocks it, and
  * only removing both produces the leak. On the WORKSPACE-mode path they are
