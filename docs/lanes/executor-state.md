@@ -13,7 +13,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Step-3 branch | `exec/07-editor-client` at **`72a7e3e`**, pushed, 0 behind `f40a850` | `git rev-list --left-right --count`; reachability by `git branch --contains` |
+| Step-3 branch | `exec/07-editor-client`, pushed, **0 behind `69b7dfe`**. **No sha is recorded here on purpose** — this branch has now been rebased twice and each rebase orphaned the tip the previous version of this row named (`52520b0`, then `72a7e3e`, both `--contains`-empty). Run `git rev-parse HEAD`. | `git rev-list --left-right --count`; reachability by `git branch --contains`, empty meaning orphaned |
 | Worktree | `~/my_projects/gisik-nokma-exec` — a doc-only change, so it does not need lane 4's tree | `git worktree list` |
 | Base | `c93c910` — **Plan 6a T9 MERGED (PR #43)** | `git log --oneline -1 origin/main` |
 | HEAD | **do not trust any sha printed here.** It cannot be recorded correctly: the commit that records it changes it. | — |
@@ -51,7 +51,8 @@ historical in `docs/lanes/lane4-periphery-state.md`.
 **Steps 1 and 2 — CLOSED.** Plan 3 Chain A `6b2fc76` (PR #38); Plan 6a T9 `c93c910` (PR #43);
 P17 obligation 1 `f40a850` (PR #45).
 
-**Step 3 — THE REBASE IS DONE. Do not redo it.** `exec/07-editor-client` is rebased onto `f40a850`,
+**Step 3 — THE REBASE IS DONE. Do not redo it.** `exec/07-editor-client` is rebased onto `69b7dfe`
+(twice: first onto `f40a850`, then forward again after #44 and #46 landed),
 force-pushed, and sits at **0 behind / 17 ahead**, tree clean. Its worktree is
 `~/my_projects/gisik-nokma-lanes/lane3-plan7-8`.
 
