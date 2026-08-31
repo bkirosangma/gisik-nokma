@@ -145,3 +145,71 @@ verified the leak escapes the file; it did not enumerate a stable victim list, a
 control term**; and `packages/domain/dist/clock-skew.js` rebuilt with zero mutant matches — `dist` is
 gitignored, so porcelain alone would not have shown it. Final gate 18/18, 658, identical to baseline.
 **No shell `diff` was used anywhere.**
+
+---
+
+# Fix round, and the scoped re-review of it — 2026-08-31
+
+**F1–F4 fixed** (`c240c53`), **F1's own pinning test corrected** (`10a314e`), **re-review response**
+(`439da6c`). F5 folded into `docs/lanes/lane4-periphery-state.md`. **F6–F10 remain recorded with the
+owners the review gave them, unfixed and deliberately so.**
+
+Eight mutations were run against the fix round before it was reviewed again; seven died naming their
+own site, and the eighth — reverting F1's `finally` — **survived**, because the pinning test read
+`process.env.TZ` *after* the three tests above it had already corrupted it. Restoring `"undefined"`
+to `"undefined"` is a faithful restore. The test now sets both configurations instead of inheriting
+either, and dies under ambient TZ and under `TZ=Pacific/Niue` alike.
+
+## The scoped re-review
+
+Run because the fix round reached past the minimal patch — a breaking `useLiveQuery` signature change
+and four widened scanner claims — which is the ruling's own trigger. **Three read-only lenses, one
+opus and two sonnet, 3 agents against a cap of 6, no refuter bank, no triage stage.** It returned one
+Critical, four Important and seven Minor.
+
+### The Critical — REFUTED as filed, and it found the better thing anyway
+
+*Filed:* `provenance.test.ts:104,130` keep the naive `process.env.TZ = original`, and under
+`--pool=threads --poolOptions.threads.singleThread=true` the suite goes red at that file's
+ambient-zone probe; the gate is green only because 10 CPUs give 7 files their own workers.
+
+*Refuted,* in four experiments:
+
+| # | Experiment | Result | What it kills |
+|---|---|---|---|
+| 1 | `main`, `provenance.test.ts` **alone**, threads | fails | pre-existing and intra-file — not this branch's, not cross-file |
+| 2 | `main`, **`forks` + `singleFork`**, all 7 files one process | **92/92 green** | the sharing hypothesis, in its own maximal configuration |
+| 3 | `main`, `threads` **without** `singleThread`, that file alone | fails | isolates the variable: the POOL, not the sharing |
+| 4 | `new Worker(...)` vs main thread, two zones | worker renders both **identically**; main thread differs | the mechanism, at the language level |
+
+Under `threads` the assignment never takes effect, so restore semantics are irrelevant to that
+failure and the named fix would not have fixed it. `provenance.test.ts`'s probe is a correctly-firing
+anti-vacuity check saying *this configuration cannot move a clock*.
+
+*Reclassified, and the real finding is in THIS branch:* `provenance.test.ts` has carried that probe
+since T6. **`board.test.tsx` made the same class of claim and shipped without one** —
+`npx vitest run --pool=threads test/views/board.test.tsx` was **32/32 green**, T9's three zone tests
+passing while the zone never moved. The probe is now there, with the delete-when-unset restore. Under
+`threads`: 33 passed / 1 failed, naming its own line. Under the gate's pool: 130/130.
+
+### Disposition of every finding
+
+| # | Sev | What | Disposition |
+|---|---|---|---|
+| C1 | Critical | `provenance.test.ts` naive restore ⇒ suite red | **Refuted as filed** (above). The naive restore *is* the F1 class — latent, no observable harm, two-line fix shape. **Recorded, owner Plan 6a.** |
+| I1 | Important | the key-change `setData(null)` is unpinned | **Fixed.** Mutation M-A had survived with all 128 green; the assertion now sits *before* the flush, and M-A dies at it. |
+| I2 | Important | template-literal / concatenated specifiers invisible to the scan | **Fixed.** `import(`/`require(` read as calls; an argument that is not exactly one quoted string reports `<computed>`, which no allow-list entry matches. |
+| I3 | Important | state doc still says T9 "NEVER REVIEWED / do not merge on a green gate" | **Fixed** in `lane4-periphery-state.md`. |
+| I4 | Important | state doc gate figures stale, and no longer apples-to-apples | **Fixed.** Both historical rows kept and marked historical; current figures added with their shas and the reason the comparison broke. |
+| m1 | Minor | error path and "a stream frame must not clear" unconstrained | **Recorded**, owner Plan 6 T7/8 — the transport that makes the error path reachable. |
+| m2 | Minor | the clear is a passive effect: one committed render still shows the old data | **Recorded**, and now *stated in `Features.md`* rather than papered over. The design that closes it together with F6 — a generation-stamped answer rendered only when its key matches — is written up in the coordination doc beside F6. |
+| m3 | Minor | 8 stale 3-arg `useLiveQuery` call sites in Plan 6's text, plus an unstated invariant | **Recorded in the coordination doc**, which is what Plans 6 T10–T13 read. |
+| m4 | Minor | refs written during render (suspicion; unreachable at this sha) | **Recorded.** Reaches only under StrictMode/transitions/Suspense, none present. |
+| m5 | Minor | `require('react' + '-router-dom')` reads as `'react'` | **Fixed** as a side effect of I2 — the classifier sees the whole argument. |
+| m6 | Minor | `/\bWebSocket\b/` false-positives on UI copy in a string literal | **Recorded, accepted.** A false positive fails loudly and names its file; the alternative — stripping string literals — blinds the scan to the thing it is for. |
+| m7 | Minor | the recursion control was coupled to today's `src/` layout | **Fixed.** It now says the flat walk cannot see the file the recursive walk finds. |
+
+**What the thinner machinery bought here, recorded per the owner's standing ask:** three agents
+found one genuinely load-bearing unpinned line (verified by running the mutation the lens could only
+predict) and, by being *wrong about a Critical's mechanism*, surfaced a vacuity hole in the branch's
+own headline claim that no lens had been asked to look for.

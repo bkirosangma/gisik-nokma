@@ -3779,3 +3779,97 @@ the third instance of one shape today: a lane reported T8's review had returned 
 it had not; a brief pointed at a superseded table its author had just replaced; and here. **An
 artifact's author is the worst-placed party to say what that artifact currently contains — the
 artifact does not get to be checked by the person who wrote it.**
+
+---
+
+## Ruling P17 (2026-08-31, serial executor) — `useLiveQuery` takes a query key, and eight call sites in Plan 6's own text are now wrong
+
+**Interface change, binding on Plans 6 T10–T13 and Plan 10.** The signature is now:
+
+```ts
+useLiveQuery(source, workspaceId, queryKey, load, debounceMs = 200)
+```
+
+`packages/app-core/src/views/use-live-query.ts`, exported from `packages/app-core/src/index.ts`.
+Landed on `exec/06a-client-core` as the fix for the T9 review's F2.
+
+**Why the parameter exists, since a reader will reasonably ask why the closure is not enough.**
+`useBoard` shipped keyed on nothing: `reload` was `useCallback(…, [])` and the only effect's deps
+were `[source, workspaceId, debounceMs, reload]`, none of which move when `projectId` does. Pointing
+the Board at another project left the previous project's columns on screen **as** the current
+project's, correcting itself only if an unrelated stream frame happened to arrive. Keying on `load`'s
+identity is not available: it is a fresh closure every render, so that refetches forever.
+
+**Three obligations, and the third is the one that will bite:**
+
+1. **`docs/superpowers/plans/2026-08-20-06-web-client.md` carries eight 3-argument call sites and a
+   contract line documenting the old signature.** T10–T13 are executed from that text. An implementer
+   transcribing it faithfully writes code that does not compile — which is the good case; the bad
+   case is transcribing the *shape* and passing something that is not a key.
+2. **The key drives the reload; the WORKSPACE drives the subscription, and they are two effects on
+   purpose.** The cheap fix — putting `load` in the subscription effect's deps — works and re-opens
+   the stream on every switch, and `subscribe` is called with cursor `0`, so each re-open replays the
+   whole workspace from the start. That cursor is Plan 6 T8's to fix; nothing may multiply it in the
+   meantime. A test pins one subscription across a project switch.
+3. **UNSTATED INVARIANT, enforced by nothing: the key must name every input `load` closes over.**
+   A hook that closes over two ids and passes one as the key gets exactly the F2 defect back, silently
+   and with a test suite that says the hook is fixed. Whoever writes the next `useX` on this hook owns
+   checking it. Recorded here rather than left to be rediscovered.
+
+**Also recorded, for whoever closes F6** (overlapping reloads for the same key resolve last-one-wins;
+no staleness flag on `LiveQueryResult`) — **owner Plan 6 T7/T8.** The clear-on-key-change is a passive
+effect, so there is still one committed render, and in a browser possibly one paint, showing the
+previous project's data under the new project's heading. F2's window is shortened from indefinite to
+one frame, not removed. **Both close together** under one design: store the answer stamped with the
+key it was issued for, and derive `data` at render time only when the stamp matches the current key.
+Then the wrong-project render is structurally impossible rather than effect-ordered, and the
+generation counter F6 needs has a natural home. Not done here: it is a redesign of a module already
+through review, at a merge boundary, and the minimal fix is verified.
+
+---
+
+## A green suite that proves nothing, and the probe that is the only thing standing between them (2026-08-31, serial executor)
+
+**Under vitest's `threads` pool, `process.env.TZ = zone` does not move the clock.** A worker thread
+does not get the process-level reconfiguration. Verified at the language level, not inferred: inside
+`new Worker(...)` the same instant renders **identically** under `Pacific/Kiritimati` and
+`Pacific/Niue`; on the main thread it differs. Under `forks` — vitest's default, and what this repo's
+config leaves it at — assignment works normally.
+
+**The consequence is not a broken test. It is a green one.** `board.test.tsx`'s three zone tests —
+Plan 6a T9's headline claim that the client has one clock and it is not the viewer's laptop — were
+**32/32 green** under `--pool=threads`, passing while the zone never moved. Nothing said so.
+`test/provenance.test.ts` has carried an anti-vacuity probe since T6 (*"the harness above really can
+move the ambient zone — otherwise it proves nothing"*), which is why the identical condition surfaces
+there as a **failure** and surfaced in `board.test.tsx` as three passes.
+
+**Binding, and it generalises past TZ:** the brief's known gap 2 says any clock-sensitive assertion
+must vary `TZ` explicitly. That is necessary and not sufficient. **A test that varies an ambient
+setting must also assert that varying it does something** — otherwise the variation is a no-op and
+every assertion built on it is vacuous in exactly the configuration where the no-op happens. Applies
+to Plan 1's `ist-day.ts`, **Plan 9's Calendar and Timeline**, and anything reasoning about a day
+boundary. One probe per harness, and it costs six lines.
+
+**How it was found, which is the part worth keeping.** A scoped re-review filed a Critical with the
+wrong mechanism — it attributed the failure to a naive `process.env.TZ = original` restore leaking
+across files in a shared worker. Four experiments refuted it: the failure reproduces on `main` with
+that file **alone**; `--pool=forks --poolOptions.forks.singleFork=true` runs all seven files in one
+process sequentially and is **92/92 green**, which is the sharing hypothesis in its own maximal
+configuration; `--pool=threads` without `singleThread` fails on that file alone, isolating the pool as
+the variable; and the worker probe names the mechanism. **Investigating a wrong Critical found a real
+defect the review had not been asked to look for.** A finding whose mechanism is refuted is not
+therefore worthless — refute the mechanism, then ask what the observation was actually evidence of.
+
+**Recorded, not fixed:** `packages/app-core/test/provenance.test.ts:104,130` still carry the naive
+restore. It is genuinely the F1 class — `process.env.TZ = undefined` assigns the string `"undefined"`,
+which ICU resolves to GMT — but with the demonstrated-harm claim refuted (`forks`+`singleFork` is
+92/92) there is no urgency left to override the standing record-do-not-fix rule. Two-line fix shape,
+same as `board.test.tsx`'s. **Owner: Plan 6a.**
+
+**Machinery instance, per the owner's standing ask to record what the thinner machinery costs and
+buys.** Three agents (1 opus, 2 sonnet; cap is 6) returned 1 Critical, 4 Important, 7 Minor. The
+Critical was wrong about its mechanism and right that something was there. One Important was a
+*prediction* the lens could not execute under its read-only mandate — the executor ran the mutation in
+two seconds and it survived, confirming a load-bearing line was pinned by nothing. **A read-only lens
+that names its mutation precisely and hands it back is cheap and works**; it is the shape to prefer
+over granting a fan-out write access to a shared tree.
