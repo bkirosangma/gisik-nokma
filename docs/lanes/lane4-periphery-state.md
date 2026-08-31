@@ -15,7 +15,7 @@ state, the mutation ledger, dispatch tiers, and the review composition that was 
 | **Plan 6a** | T1–T4 scaffold (`packages/ui`, `packages/app-core`) | **merged**, PR #16 |
 | | T5 domain gap guards | **discharged, no code** — all four targets already shipped; shapes verified (`blocked: z.boolean().optional()` at `workflow.ts:13`; `cause` with the `reopened-for-child` literal at `:144`; `docToPlainText` and `IngestResult` barrel-exported). Nothing to write. |
 | | T6 claims machinery | **committed, unmerged** — `8209397` on `exec/06a-client-core`. Implemented, fable-reviewed, three blocking items fixed, scoped re-review CLEAN. |
-| | T9 Board + `useLiveQuery` | **in flight at fold-back** — dispatched, uncommitted. Treat as not started. |
+| | T9 Board + `useLiveQuery` | **committed but NEVER REVIEWED** — it finished minutes after the fold-back order. Green (gate 621, verified by the controller, not only self-reported), 8 falsifiability proofs, but **no reviewer ever saw it**. Every other task on this branch passed implementer→reviewer→fix→scoped-re-review; this one passed none of it. Do not merge it on the strength of a green gate. |
 | | T10–T13 (List, My Work + attention strip, ticket sheet + `EditorSlot`, attachment list, reopen flow) | **not started** |
 | | T7/T8/T14/T15/T15b | deferred to Wave 3 by the original brief (need Plans 4/5) |
 | **Plan 10** | T1, T2, T3a, T8 (the prefix) | **merged**, PR #23 |
@@ -25,8 +25,12 @@ state, the mutation ledger, dispatch tiers, and the review composition that was 
 | **Plan 9** | T2 `extractMentionedUserIds`, T3 notification vocabulary | **not started**. T4 became eligible when Plan 4's `Queryable` landed. |
 
 **Merged PRs:** #16 scaffold · #17 env-contract gate · #19 colour-scan attribution · #23 Plan 10 prefix.
-**Unmerged:** `exec/06a-client-core` @ `8209397` (T6). Gate at that sha: **594 tests, 18/18** —
-domain 230 · rule-engine 128 · server 106 · app-core 91 · ui 31 · sync-client 8.
+**Unmerged:** `exec/06a-client-core`. T6 at `8209397` (gate 594) is fully reviewed; **T9 sits on top
+of it, committed and unreviewed** (gate 621 — app-core 91 → 118). The branch therefore holds two
+tiers of confidence and a merger must not treat them alike.
+
+Gate composition at HEAD: domain 230 · rule-engine 128 · server 106 · app-core 118 · ui 31 ·
+sync-client 8.
 
 > A test total is a fact about a **commit and a package set**. Quote the breakdown, never the sum —
 > two lanes reported 508 from different trees with different packages.
@@ -125,6 +129,11 @@ reading lens finds what is written wrongly; a refuter finds what is not written 
 - **After any mutating agent dies, restore by verifying the GATE, never by scanning for markers** — a
   deletion leaves no marker. A fable reviewer died mid-mutation here and left a false-pass hole in
   the tree for about an hour; a marker grep called it clean and the gate caught it.
+- **A machine whose configuration matches the product's hides a whole defect class.** T9 mutated
+  `formatIstInstant` to `toLocaleDateString` and the plan's own unfold test **passed** — this machine
+  runs Asia/Kolkata, so the device clock printed the right day by coincidence. Only tests that swap
+  `TZ` to Kiritimati and Niue killed it, turning one recorded instant into three different days. The
+  same shape as fixtures whose values coincide, one level up: the *environment* was the fixture.
 - **Two measurements that disagree are information.** The gate said 1 failed; the file alone said 2
   passed. That contradiction was the finding.
 - **A familiar pattern is the easiest false story to believe.** Seeing the guard absent, I nearly

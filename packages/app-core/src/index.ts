@@ -12,3 +12,6 @@ export {
   type PrecheckDeps,
   type PrecheckResult,
 } from './precheck.js';
+export { formatRollup } from './views/rollup-text.js';
+export { useLiveQuery, type LiveQueryResult } from './views/use-live-query.js';
+export { Board, useBoard, type BoardProps } from './views/board.js';
