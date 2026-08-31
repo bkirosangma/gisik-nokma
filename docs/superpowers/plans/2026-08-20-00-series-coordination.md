@@ -3945,11 +3945,22 @@ These are defects in the plan document, several of which sibling plans transcrib
    per-attribute. Swept with a working positive control: `getAttrs` appears in exactly two of
    Plan 7's fourteen in-scope briefs, T3 and T4, both closed. No remaining task inherits it.
 
-3. **Task 4's "planted defect: Escape" is vacuous.** `@tiptap/suggestion` (dist:129-138) calls
-   `dispatchExit(view)` unconditionally and returns true regardless of the renderer, so no
-   mutation of `packages/editor` can redden the dismissal half. Its only fail-first evidence
-   was whole-file collection failure against the pre-task tree. The other half of that case —
-   `@an` surviving as literal text — is genuine.
+3. ~~**Task 4's "planted defect: Escape" is vacuous.**~~ **HALF WRONG, corrected by T4's scoped
+   re-review (2026-08-31) — and the correction is the more useful claim.** `@tiptap/suggestion`
+   (dist:129-138) does call `dispatchExit(view)` unconditionally and return true regardless of the
+   renderer, so no mutation of `packages/editor` can redden *whether Escape reaches the exit path*.
+   But the sentence as written said "the dismissal half", and **the renderer's own teardown is part
+   of that half and IS constrained**: deleting `container?.remove()` from `destroy()`
+   (`mention-popup.ts:146`) reddens exactly one test — the `toBeNull()` assertion in
+   *'Escape dismisses the picker and the typed text stays literal'* — with 69/70 otherwise green.
+   Measured, not reasoned. The `@an`-surviving-as-literal-text half was already recorded as genuine.
+
+   **So the test is not vacuous; one of its three assertions is.** That distinction matters more than
+   the original verdict did, because "vacuous" invites deletion and the honest answer is that this
+   test earns its place while one line inside it cannot fail. **A claim that a test cannot fail is
+   itself a claim, and it needs the same mutation evidence as the claim that it can.** The original
+   was derived from library source rather than from a run — correct about the library, wrong about
+   the test, and it would have licensed deleting a check that works.
 
 4. **Task 1's `vitest.config` block omits `esbuild: { jsx: 'automatic' }`.** No `.test.tsx`
    compiles without it, and four of this partition's tasks add one. The next plan authoring a
@@ -4019,3 +4030,45 @@ Each is recorded here rather than settled, per autonomy protocol #3.
   **Task 5 decides whether §2 reaches paste and drop; Task 12 is the implementation site**,
   since `enablePasteRules`/`enableInputRules` are `Editor` options `buildEditorExtensions`
   structurally cannot reach. Two tests document current behaviour and say "flip, don't delete".
+
+---
+
+## Run the gate BEFORE a rebase, so a post-rebase red is attributable (2026-08-31, controller + serial executor)
+
+**One extra run converts a pass/fail into a diagnostic, and every remaining rebase in the serial
+order has the ambiguity it removes.**
+
+Rebasing a long-lived branch across a moved `main` produces exactly two interesting outcomes and they
+are easy to confuse: the branch was already broken, or the rebase broke it. A gate run at the OLD tip
+answers that before the question can be asked. Step 3 measured `Tasks: 21 successful, 21 total`,
+589 tests at `52520b0` (**orphaned by the rebase that followed — do not cite it as a live sha**),
+then 21/21 and 934 after, both under Node v22.22.2.
+
+**Pair it with a reconciliation, or the second number is just a number.** 934 = 853 (`main`) + 70
+(`@gisik-nokma/editor`, the branch's own package) + 11 (domain 263 → 274). A total that only *rises*
+tells you nothing; a total that decomposes into named, expected parts is checkable by the next reader.
+
+**And state the Node version beside both.** Each worktree carries its own `node_modules`, and a native
+binding matches whichever Node last rebuilt it — so two sessions can certify the same commit under
+different Node majors and both report green. The loud half of that (an ABI mismatch reddening
+`sync-client`) cost the controller a round; the quiet half is a false green and nothing in this repo
+would catch it. `engines` declares `>=22 <23`, and with no `.npmrc` setting `engine-strict=true`,
+nothing enforces it — `pnpm` under Node 24 runs with no refusal and no warning.
+
+---
+
+## A `sleep`-based timer is not a wake-up mechanism here (2026-08-31, serial executor)
+
+A backgrounded `sleep 1432` intended to wake the executor at a quota boundary was **still alive at
+59:11 elapsed** — nearly an hour into a 24-minute wait, never having advanced, exited, or notified.
+Not clamped, not killed, not overshot: suspended, and silent about it. Its output file still read
+`waiting 1432s until 18:00 IST`, which was true when written and had been false for 35 minutes. Cost:
+roughly 55 minutes of a full quota, idle — the resource the cost ruling exists to conserve.
+
+**The failure mode is silence, and silence is indistinguishable from "still waiting."** There is no
+state a caller can read that separates them, which puts it in the same family as this document's
+other entries: it fails by staying quiet and produces a well-formed wrong answer rather than an error.
+
+**Do not schedule work behind one.** Either re-check a cheap condition on the next real turn, or let
+the work itself be the clock. If a timer is unavoidable, treat "the timer has not fired" as evidence
+of nothing at all, and verify the process is actually advancing (`ps -o etime`) before believing it.
