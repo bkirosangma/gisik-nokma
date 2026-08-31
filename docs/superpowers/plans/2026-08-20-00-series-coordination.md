@@ -598,7 +598,7 @@ The tier follows the **failure cost** of the task, not its size. "Optimised" cut
 **Ultracode usage — where it is required, where it is waste.** The standing authorization above says lanes *may* orchestrate; this pins *when*, because a fan-out where one agent suffices is the same mis-sizing as a top-tier model on transcription — in the other direction.
 
 - **Required, per full plan lane (the Plans 1–2 proven shape, unchanged):** exactly two fan-outs — the **pre-flight scan** (task extractors + the repo-verified adaptation map, which under parallelism also ingests sibling lanes' branch heads, + the coordination-obligation lens → conflict table) before the first task dispatches, and the **final whole-branch review** (four lenses with mocked-contract at top effort, adversarial refuters, ledger triage, synthesis) before the branch's PR is auto-merge-eligible. No full plan ships without both.
-- **Required, per periphery lane — batched, not per branch (2026-08-31):** a lane holding slices of several plans ships a series of small branches rather than one large one, and the rule above, written per *plan lane*, silently became per *branch* for it. Lane 4 is the live case: five plans' slices, already on its second `exec/` branch, each one triggering a full review fan-out. It therefore **batches** — one final whole-branch review over the accumulated slices at a coherence point of the controller's choosing, not one per branch. This is not a thinned gate and does not touch the review-depth ruling: the same lenses at the same tier read the same lines of code, once, over a wider delta. The whole-branch lens is *improved* by it — cross-task interaction is the thing it exists to see, and it cannot see an interaction that spans two branches it read separately. What is NOT batched: the floor-list reviewers, which are per task and stay per task.
+- **Required, per periphery lane — batched, not per branch (2026-08-31):** a lane holding slices of several plans ships a series of small branches rather than one large one, and the rule above, written per *plan lane*, silently became per *branch* for it. Lane 4 is the live case: five plans' slices, already on its second `exec/` branch, each one triggering a full review fan-out. It therefore **batches** — one final whole-branch review over the accumulated slices at a coherence point of the controller's choosing, not one per branch. This is not a thinned gate and does not touch the review-depth ruling: the same lenses at the same tier read the same lines of code, once, over a wider delta. **Lane 4's own argument for it is better than the cost one and replaces it here: per-branch was buying a NARROWER review at four times the price.** A whole-branch lens cannot see interaction between two branches it read separately, so the per-branch shape paid more for less of exactly the thing the lens exists to do. What is NOT batched: the floor-list reviewers, which are per task and stay per task.
 - **Required, conditionally:** any fix wave that follows a finding-bearing final review gets a **scoped re-review fan-out** over the fix commits (the Plan 2 pattern, now pinned rather than habitual). A wave-boundary live-integration checkpoint that finds seam drift escalates from its single-session check to a scoped fan-out over the drifted seams.
 - **Not used, deliberately:** per-task implementation (plain SDD implementer→reviewer→fix rounds is the machinery), micro-PRs (pre-work, the keystone, scaffolds — single implementer + single reviewer at their class tiers, floor-list tiers where the F5 amendment or the keystone rider applies, CI still gating the merge), catalogue tasks, and mechanical rebases. Running the two-fan-out treatment on a forty-line diff is theatre, and theatre spends the budget honesty needs.
 - **Controller's judgment for everything else:** a lane controller may invoke a fan-out wherever independent perspectives or adversarial verification would change the answer — a cross-lane conflict no pre-ruling covers, a floor-list task still failing after tier escalation, a suspicious green. The test is written here so the judgment is auditable: *would a second, independent look plausibly reverse this conclusion?* If no, one agent; if yes, fan out.
@@ -2245,6 +2245,43 @@ the wrong directory and got `only in lane1: [] / only in main: []`, a well-forme
 known 67. **Printed alone, that diff would have told the owner Lane 1 had shipped no fixtures.** Hence the
 positive control: `main=67` beside "no differences" is visibly incoherent; "no differences" alone is not.
 The control makes the failure self-announcing instead of requiring a second lane to notice it.
+
+**A sweep is a fact about a tree, and "the repo" is not a tree — name the tree you swept, and sweep the others.**
+Lane 1's, produced by a symmetrical failure between lane and controller within one exchange. Lane 1 swept
+only its own branch and reported a repo-wide property; the controller swept only `main`, got 1 citation
+against Lane 1's claimed 5, and would have called the ruling overstated. Two agents, two single-tree
+sweeps, one claim about "the repo", opposite errors. The corrected enumeration is 1 on `main` and **six**
+on Lane 1's branch — five of them Lane 1's own, added since Plan 2 merged, four in files that do not exist
+on `main` at all.
+
+The live instance that shows why this is not pedantry: **Lane 3 and the controller independently reported
+508 tests and the numbers are not evidence for each other.** Controller on `b0ef5f5`: domain 230 ·
+rule-engine 128 · server 106 · ui 31 · sync-client 8 · app-core 5. Lane 3 on its own tree: domain 216 ·
+rule-engine 115 · server 102 · **editor 39** · ui 31 · app-core 5. Same total, different decomposition,
+different package sets — one tree has `editor`, the other has `sync-client`. Had either cited the other as
+corroboration, a coincidence would have been laundered into a cross-check that survived both parties being
+careful. This is the absolute-versus-delta rule at a second axis: same failure, different dimension.
+
+**A fix is a change like any other — re-run the citation sweep over the files the FIX round touched, not
+only the ones the original round did.** Lane 1's, and the count behind it is the argument: four instances
+of this shape in one week. Lane 4's fix displaced ten citations; the controller's correction to Lane 1's
+fixture number introduced a false absolute of its own; and Lane 1's own fix round introduced a comment
+naming `fieldId` while pointing at the line for `value` — the same defect class the task existed to fix,
+introduced by the fix. Cheap, narrow, and it closes the loop the original sweep leaves open.
+
+**The instinct to fix what you find is the one that hides compounds.** Lane 4's, and the strongest argument
+in this series for record-rather-than-fix. Had Lane 4 fixed §11 inside its own partition it would have
+closed the specific hole and left the compound invisible: the `origin` gap lived in another lane's file, so
+nobody would ever have written the sentence that made the two legible together — and the compound, not
+either half, is the reachable defect. A lane that finds something outside its partition records it with a
+named owner. The correct-looking instinct has a cost, and this is it.
+
+**"A fan-out is running" is a claim with a short shelf life, not a state you can report and forget.**
+Lane 4's, wider than the budget-check rule above and belonging beside the documentation rule rather than
+with budget. Lane 4 reported a review as running; it was true when said and false within the hour when the
+weekly limit killed it; the correction arrived three days later. No check existed that would have caught
+it. Any claim about work in flight decays, and the longer-lived the claim's audience, the shorter its
+useful life.
 
 **When one rule ends up stated in two schemas, delete the duplicate implementation and keep the test.**
 Lane 2's reading of Lane 4's `contest-events.ts`, recorded because the tempting move is the wrong one.
