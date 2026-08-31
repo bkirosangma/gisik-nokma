@@ -662,6 +662,68 @@ The tier table above was written from judgment. This section is written from the
 
 **Sonnet is under-used against this table's own instructions.** Lane requests ran 27:1 to 69:1 Opus-over-sonnet, against a table that assigns sonnet to transcription implementers, scaffolds, migrations, barrel exports, catalogue tasks, extractors and grep verifiers. Either the dispatches are not setting the model or the work is genuinely all semantics; the first is drift and costs nothing to correct, since this table already authorises it. Lanes should audit their own dispatch models against the table before the next wave.
 
+### Ruling (2026-08-31, controller under delegated owner authority): product-route CSRF — neither option as posed
+
+Lane 2's ruling-request, raised from measurement rather than reading: `validateOrigin` returns immediately
+with no request context (`origin-check.mjs:98`) and session resolution goes through
+`auth.api.getSession({ headers })`, so better-auth's origin machinery never sees a product route. Against
+the shipped server, `POST /v1/events` with a valid session cookie and a forged `origin:
+https://evil.example` returns **200**, and a `requireSession`-protected route returns **200 with the
+resolved `userId`**. Never 403. Once `requireSession` reaches `/v1/events` (T5 or T12), cookie auth there
+rests on `SameSite=Lax` and nothing else.
+
+**The owner delegated this ruling to the controller. It is revocable in a word, like every other.**
+
+Lane 2 posed two options — ratify Lax-only, or require an `Origin` on product routes and accept that every
+non-browser caller must then send one. **Neither is taken, because the second option's cost is an artifact
+of stating it unconditionally, and the first ratifies something that is not yet a decision.**
+
+**1. `SameSite` is not currently a choice this repository has made, and that is the first thing to fix.**
+Swept `apps/server/src` file-by-file: **no `sameSite` setting exists anywhere.** The entire defence being
+proposed for ratification is an unwritten default of a dependency. If better-auth changes its default, or
+a later task sets `SameSite=None` because some cross-site client needs it, the defence vanishes and
+nothing in this repo fails. **Pin it explicitly, with a test that fails if it changes.** This is cheap,
+immediate, affects no caller, and is the falsifiability law applied to a security property: a defence
+nobody can break on purpose is a defence nobody knows they have. Ratifying Lax-only without this would be
+ratifying an accident.
+
+**2. The Origin requirement is scoped to COOKIE-authenticated requests, and the stated cost disappears.**
+CSRF is a problem about **ambient credentials**. A cookie is ambient — the browser attaches it whether or
+not the page meant to. A bearer token is not: it is attached deliberately by code that had to hold it. So
+the check belongs exactly where the ambient credential is used, and nowhere else. **Require and validate
+`Origin` on product requests authenticated by cookie; require nothing of bearer-authenticated requests.**
+Lane 2's objection — that every non-browser caller must then send an `Origin` it has no reason to send —
+is true of the unconditional form and false of this one. The desktop and mobile clients are bearer-
+authenticated and are untouched.
+
+**3. Why not simply ratify Lax, given `/v1/events` is `app.post` and Lax does block cross-site POST.**
+Verified: it is POST-only (`routes/events.ts:12`), so Lax's top-level-GET gap does not reach it, and Lax
+genuinely is a real defence rather than a fig leaf. The reason it is not sufficient alone is
+**same-site-cross-origin**: `SameSite` is scoped to the registrable domain, so a sibling subdomain is
+same-site and Lax does nothing between them. That turns a deployment decision recorded nowhere — what
+domain this ships on, and what else shares it — into a silent determinant of whether the product has CSRF
+protection. **A security property that depends on an unrecorded hosting choice is not a property, it is a
+coincidence.** Plan 11 owns the domain and currently names none.
+
+**Owner touchpoint, flagged rather than assumed:** if the product ever ships on a domain sharing a
+registrable domain with anything untrusted — including a platform's default `*.provider.app` subdomain
+where the parent is not on the Public Suffix List — item 2 stops being defence-in-depth and becomes the
+only defence. That is a question for Plan 11's deploy, and it should be answered there rather than
+rediscovered.
+
+**Assignment.** Item 1 is small and belongs with Plan 4 T5's gate work — Lane 2. Item 2 is also T5's, as
+the second branch of the same gate, after the envelope-origin micro-PR and T4. Neither blocks the
+envelope-origin closer, which remains the nearer priority. **Note the term collision applies here in full:
+item 2 is HTTP-Origin. The micro-PR is envelope-origin. They are different fixes and this ruling asks for
+both.**
+
+**Confidence, stated because this is a security ruling made under delegation.** Item 1 is unambiguous — an
+unpinned default is not a decision, and pinning costs nothing. Item 2 is standard practice and its cost
+objection is dissolved by scoping. Item 3's same-site-cross-origin reasoning is sound in general but its
+*bite* here depends on a hosting fact nobody has established yet; if Plan 11 lands on a dedicated domain
+with nothing untrusted beside it, Lax-only would have been defensible after all. That is the part a later
+reader should re-examine rather than inherit.
+
 ### By-catch — plan defects found by the extraction, recorded so they are not rediscovered
 
 - **Plan 11's CI YAML omits the interim-plumbing gate** its own Produces bullet promises (the failing grep for Plan 10's session shortcuts). An executor following the YAML literally ships without it.
