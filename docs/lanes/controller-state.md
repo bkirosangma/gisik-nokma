@@ -203,7 +203,17 @@ EVALUATOR would find it; absent where a reader of the TASK would.** An implement
 faithfully ships the task with the window still open.
 
 So an opus reviewer there is **not opus-by-exception** — the sonnet row simply does not cover the case.
-General form: **lifting a task changes when it runs, not what its text says.**
+An exception invites re-argument every time; an unsatisfied precondition does not.
+
+General form: **lifting a task changes when it runs, not what its text says.** And the corollary, which is
+the reusable half: **when an obligation is assigned to a task from OUTSIDE that task, it must be written
+INTO that task's own text — or the next reader will not perform it, and the more faithful they are to the
+plan the more certainly they will miss it.** Fidelity is the failure mode, which is why no amount of care
+by the implementer would have caught this.
+
+**Standing instruction: before dispatching any remaining lifted or re-sequenced item, sweep its own range
+for the thing it was moved to do**, with a control term. Cheap, and it is the only check that fires before
+the work rather than after it.
 
 ## Standing owner rulings currently in force
 
