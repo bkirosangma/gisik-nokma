@@ -2143,6 +2143,46 @@ that tells a user *"no contested claim is recorded"* when the truth is that the 
 contests at all. **A loud 500 on an event nothing submits yet beats a quiet lie.** That is §9's lesson
 exactly — the silent-wrong-refusal hazard — and T4 is named as the closer.
 
+### Follow-up (2026-08-31, controller): the window is now OPEN, its named closer has not landed, and §11 made it wider than what was ruled
+
+The ruling above accepted the `origin` window on two stated grounds: reachability was nil, and it "is
+closed by work already scheduled in the same wave." **The first has expired and the second has not
+happened.** Verified at `main` = `b62be74` after Lane 4's P2 merge (#23):
+
+- **`claim.contested` is registered** — `vocabulary.ts:241`. `parseEvent` admits it. This is precisely
+  the event the ruling predicted would open the window, and Lane 4's merge is the merge that did it.
+- **`origin` is still unvalidated.** Swept `apps/server/src` and `packages/` again: the only production
+  read of `origin` is `contests.ts:43` — the evaluator the forgery defeats. `event-store.ts` stores it.
+  The two other apparent hits are prose: `auth.ts:71` is the sentence "origin of what a ULID is", and
+  `rebuild.ts:32` matched inside the word "original". **Zero checks.**
+- **Plan 4 T5 has not landed.** There is no permission-gate module in `apps/server/src` at all. #22
+  (`exec/04-auth-visibility`) merged without it.
+
+**The compound, which is the part no earlier section states.** Each window was ruled on alone. Together
+they are worse than either: a forged `origin: 'server'` gets a client past `contest.server-only`, and §11
+means the contest it then files may embed *any* fabricated claim naming *any* ticket in *any* workspace.
+So the reachable defect on `main` today is not "a client can forge the system's record of a refusal" but
+**a client can write a permanent, un-deletable ledger entry attributing a fabricated claim to any actor,
+naming any workspace.** `renderContestedClaimText` renders it into a comment body; the append-only
+trigger makes it permanent; only supersession, never deletion, is available afterwards.
+
+**What does NOT mitigate it, checked rather than assumed.** `ENTITY_WORKSPACE_MISMATCH_RULE`
+(`ingest-service.ts:110`) refuses an envelope filing an entity under the wrong workspace — but the §11
+forgery's OUTER envelope is honest (a real ticket in its real workspace). The lie is inside `payload`,
+which that guard does not read and, being opaque JSON, could not.
+
+**Assessment unchanged on risk, changed on scheduling.** Nothing is deployed, there are no users, and the
+exposure remains theoretical inside a pre-release repo — the Aug 28 reasoning holds on that point and is
+not being reopened. What changed is that the closer is no longer "work already scheduled in the same
+wave" running on time; it is now the last thing standing between `main` and a defect of this shape.
+
+**Controller ruling: Plan 4 T5 is elevated to Lane 2's next task and is now closing TWO windows, not one.**
+T5's origin check at the gate closes the forgery vector; §11's envelope-coherence check remains Plan 10 T4
+as recorded, but T4 stops being sufficient on its own the moment `origin` is trusted anywhere. The lane
+landing T5 must know it is closing something, not adding something — the §9 remedy in the form this series
+settled on. **Escalated to the owner** as a security-relevant default that should not stand, per the
+autonomous execution protocol's escalation clause: this is recorded and assigned, not silently carried.
+
 ### Negative space: two fixtures are the entire net for one defect class
 
 Lane 4 had its implementer build the harness fold **the wrong way round on purpose** — filter-then-complete,
