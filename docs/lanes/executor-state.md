@@ -16,8 +16,15 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | Branch | `exec/06a-client-core` | `git rev-parse --abbrev-ref HEAD` |
 | **Worktree** | `~/my_projects/gisik-nokma-lanes/lane4-periphery` — **NOT the exec worktree** | `git worktree list`. A `git checkout` of this branch from `gisik-nokma-exec` will refuse. Work there, or remove that worktree first. Decide before dispatching. |
 | HEAD | **do not trust any sha printed here** — run `git rev-parse HEAD`. It cannot be recorded correctly: the commit that records it changes it. | — |
-| Merge-base with `origin/main` | `55ae0a1` — HEAD is a direct descendant | `git rev-list --left-right --count origin/main...HEAD`, left half **0** |
-| Ahead / behind | **0 behind** is the stable half and the one that matters. Re-measure the ahead-count. | same command |
+| Merge-base with `origin/main` | `55ae0a1` | `git merge-base` |
+| Ahead / behind | **1 behind, and deliberately not rebased.** `main` moved to `60bc7ca` (PR #42) after this branch was rebased and its PR opened. Re-measure both halves; neither is stable now. | `git rev-list --left-right --count origin/main...HEAD` |
+| Does that 1 matter? | **No.** `60bc7ca` adds one new file, `docs/lanes/controller-state.md`, which nothing on this branch touches. `git merge-tree --write-tree origin/main HEAD` **exits 0 and prints a bare tree sha** — a clean merge. Positive control from the same run: the identical command against `origin/exec/07-editor-client` prints 2 `CONFLICT` lines, so the null is a real null and not a silent grep. | above |
+
+> **Why not just rebase again.** It would be trivially clean, and it would orphan every sha this
+> branch's own commits are cited by — `c240c53`, `10a314e`, `439da6c`, `dcf097a` appear in
+> `docs/lanes/plan-6a-t9-review.md`, in the coordination doc's Ruling P17 section, and in PR #43's
+> body. Rebasing to reclaim a cosmetic "0 behind" would create exactly the orphaned-citation problem
+> this series keeps paying for, in three documents, to fix nothing. The merge is clean; leave it.
 | Tree state | clean | `git status --porcelain` empty |
 | Orphaned, do not cite | `30e3db4`, `e82a579`, `444e1ec`, `8f3d670` — the pre-rebase tips | superseded by the rebase |
 
