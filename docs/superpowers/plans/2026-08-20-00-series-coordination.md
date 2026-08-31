@@ -2481,6 +2481,14 @@ comes off the verify response, so no test needs a database read to attribute an 
 
 ### 8. The envelope-origin gate has landed — which doors it closes, and the one sentence Plan 10 must obey (origin micro-PR)
 
+> **SUPERSEDED IN PART, 2026-08-31 (Plan 4 Task 5 landed).** The gate's POSITION and the two refusal
+> strings below are unchanged and still binding. Its SIGNATURE is not: `checkPermission` is now
+> `(env, ctx: { db, sessionUserId }) => Promise<Refusal | null>`, `SubmissionGate` is async, and
+> `ingestClientBatch` takes the session as a second argument. The "server-origin refusal and nothing
+> else" sentence below is now false — the gate also checks actor identity, workspace membership and
+> role. What did NOT change: envelope-origin `'server'` is refused at the client door and admitted at
+> the internal one, which is what Plan 10's sync route must obey.
+
 The closer named in "A forgeable `origin`…" is **in**. `apps/server/src/permissions/check-permission.ts`
 holds `checkPermission(env): Refusal | null` — the server-origin refusal and nothing else — wired inside
 `commitOne` between the entity↔workspace guard and `deps.evaluate`, exactly the position the 2026-08-31
@@ -4106,3 +4114,427 @@ asked for the editor's section to be `## 6.` on next-free reasoning; §9 is Plan
 §6 would have collided with the very next task in the serial order, against a rule that forbids
 renumbering to fix it. **The case-level rule ("next free number in the matching section") does not
 generalise one level up to sections.**
+
+---
+
+## An ahead-count is not a work-count: run `git cherry` BEFORE the pre-rebase gate (2026-08-31, serial executor)
+
+**Step 4 was scheduled around a rebase that did not need to happen, and the two measurements that
+scheduled it were both correct.**
+
+The recon for step 4 reported `exec/04-auth-visibility` as **30 behind / 4 ahead** of `main`, with
+`git merge-tree --write-tree` returning two genuine conflicts, one of them in code
+(`apps/server/src/app.ts`). It concluded — reasonably, on that evidence — that step 4 opened with "the
+largest rebase left in the series", and the handoff instructed the next session to *"Rebase FIRST, then
+review the rebased tree."*
+
+Every one of those four commits was **already on `main`**:
+
+```
+$ git cherry -v origin/main origin/exec/04-auth-visibility
+- c6bafb9  better-auth turns its CSRF check off when NODE_ENV=test...
+- 950131f  A comment justified a process.env write with a mechanism nobody ran...
+- e772499  Every Set-Cookie assertion in the suite was n=1...
+- 5c71689  A count in a comment is a claim with an expiry date...
+```
+
+`-` means *already upstream by patch-id*. They landed as `31df85b`, `24fba16`, `8c4216a`, `51aba55` —
+rebase-merged rather than squashed, so they kept their own shas on `main` and their originals kept
+theirs on the branch. **The branch reported "4 ahead" forever while contributing nothing.**
+
+**Why neither existing measurement could have caught it.** `git rev-list --left-right --count` measures
+**commit identity**. `git merge-tree` measures **a merge** — and it dutifully reported real conflicts,
+because the branch's tree genuinely differs from `main`'s: it is 30 commits *older*, so a merge has
+plenty to disagree about. Neither command asks the only question that decides whether there is work to
+do: **is this content already upstream?** Only `git cherry` (or `git range-diff`) asks that.
+
+**The rule.** For every remaining branch in the serial order, `git cherry -v origin/main <branch>` runs
+**before** the rule in *"Run the gate BEFORE a rebase"* fires. If every line is `-`, delete the branch
+and start from `main`; there is nothing to gate and nothing to rebase. **The cheapest way to make a
+rebase gate unnecessary is discovering that there is no rebase.**
+
+**What it cost to learn late.** One full gate run at `5c71689`, per the pre-rebase rule: green, 15/15
+tasks, 488 tests, Node v22.22.2. It is a control for **nothing** — it measured a tree strictly *behind*
+`main`. It is recorded as a footnote and explicitly fenced off from any `main`-derived total, because
+this series has already been burned by a number that rises without decomposing.
+
+**The generalisation, which is the part worth keeping.** This is the same shape as every other defect
+recorded in this document: *a measurement that was accurate about what it measured, and was read as
+answering a question it never asked.* A count of commits answered "how far apart are these histories",
+and was read as "how much work is there". Before acting on any figure in this project, say out loud
+which question it answers — and check that it is the question you are about to bet a round on.
+
+### Three claims from the same recon, checked rather than adopted — two of them false
+
+| Claim | Finding |
+|---|---|
+| The coordination-doc conflict risks losing content | **False.** The branch's 154-line §7 block is **byte-identical** on `main`. The one differing line in the first comparison was the *extraction* picking up main's next heading, not a real difference — a reminder that the boundary of a diffed region is itself a claim. |
+| The `app.ts` conflict risks losing content | **False.** Main's copy is a strict superset: it carries the branch's `auth: Auth` block *and* the `ingest: ClientIngest` narrowing the branch never had. |
+| Plan 4 Task 5 is unstarted | **False, and load-bearing.** T5's first branch landed on `main` as `fc904f4`: `checkPermission`, `SERVER_ORIGIN_RULE`, `SERVER_ORIGIN_REASON`, and the `SubmissionGate` type — whose own comment records that it was *"named as a type so Task 5 can widen it to carry the session (`(env, session)`) without every call site changing shape."* **T5 widens; it does not create.** Widening that signature is a breaking change, and **Ruling P17 is the precedent**: it owes a sweep of call sites in the plan text, not only in code. |
+
+**And one anchor re-verified rather than inherited.** T5's third CSRF item anchors a sentence to
+`apps/server/test/auth/sign-in-flows.test.ts:148`. The recon verified that line **on the branch** — the
+stale tree. Line numbers drift across a rebase-merge, so it was re-checked on `main @ 91df593`: still
+line 148, content unchanged. **An anchor verified on the wrong tree is not verified.**
+
+### The caveat that makes the rule safe to apply, contributed by the controller: `cherry` is ASYMMETRIC here
+
+**`-` is strong evidence of redundancy. `+` is NOT conclusive, because this repo uses BOTH merge
+strategies.** A squash-merge collapses N commits into one and destroys the per-commit patch-ids
+`cherry` matches on, so every commit of a squash-merged branch reports `+` — "new" — long after it has
+landed. Measured across the remaining branches:
+
+| Branch | `cherry` | Truth |
+|---|---|---|
+| `exec/04-auth-visibility` | 0 of 4 new | redundant; **do not merge, it would regress `main`** |
+| `exec/04-envelope-origin-gate` | 0 of 3 new | genuinely inert — merge-tree byte-identical to `main`; safe to delete |
+| `exec/10-prefix` | 0 of 1 new | content superseded; conflicts; do not merge |
+| `exec/03-tickets-hierarchy` | **31 of 31 new** | **MERGED** as `6b2fc76`, Phase 0 step 1 — squashed |
+
+Both strategies are visible on `main` and they are told apart at a glance: **a squash-merge carries a
+`(#N)` PR suffix** (`6b2fc76 … (#38)`, `a3746fb … (#47)`), while Plan 4's four rebase-merged commits
+sit on `main` under their own subjects with no suffix. Confirmed by counting both populations.
+
+The asymmetry runs in the safe direction — **a false `+` costs unnecessary work, never lost work** — but
+it must be stated that way, or the next reader concludes a merged branch has 31 commits outstanding.
+Where `+` matters, fall back to `git range-diff` or a content diff; `cherry` alone cannot clear it.
+
+### A check that cannot return "identical" for the case you care about is not a check
+
+Recorded because it nearly became a false finding against this executor, and it is the fifth costume of
+the non-falsifiable check.
+
+Confirming redundancy "authoritatively" by comparing `git merge-tree --write-tree <main> <branch>`
+against `main`'s tree looks rigorous: a redundant branch should produce an identical tree. It reported
+an 11-line difference, apparently contradicting the `cherry` result. **The 11 lines were conflict
+markers.** `merge-tree --write-tree` writes `<<<<<<<` / `=======` / `>>>>>>>` *into the tree* when a
+merge conflicts, so tree-vs-tree comparison silently answers **"did this conflict"** rather than
+**"is this redundant"** — and a conflicting branch can therefore *never* compare equal, whatever its
+content. The instrument could not produce the answer that would have cleared the branch.
+
+It was caught only by printing the actual differing lines instead of trusting the stat — the same move
+that caught the `grep -c` proxy reformatting earlier in the same session. **Print the rows, not the
+count, whenever a count is about to decide something.**
+
+**Telling the two strategies apart costs one command, and the marker has its own limit.**
+`git log -1 --format=%s <sha>` ending in `(#N)` means a squash landing — so `cherry`'s `+` is
+unreliable for that branch; the suffix's *absence* means the patch-ids are trustworthy. Both
+populations were counted on `main` by two sessions independently: every squash landing carries it
+(`#38`, `#43`, `#45`, `#47`, `#48`), and all four rebase-merged Plan 4 commits carry none.
+
+**But the marker is a convention of the GitHub squash UI, not a property of git.** A hand-written
+commit message ending in `(#12)`, or a squash performed by another tool, would both fool it. It is good
+evidence, not proof — **the same shape as `cherry` itself, one level up.** Recorded here deliberately,
+so the signal that just rescued a rule does not become the next over-trusted one.
+
+### The rule all of these are instances of
+
+**Print the rows, not the count, whenever a count is about to decide something.**
+
+One cause behind four separate incidents in this series: the `grep -c` proxy reformatting its output;
+the `merge-tree` stat that reported 11 differing lines which were conflict markers; the `9.1`/`9.34`
+catalogue census that matched prose; and the idle check where a `✻` inside a *"done"* status line made
+a finished session look busy. Every one was a count that was accurate about what it counted and was
+read as answering a different question. Every one was caught by looking at the rows.
+
+**Corollary, for when the rows are too many to read: print the first few AND the count.** The
+disagreement between them is itself the signal.
+
+**And the sharpest statement of the `merge-tree` costume, because it is distinct from the others in
+this document:** the instrument *could not produce the answer that would have cleared the branch.* It
+was not noisy, approximate, or tracking the wrong variable — it varied correctly. It answered a
+different question, and its output looks identical either way. A check whose passing outcome is
+unreachable for the population you are asking about has already decided, before you run it.
+
+---
+
+## Ruling P18 (2026-08-31, serial executor) — `proj_memberships` has landed and nothing reads it through the engine; the contract's trigger condition has fired and no task owns it
+
+**Plan 4 Task 4 lands `proj_memberships`. `engine-context.ts`'s `getEntityState('membership')` still
+returns `null`. No task in Plan 4 owns the wiring between them, and the plan text was checked twice.**
+
+`apps/server/src/engine-context.ts` says, and has said since Plan 1:
+
+> "PLAN 3 TASK 12 is where this grows a real body for 'ticket', from proj_tickets. **Plan 4 owns
+> 'membership' via proj_memberships. Until each lands, its kind stays null here**"
+
+`proj_memberships` has now landed. The sharper framing is therefore not *"this is unassigned"* but
+**a stated contract whose trigger condition has fired.** The same file's ticket analogue is explicit
+that the projection and its context method *"neither may land without the other"* — the membership half
+has no such pairing anywhere.
+
+**How thoroughly "no task owns it" was established, because it is an absence claim.** Two sweeps, both
+with positive controls from the same run:
+1. Literal identifiers across Plan 4: `engine-context` → **0 hits**; `getEntityState` → **exactly 1**,
+   at line 874, which falls inside **Task 3**'s body (860–1227) and is an event→entity *modeling
+   decision*, not a deliverable assignment. Positive control: `proj_memberships` → **32 hits**.
+2. A **second sweep for the capability in prose** rather than the identifier — "rule engine", "available
+   to rules", "entity state", "restrict-to" — across Tasks 6–14. **No hit assigns the wiring.** Positive
+   control: the same sweep over Tasks 1–5 returns 4 hits, so it is capable of hitting.
+
+Neither Task 4's nor Task 5's `Files` list names `engine-context.ts`.
+
+### What is actually broken, stated in the direction it actually fails
+
+**It fails CLOSED, and that is why nothing has noticed.** `restrict-to.ts:26` reads
+
+```js
+if (membership !== null && membership.kind === 'membership' && rule.roles.includes(membership.role))
+```
+
+so a `null` membership means the criterion does not match and the transition is **refused**. The null
+case is deliberate and *tested*: `packages/rule-engine/fixtures/rule-restrict-to-refuses-without-membership.json`.
+So this is a **functionality gap** — role-gated transition rules do not work on the server path — and
+**not** a forgery window or an authorisation bypass. Anyone reporting it as a live security defect will
+provoke a mis-sequencing ruling.
+
+**It is reachable, not dormant. Correcting a claim made in T4's own implementation report:** that report
+stated "the engine has no caller today — `transition.ts:499` is the only `getEntityState` call site and
+it reads `'ticket'`." **False.** Enumerating every call site in `packages/rule-engine/src` finds two in
+production code, reading *different kinds*: `transition.ts:41` (`'ticket'`) and **`restrict-to.ts:25`
+(`'membership'`)**, dispatched from `rules/index.ts:34`. Any workflow definition carrying a `restrict-to`
+rule with `roles` reaches it. Recorded because a "no caller" claim is exactly the kind that retires a
+hazard by accident.
+
+**And the suite cannot see it.** The rule engine's own `restrict-to` tests run against
+`memory-context.ts`, which carries `fx.memberships` and *does* answer — so they pass. The server path is
+the only place the null appears, and no server test exercises a role-gated transition. **A
+half-witnessed contract: green on the side that has the fake, untested on the side that has the truth.**
+
+### Why it was NOT fixed inside Task 4, and what would have made that right
+
+The wiring is *technically* trivial: `resolveEffectiveRole(db, userId, workspaceId)` is **scopeless**,
+taking exactly the `(workspaceId, userId)` pair `membershipId()` encodes, so an adapter is a few lines
+over T4's own deliverable — no scope-collapse policy has to be invented. **That was the discriminator,
+and it came back trivial.** It was still not done, for reasons that outrank convenience:
+
+1. **It flips rule-evaluation outcomes** — role-holders go from refused to permitted. That is a
+   behavioural change, and appending it to an already-reviewed diff ships it unreviewed.
+2. **The plan text assigns it to nobody**, and *"the instinct to fix what you find is the one that hides
+   compounds."* Recorded halves are what let Wave 1's cross-workspace forgery become visible.
+3. The serial order already has the instrument for exactly this: **step 10, the integration checkpoint**
+   — *prove the fakes against the real server before anything builds further.* A recorded gap with an
+   owner feeds that checkpoint. A quietly-widened Task 4 does not.
+
+**Owner: the ruling below, to be taken by whoever dispatches Plan 4 Task 6 or the step-10 integration
+checkpoint, whichever comes first.** The conservative default, absent an owner decision, is that the
+wiring lands as its **own reviewed change** — a projection nothing reads is this series' signature
+failure at small scale, and `proj_memberships` is one adapter away from being exactly that.
+
+### The absence is enumerated in code, not labelled
+
+Per the standing rule that a partial-implementation marker *enumerates the absences rather than the
+partiality*: `engine-context.ts` is **deliberately untouched by Task 4**, including its comment. Editing
+that comment inside T4's diff would read as "Task 4 wired the engine", which is the misreading most
+likely to retire this entry before it is acted on.
+
+---
+
+## A projection handler may only write keys its own entity totally orders (2026-08-31, Plan 4 Task 4)
+
+**The general rule.** A projection's `apply` may write only those keys for which its own entity's event
+stream is the single, totally-ordered writer. Any key two different entity streams can write is
+order-dependent, and `readLedger` replays in `(entity_kind, entity_id, seq)` — per-entity causality
+only, with no cross-entity guarantee. So live arrival order and rebuild order disagree, `diffTable`'s
+`EXCEPT` sees a set difference, and **`verify-projections` reports drift on a table nobody corrupted.**
+
+**The instance that produced it.** Plan 4 Task 4's plan text told `membership.revoked` to delete every
+row for that user, project rows included. But `membership.granted`/`revoked` file against the
+**membership** entity and `project.member_added`/`removed` against the **project** entity, and
+`'membership' < 'project'`, so a rebuild applies every membership event before any roster event.
+Arrival `grant → member_added → revoked` leaves `{}` live and `{project row}` on rebuild.
+
+**What landed instead:** disjoint key ownership. `(ws, u, 'workspace', '')` is written only by the
+membership stream; `(ws, u, 'project', P)` only by project `P`'s stream. One totally-ordered writer per
+key, so no interleaving can change the final set. The safety property the plan wanted did not
+disappear — it moved to `resolveEffectiveRole`, which returns no projects when there is no workspace
+row. That placement is **stronger**, because it also covers the roster row a legitimate rebuild leaves
+standing, which a table-level delete could not.
+
+### The part a reader will not reconstruct: `registry.ts` beat the plan text
+
+The invariant was **already stated in the code**, at the top of
+`apps/server/src/projections/registry.ts`, verbatim: *"Table contents must be a pure function of the
+ledger's rows — never of cross-entity arrival interleaving."* The plan text violated an invariant the
+shipped code already declared.
+
+**This is worth naming because the reflex when a plan and the code disagree is to trust the plan.** It
+is the same shape as coordination doc §10's ruling on `Refusal`'s import origin — *"Plan 4's executor
+takes the import origin from the shipped code, not from the plan text"* — and it generalises past
+imports: **where a plan document and a shipped invariant disagree, the shipped invariant wins**, because
+it is the thing the rest of the system was built against and the thing a verifier actually enforces.
+
+---
+
+## Search for a fact in the vocabulary the OTHER author would have used, not in your own (2026-08-31, controller)
+
+**An over-specific search returns a false negative that looks like a finding.**
+
+Establishing whether "Features.md and test-cases/ move in the same change set" was a Plan-4 quirk or a
+series-wide constraint, a search for **Plan 4's exact phrasing** across all twelve plan files returned
+**one** hit — Plan 4 itself — which supported the conclusion "Plan 4 contradicts itself." A second pass
+searching for the *rule* rather than the *wording* found it in **all eleven numbered plans**, phrased
+differently in each: `` `Features.md`/`test-cases/` must move in the same change set `` (Plan 1),
+"stay in sync with reality in the same change set" (Plan 2), section-scoped variants in Plans 7, 10, 11.
+
+The conclusion reversed completely. Not "one plan is internally inconsistent" but **"a standing
+series-wide constraint governs every plan's task-level steps"** — so reading Plan 4's Task 12–14
+catalogue steps as exempting earlier tasks would exempt earlier tasks in *every* plan and leave the rule
+meaning nothing anywhere.
+
+**The rule: when testing whether a convention is local or global, search for the FACT in the vocabulary
+the other author would have used, not the string you happen to have in front of you.** Your phrasing
+comes from one document, and that document is the one file guaranteed to match it — so an exact-phrase
+sweep is biased toward "unique to this file" by construction.
+
+**A supporting detail from the same run:** two of the twelve files returned **blank rather than `0`**,
+which is the silent-empty mode again. It is why the second pass printed rows instead of counts, and it
+is another instance of the standing rule — **print the rows, not the count, whenever a count is about to
+decide something.**
+
+---
+
+## Ruling P19 (2026-08-31) — a guest is admitted TODAY for four event types, and the module that says otherwise is the one Task 9 will read
+
+**Owner: Plan 4 Task 9.** Recorded here and not only in a code comment, because the entire risk is
+*"if Task 9's implementer trusts that list"* — so the correction has to live in the artifact that
+implementer reads.
+
+**The measured fact, stated undimmed.** Against the gate built at `6a6203c`, a workspace **guest is
+ADMITTED** for `ticket.created`, `visibility.set`, `workspace.renamed` and `comment.added`. Positive
+controls from the same run: a guest `workflow.defined` is refused *"Your role is guest."*, and a
+non-member `ticket.created` is refused NOT_A_MEMBER — so the harness can produce refusals, and the
+admissions are real rather than a broken probe.
+
+**Why the docblock made this invisible.** `check-permission.ts`'s absence list said Task 5 *"closed the
+other three — actor identity, role and membership"*, leaving **Visibility** as the single remaining
+absence, and described the extension path as `checkVisibilityPermission` running AFTER
+`checkRolePermission`. But Plan 4 Task 9's own check list assigns **two refusals to `permission.role`**:
+
+* `ticket.created` — guests refused (`permission.role`, "Guests cannot create tickets.")
+* `visibility.set` — additionally requires project-admin rights on the ticket's project OR ticket
+  creatorship (`permission.role`)
+
+Those are **write-authority** questions and belong INSIDE `checkRolePermission`. **A visibility pass
+running after it has nowhere to put them.**
+
+**The failure this would have produced:** Task 9's implementer reads the absence list, sees role marked
+closed with only read-visibility outstanding, implements `checkVisibilityPermission` as a pure `canSee`
+gate exactly as the bullet describes, and ships. Checks #2 and #5 are never written. **A workspace guest
+can then permanently retarget any ticket they can see to `mode: 'workspace'`**, widening its audience to
+the entire workspace — in an append-only ledger, where that can only be superseded, never removed.
+
+**The general rule, which is the reusable half: NEVER LET A CATEGORY BE DECLARED CLOSED. Enumerate the
+absences.** "Role: closed" is a summary; "nothing yet asks whether a guest may create a ticket, or
+whether a `visibility.set` author holds project-admin rights or wrote the ticket" is actionable. The
+standing marker rule — *a partial-implementation marker enumerates the absences, not the partiality* —
+applies to a category being retired just as much as to one being declared partial. **A closed category
+is the one thing a later reader will not re-derive**, because there is nothing left in the text to
+prompt the question.
+
+Fixed as documentation only in T5. **The checks themselves are Task 9's**, and writing them inside T5
+would ship unreviewed authorisation logic in a reviewed diff — the same reason the P18 adapter was
+declined.
+
+---
+
+## Ruling P20 (2026-08-31) — when two refusal reasons share an identifier, asserting that identifier is not a discriminating check
+
+**`SERVER_ORIGIN_RULE` is DEFINED AS `PERMISSION_ROLE_RULE`.** Every permission refusal — identity
+spoof, envelope-origin forgery, not-a-member, admin-only, project-roster overreach — therefore reports
+the **same `rule` id**. Only the `reason` string separates them.
+
+So a test asserting only `rule` cannot tell which refusal fired, and **a test that asserts a refusal
+HAPPENED cannot tell you WHY.** Measured instance: deleting the `env.origin === 'server'` branch from
+`checkPermission` left two of three forgery cases green, because `forgedContest()` minted a fresh
+`workspaceId` and the caller was a non-member of it — the membership check T5 itself had just added
+refused the event instead, wearing the same rule id.
+
+### The sharpest detail, and the one worth carrying forward
+
+**The test that survived was the LEDGER-LEVEL one** — `it('commits nothing for the refused forgery —
+the append-only ledger never sees it')`. That is the test a security reviewer trusts **most**, precisely
+because it checks the ledger rather than a string. And it is, for exactly the same reason, **the test
+least able to distinguish WHY the row is absent.** Trustworthiness and discriminating power ran in
+opposite directions here.
+
+**The fix that works, and the one that does not.** Seeding the caller as a *member* of the forged
+workspace fixes all three cases at once: under the mutation the event then commits, the ledger row count
+goes 0 → 1, and the ledger test reddens. **Asserting `reason` would NOT have worked** — the ledger-count
+test has no reason string to assert, so the most-trusted test would have stayed green under the mutation.
+**When a check's strength comes from observing an outcome rather than a message, the only way to sharpen
+it is to remove the OTHER causes of that outcome from the fixture.**
+
+---
+
+## A test named for a property must enumerate the paths that reach it (2026-08-31, controller + serial executor)
+
+**This is the escape analysis for T5's privilege escalation, and it generalises well past that bug.**
+
+T5's first commit contained a live escalation: nothing refuses a *second* `workspace.created`, the
+founding bypass admitted one, and the bootstrap then appended `membership.granted {role:'owner'}` for
+the sender — **a stranger resolving as owner of a workspace they were never in.**
+
+The implementer *had* written a test for the property. It was named `does not bootstrap twice`. **It
+exercised only the duplicate-event-id path.** A submission with a *fresh* event id is a different path
+to the same property, and it was the one that was open. **28 tests and 11 dead mutations never touched
+it.**
+
+**Two rules, and the second is the counter-intuitive one:**
+
+1. **A test named for a property must enumerate the paths that reach that property.** A test named for
+   the property reads, to every later reviewer, as coverage *of the property* — not as coverage of the
+   one path the author happened to think of. The name is the claim; the paths are the evidence.
+2. **A mutation score is evidence about the paths exercised, not about the property.** Eleven mutations
+   died here, and every one of them died on the path that was already covered. **The high score made the
+   area look better tested, not worse** — it actively concealed the gap, because a reader who sees a
+   dense mutation table stops looking. A mutation can only kill on a path some test already walks.
+
+### Where the line actually falls — the valid half of a mutation score, kept
+
+The rule above is easy to over-correct into "mutation scores are worthless." They are not, and the
+distinction is the useful part:
+
+> **Mutate to prove an ASSERTION; enumerate paths to prove a PROPERTY.**
+
+Killing a *targeted* mutation proves something real and specific: that **this assertion** is load-bearing
+for **this** behaviour. Two good instances from this same task — reverting `sameSite` to `'strict'` and
+watching two named tests redden, and enabling `crossSubDomainCookies` and watching `Domain=localhost`
+appear in the diff — are genuine evidence, and they are why those two CSRF items count as *intent*
+rather than accident.
+
+What a kill can **never** establish is coverage across the paths that reach the property, because **a
+mutation can only kill on a path some test already walks.** A high kill count is therefore not a
+coverage claim, and a test named for a property still owes an enumeration of the routes to it.
+
+Recorded because *both* sessions were making the error in the same direction all day — one reporting
+kill counts as if they were coverage, the other asking for mutation proof repeatedly without ever
+asking which paths the mutations sat on.
+
+**And the guard that finally closed it had the same shape as the bug.** The obvious fix — ask whether
+the event's *entity* already has a head row — is defeated by a founding filed under a **fresh entity
+id** against the victim's workspace. The correct question is about the **workspace**
+(`workspaceExists`), not about one entity id. `workspaceExists` is a **required** field, so a call site
+that forgets it is a type error rather than a silently re-opened door — *prefer the check whose failure
+is loud*, applied to a function signature.
+
+---
+
+## "Tracked and pushed" — the resumer covers connection loss, not unpushed work (2026-08-31, controller)
+
+T5's five commits, including **the fix for a live privilege escalation**, sat on one machine's disk
+through an entire review cycle. Local `HEAD` was `6a6203c`; `origin/exec/04-t4-t5-permissions` was still
+`a5b761c`, the previous task's handoff commit.
+
+**Caught by a peer, not by a rule** — the controller went to verify the two escalation guards, searched
+the *remote* for `workspaceExists` and `workspaceSeq === 1`, and got **zero hits with `checkPermission`
+as a positive control returning four files.** The zero was true of the remote and false of the tree.
+
+**The gap this exposes in the safety nets:** the session-limit resumer handles connection loss, and
+processes and commits survive that fine. **It does nothing for work that was never pushed.** That is
+why the handoff protocol's phrase is "tracked **and pushed**" rather than "committed".
+
+**Rule: push at every commit inside a task, not only at the task boundary.** A `--force-with-lease`
+after a later amend costs nothing; an unpushed escalation fix costs the whole task. And **verify with
+`git branch -r --contains`** — the remote-tracking form — because the same trap applies here as
+everywhere: a sha that resolves locally says nothing about what the remote holds.

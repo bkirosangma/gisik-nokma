@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import type { FastifyError, FastifyInstance } from 'fastify';
 import type { Auth } from './auth/auth.js';
 import { registerAuthRoutes } from './auth/routes.js';
+import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
 import { registerEventRoutes } from './routes/events.js';
 
@@ -78,7 +79,11 @@ export function buildApp(deps: AppDeps, options: { logLevel?: string } = {}): Fa
     }
   });
 
-  registerEventRoutes(app, deps.ingest);
+  // The events door reads `request.currentUserId`, so it is assembled WITH the
+  // preHandler that writes it — the rule `require-session.ts` states, made
+  // structural: `registerEventRoutes` takes the preHandler as an argument, so
+  // there is no version of this line that forgets it and still compiles.
+  registerEventRoutes(app, deps.ingest, makeRequireSession(deps.auth));
   registerAuthRoutes(app, deps.auth);
 
   return app;

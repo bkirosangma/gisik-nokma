@@ -9,6 +9,7 @@ import { createIngestService, type ClientIngest, type IngestService } from '../.
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { submittedWorkspaceCreated } from '../helpers/events.js';
+import { signInWithPhone } from '../helpers/session.js';
 
 /**
  * The envelope-origin gate at the client door.
@@ -81,16 +82,6 @@ afterAll(async () => {
   await db.drop();
 });
 
-function testAuth() {
-  return createAuth({
-    pool: db.pool,
-    otpSender: new LogOtpSender(() => {}),
-    magicLinkSender: new LogMagicLinkSender(() => {}),
-    baseUrl: 'http://localhost:3000',
-    secret: 'test-secret-not-used-anywhere-real',
-  });
-}
-
 function ingestService(): IngestService {
   return createIngestService({
     pool: db.pool,
@@ -99,8 +90,60 @@ function ingestService(): IngestService {
   });
 }
 
-function app(ingest: IngestService = ingestService()) {
-  return buildApp({ db: db.pool, ingest, auth: testAuth() });
+let phoneCounter = 0;
+
+/**
+ * A running app and a caller signed into it.
+ *
+ * Every client-door case below needs one, because Task 5 put `requireSession`
+ * on `/v1/events`: without a session the door answers 401 and the gate under
+ * test never runs at all. Bearer, not cookie — a cookie-carrying POST to
+ * `/api/auth/*` needs a trusted HTTP `Origin` header, and HTTP-Origin is a
+ * different subject from this file's, which is the envelope's provenance enum.
+ */
+async function signedInApp(ingest: IngestService = ingestService()) {
+  const otp = new LogOtpSender(() => {});
+  const auth = createAuth({
+    pool: db.pool,
+    otpSender: otp,
+    magicLinkSender: new LogMagicLinkSender(() => {}),
+    baseUrl: 'http://localhost:3000',
+    secret: 'test-secret-not-used-anywhere-real',
+  });
+  const app = buildApp({ db: db.pool, ingest, auth });
+  phoneCounter += 1;
+  const user = await signInWithPhone(app, otp, `+9197000${String(phoneCounter).padStart(5, '0')}`);
+  return { app, user, headers: { authorization: `Bearer ${user.token}` } };
+}
+
+/**
+ * The same caller, plus a workspace they really belong to.
+ *
+ * Every forgery case below needs one. `forgedContest()` invents its own
+ * workspace id, so a caller who merely signed in is a NON-MEMBER of the
+ * workspace the forgery names — and a non-member's submission is refused by the
+ * membership check whether or not the envelope-origin branch exists. Founding
+ * the workspace through the client door makes the caller its owner (the
+ * founding sequence appends `membership.granted {role: 'owner'}`), which leaves
+ * the borrowed provenance as the one and only thing wrong with the forgery.
+ *
+ * The founding is ASSERTED, not assumed. If it ever stops committing the caller
+ * is silently a non-member again and all three cases below go back to passing
+ * for the wrong reason — which is precisely the defect this helper exists to
+ * remove, so it must not be able to come back unannounced.
+ */
+async function signedInFounder(ingest: IngestService = ingestService()) {
+  const { app, user, headers } = await signedInApp(ingest);
+  const founding = submittedWorkspaceCreated({ actorId: user.userId });
+  const response = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers,
+    payload: { events: [founding] },
+  });
+  const body = response.json() as { results: Array<{ status: string; eventId: string }> };
+  expect(body.results[0]).toMatchObject({ status: 'committed', eventId: founding.id });
+  return { app, user, headers, workspaceId: founding.workspaceId };
 }
 
 /**
@@ -153,12 +196,49 @@ async function ledgerRowsFor(eventId: string): Promise<number> {
   return rows[0]?.count ?? 0;
 }
 
+/**
+ * WHAT THESE CASES PIN AFTER TASK 5, which is not quite what they pinned before.
+ *
+ * `checkRolePermission` wraps the envelope-origin branch in two other checks —
+ * ACTOR IDENTITY before it, WORKSPACE MEMBERSHIP after it — and a forgery that
+ * trips either of them never exercises the branch this file is named after. The
+ * fix for both is to remove the extra fault from the fixture rather than to
+ * loosen the assertion. The first was removed when Task 5 landed; the second
+ * was missed, and this is what it cost:
+ *
+ * - **Identity.** These cases used to send a random `actorId` and drew *"You
+ *   cannot submit a claim as another person."* Every forgery below is now
+ *   attributed to the signed-in caller.
+ * - **Membership.** `forgedContest()` invents its own workspace, so the caller
+ *   was a non-member of it. MEASURED at 6a6203c: with the `env.origin ===
+ *   'server'` branch deleted, the membership check refused the forgery as *"You
+ *   are not a member of this workspace."* and only 2 of the server's 200 tests
+ *   went red — the two anywhere in the repository that assert the exact
+ *   `reason`. The ledger case and the batch case stayed GREEN under a mutation
+ *   that removes the gate they exist to pin. Nothing that asserts `rule` alone
+ *   can tell the two refusals apart, because `SERVER_ORIGIN_RULE` is DEFINED AS
+ *   `PERMISSION_ROLE_RULE` — every pre-engine refusal reports the same id — and
+ *   `ledgerRowsFor` has no reason string to assert at all, so the case a
+ *   security reviewer trusts most was the least falsifiable one here.
+ *
+ * So the caller now FOUNDS the workspace each forgery names (`signedInFounder`)
+ * and submits into it as its owner. Asserting `reason` in the two weak cases
+ * would not have been a fix: the ledger case has no string to assert.
+ *
+ * Read each case as: *given an honest actor, an honest session, and a workspace
+ * the caller genuinely belongs to, a borrowed server provenance is still
+ * refused.* Mutation that reddens them: delete the `env.origin === 'server'`
+ * branch — nothing else about these submissions is wrong, so the forgery
+ * COMMITS, the ledger count goes 0 → 1, and all three fall over together.
+ */
 describe('envelope-origin gate — the client door (POST /v1/events)', () => { // test-cases 3.31
   it('refuses a client-submitted server-origin event with the exact rule and reason', async () => {
-    const forged = forgedContest();
-    const response = await app().inject({
+    const { app, user, headers, workspaceId } = await signedInFounder();
+    const forged = forgedContest({ actorId: user.userId, workspaceId });
+    const response = await app.inject({
       method: 'POST',
       url: '/v1/events',
+      headers,
       payload: { events: [forged] },
     });
 
@@ -173,20 +253,32 @@ describe('envelope-origin gate — the client door (POST /v1/events)', () => { /
   });
 
   it('commits nothing for the refused forgery — the append-only ledger never sees it', async () => {
-    const forged = forgedContest();
-    await app().inject({ method: 'POST', url: '/v1/events', payload: { events: [forged] } });
+    const { app, user, headers, workspaceId } = await signedInFounder();
+    const forged = forgedContest({ actorId: user.userId, workspaceId });
+    await app.inject({ method: 'POST', url: '/v1/events', headers, payload: { events: [forged] } });
 
     expect(await ledgerRowsFor(forged.id)).toBe(0);
   });
 
   it('refuses only the forgery in a batch, and keeps results index-aligned', async () => {
-    const before = submittedWorkspaceCreated();
-    const forged = forgedContest();
-    const after = submittedWorkspaceCreated();
+    const { app, user, headers, workspaceId } = await signedInFounder();
+    // The two honest events are workspace foundings, so each appends a founding
+    // sequence of six more events INSIDE this same batch loop (Task 5). The
+    // index alignment asserted below is therefore a stronger claim than it was:
+    // `results[i]` still answers `events[i]` even though the server appended
+    // twelve events of its own between them. A bootstrap that pushed its own
+    // results onto the array would give this test five entries, not three.
+    const before = submittedWorkspaceCreated({ actorId: user.userId });
+    // Into the workspace the caller already owns — see `signedInFounder`. A
+    // forgery in a workspace the caller is not in is refused for the wrong
+    // reason, and this case cannot see the difference.
+    const forged = forgedContest({ actorId: user.userId, workspaceId });
+    const after = submittedWorkspaceCreated({ actorId: user.userId });
 
-    const response = await app().inject({
+    const response = await app.inject({
       method: 'POST',
       url: '/v1/events',
+      headers,
       payload: { events: [before, forged, after] },
     });
 
@@ -215,10 +307,12 @@ describe('envelope-origin gate — the client door (POST /v1/events)', () => { /
   it.each(CLIENT_ORIGINS)(
     'still admits an ordinary %s-origin client submission through the same door',
     async (origin) => {
-      const honest = submittedWorkspaceCreated({ origin });
-      const response = await app().inject({
+      const { app, user, headers } = await signedInApp();
+      const honest = submittedWorkspaceCreated({ origin, actorId: user.userId });
+      const response = await app.inject({
         method: 'POST',
         url: '/v1/events',
+        headers,
         payload: { events: [honest] },
       });
 

@@ -1,0 +1,879 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  membershipId,
+  newUlid,
+  SIMPLE_KANBAN_TEMPLATE,
+  type EventEnvelope,
+  type IngestResult,
+  type SubmittedEvent,
+} from '@gisik-nokma/domain';
+import type { Pool } from 'pg';
+import { evaluateEvent } from '@gisik-nokma/rule-engine';
+import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
+import {
+  adminOnlyReason,
+  checkRolePermission,
+  IDENTITY_SPOOF_REASON,
+  NOT_A_MEMBER_REASON,
+  PERMISSION_ROLE_RULE,
+  PROJECT_ROSTER_REASON,
+  SERVER_ORIGIN_REASON,
+  WORKSPACE_MEMBERSHIP_REASON,
+} from '../../src/permissions/check-permission.js';
+import type { EffectiveRole } from '../../src/permissions/effective-role.js';
+import { buildProjectionRegistry } from '../../src/projections/index.js';
+import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { testEnvelope } from '../helpers/envelope.js';
+
+/**
+ * The pre-engine permission gate (Plan 4 Task 5), and the founding sequence
+ * behind it.
+ *
+ * TERMINOLOGY, because two unrelated things are called "origin" and they meet
+ * in this file: **envelope-origin** is `EventEnvelope.origin`, the provenance
+ * enum `'web' | 'mobile' | 'desktop' | 'server'`. **HTTP-Origin** is the
+ * browser `Origin` header, which is CSRF and appears nowhere in this file.
+ *
+ * NO `// test-cases N.N` MARKERS, deliberately, and this is the one thing to
+ * read before adding one. `3.31` — the nearest existing id — is the
+ * envelope-origin gate, and `test-cases/03-foundation-ledger.md` names
+ * `check-permission.test.ts` as its file. Stamping it on the role gate, the
+ * founding sequence and the project roster would assert coverage that entry
+ * never described, which is the false-marker class this repository keeps
+ * finding. The right id does not exist yet: Plan 4 puts its catalogue steps in
+ * **Tasks 12–14**, not in Task 5, and `test-cases/06-auth-visibility.md` is
+ * that bucket. *Owner: whoever executes Plan 4 Task 12, who claims the numbers
+ * from the reservation table and back-fills them here in the same change set.*
+ */
+
+// ---------------------------------------------------------------------------
+// Part 1 — the pure role checks. No database: `checkRolePermission` takes the
+// resolved role as an argument precisely so the rules can be stated without
+// one, and so a role the projection cannot currently produce ('guest' at
+// workspace scope, say) can still be exercised.
+// ---------------------------------------------------------------------------
+
+const WS = newUlid();
+const ACTOR = newUlid();
+
+function eff(
+  workspaceRole: EffectiveRole['workspaceRole'],
+  projects: Array<[string, boolean]> = [],
+): EffectiveRole {
+  return {
+    workspaceRole,
+    projects: new Map(projects.map(([id, projectAdmin]) => [id, { projectAdmin }])),
+  };
+}
+
+function env(
+  overrides: Partial<EventEnvelope> & Pick<EventEnvelope, 'type' | 'entity' | 'payload'>,
+): EventEnvelope {
+  return testEnvelope({ workspaceId: WS, actorId: ACTOR, ...overrides });
+}
+
+const ticket = { kind: 'ticket' as const, id: newUlid() };
+
+/**
+ * A permission context for `ACTOR`. `workspaceExists` defaults to `false` — a
+ * workspace with no ledger — because that value only changes the answer for
+ * `workspace.created`, and the two cases where it decides something pass it by
+ * name rather than relying on the default.
+ */
+function ctx(role: EffectiveRole, workspaceExists = false) {
+  return { sessionUserId: ACTOR, eff: role, workspaceExists };
+}
+
+describe('checkRolePermission — planted defects', () => {
+  it('refuses a claim submitted as another person', () => {
+    // Mutation: delete the `env.actorId !== ctx.sessionUserId` branch. This
+    // goes green-for-nothing and every other case in this file still passes,
+    // which is why identity gets its own case rather than riding along.
+    const e = env({ type: 'ticket.transitioned', entity: ticket, payload: {}, actorId: newUlid() });
+    expect(checkRolePermission(e, ctx(eff('admin')))).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: IDENTITY_SPOOF_REASON,
+    });
+  });
+
+  it("refuses a client-submitted event wearing the server's envelope-origin", () => {
+    const e = env({ type: 'ticket.transitioned', entity: ticket, payload: {}, origin: 'server' });
+    expect(checkRolePermission(e, ctx(eff('admin')))).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: SERVER_ORIGIN_REASON,
+    });
+  });
+
+  it('refuses any claim from a non-member of the workspace', () => {
+    const e = env({ type: 'ticket.transitioned', entity: ticket, payload: {} });
+    expect(checkRolePermission(e, ctx(eff(null)))).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: NOT_A_MEMBER_REASON,
+    });
+  });
+
+  it('allows any signed-in user to found a workspace — there is no membership to hold yet', () => {
+    // The one bypass, and the reason the whole product can start: a founder is
+    // a non-member of a workspace that does not exist. Mutation: move the
+    // `workspace.created` early return below the membership check and NO
+    // workspace can ever be founded through the client door again.
+    const e = env({ type: 'workspace.created', entity: { kind: 'workspace', id: WS }, payload: { name: 'New' } });
+    expect(checkRolePermission(e, ctx(eff(null), false))).toBeNull();
+  });
+
+  it('planted defect: refuses a NON-MEMBER founding a workspace that already exists', () => {
+    // The bypass's bound, and without it the bypass is a privilege escalation:
+    // nothing else refuses a second `workspace.created`, the engine has no case
+    // for the type, and the founding sequence would then append
+    // `membership.granted {role: 'owner'}` for whoever submitted it. Measured
+    // before the fix, end to end through the client door: the stranger resolved
+    // as `owner` of a workspace they were never in, and the workspace held 14
+    // events instead of 7.
+    // Mutation: drop `&& !ctx.workspaceExists` and this goes green while the
+    // integration twin below turns an outsider into an owner.
+    const e = env({ type: 'workspace.created', entity: { kind: 'workspace', id: WS }, payload: { name: 'New' } });
+    expect(checkRolePermission(e, ctx(eff(null), true))).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: NOT_A_MEMBER_REASON,
+    });
+  });
+
+  it.each(['workflow.defined', 'ticket-type.defined', 'project.created', 'ticket.workflow_rebound'] as const)(
+    'refuses %s from a plain member, names the rule and the role',
+    (type) => {
+      const entity =
+        type === 'workflow.defined'
+          ? { kind: 'workflow' as const, id: newUlid() }
+          : type === 'ticket-type.defined'
+            ? { kind: 'ticket-type' as const, id: newUlid() }
+            : type === 'project.created'
+              ? { kind: 'project' as const, id: newUlid() }
+              : { kind: 'ticket' as const, id: newUlid() };
+      const e = env({ type, entity, payload: {} });
+      expect(checkRolePermission(e, ctx(eff('member')))).toEqual({
+        refused: true,
+        rule: PERMISSION_ROLE_RULE,
+        reason: adminOnlyReason('member'),
+      });
+    },
+  );
+
+  it.each(['owner', 'admin'] as const)('allows an %s to define workflows', (role) => {
+    // Both, not one. The refusal direction was well pinned by the case above;
+    // testing only 'admin' here would leave a gate written `role !== 'admin'`
+    // green while it locked every workspace OWNER out of their own workflows.
+    const e = env({ type: 'workflow.defined', entity: { kind: 'workflow', id: newUlid() }, payload: {} });
+    expect(checkRolePermission(e, ctx(eff(role)))).toBeNull();
+  });
+
+  it('refuses workspace-scope membership grants from below admin', () => {
+    const grantee = newUlid();
+    const e = env({
+      type: 'membership.granted',
+      entity: { kind: 'membership', id: membershipId(WS, grantee) },
+      payload: { userId: grantee, role: 'member' },
+    });
+    expect(checkRolePermission(e, ctx(eff('member')))).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: WORKSPACE_MEMBERSHIP_REASON,
+    });
+  });
+
+  // A project admin runs their project's roster, not the workspace's door.
+  // Before the 2026-08-27 scope collapse a project-scoped `membership.granted`
+  // let them do both through one event; now the two questions have two events,
+  // and this pair of cases is what keeps them two.
+  it('lets a project admin manage their own project roster and no other', () => {
+    const mine = newUlid();
+    const theirs = newUlid();
+    const add = (projectId: string) =>
+      env({
+        type: 'project.member_added',
+        entity: { kind: 'project', id: projectId },
+        payload: { userId: newUlid(), projectAdmin: false },
+      });
+    const asProjectAdmin = ctx(eff('member', [[mine, true]]));
+    expect(checkRolePermission(add(mine), asProjectAdmin)).toBeNull();
+    expect(checkRolePermission(add(theirs), asProjectAdmin)).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: PROJECT_ROSTER_REASON,
+    });
+  });
+
+  it('refuses a project admin who tries to grant workspace membership', () => {
+    const grantee = newUlid();
+    const e = env({
+      type: 'membership.granted',
+      entity: { kind: 'membership', id: membershipId(WS, grantee) },
+      payload: { userId: grantee, role: 'guest' },
+    });
+    expect(
+      checkRolePermission(e, ctx(eff('member', [[newUlid(), true]]))),
+    ).toEqual({ refused: true, rule: PERMISSION_ROLE_RULE, reason: WORKSPACE_MEMBERSHIP_REASON });
+  });
+
+  it('refuses project roster changes from a plain project member', () => {
+    const project = newUlid();
+    const e = env({
+      type: 'project.member_added',
+      entity: { kind: 'project', id: project },
+      payload: { userId: newUlid(), projectAdmin: false },
+    });
+    expect(
+      checkRolePermission(e, ctx(eff('member', [[project, false]]))),
+    ).toEqual({ refused: true, rule: PERMISSION_ROLE_RULE, reason: PROJECT_ROSTER_REASON });
+  });
+
+  it('lets ordinary ticket work through — the visibility gate (Task 9) owns the rest', () => {
+    // The admits direction for the common case. Without it, a gate that
+    // refused everything would pass every refusal case above.
+    const e = env({ type: 'ticket.transitioned', entity: ticket, payload: {} });
+    expect(
+      checkRolePermission(e, ctx(eff('member', [[newUlid(), false]]))),
+    ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Part 2 — the gate and the founding sequence through the real ingest path.
+// ---------------------------------------------------------------------------
+
+let db: TestDatabase;
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+});
+
+afterAll(async () => {
+  await db.drop();
+});
+
+/** Every envelope the engine was asked to judge — how "before the engine" is proven. */
+let evaluated: string[] = [];
+
+function ingestService(): IngestService {
+  evaluated = [];
+  return createIngestService({
+    pool: db.pool,
+    evaluate: async (envelope, ctx) => {
+      evaluated.push(envelope.id);
+      return evaluateEvent(envelope, ctx);
+    },
+    projections: buildProjectionRegistry(),
+  });
+}
+
+/**
+ * Hands out real clients, but refuses to hand out a SECOND one while the first
+ * is still checked out — with a named error rather than a hang.
+ *
+ * This exists to pin one line: `commitOne` passes the gate `client`, the ingest
+ * transaction's own connection, and not `deps.pool`. The pool version compiles,
+ * and every other test in this repository passes under it, because a healthy
+ * pool simply hands out a second connection and the read returns the same rows.
+ * What it costs is invisible until it is expensive:
+ *
+ * - **Correctness.** A membership change committing between the transaction's
+ *   own reads (`readEntityHead`, the engine's context) and a pool-side
+ *   membership read gives one `commitOne` a mixed view of the world, after the
+ *   workspace lock was taken precisely to stop that.
+ * - **Liveness, which is what this test can actually see.** A gate that needs a
+ *   second connection makes every ingest hold one connection while waiting for
+ *   another. At `max` concurrent ingests the pool is empty and every one of
+ *   them is waiting for a connection only another of them could release — a
+ *   deadlock that appears under load and never in a test suite.
+ *
+ * Stated plainly because the test below pins the second and not the first: a
+ * proxy cannot manufacture a concurrent commit, so the correctness half stays
+ * an argument in `check-permission.ts`'s docblock. The liveness half is enough
+ * to make the line falsifiable, which is what it did not have before.
+ */
+function poolAllowingOneClient(real: Pool): Pool {
+  let outstanding = 0;
+  const connect = async () => {
+    if (outstanding > 0) {
+      throw new Error(
+        'planted: something asked for a second connection while the ingest transaction held one',
+      );
+    }
+    outstanding += 1;
+    const client = await real.connect();
+    return new Proxy(client, {
+      get(target, property) {
+        if (property === 'release') {
+          return (...args: unknown[]) => {
+            outstanding -= 1;
+            return (target.release as (...a: unknown[]) => void).apply(target, args);
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  };
+  return {
+    connect,
+    /**
+     * Checkout, run, release — what `pg.Pool.query` actually does, and the
+     * reason this method exists rather than being left off as "nothing calls
+     * it".
+     *
+     * The proxy had no `query` at all, so the mutation below died of
+     * `TypeError: db.query is not a function` and the planted error string
+     * occurred ZERO times in the run (measured at 6a6203c). The counter, the
+     * release hook and the named error took no part in the kill: the test
+     * reddened because the fake was incomplete, not because a second connection
+     * was asked for, which is a different property from the one its name
+     * claims. Routing through `connect` is what makes the kill mean what the
+     * title says.
+     *
+     * It cannot change the unmutated result: nothing on the green path calls
+     * `query` on this pool — if anything did, this test would already have been
+     * dying of that same TypeError. `connect()` is awaited OUTSIDE the `try` so
+     * a refused checkout never reaches a `release` that would decrement a
+     * counter it never incremented.
+     */
+    async query(...args: unknown[]) {
+      const client = await connect();
+      try {
+        return await (client.query as (...a: unknown[]) => Promise<unknown>)(...args);
+      } finally {
+        client.release();
+      }
+    },
+  } as unknown as Pool;
+}
+
+function submitted(fields: {
+  workspaceId: string;
+  entity: SubmittedEvent['entity'];
+  type: string;
+  payload: unknown;
+  actorId: string;
+}): SubmittedEvent {
+  return {
+    id: newUlid(),
+    version: 1,
+    origin: 'web',
+    clientTime: '2026-08-20T09:00:00.000Z',
+    ...fields,
+  };
+}
+
+function founding(workspaceId: string, actorId: string): SubmittedEvent {
+  return submitted({
+    workspaceId,
+    entity: { kind: 'workspace', id: workspaceId },
+    type: 'workspace.created',
+    payload: { name: 'Founded' },
+    actorId,
+  });
+}
+
+function expectCommitted(results: IngestResult[]): void {
+  expect(results.map((result) => result.status)).toEqual(results.map(() => 'committed'));
+}
+
+async function workspaceStream(workspaceId: string) {
+  const { rows } = await db.pool.query<{ type: string; payload: Record<string, unknown> }>(
+    'SELECT type, payload FROM events WHERE workspace_id = $1 ORDER BY workspace_seq',
+    [workspaceId],
+  );
+  return rows;
+}
+
+describe('the founding sequence — a new workspace can hold a ticket the moment it exists', () => {
+  it('appends the default workflow, then the four built-in types, then the grant — in that order', async () => {
+    const workspaceId = newUlid();
+    const founder = newUlid();
+    expectCommitted(await ingestService().ingestBatch([founding(workspaceId, founder)]));
+
+    // Ordered by the WORKSPACE cursor, not per-entity `seq` (coordination §18):
+    // this sequence spans four entity kinds, so per-entity seq cannot order it.
+    // Mutation: move the grant to the front of `foundingSequence` and this
+    // names the swapped pair.
+    const rows = await workspaceStream(workspaceId);
+    expect(rows.map((row) => row.type)).toEqual([
+      'workspace.created',
+      'workflow.defined',
+      'ticket-type.defined',
+      'ticket-type.defined',
+      'ticket-type.defined',
+      'ticket-type.defined',
+      'membership.granted',
+    ]);
+
+    const workflowId = rows[1]?.payload['id'] as string;
+    expect(rows.slice(2, 6).map((row) => row.payload['id'])).toEqual(['epic', 'story', 'task', 'sub-task']);
+    for (const row of rows.slice(2, 6)) {
+      // Every type names the workflow defined one event earlier — the reason
+      // the order cannot be rearranged for tidiness.
+      expect(row.payload['workflowId']).toBe(workflowId);
+    }
+  });
+
+  it('founds on the canonical template itself, not on a copy that resembles it', async () => {
+    const workspaceId = newUlid();
+    expectCommitted(await ingestService().ingestBatch([founding(workspaceId, newUlid())]));
+
+    const rows = await workspaceStream(workspaceId);
+    const { id: _id, version, ...shape } = rows[1]?.payload as Record<string, unknown> & {
+      id: string;
+      version: number;
+    };
+    expect(version).toBe(1);
+    // `toEqual` against the exported template, not a hand-written copy of the
+    // states and transitions: a second spelling of the default workflow here
+    // could agree with itself while the product founded workspaces on
+    // something else. Mutation: change one state name in
+    // `SIMPLE_KANBAN_TEMPLATE` and this stays green (both sides move) while
+    // the domain package's own validation test still guards the shape — which
+    // is the division of labour intended, this file pins the WIRING.
+    expect(shape).toEqual(SIMPLE_KANBAN_TEMPLATE);
+  });
+
+  it('leaves its founder owning the workspace', async () => {
+    const workspaceId = newUlid();
+    const founder = newUlid();
+    expectCommitted(await ingestService().ingestBatch([founding(workspaceId, founder)]));
+
+    const { rows } = await db.pool.query<{ role: string }>(
+      `SELECT role FROM proj_memberships
+       WHERE workspace_id = $1 AND user_id = $2 AND scope_kind = 'workspace'`,
+      [workspaceId, founder],
+    );
+    expect(rows).toEqual([{ role: 'owner' }]);
+  });
+
+  it('planted defect: re-founding with the same event id does not bootstrap a second time', async () => {
+    const ingest = ingestService();
+    const workspaceId = newUlid();
+    const first = founding(workspaceId, newUlid());
+    expectCommitted(await ingest.ingestBatch([first]));
+    const after = (await workspaceStream(workspaceId)).length;
+
+    // Both of Plan 11's seed CLIs re-run by re-submitting the same
+    // deterministic event id and counting `duplicate-event-id` as "already
+    // present". Hooked to anything looser than `status === 'committed'`, every
+    // re-run would append a second workflow and four more type definitions,
+    // and Plan 11's "re-run is a no-op" test would be a lie.
+    // Mutation: change the hook's condition to `result.status !== 'refused'`
+    // and this goes from 7 to 13.
+    const again = await ingest.ingestBatch([first]);
+    expect(again[0]).toMatchObject({ status: 'invalid', code: 'duplicate-event-id' });
+    expect((await workspaceStream(workspaceId)).length).toBe(after);
+    expect(after).toBe(7);
+  });
+
+  it('planted defect: a stranger cannot become owner by re-founding an existing workspace', async () => {
+    // THE ESCALATION, end to end, and it was live in this task's first commit.
+    // A second `workspace.created` is refused by nothing else in the system —
+    // `parseEvent` accepts it, the entity↔workspace guard sees no mismatch
+    // because the workspace ids agree, and `evaluateEvent` has no case for the
+    // type — so the founding bypass admitted it, it committed, and the founding
+    // sequence appended `membership.granted {role: 'owner'}` for the stranger.
+    // Measured then: the stranger resolved as `owner` and the workspace held 14
+    // events. Direct `membership.granted` is refused from below admin, so this
+    // was the only path in.
+    //
+    // The FRESH entity id is the sharp half. The obvious guards — a head-row
+    // lookup on `env.entity.id`, or the committed result's per-entity `seq` —
+    // both pass here, because this entity has never been seen. Only asking
+    // whether the WORKSPACE has a ledger catches it.
+    // Mutation: drop `&& !ctx.workspaceExists` from `checkRolePermission`.
+    const ingest = ingestService();
+    const workspaceId = newUlid();
+    const founder = newUlid();
+    const stranger = newUlid();
+    expectCommitted(await ingest.ingestBatch([founding(workspaceId, founder)]));
+
+    const reFound: SubmittedEvent = {
+      ...founding(workspaceId, stranger),
+      entity: { kind: 'workspace', id: newUlid() }, // a fresh entity, same workspace
+    };
+    expect((await ingest.ingestClientBatch([reFound], stranger))[0]).toEqual({
+      status: 'refused',
+      eventId: reFound.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: NOT_A_MEMBER_REASON,
+    });
+
+    const { rows } = await db.pool.query<{ user_id: string; role: string }>(
+      `SELECT user_id, role FROM proj_memberships
+       WHERE workspace_id = $1 AND scope_kind = 'workspace'`,
+      [workspaceId],
+    );
+    expect(rows).toEqual([{ user_id: founder, role: 'owner' }]);
+    expect((await workspaceStream(workspaceId)).length).toBe(7);
+  });
+
+  it('planted defect: "already exists" is a question about the WORKSPACE, not about one entity id', async () => {
+    // Nothing requires a workspace's founding event to be filed against an
+    // entity whose id EQUALS the workspace id — the door admits any workspace
+    // entity — so a `proj_entity_heads` lookup keyed on the workspace id is a
+    // near-miss that passes every other test in this file, where the two always
+    // coincide. Here they do not, and the near-miss reports "no such workspace"
+    // for a workspace with a full seven-event ledger, re-opening the
+    // escalation.
+    // Mutation: read `proj_entity_heads WHERE entity_kind = 'workspace' AND
+    // entity_id = $1` instead of `events WHERE workspace_id = $1` in
+    // `workspaceHasLedger`, and this is the only test that goes red.
+    const ingest = ingestService();
+    const workspaceId = newUlid();
+    const founder = newUlid();
+    const oddlyFiled: SubmittedEvent = {
+      ...founding(workspaceId, founder),
+      entity: { kind: 'workspace', id: newUlid() },
+    };
+    expectCommitted(await ingest.ingestBatch([oddlyFiled]));
+    expect((await workspaceStream(workspaceId)).length).toBe(7);
+
+    const stranger = newUlid();
+    const attempt = founding(workspaceId, stranger);
+    expect((await ingest.ingestClientBatch([attempt], stranger))[0]).toEqual({
+      status: 'refused',
+      eventId: attempt.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: NOT_A_MEMBER_REASON,
+    });
+  });
+
+  it('planted defect: the INTERNAL door does not re-found an existing workspace either', async () => {
+    // The internal door has no gate BY DESIGN, and Plan 11's seed CLIs and Task
+    // 13 both use it, so the refusal above protects nothing here. The bootstrap
+    // carries its own condition: `workspaceSeq === 1`, which is the workspace's
+    // own first event and cannot be forged by choosing a fresh entity.
+    // Mutation: relax the condition to `result.status === 'committed'` alone
+    // (or to the per-entity `seq === 1`) and the stream below goes to 13.
+    const ingest = ingestService();
+    const workspaceId = newUlid();
+    const founder = newUlid();
+    expectCommitted(await ingest.ingestBatch([founding(workspaceId, founder)]));
+
+    const second: SubmittedEvent = {
+      ...founding(workspaceId, newUlid()),
+      entity: { kind: 'workspace', id: newUlid() },
+    };
+    // It COMMITS — the internal door trusts its caller, and this is an
+    // ordinary append — but it founds nothing.
+    expectCommitted(await ingest.ingestBatch([second]));
+    expect((await workspaceStream(workspaceId)).length).toBe(8);
+    const { rows } = await db.pool.query<{ user_id: string }>(
+      `SELECT user_id FROM proj_memberships WHERE workspace_id = $1 AND scope_kind = 'workspace'`,
+      [workspaceId],
+    );
+    expect(rows).toEqual([{ user_id: founder }]);
+  });
+
+  it('founds through the CLIENT door too — the gate admits the founding and not the sequence', async () => {
+    // The discriminating case for the whole bootstrap design. The founding
+    // sequence is envelope-origin `'server'`, which `checkRolePermission`
+    // refuses outright; it commits only because `bootstrapWorkspace` appends
+    // through the INTERNAL door. Mutation: pass `door` instead of `null` at the
+    // bootstrap call site in `ingestAll` and this test fails with the
+    // server-origin refusal — the whole workspace unusable, which is exactly
+    // the failure the owner decision exists to prevent.
+    const workspaceId = newUlid();
+    const founder = newUlid();
+    const results = await ingestService().ingestClientBatch([founding(workspaceId, founder)], founder);
+
+    expectCommitted(results);
+    expect((await workspaceStream(workspaceId)).map((row) => row.type)).toEqual([
+      'workspace.created',
+      'workflow.defined',
+      'ticket-type.defined',
+      'ticket-type.defined',
+      'ticket-type.defined',
+      'ticket-type.defined',
+      'membership.granted',
+    ]);
+  });
+});
+
+describe('the gate at the client door — refusals before the rule engine', () => {
+  /** Founds a workspace and returns the owner's id; the bootstrap makes them owner. */
+  async function foundedWorkspace(ingest: IngestService) {
+    const workspaceId = newUlid();
+    const owner = newUlid();
+    expectCommitted(await ingest.ingestBatch([founding(workspaceId, owner)]));
+    return { workspaceId, owner };
+  }
+
+  async function grantMember(ingest: IngestService, workspaceId: string, owner: string, role: string) {
+    const user = newUlid();
+    expectCommitted(
+      await ingest.ingestBatch([
+        submitted({
+          workspaceId,
+          entity: { kind: 'membership', id: membershipId(workspaceId, user) },
+          type: 'membership.granted',
+          payload: { userId: user, role },
+          actorId: owner,
+        }),
+      ]),
+    );
+    return user;
+  }
+
+  it('planted defect: a member ingesting workflow.defined is refused BEFORE the engine runs', async () => {
+    const ingest = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(ingest);
+    const member = await grantMember(ingest, workspaceId, owner, 'member');
+
+    // The payload is envelope-VALID (so `parseEvent`, which runs ahead of the
+    // gate, has nothing to say) and engine-INVALID: a first publish claiming
+    // version 2 draws `workflow-version` from `evaluateWorkflowDefined`. Two
+    // different refusals are therefore available for this one event, and which
+    // one comes back says which check ran. A payload that only the gate could
+    // refuse would make the ordering claim unfalsifiable.
+    const workflowId = newUlid();
+    const event = submitted({
+      workspaceId,
+      entity: { kind: 'workflow', id: workflowId },
+      type: 'workflow.defined',
+      payload: { ...SIMPLE_KANBAN_TEMPLATE, id: workflowId, version: 2 },
+      actorId: member,
+    });
+    const results = await ingest.ingestClientBatch([event], member);
+
+    expect(results[0]).toEqual({
+      status: 'refused',
+      eventId: event.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: adminOnlyReason('member'),
+    });
+    // "Before the engine" is the load-bearing half, and two independent things
+    // pin it: the REASON above is the gate's and not `workflow-version`, and
+    // the engine was never asked at all. Mutation: move the gate below
+    // `deps.evaluate` in `commitOne` — the reason becomes the engine's and this
+    // line goes red too.
+    expect(evaluated).not.toContain(event.id);
+  });
+
+  it('admits the same event from the workspace owner', async () => {
+    // The admits direction, through the same door with the same shape. Without
+    // it, a gate that refused every `workflow.defined` would pass the case
+    // above. The payload is a real definition, because this one reaches the
+    // engine.
+    const ingest = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(ingest);
+    const workflowId = newUlid();
+    const event = submitted({
+      workspaceId,
+      entity: { kind: 'workflow', id: workflowId },
+      type: 'workflow.defined',
+      payload: { ...SIMPLE_KANBAN_TEMPLATE, id: workflowId, version: 1 },
+      actorId: owner,
+    });
+
+    expectCommitted(await ingest.ingestClientBatch([event], owner));
+    expect(evaluated).toContain(event.id);
+  });
+
+  it('refuses a non-member of the workspace', async () => {
+    const ingest = ingestService();
+    const { workspaceId } = await foundedWorkspace(ingest);
+    const stranger = newUlid();
+    const event = submitted({
+      workspaceId,
+      entity: { kind: 'ticket', id: newUlid() },
+      type: 'ticket.assigned',
+      payload: { assigneeId: newUlid() },
+      actorId: stranger,
+    });
+
+    expect((await ingest.ingestClientBatch([event], stranger))[0]).toEqual({
+      status: 'refused',
+      eventId: event.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: NOT_A_MEMBER_REASON,
+    });
+  });
+
+  it('refuses a claim attributed to someone else, even from a workspace owner', async () => {
+    const ingest = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(ingest);
+    const workflowId = newUlid();
+    const event = submitted({
+      workspaceId,
+      entity: { kind: 'workflow', id: workflowId },
+      type: 'workflow.defined',
+      payload: { ...SIMPLE_KANBAN_TEMPLATE, id: workflowId, version: 1 },
+      actorId: newUlid(), // not the session
+    });
+
+    expect((await ingest.ingestClientBatch([event], owner))[0]).toEqual({
+      status: 'refused',
+      eventId: event.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: IDENTITY_SPOOF_REASON,
+    });
+  });
+
+  it('reads the role through resolveEffectiveRole, so a revoked member is refused at once', async () => {
+    const ingest = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(ingest);
+    const member = await grantMember(ingest, workspaceId, owner, 'member');
+
+    const ticketEvent = () =>
+      submitted({
+        workspaceId,
+        entity: { kind: 'ticket', id: newUlid() },
+        type: 'ticket.assigned',
+        payload: { assigneeId: member },
+        actorId: member,
+      });
+    // Before: an ordinary member's ordinary ticket work goes through.
+    expectCommitted(await ingest.ingestClientBatch([ticketEvent()], member));
+
+    expectCommitted(
+      await ingest.ingestBatch([
+        submitted({
+          workspaceId,
+          entity: { kind: 'membership', id: membershipId(workspaceId, member) },
+          type: 'membership.revoked',
+          payload: { userId: member },
+          actorId: owner,
+        }),
+      ]),
+    );
+
+    // After: the same claim from the same person, refused. This is the pair
+    // that makes the gate's answer depend on the LEDGER rather than on the
+    // session — a gate that cached a role, or that read the request instead of
+    // `proj_memberships`, passes the first half and fails here.
+    const afterRevoke = ticketEvent();
+    expect((await ingest.ingestClientBatch([afterRevoke], member))[0]).toEqual({
+      status: 'refused',
+      eventId: afterRevoke.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: NOT_A_MEMBER_REASON,
+    });
+  });
+
+  it('gates the project roster on project-admin rights, not on workspace membership', async () => {
+    const ingest = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(ingest);
+    const projectAdmin = await grantMember(ingest, workspaceId, owner, 'member');
+    const plainMember = await grantMember(ingest, workspaceId, owner, 'member');
+    const projectId = newUlid();
+
+    const project = submitted({
+      workspaceId,
+      entity: { kind: 'project', id: projectId },
+      type: 'project.created',
+      payload: { name: 'First project' },
+      actorId: owner,
+    });
+    expectCommitted(await ingest.ingestClientBatch([project], owner));
+
+    // The owner puts one member on the project AS a project admin.
+    expectCommitted(
+      await ingest.ingestClientBatch(
+        [
+          submitted({
+            workspaceId,
+            entity: { kind: 'project', id: projectId },
+            type: 'project.member_added',
+            payload: { userId: projectAdmin, projectAdmin: true },
+            actorId: owner,
+          }),
+        ],
+        owner,
+      ),
+    );
+
+    // That project admin may now run the roster...
+    expectCommitted(
+      await ingest.ingestClientBatch(
+        [
+          submitted({
+            workspaceId,
+            entity: { kind: 'project', id: projectId },
+            type: 'project.member_added',
+            payload: { userId: plainMember, projectAdmin: false },
+            actorId: projectAdmin,
+          }),
+        ],
+        projectAdmin,
+      ),
+    );
+
+    // ...and the member they just added may not, though both are members of the
+    // same workspace and both are on the same project. Workspace membership is
+    // not project-admin rights; that is the whole distinction.
+    const overreach = submitted({
+      workspaceId,
+      entity: { kind: 'project', id: projectId },
+      type: 'project.member_added',
+      payload: { userId: newUlid(), projectAdmin: true },
+      actorId: plainMember,
+    });
+    expect((await ingest.ingestClientBatch([overreach], plainMember))[0]).toEqual({
+      status: 'refused',
+      eventId: overreach.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: PROJECT_ROSTER_REASON,
+    });
+  });
+
+  it('planted defect: the gate reads the ingest transaction, never a second connection', async () => {
+    // Set up through the ordinary service; only the gated submission runs
+    // against the one-connection pool, so the setup cannot itself trip it.
+    const setup = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(setup);
+    const member = await grantMember(setup, workspaceId, owner, 'member');
+
+    const constrained = createIngestService({
+      pool: poolAllowingOneClient(db.pool),
+      evaluate: evaluateEvent,
+      projections: buildProjectionRegistry(),
+    });
+    const event = submitted({
+      workspaceId,
+      entity: { kind: 'ticket', id: newUlid() },
+      type: 'ticket.assigned',
+      payload: { assigneeId: member },
+      actorId: member,
+    });
+
+    // Mutation: `{ db: deps.pool, ... }` at the gate call site in `commitOne`.
+    // This then rejects with the planted error above instead of committing —
+    // verified by running it, and verified for the MECHANISM and not only the
+    // colour: the planted sentence appears in the mutated run's output and
+    // `db.query is not a function` does not. Before `poolAllowingOneClient`
+    // grew a faithful `query` those two counts were the other way round, and
+    // the test was red for a reason that had nothing to do with a second
+    // connection.
+    expectCommitted(await constrained.ingestClientBatch([event], member));
+  });
+
+  it('the INTERNAL door is not gated — the same refused event commits through it', async () => {
+    // The discriminating case for the two-door design: identical event, one
+    // difference, opposite answers. Mutation: apply the gate in `ingestBatch`
+    // and this reddens, along with every server append in the product.
+    const ingest = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(ingest);
+    const member = await grantMember(ingest, workspaceId, owner, 'member');
+    const workflowId = newUlid();
+    const event = submitted({
+      workspaceId,
+      entity: { kind: 'workflow', id: workflowId },
+      type: 'workflow.defined',
+      payload: { ...SIMPLE_KANBAN_TEMPLATE, id: workflowId, version: 1 },
+      actorId: member,
+    });
+
+    expect((await ingest.ingestClientBatch([{ ...event, id: newUlid() }], member))[0]).toMatchObject({
+      status: 'refused',
+      rule: PERMISSION_ROLE_RULE,
+    });
+    expectCommitted(await ingest.ingestBatch([event]));
+  });
+});

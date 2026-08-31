@@ -80,11 +80,21 @@ describe('proj_entity_heads', () => {
     expect(rows.rows).toEqual(direct.rows);
   });
 
+  /**
+   * A SECOND copy of the registration pin. test/projection-order.test.ts is the
+   * pin of record — it asserts the same list plus the §8 ordering rationale and
+   * is deliberately DB-free, where this one sits in a file that needs Postgres
+   * and so goes silent exactly when the database is down. Both must be extended
+   * in the same commit that registers a projection; a registrant who finds only
+   * one of them will be told about the other by a red suite, which is the only
+   * reason this duplicate is tolerable.
+   */
   it('buildProjectionRegistry registers exactly the known projections', () => {
     const registry = buildProjectionRegistry();
     expect(registry.all().map((projection) => projection.name)).toEqual([
       'proj_entity_heads',
       'proj_workflows',
+      'proj_memberships',
     ]);
   });
 });

@@ -126,6 +126,33 @@ describe('phone OTP sign-in', () => {
    * including, deliberately, the ABSENCE of `Secure`, which is correct over
    * plain http and is the thing a reader most wants confirmed. The https half is
    * the next test; the two together are the whole contract.
+   *
+   * ## `toEqual` over the WHOLE list is load-bearing. Do not relax it to `toContain`.
+   *
+   * Two properties ride on the exactness, and neither has any other guard:
+   *
+   * 1. **No `Domain`.** A `Domain=.example.test` on this cookie would send the
+   *    session to EVERY subdomain of the zone — every preview deploy, every
+   *    unrelated service, anything an attacker gets hosted there — and the
+   *    browser would do it silently, on every request, forever. better-auth
+   *    emits one the moment `advanced.crossSubDomainCookies.enabled` is set
+   *    (`createCookieGetter`, `better-auth/dist/cookies/index.mjs`), which is a
+   *    one-line change somebody makes to share a session with a marketing site.
+   *    Under `toEqual` that line turns this test red. Under `toContain` it
+   *    would pass, because every attribute this test names would still be
+   *    present — a `toContain` cannot see what was ADDED, and "what was added"
+   *    is the entire question here.
+   * 2. **`SameSite=Lax` is still Lax.** It is the whole cross-site defence of a
+   *    cookie-authenticated `POST /v1/events` (`src/routes/events.ts` records
+   *    that decision), and it is now SET rather than inherited
+   *    (`advanced.defaultCookieAttributes` in `src/auth/auth.ts`). This
+   *    assertion is what makes the setting checkable: mutate it to `'strict'`
+   *    or `'none'` and this line names the change.
+   *
+   * The assertion was already exact before Task 5 — but by accident of how it
+   * happened to be written, with nothing saying what the exactness was for. A
+   * property that holds by accident holds until someone tidies it. This comment
+   * is the difference.
    */
   it('the session cookie is better-auth.session_token, HttpOnly, SameSite=Lax, and not Secure over http', async () => {
     const phone = '+919000000002';

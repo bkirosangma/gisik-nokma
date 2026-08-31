@@ -17,6 +17,27 @@ afterAll(async () => {
   await db.drop();
 });
 
+/**
+ * A valid event that founds NOTHING, for the tests below whose subject is the
+ * ledger primitives — cursors, listeners, transaction ordering — and not
+ * workspace creation.
+ *
+ * Plan 4 Task 5 made `workspace.created` a compound act: a committed one is
+ * followed, inside the same ingest path and through the same internal door, by
+ * the founding sequence (default workflow, four built-in ticket types, the
+ * founder's owner grant — `src/workspaces/bootstrap-workspace.ts`). It is
+ * therefore no longer a neutral "some valid event", and using it as filler
+ * makes a test that counts commits count seven.
+ *
+ * Every test that swapped to this helper still pins exactly what it pinned
+ * before; each says so at its own site. The founding sequence has its own tests
+ * in `test/permissions/check-role-permission.test.ts`, where it is the subject
+ * rather than the background.
+ */
+function submittedNonFoundingEvent(workspaceId: string = newUlid()) {
+  return submittedWorkflowDefined(workspaceId);
+}
+
 function service(overrides: Partial<Parameters<typeof createIngestService>[0]> = {}) {
   return createIngestService({
     pool: db.pool,
@@ -375,7 +396,17 @@ describe('ingestBatch', () => {
     // evaluation, so both are pinned here.
     const existence: Array<string | null> = [];
     const versions: Array<number | null> = [];
+    // Recorded only for the four events this test submits. The
+    // `workspace.created` below now also drags the founding sequence through
+    // the same evaluator (Plan 4 Task 5), and those six events are somebody
+    // else's subject: including them would make this assertion a transcript of
+    // the bootstrap rather than a statement about what the engine can see.
+    // The property pinned is unchanged — for each of MY four events, what did
+    // the engine see? Mutation that reddens it: make `createEngineContext` read
+    // through the uncommitted envelope and `existence[0]` becomes 'workspace'.
+    const submittedIds = new Set<string>();
     const peeking: typeof evaluateEvent = async (env, ctx) => {
+      if (!submittedIds.has(env.id)) return { refused: false };
       const state = await ctx.getEntityState(env.entity.kind, env.entity.id);
       existence.push(state === null ? null : state.kind);
       if (env.entity.kind === 'workflow') {
@@ -387,10 +418,11 @@ describe('ingestBatch', () => {
     const ingest = service({ evaluate: peeking });
 
     const base = submittedWorkspaceCreated();
+    submittedIds.add(base.id);
     await ingest.ingestBatch([base]);
-    await ingest.ingestBatch([
-      { ...base, id: newUlid(), type: 'workspace.renamed', payload: { name: 'CC HQ' } },
-    ]);
+    const renamed = { ...base, id: newUlid(), type: 'workspace.renamed', payload: { name: 'CC HQ' } };
+    submittedIds.add(renamed.id);
+    await ingest.ingestBatch([renamed]);
 
     const v1 = submittedWorkflowDefined(base.workspaceId);
     const v2 = {
@@ -398,6 +430,8 @@ describe('ingestBatch', () => {
       id: newUlid(),
       payload: { ...(v1.payload as Record<string, unknown>), version: 2, name: 'Basic, revised' },
     };
+    submittedIds.add(v1.id);
+    submittedIds.add(v2.id);
     await ingest.ingestBatch([v1]);
     await ingest.ingestBatch([v2]);
 
@@ -427,12 +461,15 @@ describe('onEventCommitted', () => {
       );
     });
 
-    const valid = submittedWorkspaceCreated();
-    const invalid = { ...submittedWorkspaceCreated(), type: 'shop.opened' };
+    // Non-founding events: the property is "one commit, one notification, and
+    // none for the invalid one", which a founding event would bury under six
+    // more notifications that are not what this test is about.
+    const valid = submittedNonFoundingEvent();
+    const invalid = { ...submittedNonFoundingEvent(), type: 'shop.opened' };
     await ingest.ingestBatch([valid, invalid]);
 
     expect(seen).toHaveLength(1);
-    expect(seen[0]).toMatchObject({ id: valid.id, seq: 1, type: 'workspace.created' });
+    expect(seen[0]).toMatchObject({ id: valid.id, seq: 1, type: 'workflow.defined' });
     expect(await Promise.all(visibleFromAnotherConnection)).toEqual([1]);
   });
 
@@ -446,7 +483,11 @@ describe('onEventCommitted', () => {
     const ingest = service({ pool: poolRecordingCommits(db.pool, order) });
     ingest.onEventCommitted(() => order.push('listener'));
 
-    const results = await ingest.ingestBatch([submittedWorkspaceCreated()]);
+    // Non-founding: the pinned property is the ORDER of one commit against its
+    // own listener call. A founding event appends six more, and `order` would
+    // become a fourteen-entry interleaving in which the pair being asserted is
+    // no longer visible.
+    const results = await ingest.ingestBatch([submittedNonFoundingEvent()]);
 
     expect(results[0]?.status).toBe('committed');
     expect(order).toEqual(['commit-completed', 'listener']);
@@ -481,7 +522,11 @@ describe('onEventCommitted', () => {
       throw new Error('broken listener');
     });
     ingest.onEventCommitted((event) => seen.push(event));
-    const results = await ingest.ingestBatch([submittedWorkspaceCreated()]);
+    // Non-founding: the property is that the SECOND listener still hears the
+    // one event after the first threw. Counting to seven would prove the same
+    // thing less clearly and would break again the day the founding sequence
+    // gains an event.
+    const results = await ingest.ingestBatch([submittedNonFoundingEvent()]);
     expect(results[0]?.status).toBe('committed');
     expect(seen).toHaveLength(1);
   });
@@ -490,25 +535,30 @@ describe('onEventCommitted', () => {
 describe('workspace stream cursor (coordination §18)', () => {
   it('two entities in one workspace get strictly increasing workspace_seq while both keep seq 1', async () => {
     const ingest = service();
-    const workspaceCreated = submittedWorkspaceCreated();
-    const workspaceId = workspaceCreated.workspaceId;
-    const renamed = {
-      ...workspaceCreated,
-      id: newUlid(),
-      type: 'workspace.renamed',
-      payload: { name: 'CC HQ' },
-    };
-    const otherWorkspace = submittedWorkspaceCreated();
+    // Two WORKFLOW entities rather than the workspace-entity pair this test
+    // used to send. The property is unchanged and is still both halves of the
+    // title: two distinct entities share one workspace cursor (1, 2) while each
+    // keeps its own per-entity seq at 1 — which the old pair could not show at
+    // all, since `workspace.created` and `workspace.renamed` are ONE entity and
+    // its seqs were 1 and 2. The swap was forced by Plan 4 Task 5's founding
+    // sequence (a committed `workspace.created` now appends six more events)
+    // and it makes the assertion stronger, not weaker: `seq` is now pinned as
+    // well as `workspace_seq`, and a cursor implementation that returned the
+    // per-entity seq would give [1, 1] here.
+    const workspaceId = newUlid();
+    const first = submittedWorkflowDefined(workspaceId);
+    const second = submittedWorkflowDefined(workspaceId);
+    const otherWorkspace = submittedWorkflowDefined(newUlid());
 
-    await ingest.ingestBatch([workspaceCreated, renamed, otherWorkspace]);
+    await ingest.ingestBatch([first, second, otherWorkspace]);
 
     const stream = await db.pool.query<{ id: string; seq: number; workspace_seq: number }>(
       'SELECT id, seq, workspace_seq FROM events WHERE workspace_id = $1 ORDER BY workspace_seq',
       [workspaceId],
     );
-    expect(stream.rows.map((row) => [row.id, row.workspace_seq])).toEqual([
-      [workspaceCreated.id, 1],
-      [renamed.id, 2],
+    expect(stream.rows.map((row) => [row.id, row.seq, row.workspace_seq])).toEqual([
+      [first.id, 1, 1],
+      [second.id, 1, 2],
     ]);
     // Cursors are per workspace, so a second workspace starts at 1 again —
     // and never appears in this workspace's stream.
@@ -523,16 +573,25 @@ describe('workspace stream cursor (coordination §18)', () => {
     const ingest = service();
     const cursors: number[] = [];
     ingest.onEventCommitted((event) => cursors.push(event.workspaceSeq));
-    const base = submittedWorkspaceCreated();
-    await ingest.ingestBatch([base]);
-    await ingest.ingestBatch([{ ...base, id: newUlid(), type: 'workspace.renamed', payload: { name: 'CC HQ' } }]);
+    // Two workflow publications in one workspace, rather than a create/rename
+    // pair on the workspace entity: the property is that consecutive commits in
+    // one workspace hand the listener 1 then 2. A founding event would hand it
+    // 1..7 before the second call was even made.
+    const workspaceId = newUlid();
+    await ingest.ingestBatch([submittedWorkflowDefined(workspaceId)]);
+    await ingest.ingestBatch([submittedWorkflowDefined(workspaceId)]);
     expect(cursors).toEqual([1, 2]);
   });
 
   it('planted defect: concurrent ingests to different entities never mint a cursor twice', async () => {
     const ingest = service();
-    const anchor = submittedWorkspaceCreated();
-    const workspaceId = anchor.workspaceId;
+    const workspaceId = newUlid();
+    // Four workflows, not three plus a `workspace.created` anchor: a founding
+    // event would append six more rows inside one of the four concurrent calls
+    // and the cursor assertion below would be counting the bootstrap. Distinct
+    // (kind, id) pairs are the only property that matters here, and four
+    // workflows have them.
+    const anchor = submittedWorkflowDefined(workspaceId);
     // Four DIFFERENT entities in one workspace: the per-entity lock cannot
     // serialise them, so only the per-workspace lock keeps the cursor unique.
     // Without it all four read the same max(workspace_seq) and
