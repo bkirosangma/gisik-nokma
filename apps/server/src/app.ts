@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import type { FastifyError, FastifyInstance } from 'fastify';
 import type { Auth } from './auth/auth.js';
 import { registerAuthRoutes } from './auth/routes.js';
-import type { IngestService } from './ingest/ingest-service.js';
+import type { ClientIngest } from './ingest/ingest-service.js';
 import { registerEventRoutes } from './routes/events.js';
 
 export type HealthDb = { query(sql: string): Promise<unknown> };
@@ -20,7 +20,13 @@ export const INTERNAL_ERROR_BODY = {
 
 export type AppDeps = {
   db: HealthDb;
-  ingest: IngestService;
+  /**
+   * The GATED door only (`ClientIngest`), never the full `IngestService`: an
+   * assembled HTTP app has no business reaching the internal append path, and
+   * narrowing it here means a future route cannot reach it either. A full
+   * `IngestService` is still what callers pass — it is assignable.
+   */
+  ingest: ClientIngest;
   /**
    * Required, not optional, and deliberately so: an assembled app with no
    * identity surface is not a degraded product, it is a different one, and the

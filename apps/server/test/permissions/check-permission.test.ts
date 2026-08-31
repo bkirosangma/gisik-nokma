@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import { newUlid, ORIGINS, type Origin, type SubmittedEvent } from '@gisik-nokma/domain';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { buildApp } from '../../src/app.js';
 import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
-import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
+import { createIngestService, type ClientIngest, type IngestService } from '../../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { submittedWorkspaceCreated } from '../helpers/events.js';
@@ -26,6 +26,32 @@ import { submittedWorkspaceCreated } from '../helpers/events.js';
  */
 const EXPECTED_RULE = 'permission.role';
 const EXPECTED_REASON = 'Only the server itself may record server-origin events.';
+
+/**
+ * Every origin a CLIENT may legitimately claim: the enum minus `'server'`.
+ * Derived, never re-spelled — a second list of what the origins are would drift
+ * from `ORIGINS` silently, and the gate's whole contract is which members it
+ * refuses.
+ */
+const CLIENT_ORIGINS: Origin[] = ORIGINS.filter((origin) => origin !== 'server');
+
+/**
+ * The compile-time half of the gate, asserted so it cannot be undone quietly.
+ *
+ * Routes receive `ClientIngest`, which exposes the GATED door alone — the
+ * ungated `ingestBatch` is deliberately out of a route's reach, because the
+ * naming asymmetry is adverse: the dangerous door has the shorter, more obvious
+ * name, and Plan 10's `POST /v1/sync` cannot be guarded by a runtime test that
+ * does not exist yet.
+ *
+ * This is a real check rather than a comment: if `ClientIngest` is ever widened
+ * back to the full `IngestService`, the error this directive expects stops
+ * happening, the directive becomes an UNUSED `@ts-expect-error`, and
+ * `pnpm turbo run typecheck` goes red. Verified by widening it and watching
+ * typecheck fail.
+ */
+// @ts-expect-error — a route may not reach the ungated internal append path
+type _RoutesCannotReachTheInternalDoor = ClientIngest['ingestBatch'];
 
 let db: TestDatabase;
 
@@ -154,22 +180,35 @@ describe('envelope-origin gate — the client door (POST /v1/events)', () => { /
   });
 
   /**
-   * The gate must refuse envelope-origin `'server'` and nothing else. Without
-   * this case, a gate that refused every client submission would pass every
-   * assertion above.
+   * The gate must refuse envelope-origin `'server'` and NOTHING ELSE, and this
+   * case is parameterised over every non-server member of the enum because
+   * testing `'web'` alone does not establish that.
+   *
+   * Found by review, by mutation: a gate written `env.origin !== 'web'` refuses
+   * every mobile and desktop user in the product, and with only the `'web'` case
+   * the entire 143-test server suite stayed green. The refusal direction was
+   * well pinned; the admits direction was pinned for one value out of three.
+   *
+   * `CLIENT_ORIGINS` is derived from the domain's own `ORIGINS` rather than
+   * re-spelled here, so a fifth origin member is covered the day it is added
+   * instead of the day somebody remembers this file — the repository's rule that
+   * where a format has one authority, tests assert through the authority.
    */
-  it('still admits an ordinary client submission through the same door', async () => {
-    const honest = submittedWorkspaceCreated({ origin: 'web' });
-    const response = await app().inject({
-      method: 'POST',
-      url: '/v1/events',
-      payload: { events: [honest] },
-    });
+  it.each(CLIENT_ORIGINS)(
+    'still admits an ordinary %s-origin client submission through the same door',
+    async (origin) => {
+      const honest = submittedWorkspaceCreated({ origin });
+      const response = await app().inject({
+        method: 'POST',
+        url: '/v1/events',
+        payload: { events: [honest] },
+      });
 
-    const body = response.json() as { results: Array<{ status: string }> };
-    expect(body.results[0]).toMatchObject({ status: 'committed', eventId: honest.id });
-    expect(await ledgerRowsFor(honest.id)).toBe(1);
-  });
+      const body = response.json() as { results: Array<{ status: string }> };
+      expect(body.results[0]).toMatchObject({ status: 'committed', eventId: honest.id });
+      expect(await ledgerRowsFor(honest.id)).toBe(1);
+    },
+  );
 });
 
 describe('envelope-origin gate — the internal door (ingestBatch) is NOT gated', () => { // test-cases 3.31
