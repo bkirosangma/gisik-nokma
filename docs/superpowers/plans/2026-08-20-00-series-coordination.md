@@ -3915,3 +3915,107 @@ right ones, and granularity makes the drift more persuasive, not less.
 **label it orphaned in the same table that cites it.** A later reader's `git branch --contains` sweep
 will flag it, and the label is the difference between a cheap confirmation and a true finding about a
 false problem.
+## Plan 7 client half — execution consequences (2026-08-31, lane 3, recorded at wind-down)
+
+Wave 1 folded back into serial execution with this partition part-done: **T1, T2, T11a (domain
+half) and T3 complete and review-clean; T4 implemented with its fix round landed but its
+scoped re-review never dispatched.** Branch `exec/07-editor-client`, pushed. Everything below
+is a claim on whoever executes Plan 7 next, and none of it changes what shipped.
+
+### Plan-text defects found by executing it
+
+These are defects in the plan document, several of which sibling plans transcribe.
+
+1. **Task 2's fixture carries four surviving mutants.** Its six specified cases do not catch:
+   a `String()` coercion behind the `!= null` guard; the `type === 'image'` discriminator
+   entirely unpinned (deleting it passed all seven cases, so a walker that also harvested a
+   `fileChip` or mention id would change what the server gate checks with every suite green);
+   a sorted-output escape; and Task 11a's guard leaving the `name`/`mimeType` conjuncts
+   unkilled. All four are closed on the branch. **Any lane transcribing a fixture block from
+   plan text should mutate the implementation before trusting it** — a fixture that agrees with
+   the implementation without constraining it is the recurring shape here.
+
+2. **Task 4's node-level `parseHTML().getAttrs` is a person-substitution forgery, and Task 3's
+   is the same trap one node earlier.** Tiptap's `injectExtensionAttributesToParseRule`
+   (`@tiptap/core@3.30.5` dist:1452-1471) spreads per-attribute results *after* a node-level
+   `getAttrs`, so validation placed there is dead code. Shipped verbatim and observed: a
+   `<span data-mention-user-id="…A" userId="…B" label="Mallory">@Anselma</span>` parsed to
+   `{userId:"…B", label:"Mallory"}` — **the stored document naming a different person than the
+   one displayed, in exactly the field notifications read.** Both nodes now validate
+   per-attribute. Swept with a working positive control: `getAttrs` appears in exactly two of
+   Plan 7's fourteen in-scope briefs, T3 and T4, both closed. No remaining task inherits it.
+
+3. **Task 4's "planted defect: Escape" is vacuous.** `@tiptap/suggestion` (dist:129-138) calls
+   `dispatchExit(view)` unconditionally and returns true regardless of the renderer, so no
+   mutation of `packages/editor` can redden the dismissal half. Its only fail-first evidence
+   was whole-file collection failure against the pre-task tree. The other half of that case —
+   `@an` surviving as literal text — is genuine.
+
+4. **Task 1's `vitest.config` block omits `esbuild: { jsx: 'automatic' }`.** No `.test.tsx`
+   compiles without it, and four of this partition's tasks add one. The next plan authoring a
+   client-package config hits this identically.
+
+5. **Task 1's `typeText` helper does not compile.** `prosemirror-view`'s `handleTextInput`
+   takes five arguments; the plan passes four. It lives in `test/`, which the plan's own
+   single-tsconfig `typecheck` never reads — every shipped package carries a second
+   `tsconfig.typecheck.json` including `test`, and the plan omits it.
+
+6. **Task 1's `Link.configure` is internally inconsistent.** It sets `autolink: false` to keep
+   typed URLs literal and leaves `linkOnPaste` at the library default `true` two properties
+   away, under a comment quoting spec §2's "nothing silently becomes markup".
+
+7. **Task 4's Step 5 export line is a `TS2300` duplicate identifier** — `MentionCandidate`
+   already had an origin in `schema/extensions.ts`.
+
+8. **Plan 7's Consumed-interfaces table is stale in two rows**: the upload response is still
+   the pre-amendment `{attachmentId, url}` (amendment 15 pins a five-field superset whose
+   `mime`/`size` are the server's sniffed truth), and `ticket.transitioned` is still
+   `{toStateId, comment}` (decision 6's 2026-08-28 amendment makes it `{to, comment:{text}}`).
+   Task 12's body text carries the correct upload shape; the header row does not.
+
+9. **Plan 7 numbers no test case for Task 2.** Task 16 pins 9.1–9.34 and claims "no other
+   numbers"; `doc-embeds.test.ts` has none. Assigned **9.35** on the branch, past the end of
+   the list, following bd9e022's 5.37 precedent.
+
+10. **`@testing-library/react` skew**: Plan 7 pins `^16.1.0`, lane 4 shipped `^16.2.0`.
+
+### A tooling hazard that can void falsifiability evidence — measured, not theorised
+
+A test importing another workspace package **by name** resolves through that package's
+`./dist`. Mutating the other package's *source* and running bare `vitest` therefore tests a
+stale build and **passes**. Measured on this branch: dropping `'paragraph'` from
+`packages/domain/src/doc-text.ts` gave **8 passed** under bare vitest and **3 failed / 70**
+under `pnpm turbo run test`. A test importing `../src/…` is immune.
+
+This matters because two workarounds compose badly: the output proxy collapses `pnpm test` to
+a bare pass/fail count, which is why dispatches push bare vitest for assertion-level detail —
+safe for a same-package mutation, unsafe the moment the test crosses a package name. **Anyone
+who adopted the first workaround without knowing the second has evidence that may be void.**
+CI is unaffected (`turbo.json` has `test.dependsOn: ["^build"]`).
+
+### Three product questions this lane took the conservative option on, unruled
+
+Each is recorded here rather than settled, per autonomy protocol #3.
+
+- **`trailingNode`.** StarterKit appends an empty paragraph after a non-paragraph block,
+  asymmetrically — nothing on load, on first keystroke. So a user who opens a description
+  ending in a code block, types one character and saves produces a version diff containing
+  their character *and* a paragraph they never wrote. Kept, and pinned by tests. Invariant 4
+  targets invented *facts* and an empty paragraph asserts none; the tension is with §2's
+  "description edits stay versioned claims". `trailingNode: false` is a one-line reversal
+  while no documents exist and a migration afterwards.
+- **Unreadable stored `wrap`.** Layer 1 coerces to `block` rather than declaring a ProseMirror
+  `validate`. The trade is not "hard failure versus degrade": with `enableContentCheck` at its
+  default the throw is caught, one `console.warn` is emitted, and **the whole document is
+  replaced by an empty paragraph** — observed on a document with two paragraphs either side of
+  one bad image, both of which vanish. The destroyed text has nothing to do with the failing
+  attribute.
+- **Paste- and drop-to-markup.** Seven paste rules across five extensions turn pasted
+  `**bold**`, `` `code` ``, `~~strike~~` and bare URLs into markup, fired from
+  `pasteRulesPlugin`'s `appendTransaction` on paste **and on drop**, gated by none of
+  `autolink` / `linkOnPaste` / `markdownLinks`. Eighteen input rules across ten extensions do
+  the same for typed text through a separate lever. Spec §2's escape-suggestion mechanic
+  (Task 5) addresses the typed path only — its brief contains no occurrence of "paste".
+  **Task 5 decides whether §2 reaches paste and drop; Task 12 is the implementation site**,
+  since `enablePasteRules`/`enableInputRules` are `Editor` options `buildEditorExtensions`
+  structurally cannot reach. Two tests document current behaviour and say "flip, don't delete".
