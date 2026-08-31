@@ -1,0 +1,684 @@
+# Review package: 950131f..e772499a913b9106b975fac17ea8e1717436a961
+
+## Commits
+e772499 Every Set-Cookie assertion in the suite was n=1, which is the one length where forwarding three cookies and flattening them into one look identical
+
+## Files changed
+ .env.example                                       |  32 ++++--
+ apps/server/src/auth/otp-sender.ts                 |  20 +++-
+ apps/server/src/auth/routes.ts                     |  41 ++++---
+ apps/server/src/index.ts                           |  21 ++--
+ apps/server/test/auth/sign-in-flows.test.ts        | 118 ++++++++++++++++++++-
+ apps/server/test/config.test.ts                    |  48 +++++++++
+ .../plans/2026-08-20-00-series-coordination.md     |  86 ++++++++++++---
+ 7 files changed, 323 insertions(+), 43 deletions(-)
+
+## Diff
+diff --git a/.env.example b/.env.example
+index b688244..c616a25 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1,22 +1,35 @@
+ # ── gisik-nokma configuration contract ─────────────────────────────────────
+ # Every variable the server and web read. scripts/check-env-example.mjs
+ # (pnpm check:env, run in CI) fails if code reads a variable this file
+ # does not document. Copy to .env and adjust; never commit .env.
+ #
+ # Convention: each section names the plan that READS its variables, and a
+ # variable whose plan has not landed is documented ahead of its reader, not
+ # live — setting it today changes nothing, because no shipped code looks at
+-# it. As of this file's landing only "Core (Plan 1)" is live: those four are
+-# exactly apps/server/src/config.ts's zod schema. This product does not
+-# assert what it has not checked, and an operator must not be told to
+-# configure something inert without being told so.
++# it. This product does not assert what it has not checked, and an operator
++# must not be told to configure something inert without being told so.
++#
++# LIVE TODAY (everything else in this file is documented ahead of its reader):
++#   DATABASE_URL, PORT, HOST, LOG_LEVEL, BETTER_AUTH_URL, BETTER_AUTH_SECRET
++#     — exactly apps/server/src/config.ts's zod schema. The last two arrived
++#       with Plan 4 Task 2; the first four are Plan 1's. A missing or invalid
++#       one stops the server at loadConfig, naming the variable.
++#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
++#     — read directly by createAuth (apps/server/src/auth/auth.ts), not through
++#       config.ts. Empty is legal: it leaves the provider registered but
++#       unusable rather than failing start.
++#   TEST_DATABASE_ADMIN_URL — read by the test-database helper.
++#
++# `pnpm check:env` proves every variable code READS is documented here. It does
++# NOT check that the documented VALUES are valid — apps/server/test/config.test.ts
++# does that, by feeding this file's own values to loadConfig.
+ 
+ # Core (Plan 1)
+ DATABASE_URL=postgres://gisik:gisik@localhost:54329/gisik_nokma
+ PORT=3000
+ HOST=127.0.0.1                       # 0.0.0.0 in containers
+ LOG_LEVEL=info                       # fatal|error|warn|info|debug|trace
+ 
+ # Time (owner decision 2026-08-20: time is Asia/Kolkata). TZ sets the Node
+ # process's own zone, so logs and any runtime Date formatting agree with the
+ # product's screens. Read by the runtime, not by application code — so the
+@@ -24,22 +37,29 @@ LOG_LEVEL=info                       # fatal|error|warn|info|debug|trace
+ # needs to know it exists. The DATABASE's zone is set separately, on the
+ # database itself (docker-compose sets it with `-c timezone=Asia/Kolkata`
+ # locally; deploy/do/README.md documents the managed-Postgres step, and
+ # `pnpm check:db-tz` verifies it — BOTH land with Plan 11 and do not exist
+ # yet, so neither is a command you can run today).
+ TZ=Asia/Kolkata
+ 
+ # Managed-Postgres TLS (production; leave empty for local)
+ DATABASE_CA_CERT=
+ 
+-# Auth (Plan 4 / better-auth)
+-BETTER_AUTH_SECRET=change-me         # secret; rotate per runbook
++# Auth (Plan 4 / better-auth) — LIVE. Both required; no defaults.
++# BETTER_AUTH_SECRET signs every session cookie and bearer token and must be at
++# least 32 characters: that is better-auth's own floor, below which it warns and
++# starts anyway, so config.ts refuses instead. The value below is a placeholder
++# of legal length and is NOT a secret — generate a real one with
++# `openssl rand -base64 32` and rotate per runbook. The previous value here was
++# `change-me`, nine characters, which made this file's own "copy to .env and
++# adjust" instruction end in ConfigError.
++BETTER_AUTH_SECRET=replace-me-with-openssl-rand-base64-32
+ BETTER_AUTH_URL=http://localhost:3000
+ GOOGLE_CLIENT_ID=                    # Google OAuth (spec §6); empty disables
+ GOOGLE_CLIENT_SECRET=
+ 
+ # Web origin + proxy trust (Plan 11)
+ WEB_ORIGIN=http://localhost:3001
+ TRUST_PROXY=false                    # true behind App Platform's router
+ 
+ # Rate limits (Plan 11) — production defaults 10 and 120; dev/CI run looser
+ RATE_LIMIT_AUTH_MAX=10
+diff --git a/apps/server/src/auth/otp-sender.ts b/apps/server/src/auth/otp-sender.ts
+index 14bf2e1..4a753c8 100644
+--- a/apps/server/src/auth/otp-sender.ts
++++ b/apps/server/src/auth/otp-sender.ts
+@@ -7,23 +7,37 @@
+ export interface OtpSender {
+   send(phoneE164: string, code: string): Promise<void>;
+ }
+ 
+ /**
+  * Development implementation: logs the code and records it for tests.
+  * Production delivery runs through a DLT-registered SMS provider behind this
+  * same interface — a deployment concern, deliberately NOT implemented in this
+  * plan (spec §6 names the errand).
+  *
+- * `sent` is what a test reads to learn the code that was issued; nothing else
+- * ever needs it, which is why there is no production implementation that keeps
+- * a transcript of every OTP the system has ever sent.
++ * `sent` is what a test reads to learn the code that was issued.
++ *
++ * **This class is not safe to run in production, for TWO reasons, and until the
++ * real sender exists `src/index.ts` wires it anyway.** An earlier version of
++ * this comment said "there is no production implementation that keeps a
++ * transcript of every OTP the system has ever sent"; Plan 4 Task 2's assembly
++ * made that sentence false, and it is corrected here rather than left standing.
++ *
++ * 1. `log` writes every one-time code to the process log, where anyone with log
++ *    access can sign in as anyone.
++ * 2. `sent` is an **unbounded in-process array** that keeps every code ever
++ *    issued for the lifetime of the process — memory that grows without limit,
++ *    and a heap dump or debugger attach that discloses the lot. A test file
++ *    lives for seconds; a server does not.
++ *
++ * The real sender must do neither. Both faults live in this class rather than in
++ * the interface, so replacing the implementation removes them together.
+  */
+ export class LogOtpSender implements OtpSender {
+   public readonly sent: Array<{ phoneE164: string; code: string }> = [];
+ 
+   constructor(private readonly log: (message: string) => void = console.info) {}
+ 
+   async send(phoneE164: string, code: string): Promise<void> {
+     this.sent.push({ phoneE164, code });
+     this.log(`[dev-otp] OTP for ${phoneE164}: ${code}`);
+   }
+diff --git a/apps/server/src/auth/routes.ts b/apps/server/src/auth/routes.ts
+index 5074263..fb5a69b 100644
+--- a/apps/server/src/auth/routes.ts
++++ b/apps/server/src/auth/routes.ts
+@@ -1,31 +1,49 @@
+ import type { FastifyInstance } from 'fastify';
+ import type { Auth } from './auth.js';
+ 
+ /**
+  * The vendor surface, mounted whole.
+  *
+  * better-auth is a Web-standard `(Request) => Promise<Response>` handler that
+- * owns 46 endpoints under one prefix, so it is mounted as a catch-all rather
++ * owns every endpoint under one prefix, so it is mounted as a catch-all rather
+  * than route by route. `['GET', 'POST']` is not a guess: `auth.api` was
+- * enumerated over all 46 endpoints and every one of them is GET or POST — no
+- * PUT, PATCH or DELETE anywhere. Some are GET where a reader would expect POST
++ * enumerated — 46 entries, 44 of which carry an HTTP `path` (`setPassword` and
++ * `consumePhoneNumberOTP` are server-only helpers), and the distinct methods
++ * across those 44 are exactly `GET` and `POST`. No PUT, PATCH or DELETE
++ * anywhere. Some are GET where a reader would expect POST
+  * (`/passkey/generate-register-options`, `/magic-link/verify`), and one carries
+  * a path parameter (`/reset-password/:token`), which is exactly why the mount is
+  * a wildcard and not a table of paths that would need editing on every upgrade.
+  *
+  * `/api/auth/*` and not `/v1/*`: the product API is ours and versioned; this
+  * prefix is better-auth's own default and the one its client library and every
+  * page of its documentation assume. Unifying them would buy consistency and cost
+  * the ability to point at the library's docs.
+  */
+ export function registerAuthRoutes(app: FastifyInstance, auth: Auth): void {
++  // Read once, at assembly, and refuse rather than improvise.
++  //
++  // The earlier shape here was `auth.options.baseURL ?? \`http://${request.headers.host}\``,
++  // and the fallback was the defect: it reintroduced the attacker-controlled
++  // Host header in exactly the situation the line exists to exclude, so the
++  // comment below promised something the code did not do unconditionally.
++  // Throwing costs a misconfigured deployment its boot instead of its integrity,
++  // and it happens here rather than inside the handler so the failure is one
++  // startup error and not a 500 on every sign-in.
++  const baseUrl = auth.options.baseURL;
++  if (baseUrl === undefined || baseUrl === '') {
++    throw new Error(
++      'registerAuthRoutes: the auth instance has no baseURL. This mount will not fall back to the request Host header — pass baseUrl to createAuth.',
++    );
++  }
++
+   // Encapsulated so the body parser below cannot reach the product routes.
+   // Verified, not assumed: with this scope in place `POST /v1/events` still
+   // arrives parsed and still answers 400 FST_ERR_VALIDATION for an unknown key,
+   // i.e. the instance-wide `removeAdditional: false` policy is untouched.
+   void app.register(async (scope) => {
+     // better-auth wants the request body as bytes, and Fastify's JSON parser
+     // would hand over an object we could only re-serialise. This is load-bearing
+     // rather than tidy: removed, `request.body` is no longer a Buffer, every
+     // POST reaches better-auth with no body, and 12 of the 17 checks in
+     // `test/auth/sign-in-flows.test.ts` fail. Run, not reasoned.
+@@ -41,35 +59,32 @@ export function registerAuthRoutes(app: FastifyInstance, auth: Auth): void {
+     // parser gets no credit for that one.
+     scope.removeAllContentTypeParsers();
+     scope.addContentTypeParser('*', { parseAs: 'buffer' }, (_request, body, done) => {
+       done(null, body);
+     });
+ 
+     scope.route({
+       method: ['GET', 'POST'],
+       url: '/api/auth/*',
+       handler: async (request, reply) => {
+-        // The origin comes from the auth instance's own configured baseURL
+-        // rather than the request's Host header, which is attacker-controlled.
++        // The origin is the configured baseURL, unconditionally — the request's
++        // Host header never reaches this URL, in any configuration.
+         //
+         // Stated exactly, because the tempting sentence here is a false one:
+         // this is NOT closing an observed hole. Measured both ways with a forged
+         // `Host: evil.example` — the magic link and the OAuth `redirect_uri` come
+         // back identical, because better-auth resolves every absolute URL of its
+-        // own from `options.baseURL` and never from the request. So nothing today
+-        // depends on this line and NO TEST COVERS IT; it is here so that an
+-        // endpoint which one day does read the request URL cannot inherit the
+-        // Host header by default. The fallback exists because `baseURL` is
+-        // optional in better-auth's option type, though `createAuth` always sets
+-        // it.
+-        const origin = auth.options.baseURL ?? `http://${request.headers.host ?? 'localhost'}`;
+-        const url = new URL(request.url, origin);
++        // own from `options.baseURL` and never from the request. So no test can
++        // cover the CHOICE; what is covered is the guard above, which is what
++        // makes the choice unconditional. The point of both is that an endpoint
++        // which one day does read the request URL cannot inherit Host by default.
++        const url = new URL(request.url, baseUrl);
+ 
+         const headers = new Headers();
+         for (const [key, value] of Object.entries(request.headers)) {
+           if (typeof value === 'string') headers.append(key, value);
+           else if (Array.isArray(value)) for (const item of value) headers.append(key, item);
+         }
+ 
+         // GET may not carry a body, and an empty Buffer is not the same as no
+         // body: `new Request(url, { body: emptyBuffer })` would set
+         // `content-length: 0` on a request the vendor expects to be bodyless.
+diff --git a/apps/server/src/index.ts b/apps/server/src/index.ts
+index 4f6ccb1..eea33f4 100644
+--- a/apps/server/src/index.ts
++++ b/apps/server/src/index.ts
+@@ -8,26 +8,35 @@ import { createPool } from './db.js';
+ import { createIngestService } from './ingest/ingest-service.js';
+ import { buildProjectionRegistry } from './projections/index.js';
+ 
+ async function main(): Promise<void> {
+   const config = loadConfig(process.env);
+   const pool = createPool(config.databaseUrl);
+   const projections = buildProjectionRegistry();
+   const ingest = createIngestService({ pool, evaluate: evaluateEvent, projections });
+   const auth = createAuth({
+     pool,
+-    // The senders that exist. `LogOtpSender` writes every one-time code to the
+-    // process log, so this assembly is not deployable to anywhere a stranger can
+-    // reach: real delivery through a DLT-registered SMS provider and an email
+-    // transport is the deployment errand Plan 4 names and does not do. Both
+-    // implement an interface, so the swap is one line each and touches nothing
+-    // else.
++    // The senders that exist, and neither is deployable.
++    //
++    // `LogOtpSender` does two things a production process must not. It writes
++    // every one-time code to the process log, so anyone with log access can sign
++    // in as anyone. And it accumulates every code it has ever issued in an
++    // unbounded in-process array (`otp-sender.ts`'s `sent`) — memory that grows
++    // for the life of the process, and a heap dump that discloses the lot. The
++    // array exists so a test can read the code that was issued; nothing on this
++    // path ever reads it.
++    //
++    // Real delivery through a DLT-registered SMS provider and an email transport
++    // is the deployment errand Plan 4 names and does not do. Both are behind an
++    // interface, so the swap is one line each and touches nothing else — and
++    // both faults leave with the implementation, because neither is in the
++    // interface.
+     otpSender: new LogOtpSender(),
+     magicLinkSender: new LogMagicLinkSender(),
+     // Both come from validated configuration, not from `process.env` with a
+     // fallback: a server that silently signs sessions with a secret checked into
+     // the repository is worse than a server that will not start.
+     baseUrl: config.betterAuthUrl,
+     secret: config.betterAuthSecret,
+   });
+   const app = buildApp({ db: pool, ingest, auth }, { logLevel: config.logLevel });
+   await app.listen({ port: config.port, host: config.host });
+diff --git a/apps/server/test/auth/sign-in-flows.test.ts b/apps/server/test/auth/sign-in-flows.test.ts
+index 83145b5..f434b61 100644
+--- a/apps/server/test/auth/sign-in-flows.test.ts
++++ b/apps/server/test/auth/sign-in-flows.test.ts
+@@ -1,17 +1,18 @@
+ import { evaluateEvent } from '@gisik-nokma/rule-engine';
+-import type { FastifyInstance } from 'fastify';
++import Fastify, { type FastifyInstance } from 'fastify';
+ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+ import { buildApp } from '../../src/app.js';
+-import { createAuth } from '../../src/auth/auth.js';
++import { createAuth, type Auth } from '../../src/auth/auth.js';
+ import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
+ import { LogOtpSender } from '../../src/auth/otp-sender.js';
++import { registerAuthRoutes } from '../../src/auth/routes.js';
+ import { createIngestService } from '../../src/ingest/ingest-service.js';
+ import { buildProjectionRegistry } from '../../src/projections/index.js';
+ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+ import { submittedWorkspaceCreated } from '../helpers/events.js';
+ import { signInWithPhone } from '../helpers/session.js';
+ 
+ /**
+  * Placeholders, not credentials, and there is no version of this test that uses
+  * real ones: `/sign-in/social` builds a Google authorization URL locally and
+  * makes no external call, so the client id only has to be present. It is set on
+@@ -440,20 +441,87 @@ describe('cross-site protection on cookie sessions', () => {
+   it('accepts a cookie-carrying POST from the configured origin', async () => {
+     const cookie = await signedInCookie('+919000000011');
+     const res = await app.inject({
+       method: 'POST',
+       url: '/api/auth/sign-out',
+       headers: { cookie, origin: BASE_URL },
+       payload: {},
+     });
+     expect(res.statusCode).toBe(200);
+     expect(res.body).toBe('{"success":true}');
++
++    // The only request in this suite that emits more than one Set-Cookie, and
++    // therefore the only one that can tell a correct implementation from a wrong
++    // one. Everywhere else n = 1, where forwarding `getSetCookie()` and
++    // flattening with `headers.get('set-cookie')` are indistinguishable — and the
++    // flattened form is a comma-joined string a browser parses as ONE cookie, so
++    // sign-out would clear `session_token` and leave `session_data` and
++    // `dont_remember` alive. Proven by mutation: with `.get()` in place and this
++    // assertion absent, the whole suite stays green.
++    const cleared = setCookies(res.headers);
++    expect(cleared).toHaveLength(3);
++    expect(cleared.map((entry) => entry.split('=')[0])).toEqual([
++      'better-auth.session_token',
++      'better-auth.session_data',
++      'better-auth.dont_remember',
++    ]);
++    for (const entry of cleared) expect(entry).toContain('Max-Age=0');
++  });
++
++  /**
++   * The half of the rule that is NOT "cookie or nothing", and the half a browser
++   * meets FIRST — before it has any cookie to send.
++   *
++   * `formCsrfMiddleware` is mounted per-endpoint (`api/routes/sign-in.mjs:245`,
++   * `sign-up.mjs:26`, `plugins/magic-link/index.mjs:60`,
++   * `plugins/email-otp/routes.mjs:77`; of those, `/sign-in/email`,
++   * `/sign-up/email` and `/sign-in/magic-link` are registered here — the
++   * email-otp plugin is not enabled). It calls `validateOrigin` with
++   * `forceValidate`, so a COOKIELESS request carrying `Origin`, `Referer` or any
++   * `Sec-Fetch-*` header is origin-checked anyway — while `send-otp` and
++   * `sign-out`, which carry no such middleware, are not.
++   */
++  it('origin-checks a cookieless magic-link request, and does not for send-otp', async () => {
++    const evil = await app.inject({
++      method: 'POST',
++      url: '/api/auth/sign-in/magic-link',
++      headers: { origin: 'https://evil.example' },
++      payload: { email: 'csrf-a@example.test' },
++    });
++    expect(evil.statusCode).toBe(403);
++    expect(evil.body).toBe('{"message":"Invalid origin","code":"INVALID_ORIGIN"}');
++
++    const crossSite = await app.inject({
++      method: 'POST',
++      url: '/api/auth/sign-in/magic-link',
++      headers: { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate' },
++      payload: { email: 'csrf-b@example.test' },
++    });
++    expect(crossSite.statusCode).toBe(403);
++    expect(crossSite.json().code).toBe('CROSS_SITE_NAVIGATION_LOGIN_BLOCKED');
++
++    const trusted = await app.inject({
++      method: 'POST',
++      url: '/api/auth/sign-in/magic-link',
++      headers: { origin: BASE_URL },
++      payload: { email: 'csrf-c@example.test' },
++    });
++    expect(trusted.statusCode).toBe(200);
++
++    // No formCsrfMiddleware here: the same forged Origin passes.
++    const otpFromEvil = await app.inject({
++      method: 'POST',
++      url: '/api/auth/phone-number/send-otp',
++      headers: { origin: 'https://evil.example' },
++      payload: { phoneNumber: '+919000000013' },
++    });
++    expect(otpFromEvil.statusCode).toBe(200);
+   });
+ 
+   /**
+    * The exemption, and the reason `signInWithPhone` hands back a bearer token
+    * rather than a cookie: a request with no cookie is not a cross-site request
+    * a browser could be tricked into making, so it is not origin-checked. Later
+    * tasks' route tests get to send one header.
+    */
+   it('a bearer-only POST needs no Origin at all', async () => {
+     const { token } = await signInWithPhone(app, otp, '+919000000012');
+@@ -512,20 +580,66 @@ describe('the catch-all mount', () => {
+     expect(needsOne.body).toBe(
+       '{"message":"[body] Invalid input: expected object, received undefined","code":"VALIDATION_ERROR"}',
+     );
+   });
+ 
+   it('forwards the vendor 404 for an unknown auth sub-path', async () => {
+     const res = await app.inject({ method: 'GET', url: '/api/auth/no-such-endpoint' });
+     expect(res.statusCode).toBe(404);
+   });
+ 
++  /**
++   * A KNOWN GAP, pinned so it is visible rather than discovered.
++   *
++   * The catch-all mounts GET and POST because those are the only methods any of
++   * better-auth's 44 routed endpoints uses. A cross-origin browser, however,
++   * preflights every `application/json` POST with OPTIONS — and that request
++   * never reaches better-auth: Fastify answers 404 first, in Fastify's own
++   * words. So adding the web origin to `trustedOrigins` when Task 14's
++   * `WEB_ORIGIN` lands will NOT be enough on its own; the preflight has to be
++   * answered too. This test turns red the moment somebody mounts CORS, so the
++   * fix and this pin land together.
++   */
++  it('known gap: OPTIONS and HEAD are not mounted, so a CORS preflight 404s before better-auth', async () => {
++    const preflight = await app.inject({
++      method: 'OPTIONS',
++      url: '/api/auth/get-session',
++      headers: {
++        origin: 'http://localhost:3001',
++        'access-control-request-method': 'POST',
++        'access-control-request-headers': 'content-type',
++      },
++    });
++    expect(preflight.statusCode).toBe(404);
++    expect(preflight.json()).toEqual({
++      message: 'Route OPTIONS:/api/auth/get-session not found',
++      error: 'Not Found',
++      statusCode: 404,
++    });
++
++    const head = await app.inject({ method: 'HEAD', url: '/api/auth/get-session' });
++    expect(head.statusCode).toBe(404);
++  });
++
++  /**
++   * The mount refuses to improvise an origin. `createAuth` always sets `baseURL`,
++   * which is exactly why the guard needs a check of its own: without one,
++   * deleting it would be invisible until some future caller built an auth
++   * instance the other way and silently inherited the request's Host header.
++   */
++  it('refuses at assembly to mount an auth instance with no baseURL', () => {
++    const withoutBaseUrl = { options: {} } as unknown as Auth;
++    expect(() => registerAuthRoutes(Fastify(), withoutBaseUrl)).toThrowError(
++      'registerAuthRoutes: the auth instance has no baseURL. This mount will not fall back to the request Host header — pass baseUrl to createAuth.',
++    );
++  });
++
+   /**
+    * The encapsulation check, and the reason it belongs in this file: the raw
+    * body parser the auth mount needs would, registered on the root instance,
+    * silently turn `/v1/events` into a door that no longer validates anything.
+    * Plan 1's `removeAdditional: false` promise is the sharpest thing to point
+    * at — if the parser had leaked, this unknown key would arrive unparsed and
+    * the refusal would never happen.
+    */
+   it('leaves the product door parsing JSON and refusing unknown keys', async () => {
+     const res = await app.inject({
+diff --git a/apps/server/test/config.test.ts b/apps/server/test/config.test.ts
+index 6beac1e..af46692 100644
+--- a/apps/server/test/config.test.ts
++++ b/apps/server/test/config.test.ts
+@@ -1,10 +1,12 @@
++import { readFileSync } from 'node:fs';
++import { fileURLToPath } from 'node:url';
+ import { describe, expect, it } from 'vitest';
+ import { ConfigError, loadConfig } from '../src/config.js';
+ 
+ const VALID_ENV = {
+   DATABASE_URL: 'postgres://gisik:gisik@localhost:54329/gisik_nokma',
+   BETTER_AUTH_URL: 'http://localhost:3000',
+   // 34 characters, over better-auth's own 32-character floor, and obviously not
+   // a key anything real is signed with.
+   BETTER_AUTH_SECRET: 'test-secret-not-used-anywhere-real',
+ };
+@@ -88,11 +90,57 @@ describe('loadConfig', () => {
+       'invalid server configuration — check: HOST',
+     );
+   });
+ 
+   it('planted defect: a LOG_LEVEL outside the enum is refused with the variable named', () => {
+     expect(() => loadConfig({ ...VALID_ENV, LOG_LEVEL: 'verbose' })).toThrowError(ConfigError);
+     expect(() => loadConfig({ ...VALID_ENV, LOG_LEVEL: 'verbose' })).toThrowError(
+       'invalid server configuration — check: LOG_LEVEL',
+     );
+   });
++
++  /**
++   * `.env.example` tells an operator to copy it and adjust. This proves that
++   * doing exactly that produces a server that starts.
++   *
++   * The gap it closes is specific and was real: `pnpm check:env` verifies every
++   * variable code READS is documented, which is a presence check — it has no
++   * opinion about the values. So `BETTER_AUTH_SECRET=change-me` sat in the file
++   * as a documented, gate-approved, boot-failing value, nine characters against
++   * a 32-character floor, and the operator following the instruction met
++   * `ConfigError` with nothing saying length was the reason. Presence and
++   * validity are different properties and now each has its own check.
++   */
++  it('the values documented in .env.example actually satisfy the schema', () => {
++    const path = fileURLToPath(new URL('../../../.env.example', import.meta.url));
++    const documented = parseEnvExample(readFileSync(path, 'utf8'));
++
++    // Guard against the check going quiet: if the parser stops finding the live
++    // variables, this test would pass on an empty object and prove nothing.
++    for (const key of ['DATABASE_URL', 'PORT', 'HOST', 'LOG_LEVEL', 'BETTER_AUTH_URL', 'BETTER_AUTH_SECRET']) {
++      expect(documented, `.env.example should document ${key}`).toHaveProperty(key);
++    }
++
++    expect(() => loadConfig(documented)).not.toThrow();
++    expect(loadConfig(documented).betterAuthSecret.length).toBeGreaterThanOrEqual(32);
++  });
+ });
++
++/**
++ * A deliberately small `.env.example` reader: `KEY=value`, `#` comments, and a
++ * trailing `# …` note stripped off a value. It is not a dotenv implementation —
++ * no quoting, no escapes, no multi-line values — because `.env.example` uses
++ * none of those, and a parser that handled more would be untested surface.
++ */
++function parseEnvExample(text: string): Record<string, string> {
++  const env: Record<string, string> = {};
++  for (const line of text.split('\n')) {
++    const trimmed = line.trim();
++    if (trimmed === '' || trimmed.startsWith('#')) continue;
++    const eq = trimmed.indexOf('=');
++    if (eq === -1) continue;
++    const key = trimmed.slice(0, eq).trim();
++    const value = trimmed.slice(eq + 1).split('#')[0]?.trim() ?? '';
++    if (value !== '') env[key] = value;
++  }
++  return env;
++}
+diff --git a/docs/superpowers/plans/2026-08-20-00-series-coordination.md b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+index 8412128..24ed217 100644
+--- a/docs/superpowers/plans/2026-08-20-00-series-coordination.md
++++ b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+@@ -1605,32 +1605,71 @@ sync code against these exact strings.
+ | session cookie, http baseURL | `better-auth.session_token`; `Max-Age=604800; Path=/; HttpOnly; SameSite=Lax` — **no `Secure`** | `test/auth/sign-in-flows.test.ts` |
+ | session cookie, **https** baseURL | `__Secure-better-auth.session_token`, same attributes **plus `Secure`** | same file |
+ | bearer token | response header `set-auth-token`, echoed in `access-control-expose-headers` | same file |
+ | session object | `{ session: {id, token, userId, expiresAt, createdAt, updatedAt, ipAddress, userAgent}, user: {id, name, email, emailVerified, image, phoneNumber, phoneNumberVerified, createdAt, updatedAt} }`; `getSession` answers **`null`** for absent, forged and signed-out alike | same file |
+ | other cookies seen | `better-auth.session_data`, `better-auth.dont_remember` (cleared on sign-out), `better-auth.state` (OAuth, `Max-Age=300`), `better-auth.better-auth-passkey` (challenge, `Max-Age=300`) | observed, not pinned |
+ 
+ **The https name is a DIFFERENT NAME, not a flag.** `__Secure-` is a browser-enforced prefix. A client
+ matching on `better-auth.session_token` finds nothing in production. Both are pinned by test so a
+ better-auth upgrade that renames either turns the suite red.
+ 
+-**The CSRF rule every later plan has to live with.** better-auth refuses any non-GET request that
+-**carries a `Cookie` header** unless it also carries a trusted `Origin` (or `Referer`):
++**The CSRF rule every later plan has to live with. It has TWO halves, and an earlier version of this
++entry recorded only the first — corrected here, because Plan 6 and Plan 10 read the mechanism sentence,
++not just the practical advice.**
++
++*Half one, the cookie gate.* `originCheckMiddleware` runs on every non-GET and calls `validateOrigin`,
++which returns early unless `headers.has("cookie")` (`api/middlewares/origin-check.mjs`). So a request
++**carrying a `Cookie`** needs a trusted `Origin` or `Referer`:
+ 403 `{"message":"Missing or null Origin","code":"MISSING_OR_NULL_ORIGIN"}` for none,
+-403 `{"message":"Invalid origin","code":"INVALID_ORIGIN"}` for an untrusted one. The gate is
+-`headers.has("cookie")` in `validateOrigin` (`api/middlewares/origin-check.mjs`), so a **bearer-only**
+-request — no cookie — is exempt. Browsers always send `Origin`, so nothing about the product changes;
+-`server.inject` sends neither unless told to. **Consequence for Tasks 5/8/12/13, Plan 6 and Plan 10:**
+-authenticate route tests with the bearer token `signInWithPhone` returns (one header, no origin needed),
+-or send `origin: <baseUrl>` alongside the cookie. `trustedOrigins` is left at better-auth's default — the
+-origin of `baseUrl` — so **when T14's `WEB_ORIGIN` lands and the web app is served from a different
+-origin than this server, that origin must be added to `trustedOrigins` or every browser cookie POST
+-403s.** That wiring is not done here.
++403 `{"message":"Invalid origin","code":"INVALID_ORIGIN"}` for an untrusted one. A **bearer-only**
++request is exempt.
++
++*Half two, and it is the one a browser meets FIRST — before it has any cookie to send.*
++`formCsrfMiddleware` is mounted **per-endpoint** (`api/routes/sign-in.mjs:245` `/sign-in/email`,
++`sign-up.mjs:26` `/sign-up/email`, `plugins/magic-link/index.mjs:60` `/sign-in/magic-link`,
++`plugins/email-otp/routes.mjs:77`). Of those four, **three are registered in this configuration** — the
++email-otp plugin is not enabled — and it calls `validateOrigin(ctx, forceValidate = true)` when a
++**cookieless** request carries `Origin`, `Referer` or any `Sec-Fetch-*` header. Measured:
++`POST /sign-in/magic-link` with no cookie and `origin: https://evil.example` → **403 INVALID_ORIGIN**;
++with `sec-fetch-site: cross-site, sec-fetch-mode: navigate` → **403 CROSS_SITE_NAVIGATION_LOGIN_BLOCKED**;
++with the trusted origin → 200. `POST /phone-number/send-otp` and `POST /sign-out` carry no such
++middleware and pass the same forged `Origin`. So "bearer-only is exempt" is true of half one and **false
++as a general statement** — the exemption belongs to the endpoint as much as to the request.
++
++**Consequence for Tasks 5/8/12/13, Plan 6 and Plan 10:** authenticate route tests with the bearer token
++`signInWithPhone` returns (one header, no origin needed) — that helper's own path, `send-otp` +
++`phone-number/verify`, carries no `formCsrfMiddleware`, which is why it works with no `Origin` at all.
++A **web** client signing in by magic link must send a trusted `Origin`, which a browser does for it.
++`trustedOrigins` is left at better-auth's default — the origin of `baseUrl` — so **when T14's
++`WEB_ORIGIN` lands and the web app is served from a different origin, that origin must be added to
++`trustedOrigins`.** That wiring is not done here.
++
++**…and adding it will NOT be sufficient on its own.** The catch-all mounts `GET` and `POST` only, because
++those are the only methods better-auth's routed endpoints use. A cross-origin browser preflights every
++`application/json` POST with `OPTIONS`, and that request never reaches better-auth — measured,
++`OPTIONS /api/auth/get-session` with preflight headers answers **404 from Fastify**
++(`{"message":"Route OPTIONS:/api/auth/get-session not found","error":"Not Found","statusCode":404}`);
++`HEAD` likewise. Whoever wires CORS must answer the preflight as well as extend `trustedOrigins`. The gap
++is pinned by a test named `known gap: OPTIONS and HEAD are not mounted`, which goes red the moment CORS
++is mounted — so the fix and the pin land in one commit.
++
++**Product routes are outside better-auth's CSRF entirely, and this is a security posture nobody had
++written down.** `validateOrigin` returns immediately when there is no `ctx.request`, and
++`makeRequireSession` calls `auth.api.getSession({ headers })` — a direct API call with no request object.
++So the origin rule binds `/api/auth/*` and nothing else. Measured: `POST /v1/events` with a valid session
++cookie and no `Origin` is answered by the ingest door (200, or 400 for a bad body) — never 403. **Once
++Task 5 or 12 puts `requireSession` on `/v1/events`, a cookie-authenticated cross-site POST is defended by
++`SameSite=Lax` alone.** That is defensible — Lax does stop a cross-site POST from carrying the cookie at
++all, so the request arrives unauthenticated and meets the 401 — but it is one mechanism rather than two,
++it is a browser behaviour rather than a server check, and it does nothing for a non-browser client
++replaying a stolen cookie. Whoever adds the guard should decide deliberately whether to require an
++`Origin` on product routes too; today the answer is no, by omission rather than by decision.
+ 
+ **`createAuth` now sets `advanced.disableOriginCheck: false`, and this is load-bearing.** better-auth's
+ default for it is `isTest() ? true : false` (`context/create-context.mjs`), and `isTest()` is
+ `NODE_ENV === 'test'` — which vitest sets. Left unset, the origin check is ON in production and OFF in
+ every test; and while `disableCSRFCheck` is unset, `shouldSkipCSRFForBackwardCompat` takes the whole CSRF
+ middleware down with it. That is a security control whose presence depends on `NODE_ENV`, and it produces
+ the worst failure mode available: a green suite in which every cookie POST passes, against a production
+ that 403s them. Proven by mutation — removing the line turns the two refusal tests green-for-the-wrong-reason (both answer 200).
+ **Do not remove it, and do not add `disableCSRFCheck`.**
+ 
+@@ -1638,35 +1677,56 @@ that 403s them. Proven by mutation — removing the line turns the two refusal t
+ byte-identically for a number with an account and a number without
+ (`400 {"message":"Invalid OTP","code":"INVALID_OTP"}`), and a magic-link request answers
+ `200 {"status":true}` for a known and an unknown address alike — both pinned. What better-auth *does*
+ distinguish is `INVALID_OTP` from `OTP_NOT_FOUND` (no code pending). That is a fact about whether a code
+ was recently **requested** — which the attacker requested themselves — and it is the same either way for
+ an account that exists and one that does not, so it is not the user oracle. Left as the vendor ships it:
+ normalising vendor error bodies at the mount would break better-auth's own client, which Plan 6 uses.
+ 
+ **The mount, and the one thing that must not be copied from the plan text.** `registerAuthRoutes(app,
+ auth)` registers an **encapsulated** Fastify scope with `removeAllContentTypeParsers()` + a raw `'*'`
+-buffer parser, then one `['GET','POST']` catch-all at `/api/auth/*` (all 46 endpoints enumerated: every
+-one is GET or POST). The plan's `JSON.stringify(request.body)` sketch does not work — with Fastify's own
++buffer parser, then one `['GET','POST']` catch-all at `/api/auth/*`. The verbs are enumerated, not
++guessed: `auth.api` carries **46 entries, 44 of which have an HTTP `path`** (`setPassword` and
++`consumePhoneNumberOTP` are server-only helpers), and the distinct methods across those 44 are exactly
++`GET` and `POST`. It also **throws at assembly** if `auth.options.baseURL` is unset rather than falling
++back to the request `Host` header — that fallback was in the first version and reintroduced exactly the
++input the line exists to exclude. The plan's `JSON.stringify(request.body)` sketch does not work — with Fastify's own
+ JSON parser, `request.body` is an object, every POST reaches better-auth with no body, and 12 of the 17
+ checks in `sign-in-flows.test.ts` fail. Encapsulation is what keeps that parser off `/v1/events`: hoisted
+ to the root instance, the events door stops enforcing `additionalProperties: false`. Both directions are
+ proven by mutation. A later task adding routes under a new prefix inherits nothing from this scope.
+ 
+ **`buildApp` widened: `AppDeps` gains `auth: Auth`, required.** Still synchronous, still
+ `buildApp(deps, options) -> FastifyInstance`. `pool`/`otpSender` were **not** added — nothing in
+ `buildApp` needs them, and `createAuth` stays in the caller, which is what keeps the signature sync.
+ `auth` is required rather than optional because an app with no identity surface should take a different
+ builder to produce; the cost is nil because **`createAuth` opens no connection** — measured at ~2ms
+ against a pool whose port nothing listens on, which is how `test/app.test.ts` stays database-free.
+ All five shipped call sites are updated — four in tests, one in `src/index.ts`.
+ 
++**`.env.example` documented a boot-failing value and no gate could see it.** Line 35 read
++`BETTER_AUTH_SECRET=change-me` — nine characters against the new 32 floor — so an operator following the
++file's own "copy to .env and adjust" met `ConfigError` with nothing saying length was the reason.
++`pnpm check:env` passed throughout, because it proves every variable code READS is **documented**, which
++is presence, not validity. Fixed, and the class closed: `config.test.ts` now parses `.env.example` and
++feeds its documented values to `loadConfig`, so a documented value that cannot boot is a red test. The
++file's header also claimed only "Core (Plan 1)" is live, which this task made false; it now names the
++live set explicitly.
++
++**`LogOtpSender` in production has TWO faults, not one.** Beyond writing every one-time code to the
++process log, it accumulates every code ever issued in an **unbounded in-process array**
++(`otp-sender.ts`'s `sent`, which exists only so a test can read the issued code) — unbounded memory plus
++a heap-dump disclosure surface. `otp-sender.ts`'s own comment claimed no production implementation kept
++such a transcript; Task 2's assembly made that false, and the comment is corrected rather than left
++standing. Both faults are in the implementation, not the interface, so the real sender removes them
++together. Plan 11 owns the replacement.
++
+ **`AppConfig` gains `betterAuthUrl` and `betterAuthSecret`**, from required `BETTER_AUTH_URL` and
+ `BETTER_AUTH_SECRET` with **no defaults**. The plan's Step 9 reached for
+ `?? 'dev-only-secret-change-me'` in the production entrypoint, which would let a deploy boot signing
+ every session with a key printed in this repository. `BETTER_AUTH_SECRET` is `z.string().min(32)` —
+ 32 is better-auth's own threshold, below which it warns and starts anyway. **T14 adds `webOrigin` to this
+ same schema**; the file is now shared between the two tasks. `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`
+ stay read at their site in `createAuth` (Task 1's decision) — a test that exercises `/sign-in/social` must
+ set both placeholders on `process.env` **before** `createAuth`, or better-auth answers 500
+ `CLIENT_ID_AND_SECRET_REQUIRED`.
+ 

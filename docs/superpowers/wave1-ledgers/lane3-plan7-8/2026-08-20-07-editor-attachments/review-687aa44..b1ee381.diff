@@ -1,0 +1,183 @@
+# Review package: 687aa44..HEAD
+
+## Commits
+b1ee381 Five checks that could not fail: the walker never proved the word "image", and the drift pin never proved a field still existed
+
+## Files changed
+ packages/domain/src/attachment-kinds.ts       |  4 ++--
+ packages/domain/test/attachment-kinds.test.ts | 12 ++++++++++--
+ packages/domain/test/doc-embeds.test.ts       | 17 +++++++++++++----
+ 3 files changed, 25 insertions(+), 8 deletions(-)
+
+## Diff
+diff --git a/packages/domain/src/attachment-kinds.ts b/packages/domain/src/attachment-kinds.ts
+index b478197..323d225 100644
+--- a/packages/domain/src/attachment-kinds.ts
++++ b/packages/domain/src/attachment-kinds.ts
+@@ -24,22 +24,22 @@ export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  * last-seen observation, not a standing fact: `name` and `mimeType` are
+  * what Drive said at `capturedAt`, and may already be stale by the time
+  * anyone reads them. That is why the renderer dates them.
+  *
+  * TWO STATEMENTS OF ONE CONCEPT, and which is which matters. This type and
+  * `isDriveReference` are the STRUCTURAL half: dependency-free, so the ingest
+  * gate and the editor bundle can ask "is this shaped like a reference?"
+  * without taking zod. The WIRE half is `attachmentDriveReferencePayload` in
+  * `events/ticket-events.ts`, and it is the only thing that validates a claim
+  * at the door: it additionally requires `kind` and a ULID `attachmentId`,
+- * real URLs for `webViewLink`/`iconLink`, and an ISO-8601 `capturedAt` that
+- * is a real calendar datetime. Passing the guard here is therefore NOT
++ * real URLs for `webViewLink`/`iconLink`, a `mimeType` matching the shared
++ * MIME regex, and an ISO-8601 `capturedAt` that is a real calendar datetime. Passing the guard here is therefore NOT
+  * evidence a payload would be accepted. The two are pinned against each
+  * other in `test/attachment-kinds.test.ts` so a rename on either side breaks
+  * loudly instead of drifting.
+  */
+ export type DriveReference = {
+   driveFileId: string;
+   name: string;
+   mimeType: string;
+   webViewLink: string;
+   iconLink?: string;
+diff --git a/packages/domain/test/attachment-kinds.test.ts b/packages/domain/test/attachment-kinds.test.ts
+index 652769f..91f055f 100644
+--- a/packages/domain/test/attachment-kinds.test.ts
++++ b/packages/domain/test/attachment-kinds.test.ts
+@@ -2,21 +2,21 @@ import { describe, expect, it } from 'vitest';
+ import {
+   DRIVE_FILE_SCOPE,
+   EVIDENCE_DRIVE_REFERENCE_REASON,
+   RULE_EVIDENCE_DRIVE_REFERENCE,
+   isDriveReference,
+   type DriveReference,
+ } from '../src/attachment-kinds.js';
+ import { attachmentDriveReferencePayload } from '../src/events/ticket-events.js';
+ import { newUlid } from '../src/ids.js';
+ 
+-const REFERENCE = {
++const REFERENCE: DriveReference = {
+   driveFileId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456',
+   name: 'GST filing Aug 2026.pdf',
+   mimeType: 'application/pdf',
+   webViewLink: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456/view',
+   capturedAt: '2026-08-20T10:00:00.000Z',
+ };
+ 
+ describe('attachment kinds', () => {
+   it('requests exactly the per-file Drive scope', () => {
+     expect(DRIVE_FILE_SCOPE).toBe('https://www.googleapis.com/auth/drive.file');
+@@ -39,35 +39,43 @@ describe('attachment kinds', () => {
+   });
+ 
+   it('planted defect: an incomplete or mistyped reference is not a reference', () => {
+     for (const broken of [
+       null,
+       'a string',
+       { ...REFERENCE, driveFileId: '' },
+       { ...REFERENCE, capturedAt: undefined },
+       { ...REFERENCE, webViewLink: 42 },
+       { ...REFERENCE, iconLink: 7 },
++      // name and mimeType had no killing case: deleting either conjunct from
++      // the guard survived every entry above.
++      { ...REFERENCE, name: '' },
++      { ...REFERENCE, mimeType: 42 },
+     ]) {
+       expect(isDriveReference(broken), `${JSON.stringify(broken)} must not pass`).toBe(false);
+     }
+   });
+ });
+ 
+ /**
+  * A Drive reference is stated twice in this package on purpose: as this
+  * dependency-free structural guard, which the ingest gate and the editor bundle
+  * can take without dragging zod in, and as `attachmentDriveReferencePayload` in
+  * events/ticket-events.ts, which is what the door actually validates. The
+  * duplication is the design; drift between the two halves is the hazard, so it
+  * is pinned here rather than left to a reviewer to notice. A rename on either
+  * side fails this block — the wire half at runtime, the guard half at compile
+- * time, since the fixture is typed `Required<DriveReference>`.
++ * time, since REFERENCE is annotated `DriveReference` and the complete fixture
++ * is `Required<DriveReference>`. The annotation is what catches a REMOVAL:
++ * without it the fixture's runtime keys came from an untyped literal, so a
++ * field dropped from the type would keep appearing in `Object.keys` and the
++ * key sets would still agree.
+  */
+ describe('the guard and the wire schema describe one concept', () => {
+   it('agrees with attachmentDriveReferencePayload field for field', () => {
+     const complete: Required<DriveReference> = {
+       ...REFERENCE,
+       iconLink: 'https://drive-thirdparty.googleusercontent.com/16/type/application/pdf',
+     };
+ 
+     // The wire adds exactly what the envelope needs and the guard cannot know:
+     // which kind of attachment this claim is, and which attachment it is about.
+diff --git a/packages/domain/test/doc-embeds.test.ts b/packages/domain/test/doc-embeds.test.ts
+index a360bac..4d8a7d4 100644
+--- a/packages/domain/test/doc-embeds.test.ts
++++ b/packages/domain/test/doc-embeds.test.ts
+@@ -1,19 +1,20 @@
+ import { describe, expect, it } from 'vitest';
+ import {
+   EMBEDDABLE_IMAGE_MIME,
+   collectImageAttachmentIds,
+   isEmbeddableImageMime,
+ } from '../src/doc-embeds.js';
+ 
+ const IMG_A = '01J9GIMA000000000000000000';
+ const IMG_B = '01J9GIMB000000000000000000';
++const IMG_C = '01J9GIMC000000000000000000';
+ 
+ describe('isEmbeddableImageMime', () => {
+   it('accepts exactly the embeddable set', () => {
+     for (const mime of ['image/png', 'image/jpeg', 'image/gif', 'image/webp']) {
+       expect(isEmbeddableImageMime(mime)).toBe(true);
+     }
+   });
+ 
+   it('planted defect: refuses svg, pdf, video, and lookalikes', () => {
+     for (const mime of [
+@@ -36,32 +37,40 @@ describe('isEmbeddableImageMime', () => {
+       'image/webp',
+     ]);
+   });
+ });
+ 
+ describe('collectImageAttachmentIds', () => {
+   it('finds top-level and nested image nodes, unique, in order', () => {
+     const doc = {
+       type: 'doc',
+       content: [
+-        { type: 'image', attrs: { attachmentId: IMG_A, wrap: 'block', alt: '' } },
++        // A non-image node that DOES carry attrs.attachmentId. Without it the
++        // word "image" in this test's name is unproven: deleting the
++        // `type === 'image'` discriminator passed every other case here,
++        // because nothing else in the document had an `attrs` at all.
++        { type: 'fileChip', attrs: { attachmentId: IMG_C } },
++        { type: 'image', attrs: { attachmentId: IMG_B, wrap: 'block', alt: '' } },
+         {
+           type: 'blockquote',
+           content: [
+             { type: 'paragraph', content: [{ type: 'text', text: 'x' }] },
+-            { type: 'image', attrs: { attachmentId: IMG_B, wrap: 'inline-left', alt: '' } },
++            { type: 'image', attrs: { attachmentId: IMG_A, wrap: 'inline-left', alt: '' } },
+           ],
+         },
+-        { type: 'image', attrs: { attachmentId: IMG_A, wrap: 'block', alt: 'dup' } },
++        { type: 'image', attrs: { attachmentId: IMG_B, wrap: 'block', alt: 'dup' } },
+       ],
+     };
+-    expect(collectImageAttachmentIds(doc)).toEqual([IMG_A, IMG_B]);
++    // B before A on purpose: these ids sort the other way, so a walker that
++    // returned ids.sort() would satisfy the original A-then-B expectation and
++    // "first-seen order" would be a claim no case could falsify.
++    expect(collectImageAttachmentIds(doc)).toEqual([IMG_B, IMG_A]);
+   });
+ 
+   it('ignores non-image nodes and images without a string attachmentId', () => {
+     const doc = {
+       type: 'doc',
+       content: [
+         { type: 'paragraph', content: [{ type: 'text', text: 'no images here' }] },
+         { type: 'image', attrs: { attachmentId: null, wrap: 'block', alt: '' } },
+         // Not in the brief's fixture, and it had to be: an implementation that
+         // coerced with String() instead of narrowing with typeof survived every

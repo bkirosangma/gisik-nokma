@@ -1,0 +1,1137 @@
+# Review package: 2a8fa3b..HEAD
+
+## Commits
+8d883e0 Mention node and picker: the plan's attribute validation hands the mention to a different person, and an empty label prints the ULID
+
+## Files changed
+ packages/editor/src/extensions/mention-popup.ts   | 119 ++++++
+ packages/editor/src/extensions/mention.ts         | 184 +++++++++
+ packages/editor/src/index.ts                      |  13 +-
+ packages/editor/src/schema/extensions.ts          |  21 +-
+ packages/editor/src/styles/editor.css             |  29 ++
+ packages/editor/test/doc-text-conformance.test.ts |  53 +++
+ packages/editor/test/mention.test.ts              | 430 ++++++++++++++++++++++
+ packages/editor/test/rule-census.test.ts          | 120 ++++++
+ packages/editor/test/schema.test.ts               |   1 +
+ 9 files changed, 962 insertions(+), 8 deletions(-)
+
+## Diff
+diff --git a/packages/editor/src/extensions/mention-popup.ts b/packages/editor/src/extensions/mention-popup.ts
+new file mode 100644
+index 0000000..8db62b7
+--- /dev/null
++++ b/packages/editor/src/extensions/mention-popup.ts
+@@ -0,0 +1,119 @@
++import type { MentionCandidate } from './mention.js';
++
++export type MentionPopupProps = {
++  items: MentionCandidate[];
++  command: (item: MentionCandidate) => void;
++  clientRect?: (() => DOMRect | null) | null;
++};
++
++export type MentionPopupRenderer = {
++  onStart(props: MentionPopupProps): void;
++  onUpdate(props: MentionPopupProps): void;
++  onKeyDown(props: { event: KeyboardEvent }): boolean;
++  onExit(): void;
++};
++
++/**
++ * Plain-DOM suggestion popup — no React, so the exact same code serves
++ * the Next.js client, Tauri, the RN webview bundle, and headless tests
++ * (the knowledge-base convention: plugin UI stays out of the React tree).
++ */
++export function createMentionPopup(): MentionPopupRenderer {
++  let container: HTMLDivElement | null = null;
++  let items: MentionCandidate[] = [];
++  let command: (item: MentionCandidate) => void = () => {};
++  let selectedIndex = 0;
++
++  function paint(): void {
++    if (!container) return;
++    container.replaceChildren();
++    items.forEach((item, index) => {
++      const button = document.createElement('button');
++      button.type = 'button';
++      button.className =
++        index === selectedIndex
++          ? 'mention-popup__item mention-popup__item--selected'
++          : 'mention-popup__item';
++      button.textContent = item.name;
++      // mousedown, not click: it fires before the editor loses focus.
++      button.addEventListener('mousedown', (event) => {
++        event.preventDefault();
++        command(item);
++      });
++      container?.appendChild(button);
++    });
++  }
++
++  function position(clientRect?: (() => DOMRect | null) | null): void {
++    if (!container) return;
++    const rect = clientRect?.();
++    if (!rect) return; // jsdom / detached: leave it unpositioned but present
++    container.style.left = `${rect.left}px`;
++    container.style.top = `${rect.bottom}px`;
++  }
++
++  function destroy(): void {
++    container?.remove();
++    container = null;
++  }
++
++  return {
++    onStart(props) {
++      container = document.createElement('div');
++      container.className = 'mention-popup';
++      container.style.position = 'absolute';
++      document.body.appendChild(container);
++      items = props.items;
++      command = props.command;
++      selectedIndex = 0;
++      paint();
++      position(props.clientRect);
++    },
++    onUpdate(props) {
++      items = props.items;
++      command = props.command;
++      if (selectedIndex >= items.length) selectedIndex = 0;
++      paint();
++      position(props.clientRect);
++    },
++    onKeyDown({ event }) {
++      // NOTHING TO NAVIGATE MEANS DECLINE, and this is not a nicety. `items`
++      // resolves asynchronously, so the popup exists with zero candidates from
++      // the moment `@` is typed until the first query returns, and typing `@`
++      // then Enter is an ordinary thing to do. Claiming those keystrokes makes
++      // the editor look frozen; the plan's version returned true for Enter,
++      // ArrowUp and ArrowDown unconditionally and a test caught it.
++      if (items.length === 0) return false;
++      if (event.key === 'ArrowDown') {
++        selectedIndex = (selectedIndex + 1) % items.length;
++        paint();
++        return true;
++      }
++      if (event.key === 'ArrowUp') {
++        selectedIndex = (selectedIndex - 1 + items.length) % items.length;
++        paint();
++        return true;
++      }
++      if (event.key === 'Enter') {
++        const item = items[selectedIndex];
++        if (!item) return false;
++        command(item);
++        return true;
++      }
++      // ESCAPE IS NOT HANDLED HERE, DELIBERATELY. @tiptap/suggestion@3.30.5
++      // owns it (dist:129-138): it calls this hook, then `dispatchExit(view)`
++      // unconditionally, then returns true whatever this returns — and the exit
++      // flips the plugin state to inactive, which the plugin view reads as a
++      // `stopped` transition and turns into `onExit` (dist:459-462, 476,
++      // 559-563), which is what removes this popup. A branch here would run
++      // before all of that and change nothing; it was written, tested both
++      // ways, and found to be a guard that cannot fail. The behaviour spec §2
++      // asks for — the typed `@…` staying literal — is still pinned by a test,
++      // against the mechanism that actually delivers it.
++      return false;
++    },
++    onExit() {
++      destroy();
++    },
++  };
++}
+diff --git a/packages/editor/src/extensions/mention.ts b/packages/editor/src/extensions/mention.ts
+new file mode 100644
+index 0000000..15d6e43
+--- /dev/null
++++ b/packages/editor/src/extensions/mention.ts
+@@ -0,0 +1,184 @@
++import { Node, mergeAttributes } from '@tiptap/core';
++import { PluginKey } from '@tiptap/pm/state';
++import Suggestion from '@tiptap/suggestion';
++import { createMentionPopup } from './mention-popup.js';
++
++export type MentionCandidate = { userId: string; name: string };
++
++export type MentionOptions = {
++  queryUsers(query: string): Promise<MentionCandidate[]>;
++};
++
++export const mentionSuggestionKey = new PluginKey('mentionSuggestion');
++
++/**
++ * THE ONE ORIGIN OF THE INSERT-TIME LABEL RULE, and the reason it needs one.
++ *
++ * `packages/domain/src/doc-text.ts` shipped before this package and its header
++ * names Plan 7's editor as the thing that conforms to it. Its mention branch
++ * takes `attrs.label` only when it is a string of NON-ZERO length, and falls
++ * back to `attrs.userId` otherwise — which in this product is a ULID. So a
++ * mention stored with an empty label is not a slightly worse mention: it is
++ * `@01J9GUSA000000000000000000` in every search projection and every
++ * notification that walker feeds. A test asserts that outcome against the
++ * shipped walker rather than describing it.
++ *
++ * The rule is therefore: trim, and REFUSE what trims away. Refusal rather than
++ * substitution follows this package's own precedent — `insertTicketImage`
++ * returns false for a non-image mime instead of coercing it — and the
++ * alternative is worse than it looks: a stand-in like 'unknown' would put a
++ * name nobody has into a stored document and from there into someone's inbox.
++ * Trimming is what makes the two failures one rule: a name of three spaces
++ * passes the walker's `length > 0` and prints `@   `, a mention of nobody that
++ * no length check on the raw string would catch.
++ *
++ * WHAT THIS DOES NOT GUARD, stated so it cannot be read wider. Only the label,
++ * and only the insert path. A candidate carrying a blank `userId` is refused by
++ * nothing here and would store a mention that resolves to no one while
++ * rendering perfectly; and the JSON and HTML doors reach `attrs.label`
++ * directly, both left open for the reason `ticket-image.ts` sets out at length
++ * — a ProseMirror `validate` throws at load, `enableContentCheck` defaults
++ * false, and the catch replaces the WHOLE document with an empty one. Tests pin
++ * all three as open.
++ */
++export function mentionLabelOf(candidate: MentionCandidate): string | null {
++  const label = typeof candidate.name === 'string' ? candidate.name.trim() : '';
++  return label.length > 0 ? label : null;
++}
++
++/**
++ * The `@` prefix has ONE origin for this node: HTML text content, plain-text
++ * serialization and the parse path all go through here, so the three cannot
++ * drift into disagreeing about it. The walker in `@gisik-nokma/domain` spells
++ * it a fourth time and deliberately cannot import this — it is dependency-free
++ * on purpose — which is what `test/doc-text-conformance.test.ts` is for.
++ */
++function mentionText(attrs: Record<string, unknown>): string {
++  return `@${typeof attrs.label === 'string' ? attrs.label : ''}`;
++}
++
++/**
++ * The `mention` node of document schema v1: `{ userId, label }`, an inline atom.
++ *
++ * `label` IS A CLAIM CAPTURED AT INSERTION TIME, not a lookup. That is the
++ * whole reason the shape carries it: `docToPlainText` renders `@name` with no
++ * user directory in reach, on a server that indexes documents it did not
++ * author. A name that changes later goes stale in old documents, which is the
++ * accepted cost — the alternative is a search projection that cannot run
++ * without joining a directory.
++ *
++ * BOTH ATTRIBUTES ARE READ AND WRITTEN PER-ATTRIBUTE, NOT NODE-LEVEL, and the
++ * reason is the one Task 3 established for the image node's `wrap`.
++ * `injectExtensionAttributesToParseRule` (@tiptap/core@3.30.5 dist:1452-1472)
++ * rebuilds every parse rule's `getAttrs` as
++ * `{ ...nodeLevelResult, ...perAttributeResults }` — the per-attribute handler
++ * is the LAST writer — and its default, when an attribute defines none, is
++ * `fromString(node.getAttribute(name))` (dist:1460), which reads the bare
++ * attribute `userId` / `label`; `getAttribute` is case-insensitive on an HTML
++ * element, so `userid="…"` reaches it too. Written node-level, as the plan
++ * specifies, the validated values are overwritten by whatever the pasted markup
++ * says. That was not reasoned about, it was SHIPPED AND WATCHED: on
++ * `<span data-mention-user-id="A" userId="B" label="Mallory">@Anselma</span>`
++ * the node came back `{ userId: 'B', label: 'Mallory' }`. For an image that
++ * mis-set a float; here it reattributes the mention to a different person.
++ *
++ * The same mechanism runs outward: `getRenderedAttributes` (dist:1431) writes
++ * an attribute with no `renderHTML` out under its own name, so the plan's
++ * version serialized `userid="…" label="Anselma"` ALONGSIDE
++ * `data-mention-user-id="…"` — two spellings of one fact, of which only one is
++ * read back through a guard. Hence a `renderHTML` on both, and a test pinning
++ * the single spelling in each direction.
++ */
++export const Mention = Node.create<MentionOptions>({
++  name: 'mention',
++  group: 'inline',
++  inline: true,
++  atom: true,
++  selectable: true,
++
++  addOptions() {
++    return { queryUsers: async () => [] };
++  },
++
++  addAttributes() {
++    return {
++      userId: {
++        default: null,
++        parseHTML: (element) => element.getAttribute('data-mention-user-id'),
++        renderHTML: (attributes) => ({ 'data-mention-user-id': attributes.userId }),
++      },
++      /** Display name at insertion time — the claim `docToPlainText` renders as @label. */
++      label: {
++        default: '',
++        parseHTML: (element) => (element.textContent ?? '').replace(/^@/, ''),
++        // The label's ONE spelling in the HTML is the span's text content,
++        // which `renderHTML` below writes. An empty object here is what keeps
++        // `getRenderedAttributes` from adding a second, unguarded spelling.
++        renderHTML: () => ({}),
++      },
++    };
++  },
++
++  parseHTML() {
++    // `data-mention-user-id` is the discriminator, not `span`: a `<span>`
++    // pasted from any web page is not one of this product's mentions, and
++    // matching the bare tag would turn arbitrary markup into a claim about a
++    // person. Per-attribute `parseHTML` above supplies both attrs.
++    return [{ tag: 'span[data-mention-user-id]' }];
++  },
++
++  renderHTML({ node, HTMLAttributes }) {
++    // `data-mention-user-id` arrives through HTMLAttributes from the attribute's
++    // own `renderHTML` and is deliberately not restated here — restating it
++    // would be the second spelling this design exists to prevent. A node with no
++    // userId renders the attribute as null, which ProseMirror drops.
++    return [
++      'span',
++      mergeAttributes(HTMLAttributes, { class: 'editor-mention' }),
++      mentionText(node.attrs),
++    ];
++  },
++
++  renderText({ node }) {
++    return mentionText(node.attrs);
++  },
++
++  addProseMirrorPlugins() {
++    return [
++      Suggestion<MentionCandidate, MentionCandidate>({
++        editor: this.editor,
++        pluginKey: mentionSuggestionKey,
++        char: '@',
++        // THE DOOR THE LABEL RULE ACTUALLY CLOSES. A candidate this editor
++        // could not label is never offered, so there is no row to click and no
++        // silent no-op when one is clicked — which is what a refusal inside
++        // `command` alone would produce.
++        items: async ({ query }) => {
++          const candidates = await this.options.queryUsers(query);
++          return candidates.filter((candidate) => mentionLabelOf(candidate) !== null);
++        },
++        command: ({ editor, range, props }) => {
++          const label = mentionLabelOf(props);
++          // UNREACHABLE THROUGH THE PICKER WHILE THE FILTER ABOVE STANDS, and
++          // said plainly rather than dressed up: deleting this line alone
++          // leaves every test green, which was run. It is kept because it is
++          // what makes `label` a `string` instead of a `string | null` asserted
++          // away, and because it is live the moment the filter is not — deleting
++          // the filter alone and deleting both redden the same case with
++          // DIFFERENT documents, an empty one versus a mention labelled with
++          // three spaces, and that difference is this branch.
++          if (label === null) return;
++          editor
++            .chain()
++            .focus()
++            .insertContentAt(range, [
++              { type: this.name, attrs: { userId: props.userId, label } },
++              { type: 'text', text: ' ' },
++            ])
++            .run();
++        },
++        render: () => createMentionPopup(),
++      }),
++    ];
++  },
++});
+diff --git a/packages/editor/src/index.ts b/packages/editor/src/index.ts
+index 5cd7f5d..0fc4be4 100644
+--- a/packages/editor/src/index.ts
++++ b/packages/editor/src/index.ts
+@@ -1,12 +1,15 @@
+ export { DOC_SCHEMA_VERSION, emptyDoc, isDocJson, type DocJson } from './doc.js';
+-export {
+-  buildEditorExtensions,
+-  type EditorSchemaOptions,
+-  type MentionCandidate,
+-} from './schema/extensions.js';
++export { buildEditorExtensions, type EditorSchemaOptions } from './schema/extensions.js';
+ export {
+   IMAGE_WRAP_MODES,
+   TicketImage,
+   type ImageWrapMode,
+   type TicketImageOptions,
+ } from './extensions/ticket-image.js';
++export {
++  Mention,
++  mentionLabelOf,
++  mentionSuggestionKey,
++  type MentionCandidate,
++  type MentionOptions,
++} from './extensions/mention.js';
+diff --git a/packages/editor/src/schema/extensions.ts b/packages/editor/src/schema/extensions.ts
+index 4ec12ae..0cff6c3 100644
+--- a/packages/editor/src/schema/extensions.ts
++++ b/packages/editor/src/schema/extensions.ts
+@@ -1,25 +1,30 @@
+ import type { Extensions } from '@tiptap/core';
+ import { StarterKit } from '@tiptap/starter-kit';
+ import { Link } from '@tiptap/extension-link';
+ import { Placeholder } from '@tiptap/extension-placeholder';
+ import { Table } from '@tiptap/extension-table';
+ import { TableRow } from '@tiptap/extension-table-row';
+ import { TableHeader } from '@tiptap/extension-table-header';
+ import { TableCell } from '@tiptap/extension-table-cell';
+ import { VersionedDocument } from './versioned-document.js';
+ import { TicketImage } from '../extensions/ticket-image.js';
+-
+-export type MentionCandidate = { userId: string; name: string };
++import { Mention, type MentionCandidate } from '../extensions/mention.js';
+ 
+ export type EditorSchemaOptions = {
+-  /** Mention picker data source (Task 4). Absent → mentions render but the picker offers nobody. */
++  /**
++   * Mention picker data source (Task 4). Absent → mentions render but the
++   * picker offers nobody. `MentionCandidate` has ONE origin and it is
++   * `../extensions/mention.js`, which is also where the rule that turns a
++   * candidate into a stored label lives; this file names the type and does not
++   * re-export it, so the barrel exports it exactly once.
++   */
+   queryUsers?: (query: string) => Promise<MentionCandidate[]>;
+   /** Maps an image node's attachmentId to a URL (Task 3). Defaults to the server route. */
+   resolveAttachmentUrl?: (attachmentId: string) => string;
+   placeholder?: string;
+ };
+ 
+ /**
+  * The ONE origin of document schema v1. Every editor surface — web,
+  * desktop, the RN webview bundle, and every test — builds its extension
+  * list here, so there is exactly one schema and it cannot drift between
+@@ -115,20 +120,30 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
+     // and is not restated here: `configure` merges with `mergeDeep` (core
+     // dist:4654-4661), which copies every key of its source with
+     // `Object.keys(...).forEach` — so an explicitly-passed `undefined` REPLACES
+     // the default rather than falling back to it, and `exactOptionalPropertyTypes`
+     // is off, so `{ resolveAttachmentUrl: props.maybeUndefined }` type-checks
+     // its way into that. Hence the conditional: the option travels only when
+     // the caller actually has one. A test drives both shapes.
+     TicketImage.configure(
+       options.resolveAttachmentUrl ? { resolveAttachmentUrl: options.resolveAttachmentUrl } : {},
+     ),
++    // The mention node of schema v1. `queryUsers` is spelled with `??` rather
++    // than passed conditionally the way TicketImage's option is, and the
++    // difference is not an inconsistency: TicketImage's default lives in its
++    // own `addOptions` and `mergeDeep` would let an explicit `undefined`
++    // REPLACE it (core dist:4654-4661), so that option must travel only when
++    // the caller has one. Here the fallback is a value, not a default being
++    // protected, so stating it at the call site is the shorter honest form —
++    // and `Mention.addOptions` still carries its own, for a host that
++    // configures the extension directly.
++    Mention.configure({ queryUsers: options.queryUsers ?? (async () => []) }),
+     // HEADING LEVELS ARE NOT VALIDATED HERE. Heading resolves to
+     // `levels: [1,2,3,4,5,6]`, which governs which levels the toolbar and
+     // input rules OFFER — it is not a constraint on stored documents, and it
+     // is not a `validate`. An earlier version of this comment said ProseMirror
+     // "validates attribute NAMES, not their values"; that is FALSE in the
+     // installed stack and was disproven by construction. An attribute spec may
+     // carry a `validate`, `checkAttrs` runs it (prosemirror-model@1.25.11
+     // dist:2058-2066) on every `Node.fromJSON` (dist:1542), and Tiptap
+     // forwards it from an extension attribute into the spec (@tiptap/core
+     // @3.30.5 dist:1491). Heading declares none, which is the actual reason a
+diff --git a/packages/editor/src/styles/editor.css b/packages/editor/src/styles/editor.css
+index 756894e..eacb637 100644
+--- a/packages/editor/src/styles/editor.css
++++ b/packages/editor/src/styles/editor.css
+@@ -25,10 +25,39 @@
+ .editor-image--inline-left {
+   float: left;
+   margin: 0 1rem 0.5rem 0;
+   max-width: 50%;
+ }
+ .editor-image--inline-right {
+   float: right;
+   margin: 0 0 0.5rem 1rem;
+   max-width: 50%;
+ }
++
++/* Mention picker popup and the mention node itself (spec §2's one non-input-rule
++   trigger). Structure only, under the same rule as everything above: the edges
++   are drawn with `currentColor`, and the surface the popup sits on is the
++   host's to supply from the one origin named at the top of this file. */
++.mention-popup {
++  position: absolute;
++  z-index: 30;
++  display: flex;
++  flex-direction: column;
++  min-width: 10rem;
++  border: 1px solid currentColor;
++}
++.mention-popup__item {
++  text-align: left;
++  padding: 0.25rem 0.5rem;
++  cursor: pointer;
++  border: 0;
++  background: none;
++  font: inherit;
++  color: inherit;
++}
++.mention-popup__item--selected {
++  outline: 1px solid currentColor;
++  outline-offset: -1px;
++}
++.editor-mention {
++  white-space: nowrap;
++}
+diff --git a/packages/editor/test/doc-text-conformance.test.ts b/packages/editor/test/doc-text-conformance.test.ts
+index 5464d0a..59ddad4 100644
+--- a/packages/editor/test/doc-text-conformance.test.ts
++++ b/packages/editor/test/doc-text-conformance.test.ts
+@@ -216,20 +216,73 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
+               ],
+             },
+           ],
+         },
+       ],
+     });
+     expect(docToPlainText(editor.getJSON())).toBe('Month\nDue\nAugust\n11th');
+     editor.destroy();
+   });
+ 
++  /**
++   * THE MENTION NODE IS THE ONE SHAPE THIS WALKER NAMES OUT LOUD. Its header
++   * says Plan 7's editor conforms to `{ type: 'mention', attrs: { userId,
++   * label? } }`, and until Task 4 there was no node to check that against — the
++   * conformance ran in the other direction only, block nodes the walker knows.
++   *
++   * Two halves, and the second is the one with teeth. The walker renders
++   * `@label`, so the mention has to arrive inline with no line break and with
++   * the display name, not the id — that is the first expectation. The second is
++   * the fallback: the walker takes `label` only when it is a string of NON-ZERO
++   * length and otherwise prints `attrs.userId`, a ULID. Both are driven on a
++   * document this editor actually produced, because a hand-written one could
++   * agree with the walker while the editor disagreed with both.
++   */
++  it('renders an editor-produced mention as @label, inline, with no id in sight', () => {
++    const editor = createTestEditor(undefined, {
++      type: 'doc',
++      content: [
++        {
++          type: 'paragraph',
++          content: [
++            { type: 'text', text: 'ask ' },
++            {
++              type: 'mention',
++              attrs: { userId: '01J9GUSA000000000000000000', label: 'Anselma' },
++            },
++            { type: 'text', text: ' about the GST receipt' },
++          ],
++        },
++      ],
++    });
++    expect(docToPlainText(editor.getJSON())).toBe('ask @Anselma about the GST receipt');
++    editor.destroy();
++  });
++
++  it('and falls back to the ULID when the label is empty — why the insert path guards it', () => {
++    const editor = createTestEditor(undefined, {
++      type: 'doc',
++      content: [
++        {
++          type: 'paragraph',
++          content: [{ type: 'mention', attrs: { userId: '01J9GUSA000000000000000000', label: '' } }],
++        },
++      ],
++    });
++    // Not the behaviour anyone wants in a search index or a notification, and
++    // not a defect in the walker either: it is the honest thing to print when
++    // the document carries no name. The refusal that keeps documents out of
++    // this state lives in src/extensions/mention.ts and is tested there.
++    expect(docToPlainText(editor.getJSON())).toBe('@01J9GUSA000000000000000000');
++    editor.destroy();
++  });
++
+   it('is unbothered by the doc attrs this schema stamps and the paragraph typing appends', () => {
+     // schemaVersion lives on the doc node's attrs, which the walker ignores
+     // entirely; trailingNode appends an empty paragraph after a heading the
+     // moment anything is typed. Neither must reach the search index.
+     const editor = createTestEditor();
+     typeText(editor, '# GST filing');
+     const json = editor.getJSON() as { attrs?: { schemaVersion?: number } };
+     expect(json.attrs?.schemaVersion).toBe(1);
+     expect(editor.getText()).toBe('GST filing\n\n');
+     expect(docToPlainText(json)).toBe('GST filing');
+diff --git a/packages/editor/test/mention.test.ts b/packages/editor/test/mention.test.ts
+new file mode 100644
+index 0000000..ed02fe3
+--- /dev/null
++++ b/packages/editor/test/mention.test.ts
+@@ -0,0 +1,430 @@
++import { readFileSync } from 'node:fs';
++import { dirname, resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import type { Editor } from '@tiptap/core';
++import { docToPlainText } from '@gisik-nokma/domain';
++import { mentionLabelOf } from '../src/extensions/mention.js';
++import { createTestEditor } from './helpers/create-editor.js';
++import { typeText } from './helpers/type-text.js';
++
++const USERS = [
++  { userId: '01J9GUSA000000000000000000', name: 'Anselma' },
++  { userId: '01J9GUSB000000000000000000', name: 'Anand' },
++];
++
++/** A directory row with no usable display name — the hazard this file is built around. */
++const NAMELESS = { userId: '01J9GUSC000000000000000000', name: '   ' };
++
++function mentionNodes(json: unknown): Array<Record<string, unknown>> {
++  const found: Array<Record<string, unknown>> = [];
++  const walk = (node: unknown): void => {
++    if (node === null || typeof node !== 'object') return;
++    if (Array.isArray(node)) return node.forEach(walk);
++    const record = node as { type?: string; attrs?: Record<string, unknown>; content?: unknown };
++    if (record.type === 'mention') found.push(record.attrs ?? {});
++    walk(record.content);
++  };
++  walk(json);
++  return found;
++}
++
++function pressKey(editor: Editor, key: string): boolean {
++  const event = new KeyboardEvent('keydown', { key, bubbles: true });
++  return editor.view.someProp('handleKeyDown', (handler) => handler(editor.view, event)) ?? false;
++}
++
++function popupItems(): HTMLButtonElement[] {
++  return [...document.querySelectorAll<HTMLButtonElement>('.mention-popup__item')];
++}
++
++let editor: Editor | null = null;
++afterEach(() => {
++  editor?.destroy();
++  editor = null;
++  document.querySelectorAll('.mention-popup').forEach((el) => el.remove());
++});
++
++describe('mention picker', () => {
++  it('typing @ plus a query surfaces matching candidates', async () => {
++    const queryUsers = vi.fn(async (query: string) =>
++      USERS.filter((user) => user.name.toLowerCase().startsWith(query.toLowerCase())),
++    );
++    editor = createTestEditor({ queryUsers });
++    typeText(editor, 'ping @an');
++    await vi.waitFor(() => {
++      expect(popupItems().length).toBe(2);
++    });
++    expect(queryUsers).toHaveBeenCalledWith('an');
++  });
++
++  it('clicking a candidate inserts a mention node {userId, label} plus a space', async () => {
++    editor = createTestEditor({ queryUsers: async () => USERS });
++    typeText(editor, '@ans');
++    await vi.waitFor(() => {
++      expect(popupItems()[0]).toBeDefined();
++    });
++    // mousedown, not click: it fires before the editor loses focus.
++    popupItems()[0]!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
++    const mentions = mentionNodes(editor.getJSON());
++    expect(mentions).toEqual([{ userId: USERS[0]!.userId, label: 'Anselma' }]);
++    // The trigger text `@ans` was consumed by the insertion.
++    expect(editor.getText()).not.toContain('@ans');
++    expect(editor.getText()).toBe('@Anselma ');
++  });
++
++  it('Enter selects the highlighted candidate', async () => {
++    editor = createTestEditor({ queryUsers: async () => USERS });
++    typeText(editor, '@an');
++    await vi.waitFor(() => {
++      expect(popupItems().length).toBe(2);
++    });
++    pressKey(editor, 'ArrowDown');
++    expect(popupItems()[1]!.className).toContain('mention-popup__item--selected');
++    pressKey(editor, 'Enter');
++    expect(mentionNodes(editor.getJSON())).toEqual([
++      { userId: USERS[1]!.userId, label: 'Anand' },
++    ]);
++  });
++
++  /**
++   * THE FAIL-FIRST EVIDENCE FOR THIS CASE IS NOT WHAT THE BRIEF THINKS IT IS,
++   * and saying so is the point of this comment.
++   *
++   * @tiptap/suggestion@3.30.5 handles Escape ITSELF (dist:129-138): it calls
++   * the renderer's `onKeyDown`, then `dispatchExit(view)` unconditionally, then
++   * returns true — and the exit flips the plugin state to inactive, which the
++   * plugin view reads as a `stopped` transition and turns into `onExit`
++   * (dist:459-462, 476, 559-563), which removes the popup. So a renderer
++   * Escape branch cannot be the thing that dismisses the popup, and deleting
++   * one does not redden this case. It was run both ways to check, and the
++   * popup file therefore ships without such a branch rather than with dead
++   * code dressed as a guard.
++   *
++   * So be exact about what evidence this case has. Against the unmodified
++   * pre-Task-4 tree the whole FILE fails at collection — `mention.js` does not
++   * exist to import — and that is the only fail-first observation there is; it
++   * is not a `waitFor` timing out, and with the import at the top of this file
++   * it could not be. No mutation reddens the dismissal half, because no line in
++   * this package delivers it.
++   *
++   * What the case does pin is the half spec §2 actually cares about, and that
++   * half is ours to break: the typed `@an` survives as literal text and no node
++   * was created. `@…` never silently becomes markup.
++   */
++  it('Escape dismisses the picker and the typed text stays literal', async () => {
++    editor = createTestEditor({ queryUsers: async () => USERS });
++    typeText(editor, '@an');
++    await vi.waitFor(() => {
++      expect(document.querySelector('.mention-popup')).not.toBeNull();
++    });
++    expect(pressKey(editor, 'Escape')).toBe(true);
++    expect(document.querySelector('.mention-popup')).toBeNull();
++    expect(mentionNodes(editor.getJSON())).toEqual([]);
++    expect(editor.getText()).toContain('@an');
++  });
++
++  it('getText renders a mention as @label', () => {
++    editor = createTestEditor({ queryUsers: async () => USERS });
++    editor.commands.setContent({
++      type: 'doc',
++      content: [
++        {
++          type: 'paragraph',
++          content: [
++            { type: 'text', text: 'ask ' },
++            { type: 'mention', attrs: { userId: USERS[0]!.userId, label: 'Anselma' } },
++          ],
++        },
++      ],
++    });
++    expect(editor.getText()).toContain('@Anselma');
++  });
++
++  it('round-trips mention attrs through JSON', () => {
++    editor = createTestEditor();
++    const doc = {
++      type: 'doc',
++      content: [
++        {
++          type: 'paragraph',
++          content: [{ type: 'mention', attrs: { userId: USERS[1]!.userId, label: 'Anand' } }],
++        },
++      ],
++    };
++    editor.commands.setContent(doc);
++    expect(mentionNodes(editor.getJSON())).toEqual([
++      { userId: USERS[1]!.userId, label: 'Anand' },
++    ]);
++  });
++
++  /**
++   * A picker that is open but empty must not eat the keys the editor needs.
++   * `items` resolves asynchronously, so the popup exists with zero candidates
++   * from the moment `@` is typed until the first query returns — and typing
++   * `@` then Enter is an ordinary thing to do ("email me @ 5pm", newline).
++   * Returning true unconditionally for Enter, ArrowUp and ArrowDown swallows
++   * every one of those keystrokes and the editor appears frozen.
++   */
++  it('declines navigation keys while it has nothing to navigate', async () => {
++    editor = createTestEditor({ queryUsers: async () => [] });
++    typeText(editor, '@');
++    await vi.waitFor(() => {
++      expect(document.querySelector('.mention-popup')).not.toBeNull();
++    });
++    // Nothing offered, nothing to move through.
++    expect(pressKey(editor, 'ArrowDown')).toBe(false);
++    expect(pressKey(editor, 'ArrowUp')).toBe(false);
++    // Enter is asserted on its EFFECT, not on what `handleKeyDown` returns.
++    // `someProp` walks on to the next plugin when the popup declines, so a
++    // `true` here would come from StarterKit's own Enter binding and would
++    // prove nothing either way — the question is whether the block split.
++    const paragraphsBefore = (editor.getJSON() as { content?: unknown[] }).content?.length ?? 0;
++    pressKey(editor, 'Enter');
++    expect((editor.getJSON() as { content?: unknown[] }).content?.length).toBe(
++      paragraphsBefore + 1,
++    );
++    expect(mentionNodes(editor.getJSON())).toEqual([]);
++  });
++});
++
++/**
++ * THE LABEL IS NOT DECORATION, AND THE COST OF AN EMPTY ONE IS NOT COSMETIC.
++ *
++ * `packages/domain/src/doc-text.ts` shipped before this package and its header
++ * names Plan 7's editor as the thing that conforms to it. Its mention branch
++ * takes `attrs.label` only when it is a string of NON-ZERO length; otherwise it
++ * falls back to `attrs.userId`, which in this product is a ULID. So a mention
++ * carrying an empty label does not render as a slightly worse mention — it
++ * renders as `@01J9GUSA000000000000000000` in every search projection and every
++ * notification the walker feeds. The first case below is that fact, asserted
++ * against the shipped walker rather than described.
++ *
++ * The guard is therefore on the INSERT PATH, stated once in `mentionLabelOf`
++ * and read from both doors the picker owns: `items` never offers a candidate it
++ * could not label, and `command` refuses one handed to it anyway. Refusal, not
++ * substitution, follows the local precedent — `insertTicketImage` returns false
++ * for a non-image mime rather than coercing it — and the alternative was worse
++ * on inspection: a fabricated stand-in like 'unknown' would put a name nobody
++ * has into a stored document and then into someone's notifications.
++ *
++ * SCOPE, STATED SO IT CANNOT BE READ WIDER THAN IT IS. Two other doors reach
++ * `attrs.label` and neither is closed here: a document loaded from JSON, and
++ * one parsed from HTML. Both are pinned open by the last case in this block,
++ * for the reason `src/extensions/ticket-image.ts` sets out at length — a
++ * ProseMirror `validate` throws at load, `enableContentCheck` defaults false,
++ * and the catch replaces the WHOLE document with an empty one. Layer 3, the
++ * server ingest gate, is the cheaper place to refuse a stored empty label.
++ */
++describe('the label a mention is stored with', () => {
++  it("empty label, and the shipped walker prints the person's ULID", () => {
++    const doc = {
++      type: 'doc',
++      content: [
++        {
++          type: 'paragraph',
++          content: [{ type: 'mention', attrs: { userId: USERS[0]!.userId, label: '' } }],
++        },
++      ],
++    };
++    expect(docToPlainText(doc)).toBe(`@${USERS[0]!.userId}`);
++  });
++
++  it('mentionLabelOf trims, and refuses what trims to nothing', () => {
++    expect(mentionLabelOf({ userId: 'x', name: 'Anselma' })).toBe('Anselma');
++    expect(mentionLabelOf({ userId: 'x', name: '  Anselma  ' })).toBe('Anselma');
++    expect(mentionLabelOf({ userId: 'x', name: '' })).toBeNull();
++    expect(mentionLabelOf({ userId: 'x', name: '   ' })).toBeNull();
++    expect(mentionLabelOf({ userId: 'x', name: '\t\n' })).toBeNull();
++  });
++
++  it('planted defect: a candidate with no usable name is never offered', async () => {
++    editor = createTestEditor({ queryUsers: async () => [NAMELESS, ...USERS] });
++    typeText(editor, '@an');
++    await vi.waitFor(() => {
++      expect(popupItems().length).toBeGreaterThan(0);
++    });
++    expect(popupItems().map((item) => item.textContent)).toEqual(['Anselma', 'Anand']);
++  });
++
++  /**
++   * The nameless row is FIRST in what the directory returns, so it is what a
++   * click and what Enter both land on — which makes what sits in that slot a
++   * correctness question, not a cosmetic one. The stored label would be three
++   * spaces: a string the walker's `length > 0` accepts, so the search index and
++   * the notification would read `@   `, a mention of nobody, which no check on
++   * the raw string's length would have caught.
++   *
++   * The case clicks whatever is actually in the first slot and then asserts on
++   * the DOCUMENT. An earlier draft waited on `.mention-popup` and clicked
++   * everything it found, and was vacuous: the popup is created synchronously
++   * with zero rows and only fills in when `items` settles, so with the fix in
++   * place there was nothing to click and the case passed without exercising
++   * anything. Two mutants caught that — it stayed green with the guard removed.
++   */
++  it('planted defect: nothing this editor cannot label ever reaches the document', async () => {
++    editor = createTestEditor({ queryUsers: async () => [NAMELESS, USERS[0]!] });
++    typeText(editor, '@an');
++    await vi.waitFor(() => {
++      expect(popupItems().length).toBeGreaterThan(0);
++    });
++    popupItems()[0]!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
++    const json = editor.getJSON();
++    expect(mentionNodes(json)).toEqual([{ userId: USERS[0]!.userId, label: 'Anselma' }]);
++    expect(docToPlainText(json)).toBe('@Anselma');
++  });
++
++  it('and every label that does reach it is one the walker will print', async () => {
++    editor = createTestEditor({ queryUsers: async () => [NAMELESS, ...USERS] });
++    typeText(editor, '@an');
++    await vi.waitFor(() => {
++      expect(popupItems().length).toBe(2);
++    });
++    popupItems()[0]!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
++    const json = editor.getJSON();
++    const mentions = mentionNodes(json);
++    expect(mentions).toHaveLength(1);
++    expect(String(mentions[0]!.label).length).toBeGreaterThan(0);
++    // And the consequence that number exists for.
++    expect(docToPlainText(json)).toContain('@Anselma');
++    expect(docToPlainText(json)).not.toContain(NAMELESS.userId);
++    expect(docToPlainText(json)).not.toContain(USERS[0]!.userId);
++  });
++
++  it('trims a padded name rather than storing the padding', async () => {
++    editor = createTestEditor({ queryUsers: async () => [{ userId: USERS[0]!.userId, name: '  Anselma  ' }] });
++    typeText(editor, '@an');
++    await vi.waitFor(() => {
++      expect(popupItems().length).toBe(1);
++    });
++    popupItems()[0]!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
++    expect(mentionNodes(editor.getJSON())).toEqual([
++      { userId: USERS[0]!.userId, label: 'Anselma' },
++    ]);
++  });
++
++  it('leaves the JSON and parse doors open, exactly as the image node does', () => {
++    editor = createTestEditor(undefined, {
++      type: 'doc',
++      content: [
++        {
++          type: 'paragraph',
++          content: [{ type: 'mention', attrs: { userId: USERS[0]!.userId, label: '' } }],
++        },
++      ],
++    });
++    expect(mentionNodes(editor.getJSON())[0]!.label).toBe('');
++    editor.destroy();
++
++    editor = createTestEditor();
++    editor.commands.setContent(`<p><span data-mention-user-id="${USERS[0]!.userId}"></span></p>`);
++    expect(mentionNodes(editor.getJSON())[0]!.label).toBe('');
++  });
++});
++
++/**
++ * THE PARSE PATH IS THE DOOR A HOSTILE DOCUMENT USES, and Task 3 established
++ * where its guard has to sit. `injectExtensionAttributesToParseRule`
++ * (@tiptap/core@3.30.5 dist:1452-1472) rebuilds every parse rule's `getAttrs`
++ * as `{ ...nodeLevelResult, ...perAttributeResults }` — the per-attribute
++ * handler is the LAST writer, and its default when an attribute defines none is
++ * `fromString(node.getAttribute(name))` (dist:1460), which reads the bare
++ * attribute `userId` / `label`. `getAttribute` is case-insensitive on an HTML
++ * element, so `userid="…"` reaches it too.
++ *
++ * The same mechanism runs in the other direction: `getRenderedAttributes`
++ * (dist:1431) writes an attribute with no `renderHTML` out under its own name,
++ * so a node whose attributes define none serializes BOTH
++ * `data-mention-user-id="…"` and `userid="…"` — two spellings of one fact, of
++ * which only one is read back through a guard.
++ */
++describe('mention HTML, in both directions', () => {
++  it('planted defect: bare `userId` / `label` attributes cannot outrank the canonical ones', () => {
++    editor = createTestEditor();
++    editor.commands.setContent(
++      `<p><span data-mention-user-id="${USERS[0]!.userId}" userId="${USERS[1]!.userId}" label="Mallory">@Anselma</span></p>`,
++    );
++    expect(mentionNodes(editor.getJSON())).toEqual([
++      { userId: USERS[0]!.userId, label: 'Anselma' },
++    ]);
++  });
++
++  it('serializes each attribute under exactly one name', () => {
++    editor = createTestEditor(undefined, {
++      type: 'doc',
++      content: [
++        {
++          type: 'paragraph',
++          content: [{ type: 'mention', attrs: { userId: USERS[0]!.userId, label: 'Anselma' } }],
++        },
++      ],
++    });
++    const html = editor.getHTML();
++    expect(html).toContain(`data-mention-user-id="${USERS[0]!.userId}"`);
++    expect(html).toContain('editor-mention');
++    expect(html).toContain('@Anselma');
++    expect(html).not.toMatch(/\suserid=/i);
++    expect(html).not.toMatch(/\slabel=/i);
++  });
++
++  it('survives a full HTML round trip with both attrs intact', () => {
++    editor = createTestEditor(undefined, {
++      type: 'doc',
++      content: [
++        {
++          type: 'paragraph',
++          content: [
++            { type: 'text', text: 'ask ' },
++            { type: 'mention', attrs: { userId: USERS[1]!.userId, label: 'Anand' } },
++          ],
++        },
++      ],
++    });
++    const json = editor.getJSON();
++    editor.commands.setContent(editor.getHTML());
++    expect(mentionNodes(editor.getJSON())).toEqual(mentionNodes(json));
++  });
++
++  it('does not claim a span that carries no mention id', () => {
++    // A `<span>` pasted from any web page is not one of this product's
++    // mentions; `data-mention-user-id` is the discriminator, not the tag.
++    editor = createTestEditor();
++    editor.commands.setContent('<p><span class="editor-mention">@Mallory</span></p>');
++    expect(mentionNodes(editor.getJSON())).toEqual([]);
++    expect(editor.getText()).toContain('@Mallory');
++  });
++});
++
++/**
++ * THE STYLESHEET IS A SPELLING OF THE BEM CONTRACT THAT TYPESCRIPT CANNOT SEE,
++ * the same argument `ticket-image.test.ts` makes for the wrap modes. The four
++ * class names in the Produces contract are built in two files — the popup
++ * builds three of them in JS, the node's `renderHTML` builds the fourth — and a
++ * rename on either side leaves correct markup with no styling and nothing red.
++ * Equality in both directions, so a rule for a class nobody emits is caught too.
++ */
++describe('the BEM classes the contract names', () => {
++  it('the stylesheet declares exactly the mention classes the code emits', () => {
++    const cssPath = resolve(dirname(fileURLToPath(import.meta.url)), '../src/styles/editor.css');
++    const css = readFileSync(cssPath, 'utf8');
++    const declared = [...css.matchAll(/\.((?:mention-popup|editor-mention)[a-z_-]*)\s*\{/g)].map(
++      (match) => match[1]!,
++    );
++    expect(declared.sort()).toEqual(
++      ['editor-mention', 'mention-popup', 'mention-popup__item', 'mention-popup__item--selected'].sort(),
++    );
++  });
++
++  it('and the code emits exactly those', async () => {
++    editor = createTestEditor({ queryUsers: async () => USERS });
++    typeText(editor, '@an');
++    await vi.waitFor(() => {
++      expect(popupItems().length).toBe(2);
++    });
++    expect(document.querySelector('.mention-popup')).not.toBeNull();
++    pressKey(editor, 'ArrowDown');
++    expect(document.querySelectorAll('.mention-popup__item--selected')).toHaveLength(1);
++    pressKey(editor, 'Enter');
++    expect(editor.getHTML()).toContain('class="editor-mention"');
++  });
++});
+diff --git a/packages/editor/test/rule-census.test.ts b/packages/editor/test/rule-census.test.ts
+new file mode 100644
+index 0000000..f2f8532
+--- /dev/null
++++ b/packages/editor/test/rule-census.test.ts
+@@ -0,0 +1,120 @@
++import { describe, expect, it } from 'vitest';
++import {
++  getExtensionField,
++  getSchema,
++  getSchemaTypeByName,
++  resolveExtensions,
++} from '@tiptap/core';
++import { buildEditorExtensions } from '../src/schema/extensions.js';
++
++/**
++ * THE COMMENT BLOCK IN `src/schema/extensions.ts` CARRIES TWO CENSUSES, AND
++ * UNTIL NOW THEY WERE HAND-COUNTED. The script was re-run by hand five times
++ * across three tasks, which is five chances to mistype a number into a
++ * comment that no machine reads. This is that script, kept.
++ *
++ * Method, unchanged from the hand runs: `getExtensionField(extension, field,
++ * context)` is the same accessor core itself uses to decide whether to
++ * register a rules plugin (@tiptap/core@3.30.5 dist:5220 for `addInputRules`,
++ * dist:5232 for `addPasteRules`), and the context it is handed here carries
++ * the same five keys core builds at dist:5195-5201. Counting what those
++ * functions RETURN is therefore counting the rules that reach a plugin, not
++ * counting mentions of the word "rule" in a source file.
++ *
++ * THE BREAKDOWN IS ASSERTED, NOT THE TOTAL, and that is the whole point. Two
++ * totals agreeing is not evidence: a change that gave `link` a second paste
++ * rule while dropping `strike`'s would leave 7 === 7 and this file green. A
++ * per-extension map cannot reconcile that way — it names which extension
++ * carries which count, so the only way to keep it green is to actually leave
++ * every extension's contribution alone.
++ *
++ * WHAT THIS DOES NOT CLAIM. These are censuses of the rules the enumerated
++ * extensions return on this extension list at tiptap 3.30.5 — the same two
++ * numbers the comment block states and no wider claim than that. Nothing here
++ * says these are all the ways a document acquires markup; `src/schema/
++ * extensions.ts` is explicit that it makes no such claim, and this file holds
++ * that line.
++ */
++const EXPECTED_PASTE_RULES: Record<string, number> = {
++  bold: 2,
++  italic: 2,
++  code: 1,
++  strike: 1,
++  link: 1,
++};
++
++const EXPECTED_INPUT_RULES: Record<string, number> = {
++  heading: 6,
++  bold: 2,
++  italic: 2,
++  codeBlock: 2,
++  blockquote: 1,
++  bulletList: 1,
++  code: 1,
++  orderedList: 1,
++  strike: 1,
++  horizontalRule: 1,
++};
++
++function census(field: 'addInputRules' | 'addPasteRules'): Record<string, number> {
++  // Both helpers are handed the BUILT list, not the resolved one. `getSchema`
++  // resolves internally, so feeding it an already-resolved list makes it
++  // flatten StarterKit's children a second time and warn about twenty
++  // duplicate extension names — noise that would teach a reader to skip past
++  // this file's stderr.
++  const built = buildEditorExtensions();
++  const extensions = resolveExtensions(built);
++  const schema = getSchema(built);
++  const counts: Record<string, number> = {};
++  for (const extension of extensions) {
++    const context = {
++      name: extension.name,
++      options: extension.options,
++      storage: {},
++      editor: undefined,
++      type: getSchemaTypeByName(extension.name, schema),
++    };
++    const add = getExtensionField<() => unknown[]>(extension, field, context);
++    if (typeof add !== 'function') continue;
++    const rules = add();
++    if (rules.length > 0) counts[extension.name] = rules.length;
++  }
++  return counts;
++}
++
++function total(counts: Record<string, number>): number {
++  return Object.values(counts).reduce((sum, count) => sum + count, 0);
++}
++
++describe('the rule census the schema origin states in prose', () => {
++  it('registers exactly the paste rules the comment block enumerates', () => {
++    const counts = census('addPasteRules');
++    expect(counts).toEqual(EXPECTED_PASTE_RULES);
++    expect(total(counts)).toBe(7);
++    expect(Object.keys(counts)).toHaveLength(5);
++  });
++
++  it('registers exactly the input rules the comment block enumerates', () => {
++    const counts = census('addInputRules');
++    expect(counts).toEqual(EXPECTED_INPUT_RULES);
++    expect(total(counts)).toBe(18);
++    expect(Object.keys(counts)).toHaveLength(10);
++  });
++
++  /**
++   * The two censused sets are DISJOINT — the comment block says so, and it is
++   * load-bearing for Task 5, because it is the reason no single lever
++   * (`enableInputRules` or `enablePasteRules`) settles spec §2. An extension
++   * appearing in both maps would not fail either case above.
++   */
++  it('keeps the two rule sets disjoint, which is why neither lever settles §2', () => {
++    const pasted = new Set(Object.keys(census('addPasteRules')));
++    const typed = new Set(Object.keys(census('addInputRules')));
++    // Disjoint as SETS OF RULES, not as sets of extensions: `bold`, `italic`,
++    // `code` and `strike` each contribute to both censuses. What is disjoint
++    // is which plugin the rules land in, and that is what the two gates read.
++    const both = [...pasted].filter((name) => typed.has(name)).sort();
++    expect(both).toEqual(['bold', 'code', 'italic', 'strike']);
++    expect([...pasted].filter((name) => !typed.has(name))).toEqual(['link']);
++  });
++});
+diff --git a/packages/editor/test/schema.test.ts b/packages/editor/test/schema.test.ts
+index efd142b..c518031 100644
+--- a/packages/editor/test/schema.test.ts
++++ b/packages/editor/test/schema.test.ts
+@@ -26,20 +26,21 @@ const SCHEMA_V1_NODES = [
+   'listItem',
+   'blockquote',
+   'codeBlock',
+   'horizontalRule',
+   'hardBreak',
+   'table',
+   'tableRow',
+   'tableHeader',
+   'tableCell',
+   'image',
++  'mention',
+ ];
+ 
+ const SCHEMA_V1_MARKS = ['bold', 'italic', 'strike', 'code', 'link'];
+ 
+ describe('document schema v1', () => {
+   it('exposes every node and mark the spec names', () => {
+     const editor = createTestEditor();
+     const nodes = Object.keys(editor.schema.nodes);
+     const marks = Object.keys(editor.schema.marks);
+     for (const node of SCHEMA_V1_NODES) {

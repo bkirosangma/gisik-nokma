@@ -1,0 +1,720 @@
+# Review package: 5f3a034d3fc84c7f146f2a15cd8f7d332e8708d8..b56692ea21534ebdee23d099848182c22332f45e
+
+## Commits
+b56692e A client could wear the server's provenance: the envelope-origin forgery, closed at the client door only
+
+## Files changed
+ Features.md                                        |   3 +-
+ apps/server/src/ingest/ingest-service.ts           |  91 ++++++++--
+ apps/server/src/permissions/check-permission.ts    |  93 ++++++++++
+ apps/server/src/routes/events.ts                   |   9 +-
+ apps/server/test/app.test.ts                       |   1 +
+ .../test/permissions/check-permission.test.ts      | 192 +++++++++++++++++++++
+ .../plans/2026-08-20-00-series-coordination.md     |  63 +++++++
+ test-cases/03-foundation-ledger.md                 |   1 +
+ 8 files changed, 435 insertions(+), 18 deletions(-)
+
+## Diff
+diff --git a/Features.md b/Features.md
+index b7b4066..4740164 100644
+--- a/Features.md
++++ b/Features.md
+@@ -25,21 +25,22 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
+ - ⚙️ **IST day boundaries** — `istDayOf(instant)` and `istDayBounds(day)` against the fixed +05:30 offset (India has no DST), plus `IST_TIME_ZONE`: the single origin for where a day starts. "Due today", "overdue", calendar-cell assignment and day counts across the whole product resolve here, never from the server's locale or the viewer's device. `packages/domain/src/ist-day.ts`
+ - ⚙️ **IST instant rendering & clock skew** — `formatIstInstant(instant)` is the ONE way the product prints an absolute instant to a person (`'21 Aug 2026, 00:00 IST'`). Its day comes from `istDayOf`, so a printed timestamp can never disagree with the calendar cell the same instant lands in; it does constant-offset arithmetic with no `Intl` and no date library, because Hermes on mobile does not reliably ship a timezone database and a silent fallback to the device's zone would be the offline copy disagreeing about when things happened. Anything that is not a well-formed, real ISO instant travels back verbatim rather than as an invented time: unparseable, year-extended, calendar-impossible (`2026-02-30`), a day claim like `2026-08-20` that `Date.parse` would call midnight UTC, or a string with no stated offset that would otherwise be read in the device timezone. `IST_CLOCK_NOTE` is the line a surface puts beside a time so a collaborator in another timezone knows which clock they are reading. Beside them, `clockSkewMs` / `GROSS_CLOCK_SKEW_MS` (10 min) / `hasGrossClockSkew` compute skew from the two clocks the envelope already keeps: DERIVED, never stored and never projected, so the flag is identical wherever it is computed and an unparseable client claim counts as gross rather than as zero. `packages/domain/src/clock-skew.ts`
+ - ⚙️ **Plain-text document rendering** — `docToPlainText(doc: unknown): string`, a dependency-free ProseMirror/Tiptap JSON walker (coordination amendment 12): total on junk input, mention nodes `{type:'mention', attrs:{userId, label?}}` render as `@label` falling back to `@userId`, image/attachment nodes render as nothing. Pulled forward as pre-work (Plan 5 Task 1) because `proj_search` (Plan 5), Plan 7's editor, and Plan 9's notifications all consume it; landed here in §3 pending Plan 5's own catalogue task, which may relocate this bullet to §7. `packages/domain/src/doc-text.ts`
+ - ⚙️ **Design tokens — the one colour origin** — `primitives` (hex palette) resolved into 26 semantic `TOKEN_ROLES` for light AND dark, emitted as `--gn-*` CSS custom properties (`themeStylesheet()`: light default, dark by explicit `data-theme="dark"` or by OS preference when unchosen). The origin declares its own `CONTRAST_PAIRS` and the suite verifies all 7 pairs in both themes — a palette edit that breaks readability fails the build. Coordination amendment 11; no colour literal is legal anywhere else in any client package. `packages/ui/src/tokens.ts`
+ - ⚙️ **Token-discipline scanner** — walks every client source tree (present and future — trees that do not exist yet are skipped, so a new client package is covered with no edit) for hex, `rgb()`/`rgba()`, `hsl()`/`hsla()`, `oklch()`/`oklab()` and `color-mix()` literals, exempting only `tokens.ts`. Proven against planted defects before the clean-tree assertion is trusted; it does NOT detect bare CSS colour keywords (`red`, `tomato`). `packages/ui/test/helpers/colour-scan.ts`
+ - ⚙️ **Base UI components** — Button, Chip, Card, Avatar, Dialog, Sheet, Table: BEM class names, colour only via `var(--gn-*)`, `type="button"` by default so forms are never submitted by accident, Escape-and-scrim close on the modal pair, and horizontal scroll contained inside the table wrapper rather than the page. `packages/ui/src/components/`, `packages/ui/src/ui.css`
+ - ⚙️ **Client `DataSource` contract & view types** — coordination amendment 10 pinned as code: `DataSource` (`ingest`, a typed `query` surface mirroring the server reads, `subscribe(workspaceId, afterSeq, cb)`), the `StreamItem` frames (amendments 13 + 19), and the view types every client renders from (`BoardView`, `ListRow`, `TicketRead`, `AttentionItem`, `UserPreferences`, …). Views consume only this interface and never import HTTP code. Scaffold only — the online HTTP + WebSocket source and the offline replica implement these same signatures later. `packages/app-core/src/`
+ - ⚙️ **The ONE local storage interface** — `SyncStorage` (`run`, `all`, `transaction`, `close`) over `SqlValue`/`SqlRow`, the single seam every offline replica writes through (coordination amendment 17): better-sqlite3 answers those four methods today, in tests and the dual-client harness; it is the seam op-sqlite (React Native, Plan 10 Task 16) and tauri-plugin-sql (desktop, Task 17) will answer, and neither exists yet, and `storageConformanceTests(name, make)` is the shared Vitest suite that keeps them honest — DDL/DML round-trip, commit-and-rollback, and no interleaving of concurrent transactions. JSON travels as TEXT: the replica owns (de)serialisation so adapters stay dumb. The native engine and the conformance suite ship behind the package's `./testing` subpath ONLY; the root barrel names its five exports one by one and a standing guard walks the module graph from it, so a Tauri or Expo bundle can never be handed a node-gyp addon or a test framework by the entry point. `packages/sync-client/src/storage/`, guard in `packages/sync-client/test/barrel.test.ts`
+ - ⚙️ **Local replica schema** — `migrateLocal(storage)` and `LOCAL_SCHEMA_VERSION`, idempotent DDL for the eight replica tables: `events` (the visibility-scoped local ledger, keeping BOTH `seq` for entity replay and `workspace_seq` for the resume cursor, because dropping either forces the replica to invent an order it was never told), `snapshots`, the reducer-folded read models `tickets` / `workflows` / `ticket_types`, `contests`, the ordered `outbox`, and `meta`. The read models are folded locally by the domain reducer — they are NEVER a downloaded copy of the server's `proj_*` projections. `client_time` / `server_time` hold the server's Z-normalised ISO instants verbatim, so string order IS chronological order and a device-offset label must never be written there. No column carries a hand-written ULID CHECK: `ULID_REGEX` in `@gisik-nokma/domain` stays the one definition of that format, and a second one in SQL would drift. Table shapes only — snapshot policy and bounded replay belong to later Plan 10 tasks. `packages/sync-client/src/storage/schema.ts`
+ - ⚙️ **Rule-engine boundary** — `evaluateEvent(env, ctx)` returning Accept or a Refusal that names its rule; pass-through internals that Plan 2 replaces. `packages/rule-engine/`
+-- ✅ **Event ingest API** — `POST /v1/events` batch ingest: parse at the door → advisory-locked per-entity `seq` and per-workspace `workspace_seq` (workspace lock first, then entity) + `serverTime` → rule-engine gate → append + projections in one transaction → index-aligned per-event committed/invalid/refused results. `GET /healthz`. `apps/server/src/routes/events.ts`, `apps/server/src/ingest/`
++- ✅ **Event ingest API** — `POST /v1/events` batch ingest: parse at the door → advisory-locked per-entity `seq` and per-workspace `workspace_seq` (workspace lock first, then entity) + `serverTime` → entity↔workspace guard → permission gate (client door only) → rule-engine gate → append + projections in one transaction → index-aligned per-event committed/invalid/refused results. `GET /healthz`. `apps/server/src/routes/events.ts`, `apps/server/src/ingest/`
++  - ✅ **Envelope-origin gate (partial permission gate)** — the ingest service has two entry points, and which one a caller uses is the whole design: `ingestClientBatch` is the client door and refuses any event whose envelope `origin` is `'server'` (rule `permission.role`, reason `Only the server itself may record server-origin events.`), while `ingestBatch` is the internal door and is not gated, because the server's own appends are legitimately server-origin. **Envelope-origin is the provenance enum `'web' | 'mobile' | 'desktop' | 'server'`, NOT the browser `Origin` header — nothing here concerns CSRF.** Closes the forgery that let a client wear the server's provenance to walk past `contest.server-only` and write a permanent, un-deletable `claim.contested` attributing a fabricated claim to any actor in any workspace. Applied inside the ingest transaction (coordination decision 15), so Plan 10's `POST /v1/sync` inherits it by calling the client door. Deliberately partial and it names its own absences: no actor-identity, role, membership or visibility check yet — Task 5 fills those in on top. `apps/server/src/permissions/check-permission.ts`
+   - ⚙️ **Error surface** — schema refusals reach the client verbatim, naming the exact rule that fired; an unexpected failure answers one fixed 500 body and never an exception message, so no SQL fragment, constraint or table name leaves through the product's only door. `apps/server/src/app.ts`
+ - ⚙️ **Append-only ledger** — Postgres `events` table where UPDATE/DELETE/TRUNCATE are refused by trigger, `(entity_kind, entity_id, seq)` is unique, and both clocks are `timestamptz` absolute instants: `client_time` the claimed instant beside `server_time` the received one, so they sort and compare without a cast and one moment stated in two offsets is one moment; `snapshots` table ready to bound future replay. `apps/server/migrations/`
+ - ⚙️ **Asia/Kolkata everywhere** — every pooled connection, the dev Postgres server, and every test database run with session timezone `Asia/Kolkata`, so an ad-hoc query reads the same clock the product shows. `apps/server/src/db.ts`, `docker-compose.yml`, `apps/server/test/helpers/db.ts`
+ - ⚙️ **Workspace stream cursor** — `workspace_seq`, unique per `(workspace_id, workspace_seq)` and assigned in the ingest transaction under a per-workspace advisory lock, is the only order a workspace stream may resume by; per-entity `seq` keeps entity history, replay and snapshots. Server-enriched and opaque to clients (coordination §18). `apps/server/src/ledger/event-store.ts`
+ - ⚙️ **Workspace stream cursor read** — `readStreamSeq(db, workspaceId)` returns the workspace's high-water `events.workspace_seq` (`0` for an empty workspace): the one position bootstrap, `subscribe.afterSeq` and `caught-up` all resume by (coordination §18). Deliberately not the envelope's per-entity `seq`, which restarts at 1 for every new entity and so silently skips their early events when used as a workspace cursor. Safe as a high-water read because ingest assigns the cursor under `lockWorkspace` inside the appending transaction. `apps/server/src/sync/stream-seq.ts`
+ - ⚙️ **Projection framework** — registry of deterministic `apply`/`reset` read models applied in the ingest transaction; `rebuildProjection` replays the canonical order; reference projection `proj_entity_heads` (newest event per entity, replay-safe). `apps/server/src/projections/`
+ - ⚙️ **Broadcast hook** — `onEventCommitted(cb)` fires only after commit, never for refused or invalid events; Plan 5 attaches WebSocket fan-out. `apps/server/src/ingest/ingest-service.ts`
+ - ⚙️ **Projection verifier** — `verify-projections` CLI re-derives every projection into a shadow schema, diffs against live in both directions, names drifted rows, exits nonzero on drift. `apps/server/src/tools/verify-projections.ts`
+ 
+ - ⚙️ **Environment contract & gate** — `.env.example` documents every configuration variable the product reads; each section names the plan that READS its group, and a variable whose plan has not landed is marked as documented ahead of its reader, not live, so an operator is never told to configure something inert without being told so. `pnpm check:env`, a step of the CI `gate` job, fails naming any variable code reads that the file does not document. The checker recognises three shapes rather than the one the plan specified: `process.env.NAME` access, destructuring off the environment, and — because this server hands the whole environment to `loadConfig` and declares its contract as zod schema KEYS — UPPER_SNAKE object keys inside files that mention `process.env`/`ProcessEnv`, which today is the ONLY shape the shipped code uses. A `process.env`-only gate would have reported “0 referenced in code” and passed vacuously forever, so two guards keep this one honest: finding zero variables anywhere is itself a failure, and so is `apps/server/src/config.ts` contributing none. `.env.example`, `scripts/check-env-example.mjs`, `.github/workflows/ci.yml`
+diff --git a/apps/server/src/ingest/ingest-service.ts b/apps/server/src/ingest/ingest-service.ts
+index a4351db..c8bd210 100644
+--- a/apps/server/src/ingest/ingest-service.ts
++++ b/apps/server/src/ingest/ingest-service.ts
+@@ -12,20 +12,21 @@ import {
+ import type { evaluateEvent } from '@gisik-nokma/rule-engine';
+ import { createEngineContext } from '../engine-context.js';
+ import {
+   insertEvent,
+   isUniqueViolation,
+   lockEntity,
+   lockWorkspace,
+   nextSeq,
+   nextWorkspaceSeq,
+ } from '../ledger/event-store.js';
++import { checkPermission, type SubmissionGate } from '../permissions/check-permission.js';
+ import { readEntityHead } from '../projections/entity-heads.js';
+ import type { ProjectionRegistry } from '../projections/registry.js';
+ 
+ export type IngestDeps = {
+   pool: Pool;
+   evaluate: typeof evaluateEvent;
+   projections: ProjectionRegistry;
+   registry?: EventTypeRegistry; // defaults to domainRegistry
+   now?: () => Date;             // injectable clock for tests
+ };
+@@ -39,22 +40,40 @@ export type IngestService = {
+    * neighbours.
+    *
+    * One path breaks the index alignment, and the promise above would be a lie
+    * without saying so: an UNEXPECTED infrastructure error (a dead connection, a
+    * projection that throws) rejects the whole call, so no results array reaches
+    * the caller at all — including the answers already decided for events that
+    * COMMITTED. Those neighbours stay committed; the client retries the batch
+    * and they answer `duplicate-event-id`, which is a safe ack precisely because
+    * the id was client-generated. Envelope errors and rule refusals are NOT this
+    * path — they ride inside results as ordinary per-event answers.
++   *
++   * This is the INTERNAL, trusted door. It applies no permission gate, so the
++   * server's own appends — Task 5's workspace bootstrap, Task 14's invite
++   * acceptance — may legitimately carry envelope-origin `'server'`. **An HTTP
++   * route must never call this; it calls `ingestClientBatch`.**
+    */
+   ingestBatch(rawEvents: unknown[]): Promise<IngestResult[]>;
++  /**
++   * The CLIENT door: identical to `ingestBatch` except that every event is put
++   * through `checkPermission` first, so a client cannot forge the envelope's
++   * `origin` field — the provenance enum, not the browser `Origin` header — and
++   * wear the server's own provenance.
++   *
++   * Two entry points rather than a flag because the distinguishing fact is
++   * which door an event arrived through, not what it says about itself.
++   * `POST /v1/events` calls this; **Plan 10's `POST /v1/sync` must call it too**,
++   * or offline-originated events bypass the gate entirely. Task 5 widens the
++   * signature to carry the session the door authenticated.
++   */
++  ingestClientBatch(rawEvents: unknown[]): Promise<IngestResult[]>;
+   /** Broadcast hook: fires AFTER an event's transaction commits, never for
+    * refused or invalid events. Returns an unsubscribe function. Plan 5 wires
+    * WebSocket fan-out onto this. */
+   onEventCommitted(listener: CommittedEventListener): () => void;
+ };
+ 
+ export function createIngestService(deps: IngestDeps): IngestService {
+   const registry = deps.registry ?? domainRegistry;
+   const now = deps.now ?? (() => new Date());
+   const listeners = new Set<CommittedEventListener>();
+@@ -63,21 +82,21 @@ export function createIngestService(deps: IngestDeps): IngestService {
+     for (const listener of listeners) {
+       try {
+         listener(event);
+       } catch {
+         // A broken listener must never break ingest or starve other
+         // listeners; Plan 5 adds logging when the broadcast layer arrives.
+       }
+     }
+   }
+ 
+-  async function commitOne(submitted: SubmittedEvent): Promise<IngestResult> {
++  async function commitOne(submitted: SubmittedEvent, gate: SubmissionGate | null): Promise<IngestResult> {
+     const client = await deps.pool.connect();
+     let rollbackFailure: Error | undefined;
+     try {
+       await client.query('BEGIN');
+       // Lock order is always workspace first, then entity — one global order
+       // across the whole server, so two ingests can never deadlock by taking
+       // the pair in opposite orders.
+       await lockWorkspace(client, submitted.workspaceId);
+       await lockEntity(client, submitted.entity.kind, submitted.entity.id);
+       const workspaceSeq = await nextWorkspaceSeq(client, submitted.workspaceId);
+@@ -110,20 +129,47 @@ export function createIngestService(deps: IngestDeps): IngestService {
+       if (head !== null && head.workspaceId !== envelope.workspaceId) {
+         await client.query('ROLLBACK');
+         return {
+           status: 'refused',
+           eventId: envelope.id,
+           rule: ENTITY_WORKSPACE_MISMATCH_RULE,
+           reason: `This ${envelope.entity.kind} belongs to workspace ${head.workspaceId}; this event files it under workspace ${envelope.workspaceId}. An entity cannot move between workspaces.`,
+         };
+       }
+ 
++      // The permission gate, and `gate` is null for every internal append.
++      //
++      // Position is a recorded ruling, not a preference (coordination doc, "A
++      // forgeable `origin`…" and "The gate's placement was contradicted by a
++      // brief"): the gate lives INSIDE the ingest path — here, after the
++      // entity↔workspace guard and before the engine — rather than at the HTTP
++      // route. Decision 15 is what makes that load-bearing: Plan 10's
++      // `POST /v1/sync` wraps this same ingest, so a permission refusal on the
++      // sync path can become a `claim.contested` with no extra wiring. A gate
++      // that lived in the route would be bypassed by sync entirely.
++      //
++      // It runs before deps.evaluate because permissions are the system's
++      // rules, not a workflow's: a permission refusal should never reach the
++      // rule engine. It runs after the entity↔workspace guard, so an event that
++      // is not honestly about its entity is told that first — the refusal that
++      // names the actual fault.
++      //
++      // Per-call rather than baked into the service, because the distinguishing
++      // fact is which door the event arrived through. See
++      // ../permissions/check-permission.ts for which doors this closes and,
++      // more importantly, which it does not.
++      const refusal = gate === null ? null : gate(envelope);
++      if (refusal !== null) {
++        await client.query('ROLLBACK');
++        return { status: 'refused', eventId: envelope.id, rule: refusal.rule, reason: refusal.reason };
++      }
++
+       const verdict = await deps.evaluate(envelope, createEngineContext(client));
+       if (verdict.refused) {
+         await client.query('ROLLBACK');
+         return { status: 'refused', eventId: envelope.id, rule: verdict.rule, reason: verdict.reason };
+       }
+ 
+       await insertEvent(client, envelope);
+       for (const projection of deps.projections.all()) {
+         await projection.apply(envelope, client);
+       }
+@@ -149,36 +195,49 @@ export function createIngestService(deps: IngestDeps): IngestService {
+       }
+       throw error;
+     } finally {
+       // Releasing with the error destroys the connection instead of returning
+       // it to the pool: a client whose ROLLBACK failed is still inside an
+       // aborted transaction, and the next borrower would inherit it.
+       client.release(rollbackFailure);
+     }
+   }
+ 
++  /**
++   * Both entry points are this loop; they differ only in the gate they carry.
++   * Parsing stays ahead of the gate so a submission that is not a well-formed
++   * claim at all is answered as `invalid` rather than as a permission refusal —
++   * and so a refused event always has a real ULID `eventId` to report.
++   */
++  async function ingestAll(rawEvents: unknown[], gate: SubmissionGate | null): Promise<IngestResult[]> {
++    const results: IngestResult[] = [];
++    for (const raw of rawEvents) {
++      const parsed = parseEvent(raw, registry);
++      if (!parsed.ok) {
++        results.push({
++          status: 'invalid',
++          eventId: parsed.eventId,
++          code: parsed.code,
++          message: parsed.message,
++        });
++        continue;
++      }
++      results.push(await commitOne(parsed.event, gate));
++    }
++    return results;
++  }
++
+   return {
+     async ingestBatch(rawEvents) {
+-      const results: IngestResult[] = [];
+-      for (const raw of rawEvents) {
+-        const parsed = parseEvent(raw, registry);
+-        if (!parsed.ok) {
+-          results.push({
+-            status: 'invalid',
+-            eventId: parsed.eventId,
+-            code: parsed.code,
+-            message: parsed.message,
+-          });
+-          continue;
+-        }
+-        results.push(await commitOne(parsed.event));
+-      }
+-      return results;
++      return ingestAll(rawEvents, null);
++    },
++    async ingestClientBatch(rawEvents) {
++      return ingestAll(rawEvents, checkPermission);
+     },
+     onEventCommitted(listener) {
+       listeners.add(listener);
+       return () => {
+         listeners.delete(listener);
+       };
+     },
+   };
+ }
+diff --git a/apps/server/src/permissions/check-permission.ts b/apps/server/src/permissions/check-permission.ts
+new file mode 100644
+index 0000000..cee79bc
+--- /dev/null
++++ b/apps/server/src/permissions/check-permission.ts
+@@ -0,0 +1,93 @@
++import type { EventEnvelope } from '@gisik-nokma/domain';
++import type { Refusal } from '@gisik-nokma/rule-engine';
++
++/**
++ * The rule id and reason the envelope-origin refusal reports, character for
++ * character. Plan 4 Task 5's plan text pins both, and Plan 6's UI maps rule
++ * names to what a person is shown, so they get one origin here rather than a
++ * literal at the call site that a rename could half-land.
++ */
++export const SERVER_ORIGIN_RULE = 'permission.role';
++export const SERVER_ORIGIN_REASON = 'Only the server itself may record server-origin events.';
++
++/**
++ * **`origin` here is the event envelope's provenance enum — `'web' | 'mobile' |
++ * 'desktop' | 'server'` (`EventEnvelope.origin`). It is NOT the browser
++ * `Origin` header.** This module has nothing to do with CSRF, cross-site
++ * requests, or any HTTP header; a reader who conflates the two writes a header
++ * check and believes this window is closed. Every name, comment and test in
++ * this area says "envelope-origin" for that reason.
++ *
++ * ## What this checks
++ *
++ * One thing: a client may not wear the server's provenance. `contest.server-only`
++ * (`packages/rule-engine/src/contests.ts`) refuses a `claim.contested` whose
++ * envelope-origin is not `'server'` — it is the rule stopping a client forging
++ * the system's own record of a refusal. Nothing validated envelope-origin, so
++ * setting it to `'server'` walked straight past that rule; and because nothing
++ * binds a contest's embedded original event to the outer envelope, the
++ * reachable defect was not "forge the record of a refusal" but **write a
++ * permanent, un-deletable ledger entry attributing a fabricated claim to any
++ * actor in any workspace** — the ledger is append-only by trigger, so such a
++ * row could only ever be superseded, never removed.
++ *
++ * ## What this does NOT check — named, not summarised
++ *
++ * The coordination doc's ruling asks this module to name the checks it does not
++ * yet perform rather than to label itself partial, because "deliberately
++ * partial" ages into background noise while a list of absences stays
++ * actionable. So, explicitly, this module does not check:
++ *
++ * - **Actor identity.** `env.actorId` is not compared against anybody: the
++ *   client door carries no session yet, so there is nothing to compare it to. A
++ *   client may still submit a claim attributed to another person.
++ * - **Role.** Nothing here asks whether the actor is an owner, admin, member or
++ *   guest, so admin-only event types (`workflow.defined`, `ticket-type.defined`,
++ *   `project.created`, `ticket.workflow_rebound`, membership changes) are
++ *   ungated.
++ * - **Membership.** Nothing asks whether the actor belongs to the workspace the
++ *   event is filed under. A non-member's claim is accepted.
++ * - **Visibility.** Nothing asks whether the actor may see the entity the event
++ *   touches; `permission.visibility` does not exist yet (Task 9).
++ *
++ * Task 4 lands `resolveEffectiveRole`, then Task 5 fills in the role logic on
++ * top of this function and Task 9 adds visibility — the additive layering the
++ * plan already uses. This is the first branch of Task 5's `checkRolePermission`,
++ * extracted and landed early because it reads `env.origin` alone and touches no
++ * context, so it was separable on the merits.
++ *
++ * ## Which doors this closes
++ *
++ * It is applied per call, by the ingest service's client entry point
++ * (`ingestClientBatch`), NOT to every append. That distinction is the whole
++ * design: the value of `origin` is not what makes an event a forgery — the door
++ * it arrived through is. The server's own appends are legitimately
++ * server-origin (Task 5's workspace bootstrap, Task 14's invite acceptance) and
++ * reach the ledger through `ingestBatch` without knocking on this gate.
++ *
++ * - **CLOSED:** `POST /v1/events`, which calls `ingestClientBatch`.
++ * - **NOT CLOSED, by design:** direct `ingestBatch` — the internal append path.
++ * - **NOT CLOSED, because it does not exist yet:** `POST /v1/sync` (Plan 10).
++ *   **When it is built it must call `ingestClientBatch`**, or offline-originated
++ *   events bypass this gate entirely.
++ *
++ * ## Do not fold this into `IngestDeps.gates`
++ *
++ * Decision 15's `gates` are construction-time and unconditional: they run for
++ * every caller of the ingest service. A construction-time gate cannot tell one
++ * door from another, which is exactly what this check needs to do, so tidying
++ * it into `gates` would refuse the server's own bootstrap appends.
++ */
++export function checkPermission(env: EventEnvelope): Refusal | null {
++  if (env.origin === 'server') {
++    return { refused: true, rule: SERVER_ORIGIN_RULE, reason: SERVER_ORIGIN_REASON };
++  }
++  return null;
++}
++
++/**
++ * The per-call gate the ingest service applies to client-submitted batches.
++ * Named as a type so Task 5 can widen it to carry the session (`(env, session)`)
++ * without every call site changing shape.
++ */
++export type SubmissionGate = (env: EventEnvelope) => Refusal | null;
+diff --git a/apps/server/src/routes/events.ts b/apps/server/src/routes/events.ts
+index dcd8336..08384fe 100644
+--- a/apps/server/src/routes/events.ts
++++ b/apps/server/src/routes/events.ts
+@@ -1,32 +1,39 @@
+ import type { FastifyInstance } from 'fastify';
+ import type { IngestService } from '../ingest/ingest-service.js';
+ 
+ export const MAX_BATCH_SIZE = 100;
+ 
+ /**
+  * Batch ingest. HTTP errors mean "this was not a batch" (schema refusal);
+  * per-event results mean "this batch was heard" — envelope errors and rule
+  * refusals ride inside results, index-aligned with the request array.
++ *
++ * This is the CLIENT-SUBMITTED door, which is why it calls `ingestClientBatch`
++ * and not `ingestBatch`. Everything arriving here is a stranger's claim, so it
++ * goes through the permission gate; the server's own appends use `ingestBatch`
++ * directly and are not gated. Switching this call back to `ingestBatch` would
++ * silently reopen the envelope-origin forgery — a client wearing
++ * `origin: 'server'` to walk past `contest.server-only`.
+  */
+ export function registerEventRoutes(app: FastifyInstance, ingest: IngestService): void {
+   app.post(
+     '/v1/events',
+     {
+       schema: {
+         body: {
+           type: 'object',
+           required: ['events'],
+           additionalProperties: false,
+           properties: {
+             events: { type: 'array', minItems: 1, maxItems: MAX_BATCH_SIZE },
+           },
+         },
+       },
+     },
+     async (request) => {
+       const { events } = request.body as { events: unknown[] };
+-      const results = await ingest.ingestBatch(events);
++      const results = await ingest.ingestClientBatch(events);
+       return { results };
+     },
+   );
+ }
+diff --git a/apps/server/test/app.test.ts b/apps/server/test/app.test.ts
+index 448beb2..2a27d8d 100644
+--- a/apps/server/test/app.test.ts
++++ b/apps/server/test/app.test.ts
+@@ -9,20 +9,21 @@ import type { IngestService } from '../src/ingest/ingest-service.js';
+ const healthyDb = { query: async () => [{ ok: 1 }] };
+ const brokenDb = {
+   query: async () => {
+     throw new Error('connection refused');
+   },
+ };
+ 
+ function fakeIngest(): IngestService {
+   return {
+     ingestBatch: async () => [],
++    ingestClientBatch: async () => [],
+     onEventCommitted: () => () => {},
+   };
+ }
+ 
+ /**
+  * `buildApp` requires an auth instance, and this file must stay database-free —
+  * its whole subject is /healthz answering correctly when the database is down.
+  * Both hold at once because `createAuth` opens no connection: run against this
+  * pool, whose port nothing listens on, it returns in ~2ms. Nothing here requests
+  * an /api/auth/* path, so the pool is never asked for a client.
+diff --git a/apps/server/test/permissions/check-permission.test.ts b/apps/server/test/permissions/check-permission.test.ts
+new file mode 100644
+index 0000000..0fdef9d
+--- /dev/null
++++ b/apps/server/test/permissions/check-permission.test.ts
+@@ -0,0 +1,192 @@
++import { afterAll, beforeAll, describe, expect, it } from 'vitest';
++import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
++import { evaluateEvent } from '@gisik-nokma/rule-engine';
++import { buildApp } from '../../src/app.js';
++import { createAuth } from '../../src/auth/auth.js';
++import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
++import { LogOtpSender } from '../../src/auth/otp-sender.js';
++import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
++import { buildProjectionRegistry } from '../../src/projections/index.js';
++import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
++import { submittedWorkspaceCreated } from '../helpers/events.js';
++
++/**
++ * The envelope-origin gate at the client door.
++ *
++ * TERMINOLOGY: "envelope-origin" throughout means the event envelope's `origin`
++ * field — the provenance enum `'web' | 'mobile' | 'desktop' | 'server'`. It is
++ * NOT the browser `Origin` header, and this file tests nothing about CSRF or
++ * cross-site requests.
++ *
++ * The two rule strings below are written out by hand rather than imported from
++ * the module under test, deliberately: importing them would make the assertion
++ * agree with whatever the module says, including a wrong value. The contract is
++ * these exact characters (Plan 4 Task 5's plan text pins them), so the test
++ * spells them.
++ */
++const EXPECTED_RULE = 'permission.role';
++const EXPECTED_REASON = 'Only the server itself may record server-origin events.';
++
++let db: TestDatabase;
++
++beforeAll(async () => {
++  db = await createTestDatabase();
++});
++
++afterAll(async () => {
++  await db.drop();
++});
++
++function testAuth() {
++  return createAuth({
++    pool: db.pool,
++    otpSender: new LogOtpSender(() => {}),
++    magicLinkSender: new LogMagicLinkSender(() => {}),
++    baseUrl: 'http://localhost:3000',
++    secret: 'test-secret-not-used-anywhere-real',
++  });
++}
++
++function ingestService(): IngestService {
++  return createIngestService({
++    pool: db.pool,
++    evaluate: evaluateEvent,
++    projections: buildProjectionRegistry(),
++  });
++}
++
++function app(ingest: IngestService = ingestService()) {
++  return buildApp({ db: db.pool, ingest, auth: testAuth() });
++}
++
++/**
++ * The reachable forgery, exactly as the coordination doc describes it: a
++ * `claim.contested` whose OUTER envelope is honest — a real ticket filed under
++ * its own workspace, so `ENTITY_WORKSPACE_MISMATCH_RULE` has nothing to catch —
++ * carrying a fabricated claim inside `payload`, attributed to a victim actor in
++ * a different workspace. Nothing binds the embedded event to the outer
++ * envelope, so the only thing standing between this and a permanent
++ * un-deletable ledger entry is `contest.server-only`, which reads envelope-origin.
++ */
++function forgedContest(overrides: Partial<SubmittedEvent> = {}): SubmittedEvent {
++  const workspaceId = newUlid();
++  const victimWorkspaceId = newUlid();
++  const victimActorId = newUlid();
++  const fabricatedClaim: SubmittedEvent = {
++    id: newUlid(),
++    workspaceId: victimWorkspaceId,
++    entity: { kind: 'ticket', id: newUlid() },
++    type: 'ticket.transitioned',
++    version: 1,
++    payload: { toStateId: 'done' },
++    actorId: victimActorId,
++    origin: 'web',
++    clientTime: '2026-08-20T09:00:00.000Z',
++  };
++  return {
++    id: newUlid(),
++    workspaceId,
++    entity: { kind: 'ticket', id: newUlid() },
++    type: 'claim.contested',
++    version: 1,
++    payload: {
++      originalEvent: fabricatedClaim,
++      rule: 'workflow.transition-not-allowed',
++      reason: 'this refusal never happened',
++    },
++    actorId: newUlid(),
++    origin: 'server', // the forgery: the client wears the server's provenance
++    clientTime: '2026-08-20T09:00:00.000Z',
++    ...overrides,
++  };
++}
++
++async function ledgerRowsFor(eventId: string): Promise<number> {
++  const { rows } = await db.pool.query<{ count: number }>(
++    'SELECT count(*)::int AS count FROM events WHERE id = $1',
++    [eventId],
++  );
++  return rows[0]?.count ?? 0;
++}
++
++describe('envelope-origin gate — the client door (POST /v1/events)', () => { // test-cases 3.31
++  it('refuses a client-submitted server-origin event with the exact rule and reason', async () => {
++    const forged = forgedContest();
++    const response = await app().inject({
++      method: 'POST',
++      url: '/v1/events',
++      payload: { events: [forged] },
++    });
++
++    expect(response.statusCode).toBe(200);
++    const body = response.json() as { results: unknown[] };
++    expect(body.results[0]).toEqual({
++      status: 'refused',
++      eventId: forged.id,
++      rule: EXPECTED_RULE,
++      reason: EXPECTED_REASON,
++    });
++  });
++
++  it('commits nothing for the refused forgery — the append-only ledger never sees it', async () => {
++    const forged = forgedContest();
++    await app().inject({ method: 'POST', url: '/v1/events', payload: { events: [forged] } });
++
++    expect(await ledgerRowsFor(forged.id)).toBe(0);
++  });
++
++  it('refuses only the forgery in a batch, and keeps results index-aligned', async () => {
++    const before = submittedWorkspaceCreated();
++    const forged = forgedContest();
++    const after = submittedWorkspaceCreated();
++
++    const response = await app().inject({
++      method: 'POST',
++      url: '/v1/events',
++      payload: { events: [before, forged, after] },
++    });
++
++    const body = response.json() as { results: Array<{ status: string; eventId: string }> };
++    expect(body.results).toHaveLength(3);
++    expect(body.results[0]).toMatchObject({ status: 'committed', eventId: before.id });
++    expect(body.results[1]).toMatchObject({ status: 'refused', eventId: forged.id, rule: EXPECTED_RULE });
++    expect(body.results[2]).toMatchObject({ status: 'committed', eventId: after.id });
++  });
++
++  /**
++   * The gate must refuse envelope-origin `'server'` and nothing else. Without
++   * this case, a gate that refused every client submission would pass every
++   * assertion above.
++   */
++  it('still admits an ordinary client submission through the same door', async () => {
++    const honest = submittedWorkspaceCreated({ origin: 'web' });
++    const response = await app().inject({
++      method: 'POST',
++      url: '/v1/events',
++      payload: { events: [honest] },
++    });
++
++    const body = response.json() as { results: Array<{ status: string }> };
++    expect(body.results[0]).toMatchObject({ status: 'committed', eventId: honest.id });
++    expect(await ledgerRowsFor(honest.id)).toBe(1);
++  });
++});
++
++describe('envelope-origin gate — the internal door (ingestBatch) is NOT gated', () => { // test-cases 3.31
++  /**
++   * The discriminating case. The server's own appends are legitimately
++   * server-origin — Task 5's workspace bootstrap and Task 14's invite
++   * acceptance both append internally — and `claim.contested` is the sharpest
++   * possible probe because `contest.server-only` REQUIRES envelope-origin
++   * `'server'`: the event can only commit if the internal door leaves origin
++   * alone AND the engine sees it. A gate wired blanket into the ingest path
++   * turns this test red.
++   */
++  it('commits a server-origin claim.contested appended internally', async () => {
++    const internal = forgedContest();
++    const results = await ingestService().ingestBatch([internal]);
++
++    expect(results[0]).toMatchObject({ status: 'committed', eventId: internal.id });
++    expect(await ledgerRowsFor(internal.id)).toBe(1);
++  });
++});
+diff --git a/docs/superpowers/plans/2026-08-20-00-series-coordination.md b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+index fb0db0c..b7a2656 100644
+--- a/docs/superpowers/plans/2026-08-20-00-series-coordination.md
++++ b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+@@ -2080,20 +2080,83 @@ an unidentified caller has made none. The same bytes answer no header, a forged
+ and a signed-out token, because every distinction is an oracle. A thrown error is **not** caught — a
+ session store outage is a 5xx, not a mass sign-out. `currentUserId` is declared non-optional on
+ `FastifyRequest`, which is a type lie on a route that forgot the preHandler; taken knowingly, because
+ `string | undefined` would put a `!` in four later tasks. **A route that reads `currentUserId` registers
+ `requireSession`.**
+ 
+ **`signInWithPhone(app, sender, phone)` returns `{token, userId}`** (`test/helpers/session.ts`) — not the
+ plan's bare token, because Tasks 8/12/13 need different halves and they must be the same person. `userId`
+ comes off the verify response, so no test needs a database read to attribute an event.
+ 
++### 8. The envelope-origin gate has landed — which doors it closes, and the one sentence Plan 10 must obey (origin micro-PR)
++
++The closer named in "A forgeable `origin`…" is **in**. `apps/server/src/permissions/check-permission.ts`
++holds `checkPermission(env): Refusal | null` — the server-origin refusal and nothing else — wired inside
++`commitOne` between the entity↔workspace guard and `deps.evaluate`, exactly the position the 2026-08-31
++ruling names. Rule `permission.role`, reason `Only the server itself may record server-origin events.`,
++character for character as Task 5's plan text pins them.
++
++**"envelope-origin", not "HTTP Origin", and the distinction is why this entry spells it out.** The repo
++now uses "origin check" for two unrelated things. This is the event envelope's `origin` field — the
++provenance enum `'web' | 'mobile' | 'desktop' | 'server'`. It has nothing to do with the browser `Origin`
++header, CSRF, or cross-site navigation, both of which §7 above discusses a few hundred lines earlier in
++the same document. Somebody who conflates them writes a header check and believes this window is closed.
++
++**The reconciliation, because the ruling as written would have broken the bootstrap.** The ruling says
++"wired into `commitOne`", and a blanket refusal there is the obvious reading — but it is wrong, and the
++wrongness is not subtle: `packages/domain/src/testing.ts` defaults envelopes to `origin: 'server'`, four
++server test files call `ingestBatch` directly, and more importantly **the server's own future appends are
++legitimately server-origin** — Task 5's workspace bootstrap and Task 14's invite acceptance both append
++internally. T5's brief protects exactly this ("the bootstrap appends are server-origin and go through
++Plan 1's internal append path, **not** through `checkPermission`"). The two are reconcilable because the
++extraction source already carried the precondition: `checkRolePermission` only ever runs with a
++session-bearing `PermissionContext`, i.e. only on the client path. A branch extracted out of it inherits
++that precondition, and dropping it is what a blanket wiring does.
++
++**So the distinguishing fact is not the value of `origin`; it is which door the event arrived through**,
++and the door is now a named entry point rather than a route-layer `if`. `IngestService` has two:
++`ingestBatch` (INTERNAL, trusted, ungated) and `ingestClientBatch` (CLIENT, gated). The gate is passed
++per call into `commitOne`; the placement ruling is satisfied because the check still lives inside the
++ingest transaction, which is what decision 15 requires and what lets a sync-path permission refusal
++become a `claim.contested` with no extra wiring.
++
++**Doors, stated so nobody has to infer them:**
++
++- **CLOSED:** `POST /v1/events` — it calls `ingestClientBatch`. Verified by running the forgery through
++  the assembled app, not by reading the route.
++- **NOT CLOSED, by design:** direct `ingestBatch`. This is the internal append path and gating it would
++  refuse the founding sequence.
++- **NOT CLOSED, does not exist yet:** `POST /v1/sync` (Plan 10). **This is the durable instruction this
++  entry exists to add: the sync route must call `ingestClientBatch`, not `ingestBatch`.** The document
++  already settled "the gate is in the ingest path"; it did not name the wiring, and a Plan 10 author
++  reaching for the obvious `ingestBatch` would reopen the window for every offline-originated event.
++- **Still open, unchanged:** §11's envelope-coherence check (Plan 10 T4). Nothing binds a contest's
++  embedded original event to the outer envelope. The compound defect is closed at the `origin` end only.
++
++**What the module does NOT check, and why it says so in its own docblock rather than calling itself
++partial:** actor identity (the client door carries no session yet, so `actorId` is compared to nothing —
++a client may still submit a claim attributed to another person), role, membership, visibility. The ruling
++asked for the checks to be named rather than the partiality labelled; a label ages into background noise
++while a list of absences stays actionable. **Task 5 completes the gate** on top of this — Task 4 first,
++for `resolveEffectiveRole`.
++
++**Do not fold this into `IngestDeps.gates`** (decision 15's Plan 7 contract). Those are construction-time
++and unconditional — they run for every caller — so a construction-time gate cannot tell one door from
++another, which is the one thing this check must do. Tidying it there would refuse the bootstrap.
++
++**Falsifiability, run in both directions rather than argued.** The red baseline first: at `main` =
++`51aba55` the forged `claim.contested` submitted over `POST /v1/events` answered `status: 'committed'`
++with one row in `events` — the window observed open, not inferred. Then two mutations. Breaking the
++comparison (`=== 'server'` → `=== 'desktop'`) reddens the three refusal cases at their own assertion
++lines; gating the internal door (`ingestBatch` passed `checkPermission`) reddens the internal-append case
++at its own assertion. The second mutation is the one that matters: without it, a test proving only that
++the refusal fires would pass equally had the legitimate path been broken.
+ 
+ ## `z.unknown()` makes a key optional, and the sweep for who inherits it (2026-08-28, controller)
+ 
+ Found by Lane 4's T1 review, swept centrally because the hole is in a **shared** schema and propagates
+ by **embedding** — the shape where no single lane can see all the consumers.
+ 
+ **The defect, proven rather than argued.** `z.unknown()` does not require the key. Probed against the
+ repo's own zod build:
+ 
+ ```
+diff --git a/test-cases/03-foundation-ledger.md b/test-cases/03-foundation-ledger.md
+index 8acf5a1..235a57e 100644
+--- a/test-cases/03-foundation-ledger.md
++++ b/test-cases/03-foundation-ledger.md
+@@ -25,10 +25,11 @@ Mirrors `Features.md` §3. Status: `❌` not covered · `✅` covered · `🟡`
+ - **3.21** ✅ Replaying the fixture ledger twice yields byte-identical projection rows, and every column of every head row is pinned — `workspace_id` (the tenant boundary) and `head_server_time` (the received clock, never the claimed one) included, against a fixture that now holds one entity whose id is not its workspace id, so a transposed pair is visible; reversed arrival derives the same bytes; every fixture id is regex-proven a ULID. — `apps/server/test/determinism.test.ts`
+ - **3.22** ✅ Boot refuses a missing `DATABASE_URL` or non-numeric `PORT` with the variable named (planted defects). — `apps/server/test/config.test.ts`
+ - **3.23** 🧪 End-to-end smoke: compose up, migrate, verify clean, boot, healthz ok, one event ingested over HTTP, verify clean again — run per release (Plan 1 Task 14 steps 1–2).
+ - **3.24** ✅ A duplicate `(workspace_id, workspace_seq)` violates `events_workspace_seq_unique` (planted defect); two entities in one workspace get strictly increasing cursors while both honestly keep `seq` 1; concurrent appends and four racing ingests never mint one cursor twice (planted defects). — `apps/server/test/migrations.test.ts`, `apps/server/test/event-store.test.ts`, `apps/server/test/ingest.test.ts`
+ - **3.25** ✅ The workspace cursor changes nothing about replay: canonical order stays `(entity_kind, entity_id, seq)`, every stored row carries a cursor unique within its workspace, and `onEventCommitted` hands listeners the cursor a stream resumes by. — `apps/server/test/event-store.test.ts`, `apps/server/test/ingest.test.ts`
+ - **3.26** ✅ Two clients stating the SAME instant with different offsets (`+05:30` and `Z`) store as one instant and compare equal, in SQL and after the round trip through `rowToEnvelope` — the comparison a text `client_time` silently got wrong (planted defects). — `apps/server/test/migrations.test.ts`, `apps/server/test/event-store.test.ts`
+ - **3.27** ✅ IST day boundaries: `18:29:59Z` and `18:30:00Z` fall on different IST days; a day's bounds are the half-open `[startUtc, endUtc)` UTC interval and round-trip back to that day for all 365 days of a year with every day exactly 24h and no gap between consecutive days; month, year and leap-day rollovers happen at the IST boundary; date-only strings, unparseable instants, offsetless instants, malformed days and unreal calendar days are refused (planted defects). — `packages/domain/test/ist-day.test.ts`
+ - **3.28** ✅ Every pooled session reports `Asia/Kolkata`, so an ad-hoc query reads the product's clock; the dev compose server and each test database are pinned to it too. — `apps/server/test/migrations.test.ts`
+ - **3.29** ✅ An unexpected mid-batch failure answers one fixed 500 body — no exception message, no SQL fragment, no constraint or table name — while schema refusals still reach the client verbatim (planted defect). — `apps/server/test/events-route.test.ts`
+ - **3.30** ✅ A ROLLBACK that itself throws (the dead connection) cannot replace the original error: the duplicate-event-id answer still lands, and the poisoned client is destroyed rather than returned to the pool (planted defect). — `apps/server/test/ingest.test.ts`
++- **3.31** ✅ Envelope-origin gate at the client door: a `claim.contested` submitted to `POST /v1/events` with envelope-origin `'server'` — the provenance enum, not the HTTP `Origin` header — is refused with rule `permission.role` and the exact reason `Only the server itself may record server-origin events.`, commits no ledger row, and does not disturb its index-aligned neighbours; an ordinary `origin: 'web'` submission still commits through the same door; and the same server-origin event appended internally via `ingestBatch` still commits, because the server's own appends are legitimately server-origin (planted defects, both directions: breaking the comparison reddens the refusal cases, gating the internal door reddens the internal case). — `apps/server/test/permissions/check-permission.test.ts`

@@ -1,0 +1,213 @@
+# Review package: 3307b9a..0a6a5687d6cdf8479ffd699d5a852ac14cf6ba67
+
+## Commits
+0a6a568 Every user this server could create was unable to author anything
+
+## Files changed
+ apps/server/src/auth/auth.ts                       | 34 ++++++++
+ apps/server/test/auth/user-ids.test.ts             | 96 ++++++++++++++++++++++
+ .../plans/2026-08-20-00-series-coordination.md     | 14 ++++
+ 3 files changed, 144 insertions(+)
+
+## Diff
+diff --git a/apps/server/src/auth/auth.ts b/apps/server/src/auth/auth.ts
+index 36c31ed..6ca7f79 100644
+--- a/apps/server/src/auth/auth.ts
++++ b/apps/server/src/auth/auth.ts
+@@ -1,10 +1,11 @@
++import { newUlid } from '@gisik-nokma/domain';
+ import { betterAuth } from 'better-auth';
+ import { bearer, magicLink, phoneNumber } from 'better-auth/plugins';
+ import { passkey } from '@better-auth/passkey';
+ import type { Pool } from 'pg';
+ import type { MagicLinkSender } from './magic-link-sender.js';
+ import type { OtpSender } from './otp-sender.js';
+ 
+ export interface AuthDeps {
+   pool: Pool;
+   otpSender: OtpSender;
+@@ -33,20 +34,53 @@ export interface AuthDeps {
+  * through `AuthDeps` because they are provider registration, not a collaborator
+  * this function's behaviour depends on — and an absent pair leaves the provider
+  * configured-but-unusable rather than failing server start.
+  */
+ export function createAuth(deps: AuthDeps) {
+   return betterAuth({
+     database: deps.pool,
+     baseURL: deps.baseUrl,
+     secret: deps.secret,
+     emailAndPassword: { enabled: false }, // the spec forbids passwords
++    advanced: {
++      database: {
++        /**
++         * Every id better-auth mints is a ULID, because a user's id is not only
++         * better-auth's business: it becomes `actorId` on every event that user
++         * authors, and `packages/domain/src/envelope.ts` declares
++         * `actorId: ulidString`. better-auth's default is a 32-character
++         * mixed-case random string (`@better-auth/core/dist/utils/id.mjs`), which
++         * that schema refuses — so without this line no user this server creates
++         * could author any event, and the door would refuse every submission as
++         * `malformed-envelope`: a refusal naming the envelope for a fault in the
++         * identity layer. The ratified membership entity id
++         * `${workspaceId}:${userId}` needs it for the same reason.
++         *
++         * Applied to EVERY model, not just `user`. Session, account, verification
++         * and passkey ids never enter the ledger and carry no ULID requirement,
++         * but one unconditional rule has no branch to get wrong, needs no vendor
++         * internal as a fallback for the other models (returning `false` would
++         * ask Postgres for a default our vendor schema does not define), and
++         * makes any table a future plugin adds conform by default.
++         *
++         * `size` is deliberately ignored: a ULID is fixed at 26 characters. This
++         * hook does not touch session *tokens* — those call better-auth's own
++         * `generateId(32)` directly (`db/internal-adapter.mjs`), so token entropy
++         * is unchanged.
++         *
++         * `newUlid()` rather than a local `ulid()` call: `ids.ts` is the single
++         * origin of what a ULID is in this repo, the same discipline
++         * `envelope.ts` states for `ULID_REGEX`.
++         */
++        generateId: () => newUlid(),
++      },
++    },
+     socialProviders: {
+       google: {
+         clientId: process.env['GOOGLE_CLIENT_ID'] ?? '',
+         clientSecret: process.env['GOOGLE_CLIENT_SECRET'] ?? '',
+       },
+     },
+     plugins: [
+       phoneNumber({
+         sendOTP: async ({ phoneNumber: phone, code }) => {
+           await deps.otpSender.send(phone, code);
+diff --git a/apps/server/test/auth/user-ids.test.ts b/apps/server/test/auth/user-ids.test.ts
+new file mode 100644
+index 0000000..43c8646
+--- /dev/null
++++ b/apps/server/test/auth/user-ids.test.ts
+@@ -0,0 +1,96 @@
++import { ULID_REGEX, parseEvent } from '@gisik-nokma/domain';
++import { afterAll, beforeAll, describe, expect, it } from 'vitest';
++import { createAuth } from '../../src/auth/auth.js';
++import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
++import { LogOtpSender } from '../../src/auth/otp-sender.js';
++import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
++import { submittedWorkspaceCreated } from '../helpers/events.js';
++
++/** Long enough that better-auth does not warn, and obviously not a credential. */
++const TEST_SECRET = 'test-secret-not-used-anywhere-real';
++
++const PHONE = '+919000000001';
++
++let db: TestDatabase;
++
++beforeAll(async () => {
++  db = await createTestDatabase();
++});
++
++afterAll(async () => {
++  await db.drop();
++});
++
++/**
++ * Signs a user up the way the product will: OTP out through our own sender, code
++ * back in. Returns the id better-auth minted, read from Postgres rather than from
++ * the response, so what is asserted is what was actually stored.
++ */
++async function signUpByPhoneAndReadStoredId(): Promise<{ userId: string; sessionId: string | undefined }> {
++  const otpSender = new LogOtpSender(() => {});
++  const auth = createAuth({
++    pool: db.pool,
++    otpSender,
++    magicLinkSender: new LogMagicLinkSender(() => {}),
++    baseUrl: 'http://localhost:3000',
++    secret: TEST_SECRET,
++  });
++
++  await auth.api.sendPhoneNumberOTP({ body: { phoneNumber: PHONE } });
++  const code = otpSender.sent[0]?.code;
++  expect(code, 'the dev sender must have captured an OTP').toBeDefined();
++
++  await auth.api.verifyPhoneNumber({ body: { phoneNumber: PHONE, code: code ?? '' } });
++
++  const users = await db.pool.query<{ id: string }>('SELECT id FROM "user"');
++  expect(users.rows).toHaveLength(1);
++  const sessions = await db.pool.query<{ id: string }>('SELECT id FROM "session"');
++  return { userId: users.rows[0]?.id ?? '', sessionId: sessions.rows[0]?.id };
++}
++
++describe('better-auth mints ULID ids', () => {
++  /**
++   * The check this whole configuration exists for, stated as the consequence
++   * rather than as a format.
++   *
++   * A user's id is not only better-auth's business: it becomes `actorId` on
++   * every event that user authors, and `packages/domain/src/envelope.ts`
++   * declares `actorId: ulidString`. better-auth's default generator is a
++   * 32-character mixed-case random string, which that schema refuses. So an
++   * unconfigured better-auth produces users who cannot author anything, and the
++   * door reports `malformed-envelope` — a refusal naming the envelope for a
++   * fault in the identity layer, which is the kind of bug that gets debugged in
++   * the wrong file.
++   *
++   * This runs the real minted id through the real door, not a regex twin of it.
++   */
++  it('a user better-auth creates can author an event — the ledger door accepts the id it minted', async () => {
++    const { userId } = await signUpByPhoneAndReadStoredId();
++
++    const submission = submittedWorkspaceCreated({ actorId: userId });
++    const parsed = parseEvent(submission);
++
++    expect(parsed.ok, parsed.ok ? '' : `door refused: ${parsed.code} — ${parsed.message}`).toBe(
++      true,
++    );
++  });
++
++  it('the stored user id is a ULID: 26 Crockford base32 characters', async () => {
++    const users = await db.pool.query<{ id: string }>('SELECT id FROM "user"');
++    const userId = users.rows[0]?.id ?? '';
++    expect(userId).toMatch(ULID_REGEX);
++    expect(userId).toHaveLength(26);
++  });
++
++  /**
++   * The generator is registered for every model, not only `user`. Session,
++   * account, verification and passkey ids never enter the ledger and carry no
++   * ULID requirement — this asserts the decision that was actually made, so that
++   * narrowing it later is a visible change rather than a silent one.
++   */
++  it('the rule is global: even a session id, which never enters the ledger, is a ULID', async () => {
++    const sessions = await db.pool.query<{ id: string }>('SELECT id FROM "session"');
++    expect(sessions.rows.length).toBeGreaterThan(0);
++    expect(sessions.rows[0]?.id).toMatch(ULID_REGEX);
++  });
++});
+diff --git a/docs/superpowers/plans/2026-08-20-00-series-coordination.md b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+index 3a77e78..55e33e2 100644
+--- a/docs/superpowers/plans/2026-08-20-00-series-coordination.md
++++ b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+@@ -1431,10 +1431,24 @@ Reached, it would misbehave silently: `openapi.cjs:20` and `:36` evaluate `optio
+ 
+ Do not "fix" the pnpm warning by upgrading the workspace to zod 4: that would touch every package in the monorepo, and it is not what makes `better-call` zod-3.
+ 
+ **The runtime half of that, checked rather than assumed (Task 1, on review request).** Type-level silence is not the whole question: if better-auth's *exported* surface handed back zod schemas, a zod-4 schema composed with one of ours would misbehave at runtime with no type error. Verified on both axes against the installed package.
+ 
+ Nothing flows in: `BetterAuthOptions` and the option types of every plugin we configure contain zero zod references, so no field of better-auth's could accept one of our zod-3 schemas. Things do flow out: seven barrel exports (`userSchema`, `sessionSchema`, `accountSchema`, `verificationSchema`, `coreSchema`, `rateLimitSchema`, `additionalAuthorizationParamsSchema`) are live zod-4 objects, and every `auth.api.<endpoint>.options.body`/`.query` is one too — `auth.api.getSession.options.query._zod.version` reads `{major: 4, minor: 4, patch: 3}`. Composing either with our zod 3 **in our own code** is a compile error rather than a silent runtime bug: `z.object({…}).and(userSchema)` fails with TS2345, zod 4's `ZodObject<…, $strip>` "missing the following properties from type `ZodType<any, any, any>`", and only an explicit cast gets a mix through. That protection stops at our source: §4 above records where the same mix already happens **inside the vendor**, silently, with no compile step to refuse it. The rule below is what keeps our side clean; it is not a claim that the hazard cannot occur.
+ 
+ One trap worth naming because it looks correct in an editor: `better-auth/dist/index.d.mts:29` carries `export * from "zod"`, so **`import { z } from 'better-auth'` type-checks** — while the runtime barrel has no such export, making it an ESM link failure (`SyntaxError: The requested module 'better-auth' does not provide an export named 'z'`). Loud, and it can never reach production, but it will waste someone's afternoon.
+ 
+ **Standing rule for every plan that enters `apps/server`'s auth code:** import `z` only from `zod`, never from `better-auth`, and never reuse `auth.api.*.options.body` as a validator inside our own zod-3 code. Write our own schema.
++
++### 5. better-auth mints ULID ids, by configuration — and it does not by default (Task 1)
++
++`createAuth` sets `advanced.database.generateId: () => newUlid()`. **This is load-bearing, not tidiness.** better-auth's default generator is `createRandomStringGenerator("a-z","A-Z","0-9")(32)` — a 32-character mixed-case random string (`@better-auth/core/dist/utils/id.mjs`). A user's id is not only better-auth's business: it becomes `actorId` on every event that user authors, and `packages/domain/src/envelope.ts` (Plan 1, shipped) declares `actorId: ulidString`. So an unconfigured better-auth produces users who **cannot author any event at all** — every submission refused `malformed-envelope`, a refusal naming the envelope for a fault in the identity layer, which is the kind of bug that gets debugged in the wrong file for a day. Reproduced deliberately: with the option removed, `parseEvent` answers *"event envelope is malformed at actorId: must be a ULID"* and the minted id reads `QhiYV1j73o6pGaVNrVv37ccUwk9fsFtY`.
++
++The ratified membership entity id `${workspaceId}:${userId}` needs it for the same reason, and `project.member_added`/`removed` and `visibility.set`'s explicit `userIds` inherit it.
++
++**Scope: every model, not only `user`.** Session, account, verification and passkey ids never enter the ledger and carry no ULID requirement, so this is wider than strictly necessary — deliberately. One unconditional rule has no branch to get wrong; it needs no vendor internal as a fallback for the other models (returning `false` would ask Postgres for a default the vendor schema does not define); and a table a future plugin adds conforms without anyone remembering to extend a list. Session **tokens** are untouched — those call better-auth's own `generateId(32)` directly (`db/internal-adapter.mjs`), so token entropy is unchanged by this.
++
++`newUlid()` from `@gisik-nokma/domain`, never a local `ulid()` call: `ids.ts` is the single origin of what a ULID is here, the same discipline `envelope.ts` states for `ULID_REGEX`.
++
++**No migration change was needed and this was checked, not assumed:** every id column in the vendor schema is unbounded `text` (`user.id`, and the `userId` foreign keys on `session`, `account`, `passkey`), with no `varchar(n)` or `char(n)` anywhere, so 26 characters fit where 32 did. better-auth's own migration planner agrees — a function-valued `generateId` is not `"uuid"` or `"serial"`, so it still expects `text`, and the anti-drift test (§2) stays green with the option in place.
++
++**Any later plan that swaps the auth provider inherits this constraint.** The requirement belongs to the ledger, not to better-auth: whatever mints user ids must mint ULIDs, or `envelope.ts` must change — and it should not, because `actorId: ulidString` is the contract every other id in the series is held to. Covered by `apps/server/test/auth/user-ids.test.ts`, which signs a user up through the real phone-OTP path and puts the id better-auth actually stored through the real door.

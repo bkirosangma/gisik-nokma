@@ -1,0 +1,81 @@
+# Review package: 00b6c9c..e3aba70782acca81e321dd4cff68139fcfc38e4e
+
+## Commits
+e3aba70 The caveat was right that a hazard exists and wrong about everything that would set it off
+
+## Files changed
+ apps/server/src/auth/auth-dev.ts                            | 12 +++++++++---
+ docs/superpowers/plans/2026-08-20-00-series-coordination.md | 12 +++++++++++-
+ 2 files changed, 20 insertions(+), 4 deletions(-)
+
+## Diff
+diff --git a/apps/server/src/auth/auth-dev.ts b/apps/server/src/auth/auth-dev.ts
+index bfebf5a..89af204 100644
+--- a/apps/server/src/auth/auth-dev.ts
++++ b/apps/server/src/auth/auth-dev.ts
+@@ -1,19 +1,25 @@
+ import { createPool } from '../db.js';
+ import { createAuth } from './auth.js';
+ import { LogMagicLinkSender } from './magic-link-sender.js';
+ import { LogOtpSender } from './otp-sender.js';
+ 
+ /**
+- * Concrete instance for `pnpm exec better-auth generate --config …` and local
+- * dev runs. Never imported by production assembly — that wires real deps from
+- * validated configuration (`src/config.ts`).
++ * Concrete instance for `pnpm --filter @gisik-nokma/server run auth:schema`
++ * (which reads `auth.options` off this instance) and for local dev runs. Never
++ * imported by production assembly — that wires real deps from validated
++ * configuration (`src/config.ts`).
++ *
++ * Deliberately NOT `better-auth generate`: that bin ships in `@better-auth/cli`,
++ * which is not a dependency of this repo and must not become one — it pins its
++ * own better-auth 1.4.21 and emits a schema missing `account."issuer"`. The
++ * command would not even resolve. See `src/tools/auth-schema.ts`.
+  *
+  * The pool comes through `createPool` and not `new Pool(...)`: `src/db.ts`
+  * installs the int8 parser and pins every session to Asia/Kolkata, and a second
+  * pool built any other way would read a different clock than the product.
+  * The default URL is the docker-compose database (port 54329, user `gisik`),
+  * which is the only Postgres this repo ever brings up.
+  */
+ export const auth = createAuth({
+   pool: createPool(
+     process.env['DATABASE_URL'] ?? 'postgres://gisik:gisik@localhost:54329/gisik_nokma',
+diff --git a/docs/superpowers/plans/2026-08-20-00-series-coordination.md b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+index fb9c84a..13fd8e5 100644
+--- a/docs/superpowers/plans/2026-08-20-00-series-coordination.md
++++ b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+@@ -639,21 +639,31 @@ What replaces it: `pnpm --filter @gisik-nokma/server run auth:schema` (`src/tool
+ **The conclusion holds: nobody upgrades zod.** `apps/server` keeps `zod ^3.25.0`, no package in the monorepo moved, and better-auth 1.7.2 declares **no zod peer range** — zod `^4.3.6` is a direct dependency of its own.
+ 
+ **The first version of this entry got the mechanism backwards and is corrected here**, because it is the durable record and a wrong reason is worse than none. It claimed the single `better-call` had resolved zod 4 and that pnpm's warning was reporting the wrong thing. The lockfile says the opposite, and the warning is accurate. Derived from `pnpm-lock.yaml` and a pruned `node_modules` (`pnpm install --frozen-lockfile` into an emptied tree):
+ 
+ - `pnpm-lock.yaml` holds exactly **one** `better-call` snapshot — `better-call@1.4.0(zod@3.25.76)` — whose `optionalDependencies` read `zod: 3.25.76`.
+ - `@better-auth/core`'s snapshot **key** contains the substring `(better-call@1.4.0(zod@4.4.3))`, but its `dependencies` block resolves `better-call: 1.4.0(zod@3.25.76)`. The key is a stale peer label; the edge is what counts. Reading the key — or worse, a leftover `.pnpm` directory name — is what produced the original error.
+ - On a pruned store there is exactly one `better-call` directory, `better-call@1.4.0_zod@3.25.76`, and **all three** of `better-auth`, `@better-auth/core` and `@better-auth/passkey` symlink to it.
+ 
+ So `better-call` resolved its optional zod peer to **3.25.76, outside its declared `^4.0.0`** — precisely what pnpm's `✕ unmet peer zod@^4.0.0: found 3.25.76` reports. The zod split in force is: `better-call` → 3.25.76; `better-auth`, `@better-auth/core`, `@better-auth/passkey` → 4.4.3 (passkey via its own direct `zod ^4.3.6`).
+ 
+-**Why that is nevertheless safe here, and where it stops being safe.** `better-call`'s only use of zod anywhere in `dist/` is `openapi.mjs` / `openapi.cjs` — a module that is not even in its `exports` map. The endpoint runtime this repo exercises never imports zod. **But do not read that as "the compiler refuses the mix, so the hazard cannot occur":** it refuses the mix in *our* code, and inside the vendor it has already happened. `better-call/dist/openapi.cjs:20` and `:36` evaluate `options.query instanceof zod.ZodObject` / `options.body instanceof zod.ZodObject` with a **zod-3** `ZodObject` against **zod-4** schema objects. That is a silent `false` — no compile error, no throw, just an OpenAPI document quietly missing its parameters and request bodies. It is inert only because nothing in this repo enables better-auth's openAPI plugin. **Whichever plan first enables it inherits this**, and the fix then is to force one zod major across `better-call` and better-auth, not to shrug at the warning.
++**Why that is nevertheless safe here, and what would actually break it.** `better-call`'s only use of zod anywhere is `dist/openapi.mjs` / `openapi.cjs` (`import { ZodObject, ZodOptional } from "zod"`, resolving to **3.25.76**). That module is **not** absent from the running process: `generator` and `getHTML` are re-exported from better-call's **root barrel** (`dist/index.cjs:8,17,19`; `dist/index.mjs:7`) and `dist/router.mjs:4` imports them too, so `openapi` and its zod-3 binding load **eagerly on every `import 'better-call'`**. The accurate statement is that the code is *loaded and never reached*, not that it is never loaded.
++
++Reached, it would misbehave silently: `openapi.cjs:20` and `:36` evaluate `options.query instanceof ZodObject` / `options.body instanceof ZodObject` with a **zod-3** constructor against the **zod-4** schema objects better-auth's endpoints carry. Every test is `false` — no compile error, no throw, just an OpenAPI document quietly missing its parameters and request bodies.
++
++**The trigger is narrower than first recorded here, and the earlier version named the wrong one.** It is *not* "whichever plan enables better-auth's openAPI plugin", and the remedy is *not* "force one zod major":
++
++- better-auth's `openAPI()` plugin **does not use better-call's generator**. It ships its own — `dist/plugins/open-api/index.mjs:5` imports `./generator.mjs`, whose line 3 is `import * as z from "zod"` resolving through better-auth's own link to **zod 4.4.3**. Enabling that plugin never reaches better-call's zod-3 code.
++- better-call's own hazard path is **already switched off**. Its router registers `/api/reference` and calls `generator` only under `if (!config?.openapi?.disabled)` (`better-call/dist/router.mjs:7-16`), and better-auth passes `openapi: { disabled: true }` unconditionally (`better-auth/dist/api/index.mjs:155`).
++- Nothing in `apps/` or `packages/` imports `better-call` at all.
++
++**So what a future plan should actually watch for:** repo code calling better-call's `createRouter` **without** `openapi: { disabled: true }`, or calling the root barrel's `generator` / `getHTML` directly. Only those reach the zod-3 `instanceof`. If that day comes, the fix is to keep better-call's OpenAPI generation disabled — or to align better-call's zod with better-auth's — and enabling better-auth's own `openAPI()` plugin is not the event to watch for.
+ 
+ Do not "fix" the pnpm warning by upgrading the workspace to zod 4: that would touch every package in the monorepo, and it is not what makes `better-call` zod-3.
+ 
+ **The runtime half of that, checked rather than assumed (Task 1, on review request).** Type-level silence is not the whole question: if better-auth's *exported* surface handed back zod schemas, a zod-4 schema composed with one of ours would misbehave at runtime with no type error. Verified on both axes against the installed package.
+ 
+ Nothing flows in: `BetterAuthOptions` and the option types of every plugin we configure contain zero zod references, so no field of better-auth's could accept one of our zod-3 schemas. Things do flow out: seven barrel exports (`userSchema`, `sessionSchema`, `accountSchema`, `verificationSchema`, `coreSchema`, `rateLimitSchema`, `additionalAuthorizationParamsSchema`) are live zod-4 objects, and every `auth.api.<endpoint>.options.body`/`.query` is one too — `auth.api.getSession.options.query._zod.version` reads `{major: 4, minor: 4, patch: 3}`. Composing either with our zod 3 **in our own code** is a compile error rather than a silent runtime bug: `z.object({…}).and(userSchema)` fails with TS2345, zod 4's `ZodObject<…, $strip>` "missing the following properties from type `ZodType<any, any, any>`", and only an explicit cast gets a mix through. That protection stops at our source: §4 above records where the same mix already happens **inside the vendor**, silently, with no compile step to refuse it. The rule below is what keeps our side clean; it is not a claim that the hazard cannot occur.
+ 
+ One trap worth naming because it looks correct in an editor: `better-auth/dist/index.d.mts:29` carries `export * from "zod"`, so **`import { z } from 'better-auth'` type-checks** — while the runtime barrel has no such export, making it an ESM link failure (`SyntaxError: The requested module 'better-auth' does not provide an export named 'z'`). Loud, and it can never reach production, but it will waste someone's afternoon.
+ 
+ **Standing rule for every plan that enters `apps/server`'s auth code:** import `z` only from `zod`, never from `better-auth`, and never reuse `auth.api.*.options.body` as a validator inside our own zod-3 code. Write our own schema.

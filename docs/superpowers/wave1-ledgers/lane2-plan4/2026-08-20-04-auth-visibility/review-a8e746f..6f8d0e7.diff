@@ -1,0 +1,1623 @@
+# Review package: a8e746f..6f8d0e7c297ac2e95bb7ff17d42bd323347bf124
+
+## Commits
+6f8d0e7 The membership id the coordination doc mandates was refused by the door, and the fix has a half that does not fit where the fix lives
+
+## Files changed
+ .../plans/2026-08-20-00-series-coordination.md     |  61 +++++
+ .../plans/2026-08-20-04-auth-visibility.md         |   9 +-
+ packages/domain/src/envelope.ts                    | 124 +++++++++-
+ packages/domain/src/events/membership.ts           | 125 ++++++++++
+ packages/domain/src/events/visibility.ts           |  59 +++++
+ packages/domain/src/ids.ts                         |  18 ++
+ packages/domain/src/index.ts                       |   2 +
+ packages/domain/src/parse-event.ts                 |  50 ++++
+ packages/domain/src/vocabulary.ts                  |  92 +++++++-
+ packages/domain/test/envelope.test.ts              | 156 ++++++++++++-
+ packages/domain/test/events/membership.test.ts     | 253 +++++++++++++++++++++
+ packages/domain/test/events/visibility.test.ts     | 109 +++++++++
+ packages/domain/test/ids.test.ts                   |  29 ++-
+ packages/domain/test/parse-event.test.ts           | 117 ++++++++++
+ 14 files changed, 1181 insertions(+), 23 deletions(-)
+
+## Diff
+diff --git a/docs/superpowers/plans/2026-08-20-00-series-coordination.md b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+index ba06b54..8837af7 100644
+--- a/docs/superpowers/plans/2026-08-20-00-series-coordination.md
++++ b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+@@ -924,20 +924,81 @@ unchanged" a proof rather than a claim.
+ to it once, Plan 9 twice, and Plan 10 references `ENTITY_KINDS`. None of those is in Wave 1's Plan 4
+ window except Plan 3 (Lane 1). **Sequencing rule for this wave: Plan 4 lands both envelope amendments as
+ early, separate, additive changes, and any other lane needing `envelope.ts` rebases onto them rather than
+ editing in parallel.** Merge-resolving a schema that governs every event's identity is the one place in
+ this series where a textual merge is more expensive than waiting.
+ 
+ Amendment 1 was raised as a ruling-request and is now **ratified** by the owner (see the ruling at the
+ top of this section); amendment 2 needed no ruling, being inert until an event type declares the kind.
+ Neither ever blocked.
+ 
++**A third amendment, found while the file was open, and landed with the other two.**
++`submittedEventSchema` declared `payload: z.unknown()`, and `z.unknown()` does not require the key.
++Probed against this repo's own zod rather than reasoned about:
++
++| payload | before | after |
++|---|---|---|
++| absent | ACCEPTED — the claim erased entirely | REFUSED |
++| present-but-undefined | ACCEPTED | REFUSED |
++| `null` | ACCEPTED | ACCEPTED |
++| `{}` | ACCEPTED | ACCEPTED |
++
++**Only absence was the defect**, and the two acceptances are pinned by tests as deliberate: an empty
++claim is still a claim and a null payload is still a claim, so a "fix" that also refused them would look
++correct and quietly refuse legitimate events. The check is `!== undefined`, not `'payload' in v`, because
++both absent and present-but-undefined must go and `JSON.stringify` erases the difference between them on
++the wire anyway. `eventEnvelopeSchema` inherited the hole through `.extend()` and inherits the fix the
++same way. There was no live exploit path — `parse-event.ts` reconstructs the event explicitly rather than
++passing the inferred object through — so this is recorded for the next person to add a field to that
++schema, not as an incident. Not fixed here and not Plan 4's: `z.infer` on the fixed schema yields
++`payload?: unknown`, which is not assignable to `SubmittedEvent`, so a downstream consumer's natural
++unblock is a cast that erases the guarantee; that half belongs to the app-core factory's lane.
++
++**LANDED 2026-08-28 by Lane 2 (Plan 4 Task 3), all three in one commit.** What shipped, so no lane has to
++read the diff to know:
++
++- `ids.ts` gains `MEMBERSHIP_ID_REGEX`, **composed from `ULID_REGEX.source`** rather than hand-spelled —
++  a second spelling of what a ULID is would be free to drift from the first, which is the discipline
++  `ulidString` already states about itself. (The adaptation map's sketch hand-spelled it; the composition
++  is the version that shipped.)
++- `envelope.ts`: the entity schema is a `superRefine` that branches on `kind`. `membership` takes
++  `MEMBERSHIP_ID_REGEX`; every other kind takes `ULID_REGEX` with the message `'must be a ULID'`
++  byte-for-byte. `EventEnvelope` the TYPE is untouched.
++- **The coherence check is in TWO halves, and half of it is not in `envelope.ts`.** The regex alone admits
++  `entity.id = wsB:userC` on an event whose `workspaceId` is `wsA` granting `userD`, and that is not a
++  harmless mis-address: `ingest-service.ts`'s entity↔workspace guard only fires once a head row exists, so
++  the first mis-filed event commits cleanly and a later, correctly-addressed revoke opens a SECOND stream
++  at seq 1 — the split membership stream decision 5 exists to prevent, re-created by its own fix. The
++  **workspace** half is a cross-field `superRefine` in `envelope.ts`; the **user** half needs the parsed
++  payload and lives in `parse-event.ts`, after payload validation, returning `malformed-envelope` (the
++  code union is unchanged — nothing downstream has to widen `IngestErrorCode`). Reading `userId` off raw
++  JSON instead would report an id mismatch when the real complaint is that `userId` is not a ULID.
++- Because both exported schemas now carry a cross-field refinement, they are built from a shared private
++  `z.object` and each `.superRefine`d — a ZodEffects has no `.extend`. `eventEnvelopeSchema` is still
++  derived from the same shape; only the route changed. Both remain `safeParse`-only consumers' concern.
++- `'invite'` is appended to `ENTITY_KINDS` (seventh member, at the end). Inert: every registration names
++  its `entityKind` and `parseEvent` refuses a type filed against a kind it did not declare, so no event
++  can carry it until Plan 4 T14 registers the three invite types. The Global Constraints entity-kind line
++  in `2026-08-20-04-auth-visibility.md` moved with it.
++- **A consequence every lane will meet:** a user id is now a ULID at the door. A membership is addressed
++  as `${workspaceId}:${userId}` and the door admits only `^<ULID>:<ULID>$`, so `membership.granted`,
++  `membership.revoked`, `project.member_added`, `project.member_removed` and `visibility.set`'s explicit
++  `userIds` all type their user ids as `ulidString`. This is the dialect trap below, arriving in payloads
++  as predicted — `usr_1` and `usr_founder` are refused `invalid-payload`. better-auth must therefore mint
++  ULID user ids; that is now a constraint on Task 1, not a preference.
++- **The test design, which the ruling explicitly did not settle:** three directions for the regex
++  (`membership` composite accepted; `membership` bare ULID refused; a non-`membership` kind still refusing
++  a composite with `'must be a ULID'` byte-for-byte), and the two coherence halves are asserted through
++  DIFFERENT doors on purpose — the workspace half against `submittedEventSchema` directly, the user half
++  through `parseEvent` with a prefix-CORRECT, user-wrong id. Full equality subsumes the prefix, so
++  asserting both through `parseEvent` would let either check be deleted with nothing noticing.
++
+ **The dialect trap that rides with this file, found twice in one day in two different fields.** Shipped
+ `envelope.ts:53` defines `ulidString` as `z.string().regex(ULID_REGEX, 'must be a ULID')`, and `ids.ts:9`
+ pins `ULID_REGEX = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/`. So `t1` and `ws_1` are not ULIDs.
+ 
+ - **Entity ids** (Lane 1): the rule-engine fixtures use exactly that short dialect and are fine, because
+   the harness enters at `evaluateEvent` and never passes the envelope door. A **server** test that
+   ingests with a short id is refused at the door **for a reason unrelated to what it is proving**, and
+   the refusal reads as the thing under test failing. Live for Plan 3's T9–T13.
+ - **Actor ids** (Lane 4): `packages/app-core`'s seed builders use `actorId: 'user_kiro'` against the same
+   schema's `actorId: ulidString`, harmless against `createFakeDataSource` because it validates nothing,
+diff --git a/docs/superpowers/plans/2026-08-20-04-auth-visibility.md b/docs/superpowers/plans/2026-08-20-04-auth-visibility.md
+index 29f21ff..438173e 100644
+--- a/docs/superpowers/plans/2026-08-20-04-auth-visibility.md
++++ b/docs/superpowers/plans/2026-08-20-04-auth-visibility.md
+@@ -12,21 +12,21 @@
+ 
+ **Series position:** Plan 4 of 11. **Consumes** from Plan 1: `EventEnvelope`, the event-type registry and pure `parseEvent` in `packages/domain`; the Fastify 5 server and ingest pipeline calling `evaluateEvent(env, ctx)` in `apps/server`; the projection registry `registerProjection({name, apply, reset})` with `proj_`-prefixed tables; node-pg-migrate; the verify-projections CLI. From Plan 2: the rule engine and the `Refusal` shape it returns, `workflow.defined` v1 and `WorkflowDef`. From Plan 3: ticket events (`ticket.created`, `ticket.reparented`, …), `ticket-type.defined` and `builtinTicketTypeDefs(defaultWorkflowId)`, `proj_tickets` (head states incl. parentId), `proj_rollups` (direct-children counts by category), `TicketState`. **Produces** (consumed by later plans, exact signatures in the task Interfaces blocks): `proj_memberships`, `proj_visibility`, `canSee(db, userId, ticketId)`, `visibleEventsFor(db, userId, workspaceId, afterSeq)` (where `afterSeq` is Plan 1's per-workspace `workspace_seq` cursor, coordination §18), the auth surface (`/api/auth/*` routes, `makeRequireSession`, `OtpSender`) for all client plans, and — new, per the owner decision of 2026-08-26 — the **workspace-creation surface**: `bootstrapWorkspace(db, foundingEvent, append)` (Task 5) and `registerWorkspaceRoutes(app, deps)` serving `POST /v1/workspaces` (Task 13). It also **creates** the canonical simple-Kanban definition in `@gisik-nokma/domain` (`SIMPLE_KANBAN_TEMPLATE`, `simpleKanbanWorkflowDef(workflowId)`, Task 5) — Plan 8's template gallery and Plan 11's seeds consume that one export rather than declaring copies.
+ 
+ ## Global Constraints
+ 
+ Copied verbatim from the series engineering contract and the spec; every task's requirements implicitly include this section.
+ 
+ - MONOREPO: pnpm workspaces + Turborepo, TypeScript strict, Node 22 LTS, pnpm 9.
+ - TESTING: Vitest.
+ - IDS: ULID via `ulidx`.
+-- EVENT ENVELOPE (exact): entity.kind ∈ 'workspace'|'project'|'ticket'|'workflow'|'ticket-type'|'membership'; fields id, workspaceId, entity, type, version, payload, actorId, origin('web'|'mobile'|'desktop'|'server'), clientTime, serverTime, seq.
++- EVENT ENVELOPE (exact): entity.kind ∈ 'workspace'|'project'|'ticket'|'workflow'|'ticket-type'|'membership'|'invite'; fields id, workspaceId, entity, type, version, payload, actorId, origin('web'|'mobile'|'desktop'|'server'), clientTime, serverTime, seq. ('invite' joined the set in Task 3 rather than Task 14, so the file every lane imports is amended once, early — see the coordination doc's envelope-collision section. A membership's entity.id is the composite `${workspaceId}:${userId}`; every other kind's is a bare ULID.)
+ - Refusal shape (exact): `{refused: true; rule: string; reason: string}` — plain-language reason.
+ - Every refusal is proven against planted defects before it is trusted (spec §1 invariant 6).
+ - Provenance is never redacted from someone who can see the ticket (spec §6).
+ - Rollups show true counts with restriction named: "5 of 8 done · 2 restricted" (spec §6).
+ - A visible child under a restricted parent shows a placeholder — existence, no title (spec §6).
+ - No passwords. Sign-in: phone OTP, email magic link, Google OAuth, passkeys (spec §6).
+ - `reference/` is frozen — never edit anything under it.
+ - Commits are prose that says what was found and why it matters (spec, constraints carried from the base).
+ - CODING_STANDARDS: `snake_case` for database tables and columns (exception: better-auth's own generated tables keep the library's naming — vendor schema, managed by its migrator; renaming them breaks the library). Log detailed errors internally; return generic, safe errors to clients — an invisible ticket reads as 404 `not_found`, indistinguishable from nonexistent.
+ - Features.md and test-cases/ move in the same change set as the work.
+@@ -1077,21 +1077,24 @@ export function parseProjectMemberAdded(payload: unknown): ProjectMemberAddedPay
+ 
+ export function parseProjectMemberRemoved(payload: unknown): ProjectMemberRemovedPayload {
+   if (!isRecord(payload)) throw new Error('project.member_removed payload requires userId');
+   return { userId: requireNonEmptyString(payload, 'userId', 'project.member_removed') };
+ }
+ ```
+ 
+ - [ ] **Step 4: Run the membership tests to verify they pass**
+ 
+ Run (from `packages/domain/`): `pnpm vitest run test/events/membership.test.ts`
+-Expected: PASS (13 tests).
++Expected: PASS. (The plan said 13; Step 1 above literally contains 14 `it` blocks, so 13 was wrong and the
++block count governs. As executed the file holds 23 — the extra nine cover the ULID user id, the blank-name
++refusal, the role vocabulary in both directions, `.strict()`'s generic message staying generic, and the
++registrations themselves. No written test was deleted to reach any stated total.)
+ 
+ - [ ] **Step 5: Write the failing visibility parser tests**
+ 
+ ```ts
+ // packages/domain/test/events/visibility.test.ts
+ import { describe, expect, it } from 'vitest';
+ import { parseVisibilitySet } from '../../src/events/visibility';
+ 
+ describe('parseVisibilitySet', () => {
+   it('accepts workspace, project, and inherit modes without userIds', () => {
+@@ -1203,21 +1206,21 @@ registerEventType({ type: 'visibility.set', version: 1, entityKind: 'ticket', pa
+ Also export everything from `packages/domain/src/index.ts`:
+ 
+ ```ts
+ export * from './events/membership';
+ export * from './events/visibility';
+ ```
+ 
+ - [ ] **Step 8: Run the full domain suite**
+ 
+ Run (from `packages/domain/`): `pnpm vitest run`
+-Expected: PASS — Plan 1's registry/parseEvent tests still green (proving the seven registrations are well-formed), plus the 19 new tests.
++Expected: PASS — Plan 1's registry/parseEvent tests still green (proving the registrations are well-formed), plus the new tests. Six registrations are added, not seven: `workspace.created` was already registered by Plan 1 and is TAKEN OVER here, not re-registered (`register` throws on a duplicate `type@version`). Counted as executed: 23 in `test/events/membership.test.ts`, 10 in `test/events/visibility.test.ts`, and 20 more for the three envelope amendments across `envelope.test.ts`, `parse-event.test.ts` and `ids.test.ts` — domain goes 152 → 205.
+ 
+ - [ ] **Step 9: Commit**
+ 
+ ```bash
+ git add packages/domain/src/events packages/domain/src/index.ts packages/domain/test/events
+ git commit -m "Membership and visibility claims parse at the door: seven event types the ledger can replay — workspaces, projects, grants, revocations, rosters, and who may see a ticket."
+ ```
+ 
+ ---
+ 
+diff --git a/packages/domain/src/envelope.ts b/packages/domain/src/envelope.ts
+index 5e5ae86..2778d2a 100644
+--- a/packages/domain/src/envelope.ts
++++ b/packages/domain/src/envelope.ts
+@@ -1,14 +1,33 @@
+ import { z } from 'zod';
+-import { ULID_REGEX } from './ids.js';
++import { MEMBERSHIP_ID_REGEX, ULID_REGEX } from './ids.js';
+ 
+-export const ENTITY_KINDS = ['workspace', 'project', 'ticket', 'workflow', 'ticket-type', 'membership'] as const;
++/**
++ * The closed set of things an event can be about. `invite` joins the original
++ * six for Plan 4's invitation vocabulary (`invite.sent` / `invite.accepted` /
++ * `invite.revoked`, registered in a later task of that plan). Adding a member
++ * is additive and INERT until an event type declares it: every registration
++ * names its `entityKind`, and `parseEvent` refuses a type filed against a kind
++ * it did not declare, so no event can carry `invite` before the types exist.
++ * It lands here, early, because `envelope.ts` is the file every lane imports
++ * and a second amendment to it late in the wave would make three sibling lanes
++ * rebase onto the same schema twice.
++ */
++export const ENTITY_KINDS = [
++  'workspace',
++  'project',
++  'ticket',
++  'workflow',
++  'ticket-type',
++  'membership',
++  'invite',
++] as const;
+ export type EntityKind = (typeof ENTITY_KINDS)[number];
+ 
+ export const ORIGINS = ['web', 'mobile', 'desktop', 'server'] as const;
+ export type Origin = (typeof ORIGINS)[number];
+ 
+ /**
+  * ISO 8601 with whole seconds and AT MOST 3 fractional digits, 'Z' or a numeric
+  * offset. Bounding precision at milliseconds keeps every stored claim exact on
+  * readback: a JS Date and a Postgres timestamptz both hold a millisecond
+  * instant without loss. Any offset is admitted on the wire — storage keeps the
+@@ -45,43 +64,130 @@ const isoDatetime = z
+ 
+ /**
+  * The one ULID string schema. Exported rather than kept local because every
+  * event payload carrying an id (`parentId`, `attachmentId`, …) needs exactly
+  * this check: a second `z.string().regex(...)` spelled out beside a payload
+  * schema is a second statement of what a ULID is, and the two are free to
+  * drift. `ULID_REGEX` in ids.ts stays the single origin of the pattern.
+  */
+ export const ulidString = z.string().regex(ULID_REGEX, 'must be a ULID');
+ 
++/**
++ * Entity ids are bare ULIDs for every kind but one. `membership` admits the
++ * composite `${workspaceId}:${userId}` — coordination decision 5, ratified by
++ * the owner 2026-08-28 — because the engine must address a membership from
++ * `(workspaceId, actorId)` via `getEntityState('membership', id)`, and grant →
++ * revoke → re-grant must land on one entity stream. `seq`, `lockEntity`,
++ * snapshots and canonical replay all key on `(entity_kind, entity_id)`, so a
++ * fresh ULID per grant would split one person's membership into several
++ * histories. Four alternatives (composite as a lookup key only, filing under
++ * `kind:'workspace'`, a hashed pseudo-ULID, relaxing `ulidString` generally)
++ * were refuted on exactly that.
++ *
++ * The exception is kind-scoped on purpose: EVERY other kind keeps `ulidString`
++ * byte-for-byte, message included, and the `EventEnvelope` TYPE is untouched
++ * (`entity: { kind; id: string }`). Only the door's runtime shape check knows
++ * the difference. This is the first time the door behaves differently per kind,
++ * so the test beside it asserts all three directions — composite admitted for
++ * `membership`, bare ULID refused for `membership`, composite still refused for
++ * a non-membership kind — because the third is the only thing that keeps
++ * "every other kind is unchanged" a proof rather than a claim.
++ */
++const entitySchema = z.object({ kind: z.enum(ENTITY_KINDS), id: z.string() }).superRefine((entity, ctx) => {
++  const ok = entity.kind === 'membership' ? MEMBERSHIP_ID_REGEX.test(entity.id) : ULID_REGEX.test(entity.id);
++  if (ok) return;
++  ctx.addIssue({
++    code: z.ZodIssueCode.custom,
++    path: ['id'],
++    message:
++      entity.kind === 'membership'
++        ? 'must be a membership entity id — workspaceId:userId, two ULIDs joined by a colon'
++        : 'must be a ULID',
++  });
++});
++
++/**
++ * `z.unknown()` alone does NOT require the key: probed against this repo's zod,
++ * an object with no `payload` at all parses clean, and so does one with an
++ * explicit `undefined`. `JSON.stringify` erases the two alike, so the wire form
++ * cannot tell them apart either — an event could reach an append-only table
++ * with its claim missing entirely and nothing would have objected.
++ *
++ * Only ABSENCE is the defect. `null` and `{}` stay accepted, deliberately and
++ * with tests pinning them: an empty claim is still a claim, and a null payload
++ * is still a claim. The check is `!== undefined` rather than `'payload' in v`
++ * because both absent and present-but-undefined must be refused and
++ * serialisation loses the distinction anyway — writing it the other way would
++ * invite a reader to think the distinction meant something.
++ */
++const requiredPayload = z
++  .unknown()
++  .refine((value) => value !== undefined, 'is required — an event with no payload is not a claim');
++
++/**
++ * The regex above proves a membership entity id's SHAPE; it cannot see the
++ * workspace the event is filed under. Without this, `entity.id = wsB:userC` on
++ * an event whose `workspaceId` is `wsA` parses clean. The server's mismatch
++ * guard only fires once a head row exists, so the first mis-filed event commits
++ * and a later, correctly-addressed revoke starts a SECOND stream at seq 1 —
++ * the split membership stream decision 5 exists to prevent, reintroduced by its
++ * own fix. This is the workspace half of that coherence check; the user half
++ * needs the parsed payload and lives in parse-event.ts.
++ */
++function refuseMisfiledMembership(
++  value: { workspaceId: string; entity: { kind: EntityKind; id: string } },
++  ctx: z.RefinementCtx,
++): void {
++  if (value.entity.kind !== 'membership') return;
++  if (value.entity.id.startsWith(`${value.workspaceId}:`)) return;
++  ctx.addIssue({
++    code: z.ZodIssueCode.custom,
++    path: ['entity', 'id'],
++    message: "must name this event's own workspace — a membership entity id is workspaceId:userId",
++  });
++}
++
+ export type EventEnvelope = {
+   id: string;              // ULID, client-generated
+   workspaceId: string;
+   entity: { kind: EntityKind; id: string };
+   type: string;            // 'ticket.transitioned' etc.
+   version: number;         // schema version of this event type
+   payload: unknown;        // validated per-type by zod schema from packages/domain
+   actorId: string;
+   origin: Origin;
+   clientTime: string;      // ISO 8601 — the actor's claim about when
+   serverTime: string;      // ISO 8601 — assigned at ingest
+   seq: number;             // per-entity sequence, assigned at ingest
+ };
+ 
+ /** What a client submits: the envelope minus the two fields the server assigns at ingest. */
+ export type SubmittedEvent = Omit<EventEnvelope, 'serverTime' | 'seq'>;
+ 
+-export const submittedEventSchema = z.object({
++/**
++ * The plain object both exported schemas are built from. It exists because a
++ * cross-field check (`refuseMisfiledMembership`, which needs `workspaceId` and
++ * `entity` together) makes the exported schema a ZodEffects, and ZodEffects has
++ * no `.extend`. Extending the OBJECT and refining each result keeps
++ * `eventEnvelopeSchema` derived from the same shape it always was, and keeps it
++ * inheriting the entity and payload checks the way it used to inherit them.
++ */
++const submittedEventObject = z.object({
+   id: ulidString,
+   workspaceId: ulidString,
+-  entity: z.object({ kind: z.enum(ENTITY_KINDS), id: ulidString }),
++  entity: entitySchema,
+   type: z.string().min(1),
+   version: z.number().int().positive(),
+-  payload: z.unknown(),
++  payload: requiredPayload,
+   actorId: ulidString,
+   origin: z.enum(ORIGINS),
+   clientTime: isoDatetime,
+ });
+ 
+-export const eventEnvelopeSchema = submittedEventSchema.extend({
+-  serverTime: isoDatetime,
+-  seq: z.number().int().positive(),
+-});
++export const submittedEventSchema = submittedEventObject.superRefine(refuseMisfiledMembership);
++
++export const eventEnvelopeSchema = submittedEventObject
++  .extend({
++    serverTime: isoDatetime,
++    seq: z.number().int().positive(),
++  })
++  .superRefine(refuseMisfiledMembership);
+diff --git a/packages/domain/src/events/membership.ts b/packages/domain/src/events/membership.ts
+new file mode 100644
+index 0000000..a698eda
+--- /dev/null
++++ b/packages/domain/src/events/membership.ts
+@@ -0,0 +1,125 @@
++import { z } from 'zod';
++import type { WorkspaceRole } from '../entity-state.js';
++import { ulidString } from '../envelope.js';
++
++/**
++ * The payload shapes of the workspace, project and membership vocabulary
++ * (spec §6). Schemas only — the `domainRegistry.register` calls that bind them
++ * to a type, a version and an entity kind live in `../vocabulary.ts`, following
++ * the precedent `workflow.defined` and the ticket vocabulary set: registration
++ * in the registry module, schema beside the concept it describes. Keeping them
++ * there means the registry is complete for every importer of `parseEvent`, not
++ * only for importers of the barrel.
++ *
++ * `workspace.created` and `workspace.renamed` are NOT new here. Plan 1 seeded
++ * them so the ledger had something real to carry, marked provisional until this
++ * plan landed (coordination decision 6). This is that landing: the shapes move
++ * beside their siblings and the registrations stay exactly one apiece — the
++ * registry throws on a duplicate `type@version`, so re-registering them would
++ * crash at module load.
++ *
++ * Every user id is a ULID (`ulidString`), which is FORCED rather than chosen.
++ * A membership's entity id is `${workspaceId}:${userId}` and the door admits
++ * only `^<ULID>:<ULID>$`, so a membership naming a non-ULID user could never be
++ * addressed at all. The project roster and the explicit-visibility list follow
++ * the same spelling, because one product cannot hold two ideas of what names a
++ * person. This is stricter than the plan's `usr_1` fixtures, which the door
++ * refuses anyway.
++ */
++/**
++ * A name someone will read. `.min(1)` alone admits `'   '`, which names nothing
++ * while looking like a name everywhere it is displayed — the plan pinned that
++ * refusal (`value.trim() === ''`) and it is kept. It REFUSES rather than trims:
++ * the ledger stores the claim as it was made, so quietly rewriting `'  Corner '`
++ * to `'Corner'` would put words in the actor's mouth. This tightens Plan 1's
++ * provisional `z.string().min(1)` on the two workspace types, which is what
++ * taking them over means.
++ */
++const displayName = z
++  .string()
++  .min(1)
++  .refine((value) => value.trim() !== '', 'must not be blank — a name of only spaces names nothing');
++
++export const workspaceCreatedPayload = z.object({ name: displayName }).strict();
++export type WorkspaceCreatedPayload = z.infer<typeof workspaceCreatedPayload>;
++
++export const workspaceRenamedPayload = z.object({ name: displayName }).strict();
++export type WorkspaceRenamedPayload = z.infer<typeof workspaceRenamedPayload>;
++
++export const projectCreatedPayload = z.object({ name: displayName }).strict();
++export type ProjectCreatedPayload = z.infer<typeof projectCreatedPayload>;
++
++/**
++ * The role vocabulary as the door spells it. `WorkspaceRole` in entity-state.ts
++ * stays the type origin; `satisfies` here means a role this list has and the
++ * type does not fails to compile, and the exhaustive switch in the test file
++ * fails to compile in the other direction. One vocabulary, checked both ways.
++ */
++export const WORKSPACE_ROLES = ['owner', 'admin', 'member', 'guest'] as const satisfies readonly WorkspaceRole[];
++export const workspaceRoleSchema = z.enum(WORKSPACE_ROLES);
++
++/**
++ * A `scope` is REFUSED, not ignored.
++ *
++ * `membership.granted` used to carry `MembershipScope = 'workspace' | {projectId}`,
++ * removed by the owner 2026-08-27. Two ways on meant two ways off: a project
++ * scope here and `project.member_added` both put a person on a project, and
++ * `membership.revoked` with a scope and `project.member_removed` both took them
++ * off — so unless both paths wrote the identical projection key, removing by one
++ * left the other standing and an admin believed access was gone when it was not.
++ * The scope bought nothing either: a guest's `canSee` is explicit-only so it
++ * granted no reads, and guests are refused ticket creation before the project
++ * check is reached so it granted no writes.
++ *
++ * A stale client or an old fixture can still send one, and accepting it while
++ * silently doing something else is exactly the quiet acceptance the honesty
++ * contract forbids — the claim means "put them on project P". So `scope` is
++ * DECLARED as `z.never()` rather than left to `.strict()`: strict alone would
++ * answer "Unrecognized key(s) in object: 'scope'", which is true and useless.
++ * Declaring it keeps the sentence that says where to go instead, while
++ * `.strict()` still catches every other unknown key generically.
++ *
++ * Project association is `project.member_added` / `project.member_removed`, and
++ * nothing else.
++ */
++const refusedGrantScope = z.never({
++  invalid_type_error:
++    'membership.granted no longer takes a scope; use project.member_added to put someone on a project',
++});
++
++const refusedRevokeScope = z.never({
++  invalid_type_error:
++    'membership.revoked no longer takes a scope; use project.member_removed to take someone off a project',
++});
++
++export const membershipGrantedPayload = z
++  .object({ userId: ulidString, role: workspaceRoleSchema, scope: refusedGrantScope.optional() })
++  .strict();
++/** `scope` is dropped from the type: it exists in the schema only to be refused. */
++export type MembershipGrantedPayload = Omit<z.infer<typeof membershipGrantedPayload>, 'scope'>;
++
++export const membershipRevokedPayload = z
++  .object({ userId: ulidString, scope: refusedRevokeScope.optional() })
++  .strict();
++export type MembershipRevokedPayload = Omit<z.infer<typeof membershipRevokedPayload>, 'scope'>;
++
++/**
++ * `projectAdmin` is required, with no default. The flag is a claim about what
++ * this person may do to the project's roster and its tickets' visibility, and a
++ * claim nobody made is not a claim — defaulting it to false would put an
++ * unattributed answer in the ledger, and defaulting it to true would grant
++ * rights nobody asked for.
++ */
++export const projectMemberAddedPayload = z
++  .object({
++    userId: ulidString,
++    projectAdmin: z.boolean({
++      required_error: 'is required — a project-admin flag is a claim, not a default',
++      invalid_type_error: 'is required — a project-admin flag is a claim, not a default',
++    }),
++  })
++  .strict();
++export type ProjectMemberAddedPayload = z.infer<typeof projectMemberAddedPayload>;
++
++export const projectMemberRemovedPayload = z.object({ userId: ulidString }).strict();
++export type ProjectMemberRemovedPayload = z.infer<typeof projectMemberRemovedPayload>;
+diff --git a/packages/domain/src/events/visibility.ts b/packages/domain/src/events/visibility.ts
+new file mode 100644
+index 0000000..1987cd7
+--- /dev/null
++++ b/packages/domain/src/events/visibility.ts
+@@ -0,0 +1,59 @@
++import { z } from 'zod';
++import { ulidString } from '../envelope.js';
++
++/**
++ * Who may see one ticket (spec §6). Schema only; the registration binding it to
++ * `visibility.set` v1 on entity kind `ticket` lives in `../vocabulary.ts`.
++ *
++ * Four modes, and `inherit` is the default a ticket is born with: it sees
++ * whatever its parent decided. `workspace` and `project` widen or narrow to a
++ * standing audience; `explicit` names people one by one, and is how a guest
++ * reaches any work at all.
++ *
++ * `payload.ticketId` restates the entity the event is filed against. That
++ * duplication is deliberate — it lets a reader of the payload alone know what
++ * the claim is about — and Task 9 refuses the two disagreeing, the same way
++ * parse-event.ts refuses a membership filed away from its own (workspace, user).
++ */
++export const VISIBILITY_MODES = ['workspace', 'project', 'explicit', 'inherit'] as const;
++export type VisibilityMode = (typeof VISIBILITY_MODES)[number];
++
++/**
++ * The two `userIds` refusals are a matched pair, and each is a lie prevented
++ * rather than a shape enforced.
++ *
++ * `explicit` with no one named is an audience of nobody — it reads as a
++ * restriction that hides the ticket from everyone including its author, when
++ * what the sender almost certainly meant was a list they forgot to attach. And
++ * `userIds` on any other mode is a list NOTHING will ever read: the ticket
++ * would be visible to a whole workspace or project while the ledger carried a
++ * permanent, untrue record of a hand-picked audience.
++ */
++export const visibilitySetPayload = z
++  .object({
++    ticketId: ulidString,
++    mode: z.enum(VISIBILITY_MODES),
++    userIds: z.array(ulidString).optional(),
++  })
++  .strict()
++  .superRefine((payload, ctx) => {
++    if (payload.mode === 'explicit') {
++      if (payload.userIds === undefined || payload.userIds.length === 0) {
++        ctx.addIssue({
++          code: z.ZodIssueCode.custom,
++          path: ['userIds'],
++          message: 'visibility.set with explicit mode requires a non-empty userIds list',
++        });
++      }
++      return;
++    }
++    if (payload.userIds !== undefined) {
++      ctx.addIssue({
++        code: z.ZodIssueCode.custom,
++        path: ['userIds'],
++        message: `visibility.set with mode '${payload.mode}' must not carry userIds`,
++      });
++    }
++  });
++
++export type VisibilitySetPayload = z.infer<typeof visibilitySetPayload>;
+diff --git a/packages/domain/src/ids.ts b/packages/domain/src/ids.ts
+index e691492..40f24a3 100644
+--- a/packages/domain/src/ids.ts
++++ b/packages/domain/src/ids.ts
+@@ -1,19 +1,37 @@
+ import { ulid } from 'ulidx';
+ 
+ declare const brandSymbol: unique symbol;
+ 
+ /** Nominal typing helper: Brand<string, 'Ulid'> is assignable to string, never the reverse. */
+ export type Brand<T, B extends string> = T & { readonly [brandSymbol]: B };
+ 
+ /** Crockford base32, 26 chars; first char 0-7 because the 48-bit timestamp bounds it. */
+ export const ULID_REGEX = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/;
+ 
++/**
++ * The composite entity id of a membership: `${workspaceId}:${userId}`, two
++ * ULIDs joined by a colon. `membership` is the ONE entity kind whose id is not
++ * a bare ULID (coordination decision 5, owner-ratified 2026-08-28): grant →
++ * revoke → re-grant must share one entity stream, and a replica has to be able
++ * to mint that id from `(workspaceId, userId)` without a read-before-write, so
++ * an opaque fresh ULID cannot serve.
++ *
++ * Composed from `ULID_REGEX`'s OWN SOURCE rather than spelled a second time. A
++ * hand-written `[0-7][0-9A-HJKMNP-TV-Z]{25}` here would be a second statement
++ * of what a ULID is, free to drift from the first — the same discipline
++ * `ulidString` states about itself in envelope.ts. `membershipId()` in
++ * entity-state.ts writes the string this pattern reads; they are one
++ * convention seen from its two sides.
++ */
++const ULID_BODY = ULID_REGEX.source.replace(/^\^/, '').replace(/\$$/, '');
++export const MEMBERSHIP_ID_REGEX = new RegExp(`^${ULID_BODY}:${ULID_BODY}$`);
++
+ export type Ulid = Brand<string, 'Ulid'>;
+ 
+ export function newUlid(): Ulid {
+   return ulid() as Ulid;
+ }
+ 
+ export function isUlid(value: string): value is Ulid {
+   return ULID_REGEX.test(value);
+ }
+diff --git a/packages/domain/src/index.ts b/packages/domain/src/index.ts
+index ea6db1b..7c144d2 100644
+--- a/packages/domain/src/index.ts
++++ b/packages/domain/src/index.ts
+@@ -7,11 +7,13 @@ export * from './parse-event.js';
+ export * from './ingest-result.js';
+ export * from './state.js';
+ export * from './workflow.js';
+ export * from './validate-workflow.js';
+ export * from './advise-workflow.js';
+ export * from './entity-state.js';
+ export * from './ist-day.js';
+ export * from './doc-text.js';
+ export * from './ticket-types.js';
+ export * from './events/ticket-events.js';
++export * from './events/membership.js';
++export * from './events/visibility.js';
+ export { makeEnvelope } from './testing.js';
+diff --git a/packages/domain/src/parse-event.ts b/packages/domain/src/parse-event.ts
+index 816902a..9f7f61a 100644
+--- a/packages/domain/src/parse-event.ts
++++ b/packages/domain/src/parse-event.ts
+@@ -1,10 +1,11 @@
++import { membershipId } from './entity-state.js';
+ import { submittedEventSchema, type SubmittedEvent } from './envelope.js';
+ import type { EventTypeRegistry } from './registry.js';
+ import { domainRegistry } from './vocabulary.js';
+ 
+ export type EnvelopeErrorCode =
+   | 'malformed-envelope'
+   | 'unknown-event-type'
+   | 'unknown-event-version'
+   | 'entity-kind-mismatch'
+   | 'invalid-payload';
+@@ -89,23 +90,72 @@ export function parseEvent(
+     const issue = payload.error.issues[0];
+     const at = issue !== undefined && issue.path.length > 0 ? ` at ${issue.path.join('.')}` : '';
+     return {
+       ok: false,
+       code: 'invalid-payload',
+       message: `payload for '${type}' v${version} is invalid${at}: ${issue?.message ?? 'invalid'}`,
+       eventId: envelope.data.id,
+     };
+   }
+ 
++  // The USER half of the membership coherence check (coordination decision 5).
++  // The envelope schema proves the id's shape and that it names this event's own
++  // workspace; neither can see the payload, so neither can tell that
++  // `wsA:userC` is filed on an event that grants userD. The regex alone would
++  // admit exactly that, and it is not a harmless mis-address: the server's
++  // entity↔workspace guard only fires once a head row exists, so the first
++  // mis-filed event commits cleanly and a later, correctly-addressed revoke
++  // opens a SECOND stream at seq 1 for the same person — the split membership
++  // stream decision 5 exists to prevent, re-created by its own fix.
++  //
++  // It sits here, after payload validation, because it needs the PARSED
++  // payload: reading `userId` off raw JSON would report an id mismatch when the
++  // real complaint is that `userId` is not a ULID, and the honest refusal is
++  // the one that names the actual fault. Two layers, deliberately — this door
++  // answers for client and server alike, and Task 9's identical check on
++  // `visibility.set` is a permission-layer answer the offline replica never
++  // reaches.
++  const { entity, workspaceId } = envelope.data;
++  if (entity.kind === 'membership') {
++    const userId = readUserId(payload.data);
++    if (userId === null) {
++      return {
++        ok: false,
++        code: 'malformed-envelope',
++        message: `This membership event is filed at entity '${entity.id}' but its payload names no user — a membership's entity id is workspaceId:userId, so an event that does not say who it is about cannot be addressed at all.`,
++        eventId: envelope.data.id,
++      };
++    }
++    if (entity.id !== membershipId(workspaceId, userId)) {
++      return {
++        ok: false,
++        code: 'malformed-envelope',
++        message: `This membership event is filed at entity '${entity.id}', but it is about user '${userId}' in workspace '${workspaceId}' — a membership's entity id is workspaceId:userId. Filing it anywhere else starts a second stream for the same person.`,
++        eventId: envelope.data.id,
++      };
++    }
++  }
++
+   const event: SubmittedEvent = { ...envelope.data, payload: payload.data as unknown };
+   return { ok: true, event };
+ }
+ 
++/** The `userId` a validated payload claims, or null when it names none. */
++function readUserId(payload: unknown): string | null {
++  if (typeof payload === 'object' && payload !== null && 'userId' in payload) {
++    const userId = (payload as { userId: unknown }).userId;
++    if (typeof userId === 'string') {
++      return userId;
++    }
++  }
++  return null;
++}
++
+ function extractClaimedId(raw: unknown): string | null {
+   if (typeof raw === 'object' && raw !== null && 'id' in raw) {
+     const id = (raw as { id: unknown }).id;
+     if (typeof id === 'string') {
+       return id;
+     }
+   }
+   return null;
+ }
+diff --git a/packages/domain/src/vocabulary.ts b/packages/domain/src/vocabulary.ts
+index 398d24e..59c7e7d 100644
+--- a/packages/domain/src/vocabulary.ts
++++ b/packages/domain/src/vocabulary.ts
+@@ -1,49 +1,63 @@
+-import { z } from 'zod';
++import {
++  membershipGrantedPayload,
++  membershipRevokedPayload,
++  projectCreatedPayload,
++  projectMemberAddedPayload,
++  projectMemberRemovedPayload,
++  workspaceCreatedPayload,
++  workspaceRenamedPayload,
++} from './events/membership.js';
+ import {
+   attachmentAddedPayload,
+   commentAddedPayload,
+   ticketAssignedPayload,
+   ticketCollaboratorPayload,
+   ticketCreatedPayload,
+   ticketFieldSetPayload,
+   ticketReparentedPayload,
+   ticketWorkflowReboundPayload,
+ } from './events/ticket-events.js';
++import { visibilitySetPayload } from './events/visibility.js';
+ import { createEventTypeRegistry } from './registry.js';
+ import { ticketTypeDefSchema } from './ticket-types.js';
+ import { ticketTransitionedPayloadSchema, workflowDefinedPayloadSchema } from './workflow.js';
+ 
+ /**
+- * The shared event-type registry. The two workspace types below are
+- * PROVISIONAL: they exist so the ledger, projections, and fixtures have
+- * something real to carry in Plan 1. They may still be revised before any
+- * production data exists; the ticket vocabulary beneath them is the closed
+- * vocabulary of spec §3 and is contracted.
++ * The shared event-type registry.
++ *
++ * The two workspace types below were PROVISIONAL under Plan 1 — they existed so
++ * the ledger, projections and fixtures had something real to carry. Plan 4 has
++ * now landed the workspace/membership vocabulary they were standing in for, so
++ * they are provisional no longer: they are the contracted `workspace.created`
++ * and `workspace.renamed`, and their shapes have moved to `events/membership.ts`
++ * beside their siblings. Taking them over is a re-point, never a re-register —
++ * `register` throws on a duplicate `type@version`, so a second registration
++ * would crash at module load (coordination decision 6).
+  *
+  * Every registration names the entity kind its events are about, so the door
+  * refuses a type filed against the wrong kind (coordination doc §11).
+  */
+ export const domainRegistry = createEventTypeRegistry();
+ 
+ domainRegistry.register({
+   type: 'workspace.created',
+   version: 1,
+   entityKind: 'workspace',
+-  payloadSchema: z.object({ name: z.string().min(1) }).strict(),
++  payloadSchema: workspaceCreatedPayload,
+ });
+ 
+ domainRegistry.register({
+   type: 'workspace.renamed',
+   version: 1,
+   entityKind: 'workspace',
+-  payloadSchema: z.object({ name: z.string().min(1) }).strict(),
++  payloadSchema: workspaceRenamedPayload,
+ });
+ 
+ domainRegistry.register({
+   type: 'workflow.defined',
+   version: 1,
+   entityKind: 'workflow',
+   payloadSchema: workflowDefinedPayloadSchema,
+ });
+ 
+ /**
+@@ -132,10 +146,72 @@ domainRegistry.register({
+   entityKind: 'ticket',
+   payloadSchema: commentAddedPayload,
+ });
+ 
+ domainRegistry.register({
+   type: 'attachment.added',
+   version: 1,
+   entityKind: 'ticket',
+   payloadSchema: attachmentAddedPayload,
+ });
++
++/**
++ * The membership and visibility vocabulary (Plan 4 Task 3). Six types, all
++ * version 1.
++ *
++ * The two membership types are the only ones in the whole registry whose entity
++ * id is not a bare ULID: a membership is addressed as
++ * `${workspaceId}:${userId}` so grant → revoke → re-grant share one stream
++ * (coordination decision 5, owner-ratified 2026-08-28). `envelope.ts` admits
++ * that shape for `kind: 'membership'` alone, and `parse-event.ts` refuses an id
++ * that names a different workspace or a different user than the event itself
++ * does.
++ *
++ * `project.member_added` / `project.member_removed` are filed against the
++ * PROJECT, not against a membership: they are the project's roster history, and
++ * since the 2026-08-27 collapse they are the only way anyone joins or leaves a
++ * project.
++ *
++ * `visibility.set` is filed against the TICKET whose audience it changes — a
++ * claim on that ticket's own history, exactly as `comment.added` is.
++ */
++domainRegistry.register({
++  type: 'project.created',
++  version: 1,
++  entityKind: 'project',
++  payloadSchema: projectCreatedPayload,
++});
++
++domainRegistry.register({
++  type: 'membership.granted',
++  version: 1,
++  entityKind: 'membership',
++  payloadSchema: membershipGrantedPayload,
++});
++
++domainRegistry.register({
++  type: 'membership.revoked',
++  version: 1,
++  entityKind: 'membership',
++  payloadSchema: membershipRevokedPayload,
++});
++
++domainRegistry.register({
++  type: 'project.member_added',
++  version: 1,
++  entityKind: 'project',
++  payloadSchema: projectMemberAddedPayload,
++});
++
++domainRegistry.register({
++  type: 'project.member_removed',
++  version: 1,
++  entityKind: 'project',
++  payloadSchema: projectMemberRemovedPayload,
++});
++
++domainRegistry.register({
++  type: 'visibility.set',
++  version: 1,
++  entityKind: 'ticket',
++  payloadSchema: visibilitySetPayload,
++});
+diff --git a/packages/domain/test/envelope.test.ts b/packages/domain/test/envelope.test.ts
+index 33c62cb..2796bfe 100644
+--- a/packages/domain/test/envelope.test.ts
++++ b/packages/domain/test/envelope.test.ts
+@@ -1,14 +1,14 @@
+ import type { z } from 'zod';
+ import { describe, expect, it } from 'vitest';
+ import { newUlid } from '../src/ids.js';
+-import { eventEnvelopeSchema, submittedEventSchema } from '../src/envelope.js';
++import { ENTITY_KINDS, eventEnvelopeSchema, submittedEventSchema } from '../src/envelope.js';
+ 
+ function validSubmitted(): Record<string, unknown> {
+   const workspaceId = newUlid();
+   return {
+     id: newUlid(),
+     workspaceId,
+     entity: { kind: 'workspace', id: workspaceId },
+     type: 'workspace.created',
+     version: 1,
+     payload: { name: 'Convenience Corner' },
+@@ -60,21 +60,21 @@ describe('submittedEventSchema', () => {
+     expect(rejectionIssues(result)).toContainEqual({ path: ['id'], message: 'must be a ULID' });
+   });
+ 
+   it('planted defect: refuses an unknown entity kind', () => {
+     const event = { ...validSubmitted(), entity: { kind: 'shop', id: newUlid() } };
+     const result = submittedEventSchema.safeParse(event);
+     expect(result.success).toBe(false);
+     expect(rejectionIssues(result)).toContainEqual({
+       path: ['entity', 'kind'],
+       message:
+-        "Invalid enum value. Expected 'workspace' | 'project' | 'ticket' | 'workflow' | 'ticket-type' | 'membership', received 'shop'",
++        "Invalid enum value. Expected 'workspace' | 'project' | 'ticket' | 'workflow' | 'ticket-type' | 'membership' | 'invite', received 'shop'",
+     });
+   });
+ 
+   it('planted defect: refuses microsecond precision — a JS Date cannot hold it, so it would not read back as the same instant', () => {
+     const event = { ...validSubmitted(), clientTime: '2026-08-20T09:00:00.123456Z' };
+     const result = submittedEventSchema.safeParse(event);
+     expect(result.success).toBe(false);
+     expect(rejectionIssues(result)).toContainEqual({
+       path: ['clientTime'],
+       message: 'must be ISO 8601 with at most millisecond precision',
+@@ -200,10 +200,162 @@ describe('eventEnvelopeSchema', () => {
+   it('planted defect: refuses a malformed serverTime', () => {
+     const full = { ...validSubmitted(), serverTime: 'nope', seq: 1 };
+     const result = eventEnvelopeSchema.safeParse(full);
+     expect(result.success).toBe(false);
+     expect(rejectionIssues(result)).toContainEqual({
+       path: ['serverTime'],
+       message: 'must be ISO 8601 with at most millisecond precision',
+     });
+   });
+ });
++
++/**
++ * Amendment 1 (coordination decision 5, owner-ratified 2026-08-28). The door
++ * behaves differently per entity kind for the first time, so all THREE
++ * directions are asserted: the composite admitted for `membership`, a bare ULID
++ * refused for `membership`, and — the one that makes "every other kind is
++ * unchanged" a proof rather than a claim — a non-membership kind still refusing
++ * the composite with the byte-identical `must be a ULID`.
++ */
++describe('entity id, kind by kind', () => {
++  function membershipEvent(overrides: Record<string, unknown> = {}): Record<string, unknown> {
++    const workspaceId = newUlid();
++    const userId = newUlid();
++    return {
++      ...validSubmitted(),
++      workspaceId,
++      entity: { kind: 'membership', id: `${workspaceId}:${userId}` },
++      type: 'membership.granted',
++      payload: { userId, role: 'member' },
++      ...overrides,
++    };
++  }
++
++  it("accepts a membership's composite entity id — `${workspaceId}:${userId}`", () => {
++    expect(submittedEventSchema.safeParse(membershipEvent()).success).toBe(true);
++  });
++
++  it('planted defect: refuses a membership entity id that is a bare ULID — the composite IS the addressing', () => {
++    const event = membershipEvent({ entity: { kind: 'membership', id: newUlid() } });
++    const result = submittedEventSchema.safeParse(event);
++    expect(result.success).toBe(false);
++    expect(rejectionIssues(result)).toContainEqual({
++      path: ['entity', 'id'],
++      message: 'must be a membership entity id — workspaceId:userId, two ULIDs joined by a colon',
++    });
++  });
++
++  it('planted defect: every OTHER kind still refuses a composite, byte-for-byte as before', () => {
++    // The regression guard for the whole amendment. Delete the kind test in
++    // envelope.ts and this is the assertion that notices.
++    for (const kind of ['workspace', 'project', 'ticket', 'workflow', 'ticket-type', 'invite'] as const) {
++      const event = { ...validSubmitted(), entity: { kind, id: `${newUlid()}:${newUlid()}` } };
++      const result = submittedEventSchema.safeParse(event);
++      expect(result.success).toBe(false);
++      expect(rejectionIssues(result)).toContainEqual({ path: ['entity', 'id'], message: 'must be a ULID' });
++    }
++  });
++
++  it('planted defect: refuses a composite naming a DIFFERENT workspace — the shape is right and the claim is not', () => {
++    // Shape-valid on purpose, so only the cross-field check can fail here: if
++    // this asserted a malformed composite instead, the regex above would mask a
++    // deleted workspace check and the test would stay green without it.
++    const event = membershipEvent({ entity: { kind: 'membership', id: `${newUlid()}:${newUlid()}` } });
++    const result = submittedEventSchema.safeParse(event);
++    expect(result.success).toBe(false);
++    expect(rejectionIssues(result)).toContainEqual({
++      path: ['entity', 'id'],
++      message: "must name this event's own workspace — a membership entity id is workspaceId:userId",
++    });
++  });
++
++  it('eventEnvelopeSchema inherits both membership checks from the shared base object', () => {
++    const full = {
++      ...membershipEvent({ entity: { kind: 'membership', id: `${newUlid()}:${newUlid()}` } }),
++      serverTime: '2026-08-20T09:00:01.000Z',
++      seq: 1,
++    };
++    const result = eventEnvelopeSchema.safeParse(full);
++    expect(result.success).toBe(false);
++    expect(rejectionIssues(result)).toContainEqual({
++      path: ['entity', 'id'],
++      message: "must name this event's own workspace — a membership entity id is workspaceId:userId",
++    });
++  });
++});
++
++/**
++ * Amendment 2. `'invite'` is inert until Plan 4's invite types are registered:
++ * the envelope admits the kind, and `parseEvent` still has nothing to file
++ * against it. Both halves are asserted so "additive and inert" is checked, not
++ * assumed.
++ */
++describe("ENTITY_KINDS admits 'invite'", () => {
++  it('accepts an invite entity with a bare ULID id', () => {
++    const event = { ...validSubmitted(), entity: { kind: 'invite', id: newUlid() } };
++    expect(submittedEventSchema.safeParse(event).success).toBe(true);
++  });
++
++  it('lists exactly the seven kinds', () => {
++    expect([...ENTITY_KINDS]).toEqual([
++      'workspace',
++      'project',
++      'ticket',
++      'workflow',
++      'ticket-type',
++      'membership',
++      'invite',
++    ]);
++  });
++});
++
++/**
++ * Amendment 3. `z.unknown()` does not require the key, so an event could carry
++ * no claim at all into an append-only table. ONLY absence is the defect: the
++ * two acceptances below are pinned deliberately, because a fix that also
++ * refused `null` or `{}` would look correct and quietly refuse legitimate
++ * claims — an empty claim is still a claim.
++ */
++describe('payload is required', () => {
++  it('planted defect: refuses an absent payload — an event with no claim is not an event', () => {
++    const event = validSubmitted();
++    delete event['payload'];
++    const result = submittedEventSchema.safeParse(event);
++    expect(result.success).toBe(false);
++    expect(rejectionIssues(result)).toContainEqual({
++      path: ['payload'],
++      message: 'is required — an event with no payload is not a claim',
++    });
++  });
++
++  it('planted defect: refuses an explicitly undefined payload — JSON erases the difference from absence', () => {
++    const result = submittedEventSchema.safeParse({ ...validSubmitted(), payload: undefined });
++    expect(result.success).toBe(false);
++    expect(rejectionIssues(result)).toContainEqual({
++      path: ['payload'],
++      message: 'is required — an event with no payload is not a claim',
++    });
++  });
++
++  it('accepts a null payload — a null claim is still a claim', () => {
++    expect(submittedEventSchema.safeParse({ ...validSubmitted(), payload: null }).success).toBe(true);
++  });
++
++  it('accepts an empty-object payload — an empty claim is still a claim', () => {
++    expect(submittedEventSchema.safeParse({ ...validSubmitted(), payload: {} }).success).toBe(true);
++  });
++
++  it('eventEnvelopeSchema inherits the requirement', () => {
++    const full: Record<string, unknown> = {
++      ...validSubmitted(),
++      serverTime: '2026-08-20T09:00:01.000Z',
++      seq: 1,
++    };
++    delete full['payload'];
++    const result = eventEnvelopeSchema.safeParse(full);
++    expect(result.success).toBe(false);
++    expect(rejectionIssues(result)).toContainEqual({
++      path: ['payload'],
++      message: 'is required — an event with no payload is not a claim',
++    });
++  });
++});
+diff --git a/packages/domain/test/events/membership.test.ts b/packages/domain/test/events/membership.test.ts
+new file mode 100644
+index 0000000..f7cd43f
+--- /dev/null
++++ b/packages/domain/test/events/membership.test.ts
+@@ -0,0 +1,253 @@
++import type { z } from 'zod';
++import { describe, expect, it } from 'vitest';
++import type { WorkspaceRole } from '../../src/entity-state.js';
++import {
++  WORKSPACE_ROLES,
++  membershipGrantedPayload,
++  membershipRevokedPayload,
++  projectCreatedPayload,
++  projectMemberAddedPayload,
++  projectMemberRemovedPayload,
++  workspaceCreatedPayload,
++  workspaceRenamedPayload,
++  workspaceRoleSchema,
++} from '../../src/events/membership.js';
++import { newUlid } from '../../src/ids.js';
++import { domainRegistry } from '../../src/vocabulary.js';
++
++/**
++ * Same helper as envelope.test.ts, for the same reason: a bare `.success ===
++ * false` stays green when the check underneath it is deleted, so every refusal
++ * below asserts the path AND the exact message.
++ */
++function rejectionIssues<Input, Output>(
++  result: z.SafeParseReturnType<Input, Output>,
++): Array<{ path: (string | number)[]; message: string }> {
++  if (result.success) {
++    throw new Error('expected safeParse to fail, but it succeeded');
++  }
++  return result.error.issues.map((issue) => ({ path: issue.path, message: issue.message }));
++}
++
++describe('workspaceCreatedPayload', () => {
++  it('accepts a non-empty name', () => {
++    expect(workspaceCreatedPayload.parse({ name: 'Convenience Corner' })).toEqual({ name: 'Convenience Corner' });
++  });
++
++  it('planted defect: refuses a missing or empty name', () => {
++    expect(rejectionIssues(workspaceCreatedPayload.safeParse({}))).toContainEqual({
++      path: ['name'],
++      message: 'Required',
++    });
++    expect(rejectionIssues(workspaceCreatedPayload.safeParse({ name: '' }))).toContainEqual({
++      path: ['name'],
++      message: 'String must contain at least 1 character(s)',
++    });
++  });
++
++  it('planted defect: refuses a name of only spaces, and does not silently trim one that has content', () => {
++    // `.min(1)` alone lets `'   '` through; the plan pinned the trim check, so
++    // this is what taking Plan 1's provisional shape over actually changes.
++    expect(rejectionIssues(workspaceCreatedPayload.safeParse({ name: '  ' }))).toContainEqual({
++      path: ['name'],
++      message: 'must not be blank — a name of only spaces names nothing',
++    });
++    // And the claim survives verbatim: refusing blanks must not become trimming.
++    expect(workspaceCreatedPayload.parse({ name: '  Corner  ' })).toEqual({ name: '  Corner  ' });
++  });
++});
++
++describe('workspaceRenamedPayload', () => {
++  // Plan 1 seeded this type PROVISIONALLY; Plan 4 takes it over rather than
++  // re-registering it, so its shape is pinned here for the first time.
++  it('accepts a non-empty name and refuses a blank one', () => {
++    expect(workspaceRenamedPayload.parse({ name: 'Corner Shop' })).toEqual({ name: 'Corner Shop' });
++    expect(rejectionIssues(workspaceRenamedPayload.safeParse({ name: '  ' }))).toContainEqual({
++      path: ['name'],
++      message: 'must not be blank — a name of only spaces names nothing',
++    });
++  });
++});
++
++describe('projectCreatedPayload', () => {
++  it('accepts a non-empty name', () => {
++    expect(projectCreatedPayload.parse({ name: 'Registrations' })).toEqual({ name: 'Registrations' });
++  });
++
++  it('planted defect: refuses junk', () => {
++    expect(rejectionIssues(projectCreatedPayload.safeParse(null))).toContainEqual({
++      path: [],
++      message: 'Expected object, received null',
++    });
++  });
++});
++
++describe('membershipGrantedPayload', () => {
++  it('accepts a workspace grant', () => {
++    const userId = newUlid();
++    expect(membershipGrantedPayload.parse({ userId, role: 'admin' })).toEqual({ userId, role: 'admin' });
++  });
++
++  it('planted defect: refuses an unknown role', () => {
++    const result = membershipGrantedPayload.safeParse({ userId: newUlid(), role: 'superuser' });
++    expect(rejectionIssues(result)).toContainEqual({
++      path: ['role'],
++      message: "Invalid enum value. Expected 'owner' | 'admin' | 'member' | 'guest', received 'superuser'",
++    });
++  });
++
++  it('planted defect: refuses a scope, rather than ignoring one', () => {
++    // Both shapes the removed `MembershipScope` could take. Accepting either and
++    // dropping it would take in a claim meaning "put them on project P" and do
++    // something else — the quiet acceptance the honesty contract forbids.
++    const withObject = membershipGrantedPayload.safeParse({
++      userId: newUlid(),
++      role: 'guest',
++      scope: { projectId: newUlid() },
++    });
++    expect(rejectionIssues(withObject)).toContainEqual({
++      path: ['scope'],
++      message: 'membership.granted no longer takes a scope; use project.member_added to put someone on a project',
++    });
++    const withString = membershipGrantedPayload.safeParse({
++      userId: newUlid(),
++      role: 'member',
++      scope: 'workspace',
++    });
++    expect(rejectionIssues(withString)).toContainEqual({
++      path: ['scope'],
++      message: 'membership.granted no longer takes a scope; use project.member_added to put someone on a project',
++    });
++  });
++
++  it('planted defect: the scope sentence is specific to scope, not a blanket message for every stray key', () => {
++    // `.strict()` alone would answer "Unrecognized key(s)" for `scope` too —
++    // true and useless. Declaring `scope` is what keeps the sentence that says
++    // where to go instead; this asserts the declaration did not turn into a
++    // blanket message that lies about unrelated keys.
++    const result = membershipGrantedPayload.safeParse({ userId: newUlid(), role: 'member', colour: 'red' });
++    expect(rejectionIssues(result)).toEqual([{ path: [], message: "Unrecognized key(s) in object: 'colour'" }]);
++  });
++
++  it('planted defect: refuses a userId that is not a ULID — the composite entity id could not otherwise be addressed', () => {
++    // Not a style choice. A membership is addressed as `${workspaceId}:${userId}`
++    // and the door admits only `^<ULID>:<ULID>$`, so a grant naming `usr_1`
++    // could never be filed at an id the door would accept.
++    const result = membershipGrantedPayload.safeParse({ userId: 'usr_1', role: 'member' });
++    expect(rejectionIssues(result)).toContainEqual({ path: ['userId'], message: 'must be a ULID' });
++  });
++});
++
++describe('workspaceRoleSchema', () => {
++  it('accepts exactly the four workspace roles and refuses a fifth', () => {
++    for (const role of WORKSPACE_ROLES) {
++      expect(workspaceRoleSchema.parse(role)).toBe(role);
++    }
++    expect(workspaceRoleSchema.safeParse('wizard').success).toBe(false);
++  });
++
++  it('is the same four as WorkspaceRole, checked in the direction `satisfies` cannot check', () => {
++    // `WORKSPACE_ROLES ... satisfies readonly WorkspaceRole[]` in the source
++    // catches a role this list has and the type does not. This switch catches
++    // the reverse: add a member to `WorkspaceRole` and it stops compiling,
++    // because a non-exhaustive switch cannot satisfy the declared return type.
++    function narrow(role: WorkspaceRole): (typeof WORKSPACE_ROLES)[number] {
++      switch (role) {
++        case 'owner':
++        case 'admin':
++        case 'member':
++        case 'guest':
++          return role;
++      }
++    }
++    expect(WORKSPACE_ROLES.map(narrow)).toEqual(['owner', 'admin', 'member', 'guest']);
++  });
++});
++
++describe('membershipRevokedPayload', () => {
++  it('accepts a userId', () => {
++    const userId = newUlid();
++    expect(membershipRevokedPayload.parse({ userId })).toEqual({ userId });
++  });
++
++  it('planted defect: refuses a missing userId', () => {
++    expect(rejectionIssues(membershipRevokedPayload.safeParse({}))).toContainEqual({
++      path: ['userId'],
++      message: 'Required',
++    });
++  });
++
++  it('planted defect: refuses a scope, rather than ignoring one', () => {
++    const result = membershipRevokedPayload.safeParse({ userId: newUlid(), scope: { projectId: newUlid() } });
++    expect(rejectionIssues(result)).toContainEqual({
++      path: ['scope'],
++      message: 'membership.revoked no longer takes a scope; use project.member_removed to take someone off a project',
++    });
++  });
++});
++
++describe('projectMemberAddedPayload', () => {
++  it('accepts userId and an explicit projectAdmin flag', () => {
++    const userId = newUlid();
++    expect(projectMemberAddedPayload.parse({ userId, projectAdmin: true })).toEqual({ userId, projectAdmin: true });
++  });
++
++  it('planted defect: refuses a missing projectAdmin flag — the flag is a claim, not a default', () => {
++    const result = projectMemberAddedPayload.safeParse({ userId: newUlid() });
++    expect(rejectionIssues(result)).toContainEqual({
++      path: ['projectAdmin'],
++      message: 'is required — a project-admin flag is a claim, not a default',
++    });
++  });
++
++  it('planted defect: refuses a non-boolean projectAdmin — "true" the string is not the claim', () => {
++    const result = projectMemberAddedPayload.safeParse({ userId: newUlid(), projectAdmin: 'true' });
++    expect(rejectionIssues(result)).toContainEqual({
++      path: ['projectAdmin'],
++      message: 'is required — a project-admin flag is a claim, not a default',
++    });
++  });
++});
++
++describe('projectMemberRemovedPayload', () => {
++  it('accepts a userId', () => {
++    const userId = newUlid();
++    expect(projectMemberRemovedPayload.parse({ userId })).toEqual({ userId });
++  });
++
++  it('planted defect: refuses junk', () => {
++    expect(rejectionIssues(projectMemberRemovedPayload.safeParse('usr_1'))).toContainEqual({
++      path: [],
++      message: 'Expected object, received string',
++    });
++  });
++});
++
++describe('registration in domainRegistry', () => {
++  it('binds each workspace, project and membership type to the entity kind its events are about', () => {
++    // The registrations are what make these types legal at the door; a schema
++    // nobody registered is a vocabulary the ledger will still refuse.
++    const expected = [
++      ['workspace.created', 'workspace'],
++      ['workspace.renamed', 'workspace'],
++      ['project.created', 'project'],
++      ['membership.granted', 'membership'],
++      ['membership.revoked', 'membership'],
++      ['project.member_added', 'project'],
++      ['project.member_removed', 'project'],
++    ] as const;
++    for (const [type, entityKind] of expected) {
++      const registration = domainRegistry.get(type, 1);
++      expect(registration, `${type} is not registered at v1`).toBeDefined();
++      expect(registration?.entityKind, `${type} is bound to the wrong kind`).toBe(entityKind);
++    }
++  });
++
++  it('registers workspace.created exactly once — Plan 4 takes Plan 1’s seed over, it does not re-register it', () => {
++    // `register` throws on a duplicate `type@version`, so a second registration
++    // would crash at module load rather than fail here. This asserts the seed
++    // now carries THIS plan's schema, which is the whole content of "takes over".
++    expect(domainRegistry.get('workspace.created', 1)?.payloadSchema).toBe(workspaceCreatedPayload);
++    expect(domainRegistry.get('workspace.renamed', 1)?.payloadSchema).toBe(workspaceRenamedPayload);
++  });
++});
+diff --git a/packages/domain/test/events/visibility.test.ts b/packages/domain/test/events/visibility.test.ts
+new file mode 100644
+index 0000000..f6abcb2
+--- /dev/null
++++ b/packages/domain/test/events/visibility.test.ts
+@@ -0,0 +1,109 @@
++import type { z } from 'zod';
++import { describe, expect, it } from 'vitest';
++import { VISIBILITY_MODES, visibilitySetPayload } from '../../src/events/visibility.js';
++import { newUlid } from '../../src/ids.js';
++import { domainRegistry } from '../../src/vocabulary.js';
++
++function rejectionIssues<Input, Output>(
++  result: z.SafeParseReturnType<Input, Output>,
++): Array<{ path: (string | number)[]; message: string }> {
++  if (result.success) {
++    throw new Error('expected safeParse to fail, but it succeeded');
++  }
++  return result.error.issues.map((issue) => ({ path: issue.path, message: issue.message }));
++}
++
++describe('visibilitySetPayload', () => {
++  it('accepts workspace, project, and inherit modes without userIds', () => {
++    for (const mode of ['workspace', 'project', 'inherit'] as const) {
++      const ticketId = newUlid();
++      expect(visibilitySetPayload.parse({ ticketId, mode })).toEqual({ ticketId, mode });
++    }
++  });
++
++  it('accepts explicit mode with a non-empty userIds list', () => {
++    const ticketId = newUlid();
++    const userIds = [newUlid(), newUlid()];
++    expect(visibilitySetPayload.parse({ ticketId, mode: 'explicit', userIds })).toEqual({
++      ticketId,
++      mode: 'explicit',
++      userIds,
++    });
++  });
++
++  it('planted defect: refuses explicit mode without userIds — an audience of nobody is not a claim', () => {
++    const missing = visibilitySetPayload.safeParse({ ticketId: newUlid(), mode: 'explicit' });
++    expect(rejectionIssues(missing)).toContainEqual({
++      path: ['userIds'],
++      message: 'visibility.set with explicit mode requires a non-empty userIds list',
++    });
++    const empty = visibilitySetPayload.safeParse({ ticketId: newUlid(), mode: 'explicit', userIds: [] });
++    expect(rejectionIssues(empty)).toContainEqual({
++      path: ['userIds'],
++      message: 'visibility.set with explicit mode requires a non-empty userIds list',
++    });
++  });
++
++  it('planted defect: refuses userIds on non-explicit modes — a list nobody reads would be a silent lie', () => {
++    // Named per mode, so the refusal says which claim was contradicted rather
++    // than restating the rule.
++    for (const mode of ['workspace', 'project', 'inherit'] as const) {
++      const result = visibilitySetPayload.safeParse({ ticketId: newUlid(), mode, userIds: [newUlid()] });
++      expect(rejectionIssues(result)).toContainEqual({
++        path: ['userIds'],
++        message: `visibility.set with mode '${mode}' must not carry userIds`,
++      });
++    }
++  });
++
++  it('planted defect: refuses an unknown mode', () => {
++    const result = visibilitySetPayload.safeParse({ ticketId: newUlid(), mode: 'secret' });
++    expect(rejectionIssues(result)).toContainEqual({
++      path: ['mode'],
++      message: "Invalid enum value. Expected 'workspace' | 'project' | 'explicit' | 'inherit', received 'secret'",
++    });
++  });
++
++  it('planted defect: refuses a missing ticketId', () => {
++    expect(rejectionIssues(visibilitySetPayload.safeParse({ mode: 'project' }))).toContainEqual({
++      path: ['ticketId'],
++      message: 'Required',
++    });
++  });
++
++  it('planted defect: refuses a readable placeholder ticketId or userId — the door speaks ULIDs', () => {
++    expect(rejectionIssues(visibilitySetPayload.safeParse({ ticketId: 'tkt_1', mode: 'project' }))).toContainEqual({
++      path: ['ticketId'],
++      message: 'must be a ULID',
++    });
++    const badUser = visibilitySetPayload.safeParse({
++      ticketId: newUlid(),
++      mode: 'explicit',
++      userIds: [newUlid(), 'usr_2'],
++    });
++    expect(rejectionIssues(badUser)).toContainEqual({ path: ['userIds', 1], message: 'must be a ULID' });
++  });
++
++  it('planted defect: refuses an unknown key — the payload is strict', () => {
++    const result = visibilitySetPayload.safeParse({ ticketId: newUlid(), mode: 'project', scope: 'workspace' });
++    expect(rejectionIssues(result)).toContainEqual({
++      path: [],
++      message: "Unrecognized key(s) in object: 'scope'",
++    });
++  });
++
++  it('lists exactly the four modes', () => {
++    expect([...VISIBILITY_MODES]).toEqual(['workspace', 'project', 'explicit', 'inherit']);
++  });
++});
++
++describe('registration in domainRegistry', () => {
++  it('binds visibility.set v1 to the TICKET whose audience it changes', () => {
++    // Filed against the ticket, not against a visibility entity of its own: a
++    // claim on that ticket's history, exactly as comment.added is.
++    const registration = domainRegistry.get('visibility.set', 1);
++    expect(registration).toBeDefined();
++    expect(registration?.entityKind).toBe('ticket');
++    expect(registration?.payloadSchema).toBe(visibilitySetPayload);
++  });
++});
+diff --git a/packages/domain/test/ids.test.ts b/packages/domain/test/ids.test.ts
+index 5612e25..421614b 100644
+--- a/packages/domain/test/ids.test.ts
++++ b/packages/domain/test/ids.test.ts
+@@ -1,21 +1,48 @@
+ import { describe, expect, it } from 'vitest';
+-import { ULID_REGEX, isUlid, newUlid } from '../src/ids.js';
++import { MEMBERSHIP_ID_REGEX, ULID_REGEX, isUlid, newUlid } from '../src/ids.js';
++import { membershipId } from '../src/entity-state.js';
+ 
+ describe('ULID helpers', () => {
+   it('newUlid generates 26-char Crockford base32 ids that pass their own regex', () => {
+     for (let i = 0; i < 100; i += 1) {
+       expect(newUlid()).toMatch(ULID_REGEX);
+     }
+   });
+ 
+   it('isUlid accepts a valid literal', () => {
+     expect(isUlid('01J60000000000000000000WKA')).toBe(true);
+   });
+ 
+   it('isUlid refuses wrong length, lowercase, and the excluded letters I L O U', () => {
+     expect(isUlid('01J60000000000000000000WK')).toBe(false); // 25 chars
+     expect(isUlid('01j60000000000000000000wka')).toBe(false); // lowercase
+     expect(isUlid('01J6000000000000000000ILOU')).toBe(false); // excluded alphabet
+     expect(isUlid('81J60000000000000000000WKA')).toBe(false); // first char > 7 overflows 48-bit time
+   });
+ });
++
++describe('MEMBERSHIP_ID_REGEX', () => {
++  it('admits exactly what membershipId() writes', () => {
++    for (let i = 0; i < 100; i += 1) {
++      expect(membershipId(newUlid(), newUlid())).toMatch(MEMBERSHIP_ID_REGEX);
++    }
++  });
++
++  it('planted defect: refuses a bare ULID, a lone colon, three parts, and a non-ULID half', () => {
++    expect(MEMBERSHIP_ID_REGEX.test('01J60000000000000000000WKA')).toBe(false);
++    expect(MEMBERSHIP_ID_REGEX.test('01J60000000000000000000WKA:')).toBe(false);
++    expect(MEMBERSHIP_ID_REGEX.test(':01J6000000000000000000ACTR')).toBe(false);
++    expect(MEMBERSHIP_ID_REGEX.test('01J60000000000000000000WKA:01J6000000000000000000ACTR:01J60000000000000000000WKA')).toBe(
++      false,
++    );
++    expect(MEMBERSHIP_ID_REGEX.test('01J60000000000000000000WKA:usr_founder')).toBe(false);
++    // The excluded alphabet, on the right-hand half — this is the assertion that
++    // notices if the pattern is ever re-spelled by hand instead of composed.
++    expect(MEMBERSHIP_ID_REGEX.test('01J60000000000000000000WKA:01J6000000000000000000ILOU')).toBe(false);
++  });
++
++  it('is composed from ULID_REGEX rather than re-spelled — one origin for what a ULID is', () => {
++    const body = ULID_REGEX.source.replace(/^\^/, '').replace(/\$$/, '');
++    expect(MEMBERSHIP_ID_REGEX.source).toBe(`^${body}:${body}$`);
++  });
++});
+diff --git a/packages/domain/test/parse-event.test.ts b/packages/domain/test/parse-event.test.ts
+index b9b9652..163b632 100644
+--- a/packages/domain/test/parse-event.test.ts
++++ b/packages/domain/test/parse-event.test.ts
+@@ -132,10 +132,127 @@ describe('parseEvent', () => {
+     const result = parseEvent(raw);
+     expect(result).toEqual({
+       ok: false,
+       code: 'malformed-envelope',
+       message:
+         "event envelope is malformed at origin: Invalid enum value. Expected 'web' | 'mobile' | 'desktop' | 'server', received 'carrier-pigeon'",
+       eventId: raw['id'],
+     });
+   });
+ });
++
++/**
++ * The USER half of the membership coherence check (coordination decision 5).
++ *
++ * It is asserted HERE, through `parseEvent`, and its fixtures are all
++ * prefix-CORRECT: the envelope schema's own workspace check would otherwise
++ * mask it, and a masked check is one that can be deleted without any assertion
++ * noticing. Everything below differs from a valid membership event in the user
++ * alone.
++ */
++describe('parseEvent — a membership event must be filed at its own (workspace, user)', () => {
++  function rawMembershipGranted(overrides: Record<string, unknown> = {}): Record<string, unknown> {
++    const workspaceId = newUlid();
++    const userId = newUlid();
++    return {
++      id: newUlid(),
++      workspaceId,
++      entity: { kind: 'membership', id: `${workspaceId}:${userId}` },
++      type: 'membership.granted',
++      version: 1,
++      payload: { userId, role: 'member' },
++      actorId: newUlid(),
++      origin: 'web',
++      clientTime: '2026-08-20T09:00:00.000Z',
++      ...overrides,
++    };
++  }
++
++  it('accepts a membership.granted addressed as membershipId() writes it', () => {
++    const result = parseEvent(rawMembershipGranted());
++    expect(result.ok).toBe(true);
++  });
++
++  it('planted defect: refuses an id naming a DIFFERENT user than the payload grants', () => {
++    // Right workspace, right shape, wrong person. Nothing else in the system
++    // catches this: the server's entity↔workspace guard only fires once a head
++    // row exists, so this event would commit and a later, correctly-addressed
++    // revoke would open a second stream at seq 1 for the same person.
++    const workspaceId = newUlid();
++    const grantedUser = newUlid();
++    const otherUser = newUlid();
++    const raw = rawMembershipGranted({
++      workspaceId,
++      entity: { kind: 'membership', id: `${workspaceId}:${otherUser}` },
++      payload: { userId: grantedUser, role: 'admin' },
++    });
++    const result = parseEvent(raw);
++    expect(result).toEqual({
++      ok: false,
++      code: 'malformed-envelope',
++      message: `This membership event is filed at entity '${workspaceId}:${otherUser}', but it is about user '${grantedUser}' in workspace '${workspaceId}' — a membership's entity id is workspaceId:userId. Filing it anywhere else starts a second stream for the same person.`,
++      eventId: raw['id'],
++    });
++  });
++
++  it('planted defect: refuses membership.revoked filed at the wrong user just as it refuses a grant', () => {
++    const workspaceId = newUlid();
++    const revokedUser = newUlid();
++    const otherUser = newUlid();
++    const raw = rawMembershipGranted({
++      workspaceId,
++      entity: { kind: 'membership', id: `${workspaceId}:${otherUser}` },
++      type: 'membership.revoked',
++      payload: { userId: revokedUser },
++    });
++    const result = parseEvent(raw);
++    expect(result).toEqual({
++      ok: false,
++      code: 'malformed-envelope',
++      message: `This membership event is filed at entity '${workspaceId}:${otherUser}', but it is about user '${revokedUser}' in workspace '${workspaceId}' — a membership's entity id is workspaceId:userId. Filing it anywhere else starts a second stream for the same person.`,
++      eventId: raw['id'],
++    });
++  });
++
++  it('planted defect: refuses a membership event whose payload names no user at all', () => {
++    // Reachable only through an injected registry today, because both shipped
++    // membership types require `userId` — but the check is written for the KIND,
++    // not for the two types, so a future membership type that forgot its user
++    // meets a refusal rather than an unaddressable stream. Asserting it here is
++    // what keeps that branch from being a check that cannot fail.
++    const registry = createEventTypeRegistry();
++    registry.register({
++      type: 'membership.something',
++      version: 1,
++      entityKind: 'membership',
++      payloadSchema: z.object({ note: z.string() }).strict(),
++    });
++    const workspaceId = newUlid();
++    const entityId = `${workspaceId}:${newUlid()}`;
++    const raw = rawMembershipGranted({
++      workspaceId,
++      entity: { kind: 'membership', id: entityId },
++      type: 'membership.something',
++      payload: { note: 'no user here' },
++    });
++    const result = parseEvent(raw, registry);
++    expect(result).toEqual({
++      ok: false,
++      code: 'malformed-envelope',
++      message: `This membership event is filed at entity '${entityId}' but its payload names no user — a membership's entity id is workspaceId:userId, so an event that does not say who it is about cannot be addressed at all.`,
++      eventId: raw['id'],
++    });
++  });
++
++  it('leaves every non-membership kind alone — a ticket payload may carry any userId it likes', () => {
++    // The regression guard for this check: it is scoped to `kind === membership`
++    // and must not start inspecting ids on kinds that never had a composite.
++    const ticketId = newUlid();
++    const raw: Record<string, unknown> = {
++      ...rawWorkspaceCreated(),
++      entity: { kind: 'ticket', id: ticketId },
++      type: 'ticket.collaborator_added',
++      payload: { userId: newUlid() },
++    };
++    expect(parseEvent(raw).ok).toBe(true);
++  });
++});

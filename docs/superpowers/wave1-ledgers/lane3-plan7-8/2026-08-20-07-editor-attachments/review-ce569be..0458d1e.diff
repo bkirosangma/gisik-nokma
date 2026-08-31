@@ -1,0 +1,223 @@
+# Review package: ce569be..HEAD
+
+## Commits
+0458d1e A comment that stops counting: the option selected an implementation, not a behaviour, and the rules never fired only on paste
+
+## Files changed
+ packages/editor/src/schema/extensions.ts          | 82 ++++++++++++++---------
+ packages/editor/test/doc-text-conformance.test.ts | 33 +++++----
+ packages/editor/test/schema.test.ts               | 14 +++-
+ 3 files changed, 84 insertions(+), 45 deletions(-)
+
+## Diff
+diff --git a/packages/editor/src/schema/extensions.ts b/packages/editor/src/schema/extensions.ts
+index 8323869..1d13c07 100644
+--- a/packages/editor/src/schema/extensions.ts
++++ b/packages/editor/src/schema/extensions.ts
+@@ -47,55 +47,75 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
+     StarterKit.configure({
+       // Replaced by VersionedDocument so the doc node carries schemaVersion.
+       document: false,
+       // Configured separately below.
+       link: false,
+       // Outside document schema v1's closed mark vocabulary.
+       underline: false,
+     }),
+     VersionedDocument,
+     // SPEC §2 SAYS "NOTHING SILENTLY BECOMES MARKUP". THESE OPTIONS DO NOT
+-    // ACHIEVE THAT, AND THIS COMMENT USED TO CLAIM THEY DID. There are FOUR
+-    // paths from text to link markup. Three are closed here by option:
+-    //   - `autolink` — a URL typed and then left. Off.
+-    //   - `linkOnPaste` — a URL pasted over a selection. Off. The library
+-    //     defaults it TRUE and the plan's config omits it, so a URL pasted
+-    //     over selected text became link markup. Deviation from the plan's
+-    //     verbatim config, ruled by the controller in review round 1.
+-    //   - `markdownLinks` — pasted `[text](url)` syntax. Already false by
+-    //     default; stated so the path is visibly checked, not accidentally
+-    //     correct.
++    // ACHIEVE THAT. Two earlier versions of this comment claimed otherwise —
++    // the first by naming three paths, the second by naming four — so this one
++    // describes the mechanism and deliberately does NOT count. Counting is what
++    // kept recreating the defect: a total is a claim of completeness, and it was
++    // false both times.
+     //
+-    // THE FOURTH IS NOT AN OPTION AND IS STILL LIVE. `Link.addPasteRules()`
+-    // returns a plain-URL `markPasteRule` UNCONDITIONALLY whenever
+-    // `markdownLinks` is false (extension-link@3.30.5 dist:445-482), core
+-    // registers it, and it fires from `pasteRulesPlugin`'s `appendTransaction`
+-    // gated only on `transaction.getMeta('uiEvent') === 'paste'` — which
+-    // prosemirror-view's `doPaste` sets AFTER `handlePaste` declines. None of
+-    // the three options above gates it. Setting `markdownLinks: false` in fact
+-    // routes INTO this branch rather than away from it.
++    // Line references are to the installed 3.30.5 dists, verified there.
+     //
+-    // So today a pasted URL becomes a link at a bare cursor as well as over a
+-    // selection — broader than the round-1 defect, which at least returned
+-    // early on an empty selection — and a bare `gst.gov.in` becomes
+-    // `http://gst.gov.in`. It is not link-only: five configured extensions
++    // WHAT IS CLOSED HERE, BY OPTION:
++    //   - `autolink` (off) — a URL typed and then left.
++    //   - `linkOnPaste` (off) — extension-link dist:502 registers the
++    //     `handlePasteLink` plugin only when true. Its handler returns early on
++    //     an empty selection, so it only ever covered pastes over a selection.
++    //   - `markdownLinks` (off) — gates TWO mechanisms, not one:
++    //     `addInputRules()` at dist:434-435, a TYPED `[text](url)` rule, and
++    //     the shape of the paste rule below. With it false, typing markdown
++    //     link syntax stays literal text.
++    //
++    // WHAT IS NOT CLOSED, AND CANNOT BE FROM THIS FUNCTION: the plain-URL paste
++    // rule. `addPasteRules()` (dist:445-482) returns a `markPasteRule` over
++    // `findPlainUrls` when `markdownLinks` is false — and when it is TRUE it
++    // returns `markdownLinkPasteRule`, which merges `findPlainUrls` matches in
++    // alongside the markdown ones (dist:225-237, and the library's own comment
++    // there says "and links the plain URLs from findPlainUrls"). Both branches
++    // link plain URLs. Verified empirically on this extension list: with
++    // `markdownLinks` true and false alike, a pasted URL becomes a link and a
++    // bare `gst.gov.in` becomes `http://gst.gov.in`.
++    //
++    // THAT IS THE LESSON WORTH CARRYING, and it is narrower than "an unaudited
++    // default got in": AN OPTION THAT LOOKS LIKE IT SELECTS BETWEEN A SAFE AND
++    // AN UNSAFE BRANCH MAY BE SELECTING BETWEEN TWO IMPLEMENTATIONS OF THE SAME
++    // BEHAVIOUR. Flipping `markdownLinks` does not avoid this path; it only
++    // changes which rule object implements it.
++    //
++    // TRIGGERS ARE NOT PASTE-ONLY. core dist:5119-5125 runs these rules from
++    // `pasteRulesPlugin`'s `appendTransaction` on any of:
++    //   - `uiEvent === 'paste'` AND not pasted from ProseMirror (dist:5121);
++    //   - `uiEvent === 'drop'` AND not dropped from ProseMirror (dist:5122) —
++    //     prosemirror-view dist:3902 dispatches it, so DRAGGING TEXT IN is a
++    //     live route, confirmed here to produce the same links as pasting;
++    //   - an `applyPasteRules` meta (dist:5123), Tiptap's simulated paste.
++    //
++    // Nothing live is left unnamed above. Everything not closed by option is
++    // the same rule set under a different trigger, so one lever covers all of
++    // it — `enablePasteRules`, an `Editor` option this function structurally
++    // cannot reach. It is also not link-only: five configured extensions
+     // register seven paste rules between them (`bold` 2, `italic` 2, `code` 1,
+-    // `strike` 1, `link` 1), so `**due soon**` pastes as bold, `*soon*` as
+-    // italic, `` `npm run gst` `` as code and `~~gone~~` as strike.
++    // `strike` 1, `link` 1), so `**due soon**` arrives bold, `*soon*` italic,
++    // `` `npm run gst` `` code and `~~gone~~` strike.
+     //
+-    // NOT DECIDED HERE, DELIBERATELY. Switching paste rules off is
+-    // `enablePasteRules`, an `Editor` option this function structurally cannot
+-    // reach, it spans five extensions, and it is a product judgement about how
+-    // §2 should be honoured. TASK 5 — the escape-suggestion mechanic — owns
+-    // that decision; the plan created it for this requirement. A test in
+-    // test/schema.test.ts records the current behaviour truthfully so that
+-    // Task 5's change is what makes it fail.
++    // NOT DECIDED HERE, DELIBERATELY. How §2 should be honoured across five
++    // extensions is a product judgement, and TASK 5 — the escape-suggestion
++    // mechanic — owns it; the plan created that task for this requirement.
++    // Tests in test/schema.test.ts record the current behaviour truthfully, so
++    // Task 5's change is what makes them fail.
+     //
+     // `openOnClick: false` keeps a click editing the link, not following it.
+     Link.configure({
+       openOnClick: false,
+       autolink: false,
+       linkOnPaste: false,
+       markdownLinks: false,
+     }),
+     Placeholder.configure({ placeholder: options.placeholder ?? 'Write…' }),
+     Table.configure({ resizable: false }),
+diff --git a/packages/editor/test/doc-text-conformance.test.ts b/packages/editor/test/doc-text-conformance.test.ts
+index 206231d..5464d0a 100644
+--- a/packages/editor/test/doc-text-conformance.test.ts
++++ b/packages/editor/test/doc-text-conformance.test.ts
+@@ -12,33 +12,42 @@ import { typeText } from './helpers/type-text.js';
+  * notifications both go through it — and it recognises a CLOSED set of block
+  * node names. Any node this schema emits that the walker does not know is
+  * descended into without a line break, so its text silently fuses with its
+  * neighbour's in every search index and every notification. Nothing else in
+  * the system would report that; the document would still round-trip, still
+  * render, still validate. So the check is run against documents this editor
+  * actually produced, not against hand-written JSON that could agree with the
+  * walker while the editor disagreed with both.
+  *
+  * WHAT THESE CASES DO AND DO NOT PIN, established by deleting each entry from
+- * the walker's block set and re-running: `paragraph`, `heading` and `codeBlock`
+- * each kill a case. `doc`, `blockquote`, `bulletList`, `orderedList` and
+- * `listItem` survive, and no schema-v1 document can change that — every one of
+- * them contains only other blocks, so the newline is emitted by the child
+- * regardless and the walker's `\n{2,}` collapse hides the duplicate. Their
+- * entries are inert for this editor's output. Stated here so a later reader
+- * does not mistake these cases for whole-set coverage and build on a guarantee
+- * they do not give.
++ * the walker's block set and re-running. The set has TWELVE entries. Three are
++ * load-bearing — `paragraph`, `heading` and `codeBlock` each kill a case. The
++ * other NINE are inert for this editor's output, and here they all are, so the
++ * list cannot be mistaken for a partial one:
+  *
+- * Only the three TEXTBLOCK entries are load-bearing, and that is the general
+- * shape rather than a coincidence: an entry earns its keep exactly when its
+- * node holds text directly. Every container's newline is already paid for by
+- * the block inside it.
++ *   `doc`, `blockquote`, `bulletList`, `orderedList`, `listItem` — each
++ *      contains only other blocks, so the newline is emitted by the child
++ *      regardless and the walker's `\n{2,}` collapse hides the duplicate. No
++ *      schema-v1 document can change that.
++ *   `code_block`, `bullet_list`, `ordered_list`, `list_item` — the snake_case
++ *      aliases. Unreachable from THIS editor at all: schema v1 emits camelCase
++ *      only, so nothing here can ever hit them. The walker carries them for
++ *      documents from other producers.
++ *
++ * Two different reasons for inertness, which is why no single rule covers it.
++ * `code_block` is the case that kills the tempting generalisation: it holds
++ * text directly, exactly as `codeBlock` does, and is still inert here — not
++ * because of what the node contains but because this editor never spells it
++ * that way. Containment explains the first group; spelling explains the second.
++ *
++ * Stated at this length so a later reader does not mistake these cases for
++ * whole-set coverage and build on a guarantee they do not give.
+  */
+ describe('schema v1 output conforms to the shipped plain-text walker', () => {
+   it('renders every block node the schema names as its own line', () => {
+     const editor = createTestEditor(undefined, {
+       type: 'doc',
+       content: [
+         { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'GST filing' }] },
+         { type: 'paragraph', content: [{ type: 'text', text: 'due soon' }] },
+         {
+           type: 'bulletList',
+diff --git a/packages/editor/test/schema.test.ts b/packages/editor/test/schema.test.ts
+index cccd37a..ae397cf 100644
+--- a/packages/editor/test/schema.test.ts
++++ b/packages/editor/test/schema.test.ts
+@@ -227,24 +227,34 @@ describe('behavioural options that spec §2 constrains', () => {
+     // asserting `options.linkOnPaste === false` would only echo the source.
+     const editor = createTestEditor();
+     const keys = editor.state.plugins.map((plugin) => String((plugin as { key?: unknown }).key));
+     expect(keys.some((key) => key.startsWith('handlePasteLink'))).toBe(false);
+     // Its typed sibling, for the same reason.
+     expect(keys.some((key) => key.startsWith('autolink'))).toBe(false);
+     editor.destroy();
+   });
+ 
+   /**
+-   * Replicates `doPaste` from prosemirror-view@1.42.3 in full: consult
+-   * `handlePaste` first, and if it declines, dispatch the replacement with
++   * Replicates the META-SETTING TAIL of `doPaste` (prosemirror-view@1.42.3
++   * dist:3754-3765) — NOT the whole function. It consults `handlePaste` first
++   * and, if that declines, dispatches the replacement with
+    * `.setMeta('paste', true).setMeta('uiEvent', 'paste')`.
+    *
++   * What is skipped, deliberately: the real `doPaste` takes
++   * `sliceSingleNode(slice)` and uses `replaceSelectionWith(singleNode,
++   * preferPlain)` where that yields a node, and adds `scrollIntoView()`. This
++   * helper always uses `replaceSelection(slice)` and never scrolls. Both are
++   * outcome-equivalent for the single-text-node slices used here, and
++   * `scrollIntoView` is a no-op in jsdom — but the difference is written down
++   * rather than papered over with the word "full", because the meta is the only
++   * part these tests actually depend on.
++   *
+    * BOTH HALVES ARE LOAD-BEARING and the second is the one an earlier version
+    * of this test omitted. `handlePaste` is a synchronous prop; paste RULES run
+    * from `pasteRulesPlugin`'s `appendTransaction`, gated on that `uiEvent`
+    * meta, which `doPaste` sets only AFTER `handlePaste` declines. A test that
+    * calls `someProp('handlePaste')` alone therefore cannot observe a paste
+    * rule at all — it will report "no link was created" no matter what the
+    * product does on that same keystroke.
+    */
+   function pasteInto(editor: ReturnType<typeof createTestEditor>, text: string): void {
+     const { view } = editor;

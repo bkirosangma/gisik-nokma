@@ -1,0 +1,1147 @@
+# Review package: f363b2f..HEAD
+
+## Commits
+deb90ca The stranded-state refusal named a state and a version that never coexisted, and said so only because every fixture was two-version
+67a8650 One fold for ticket head state, shared by the projection and the fixtures — every field carries its claimant and both clocks, and a replay-integrity break throws instead of degrading into quiet fiction
+
+## Files changed
+ .../plans/2026-08-20-00-series-coordination.md     |   6 +
+ packages/domain/src/index.ts                       |   2 +
+ packages/domain/src/ticket-state.ts                | 335 +++++++++++
+ packages/domain/src/workflow-helpers.ts            |  21 +
+ packages/domain/test/ticket-state.test.ts          | 650 +++++++++++++++++++++
+ .../transition-refuses-a-stranded-ticket.json      |   2 +-
+ packages/rule-engine/src/transition.ts             |  14 +-
+ 7 files changed, 1028 insertions(+), 2 deletions(-)
+
+## Diff
+diff --git a/docs/superpowers/plans/2026-08-20-00-series-coordination.md b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+index 16038f2..25fce86 100644
+--- a/docs/superpowers/plans/2026-08-20-00-series-coordination.md
++++ b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+@@ -406,20 +406,26 @@ Plan 2 ran with an execution ledger too, and at six separate points it wrote "ro
+ This section is that recording, late. One of the six is recorded as *resolved* rather than deferred, because the fix was small enough to take in the fix wave (item 6). The rest are claims on later plans. None of it changes Plan 2's shipped behaviour.
+ 
+ ### 1. The stranded-state refusal names a state against the wrong version's vocabulary
+ 
+ `transition.ts:65` renders the stranding refusal as `Ticket X sits in state "<unmappedStateId>" of workflow version <ticket.workflowVersion>` — asserting that the unmapped id belongs to the ticket's **origin** version. By `foldStateIdForward`'s own documented contract (`packages/domain/src/workflow.ts:99-101`, "on failure it reports the id at the point the chain broke, not the id it started from"), it does not. For a v1 ticket walking v1→v2→v3, the id reported is the one current *where the walk failed* — possibly a v2 id that the ticket's v1 vocabulary never contained. The sentence names a state and a version that never coexisted.
+ 
+ The copy is character-exact to the plan's canonical table, so this is an inaccuracy in the pinned copy rather than an implementation slip, and it is invisible to the current suite because every stranded-state fixture is two-version, where break-point and origin coincide. **Plan 6 renders these reasons verbatim to a human**, which is where a state id belonging to no version the reader can see becomes a support ticket.
+ 
+ The fix is a cross-plan surface change and belongs to whichever plan next touches the fold: **`FoldedState` must carry the version the chain broke on**, so the refusal can name `"<id>" of version <breakVersion>` truthfully — or drop the version clause and name only the id. Do not "fix" it by folding the id back to the origin version; there is no backward walk, and inventing one is a second set of rounding errors of exactly the kind the ONE VERSION WALK comment forbids. First plan to author a three-version fixture will observe this directly.
+ 
++**Resolved by Plan 3, Task 3 (2026-08-28): the version clause is DROPPED.** Plan 3 is the plan that next touched the fold — `foldTicketToWorkflowVersion` in `packages/domain/src/ticket-state.ts` is built on `foldStateIdForward` and inherited the same inaccuracy into its own message — so the take-or-record obligation fell due here, and it was taken rather than declined. `transition.ts:65` now reads `Ticket ${id} sits in state "${unmappedStateId}", which no longer exists in version ${latest.version} and no state mapping covers it.`, and `fixtures/transition-refuses-a-stranded-ticket.json` matches it character-for-character. **The fixture COUNT is unchanged at 61** — this is a copy edit to an existing fixture, not an addition. `packages/rule-engine/src/refusal-rules.ts` and the `stranded-state` rule id are untouched, so nothing that keys on the rule moves; only the sentence a human reads changes. The reasoning now lives in a comment at the refusal site, so a later tidy-up cannot restore the clause without reading why it went.
++
++Why this half rather than the surface change: the two options are not equally priced. Dropping the clause is a two-line copy edit inside one plan's blast radius; carrying the break version on `FoldedState` retypes `workflow.ts:84` and every consumer of the union across two packages, for a sentence that would then have to explain to a human why the version it names is neither the ticket's nor the latest. **The `FoldedState` break-version change stays available and is not withdrawn** — it remains the strictly more informative answer, and the trigger that should reopen it is a support or debugging need to know *where* a chain broke rather than merely *that* it did (Plan 6's refusal rendering, or an operator tool over a corrupted store). Folding the id back to the origin version remains forbidden either way.
++
++Two consequences later plans inherit as fact. **Plan 2's canonical copy table (`docs/superpowers/plans/2026-08-20-02-workflow-engine.md:164`) is superseded for this one reason** and is deliberately left unedited — plan text is never the authority for shipped behaviour, and a landed plan document is a record of what was decided then, not a mirror of what is running now. And **the same wording discipline now applies to the fold's own stranding error**: `foldTicketToWorkflowVersion` names the break-point state id and no version beside it, for the same reason, with the same citation of `workflow.ts:99-101` at the throw site. Plan 3 also authored the series' first three-version walk (`packages/domain/test/ticket-state.test.ts`), which is where §1 predicted the divergence would first be observable directly; it is, and the fold's separate hole-in-the-chain error is what names the missing version when there is one to name.
++
+ ### 2. `WorkflowDef.roles` is plain strings, so a definition can name a role that does not exist — owner needed
+ 
+ `packages/domain/src/workflow.ts:21` types restrict-to's roles as `z.array(z.string()).optional()`, not `WorkspaceRole[]`. A definition whose restrict-to names `"wizard"` therefore validates clean, publishes, lands in `proj_workflows`, and renders in the builder as a guard — and `evaluateRestrictTo` then compares `"wizard"` against a real membership role forever, matching nobody. The transition is not guarded; it is **closed**, silently, and the refusal reason names a rule that reads entirely legitimate.
+ 
+ This is precisely the shape `validateWorkflowDef` refuses everywhere else: `rdu-unknown-state` exists because a rule watching a state that does not exist is a declared thing that cannot function. A rule naming a role that does not exist is the same defect with no check behind it.
+ 
+ **This needs an owner, and the choice is a real one.** Either (a) Task 3's validator gains an unknown-role check — but `validateWorkflowDef` is pure and I/O-free by design and workspace roles are a domain constant, so this only works if the role vocabulary is a closed domain enum the validator may import; or (b) it becomes a **Plan 8 builder-surface** concern, because the builder picks roles from a list and can simply never emit an unknown one — which leaves the API door open to a hand-written definition. (a) is the honesty floor; (b) is cheaper. Plan 2 declined to rule it, because either answer changes a behaviour the plan had frozen. **Whoever rules it: typing `roles` as `WorkspaceRole[]` is the same fix as (a) and is strictly better than a check, if the enum can live in domain.**
+ 
+ ### 3. `require-different-user` is fail-open on an unresolvable entry, and the comment justifying that is conditionally false
+ 
+diff --git a/packages/domain/src/index.ts b/packages/domain/src/index.ts
+index ea6db1b..4dc9cc1 100644
+--- a/packages/domain/src/index.ts
++++ b/packages/domain/src/index.ts
+@@ -8,10 +8,12 @@ export * from './ingest-result.js';
+ export * from './state.js';
+ export * from './workflow.js';
+ export * from './validate-workflow.js';
+ export * from './advise-workflow.js';
+ export * from './entity-state.js';
+ export * from './ist-day.js';
+ export * from './doc-text.js';
+ export * from './ticket-types.js';
+ export * from './events/ticket-events.js';
+ export { makeEnvelope } from './testing.js';
++export * from './ticket-state.js';
++export * from './workflow-helpers.js';
+diff --git a/packages/domain/src/ticket-state.ts b/packages/domain/src/ticket-state.ts
+new file mode 100644
+index 0000000..52b01e0
+--- /dev/null
++++ b/packages/domain/src/ticket-state.ts
+@@ -0,0 +1,335 @@
++import type { EventEnvelope } from './envelope.js';
++// FieldClaim and TicketState are defined by Plan 2's Task 2 in entity-state.ts
++// (coordination doc §4): this reducer PRODUCES the type, it does not redefine
++// it. Deliberately NOT re-exported from this module — the package index already
++// star-exports entity-state, and a second export of the same names collides.
++import type { FieldClaim, TicketState } from './entity-state.js';
++import {
++  ticketAssignedPayload,
++  ticketCollaboratorPayload,
++  ticketCreatedPayload,
++  ticketFieldSetPayload,
++  ticketReparentedPayload,
++  ticketWorkflowReboundPayload,
++} from './events/ticket-events.js';
++import type { TicketTypeDef } from './ticket-types.js';
++// `ticket.transitioned`'s schema lives in workflow.ts, not with the rest of the
++// ticket vocabulary: Plan 2 shipped it there because the engine parses it, and
++// events/ticket-events.ts says so in its own header. Its destination field is
++// `to`. The transition LOG ENTRY separately and correctly spells `toStateId`.
++// Both spellings are real; they are not unified (coordination doc,
++// O-transitioned-payload).
++//
++// `foldStateIdForward` is THE ONE VERSION WALK for the monorepo, and it is
++// imported RELATIVELY. `@gisik-nokma/domain` resolves to this package's own
++// `dist/`, so a source file here importing its own package root is a build-order
++// cycle, not an import.
++import {
++  foldStateIdForward,
++  ticketTransitionedPayloadSchema,
++  type WorkflowDef,
++} from './workflow.js';
++import { stateCategoryOf } from './workflow-helpers.js';
++
++/**
++ * What the reducer needs looked up, and nothing more.
++ *
++ * `getWorkflow(workflowId)` is a PURE BY-ID LOOKUP: the caller does not
++ * pre-select which workflow the reducer is about to want. That is a contract,
++ * not an implementation detail. A `ticket.workflow_rebound` asks for the
++ * payload's `toWorkflowId` — a workflow the ticket is not on yet and which no
++ * caller inspecting only the ticket's current row would think to fetch — so a
++ * loader that serves "the ticket's workflow" and nothing else resolves null and
++ * this reducer throws on the very event the migration exists for. Every loader
++ * (the proj_tickets projection, the fixture context, Plan 10's replica) must
++ * serve ANY id asked for. The reducer stays the only place that knows which id
++ * an event needs, because the event is the only thing that knows.
++ */
++export type TicketStateDeps = {
++  getTicketType(typeId: string): TicketTypeDef | undefined;
++  getWorkflow(workflowId: string): WorkflowDef | undefined;
++};
++
++/**
++ * The event types this reducer folds — the ten registered against
++ * `entityKind: 'ticket'`. `ticket-type.defined` is deliberately absent: it is
++ * about a ticket TYPE, has its own entity kind and its own stream, and changing
++ * a type's workflow binding does not move any existing ticket (owner decision
++ * 2026-08-26: a ticket pins the workflow it was created under).
++ */
++export const TICKET_EVENT_TYPES = [
++  'ticket.created',
++  'ticket.transitioned',
++  'ticket.assigned',
++  'ticket.collaborator_added',
++  'ticket.collaborator_removed',
++  'ticket.field_set',
++  'ticket.reparented',
++  'ticket.workflow_rebound',
++  'comment.added',
++  'attachment.added',
++] as const;
++
++function claim(value: unknown, env: EventEnvelope): FieldClaim {
++  return { value, actorId: env.actorId, clientTime: env.clientTime, serverTime: env.serverTime };
++}
++
++/**
++ * Pure fold of one ACCEPTED ticket event into head state. Both the proj_tickets
++ * projection and the fixture suite's in-memory context use this one function, so
++ * client and server cannot quietly disagree about what a ticket is.
++ *
++ * It folds only events the engine has already accepted (projections consume the
++ * ledger; fixtures fold `priorEvents`), so it THROWS on the states the engine is
++ * contracted to refuse at the door — an event for a never-created ticket, an
++ * unknown type, an unresolvable workflow. Reaching one of those in replay means
++ * ledger integrity is broken; degrading silently would put a ticket in a status
++ * nobody claimed, which is what invariant 4 forbids.
++ */
++export function applyTicketEvent(
++  state: TicketState | undefined,
++  env: EventEnvelope,
++  deps: TicketStateDeps,
++): TicketState {
++  if (env.type === 'ticket.created') {
++    const p = ticketCreatedPayload.parse(env.payload);
++    const type = deps.getTicketType(p.typeId);
++    if (!type) {
++      throw new Error(
++        `applyTicketEvent: unknown ticket type "${p.typeId}" — the engine must refuse ticket.created before it reaches a projection`,
++      );
++    }
++    const wf = deps.getWorkflow(type.workflowId);
++    if (!wf) {
++      throw new Error(
++        `applyTicketEvent: workflow "${type.workflowId}" is not defined — the engine must refuse ticket.created before it reaches a projection`,
++      );
++    }
++    const category = stateCategoryOf(wf, wf.initialStateId);
++    if (!category) {
++      throw new Error(`applyTicketEvent: workflow "${wf.id}" has no state "${wf.initialStateId}"`);
++    }
++    return {
++      kind: 'ticket',
++      id: env.entity.id,
++      workspaceId: env.workspaceId,
++      projectId: p.projectId,
++      typeId: p.typeId,
++      parentId: p.parentId,
++      // The ticket pins the workflow it was created under, by id AND by the
++      // version in force at creation — a later re-point of the TYPE's binding
++      // moves nothing that already exists.
++      workflowId: type.workflowId,
++      workflowVersion: wf.version,
++      stateId: wf.initialStateId,
++      stateCategory: category,
++      assigneeId: null,
++      collaboratorIds: [],
++      fields: { title: claim(p.title, env) },
++      transitions: [],
++    };
++  }
++
++  if (!state) {
++    throw new Error(
++      `applyTicketEvent: ${env.type} for ticket ${env.entity.id} that was never created`,
++    );
++  }
++
++  switch (env.type) {
++    case 'ticket.transitioned': {
++      const p = ticketTransitionedPayloadSchema.parse(env.payload);
++      const wf = deps.getWorkflow(state.workflowId);
++      if (!wf) {
++        throw new Error(
++          `applyTicketEvent: workflow "${state.workflowId}" vanished — replay integrity is broken`,
++        );
++      }
++      const category = stateCategoryOf(wf, p.to);
++      if (!category) {
++        throw new Error(`applyTicketEvent: workflow "${wf.id}" has no state "${p.to}"`);
++      }
++      return {
++        ...state,
++        stateId: p.to,
++        stateCategory: category,
++        workflowVersion: wf.version,
++        // The entry's `workflowId`/`workflowVersion` name the vocabulary its
++        // `toStateId` is written in — the ticket's own pair at the moment the
++        // event applied, AFTER the forward fold performed on the line above. So
++        // the version is `wf.version` (the def `p.to` was just resolved
++        // against), never the pre-spread `state.workflowVersion`, which is where
++        // the ticket sat BEFORE this fold. require-different-user skips entries
++        // from a different workflow and walks the rest forward from this version
++        // through `stateMapping` before comparing, so neither a remapped state
++        // nor a migration can disarm four-eyes.
++        //
++        // `seq` is the envelope's, and it is load-bearing: RDU sorts a copy of
++        // the entries by ascending `seq` at the point of use rather than
++        // trusting array order (Plan 2 consequences §4). A wrong `seq` here
++        // silently mis-sorts the log instead of being ignored.
++        transitions: [
++          ...state.transitions,
++          {
++            toStateId: p.to,
++            actorId: env.actorId,
++            seq: env.seq,
++            workflowId: state.workflowId,
++            workflowVersion: wf.version,
++          },
++        ],
++      };
++    }
++    case 'ticket.assigned': {
++      const p = ticketAssignedPayload.parse(env.payload);
++      return { ...state, assigneeId: p.assigneeId };
++    }
++    case 'ticket.collaborator_added': {
++      const p = ticketCollaboratorPayload.parse(env.payload);
++      return state.collaboratorIds.includes(p.userId)
++        ? state
++        : { ...state, collaboratorIds: [...state.collaboratorIds, p.userId] };
++    }
++    case 'ticket.collaborator_removed': {
++      const p = ticketCollaboratorPayload.parse(env.payload);
++      return { ...state, collaboratorIds: state.collaboratorIds.filter((id) => id !== p.userId) };
++    }
++    case 'ticket.field_set': {
++      const p = ticketFieldSetPayload.parse(env.payload);
++      // A clearing claim is a claim: `value: null` keeps the clearer's id and
++      // both clocks, so "who emptied this, and when" survives.
++      return { ...state, fields: { ...state.fields, [p.fieldId]: claim(p.value ?? null, env) } };
++    }
++    case 'ticket.reparented': {
++      const p = ticketReparentedPayload.parse(env.payload);
++      return { ...state, parentId: p.newParentId };
++    }
++    case 'ticket.workflow_rebound': {
++      // The one payload in this vocabulary whose destination field genuinely IS
++      // `toStateId` — the outgoing and incoming workflows are unrelated graphs,
++      // so the claim names where the ticket lands rather than leaving it to be
++      // guessed (events/ticket-events.ts:90-95).
++      const p = ticketWorkflowReboundPayload.parse(env.payload);
++      const wf = deps.getWorkflow(p.toWorkflowId);
++      if (!wf) {
++        throw new Error(
++          `applyTicketEvent: workflow "${p.toWorkflowId}" is not defined — the engine must refuse ticket.workflow_rebound before it reaches a projection`,
++        );
++      }
++      const category = stateCategoryOf(wf, p.toStateId);
++      if (!category) {
++        throw new Error(`applyTicketEvent: workflow "${wf.id}" has no state "${p.toStateId}"`);
++      }
++      // The transition log is NOT appended to, and existing entries are NOT
++      // rewritten. A migration is an attributed claim of its own, not a move
++      // anybody performed, so four-eyes has nobody to differ from on the first
++      // guarded move in the new workflow — and the entries left behind keep the
++      // workflowId they were recorded under, so require-different-user filters
++      // them out instead of walking them through a chain they were never
++      // written in. Rewriting them would destroy the very fact that filter
++      // reads.
++      return {
++        ...state,
++        workflowId: p.toWorkflowId,
++        workflowVersion: wf.version,
++        stateId: p.toStateId,
++        stateCategory: category,
++      };
++    }
++    case 'comment.added':
++    case 'attachment.added':
++      // Neither adds to head state: comments and attachments are ledger entries
++      // the history endpoint renders, not fields anything folds. This is
++      // precisely why "a Drive reference cannot be evidence" is NOT a
++      // rule-engine rule — `TicketState` never carries attachments, so no pure
++      // rule has anywhere to read an attachment's kind from. That gate is Plan
++      // 7's unconditionally (pre-flight ruling 5, 2026-08-28, settling the
++      // "whichever lands second" clause Plan 2 left open): it lives inside the
++      // ingest transaction, where the attachments table and the ledger are both
++      // in reach.
++      return state;
++    default:
++      throw new Error(`applyTicketEvent: not a ticket event: ${env.type}`);
++  }
++}
++
++/**
++ * Fold ONE ticket's head state forward onto a newly published workflow version
++ * (design decision 10, owner decision 2026-08-26). The ONE implementation of
++ * refresh-on-publish: the proj_tickets projection, the fixture suite's
++ * in-memory context, and Plan 10's offline replica all call this. Two of the
++ * three would otherwise drift, and the replica — which never sees the server's
++ * pg projections — would keep stale categories forever.
++ *
++ * `getVersion` resolves an exact intermediate version of the SAME workflow and
++ * returns `null` for one it cannot supply, matching `foldStateIdForward`'s
++ * contract. It is consulted only for versions strictly between the ticket's and
++ * the target's.
++ *
++ * The `>=` early return is NOT dead code on the live path's account. Plan 1's
++ * canonical replay order is (entity_kind, entity_id, seq), so on a rebuild every
++ * `ticket` event replays before every `workflow` event and rows arrive here
++ * already at their as-of version; the older publishes then land last and would
++ * drag them backwards. Skipping makes the fold monotone, so the last
++ * `workflow.defined` puts every row at the same place whatever order the ledger
++ * was replayed in. Do not remove it.
++ */
++export function foldTicketToWorkflowVersion(
++  state: TicketState,
++  target: WorkflowDef,
++  getVersion: (version: number) => WorkflowDef | null,
++): TicketState {
++  if (state.workflowVersion >= target.version) return state;
++
++  // Pre-check the chain so that a hole reports as a hole. `foldStateIdForward`
++  // folds a missing definition into the same `ok: false` as an unmapped drop,
++  // and those are different faults: one is a gap in the ledger, the other a
++  // publish that should have been refused. Naming the wrong one sends whoever
++  // reads the error hunting in the wrong place.
++  for (let version = state.workflowVersion + 1; version < target.version; version += 1) {
++    if (!getVersion(version)) {
++      throw new Error(
++        `foldTicketToWorkflowVersion: workflow "${state.workflowId}" version ${version} is missing — the version chain has a hole and ticket ${state.id} cannot be walked forward`,
++      );
++    }
++  }
++
++  const resolved = foldStateIdForward(state.stateId, state.workflowVersion, target, getVersion);
++  if (!resolved.ok) {
++    // Publishing refuses unmapped drops (Plan 2), so this is only reachable on a
++    // corrupted or hand-planted store. The honest answer is a loud failure,
++    // never a guessed state — a ticket whose status we invented is exactly what
++    // invariant 4 forbids.
++    //
++    // The message names the id at the point the chain BROKE and no version
++    // beside it, because `foldStateIdForward` reports the break-point id, not
++    // the one it started from (workflow.ts:99-101): on a chain longer than two
++    // that id can belong to a version the ticket never sat in, and naming a
++    // state and a version that never coexisted is worse than naming neither.
++    // Same reasoning, same wording discipline as the engine's stranded-state
++    // refusal (coordination doc, Plan 2 consequences §1).
++    throw new Error(
++      `foldTicketToWorkflowVersion: ticket ${state.id} cannot be folded forward to workflow "${target.id}" version ${target.version} — state "${resolved.unmappedStateId}" is dropped with no stateMapping entry`,
++    );
++  }
++
++  const category = stateCategoryOf(target, resolved.stateId);
++  if (!category) {
++    throw new Error(
++      `foldTicketToWorkflowVersion: workflow "${target.id}" version ${target.version} has no state "${resolved.stateId}"`,
++    );
++  }
++
++  return {
++    ...state,
++    stateId: resolved.stateId,
++    stateCategory: category,
++    workflowVersion: target.version,
++    // `transitions` is deliberately untouched. Each entry's workflowId and
++    // workflowVersion name the vocabulary its `toStateId` is written in;
++    // rewriting them would destroy the evidence require-different-user walks
++    // forward to find an earlier performer (Plan 2 Task 11, coordination doc
++    // 2026-08-26). A fold moves the ticket's current state, never the history
++    // that got it there.
++  };
++}
+diff --git a/packages/domain/src/workflow-helpers.ts b/packages/domain/src/workflow-helpers.ts
+new file mode 100644
+index 0000000..26b32b1
+--- /dev/null
++++ b/packages/domain/src/workflow-helpers.ts
+@@ -0,0 +1,21 @@
++import type { StateCategory, WorkflowDef } from './workflow.js';
++
++/**
++ * The category a workflow definition gives one of its state ids, or `undefined`
++ * when the definition has no such state.
++ *
++ * `TicketState.stateCategory` is denormalized from the ticket's workflow so the
++ * parent-terminal invariant needs no per-child workflow lookup
++ * (`entity-state.ts:12-13`). Denormalized means *derived*, and this is the one
++ * derivation: every place that writes a `stateCategory` — the reducer on
++ * creation, on transition and on rebind, and the refresh-on-publish fold — asks
++ * this function rather than reaching into `def.states` itself, so a ticket's
++ * category cannot come to mean something the workflow does not say.
++ *
++ * `undefined` rather than a throw: the callers differ on what a missing state
++ * means (a broken replay, a corrupt publish, a fold that stranded), and each
++ * says so in its own words. A throw here would flatten three faults into one.
++ */
++export function stateCategoryOf(def: WorkflowDef, stateId: string): StateCategory | undefined {
++  return def.states.find((state) => state.id === stateId)?.category;
++}
+diff --git a/packages/domain/test/ticket-state.test.ts b/packages/domain/test/ticket-state.test.ts
+new file mode 100644
+index 0000000..be90aff
+--- /dev/null
++++ b/packages/domain/test/ticket-state.test.ts
+@@ -0,0 +1,650 @@
++import { describe, expect, it } from 'vitest';
++import type { TicketState } from '../src/entity-state.js';
++import { makeEnvelope } from '../src/testing.js';
++import {
++  applyTicketEvent,
++  foldTicketToWorkflowVersion,
++  TICKET_EVENT_TYPES,
++  type TicketStateDeps,
++} from '../src/ticket-state.js';
++import type { TicketTypeDef } from '../src/ticket-types.js';
++import { domainRegistry } from '../src/vocabulary.js';
++import type { PublishedWorkflowDef, WorkflowDef } from '../src/workflow.js';
++import { stateCategoryOf } from '../src/workflow-helpers.js';
++
++const PROJECT = '01J9GPRJ000000000000000000';
++const TICKET = '01J9GTKA000000000000000000';
++const PARENT = '01J9GPAR000000000000000000';
++/** makeEnvelope's default — the workspace every envelope below is filed under. */
++const WORKSPACE = '01J9GWS0000000000000000000';
++/** makeEnvelope's default actor, asserted wherever a test does not override it. */
++const DEFAULT_ACTOR = '01J9GACT000000000000000000';
++
++const WF: WorkflowDef = {
++  id: 'wf-basic',
++  version: 1,
++  name: 'Basic',
++  initialStateId: 'todo',
++  states: [
++    { id: 'todo', name: 'To do', category: 'open' },
++    { id: 'doing', name: 'Doing', category: 'active' },
++    { id: 'done', name: 'Done', category: 'terminal' },
++  ],
++  transitions: [
++    { from: '*', to: 'todo', rules: [] },
++    { from: '*', to: 'doing', rules: [] },
++    { from: '*', to: 'done', rules: [] },
++  ],
++};
++
++/** A second, unrelated workflow — the destination of a rebind. */
++const WF_SUPPORT: WorkflowDef = {
++  id: 'wf-support',
++  version: 4,
++  name: 'Support',
++  initialStateId: 'new',
++  states: [
++    { id: 'new', name: 'New', category: 'open' },
++    { id: 'waiting', name: 'Waiting on customer', category: 'active' },
++    { id: 'closed', name: 'Closed', category: 'terminal' },
++  ],
++  transitions: [{ from: '*', to: 'closed', rules: [] }],
++};
++
++const TASK_TYPE: TicketTypeDef = {
++  id: 'task',
++  name: 'Task',
++  icon: 'check',
++  rank: 3,
++  workflowId: 'wf-basic',
++  fields: [],
++};
++
++/** A type bound to a workflow nobody ever published. */
++const ORPHAN_TYPE: TicketTypeDef = { ...TASK_TYPE, id: 'orphan', workflowId: 'wf-ghost' };
++
++const WORKFLOWS: WorkflowDef[] = [WF, WF_SUPPORT];
++const TYPES: TicketTypeDef[] = [TASK_TYPE, ORPHAN_TYPE];
++
++/** The deps contract as ruled: `getWorkflow` is a pure by-id lookup over everything published. */
++const deps: TicketStateDeps = {
++  getTicketType: (id) => TYPES.find((type) => type.id === id),
++  getWorkflow: (id) => WORKFLOWS.find((wf) => wf.id === id),
++};
++
++/**
++ * Asserting a thrown message character-for-character, and failing when nothing
++ * throws at all. `toThrow('…')` matches a SUBSTRING, which would let a truncated
++ * or reworded message certify itself.
++ */
++function messageOf(run: () => unknown): string {
++  try {
++    run();
++  } catch (error) {
++    return error instanceof Error ? error.message : String(error);
++  }
++  throw new Error('expected the call to throw, and it returned instead');
++}
++
++function createdState(): TicketState {
++  return applyTicketEvent(
++    undefined,
++    makeEnvelope({
++      type: 'ticket.created',
++      entity: { kind: 'ticket', id: TICKET },
++      payload: { typeId: 'task', projectId: PROJECT, parentId: PARENT, title: 'File the GST return' },
++      actorId: 'user-kiro',
++      clientTime: '2026-08-20T09:00:00.000Z',
++      serverTime: '2026-08-20T09:00:00.100Z',
++    }),
++    deps,
++  );
++}
++
++describe('applyTicketEvent', () => {
++  it('creation enters the workflow initial state and records the title as an attributed claim', () => {
++    expect(createdState()).toEqual({
++      kind: 'ticket',
++      id: TICKET,
++      workspaceId: WORKSPACE,
++      projectId: PROJECT,
++      typeId: 'task',
++      parentId: PARENT,
++      workflowId: 'wf-basic',
++      workflowVersion: 1,
++      stateId: 'todo',
++      stateCategory: 'open',
++      assigneeId: null,
++      collaboratorIds: [],
++      transitions: [],
++      fields: {
++        title: {
++          value: 'File the GST return',
++          actorId: 'user-kiro',
++          clientTime: '2026-08-20T09:00:00.000Z',
++          serverTime: '2026-08-20T09:00:00.100Z',
++        },
++      },
++    });
++  });
++
++  it('creation throws when the type names a workflow nothing published', () => {
++    expect(
++      messageOf(() =>
++        applyTicketEvent(
++          undefined,
++          makeEnvelope({
++            type: 'ticket.created',
++            entity: { kind: 'ticket', id: TICKET },
++            payload: { typeId: 'orphan', projectId: PROJECT, parentId: null, title: 'x' },
++          }),
++          deps,
++        ),
++      ),
++    ).toBe(
++      'applyTicketEvent: workflow "wf-ghost" is not defined — the engine must refuse ticket.created before it reaches a projection',
++    );
++  });
++
++  it('transition moves state, re-derives the category, and logs the mover under the vocabulary the move is written in', () => {
++    const state = applyTicketEvent(
++      createdState(),
++      makeEnvelope({
++        type: 'ticket.transitioned',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { to: 'done' },
++        actorId: 'user-anselma',
++        seq: 7,
++      }),
++      deps,
++    );
++    expect(state.stateId).toBe('done');
++    expect(state.stateCategory).toBe('terminal');
++    // The entry names the actor who MOVED it (not the creator), the envelope's
++    // own seq (not a default), and both halves of the vocabulary its toStateId
++    // is written in. Every one of the five is read by require-different-user.
++    expect(state.transitions).toEqual([
++      {
++        toStateId: 'done',
++        actorId: 'user-anselma',
++        seq: 7,
++        workflowId: 'wf-basic',
++        workflowVersion: 1,
++      },
++    ]);
++  });
++
++  it('a transition applied under a newer version stamps THAT version, on the ticket and on the entry', () => {
++    // The ticket was created under v1 and has not been refolded. The event is
++    // applied against the definition in force when it happened, which is v2 —
++    // where 'doing' is terminal rather than active. Both the ticket's version
++    // and the entry's are the version the destination id was resolved against,
++    // never the one the ticket sat at before this fold; an entry stamped with
++    // the pre-fold version would send require-different-user walking the id
++    // forward from a vocabulary it was not written in.
++    const v2: WorkflowDef = {
++      ...WF,
++      version: 2,
++      states: [
++        { id: 'todo', name: 'To do', category: 'open' },
++        { id: 'doing', name: 'Doing', category: 'terminal' },
++        { id: 'done', name: 'Done', category: 'terminal' },
++      ],
++    };
++    const created = createdState();
++    expect(created.workflowVersion).toBe(1);
++    const state = applyTicketEvent(
++      created,
++      makeEnvelope({
++        type: 'ticket.transitioned',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { to: 'doing' },
++        seq: 5,
++      }),
++      { getTicketType: deps.getTicketType, getWorkflow: (id) => (id === 'wf-basic' ? v2 : undefined) },
++    );
++    expect(state.workflowVersion).toBe(2);
++    expect(state.stateCategory).toBe('terminal');
++    expect(state.transitions).toEqual([
++      {
++        toStateId: 'doing',
++        actorId: DEFAULT_ACTOR,
++        seq: 5,
++        workflowId: 'wf-basic',
++        workflowVersion: 2,
++      },
++    ]);
++  });
++
++  it('field_set preserves provenance per field — who claimed it, and both times', () => {
++    const state = applyTicketEvent(
++      createdState(),
++      makeEnvelope({
++        type: 'ticket.field_set',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { fieldId: 'dueDate', value: { date: '2026-08-30', note: 'GST' } },
++        actorId: 'user-anselma',
++        clientTime: '2026-08-21T08:00:00.000Z',
++        serverTime: '2026-08-21T08:00:00.900Z',
++      }),
++      deps,
++    );
++    expect(state.fields.dueDate).toEqual({
++      value: { date: '2026-08-30', note: 'GST' },
++      actorId: 'user-anselma',
++      clientTime: '2026-08-21T08:00:00.000Z',
++      serverTime: '2026-08-21T08:00:00.900Z',
++    });
++    expect(state.fields.title).toEqual({
++      value: 'File the GST return',
++      actorId: 'user-kiro',
++      clientTime: '2026-08-20T09:00:00.000Z',
++      serverTime: '2026-08-20T09:00:00.100Z',
++    });
++  });
++
++  it('clearing a field with null keeps the provenance of the clearing claim', () => {
++    let state = createdState();
++    state = applyTicketEvent(
++      state,
++      makeEnvelope({
++        type: 'ticket.field_set',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { fieldId: 'dueDate', value: { date: '2026-08-30' } },
++      }),
++      deps,
++    );
++    state = applyTicketEvent(
++      state,
++      makeEnvelope({
++        type: 'ticket.field_set',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { fieldId: 'dueDate', value: null },
++        actorId: 'user-anselma',
++      }),
++      deps,
++    );
++    expect(state.fields.dueDate).toEqual({
++      value: null,
++      actorId: 'user-anselma',
++      clientTime: '2026-08-20T09:00:00.000Z',
++      serverTime: '2026-08-20T09:00:00.100Z',
++    });
++  });
++
++  it('assignment and unassignment', () => {
++    let state = createdState();
++    state = applyTicketEvent(
++      state,
++      makeEnvelope({
++        type: 'ticket.assigned',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { assigneeId: 'user-anselma' },
++      }),
++      deps,
++    );
++    expect(state.assigneeId).toBe('user-anselma');
++    state = applyTicketEvent(
++      state,
++      makeEnvelope({
++        type: 'ticket.assigned',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { assigneeId: null },
++      }),
++      deps,
++    );
++    expect(state.assigneeId).toBeNull();
++  });
++
++  it('collaborators deduplicate on add and no-op on removing a non-member', () => {
++    const add = () =>
++      makeEnvelope({
++        type: 'ticket.collaborator_added',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { userId: 'user-anselma' },
++      });
++    const first = applyTicketEvent(createdState(), add(), deps);
++    const second = applyTicketEvent(first, add(), deps);
++    expect(second.collaboratorIds).toEqual(['user-anselma']);
++    // A duplicate add returns the SAME object: nothing changed, so nothing is
++    // rewritten, and a projection diffing by identity sees no write.
++    expect(second).toBe(first);
++    const removed = applyTicketEvent(
++      second,
++      makeEnvelope({
++        type: 'ticket.collaborator_removed',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { userId: 'user-nobody' },
++      }),
++      deps,
++    );
++    expect(removed.collaboratorIds).toEqual(['user-anselma']);
++  });
++
++  it('reparent moves the pointer; comments and attachments leave head state untouched', () => {
++    const reparented = applyTicketEvent(
++      createdState(),
++      makeEnvelope({
++        type: 'ticket.reparented',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { newParentId: null },
++      }),
++      deps,
++    );
++    expect(reparented.parentId).toBeNull();
++    const commented = applyTicketEvent(
++      reparented,
++      makeEnvelope({
++        type: 'comment.added',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { body: { type: 'doc', content: [] } },
++      }),
++      deps,
++    );
++    expect(commented).toBe(reparented);
++    const attached = applyTicketEvent(
++      commented,
++      makeEnvelope({
++        type: 'attachment.added',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: {
++          kind: 'drive-reference',
++          attachmentId: '01J9GATT000000000000000000',
++          driveFileId: 'drive-1',
++          name: 'gst.pdf',
++          mimeType: 'application/pdf',
++          webViewLink: 'https://drive.example/gst',
++          capturedAt: '2026-08-21T08:00:00.000Z',
++        },
++      }),
++      deps,
++    );
++    expect(attached).toBe(reparented);
++  });
++
++  it('a rebind moves the pinned workflow, its version, the state and the category — and appends no log entry', () => {
++    const moved = applyTicketEvent(
++      createdState(),
++      makeEnvelope({
++        type: 'ticket.transitioned',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { to: 'doing' },
++        seq: 2,
++      }),
++      deps,
++    );
++    const rebound = applyTicketEvent(
++      moved,
++      makeEnvelope({
++        type: 'ticket.workflow_rebound',
++        entity: { kind: 'ticket', id: TICKET },
++        payload: { toWorkflowId: 'wf-support', toStateId: 'waiting' },
++      }),
++      deps,
++    );
++    expect(rebound).toMatchObject({
++      workflowId: 'wf-support',
++      workflowVersion: 4,
++      stateId: 'waiting',
++      stateCategory: 'active',
++    });
++    // The entry left behind keeps the workflow it was recorded under, so
++    // four-eyes filters it out rather than walking it through a chain it was
++    // never written in.
++    expect(rebound.transitions).toEqual([
++      {
++        toStateId: 'doing',
++        actorId: DEFAULT_ACTOR,
++        seq: 2,
++        workflowId: 'wf-basic',
++        workflowVersion: 1,
++      },
++    ]);
++  });
++
++  it('the rebind asks its deps for the workflow the PAYLOAD names, not the one the ticket is on', () => {
++    // A loader that serves only "the ticket's own workflow" — the pre-selecting
++    // shape ruling P1 forbids. If the reducer asked for state.workflowId this
++    // would resolve wf-basic and refuse with a different sentence entirely; the
++    // message proves which id was asked for.
++    const ticketsOwnWorkflowOnly: TicketStateDeps = {
++      getTicketType: deps.getTicketType,
++      getWorkflow: (id) => (id === 'wf-basic' ? WF : undefined),
++    };
++    expect(
++      messageOf(() =>
++        applyTicketEvent(
++          createdState(),
++          makeEnvelope({
++            type: 'ticket.workflow_rebound',
++            entity: { kind: 'ticket', id: TICKET },
++            payload: { toWorkflowId: 'wf-support', toStateId: 'waiting' },
++          }),
++          ticketsOwnWorkflowOnly,
++        ),
++      ),
++    ).toBe(
++      'applyTicketEvent: workflow "wf-support" is not defined — the engine must refuse ticket.workflow_rebound before it reaches a projection',
++    );
++  });
++
++  it('a rebind onto a state the target workflow does not have throws rather than inventing a status', () => {
++    expect(
++      messageOf(() =>
++        applyTicketEvent(
++          createdState(),
++          makeEnvelope({
++            type: 'ticket.workflow_rebound',
++            entity: { kind: 'ticket', id: TICKET },
++            payload: { toWorkflowId: 'wf-support', toStateId: 'doing' },
++          }),
++          deps,
++        ),
++      ),
++    ).toBe('applyTicketEvent: workflow "wf-support" has no state "doing"');
++  });
++
++  it('throws loudly on replay-integrity breaks the engine is contracted to refuse', () => {
++    expect(
++      messageOf(() =>
++        applyTicketEvent(
++          undefined,
++          makeEnvelope({
++            type: 'ticket.assigned',
++            entity: { kind: 'ticket', id: TICKET },
++            payload: { assigneeId: null },
++          }),
++          deps,
++        ),
++      ),
++    ).toBe(
++      `applyTicketEvent: ticket.assigned for ticket ${TICKET} that was never created`,
++    );
++    expect(
++      messageOf(() =>
++        applyTicketEvent(
++          undefined,
++          makeEnvelope({
++            type: 'ticket.created',
++            entity: { kind: 'ticket', id: TICKET },
++            payload: { typeId: 'ghost', projectId: PROJECT, parentId: null, title: 'x' },
++          }),
++          deps,
++        ),
++      ),
++    ).toBe(
++      'applyTicketEvent: unknown ticket type "ghost" — the engine must refuse ticket.created before it reaches a projection',
++    );
++  });
++
++  it('an event outside the ticket vocabulary throws rather than being folded into silence', () => {
++    expect(
++      messageOf(() =>
++        applyTicketEvent(
++          createdState(),
++          makeEnvelope({
++            type: 'workflow.defined',
++            entity: { kind: 'ticket', id: TICKET },
++            payload: {},
++          }),
++          deps,
++        ),
++      ),
++    ).toBe('applyTicketEvent: not a ticket event: workflow.defined');
++  });
++});
++
++describe('TICKET_EVENT_TYPES', () => {
++  it('lists exactly the registered types whose entity kind is a ticket', () => {
++    for (const type of TICKET_EVENT_TYPES) {
++      expect(domainRegistry.get(type, 1)?.entityKind).toBe('ticket');
++    }
++    // ticket-type.defined is registered against 'ticket-type' and folds into no
++    // ticket: a type's workflow binding changes what NEW tickets get, never
++    // where an existing one sits.
++    expect((TICKET_EVENT_TYPES as readonly string[]).includes('ticket-type.defined')).toBe(false);
++    expect(TICKET_EVENT_TYPES).toHaveLength(10);
++  });
++});
++
++describe('stateCategoryOf', () => {
++  it('maps a state id to its category, undefined when absent', () => {
++    expect(stateCategoryOf(WF, 'doing')).toBe('active');
++    expect(stateCategoryOf(WF, 'ghost')).toBeUndefined();
++  });
++});
++
++// Refresh-on-publish: the fold a new workflow version applies to tickets already
++// sitting in its states (design decision 10).
++const WF2_RECATEGORISED: WorkflowDef = {
++  ...WF,
++  version: 2,
++  states: [
++    { id: 'todo', name: 'To do', category: 'open' },
++    { id: 'doing', name: 'Doing', category: 'terminal' }, // was 'active' in v1
++    { id: 'done', name: 'Done', category: 'terminal' },
++  ],
++};
++
++// `stateMapping` lives on PublishedWorkflowDef, never on WorkflowDef — the
++// shipped alias, so no cast is needed anywhere here.
++const WF2_DROPS_DOING: PublishedWorkflowDef = {
++  ...WF,
++  version: 2,
++  states: [
++    { id: 'todo', name: 'To do', category: 'open' },
++    { id: 'done', name: 'Done', category: 'terminal' },
++  ],
++  transitions: [
++    { from: '*', to: 'todo', rules: [] },
++    { from: '*', to: 'done', rules: [] },
++  ],
++  stateMapping: { doing: 'todo' },
++};
++
++// A three-version chain, which is where the walk stops being a straight line:
++// v2 renames doing→review, v3 folds review→todo.
++const WF2_RENAMES_DOING: PublishedWorkflowDef = {
++  ...WF,
++  version: 2,
++  states: [
++    { id: 'todo', name: 'To do', category: 'open' },
++    { id: 'review', name: 'In review', category: 'active' },
++    { id: 'done', name: 'Done', category: 'terminal' },
++  ],
++  stateMapping: { doing: 'review' },
++};
++
++const WF3_DROPS_REVIEW: PublishedWorkflowDef = {
++  ...WF,
++  version: 3,
++  states: [
++    { id: 'todo', name: 'To do', category: 'open' },
++    { id: 'done', name: 'Done', category: 'terminal' },
++  ],
++  stateMapping: { review: 'todo' },
++};
++
++function inDoing(): TicketState {
++  return applyTicketEvent(
++    createdState(),
++    makeEnvelope({
++      type: 'ticket.transitioned',
++      entity: { kind: 'ticket', id: TICKET },
++      payload: { to: 'doing' },
++      seq: 3,
++    }),
++    deps,
++  );
++}
++
++describe('foldTicketToWorkflowVersion', () => {
++  const noIntermediates = () => null;
++
++  it('re-categorises a surviving state and stamps the new version', () => {
++    expect(foldTicketToWorkflowVersion(inDoing(), WF2_RECATEGORISED, noIntermediates)).toMatchObject(
++      { stateId: 'doing', stateCategory: 'terminal', workflowVersion: 2 },
++    );
++  });
++
++  it('walks a dropped state through the stateMapping instead of throwing', () => {
++    expect(foldTicketToWorkflowVersion(inDoing(), WF2_DROPS_DOING, noIntermediates)).toMatchObject({
++      stateId: 'todo',
++      stateCategory: 'open',
++      workflowVersion: 2,
++    });
++  });
++
++  it('walks a three-version chain through the intermediate it is handed', () => {
++    const folded = foldTicketToWorkflowVersion(inDoing(), WF3_DROPS_REVIEW, (version) =>
++      version === 2 ? WF2_RENAMES_DOING : null,
++    );
++    // doing --(v2)--> review --(v3)--> todo. Neither hop is visible in the
++    // target definition alone, which is the whole reason the intermediate is
++    // consulted rather than guessed at.
++    expect(folded).toMatchObject({ stateId: 'todo', stateCategory: 'open', workflowVersion: 3 });
++  });
++
++  it('leaves the transition log alone — each entry keeps the vocabulary its toStateId is written in', () => {
++    const before = inDoing();
++    const folded = foldTicketToWorkflowVersion(before, WF2_DROPS_DOING, noIntermediates);
++    // The head state moved to 'todo'; the log still says the actor moved to
++    // 'doing' under wf-basic version 1, because that is what happened. RDU walks
++    // log entries forward itself (Plan 2 Task 11); rewriting them here would
++    // destroy the very evidence four-eyes compares against.
++    expect(folded.transitions).toEqual([
++      {
++        toStateId: 'doing',
++        actorId: DEFAULT_ACTOR,
++        seq: 3,
++        workflowId: 'wf-basic',
++        workflowVersion: 1,
++      },
++    ]);
++    expect(folded.transitions).toEqual(before.transitions);
++  });
++
++  it('is a no-op for a ticket already at or past the target version — the guard that makes replay order-insensitive', () => {
++    const already: TicketState = { ...inDoing(), workflowVersion: 2, stateCategory: 'terminal' };
++    expect(foldTicketToWorkflowVersion(already, WF, noIntermediates)).toBe(already);
++    expect(foldTicketToWorkflowVersion(already, WF2_RECATEGORISED, noIntermediates)).toBe(already);
++  });
++
++  it('planted defect: a chain that cannot be walked throws rather than guessing a state', () => {
++    const stranding: PublishedWorkflowDef = { ...WF2_DROPS_DOING, stateMapping: {} };
++    expect(messageOf(() => foldTicketToWorkflowVersion(inDoing(), stranding, noIntermediates))).toBe(
++      `foldTicketToWorkflowVersion: ticket ${TICKET} cannot be folded forward to workflow "wf-basic" version 2 — state "doing" is dropped with no stateMapping entry`,
++    );
++  });
++
++  it('a hole in the version chain reports as a hole, not as an unmapped drop', () => {
++    // Two different faults: a gap in the ledger, versus a publish that should
++    // have been refused. `foldStateIdForward` folds both into one `ok: false`,
++    // so the pre-check exists to tell whoever reads the error which one it is.
++    expect(
++      messageOf(() => foldTicketToWorkflowVersion(inDoing(), WF3_DROPS_REVIEW, noIntermediates)),
++    ).toBe(
++      `foldTicketToWorkflowVersion: workflow "wf-basic" version 2 is missing — the version chain has a hole and ticket ${TICKET} cannot be walked forward`,
++    );
++  });
++});
+diff --git a/packages/rule-engine/fixtures/transition-refuses-a-stranded-ticket.json b/packages/rule-engine/fixtures/transition-refuses-a-stranded-ticket.json
+index 1dd07d6..39ceec2 100644
+--- a/packages/rule-engine/fixtures/transition-refuses-a-stranded-ticket.json
++++ b/packages/rule-engine/fixtures/transition-refuses-a-stranded-ticket.json
+@@ -29,13 +29,13 @@
+   ],
+   "candidateEvent": {
+     "type": "ticket.transitioned",
+     "entity": { "kind": "ticket", "id": "t1" },
+     "actorId": "user_a",
+     "payload": { "to": "done" }
+   },
+   "expected": {
+     "refused": true,
+     "rule": "stranded-state",
+-    "reason": "Ticket t1 sits in state \"doing\" of workflow version 1, which no longer exists in version 2 and no state mapping covers it."
++    "reason": "Ticket t1 sits in state \"doing\", which no longer exists in version 2 and no state mapping covers it."
+   }
+ }
+diff --git a/packages/rule-engine/src/transition.ts b/packages/rule-engine/src/transition.ts
+index 9cc2e84..684d441 100644
+--- a/packages/rule-engine/src/transition.ts
++++ b/packages/rule-engine/src/transition.ts
+@@ -55,21 +55,33 @@ export async function evaluateTicketTransitioned(
+       rule: REFUSAL_RULES.unknownWorkflow,
+       reason: `Ticket ${ticket.id} uses workflow ${ticket.workflowId}, but no published definition of that workflow is known.`,
+     };
+   }
+ 
+   const resolved = await resolveCurrentStateId(ticket, latest, ctx);
+   if (!resolved.ok) {
+     return {
+       refused: true,
+       rule: REFUSAL_RULES.strandedState,
+-      reason: `Ticket ${ticket.id} sits in state "${resolved.unmappedStateId}" of workflow version ${ticket.workflowVersion}, which no longer exists in version ${latest.version} and no state mapping covers it.`,
++      // No version clause beside the state id, deliberately. `resolveCurrentStateId`
++      // reports the id at the point the chain BROKE, not the id it started from
++      // (`foldStateIdForward`, packages/domain/src/workflow.ts:99-101), while
++      // `ticket.workflowVersion` is the ticket's ORIGIN version. On a chain
++      // longer than two those are different versions, so "state X of version Y"
++      // named a pair that never coexisted. It coincided — and so read true — only
++      // while every stranded fixture was two-version; Plan 3's refresh-on-publish
++      // makes the divergence routine. Naming the id alone is the whole truth this
++      // refusal can tell without a backward walk, and a backward walk is
++      // forbidden: there is no such thing, and inventing one is a second set of
++      // rounding errors of exactly the kind THE ONE VERSION WALK exists to
++      // prevent. Plan 6 renders this sentence verbatim to a human.
++      reason: `Ticket ${ticket.id} sits in state "${resolved.unmappedStateId}", which no longer exists in version ${latest.version} and no state mapping covers it.`,
+     };
+   }
+ 
+   const toState = latest.states.find((state) => state.id === payload.to);
+   if (toState === undefined) {
+     return {
+       refused: true,
+       rule: REFUSAL_RULES.unknownState,
+       reason: `The workflow "${latest.name}" has no state "${payload.to}".`,
+     };

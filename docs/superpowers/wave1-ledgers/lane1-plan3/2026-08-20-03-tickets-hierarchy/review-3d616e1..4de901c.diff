@@ -1,0 +1,509 @@
+# Review package: 3d616e1..HEAD
+
+## Commits
+4de901c Two refusals were true of something and false of the path that reached them, and the suite asserted both as canonical copy
+
+## Files changed
+ Features.md                                        |  1 +
+ apps/server/test/engine-context.test.ts            | 20 +++--
+ .../plans/2026-08-20-00-series-coordination.md     |  2 +
+ packages/rule-engine/src/checks/hierarchy.ts       | 41 ++++++++--
+ packages/rule-engine/src/checks/refusals.ts        | 24 +++++-
+ packages/rule-engine/test/hierarchy.test.ts        | 88 +++++++++++++++++++++-
+ test-cases/05-tickets-hierarchy.md                 |  4 +-
+ 7 files changed, 162 insertions(+), 18 deletions(-)
+
+## Diff
+diff --git a/Features.md b/Features.md
+index 8659c65..e4d4833 100644
+--- a/Features.md
++++ b/Features.md
+@@ -49,12 +49,13 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
+ - ⚙️ **Type↔kind binding at the door (G1)** — `workflow.defined`'s registration declares `entityKind: 'workflow'`; `parseEvent` refuses any envelope naming that type against a different entity kind (`entity-kind-mismatch`), the same general door every entity-kind-declaring registration gets (coordination doc §11). Layered with the engine's own kind checks by design: fixtures and Plan 10's offline replica reach `evaluateEvent` directly, bypassing `parseEvent`, so the door alone would leave them unguarded. `packages/domain/src/parse-event.ts`, `packages/domain/src/registry.ts`
+ - ⚙️ **Entity↔workspace binding at ingest (G2)** — an entity belongs to one workspace forever: `commitOne` reads `proj_entity_heads` after both locks and before the engine runs, and refuses `entity-workspace-mismatch` when an envelope's `workspaceId` disagrees with the entity's recorded one. A server-side door, deliberately not a shared-engine rule — a workspace-scoped client replica cannot see that an entity id is already bound elsewhere, so Plan 10's offline replica must mirror this door knowingly rather than find it in the fixtures. No fixture; proven by integration test. `apps/server/src/ingest/ingest-service.ts`
+ - ⚙️ **Projection registration order, pinned (G3)** — `buildProjectionRegistry()` registers `proj_entity_heads` before `proj_workflows`; registration order is application order inside the ingest transaction (coordination doc §8), so a projection may read a table an earlier one wrote in the same transaction. A DB-free test pins the exact array, so a re-ordering breaks loudly rather than silently before any later projection comes to depend on it. `apps/server/src/projections/index.ts`
+ 
+ ## 5. Tickets, hierarchy & rollups
+ 
+ *(Plan 3's keystone only — the ticket type model, the event vocabulary, and the engine-context rider that had to ship with them. The reducer, hierarchy and field refusals, the three projections, the rollups and the history endpoint arrive with the rest of Plan 3's lane and extend this section.)*
+ 
+ - ⚙️ **Ticket type system** — built-in ladder epic(1)/story(2)/task(3)/sub-task(4) as seed data plus custom reusable types defined by `ticket-type.defined` events: name, icon, rank, workflow binding, and typed custom fields (text, number, date, select, person), Zod-validated. A select field cannot exist without its choices, no custom field may shadow a built-in id, and `DEEPEST_RANK` is a pinned constant rather than a maximum over the defined types — the rank at or below which a type's tickets will require a parent must not shift underfoot when an admin defines a deeper type. `packages/domain/src/ticket-types.ts`
+ - ⚙️ **Ticket event vocabulary** — eleven registered types, all v1, each bound to the entity kind it is about: `ticket-type.defined`, `ticket.created`, `ticket.transitioned` (Plan 2's shipped payload, whose optional `cause` marks a reopen forced by arriving live work), `ticket.assigned`, `ticket.collaborator_added/removed`, `ticket.field_set` (built-ins title/description/dueDate/startDate ride it; a due date and a start date are always `{date, note?}` claims), `ticket.reparented`, `ticket.workflow_rebound`, `comment.added` (opaque doc body), `attachment.added` (a `kind`-discriminated union: an `upload` carrying the server's sniffed mime/size and its `sha256` of the stored bytes, or a `drive-reference` carrying the pointer plus the name, mimeType and `capturedAt` last seen on a file this product does not hold). Unknown types, malformed payloads and misfiled entity kinds are refused at the door. `packages/domain/src/events/ticket-events.ts`, `packages/domain/src/vocabulary.ts`
++- ✅ **Hierarchy sanity refusals on creation** — `checkTicketCreated` forces every precondition creation has *in this plan*, in a deliberate order, each in plain language: the ticket must not already exist, its type and that type's workflow must be defined, a type at or below `DEEPEST_RANK` must name a parent, and a named parent must exist in this workspace, sit in the same project, have a readable type, outrank the child, and not already be finished. The order is load-bearing and tested as its own property — the most fundamental truth names the refusal, and the one remedy that is an *offer* (reopen the finished parent) comes last so it is never offered while something else is still in the way. Two refusals exist because a borrowed sentence was false on the path that reached it: `hierarchy.parent-type-unknown` (the ticket's own type had already resolved) and `hierarchy.unknown-parent` for a parent in another workspace (ticket lookup is global, so a foreign parent resolves — and naming its project would both lie and confirm the id exists). The project a ticket is created *into* is **not** checked here: Plan 4 owns `proj_projects` and that refusal, and the refusal map says so rather than reading complete. `packages/rule-engine/src/checks/hierarchy.ts`, `packages/rule-engine/src/checks/refusals.ts`
+ - ⚙️ **Honest engine-context seam** — `getEntityState` answers `null` for the kinds this server cannot yet serve ('ticket' until Plan 3's projections, 'membership' until Plan 4's) and returns the whole state, `{kind, id}`, for the four kinds whose state is exactly that. It replaces a `as unknown as EntityState` cast that returned a head pointer for every kind: registering the ticket vocabulary made transitions ingestible, and the cast turned every one of them into a refusal whose plain-language reason blamed a workflow named `undefined`. Coordination doc, Plan 1 consequences §9. `apps/server/src/engine-context.ts`
+ - ⚙️ **Shared envelope builder** — `makeEnvelope`, the test-only envelope factory shipped from the domain package so every plan's tests build valid claims from one set of defaults. `packages/domain/src/testing.ts`
+diff --git a/apps/server/test/engine-context.test.ts b/apps/server/test/engine-context.test.ts
+index bde61d8..26145f3 100644
+--- a/apps/server/test/engine-context.test.ts
++++ b/apps/server/test/engine-context.test.ts
+@@ -82,33 +82,43 @@ beforeAll(async () => {
+   // The create is REFUSED from Plan 3 Task 5, and this is the seam working
+   // rather than breaking. `checkTicketCreated` reads the ticket type's rank and
+   // name through `getTicketTypeDef`, and this server context answers null for
+   // every type until Task 12 backs that method with `proj_ticket_types` — so
+   // the server refuses to create a ticket whose type it cannot see, which is
+   // exactly what `createEngineContext`'s own comment on that method says it
+   // will do. Before Task 5 the event fell through the engine's `default` arm
+   // and committed unjudged; nothing consumed it, because proj_tickets does not
+   // exist yet either.
+   //
+-  // TASK 12 REVERTS THIS PAIR: once getTicketTypeDef reads proj_ticket_types,
+-  // a workspace that has defined `task` commits this create, the planted head
+-  // row below goes away, and this expectation becomes ['committed','committed']
+-  // again. It joins the two assertions A12/BA-3 already assigns that task.
++  // TASK 12'S REVERT, in full, so it is mechanical rather than inferential.
++  // Once getTicketTypeDef reads proj_ticket_types, all FOUR of these move
++  // together and none may land without the others:
++  //
++  //   1. ADD a `ticket-type.defined` event for `task` to this batch, ahead of
++  //      the create. Without one, proj_ticket_types has no row to serve and the
++  //      create is still refused for the same reason — a context that can read
++  //      the table is not the same thing as a table with the type in it.
++  //   2. This expectation becomes ['committed', 'committed', 'committed'].
++  //   3. DELETE the refusal-object assertion immediately below.
++  //   4. DELETE the planted ticket head row further down; the create writes it.
++  //
++  // Those four join the two assertions A12/BA-3 already assigns that task.
+   expect(results.map((result) => result.status)).toEqual(['committed', 'refused']);
+   expect(results[1]).toEqual({
+     status: 'refused',
+     eventId: expect.any(String),
+     rule: 'ticket.unknown-type',
+     reason: "This ticket's type is not defined in this workspace.",
+   });
+ 
+-  // The ticket head row the create would have written, planted for the same
++  // Deleted by Task 12, step 4 above. The ticket head row the create would have
++  // written, planted for the same
+   // reason the membership row below is: the assertion it serves is about what
+   // `getEntityState` does with a head row that EXISTS. Against the
+   // `as unknown as EntityState` body this file was written to kill, a ticket
+   // WITH a head comes back looking like a TicketState whose `workflowId` is
+   // undefined — and with no head row at all that body returns null too, so the
+   // test would pass against the very defect it exists to catch.
+   await db.pool.query(
+     `INSERT INTO proj_entity_heads
+        (entity_kind, entity_id, workspace_id, head_seq, head_event_id, head_event_type, head_server_time)
+      VALUES ('ticket', $1, $2, 1, $3, 'ticket.created', '2026-08-20T09:00:01.000Z')`,
+diff --git a/docs/superpowers/plans/2026-08-20-00-series-coordination.md b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+index 1b2f97d..87dca55 100644
+--- a/docs/superpowers/plans/2026-08-20-00-series-coordination.md
++++ b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+@@ -475,20 +475,22 @@ The resolution, which later plans need as fact rather than as warning:
+ 
+ **Plans 3 and 9 ship fixtures into `packages/rule-engine/fixtures/` and import the harness from `@gisik-nokma/rule-engine/fixtures`, not from the package root.** Two constraints ride with that import, both previously brief-only and now committed beside the code they constrain: fixtures live **flat** in that directory (the scan is non-recursive; a fixture in a subdirectory is silently skipped, which `fixtures.test.ts`'s exact-count assertion now catches — **bump the count in the same commit as the fixture**), and fixture candidates stay in workspace **`ws_1`** unless the harness is extended, because memberships are keyed to `ws_1` unconditionally and an overridden workspaceId yields a null membership and a legitimate-looking restrict-to refusal.
+ 
+ Carried in the same item because it was routed with it: **`asOfWorkspaceSeq`'s same-stream precondition, for Plan 3's brief.** The docstring half is durable in code already; the half that is not is who it is for. Positions from different workspace streams are not comparable — asking for a definition as of another workspace's sequence number returns a silently *wrong* version, not an empty result. **`proj_tickets` is the intended caller**, and it must pass a position from the same workspace stream as the workflow it is asking about.
+ 
+ ### 7. Riders — smaller claims on later plans, recorded so they are not rediscovered
+ 
+ - **The parent-terminal invariant is inert server-side until Plan 3.** `getChildrenStates` stubs `[]` in `apps/server/src/engine-context.ts`, so the one invariant no workflow author can switch off currently refuses nothing in production. It is fully proven by fixtures against the in-memory harness, which is why the suite says nothing about it. **Plan 3 makes it real when it lands the ticket projection**, and that is the moment its fixtures stop being the only thing holding it up.
+ - **Evidence-id existence is unchecked by design.** `require-evidence` proves an id was supplied, not that it points at anything. Attachments are Plan 7's and the ticket projection is Plan 3's; **whichever lands second owns the existence check**, or owns recording that it stays unchecked.
+ - **Dispatch hygiene: an RTK-proxied `diff` reported "identical" for files that differed**, during a Task 10 mutation sweep — a false clean on the exact operation a mutation restoration depends on. The incident was closed by sampling the tree directly, and the compensating procedure was applied for the rest of the plan and belongs in every future one: **verify mutation restorations with `git diff` or by reading the file, never with a proxied shell `diff`.** A tool that lies about equality turns a mutation sweep into theatre.
++- **A claim on Plan 10: `checkTicketCreated` is non-idempotent under re-evaluation, and the replica is the only caller that could re-judge.** Plan 3 Task 5 added `ticket.already-exists` — a `ticket.created` for a ticket the context already holds is refused, because the shared reducer folds creation unconditionally (`packages/domain/src/ticket-state.ts:94`) and an accepted duplicate silently RESETS the fold, erasing status, collaborators, field claims and the transition log four-eyes reads. That is correct under the engine's contract: `evaluateEvent` judges a CANDIDATE against a context of already-accepted history, and an event that is already in that history is not a candidate. The server is safe (ingest evaluates once, before insert), and so is the fixture suite (only `candidateEvent` faces the engine; `priorEvents` are folded, never judged). **Plan 10's offline replica is the one place this could bite**, and Plan 3 Task 5's own justifications name it twice (`packages/rule-engine/src/checks/hierarchy.ts`, `evaluate.ts`) as a caller that enters at `evaluateEvent` without ingest's door in front of it. If the replica ever re-runs the engine over SYNCED events rather than only over pending local ones, every re-judged `ticket.created` is refused — and it will look like a hierarchy defect rather than a replay defect. **Plan 10 either judges only pending local events, or records why re-judging is safe.** The same shape applies to any later check that asks "does this already exist"; this is the first one in the series.
++
+ - **`transitionSchema` admits `to: '*'`, and a dangling wildcard target publishes clean.** `packages/domain/src/workflow.ts:36` types `to` as `z.string().min(1)`, and the reference check at `packages/domain/src/validate-workflow.ts:40` is `if (ref !== '*' && !stateIds.has(ref))` — applied to **both** endpoints. The wildcard is only meaningful on `from`; on `to` it means nothing. Such an edge passes `unknown-transition-state`, contributes nothing to reachability or `terminal-no-inbound`, and can never be selected at runtime (the engine refuses `unknown-state` first), so it is inert — but it survives into `proj_workflows` and **Plan 8's builder will read it back and render an edge to nowhere**. The fix is one condition: make the check endpoint-aware, so the `'*'` exemption applies to `from` only, plus an issue code for the `to` case. Taking it or explicitly declining it both close this; leaving it unrecorded does not.
+ 
+ ### 8. Owner ruling requested: a wildcard edge voids the rule vocabulary on every other inbound edge
+ 
+ This is a **request, not a ruling.** It is the same class as item 2 — a shape that publishes clean and silently does not do what its author drew — and Plan 2 declined to rule it because the answer changes a tier the owner scoped by hand.
+ 
+ Rules in the closed vocabulary attach to **one transition**. A `from: '*'` transition is an edge from *every* state. So an authored `{from:'*', to:'done', rules:[]}` sitting beside a guarded `{from:'doing', to:'done', rules:[restrict-to …]}` makes the guard optional for any ticket not currently in `doing`: the author drew a guard, the engine honours it on one path, and nothing tells them.
+ 
+ Probed against the built engine on exactly the canonical `wf_rules` "Guarded" definition that all seventeen rule-vocabulary fixtures use, with a restrict-to on doing→done naming only `user_boss`:
+ 
+diff --git a/packages/rule-engine/src/checks/hierarchy.ts b/packages/rule-engine/src/checks/hierarchy.ts
+index 03ea801..c24db12 100644
+--- a/packages/rule-engine/src/checks/hierarchy.ts
++++ b/packages/rule-engine/src/checks/hierarchy.ts
+@@ -1,30 +1,44 @@
+ import type { EventEnvelope } from '@gisik-nokma/domain';
+ import { DEEPEST_RANK, ticketCreatedPayload } from '@gisik-nokma/domain';
+ import type { Accept, EngineContext, Refusal } from '../engine.js';
+ import { REFUSAL_RULES } from '../refusal-rules.js';
+ import { getTicketState, getTicketTypeDef } from './context-helpers.js';
+ import { ACCEPT, deepestRankParentRefusal, parentTerminalRefusal, rankRefusal, refuse } from './refusals.js';
+ 
+ /**
+  * Hierarchy sanity for ticket.created. Check order is deliberate — the most
+- * fundamental truth names the refusal: already exists → unknown type →
+- * workflow undefined → (root: deepest-rank rule) → unknown parent →
+- * cross-project → rank → parent-terminal (the remediable contradiction comes
+- * last: it is the only one whose remedy is an offer rather than a correction).
++ * fundamental truth names the refusal:
++ *
++ *   already exists → unknown type → workflow undefined
++ *     → (root) deepest-rank rule
++ *     → unknown parent (a parent in another WORKSPACE is one of these)
++ *     → cross-project → parent's type unknown → rank → parent-terminal
++ *
++ * Parent-terminal comes last because it is the only refusal whose remedy is an
++ * OFFER rather than a correction: put it earlier and it offers a reopen that
++ * does not work, because the thing actually in the way is still in the way
++ * afterwards.
+  *
+  * `already exists` leads because it is the only question about the event's own
+  * target rather than about what the payload points at. A create for a ticket
+  * that exists is refused whatever its type or parent would have been — and
+  * telling that actor their type is undefined would send them to fix the one
+  * thing that was never the problem.
+  *
++ * The same doctrine is why the parent's-type guard has a refusal of its own
++ * (`hierarchy.parent-type-unknown`, controller ruling P11) rather than reusing
++ * `ticket.unknown-type`: by the time it fires, THIS ticket's type has already
++ * resolved, so the borrowed sentence sent the actor to define a type that is
++ * already defined. Every refusal in the chain above must be true on the path
++ * that reaches it, not merely true of something.
++ *
+  * The project this ticket is created INTO is not checked here: Plan 4 owns
+  * `proj_projects` and the "the project does not exist" refusal (coordination
+  * doc, owner decision 2026-08-26). The order above is every precondition this
+  * check forces, which is not the same as every precondition creation has.
+  */
+ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {
+   // Two layers, by design, exactly as in transition.ts:11-28 (pre-flight A19):
+   // the fixture suite and Plan 10's offline replica enter at `evaluateEvent`
+   // and never pass through ingest's door, so this check keeps its own kind
+   // guard. Server-side the door answers first and this never runs — but it says
+@@ -51,21 +65,21 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
+     const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
+     return {
+       refused: true,
+       rule: REFUSAL_RULES.malformedPayload,
+       reason: `This ticket.created event's payload is malformed: ${detail}`,
+     };
+   }
+   const p = parsed.data;
+ 
+   // Routed here by Task 3's review; not in this task's brief. The reducer folds
+-  // `ticket.created` unconditionally (`ticket-state.ts:95`), so a second
++  // `ticket.created` unconditionally (`ticket-state.ts:94`), so a second
+   // accepted create for an existing ticket does not error and does not merge —
+   // it RESETS the fold, erasing the ticket's status, its collaborators, its
+   // field claims and its transition log, which is the evidence four-eyes reads.
+   // Nothing shipped refused it. The reducer is right to stay unconditional (a
+   // projection replaying a ledger that already refused this should not carry a
+   // second opinion); the door that keeps it out is here.
+   if ((await getTicketState(ctx, env.entity.id)) !== null) return refuse('ticket.already-exists');
+ 
+   const type = await getTicketTypeDef(ctx, p.typeId);
+   if (!type) return refuse('ticket.unknown-type');
+@@ -90,26 +104,39 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
+     // floor plus `>=` gives both — the meaning never moves, and nothing slips
+     // underneath it. The constant is imported from `@gisik-nokma/domain`
+     // (`ticket-types.ts:70`), never restated: a second 4 written down here is a
+     // second chance for the floor to move on one side only.
+     if (type.rank >= DEEPEST_RANK) {
+       return refuse('hierarchy.deepest-rank-parent-required', deepestRankParentRefusal(type.name));
+     }
+     return ACCEPT;
+   }
+ 
++  // ONE refusal, two ways of not existing here (controller ruling P12). A
++  // parent this workspace does not hold resolves anyway: `getTicketState` is an
++  // id lookup with no workspace predicate, over a projection whose primary key
++  // is `(entity_kind, entity_id)` — global, not per-tenant. Left to fall
++  // through, a foreign parent was refused `hierarchy.cross-project`, which said
++  // something false ("a different project" — it is a different WORKSPACE) and
++  // confirmed to the actor that the id exists somewhere they cannot see. The
++  // ingest door's tenancy check does not cover this: it guards the event's own
++  // entity, never the parent the payload names.
+   const parent = await getTicketState(ctx, p.parentId);
+-  if (!parent) return refuse('hierarchy.unknown-parent');
++  if (!parent || parent.workspaceId !== env.workspaceId) return refuse('hierarchy.unknown-parent');
+   if (parent.projectId !== p.projectId) return refuse('hierarchy.cross-project');
+ 
++  // The PARENT's type, and the parent is the subject of the refusal. This used
++  // to answer `ticket.unknown-type` — "This ticket's type is not defined in
++  // this workspace." — which is false the moment it can fire: this ticket's
++  // type resolved above, or we never got here. Controller ruling P11.
+   const parentType = await getTicketTypeDef(ctx, parent.typeId);
+-  if (!parentType) return refuse('ticket.unknown-type');
++  if (!parentType) return refuse('hierarchy.parent-type-unknown');
+   if (type.rank <= parentType.rank) {
+     return refuse('hierarchy.rank', rankRefusal(type.name, parentType.name));
+   }
+ 
+   // Owner decision (2026-08-20): a finished parent refuses new live work; the
+   // decision keys off the denormalized stateCategory — the def lookup below
+   // only names the state for the reason, so it falls back to raw ids rather
+   // than blocking the refusal on a missing definition.
+   if (parent.stateCategory === 'terminal') {
+     const parentDef = await ctx.getWorkflowDef(parent.workflowId, parent.workflowVersion);
+diff --git a/packages/rule-engine/src/checks/refusals.ts b/packages/rule-engine/src/checks/refusals.ts
+index b264af4..e59d5e3 100644
+--- a/packages/rule-engine/src/checks/refusals.ts
++++ b/packages/rule-engine/src/checks/refusals.ts
+@@ -24,32 +24,54 @@ import type { Accept, Refusal } from '../engine.js';
+  * `checkTicketCreated`'s documented check order says the same thing at the
+  * other end. This note is the cross-reference: read the list below as the
+  * preconditions THIS plan enforces, not as every precondition there is.
+  */
+ export const REFUSALS = {
+   'ticket.unknown-type': "This ticket's type is not defined in this workspace.",
+   'ticket.unknown': 'This ticket does not exist in this workspace.',
+   /**
+    * The mirror of `ticket.unknown`, and it is not in Plan 3's table: it was
+    * routed here by Task 3's review. `applyTicketEvent` folds a `ticket.created`
+-   * UNCONDITIONALLY (`packages/domain/src/ticket-state.ts:95`, which is what
++   * UNCONDITIONALLY (`packages/domain/src/ticket-state.ts:94`, which is what
+    * Task 3's brief asked for), so a second accepted create for a ticket that
+    * already exists does not error and does not merge — it resets the fold,
+    * erasing the ticket's status, collaborators, field claims and transition
+    * log. The reason names that consequence rather than the mechanism, because
+    * "this id is taken" tells a person nothing about what they nearly lost.
+    */
+   'ticket.already-exists':
+     'This ticket already exists. Creating it again would erase everything recorded on it — open the existing ticket instead.',
+   'ticket.workflow-undefined':
+     "This ticket type's workflow has not been defined yet, so the ticket would have no status.",
++  /**
++   * Also the answer for a parent in ANOTHER WORKSPACE, and deliberately the
++   * same sentence. `getTicketState` looks a ticket up by id with no workspace
++   * predicate — `proj_entity_heads`' primary key is `(entity_kind, entity_id)`,
++   * global rather than per-tenant (`migrations/1787847393435_proj-entity-heads.sql:11`)
++   * — so a foreign parent RESOLVES. Answering anything more specific than this
++   * would confirm to an actor that a ticket id exists somewhere they cannot
++   * see, and from this workspace's point of view "does not exist here" is not a
++   * euphemism: it is the whole truth available (controller ruling P12).
++   */
+   'hierarchy.unknown-parent': 'The chosen parent ticket does not exist in this workspace.',
++  /**
++   * NOT `ticket.unknown-type`, which is the refusal this used to give and which
++   * was false on every path that reached it: the ticket's OWN type resolved
++   * twenty lines earlier, so "This ticket's type is not defined" sent the actor
++   * to define a type that is already defined (controller ruling P11). The
++   * subject of the sentence is the PARENT, because the parent is what is
++   * unreadable, and the remedy is the only one the actor can act on alone —
++   * they cannot define somebody else's ticket type, but they can choose a
++   * different parent.
++   */
++  'hierarchy.parent-type-unknown':
++    "The parent ticket's type is not defined in this workspace, so there is no way to tell whether this ticket belongs under it. Pick a different parent.",
+   'hierarchy.cross-project': 'The parent is in a different project. Pick a parent from the same project.',
+   'hierarchy.cycle':
+     'This move would put the ticket inside one of its own sub-items, making a loop. A ticket cannot contain itself.',
+   'field.unknown': "This ticket's type has no such field. Add the field to the ticket type first.",
+   'field.title-required': 'A ticket always has a title. Change the title instead of clearing it.',
+ } as const;
+ 
+ export function rankRefusal(childTypeName: string, parentTypeName: string): string {
+   return `"${childTypeName}" cannot go under "${parentTypeName}": a ticket's parent must be a bigger kind of work.`;
+ }
+diff --git a/packages/rule-engine/test/hierarchy.test.ts b/packages/rule-engine/test/hierarchy.test.ts
+index 2a25f69..23b73e0 100644
+--- a/packages/rule-engine/test/hierarchy.test.ts
++++ b/packages/rule-engine/test/hierarchy.test.ts
+@@ -1,31 +1,44 @@
+ import { describe, expect, it } from 'vitest';
+-import type { TicketState, TicketTypeDef } from '@gisik-nokma/domain';
++import type { EventEnvelope, TicketState, TicketTypeDef } from '@gisik-nokma/domain';
+ import { makeEnvelope } from '@gisik-nokma/domain';
+ import { buildMemoryContext } from '../src/memory-context.js';
+ import { checkTicketCreated } from '../src/checks/hierarchy.js';
++import { parentTerminalRefusal } from '../src/checks/refusals.js';
+ import type { EngineContext } from '../src/engine.js';
+ import {
+   EPIC,
+   PROJECT,
+   PROJECT_B,
+   STORY,
+   SUBTASK,
+   TASK,
+   WF,
+   created,
+   typeDefined,
+ } from '../src/checks/test-support.js';
+ 
+ const PARENT = '01J9GPAR000000000000000000';
+ const NEW = '01J9GNEW000000000000000000';
+ const GHOST = '01J9GGHT000000000000000000';
++/** A second workspace, for the parent this one is not allowed to see. */
++const OTHER_WS = '01J9GWSB000000000000000000';
++
++/** `created()` files everything under WS; the tenancy cases need the other one. */
++function createdIn(workspaceId: string, id: string, typeId: string, projectId: string): EventEnvelope {
++  return makeEnvelope({
++    type: 'ticket.created',
++    entity: { kind: 'ticket', id },
++    workspaceId,
++    payload: { typeId, projectId, parentId: null, title: `ticket ${id.slice(4, 8)}` },
++  });
++}
+ 
+ const baseCtx = () =>
+   buildMemoryContext(
+     [WF],
+     [
+       typeDefined(EPIC),
+       typeDefined(STORY),
+       typeDefined(TASK),
+       typeDefined(SUBTASK),
+       created(PARENT, 'story', null),
+@@ -207,21 +220,21 @@ describe('checkTicketCreated', () => {
+     });
+     expect(await checkTicketCreated(env, baseCtx())).toEqual({
+       refused: true,
+       rule: 'malformed-payload',
+       reason: "This ticket.created event's payload is malformed: must be a ULID",
+     });
+   });
+ 
+   /**
+    * Routed here by Task 3's review, and NOT in this task's brief. The reducer
+-   * handles `ticket.created` unconditionally (`ticket-state.ts:95` — it returns
++   * handles `ticket.created` unconditionally (`ticket-state.ts:94` — it returns
+    * a fresh state without ever consulting the `state` it was handed), which is
+    * what the brief that wrote it asked for. So a SECOND accepted
+    * `ticket.created` for a ticket that exists does not error and does not merge:
+    * it silently resets the fold, wiping the ticket's status, its collaborators,
+    * its field claims and its whole transition log — the evidence four-eyes
+    * reads. Nothing shipped refused it. This check does.
+    */
+   it('planted defect: creating a ticket that already exists — a second create silently resets the fold', async () => {
+     expect(await checkTicketCreated(created(PARENT, 'story', null), baseCtx())).toEqual({
+       refused: true,
+@@ -244,20 +257,26 @@ describe('checkTicketCreated', () => {
+   });
+ 
+   /**
+    * The one branch `buildMemoryContext` cannot stage: a parent that exists
+    * whose TYPE does not. The reducer refuses to create a ticket of an undefined
+    * type at all, so no sequence of events reaches this state — but a context is
+    * an interface, not that reducer, and the server's answers come from two
+    * different projections that can disagree. Rather than delete the guard (the
+    * alternative this lane allows) it is pinned against a hand-built context,
+    * which is the only thing that can hold the contradiction.
++   *
++   * The refusal names the PARENT. It used to answer `ticket.unknown-type` —
++   * "This ticket's type is not defined in this workspace." — and this test
++   * asserted that sentence as a literal, so the suite certified copy that is
++   * false on the only path that reaches it: the candidate's own type
++   * (`task`) resolves in this very context. Controller ruling P11.
+    */
+   it('refuses when the PARENT exists but its type does not — the guard the reducer cannot stage', async () => {
+     const orphanParent: TicketState = {
+       kind: 'ticket',
+       id: PARENT,
+       workspaceId: '01J9GWS0000000000000000000',
+       projectId: PROJECT,
+       typeId: 'retired-type',
+       parentId: null,
+       workflowId: 'wf-basic',
+@@ -271,22 +290,43 @@ describe('checkTicketCreated', () => {
+     };
+     const ctx: EngineContext = {
+       getEntityState: async (kind, id) => (kind === 'ticket' && id === PARENT ? orphanParent : null),
+       getChildrenStates: async () => [],
+       getWorkflowDef: async () => WF,
+       // The candidate's own type resolves; the parent's does not.
+       getTicketTypeDef: async (typeId) => (typeId === 'task' ? TASK : null),
+     };
+     expect(await checkTicketCreated(created(NEW, 'task', PARENT), ctx)).toEqual({
+       refused: true,
+-      rule: 'ticket.unknown-type',
+-      reason: "This ticket's type is not defined in this workspace.",
++      rule: 'hierarchy.parent-type-unknown',
++      reason:
++        "The parent ticket's type is not defined in this workspace, so there is no way to tell whether this ticket belongs under it. Pick a different parent.",
++    });
++  });
++
++  /**
++   * Tenancy. `getTicketState` looks a ticket up by id with NO workspace
++   * predicate, over a projection keyed `(entity_kind, entity_id)` — global, not
++   * per-tenant (`migrations/1787847393435_proj-entity-heads.sql:11`) — so a
++   * parent belonging to somebody else's workspace resolves rather than coming
++   * back null. The ingest door's entity↔workspace check does not cover this: it
++   * guards the event's OWN entity, never the parent its payload names.
++   */
++  it('planted defect: a parent in another workspace does not exist as far as this one is concerned', async () => {
++    const ctx = buildMemoryContext(
++      [WF],
++      [typeDefined(STORY), typeDefined(TASK), createdIn(OTHER_WS, PARENT, 'story', PROJECT)],
++    );
++    expect(await checkTicketCreated(created(NEW, 'task', PARENT), ctx)).toEqual({
++      refused: true,
++      rule: 'hierarchy.unknown-parent',
++      reason: 'The chosen parent ticket does not exist in this workspace.',
+     });
+   });
+ });
+ 
+ /**
+  * The check ORDER, which `checkTicketCreated`'s docstring pins and which every
+  * test above leaves free. Each case above stages exactly ONE available
+  * refusal — the cross-project parent also has a legal rank, the rank cases sit
+  * in one project under an open parent, the terminal-parent case is
+  * rank-legal — so a check that answered them in any order at all would pass the
+@@ -351,11 +391,51 @@ describe('checkTicketCreated — which refusal names the event when two are avai
+           payload: { to: 'done' },
+         }),
+       ],
+     );
+     expect(await checkTicketCreated(created(NEW, 'epic', PARENT), ctx)).toEqual({
+       refused: true,
+       rule: 'hierarchy.rank',
+       reason: '"Epic" cannot go under "Story": a ticket\'s parent must be a bigger kind of work.',
+     });
+   });
++
++  it('a foreign WORKSPACE outranks a foreign project: the more specific answer would be false, and would leak', async () => {
++    // The parent is in another workspace AND another project, so both refusals
++    // are available. `hierarchy.cross-project` — "The parent is in a different
++    // project. Pick a parent from the same project." — is the wrong one twice
++    // over: it is false (the parent is in a different WORKSPACE, and its
++    // project is unreachable either way), and it confirms to an actor that this
++    // ticket id exists somewhere they cannot see. Controller ruling P12.
++    const ctx = buildMemoryContext(
++      [WF],
++      [typeDefined(STORY), typeDefined(TASK), createdIn(OTHER_WS, PARENT, 'story', PROJECT_B)],
++    );
++    expect(await checkTicketCreated(created(NEW, 'task', PARENT, PROJECT), ctx)).toEqual({
++      refused: true,
++      rule: 'hierarchy.unknown-parent',
++      reason: 'The chosen parent ticket does not exist in this workspace.',
++    });
++  });
++});
++
++/**
++ * The copy builders' branches that no check in THIS task reaches. Refusal copy
++ * is a deliverable of this plan, so a branch of it that ships with no assertion
++ * ships unverified — the same "add the test or delete the branch" rule the
++ * parent's-type guard was held to. The branch stays (C-22 pins it as Task 6's
++ * import contract); this is what makes it something Task 6 imports already
++ * falsifiable rather than merely present.
++ */
++describe('parentTerminalRefusal — the branch Task 6 will call', () => {
++  it("renders the 'move' verb pair, which no ticket.created path reaches", () => {
++    expect(parentTerminalRefusal('Quarterly filings', 'Done', 'move')).toBe(
++      '"Quarterly filings" is finished (Done). Moving live work under it reopens it — choose a state to reopen it to, then move this ticket.',
++    );
++  });
++
++  it("renders the 'add' verb pair — the pair that IS reached, so the two cannot be swapped unnoticed", () => {
++    expect(parentTerminalRefusal('Quarterly filings', 'Done', 'add')).toBe(
++      '"Quarterly filings" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.',
++    );
++  });
+ });
+diff --git a/test-cases/05-tickets-hierarchy.md b/test-cases/05-tickets-hierarchy.md
+index 90b65ff..2a92b71 100644
+--- a/test-cases/05-tickets-hierarchy.md
++++ b/test-cases/05-tickets-hierarchy.md
+@@ -1,11 +1,13 @@
+ # 5. Tickets, hierarchy & rollups — test cases
+ 
+ Mirrors `Features.md` §5. Status: `❌` not covered · `✅` covered · `🟡` partial · `🧪` manual · `🚫` out of scope (with reason).
+ 
+-**Scope of this file today.** Only Plan 3's keystone (Tasks 1–2 plus the coordination doc's §9 rider) has landed, so only the cases those tasks cover are written down. **Case ids 5.4 through 5.36 are reserved verbatim by Plan 3's own catalogue task** (`docs/superpowers/plans/2026-08-20-03-tickets-hierarchy.md`, Task 14) and must not be claimed by anything else — the rest of Plan 3's lane fills them in with the tests that cover them. New cases beyond that plan's list continue from 5.38.
++**Scope of this file today.** Plan 3's keystone (Tasks 1–2 plus the coordination doc's §9 rider) and Task 5's hierarchy checks have landed, so only the cases those tasks cover are written down. **Case ids 5.4 through 5.36 are reserved verbatim by Plan 3's own catalogue task** (`docs/superpowers/plans/2026-08-20-03-tickets-hierarchy.md`, Task 14) and must not be claimed by anything else — the rest of Plan 3's lane fills them in with the tests that cover them. Task 14's own list also covers Task 5's brief-mandated refusals at 5.7–5.11, 5.21, 5.23 and 5.24; **only the refusals Task 5 minted that no plan document anticipated are catalogued here**, and they continue from 5.38. New cases beyond that continue from 5.40. **Never renumber**: 5.27 and 5.30 are cited by Plan 5, 5.36 by the coordination doc.
+ 
+ - 5.1 ✅ Custom ticket type definitions validated: select needs options, options only on select, duplicate field ids refused, built-in field ids not shadowable, rank ≥ 1. (`packages/domain/test/ticket-types.test.ts`)
+ - 5.2 ✅ Built-in ladder ships as seed data with ranks epic 1 / story 2 / task 3 / sub-task 4, materialisable against a workspace default workflow; `DEEPEST_RANK` is asserted against the shipped ladder's real maximum, so a deeper seed fails loudly instead of quietly releasing sub-tasks from the parent requirement. (`packages/domain/test/ticket-types.test.ts`)
+ - 5.3 ✅ Every vocabulary event round-trips `parseEvent`; malformed payloads, unknown event types, and a ticket event filed against another kind of entity are all refused at the door. (`packages/domain/test/ticket-events.test.ts`)
+ - 5.26 ✅ An `attachment.added` claim says which of the two kinds it is, or it is refused at the door: an upload round-trips with its `sha256`, a Drive reference round-trips with its pointer and `capturedAt`, and both a payload with no `kind` and an `upload` with no `sha256` are refused — an attachment whose kind is unstated is exactly the ambiguity these rules exist to remove. (`packages/domain/test/ticket-events.test.ts`)
+ - 5.37 ✅ The server's `EngineContext` answers honestly about what it can serve while ticket state does not exist yet: `null` for a ticket and for a membership that HAS a head row, and the whole `{kind, id}` state for the kinds whose state is exactly that. A role-gated transition ingested end to end is refused as `unknown-ticket` — the true reason — and never as `unknown-workflow` naming a workflow called `undefined`, which is what the head-pointer cast produced for every transition. Coordination doc, Plan 1 consequences §9; every assertion fails against the body it replaced. (`apps/server/test/engine-context.test.ts`)
++- 5.38 ✅ A second `ticket.created` for a ticket that already exists is refused `ticket.already-exists`, ahead of every question about its payload. The reducer folds creation unconditionally (`packages/domain/src/ticket-state.ts:94`), so an accepted duplicate does not error and does not merge — it RESETS the fold, erasing the ticket's status, collaborators, field claims and the whole transition log four-eyes reads. Nothing refused it before, and the reset left no trace in head state. The order is pinned separately: a duplicate create whose type is ALSO undefined still names the duplicate, because the actor's type was never the problem. (`packages/rule-engine/test/hierarchy.test.ts`)
++- 5.39 ✅ Two refusals that used to fire with somebody else's sentence now tell the truth on the path that reaches them. A parent whose TYPE is undefined refuses `hierarchy.parent-type-unknown` naming the parent, not `ticket.unknown-type` — this ticket's own type resolved, so the borrowed copy sent the actor to define a type that is already defined (ruling P11). A parent in ANOTHER WORKSPACE refuses `hierarchy.unknown-parent`, not `hierarchy.cross-project`: ticket lookup carries no workspace predicate over a projection keyed `(entity_kind, entity_id)`, so a foreign parent resolves, and the more specific sentence was both false and a confirmation that the id exists somewhere the actor cannot see (ruling P12). Both are pinned as literals and mutation-proven, and the workspace case is staged against a parent that is foreign in project too, so the order is what the test constrains. (`packages/rule-engine/test/hierarchy.test.ts`)

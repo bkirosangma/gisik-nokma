@@ -1,0 +1,318 @@
+# Review package: 140afd5..HEAD
+
+## Commits
+ce569be A green check that certified the absence of a behaviour the product has: the fourth path to markup, and the test that could not see it
+
+## Files changed
+ packages/editor/src/schema/extensions.ts          |  43 +++++++--
+ packages/editor/test/doc-text-conformance.test.ts |  30 ++++---
+ packages/editor/test/schema.test.ts               | 103 +++++++++++++++++++++-
+ 3 files changed, 155 insertions(+), 21 deletions(-)
+
+## Diff
+diff --git a/packages/editor/src/schema/extensions.ts b/packages/editor/src/schema/extensions.ts
+index ffda961..8323869 100644
+--- a/packages/editor/src/schema/extensions.ts
++++ b/packages/editor/src/schema/extensions.ts
+@@ -46,32 +46,57 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
+   return [
+     StarterKit.configure({
+       // Replaced by VersionedDocument so the doc node carries schemaVersion.
+       document: false,
+       // Configured separately below.
+       link: false,
+       // Outside document schema v1's closed mark vocabulary.
+       underline: false,
+     }),
+     VersionedDocument,
+-    // NOTHING SILENTLY BECOMES MARKUP (spec §2), and that takes three
+-    // options rather than the two the plan names, because Tiptap turns text
+-    // into links along three separate paths:
++    // SPEC §2 SAYS "NOTHING SILENTLY BECOMES MARKUP". THESE OPTIONS DO NOT
++    // ACHIEVE THAT, AND THIS COMMENT USED TO CLAIM THEY DID. There are FOUR
++    // paths from text to link markup. Three are closed here by option:
+     //   - `autolink` — a URL typed and then left. Off.
+     //   - `linkOnPaste` — a URL pasted over a selection. Off. The library
+-    //     defaults it TRUE, and the plan's config omits it; a URL pasted
+-    //     over selected text would have become link markup while the comment
+-    //     two lines up promised it could not. Deviation from the plan's
++    //     defaults it TRUE and the plan's config omits it, so a URL pasted
++    //     over selected text became link markup. Deviation from the plan's
+     //     verbatim config, ruled by the controller in review round 1.
+-    //   - `markdownLinks` — pasted `[text](url)` syntax. The library already
+-    //     defaults it false; named here so the third path is visibly checked
+-    //     rather than accidentally correct.
++    //   - `markdownLinks` — pasted `[text](url)` syntax. Already false by
++    //     default; stated so the path is visibly checked, not accidentally
++    //     correct.
++    //
++    // THE FOURTH IS NOT AN OPTION AND IS STILL LIVE. `Link.addPasteRules()`
++    // returns a plain-URL `markPasteRule` UNCONDITIONALLY whenever
++    // `markdownLinks` is false (extension-link@3.30.5 dist:445-482), core
++    // registers it, and it fires from `pasteRulesPlugin`'s `appendTransaction`
++    // gated only on `transaction.getMeta('uiEvent') === 'paste'` — which
++    // prosemirror-view's `doPaste` sets AFTER `handlePaste` declines. None of
++    // the three options above gates it. Setting `markdownLinks: false` in fact
++    // routes INTO this branch rather than away from it.
++    //
++    // So today a pasted URL becomes a link at a bare cursor as well as over a
++    // selection — broader than the round-1 defect, which at least returned
++    // early on an empty selection — and a bare `gst.gov.in` becomes
++    // `http://gst.gov.in`. It is not link-only: five configured extensions
++    // register seven paste rules between them (`bold` 2, `italic` 2, `code` 1,
++    // `strike` 1, `link` 1), so `**due soon**` pastes as bold, `*soon*` as
++    // italic, `` `npm run gst` `` as code and `~~gone~~` as strike.
++    //
++    // NOT DECIDED HERE, DELIBERATELY. Switching paste rules off is
++    // `enablePasteRules`, an `Editor` option this function structurally cannot
++    // reach, it spans five extensions, and it is a product judgement about how
++    // §2 should be honoured. TASK 5 — the escape-suggestion mechanic — owns
++    // that decision; the plan created it for this requirement. A test in
++    // test/schema.test.ts records the current behaviour truthfully so that
++    // Task 5's change is what makes it fail.
++    //
+     // `openOnClick: false` keeps a click editing the link, not following it.
+     Link.configure({
+       openOnClick: false,
+       autolink: false,
+       linkOnPaste: false,
+       markdownLinks: false,
+     }),
+     Placeholder.configure({ placeholder: options.placeholder ?? 'Write…' }),
+     Table.configure({ resizable: false }),
+     TableRow,
+diff --git a/packages/editor/test/doc-text-conformance.test.ts b/packages/editor/test/doc-text-conformance.test.ts
+index 23491a7..206231d 100644
+--- a/packages/editor/test/doc-text-conformance.test.ts
++++ b/packages/editor/test/doc-text-conformance.test.ts
+@@ -13,26 +13,32 @@ import { typeText } from './helpers/type-text.js';
+  * node names. Any node this schema emits that the walker does not know is
+  * descended into without a line break, so its text silently fuses with its
+  * neighbour's in every search index and every notification. Nothing else in
+  * the system would report that; the document would still round-trip, still
+  * render, still validate. So the check is run against documents this editor
+  * actually produced, not against hand-written JSON that could agree with the
+  * walker while the editor disagreed with both.
+  *
+  * WHAT THESE CASES DO AND DO NOT PIN, established by deleting each entry from
+  * the walker's block set and re-running: `paragraph`, `heading` and `codeBlock`
+- * each kill a case. `doc`, `blockquote`, `bulletList` and `listItem` survive,
+- * and no schema-v1 document can change that — every one of them contains only
+- * other blocks, so the newline is emitted by the child regardless and the
+- * walker's `\n{2,}` collapse hides the duplicate. Their entries are inert for
+- * this editor's output. Stated here so a later reader does not mistake these
+- * cases for whole-set coverage and build on a guarantee they do not give.
++ * each kill a case. `doc`, `blockquote`, `bulletList`, `orderedList` and
++ * `listItem` survive, and no schema-v1 document can change that — every one of
++ * them contains only other blocks, so the newline is emitted by the child
++ * regardless and the walker's `\n{2,}` collapse hides the duplicate. Their
++ * entries are inert for this editor's output. Stated here so a later reader
++ * does not mistake these cases for whole-set coverage and build on a guarantee
++ * they do not give.
++ *
++ * Only the three TEXTBLOCK entries are load-bearing, and that is the general
++ * shape rather than a coincidence: an entry earns its keep exactly when its
++ * node holds text directly. Every container's newline is already paid for by
++ * the block inside it.
+  */
+ describe('schema v1 output conforms to the shipped plain-text walker', () => {
+   it('renders every block node the schema names as its own line', () => {
+     const editor = createTestEditor(undefined, {
+       type: 'doc',
+       content: [
+         { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'GST filing' }] },
+         { type: 'paragraph', content: [{ type: 'text', text: 'due soon' }] },
+         {
+           type: 'bulletList',
+@@ -63,24 +69,28 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
+       'GST filing\ndue soon\ncollect invoices\nfile GSTR-1\nCA said wait\nnpm run gst\nthen reconcile',
+     );
+     editor.destroy();
+   });
+ 
+   /**
+    * `orderedList` and `horizontalRule` are in the v1 node set and were in no
+    * case here. Their pinning strength differs and it is worth being straight
+    * about which is which.
+    *
+-   * `orderedList` is load-bearing the same way `bulletList` is — its numbering
+-   * is presentational, so the plain text must carry the item text and nothing
+-   * else, and dropping `paragraph` from the walker's block set fails this case
+-   * along with the others.
++   * `orderedList`'s OWN entry is inert, exactly like `bulletList`'s — deleting
++   * `orderedList`, `listItem`, `bulletList` or `doc` from the walker's block
++   * set all leave this case green, because a list item's newline comes from
++   * the paragraph inside it. What this case does pin is that the numbering is
++   * presentational: the plain text carries the item text and no digits, no
++   * '1.' markers, no separators. Deleting `paragraph` is the mutation that
++   * kills it, and it does — this case joined that mutant's kill set, taking it
++   * from two conformance failures to three.
+    *
+    * `horizontalRule` is pinned from the other direction, and it took a moment
+    * to see that it was pinned at all. DELETING something cannot break it — an
+    * `hr` has no content, so it contributes nothing whether or not the walker
+    * calls it a block. ADDING something can: teaching the walker to render it
+    * as a '---' separator fails this case, which was run and does fail. That is
+    * the change worth guarding against, because it is the plausible one — a
+    * later hand deciding a rule should be visible in plain text would start
+    * injecting punctuation into every indexed document and every notification,
+    * and would otherwise find out from a user.
+diff --git a/packages/editor/test/schema.test.ts b/packages/editor/test/schema.test.ts
+index 22989e6..cccd37a 100644
+--- a/packages/editor/test/schema.test.ts
++++ b/packages/editor/test/schema.test.ts
+@@ -192,20 +192,32 @@ describe('document schema v1', () => {
+  * These cases exist because exactly that happened. `linkOnPaste` defaults to
+  * true in @tiptap/extension-link@3.30.5 and the plan's verbatim config omits
+  * it, so a URL pasted over selected text became link markup — two properties
+  * away from the `autolink: false` that was set to prevent the typed version of
+  * the same thing, and directly under a comment quoting spec §2's "nothing
+  * silently becomes markup".
+  */
+ describe('behavioural options that spec §2 constrains', () => {
+   const PASTED_URL = 'https://gst.gov.in';
+ 
++  function linkHrefsIn(doc: unknown): string[] {
++    const hrefs: string[] = [];
++    JSON.stringify(doc, (_key, value) => {
++      const mark = value as { type?: unknown; attrs?: { href?: unknown } };
++      if (mark && typeof mark === 'object' && mark.type === 'link') {
++        if (typeof mark.attrs?.href === 'string') hrefs.push(mark.attrs.href);
++      }
++      return value;
++    });
++    return hrefs;
++  }
++
+   function selectAllOf(text: string) {
+     const editor = createTestEditor(undefined, {
+       type: 'doc',
+       content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+     });
+     editor.commands.selectAll();
+     return editor;
+   }
+ 
+   it('registers no paste-to-link plugin at all', () => {
+@@ -214,32 +226,119 @@ describe('behavioural options that spec §2 constrains', () => {
+     // true. Asserting the plugin is absent proves the wiring is gone, where
+     // asserting `options.linkOnPaste === false` would only echo the source.
+     const editor = createTestEditor();
+     const keys = editor.state.plugins.map((plugin) => String((plugin as { key?: unknown }).key));
+     expect(keys.some((key) => key.startsWith('handlePasteLink'))).toBe(false);
+     // Its typed sibling, for the same reason.
+     expect(keys.some((key) => key.startsWith('autolink'))).toBe(false);
+     editor.destroy();
+   });
+ 
+-  it('leaves a URL pasted over a selection as literal text', () => {
++  /**
++   * Replicates `doPaste` from prosemirror-view@1.42.3 in full: consult
++   * `handlePaste` first, and if it declines, dispatch the replacement with
++   * `.setMeta('paste', true).setMeta('uiEvent', 'paste')`.
++   *
++   * BOTH HALVES ARE LOAD-BEARING and the second is the one an earlier version
++   * of this test omitted. `handlePaste` is a synchronous prop; paste RULES run
++   * from `pasteRulesPlugin`'s `appendTransaction`, gated on that `uiEvent`
++   * meta, which `doPaste` sets only AFTER `handlePaste` declines. A test that
++   * calls `someProp('handlePaste')` alone therefore cannot observe a paste
++   * rule at all — it will report "no link was created" no matter what the
++   * product does on that same keystroke.
++   */
++  function pasteInto(editor: ReturnType<typeof createTestEditor>, text: string): void {
++    const { view } = editor;
++    const slice = new Slice(Fragment.from(view.state.schema.text(text)), 0, 0);
++    const handled = view.someProp('handlePaste', (handler) =>
++      handler(view, new Event('paste') as ClipboardEvent, slice),
++    );
++    if (handled) return;
++    view.dispatch(
++      view.state.tr.replaceSelection(slice).setMeta('paste', true).setMeta('uiEvent', 'paste'),
++    );
++  }
++
++  it('declines the paste in handlePaste — the linkOnPaste path really is shut', () => {
+     const editor = selectAllOf('the portal');
+     const { view } = editor;
+     const slice = new Slice(Fragment.from(view.state.schema.text(PASTED_URL)), 0, 0);
+     const handled = view.someProp('handlePaste', (handler) =>
+       handler(view, new Event('paste') as ClipboardEvent, slice),
+     );
+     expect(handled).toBeFalsy();
+-    expect(JSON.stringify(editor.getJSON())).not.toContain('"link"');
+     editor.destroy();
+   });
+ 
++  /**
++   * DOCUMENTS CURRENT BEHAVIOUR, WHICH SPEC §2 DOES NOT WANT. Pending Task 5
++   * (the escape-suggestion mechanic), which owns this decision.
++   *
++   * This case asserts that a pasted URL DOES become a link, because that is
++   * what the product does. Its predecessor asserted the opposite and passed,
++   * by driving an entry point that structurally cannot see the behaviour —
++   * a green check certifying a property the product does not have, which is
++   * this branch's named defect class with our own name on it.
++   *
++   * `Link.addPasteRules()` returns a plain-URL `markPasteRule`
++   * unconditionally when `markdownLinks` is false, and no option here gates
++   * it. When Task 5 closes this path, this test fails — and that failure is
++   * the notification that the fix landed, which is exactly what it is for.
++   * Flip the expectations then; do not delete the case.
++   */
++  it('CURRENT BEHAVIOUR pending Task 5: a pasted URL becomes a link anyway', () => {
++    const overSelection = selectAllOf('the portal');
++    pasteInto(overSelection, PASTED_URL);
++    expect(linkHrefsIn(overSelection.getJSON())).toEqual([PASTED_URL]);
++    overSelection.destroy();
++
++    // Broader than the round-1 defect: `pasteHandler` returned early on an
++    // empty selection, so this path catches a plain cursor that one missed.
++    const bareCursor = createTestEditor(undefined, emptyDoc());
++    pasteInto(bareCursor, PASTED_URL);
++    expect(linkHrefsIn(bareCursor.getJSON())).toEqual([PASTED_URL]);
++    bareCursor.destroy();
++
++    // And a bare domain acquires a protocol it was never given. The `http`
++    // comes from linkifyjs's own `find()` default inside `findPlainUrls`, not
++    // from Link's `defaultProtocol` option.
++    const bareDomain = createTestEditor(undefined, emptyDoc());
++    pasteInto(bareDomain, 'gst.gov.in');
++    expect(linkHrefsIn(bareDomain.getJSON())).toEqual(['http://gst.gov.in']);
++    bareDomain.destroy();
++  });
++
++  /**
++   * The same path, and the reason Task 5's decision is bigger than links:
++   * five configured extensions register seven paste rules between them
++   * (`bold` 2, `italic` 2, `code` 1, `strike` 1, `link` 1). Also pending
++   * Task 5; also flip rather than delete.
++   */
++  it('CURRENT BEHAVIOUR pending Task 5: pasted markdown syntax becomes marks', () => {
++    for (const [pasted, mark, text] of [
++      ['**due soon**', 'bold', 'due soon'],
++      ['*soon*', 'italic', 'soon'],
++      ['`npm run gst`', 'code', 'npm run gst'],
++      ['~~gone~~', 'strike', 'gone'],
++    ] as const) {
++      const editor = createTestEditor(undefined, emptyDoc());
++      pasteInto(editor, pasted);
++      const json = editor.getJSON() as {
++        content?: Array<{ content?: Array<{ text?: string; marks?: Array<{ type?: string }> }> }>;
++      };
++      const leaf = json.content?.[0]?.content?.[0];
++      expect(leaf?.text, `${pasted} should have lost its delimiters`).toBe(text);
++      expect(leaf?.marks?.[0]?.type, `${pasted} should have become ${mark}`).toBe(mark);
++      editor.destroy();
++    }
++  });
++
+   it('keeps openOnClick and resizable at the values the schema origin chose', () => {
+     // The rest of the resolved-option sweep found nothing else contradicting a
+     // stated constraint; these two are the other options the plan sets on
+     // purpose, pinned so a later edit cannot drop them silently.
+     const editor = createTestEditor();
+     const byName = new Map(editor.extensionManager.extensions.map((e) => [e.name, e.options]));
+     expect((byName.get('link') as { openOnClick?: unknown } | undefined)?.openOnClick).toBe(false);
+     expect((byName.get('link') as { autolink?: unknown } | undefined)?.autolink).toBe(false);
+     expect((byName.get('link') as { linkOnPaste?: unknown } | undefined)?.linkOnPaste).toBe(false);
+     expect((byName.get('link') as { markdownLinks?: unknown } | undefined)?.markdownLinks).toBe(

@@ -1,0 +1,112 @@
+# Review package: 9fe41aa..HEAD
+
+## Commits
+c94b103 A citation repaired by filename rather than by meaning, and a separator chosen in new code with nothing to contradict it
+
+## Files changed
+ packages/rule-engine/test/engine.test.ts | 30 +++++++++++++++++++++++++++++-
+ packages/rule-engine/test/fields.test.ts |  2 +-
+ test-cases/05-tickets-hierarchy.md       |  2 +-
+ 3 files changed, 31 insertions(+), 3 deletions(-)
+
+## Diff
+diff --git a/packages/rule-engine/test/engine.test.ts b/packages/rule-engine/test/engine.test.ts
+index 195b5bc..580ba91 100644
+--- a/packages/rule-engine/test/engine.test.ts
++++ b/packages/rule-engine/test/engine.test.ts
+@@ -396,22 +396,50 @@ describe('a malformed payload names the field it is about', () => {
+       type: 'workflow.defined',
+       entity: { kind: 'workflow', id: newUlid() },
+       payload: 'not a definition',
+     });
+     await expect(evaluateEvent(env, ctx)).resolves.toEqual({
+       refused: true,
+       rule: 'malformed-payload',
+       reason: "This workflow.defined event's payload is malformed: Expected object, received string",
+     });
+   });
+-});
+ 
++  /**
++   * The SEPARATOR, pinned for the same reason and by the same argument as the
++   * structural refusal's below: every other assertion in this suite fires
++   * exactly one issue, and a one-element join is identical for any separator
++   * (`['x'].join('; ') === ['x'].join('')`), so `'; '` would otherwise be
++   * unfalsifiable in brand-new code. `ticketCreatedPayload` is the one payload
++   * here that can fire two independent issues from one candidate — an empty
++   * `typeId` and a `projectId` that is not a ULID — in the order zod reports
++   * them, which is the schema's own key order. Change the join and this dies;
++   * delete this and the join is unpinned again.
++   *
++   * It also proves the path clause is per-issue rather than appended once: both
++   * fields are named, each beside its own message.
++   */
++  it('ticket.created: two issues are joined with a semicolon, each carrying its own path', async () => {
++    const { ctx } = spyContext();
++    const env = envelope({
++      type: 'ticket.created',
++      entity: { kind: 'ticket', id: newUlid() },
++      payload: { typeId: '', projectId: 'not-a-ulid', parentId: null, title: 'Two things wrong' },
++    });
++    await expect(evaluateEvent(env, ctx)).resolves.toEqual({
++      refused: true,
++      rule: 'malformed-payload',
++      reason:
++        "This ticket.created event's payload is malformed: at typeId: String must contain at least 1 character(s); at projectId: must be a ULID",
++    });
++  });
++});
+ 
+ /**
+  * The structural refusal joins EVERY issue into one reason, separated by a
+  * single space. No fixture can pin that separator: every planted definition in
+  * the fixture suite is built to fire exactly one issue, and a one-element join
+  * is identical for any separator (`['x'].join(' ') === ['x'].join('')`). So the
+  * separator is pinned here, on a definition that fires exactly two issues, in
+  * the order validateWorkflowDef fixes. Change the join and this dies; delete
+  * this and the join is unpinned again.
+  */
+diff --git a/packages/rule-engine/test/fields.test.ts b/packages/rule-engine/test/fields.test.ts
+index cb6eb42..3b6aa29 100644
+--- a/packages/rule-engine/test/fields.test.ts
++++ b/packages/rule-engine/test/fields.test.ts
+@@ -45,21 +45,21 @@ const ctx = (): MemoryContext => buildMemoryContext([WF], [typeDefined(INVOICE),
+  * and not with a fixture.
+  */
+ function ctxWithoutTheTicketsType(): MemoryContext {
+   const context = ctx();
+   context.ticketTypes.delete('invoice');
+   return context;
+ }
+ 
+ /**
+  * Candidate payloads spell the key `fieldId`, which is what the DOMAIN schema
+- * says (`events/ticket-events.ts:91`). The fixture harness's PRIOR-event parser
++ * says (`events/ticket-events.ts:90`). The fixture harness's PRIOR-event parser
+  * spells it `field`, and the split is deliberate — controller ruling P8,
+  * pre-flight A16. Neither is adapted into the other.
+  */
+ function fieldSet(fieldId: string, value: unknown, ticketId: string = TICKET): EventEnvelope {
+   return makeEnvelope({
+     type: 'ticket.field_set',
+     entity: { kind: 'ticket', id: ticketId },
+     workspaceId: WS,
+     payload: { fieldId, value },
+   });
+diff --git a/test-cases/05-tickets-hierarchy.md b/test-cases/05-tickets-hierarchy.md
+index 8666dcf..e8f79ad 100644
+--- a/test-cases/05-tickets-hierarchy.md
++++ b/test-cases/05-tickets-hierarchy.md
+@@ -14,11 +14,11 @@ Mirrors `Features.md` §5. Status: `❌` not covered · `✅` covered · `🟡`
+ - 5.40 ✅ Reparenting inherits both rulings the create path was corrected by, and its check ORDER is pinned rather than described. A parent whose type is undefined refuses `hierarchy.parent-type-unknown` naming the parent — Task 6's brief specified `ticket.unknown-type`, which is false on every path that reaches it because the MOVED ticket's own type resolved first (ruling P11) — while a ticket whose own type is missing still refuses `ticket.unknown-type`, because there the sentence is exactly true. A parent in another WORKSPACE refuses `hierarchy.unknown-parent`, not `hierarchy.cross-project`: the brief had no workspace guard at all, and a reparent grafts an EXISTING ticket into another workspace's hierarchy rather than merely failing to make a new one (ruling P12). Seven order cases stage two live defects each and assert which names the event — the ticket's own absence outranks the parent's; a loop is named as a loop even when the rank is violated and even when the parent is in another project; a foreign workspace outranks a foreign project; cross-project outranks an unreadable parent type; cross-project outranks a rank violation; rank outranks a finished parent. The cross-project-over-unreadable-parent-type pairing is also added to `checkTicketCreated`, closing the one chain position Task 5 left prose-pinned: a mutation hoisting the parent-type guard above the cross-project check passed the entire suite until now. (`packages/rule-engine/test/reparent.test.ts`, `packages/rule-engine/test/hierarchy.test.ts`)
+ - 5.41 ✅ An ancestor chain that never ends THROWS rather than refusing, staged against two tickets that are each other's parent and neither of which is the ticket being moved. The distinction is deliberate: a malformed payload is the actor's claim and is refusable in the actor's language, while a cycle already standing in the tree is the store's state — this check is what prevents one — so there is no true sentence to tell the actor, and `hierarchy.cycle` would name a loop that is not the one they proposed. (`packages/rule-engine/test/reparent.test.ts`)
+ - 5.42 ✅ `evaluateEvent` actually routes the three new event types. Every other case calls its check directly, so before these assertions deleting a `case` from the dispatch left a perfect, unreachable check and an engine that accepted every reparent and every same-workflow rebind through the pass-through default. `ticket-type.defined`'s routing was pinned only by its two fixtures, which enter at `evaluateEvent` — real coverage, but living in another file, so relocating those fixtures would have reopened the gap silently; Task 7 added the third describe so the dispatch is pinned where the check's own tests are. (`packages/rule-engine/test/reparent.test.ts`, `packages/rule-engine/test/workflow-rebind.test.ts`, `packages/rule-engine/test/ticket-type.test.ts`, `packages/rule-engine/fixtures/type-defined-*.json`)
+ - 5.43 ✅ A `ticket.workflow_rebound` naming a workflow this workspace has not defined is refused `ticket.rebound-unknown-workflow`, whose reason names **that** workflow and offers the two remedies an admin can take alone. It is deliberately not `ticket.workflow-undefined` — "This ticket type's workflow has not been defined yet, so the ticket would have no status." — which makes the ticket TYPE's binding its subject: correct on `ticket.created`, where a ticket has no workflow but the one its type names, and false on a migration, where the binding may be perfectly well defined and the missing workflow is the one the payload asked for. The old sentence sent an admin to inspect a thing that was not broken. The test asserts the premise as well as the refusal — the ticket's own type binding resolves in the same context, so the borrowed sentence was false of the world it was told in. Controller ruling P13, the third instance of the class P11 and P12 closed. **Task 14 folds this into case 5.34**, whose plan text this change set corrected in place (same number — 5.34 is cited only inside Plan 3's own document, unlike 5.27/5.30/5.36). (`packages/rule-engine/test/workflow-rebind.test.ts`)
+ - 5.44 ✅ A `ticket.field_set` whose payload omits `value` entirely is refused at the door, not folded into a clearing. `z.unknown()` does not require its key, so `{ fieldId: 'title' }` parsed clean, and the reducer's then-`p.value ?? null` turned that absence into a null CLEARING claim — a field wiped under someone's name and both their clocks, into an append-only table, on the strength of a claim nobody made. Four assertions rather than one "the field is required", because two of them are ACCEPTANCES and they are the half a careless fix breaks: `null` is the explicit clearing claim and `{}` is an empty claim, both still claims. Proven by reverting the schema to bare `z.unknown()` and watching the ABSENT case fail specifically — a mutation that killed only the present-but-`undefined` case would have proven a side effect of the fix rather than the fix. The identical matrix guards the envelope's own payload (`packages/domain/src/envelope.ts`), so the two doors answer alike. **Task 14's 5.12 stays the home for the field refusals the plan anticipated** (unknown field, per-kind mismatch, the title that cannot be cleared); this id covers only the presence hole, which no plan document names. The coalesce itself is gone as well (case 5.50): with the key required, `parse` throws before the fold and `null ?? null` is identity, so `packages/domain/src/ticket-state.ts:211` now reads `claim(p.value, env)`. (`packages/domain/test/ticket-events.test.ts`, `packages/rule-engine/test/fields.test.ts`)
+ - 5.45 ✅ `evaluateEvent` routes `ticket.field_set`. Every field test calls `checkTicketFieldSet` directly, so without this assertion deleting the `case` from the dispatch left a fully mutation-proven, unreachable check while the pass-through default accepted every field claim — including the ones clearing a title and the ones naming a field no type declared. (`packages/rule-engine/test/fields.test.ts`)
+ - 5.46 ✅ A custom-field claim on a ticket whose TYPE is not defined refuses `ticket.unknown-type`, while a title change on that same ticket is still accepted — the branch that shipped implemented and untested in this check's first draft, and the order that makes the built-ins independent of the type, pinned together. It must be a memory-context test rather than a fixture: the fixture harness's `getTicketTypeDef` throws by design until Task 8 (pre-flight Addendum 5), so a fixture reaching this branch would throw rather than refuse, and `buildMemoryContext` cannot fold the world either — `applyTicketEvent` throws on a `ticket.created` whose type is unknown, so the type is defined for the fold and then removed from the context's own map. Task 14's 5.12 does not name this branch — it lists the unknown field, the per-kind mismatches and the title — so this is a case, not a duplicate. (`packages/rule-engine/test/fields.test.ts`)
+ - 5.47 ✅ The premise under case 5.43 is asserted rather than neighboured. The test showed a DIFFERENT workflow being accepted, which says the check works, not that the ticket's own type binding resolves in that context — the thing the P13 argument rests on. One line asserts the premise itself (`getWorkflowDef(TASK.workflowId)` is non-null); it is true by construction, which is exactly why leaving it implicit cost the claim its evidence rather than making it wrong. (`packages/rule-engine/test/workflow-rebind.test.ts`)
+ - 5.48 ✅ A `ticket.created` whose title is only spaces is refused at the door, and a padded real title is stored VERBATIM. `z.string().min(1)` admitted `'   '`, so the create door was letting in precisely the state the edit door forbids — `checkTicketFieldSet` refuses a whitespace-only title change with `field.type-mismatch`, which made "the title that cannot vanish" an edit-time rule rather than an invariant, and a blank title one that could be created but never set. It REFUSES rather than trims, matching the treatment `workspace.created`/`workspace.renamed`/`project.created` already ship for their names: the ledger stores the claim as it was made, so rewriting `'  Reconcile the till  '` would put words in the actor's mouth. Four assertions, because two are ACCEPTANCES and they are the half a trimming "fix" breaks — the padded case asserts the stored string byte for byte. Proven by removing the refine and watching only the whitespace-only case (and its `parseEvent` twin) fail; the empty-title case stays green on `.min(1)`, which is what makes the mutation specific. Controller ruling P15. (`packages/domain/test/ticket-events.test.ts`)
+ - 5.49 ✅ A malformed-payload refusal names the FIELD it is about. Every check that parses a payload built its detail from `issue.message` alone and dropped the zod path, and a zod message is a subject-less fragment: `ticketCreatedPayload` has two ULID fields and refused a bad `parentId` with "must be a ULID"; a rebound with an empty `toStateId` said "String must contain at least 1 character(s)", where a reader guesses `toWorkflowId` first; and the presence refine produced a whole sentence about nothing. One shared `malformedPayloadDetail` now renders `at <path>: <message>` per issue, mirroring `parse-event.ts`'s construction so the door and the engine say the path the same way, and omitting the clause when the path is empty. All seven call sites route through it — `ticket.created`, `ticket.reparented`, `ticket.field_set`, `ticket-type.defined`, `ticket.workflow_rebound`, `ticket.transitioned`, `workflow.defined` — and one mutation of the helper turns all seven red at their own assertions. The nested-path case (`comment.text`) is the only assertion in the repo pinning the dot join, and the not-an-object case is the only one pinning the empty-path omission; the two shipped fixtures assert only the prefix that stops at "malformed:", which is unchanged byte for byte. (`packages/rule-engine/test/engine.test.ts`, `packages/rule-engine/test/hierarchy.test.ts`, `packages/rule-engine/test/reparent.test.ts`, `packages/rule-engine/test/ticket-type.test.ts`, `packages/rule-engine/test/workflow-rebind.test.ts`, `packages/rule-engine/test/fields.test.ts`)
+-- 5.50 ✅ The reducer's `p.value ?? null` is gone, and the three places that described the fold as live now say what used to happen. Once `ticketFieldSetPayload` requires `value` (case 5.44) the coalesce is unreachable — the `parse` above it throws on an absent or `undefined` value, `null ?? null` is identity, and `claim(value: unknown, …)` never needed it for typing — so keeping it would state the defect as the design, the same reasoning that dropped the identical coalesce in `checks/fields.ts`. Covered by Task 3's own reducer suite, which exercises this fold and stays green. Deliberately NOT changed: the fixture harness's matching `payload.value ?? null` is still reachable, because the harness's prior-event schema is still bare `z.unknown()` — that pair belongs to Task 8 (pre-flight Addendum 7a). (`packages/domain/test/ticket-state.test.ts`)
++- 5.50 ✅ The reducer's `p.value ?? null` is gone, and the four comments that described the fold as live now say what used to happen — plus a fifth reference that had come to dangle. Once `ticketFieldSetPayload` requires `value` (case 5.44) the coalesce is unreachable — the `parse` above it throws on an absent or `undefined` value, `null ?? null` is identity, and `claim(value: unknown, …)` never needed it for typing — so keeping it would state the defect as the design, the same reasoning that dropped the identical coalesce in `checks/fields.ts`. Covered by Task 3's own reducer suite, which exercises this fold and stays green. Deliberately NOT changed: the fixture harness's matching `payload.value ?? null` is still reachable, because the harness's prior-event schema is still bare `z.unknown()` — that pair belongs to Task 8 (pre-flight Addendum 7a). (`packages/domain/test/ticket-state.test.ts`)

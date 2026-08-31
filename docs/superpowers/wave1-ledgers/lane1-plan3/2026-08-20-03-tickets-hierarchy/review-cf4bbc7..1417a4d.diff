@@ -1,0 +1,835 @@
+# Review package: cf4bbc7..HEAD
+
+## Commits
+1417a4d A second in-memory EngineContext, built by the reducer the server folds with — and a fourth context method, because a ticket type's rank was unreachable through the first three
+
+## Files changed
+ apps/server/src/engine-context.ts                |  31 +-
+ packages/rule-engine/src/engine.ts               |  34 +-
+ packages/rule-engine/src/fixtures/harness.ts     |  14 +
+ packages/rule-engine/src/index.ts                |   1 +
+ packages/rule-engine/src/memory-context.ts       | 172 ++++++++++
+ packages/rule-engine/test/engine.test.ts         |   4 +-
+ packages/rule-engine/test/memory-context.test.ts | 396 +++++++++++++++++++++++
+ packages/rule-engine/test/version-map.test.ts    |   1 +
+ 8 files changed, 646 insertions(+), 7 deletions(-)
+
+## Diff
+diff --git a/apps/server/src/engine-context.ts b/apps/server/src/engine-context.ts
+index 657b474..09c0ece 100644
+--- a/apps/server/src/engine-context.ts
++++ b/apps/server/src/engine-context.ts
+@@ -49,25 +49,34 @@ export function createEngineContext(client: PoolClient): EngineContext {
+       // membership came back satisfying restrict-to's
+       // `membership.kind === 'membership'` narrowing with `role` undefined.
+       //
+       // Registering the ticket vocabulary (Plan 3 Task 2) is what turned that
+       // into a live defect rather than a documented seam: transitions became
+       // ingestible while ticket state is still ten tasks away. The honest
+       // answer is null for the kinds this server cannot serve — the engine then
+       // refuses with "no such ticket is known", which is TRUE of this server
+       // today, instead of blaming a workflow named `undefined`.
+       //
+-      // PLAN 3 TASK 12 is where this grows real bodies: 'ticket' from
+-      // proj_tickets, 'ticket-type' from proj_ticket_types. Plan 4 owns
+-      // 'membership' via proj_memberships. Until each lands, its kind stays
+-      // null here, and the cast stays gone — the four identity-only kinds are
+-      // returned as themselves, structurally, with the compiler checking.
++      // PLAN 3 TASK 12 is where this grows a real body for 'ticket', from
++      // proj_tickets. Plan 4 owns 'membership' via proj_memberships. Until each
++      // lands, its kind stays null here, and the cast stays gone — the four
++      // identity-only kinds are returned as themselves, structurally, with the
++      // compiler checking.
++      //
++      // 'ticket-type' is NOT on that list and never will be. This comment used
++      // to promise it a real body here too; controller ruling P3 (2026-08-28)
++      // settled the opposite — the domain union keeps 'ticket-type' as identity
++      // only, and a type's DEFINITION (rank, name, workflow binding, fields)
++      // arrives through the context's fourth method, getTicketTypeDef, which
++      // Task 12 backs with proj_ticket_types. Growing a TicketTypeState in the
++      // union is the rejected alternative; do not reach for it because this
++      // comment once pointed at it.
+       const head = await readEntityHead(client, kind, id);
+       if (head === null || !isIdentityOnlyKind(kind)) {
+         return null;
+       }
+       return { kind, id };
+     },
+     async getChildrenStates(ticketId) {
+       // Empty because getEntityState answers null for 'ticket': the only
+       // caller (the parent-terminal invariant) is reached solely through a
+       // resolved TicketState, so on this server it is unreachable until Plan 3
+@@ -75,12 +84,24 @@ export function createEngineContext(client: PoolClient): EngineContext {
+       // Task 2 put ticket.created in the vocabulary, and children can now be
+       // committed to the ledger. Task 12 replaces this with the real
+       // proj_tickets query, in the same change set that makes getEntityState
+       // answer for 'ticket'; neither may land without the other.
+       void ticketId;
+       return [];
+     },
+     async getWorkflowDef(workflowId, version) {
+       return await getWorkflowDefFromProjection(client, workflowId, version);
+     },
++    async getTicketTypeDef(typeId) {
++      // Null for the same reason getEntityState answers null for 'ticket':
++      // proj_ticket_types does not exist yet (Plan 3 Task 9 lands the table,
++      // Task 12 wires this method to it). Null, not a throw, because this
++      // server is live — the engine's hierarchy checks then refuse with "no
++      // such ticket type is known", which is TRUE of this server today, rather
++      // than turning an ingest into a 500. It joins getEntityState('ticket')
++      // and getChildrenStates in the same change set: Task 12 replaces all
++      // three, and none may land without the others.
++      void typeId;
++      return null;
++    },
+   };
+ }
+diff --git a/packages/rule-engine/src/engine.ts b/packages/rule-engine/src/engine.ts
+index 1180573..dc76dd2 100644
+--- a/packages/rule-engine/src/engine.ts
++++ b/packages/rule-engine/src/engine.ts
+@@ -1,19 +1,51 @@
+-import type { EntityState, EventEnvelope, TicketState, WorkflowDef } from '@gisik-nokma/domain';
++import type {
++  EntityState,
++  EventEnvelope,
++  TicketState,
++  TicketTypeDef,
++  WorkflowDef,
++} from '@gisik-nokma/domain';
+ 
+ export type Refusal = { refused: true; rule: string; reason: string }; // reason: plain language, names the rule
+ export type Accept = { refused: false };
+ export type Verdict = Accept | Refusal;
+ 
+ export type EngineContext = {
+   getEntityState(kind: EventEnvelope['entity']['kind'], id: string): Promise<EntityState | null>;
+   getChildrenStates(ticketId: string): Promise<TicketState[]>;
+   getWorkflowDef(workflowId: string, version?: number): Promise<WorkflowDef | null>;
++  /**
++   * A ticket type's DEFINITION — rank, name, workflow binding, custom fields.
++   *
++   * A fourth method rather than a fourth answer from `getEntityState`, because
++   * `getEntityState('ticket-type', id)` cannot serve one: `'ticket-type'` is an
++   * `OtherEntityState` in the domain union — literally `{ kind, id }`, identity
++   * and nothing else (`packages/domain/src/entity-state.ts:49-53`) — and the
++   * server context returns exactly that, by design. Every hierarchy rank check
++   * (Plan 3 Tasks 5–7) needs `rank`, so without this method not one of them is
++   * implementable through the shipped context (pre-flight BA-4).
++   *
++   * The alternative — promoting `'ticket-type'` into a real `TicketTypeState`
++   * in the domain union — was REJECTED (controller ruling P3, 2026-08-28): it
++   * rewrites a union three lanes read concurrently, while this addition leaves
++   * the union and the four identity-only kinds untouched and cannot regress any
++   * existing `getEntityState` reader. `getEntityState('ticket-type', id)` keeps
++   * answering identity-only FOREVER; the definition arrives here.
++   *
++   * Three implementations, and they must not drift: the reducer-backed memory
++   * context (`./memory-context.js`, Plan 3 Task 4 — the first), the fixture
++   * harness (`./fixtures/harness.js`, Task 8), and the server's Postgres-backed
++   * context over `proj_ticket_types` (`apps/server/src/engine-context.ts`,
++   * Task 12). The two later ones throw or answer null until their task lands,
++   * loudly rather than quietly.
++   */
++  getTicketTypeDef(typeId: string): Promise<TicketTypeDef | null>;
+ };
+ 
+ /**
+  * `evaluateEvent` used to live here as Plan 1's pass-through. Plan 2 replaced
+  * it with the real dispatcher in `./evaluate.js`; the types above stayed,
+  * because they are what the server, the fixture harness and every rule module
+  * bind to. The signature Plan 1 froze is unchanged and remains cross-plan
+  * contract: pure, no I/O, all state arrives through `ctx`.
+  */
+diff --git a/packages/rule-engine/src/fixtures/harness.ts b/packages/rule-engine/src/fixtures/harness.ts
+index e627d62..c939bad 100644
+--- a/packages/rule-engine/src/fixtures/harness.ts
++++ b/packages/rule-engine/src/fixtures/harness.ts
+@@ -188,20 +188,34 @@ export function buildInMemoryContext(fx: Fixture): EngineContext {
+       if (kind === 'membership') return memberships.get(id) ?? null;
+       return null;
+     },
+     async getChildrenStates(ticketId) {
+       return [...tickets.values()].filter((ticket) => ticket.parentId === ticketId);
+     },
+     async getWorkflowDef(workflowId, version) {
+       if (version !== undefined) return defs.get(`${workflowId}@${version}`) ?? null;
+       return latestOf(workflowId);
+     },
++    async getTicketTypeDef(typeId) {
++      // NOT null, deliberately. This dialect has no `ticket-type.defined` yet —
++      // Plan 3 Task 8 adds it to `applyPriorEvent` and gives this method a
++      // ticketTypes map to answer from (pre-flight A14). Until then a fixture
++      // reaching a rank check has no type definition to be judged against, and
++      // answering null would make the check refuse for a reason that reads
++      // entirely legitimate — the same silent-wrong-verdict failure the
++      // memberships comment above warns about, which is why that one is a
++      // warning and this one is an exception. Nothing calls this today: the
++      // 61 shipped fixtures and 30 harness tests never reach it.
++      throw new Error(
++        `buildInMemoryContext: no ticket type definition for "${typeId}" — the fixture harness does not fold ticket-type.defined yet (Plan 3 Task 8). Extend applyPriorEvent rather than letting a rank check judge against a missing type.`,
++      );
++    },
+   };
+ }
+ 
+ function applyPriorEvent(
+   tickets: Map<string, TicketState>,
+   defs: Map<string, PublishedWorkflowDef>,
+   latestOf: (workflowId: string) => PublishedWorkflowDef | null,
+   env: EventEnvelope,
+ ): void {
+   switch (env.type) {
+diff --git a/packages/rule-engine/src/index.ts b/packages/rule-engine/src/index.ts
+index 29644a3..ef46d9d 100644
+--- a/packages/rule-engine/src/index.ts
++++ b/packages/rule-engine/src/index.ts
+@@ -2,12 +2,13 @@
+ // `node:fs`/`node:path`/`node:url` at module top level, and Plans 6 and 10 run
+ // this package in the browser entering at `evaluateEvent`. It ships instead as
+ // the `@gisik-nokma/rule-engine/fixtures` subpath export.
+ export * from './engine.js';
+ export { evaluateEvent } from './evaluate.js';
+ export { REFUSAL_RULES } from './refusal-rules.js';
+ export { evaluateWorkflowDefined } from './workflow-defined.js';
+ export { evaluateTicketTransitioned } from './transition.js';
+ export { resolveCurrentStateId, resolveStateIdForward } from './version-map.js';
+ export type { ResolvedState } from './version-map.js';
++export { buildMemoryContext, type MemoryContext } from './memory-context.js';
+ export { evaluateTransitionRules } from './rules/index.js';
+ export type { RuleEvaluator, TransitionRuleInput } from './rules/types.js';
+diff --git a/packages/rule-engine/src/memory-context.ts b/packages/rule-engine/src/memory-context.ts
+new file mode 100644
+index 0000000..ad38f51
+--- /dev/null
++++ b/packages/rule-engine/src/memory-context.ts
+@@ -0,0 +1,172 @@
++import type {
++  EventEnvelope,
++  PublishedWorkflowDef,
++  TicketState,
++  TicketStateDeps,
++  TicketTypeDef,
++} from '@gisik-nokma/domain';
++import {
++  TICKET_EVENT_TYPES,
++  applyTicketEvent,
++  foldTicketToWorkflowVersion,
++  ticketTypeDefSchema,
++  workflowDefinedPayloadSchema,
++} from '@gisik-nokma/domain';
++import type { EngineContext } from './engine.js';
++
++/**
++ * A SECOND in-memory EngineContext. It does NOT replace `buildInMemoryContext`
++ * in `./fixtures/harness.js`, and merging the two would break the suite three
++ * ways: 61 fixtures and 30 harness tests bind to that one, its prior-event
++ * dialect is deliberately not the domain schemas (`{ field }` not `{ fieldId }`,
++ * non-ULID ids, harness-only `stateId`/`stateCategory` overrides for planting
++ * states the ledger could not produce), and it carries `fx.memberships`, which a
++ * `(seedWorkflows, events)` signature cannot receive. Both contexts stay
++ * (pre-flight A15 / BA-6 / C-14).
++ *
++ * What this one adds is the SHARED REDUCER. Every ticket event here goes through
++ * `applyTicketEvent`, the same function `proj_tickets` and Plan 10's offline
++ * replica fold with, so a rule cannot answer one way in a unit test and another
++ * on the server. The harness hand-writes its fold; this one cannot drift from
++ * production because it is production's.
++ *
++ * Where the two must agree, they agree BY CONSTRUCTION and the agreement is
++ * copied deliberately: `getChildrenStates` returns DIRECT children only, and
++ * `getWorkflowDef` answers an exact version when given one and the latest
++ * otherwise — both mirrored from `harness.ts:191-197`. If these two contexts
++ * disagreed about what the same rule sees, the promise the shared fixture suite
++ * exists to keep would already be void.
++ */
++export type MemoryContext = EngineContext & {
++  tickets: Map<string, TicketState>;
++  ticketTypes: Map<string, TicketTypeDef>;
++  /** Latest version per workflow id — highest `version`, not last published. */
++  workflows: Map<string, PublishedWorkflowDef>;
++  /** Every version seen, ascending — what the refresh-on-publish fold walks. */
++  workflowVersions: Map<string, PublishedWorkflowDef[]>;
++};
++
++/**
++ * Folds already-accepted events into an in-memory EngineContext.
++ *
++ * NO EVALUATION HAPPENS HERE. These events are the past — the ledger as it
++ * already stands. Only a CANDIDATE event goes through `evaluateEvent`, by the
++ * caller, against the context this returns. That is why the reducer is allowed
++ * to throw on what the engine is contracted to refuse at the door: reaching one
++ * of those states in a replay means the history it was handed is broken.
++ *
++ * Seeds are the workflows that already exist before the first event. They go
++ * through the same accumulation as a `workflow.defined`, so a seeded version is
++ * findable by exact number and two seeds of one workflow do not lose the older
++ * one.
++ */
++export function buildMemoryContext(
++  seedWorkflows: readonly PublishedWorkflowDef[],
++  events: readonly EventEnvelope[],
++): MemoryContext {
++  const workflows = new Map<string, PublishedWorkflowDef>();
++  const workflowVersions = new Map<string, PublishedWorkflowDef[]>();
++  const ticketTypes = new Map<string, TicketTypeDef>();
++  const tickets = new Map<string, TicketState>();
++
++  /**
++   * `getWorkflow` is a PURE BY-ID LOOKUP, per the contract on `TicketStateDeps`
++   * (Ruling P1): a `ticket.workflow_rebound` asks for the workflow named in its
++   * own payload, which is not the one the ticket is on. Serving "the ticket's
++   * workflow" and nothing else would resolve null and throw on the very event
++   * the migration exists for.
++   */
++  const deps: TicketStateDeps = {
++    getTicketType: (typeId) => ticketTypes.get(typeId),
++    getWorkflow: (workflowId) => workflows.get(workflowId),
++  };
++
++  /** An exact version of one workflow, or null — `foldStateIdForward`'s contract. */
++  function versionOf(workflowId: string, version: number): PublishedWorkflowDef | null {
++    return workflowVersions.get(workflowId)?.find((def) => def.version === version) ?? null;
++  }
++
++  function recordWorkflow(def: PublishedWorkflowDef): void {
++    const seen = workflowVersions.get(def.id) ?? [];
++    workflowVersions.set(
++      def.id,
++      [...seen.filter((other) => other.version !== def.version), def].sort((a, b) => a.version - b.version),
++    );
++    // Latest is the HIGHEST version, mirroring the harness's `latestOf`
++    // (`harness.ts:161-167`), not "whatever arrived last" — a re-publish of an
++    // older version must not become the answer to "the latest". `>=` so that a
++    // second definition of the SAME version replaces the first, which is what
++    // the version list above does too: the exact-version answer and the latest
++    // answer must not disagree with each other.
++    const latest = workflows.get(def.id);
++    if (latest === undefined || def.version >= latest.version) workflows.set(def.id, def);
++  }
++
++  for (const seed of seedWorkflows) recordWorkflow(seed);
++
++  for (const env of events) {
++    if (env.type === 'workflow.defined') {
++      // Parsed with the PUBLISHED payload schema, never `workflowDefSchema`, and
++      // never an `as` cast. Zod strips undeclared keys, so the plain definition
++      // schema would silently delete `stateMapping` — and the refresh below
++      // would then throw "dropped with no stateMapping entry" for every ticket
++      // standing in a state the new version drops, which is exactly the case the
++      // mapping exists to cover.
++      const def = workflowDefinedPayloadSchema.parse(env.payload);
++      recordWorkflow(def);
++      // Refresh on publish (design decision 10). The server's proj_tickets folds
++      // its rows here, so this context must too, through the SAME domain
++      // function — otherwise the shared fixture suite and the server disagree
++      // about a ticket's category the moment a version re-categorises a state,
++      // and `getChildrenStates` hands the parent-terminal invariant stale
++      // categories on one side and folded ones on the other. That single
++      // disagreement is what this suite exists to make impossible.
++      //
++      // Only the tickets on THIS workflow: another workflow's version says
++      // nothing about them, and folding them against it would walk their state
++      // ids through a vocabulary they were never written in.
++      for (const [id, ticket] of tickets) {
++        if (ticket.workflowId !== def.id) continue;
++        tickets.set(id, foldTicketToWorkflowVersion(ticket, def, (version) => versionOf(def.id, version)));
++      }
++    } else if (env.type === 'ticket-type.defined') {
++      // Last definition wins — types are events, and a later definition replaces
++      // the earlier one. That is what makes rank RE-definition, and therefore
++      // the hierarchy cycle a rank change can create, reachable at all.
++      const def = ticketTypeDefSchema.parse(env.payload);
++      ticketTypes.set(def.id, def);
++    } else if ((TICKET_EVENT_TYPES as readonly string[]).includes(env.type)) {
++      tickets.set(env.entity.id, applyTicketEvent(tickets.get(env.entity.id), env, deps));
++    }
++    // Other event kinds (membership, visibility, …) belong to other plans and
++    // shape no ticket state. They pass through rather than throwing, so a
++    // fixture may carry them without this context claiming to understand them.
++  }
++
++  return {
++    tickets,
++    ticketTypes,
++    workflows,
++    workflowVersions,
++    getEntityState: async (kind, id) => {
++      if (kind === 'ticket') return tickets.get(id) ?? null;
++      // Identity ONLY, exactly as the server answers: `'ticket-type'` is an
++      // `OtherEntityState` in the domain union — `{ kind, id }` — and controller
++      // ruling P3 keeps it that way. A rank arrives through `getTicketTypeDef`
++      // below. Serving a definition through this door would make a rule pass
++      // here and find `rank` undefined on the server.
++      if (kind === 'ticket-type') return ticketTypes.has(id) ? { kind, id } : null;
++      return null;
++    },
++    // DIRECT children only, mirroring `harness.ts:191-193`. The parent-terminal
++    // invariant counts the children a parent owns, not its descendants.
++    getChildrenStates: async (ticketId) => [...tickets.values()].filter((ticket) => ticket.parentId === ticketId),
++    // An explicit version is answered with THAT version; without one, the
++    // latest. Mirrors `harness.ts:194-197`. The engine's forward walk fetches
++    // intermediates by exact version, and answering "latest" to that question is
++    // a wrong answer that looks like an answer.
++    getWorkflowDef: async (workflowId, version) =>
++      (version === undefined ? (workflows.get(workflowId) ?? null) : versionOf(workflowId, version)),
++    getTicketTypeDef: async (typeId) => ticketTypes.get(typeId) ?? null,
++  };
++}
+diff --git a/packages/rule-engine/test/engine.test.ts b/packages/rule-engine/test/engine.test.ts
+index ee08e78..830561e 100644
+--- a/packages/rule-engine/test/engine.test.ts
++++ b/packages/rule-engine/test/engine.test.ts
+@@ -58,21 +58,23 @@ function spyContext(
+ } {
+   const getEntityState = vi.fn(async () => opts.entity ?? null);
+   const getChildrenStates = vi.fn(async () => opts.children ?? []);
+   const getWorkflowDef = vi.fn(async () => latest);
+   const counts = (): SpyCounts => ({
+     entityState: getEntityState.mock.calls.length,
+     childrenStates: getChildrenStates.mock.calls.length,
+     workflowDef: getWorkflowDef.mock.calls.length,
+   });
+   return {
+-    ctx: { getEntityState, getChildrenStates, getWorkflowDef },
++    // getTicketTypeDef is not counted: no rule reads a type definition yet
++    // (Plan 3 Tasks 5–7 add the first), so a spy on it would pin nothing.
++    ctx: { getEntityState, getChildrenStates, getWorkflowDef, getTicketTypeDef: vi.fn(async () => null) },
+     calls: () => {
+       const seen = counts();
+       return seen.entityState + seen.childrenStates + seen.workflowDef;
+     },
+     counts,
+   };
+ }
+ 
+ /** A published v1 with two states a v2 can drop at once — the stranding tests plant this. */
+ const basicV1: WorkflowDef = {
+diff --git a/packages/rule-engine/test/memory-context.test.ts b/packages/rule-engine/test/memory-context.test.ts
+new file mode 100644
+index 0000000..fd2f18a
+--- /dev/null
++++ b/packages/rule-engine/test/memory-context.test.ts
+@@ -0,0 +1,396 @@
++import { describe, expect, it } from 'vitest';
++import type {
++  EventEnvelope,
++  PublishedWorkflowDef,
++  TicketTypeDef,
++  WorkflowDef,
++} from '@gisik-nokma/domain';
++import { makeEnvelope } from '@gisik-nokma/domain';
++import { buildMemoryContext } from '../src/memory-context.js';
++
++const PROJECT = '01J9GPRJ000000000000000000';
++const PARENT = '01J9GPAR000000000000000000';
++const PARENT2 = '01J9GPAT000000000000000000';
++const CHILD = '01J9GCHA000000000000000000';
++const GRANDCHILD = '01J9GCHB000000000000000000';
++const OTHER = '01J9GTKA000000000000000000';
++
++const WF: PublishedWorkflowDef = {
++  id: 'wf-basic',
++  version: 1,
++  name: 'Basic',
++  initialStateId: 'todo',
++  states: [
++    { id: 'todo', name: 'To do', category: 'open' },
++    { id: 'doing', name: 'Doing', category: 'active' },
++    { id: 'done', name: 'Done', category: 'terminal' },
++  ],
++  transitions: [
++    { from: '*', to: 'todo', rules: [] },
++    { from: '*', to: 'doing', rules: [] },
++    { from: '*', to: 'done', rules: [] },
++  ],
++};
++
++const EPIC: TicketTypeDef = { id: 'epic', name: 'Epic', icon: 'flag', rank: 1, workflowId: 'wf-basic', fields: [] };
++const STORY: TicketTypeDef = { id: 'story', name: 'Story', icon: 'book', rank: 2, workflowId: 'wf-basic', fields: [] };
++const TASK: TicketTypeDef = { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-basic', fields: [] };
++
++function typeDefined(def: TicketTypeDef): EventEnvelope {
++  return makeEnvelope({ type: 'ticket-type.defined', entity: { kind: 'ticket-type', id: def.id }, payload: def });
++}
++
++function created(id: string, typeId: string, parentId: string | null, seq = 1): EventEnvelope {
++  return makeEnvelope({
++    type: 'ticket.created',
++    entity: { kind: 'ticket', id },
++    seq,
++    payload: { typeId, projectId: PROJECT, parentId, title: `t-${id.slice(0, 8)}` },
++  });
++}
++
++/**
++ * The destination field is `to`, NOT `toStateId` — and a comment is `{ text }`,
++ * not a bare string (`packages/domain/src/workflow.ts:137-145`, pre-flight A10 +
++ * addendum 1). The transition LOG ENTRY these events produce separately and
++ * correctly spells `toStateId`; both spellings are real and neither is a typo
++ * for the other.
++ *
++ * `seq` is varied deliberately. `makeEnvelope` defaults it to 1, so a context
++ * that dropped the envelope on the floor and hardcoded 1 would pass every
++ * assertion about the log — the defect Task 3's mutation M2 exists to catch.
++ */
++function transitioned(id: string, to: string, seq: number, actorId?: string): EventEnvelope {
++  return makeEnvelope({
++    type: 'ticket.transitioned',
++    entity: { kind: 'ticket', id },
++    seq,
++    ...(actorId === undefined ? {} : { actorId }),
++    payload: { to },
++  });
++}
++
++function published(def: PublishedWorkflowDef): EventEnvelope {
++  return makeEnvelope({ type: 'workflow.defined', entity: { kind: 'workflow', id: def.id }, payload: def });
++}
++
++/**
++ * Vitest's `toThrow('…')` is a SUBSTRING match, so a truncated or reworded
++ * message certifies itself. Capture and assert the whole message with `toBe`.
++ */
++function messageOf(run: () => unknown): string {
++  try {
++    run();
++  } catch (error) {
++    return error instanceof Error ? error.message : String(error);
++  }
++  throw new Error('expected the call to throw, and it returned instead');
++}
++
++describe('buildMemoryContext', () => {
++  it('folds prior events into ticket states reachable via getEntityState', async () => {
++    const ctx = buildMemoryContext([WF], [
++      typeDefined(TASK),
++      created(CHILD, 'task', null),
++      transitioned(CHILD, 'doing', 7, '01J9GACT000000000000000001'),
++    ]);
++    const state = await ctx.getEntityState('ticket', CHILD);
++    expect(state).toMatchObject({
++      kind: 'ticket',
++      id: CHILD,
++      projectId: PROJECT,
++      typeId: 'task',
++      workflowId: 'wf-basic',
++      workflowVersion: 1,
++      stateId: 'doing',
++      stateCategory: 'active',
++    });
++  });
++
++  it('folds through the shipped reducer — the transition log carries the envelope, not defaults', async () => {
++    const ctx = buildMemoryContext([WF], [
++      typeDefined(TASK),
++      created(CHILD, 'task', null),
++      transitioned(CHILD, 'doing', 7, '01J9GACT000000000000000001'),
++    ]);
++    const state = ctx.tickets.get(CHILD);
++    expect(state?.transitions).toEqual([
++      {
++        toStateId: 'doing',
++        actorId: '01J9GACT000000000000000001',
++        seq: 7,
++        workflowId: 'wf-basic',
++        workflowVersion: 1,
++      },
++    ]);
++  });
++
++  it('folds events WITHOUT evaluating them — these are the already-accepted past', async () => {
++    // The transition into `doing` carries a require-comment rule and no comment.
++    // The engine would refuse this event at the door; a context that evaluated
++    // its prior events would drop it. Prior events are history, not candidates:
++    // only the candidate goes through evaluateEvent, against what this returns.
++    const guarded: PublishedWorkflowDef = {
++      ...WF,
++      transitions: [
++        { from: '*', to: 'todo', rules: [] },
++        { from: '*', to: 'doing', rules: [{ kind: 'require-comment' }] },
++      ],
++    };
++    const ctx = buildMemoryContext([guarded], [
++      typeDefined(TASK),
++      created(CHILD, 'task', null),
++      transitioned(CHILD, 'doing', 2),
++    ]);
++    expect((await ctx.getEntityState('ticket', CHILD)) as { stateId: string }).toMatchObject({
++      stateId: 'doing',
++    });
++  });
++
++  it('getChildrenStates returns DIRECT children only — a grandchild is not a child', async () => {
++    const ctx = buildMemoryContext([WF], [
++      typeDefined(EPIC),
++      typeDefined(STORY),
++      typeDefined(TASK),
++      created(PARENT, 'epic', null),
++      created(CHILD, 'story', PARENT),
++      created(GRANDCHILD, 'task', CHILD),
++    ]);
++    const children = await ctx.getChildrenStates(PARENT);
++    expect(children.map((child) => child.id)).toEqual([CHILD]);
++  });
++
++  it('getChildrenStates follows a reparent — the whole ticket vocabulary folds, not a subset', async () => {
++    const ctx = buildMemoryContext([WF], [
++      typeDefined(EPIC),
++      typeDefined(STORY),
++      created(PARENT, 'epic', null),
++      created(PARENT2, 'epic', null),
++      created(CHILD, 'story', PARENT),
++      makeEnvelope({
++        type: 'ticket.reparented',
++        entity: { kind: 'ticket', id: CHILD },
++        seq: 4,
++        payload: { newParentId: PARENT2 },
++      }),
++    ]);
++    expect((await ctx.getChildrenStates(PARENT)).map((child) => child.id)).toEqual([]);
++    expect((await ctx.getChildrenStates(PARENT2)).map((child) => child.id)).toEqual([CHILD]);
++  });
++
++  it('getEntityState("ticket-type") answers identity ONLY — the definition comes from getTicketTypeDef', async () => {
++    // `'ticket-type'` is an OtherEntityState in the domain union — `{ kind, id }`
++    // and nothing else — and the server context returns exactly that. This
++    // context must not quietly serve something richer through the same door, or
++    // a rule that worked here would find `rank` undefined on the server
++    // (controller ruling P3, pre-flight BA-4).
++    const ctx = buildMemoryContext([WF], [typeDefined(TASK)]);
++    expect(await ctx.getEntityState('ticket-type', 'task')).toEqual({ kind: 'ticket-type', id: 'task' });
++    expect(await ctx.getEntityState('ticket-type', 'ghost')).toBeNull();
++  });
++
++  it('getTicketTypeDef resolves the definition, and the LAST definition wins', async () => {
++    // Types are events: a later definition replaces the earlier one. This is
++    // what makes rank re-definition — and therefore the hierarchy cycle Task 6
++    // guards — reachable at all.
++    const ctx = buildMemoryContext([WF], [
++      typeDefined({ ...TASK, rank: 3 }),
++      typeDefined({ ...TASK, rank: 5 }),
++    ]);
++    expect(await ctx.getTicketTypeDef('task')).toEqual({ ...TASK, rank: 5 });
++    expect(await ctx.getTicketTypeDef('ghost')).toBeNull();
++  });
++
++  it('does not serve memberships — this context is a SECOND context, not a replacement', async () => {
++    // The fixture harness keeps `buildInMemoryContext`, which is where
++    // memberships live (61 fixtures depend on them). A membership answered null
++    // here is the boundary, not an omission: a restrict-to fixture belongs to
++    // the harness.
++    const ctx = buildMemoryContext([WF], [typeDefined(TASK), created(CHILD, 'task', null)]);
++    expect(await ctx.getEntityState('membership', 'ws_1:user-kiro')).toBeNull();
++    expect(await ctx.getEntityState('workflow', 'wf-basic')).toBeNull();
++  });
++
++  it('resolves seeded workflows: latest by default, null for one never seen', async () => {
++    const ctx = buildMemoryContext([WF], []);
++    expect(await ctx.getWorkflowDef('wf-basic')).toEqual(WF);
++    expect(await ctx.getWorkflowDef('wf-ghost')).toBeNull();
++  });
++
++  it('folds workflow.defined events from priorEvents alongside seeds', async () => {
++    const wf2: PublishedWorkflowDef = { ...WF, id: 'wf-two' };
++    const ctx = buildMemoryContext([WF], [published(wf2)]);
++    expect(await ctx.getWorkflowDef('wf-two')).toEqual(wf2);
++    expect(await ctx.getWorkflowDef('wf-basic')).toEqual(WF);
++  });
++
++  it('getWorkflowDef answers an explicit version with THAT version, not the latest', async () => {
++    const wfV2: PublishedWorkflowDef = { ...WF, version: 2, name: 'Basic v2' };
++    const ctx = buildMemoryContext([WF], [published(wfV2)]);
++    expect((await ctx.getWorkflowDef('wf-basic'))?.version).toBe(2);
++    expect((await ctx.getWorkflowDef('wf-basic', 1))?.name).toBe('Basic');
++    expect((await ctx.getWorkflowDef('wf-basic', 2))?.name).toBe('Basic v2');
++    expect(await ctx.getWorkflowDef('wf-basic', 7)).toBeNull();
++  });
++
++  it('"latest" is the highest version, not the last one published', async () => {
++    // Mirrors the fixture harness's `latestOf` (harness.ts:161-167), which scans
++    // for the maximum. A context that took "whatever was published last" would
++    // answer a different question than the harness for the same inputs.
++    const wfV2: PublishedWorkflowDef = { ...WF, version: 2, name: 'Basic v2' };
++    const ctx = buildMemoryContext([WF], [published(wfV2), published(WF)]);
++    expect((await ctx.getWorkflowDef('wf-basic'))?.version).toBe(2);
++    expect(ctx.workflowVersions.get('wf-basic')?.map((def) => def.version)).toEqual([1, 2]);
++  });
++
++  it('a re-categorising v2 refreshes the tickets already sitting in that state', async () => {
++    // Design decision 10. The server's proj_tickets refreshes on publish; if
++    // this context did not, a fixture that publishes a re-categorising v2 after
++    // some transitions would get one verdict here and another from the server —
++    // the parent-terminal invariant would read stale categories in one and
++    // folded ones in the other. Same domain function on both sides.
++    const wfV2: PublishedWorkflowDef = {
++      ...WF,
++      version: 2,
++      states: [
++        { id: 'todo', name: 'To do', category: 'open' },
++        { id: 'doing', name: 'Doing', category: 'terminal' }, // was 'active'
++        { id: 'done', name: 'Done', category: 'terminal' },
++      ],
++    };
++    const ctx = buildMemoryContext([WF], [
++      typeDefined(TASK),
++      created(CHILD, 'task', null),
++      transitioned(CHILD, 'doing', 2),
++      published(wfV2),
++    ]);
++    expect(await ctx.getEntityState('ticket', CHILD)).toMatchObject({
++      stateId: 'doing',
++      stateCategory: 'terminal',
++      workflowVersion: 2,
++    });
++  });
++
++  it('the refresh follows a stateMapping when the new version DROPS the state a ticket sits in', async () => {
++    // The one test that catches parsing `workflow.defined` with
++    // `workflowDefSchema` instead of `workflowDefinedPayloadSchema`: zod strips
++    // undeclared keys, so the wrong schema silently deletes `stateMapping` and
++    // every refold across a dropped state throws instead of following the map.
++    const wfV2: PublishedWorkflowDef = {
++      ...WF,
++      version: 2,
++      states: [
++        { id: 'todo', name: 'To do', category: 'open' },
++        { id: 'in-progress', name: 'In progress', category: 'active' },
++        { id: 'done', name: 'Done', category: 'terminal' },
++      ],
++      stateMapping: { doing: 'in-progress' },
++    };
++    const ctx = buildMemoryContext([WF], [
++      typeDefined(TASK),
++      created(CHILD, 'task', null),
++      transitioned(CHILD, 'doing', 2),
++      published(wfV2),
++    ]);
++    expect(await ctx.getEntityState('ticket', CHILD)).toMatchObject({
++      stateId: 'in-progress',
++      stateCategory: 'active',
++      workflowVersion: 2,
++    });
++  });
++
++  it('the refresh consults intermediate versions by exact number, and a hole is reported as a hole', async () => {
++    // v2 is never published, so folding v1 → v3 asks for it and cannot have it.
++    // A context that answered "latest" to that question would fold the ticket
++    // through the wrong vocabulary and call the result an answer.
++    const wfV3: PublishedWorkflowDef = { ...WF, version: 3 };
++    const message = messageOf(() =>
++      buildMemoryContext([WF], [
++        typeDefined(TASK),
++        created(CHILD, 'task', null),
++        transitioned(CHILD, 'doing', 2),
++        published(wfV3),
++      ]),
++    );
++    expect(message).toBe(
++      `foldTicketToWorkflowVersion: workflow "wf-basic" version 2 is missing — the version chain has a hole and ticket ${CHILD} cannot be walked forward`,
++    );
++  });
++
++  it('a publish refreshes only the tickets on THAT workflow', async () => {
++    const support: PublishedWorkflowDef = {
++      id: 'wf-support',
++      version: 1,
++      name: 'Support',
++      initialStateId: 'new',
++      states: [
++        { id: 'new', name: 'New', category: 'open' },
++        { id: 'closed', name: 'Closed', category: 'terminal' },
++      ],
++      transitions: [{ from: '*', to: 'closed', rules: [] }],
++    };
++    const SUPPORT_TYPE: TicketTypeDef = { ...TASK, id: 'ticket', workflowId: 'wf-support' };
++    const wfV2: PublishedWorkflowDef = {
++      ...WF,
++      version: 2,
++      states: [
++        { id: 'todo', name: 'To do', category: 'open' },
++        { id: 'doing', name: 'Doing', category: 'terminal' },
++        { id: 'done', name: 'Done', category: 'terminal' },
++      ],
++    };
++    const ctx = buildMemoryContext([WF, support], [
++      typeDefined(TASK),
++      typeDefined(SUPPORT_TYPE),
++      created(CHILD, 'task', null),
++      transitioned(CHILD, 'doing', 2),
++      created(OTHER, 'ticket', null, 3),
++      published(wfV2),
++    ]);
++    expect(await ctx.getEntityState('ticket', OTHER)).toMatchObject({
++      workflowId: 'wf-support',
++      workflowVersion: 1,
++      stateId: 'new',
++      stateCategory: 'open',
++    });
++    expect(await ctx.getEntityState('ticket', CHILD)).toMatchObject({
++      workflowVersion: 2,
++      stateCategory: 'terminal',
++    });
++  });
++
++  it('ignores event types that shape no ticket state', async () => {
++    // Membership, visibility and the rest belong to other plans. They pass
++    // through rather than throwing, so a fixture may carry them.
++    const ctx = buildMemoryContext([WF], [
++      typeDefined(TASK),
++      created(CHILD, 'task', null),
++      makeEnvelope({
++        type: 'membership.granted',
++        entity: { kind: 'membership', id: 'ws_1:user-kiro' },
++        seq: 2,
++        payload: { role: 'member' },
++      }),
++    ]);
++    expect(ctx.tickets.size).toBe(1);
++    expect([...ctx.tickets.keys()]).toEqual([CHILD]);
++  });
++
++  it('throws on a ticket event for a ticket that was never created — replay integrity, not a shrug', async () => {
++    const message = messageOf(() => buildMemoryContext([WF], [transitioned(CHILD, 'doing', 2)]));
++    expect(message).toBe(
++      `applyTicketEvent: ticket.transitioned for ticket ${CHILD} that was never created`,
++    );
++  });
++
++  it('exposes its maps for tests that need to plant or inspect state directly', async () => {
++    const ctx = buildMemoryContext([WF], [typeDefined(TASK), created(CHILD, 'task', null)]);
++    expect(ctx.ticketTypes.get('task')).toEqual(TASK);
++    expect(ctx.workflows.get('wf-basic')).toEqual(WF);
++    expect(ctx.tickets.get(CHILD)?.stateId).toBe('todo');
++    // The seed is in the version list too, so an explicit-version lookup can
++    // find it — seeds and published versions go through one accumulation.
++    const versions: WorkflowDef[] = ctx.workflowVersions.get('wf-basic') ?? [];
++    expect(versions.map((def) => def.version)).toEqual([1]);
++  });
++});
+diff --git a/packages/rule-engine/test/version-map.test.ts b/packages/rule-engine/test/version-map.test.ts
+index 61664a0..cddb302 100644
+--- a/packages/rule-engine/test/version-map.test.ts
++++ b/packages/rule-engine/test/version-map.test.ts
+@@ -50,20 +50,21 @@ function chainContext(byVersion: Map<number, WorkflowDef>): {
+   versionsAsked: () => (number | undefined)[];
+   workflowIdsAsked: () => string[];
+ } {
+   const getWorkflowDef = vi.fn(async (_workflowId: string, version?: number) =>
+     version === undefined ? (byVersion.get(3) ?? null) : (byVersion.get(version) ?? null),
+   );
+   return {
+     ctx: {
+       getEntityState: vi.fn(async () => null),
+       getChildrenStates: vi.fn(async () => []),
++      getTicketTypeDef: vi.fn(async () => null),
+       getWorkflowDef,
+     },
+     versionsAsked: () => getWorkflowDef.mock.calls.map((call) => call[1]),
+     workflowIdsAsked: () => getWorkflowDef.mock.calls.map((call) => call[0]),
+   };
+ }
+ 
+ function ticketAt(stateId: string, workflowVersion: number): TicketState {
+   return {
+     kind: 'ticket',

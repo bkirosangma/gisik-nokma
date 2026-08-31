@@ -1,0 +1,169 @@
+# Review package: 0458d1e..HEAD
+
+## Commits
+26a44ec The defect was never the number: a census replaces the boundary, and both levers get their names
+
+## Files changed
+ packages/editor/src/schema/extensions.ts | 93 ++++++++++++++------------------
+ packages/editor/test/schema.test.ts      | 11 ++--
+ 2 files changed, 48 insertions(+), 56 deletions(-)
+
+## Diff
+diff --git a/packages/editor/src/schema/extensions.ts b/packages/editor/src/schema/extensions.ts
+index 1d13c07..9067bfc 100644
+--- a/packages/editor/src/schema/extensions.ts
++++ b/packages/editor/src/schema/extensions.ts
+@@ -46,76 +46,63 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
+   return [
+     StarterKit.configure({
+       // Replaced by VersionedDocument so the doc node carries schemaVersion.
+       document: false,
+       // Configured separately below.
+       link: false,
+       // Outside document schema v1's closed mark vocabulary.
+       underline: false,
+     }),
+     VersionedDocument,
+-    // SPEC §2 SAYS "NOTHING SILENTLY BECOMES MARKUP". THESE OPTIONS DO NOT
+-    // ACHIEVE THAT. Two earlier versions of this comment claimed otherwise —
+-    // the first by naming three paths, the second by naming four — so this one
+-    // describes the mechanism and deliberately does NOT count. Counting is what
+-    // kept recreating the defect: a total is a claim of completeness, and it was
+-    // false both times.
++    // SPEC §2 SAYS "NOTHING SILENTLY BECOMES MARKUP". THE OPTIONS BELOW DO
++    // NOT ACHIEVE THAT. Earlier versions of this comment tried to prove how
++    // far short they fall by enumerating every live path to markup, and each
++    // carried a completeness claim — first as a count, then as prose — and
++    // each was false. This version enumerates only what was counted and
++    // verified, with the dist lines to check it by; the full analysis lives
++    // in .superpowers/sdd/2026-08-20-07-editor-attachments/task-1-report.md.
+     //
+-    // Line references are to the installed 3.30.5 dists, verified there.
++    // What the options do, in the installed extension-link@3.30.5:
++    //   - `autolink: false` — the autolink plugin is not registered
++    //     (dist:486).
++    //   - `linkOnPaste: false` — the pasteHandler plugin is not registered
++    //     (dist:502).
++    //   - `markdownLinks: false` — the typed `[text](url)` input rule is not
++    //     registered (dist:434-435). NO value of this option stops a pasted
++    //     plain URL from becoming a link: both branches of `addPasteRules`
++    //     link plain URLs (dist:474 directly; dist:465 via
++    //     `markdownLinkPasteRule`, which merges `findPlainUrls` matches in,
++    //     dist:225-234) — even inside pasted `[text](url)`, the URL half
++    //     gets linked.
+     //
+-    // WHAT IS CLOSED HERE, BY OPTION:
+-    //   - `autolink` (off) — a URL typed and then left.
+-    //   - `linkOnPaste` (off) — extension-link dist:502 registers the
+-    //     `handlePasteLink` plugin only when true. Its handler returns early on
+-    //     an empty selection, so it only ever covered pastes over a selection.
+-    //   - `markdownLinks` (off) — gates TWO mechanisms, not one:
+-    //     `addInputRules()` at dist:434-435, a TYPED `[text](url)` rule, and
+-    //     the shape of the paste rule below. With it false, typing markdown
+-    //     link syntax stays literal text.
++    // Still live, counted on the extension list this function builds, at
++    // tiptap 3.30.5: SEVEN PASTE RULES across five extensions (`bold` 2,
++    // `italic` 2, `code` 1, `strike` 1, `link` 1), firing on external paste,
++    // external drop, or an `applyPasteRules` meta (the guard at core
++    // dist:5121-5125); and EIGHTEEN INPUT RULES across ten extensions
++    // (`heading` 6, `bold` 2, `italic` 2, `codeBlock` 2, `blockquote` 1,
++    // `bulletList` 1, `code` 1, `orderedList` 1, `strike` 1,
++    // `horizontalRule` 1), firing from `handleTextInput` as text is typed
++    // (core dist:4834). So `**due soon**` arrives bold whether pasted,
++    // dropped, or typed — through two different plugins, all three verified
++    // on this list. The two censused sets are disjoint and sit behind two
++    // separate `Editor` options, both defaulting true: `enablePasteRules`
++    // (gate at core dist:5233) and `enableInputRules` (gate at dist:5221;
++    // defaults at dist:6147-6148). Disabling either was verified to leave
++    // the other set firing. This function returns `Extensions` and never
++    // constructs an `Editor`, so it can reach neither option.
+     //
+-    // WHAT IS NOT CLOSED, AND CANNOT BE FROM THIS FUNCTION: the plain-URL paste
+-    // rule. `addPasteRules()` (dist:445-482) returns a `markPasteRule` over
+-    // `findPlainUrls` when `markdownLinks` is false — and when it is TRUE it
+-    // returns `markdownLinkPasteRule`, which merges `findPlainUrls` matches in
+-    // alongside the markdown ones (dist:225-237, and the library's own comment
+-    // there says "and links the plain URLs from findPlainUrls"). Both branches
+-    // link plain URLs. Verified empirically on this extension list: with
+-    // `markdownLinks` true and false alike, a pasted URL becomes a link and a
+-    // bare `gst.gov.in` becomes `http://gst.gov.in`.
+-    //
+-    // THAT IS THE LESSON WORTH CARRYING, and it is narrower than "an unaudited
+-    // default got in": AN OPTION THAT LOOKS LIKE IT SELECTS BETWEEN A SAFE AND
+-    // AN UNSAFE BRANCH MAY BE SELECTING BETWEEN TWO IMPLEMENTATIONS OF THE SAME
+-    // BEHAVIOUR. Flipping `markdownLinks` does not avoid this path; it only
+-    // changes which rule object implements it.
+-    //
+-    // TRIGGERS ARE NOT PASTE-ONLY. core dist:5119-5125 runs these rules from
+-    // `pasteRulesPlugin`'s `appendTransaction` on any of:
+-    //   - `uiEvent === 'paste'` AND not pasted from ProseMirror (dist:5121);
+-    //   - `uiEvent === 'drop'` AND not dropped from ProseMirror (dist:5122) —
+-    //     prosemirror-view dist:3902 dispatches it, so DRAGGING TEXT IN is a
+-    //     live route, confirmed here to produce the same links as pasting;
+-    //   - an `applyPasteRules` meta (dist:5123), Tiptap's simulated paste.
+-    //
+-    // Nothing live is left unnamed above. Everything not closed by option is
+-    // the same rule set under a different trigger, so one lever covers all of
+-    // it — `enablePasteRules`, an `Editor` option this function structurally
+-    // cannot reach. It is also not link-only: five configured extensions
+-    // register seven paste rules between them (`bold` 2, `italic` 2, `code` 1,
+-    // `strike` 1, `link` 1), so `**due soon**` arrives bold, `*soon*` italic,
+-    // `` `npm run gst` `` code and `~~gone~~` strike.
+-    //
+-    // NOT DECIDED HERE, DELIBERATELY. How §2 should be honoured across five
+-    // extensions is a product judgement, and TASK 5 — the escape-suggestion
+-    // mechanic — owns it; the plan created that task for this requirement.
+-    // Tests in test/schema.test.ts record the current behaviour truthfully, so
+-    // Task 5's change is what makes them fail.
++    // NOT DECIDED HERE, DELIBERATELY. How §2 should be honoured across those
++    // ten extensions and both levers is a product judgement, and TASK 5 —
++    // the escape-suggestion mechanic — owns it. Tests in test/schema.test.ts
++    // record the current behaviour truthfully, so Task 5's change is what
++    // makes them fail.
+     //
+     // `openOnClick: false` keeps a click editing the link, not following it.
+     Link.configure({
+       openOnClick: false,
+       autolink: false,
+       linkOnPaste: false,
+       markdownLinks: false,
+     }),
+     Placeholder.configure({ placeholder: options.placeholder ?? 'Write…' }),
+     Table.configure({ resizable: false }),
+diff --git a/packages/editor/test/schema.test.ts b/packages/editor/test/schema.test.ts
+index ae397cf..80229c8 100644
+--- a/packages/editor/test/schema.test.ts
++++ b/packages/editor/test/schema.test.ts
+@@ -311,24 +311,29 @@ describe('behavioural options that spec §2 constrains', () => {
+     // And a bare domain acquires a protocol it was never given. The `http`
+     // comes from linkifyjs's own `find()` default inside `findPlainUrls`, not
+     // from Link's `defaultProtocol` option.
+     const bareDomain = createTestEditor(undefined, emptyDoc());
+     pasteInto(bareDomain, 'gst.gov.in');
+     expect(linkHrefsIn(bareDomain.getJSON())).toEqual(['http://gst.gov.in']);
+     bareDomain.destroy();
+   });
+ 
+   /**
+-   * The same path, and the reason Task 5's decision is bigger than links:
++   * The same path, and part of why Task 5's decision is bigger than links:
+    * five configured extensions register seven paste rules between them
+-   * (`bold` 2, `italic` 2, `code` 1, `strike` 1, `link` 1). Also pending
+-   * Task 5; also flip rather than delete.
++   * (`bold` 2, `italic` 2, `code` 1, `strike` 1, `link` 1). Its TYPED
++   * sibling — eighteen input rules across ten extensions, behind
++   * `enableInputRules` rather than `enablePasteRules` — is a disjoint rule
++   * set: disabling either lever was verified to leave the other set firing,
++   * so no single lever settles Task 5's decision. Census and dist citations
++   * in src/schema/extensions.ts. Also pending Task 5; also flip rather than
++   * delete.
+    */
+   it('CURRENT BEHAVIOUR pending Task 5: pasted markdown syntax becomes marks', () => {
+     for (const [pasted, mark, text] of [
+       ['**due soon**', 'bold', 'due soon'],
+       ['*soon*', 'italic', 'soon'],
+       ['`npm run gst`', 'code', 'npm run gst'],
+       ['~~gone~~', 'strike', 'gone'],
+     ] as const) {
+       const editor = createTestEditor(undefined, emptyDoc());
+       pasteInto(editor, pasted);

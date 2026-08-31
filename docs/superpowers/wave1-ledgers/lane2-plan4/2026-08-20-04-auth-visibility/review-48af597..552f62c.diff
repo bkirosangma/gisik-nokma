@@ -1,0 +1,147 @@
+# Review package: 48af597..552f62c7c2aaec98aafa8eb03cb33f414684811b
+
+## Commits
+552f62c A sentence saying a fixture now fails, when padded names pass, no such fixture exists, and the door is in another file
+
+## Files changed
+ .../plans/2026-08-20-00-series-coordination.md     | 58 ++++++++++++++++------
+ packages/domain/src/envelope.ts                    | 19 +++++++
+ 2 files changed, 61 insertions(+), 16 deletions(-)
+
+## Diff
+diff --git a/docs/superpowers/plans/2026-08-20-00-series-coordination.md b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+index 816ffa7..70c96ee 100644
+--- a/docs/superpowers/plans/2026-08-20-00-series-coordination.md
++++ b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+@@ -1514,49 +1514,75 @@ The ratified membership entity id `${workspaceId}:${userId}` needs it for the sa
+ 
+ **Any later plan that swaps the auth provider inherits this constraint.** The requirement belongs to the ledger, not to better-auth: whatever mints user ids must mint ULIDs, or `envelope.ts` must change — and it should not, because `actorId: ulidString` is the contract every other id in the series is held to. Covered by `apps/server/test/auth/user-ids.test.ts`, which signs a user up through the real phone-OTP path and puts the id better-auth actually stored through the real door.
+ 
+ ### 6. Three constraints the membership coherence check creates, which exist in code and nowhere else (Task 3)
+ 
+ All three were found by review, not by execution. None is a defect; each is a fact a later author needs
+ before touching this code, and the durable record is the only place they can look.
+ 
+ **`submittedEventSchema` and `eventEnvelopeSchema` carry only the WORKSPACE half of the check.** The
+ membership coherence check has two halves (see the envelope-collision section above). The workspace half
+-is a cross-field refinement inside both exported schemas; the user half compares `entity.id`'s right half
+-against `payload.userId` and therefore needs the payload PARSED — which needs the event's type, version
+-and registered schema, none of them knowable inside a schema whose `payload` is `unknown` by design. So
+-it lives in `parseEvent`. Verified rather than reasoned about:
++is a cross-field refinement inside both exported schemas; the user half compares `entity.id` in FULL
++against `membershipId(workspaceId, payload.userId)` (`parse-event.ts` — not the right half alone, so it
++re-proves the workspace half as a by-product) and therefore needs the payload PARSED, which needs the
++event's type, version and registered schema, none of them knowable inside a schema whose `payload` is
++`unknown` by design. So it lives in `parseEvent`. That full-equality shape is exactly why the two halves
++are asserted through DIFFERENT doors — see the test-design bullet in the envelope-collision section
++above; asserting both through `parseEvent` would let either be deleted with nothing noticing. Verified
++rather than reasoned about:
+ 
+ | input | `submittedEventSchema` | `eventEnvelopeSchema` | `parseEvent` |
+ |---|---|---|---|
+ | membership in wsA, filed `A:userC`, payload grants **userD** | **accepts** | **accepts** | `malformed-envelope` |
+ | membership in wsA, filed **wsB**`:userD`, payload grants userD | refuses | refuses | `malformed-envelope` |
+ 
+ Note the first row is `true` for **both** schemas, not only the full-envelope one — the review named
+ `eventEnvelopeSchema` because that is the one a sync-down reader reaches for, but a consumer of
+ `submittedEventSchema` inherits exactly the same gap. **Zero production consumers validate a bare
+ envelope today** (`parse-event.ts` is the only caller; everything else is tests), so nothing is broken
+ now. The hazard is the first consumer that does: it would inherit half a check with no way to tell. The
+ rule, stated once: **to validate an event, call `parseEvent`** — these schemas are the shape layer
+-underneath it, not a substitute for it. A comment at the export site in `envelope.ts` says the same
+-thing, because that is where someone reaching for the schema actually looks.
++underneath it, not a substitute for it. `envelope.ts` carries that note **twice, once above each export**,
++and the duplication is deliberate rather than sloppy: a doc comment binds to the single declaration
++beneath it, so a note written only above `submittedEventSchema` reaches nobody hovering
++`eventEnvelopeSchema` — in the emitted `envelope.d.ts` the whole inlined shape of the first export sits
++between the two declarations, putting them ~100 lines apart. That was the round-1 defect: one comment,
++one export covered, and the uncovered one was the export the finding was about. Checked in
++`dist/envelope.d.ts` after a rebuild, both before and after, not assumed from the source layout.
+ 
+ **Any future `membership`-kind event type must carry a top-level string `userId`.** The user half is
+ written against the entity KIND, not against the two types that exist — `if (entity.kind ===
+ 'membership')`, then read `userId` off the parsed payload. A membership-kind event whose payload has no
+-top-level string `userId` is refused `malformed-envelope` with *"…its payload names no user…"*, whatever
+-its type. That is deliberate: a membership's entity id IS `${workspaceId}:${userId}`, so an event that
++top-level string `userId` is refused `malformed-envelope` with *"…its payload names no user…"*.
++
++**Which refusal a caller actually meets depends on the type's own schema, and for the two shipped types
++it is NOT that one** — run, not reasoned: `membership.granted` with `{role}` and `membership.revoked`
++with `{}` both answer `invalid-payload` — *"payload for '…' v1 is invalid at userId: Required"* — because
++their payload schemas require `userId: ulidString` and the payload gate runs first. The
++`malformed-envelope` sentence is exact only for a **future** membership-kind type whose own schema does
++not require `userId`, which is precisely the case the by-kind check exists for. Both refusals are
++correct; a later author should expect the payload one while the shipped types are the only two.
++
++The by-kind design is deliberate: a membership's entity id IS `${workspaceId}:${userId}`, so an event that
+ does not say who it is about cannot be addressed at all, and a per-type check would let the next
+ membership type inherit the hole instead of meeting the refusal. **Consequence for T14, Plan 10, and
+ anyone else adding one:** name the user in a top-level `userId`, or file the event against a different
+ kind. It is not enough to satisfy the entity-id regex. (The branch is reachable and tested — see
+ `parse-event.test.ts`, which registers a userId-less membership type through `parseEvent`'s injectable
+ registry rather than leaving a check that cannot fail.)
+ 
+-**`workspace.created` and `workspace.renamed` now refuse a blank name, and refuse rather than trim.**
+-Taking over Plan 1's provisional seeds meant adopting Plan 4's stricter shape: `z.string().min(1)`
+-accepted `'   '`, which names nothing while looking like a name everywhere it is displayed, so a
+-`.trim() !== ''` refinement was added (`project.created` shares it). **The interesting half is that it
+-REFUSES rather than trims** — `'  Corner  '` is stored exactly as claimed, and a test pins that. Trimming
+-would have been the obvious implementation and would put words in the actor's mouth; the ledger stores
+-the claim as it was made. Sibling lanes rebasing onto `envelope.ts` inherit this door too, and a fixture
+-with a padded workspace name now fails where it used to pass.
++**`workspace.created`, `workspace.renamed` and `project.created` now refuse a WHITESPACE-ONLY name, and
++refuse rather than trim.** Taking over Plan 1's provisional seeds meant adopting Plan 4's stricter shape:
++`z.string().min(1)` accepted `'   '`, which names nothing while looking like a name everywhere it is
++displayed. The door is the shared `displayName` schema at **`packages/domain/src/events/membership.ts`**,
++bound to all three types through `vocabulary.ts` — not in `envelope.ts`, which has nothing to do with it.
++
++**The interesting half is that it REFUSES rather than trims.** Run, not reasoned: `'   '` is refused
++*"must not be blank — a name of only spaces names nothing"*, `''` is refused
++*"String must contain at least 1 character(s)"*, and **`'  Corner  '` is ACCEPTED and stored verbatim** —
++padding is not the defect and a test pins that. Trimming would have been the obvious implementation and
++would put words in the actor's mouth; the ledger stores the claim as it was made.
++
++**No existing fixture is affected**, checked across `apps/server/test`, `packages/domain/test` and
++`packages/rule-engine`: every `workspace.created` / `workspace.renamed` payload in the repo carries a
++real name (`'Convenience Corner'`, `'Gisik Nokma Build'`, `'Personal'`, `'CC HQ'`, …) and there are no
++`project.created` fixtures at all. What a sibling lane inherits on rebase is the door, not a breakage.
+diff --git a/packages/domain/src/envelope.ts b/packages/domain/src/envelope.ts
+index 87d86ff..ecf6cf4 100644
+--- a/packages/domain/src/envelope.ts
++++ b/packages/domain/src/envelope.ts
+@@ -199,16 +199,35 @@ const submittedEventObject = z.object({
+  * The gap is real and passes silently. An envelope in workspace A, filed at
+  * `A:userC`, whose payload grants `userD`, is `success: true` here and
+  * `malformed-envelope` through `parseEvent`. Nothing in production validates a
+  * bare envelope today, so nothing is wrong now — but the first consumer that
+  * does (a sync-down reader is the obvious shape) would inherit half a check and
+  * have no way to tell. **If you are validating an event, call `parseEvent`.**
+  * These schemas are the shape layer underneath it, not a substitute for it.
+  */
+ export const submittedEventSchema = submittedEventObject.superRefine(refuseMisfiledMembership);
+ 
++/**
++ * HALF a check, exactly as `submittedEventSchema` above — and the note is
++ * repeated rather than referenced because a doc comment binds to the ONE
++ * declaration beneath it. In the emitted `.d.ts` the whole inlined shape of the
++ * first export sits between them, so they are nowhere near each other, and
++ * hover or jump-to-definition on this one would otherwise show nothing.
++ *
++ * Enforced here: a membership `entity.id` is `^<ULID>:<ULID>$` and its left half
++ * is this event's own `workspaceId`. NOT enforced here: that it names the user
++ * the payload is about — that needs the payload parsed, which needs the type,
++ * the version and the registered schema, none of them knowable where `payload`
++ * is `unknown` by design. An envelope in workspace A, filed at `A:userC`, whose
++ * payload grants `userD`, is `success: true` here and `malformed-envelope`
++ * through `parseEvent`.
++ *
++ * **If you are validating an event, call `parseEvent`.** This is the shape layer
++ * underneath it, not a substitute for it — and this is the export a sync-down
++ * reader reaches for first.
++ */
+ export const eventEnvelopeSchema = submittedEventObject
+   .extend({
+     serverTime: isoDatetime,
+     seq: z.number().int().positive(),
+   })
+   .superRefine(refuseMisfiledMembership);

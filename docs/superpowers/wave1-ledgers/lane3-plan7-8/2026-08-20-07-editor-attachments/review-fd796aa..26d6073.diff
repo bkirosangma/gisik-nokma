@@ -1,0 +1,239 @@
+# Review package: fd796aa..HEAD
+
+## Commits
+26d6073 The reason was false, not the design: ProseMirror can validate an attribute's value, and does it by throwing at load
+
+## Files changed
+ packages/editor/src/extensions/ticket-image.ts | 31 ++++++++++++++++++++------
+ packages/editor/src/schema/extensions.ts       | 27 ++++++++++++++--------
+ packages/editor/src/styles/editor.css          |  2 +-
+ packages/editor/test/schema.test.ts            | 13 ++++++-----
+ packages/editor/test/ticket-image.test.ts      | 22 ++++++++++++++++++
+ 5 files changed, 73 insertions(+), 22 deletions(-)
+
+## Diff
+diff --git a/packages/editor/src/extensions/ticket-image.ts b/packages/editor/src/extensions/ticket-image.ts
+index 961fbca..60877a3 100644
+--- a/packages/editor/src/extensions/ticket-image.ts
++++ b/packages/editor/src/extensions/ticket-image.ts
+@@ -67,26 +67,38 @@ declare module '@tiptap/core' {
+  * `fromString(node.getAttribute(name))` (dist:1461), which reads the bare
+  * attribute `wrap`. So validation lives in the per-attribute `parseHTML`
+  * below, and a test pins a bare `wrap="float-up"` losing to it.
+  *
+  * The same reason each attribute defines `renderHTML`: an `addAttributes`
+  * entry without one is written out under its own name, so the node would
+  * serialize both `wrap="inline-left"` and `data-wrap="inline-left"` — two
+  * spellings of one fact in the HTML, of which only one is validated on the
+  * way back in. A test pins the single spelling.
+  *
+- * WHAT IS NOT ENFORCED HERE, DELIBERATELY. ProseMirror validates attribute
+- * NAMES, not their values (the same reason `heading` cannot pin its levels —
+- * see the note in schema/extensions.ts), so a doc JSON claiming
+- * `{ type: 'image', attrs: { wrap: 'float-up' } }` round-trips with the
+- * 'float-up' intact. Layer 1 is the editor's own doors; the server's ingest
+- * gate is layer 3 and owns the stored-document question.
++ * WHAT IS NOT ENFORCED HERE, DELIBERATELY — AND NOT FOR WANT OF A MECHANISM.
++ * A doc JSON claiming `{ type: 'image', attrs: { wrap: 'float-up' } }`
++ * round-trips with the 'float-up' intact. That is a CHOICE, not a limitation
++ * of the library: an attribute spec may carry a `validate`, `checkAttrs` runs
++ * it (prosemirror-model@1.25.11 dist:2058-2066) on every `Node.fromJSON`
++ * (dist:1542), and Tiptap forwards an extension attribute's `validate` into
++ * the spec it builds (@tiptap/core@3.30.5 dist:1491). Built both ways to check
++ * it: the shipped `wrap` spec has keys ['default'] and accepts that JSON; the
++ * same node re-declared with a `validate` has ['default','validate'] and
++ * throws `RangeError: bad wrap: float-up` on the identical JSON.
++ *
++ * The reason to leave it off is what `validate` does when it fires — it THROWS
++ * AT LOAD. One stored document with a junk wrap would fail the whole editor
++ * hard rather than degrade to `block`, and choosing that is an owner's call,
++ * not a node's. So the division is: layer 3 (the server ingest gate) REJECTS
++ * a bad document at the door, and layer 1 COERCES whatever it is handed —
++ * every path this file owns, parse and render alike, ends at a member of the
++ * vocabulary even when the stored value is not one.
+  */
+ export const TicketImage = Node.create<TicketImageOptions>({
+   name: 'image',
+   group: 'block',
+   atom: true,
+   draggable: true,
+ 
+   addOptions() {
+     return {
+       // The one origin of the default route. `buildEditorExtensions` passes
+@@ -99,21 +111,26 @@ export const TicketImage = Node.create<TicketImageOptions>({
+   addAttributes() {
+     return {
+       attachmentId: {
+         default: null,
+         parseHTML: (element) => element.getAttribute('data-attachment-id'),
+         renderHTML: (attributes) => ({ 'data-attachment-id': attributes.attachmentId }),
+       },
+       wrap: {
+         default: DEFAULT_IMAGE_WRAP,
+         parseHTML: (element) => toImageWrapMode(element.getAttribute('data-wrap')),
+-        renderHTML: (attributes) => ({ 'data-wrap': attributes.wrap }),
++        // Coerced on the way out, exactly as `renderHTML`'s class is. A stored
++        // wrap outside the vocabulary is reachable through the JSON door
++        // above, and rendering `data-wrap="float-up"` beside
++        // `editor-image--block` would be two spellings of one fact that
++        // disagree — the thing per-attribute `renderHTML` exists to prevent.
++        renderHTML: (attributes) => ({ 'data-wrap': toImageWrapMode(attributes.wrap) }),
+       },
+       alt: {
+         default: '',
+         parseHTML: (element) => element.getAttribute('alt') ?? '',
+         renderHTML: (attributes) => ({ alt: attributes.alt }),
+       },
+     };
+   },
+ 
+   parseHTML() {
+diff --git a/packages/editor/src/schema/extensions.ts b/packages/editor/src/schema/extensions.ts
+index 0893c6f..fe34bcf 100644
+--- a/packages/editor/src/schema/extensions.ts
++++ b/packages/editor/src/schema/extensions.ts
+@@ -115,21 +115,30 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
+     // and is not restated here: `configure` merges with `mergeDeep` (core
+     // dist:4654-4661), which copies every key of its source with
+     // `Object.keys(...).forEach` — so an explicitly-passed `undefined` REPLACES
+     // the default rather than falling back to it, and `exactOptionalPropertyTypes`
+     // is off, so `{ resolveAttachmentUrl: props.maybeUndefined }` type-checks
+     // its way into that. Hence the conditional: the option travels only when
+     // the caller actually has one. A test drives both shapes.
+     TicketImage.configure(
+       options.resolveAttachmentUrl ? { resolveAttachmentUrl: options.resolveAttachmentUrl } : {},
+     ),
+-    // HEADING LEVELS ARE NOT VALIDATED, AND CANNOT BE HERE. Heading resolves
+-    // to `levels: [1,2,3,4,5,6]`, which governs which levels the toolbar and
+-    // input rules OFFER — it is not a constraint on stored documents.
+-    // ProseMirror validates attribute NAMES, not their values, so a doc
+-    // claiming `{ type: 'heading', attrs: { level: 99 } }` round-trips with
+-    // the 99 intact even under `errorOnInvalidContent: true`. If levels ever
+-    // need enforcing, the door is the place (a server-side payload check),
+-    // not the schema. A test pins the positive half: 1–6 survive a round
+-    // trip, so a change that clamps or drops them fails.
++    // HEADING LEVELS ARE NOT VALIDATED HERE. Heading resolves to
++    // `levels: [1,2,3,4,5,6]`, which governs which levels the toolbar and
++    // input rules OFFER — it is not a constraint on stored documents, and it
++    // is not a `validate`. An earlier version of this comment said ProseMirror
++    // "validates attribute NAMES, not their values"; that is FALSE in the
++    // installed stack and was disproven by construction. An attribute spec may
++    // carry a `validate`, `checkAttrs` runs it (prosemirror-model@1.25.11
++    // dist:2058-2066) on every `Node.fromJSON` (dist:1542), and Tiptap
++    // forwards it from an extension attribute into the spec (@tiptap/core
++    // @3.30.5 dist:1491). Heading declares none, which is the actual reason a
++    // doc claiming `{ type: 'heading', attrs: { level: 99 } }` round-trips
++    // with the 99 intact even under `errorOnInvalidContent: true`.
++    // Adding one is not free: `validate` THROWS AT LOAD, so a single stored
++    // level-99 heading would fail the whole editor rather than degrade. The
++    // server door stays the cheaper place to enforce a range; the same trade,
++    // reasoned out for the image node's `wrap`, is in extensions/ticket-image.ts.
++    // A test pins the positive half: 1–6 survive a round trip, so a change
++    // that clamps or drops them fails.
+   ];
+ }
+diff --git a/packages/editor/src/styles/editor.css b/packages/editor/src/styles/editor.css
+index d1c89b5..756894e 100644
+--- a/packages/editor/src/styles/editor.css
++++ b/packages/editor/src/styles/editor.css
+@@ -1,13 +1,13 @@
+ /* @gisik-nokma/editor — document styles. BEM classes, STRUCTURAL ONLY: no
+    colour of any kind lives here — no hex, no colour function, and no bare
+-   keyword such as `red` either. Amendment 11's scanner
++   colour keyword either. Amendment 11's scanner
+    (packages/ui/test/helpers/colour-scan.ts) already names packages/editor/src
+    among its roots and catches the first two kinds; the third it does not yet
+    match, which is why it is written down rather than left to the machine.
+    That scanner is line-based and does not skip CSS comments, so this note
+    deliberately spells none of the forms it prohibits — naming them here would
+    fail a test in a package this one does not own.
+ 
+    Anything needing a visible edge draws it with `currentColor`, which inherits
+    the surrounding text colour and is therefore already contrast-proven.
+    packages/editor must not depend on packages/ui, so a token variable from
+diff --git a/packages/editor/test/schema.test.ts b/packages/editor/test/schema.test.ts
+index b029491..50d447e 100644
+--- a/packages/editor/test/schema.test.ts
++++ b/packages/editor/test/schema.test.ts
+@@ -127,25 +127,28 @@ describe('document schema v1', () => {
+       warn.mockRestore();
+     }
+   });
+ 
+   /**
+    * The Produces contract says `heading (levels 1–6)` and nothing enforced it.
+    * It takes TWO checks, because the clause spans two things that Tiptap keeps
+    * entirely separate, and each is blind to the other's failure.
+    *
+    * What a document may STORE is not constrained by the `levels` option at all
+-   * — ProseMirror validates attribute names, not their values, so `level: 99`
+-   * round-trips intact even under `errorOnInvalidContent`, and so does level 6
+-   * with Heading configured to `levels: [1,2,3]`. That mutant was run and it
+-   * survived this round-trip case. Range enforcement, if it is ever wanted,
+-   * belongs at the server door; it cannot be done here.
++   * — `levels` is not a `validate` and Heading declares no `validate`, so
++   * `level: 99` round-trips intact even under `errorOnInvalidContent`, and so
++   * does level 6 with Heading configured to `levels: [1,2,3]`. That mutant was
++   * run and it survived this round-trip case. (An attribute spec CAN validate
++   * its value — `checkAttrs` runs it on every `Node.fromJSON` — so "it cannot
++   * be done here" would be false; what is true is that it would THROW AT LOAD.
++   * The trade is reasoned out in src/extensions/ticket-image.ts.) Range
++   * enforcement, if it is ever wanted, is cheaper at the server door.
+    *
+    * What the toolbar and input rules OFFER is the `levels` option, and that is
+    * where narrowing would actually show up. So the option is asserted directly
+    * below, and the round-trip case keeps the storage half honest — dropping
+    * Heading from the schema fails both.
+    */
+   it('offers exactly the heading levels the contract names', () => {
+     const editor = createTestEditor();
+     const heading = editor.extensionManager.extensions.find((e) => e.name === 'heading');
+     expect((heading?.options as { levels?: unknown } | undefined)?.levels).toEqual([
+diff --git a/packages/editor/test/ticket-image.test.ts b/packages/editor/test/ticket-image.test.ts
+index b9984be..c77caad 100644
+--- a/packages/editor/test/ticket-image.test.ts
++++ b/packages/editor/test/ticket-image.test.ts
+@@ -210,20 +210,42 @@ describe('image node', () => {
+       mime: 'image/png',
+       wrap: 'inline-right',
+       alt: 'the receipt',
+     });
+     const json = editor.getJSON();
+     editor.commands.setContent(editor.getHTML());
+     expect(imageNodes(editor.getJSON())).toEqual(imageNodes(json));
+     editor.destroy();
+   });
+ 
++  /**
++   * THE JSON DOOR IS LEFT OPEN ON PURPOSE (the node's docblock says why: a
++   * ProseMirror `validate` is available and forwarded, but it throws at load,
++   * so layer 3 rejects and layer 1 coerces). What must NOT survive that choice
++   * is the node emitting two spellings of one fact that DISAGREE — the exact
++   * thing the per-attribute `renderHTML` was introduced to kill. A stored
++   * `wrap: 'float-up'` renders one coerced answer in both places or neither.
++   */
++  it('renders a coerced wrap in both spellings when the stored one is junk', () => {
++    const editor = createTestEditor(undefined, {
++      type: 'doc',
++      content: [{ type: 'image', attrs: { attachmentId: IMG, wrap: 'float-up', alt: '' } }],
++    });
++    // The stored attribute is untouched — the JSON door really is open.
++    expect(imageNodes(editor.getJSON())[0]!.attrs.wrap).toBe('float-up');
++    const html = editor.getHTML();
++    expect(html).toContain('data-wrap="block"');
++    expect(html).toContain('editor-image--block');
++    expect(html).not.toContain('float-up');
++    editor.destroy();
++  });
++
+   /**
+    * THE STYLESHEET IS A FOURTH SPELLING OF THE VOCABULARY and the only one
+    * TypeScript cannot see. `renderHTML` builds the class from the attribute
+    * (`editor-image--${wrap}`), so a mode added to `IMAGE_WRAP_MODES` without a
+    * matching rule renders an unstyled image and nothing goes red — the
+    * quietest possible failure, since the markup is correct and only the
+    * appearance is missing.
+    *
+    * Set-equality in both directions, for the same reason schema.test.ts uses
+    * it: a rule for a mode that no longer exists is dead CSS nobody deletes.

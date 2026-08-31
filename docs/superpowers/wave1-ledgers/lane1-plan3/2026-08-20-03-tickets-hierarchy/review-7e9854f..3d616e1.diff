@@ -1,0 +1,1025 @@
+# Review package: 7e9854f..HEAD
+
+## Commits
+3d616e1 The order the checks run in was documented, argued for, and pinned by nothing
+6c159df Creation now answers for the hierarchy — and for its own identity, which nothing was asking about
+
+## Files changed
+ apps/server/test/engine-context.test.ts            |  38 ++-
+ packages/rule-engine/src/checks/context-helpers.ts |  36 ++
+ packages/rule-engine/src/checks/hierarchy.ts       | 123 +++++++
+ packages/rule-engine/src/checks/refusals.ts        | 104 ++++++
+ packages/rule-engine/src/checks/test-support.ts    |  85 +++++
+ packages/rule-engine/src/evaluate.ts               |  14 +-
+ packages/rule-engine/test/engine.test.ts           |  56 +++-
+ packages/rule-engine/test/hierarchy.test.ts        | 361 +++++++++++++++++++++
+ 8 files changed, 805 insertions(+), 12 deletions(-)
+
+## Diff
+diff --git a/apps/server/test/engine-context.test.ts b/apps/server/test/engine-context.test.ts
+index b5dd4c2..bde61d8 100644
+--- a/apps/server/test/engine-context.test.ts
++++ b/apps/server/test/engine-context.test.ts
+@@ -72,36 +72,70 @@ const roleGatedWorkflow = submitted({
+ });
+ 
+ const ticketCreated = submitted({
+   entity: { kind: 'ticket', id: TICKET },
+   type: 'ticket.created',
+   payload: { typeId: 'task', projectId: PROJECT, parentId: null, title: 'File the GST return' },
+ });
+ 
+ beforeAll(async () => {
+   const results = await service().ingestBatch([roleGatedWorkflow, ticketCreated]);
+-  expect(results.map((result) => result.status)).toEqual(['committed', 'committed']);
++  // The create is REFUSED from Plan 3 Task 5, and this is the seam working
++  // rather than breaking. `checkTicketCreated` reads the ticket type's rank and
++  // name through `getTicketTypeDef`, and this server context answers null for
++  // every type until Task 12 backs that method with `proj_ticket_types` — so
++  // the server refuses to create a ticket whose type it cannot see, which is
++  // exactly what `createEngineContext`'s own comment on that method says it
++  // will do. Before Task 5 the event fell through the engine's `default` arm
++  // and committed unjudged; nothing consumed it, because proj_tickets does not
++  // exist yet either.
++  //
++  // TASK 12 REVERTS THIS PAIR: once getTicketTypeDef reads proj_ticket_types,
++  // a workspace that has defined `task` commits this create, the planted head
++  // row below goes away, and this expectation becomes ['committed','committed']
++  // again. It joins the two assertions A12/BA-3 already assigns that task.
++  expect(results.map((result) => result.status)).toEqual(['committed', 'refused']);
++  expect(results[1]).toEqual({
++    status: 'refused',
++    eventId: expect.any(String),
++    rule: 'ticket.unknown-type',
++    reason: "This ticket's type is not defined in this workspace.",
++  });
++
++  // The ticket head row the create would have written, planted for the same
++  // reason the membership row below is: the assertion it serves is about what
++  // `getEntityState` does with a head row that EXISTS. Against the
++  // `as unknown as EntityState` body this file was written to kill, a ticket
++  // WITH a head comes back looking like a TicketState whose `workflowId` is
++  // undefined — and with no head row at all that body returns null too, so the
++  // test would pass against the very defect it exists to catch.
++  await db.pool.query(
++    `INSERT INTO proj_entity_heads
++       (entity_kind, entity_id, workspace_id, head_seq, head_event_id, head_event_type, head_server_time)
++     VALUES ('ticket', $1, $2, 1, $3, 'ticket.created', '2026-08-20T09:00:01.000Z')`,
++    [TICKET, WORKSPACE, newUlid()],
++  );
+ 
+   // The membership row Plan 4 will write for real. Planted directly because no
+   // event type is bound to the `membership` kind yet, and §9's hazard needs a
+   // membership entity that HAS a head — "if the membership entity has any
+   // committed event the guard passes `!== null`" is the whole sentence.
+   await db.pool.query(
+     `INSERT INTO proj_entity_heads
+        (entity_kind, entity_id, workspace_id, head_seq, head_event_id, head_event_type, head_server_time)
+      VALUES ('membership', $1, $2, 1, $3, 'membership.granted', '2026-08-20T09:00:01.000Z')`,
+     [membershipId(WORKSPACE, ACTOR), WORKSPACE, newUlid()],
+   );
+ });
+ 
+ describe('createEngineContext.getEntityState — what the server can honestly serve', () => {
+-  it('answers null for a ticket, because ticket state does not exist until Plan 3 Task 12', async () => {
++  it('answers null for a ticket that HAS a head row, because ticket state does not exist until Plan 3 Task 12', async () => {
+     const client = await db.pool.connect();
+     try {
+       expect(await createEngineContext(client).getEntityState('ticket', TICKET)).toBeNull();
+     } finally {
+       client.release();
+     }
+   });
+ 
+   it('answers null for a membership that HAS a head row — the §9 hazard, planted', async () => {
+     // The head pointer carries `kind: 'membership'`, so the cast this replaces
+diff --git a/packages/rule-engine/src/checks/context-helpers.ts b/packages/rule-engine/src/checks/context-helpers.ts
+new file mode 100644
+index 0000000..e4f41f7
+--- /dev/null
++++ b/packages/rule-engine/src/checks/context-helpers.ts
+@@ -0,0 +1,36 @@
++import type { TicketState, TicketTypeDef } from '@gisik-nokma/domain';
++import type { EngineContext } from '../engine.js';
++
++/**
++ * Typed reads over `EngineContext`, so no check has to restate how a kind is
++ * narrowed or where a definition comes from.
++ */
++
++/**
++ * NARROWS, never casts. `getEntityState` returns a union keyed on `kind`, and a
++ * cast to `TicketState` would compile happily against a `MembershipState` and
++ * then read `undefined` off every field the check asks about. Same pattern as
++ * `transition.ts:41-42`.
++ */
++export async function getTicketState(ctx: EngineContext, id: string): Promise<TicketState | null> {
++  const state = await ctx.getEntityState('ticket', id);
++  return state !== null && state.kind === 'ticket' ? state : null;
++}
++
++/**
++ * A ticket TYPE's definition arrives through the fourth `EngineContext` method,
++ * NOT through `getEntityState('ticket-type', id)` — that door answers
++ * `OtherEntityState`, literally `{ kind, id }`, with no rank, name, workflowId
++ * or fields (`packages/domain/src/entity-state.ts:49-53`), which makes every
++ * rank check unimplementable through it (pre-flight BA-4). Controller ruling P3
++ * settled the widening: the union stays as it is, and the definition comes from
++ * `getTicketTypeDef` (`engine.ts`, and its comment for why the alternative was
++ * rejected).
++ *
++ * The wrapper exists so that no check reaches for the wrong door by habit: the
++ * two lookups sit side by side here, named for what they return, and the shape
++ * of each answer is a compile error away from the other.
++ */
++export async function getTicketTypeDef(ctx: EngineContext, id: string): Promise<TicketTypeDef | null> {
++  return ctx.getTicketTypeDef(id);
++}
+diff --git a/packages/rule-engine/src/checks/hierarchy.ts b/packages/rule-engine/src/checks/hierarchy.ts
+new file mode 100644
+index 0000000..03ea801
+--- /dev/null
++++ b/packages/rule-engine/src/checks/hierarchy.ts
+@@ -0,0 +1,123 @@
++import type { EventEnvelope } from '@gisik-nokma/domain';
++import { DEEPEST_RANK, ticketCreatedPayload } from '@gisik-nokma/domain';
++import type { Accept, EngineContext, Refusal } from '../engine.js';
++import { REFUSAL_RULES } from '../refusal-rules.js';
++import { getTicketState, getTicketTypeDef } from './context-helpers.js';
++import { ACCEPT, deepestRankParentRefusal, parentTerminalRefusal, rankRefusal, refuse } from './refusals.js';
++
++/**
++ * Hierarchy sanity for ticket.created. Check order is deliberate — the most
++ * fundamental truth names the refusal: already exists → unknown type →
++ * workflow undefined → (root: deepest-rank rule) → unknown parent →
++ * cross-project → rank → parent-terminal (the remediable contradiction comes
++ * last: it is the only one whose remedy is an offer rather than a correction).
++ *
++ * `already exists` leads because it is the only question about the event's own
++ * target rather than about what the payload points at. A create for a ticket
++ * that exists is refused whatever its type or parent would have been — and
++ * telling that actor their type is undefined would send them to fix the one
++ * thing that was never the problem.
++ *
++ * The project this ticket is created INTO is not checked here: Plan 4 owns
++ * `proj_projects` and the "the project does not exist" refusal (coordination
++ * doc, owner decision 2026-08-26). The order above is every precondition this
++ * check forces, which is not the same as every precondition creation has.
++ */
++export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {
++  // Two layers, by design, exactly as in transition.ts:11-28 (pre-flight A19):
++  // the fixture suite and Plan 10's offline replica enter at `evaluateEvent`
++  // and never pass through ingest's door, so this check keeps its own kind
++  // guard. Server-side the door answers first and this never runs — but it says
++  // the same sentence in the same words as its sibling, because a person who
++  // meets this refusal twice should not have to work out whether it is the same
++  // refusal.
++  if (env.entity.kind !== 'ticket') {
++    return {
++      refused: true,
++      rule: REFUSAL_RULES.malformedPayload,
++      reason: `This ticket.created event does not point at a ticket; it points at a ${env.entity.kind}.`,
++    };
++  }
++
++  // `safeParse`, not `parse`, for the same reason the kind guard exists.
++  // `evaluateEvent`'s frozen signature is `Promise<Accept | Refusal>` — a
++  // throw is neither, and the callers that reach this check without the door
++  // in front of them are exactly the ones with no other net. On the server the
++  // registered schema has already accepted this payload, so this branch is
++  // unreachable there; everywhere else it is the difference between a refusal
++  // and a crash.
++  const parsed = ticketCreatedPayload.safeParse(env.payload);
++  if (!parsed.success) {
++    const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
++    return {
++      refused: true,
++      rule: REFUSAL_RULES.malformedPayload,
++      reason: `This ticket.created event's payload is malformed: ${detail}`,
++    };
++  }
++  const p = parsed.data;
++
++  // Routed here by Task 3's review; not in this task's brief. The reducer folds
++  // `ticket.created` unconditionally (`ticket-state.ts:95`), so a second
++  // accepted create for an existing ticket does not error and does not merge —
++  // it RESETS the fold, erasing the ticket's status, its collaborators, its
++  // field claims and its transition log, which is the evidence four-eyes reads.
++  // Nothing shipped refused it. The reducer is right to stay unconditional (a
++  // projection replaying a ledger that already refused this should not carry a
++  // second opinion); the door that keeps it out is here.
++  if ((await getTicketState(ctx, env.entity.id)) !== null) return refuse('ticket.already-exists');
++
++  const type = await getTicketTypeDef(ctx, p.typeId);
++  if (!type) return refuse('ticket.unknown-type');
++
++  const workflow = await ctx.getWorkflowDef(type.workflowId);
++  if (!workflow) return refuse('ticket.workflow-undefined');
++
++  if (p.parentId === null) {
++    // Owner decision (2026-08-20): the parent requirement follows the RANK, not
++    // the built-in id — the built-in sub-task and any custom type an admin
++    // defines at that rank or below it all carry it.
++    //
++    // `>=` rather than `===`: the rule's justification is that the smallest
++    // kind of work always belongs to something bigger, so a type DEEPER than
++    // sub-task is smaller still and cannot coherently be exempt — `===` would
++    // leave an escape hatch where defining rank 5 floats your tickets free.
++    //
++    // DEEPEST_RANK stays a fixed constant rather than a max computed over the
++    // workspace's defined types: a computed max would silently change this
++    // refusal's meaning as the type inventory changed, and a refusal that
++    // shifts underfoot is exactly what this product refuses to ship. Fixed
++    // floor plus `>=` gives both — the meaning never moves, and nothing slips
++    // underneath it. The constant is imported from `@gisik-nokma/domain`
++    // (`ticket-types.ts:70`), never restated: a second 4 written down here is a
++    // second chance for the floor to move on one side only.
++    if (type.rank >= DEEPEST_RANK) {
++      return refuse('hierarchy.deepest-rank-parent-required', deepestRankParentRefusal(type.name));
++    }
++    return ACCEPT;
++  }
++
++  const parent = await getTicketState(ctx, p.parentId);
++  if (!parent) return refuse('hierarchy.unknown-parent');
++  if (parent.projectId !== p.projectId) return refuse('hierarchy.cross-project');
++
++  const parentType = await getTicketTypeDef(ctx, parent.typeId);
++  if (!parentType) return refuse('ticket.unknown-type');
++  if (type.rank <= parentType.rank) {
++    return refuse('hierarchy.rank', rankRefusal(type.name, parentType.name));
++  }
++
++  // Owner decision (2026-08-20): a finished parent refuses new live work; the
++  // decision keys off the denormalized stateCategory — the def lookup below
++  // only names the state for the reason, so it falls back to raw ids rather
++  // than blocking the refusal on a missing definition.
++  if (parent.stateCategory === 'terminal') {
++    const parentDef = await ctx.getWorkflowDef(parent.workflowId, parent.workflowVersion);
++    const stateName = parentDef?.states.find((s) => s.id === parent.stateId)?.name ?? parent.stateId;
++    const titleClaim = parent.fields['title']?.value;
++    const parentTitle = typeof titleClaim === 'string' ? titleClaim : parent.id;
++    return refuse('hierarchy.parent-terminal', parentTerminalRefusal(parentTitle, stateName, 'add'));
++  }
++
++  return ACCEPT;
++}
+diff --git a/packages/rule-engine/src/checks/refusals.ts b/packages/rule-engine/src/checks/refusals.ts
+new file mode 100644
+index 0000000..b264af4
+--- /dev/null
++++ b/packages/rule-engine/src/checks/refusals.ts
+@@ -0,0 +1,104 @@
++import type { Accept, Refusal } from '../engine.js';
++
++/**
++ * The exact plain-language refusal reasons — a deliverable of Plan 3.
++ *
++ * Tests and fixtures assert the LITERAL strings, never these constants, so a
++ * typo here cannot certify itself. Every reason is written to a person who is
++ * being told "no": it states the fact, and where a remedy exists it names the
++ * remedy, because a refusal a person cannot act on is a dead end wearing a
++ * sentence.
++ *
++ * The ids are namespaced by what the refusal is ABOUT — `ticket.` for the
++ * ticket or its type, `hierarchy.` for the shape of the tree, `field.` for a
++ * claim on a field — not by which check happens to raise them. Two checks may
++ * raise the same id (`checkTicketCreated` and `checkTicketReparented` both
++ * refuse `hierarchy.rank`), and a person who meets one refusal twice should not
++ * have to work out whether it is the same refusal.
++ *
++ * NOT EXHAUSTIVE, and deliberately so: a ticket cannot be created into a
++ * project that was never founded, but `proj_projects` and the honest
++ * "the project does not exist" refusal belong to PLAN 4 (coordination doc,
++ * owner decision 2026-08-26 — it "joins Plan 3's precondition list as a
++ * cross-reference"). Nothing here checks project existence, and
++ * `checkTicketCreated`'s documented check order says the same thing at the
++ * other end. This note is the cross-reference: read the list below as the
++ * preconditions THIS plan enforces, not as every precondition there is.
++ */
++export const REFUSALS = {
++  'ticket.unknown-type': "This ticket's type is not defined in this workspace.",
++  'ticket.unknown': 'This ticket does not exist in this workspace.',
++  /**
++   * The mirror of `ticket.unknown`, and it is not in Plan 3's table: it was
++   * routed here by Task 3's review. `applyTicketEvent` folds a `ticket.created`
++   * UNCONDITIONALLY (`packages/domain/src/ticket-state.ts:95`, which is what
++   * Task 3's brief asked for), so a second accepted create for a ticket that
++   * already exists does not error and does not merge — it resets the fold,
++   * erasing the ticket's status, collaborators, field claims and transition
++   * log. The reason names that consequence rather than the mechanism, because
++   * "this id is taken" tells a person nothing about what they nearly lost.
++   */
++  'ticket.already-exists':
++    'This ticket already exists. Creating it again would erase everything recorded on it — open the existing ticket instead.',
++  'ticket.workflow-undefined':
++    "This ticket type's workflow has not been defined yet, so the ticket would have no status.",
++  'hierarchy.unknown-parent': 'The chosen parent ticket does not exist in this workspace.',
++  'hierarchy.cross-project': 'The parent is in a different project. Pick a parent from the same project.',
++  'hierarchy.cycle':
++    'This move would put the ticket inside one of its own sub-items, making a loop. A ticket cannot contain itself.',
++  'field.unknown': "This ticket's type has no such field. Add the field to the ticket type first.",
++  'field.title-required': 'A ticket always has a title. Change the title instead of clearing it.',
++} as const;
++
++export function rankRefusal(childTypeName: string, parentTypeName: string): string {
++  return `"${childTypeName}" cannot go under "${parentTypeName}": a ticket's parent must be a bigger kind of work.`;
++}
++
++/**
++ * Owner decision (2026-08-20, coordination doc sign-off table): a ticket whose
++ * type sits at the deepest rank always belongs to a parent. The reason names
++ * the TYPE rather than saying "sub-task", because the built-in sub-task is only
++ * the most common type this bites — any custom type at the same rank raises it.
++ */
++export function deepestRankParentRefusal(typeName: string): string {
++  return `"${typeName}" is the smallest kind of work, so it always belongs to a parent ticket. Pick the ticket this one is part of.`;
++}
++
++export function fieldKindRefusal(fieldName: string, needsPhrase: string): string {
++  return `"${fieldName}" needs ${needsPhrase}.`;
++}
++
++/**
++ * One argument for a refusal whose reason is fixed; two when the reason names
++ * something from the event (a type name, a parent's title) and therefore has to
++ * be built. The overloads keep the fixed-reason call honest: `refuse('…')` only
++ * type-checks for a key the map actually has.
++ */
++export function refuse(rule: keyof typeof REFUSALS): Refusal;
++export function refuse(rule: string, reason: string): Refusal;
++export function refuse(rule: string, reason?: string): Refusal {
++  return { refused: true, rule, reason: reason ?? REFUSALS[rule as keyof typeof REFUSALS] };
++}
++
++export const ACCEPT: Accept = { refused: false };
++
++/**
++ * Owner decision (2026-08-20, coordination doc): live work arriving under a
++ * finished parent refuses toward the offered reopen — the remedy is in the
++ * reason. `move` picks the verb pair: 'add' for ticket.created, 'move' for
++ * ticket.reparented.
++ *
++ * This is NOT Plan 2's `parent-terminal-with-open-children`
++ * (`refusal-rules.ts:14`), and neither may be renamed to the other: that one
++ * fires when a PARENT tries to enter a terminal state while children are still
++ * open; this one fires when live work arrives UNDER a parent already finished.
++ * Adjacent meanings, opposite directions, and a person meeting one is being
++ * told something the other does not say.
++ */
++export function parentTerminalRefusal(parentTitle: string, stateName: string, move: 'add' | 'move'): string {
++  const remedy =
++    move === 'add'
++      ? 'Adding live work reopens it — choose a state to reopen it to, then add this ticket.'
++      : 'Moving live work under it reopens it — choose a state to reopen it to, then move this ticket.';
++  return `"${parentTitle}" is finished (${stateName}). ${remedy}`;
++}
+diff --git a/packages/rule-engine/src/checks/test-support.ts b/packages/rule-engine/src/checks/test-support.ts
+new file mode 100644
+index 0000000..86de9e1
+--- /dev/null
++++ b/packages/rule-engine/src/checks/test-support.ts
+@@ -0,0 +1,85 @@
++import type { EventEnvelope, PublishedWorkflowDef, TicketTypeDef } from '@gisik-nokma/domain';
++import { makeEnvelope } from '@gisik-nokma/domain';
++
++/**
++ * Builders shared by the check suites (`test/hierarchy.test.ts` today, Tasks 6
++ * and 7's next). They live in `src/` rather than `test/` because `test/` is not
++ * on this package's `rootDir` and three test files in two later tasks import
++ * them; one ladder in one place is what stops Task 6's rank tests and Task 7's
++ * field tests from quietly describing different hierarchies.
++ *
++ * The ladder here is the BUILT-IN one — epic(1)/story(2)/task(3)/sub-task(4),
++ * the same ranks `BUILTIN_TICKET_TYPE_SEEDS` ships. A test that needs a custom
++ * type (one an admin invents at rank 4, or below it) declares it locally beside
++ * the assertion it serves, so a reader of these shared builders is never left
++ * wondering which of them is the product's ladder and which is a workspace's.
++ */
++
++export const WS = '01J9GWS0000000000000000000';
++export const PROJECT = '01J9GPRJ000000000000000000';
++export const PROJECT_B = '01J9GPRB000000000000000000';
++
++/**
++ * Typed `PublishedWorkflowDef`, not `WorkflowDef`: `buildMemoryContext` takes
++ * published definitions (they are the ones that may carry a `stateMapping`),
++ * and the two types are mutually assignable when no mapping is present, so a
++ * consumer wanting a plain `WorkflowDef` loses nothing.
++ *
++ * Every transition is `from: '*'`, so a test that needs a ticket in a
++ * particular state can put it there in one event without first describing a
++ * path. `done` is the only terminal state — the parent-terminal refusal needs
++ * exactly one.
++ */
++export const WF: PublishedWorkflowDef = {
++  id: 'wf-basic',
++  version: 1,
++  name: 'Basic',
++  initialStateId: 'todo',
++  states: [
++    { id: 'todo', name: 'To do', category: 'open' },
++    { id: 'doing', name: 'Doing', category: 'active' },
++    { id: 'done', name: 'Done', category: 'terminal' },
++  ],
++  transitions: [
++    { from: '*', to: 'todo', rules: [] },
++    { from: '*', to: 'doing', rules: [] },
++    { from: '*', to: 'done', rules: [] },
++  ],
++};
++
++export const EPIC: TicketTypeDef = { id: 'epic', name: 'Epic', icon: 'flag', rank: 1, workflowId: 'wf-basic', fields: [] };
++export const STORY: TicketTypeDef = { id: 'story', name: 'Story', icon: 'book', rank: 2, workflowId: 'wf-basic', fields: [] };
++export const TASK: TicketTypeDef = { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-basic', fields: [] };
++export const SUBTASK: TicketTypeDef = { id: 'sub-task', name: 'Sub-task', icon: 'list', rank: 4, workflowId: 'wf-basic', fields: [] };
++
++export function typeDefined(def: TicketTypeDef): EventEnvelope {
++  return makeEnvelope({
++    type: 'ticket-type.defined',
++    entity: { kind: 'ticket-type', id: def.id },
++    payload: def,
++    workspaceId: WS,
++  });
++}
++
++/**
++ * A `ticket.created` envelope in the domain's own dialect — `projectId` and
++ * `parentId` are `ulidString` in `ticketCreatedPayload`, so every id a caller
++ * passes must be ULID-shaped or the payload is refused before any hierarchy
++ * question is asked.
++ *
++ * `seq` is left at `makeEnvelope`'s default: creation is a ticket's first
++ * event, and the checks here read no sequence.
++ */
++export function created(
++  id: string,
++  typeId: string,
++  parentId: string | null,
++  projectId: string = PROJECT,
++): EventEnvelope {
++  return makeEnvelope({
++    type: 'ticket.created',
++    entity: { kind: 'ticket', id },
++    workspaceId: WS,
++    payload: { typeId, projectId, parentId, title: `ticket ${id.slice(4, 8)}` },
++  });
++}
+diff --git a/packages/rule-engine/src/evaluate.ts b/packages/rule-engine/src/evaluate.ts
+index 172a24f..57ddce3 100644
+--- a/packages/rule-engine/src/evaluate.ts
++++ b/packages/rule-engine/src/evaluate.ts
+@@ -1,21 +1,29 @@
+ import type { EventEnvelope } from '@gisik-nokma/domain';
+ import { evaluateWorkflowDefined } from './workflow-defined.js';
+ import { evaluateTicketTransitioned } from './transition.js';
++import { checkTicketCreated } from './checks/hierarchy.js';
+ import type { Accept, EngineContext, Refusal } from './engine.js';
+ 
+ /**
+  * The rule engine. Envelope-level checks (shape, unknown event type, ULID,
+- * sequencing) belong to ingest (Plan 1) and are NOT repeated here. This plan
+- * handles workflow.defined and (from Task 6) ticket.transitioned; every other
+- * event type passes through — later plans add their own cases.
++ * sequencing) belong to ingest (Plan 1) and are NOT repeated here. Plan 2
++ * handles workflow.defined and ticket.transitioned; Plan 3 adds the ticket
++ * cases; every other event type passes through — later plans add their own.
++ *
++ * Each case's check carries its OWN `env.entity.kind` guard rather than
++ * trusting this dispatch, the two-layer precedent `transition.ts:11-28` set:
++ * the fixture suite and Plan 10's offline replica enter here and never pass
++ * through ingest's door, so the door's answer is not available to them.
+  */
+ export async function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {
+   switch (env.type) {
+     case 'workflow.defined':
+       return evaluateWorkflowDefined(env, ctx);
+     case 'ticket.transitioned':
+       return evaluateTicketTransitioned(env, ctx);
++    case 'ticket.created':
++      return checkTicketCreated(env, ctx);
+     default:
+       return { refused: false };
+   }
+ }
+diff --git a/packages/rule-engine/test/engine.test.ts b/packages/rule-engine/test/engine.test.ts
+index 830561e..ed13ea6 100644
+--- a/packages/rule-engine/test/engine.test.ts
++++ b/packages/rule-engine/test/engine.test.ts
+@@ -34,50 +34,61 @@ function envelope(overrides: Partial<EventEnvelope> = {}): EventEnvelope {
+ /** A workflow.defined envelope whose entity id matches its payload id, as every legitimate one does. */
+ function defined(payload: Omit<WorkflowDefinedPayload, 'id'> & { id?: string }): EventEnvelope {
+   const id = payload.id ?? newUlid();
+   return envelope({
+     type: 'workflow.defined',
+     entity: { kind: 'workflow', id },
+     payload: { ...payload, id },
+   });
+ }
+ 
+-type SpyCounts = { entityState: number; childrenStates: number; workflowDef: number };
++type SpyCounts = {
++  entityState: number;
++  childrenStates: number;
++  workflowDef: number;
++  ticketTypeDef: number;
++};
+ 
+ /**
+  * `entity`/`children` default to Plan 1's original stubs (no ticket, no
+  * children) so every pre-existing call site is unaffected; the parent-terminal
+  * tests below are the only callers that pass them.
+  */
+ function spyContext(
+   latest: WorkflowDef | null = null,
+   opts: { entity?: EntityState | null; children?: TicketState[] } = {},
+ ): {
+   ctx: EngineContext;
+   calls: () => number;
+   counts: () => SpyCounts;
+ } {
+   const getEntityState = vi.fn(async () => opts.entity ?? null);
+   const getChildrenStates = vi.fn(async () => opts.children ?? []);
+   const getWorkflowDef = vi.fn(async () => latest);
++  // Counted from Plan 3 Task 5, which is the first caller: `checkTicketCreated`
++  // reads a ticket type's rank and name. Leaving it out was correct while
++  // nothing called it — and would stop being correct silently, because every
++  // "N context calls" assertion in this file would go on passing while no
++  // longer being total. A spy that is not summed is a spy that has been
++  // switched off.
++  const getTicketTypeDef = vi.fn(async () => null);
+   const counts = (): SpyCounts => ({
+     entityState: getEntityState.mock.calls.length,
+     childrenStates: getChildrenStates.mock.calls.length,
+     workflowDef: getWorkflowDef.mock.calls.length,
++    ticketTypeDef: getTicketTypeDef.mock.calls.length,
+   });
+   return {
+-    // getTicketTypeDef is not counted: no rule reads a type definition yet
+-    // (Plan 3 Tasks 5–7 add the first), so a spy on it would pin nothing.
+-    ctx: { getEntityState, getChildrenStates, getWorkflowDef, getTicketTypeDef: vi.fn(async () => null) },
++    ctx: { getEntityState, getChildrenStates, getWorkflowDef, getTicketTypeDef },
+     calls: () => {
+       const seen = counts();
+-      return seen.entityState + seen.childrenStates + seen.workflowDef;
++      return seen.entityState + seen.childrenStates + seen.workflowDef + seen.ticketTypeDef;
+     },
+     counts,
+   };
+ }
+ 
+ /** A published v1 with two states a v2 can drop at once — the stranding tests plant this. */
+ const basicV1: WorkflowDef = {
+   id: 'wf_basic',
+   version: 1,
+   name: 'Basic',
+@@ -240,20 +251,51 @@ describe('evaluateEvent — the dispatcher', () => {
+     const { ctx } = spyContext();
+     await expect(evaluateEvent(envelope(), ctx)).resolves.toEqual({ refused: false });
+   });
+ 
+   it('consults nothing for an unhandled type — a pass-through must not fake judgement it does not have', async () => {
+     const { ctx, calls } = spyContext();
+     await evaluateEvent(envelope(), ctx);
+     expect(calls()).toBe(0);
+   });
+ 
++  /**
++   * The `ticket.created` arm, and the same claim in its other half: the
++   * dispatcher routes it, and the spy ledger above is TOTAL. `getTicketTypeDef`
++   * answers null here, so the check refuses `ticket.unknown-type` — the point
++   * is not the verdict but the two lookups it took to reach it. Drop
++   * `ticketTypeDef` from `counts()` and this assertion fails; that is the whole
++   * reason it is written as a whole-object comparison rather than a sum.
++   */
++  it('routes ticket.created to the hierarchy check, and the call ledger counts the type lookup', async () => {
++    const { ctx, counts } = spyContext();
++    const env = envelope({
++      type: 'ticket.created',
++      entity: { kind: 'ticket', id: '01J9GNEW000000000000000000' },
++      payload: {
++        typeId: 'task',
++        projectId: '01J9GPRJ000000000000000000',
++        parentId: null,
++        title: 'Reconcile the till',
++      },
++    });
++    await expect(evaluateEvent(env, ctx)).resolves.toEqual({
++      refused: true,
++      rule: 'ticket.unknown-type',
++      reason: "This ticket's type is not defined in this workspace.",
++    });
++    // One `getEntityState` for "does this ticket already exist", one
++    // `getTicketTypeDef` for the type. No workflow, no children: neither
++    // question is reachable once the type is unknown.
++    expect(counts()).toEqual({ entityState: 1, childrenStates: 0, workflowDef: 0, ticketTypeDef: 1 });
++  });
++
+   it('routes workflow.defined to its rule module rather than passing it through', async () => {
+     const { ctx, calls } = spyContext();
+     const verdict = await evaluateEvent(
+       defined({
+         version: 1,
+         name: 'Basic',
+         initialStateId: 'todo',
+         states: [
+           { id: 'todo', name: 'To do', category: 'open' },
+           { id: 'done', name: 'Done', category: 'terminal' },
+@@ -343,28 +385,28 @@ describe('the structural refusal names every issue at once', () => {
+ describe('the stranding refusal, and what it refuses to ask', () => {
+   it('lists two dropped states comma-separated, and consults no occupancy to do it', async () => {
+     const { ctx, counts } = spyContext(basicV1);
+     const verdict = await evaluateEvent(basicV2(), ctx);
+     expect(verdict).toEqual({
+       refused: true,
+       rule: REFUSAL_RULES.workflowStateMapping,
+       reason:
+         'Version 2 drops state(s) "doing", "review" that version 1 has; publishing cannot see which tickets sit in which state, so every dropped state needs a stateMapping entry.',
+     });
+-    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1 });
++    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1, ticketTypeDef: 0 });
+   });
+ 
+   it('accepts a v2 that maps both dropped states without asking whether either is occupied', async () => {
+     const { ctx, counts } = spyContext(basicV1);
+     const verdict = await evaluateEvent(basicV2({ doing: 'todo', review: 'todo' }), ctx);
+     expect(verdict).toEqual({ refused: false });
+-    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1 });
++    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1, ticketTypeDef: 0 });
+   });
+ });
+ 
+ /**
+  * The rule names are cross-plan API: later plans, the HTTP layer and the
+  * offline replica all match on these exact strings. Renaming one is a breaking
+  * change and should read as one here.
+  */
+ describe('REFUSAL_RULES', () => {
+   it('spells every canonical rule name', () => {
+diff --git a/packages/rule-engine/test/hierarchy.test.ts b/packages/rule-engine/test/hierarchy.test.ts
+new file mode 100644
+index 0000000..2a25f69
+--- /dev/null
++++ b/packages/rule-engine/test/hierarchy.test.ts
+@@ -0,0 +1,361 @@
++import { describe, expect, it } from 'vitest';
++import type { TicketState, TicketTypeDef } from '@gisik-nokma/domain';
++import { makeEnvelope } from '@gisik-nokma/domain';
++import { buildMemoryContext } from '../src/memory-context.js';
++import { checkTicketCreated } from '../src/checks/hierarchy.js';
++import type { EngineContext } from '../src/engine.js';
++import {
++  EPIC,
++  PROJECT,
++  PROJECT_B,
++  STORY,
++  SUBTASK,
++  TASK,
++  WF,
++  created,
++  typeDefined,
++} from '../src/checks/test-support.js';
++
++const PARENT = '01J9GPAR000000000000000000';
++const NEW = '01J9GNEW000000000000000000';
++const GHOST = '01J9GGHT000000000000000000';
++
++const baseCtx = () =>
++  buildMemoryContext(
++    [WF],
++    [
++      typeDefined(EPIC),
++      typeDefined(STORY),
++      typeDefined(TASK),
++      typeDefined(SUBTASK),
++      created(PARENT, 'story', null),
++    ],
++  );
++
++/**
++ * Every expectation below asserts the LITERAL rule id and the LITERAL,
++ * fully-interpolated reason — never `REFUSALS['…']` or a call to one of the
++ * builders. A test that asserts the constant it is testing certifies a typo in
++ * that constant as correct copy, and this plan's deliverable IS the copy.
++ */
++describe('checkTicketCreated', () => {
++  it('accepts a task under a story, and a task at project root', async () => {
++    expect(await checkTicketCreated(created(NEW, 'task', PARENT), baseCtx())).toEqual({ refused: false });
++    expect(await checkTicketCreated(created(NEW, 'task', null), baseCtx())).toEqual({ refused: false });
++  });
++
++  it('planted defect: an epic under a story — rank must exceed the parent rank', async () => {
++    expect(await checkTicketCreated(created(NEW, 'epic', PARENT), baseCtx())).toEqual({
++      refused: true,
++      rule: 'hierarchy.rank',
++      reason: '"Epic" cannot go under "Story": a ticket\'s parent must be a bigger kind of work.',
++    });
++  });
++
++  it('planted defect: equal rank cannot nest either', async () => {
++    const ctx = buildMemoryContext([WF], [typeDefined(STORY), created(PARENT, 'story', null)]);
++    expect(await checkTicketCreated(created(NEW, 'story', PARENT), ctx)).toEqual({
++      refused: true,
++      rule: 'hierarchy.rank',
++      reason: '"Story" cannot go under "Story": a ticket\'s parent must be a bigger kind of work.',
++    });
++  });
++
++  it('planted defect: a sub-task without a parent — the deepest rank always belongs to something', async () => {
++    expect(await checkTicketCreated(created(NEW, 'sub-task', null), baseCtx())).toEqual({
++      refused: true,
++      rule: 'hierarchy.deepest-rank-parent-required',
++      reason:
++        '"Sub-task" is the smallest kind of work, so it always belongs to a parent ticket. Pick the ticket this one is part of.',
++    });
++  });
++
++  it('planted defect: a parent from another project', async () => {
++    const ctx = buildMemoryContext(
++      [WF],
++      [typeDefined(STORY), typeDefined(TASK), created(PARENT, 'story', null, PROJECT_B)],
++    );
++    expect(await checkTicketCreated(created(NEW, 'task', PARENT, PROJECT), ctx)).toEqual({
++      refused: true,
++      rule: 'hierarchy.cross-project',
++      reason: 'The parent is in a different project. Pick a parent from the same project.',
++    });
++  });
++
++  it('planted defect: a parent that does not exist', async () => {
++    expect(await checkTicketCreated(created(NEW, 'task', GHOST), baseCtx())).toEqual({
++      refused: true,
++      rule: 'hierarchy.unknown-parent',
++      reason: 'The chosen parent ticket does not exist in this workspace.',
++    });
++  });
++
++  it('planted defect: a type nobody defined', async () => {
++    expect(await checkTicketCreated(created(NEW, 'ghost-type', PARENT), baseCtx())).toEqual({
++      refused: true,
++      rule: 'ticket.unknown-type',
++      reason: "This ticket's type is not defined in this workspace.",
++    });
++  });
++
++  it('planted defect: a type whose workflow is not defined — the ledger accepts only what it can replay', async () => {
++    const ctx = buildMemoryContext([], [typeDefined(TASK)]); // no workflow seeded
++    expect(await checkTicketCreated(created(NEW, 'task', null), ctx)).toEqual({
++      refused: true,
++      rule: 'ticket.workflow-undefined',
++      reason: "This ticket type's workflow has not been defined yet, so the ticket would have no status.",
++    });
++  });
++
++  it('planted defect: creating live work under a finished parent — the remedy named is the reopen', async () => {
++    const ctx = buildMemoryContext(
++      [WF],
++      [
++        typeDefined(STORY),
++        typeDefined(TASK),
++        makeEnvelope({
++          type: 'ticket.created',
++          entity: { kind: 'ticket', id: PARENT },
++          payload: { typeId: 'story', projectId: PROJECT, parentId: null, title: 'Quarterly filings' },
++        }),
++        // The destination field is `to`, NOT `toStateId` (`workflow.ts:137-145`,
++        // pre-flight A10 + addendum 1). The transition LOG ENTRY this produces
++        // separately and correctly spells `toStateId`; both spellings are real.
++        // Spelled `toStateId` here the reducer throws at SETUP and this test
++        // never reaches the assertion it exists to make.
++        makeEnvelope({
++          type: 'ticket.transitioned',
++          entity: { kind: 'ticket', id: PARENT },
++          payload: { to: 'done' },
++        }),
++      ],
++    );
++    expect(await checkTicketCreated(created(NEW, 'task', PARENT), ctx)).toEqual({
++      refused: true,
++      rule: 'hierarchy.parent-terminal',
++      reason:
++        '"Quarterly filings" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.',
++    });
++  });
++
++  // Workspace-invented types at and below sub-task's depth. Local to this pair
++  // on purpose: the shared builders describe the built-in ladder.
++  const CHECKLIST: TicketTypeDef = {
++    id: 'checklist-item', name: 'Checklist item', icon: 'list', rank: 4, workflowId: 'wf-basic', fields: [],
++  };
++  const MICRO_STEP: TicketTypeDef = {
++    id: 'micro-step', name: 'Micro step', icon: 'list', rank: 7, workflowId: 'wf-basic', fields: [],
++  };
++  const checklistCtx = () =>
++    buildMemoryContext(
++      [WF],
++      [typeDefined(STORY), typeDefined(CHECKLIST), typeDefined(MICRO_STEP), created(PARENT, 'story', null)],
++    );
++
++  it('planted defect: a CUSTOM type at the deepest rank, cast at project root — the rule follows the rank, not the id', async () => {
++    expect(await checkTicketCreated(created(NEW, 'checklist-item', null), checklistCtx())).toEqual({
++      refused: true,
++      rule: 'hierarchy.deepest-rank-parent-required',
++      reason:
++        '"Checklist item" is the smallest kind of work, so it always belongs to a parent ticket. Pick the ticket this one is part of.',
++    });
++
++    // …and nothing slips underneath the floor: rank 7 is smaller work than a
++    // sub-task, so exempting it would invert the rule's own justification.
++    // This assertion is the standing guard for the `>=` in Step 7e.
++    expect(await checkTicketCreated(created(NEW, 'micro-step', null), checklistCtx())).toEqual({
++      refused: true,
++      rule: 'hierarchy.deepest-rank-parent-required',
++      reason:
++        '"Micro step" is the smallest kind of work, so it always belongs to a parent ticket. Pick the ticket this one is part of.',
++    });
++  });
++
++  it('accepts the same custom deepest-rank type once it names a parent', async () => {
++    expect(await checkTicketCreated(created(NEW, 'checklist-item', PARENT), checklistCtx())).toEqual({
++      refused: false,
++    });
++  });
++
++  /**
++   * The two-layer guard (pre-flight A19, the precedent `transition.ts:11-28`
++   * set). On the server, ingest's door has already checked the entity kind and
++   * parsed the payload against the registered schema before the engine runs —
++   * but the fixture suite and Plan 10's offline replica enter at
++   * `evaluateEvent` and never pass through that door, so the check keeps its
++   * own copy of both questions, and answers them in the same words the
++   * transition check uses.
++   */
++  it('planted defect: a ticket.created that does not point at a ticket', async () => {
++    const env = makeEnvelope({
++      type: 'ticket.created',
++      entity: { kind: 'project', id: PROJECT },
++      payload: { typeId: 'task', projectId: PROJECT, parentId: null, title: 'Not a ticket' },
++    });
++    expect(await checkTicketCreated(env, baseCtx())).toEqual({
++      refused: true,
++      rule: 'malformed-payload',
++      reason: 'This ticket.created event does not point at a ticket; it points at a project.',
++    });
++  });
++
++  it('planted defect: a malformed payload REFUSES rather than throwing out of the engine', async () => {
++    const env = makeEnvelope({
++      type: 'ticket.created',
++      entity: { kind: 'ticket', id: NEW },
++      payload: { typeId: 'task', projectId: PROJECT, parentId: 'not-a-ulid', title: 'Bad parent id' },
++    });
++    expect(await checkTicketCreated(env, baseCtx())).toEqual({
++      refused: true,
++      rule: 'malformed-payload',
++      reason: "This ticket.created event's payload is malformed: must be a ULID",
++    });
++  });
++
++  /**
++   * Routed here by Task 3's review, and NOT in this task's brief. The reducer
++   * handles `ticket.created` unconditionally (`ticket-state.ts:95` — it returns
++   * a fresh state without ever consulting the `state` it was handed), which is
++   * what the brief that wrote it asked for. So a SECOND accepted
++   * `ticket.created` for a ticket that exists does not error and does not merge:
++   * it silently resets the fold, wiping the ticket's status, its collaborators,
++   * its field claims and its whole transition log — the evidence four-eyes
++   * reads. Nothing shipped refused it. This check does.
++   */
++  it('planted defect: creating a ticket that already exists — a second create silently resets the fold', async () => {
++    expect(await checkTicketCreated(created(PARENT, 'story', null), baseCtx())).toEqual({
++      refused: true,
++      rule: 'ticket.already-exists',
++      reason:
++        'This ticket already exists. Creating it again would erase everything recorded on it — open the existing ticket instead.',
++    });
++  });
++
++  it('says the ticket already exists before it says anything about the type — the identity question comes first', async () => {
++    // Both refusals are available: the ticket exists AND the type does not.
++    // The order is the claim under test, so a check that merely refused
++    // something would still fail here.
++    expect(await checkTicketCreated(created(PARENT, 'ghost-type', null), baseCtx())).toEqual({
++      refused: true,
++      rule: 'ticket.already-exists',
++      reason:
++        'This ticket already exists. Creating it again would erase everything recorded on it — open the existing ticket instead.',
++    });
++  });
++
++  /**
++   * The one branch `buildMemoryContext` cannot stage: a parent that exists
++   * whose TYPE does not. The reducer refuses to create a ticket of an undefined
++   * type at all, so no sequence of events reaches this state — but a context is
++   * an interface, not that reducer, and the server's answers come from two
++   * different projections that can disagree. Rather than delete the guard (the
++   * alternative this lane allows) it is pinned against a hand-built context,
++   * which is the only thing that can hold the contradiction.
++   */
++  it('refuses when the PARENT exists but its type does not — the guard the reducer cannot stage', async () => {
++    const orphanParent: TicketState = {
++      kind: 'ticket',
++      id: PARENT,
++      workspaceId: '01J9GWS0000000000000000000',
++      projectId: PROJECT,
++      typeId: 'retired-type',
++      parentId: null,
++      workflowId: 'wf-basic',
++      workflowVersion: 1,
++      stateId: 'todo',
++      stateCategory: 'open',
++      assigneeId: null,
++      collaboratorIds: [],
++      fields: {},
++      transitions: [],
++    };
++    const ctx: EngineContext = {
++      getEntityState: async (kind, id) => (kind === 'ticket' && id === PARENT ? orphanParent : null),
++      getChildrenStates: async () => [],
++      getWorkflowDef: async () => WF,
++      // The candidate's own type resolves; the parent's does not.
++      getTicketTypeDef: async (typeId) => (typeId === 'task' ? TASK : null),
++    };
++    expect(await checkTicketCreated(created(NEW, 'task', PARENT), ctx)).toEqual({
++      refused: true,
++      rule: 'ticket.unknown-type',
++      reason: "This ticket's type is not defined in this workspace.",
++    });
++  });
++});
++
++/**
++ * The check ORDER, which `checkTicketCreated`'s docstring pins and which every
++ * test above leaves free. Each case above stages exactly ONE available
++ * refusal — the cross-project parent also has a legal rank, the rank cases sit
++ * in one project under an open parent, the terminal-parent case is
++ * rank-legal — so a check that answered them in any order at all would pass the
++ * whole suite. Order is a property of its own, and a property nothing can
++ * falsify is a property that is not being tested.
++ *
++ * Every case here stages TWO simultaneous defects and asserts which one names
++ * the event: the most fundamental truth, so that the person told "no" is sent
++ * to fix the thing that was actually in the way.
++ */
++describe('checkTicketCreated — which refusal names the event when two are available', () => {
++  it('an undefined workflow outranks the deepest-rank rule: a ticket with no possible status has no hierarchy question yet', async () => {
++    // Sub-task at project root (deepest-rank violation) whose workflow was
++    // never published. Telling this actor to pick a parent would send them to
++    // do work that still could not produce a ticket.
++    const ctx = buildMemoryContext([], [typeDefined(SUBTASK)]);
++    expect(await checkTicketCreated(created(NEW, 'sub-task', null), ctx)).toEqual({
++      refused: true,
++      rule: 'ticket.workflow-undefined',
++      reason: "This ticket type's workflow has not been defined yet, so the ticket would have no status.",
++    });
++  });
++
++  it('an undefined workflow outranks an unknown parent, for the same reason', async () => {
++    const ctx = buildMemoryContext([], [typeDefined(TASK)]);
++    expect(await checkTicketCreated(created(NEW, 'task', GHOST), ctx)).toEqual({
++      refused: true,
++      rule: 'ticket.workflow-undefined',
++      reason: "This ticket type's workflow has not been defined yet, so the ticket would have no status.",
++    });
++  });
++
++  it('a cross-project parent outranks a rank violation: the wrong parent is not a rank problem', async () => {
++    // An epic (rank 1) under a story (rank 2) IS a rank violation — and the
++    // story is in another project entirely. Naming the rank would send the
++    // actor to pick a bigger parent inside a project they were never entitled
++    // to reach into.
++    const ctx = buildMemoryContext(
++      [WF],
++      [typeDefined(EPIC), typeDefined(STORY), created(PARENT, 'story', null, PROJECT_B)],
++    );
++    expect(await checkTicketCreated(created(NEW, 'epic', PARENT, PROJECT), ctx)).toEqual({
++      refused: true,
++      rule: 'hierarchy.cross-project',
++      reason: 'The parent is in a different project. Pick a parent from the same project.',
++    });
++  });
++
++  it('a rank violation outranks a finished parent: the remediable contradiction comes last', async () => {
++    // The parent is finished AND too small to hold an epic. Offering the reopen
++    // first would offer a remedy that does not work: reopen the story and the
++    // create is still refused, now for the reason nobody mentioned.
++    const ctx = buildMemoryContext(
++      [WF],
++      [
++        typeDefined(EPIC),
++        typeDefined(STORY),
++        created(PARENT, 'story', null),
++        makeEnvelope({
++          type: 'ticket.transitioned',
++          entity: { kind: 'ticket', id: PARENT },
++          payload: { to: 'done' },
++        }),
++      ],
++    );
++    expect(await checkTicketCreated(created(NEW, 'epic', PARENT), ctx)).toEqual({
++      refused: true,
++      rule: 'hierarchy.rank',
++      reason: '"Epic" cannot go under "Story": a ticket\'s parent must be a bigger kind of work.',
++    });
++  });
++});

@@ -1,0 +1,873 @@
+# Review package: d3751c8..HEAD
+
+## Commits
+2624e1a A field claim with no value was folded into a clearing nobody made, and the door that should have refused it was the one inventing it
+
+## Files changed
+ Features.md                                        |   3 +-
+ .../plans/2026-08-20-00-series-coordination.md     |  72 +++++-
+ packages/domain/src/events/ticket-events.ts        |  30 ++-
+ packages/domain/test/ticket-events.test.ts         |  52 ++++
+ packages/rule-engine/src/checks/fields.ts          | 155 ++++++++++++
+ packages/rule-engine/src/evaluate.ts               |   3 +
+ packages/rule-engine/test/fields.test.ts           | 281 +++++++++++++++++++++
+ packages/rule-engine/test/ticket-type.test.ts      |  24 ++
+ packages/rule-engine/test/workflow-rebind.test.ts  |  10 +
+ test-cases/05-tickets-hierarchy.md                 |   8 +-
+ 10 files changed, 631 insertions(+), 7 deletions(-)
+
+## Diff
+diff --git a/Features.md b/Features.md
+index 59fa8b7..61cce1c 100644
+--- a/Features.md
++++ b/Features.md
+@@ -52,17 +52,18 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
+ - ⚙️ **Workflow projection** — `proj_workflows` keeps every published version queryable (the engine's version walk needs intermediates and their mappings) and backs the server's `getWorkflowDef`; each row records the ledger position it was published at, so a definition can be asked for as of a point in the ledger rather than only as of now; idempotent apply, deterministic rebuild. `apps/server/src/projections/workflows.ts`
+ - ⚙️ **Type↔kind binding at the door (G1)** — `workflow.defined`'s registration declares `entityKind: 'workflow'`; `parseEvent` refuses any envelope naming that type against a different entity kind (`entity-kind-mismatch`), the same general door every entity-kind-declaring registration gets (coordination doc §11). Layered with the engine's own kind checks by design: fixtures and Plan 10's offline replica reach `evaluateEvent` directly, bypassing `parseEvent`, so the door alone would leave them unguarded. `packages/domain/src/parse-event.ts`, `packages/domain/src/registry.ts`
+ - ⚙️ **Entity↔workspace binding at ingest (G2)** — an entity belongs to one workspace forever: `commitOne` reads `proj_entity_heads` after both locks and before the engine runs, and refuses `entity-workspace-mismatch` when an envelope's `workspaceId` disagrees with the entity's recorded one. A server-side door, deliberately not a shared-engine rule — a workspace-scoped client replica cannot see that an entity id is already bound elsewhere, so Plan 10's offline replica must mirror this door knowingly rather than find it in the fixtures. No fixture; proven by integration test. `apps/server/src/ingest/ingest-service.ts`
+ - ⚙️ **Projection registration order, pinned (G3)** — `buildProjectionRegistry()` registers `proj_entity_heads` before `proj_workflows`; registration order is application order inside the ingest transaction (coordination doc §8), so a projection may read a table an earlier one wrote in the same transaction. A DB-free test pins the exact array, so a re-ordering breaks loudly rather than silently before any later projection comes to depend on it. `apps/server/src/projections/index.ts`
+ 
+ ## 5. Tickets, hierarchy & rollups
+ 
+ *(Plan 3's keystone only — the ticket type model, the event vocabulary, and the engine-context rider that had to ship with them. The reducer, hierarchy and field refusals, the three projections, the rollups and the history endpoint arrive with the rest of Plan 3's lane and extend this section.)*
+ 
+ - ⚙️ **Ticket type system** — built-in ladder epic(1)/story(2)/task(3)/sub-task(4) as seed data plus custom reusable types defined by `ticket-type.defined` events: name, icon, rank, workflow binding, and typed custom fields (text, number, date, select, person), Zod-validated. A select field cannot exist without its choices, no custom field may shadow a built-in id, and `DEEPEST_RANK` is a pinned constant rather than a maximum over the defined types — the rank at or below which a type's tickets will require a parent must not shift underfoot when an admin defines a deeper type. `packages/domain/src/ticket-types.ts`
+-- ⚙️ **Ticket event vocabulary** — eleven registered types, all v1, each bound to the entity kind it is about: `ticket-type.defined`, `ticket.created`, `ticket.transitioned` (Plan 2's shipped payload, whose optional `cause` marks a reopen forced by arriving live work), `ticket.assigned`, `ticket.collaborator_added/removed`, `ticket.field_set` (built-ins title/description/dueDate/startDate ride it; a due date and a start date are always `{date, note?}` claims), `ticket.reparented`, `ticket.workflow_rebound`, `comment.added` (opaque doc body), `attachment.added` (a `kind`-discriminated union: an `upload` carrying the server's sniffed mime/size and its `sha256` of the stored bytes, or a `drive-reference` carrying the pointer plus the name, mimeType and `capturedAt` last seen on a file this product does not hold). Unknown types, malformed payloads and misfiled entity kinds are refused at the door. `packages/domain/src/events/ticket-events.ts`, `packages/domain/src/vocabulary.ts`
++- ⚙️ **Ticket event vocabulary** — eleven registered types, all v1, each bound to the entity kind it is about: `ticket-type.defined`, `ticket.created`, `ticket.transitioned` (Plan 2's shipped payload, whose optional `cause` marks a reopen forced by arriving live work), `ticket.assigned`, `ticket.collaborator_added/removed`, `ticket.field_set` (built-ins title/description/dueDate/startDate ride it; a due date and a start date are always `{date, note?}` claims, and `value` must be PRESENT — `z.unknown()` alone left the key optional, and the reducer's `?? null` folded an omitted value into a clearing claim nobody made), `ticket.reparented`, `ticket.workflow_rebound`, `comment.added` (opaque doc body), `attachment.added` (a `kind`-discriminated union: an `upload` carrying the server's sniffed mime/size and its `sha256` of the stored bytes, or a `drive-reference` carrying the pointer plus the name, mimeType and `capturedAt` last seen on a file this product does not hold). Unknown types, malformed payloads and misfiled entity kinds are refused at the door. `packages/domain/src/events/ticket-events.ts`, `packages/domain/src/vocabulary.ts`
+ - ✅ **Hierarchy sanity refusals on creation** — `checkTicketCreated` forces every precondition creation has *in this plan*, in a deliberate order, each in plain language: the ticket must not already exist, its type and that type's workflow must be defined, a type at or below `DEEPEST_RANK` must name a parent, and a named parent must exist in this workspace, sit in the same project, have a readable type, outrank the child, and not already be finished. The order is load-bearing and tested as its own property — the most fundamental truth names the refusal, and the one remedy that is an *offer* (reopen the finished parent) comes last so it is never offered while something else is still in the way. Two refusals exist because a borrowed sentence was false on the path that reached it: `hierarchy.parent-type-unknown` (the ticket's own type had already resolved) and `hierarchy.unknown-parent` for a parent in another workspace (ticket lookup is global, so a foreign parent resolves — and naming its project would both lie and confirm the id exists). The project a ticket is created *into* is **not** checked here: Plan 4 owns `proj_projects` and that refusal, and the refusal map says so rather than reading complete. `packages/rule-engine/src/checks/hierarchy.ts`, `packages/rule-engine/src/checks/refusals.ts`
+ - ✅ **Hierarchy sanity refusals on reparenting** — `checkTicketReparented` asks creation's questions of a ticket that already exists, plus the one creation cannot raise: a **loop**. Order: unknown ticket → unknown type → (to project root) the deepest-rank rule → self/cycle → unknown parent (a parent in another workspace is one of these) → cycle by ancestry → cross-project → parent's type unknown → rank → parent-terminal, and a loop is named as a **loop** even when rank or project is also violated. The cycle walk is not dead code under strict rank ordering: `ticket-type.defined` is last-definition-wins, so a workspace can move a type's rank *under* one it already contains, after which a loop-closing reparent is rank-legal and nothing else refuses it. A parent chain that never ends throws rather than refusing — a cycle already standing in the tree is the store's state, not a claim the actor can be told anything true about. `packages/rule-engine/src/checks/hierarchy.ts`
+ - ✅ **Workflow migration checks** — `checkTicketWorkflowRebound` guards `ticket.workflow_rebound`, the deliberate, attributed act that moves an existing ticket between two unrelated workflows (a ticket otherwise pins the workflow it was created under, so re-pointing a *type* changes only what new tickets get). A rebound to the ticket's **own** workflow is refused, and that is the load-bearing one: the event sets `stateId` directly and evaluates no transition rule, so permitting it inside one workflow would let any actor who can emit it reach any state without satisfying `restrict-to`, `require-comment`, `require-evidence`, `require-field` or `require-different-user`, and without leaving the log entry four-eyes reads. An undefined target workflow and a state the target does not have are refused too — the ledger accepts only what it can later replay — and each names its own subject: `ticket.rebound-unknown-workflow` names the workflow the *payload* asked for, never the ticket type's binding, which on a migration may be perfectly well defined and is beside the point (controller ruling P13). Who may *emit* it is Plan 4's admin gate. `packages/rule-engine/src/checks/workflow-rebind.ts`
++- ✅ **Field claim checks** — `checkTicketFieldSet` guards `ticket.field_set`, the one event that carries every field claim a ticket has. A field the ticket's type never declared is refused by name (`field.unknown`); a value that does not fit its declared kind is refused with the kind spelled out (`"Invoice amount" needs a number.`, `"Stage" needs one of: Draft, Sent, Paid.`), a `select` value must be one of its options, and a `person` value is a non-empty user id — whether that user exists belongs to the membership plan, which is the only place with a roster to ask. `value: null` clears any field and stays a claim, keeping the clearer's id and both clocks — except `title`, which a ticket always has (`field.title-required`). The four built-ins are answered BEFORE the ticket's type is resolved, because they belong to no type and refusing a rename with "this ticket's type is not defined" would name the wrong noun. `dueDate` and `startDate` share one branch and one schema rather than two that could drift, and a custom `date` field is held to `IST_DAY_REGEX` — the same one origin of what a day is. `packages/rule-engine/src/checks/fields.ts`
+ - ✅ **Built-in rank lock, enforced at the server** — `checkTicketTypeDefined` refuses `type.builtin-rank` when a `ticket-type.defined` re-ranks one of the four built-ins. The type builder locked those ranks in the UI while last-definition-wins accepted a re-rank anyway, and a lock the server does not hold is a description of a rule: `DEEPEST_RANK` is 4 *because* the built-in sub-task's rank is, so re-ranking `sub-task` to 3 released every sub-task from the parent requirement while the builder still displayed the lock. Only the rank is locked — a built-in's name, icon, workflow binding and custom fields stay an admin's to change (which is also how built-ins are seeded per workspace), and custom types stay re-rankable in either direction. `packages/rule-engine/src/checks/ticket-type.ts`
+ - ⚙️ **Honest engine-context seam** — `getEntityState` answers `null` for the kinds this server cannot yet serve ('ticket' until Plan 3's projections, 'membership' until Plan 4's) and returns the whole state, `{kind, id}`, for the four kinds whose state is exactly that. It replaces a `as unknown as EntityState` cast that returned a head pointer for every kind: registering the ticket vocabulary made transitions ingestible, and the cast turned every one of them into a refusal whose plain-language reason blamed a workflow named `undefined`. Coordination doc, Plan 1 consequences §9. `apps/server/src/engine-context.ts`
+ - ⚙️ **Shared envelope builder** — `makeEnvelope`, the test-only envelope factory shipped from the domain package so every plan's tests build valid claims from one set of defaults. `packages/domain/src/testing.ts`
+diff --git a/docs/superpowers/plans/2026-08-20-00-series-coordination.md b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+index eaac496..d26b4d2 100644
+--- a/docs/superpowers/plans/2026-08-20-00-series-coordination.md
++++ b/docs/superpowers/plans/2026-08-20-00-series-coordination.md
+@@ -2215,13 +2215,79 @@ instances in this plan were visible that way, and all three shipped in plan text
+ **Two findings from the same task, recorded so they are not rediscovered.**
+ 
+ - **Fixture-count arithmetic: the directory, never the plan.** Pre-flight ruling 6 tracked `61 → 63 after
+   T6`; it assumed Task 4b would add no fixture, and Task 4b added one. The base at Task 6's dispatch was
+   **62**, so the correct running total is **62 → 64 after T6**. The count-from-the-directory rule is what
+   caught it — an absolute number copied from the plan would have shipped wrong and failed the gate in
+   whichever lane merged second.
+ - **A dispatch nobody tested.** Every Plan 3 check test called its function directly, so deleting a `case`
+   from `packages/rule-engine/src/evaluate.ts` left a fully mutation-proven, **unreachable** check while
+   `evaluateEvent`'s pass-through default accepted every reparent and every same-workflow rebind. Task 6
+-  added three assertions that enter at `evaluateEvent`. **Task 7 appends to the same switch and inherits
+-  the obligation.** The shape generalises: a lane can prove every branch of a check falsifiable and still
+-  never touch the one line that decides whether the check runs.
++  added **two** assertions that enter at `evaluateEvent` — `ticket.reparented` in `test/reparent.test.ts`
++  and `ticket.workflow_rebound` in `test/workflow-rebind.test.ts` — plus two `ticket-type.defined`
++  fixtures, which enter there too because `test/fixtures.test.ts:19` is `evaluateEvent(...)`.
++  *(Corrected by Task 7, which counted the shipped files. The earlier "three" conflated the two unit
++  assertions with the fixture-carried third; `test/ticket-type.test.ts` had no `evaluateEvent` entry of
++  its own, so `ticket-type.defined`'s routing rested entirely in another file and a task relocating those
++  two fixtures would have silently reopened the gap. Task 7 added that third describe and a fourth for
++  `ticket.field_set`, so the sentence is now true of the repo as well as of the intent.)*
++  **Task 7 appended to the same switch and inherited the obligation.** The shape generalises: a lane can
++  prove every branch of a check falsifiable and still never touch the one line that decides whether the
++  check runs — and a dispatch pinned only from another file is one relocation away from unpinned.
++
++---
++
++## Ruling P14 (2026-08-31, controller) — an actor-supplied id resolved with no workspace predicate, and this one is ACCEPTED rather than mislabelled
++
++Found by Plan 3 Task 6's review; **recorded here by Task 7**, the next change set, rather than at plan end —
++this series has lost rulings twice to a gitignored ledger. **Task 7 does not implement it. Task 12 does.**
++
++**P12 closed a tenancy hole on the parent. The same hole is open on the target workflow, and there it admits
++a write.** `packages/rule-engine/src/checks/workflow-rebind.ts:87` calls `ctx.getWorkflowDef(p.toWorkflowId)`
++on an id the ACTOR supplied, and there is no workspace predicate anywhere on the server path:
++
++- `apps/server/migrations/1787896601515_proj-workflows.sql:4-13` — `workspace_id` is a plain column; the PK
++  is `(workflow_id, version)`, global.
++- `apps/server/src/projections/workflows.ts:80-83` — `WHERE workflow_id = $1 ORDER BY version DESC LIMIT 1`.
++  No tenancy filter in any of the three selector branches.
++- `apps/server/src/engine-context.ts:92` — passes straight through.
++
++So a foreign workflow id RESOLVES, the target-state check runs against another workspace's state graph, and
++the event is accepted: a live ticket bound to a workflow its workspace cannot see, standing in one of that
++workflow's states. `ticket.workflow_rebound` is the first check in this plan where an actor-supplied id is
++resolved directly — creation reads the type's binding, a transition reads the ticket's own — which is why
++the class did not appear until now. P12's own shipped comment indicts it verbatim once the noun is
++substituted (`checks/hierarchy.ts:242-244`): *"The ingest door's tenancy check does not cover this: it
++guards the event's own entity, never the parent the payload names."*
++
++**Severity, against the two rulings it extends.** P11 told the actor a false sentence. P12 mislabelled a
++refusal and confirmed that an id exists somewhere they cannot see. **P14 admits the write** — the worst of
++the three, and a boundary the spec makes explicit (§6: *"Enforcement is server-side on every read and every
++sync-down"*).
++
++**Latent today, live in one specific commit.** `apps/server/src/engine-context.ts:74-76` returns null for
++every kind outside `KINDS_WHOSE_STATE_IS_ONLY_IDENTITY`, `'ticket'` among them, so `ticket.unknown` fires
++first at `workflow-rebind.ts:64` and the workflow lookup is never reached on the server. (Addendum 10 cited
++`:76-78` for this; the branch is at `:74-76` in the shipped file — checked, not inherited.) **It goes live in the same commit Task 12 lands** — the same commit
++Addendum 9 already flags for the `rowToTicketState` `workspaceId` trap, where a missing field refuses every
++parented `ticket.created`. Two independent tenancy hazards converge there; Task 12 meets both or neither.
++
++**The ruling: close it fail-closed, in Task 12.** The conservative option under the autonomous protocol is
++to refuse. The DESIGN is Task 12's — either a workspace predicate on the `EngineContext` lookups at all
++three implementations, or an equivalent that keeps the comparison inside the check — because Task 12 is
++what backs those lookups with real projections. **No unit test can pin the fix:** `buildMemoryContext` has
++no workspace notion for workflows at all, so the test home is Task 12's `apps/server/test/engine-context.test.ts`
++suite. Cost if wrong: a workspace predicate on a lookup that is already per-workspace in every legitimate
++call.
++
++**The class extends one step further, and Task 12 owns that end too.** `getTicketTypeDef(ctx, p.typeId)` on
++the create path (`checks/hierarchy.ts:84`) has the identical shape the moment Task 12 backs it with
++`proj_ticket_types` — a type id the actor supplies, resolved with no tenancy filter. Addendum 9a recorded
++the *own-entity* sibling of P12 (`hierarchy.ts:82`, `ticket.already-exists`) and ruled it non-blocking
++because both real consumers are workspace-scoped before the engine; the **actor-supplied-id** siblings were
++not considered then. They are this ruling.
++
++**The transferable tell, alongside P11–P13's.** Those three ask *"read the reason aloud — is its noun what
++the check just failed to resolve?"* This one asks a different question of the same line: **whose id is
++this?** An id the ACTOR chose, resolved through a lookup with no tenancy predicate, is a tenancy hole
++whatever the answer looks like — and it is worst where the lookup succeeding leads to an ACCEPT rather than
++to a refusal, because nothing downstream will ever mention it.
+diff --git a/packages/domain/src/events/ticket-events.ts b/packages/domain/src/events/ticket-events.ts
+index 2e923ae..5392bbb 100644
+--- a/packages/domain/src/events/ticket-events.ts
++++ b/packages/domain/src/events/ticket-events.ts
+@@ -22,22 +22,50 @@ export const ticketCreatedPayload = z.object({
+ 
+ export const ticketAssignedPayload = z.object({ assigneeId: z.string().min(1).nullable() });
+ 
+ export const ticketCollaboratorPayload = z.object({ userId: z.string().min(1) });
+ 
+ /**
+  * Shape-only at the door: {fieldId, value}. Semantics (does the field exist,
+  * does the value fit its kind) are the engine's job — see checkTicketFieldSet.
+  * value: null is the clearing claim; built-ins title/description/dueDate/startDate ride
+  * this same event, and a due date value is always { date, note? } — a claim.
++ *
++ * `value` is REQUIRED, and `z.unknown()` alone does not make it so: probed
++ * against this repo's zod, `{ fieldId: 'title' }` with no `value` key at all
++ * parses clean, and so does one carrying an explicit `undefined`. That is not
++ * a harmless permissiveness here. The reducer reads `p.value ?? null`
++ * (`../ticket-state.ts:201`), so an omitted `value` is folded into a null
++ * CLEARING CLAIM — a field wiped under the actor's name and both their clocks,
++ * into an append-only table, on the strength of a claim nobody made. Invariant
++ * 4 ("nothing is invented"), violated by the door.
++ *
++ * Only ABSENCE is the defect, and the two acceptances are pinned by their own
++ * tests rather than left to fall out of the fix: `null` is the explicit
++ * clearing claim design decision 3 sanctions, and any other value — `{}`
++ * included — is a claim like any other. The check is `!== undefined` rather
++ * than `'value' in payload` because absent and present-but-`undefined` must
++ * both be refused and `JSON.stringify` erases the difference on the wire
++ * anyway; writing it the other way would invite a reader to think the
++ * distinction meant something.
++ *
++ * Same defect, same shape, same answer as `envelope.ts`'s `requiredPayload`
++ * (an event with no payload at all). The two doors are deliberately proven
++ * alike — four assertions each, and both mutated back to bare `z.unknown()` to
++ * watch the ABSENT case fail specifically.
+  */
+-export const ticketFieldSetPayload = z.object({ fieldId: z.string().min(1), value: z.unknown() });
++export const ticketFieldSetPayload = z.object({
++  fieldId: z.string().min(1),
++  value: z
++    .unknown()
++    .refine((value) => value !== undefined, 'is required — a field claim with no value would record a clearing nobody made'),
++});
+ 
+ export const ticketReparentedPayload = z.object({ newParentId: ulidString.nullable() });
+ 
+ /** Body is opaque structured-doc JSON — the editor plan owns its schema. */
+ export const commentAddedPayload = z.object({ body: z.record(z.string(), z.unknown()) });
+ 
+ const mimeType = z.string().regex(/^[\w.+-]+\/[\w.+-]+$/, 'must be a MIME type');
+ 
+ /**
+  * An attachment is one of exactly two kinds, and the claim says which
+diff --git a/packages/domain/test/ticket-events.test.ts b/packages/domain/test/ticket-events.test.ts
+index 1fe8a1b..134b605 100644
+--- a/packages/domain/test/ticket-events.test.ts
++++ b/packages/domain/test/ticket-events.test.ts
+@@ -1,12 +1,13 @@
+ import { describe, expect, it } from 'vitest';
+ import { parseEvent } from '../src/parse-event.js';
++import { ticketFieldSetPayload } from '../src/events/ticket-events.js';
+ import { makeEnvelope } from '../src/testing.js';
+ 
+ const TICKET = '01J9GTKA000000000000000000';
+ const PROJECT = '01J9GPRJ000000000000000000';
+ const PARENT = '01J9GPAR000000000000000000';
+ const ATTACHMENT = '01J9GATT000000000000000000';
+ const DRIVE_ATTACHMENT = '01J9GATD000000000000000000';
+ const SHA256 = 'a3f1'.repeat(16); // 64 lowercase-hex characters
+ 
+ /**
+@@ -120,10 +121,61 @@ describe('ticket event vocabulary', () => {
+     // (coordination doc §11), so the door refuses a misfiled claim before the
+     // ledger — which is append-only by trigger and could never take it back.
+     expect(
+       refuses('ticket.created', 'workflow', { typeId: 'task', projectId: PROJECT, parentId: null, title: 'x' }),
+     ).toBe('entity-kind-mismatch');
+     expect(refuses('ticket-type.defined', 'ticket', {
+       id: 'invoice', name: 'Invoice', icon: 'receipt', rank: 3, workflowId: 'wf-basic', fields: [],
+     })).toBe('entity-kind-mismatch');
+   });
+ });
++
++/**
++ * The presence hole, closed. `z.unknown()` alone does NOT require the key, so
++ * `{ fieldId: 'title' }` — no `value` at all — parsed clean, and the reducer's
++ * `p.value ?? null` (`src/ticket-state.ts:201`) folded that absence into a null
++ * CLEARING claim: a field wiped under the actor's name and both their clocks,
++ * into an append-only table, on the strength of a claim nobody made.
++ *
++ * FOUR assertions rather than one "the field is required", because two of the
++ * four are ACCEPTANCES and they are the half a careless fix breaks. A schema
++ * that also refused `null` or `{}` would look correct and would quietly start
++ * refusing legitimate claims — `null` is the explicit clearing claim, and an
++ * empty claim is still a claim.
++ *
++ * The same matrix, in the same words, as `envelope.test.ts`'s "payload is
++ * required" block: two doors, one answer.
++ */
++describe('ticket.field_set value is required', () => {
++  function issues(payload: Record<string, unknown>): Array<{ path: (string | number)[]; message: string }> {
++    const result = ticketFieldSetPayload.safeParse(payload);
++    if (result.success) throw new Error('expected safeParse to fail, but it succeeded');
++    return result.error.issues.map((issue) => ({ path: issue.path, message: issue.message }));
++  }
++
++  it('planted defect: refuses an ABSENT value — the reducer would fold it into a clearing nobody claimed', () => {
++    expect(ticketFieldSetPayload.safeParse({ fieldId: 'title' }).success).toBe(false);
++    expect(issues({ fieldId: 'title' })).toContainEqual({
++      path: ['value'],
++      message: 'is required — a field claim with no value would record a clearing nobody made',
++    });
++  });
++
++  it('planted defect: refuses an explicitly undefined value — JSON erases the difference from absence', () => {
++    expect(issues({ fieldId: 'title', value: undefined })).toContainEqual({
++      path: ['value'],
++      message: 'is required — a field claim with no value would record a clearing nobody made',
++    });
++  });
++
++  it('accepts value: null — the clearing claim is a claim, made by somebody, at a time', () => {
++    expect(ticketFieldSetPayload.safeParse({ fieldId: 'amount', value: null }).success).toBe(true);
++  });
++
++  it('accepts an empty-object value — an empty claim is still a claim', () => {
++    expect(ticketFieldSetPayload.safeParse({ fieldId: 'description', value: {} }).success).toBe(true);
++  });
++
++  it('the door inherits it: parseEvent refuses a field_set carrying no value', () => {
++    expect(refuses('ticket.field_set', 'ticket', { fieldId: 'title' })).toBe('invalid-payload');
++  });
++});
+diff --git a/packages/rule-engine/src/checks/fields.ts b/packages/rule-engine/src/checks/fields.ts
+new file mode 100644
+index 0000000..0e9c80f
+--- /dev/null
++++ b/packages/rule-engine/src/checks/fields.ts
+@@ -0,0 +1,155 @@
++import type { CustomFieldDef, EventEnvelope } from '@gisik-nokma/domain';
++import { IST_DAY_REGEX, dueDateValueSchema, ticketFieldSetPayload } from '@gisik-nokma/domain';
++import type { Accept, EngineContext, Refusal } from '../engine.js';
++import { REFUSAL_RULES } from '../refusal-rules.js';
++import { getTicketState, getTicketTypeDef } from './context-helpers.js';
++import { ACCEPT, fieldKindRefusal, refuse } from './refusals.js';
++
++// A custom `date` field claims the same kind of day the built-ins do, so it is
++// held to the same shape from the same origin — `IST_DAY_REGEX`, imported, not
++// restated. A second copy here would be a second answer to "what is a day",
++// and the two would drift the moment either moved.
++
++function isPlainObject(value: unknown): value is Record<string, unknown> {
++  return typeof value === 'object' && value !== null && !Array.isArray(value);
++}
++
++/**
++ * Does the value fit the kind the type declared?
++ *
++ * The `default` branch is unreachable and exists to STAY unreachable:
++ * `CustomFieldDef['type']` is `z.enum(CUSTOM_FIELD_KINDS)` and
++ * `CUSTOM_FIELD_KINDS` is exactly the five below (`ticket-types.ts:4`), so the
++ * switch is exhaustive today. The `never` assignment is the net for tomorrow —
++ * define a sixth kind and this file stops COMPILING, instead of silently
++ * falling through and accepting every value of that kind unchecked. The
++ * compile error is the guard; the throw only fires for a value that was cast
++ * past the type system on its way in.
++ */
++function customFieldVerdict(field: CustomFieldDef, value: unknown): Accept | Refusal {
++  switch (field.type) {
++    case 'text':
++      return typeof value === 'string'
++        ? ACCEPT
++        : refuse('field.type-mismatch', fieldKindRefusal(field.name, 'text'));
++    case 'number':
++      return typeof value === 'number' && Number.isFinite(value)
++        ? ACCEPT
++        : refuse('field.type-mismatch', fieldKindRefusal(field.name, 'a number'));
++    case 'date':
++      return typeof value === 'string' && IST_DAY_REGEX.test(value)
++        ? ACCEPT
++        : refuse('field.type-mismatch', fieldKindRefusal(field.name, 'a date in YYYY-MM-DD form'));
++    case 'select':
++      return typeof value === 'string' && (field.options ?? []).includes(value)
++        ? ACCEPT
++        : refuse('field.type-mismatch', fieldKindRefusal(field.name, `one of: ${(field.options ?? []).join(', ')}`));
++    case 'person':
++      // Non-empty id only. Whether that user EXISTS, and whether they are a
++      // member of this workspace, belongs to the membership plan — this check
++      // has no roster to ask and would have to invent an answer.
++      return typeof value === 'string' && value.length > 0
++        ? ACCEPT
++        : refuse('field.type-mismatch', fieldKindRefusal(field.name, 'a person'));
++    default: {
++      const unhandled: never = field.type;
++      throw new Error(`customFieldVerdict: unhandled custom field kind "${String(unhandled)}"`);
++    }
++  }
++}
++
++/**
++ * Semantics for `ticket.field_set`: does the field exist on this ticket's type,
++ * and does the value fit its kind? `value: null` clears — a claim like any
++ * other, keeping the clearer's id and both clocks — except `title`: a ticket
++ * always has one.
++ *
++ * Order: kind → payload → unknown ticket → the four built-ins → unknown type →
++ * unknown field → clearing → kind fit. The built-ins are answered BEFORE the
++ * type is resolved because they do not belong to the type: `title`,
++ * `description`, `dueDate` and `startDate` ride this event on every ticket
++ * whatever its type declares, and `ticketTypeDefSchema` refuses a custom field
++ * that shadows one of their ids (`ticket-types.ts:43-48`). Refusing a title
++ * change with "this ticket's type is not defined" would be a sentence about the
++ * wrong noun — the defect class rulings P11, P12 and P13 closed three times in
++ * this plan.
++ *
++ * NOTHING HERE HAS TO INVENT AN ABSENT VALUE. `ticketFieldSetPayload` now
++ * requires `value` to be present (`events/ticket-events.ts:56-61`, this task):
++ * before that, a payload omitting it parsed clean and the reducer's
++ * `p.value ?? null` folded the absence into a null clearing claim nobody made.
++ * The refusal for an absent value is therefore `malformed-payload` from the
++ * parse below, which is the honest answer — the claim never arrived.
++ */
++export async function checkTicketFieldSet(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {
++  // Two layers, exactly as the hierarchy and rebind checks (pre-flight A19):
++  // the fixture suite and Plan 10's offline replica enter at `evaluateEvent`
++  // and never pass ingest's door, so this check keeps its own copy of both
++  // questions.
++  if (env.entity.kind !== 'ticket') {
++    return {
++      refused: true,
++      rule: REFUSAL_RULES.malformedPayload,
++      reason: `This ticket.field_set event does not point at a ticket; it points at a ${env.entity.kind}.`,
++    };
++  }
++
++  // `safeParse`, not `parse`: `evaluateEvent`'s frozen signature is
++  // `Promise<Accept | Refusal>` and a throw is neither. On the server the
++  // registered schema has already accepted this payload, so this branch is
++  // unreachable there; everywhere else it is the difference between a refusal
++  // and a crash.
++  const parsed = ticketFieldSetPayload.safeParse(env.payload);
++  if (!parsed.success) {
++    const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
++    return {
++      refused: true,
++      rule: REFUSAL_RULES.malformedPayload,
++      reason: `This ticket.field_set event's payload is malformed: ${detail}`,
++    };
++  }
++  const p = parsed.data;
++  const value = p.value;
++
++  const ticket = await getTicketState(ctx, env.entity.id);
++  if (!ticket) return refuse('ticket.unknown');
++
++  if (p.fieldId === 'title') {
++    if (value === null) return refuse('field.title-required');
++    return typeof value === 'string' && value.trim().length > 0
++      ? ACCEPT
++      : refuse('field.type-mismatch', fieldKindRefusal('Title', 'text'));
++  }
++
++  if (p.fieldId === 'description') {
++    if (value === null) return ACCEPT;
++    return isPlainObject(value)
++      ? ACCEPT
++      : refuse('field.type-mismatch', fieldKindRefusal('Description', 'a document'));
++  }
++
++  // The two day-claim built-ins share one shape, so they share one branch and
++  // one schema — a second copy is a second thing to drift. Only the NAME in the
++  // reason differs, because that is the only thing about them that does.
++  if (p.fieldId === 'dueDate' || p.fieldId === 'startDate') {
++    if (value === null) return ACCEPT;
++    const fieldName = p.fieldId === 'dueDate' ? 'Due date' : 'Start date';
++    return dueDateValueSchema.safeParse(value).success
++      ? ACCEPT
++      : refuse('field.type-mismatch', fieldKindRefusal(fieldName, 'a day in YYYY-MM-DD form (a note is optional)'));
++  }
++
++  // Now, and only now, is the ticket's own TYPE the subject: everything below
++  // asks what this type declared.
++  const type = await getTicketTypeDef(ctx, ticket.typeId);
++  if (!type) return refuse('ticket.unknown-type');
++
++  const field = type.fields.find((f) => f.id === p.fieldId);
++  if (!field) return refuse('field.unknown');
++
++  // Clearing any custom field is a legal claim, and a claim is what it stays:
++  // the reducer keeps the clearer's id and both clocks, so "who emptied this,
++  // and when" survives (`ticket-state.ts:198-202`).
++  if (value === null) return ACCEPT;
++  return customFieldVerdict(field, value);
++}
+diff --git a/packages/rule-engine/src/evaluate.ts b/packages/rule-engine/src/evaluate.ts
+index ddd512a..bc31f80 100644
+--- a/packages/rule-engine/src/evaluate.ts
++++ b/packages/rule-engine/src/evaluate.ts
+@@ -1,14 +1,15 @@
+ import type { EventEnvelope } from '@gisik-nokma/domain';
+ import { evaluateWorkflowDefined } from './workflow-defined.js';
+ import { evaluateTicketTransitioned } from './transition.js';
+ import { checkTicketCreated, checkTicketReparented } from './checks/hierarchy.js';
++import { checkTicketFieldSet } from './checks/fields.js';
+ import { checkTicketTypeDefined } from './checks/ticket-type.js';
+ import { checkTicketWorkflowRebound } from './checks/workflow-rebind.js';
+ import type { Accept, EngineContext, Refusal } from './engine.js';
+ 
+ /**
+  * The rule engine. Envelope-level checks (shape, unknown event type, ULID,
+  * sequencing) belong to ingest (Plan 1) and are NOT repeated here. Plan 2
+  * handles workflow.defined and ticket.transitioned; Plan 3 adds the ticket
+  * cases; every other event type passes through — later plans add their own.
+  *
+@@ -20,18 +21,20 @@ import type { Accept, EngineContext, Refusal } from './engine.js';
+ export async function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {
+   switch (env.type) {
+     case 'workflow.defined':
+       return evaluateWorkflowDefined(env, ctx);
+     case 'ticket.transitioned':
+       return evaluateTicketTransitioned(env, ctx);
+     case 'ticket.created':
+       return checkTicketCreated(env, ctx);
+     case 'ticket.reparented':
+       return checkTicketReparented(env, ctx);
++    case 'ticket.field_set':
++      return checkTicketFieldSet(env, ctx);
+     case 'ticket.workflow_rebound':
+       return checkTicketWorkflowRebound(env, ctx);
+     case 'ticket-type.defined':
+       return checkTicketTypeDefined(env, ctx);
+     default:
+       return { refused: false };
+   }
+ }
+diff --git a/packages/rule-engine/test/fields.test.ts b/packages/rule-engine/test/fields.test.ts
+new file mode 100644
+index 0000000..c1e23cc
+--- /dev/null
++++ b/packages/rule-engine/test/fields.test.ts
+@@ -0,0 +1,281 @@
++import { describe, expect, it } from 'vitest';
++import type { EventEnvelope, TicketTypeDef } from '@gisik-nokma/domain';
++import { makeEnvelope } from '@gisik-nokma/domain';
++import type { MemoryContext } from '../src/memory-context.js';
++import { buildMemoryContext } from '../src/memory-context.js';
++import { checkTicketFieldSet } from '../src/checks/fields.js';
++import { evaluateEvent } from '../src/evaluate.js';
++import { WF, WS, created, typeDefined } from '../src/checks/test-support.js';
++
++const TICKET = '01J9GTKA000000000000000000';
++const GHOST = '01J9GGHT000000000000000000';
++
++/**
++ * One type carrying one field of every custom kind, so a single context can
++ * answer every kind question. Declared here rather than in `test-support.ts`
++ * because only this suite needs a type with fields: the shared ladder is about
++ * RANK, and a fielded type living beside it would leave a reader wondering
++ * which is the product's.
++ */
++const INVOICE: TicketTypeDef = {
++  id: 'invoice',
++  name: 'Invoice',
++  icon: 'receipt',
++  rank: 3,
++  workflowId: 'wf-basic',
++  fields: [
++    { id: 'amount', name: 'Invoice amount', type: 'number' },
++    { id: 'stage', name: 'Stage', type: 'select', options: ['Draft', 'Sent', 'Paid'] },
++    { id: 'counterparty', name: 'Counterparty', type: 'person' },
++    { id: 'filed-on', name: 'Filed on', type: 'date' },
++    { id: 'reference', name: 'Reference', type: 'text' },
++  ],
++};
++
++const ctx = (): MemoryContext => buildMemoryContext([WF], [typeDefined(INVOICE), created(TICKET, 'invoice', null)]);
++
++/**
++ * The ticket exists and its TYPE does not — a world `buildMemoryContext` cannot
++ * fold its way into, because `applyTicketEvent` throws on a `ticket.created`
++ * whose type is unknown (`ticket-state.ts:97-99`). So the type is defined for
++ * the fold and then removed from the context's own map, which is the only
++ * staging a unit test has: the fixture harness's `getTicketTypeDef` THROWS by
++ * design, naming Task 8 (pre-flight Addendum 5), so a fixture reaching this
++ * branch would throw rather than refuse — which is why this hole is closed here
++ * and not with a fixture.
++ */
++function ctxWithoutTheTicketsType(): MemoryContext {
++  const context = ctx();
++  context.ticketTypes.delete('invoice');
++  return context;
++}
++
++/**
++ * Candidate payloads spell the key `fieldId`, which is what the DOMAIN schema
++ * says (`events/ticket-events.ts:56`). The fixture harness's PRIOR-event parser
++ * spells it `field`, and the split is deliberate — controller ruling P8,
++ * pre-flight A16. Neither is adapted into the other.
++ */
++function fieldSet(fieldId: string, value: unknown, ticketId: string = TICKET): EventEnvelope {
++  return makeEnvelope({
++    type: 'ticket.field_set',
++    entity: { kind: 'ticket', id: ticketId },
++    workspaceId: WS,
++    payload: { fieldId, value },
++  });
++}
++
++/** The same event with `value` absent entirely — the claim that was never made. */
++function fieldSetWithNoValue(fieldId: string): EventEnvelope {
++  return makeEnvelope({
++    type: 'ticket.field_set',
++    entity: { kind: 'ticket', id: TICKET },
++    workspaceId: WS,
++    payload: { fieldId },
++  });
++}
++
++/** Literal rule ids and literal, fully-interpolated reasons — never the builder. */
++describe('checkTicketFieldSet', () => {
++  it('accepts fitting values for every kind, and null to clear', async () => {
++    expect(await checkTicketFieldSet(fieldSet('amount', 1200), ctx())).toEqual({ refused: false });
++    expect(await checkTicketFieldSet(fieldSet('stage', 'Sent'), ctx())).toEqual({ refused: false });
++    expect(await checkTicketFieldSet(fieldSet('counterparty', 'user-anselma'), ctx())).toEqual({ refused: false });
++    expect(await checkTicketFieldSet(fieldSet('filed-on', '2026-08-30'), ctx())).toEqual({ refused: false });
++    expect(await checkTicketFieldSet(fieldSet('reference', 'INV-7'), ctx())).toEqual({ refused: false });
++    expect(await checkTicketFieldSet(fieldSet('amount', null), ctx())).toEqual({ refused: false });
++    expect(await checkTicketFieldSet(fieldSet('title', 'Renamed honestly'), ctx())).toEqual({ refused: false });
++    expect(await checkTicketFieldSet(fieldSet('description', { type: 'doc', content: [] }), ctx())).toEqual({
++      refused: false,
++    });
++    expect(await checkTicketFieldSet(fieldSet('description', null), ctx())).toEqual({ refused: false });
++    expect(await checkTicketFieldSet(fieldSet('dueDate', { date: '2026-08-30', note: 'GST' }), ctx())).toEqual({
++      refused: false,
++    });
++    expect(await checkTicketFieldSet(fieldSet('dueDate', null), ctx())).toEqual({ refused: false });
++  });
++
++  it('planted defect: a field the type never declared', async () => {
++    expect(await checkTicketFieldSet(fieldSet('invoice-number', 'INV-7'), ctx())).toEqual({
++      refused: true,
++      rule: 'field.unknown',
++      reason: "This ticket's type has no such field. Add the field to the ticket type first.",
++    });
++  });
++
++  it('planted defect: text where a number belongs', async () => {
++    expect(await checkTicketFieldSet(fieldSet('amount', 'twelve'), ctx())).toEqual({
++      refused: true,
++      rule: 'field.type-mismatch',
++      reason: '"Invoice amount" needs a number.',
++    });
++  });
++
++  it('planted defect: a select value outside its list', async () => {
++    expect(await checkTicketFieldSet(fieldSet('stage', 'Lost'), ctx())).toEqual({
++      refused: true,
++      rule: 'field.type-mismatch',
++      reason: '"Stage" needs one of: Draft, Sent, Paid.',
++    });
++  });
++
++  it('planted defect: a date that is not a day, a person that is not an id, a number that is not a text', async () => {
++    expect(await checkTicketFieldSet(fieldSet('filed-on', '30/08/2026'), ctx())).toEqual({
++      refused: true,
++      rule: 'field.type-mismatch',
++      reason: '"Filed on" needs a date in YYYY-MM-DD form.',
++    });
++    expect(await checkTicketFieldSet(fieldSet('counterparty', 42), ctx())).toEqual({
++      refused: true,
++      rule: 'field.type-mismatch',
++      reason: '"Counterparty" needs a person.',
++    });
++    expect(await checkTicketFieldSet(fieldSet('reference', 7), ctx())).toEqual({
++      refused: true,
++      rule: 'field.type-mismatch',
++      reason: '"Reference" needs text.',
++    });
++  });
++
++  it('planted defect: clearing the title', async () => {
++    expect(await checkTicketFieldSet(fieldSet('title', null), ctx())).toEqual({
++      refused: true,
++      rule: 'field.title-required',
++      reason: 'A ticket always has a title. Change the title instead of clearing it.',
++    });
++  });
++
++  it('planted defect: a non-text title, a non-document description, a timestamp due date', async () => {
++    expect(await checkTicketFieldSet(fieldSet('title', 42), ctx())).toEqual({
++      refused: true,
++      rule: 'field.type-mismatch',
++      reason: '"Title" needs text.',
++    });
++    expect(await checkTicketFieldSet(fieldSet('description', 'plain string'), ctx())).toEqual({
++      refused: true,
++      rule: 'field.type-mismatch',
++      reason: '"Description" needs a document.',
++    });
++    expect(await checkTicketFieldSet(fieldSet('dueDate', { date: '2026-08-30T10:00:00Z' }), ctx())).toEqual({
++      refused: true,
++      rule: 'field.type-mismatch',
++      reason: '"Due date" needs a day in YYYY-MM-DD form (a note is optional).',
++    });
++  });
++
++  /**
++   * A title of nothing but spaces, pinned because the `.trim()` that refuses it
++   * is otherwise a branch no test can fail. `field.type-mismatch` rather than
++   * `field.title-required`: the reason reads "needs text", and what is missing
++   * IS the title's text — the person typed something, it just was not a title.
++   * `field.title-required`'s sentence ("Change the title instead of clearing
++   * it") is the one true of the actor who sent `null`, and telling it here
++   * would be the borrowed-subject defect P11/P12/P13 closed three times.
++   */
++  it('planted defect: a title of nothing but whitespace', async () => {
++    expect(await checkTicketFieldSet(fieldSet('title', '   '), ctx())).toEqual({
++      refused: true,
++      rule: 'field.type-mismatch',
++      reason: '"Title" needs text.',
++    });
++  });
++
++  it('planted defect: field_set on a ticket that does not exist', async () => {
++    expect(await checkTicketFieldSet(fieldSet('amount', 1200, GHOST), ctx())).toEqual({
++      refused: true,
++      rule: 'ticket.unknown',
++      reason: 'This ticket does not exist in this workspace.',
++    });
++  });
++
++  it('accepts a start-date claim, with or without a note, and null to clear it', async () => {
++    expect(await checkTicketFieldSet(fieldSet('startDate', { date: '2026-09-01' }), ctx())).toEqual({
++      refused: false,
++    });
++    expect(
++      await checkTicketFieldSet(fieldSet('startDate', { date: '2026-09-01', note: 'after the licence renewal' }), ctx()),
++    ).toEqual({ refused: false });
++    expect(await checkTicketFieldSet(fieldSet('startDate', null), ctx())).toEqual({ refused: false });
++  });
++
++  it('planted defect: a timestamp start date, and a bare string where the claim belongs', async () => {
++    expect(await checkTicketFieldSet(fieldSet('startDate', { date: '2026-09-01T10:00:00Z' }), ctx())).toEqual({
++      refused: true,
++      rule: 'field.type-mismatch',
++      reason: '"Start date" needs a day in YYYY-MM-DD form (a note is optional).',
++    });
++    expect(await checkTicketFieldSet(fieldSet('startDate', '2026-09-01'), ctx())).toEqual({
++      refused: true,
++      rule: 'field.type-mismatch',
++      reason: '"Start date" needs a day in YYYY-MM-DD form (a note is optional).',
++    });
++  });
++
++  /**
++   * `refuse('ticket.unknown-type')` shipped in this check's first draft with no
++   * test behind it — the brief's own self-consistency finding 3, and a branch
++   * that could have been deleted with the whole suite green. The built-ins are
++   * answered before the type is resolved, so it takes a CUSTOM field to reach:
++   * a title change on this same ticket is still accepted, which is the half
++   * that pins the order rather than merely the branch.
++   */
++  it('planted defect: a custom field on a ticket whose type is no longer defined', async () => {
++    expect(await checkTicketFieldSet(fieldSet('amount', 1200), ctxWithoutTheTicketsType())).toEqual({
++      refused: true,
++      rule: 'ticket.unknown-type',
++      reason: "This ticket's type is not defined in this workspace.",
++    });
++    expect(await checkTicketFieldSet(fieldSet('title', 'Still renameable'), ctxWithoutTheTicketsType())).toEqual({
++      refused: false,
++    });
++  });
++
++  /**
++   * The presence hole at the check's own door. `ticketFieldSetPayload` used to
++   * admit a payload with no `value` key at all, and the reducer's
++   * `p.value ?? null` turned that absence into a null CLEARING claim nobody
++   * made. The domain schema now refuses it (four assertions in
++   * `packages/domain/test/ticket-events.test.ts`); this is the same refusal
++   * seen from where the fixture suite and Plan 10's offline replica stand,
++   * which is the only door those two ever pass.
++   */
++  it('planted defect: a field_set carrying no value at all is refused, not folded into a clearing', async () => {
++    expect(await checkTicketFieldSet(fieldSetWithNoValue('amount'), ctx())).toEqual({
++      refused: true,
++      rule: 'malformed-payload',
++      reason:
++        "This ticket.field_set event's payload is malformed: is required — a field claim with no value would record a clearing nobody made",
++    });
++  });
++
++  it('planted defect: a field_set filed against something that is not a ticket', async () => {
++    const env = makeEnvelope({
++      type: 'ticket.field_set',
++      entity: { kind: 'ticket-type', id: 'invoice' },
++      workspaceId: WS,
++      payload: { fieldId: 'title', value: 'x' },
++    });
++    expect(await checkTicketFieldSet(env, ctx())).toEqual({
++      refused: true,
++      rule: 'malformed-payload',
++      reason: 'This ticket.field_set event does not point at a ticket; it points at a ticket-type.',
++    });
++  });
++});
++
++/**
++ * The dispatch, which every test above bypasses by calling the check directly.
++ * Without this, deleting `case 'ticket.field_set'` from `evaluate.ts` passes
++ * the entire suite — the check would be perfect and unreachable, and the engine
++ * would accept every field claim through the pass-through default, including
++ * the ones that clear a title and the ones that name a field no type declared.
++ */
++describe('evaluateEvent dispatches ticket.field_set', () => {
++  it('routes the event to checkTicketFieldSet rather than passing it through', async () => {
++    expect(await evaluateEvent(fieldSet('title', null), ctx())).toEqual({
++      refused: true,
++      rule: 'field.title-required',
++      reason: 'A ticket always has a title. Change the title instead of clearing it.',
++    });
++  });
++});
+diff --git a/packages/rule-engine/test/ticket-type.test.ts b/packages/rule-engine/test/ticket-type.test.ts
+index 85d0061..6158d6d 100644
+--- a/packages/rule-engine/test/ticket-type.test.ts
++++ b/packages/rule-engine/test/ticket-type.test.ts
+@@ -1,15 +1,16 @@
+ import { describe, expect, it } from 'vitest';
+ import type { TicketTypeDef } from '@gisik-nokma/domain';
+ import { BUILTIN_TICKET_TYPE_SEEDS, DEEPEST_RANK, makeEnvelope } from '@gisik-nokma/domain';
+ import { buildMemoryContext } from '../src/memory-context.js';
+ import { checkTicketTypeDefined } from '../src/checks/ticket-type.js';
++import { evaluateEvent } from '../src/evaluate.js';
+ import { PROJECT, WF, WS, typeDefined } from '../src/checks/test-support.js';
+ 
+ /** Nothing this check asks is a question about workspace state; any context does. */
+ const ctx = () => buildMemoryContext([WF], []);
+ 
+ function def(over: Partial<TicketTypeDef> & Pick<TicketTypeDef, 'id' | 'name' | 'rank'>): TicketTypeDef {
+   return { icon: 'list', workflowId: 'wf-basic', fields: [], ...over };
+ }
+ 
+ /**
+@@ -142,10 +143,33 @@ describe('checkTicketTypeDefined', () => {
+    * The connective tissue the refusal's whole justification rests on, asserted
+    * rather than asserted-in-prose: `DEEPEST_RANK` is the built-in sub-task's
+    * rank. If a future edit moved either, this lock would be guarding a number
+    * that no longer means the floor of the hierarchy.
+    */
+   it("the locked sub-task rank IS DEEPEST_RANK — the reason this refusal is not tidiness", () => {
+     const subTask = BUILTIN_TICKET_TYPE_SEEDS.find((seed) => seed.id === 'sub-task');
+     expect(subTask?.rank).toBe(DEEPEST_RANK);
+   });
+ });
++
++/**
++ * The dispatch, which every test above bypasses by calling the check directly.
++ *
++ * Until now `ticket-type.defined`'s routing was pinned ONLY by its two
++ * fixtures. That is real coverage — the fixture suite enters at `evaluateEvent`
++ * (`test/fixtures.test.ts:19`) — but it lives in another file, and a future
++ * task relocating or rewriting those two fixtures would silently reopen exactly
++ * the gap Task 6 was credited with finding: a fully mutation-proven check that
++ * nothing reaches, and a built-in rank lock quietly released through the
++ * pass-through default.
++ */
++describe('evaluateEvent dispatches ticket-type.defined', () => {
++  it('routes the event to checkTicketTypeDefined rather than passing it through', async () => {
++    const env = typeDefined(def({ id: 'sub-task', name: 'Sub-task', rank: 3 }));
++    expect(await evaluateEvent(env, ctx())).toEqual({
++      refused: true,
++      rule: 'type.builtin-rank',
++      reason:
++        '"Sub-task" is the built-in sub-task type; its rank is 4 and cannot be changed. Define a custom type for differently-ranked work.',
++    });
++  });
++});
+diff --git a/packages/rule-engine/test/workflow-rebind.test.ts b/packages/rule-engine/test/workflow-rebind.test.ts
+index 7d755c3..99b284e 100644
+--- a/packages/rule-engine/test/workflow-rebind.test.ts
++++ b/packages/rule-engine/test/workflow-rebind.test.ts
+@@ -112,20 +112,30 @@ describe('checkTicketWorkflowRebound', () => {
+   it('planted defect: a rebound onto a workflow nobody defined names THAT workflow, not the type\'s binding', async () => {
+     expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ghost', 'shipped'), ctx())).toEqual({
+       refused: true,
+       rule: 'ticket.rebound-unknown-workflow',
+       reason:
+         'The workflow "wf-ghost" is not defined in this workspace, so there is nowhere to move this ticket to. Pick a workflow that has been published, or publish that one first.',
+     });
+     // The premise the refusal rests on, asserted rather than assumed: the
+     // ticket's own type binding resolves in this same context, so the sentence
+     // the old refusal told was false of the world it was told in.
++    //
++    // This line is the premise ITSELF — `task`'s workflow, looked up by the
++    // binding on the type, answering non-null. The line below it is a NEIGHBOUR
++    // of the premise: a different workflow being accepted says the check works,
++    // not that the type's binding resolves. The premise happens to be true by
++    // construction here (`buildMemoryContext`'s reducer throws on a
++    // `ticket.created` whose type's workflow is undefined, `ticket-state.ts:103-107`),
++    // which is exactly why asserting it costs one line and leaving it implicit
++    // cost the claim its evidence.
++    expect(await ctx().getWorkflowDef(TASK.workflowId)).not.toBeNull();
+     expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ops', 'shipped'), ctx())).toEqual({ refused: false });
+   });
+ 
+   /**
+    * "The ledger accepts only what it can later replay" (spec §3): the reducer
+    * throws on a rebound whose destination the target workflow does not have
+    * (`ticket-state.ts:219-222`), so an accepted one would be unprojectable. The
+    * state named is one of the OUTGOING workflow's, which is the mistake an
+    * admin authoring a cross-workflow map actually makes.
+    */
+diff --git a/test-cases/05-tickets-hierarchy.md b/test-cases/05-tickets-hierarchy.md
+index dd29d31..0c60085 100644
+--- a/test-cases/05-tickets-hierarchy.md
++++ b/test-cases/05-tickets-hierarchy.md
+@@ -1,17 +1,21 @@
+ # 5. Tickets, hierarchy & rollups — test cases
+ 
+ Mirrors `Features.md` §5. Status: `❌` not covered · `✅` covered · `🟡` partial · `🧪` manual · `🚫` out of scope (with reason).
+ 
+-**Scope of this file today.** Plan 3's keystone (Tasks 1–2 plus the coordination doc's §9 rider) and Task 5's hierarchy checks have landed, so only the cases those tasks cover are written down. **Case ids 5.4 through 5.36 are reserved verbatim by Plan 3's own catalogue task** (`docs/superpowers/plans/2026-08-20-03-tickets-hierarchy.md`, Task 14) and must not be claimed by anything else — the rest of Plan 3's lane fills them in with the tests that cover them. Task 14's own list also covers Task 5's brief-mandated refusals at 5.7–5.11, 5.21, 5.23 and 5.24; **only the refusals Task 5 minted that no plan document anticipated are catalogued here**, and they continue from 5.38. New cases beyond that continue from 5.44. **Never renumber**: 5.27 and 5.30 are cited by Plan 5, 5.36 by the coordination doc.
++**Scope of this file today.** Plan 3's keystone (Tasks 1–2 plus the coordination doc's §9 rider) and Task 5's hierarchy checks have landed, so only the cases those tasks cover are written down. **Case ids 5.4 through 5.36 are reserved verbatim by Plan 3's own catalogue task** (`docs/superpowers/plans/2026-08-20-03-tickets-hierarchy.md`, Task 14) and must not be claimed by anything else — the rest of Plan 3's lane fills them in with the tests that cover them. Task 14's own list also covers Task 5's brief-mandated refusals at 5.7–5.11, 5.21, 5.23 and 5.24; **only the refusals Task 5 minted that no plan document anticipated are catalogued here**, and they continue from 5.38. New cases beyond that continue from 5.48. **Never renumber**: 5.27 and 5.30 are cited by Plan 5, 5.36 by the coordination doc.
+ 
+ - 5.1 ✅ Custom ticket type definitions validated: select needs options, options only on select, duplicate field ids refused, built-in field ids not shadowable, rank ≥ 1. (`packages/domain/test/ticket-types.test.ts`)
+ - 5.2 ✅ Built-in ladder ships as seed data with ranks epic 1 / story 2 / task 3 / sub-task 4, materialisable against a workspace default workflow; `DEEPEST_RANK` is asserted against the shipped ladder's real maximum, so a deeper seed fails loudly instead of quietly releasing sub-tasks from the parent requirement. (`packages/domain/test/ticket-types.test.ts`)
+ - 5.3 ✅ Every vocabulary event round-trips `parseEvent`; malformed payloads, unknown event types, and a ticket event filed against another kind of entity are all refused at the door. (`packages/domain/test/ticket-events.test.ts`)
+ - 5.26 ✅ An `attachment.added` claim says which of the two kinds it is, or it is refused at the door: an upload round-trips with its `sha256`, a Drive reference round-trips with its pointer and `capturedAt`, and both a payload with no `kind` and an `upload` with no `sha256` are refused — an attachment whose kind is unstated is exactly the ambiguity these rules exist to remove. (`packages/domain/test/ticket-events.test.ts`)
+ - 5.37 ✅ The server's `EngineContext` answers honestly about what it can serve while ticket state does not exist yet: `null` for a ticket and for a membership that HAS a head row, and the whole `{kind, id}` state for the kinds whose state is exactly that. A role-gated transition ingested end to end is refused as `unknown-ticket` — the true reason — and never as `unknown-workflow` naming a workflow called `undefined`, which is what the head-pointer cast produced for every transition. Coordination doc, Plan 1 consequences §9; every assertion fails against the body it replaced. (`apps/server/test/engine-context.test.ts`)
+ - 5.38 ✅ A second `ticket.created` for a ticket that already exists is refused `ticket.already-exists`, ahead of every question about its payload. The reducer folds creation unconditionally (`packages/domain/src/ticket-state.ts:94`), so an accepted duplicate does not error and does not merge — it RESETS the fold, erasing the ticket's status, collaborators, field claims and the whole transition log four-eyes reads. Nothing refused it before, and the reset left no trace in head state. The order is pinned separately: a duplicate create whose type is ALSO undefined still names the duplicate, because the actor's type was never the problem. (`packages/rule-engine/test/hierarchy.test.ts`)
+ - 5.39 ✅ Two refusals that used to fire with somebody else's sentence now tell the truth on the path that reaches them. A parent whose TYPE is undefined refuses `hierarchy.parent-type-unknown` naming the parent, not `ticket.unknown-type` — this ticket's own type resolved, so the borrowed copy sent the actor to define a type that is already defined (ruling P11). A parent in ANOTHER WORKSPACE refuses `hierarchy.unknown-parent`, not `hierarchy.cross-project`: ticket lookup carries no workspace predicate over a projection keyed `(entity_kind, entity_id)`, so a foreign parent resolves, and the more specific sentence was both false and a confirmation that the id exists somewhere the actor cannot see (ruling P12). Both are pinned as literals and mutation-proven, and the workspace case is staged against a parent that is foreign in project too, so the order is what the test constrains. (`packages/rule-engine/test/hierarchy.test.ts`)
+ - 5.40 ✅ Reparenting inherits both rulings the create path was corrected by, and its check ORDER is pinned rather than described. A parent whose type is undefined refuses `hierarchy.parent-type-unknown` naming the parent — Task 6's brief specified `ticket.unknown-type`, which is false on every path that reaches it because the MOVED ticket's own type resolved first (ruling P11) — while a ticket whose own type is missing still refuses `ticket.unknown-type`, because there the sentence is exactly true. A parent in another WORKSPACE refuses `hierarchy.unknown-parent`, not `hierarchy.cross-project`: the brief had no workspace guard at all, and a reparent grafts an EXISTING ticket into another workspace's hierarchy rather than merely failing to make a new one (ruling P12). Seven order cases stage two live defects each and assert which names the event — the ticket's own absence outranks the parent's; a loop is named as a loop even when the rank is violated and even when the parent is in another project; a foreign workspace outranks a foreign project; cross-project outranks an unreadable parent type; cross-project outranks a rank violation; rank outranks a finished parent. The cross-project-over-unreadable-parent-type pairing is also added to `checkTicketCreated`, closing the one chain position Task 5 left prose-pinned: a mutation hoisting the parent-type guard above the cross-project check passed the entire suite until now. (`packages/rule-engine/test/reparent.test.ts`, `packages/rule-engine/test/hierarchy.test.ts`)
+ - 5.41 ✅ An ancestor chain that never ends THROWS rather than refusing, staged against two tickets that are each other's parent and neither of which is the ticket being moved. The distinction is deliberate: a malformed payload is the actor's claim and is refusable in the actor's language, while a cycle already standing in the tree is the store's state — this check is what prevents one — so there is no true sentence to tell the actor, and `hierarchy.cycle` would name a loop that is not the one they proposed. (`packages/rule-engine/test/reparent.test.ts`)
+-- 5.42 ✅ `evaluateEvent` actually routes the three new event types. Every other case calls its check directly, so before these assertions deleting a `case` from the dispatch left a perfect, unreachable check and an engine that accepted every reparent and every same-workflow rebind through the pass-through default. `ticket-type.defined`'s routing is pinned by its two fixtures, which enter at `evaluateEvent`. (`packages/rule-engine/test/reparent.test.ts`, `packages/rule-engine/test/workflow-rebind.test.ts`, `packages/rule-engine/fixtures/type-defined-*.json`)
++- 5.42 ✅ `evaluateEvent` actually routes the three new event types. Every other case calls its check directly, so before these assertions deleting a `case` from the dispatch left a perfect, unreachable check and an engine that accepted every reparent and every same-workflow rebind through the pass-through default. `ticket-type.defined`'s routing was pinned only by its two fixtures, which enter at `evaluateEvent` — real coverage, but living in another file, so relocating those fixtures would have reopened the gap silently; Task 7 added the third describe so the dispatch is pinned where the check's own tests are. (`packages/rule-engine/test/reparent.test.ts`, `packages/rule-engine/test/workflow-rebind.test.ts`, `packages/rule-engine/test/ticket-type.test.ts`, `packages/rule-engine/fixtures/type-defined-*.json`)
+ - 5.43 ✅ A `ticket.workflow_rebound` naming a workflow this workspace has not defined is refused `ticket.rebound-unknown-workflow`, whose reason names **that** workflow and offers the two remedies an admin can take alone. It is deliberately not `ticket.workflow-undefined` — "This ticket type's workflow has not been defined yet, so the ticket would have no status." — which makes the ticket TYPE's binding its subject: correct on `ticket.created`, where a ticket has no workflow but the one its type names, and false on a migration, where the binding may be perfectly well defined and the missing workflow is the one the payload asked for. The old sentence sent an admin to inspect a thing that was not broken. The test asserts the premise as well as the refusal — the ticket's own type binding resolves in the same context, so the borrowed sentence was false of the world it was told in. Controller ruling P13, the third instance of the class P11 and P12 closed. **Task 14 folds this into case 5.34**, whose plan text this change set corrected in place (same number — 5.34 is cited only inside Plan 3's own document, unlike 5.27/5.30/5.36). (`packages/rule-engine/test/workflow-rebind.test.ts`)
++- 5.44 ✅ A `ticket.field_set` whose payload omits `value` entirely is refused at the door, not folded into a clearing. `z.unknown()` does not require its key, so `{ fieldId: 'title' }` parsed clean, and the reducer's `p.value ?? null` (`packages/domain/src/ticket-state.ts:201`) turned that absence into a null CLEARING claim — a field wiped under someone's name and both their clocks, into an append-only table, on the strength of a claim nobody made. Four assertions rather than one "the field is required", because two of them are ACCEPTANCES and they are the half a careless fix breaks: `null` is the explicit clearing claim and `{}` is an empty claim, both still claims. Proven by reverting the schema to bare `z.unknown()` and watching the ABSENT case fail specifically — a mutation that killed only the present-but-`undefined` case would have proven a side effect of the fix rather than the fix. The identical matrix guards the envelope's own payload (`packages/domain/src/envelope.ts`), so the two doors answer alike. **Task 14's 5.12 stays the home for the field refusals the plan anticipated** (unknown field, per-kind mismatch, the title that cannot be cleared); this id covers only the presence hole, which no plan document names. (`packages/domain/test/ticket-events.test.ts`, `packages/rule-engine/test/fields.test.ts`)
++- 5.45 ✅ `evaluateEvent` routes `ticket.field_set`. Every field test calls `checkTicketFieldSet` directly, so without this assertion deleting the `case` from the dispatch left a fully mutation-proven, unreachable check while the pass-through default accepted every field claim — including the ones clearing a title and the ones naming a field no type declared. (`packages/rule-engine/test/fields.test.ts`)
++- 5.46 ✅ A custom-field claim on a ticket whose TYPE is not defined refuses `ticket.unknown-type`, while a title change on that same ticket is still accepted — the branch that shipped implemented and untested in this check's first draft, and the order that makes the built-ins independent of the type, pinned together. It must be a memory-context test rather than a fixture: the fixture harness's `getTicketTypeDef` throws by design until Task 8 (pre-flight Addendum 5), so a fixture reaching this branch would throw rather than refuse, and `buildMemoryContext` cannot fold the world either — `applyTicketEvent` throws on a `ticket.created` whose type is unknown, so the type is defined for the fold and then removed from the context's own map. Task 14's 5.12 does not name this branch — it lists the unknown field, the per-kind mismatches and the title — so this is a case, not a duplicate. (`packages/rule-engine/test/fields.test.ts`)
++- 5.47 ✅ The premise under case 5.43 is asserted rather than neighboured. The test showed a DIFFERENT workflow being accepted, which says the check works, not that the ticket's own type binding resolves in that context — the thing the P13 argument rests on. One line asserts the premise itself (`getWorkflowDef(TASK.workflowId)` is non-null); it is true by construction, which is exactly why leaving it implicit cost the claim its evidence rather than making it wrong. (`packages/rule-engine/test/workflow-rebind.test.ts`)
