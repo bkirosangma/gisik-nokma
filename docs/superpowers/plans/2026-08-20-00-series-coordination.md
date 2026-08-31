@@ -4796,3 +4796,85 @@ it** — and the more faithful they are to the plan, the more certainly they wil
 **Corollary for every remaining lifted or re-sequenced item in the serial order:** before dispatching
 one, sweep its own range for the thing it was moved to do. If the terms are absent, the dispatch must
 carry the obligation explicitly, because the plan text will not.
+
+---
+
+## The sweep for an externally-assigned obligation must DISCRIMINATE, not just confirm (2026-08-31)
+
+Step 6 established that **lifting a task changes when it runs, not what its text says**, and that any
+obligation assigned to a task from outside must be carried by the dispatch. Applied to Plan 4 Tasks
+8–14, the sweep produced three results and **the discriminating one is worth more than the confirming
+ones**:
+
+| task | range | terms swept | result | control |
+|---|---|---|---|---|
+| **T8** | 3292–3635 | `branded`, `opaque`, `EffectiveRole`, `exhaustive` | **all 0 — BLIND** | `404`=12, `proj_tickets`=4 |
+| **T13** | 5008–5244 | `already exists`, `half-founded`, `repair` | **all 0 — BLIND** | `workspace.created`=4 |
+| **T9** | 3635–4039 | `guest`, `visibility.set`, `project-admin`, `creatorship` | **all present — SIGHTED** | `permission.role`=9 |
+
+**The rule this yields:**
+
+> **A BLIND task needs the obligation carried in the dispatch. A SIGHTED one needs only the urgency
+> explained.**
+
+Without that distinction the sweep degenerates into pasting every standing ruling into every dispatch —
+which **buries the two that genuinely are not in the text** among a dozen that are. The sweep's value is
+in the zeros, and a zero is only legible beside a control.
+
+*(Two sessions ran this sweep independently and got different counts for `guest` — 22 vs 30 — because one
+counted matching LINES and the other matching OCCURRENCES. Immaterial here, and worth noting anyway: two
+correct answers to two different questions, which is the `@{u}` family again. The discrimination held
+under both.)*
+
+### The correction this produced to Ruling P19's own framing
+
+P19 was being read — by both sessions — as *"Task 9 must remember to write these checks."* **That was
+never the risk.** The sweep shows the checks are natively in T9's text; P19 was *derived from* T9's own
+check list. The actual hazard was that **Task 5's absence list declared the category "role" CLOSED**,
+which would have told T9's implementer there was nothing left to do.
+
+**That list was corrected in step 4, so P19 is HANDLED, not merely ASSIGNED.** Those are different
+states, and a later reader seeing "P19, owner T9" would otherwise re-derive the wrong worry and go
+looking for missing checks that are present.
+
+**Generalisation: when a ruling names an owner, say whether the owner still has WORK or only has a
+DEPENDENCY that has since been satisfied.** An owner line is not a status.
+
+---
+
+## A half-applied opaque type is worse than the convention it replaces (2026-08-31)
+
+Recorded when Ruling P22's closer — branding `EffectiveRole` so only `resolveEffectiveRole` can produce
+one — was dispatched to Plan 4 Task 8 **with an explicit licence to defer.**
+
+**The reasoning, which generalises past this instance:** a brand that covers some construction sites and
+not others **looks enforced**. A reader seeing an opaque type reasonably stops checking provenance by
+hand — that is the entire point of the type — so a partial brand withdraws the human check while
+supplying only part of the machine one. The convention it replaced was at least honestly unenforced.
+
+**This is the same family as a vacuous test and a blind instrument: the failure is not the absence of
+protection but the FALSE APPEARANCE of it.** Each of the three passes something that looks like a check
+and answers a question nobody asked.
+
+So the dispatch said: brand it if genuinely mechanical; **if it ripples into surfaces Task 8 does not
+own, say so plainly and leave 6.64 recorded with the mechanism named.** An honest deferral is not a miss
+here, and must not be read as one.
+
+### Ruling P22 is CLOSED — verified independently, not accepted from a report
+
+Plan 4 Task 8 branded `EffectiveRole` with a real module-private `unique symbol` in
+`apps/server/src/permissions/effective-role.ts`. **Verified by the executor rather than taken from a
+zero-finding review, because a security closer's own report is the last thing that should establish it:**
+a probe constructing `const forged: EffectiveRole = { workspaceRole: 'owner', projects: new Map() }` —
+exactly the right shape, no provenance — now fails to compile with
+
+> `TS2741: Property '[RESOLVED]' is missing in type '{ workspaceRole: "owner"; projects: Map }' but
+> required in type 'EffectiveRole'.`
+
+**So "verified by convention" became "unconstructable elsewhere", and every future misuse in Task 9,
+Task 11 or Plan 10's sync filter is now a compile error rather than a silent grant.** The ripple was
+exactly the two hand-build sites the ruling predicted, both in tests.
+
+**The deferral licence was not needed — but it was still the right thing to grant**, and the reasoning
+stands for the next closer of this kind: a brand covering some construction sites and not others *looks*
+enforced, which is worse than an honestly unenforced convention.
