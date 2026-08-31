@@ -1,6 +1,7 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { Queryable } from '../db/queryable.js';
 import { canSee } from '../visibility/can-see.js';
+import { rollupFor, type RollupView } from '../visibility/rollup.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
 
 /**
@@ -304,7 +305,19 @@ export function registerTicketRoutes(
         }
       }
 
-      return { ticket: toTicketView(ticket), parent };
+      // AFTER both guards, and that order is load-bearing rather than tidy:
+      // `rollupFor` performs no visibility check of its own, so asking it above
+      // the guards would disclose a parent's child count to someone answered
+      // 404. The leak is NOT observable through the responses — the 404 body is
+      // fixed and identical either way — so it is recorded (case 6.85) rather
+      // than pinned by a test that could only pass for the wrong reason.
+      const rollup: RollupView | null = await rollupFor(
+        deps.pool,
+        request.currentUserId,
+        ticketId,
+      );
+
+      return { ticket: toTicketView(ticket), parent, rollup };
     },
   );
 

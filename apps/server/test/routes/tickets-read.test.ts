@@ -236,6 +236,63 @@ describe('GET /v1/workspaces/:workspaceId/tickets — the viewer’s slice, filt
   });
 });
 
+describe('the single read carries the rollup — true totals with the restriction named', () => {
+  it('a parent whose children the viewer only partly sees is told the TRUE total beside what it may not reach', async () => {
+    // Three different numbers on purpose (total 3 · visible 2 · restricted 1):
+    // a fixture where any two coincided would let a swap through.
+    const ws = newUlid();
+    const mine = newUlid();
+    const theirs = newUlid();
+    const { userId, headers } = await signedIn();
+    await seedMember(db.pool, ws, userId, 'member', [{ projectId: mine }]);
+
+    const parentId = newUlid();
+    const visibleA = newUlid();
+    const visibleB = newUlid();
+    const hidden = newUlid();
+    await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: parentId });
+    for (const id of [visibleA, visibleB]) {
+      await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: id, parentId });
+    }
+    await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: hidden, parentId });
+    await applyAll(db.pool, [
+      setVisibilityEnv(ws, visibleA, 'workspace'),
+      setVisibilityEnv(ws, visibleB, 'workspace'),
+      setVisibilityEnv(ws, hidden, 'project'),
+    ]);
+
+    const res = await get(`/v1/workspaces/${ws}/tickets/${parentId}`, headers);
+    expect(res.statusCode).toBe(200);
+    // `toEqual` is exact, so an `open`/`active`/`terminal` grown here would
+    // redden — those need `proj_tickets` and are deliberately absent from the
+    // shape rather than zeroed (cases 6.82, 6.83).
+    expect(res.json().rollup).toEqual({ total: 3, visibleCount: 2, restrictedCount: 1 });
+
+    // The non-vacuity control, in the same test: the restricted child really is
+    // one this viewer is refused, so "3 · 2 · 1" is not an arithmetic accident
+    // over three children they could all see.
+    const probe = await get(`/v1/workspaces/${ws}/tickets/${hidden}`, headers);
+    expect(probe.statusCode).toBe(404);
+    const reachable = await get(`/v1/workspaces/${ws}/tickets/${visibleA}`, headers);
+    expect(reachable.statusCode).toBe(200);
+  });
+
+  it('a childless ticket carries rollup null, present as a key rather than omitted', async () => {
+    const ws = newUlid();
+    const prj = newUlid();
+    const { userId, headers } = await signedIn();
+    await seedMember(db.pool, ws, userId, 'member', [{ projectId: prj }]);
+    const leaf = newUlid();
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: leaf });
+
+    const res = await get(`/v1/workspaces/${ws}/tickets/${leaf}`, headers);
+    // The key is part of the contract: a client that reads `body.rollup` must
+    // get an explicit "no children", not `undefined` from a missing field.
+    expect(Object.hasOwn(res.json(), 'rollup')).toBe(true);
+    expect(res.json().rollup).toBeNull();
+  });
+});
+
 describe('the restricted-parent placeholder — existence, and nothing else', () => {
   it('a visible child under a parent it may not see reports the parent’s existence and its id alone', async () => {
     // Mutation: return the parent's row on the restricted branch (or fall back
