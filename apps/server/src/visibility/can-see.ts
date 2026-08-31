@@ -134,8 +134,29 @@ export async function getResolvedVisibility(
  * deleted rows used to give lives in `resolveEffectiveRole`'s early return: no
  * workspace role means an EMPTY project set. It is documented on the migration's
  * `COMMENT ON TABLE`, in `effective-role.ts` and in `check-permission.ts`, and
- * it is enforced by nothing but that one line — so every reader here goes
- * through the function rather than the table.
+ * it is enforced by that one line — so every reader here goes through the
+ * function rather than the table.
+ *
+ * ## Two guards stand on this path, and only one of them is observable here
+ *
+ * Measured, not reasoned about. `canSeeResolved` refuses a null workspace role
+ * BEFORE the project set is ever consulted, so for this surface the revoked
+ * member is stopped twice over: once by that short-circuit, once by
+ * `resolveEffectiveRole` returning them no projects. Deleting the short-circuit
+ * reddens the revoked-member case (`test/visibility/can-see.test.ts`) at its own
+ * site. **Deleting `resolveEffectiveRole`'s early return instead leaves all 16
+ * of this task's tests green** — and leaves the whole server suite green but for
+ * one case, Task 4's own `test/permissions/effective-role.test.ts` "a revoked
+ * member resolves to nothing, though the roster row survives in the table".
+ *
+ * That is a fact worth writing down rather than a gap to close. No test
+ * reachable from `canSee` can pin that line, because no input to it can make
+ * the project set matter while the workspace role is null. A test here claiming
+ * to prove the ruling would be passing for a reason unrelated to the property it
+ * named. The ruling's line is covered where it lives; what is covered HERE is
+ * the second guard, and the two are independent rather than redundant — the
+ * early return is what protects readers with no null check of their own, such
+ * as `hasProjectAdminRights`.
  *
  * ## The workspace is the TICKET's, not the caller's
  *

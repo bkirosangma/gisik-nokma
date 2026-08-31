@@ -176,24 +176,38 @@ describe('canSee — against the real projections', () => {
     expect(await canSee(db.pool, listed, child)).toBe(true);
   });
 
-  it('THE RULING: a revoked member resolves nothing though their project-scope row is still standing', async () => {
+  it('THE RULING: a revoked member resolves nothing in ANY mode, though their project-scope row is still standing', async () => {
     const ws = newUlid();
     const prj = newUlid();
     const user = newUlid();
-    const tkt = newUlid();
+    const projectMode = newUlid();
+    const workspaceMode = newUlid();
+    const explicitMode = newUlid();
 
     await seedMember(db.pool, ws, user, 'member', [{ projectId: prj }]);
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: tkt });
-    // Project default: ticket.created leaves own_mode 'inherit' and a root
-    // resolves to 'project'. So this is the mode a project attachment answers.
-    expect(await canSee(db.pool, user, tkt)).toBe(true); // positive control, before
+    // All three resolved modes, because the guarantee is enforced at two
+    // independent points and each mode reaches a different one. `project` is
+    // the mode a project attachment answers, so it is the one the surviving
+    // roster row would speak to; `workspace` and `explicit` never consult the
+    // project set at all and are answered by the workspace role alone.
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: projectMode });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: workspaceMode });
+    await applyAll(db.pool, [setVisibilityEnv(ws, workspaceMode, 'workspace')]);
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: explicitMode });
+    await applyAll(db.pool, [setVisibilityEnv(ws, explicitMode, 'explicit', [user])]);
+
+    // The positive control: every one of them was visible a moment ago, so the
+    // `false`s below are a change and not a fixture that never worked.
+    expect(await canSee(db.pool, user, projectMode)).toBe(true);
+    expect(await canSee(db.pool, user, workspaceMode)).toBe(true);
+    expect(await canSee(db.pool, user, explicitMode)).toBe(true);
 
     await revokeMember(db.pool, ws, user);
 
     // The row a bare project-scope SELECT would return is PRESENT — printed,
     // not counted, because it is the whole premise of the case. If it were
-    // gone, `canSee` returning false below would prove nothing about the
-    // ruling: it would only prove that a missing row confers nothing.
+    // gone, the `false`s below would prove nothing about the ruling: they would
+    // only prove that a missing row confers nothing.
     const surviving = await db.pool.query(
       `SELECT workspace_id, user_id, scope_kind, project_id, role, project_admin
        FROM proj_memberships
@@ -212,10 +226,11 @@ describe('canSee — against the real projections', () => {
       },
     ]);
 
-    // …and it confers nothing, because canSee reads membership through
-    // resolveEffectiveRole, whose empty-project-set early return is the only
-    // thing standing here.
-    expect(await canSee(db.pool, user, tkt)).toBe(false);
+    // …and it confers nothing. An explicit list that still NAMES them by id
+    // confers nothing either — the list is not a membership.
+    expect(await canSee(db.pool, user, projectMode)).toBe(false);
+    expect(await canSee(db.pool, user, workspaceMode)).toBe(false);
+    expect(await canSee(db.pool, user, explicitMode)).toBe(false);
   });
 
   it('a role is resolved in the TICKET’s workspace, not in one the viewer happens to own', async () => {
