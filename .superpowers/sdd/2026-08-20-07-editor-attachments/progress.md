@@ -1,28 +1,57 @@
 # SDD ledger — plan: docs/superpowers/plans/2026-08-20-07-editor-attachments.md
 
-## STATE — rewritten in place; everything below this block is append-only history
+## STATE — handoff to serial execution, 2026-08-31. Rewritten in place; history below is append-only.
 
-Read this block, then `git log`, then the rulings. Do NOT trust shas quoted in the history
-below: this branch has been rebased three times and the completion lines for Tasks 1, 2 and
-11a cite PRE-REBASE shas that no longer exist. Task 3's are current. `git log` is authoritative.
+Read this block, then `git log`, then every line containing `Ruling:`. Do NOT trust shas quoted
+in the history below — this branch was rebased three times and the completion lines for Tasks 1,
+2 and 11a cite pre-rebase shas that no longer exist. `git log` is authoritative.
 
-- Branch `exec/07-editor-client`, HEAD **8d883e0**, 13 commits.
-- Actual merge-base: **b0ef5f5**. `origin/main` is **5339af9**, 10 commit(s) ahead —
-  rebase at the next task boundary, never while a subagent is live.
-- Worktree `/Users/kiro/my_projects/gisik-nokma-lanes/lane3-plan7-8`. Single-writer: never
-  mutate the tree while a subagent is live in it.
-- DONE, review-clean: **T2, T11a (domain half), T1, T3**.
-- IN FLIGHT: **T4 fix round 1** — blank `userId`, the parse-door rationale, picker ARIA.
-- REMAINING this branch: T5, T6, T12, T12a, T12b, T12c, T13, T13a, T15, then the partial
-  catalogue (§9 + `test-cases/09-editor-attachments.md`) and the coordination-doc change set.
-- FOLLOW-ON branch after this PR merges: T7, T8 (unblocked — `Queryable` is on main).
-- NOT this lane, any wave: T9, T9a, T10, T11, T11a gate half, T14, T16.
-- Binding context for every dispatch: `LANE-CONTEXT.md` beside this file.
-- Model tiering for remaining dispatches: see the MODEL AUDIT entry near the end.
-- Final review composition: 3 lenses opus/max · mocked-contract lens fable · refuters fable
-  with `isolation: "worktree"` · check the pool (~<$117) BEFORE dispatching.
+**Branch `exec/07-editor-client`, PUSHED, HEAD `1e83700`, 16 commits.**
+- Merge-base **`b0ef5f5`**; `origin/main` is **`f3e919b`**, 13 commits ahead.
+  **Do not rebase piecemeal — serial rebases once, cleanly.** The only conflict seen in three
+  prior rebases was `pnpm-lock.yaml`, and the resolution is fixed: take one side wholesale,
+  regenerate with `pnpm install`, never hand-merge (CI runs `--frozen-lockfile`).
+- Gate on this tree: **21/21 turbo tasks**, 589 tests — domain 241 · rule-engine 128 ·
+  server 106 · editor 70 · ui 31 · sync-client 8 · app-core 5. Counted on a clean tree with no
+  operation in flight; do not add a remembered delta to this.
+- Worktree is **single-writer**: never mutate the tree while a subagent is live in it.
 
+**DONE, review-clean:** T1 (4 fix rounds) · T2 · T11a domain half · T3 (3 fix rounds).
+**IN FLIGHT, incomplete:** **T4** — implemented, fix round 1 landed and reported DONE, but its
+scoped re-review was **never dispatched**. That is the one open gate. Its fix round closed the
+blank-`userId` hole, rewrote the parse-door rationale, added picker ARIA, and reported two
+findings from building rather than reading (popup rows cannot be `<button>` — tab order fights
+the `mousedown` handler; ProseMirror already sets `role="textbox"`, so combobox attributes are
+saved and restored, not set and removed). Editor went 64 → 70.
 
+**REMAINING on this branch:** T5, T6, T12, T12a, T12b, T12c, T13, T13a, T15; then the partial
+catalogue (Features.md §9 + `test-cases/09-editor-attachments.md`, claiming only what shipped,
+🟡 with the missing slice named, ❌ reserved verbatim, and Task 2's test assigned **9.35**).
+**FOLLOW-ON branch after this PR merges:** T7, T8 — unblocked, `Queryable` is on main.
+**NOT this lane, any wave:** T9, T9a, T10, T11, T11a gate half, T14, T16.
+**PLAN 8: entirely untouched.** Nothing was started. Its scaffold dependency (`packages/ui`,
+`packages/app-core`) has been on main since 2e9f405, so it is unblocked whenever serial reaches
+it. One ruling was made in advance and is recorded below: `createFakeGateway` must parse
+submitted events with the shipped `submittedEventSchema` rather than accepting what it is
+handed — a fake that validates nothing is why the payload-absence defect stayed invisible.
+
+**FINAL WHOLE-BRANCH REVIEW: composed, deliberately NOT dispatched.** A fan-out started at
+wind-down could not finish, which is the exact failure the budget rule exists for — full price,
+no gate. Serial should dispatch it against the merged tree: **three reading lenses at
+opus/`max`**, the **mocked-contract lens at fable**, **adversarial refuters at fable with
+`isolation: "worktree"`** (they mutate; thirteen concurrent mutators in one tree were read as
+tampering in another lane), read-only lenses may share a tree, and **check the pool against the
+measured ~$117 before dispatching**. No floor-list reviewers apply here — Plan 7's floor-list
+tasks are T9 and T11, both out of this lane's scope.
+
+**Binding context for every dispatch:** `LANE-CONTEXT.md` beside this file — environment, the
+five instruments that fail with confident wrong answers, the counting and positive-control
+rules, CSS/colour rules, and the cross-package mutation rule.
+**Model tiering for remaining dispatches:** see the MODEL AUDIT entry near the end — 6 of ~11
+remaining implementers go sonnet; reviewers stay opus (class floor).
+**Consequences are written to the coordination doc** (commit `1e83700`), not left here: ten
+plan-text defects, the measured cross-package mutation hazard, and three unruled product
+questions (`trailingNode`, unreadable stored `wrap`, paste/drop-to-markup).
 
 Branch: `exec/07-editor-client` off `origin/main` @ f363b2f
 Scope: T2, T11a(domain), T1, T3, T4, T5, T6, T12, T12a, T12b, T12c, T13, T13a, T15, partial catalogue
