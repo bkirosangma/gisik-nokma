@@ -948,6 +948,59 @@ because enforcement is T4's constructor, not this partition's — and recorded a
 this branch's other two live windows (the `getContest` 500, the origin-provenance gap) this one had
 no owner and appeared in no section.
 
+### 12. Plan 6 Task 6's local pre-check — one false `passed` closed, and two claims on other plans
+
+The claims machinery ships with a scope sentence: **`passed` means no rule the shared engine can
+evaluate refuses this claim, AND every fact the verdict rested on came from server-served state
+this client holds.** The line it holds is between `passed` and `not-evaluated` — **a pre-check may
+never manufacture a pass out of absence.** Two holes in that line were found and closed; both are
+recorded because Plan 10 reuses `precheckEvent` unchanged over the offline replica, where the
+window is a whole offline period rather than a race.
+
+- **The child set could not be bounded.** `getChildrenStates` answered with cached children only,
+  and the parent-terminal invariant counts open children — so an unseen open child read as *no*
+  open child and the pre-check announced `passed` for a move the server refuses. Closed with an
+  explicit completeness vouch: absence downgrades. **The vouch has no producer yet**, so every
+  accepted move into a terminal state answers `not-evaluated` in production today. Feeding it is
+  **Plan 6 Task 7's** (the online `DataSource`) or the board/list reads. `TicketRead.rollup` was
+  deliberately NOT used as the voucher: `rollup: null` cannot distinguish "no children" from "not
+  computed", and guessing there re-opens the hole.
+- **The version-chain gate guarded one end of a range.** It scanned versions between the earliest
+  recorded version and the *cached* latest, assuming the cached latest was the latest. A ticket read
+  after a republish names a version newer than anything cached — so **the cache held the proof a
+  version was missing and the gate ignored it**. `foldStateIdForward` runs zero iterations when
+  `fromVersion` exceeds `latest.version` and then merely containment-checks the id, so a state id
+  resolves *cleanly* against the wrong vocabulary. Proven end to end: a server holding v1+v2 refuses
+  `require-different-user`; the v1-only client answered `passed`. The same gap on the log side
+  disarms four-eyes, which **skips** entries it cannot resolve rather than refusing.
+  **Generalisation worth more than the fix: a gate that closes one end of a range is the shape to
+  check both ends of.** Three readers missed it, including the one who had just fixed the other end.
+
+**Two claims on other plans.**
+
+1. **Plan 3 should export its parent-terminal refusal sentence.** The rule *id*
+   `hierarchy.parent-terminal` is pinned and matches. The *sentence* does not: Plan 3 pins
+   `"${parentTitle}" is finished (${stateName}). Adding live work reopens it — …` while the
+   client's preview says something else. Plan 6 did not copy it — it is not exported, and
+   duplicating an unlanded string is the second-definition drift this series keeps finding. Until
+   Plan 3 exports a builder and Plan 6 imports it, **a user can meet two wordings for one refusal.**
+2. **Plan 3's hierarchy checks will silently widen this pre-check's pass surface.**
+   `precheckParentTerminal` answers `passed` for `ticket.created` / `ticket.reparented` without
+   consulting the engine — true today, verified at two commits, because `evaluateEvent` passes both
+   types through. The moment Plan 3 lands rank, cycle, deepest-rank and cross-project checks as
+   engine cases, that `passed` violates the scope sentence above. **A canary now asserts the engine
+   still has nothing to say for those two types, so Plan 3's landing breaks `app-core` loudly rather
+   than quietly.** It is fed claims a real hierarchy rule would refuse, so it trips on the arrival
+   of a *rule*, not of a `case` label.
+
+**Also recorded, because it is a correction to this lane's own earlier framing:** "stale local state
+over-refuses, and over-refusing is the safe direction" is **false**. Staleness under-refuses too —
+the version-chain hole above is exactly that. After both fixes the *locally detectable* subset is
+closed: every absence the cache can prove from what it holds now downgrades. What remains is
+undetectable from local state — a snapshot the client believes current with nothing in hand to
+contradict it — bounded by stream invalidation and disclaimed by "`passed` is not a promise of
+acceptance." No client-side pre-check can do better.
+
 ## Wave 1 cross-lane watch (2026-08-28, controller) — where the decision-6 drift is loud, where it is silent, one obligation assigned by position, and one MUST that does not fire
 
 Recorded by the cross-lane controller during Wave 1. Everything here is verified against shipped code or
