@@ -72,6 +72,15 @@ them. 29 commits and a code conflict is the largest rebase left in the series.
    and that matters because a `Domain` attribute would send the session cookie to **every subdomain of
    the zone**. The test forbids it today by accident of exactness; the sentence makes it on purpose.
 
+**WHAT UNITES ALL THREE, and it is the sentence to write T5 against: its job is to convert ACCIDENT
+INTO INTENT.** Every one of these is already true today and true for the wrong reason. The `Domain`
+attribute is forbidden by the exactness of a `toEqual` nobody chose for that purpose. `SameSite=Lax`
+is emitted by a default, not set by a decision. A property that holds by accident holds until someone
+tidies it — a `toEqual` relaxed to `toContain`, a default that moves in a library upgrade — and
+nothing anywhere says a security property just changed. T5 does not need to change what the system
+DOES on these three; it needs to make each one deliberate, and pinned, so the next edit that would
+undo it fails loudly instead of succeeding quietly.
+
 **THE NAMING TRAP, and it is the one the brief says costs a round.** The HTTP `Origin` **header**
 (CSRF) and the event-envelope `origin` **field** (provenance enum) are unrelated and they meet in T5.
 Say **HTTP-Origin** or **envelope-origin** in every task, commit, review and message. Someone who
