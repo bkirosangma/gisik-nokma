@@ -2,12 +2,46 @@ import type { WorkspaceRole } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 
 /**
+ * The brand that says an `EffectiveRole` came out of `resolveEffectiveRole`.
+ *
+ * A real runtime symbol, and deliberately NOT exported: a module that cannot
+ * name it cannot write the property, so the only object literal in the program
+ * that satisfies `EffectiveRole` structurally is the one this file returns.
+ * `Symbol()` is unforgeable — `Symbol('x') !== Symbol('x')` — so there is no
+ * string a caller could guess into place either.
+ *
+ * Ruling P22, closed here (case 6.64). Every safety property proved of
+ * `canSeeResolved` rests on its `EffectiveRole` having been produced by
+ * `resolveEffectiveRole`, because that is the only thing that makes a null
+ * workspace role imply an EMPTY project set. TypeScript is structural, so
+ * before this brand any object of the right shape was accepted — a caller
+ * building one by hand, or caching one across a revocation, would have carried
+ * a project set no early return had emptied, and nothing would have objected.
+ *
+ * ## What the brand buys, stated exactly
+ *
+ * It does NOT make `resolveEffectiveRole` the only possible source. A caller
+ * can still write `{ workspaceRole, projects } as unknown as EffectiveRole`,
+ * and two test files legitimately do, because `canSeeResolved` and
+ * `checkRolePermission` are pure functions whose whole point is to be driven
+ * across every role. What the brand buys is that such a caller must now write a
+ * CAST — a deliberate, greppable act at a named site — instead of matching
+ * structurally by accident. A silent grant becomes a visible assertion.
+ */
+const RESOLVED: unique symbol = Symbol('EffectiveRole.resolveEffectiveRole');
+
+/**
  * What one user may be, in one workspace, as of the events committed so far.
  *
  * `workspaceRole === null` means "not a member of this workspace at all", and
  * when it is null `projects` is ALWAYS empty — see resolveEffectiveRole.
+ *
+ * Branded: see `RESOLVED` above. Never construct one by hand outside a test,
+ * and never cache one across a membership change.
  */
 export interface EffectiveRole {
+  /** Proof of provenance, writable only inside this module. See `RESOLVED`. */
+  readonly [RESOLVED]: true;
   /** null = not a member of this workspace at all. */
   workspaceRole: WorkspaceRole | null;
   /** Every project the user is on, with that project's project-admin flag. */
@@ -90,10 +124,10 @@ export async function resolveEffectiveRole(
     // rows survive. A person can only be put on a project after being let into
     // the workspace, and being put out of the workspace is being put off
     // everything inside it.
-    return { workspaceRole: null, projects: new Map() };
+    return { [RESOLVED]: true, workspaceRole: null, projects: new Map() };
   }
 
-  return { workspaceRole, projects };
+  return { [RESOLVED]: true, workspaceRole, projects };
 }
 
 /**

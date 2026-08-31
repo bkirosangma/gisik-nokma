@@ -56,6 +56,13 @@ import { testEnvelope } from '../helpers/envelope.js';
 const WS = newUlid();
 const ACTOR = newUlid();
 
+/**
+ * A hand-built `EffectiveRole` for `checkRolePermission`, which is pure and is
+ * driven here across every role. The cast is required since Plan 4 Task 8
+ * branded the type (ruling P22, case 6.64): a hand-builder must now assert at a
+ * greppable site rather than satisfy the shape structurally. Sound here because
+ * the value never leaves this file's pure calls.
+ */
 function eff(
   workspaceRole: EffectiveRole['workspaceRole'],
   projects: Array<[string, boolean]> = [],
@@ -63,7 +70,7 @@ function eff(
   return {
     workspaceRole,
     projects: new Map(projects.map(([id, projectAdmin]) => [id, { projectAdmin }])),
-  };
+  } as unknown as EffectiveRole;
 }
 
 function env(

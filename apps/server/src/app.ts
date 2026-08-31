@@ -5,6 +5,7 @@ import { registerAuthRoutes } from './auth/routes.js';
 import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
 import { registerEventRoutes } from './routes/events.js';
+import { registerTicketRoutes } from './routes/tickets.js';
 import { registerContestsRoute } from './sync/contests-route.js';
 import type { Queryable } from './db/queryable.js';
 
@@ -100,6 +101,10 @@ export function buildApp(deps: AppDeps, options: { logLevel?: string } = {}): Fa
   // parameter for the same reason the events door does: a route that reads
   // `request.currentUserId` cannot be assembled without the thing that sets it.
   registerContestsRoute(app, { pool: deps.pool }, requireSession);
+  // The ticket read surface (Plan 4 Task 8) — list, single read, and history,
+  // each enforcing visibility server-side. Same preHandler by parameter, same
+  // reason: all three handlers read `request.currentUserId`.
+  registerTicketRoutes(app, { pool: deps.pool }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;

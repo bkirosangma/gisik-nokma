@@ -28,6 +28,19 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 const PRJ = newUlid();
 const OTHER_PRJ = newUlid();
 
+/**
+ * A hand-built `EffectiveRole` for the PURE cases below, which exist to drive
+ * `canSeeResolved` across every role the product can produce — including ones
+ * no fixture in a database could hold at the same time.
+ *
+ * The cast is deliberate and is the only thing that makes this legal since
+ * Plan 4 Task 8 branded `EffectiveRole` (ruling P22, case 6.64). The brand does
+ * not forbid a hand-built value; it forces the builder to SAY SO at a named,
+ * greppable site instead of matching the shape by accident. This is that site,
+ * and it is sound here for a reason that does not generalise: every value it
+ * produces is fed straight into a pure function in the same file, never into a
+ * path that would trust the provenance the brand stands for.
+ */
 function eff(
   role: EffectiveRole['workspaceRole'],
   projects: ReadonlyArray<string | [string, boolean]> = [],
@@ -41,7 +54,7 @@ function eff(
           : ([p[0], { projectAdmin: p[1] }] as const),
       ),
     ),
-  };
+  } as unknown as EffectiveRole;
 }
 
 function vis(
