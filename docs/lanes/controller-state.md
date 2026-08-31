@@ -14,13 +14,11 @@ decision boundary.
 
 | what | value |
 |---|---|
-| `main` | `a3746fb` **as of 19:05 IST — this row goes stale by design.** #43 → #45 → #46 → #44 → #47 |
-| last forced gate | **`a3746fb`** — 21/21, 0 cached, **936 tests**, `TURBO_EXIT=0`, node **v22.22.2**.
-  Re-established here because #47 is the first **code-bearing** merge since `c93c910`; the 853 anchor is
-  retired, not carried |
-| gate composition | domain **274** · rule-engine 278 · server 143 · app-core 130 · **editor 72** · ui 31 · sync-client 8 |
+| `main` | `33538be` **as of 22:05 IST — this row goes stale by design.** Phase 1 steps 4/5/6 merged (#51/#52/#53) |
+| last forced gate | **`33538be`** — 21/21, 0 cached, **1070 tests**, `TURBO_EXIT=0`, node **v22.22.2** |
+| gate composition | domain 276 · rule-engine 278 · server **275** · app-core 130 · editor 72 · ui 31 · sync-client 8 |
 | **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
-| collision surfaces | fixtures **84** · projections **2** (`proj_entity_heads`, `proj_workflows`) · packages **6** (`editor` new) |
+| collision surfaces | fixtures **84** · projections **5** (`contested`, `entity_heads`, `memberships`, `visibility`, `workflows`) · packages 6 |
 | open PRs | none at time of writing — **re-measure** |
 
 **Re-measure everything above on resume.** Recount at the sha you report; do not carry a composition
@@ -65,8 +63,23 @@ superseded (see the coordination doc's serial-execution section).
   without a per-PR ask. `gh pr checks <n>` — **pending is not green.** Prefer
   `gh api repos/<o>/<r>/commits/<head-sha>/check-runs` — it names the conclusion at the exact sha.
 - The controller does **not** implement plan tasks, and does not re-review the executor's work.
-- **Restart the executor at task boundaries.** This is a kill-and-relaunch from its brief, NOT a `/clear`,
-  which is user-typed and cannot be issued to another session.
+- ~~**Restart the executor at task boundaries.**~~ **WRONG — that boundary cannot meet its own
+  precondition.** The precondition is *"handoff current on `main`"*, and the handoff only reaches `main`
+  when the **step's PR merges**. Within a step no such moment exists: mid-step, `main`'s handoff is a full
+  step behind, so a relaunched session does not know which tasks have landed or which branch carries them.
+
+  **THE RULE: restart the executor immediately after merging its step PR, BEFORE dispatching the next
+  step.** That is the only instant where every precondition holds at once — handoff just merged, nothing
+  in flight, no branch name to hand over, no fan-out to interrupt. It is a fixed point in the loop, not a
+  judgment call, and **it is not optional because the executor did not ask.**
+
+  It is a kill-and-relaunch from the brief, NOT a `/clear` (user-typed, cannot be issued to another
+  session). Measured cost of skipping it: three consecutive opportunities missed (#51, #52, #53), context
+  7% → 54%, and the only restart that did happen was one the executor requested.
+
+  **Note the conflict, because it is live:** the brief's "KEEP GOING / do not end a turn" rule removes the
+  natural pause a restart used to occupy. The two are reconciled *only* by the step-PR trigger — chaining
+  is correct WITHIN a step, and the restart happens BETWEEN steps.
 
 ## The executor
 
@@ -93,8 +106,88 @@ discharged in `f40a850`.
 > *"at `8209397`, not at the branch tip"* is **SUPERSEDED** — T9 was reviewed and its fixes applied, and
 > the branch merged at its tip.
 
-**Step 4 is next: Plan 4 T4 → T5**, dispatched to the executor. It carries the CSRF ruling and **creates
-`Features.md` §6 and `test-cases/06-auth-visibility.md`** — in the same change set, per the rule below.
+**Steps 4, 5 and 6 are CLOSED** — `45c83eb` (#51), `40c5219` (#52), `33538be` (#53).
+**The §11 envelope-origin window is CLOSED at the constructor** (`fc904f4` had closed only the client
+door). **Step 7 is next: Plan 4 T8–T14**, with **T11 and T14 floor-list**.
+
+**Three privilege/forgery defects were found and closed in Phase 1, none by a pre-existing test:** a
+founding bypass that made strangers owners of workspaces they were never in; a role chain whose
+unenumerated direction was *grant*; and the embedded-claim window. All three were caught by review.
+
+**Seven gaps carried with named owners, none folded in opportunistically.** The two that bite hardest:
+**P19 guest admissions (T9)** — a guest is admitted TODAY for `ticket.created`, `visibility.set`,
+`workspace.renamed`, `comment.added`, and `visibility.set` in an append-only ledger cannot be walked back;
+and **P22 (T8)** — `canSeeResolved` takes `EffectiveRole` **by value**, so every safety property rests on
+provenance nothing enforces. TypeScript is structural, so Task 8/9/11 can each build or cache one no early
+return ever emptied. **Closer, so it is not re-litigated: a branded type** carrying a unique symbol only
+`resolveEffectiveRole` can produce — turning a silent grant into a compile error.
+
+> ### ~~⚠ IN-FLIGHT BRANCH — `exec/04-t6-t7-visibility`~~ **MERGED as `40c5219`. Kept for the rule below.**
+> **Cut from `main` at `45c83eb`. T6 (`proj_visibility`) is running.** The executor's handoff on `main`
+> may still read *"step 5 is next and nothing is in flight"* — that was true when written and goes stale
+> the moment T6 starts, because the executor deliberately does **not** commit a docs refresh underneath a
+> reviewer reading `git diff origin/main...HEAD` (the 2026-08-28 concurrent-mutation incident).
+> **So: before restarting the executor, hand the new session this branch name.** Otherwise it reads
+> `main`, sees step 5 unstarted, and cuts a second branch duplicating T6.
+> The executor mitigated this by telling the controller in a message — which does not survive the
+> CONTROLLER being restarted. **A mitigation that lives only in a conversation is not a mitigation.**
+> It is recorded here because this file is the thing that survives.
+T6/T7 must read membership through **`resolveEffectiveRole`**, never by joining `proj_memberships`
+directly — documented in three places and **enforced by nothing**; it is T4's implementer's own
+least-sure claim, so raise a ruling if T6 joins directly.
+
+**Four gaps carried with named owners, none silently fixed:** P18 engine-context wiring (T6 or the
+step-10 checkpoint) · **P19 guest admissions (T9)** — a guest is admitted TODAY for `ticket.created`,
+`visibility.set`, `workspace.renamed`, `comment.added`, and `visibility.set` in an append-only ledger is
+unrecoverable · a second `workspace.created` still commits (T13) · the half-founded workspace with no
+repair path (T13), **already closed by T5's escalation guards — do not read it as a regression.**
+
+**Case ids are reserved too, and I got this wrong a second time.** I ruled "cases numbered from 6.1";
+Plan 4 reserves **6.1–6.42 verbatim with content assigned per id**, and 6.5–6.8 are exactly T4's and T5's
+work. The executor filled those and continued at 6.43. **Same root error as the §6/§9 section mistake:
+assuming sequential allocation in a scheme that allocates from a table.** Claim from the table — at every
+level, sections and case ids alike.
+
+~~**Step 4 is running: Plan 4 T4 → T5.**~~ T4 (`proj_memberships`) is committed and green; T5 widens
+`SubmissionGate` — note **T5 is NOT unstarted**, `fc904f4` landed its first branch, so review its PR as a
+widening, not a creation. **No rebase was needed:** `exec/04-auth-visibility` is redundant (see the
+`git cherry` rule below) — the recon's "31 behind / 4 ahead, two conflicts" was accurate and its
+conclusion was false.
+
+**Catalogue, ruled 2026-08-31 — an earlier version of this line was WRONG.** It said step 4 "creates §6",
+asserted from the dispatch brief without opening Plan 4. **Plan 4's explicit catalogue steps are all in
+Tasks 12–14** (lines 4700/4866/4884/4922, 5131, 5260); T4 and T5 have none. But **the same-change-set rule is a series-wide
+standing constraint, not Plan 4 boilerplate** — measured, it appears in **all 11 numbered plans** (01–11),
+phrased differently in each. So if T12–14's steps meant "earlier tasks are exempt", the same inference
+would exempt earlier tasks in *every* plan and the rule would mean nothing anywhere. A general rule stated
+in eleven places governs the specific steps below it. **Ruling:
+step 4's PR creates §6 and `test-cases/06-auth-visibility.md` carrying ONLY T4's and T5's own entries**;
+T12–14 append theirs. Rationale: `proj_memberships` ships to `main` at this PR, so deferring leaves the
+catalogue not knowing about a live projection — the drift #47 was blocked for. Waiving it would make that
+block arbitrary.
+
+### `git cherry` before you believe an ahead-count
+
+**An ahead-count is not a work-count.** `exec/04-auth-visibility` read `31 behind / 4 ahead` with two real
+`merge-tree` conflicts — and `git cherry origin/main <branch>` prints `-` for all four commits: every one
+already upstream. `rev-list` measures commit identity, `merge-tree` measures a merge; **neither asks
+whether the content is already upstream.** Run `git cherry` FIRST for every remaining branch.
+
+**CONFIRMED LIVE 2026-08-31** on the first branch to test it: after #51 squash-merged,
+`git cherry origin/main origin/exec/04-t4-t5-permissions` returns **`+` for all 11** already-merged
+commits, and `main`'s subject ends in `(#51)`. A `+` from a branch whose PR landed with a `(#N)` suffix
+means nothing.
+
+**Asymmetry, because this repo squash-merges.** `-` is strong evidence of redundancy. `+` is NOT
+conclusive: a squash collapses N commits into one and destroys the per-commit patch-ids `cherry` matches,
+so `exec/03-tickets-hierarchy` reports `31/31 new` despite having merged as `6b2fc76`. A false `+` costs
+work, never loses it. **Tell them apart:** a squash landing's subject ends in `(#N)` and a rebase landing's
+does not — verified against both populations here. That is a GitHub UI convention, not a git property, so
+it is good evidence rather than proof.
+
+Measured: `exec/04-envelope-origin-gate` is the only genuinely inert branch (merge-tree byte-identical to
+`main`). `exec/04-auth-visibility` and `exec/10-prefix` are superseded AND conflicting — **merging either
+would now regress `main`**, which is a stronger statement than "redundant".
 
 ### The catalogue rule, and how I got its number wrong
 
@@ -113,6 +206,33 @@ rule ("next free number in the matching section") one level up to *section* numb
 
 Case ids are reserved the same way: Plan 7 T16 pins 9.1–9.34 and has not run, so the new bucket starts
 at **9.35**.
+
+### The sonnet reviewer default is CONDITIONAL, and the condition is checkable
+
+The cost ruling's table reads *"Per-task reviewers **where the plan text is complete** | sonnet | medium"*
+(line 1016; the older `| opus | high` row at 613 is superseded — do not cite it). **That precondition is
+measurable, so measure it** rather than defaulting: grep the task's own line range for the
+security-relevant terms it is supposed to cover, with a control term from the same range.
+
+Measured at step 6: **Plan 10 T4's range (1300–1810) contains ZERO** `coheren` / `binds` / `embedded` /
+`outer envelope` / `envelope-origin` / `§11`, against `projection` = 30 as the control. The §11 closer —
+**the entire reason the task was lifted to Phase 1** — is absent from its own text. It lives in the
+coordination doc and in `packages/rule-engine/src/contests.ts:36`. **Named where a reader of the
+EVALUATOR would find it; absent where a reader of the TASK would.** An implementer following the plan
+faithfully ships the task with the window still open.
+
+So an opus reviewer there is **not opus-by-exception** — the sonnet row simply does not cover the case.
+An exception invites re-argument every time; an unsatisfied precondition does not.
+
+General form: **lifting a task changes when it runs, not what its text says.** And the corollary, which is
+the reusable half: **when an obligation is assigned to a task from OUTSIDE that task, it must be written
+INTO that task's own text — or the next reader will not perform it, and the more faithful they are to the
+plan the more certainly they will miss it.** Fidelity is the failure mode, which is why no amount of care
+by the implementer would have caught this.
+
+**Standing instruction: before dispatching any remaining lifted or re-sequenced item, sweep its own range
+for the thing it was moved to do**, with a control term. Cheap, and it is the only check that fires before
+the work rather than after it.
 
 ## Standing owner rulings currently in force
 
@@ -186,6 +306,37 @@ Every one below was violated by a controller that had just written it. **Assume 
   assertions was dead, not the test. **"Vacuous" invites deletion**, so a too-wide verdict licenses
   removing a working check. The controller propagated this one in a dispatch while simultaneously
   demanding mutation proof for the positive claim.
+- **An over-specific search returns a false negative that looks like a finding.** Searching all 12 plans
+  for Plan 4's *exact* wording of the catalogue rule found it in **one** file; searching for the rule
+  loosely found it in **all 11**. Same class as grepping for `21 behind` when the file said `20`.
+  **Search for the fact in the vocabulary the other author would have used, not in yours** — and print the
+  rows, because two of the twelve returned blank rather than `0`.
+- **A RIGHT ANSWER ON DEAD EVIDENCE is worse than a wrong one** — a wrong answer gets caught; a right one
+  confirms the method that produced it. P21's role/mode asymmetry was established by widening a union in
+  `packages/domain/src` and compiling `apps/server`, which resolves that package through
+  **`dist/*.d.ts`** — the edit never reached the compiler under test, so `tsc` exiting 0 was equally
+  consistent with the finding and with a blind instrument. This is the **stale-`dist`** trap in its
+  *type-level* form; the mutation form is already recorded. Both fail as a **quiet pass**, never an error.
+  **Prove the instrument can see before reading it**: rebuild, then confirm a probe (`const _probe:
+  WorkspaceRole = 'viewer'`) does NOT error. And prefer a check whose **count** discriminates — the fix
+  raised exactly two `TS2366`s, one per file, where one would have meant a single switch was load-bearing.
+- **Name the ref; don't trust the symbol.** I prescribed `git rev-list --left-right --count @{u}...HEAD`
+  to verify a push. `@{u}` is whatever upstream the branch was *created* with, and
+  `git checkout -b <n> origin/main` sets it to **`origin/main`** — so it returned `0 6` right after a
+  successful push, truthfully answering a question nobody asked. Use `origin/<branch>...HEAD`.
+- **`git cat-file` also lies from a SIBLING WORKTREE, not only the reflog.** Worktrees share one object
+  store, so an unpushed commit resolves as `commit` from the main clone and reads as landed — fooling the
+  *reviewing* session, which is the party least able to suspect it. `git branch -r --contains <sha>`
+  (empty = on no remote) is the discriminating check. Caught two unpushed rounds this way.
+- **PRINT THE ROWS, NOT THE COUNT, whenever a count is about to decide something.** Four instances in one
+  day, one cause: a proxied `grep -c` silently reformatting its output; a `merge-tree` stat whose 11-line
+  "difference" was **conflict markers**; a regex counting `9.1`/`9.34` out of prose *describing* a reserved
+  range; and an idle check where a `✻` inside a "done" line made a finished session look busy. Corollary:
+  when the rows are too many to read, print the first few **and** the count — the disagreement is the signal.
+- **`git merge-tree --write-tree` writes conflict markers INTO the tree**, so comparing its output tree to
+  `main`'s answers *"did this conflict"*, never *"is this redundant"* — a conflicting branch can never
+  compare equal whatever its content. The tell for any instrument: **could it produce the answer that
+  would clear the subject?** If not, it is not a check.
 - **Verify a count by enumerating and marking, with the marker string counted as a control** so a zero
   cannot come from a sweep that matched nothing. Method from the executor, after the controller and
   Ruling P17 asserted two different wrong counts for the same thing.
