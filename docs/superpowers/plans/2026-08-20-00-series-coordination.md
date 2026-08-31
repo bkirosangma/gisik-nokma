@@ -2205,6 +2205,15 @@ exactly — the silent-wrong-refusal hazard — and T4 is named as the closer.
 
 ### Follow-up (2026-08-31, controller): the window is now OPEN, its named closer has not landed, and §11 made it wider than what was ruled
 
+> **TERM WARNING — two unrelated things are called "the origin check" in this document, and they meet in
+> one task.** Everything in THIS section means the **event-envelope `origin` field** — the provenance
+> enum (`web` | `mobile` | `desktop` | `server`) that `contest.server-only` reads and that nothing
+> validates. §7's prose means the **HTTP `Origin` header** — CSRF and cross-site navigation, a different
+> layer, a different attack, a different fix. Plan 4 T5 is asked to do something about both, in the same
+> region of the same file. An implementer who conflates them will write a header check and believe the
+> forgery window is closed. Flagged by Lane 2 before it dispatched. **Say "envelope-origin" or
+> "HTTP-Origin" in every task, commit and review that touches either.**
+
 The ruling above accepted the `origin` window on two stated grounds: reachability was nil, and it "is
 closed by work already scheduled in the same wave." **The first has expired and the second has not
 happened.** Verified at `main` = `b62be74` after Lane 4's P2 merge (#23):
@@ -2304,6 +2313,30 @@ rule-engine 115 · server 102 · **editor 39** · ui 31 · app-core 5. Same tota
 different package sets — one tree has `editor`, the other has `sync-client`. Had either cited the other as
 corroboration, a coincidence would have been laundered into a cross-check that survived both parties being
 careful. This is the absolute-versus-delta rule at a second axis: same failure, different dimension.
+
+**Naming the commit is not sufficient — confirm no operation is in flight and the tree is clean before a
+count means anything.** Lane 3's refinement, and it is a refinement rather than an instance because the
+failure satisfies the rule as previously written. Mid-rebase on a lockfile conflict, Lane 3 ran a forced
+count and got `editor 16` at commit `d30a375` — a coherent number, at a real sha, from a half-applied
+tree. It was caught only because 16 contradicted a figure verified minutes earlier; had it been plausible
+it would have shipped. A mid-rebase, mid-merge or dirty tree HAS a sha and is not a state anything can be
+counted at, and the number arrives looking exactly like a good one.
+
+**Two totals agreeing is not evidence; a decomposition that reconciles is.** Lane 3's, and the general
+form of the 508 coincidence above. Its properly-counted total is 558, and that number is checkable rather
+than comparable: every shared package equals the controller's exactly (rule-engine 128, server 106, ui 31,
+sync-client 8, app-core 5), domain is 230 + its 11, and editor 39 exists only there — 508 + 50 = 558. The
+coincidence was detectable ONLY because the controller published a breakdown instead of a sum. **Publish
+the decomposition; a bare total cannot be audited, only matched.**
+
+**A fourth silent-empty mode on this machine: the proxy reformats `git diff`, indenting the `+`/`-`
+markers, which defeats any `grep "^[+-]"` filter.** Lane 2's, found when a comment-only-change check
+returned a false clean that happened to be implausible enough to recheck. Parse the `.diff` file the
+review-package script writes; never `git diff` piped through a marker filter. That makes four distinct
+silent-empty modes recorded here — eaten globs, wrong-directory enumeration, proxied directory search, and
+now reformatted diff markers — **all four producing well-formed wrong answers rather than errors.** The
+common remedy is the positive control, and the reason it is not optional is that none of the four is
+detectable from inside its own run.
 
 **A fix is a change like any other — re-run the citation sweep over the files the FIX round touched, not
 only the ones the original round did.** Lane 1's, and the count behind it is the argument: four instances
