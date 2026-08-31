@@ -1012,6 +1012,36 @@ sonnet** — the previous inversion produced 2.9% sonnet against a table that ha
 Target shape: **~6 agents per task at sonnet-default**, which projects to roughly **$25-30 per task and
 ~$3,000 for the remaining 109** — inside the budget rather than triple it.
 
+### Chunk the SESSION, batch the REVIEWS — they are different axes and they pull opposite ways
+
+Measured on the executor's first task: its own session context ran **98K → 143K → 201K → 282K per
+request** across four quarters of a single task. **It nearly tripled inside one task.** Its subagents
+averaged 86K — less than half — because each starts fresh carrying only its dispatch.
+
+That decides the shape, because the two obvious economies conflict:
+
+- **Smaller PRs** would cut the delta each review must read, but multiply the number of reviews, and every
+  review pays full agent-startup context. **Rejected — keep batching PRs per phase.**
+- **Smaller SESSIONS** cut the compounding carriage that is 66% of all spend. **Adopted.**
+
+**The rule: the controller restarts the executor at every task boundary.** Not at plan boundaries — task
+boundaries. At 282K/request and climbing, every request late in a task costs roughly three times an early
+one, and the tail is where most requests are. A restart returns it to ~98K.
+
+This is the largest single lever available and the controller can execute it without the owner, because a
+restart-from-brief is not a `/clear` — see the clearing protocol above. Its preconditions are unchanged
+and non-negotiable: **the handoff must be current, tracked, pushed, and its anchors verified reachable
+rather than merely resolvable.** A restart against a stale handoff destroys exactly what it was meant to
+preserve.
+
+**Consequences for how work is sized.** A task is the chunk. If a plan task is large enough that its
+context triples before it completes, it is split at a coherent internal boundary and the handoff carries
+the seam. **Wall-clock cost of a restart is accepted deliberately** — the owner has stated the trade:
+slower is fine, expensive is not.
+
+**Dispatch prompts stay lean.** A subagent at 86K is cheap only while its dispatch is small; a fan-out
+brief that inlines whole documents rebuilds the problem inside every agent it spawns.
+
 ### What this costs, stated once so nobody has to rediscover it
 
 The two most valuable findings of 2026-08-31 came from exactly what is being removed. **The §11
