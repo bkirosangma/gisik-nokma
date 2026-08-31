@@ -2629,8 +2629,14 @@ content**. A resumer checking one is not handed an error; it is handed a stale t
 Verified independently by the controller on four of them: all four resolve, all four fail ancestry, and a
 live HEAD passes both.
 
-**"Does it resolve" is the test that lies. The test that works is reachability:**
-`git merge-base --is-ancestor <sha> HEAD`.
+**"Does it resolve" is the test that lies — and Lane 2's refinement says WHY, which matters because the
+obvious test passes on everything.** The orphans are **reflog-only**: alive in the worktree that made them,
+so `git cat-file -e` succeeds on all of them, and absent from a fresh clone, dying at the next `gc`. A lane
+that "tested its ledger" with the obvious command gets a clean bill and is still broken. So the finding is
+not *check your ledger* but **`cat-file` is the wrong question; ref-reachability is the right one** —
+`git branch --contains <sha>` (empty output means orphaned), or `git merge-base --is-ancestor <sha> HEAD`
+for the narrower ancestry form. Lane 2 measured **10 of 25** orphaned this way; Lane 1, **17 of 32**.
+Every merged task was rebase-merged, rewriting its shas a second time.
 
 Two things make this worse than the other four instruments. First, it lives in the **recovery set** — the
 artifact whose entire purpose is to be correct when everything else is gone, and which is consulted only
@@ -2644,9 +2650,17 @@ anchors (merge-base, HEAD, ahead-count, tree state, gate, fixture count), a task
 from `git log --reverse --oneline origin/main..HEAD`, an explicit instruction not to `git show` anything
 below it, and **the regeneration command**, because this will rot again at the next rebase.
 
+**A sixth silent-empty mode, found inside the verification itself.** Lane 2's first check reported
+`tested=1 resolve=0 dead=1` — zsh does not word-split an unquoted parameter, so it tested the entire sha
+list as a single token. It was caught only because the count was printed beside the result. **That is the
+positive-control rule catching a failure in the checking rather than in the tooling**, which is the case
+the rule was least obviously written for and most needed in.
+
 **The general form, which is the reason this is recorded above the instrument rules rather than beside
-them: durable state that nobody has tested is not durable state.** Lane 1 had asserted its ledger's
-recoverability twice before testing it, and lanes 2 and 3 asserted the same property about theirs. The
+them: durable state that nobody has tested is not durable state.** All three lanes with ledgers asserted
+the property. Both that then tested it found it false. Lane 2's assertion was the load-bearing one — it
+was made in the same message that declined a `/clear`, so it was offered as grounds for someone else's
+decision, and it had not been run. The
 assertion is free and the test is one command. **Before any lane session is cleared, its ledger's anchors
 must be verified reachable — clearing a lane whose recovery set has rotted destroys exactly the state the
 clear was meant to preserve.**
