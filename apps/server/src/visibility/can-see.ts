@@ -66,7 +66,11 @@ export interface ResolvedVisibility {
  * function ends without returning, and tsc refuses it with TS2366 ("Function
  * lacks ending return statement"). So a role or a mode nobody has enumerated
  * fails to COMPILE rather than picking up whatever the last branch happened to
- * grant.
+ * grant. Both halves are measured on THIS shape, not on the flat switch that
+ * preceded it: `| 'viewer'` on `WorkspaceRole` and `| 'inherit'` on
+ * `resolvedMode` each raise TS2366 here — the mode switch is nested inside the
+ * member case, and its non-exhaustiveness still propagates out to the function
+ * end.
  *
  * This was NOT true of the role side until it was measured. The role used to be
  * an if-chain — `null`, then `'owner'`, then `'guest'`, then everything else
