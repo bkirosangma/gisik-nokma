@@ -19,7 +19,9 @@ import { signInWithPhone } from '../helpers/session.js';
  * design (Task 1: provider registration is not a collaborator) — and with the
  * pair absent better-auth answers 500 `CLIENT_ID_AND_SECRET_REQUIRED`, so
  * without these two lines the Google check below would be testing their absence.
- * Vitest isolates test files in separate workers, so this reaches no other file.
+ * Nothing depends on how far a `process.env` write reaches: a placeholder pair
+ * leaves the provider configured-but-unusable, which is the same state an absent
+ * pair leaves it in, so another file seeing these would behave identically.
  */
 process.env['GOOGLE_CLIENT_ID'] = 'test-google-client-id.apps.googleusercontent.com';
 process.env['GOOGLE_CLIENT_SECRET'] = 'test-google-client-secret';
