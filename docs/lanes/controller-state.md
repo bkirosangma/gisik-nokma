@@ -188,6 +188,23 @@ rule ("next free number in the matching section") one level up to *section* numb
 Case ids are reserved the same way: Plan 7 T16 pins 9.1–9.34 and has not run, so the new bucket starts
 at **9.35**.
 
+### The sonnet reviewer default is CONDITIONAL, and the condition is checkable
+
+The cost ruling's table reads *"Per-task reviewers **where the plan text is complete** | sonnet | medium"*
+(line 1016; the older `| opus | high` row at 613 is superseded — do not cite it). **That precondition is
+measurable, so measure it** rather than defaulting: grep the task's own line range for the
+security-relevant terms it is supposed to cover, with a control term from the same range.
+
+Measured at step 6: **Plan 10 T4's range (1300–1810) contains ZERO** `coheren` / `binds` / `embedded` /
+`outer envelope` / `envelope-origin` / `§11`, against `projection` = 30 as the control. The §11 closer —
+**the entire reason the task was lifted to Phase 1** — is absent from its own text. It lives in the
+coordination doc and in `packages/rule-engine/src/contests.ts:36`. **Named where a reader of the
+EVALUATOR would find it; absent where a reader of the TASK would.** An implementer following the plan
+faithfully ships the task with the window still open.
+
+So an opus reviewer there is **not opus-by-exception** — the sonnet row simply does not cover the case.
+General form: **lifting a task changes when it runs, not what its text says.**
+
 ## Standing owner rulings currently in force
 
 - **Fable is not dispatched, for any role.** Sonnet default, opus by exception, hard cap **6 subagents per
