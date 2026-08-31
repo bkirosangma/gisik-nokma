@@ -814,6 +814,149 @@ produced a reasoning failure worth naming, from Lane 2: **an option priced as un
 option scoped too widely** — it rejected a correct control because it had described that control more
 broadly than anyone had proposed it.
 
+## Serial execution (owner decision 2026-08-31) — the wave schedule is superseded
+
+Wave 1 folded back into a serial run. **The parallel-waves schedule above is superseded in its entirety**
+— its gates (`Plans 3+4 → Wave 2`, `Plan 5 → Wave 3`, `Plan 6 → Wave 4`) describe transitions between
+concurrent lanes that no longer exist. What survives untouched: the eleven plans and their task
+dependencies, the model/effort table, the floor list, the verification-method rules, and every ruling.
+
+### Topology: two sessions, not one
+
+**Controller** (as during Wave 1) and **one executor**. The second session is not a convenience — it is
+the check that caught most of Wave 1's orchestrator errors, and a single-session run would have shipped
+every one of them. On 2026-08-31 alone, peer lanes caught the controller's T5 sequencing ruling (which
+would have held a security window open longer), its fixture arithmetic twice, its claim that
+`.superpowers` was untracked-by-oversight, its assertion that a hosting fact was unestablished when the
+answer sat eighty lines above in this document, and its estimate of an incident window that was off by 4x.
+
+**None of those were caught by a rule.** They were caught by an agent with a different vantage. The
+verification rules below are correct and were, in several cases, asserted by their own authors in the same
+message where they went unrun — one lane asserted its ledger was durable in the message declining a
+`/clear`, another asserted recoverability twice before testing it, and the controller wrote the
+mutating-worktree rule and then mutated a lane's worktree. **A rule does not reliably fire on its author.
+A peer does.**
+
+What the split preserves and what it does not: the SDD machinery (implementer → reviewer → refuters) was
+never the thing at risk — those are separate agents with separate context and they survive any topology.
+What needs the second session is review of the ORCHESTRATOR's judgments: rulings, arithmetic, scope
+claims, sequencing. That layer had no reviewer in Wave 1 either, except by accident of there being peers.
+
+### Authority (owner re-grant 2026-08-31)
+
+**Auto-merge: re-granted.** Clause 1 of the autonomous execution protocol was never schedule-tied and
+stands — a PR that has passed its full machinery AND an independent CI run green merges without a per-PR
+ask. **Amended for this topology: the controller merges the executor's work, never its own.** Self-merging
+one's own branch is a weaker check than the clause was written to describe, and the two-session split
+exists precisely to avoid it.
+
+**Ultracode orchestration: re-granted.** Clause 2 tied fan-out authorization to "all lane work under this
+schedule," and the schedule is void, so on a literal reading the authorization lapsed with it. It is
+re-granted here explicitly rather than inferred. The two-fan-out shape is restated **per plan** rather
+than per lane: a pre-flight scan before the plan's first task, and a final whole-branch review before its
+PR is auto-merge-eligible. The pre-flight's sibling-branch ingestion has no input in a serial run and is
+dropped; the adaptation map and the coordination-obligation lens remain.
+
+### Context management for the executor
+
+**The controller cannot clear the executor — `/clear` is user-typed.** This was established when a lane
+refused the instruction on exactly those grounds, and the refusal was correct. What the controller CAN do
+is kill and relaunch the executor from its brief, which is a **restart, not a clear**, and is survivable
+only if the handoff is current. So the protocol is:
+
+1. Controller watches the executor's context and calls the boundary — at a task boundary, never mid-task.
+2. **Precondition, non-negotiable: the executor's handoff anchors must be verified REACHABLE**, not merely
+   resolvable. `git branch --contains <sha>` — empty means orphaned. Wave 1 measured 17 of 32 cited shas
+   orphaned in one lane and 10 of 25 in another, all of which still `cat-file`d clean. **Clearing a
+   session whose handoff has rotted destroys exactly the state the clear was meant to preserve.**
+3. The executor writes its handoff to a TRACKED file and pushes. Not `.superpowers/` — that directory
+   carries its own `.gitignore` containing `*`, placed by the SDD skill, so a handoff written there is a
+   handoff thrown away. Wave 1 lost nothing to this only because it was caught in time.
+4. Controller verifies the push, then either signals the owner for the keystroke or relaunches.
+
+### The serial sequence
+
+Derived from the plans' own dependency declarations, not from the wave gates. The spine is
+`1,2 → 3,4 → 5 → {6,7,8,9,10} → 11`; Plan 5 states it itself — *"Runs after Plans 1-4; Plans 6-10 consume
+everything in this plan's Produces blocks."* **~109 of 177 tasks remain.**
+
+**Phase 0 — land what exists.** Three branches, all clean against `main` individually; the collisions
+appear only once one lands and the others rebase. Fixture count goes 67 → 84 at step 1, and every later
+assertion is **recounted, never computed**.
+
+1. `exec/03-tickets-hierarchy` — Plan 3 Chain A (T3-T8), complete and reviewed. First: largest shared
+   surface, and Plan 10 T4 must rebase onto its `contests.test.ts` change regardless.
+2. `exec/06a-client-core` **at `8209397`, not at the branch tip.** T6 is reviewed; T9 sits on top
+   **unreviewed** — it finished after the stop order and was committed deliberately, labelled in three
+   places. Merging at the reviewed sha keeps the work and keeps the gate; T9 takes its review in the
+   serial run. Do not merge this branch on a green gate.
+3. `exec/07-editor-client` — **T4's scoped re-review was never dispatched**, so every surface says
+   complete except the gate. Review first, then merge. Also 13 behind, so it takes the largest rebase.
+
+**Phase 1 — finish the Plan 5 gate.**
+
+4. Plan 4 **T4** → **T5** *(floor-list)* — permission gate, carrying the CSRF ruling's three items:
+   HTTP-Origin on cookie-authenticated routes, `sameSite` set explicitly, and the sentence naming that the
+   cookie assertion forbids a `Domain` attribute.
+5. Plan 4 **T6, T7** *(T7 floor-list)*.
+6. **LIFTED: Plan 10 T4** — the §11 closer, out of Plan 10's position and to here. It consumes only Plan
+   1's registry, Plan 10 T1's schemas (both on `main`) and `canSee` from the step above. `fc904f4` closed
+   the forgery at the client door only; this closes it at the constructor. Note it registers a projection
+   after `proj_visibility`, which collides with Plan 5's registrations — §8's order is the single source.
+7. Plan 4 **T8-T14** *(T11, T14 floor-list)*.
+8. Plan 3 **Chain B: T9-T13, then T14** *(T10, T12 floor-list)*. **Read `docs/plan-3-chain-b-handoff.md`
+   before T12, not during it** — two independent tenancy hazards converge on that one commit, and one is a
+   total outage that presents as a data problem.
+
+**Phase 2 — the hinge.**
+
+9. **Plan 5, all 17 tasks** *(T5, T9b, T14, T15 floor-list)*.
+10. **Integration checkpoint** — the replacement for the wave-boundary pass. Prove Plans 6a, 8 and 9's
+    fakes against the real server before anything builds further on them.
+
+**Phase 3 — the consumers.**
+
+11. **Plan 6 remainder** — first, because Plan 8's T13-14 and Plan 9's T14 both require `apps/web`.
+12. **Plan 7 remainder** *(T9, T11 floor-list)*.
+13. **Plan 8** — T1-T12 self-contained in `app-core`; T13-14 after Plan 6 *(F5 amendment floor-list)*.
+14. **Plan 9** *(T6 floor-list)* — T14 after `apps/web`.
+15. **Plan 10 remainder** *(T7, T9, T14, T15 floor-list)*.
+
+**Phase 4.**
+
+16. **Plan 11** *(T8/T9, T12 floor-list)* — last by construction: its interim-plumbing CI gate fails while
+    Plan 10's marked shortcuts are still present.
+
+**Nine floor-list tasks remain ahead**, each keeping an opus implementer and a `fable` reviewer under the
+2026-08-31 narrowing. The seven pre-rulings survive as DECISIONS but are moot as OWNERSHIP — one executor
+cannot collide with itself, and the trap is reading "a pre-ruling covers this" and skipping the thought
+when the ruling was about *who*, not *what*.
+
+### Two concerns the topology does NOT solve, recorded so they are not assumed away
+
+**The wave-boundary integration checkpoint no longer fires, and it guarded the signature defect.** The
+schedule provided "at each wave boundary, one live-integration pass proves the seams against the real
+server before the next wave builds on them." Plans 6a, 8 and 9 all build against sanctioned fakes, and *a
+mocked contract is the thing that excuses the server from existing* is this series' most-repeated failure
+— the Fable narrowing kept a dedicated lens for it. **Replacement trigger: the Phase 2/3 boundary** —
+after Plan 5 lands and before Plan 6, 7, 8, 9 or 10 build on it. It is the only point in the serial order
+where the same seams are exposed.
+
+**The environment is a fixture, and no test on `main` varies it.** Measured across all 48 test files on
+`main`: **zero vary `TZ`; seven are day- or clock-sensitive; all seven omit it.** The exposed set includes
+`packages/domain/test/ist-day.test.ts` — the dedicated test for the IST day-boundary module, which
+therefore cannot distinguish *the code computes IST correctly* from *the machine is already in IST*. Also
+`clock-skew.test.ts` and `event-store.test.ts`.
+
+Found by Lane 4's T9, which mutated the shared IST renderer to the device's `toLocaleDateString` and
+**passed the plan's own test** — this machine runs Asia/Kolkata, so the device clock printed the correct
+day by coincidence. Only tests swapping to Kiritimati and Niue killed it, and those exist nowhere on
+`main`. Since the owner decision put both clocks in Asia/Kolkata and every machine here matches, **every
+day-boundary and one-clock proof currently on `main` is consistent with the property being false.** This
+is a class of evidence, not a test: any clock-sensitive assertion must vary `TZ` explicitly, and the fix
+is a pattern applied to Plan 1's `ist-day.ts`, Plan 9's Calendar and Timeline, and anything reasoning
+about a day boundary.
+
 ### By-catch — plan defects found by the extraction, recorded so they are not rediscovered
 
 - **Plan 11's CI YAML omits the interim-plumbing gate** its own Produces bullet promises (the failing grep for Plan 10's session shortcuts). An executor following the YAML literally ships without it.
