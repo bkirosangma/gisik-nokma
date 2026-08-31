@@ -658,7 +658,48 @@ The tier table above was written from judgment. This section is written from the
 
 **A fan-out needs isolated worktrees, or serialised mutation windows.** Reported by Lane 4 from the same review: thirteen concurrent review agents mutation-testing a single shared worktree produced transient states another reviewer read as tampering — "a stat-invisible process planting defects with `git status` clean throughout." It was the agents observing each other's in-flight mutations. No damage, tree verified clean afterwards, but it came within one step of being filed as a security finding, and a false security finding costs a full investigation. **Any fan-out whose agents mutate the tree — mutation testers, planted-defect verifiers, refuters that edit to check a claim — gets one worktree per agent, or a serialised mutation window.** Read-only lenses may share.
 
-**What the burn actually looked like, for calibration.** Fable was 45% of spend on 22% of requests, Opus 52% on 65%, sonnet 2% on 12%. But 59% of everything was *cache reads* — context re-sent per request, a function of session length and request count that no tier policy touches. And the day the weekly pool blew (2026-08-28, 39% of the project's entire spend in one day) was 71% Opus, not Fable: four lanes launched at once alongside the controller. **Concurrency, not tier, is what exhausted the pool.** A future wave that must fit a budget caps lanes before it touches models.
+**What the burn actually looked like, for calibration.** Fable was 45% of spend on 22% of requests, Opus 52% on 65%, sonnet 2% on 12%. But 59% of everything was *cache reads* — context re-sent per request, a function of session length and request count that no tier policy touches. And the day the weekly pool blew (2026-08-28, 39% of the project's entire spend in one day) was 71% Opus, not Fable: four lanes launched at once alongside the controller. **CORRECTED 2026-08-31, later the same day: concurrency AND tier drift, not concurrency alone.** The
+original sentence read "concurrency, not tier, is what exhausted the pool" and was written without looking
+at the serial baseline's tier mix. Measured since: Plans 1-2, executed serially, ran **30.1% sonnet /
+45.6% opus / 23.8% fable**. Wave 1, parallel, ran **2.9% sonnet / 82.3% opus / 14.4% fable**. The tier
+policy was in force during the serial run and had collapsed during the parallel one. Tier drift was a
+co-cause, not a bystander, and the first version of this line would have sent a reader to cap lanes while
+leaving the cheaper fix untouched.
+
+### Wave 1 decomposition (2026-08-31) — 93% of spend carries context, 7.5% produces it
+
+| where | $out | $cacheW | $cacheR | total | cacheR% | avg ctx/req |
+|---|---|---|---|---|---|---|
+| lane4 | 29 | 123 | 303 | 455 | 67% | 144K |
+| lane2 | 19 | 116 | 231 | 366 | 63% | 169K |
+| lane1 | 22 | 91 | 227 | 340 | 67% | 179K |
+| controller | 39 | 51 | 195 | 285 | 69% | 240K |
+| lane3 | 18 | 73 | 157 | 249 | 63% | 143K |
+| **WAVE 1** | **127** | **453** | **1,114** | **1,695** | **66%** | |
+
+**The controller seat is 17% of the wave.** That is not where the money is, and the coordination it buys
+has receipts no lane could produce: the compound forgery window was findable only from a seat that saw
+both halves, and no lane can inspect another's worktree for a collision. It is not free either — the
+controller introduced the T5 sequencing error Lane 2 corrected, and one of the two wrong fixture absolutes.
+
+**Coordination's true share is a RANGE, not 17%.** Lanes carry coordination artifacts too: this document
+is ~45K tokens, which is 25-30% of a lane's measured 143-179K average context, plus every cross-lane
+message sits permanently in the recipient's transcript. Honest bound: **17% (controller seat) to roughly a
+third (if this doc is resident in every lane request).** Which end is true is unmeasured. The mitigation
+already exists and is not switched on — the briefs became self-sufficient on 2026-08-31, so lanes no
+longer need this document resident, and the owner-approved clear-and-reload protocol is the mechanism.
+
+**Do not read the per-task comparison as a parallelism tax.** Serial Plans 1-2 came to ~$23/task; parallel
+Wave 1 to ~$94/task so far. The tier table above says a material and unseparated fraction of that gap is
+drift rather than parallelism. **Killing parallelism on that number would pay for a tier problem with
+wall-clock.** And $94 is an interim upper bound: the window contains a 2.5-day stall and one unusually
+heavy coordination day, and Wave 1 is front-loaded — four pre-flights paid, 18 of 55+ tasks done. The
+honest figure exists at wave end, not now.
+
+**The synthesis, since the constraint is the pool and not dollars:** parallelism's entire product is
+wall-clock, and pool exhaustion destroyed 2.5 days of it across all four lanes at once. **Parallel at four
+lanes annulled its own benefit, once.** A wave that must fit a budget caps lanes AND enforces the tier
+table — the second costs nothing, because the table already says it.
 
 **Sonnet is under-used against this table's own instructions.** Lane requests ran 27:1 to 69:1 Opus-over-sonnet, against a table that assigns sonnet to transcription implementers, scaffolds, migrations, barrel exports, catalogue tasks, extractors and grep verifiers. Either the dispatches are not setting the model or the work is genuinely all semantics; the first is drift and costs nothing to correct, since this table already authorises it. Lanes should audit their own dispatch models against the table before the next wave.
 
