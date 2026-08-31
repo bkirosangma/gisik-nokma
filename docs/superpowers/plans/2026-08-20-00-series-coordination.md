@@ -3563,3 +3563,63 @@ import.
 design". **Task 8 on this same branch changed it to answer `null`.** The conclusion it supports still
 holds; its reason did not. A claim made false by one's own landing is inside scope — it is the defect
 class this branch has now caught six times, and it does not get an exemption for sitting in a test file.
+
+## Task 8's re-review, run because its first one was contaminated (2026-08-31, serial executor)
+
+`docs/plan-3-chain-b-handoff.md` recorded that T8's task review ran while a sibling controller had this
+worktree checked out to another branch for 26 seconds, and instructed a re-verification or a re-run. The
+dispatch brief for the serial executor described Chain A as "complete and reviewed clean", which the
+document contradicts; **the document wins, and this is the re-run**, against the rebased tree — which is
+also the tree that merges. Three lenses, six raw findings, one refuted, five upheld by `fable` refuters.
+
+### Fixed here
+
+**`reparent-legal-grandchild-up.json` claimed a property its staging did not have** — the third instance
+of this branch's own recurring class, a sentence beside the code that the code contradicts. Its note said
+"a real three-deep chain, so the ancestor walk actually walks". The walk starts at the NEW PARENT, and the
+fixture moved a grandchild under the ROOT grandparent — so the loop ran exactly one iteration and
+terminated. Two mutations proved it: refusing whenever the cursor has a parent, and refusing on entering a
+second iteration, **both left the whole fixture suite green**. Restaged four deep (epic → story → task →
+sub-task) with the move landing under `TKB`, whose parent is `TKA`: the walk now visits two nodes, and
+both mutations die naming this fixture at its own site. Fixture count is unchanged at 84.
+
+### Recorded with owners, not fixed
+
+- **The reparent path's rank rules have no end-to-end fixture.** Across all 84 fixtures, `hierarchy.rank`
+  and `hierarchy.deepest-rank-parent-required` appear exactly once each, **both on the created path**.
+  Neutralising either of `checkTicketReparented`'s twins leaves the whole fixture suite green. Correctly
+  classified as an UNCONSTRAINED PATH rather than a mutation that never ran — `fixtures.test.ts` imports
+  `../src/index.js`, so the mutated code executed, and the same mutations flipped `test/reparent.test.ts`
+  in the same run, which is the positive control. Both rules do have unit coverage; it is the end-to-end
+  layer that is one-sided, and the code comments make the shared refusal sentence a deliberate cross-path
+  property. Owner: **Plan 3 Task 14**.
+- **Eleven refusal ids have no end-to-end fixture, not four.** Commit `646939c` corrected a false universal
+  by naming four (`hierarchy.unknown-parent`, `hierarchy.parent-type-unknown`, `hierarchy.cross-project`,
+  `field.title-required`) and was right about those, but it is not the full inventory: `ticket.unknown`,
+  `ticket.unknown-type`, `ticket.already-exists`, `ticket.workflow-undefined`,
+  `ticket.rebound-same-workflow`, `ticket.rebound-unknown-state` and `ticket.rebound-unknown-workflow` are
+  also absent. A resumer reading that commit as the inventory would think seven ids are covered that are
+  not — the same class the commit exists to repair, one level up. `Features.md` now names all eleven.
+  Owner: **Plan 3 Task 14**.
+- **No test in the repo cites a catalogue case id**, so the `test-cases/` ↔ test citation is
+  one-directional: a test can be deleted and its case keeps its ✅. Repo-wide convention gap predating T8,
+  reported because the honest answer to "are the ✅ markers true?" is that it is unanswerable in that
+  direction. Owner: **workspace convention / Plan 11**.
+
+### A process finding, and it is the executor's own
+
+One lens reported **BLOCKING: this worktree is being concurrently mutated while the re-review runs**, and
+it was right. The reviewers were told read-only and then also told to restore anything they mutated —
+which on a SHARED tree is precisely the pattern that produced Wave 1's near-miss false tampering finding.
+The rule already existed ("mutating fan-outs get one worktree per agent, or a serialised mutation window;
+read-only lenses may share") and the executor wrote a dispatch that violated it. **A rule does not
+reliably fire on its author.**
+
+No result was corrupted, and that is luck plus discipline rather than design: the agents used
+anchor-uniqueness guards, positive controls in the same run, and md5-verified restores, and one explicitly
+identified a red run at 15:02:56 as a sibling's mutation rather than reporting it as a T8 defect — which
+is exactly the trap. Afterwards the tree was verified byte-identical to the pinned baseline (`HEAD`
+`6027d7e`, tree `e7f2cbec`, `git status` clean, empty `git diff`). **The gate that certifies this branch
+ran at 14:52, before the fan-out started, so it is uncontaminated — and was re-run afterwards on the
+verified-restored tree anyway.** Standing correction: any fan-out permitted to mutate gets a worktree per
+agent, and "read-only" in a prompt is not read-only if the same prompt also explains how to restore.
