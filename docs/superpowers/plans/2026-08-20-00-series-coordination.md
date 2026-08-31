@@ -3435,8 +3435,11 @@ answer, silently. It differs from them in one respect worth naming: the wrong an
 
 `packages/rule-engine/fixtures/` held **70** `.json` files before this task and holds **84** after, a delta
 of **+14** — the thirteen the plan text specifies plus one closing Ruling P15's end-to-end residual. Both
-numbers were counted from the directory with a clean tree and no rebase in flight, not derived from a
-tracker; the gate at `packages/rule-engine/test/fixtures.test.ts` moved in the same commit as the fixtures.
+numbers were counted from the directory rather than derived from a tracker, with no `MERGE_HEAD`,
+`rebase-apply`, `rebase-merge` or `CHERRY_PICK_HEAD` present, so no operation was in flight — which is the
+rider's actual requirement, and not the same as a clean tree, which the count could not have had because
+the fixtures being counted were the uncommitted objects; the gate at
+`packages/rule-engine/test/fixtures.test.ts` moved in the same commit as the fixtures.
 Lane 4's cross-lane merge resolves against whatever each lane counted at its own commit, per pre-ruling 6.
 
 **Task 14 inherits two facts from this, and one instruction.** The fourteen fixtures are catalogued in
