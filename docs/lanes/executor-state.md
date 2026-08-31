@@ -13,30 +13,18 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch | `exec/06a-client-core` | `git rev-parse --abbrev-ref HEAD` |
-| **Worktree** | `~/my_projects/gisik-nokma-lanes/lane4-periphery` — **NOT the exec worktree** | `git worktree list`. A `git checkout` of this branch from `gisik-nokma-exec` will refuse. Work there, or remove that worktree first. Decide before dispatching. |
-| HEAD | **do not trust any sha printed here** — run `git rev-parse HEAD`. It cannot be recorded correctly: the commit that records it changes it. | — |
-| Merge-base with `origin/main` | `55ae0a1` | `git merge-base` |
-| Ahead / behind | **1 behind, and deliberately not rebased.** `main` moved to `60bc7ca` (PR #42) after this branch was rebased and its PR opened. Re-measure both halves; neither is stable now. | `git rev-list --left-right --count origin/main...HEAD` |
-| Does that 1 matter? | **No.** `60bc7ca` adds one new file, `docs/lanes/controller-state.md`, which nothing on this branch touches. `git merge-tree --write-tree origin/main HEAD` **exits 0 and prints a bare tree sha** — a clean merge. Positive control from the same run: the identical command against `origin/exec/07-editor-client` prints 2 `CONFLICT` lines, so the null is a real null and not a silent grep. | above |
+| Branch | `docs/p17-plan6-stale-signature`, branched off `origin/main` | `git rev-parse --abbrev-ref HEAD` |
+| Worktree | `~/my_projects/gisik-nokma-exec` — a doc-only change, so it does not need lane 4's tree | `git worktree list` |
+| Base | `c93c910` — **Plan 6a T9 MERGED (PR #43)** | `git log --oneline -1 origin/main` |
+| HEAD | **do not trust any sha printed here.** It cannot be recorded correctly: the commit that records it changes it. | — |
+| Behind | re-measure. `main` moved twice while step 2's PR was open (#42, then #43 itself). | `git rev-list --left-right --count origin/main...HEAD` |
+| `exec/06a-client-core` | **merged and done.** Its pre-rebase tips `30e3db4`, `e82a579`, `444e1ec`, `8f3d670` are orphaned; so, after the squash, is every sha on the branch itself. **Cite `c93c910`.** | `git branch --contains` |
 
-> **Why not just rebase again.** It would be trivially clean, and it would orphan every sha this
-> branch's own commits are cited by — `c240c53`, `10a314e`, `439da6c`, `dcf097a` appear in
-> `docs/lanes/plan-6a-t9-review.md`, in the coordination doc's Ruling P17 section, and in PR #43's
-> body. Rebasing to reclaim a cosmetic "0 behind" would create exactly the orphaned-citation problem
-> this series keeps paying for, in three documents, to fix nothing. The merge is clean; leave it.
-| Tree state | clean | `git status --porcelain` empty |
-| Orphaned, do not cite | `30e3db4`, `e82a579`, `444e1ec`, `8f3d670` — the pre-rebase tips | superseded by the rebase |
-
-### Why the rebase is trusted
-
-`git range-diff 3fb22d3..30e3db4 origin/main..HEAD` reported **three `=` and one `!`**. The `!` is the
-commit carrying `Features.md`, and its only difference is the context line for the **Local pre-check**
-bullet that `main`'s `6b2fc76` rewrote. The resolution keeps `main`'s rewritten bullet — md5-checked
-identical to `origin/main`'s line 35 — and appends the branch's three new bullets after it.
-`Features.md` was the only collision, **re-confirmed against current main** with
-`git merge-tree --write-tree origin/main <branch>` rather than adopted from the review's older
-measurement.
+> **A note the controller's verification earned.** Its `--contains` sweep flagged four shas in this
+> file as unreachable. They were the four this file's own table labels *"Orphaned, do not cite — the
+> pre-rebase tips."* The claim was correct and the label is what made it checkable. **Label an
+> orphaned sha as orphaned in the same table that cites it**, or the next reader's sweep produces a
+> true finding about a false problem.
 
 ## Gate composition — recounted at the final sha
 
@@ -46,6 +34,7 @@ over a failed turbo run.
 
 | Measure | Value | How counted |
 |---|---|---|
+| **Node** | **v22.22.2** — every gate figure in this file was produced under it | `node -v` inside the same `export PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH"` the brief mandates. **Checked, not assumed:** this machine's *default* `node` is **v24.11.1**, outside the declared range, so a gate run without that export is a different configuration wearing the same numbers. |
 | Gate exit code | **0** | the run itself |
 | Turbo tasks | **18 successful of 18**, 0 cached | same run |
 | Tests | **853** = domain 263 + rule-engine 278 + server 143 + app-core **130** + ui 31 + sync-client 8 | summed from the six per-package lines in the same run |
@@ -60,16 +49,24 @@ historical in `docs/lanes/lane4-periphery-state.md`.
 ## Where I am in the serial sequence
 
 **Phase 0 step 1 — CLOSED.** Plan 3 Chain A merged as `6b2fc76` (PR #38).
+**Phase 0 step 2 — CLOSED.** Plan 6a T9 merged as `c93c910` (PR #43), CI green, controller-verified.
 
-**Phase 0 step 2 — COMPLETE on the branch. PR #43 is OPEN against `main`, awaiting the controller's
-merge.** That is the whole of what is in flight; nothing else is running. If you are a restarted
-executor and #43 is already merged, step 2 is closed — go to step 3.
+**IN FLIGHT: a doc-only PR discharging Ruling P17's obligation 1** — the Plan 6 text still documented
+the dead 3-argument `useLiveQuery`, and T10–T13 are transcribed from that text. Marked at every entry
+point a transcriber actually uses: a DEAD banner at the contract line, a SUPERSEDED note in the
+definition's own docblock, and an inline `P17: STALE` marker on **all nine** call sites.
 
-**Step 3 is next:** `exec/07-editor-client`, whose T4 scoped re-review was never dispatched. Recon done
-so the next session does not pay for it: it is **20 behind / 17 ahead** of `main` (the brief's "13+
-behind" is stale), and `git merge-tree --write-tree origin/main origin/exec/07-editor-client` reports
-**two** conflicts, not one — `docs/superpowers/plans/2026-08-20-00-series-coordination.md` and
-`packages/domain/src/index.ts`. The second is code. Budget for it.
+> **Recount, not transcription.** The controller's message named four call sites (`~4460`, `~5121`,
+> `~5122`, `~5419`). There are **nine** — `5514`, `6390`, `6391`, `6395` and `6396` were not in that
+> list. Marking only the named four would have left five stale in exactly the tasks that have not been
+> written yet, and the sweep would have reported success. Verified after the edit: 9 call sites found,
+> 9 marked, 0 unmarked, with the marker string itself counted as a control.
+
+**Step 3 is next:** `exec/07-editor-client`, whose T4 scoped re-review was never dispatched. Recon,
+done so the next session does not pay for it: **21 behind** as of the controller's last count (the
+brief's "13+" is stale and the number is still moving), and `git merge-tree --write-tree` reports
+**two** conflicts — `docs/superpowers/plans/2026-08-20-00-series-coordination.md` and
+`packages/domain/src/index.ts`. **The second is code.** Budget for it.
 
 Remaining order is the coordination doc's `## Serial execution` section, which is the authority; the
 dispatch brief is a copy and is advisory where they differ — **except on model and effort policy,
@@ -118,6 +115,38 @@ It has now passed all four.
 - **Auto-merge eligibility is the controller's call.** The PR is offered as a review ledger with the
   fixes-applied and recorded-with-owner split stated explicitly.
 
+## RECORDED, owner Plan 11 (infra) — the Node version is declared and enforced by nothing
+
+Raised by the controller after it cost a round, then verified here rather than adopted:
+
+| Fact | Evidence |
+|---|---|
+| `package.json` declares `"engines": { "node": ">=22.0.0 <23" }` | read at `c93c910` |
+| CI pins `node-version: 22` | `.github/workflows/ci.yml:62` |
+| This machine's default `node` is **v24.11.1** — outside that range | `node -v` with no PATH export |
+| **Nothing pins a shell** | `.nvmrc`, `.node-version`, `.tool-versions` all **ABSENT** |
+| **Nothing enforces the declaration either** | no `.npmrc`, so `engine-strict` is off by default. Tested: under v24.11.1, `pnpm exec node -v` and `pnpm run` both **succeed with no refusal and not even a warning**. Control: the same commands under v22.22.2 behave identically, so the silence is not a broken probe. |
+
+**Why this is the same class as the TZ finding, and worse.** Each worktree carries its own
+`node_modules`, and a native binding (`better-sqlite3@11.10.0`) matches whichever Node last rebuilt
+it. So **two sessions can certify the same commit under different Node majors and both report
+green**, with nothing in either report saying which. The controller met the loud half — a *false red*
+at `@gisik-nokma/sync-client#test`, ABI 137 runtime against an ABI 127 binding. The quiet half is a
+**false green**, and this repo has no way to notice it.
+
+**A gate result is not evidence unless it names its Node.** This file now does.
+
+**The fix is not mine to make and is named so it is not lost:** an `.nvmrc` (or `.node-version`)
+pinning 22, and `engine-strict=true` in `.npmrc` so an unsupported Node is a loud refusal rather than
+a silent success — *prefer the check whose failure is loud* applied to the toolchain itself. Not done
+here: it is Plan 11's infra surface, `engine-strict` needs a CI run to prove it does not break the
+pipeline, and it does not belong in a doc-only PR. The controller's PR #44 already carries the Node
+finding and is the natural home.
+
+**Rebuilding a stale binding takes `nvm use 22 && pnpm rebuild better-sqlite3`** — the bare rebuild
+compiles against whatever Node the shell has, which on this machine's default is 24, i.e. it
+reproduces the problem while looking like the cure.
+
 ## Method notes earned here — cheap to re-learn, expensive to rediscover
 
 - **`process.env.TZ` assignment does nothing inside a worker thread.** Verified with `new Worker(...)`:
@@ -140,3 +169,14 @@ It has now passed all four.
   that shape over granting a fan-out write access to a shared tree.
 - **Hold the tree still while a fan-out reads it.** All doc edits here were deferred until the three
   lenses returned, rather than repeating 2026-08-28's concurrent-mutation incident.
+- **This machine's Node was upgraded to v24.11.1 (ABI 137) mid-series**, while `better-sqlite3@11.10.0`
+  bindings built under Node 22 are ABI 127. **Any worktree whose `node_modules` predates the upgrade
+  shows a false RED at `@gisik-nokma/sync-client#test` that is not a code defect.** Fix:
+  **`nvm use 22 && pnpm rebuild better-sqlite3`** — the bare rebuild builds against the shell's Node,
+  which defaults to 24 here, so it reproduces the fault while looking like the fix. Reported by the
+  controller after it cost a round, and corrected by it before this file was pushed.
+- **A trailing command makes the harness report the gate's exit code as its own.** The piped-gate trap
+  (`| tail` returning 0 over a failed turbo run) is the special case; the general rule is that ANY
+  command after the gate in the same chain — including a bare `echo` — becomes the status you are
+  shown. **The summary line is the only honest signal.** The controller hit this with a gate that
+  reported "exit code 0" while its own summary said `Tasks: 11 successful, 18 total`.
