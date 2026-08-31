@@ -3881,3 +3881,37 @@ Critical was wrong about its mechanism and right that something was there. One I
 two seconds and it survived, confirming a load-bearing line was pinned by nothing. **A read-only lens
 that names its mutation precisely and hands it back is cheap and works**; it is the shape to prefer
 over granting a fan-out write access to a shared tree.
+
+---
+
+## Counting a defect class you are about to fix: recount from the file, then verify with the marker as its own control (2026-08-31, serial executor + controller)
+
+**The false-negative class has a cheap answer and this is it.** A sweep that returns zero is
+indistinguishable from a sweep that matched nothing, and six silent-empty modes are already recorded
+on this machine. So:
+
+1. **Recount from the FILE, never from a claim** — not from the ruling that named the count, not from
+   the dispatch that listed the sites. Both can be wrong, and when they disagree neither is a
+   tiebreak. Ruling P17 said *eight* stale `useLiveQuery` call sites; the dispatch asking for them to
+   be marked named *four*. **There were nine.** The five in neither list sat in Tasks 11–13 — the only
+   tasks not yet written, i.e. precisely the ones the marking existed to protect.
+2. **After the edit, enumerate every site again and check each one for its marker** — do not trust
+   that N replacements means N sites. Assert the count of unmarked sites is zero.
+3. **Count the marker string itself in the same run.** That is the control: a zero-unmarked result is
+   only evidence if the thing being searched for is demonstrably findable. Without it, "0 unmarked"
+   and "the search is broken" print identically.
+
+```
+call sites found: 9      UNMARKED: 0
+control — lines containing "P17: STALE": 9
+```
+
+**Why step 3 is not optional here.** *"A decomposition that reconciles almost everywhere reads as
+verified"* — the four sites the dispatch named were all real, so marking exactly those would have
+produced a clean-looking sweep with the live defect still in it. The wrong entry hides inside the
+right ones, and granularity makes the drift more persuasive, not less.
+
+**Companion rule, from the same exchange:** when a document cites a sha it knows to be orphaned,
+**label it orphaned in the same table that cites it.** A later reader's `git branch --contains` sweep
+will flag it, and the label is the difference between a cheap confirmation and a true finding about a
+false problem.
