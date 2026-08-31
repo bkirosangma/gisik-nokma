@@ -213,8 +213,9 @@ remove it first, or review from a detached checkout — decide before dispatchin
 Relayed by the controller and verified live (`gh pr view 39` — *"Removing Fable saves 15% of a bill
 that is 3.3x too large, so the machinery gets thinner too"*). The measured basis: **$113/task at 17.6
 subagents/task**, opus 85% of spend, sonnet 0%; 109 tasks remaining project to **~$12,400, 3.3x the
-project to date**. **A restart must apply this, not the brief's table.** **This block stays until PR #39 merges, and
-is deliberately a second source of truth for exactly that window** — see the hazard below.
+project to date**. **A restart must apply this, not the brief's table.** **This block stays until PR #40 merges** (not #39 — #39
+alone left the document self-contradictory, so my stopping condition was one PR short), and is
+deliberately a second source of truth for exactly that window — see the hazard below.
 
 1. **Fable is OUT entirely** — no exception. Not refuters, not the mocked-contract lens, not
    floor-list reviewers. Opus at the stated effort is the ceiling.
@@ -254,9 +255,21 @@ policy, 1 of 6 subagents. Reviewing in the lane4 worktree, so no shared-tree con
 `main` waits until PR #38 merges, per §8 merge order. PR #38's CI is **green**; the controller holds
 it for the owner's call on the accept-preview regression.
 
-## HAZARD, open at the time of writing — a restart reinstates fable through the brief's own precedence clause
+## HAZARD — the acute half is CLOSED; the residual is open until PR #40
 
-**Do not restart the executor until this is closed.** Verified, not inferred:
+**Status, verified on `origin/main` after the fixes landed:** the brief's precedence clause is now
+scoped — *"the document wins — EXCEPT on model and effort policy, where THIS BRIEF IS LATER AND
+WINS"*, with the reasoning inline so it is not removed as redundant, and `## MODEL & EFFORT` in the
+brief named as the operative policy. **So a restart is safe now**: it follows the brief's table, and
+the document's fable rows are dead by that clause whatever their heading says.
+
+**What is still open** is the document's INTERNAL contradiction, which PR #40 fixes: on `main`
+`90de0ff` (PR #39) added the cost ruling at line ~980 while the table at 605–606 still assigns
+`fable`, 609 still instructs an explicit `model: fable` dispatch, and the supersession sits **375
+lines below the table a reader hits first** — 23 fable mentions in total. Anyone reading the
+DOCUMENT directly, rather than through the brief, still meets live-looking rows.
+
+**Original finding, kept because the mechanism is the lesson:**
 
 The rewritten `dispatch-executor-serial.md` (2026-08-31 15:46) does carry the cost ruling — sonnet
 default, the machinery cuts, the 6-agent cap, the restart protocol. But its **READ FIRST** section
@@ -282,13 +295,14 @@ This is the two-sources-of-truth failure in a worse form than the one it replace
 policy *drifts*; a policy that explicitly **defers** to a contradicting document **reverses**,
 deterministically, at the next restart.
 
-**Fix, in order:** (1) merge PR #39 — note the topology amendment says the controller merges the
-executor's work and never its own, so #39 is an **owner** merge and is now on the restart critical
-path; (2) until then, scope the precedence clause — drop "with the 2026-08-31 Fable narrowing" and
-name the cost ruling as superseding, or carve the exception in one sentence: the document wins EXCEPT
-on model/effort policy, where the brief is later; (3) **the BINDING block above stays until #39 is on
-`main`** — today it is the only durable copy the precedence rule does not defeat, and it comes out
-the moment the first source is correct.
+**Fixes: (1) and (2) are DONE.** The precedence clause is scoped in the brief, and PR #40 repairs the
+document at the reader's entry point rather than with another statement further down — banner on the
+table, the two rows struck and marked DEAD, the 2026-08-28 amendment marked superseded in part with
+its controller-runs-Opus half preserved, the earlier narrowing struck at its heading but kept for its
+reasoning and cost ledger, and the floor-list line corrected to an opus reviewer. **(3) #40 is an
+OWNER merge** — the topology amendment says the controller merges the executor's work and never its
+own — so it sits on a restart's critical path rather than being documentation hygiene. **The BINDING
+block above comes out when #40 is on `main`, and I will say so when I drop it.**
 
 ## Step 1 CLOSED
 
