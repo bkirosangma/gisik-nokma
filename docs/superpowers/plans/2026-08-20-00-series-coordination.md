@@ -4072,3 +4072,37 @@ other entries: it fails by staying quiet and produces a well-formed wrong answer
 **Do not schedule work behind one.** Either re-check a cheap condition on the next real turn, or let
 the work itself be the clock. If a timer is unavoidable, treat "the timer has not fired" as evidence
 of nothing at all, and verify the process is actually advancing (`ps -o etime`) before believing it.
+
+---
+
+## What a catalogue entry is actually worth (2026-08-31, serial executor + controller)
+
+**A `✅` written from the implementation instead of from the test is the drift the catalogue exists to
+prevent, arriving during its creation.**
+
+Measured, on the `Features.md` §9 / `09-editor-attachments.md` bucket that #47 was blocked on. The
+cases were drafted from the source and the commit messages — which is the natural way to write them,
+because that is where the author's knowledge is — and then checked against the actual `it(...)` names.
+**Four of them did not survive:** one cited `rule-census.test.ts` for assertions living in
+`schema.test.ts`; one asserted a property (`VersionedDocument` replaces rather than re-registers) that
+no test makes; one described a mechanism as directly tested when what is tested is the round trip that
+implies it; and one marked a behaviour `🚫` out-of-scope when two tests already document it as current
+behaviour pending a later task, i.e. `✅` with a *flip, don't delete* note.
+
+**So: draft from the implementation if you like, but VERIFY EVERY MARKER AGAINST THE TEST NAMES before
+committing.** Listing `it(...)` titles per file takes one command and it caught four errors in
+twenty-eight entries.
+
+**And state the limit, because the marker is weaker than it looks.** No test in this repo cites a case
+id in either direction — the cross-reference rule is unimplemented repo-wide (owner workspace/Plan 11).
+So a `✅` is checkable only by reading the file the case names, never by grep, and **nothing fails when
+a test covering a case is deleted.** The catalogue is a claim about coverage that the suite does not
+enforce. Both halves belong in any bucket that carries a `✅`: name the covering file, and say that the
+naming is all the linkage there is.
+
+**Section numbers are RESERVED, not next-free — this is where it bites.** `test-cases/README.md` says
+claim from the table rather than renumbering, and the table above assigns §6 to Plan 4. A block on #47
+asked for the editor's section to be `## 6.` on next-free reasoning; §9 is Plan 7's reservation, and
+§6 would have collided with the very next task in the serial order, against a rule that forbids
+renumbering to fix it. **The case-level rule ("next free number in the matching section") does not
+generalise one level up to sections.**
