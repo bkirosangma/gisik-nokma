@@ -42,6 +42,32 @@ export function createAuth(deps: AuthDeps) {
     secret: deps.secret,
     emailAndPassword: { enabled: false }, // the spec forbids passwords
     advanced: {
+      /**
+       * Stated because better-auth's default for it depends on `NODE_ENV`, and
+       * that is not a property a security control may have.
+       *
+       * `skipOriginCheck: options.advanced?.disableOriginCheck !== undefined ? … : isTest() ? true : false`
+       * (`better-auth/dist/context/create-context.mjs`) — so left unset, the CSRF
+       * origin check is ON in production and OFF under vitest, which sets
+       * `NODE_ENV=test`. And it is not only the origin check: while
+       * `disableCSRFCheck` is unset, `shouldSkipCSRFForBackwardCompat` — which is
+       * `skipOriginCheck === true && options.advanced?.disableCSRFCheck === undefined`
+       * (`api/middlewares/origin-check.mjs`) — takes the whole CSRF middleware
+       * down with it. The result would be a suite in which
+       * every cookie-authenticated POST passes and the same request 403s in
+       * production — the failure mode where the tests are the thing that is wrong.
+       *
+       * `false` turns it on everywhere, so `test/auth/sign-in-flows.test.ts` can
+       * assert the refusals a browser will actually meet. The rule it switches on:
+       * any non-GET request that CARRIES A COOKIE must also carry a trusted
+       * `Origin` or `Referer`; a bearer-only request sends no cookie and is
+       * exempt, which is why `signInWithPhone` hands later tasks a bearer token.
+       *
+       * `trustedOrigins` is left at its default — the origin of `baseUrl`. When
+       * the web app is served from a different origin than this server, that
+       * origin must be added here or the browser's own cookie POSTs will 403.
+       */
+      disableOriginCheck: false,
       database: {
         /**
          * Every id better-auth mints is a ULID, because a user's id is not only
