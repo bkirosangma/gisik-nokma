@@ -1,6 +1,6 @@
 {
   "name": "reparenting under a descendant is refused as a loop even when a rank re-definition made it rank-legal",
-  "notes": "The rank re-definition is the point. Types are events and the last definition wins, so moving `phase` from rank 1 to rank 3 puts it BELOW the `step` it already contains — after which the loop-closing reparent is rank-legal and nothing but the ancestor walk refuses it. Without the second definition this fixture would be caught by the rank check and would prove nothing about cycles. The re-definition is a PRIOR, so it is never itself evaluated: priorEvents are the accepted past.",
+  "notes": "The rank re-definition is the point. Types are events and the last definition wins, so moving `phase` from rank 1 to rank 3 puts it BELOW the `step` it already contains — after which the loop-closing reparent is rank-legal and nothing but the ancestor walk refuses it. Without the second definition the fixture would still refuse `hierarchy.cycle` — the walk sits ABOVE rank, and a loop is named as a loop even when the rank is also violated — but it would prove nothing, because DELETING the walk would then leave the rank check refusing (1 under 2), and a planted defect that swaps one refusal for another cannot show the walk was the only thing standing. The re-definition is what turns the mutation into a clean ACCEPTANCE. The re-definition is a PRIOR, so it is never itself evaluated: priorEvents are the accepted past.",
   "workflowDefs": [
     {
       "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",

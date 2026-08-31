@@ -339,7 +339,26 @@ export function buildInMemoryContext(fx: Fixture): EngineContext {
 }
 
 /**
- * The prior-event fold. It is NOT the shared reducer — `buildMemoryContext`
+ * The prior-event fold, and the sentence the whole suite rests on: **prior
+ * events are folded WITHOUT evaluation.** They are the accepted past — the
+ * ledger as it already stands — and only the CANDIDATE faces `evaluateEvent`,
+ * once, against the context this builds (`test/fixtures.test.ts`). That is why
+ * a fixture may stage a `ticket-type.defined` re-ranking a type UNDER one the
+ * workspace already contains without the re-definition itself being judged,
+ * and it is what lets these fixtures compose with Plan 2's without
+ * re-litigating history. It is also why this fold is allowed to THROW on what
+ * the engine is contracted to refuse at the door: reaching one of those states
+ * in a replay means the history the fixture describes could not have happened.
+ *
+ * A runner that ever evaluated prior events would not merely shift a verdict
+ * here and there. Measured across the whole directory, it refuses
+ * `malformed-payload` on nearly every shipped `ticket.created` prior, because
+ * this dialect is deliberately not the domain's — so the failure would arrive
+ * as a wall of red at setup rather than as a wrong answer, which is the good
+ * case. The property is stated here, at the fold, and not only at the caller,
+ * because the fold is what would have to change to make it false.
+ *
+ * It is NOT the shared reducer — `buildMemoryContext`
  * (`../memory-context.js`) is the context that folds through
  * `applyTicketEvent`, and both contexts stay (pre-flight A15 / C-14). What
  * keeps the two from drifting is that everything added to one is checked
