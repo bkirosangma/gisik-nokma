@@ -19,7 +19,7 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/04-t6-t7-visibility`**, cut from `origin/main` at `45c83eb`. **T6 committed at `0c6b8d3`** (3 commits). T7 next; one PR after T7 | `git log`, `git rev-parse` |
+| Branch in flight | **`exec/04-t6-t7-visibility`**, cut from `origin/main` at `45c83eb`. **T6 AND T7 both done, reviewed, fixed.** PR open for the controller | `git log`, `git rev-parse` |
 | `main` | **`45c83eb`** (PR #51, step 4). Verified by presence, not by report: `proj-memberships.ts`, `effective-role.ts`, `bootstrap-workspace.ts`, `simple-kanban.ts`, `test-cases/06-auth-visibility.md` and Features.md §6 are all on it | `git cat-file -e`, `git show` |
 | `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
@@ -45,39 +45,32 @@ measured a tree strictly *behind* main and is **a control for nothing**. Do not 
 main-derived total: they are different trees, and a total that rises without decomposing is exactly what
 the coordination doc warns against.
 
-## Gate composition — recounted at the sha being reported, `e07a043` (step 4 complete)
+## Gate composition — recounted at the sha being reported (step 5 complete)
 
-**Status: GREEN.** `pnpm turbo run build test typecheck --force`, redirected to a file, **never piped**
-— and note the broader rule: **ANY command after the gate in the same chain becomes the status you are
-shown**, a bare `echo` included. The summary line is the only honest signal.
+**GREEN.** `pnpm turbo run build test typecheck --force`, redirected to a file, **never piped, nothing
+chained after it** — any command following the gate in the same chain becomes the status you are shown.
 
-| Measure | `main @ 91df593` | `c0e3fe0` (T4) | `e07a043` (T5 + fixes + catalogue) |
+| Measure | `main @ 45c83eb` | `0c6b8d3` (T6) | step 5 final |
 |---|---|---|---|
 | **Node** | v22.22.2 | v22.22.2 | **v22.22.2** |
 | Exit code | 0 | 0 | **0** |
 | Turbo tasks | 21/21, 0 cached | 21/21, 0 cached | **21/21, 0 cached** |
-| **Tests** | **936** | **960** | **995** |
-| domain | 274 | 274 | **276** |
+| **Tests** | **995** | **1016** | **1032** |
+| domain | 276 | 276 | 276 |
 | rule-engine | 278 | 278 | 278 |
-| **server** | 143 | 167 | **200** |
+| **server** | 200 | 221 | **237** |
 | app-core | 130 | 130 | 130 |
 | editor | 72 | 72 | 72 |
 | sync-client | 8 | 8 | 8 |
 | ui | 31 | 31 | 31 |
 
-**Both deltas decompose, which is the only thing that makes them checkable.**
-**936 → 960 (+24)**, all server: 12 `proj-memberships` + 11 `effective-role` + 1 new DB-free `tables` pin.
-**960 → 995 (+35)**: domain **+2** (`simple-kanban.test.ts`) and server **+33** = 32
-(`check-role-permission.test.ts`) + 1 (`events-route.test.ts`'s 401 pin). Every other package
-unchanged, as it must be.
+**Both deltas decompose, entirely in `server`.** 995 → 1016 (**+21**, all `proj-visibility.test.ts`);
+1016 → 1032 (**+16** = `can-see.test.ts` 12 + `visible-tickets.test.ts` 4). Every other package is
+unchanged, as it must be — step 5 touches only `apps/server`.
 
-**The fix round's delta was ZERO and that was the correct result** — it modified three existing `it`
-cases in place and added documentation; a non-zero delta there would itself have been a finding.
-
-**The final commit (`e07a043`, catalogue + rulings) touches only `Features.md`, `test-cases/` and
-`docs/`, all at repo root and outside every package.** `turbo.json` declares no `inputs`, so hashing
-falls back to package contents — **a root-level docs commit cannot move gate composition.** The figures
-above were measured at `e07a043` itself regardless, so no inference is being relied on.
+**T7's fix round delta was ZERO and that is the EXPECTED number**, not a figure to explain: both fixes
+are a semantics-preserving control-flow refactor plus prose. **A non-zero delta there would have been a
+tripwire that the refactor changed behaviour.**
 
 ## What was verified about step 4's surface, so the next session does not re-pay for it
 
@@ -92,53 +85,67 @@ above were measured at `e07a043` itself regardless, so no inference is being rel
 
 ## Where I am in the serial sequence
 
-**PHASE 0 COMPLETE.** **STEP 4 COMPLETE AND MERGED** — PR #51, `main @ 45c83eb`, 995 tests.
+**PHASE 0 COMPLETE. STEP 4 MERGED** (PR #51, `main @ 45c83eb`, 995 tests).
 
-**STEP 5 IS IN PROGRESS on `exec/04-t6-t7-visibility`. T6 IS DONE (`0c6b8d3`), REVIEWED WITH ZERO
-FINDINGS, GATE GREEN AT 1016. T7 (`canSee`) IS NEXT AND NOTHING IS IN FLIGHT.** T7 is **floor-list** —
-opus implementer AND opus reviewer. One PR after T7.
+**STEP 5 IS COMPLETE AND AWAITING MERGE.** T6 (`proj_visibility`) and T7 (`canSee`) are both done,
+reviewed, fixed and green on `exec/04-t6-t7-visibility`. **STEP 6 — the LIFTED Plan 10 T4, the §11
+closer — IS NEXT** per the dispatch brief's sequence, and nothing is in flight.
 
-### T6 — what it landed, and the vacuous test it had to replace
-
-`proj_visibility` + migration + `reResolveSubtree`, registered at its §8 position with **both** pins
-extended (`projection-order.test.ts`, still DB-free, now pinning names *and* `[name, tables]`; plus the
-undocumented one in `entity-heads.test.ts`). 21 new tests, all in server.
+### T6 — `proj_visibility`. Zero review findings.
 
 **The plan text's determinism test could not have failed.** It replayed the same ARRIVAL order it had
-applied, so it asserted only that `apply` is a deterministic function — never that the table is a pure
-function of the ledger's rows. Underneath it was a real defect: every event this projection reads is
-filed against a **ticket**, so canonical order is ticket-id order and a parent is routinely created when
-its children are already in the table. The plan's `ticket.created` resolved only the new ticket
-(*"a fresh ticket has no children"*) — true of arrival, false of replay. **Every handler now restores a
-table-wide invariant rather than applying a delta.** Ruling recorded in the coordination doc.
+applied, so it compared a thing with itself and asserted only that `apply` is a deterministic function.
+Underneath it: every event this projection reads is filed against a **ticket**, so canonical replay order
+is ticket-id order and under ULIDs a parent is routinely created when its children are already in the
+table. The plan's `ticket.created` resolved only the new ticket — true of arrival, false of replay.
+**Every handler now restores a table-wide invariant rather than applying a delta.**
 
-**Carried into T7 and beyond:** the reparent payload field is **`newParentId`**, not `parentId` — the
-plan text *and its own fixture* were self-consistently wrong, so nothing goes red until a real Plan 3
-event flows through, at which point reparent resolution silently stops working rather than erroring.
+### T7 — `canSee`. Floor-list. One Important, one Minor, both fixed.
 
-### T7 — `canSee`, floor-list. Plan text at line 2823
+**P21 — the role side granted by default.** `canSeeResolved` decided the role with an if-chain and the
+mode with a `switch`: a fourth `resolvedMode` errored TS2366, a fifth `WorkspaceRole` compiled clean.
+**The unenumerated direction was GRANT.** Both `canSeeResolved` and `listVisibleTickets` now use a bare
+exhaustive `switch`; widening `WorkspaceRole` raises **two** TS2366s, one per file. **Independently
+re-verified here** with the domain package rebuilt and a `const _probe: WorkspaceRole = 'viewer'`
+compiling clean first — see below, because the original measurement was void.
 
-- **T7 is the task that joins `proj_memberships`.** T6 legitimately never touched it. **The ruling
-  stands and applies to T7 in full: read membership through `resolveEffectiveRole(db, userId,
-  workspaceId)`, NEVER a direct project-scope `SELECT`** — such a row survives `membership.revoked` by
-  design, because each key must have exactly one totally-ordered writer. Documented in three places and
-  **enforced by nothing**. If T7 joins directly, that is a ruling, not a style note.
-- **Registration/contract shapes the plan text gets wrong** (from T6's adaptation map, verified): there
-  is no `registerProjection()` function — it is `registry.register(...)` inside
-  `buildProjectionRegistry()`; migrations are raw **`.sql`**, not `.cjs`; and `Projection` requires
-  `tables`, with `apply(event: LedgerEvent, tx: PoolClient)` — **`Queryable` is deliberately NOT the
-  type for `Projection.apply`**, though it IS correct for `canSee`/`resolveEffectiveRole`.
-- **Catalogue, same change set.** Plan 4 reserves **6.1–6.42** with content per id. T6 filled **6.9,
-  6.10** and minted **6.55–6.58**. **Claim from the table** — check which reserved id names T7's surface
-  before minting; only continue past the highest minted id for what no plan document anticipated.
-- **Open question T6 raised and did not settle:** whether Task 12's catalogue intends `canSee`'s tests
-  to ride under a reserved id or to need a new one. Resolve from the plan text, not by invention.
+**P22 — `EffectiveRole` is trusted by convention.** Every safety property rests on the value having come
+from `resolveEffectiveRole`, and **TypeScript is structural**, so any object of the right shape is
+accepted. Closer named for its implementer: **a branded/opaque type** carrying a unique symbol only
+`resolveEffectiveRole` can produce. *Owner: Task 8.* Case **6.64**.
 
-### The four carried gaps — owners unchanged, do NOT fold into step 5
+**The dispatch's own expectation was wrong and the implementer proved it against its own work.** The
+early return was named as the guard to watch; **the mutation that was supposed to prove it SURVIVED** —
+deleting it leaves all 16 of T7's tests green and reddens exactly one case in 237. The ruling holds, but
+**by two short-circuits, not by the early return**. The implementer withdrew the catalogue claim it had
+already written rather than keeping a sentence the evidence no longer supported.
 
-**P18** membership wiring (T6-or-step-10 → now: step-10 checkpoint, since T6 has passed) ·
-**P19** guest admissions, case 6.51 (T9) · second `workspace.created` still commits, 6.52 (T13) ·
-half-founded workspace with no repair path, 6.53 (T13).
+### THE TRAP THAT NEARLY VOIDED P21 — read before making any type-level claim
+
+**`apps/server` resolves `@gisik-nokma/domain` through `packages/domain/dist/*.d.ts`.** Widening a union
+in SOURCE does not reach the server's `tsc` at all. The review's pre-fix "exits 0" was equally consistent
+with a real finding and with **an instrument that could not see the change.** The conclusion was right;
+the evidence was not.
+
+**Rule: any claim of the form "widening this type does / does not produce a compile error over there" is
+VOID unless the package was rebuilt AND a probe proves the change is visible.** This is the stale-`dist`
+trap the coordination doc records for *mutations*, in its **type-level** form — and both halves produce a
+**quiet pass** rather than an error.
+
+### Step 6 — LIFTED Plan 10 T4, the §11 closer
+
+Per the dispatch brief: consumes only Plan 1's registry, Plan 10 T1's schemas (both on `main`) and
+`canSee` from step 5. **Registers a projection AFTER `proj_visibility`** — §8's order is the single
+source, and `projections/index.ts` now says registrants **insert at their §8 position**.
+**Both registration pins must be extended**: `projection-order.test.ts` (DB-free, pins names *and*
+`[name, tables]`) and the undocumented one in `entity-heads.test.ts`.
+
+### The carried gaps — owners unchanged, do NOT fold into step 6
+
+**P18** membership wiring, 6.50 (step-10 checkpoint) · **P19** guest admissions, 6.51 (T9) ·
+second `workspace.created`, 6.52 (T13) · half-founded workspace, 6.53 (T13) ·
+stale `project_id` on cross-project reparent, 6.57 (Plan 3, then T8) ·
+**P22** `EffectiveRole` provenance, 6.64 (T8) · SQL mode-side not compiler-exhaustive, 6.65 (T8).
 
 ## What step 2 actually contained
 
