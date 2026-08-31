@@ -45,46 +45,39 @@ measured a tree strictly *behind* main and is **a control for nothing**. Do not 
 main-derived total: they are different trees, and a total that rises without decomposing is exactly what
 the coordination doc warns against.
 
-## Gate composition — recounted at the sha being reported (T5 landed)
+## Gate composition — recounted at the sha being reported, `e07a043` (step 4 complete)
 
 **Status: GREEN.** `pnpm turbo run build test typecheck --force`, redirected to a file, **never piped**
-— a piped gate reports the pipe's exit code, and this repo has already seen `| tail` return 0 over a
-failed turbo run. The general rule is broader: **ANY command after the gate in the same chain becomes
-the status you are shown**, a bare `echo` included. The summary line is the only honest signal.
+— and note the broader rule: **ANY command after the gate in the same chain becomes the status you are
+shown**, a bare `echo` included. The summary line is the only honest signal.
 
-| Measure | `main @ 91df593` (baseline) | `c0e3fe0` (T4) | T5 (this branch's tip) |
+| Measure | `main @ 91df593` | `c0e3fe0` (T4) | `e07a043` (T5 + fixes + catalogue) |
 |---|---|---|---|
-| **Node** | **v22.22.2** | **v22.22.2** | **v22.22.2** |
-| Gate exit code | **0** | **0** | **0** |
-| Turbo tasks | **21 of 21**, 0 cached | **21 of 21**, 0 cached | **21 of 21**, 0 cached |
+| **Node** | v22.22.2 | v22.22.2 | **v22.22.2** |
+| Exit code | 0 | 0 | **0** |
+| Turbo tasks | 21/21, 0 cached | 21/21, 0 cached | **21/21, 0 cached** |
 | **Tests** | **936** | **960** | **995** |
 | domain | 274 | 274 | **276** |
 | rule-engine | 278 | 278 | 278 |
-| **server** | 143 | **167** | **200** |
+| **server** | 143 | 167 | **200** |
 | app-core | 130 | 130 | 130 |
 | editor | 72 | 72 | 72 |
 | sync-client | 8 | 8 | 8 |
 | ui | 31 | 31 | 31 |
 
-**T4's delta decomposed** as +24, entirely in `server` (143 → 167) = **12** (`proj-memberships.test.ts`)
-+ **11** (`effective-role.test.ts`) + **1** (the DB-free `tables` pin in `projection-order.test.ts`).
+**Both deltas decompose, which is the only thing that makes them checkable.**
+**936 → 960 (+24)**, all server: 12 `proj-memberships` + 11 `effective-role` + 1 new DB-free `tables` pin.
+**960 → 995 (+35)**: domain **+2** (`simple-kanban.test.ts`) and server **+33** = 32
+(`check-role-permission.test.ts`) + 1 (`events-route.test.ts`'s 401 pin). Every other package
+unchanged, as it must be.
 
-**T5's delta decomposes as +35 over T4**, in two packages and no others:
-- `domain` +2 — `test/simple-kanban.test.ts`, the canonical default workflow (validates clean at
-  version 1; deep-cloned).
-- `server` +33 — **+32** `test/permissions/check-role-permission.test.ts` (new: 12 pure
-  `checkRolePermission` cases, 8 founding-sequence cases, 12 client-door/gate cases) and **+1**
-  `test/events-route.test.ts` (12 → 13: the new `401 unauthenticated` pin on `/v1/events`).
-- Everything else is COUNT-STABLE and content-changed: `ingest.test.ts` stays 19,
-  `check-permission.test.ts` stays 7, `sign-in-flows.test.ts` stays 20. Those files were edited, not
-  extended — see "what changed meaning" below.
+**The fix round's delta was ZERO and that was the correct result** — it modified three existing `it`
+cases in place and added documentation; a non-zero delta there would itself have been a finding.
 
-**Both figures measured under Node v22.22.2**, stated because each worktree carries its own
-`node_modules` and a native binding matches whichever Node last rebuilt it — two sessions can certify
-the same commit under different Node majors and both report green.
-
-**Do not carry forward 853, or 631/658, or the 488** from the abandoned branch's pre-rebase gate.
-Different trees; the 488 in particular is a control for nothing.
+**The final commit (`e07a043`, catalogue + rulings) touches only `Features.md`, `test-cases/` and
+`docs/`, all at repo root and outside every package.** `turbo.json` declares no `inputs`, so hashing
+falls back to package contents — **a root-level docs commit cannot move gate composition.** The figures
+above were measured at `e07a043` itself regardless, so no inference is being relied on.
 
 ## What was verified about step 4's surface, so the next session does not re-pay for it
 
@@ -99,208 +92,67 @@ Different trees; the 488 in particular is a control for nothing.
 
 ## Where I am in the serial sequence
 
-**PHASE 0 COMPLETE.** Step 1 (`6b2fc76`, #38) · step 2 (`c93c910`, #43) · step 3 (`a3746fb`, #47).
+**PHASE 0 COMPLETE.** Steps 1-3 merged (`6b2fc76` #38 · `c93c910` #43 · `a3746fb` #47).
 
-**STEP 4: T4 AND T5 ARE BOTH DONE AND COMMITTED on `exec/04-t4-t5-permissions`, GATE GREEN at 995.
-NOTHING IS IN FLIGHT. THE NEXT ACTION IS TO OPEN THE ONE PR** (one PR for the step, not one per task). Gate green at **995**.
+**STEP 4 IS COMPLETE AND AWAITING MERGE. T4 AND T5 ARE BOTH DONE, REVIEWED, FIXED AND GREEN.**
+Branch `exec/04-t4-t5-permissions`, **10 commits** ahead of `main`, pushed, PR opened for the
+controller. **STEP 5 (Plan 4 T6, T7) IS NEXT AND NOTHING IS IN FLIGHT.**
 
-### T4 — done. What it landed, and the plan-text defect it had to refuse
+### What step 4 landed
 
-`proj_memberships` (+ migration), `resolveEffectiveRole`, the order pins, a fixture helper.
-**Reviewed with ZERO findings**, by a reviewer that re-ran three of the nine mutations itself rather
-than reading the report.
+**T4 — `proj_memberships`, `resolveEffectiveRole`, order pins.** Reviewed, **zero findings**.
+**T5 — the pre-engine permission gate, the founding sequence, the three CSRF items.** Floor-list
+review returned **7 findings (2 Important, 3 Minor, 2 Nit)**; the fix round closed both Importants
+plus one Minor and was verified not to have over-reached (three files, `check-permission.ts`
+**comment-only** — the code rows were printed and there are none).
 
-**The plan text's `membership.revoked` handler could not land as written, and this is the reusable
-part.** It says to delete every row for that user, project rows included. But `membership.granted`/
-`revoked` are filed against the **membership** entity and `project.member_added`/`removed` against the
-**project** entity, and `readLedger` replays in `(entity_kind, entity_id, seq)` order — so a rebuild
-applies every membership event before any roster event. Arrival `grant → member_added → revoked` leaves
-`{}` live and `{project row}` on rebuild. `diffTable` uses `EXCEPT`, so **`verify-projections` would
-have reported drift on a table nobody had corrupted.** `registry.ts` states the binding rule verbatim —
-*table contents must be a pure function of the ledger's rows, never of cross-entity arrival
-interleaving* — and **where the plan text and `registry.ts` disagree, `registry.ts` wins.**
+**T5's first commit contained a live privilege escalation.** Nothing refuses a *second*
+`workspace.created`; the founding bypass admitted one and the bootstrap then appended
+`membership.granted {role:'owner'}` for the sender — **a stranger resolving as owner of a workspace
+they were never in.** Closed by two guards, one per door: `ctx.workspaceExists` (a **required** field,
+so a call site that forgets it is a type error) asking whether the **workspace** has a ledger rather
+than whether the event's entity has a head row, and the bootstrap firing on
+`committed.workspaceSeq === 1`. **The guard has the same shape as the bug** — the obvious fix asks
+about the entity and is defeated by a founding filed under a *fresh entity id* against the victim's
+workspace.
 
-What landed instead is **disjoint key ownership**: one totally-ordered writer per key, so no
-interleaving can change the final set. The safety property the plan wanted moved to
-`resolveEffectiveRole` (no workspace row ⇒ no projects), which is a *stronger* placement — it also
-covers the roster row a legitimate rebuild leaves standing, which a table-level delete could not.
+### The four things step 4 leaves for later, each with an owner
 
-**`index.ts`'s "every new registrant appends" comment is corrected to "inserts at its §8 position."**
-Appending is right today only because the three projections sorting before `proj_memberships` do not
-exist yet. **Plan 3 Chain B — step 8 — adds them and MUST INSERT.**
+1. **P18** — `getEntityState('membership')` still answers `null`; no Plan 4 task owns the wiring.
+   **Fails CLOSED** (functionality gap, not a forgery window) and is **reachable, not dormant**
+   (`restrict-to.ts:25` is a live call site). *Owner: Plan 4 T6 or the step-10 checkpoint.*
+2. **P19** — **a guest is admitted TODAY** for `ticket.created`, `visibility.set`,
+   `workspace.renamed`, `comment.added`. Two are `permission.role` questions Task 9 owes that belong
+   **inside `checkRolePermission`**; a visibility pass running after it cannot supply them.
+   *Owner: Plan 4 T9.* Catalogued as **6.51**.
+3. **A second `workspace.created` still commits** (founding nothing). *Owner: T13.* Case **6.52**.
+4. **A half-founded workspace has no repair path through either door** — closed by T5's own escalation
+   guards. *Owner: T13.* Case **6.53**.
 
-### Carried out of T5 with named owners — recorded, deliberately not fixed
+### Catalogue — §6 exists now, and the numbering was NOT invented
 
-1. **The plan text's stated reason for the founding order is a refusal that does not exist.** Step 6
-   says a `ticket-type.defined` naming an undefined workflow is refused. `checkTicketTypeDefined`
-   (`packages/rule-engine/src/checks/ticket-type.ts`) takes `_ctx` unread and checks entity kind,
-   payload shape and the built-in rank lock — nothing else. The order is kept and is still load-bearing
-   (ledger honesty, stated in `bootstrap-workspace.ts`), but the justification was corrected rather
-   than repeated. *Owner of the missing check, if the series wants one: **Plan 3 Chain B**.*
-2. **Step 6's "a workspace can hold a ticket the moment it exists" test was not written**, because
-   `proj_tickets` does not exist on main. What was written pins the ledger instead. *Owner: the
-   **step-10 integration checkpoint**, after Plan 3 Chain B lands.*
-3. **RULING P18 is untouched and still open** — `getEntityState('membership')` still returns `null`.
-   T5 read roles through `resolveEffectiveRole` and never through the engine, exactly as scoped.
-   *Owner unchanged: whoever dispatches Plan 4 Task 6 or the step-10 checkpoint.*
-4. **A second `workspace.created` still COMMITS — through the internal door, and through the CLIENT
-   door for anyone who is already a member of that workspace.** `workspace.created` is not in
-   `ADMIN_ONLY_TYPES`, so a member passes the membership check and lands at `workspaceSeq > 1`; the
-   bootstrap does not fire, so it grants nothing and is not a security item. It is still a noise event
-   nothing refuses. Refusing it outright would be a new door or engine rule and is out of T5's scope.
-   *Owner: Plan 4 Task 13, which builds `POST /v1/workspaces`.*
-5. **No `test-cases` markers on the new file, deliberately.** `3.31` is the envelope-origin gate and
-   its catalogue entry names `check-permission.test.ts`; stamping it on 31 role/founding/roster tests
-   would assert coverage that entry never described. Plan 4 puts its catalogue steps in Tasks 12–14.
-   *Owner: whoever executes Plan 4 Task 12.*
-6. **The correctness half of the transactional-read argument is still an argument.** The new pin
-   catches a gate that needs a second CONNECTION; it cannot manufacture a concurrent commit, so
-   "a revoke committing mid-transaction is invisible to a pool-side read" remains prose in
-   `check-permission.ts`. *Owner: whoever builds the first real concurrency harness — Plan 10's sync
-   is the natural place.*
+`Features.md` §6 and `test-cases/06-auth-visibility.md` were created in this change set, because the
+same-change-set rule is stated in **all eleven numbered plans** — so Plan 4's T12-14 catalogue steps
+cannot be read as exempting earlier tasks without voiding the rule everywhere.
 
-### Carried out of T4 with named owners — recorded, deliberately not fixed
+**Plan 4's own catalogue tasks reserve 6.1-6.42 verbatim.** Ids **6.5-6.8** were already assigned to
+exactly what T4/T5 built and are **filled, not duplicated**. 6.1-6.4 (identity surface, Tasks 1-3) and
+6.9-6.42 (visibility, Tasks 6-11) are **absent, not missing**. New cases continue from **6.43**.
+**Check this reservation before writing any future bucket** — Plan 3 reserves 5.4-5.36 the same way.
 
-1. **RULING P18 (coordination doc): `proj_memberships` has landed and nothing reads it through the
-   engine.** `engine-context.ts`'s `getEntityState('membership')` still returns `null`, and **no task in
-   Plan 4 owns the wiring** — established by two sweeps with positive controls, one for the identifier
-   (`getEntityState` → 1 hit, in *Task 3*; control `proj_memberships` → 32) and one for the **capability
-   in prose** across Tasks 6–14 (no hit; control: 4 hits in Tasks 1–5).
-   **It fails CLOSED** — `restrict-to` refuses when membership is null, and that case has its own
-   fixture — so it is a **functionality gap, not a forgery window**. Report it that way or it provokes a
-   mis-sequencing ruling.
-   **It is reachable, not dormant.** T4's own implementation report claimed "the engine has no caller
-   today"; that is **false**, and the ruling corrects it. Enumerating every call site in
-   `packages/rule-engine/src` finds two in production reading *different kinds*: `transition.ts:41`
-   (`'ticket'`) and **`restrict-to.ts:25` (`'membership'`)**, dispatched from `rules/index.ts:34`.
-   The adapter is *trivial* — `resolveEffectiveRole(db, userId, workspaceId)` is **scopeless**, exactly
-   the pair `membershipId()` encodes — and it was still not done, because it flips rule-evaluation
-   outcomes and would ship unreviewed inside a reviewed diff.
-   **Owner: whoever dispatches Plan 4 Task 6 or the step-10 integration checkpoint, whichever is first.**
-2. **`entity-heads.test.ts` holds a SECOND, undocumented registration pin** the plan's Files list does
-   not name — so T4 came back red on a file the plan never mentions. Updated, and it now points at
-   `projection-order.test.ts` as the pin of record. **The duplicate sits in a DB-backed file, so it goes
-   quiet exactly when Postgres is down** — which is what the DB-free pin exists to prevent.
-   *Owner: Plan 3 Chain B, which is the next registrant and hits this first.*
-3. **`verify-projections.test.ts` now asserts "clean" over a projection it never populates** — it seeds
-   only `workspace.created` and `workflow.defined`, so `proj_memberships` diffs empty-against-empty.
-   Not a correctness gap (T4's own fence test covers the real property). *Owner: whoever next extends
-   that seed.*
-4. **A fourth RENAMED entry, and it is the implementer's own:** the export is **`membershipsProjection`**
-   (repo convention), not the plan text's `projMemberships`. **T5's plan-text code imports the old name
-   and must apply this rename**, alongside the three the adaptation map found.
+**Every ✅ was written from the covering test's own name**, never from the implementation.
 
-### T5 — DONE. What landed, what changed meaning, and what was recorded rather than fixed
+### Step 5 — Plan 4 T6 (`proj_visibility`) then T7 (`canSee`), T7 is floor-list
 
-**Landed:** `checkRolePermission` (pure) + a widened async `checkPermission(env, ctx)`;
-`SubmissionGate` widened and threaded through `commitOne` as a single `ClientDoor | null`;
-`ingestClientBatch(rawEvents, sessionUserId)`; `requireSession` on `POST /v1/events`;
-`packages/domain/src/simple-kanban.ts`; `apps/server/src/workspaces/bootstrap-workspace.ts` fired from
-`ingestAll` on accept.
-
-**THE ONE THING TO READ IF YOU READ NOTHING ELSE ABOUT T5.** T5's first commit shipped a live
-**privilege escalation**, found in review and fixed in the second commit. Nothing in this system refuses
-a SECOND `workspace.created`: `parseEvent` accepts it, the entity↔workspace guard sees no mismatch when
-the workspace ids agree, and `evaluateEvent` has no case for the type. So the founding bypass — the one
-event type a non-member may submit — admitted it, and T5's own founding sequence then appended
-`membership.granted {role: 'owner'}` for whoever sent it. **Measured before the fix: a stranger resolved
-as `owner` of a workspace they were never in, and the workspace held 14 events instead of 7.** Direct
-`membership.granted` is refused from below admin, so the founding bypass was the only path in — the
-escalation was created by T5's own bootstrap, not inherited.
-
-Two guards, because two doors:
-- `PermissionContext.workspaceExists` — REQUIRED, not optional, since `false` is the permissive value —
-  bounds the bypass to a workspace with no ledger. It asks about the WORKSPACE, not the event's entity:
-  the sharp variant of the attack files its second `workspace.created` against a FRESH entity id, which
-  has no head row and whose per-entity `seq` is 1, so both obvious guards pass it.
-- The bootstrap now fires on `committed.workspaceSeq === 1`, which is what protects the INTERNAL door —
-  ungated by design, and used by Plan 11's seeds and Task 13.
-
-**The test that missed it exercised only the duplicate-event-id path.** A second `workspace.created`
-with a FRESH id is a different path, and 28 passing tests and 11 dead mutations did not touch it. Both
-directions are pinned now.
-
-**Sixteen distinct mutations run; ALL SIXTEEN now die naming their own site.** Two survived their first
-run and both were fixed rather than excused, and both survivors were of the same species — *a docblock
-was the only guard*:
-
-| Survivor | Why it passed everything | What kills it now |
-|---|---|---|
-| `{ db: client }` → `{ db: deps.pool }` at the gate call site | a healthy pool just hands out a second connection; the read returns the same rows | a one-connection proxy pool — a gate needing a second connection deadlocks a saturated pool |
-| `workspaceHasLedger` reading `proj_entity_heads WHERE entity_id = <workspaceId>` instead of `events WHERE workspace_id` | in every other test the workspace entity's id EQUALS the workspace id, so the two reads agree | a founding filed against a workspace entity whose id differs — legal at the door — where the near-miss reports "no such workspace" for a seven-event ledger and re-opens the escalation |
-
-One more mutation is worth recording because it is now **unreachable by construction rather than
-test-guarded**: "bootstrap on duplicate" cannot be written any more. `commitOne` answers
-`{ result, committed: LedgerEvent | null }`, and a duplicate has `committed === null`, so the condition
-has nothing to fire on. The test is kept anyway — the type could be widened back.
-
-**Three things changed MEANING and are recorded so a reader does not read them as they were:**
-1. `check-permission.test.ts`'s five client-door cases used a forgery with a random `actorId`. The new
-   identity check runs BEFORE the envelope-origin one, so they were refusing for identity, not
-   provenance. Every forgery is now attributed to the signed-in caller: the only thing wrong with it is
-   the envelope-origin, so the refusal it draws is the one the file is named after.
-2. Seven of Plan 1's `ingest.test.ts` cases used `workspace.created` as neutral filler. It is not
-   neutral any more — a committed one appends six more events — so they use `workflow.defined`, and the
-   "two entities in one workspace" case got STRONGER (it now pins `seq` as well as `workspace_seq`,
-   which the old workspace-entity pair could not show at all).
-3. `sign-in-flows.test.ts:148`'s `toEqual` is unchanged and now says what its exactness is for.
-
-**The three CSRF items — converted to intent, not to new behaviour.** `sameSite` is SET in
-`createAuth` (`advanced.defaultCookieAttributes`) rather than inherited from better-auth's hard-coded
-`"lax"`; mutation to `'strict'` reddens `sign-in-flows.test.ts`. The `toEqual` sentence names what a
-relaxation to `toContain` would lose (a `Domain` attribute is invisible to `toContain`). **HTTP-Origin
-on product routes: the answer is still NO, and it is now a decision** recorded in `routes/events.ts` —
-`SameSite=Lax` already refuses the cross-site browser POST at 401, and the residual §7 names (a
-non-browser replaying a stolen cookie) sets any header it likes. *Residual recorded with owner: Plan 4
-T13 or Plan 11 hardening.* If the controller wanted the check built rather than decided, that is the
-one call to reverse — and it CHANGES what the door accepts, which the brief forbade.
-
-### T5 — the floor-list it was dispatched with (kept for the record)
-
-**The adaptation map's corrections, which are the difference between T5 working and T5 inventing files:**
-
-| Plan text says | Reality on `main` |
-|---|---|
-| Modify `apps/server/src/ingest/pipeline.ts` | **No such file.** It is `ingest/ingest-service.ts` |
-| `import type { Refusal } from '@gisik-nokma/domain'` | **Not exported there.** `Refusal` lives in `@gisik-nokma/rule-engine`. **Coordination doc §10 already ruled this**: *"Plan 4's executor takes the import origin from the shipped code, not from the plan text"* |
-| Create `packages/domain/src/workflows/simple-kanban.ts` | **No `workflows/` directory.** Flat: `src/simple-kanban.ts`, importing `./workflow.js` and `./validate-workflow.js` |
-| `projMemberships` | **`membershipsProjection`** (see above) |
-
-**The insertion point is not a linear insert.** `ingest-service.ts` already anticipates the widening —
-two doors (`ingestBatch` ungated / `ingestClientBatch` gated), a `SubmissionGate` threaded through
-`commitOne`, and a comment at lines 63–72 saying Task 5 widens the signature to carry the session. The
-real shape is: widen `SubmissionGate` to async carrying `sessionUserId`, thread it through
-`ingestClientBatch`, and `await` the `gate(envelope, …)` call inside `commitOne` (~line 180).
-
-**Widening `SubmissionGate` is a breaking signature change → RULING P17 IS THE PRECEDENT:** it owes a
-sweep of call sites **in the plan text**, not only in code. Note `test/permissions/check-permission.test.ts`
-(249 lines, on main) exercises the old sync signature end-to-end and will need updating.
-
-**The three CSRF items, and the sentence that unites them.** HTTP-Origin on cookie-authenticated product
-requests · `sameSite` set **explicitly** (check the config, not the emitted header — observed output is
-not a setting) · a sentence at **`apps/server/test/auth/sign-in-flows.test.ts:148`**, verified at that
-line on `main`. **All three are already true, and all three are true for the wrong reason.** `Domain` is
-forbidden by the exactness of a `toEqual` nobody chose for that purpose; `SameSite=Lax` is a library
-default, not a decision. A property that holds by accident holds until someone tidies it — a `toEqual`
-relaxed to `toContain`, a default that moves in a library upgrade — and nothing says a security property
-just changed. **T5 converts accident into intent**: pinned, so the next edit that would undo it fails
-loudly instead of succeeding quietly. A `Domain=.artsourced.in` would send the session cookie to every
-subdomain of the zone.
-
-**THE NAMING TRAP.** HTTP `Origin` **header** (CSRF) vs event-envelope `origin` **field** (provenance
-enum) are unrelated and meet in T5. Say **HTTP-Origin** or **envelope-origin** everywhere.
-`check-permission.ts` on main already models this, and main carries a coordination-doc section
-*"The envelope-origin gate has landed"* which is about the **field**, not the header.
-
-### Features.md §6 / test-cases 06 — the brief and the plan text DISAGREE, and the plan text wins
-
-The dispatch brief says step 4 owns `Features.md` §6 and `test-cases/06-auth-visibility.md` in the same
-change set. **Plan 4's own text does not put them in T4 or T5.** Enumerated: its Features.md steps sit at
-lines **4922, 4936, 5131, 5260** — inside Tasks 12/13/14, far past T5 (which ends at 2386). T5 has **no**
-Features.md step of its own. Per the precedence rule (*the document wins except on model/effort policy*),
-**§6 lands with Plan 4's later tasks — step 7 of the sequence, not step 4.** T4 correctly left both
-untouched and the reviewer confirmed it. Recorded so the next session does not "fix" a false omission.
-**§6 is a *section* number; the never-renumber rule applies to case numbers, not section numbers.**
+- **T6 registers `proj_visibility` AFTER `proj_memberships`** per §8. `index.ts`'s comment now says
+  **"inserts at its §8 position"** (T4 corrected the old "appends", which is a trap for Plan 3 Chain B).
+- **T6/T7 must read membership through `resolveEffectiveRole`, never `proj_memberships` directly** — a
+  bare project-scope `SELECT` returns rows for someone no longer in the workspace. This is T4's
+  implementer's own least-sure claim: the discipline is documented in three places and **nothing makes
+  it fail if ignored**. If T6 joins the table directly, that is the ruling to raise.
+- **A second, undocumented registration pin lives in `entity-heads.test.ts`** — the plan's Files list
+  does not name it, so a registrant comes back red on a file the plan never mentions. It sits in a
+  **DB-backed** file, so it goes quiet exactly when Postgres is down. *Owner: Plan 3 Chain B.*
 
 ## What step 2 actually contained
 
