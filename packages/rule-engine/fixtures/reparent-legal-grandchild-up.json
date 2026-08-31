@@ -1,0 +1,38 @@
+{
+  "name": "pulling a grandchild up under its grandparent is accepted",
+  "notes": "A real three-deep chain, so the ancestor walk actually walks: the accepting twin of the cycle refusal, catching a walk that refused any move whose parent has a parent.",
+  "workflowDefs": [
+    {
+      "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "*", "to": "todo", "rules": [] },
+        { "from": "*", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "epic" }, "actorId": "user-kiro",
+      "payload": { "id": "epic", "name": "Epic", "icon": "flag", "rank": 1, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "story" }, "actorId": "user-kiro",
+      "payload": { "id": "story", "name": "Story", "icon": "book", "rank": 2, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "task" }, "actorId": "user-kiro",
+      "payload": { "id": "task", "name": "Task", "icon": "check", "rank": 3, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GTKA000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "epic", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Opening the second counter", "workflowId": "wf-basic" } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GTKB000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "story", "projectId": "01J9GPRJ000000000000000000", "parentId": "01J9GTKA000000000000000000", "title": "Fit out the space", "workflowId": "wf-basic" } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GTKC000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "task", "projectId": "01J9GPRJ000000000000000000", "parentId": "01J9GTKB000000000000000000", "title": "Order the counter", "workflowId": "wf-basic" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.reparented", "entity": { "kind": "ticket", "id": "01J9GTKC000000000000000000" }, "actorId": "user-kiro",
+    "payload": { "newParentId": "01J9GTKA000000000000000000" }
+  },
+  "expected": { "refused": false }
+}

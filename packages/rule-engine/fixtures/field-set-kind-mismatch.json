@@ -1,0 +1,33 @@
+{
+  "name": "text where a number belongs is refused with the field named",
+  "workflowDefs": [
+    {
+      "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "*", "to": "todo", "rules": [] },
+        { "from": "*", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "invoice" }, "actorId": "user-kiro",
+      "payload": { "id": "invoice", "name": "Invoice", "icon": "receipt", "rank": 3, "workflowId": "wf-basic", "fields": [ { "id": "amount", "name": "Invoice amount", "type": "number" } ] } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GTKA000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "invoice", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Supplier invoice, August", "workflowId": "wf-basic" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.field_set", "entity": { "kind": "ticket", "id": "01J9GTKA000000000000000000" }, "actorId": "user-kiro",
+    "payload": { "fieldId": "amount", "value": "twelve" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "field.type-mismatch",
+    "reason": "\"Invoice amount\" needs a number."
+  }
+}

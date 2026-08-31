@@ -1,0 +1,38 @@
+{
+  "name": "parent terminal is accepted once every child is terminal",
+  "notes": "The accepting twin of parent-terminal-with-open-children: identical world plus one event, so a rule that refused every terminal move would be caught here rather than looking correct.",
+  "workflowDefs": [
+    {
+      "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "*", "to": "todo", "rules": [] },
+        { "from": "*", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "story" }, "actorId": "user-kiro",
+      "payload": { "id": "story", "name": "Story", "icon": "book", "rank": 2, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "task" }, "actorId": "user-kiro",
+      "payload": { "id": "task", "name": "Task", "icon": "check", "rank": 3, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GPAR000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "story", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Quarterly filings", "workflowId": "wf-basic" } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GCHA000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "task", "projectId": "01J9GPRJ000000000000000000", "parentId": "01J9GPAR000000000000000000", "title": "File GST", "workflowId": "wf-basic" } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GCHB000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "task", "projectId": "01J9GPRJ000000000000000000", "parentId": "01J9GPAR000000000000000000", "title": "File TDS", "workflowId": "wf-basic" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "01J9GCHA000000000000000000" }, "actorId": "user-anselma", "payload": { "to": "done" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "01J9GCHB000000000000000000" }, "actorId": "user-anselma", "payload": { "to": "done" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "01J9GPAR000000000000000000" }, "actorId": "user-kiro",
+    "payload": { "to": "done" }
+  },
+  "expected": { "refused": false }
+}

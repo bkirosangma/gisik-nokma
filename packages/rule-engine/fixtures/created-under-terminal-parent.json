@@ -1,0 +1,37 @@
+{
+  "name": "creating live work under a finished parent is refused toward a reopen",
+  "notes": "Not Plan 2's `parent-terminal-with-open-children`, which fires in the opposite direction (a parent trying to FINISH while children are open). This one fires when live work ARRIVES under a parent already finished, and its remedy is an offer rather than a correction — which is why it is checked last, and why the reason quotes the parent's own title, read from the title field claim the create recorded.",
+  "workflowDefs": [
+    {
+      "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "*", "to": "todo", "rules": [] },
+        { "from": "*", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "story" }, "actorId": "user-kiro",
+      "payload": { "id": "story", "name": "Story", "icon": "book", "rank": 2, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "task" }, "actorId": "user-kiro",
+      "payload": { "id": "task", "name": "Task", "icon": "check", "rank": 3, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GPAR000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "story", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Quarterly filings", "workflowId": "wf-basic" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "01J9GPAR000000000000000000" }, "actorId": "user-anselma", "payload": { "to": "done" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GNEW000000000000000000" }, "actorId": "user-kiro",
+    "payload": { "typeId": "task", "projectId": "01J9GPRJ000000000000000000", "parentId": "01J9GPAR000000000000000000", "title": "File CGST" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "hierarchy.parent-terminal",
+    "reason": "\"Quarterly filings\" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket."
+  }
+}

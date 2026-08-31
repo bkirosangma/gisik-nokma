@@ -1,0 +1,35 @@
+{
+  "name": "an epic created under a story is refused — rank must exceed the parent",
+  "workflowDefs": [
+    {
+      "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "*", "to": "todo", "rules": [] },
+        { "from": "*", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "epic" }, "actorId": "user-kiro",
+      "payload": { "id": "epic", "name": "Epic", "icon": "flag", "rank": 1, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "story" }, "actorId": "user-kiro",
+      "payload": { "id": "story", "name": "Story", "icon": "book", "rank": 2, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GPAR000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "story", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Shop compliance", "workflowId": "wf-basic" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GNEW000000000000000000" }, "actorId": "user-kiro",
+    "payload": { "typeId": "epic", "projectId": "01J9GPRJ000000000000000000", "parentId": "01J9GPAR000000000000000000", "title": "Everything, under one story" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "hierarchy.rank",
+    "reason": "\"Epic\" cannot go under \"Story\": a ticket's parent must be a bigger kind of work."
+  }
+}

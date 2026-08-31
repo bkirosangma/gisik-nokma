@@ -34,6 +34,17 @@ function refuses(type: string, entityKind: 'ticket' | 'ticket-type' | 'workflow'
   return result.ok ? '' : result.code;
 }
 
+/**
+ * The sibling of `refuses` that returns what the door SAYS rather than which
+ * code it answers. A code is a branch; the message is the sentence a person
+ * reads, and the two fail independently — a reworded message keeps its code.
+ */
+function refusalMessage(type: string, payload: unknown): string {
+  const result = parseEvent(makeEnvelope({ type, entity: { kind: 'ticket', id: TICKET }, payload }));
+  expect(result.ok).toBe(false);
+  return result.ok ? '' : result.message;
+}
+
 describe('ticket event vocabulary', () => {
   it('accepts every event in the vocabulary', () => {
     roundTrips('ticket-type.defined', 'ticket-type', {
@@ -239,5 +250,15 @@ describe('ticket.created title must not be blank', () => {
 
   it('the door inherits it: parseEvent refuses a ticket.created whose title is only spaces', () => {
     expect(refuses('ticket.created', 'ticket', created('   '))).toBe('invalid-payload');
+    // The MESSAGE, not only the code. Until now this sentence was verified by a
+    // probe and pinned by nothing, so the code alone would have stayed green
+    // through any rewording — and this is the sentence Plan 6 renders to a
+    // person. It names the field because `parse-event.ts` renders the zod path;
+    // the same `at <path>: <message>` construction the engine's own
+    // `malformedPayloadDetail` mirrors, so the door and the engine say the path
+    // the same way.
+    expect(refusalMessage('ticket.created', created('   '))).toBe(
+      "payload for 'ticket.created' v1 is invalid at title: must not be blank — a title of only spaces names nothing",
+    );
   });
 });

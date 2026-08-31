@@ -1,0 +1,32 @@
+{
+  "name": "a ticket created with a title of only spaces is refused at the engine, naming the field",
+  "notes": "Ruling P15's end-to-end proof. The whitespace-title refusal was pinned at the schema, through `parseEvent` and through `checkTicketCreated`'s own safeParse — but nowhere through the engine, so nothing showed that an actor emitting this event meets the refusal rather than a created ticket. Everything else about this candidate is legal: the type resolves, its workflow is published, and rank 2 needs no parent. Remove the schema's blank-title refine and this fixture ACCEPTS.",
+  "workflowDefs": [
+    {
+      "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "*", "to": "todo", "rules": [] },
+        { "from": "*", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "story" }, "actorId": "user-kiro",
+      "payload": { "id": "story", "name": "Story", "icon": "book", "rank": 2, "workflowId": "wf-basic", "fields": [] } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GNEW000000000000000000" }, "actorId": "user-kiro",
+    "payload": { "typeId": "story", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "   " }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "malformed-payload",
+    "reason": "This ticket.created event's payload is malformed: at title: must not be blank — a title of only spaces names nothing"
+  }
+}

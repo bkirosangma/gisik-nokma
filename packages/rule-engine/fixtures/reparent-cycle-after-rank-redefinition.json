@@ -1,0 +1,40 @@
+{
+  "name": "reparenting under a descendant is refused as a loop even when a rank re-definition made it rank-legal",
+  "notes": "The rank re-definition is the point. Types are events and the last definition wins, so moving `phase` from rank 1 to rank 3 puts it BELOW the `step` it already contains — after which the loop-closing reparent is rank-legal and nothing but the ancestor walk refuses it. Without the second definition this fixture would be caught by the rank check and would prove nothing about cycles. The re-definition is a PRIOR, so it is never itself evaluated: priorEvents are the accepted past.",
+  "workflowDefs": [
+    {
+      "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "*", "to": "todo", "rules": [] },
+        { "from": "*", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "phase" }, "actorId": "user-kiro",
+      "payload": { "id": "phase", "name": "Phase", "icon": "flag", "rank": 1, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "step" }, "actorId": "user-kiro",
+      "payload": { "id": "step", "name": "Step", "icon": "check", "rank": 2, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GTKA000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "phase", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Opening the second counter", "workflowId": "wf-basic" } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GTKB000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "step", "projectId": "01J9GPRJ000000000000000000", "parentId": "01J9GTKA000000000000000000", "title": "Order the counter", "workflowId": "wf-basic" } },
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "phase" }, "actorId": "user-kiro",
+      "payload": { "id": "phase", "name": "Phase", "icon": "flag", "rank": 3, "workflowId": "wf-basic", "fields": [] } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.reparented", "entity": { "kind": "ticket", "id": "01J9GTKA000000000000000000" }, "actorId": "user-kiro",
+    "payload": { "newParentId": "01J9GTKB000000000000000000" }
+  },
+  "expected": {
+    "refused": true,
+    "rule": "hierarchy.cycle",
+    "reason": "This move would put the ticket inside one of its own sub-items, making a loop. A ticket cannot contain itself."
+  }
+}

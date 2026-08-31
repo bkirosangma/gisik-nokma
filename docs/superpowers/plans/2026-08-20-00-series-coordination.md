@@ -3393,3 +3393,66 @@ the check just failed to resolve?"* This one asks a different question of the sa
 this?** An id the ACTOR chose, resolved through a lookup with no tenancy predicate, is a tenancy hole
 whatever the answer looks like — and it is worst where the lookup succeeding leads to an ACCEPT rather than
 to a refusal, because nothing downstream will ever mention it.
+
+---
+
+## A mutation that crosses a package boundary is inert until the package is rebuilt (2026-08-31, Lane 1 Task 8)
+
+**Found by a mutation that reported the wrong answer, and would have been reported as a finding.** Plan 3's
+end-to-end fixture for the whitespace-title refusal was mutated by deleting the refine on
+`ticketCreatedPayload.title` (`packages/domain/src/events/ticket-events.ts`) and rerunning
+`packages/rule-engine`'s fixture suite. Every fixture stayed green. Under the standing discipline — *if no
+mutation can make a fixture fail, report it, do not ship it* — that reads as a fixture that agrees without
+constraining, and the honest thing to do would have been to report it as such.
+
+It was the mutation that was wrong. `@gisik-nokma/domain`'s `exports` map points at `./dist/index.js`
+(`packages/domain/package.json`), so every package that imports it by name reads BUILT OUTPUT, not source.
+A rule-engine test therefore cannot see an unbuilt change to a domain source file at all. Rebuilding the
+domain package and rerunning turned the same mutation red immediately, at the fixture's own expected
+outcome — the candidate is ACCEPTED once the refine is gone, which is precisely the proof the fixture exists
+to give.
+
+**Binding on every task that mutates across a package boundary**, which is most of the remaining lane:
+`packages/domain` is mutated by tasks whose tests live in `packages/rule-engine` and `apps/server`, and the
+same asymmetry holds for `packages/rule-engine` read from `apps/server`.
+
+- **A same-package mutation needs no rebuild** — vitest compiles the package's own sources, and a relative
+  `../src/x.js` import sees the edit. Every mutation inside `packages/rule-engine/src` proven by this task
+  behaved correctly without one.
+- **A cross-package mutation needs `pnpm --filter <pkg> run build` before the run, and again after the
+  restore.** Skipping the second rebuild leaves a mutated `dist/` standing behind a clean `git status`,
+  which is worse than the first error: the tree reads restored and the next suite runs against the mutant.
+- **The tell is a survivor with no explanation.** A mutation that deletes a check and changes nothing is
+  either a genuinely unconstrained path or a mutation that never arrived. Distinguish them before
+  reporting: assert the mutation is live (read the built file, or watch the mutated package's OWN suite go
+  red) and only then call the surviving fixture unfalsifiable.
+
+This is the same shape as the verification-method rules above — a method that produces a confident wrong
+answer, silently. It differs from them in one respect worth naming: the wrong answer here is
+*conservative-looking*. It reports a weakness that does not exist, so it would have been believed.
+
+### Fixture count on Lane 1 at Task 8, counted (Ruling P6)
+
+`packages/rule-engine/fixtures/` held **70** `.json` files before this task and holds **84** after, a delta
+of **+14** — the thirteen the plan text specifies plus one closing Ruling P15's end-to-end residual. Both
+numbers were counted from the directory with a clean tree and no rebase in flight, not derived from a
+tracker; the gate at `packages/rule-engine/test/fixtures.test.ts` moved in the same commit as the fixtures.
+Lane 4's cross-lane merge resolves against whatever each lane counted at its own commit, per pre-ruling 6.
+
+**Task 14 inherits two facts from this, and one instruction.** The fourteen fixtures are catalogued in
+`Features.md` §5 but **claim no new test-case ids**: thirteen of them prove scenarios Plan 3's own document
+already reserves inside 5.4–5.36, so Task 14 cites the fixture filenames from those ids rather than
+minting a second set of numbers for the same behaviour. Only the three things no plan document anticipated
+— the harness/domain presence audit, the fold extension, and Ruling P15's end-to-end proof — take new ids,
+at 5.51–5.53. New cases beyond those continue from 5.54.
+
+### The fixture prior-event dialect changed shape, and later fixture authors inherit it
+
+Any task or lane that writes a fixture with a `ticket.created` prior must now spell `typeId`, `projectId`,
+`parentId` and `title` — required, with `parentId` required-and-nullable, mirroring `ticketCreatedPayload`'s
+PRESENCE while keeping the loose string FORMAT that lets `t1` and `prj_1` work (Ruling P10). The fold no
+longer answers `prj_1`/`task` from constants, and it records the title as a field claim exactly as
+`applyTicketEvent` does — which is what makes the parent-terminal refusals quote a title rather than a raw
+ticket id. `workflowId` stays a harness-only affordance and stays required: this dialect binds a workflow
+directly because no ticket-type projection stands behind it, and the fold deliberately does NOT throw on a
+`typeId` no `ticket-type.defined` declared, so a fixture about transitions need not invent a type ladder.

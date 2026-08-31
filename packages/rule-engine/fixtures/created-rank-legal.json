@@ -1,0 +1,34 @@
+{
+  "name": "a custom type at the deepest rank, created under a story, is accepted — rank-legal and its parent named",
+  "notes": "One candidate, two guards. `hierarchy.rank` must not fire (4 under 2 is legal) and `hierarchy.deepest-rank-parent-required` must not fire either (the deepest rank is fine once a parent is named) — so a single accepting twin covers both refusals over-firing, without a near-duplicate fixture for each.",
+  "workflowDefs": [
+    {
+      "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "*", "to": "todo", "rules": [] },
+        { "from": "*", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "story" }, "actorId": "user-kiro",
+      "payload": { "id": "story", "name": "Story", "icon": "book", "rank": 2, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "task" }, "actorId": "user-kiro",
+      "payload": { "id": "task", "name": "Task", "icon": "check", "rank": 3, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "checklist-item" }, "actorId": "user-kiro",
+      "payload": { "id": "checklist-item", "name": "Checklist item", "icon": "list", "rank": 4, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GPAR000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "story", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Shop compliance", "workflowId": "wf-basic" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GNEW000000000000000000" }, "actorId": "user-kiro",
+    "payload": { "typeId": "checklist-item", "projectId": "01J9GPRJ000000000000000000", "parentId": "01J9GPAR000000000000000000", "title": "Photograph the renewed licence" }
+  },
+  "expected": { "refused": false }
+}
