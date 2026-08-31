@@ -2650,6 +2650,35 @@ anchors (merge-base, HEAD, ahead-count, tree state, gate, fixture count), a task
 from `git log --reverse --oneline origin/main..HEAD`, an explicit instruction not to `git show` anything
 below it, and **the regeneration command**, because this will rot again at the next rebase.
 
+**Never run a state-changing git command in a shell whose working directory was set for a read — and this
+is a gap neither worktree rule covers.** Controller incident, 2026-08-31: verifying Lane 1's orphaned-sha
+claim required `cd` into its worktree; the next command in the same shell was a `git checkout` of the
+controller's own branch, which swapped Lane 1's working tree out from under a live task. Reflog-measured
+window: **26 seconds** (13:24:42 to 13:25:08). Restored, and verified by both parties independently —
+branch, HEAD `11f1fb3`, 19 ahead, tree clean, fixtures 84/84, nothing uncommitted lost.
+
+The cwd was correct for the read and wrong for everything after it, and nothing announced the difference.
+Use `git -C <path>` for inspection; never a bare `checkout` after a `cd` made for another purpose.
+
+**Why the existing rules would not have caught it.** Lane 4's rule covers agents *inside* one fan-out
+sharing a tree; the per-agent isolation remedy covers mutating reviewers. **This came from outside the
+fan-out entirely — a peer with filesystem access to a lane it does not own.** Per-agent isolation would
+not have prevented it, because the controller was not one of the agents. Lane 1's framing, and it is the
+gap this rule closes.
+
+**Corollary from the same incident, Lane 1's: during an active mutation review, "tree clean" is a RACING
+check.** Its answer depends on where in the reviewer's cycle it lands. Lane 1 caught a transient
+` M checks/hierarchy.ts` and briefly read it as controller damage; it was its own reviewer mid-mutation.
+Anyone verifying a lane's state while a mutation review runs will otherwise diagnose contamination that is
+not there, or miss contamination that is. **And a contaminated review input is repaired by re-verification
+at the same tier, not by discarding the review** — which would be thinning a gate to fix someone else's
+mistake.
+
+**One more of the controller's own, recorded because it is the fifth today.** The incident report said the
+window was "roughly two minutes." It was 26 seconds, and Lane 1 measured it from the reflog because the
+controller had estimated rather than checked. An error report is a claim like any other and inherits every
+rule above it.
+
 **A sixth silent-empty mode, found inside the verification itself.** Lane 2's first check reported
 `tested=1 resolve=0 dead=1` — zsh does not word-split an unquoted parameter, so it tested the entire sha
 list as a single token. It was caught only because the count was printed beside the result. **That is the
