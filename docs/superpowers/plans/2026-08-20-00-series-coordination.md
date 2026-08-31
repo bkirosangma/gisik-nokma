@@ -2672,6 +2672,27 @@ Lane 4's framing: this is the third costume of *a mutation that does not do what
 — after a regex that matched a comment, and a deletion that left no marker — and the first that crosses a
 package boundary.
 
+**The general rule, Lane 1's, and it covers a case the turbo remedy does not.** Lane 1 hit the stale-`dist`
+false green independently before the broadcast reached it — `task-8-report.md:139`, diagnosed from
+`exports` and killed by a rebuild — and then hit a SECOND false green that no build step would have
+caught: its mutation script replaced the **first** occurrence of an anchor, and `parse-event.ts` carries
+two identical `const at = …` lines, so the mutant landed in the envelope branch instead of the intended
+one. Fresh output, correct build, suite green, proving nothing — and reading exactly like an
+unfalsifiable assertion. So the rule is not about build staleness:
+
+> **A survivor with no explanation is either an unconstrained path or a mutation that never ran, and those
+> must be distinguished before either is reported.**
+
+Stale `dist` and a mis-anchored replace are two instances of *the mutation never ran*. There will be
+others — a guard clause returning early, a mutated branch no fixture enters. **A lane following only the
+turbo form will still report a mis-anchored mutant as an unfalsifiable check**, which is the more damaging
+error: it condemns a check that is fine.
+
+**The cheap corroboration that distinguishes them, also Lane 1's: every mutation you keep should produce a
+failure specific enough to identify its own site.** That is what confirms the anchor landed where intended,
+without inspecting each one. **A mutation whose failure could have come from anywhere has not proven its
+anchor.**
+
 **Never run a state-changing git command in a shell whose working directory was set for a read — and this
 is a gap neither worktree rule covers.** Controller incident, 2026-08-31: verifying Lane 1's orphaned-sha
 claim required `cd` into its worktree; the next command in the same shell was a `git checkout` of the
