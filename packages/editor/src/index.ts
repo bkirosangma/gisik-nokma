@@ -8,8 +8,15 @@ export {
 } from './extensions/ticket-image.js';
 export {
   Mention,
-  mentionLabelOf,
+  mentionAttrsOf,
   mentionSuggestionKey,
+  type MentionAttrs,
   type MentionCandidate,
   type MentionOptions,
 } from './extensions/mention.js';
+export {
+  createMentionPopup,
+  mentionResultAnnouncement,
+  type MentionPopupProps,
+  type MentionPopupRenderer,
+} from './extensions/mention-popup.js';

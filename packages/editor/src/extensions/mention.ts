@@ -11,8 +11,10 @@ export type MentionOptions = {
 
 export const mentionSuggestionKey = new PluginKey('mentionSuggestion');
 
+export type MentionAttrs = { userId: string; label: string };
+
 /**
- * THE ONE ORIGIN OF THE INSERT-TIME LABEL RULE, and the reason it needs one.
+ * THE ONE ORIGIN OF THE INSERT-TIME MENTION ATTRS, and the reason it needs one.
  *
  * `packages/domain/src/doc-text.ts` shipped before this package and its header
  * names Plan 7's editor as the thing that conforms to it. Its mention branch
@@ -23,27 +25,35 @@ export const mentionSuggestionKey = new PluginKey('mentionSuggestion');
  * notification that walker feeds. A test asserts that outcome against the
  * shipped walker rather than describing it.
  *
- * The rule is therefore: trim, and REFUSE what trims away. Refusal rather than
- * substitution follows this package's own precedent — `insertTicketImage`
- * returns false for a non-image mime instead of coercing it — and the
- * alternative is worse than it looks: a stand-in like 'unknown' would put a
- * name nobody has into a stored document and from there into someone's inbox.
- * Trimming is what makes the two failures one rule: a name of three spaces
- * passes the walker's `length > 0` and prints `@   `, a mention of nobody that
- * no length check on the raw string would catch.
+ * BOTH FIELDS ARE JUDGED HERE, AND THE SECOND IS THE DANGEROUS ONE. An empty
+ * label is VISIBLY wrong — a reader sees a ULID where a name belongs and
+ * reports it. An empty `userId` is INVISIBLY wrong: `{ userId: '', name:
+ * 'Anselma' }` renders `@Anselma` perfectly, reads correctly to every human who
+ * sees it, and addresses nobody. Nothing downstream catches it either; a
+ * repo-wide sweep found no gate on mention userIds anywhere outside the walker
+ * and this task's own files. A silent failure with no downstream net is worth
+ * more of a guard than a loud one, not less, which is why this function judges
+ * the pair and returns the attrs to store rather than just the label.
  *
- * WHAT THIS DOES NOT GUARD, stated so it cannot be read wider. Only the label,
- * and only the insert path. A candidate carrying a blank `userId` is refused by
- * nothing here and would store a mention that resolves to no one while
- * rendering perfectly; and the JSON and HTML doors reach `attrs.label`
- * directly, both left open for the reason `ticket-image.ts` sets out at length
- * — a ProseMirror `validate` throws at load, `enableContentCheck` defaults
- * false, and the catch replaces the WHOLE document with an empty one. Tests pin
- * all three as open.
+ * The rule is the same for both: TRIM, AND REFUSE WHAT TRIMS AWAY. Trimming is
+ * what makes the empty and the blank case one rule — a name of three spaces
+ * passes the walker's `length > 0` and prints `@   `, a mention of nobody that
+ * no length check on the raw string would catch. Refusal rather than
+ * substitution follows this package's own precedent: `insertTicketImage`
+ * returns false for a non-image mime instead of coercing it, and the
+ * alternative is worse than it looks — a stand-in like 'unknown' would put a
+ * name nobody has into a stored document and from there into someone's inbox.
+ *
+ * WHAT THIS DOES NOT GUARD, stated so it cannot be read wider: the insert path
+ * only. The JSON door and the HTML door both reach `attrs` directly, and the
+ * reasons they stay open are DIFFERENT reasons — see the node's docblock below,
+ * which spells out why one of them is not the precedent it looks like.
  */
-export function mentionLabelOf(candidate: MentionCandidate): string | null {
+export function mentionAttrsOf(candidate: MentionCandidate): MentionAttrs | null {
+  const userId = typeof candidate.userId === 'string' ? candidate.userId.trim() : '';
   const label = typeof candidate.name === 'string' ? candidate.name.trim() : '';
-  return label.length > 0 ? label : null;
+  if (userId.length === 0 || label.length === 0) return null;
+  return { userId, label };
 }
 
 /**
@@ -88,6 +98,33 @@ function mentionText(attrs: Record<string, unknown>): string {
  * `data-mention-user-id="…"` — two spellings of one fact, of which only one is
  * read back through a guard. Hence a `renderHTML` on both, and a test pinning
  * the single spelling in each direction.
+ *
+ * TWO DOORS PAST THE INSERT-TIME GUARD STAY OPEN, FOR TWO DIFFERENT REASONS,
+ * and an earlier version of this comment gave the first reason for both.
+ *
+ * THE JSON DOOR is `ticket-image.ts`'s case exactly, and its reasoning carries
+ * over unchanged: an attribute spec may declare a `validate`, `checkAttrs` runs
+ * it on every `Node.fromJSON` (prosemirror-model@1.25.11 dist:2058-2066) and
+ * Tiptap forwards it (core dist:1491) — but it THROWS AT LOAD,
+ * `enableContentCheck` defaults false (core dist:6150) and is set nowhere in
+ * this repo, so the catch replaces the WHOLE document with an empty one. One
+ * stored junk mention would take every surrounding paragraph with it.
+ *
+ * THE HTML DOOR IS NOT THAT CASE, and citing ticket-image for it would be
+ * citing a precedent that reaches the OPPOSITE conclusion — ticket-image
+ * guards its parse door, coercing every unknown `wrap` to `block`, and says so.
+ * Nor is a `validate` needed to close this one: a node-level `getAttrs`
+ * returning `false` cancels the rule outright, no load-time throw involved. The
+ * real reason is that neither move available here is an improvement.
+ * COERCION HAS NO LEGAL TARGET: `wrap` has a `block` to fall back to, and a
+ * missing name has nothing — inventing one is precisely what the insert path
+ * refuses to do. And REFUSAL DISCARDS EVIDENCE: cancelling the rule on
+ * `<span data-mention-user-id="01J9…"></span>` demotes it to the literal text
+ * `@`, throwing away the one fact the markup actually carried, and turning a
+ * mention that renders badly — visibly, repairably — into text that cannot be
+ * repaired at all. Left open deliberately; layer 3 is where a stored mention
+ * with no name gets rejected, and a test pins both doors open so this stays a
+ * decision rather than an oversight.
  */
 export const Mention = Node.create<MentionOptions>({
   name: 'mention',
@@ -149,30 +186,33 @@ export const Mention = Node.create<MentionOptions>({
         editor: this.editor,
         pluginKey: mentionSuggestionKey,
         char: '@',
-        // THE DOOR THE LABEL RULE ACTUALLY CLOSES. A candidate this editor
-        // could not label is never offered, so there is no row to click and no
-        // silent no-op when one is clicked — which is what a refusal inside
-        // `command` alone would produce.
+        // THE DOOR THE ATTRS RULE ACTUALLY CLOSES. A candidate this editor
+        // could not STORE is never offered — one it cannot name, and equally
+        // one it cannot address — so there is no row to click and no silent
+        // no-op when one is clicked, which is what a refusal inside `command`
+        // alone would produce.
         items: async ({ query }) => {
           const candidates = await this.options.queryUsers(query);
-          return candidates.filter((candidate) => mentionLabelOf(candidate) !== null);
+          return candidates.filter((candidate) => mentionAttrsOf(candidate) !== null);
         },
         command: ({ editor, range, props }) => {
-          const label = mentionLabelOf(props);
+          const attrs = mentionAttrsOf(props);
           // UNREACHABLE THROUGH THE PICKER WHILE THE FILTER ABOVE STANDS, and
           // said plainly rather than dressed up: deleting this line alone
-          // leaves every test green, which was run. It is kept because it is
-          // what makes `label` a `string` instead of a `string | null` asserted
-          // away, and because it is live the moment the filter is not — deleting
-          // the filter alone and deleting both redden the same case with
-          // DIFFERENT documents, an empty one versus a mention labelled with
-          // three spaces, and that difference is this branch.
-          if (label === null) return;
+          // leaves every test green, which was run. A test that cannot fail is
+          // not evidence; a runtime guard is not evidence, it is a second door.
+          // It narrows `attrs` from `MentionAttrs | null` to `MentionAttrs` at
+          // the one site that writes the node, and it is live the moment the
+          // filter is not — deleting the filter alone and deleting both redden
+          // the same case with DIFFERENT documents, an empty one versus a
+          // mention labelled with three spaces, and that difference is this
+          // branch.
+          if (attrs === null) return;
           editor
             .chain()
             .focus()
             .insertContentAt(range, [
-              { type: this.name, attrs: { userId: props.userId, label } },
+              { type: this.name, attrs },
               { type: 'text', text: ' ' },
             ])
             .run();

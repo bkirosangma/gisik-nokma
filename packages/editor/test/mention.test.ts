@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Editor } from '@tiptap/core';
 import { docToPlainText } from '@gisik-nokma/domain';
-import { mentionLabelOf } from '../src/extensions/mention.js';
+import { mentionAttrsOf } from '../src/extensions/mention.js';
+import { mentionResultAnnouncement } from '../src/extensions/mention-popup.js';
 import { createTestEditor } from './helpers/create-editor.js';
 import { typeText } from './helpers/type-text.js';
 
@@ -15,6 +16,8 @@ const USERS = [
 
 /** A directory row with no usable display name — the hazard this file is built around. */
 const NAMELESS = { userId: '01J9GUSC000000000000000000', name: '   ' };
+/** Its invisible twin: a perfect name attached to nobody. */
+const IDLESS = { userId: '  ', name: 'Anselma' };
 
 function mentionNodes(json: unknown): Array<Record<string, unknown>> {
   const found: Array<Record<string, unknown>> = [];
@@ -34,9 +37,12 @@ function pressKey(editor: Editor, key: string): boolean {
   return editor.view.someProp('handleKeyDown', (handler) => handler(editor.view, event)) ?? false;
 }
 
-function popupItems(): HTMLButtonElement[] {
-  return [...document.querySelectorAll<HTMLButtonElement>('.mention-popup__item')];
+function popupItems(): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>('.mention-popup__item')];
 }
+
+/** Everything the browser puts in the tab order by default, plus explicit opt-ins. */
+const TABBABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
 let editor: Editor | null = null;
 afterEach(() => {
@@ -200,21 +206,31 @@ describe('mention picker', () => {
  * notification the walker feeds. The first case below is that fact, asserted
  * against the shipped walker rather than described.
  *
- * The guard is therefore on the INSERT PATH, stated once in `mentionLabelOf`
- * and read from both doors the picker owns: `items` never offers a candidate it
- * could not label, and `command` refuses one handed to it anyway. Refusal, not
- * substitution, follows the local precedent — `insertTicketImage` returns false
- * for a non-image mime rather than coercing it — and the alternative was worse
- * on inspection: a fabricated stand-in like 'unknown' would put a name nobody
- * has into a stored document and then into someone's notifications.
+ * A BLANK `userId` IS THE SAME CLASS OF DEFECT AND THE WORSE HALF OF IT.
+ * `{ userId: '', name: 'Anselma' }` stores `{"userId":"","label":"Anselma"}`,
+ * renders `@Anselma` perfectly, reads correctly to every human who sees it, and
+ * addresses nobody. The empty label is VISIBLY wrong — a ULID where a name
+ * belongs gets reported; this one is INVISIBLY wrong, and a repo-wide sweep
+ * found no gate on mention userIds anywhere downstream to catch it. So
+ * `mentionAttrsOf` judges the pair, not the label, and returns the attrs to
+ * store or null.
  *
- * SCOPE, STATED SO IT CANNOT BE READ WIDER THAN IT IS. Two other doors reach
- * `attrs.label` and neither is closed here: a document loaded from JSON, and
- * one parsed from HTML. Both are pinned open by the last case in this block,
- * for the reason `src/extensions/ticket-image.ts` sets out at length — a
- * ProseMirror `validate` throws at load, `enableContentCheck` defaults false,
- * and the catch replaces the WHOLE document with an empty one. Layer 3, the
- * server ingest gate, is the cheaper place to refuse a stored empty label.
+ * The rule is read from both doors the picker owns: `items` never offers a
+ * candidate it could not store, and `command` refuses one handed to it anyway.
+ * Refusal, not substitution, follows the local precedent — `insertTicketImage`
+ * returns false for a non-image mime rather than coercing it — and the
+ * alternative was worse on inspection: a fabricated stand-in like 'unknown'
+ * would put a name nobody has into a stored document and then into someone's
+ * notifications.
+ *
+ * SCOPE, STATED SO IT CANNOT BE READ WIDER THAN IT IS: the insert path only.
+ * A document loaded from JSON and one parsed from HTML both reach `attrs`
+ * directly, and the last case in this block pins both open. They are open for
+ * two DIFFERENT reasons and `src/extensions/mention.ts` gives both — the JSON
+ * door is ticket-image's case unchanged, the HTML door is not ticket-image's
+ * case at all (it guards its parse door) and stays open because coercion has no
+ * legal target and refusal would discard the userId the markup carries. Layer
+ * 3, the server ingest gate, is the cheaper place to reject either.
  */
 describe('the label a mention is stored with', () => {
   it("empty label, and the shipped walker prints the person's ULID", () => {
@@ -230,12 +246,47 @@ describe('the label a mention is stored with', () => {
     expect(docToPlainText(doc)).toBe(`@${USERS[0]!.userId}`);
   });
 
-  it('mentionLabelOf trims, and refuses what trims to nothing', () => {
-    expect(mentionLabelOf({ userId: 'x', name: 'Anselma' })).toBe('Anselma');
-    expect(mentionLabelOf({ userId: 'x', name: '  Anselma  ' })).toBe('Anselma');
-    expect(mentionLabelOf({ userId: 'x', name: '' })).toBeNull();
-    expect(mentionLabelOf({ userId: 'x', name: '   ' })).toBeNull();
-    expect(mentionLabelOf({ userId: 'x', name: '\t\n' })).toBeNull();
+  it('mentionAttrsOf trims both fields, and refuses what trims to nothing', () => {
+    expect(mentionAttrsOf({ userId: ' x ', name: '  Anselma  ' })).toEqual({
+      userId: 'x',
+      label: 'Anselma',
+    });
+    for (const name of ['', '   ', '\t\n']) {
+      expect(mentionAttrsOf({ userId: 'x', name }), JSON.stringify(name)).toBeNull();
+    }
+    // The invisible half: a perfectly good name attached to no one.
+    for (const userId of ['', '   ', '\t\n']) {
+      expect(mentionAttrsOf({ userId, name: 'Anselma' }), JSON.stringify(userId)).toBeNull();
+    }
+  });
+
+  /**
+   * The candidate reads correctly in every human-facing surface — the row says
+   * "Anselma", the document renders `@Anselma`, the walker prints `@Anselma` —
+   * and the mention addresses nobody. Nothing downstream catches it, which is
+   * why the check has to be here and why it is asserted on the document rather
+   * than on the row.
+   */
+  it('planted defect: a candidate with a blank userId is never offered', async () => {
+    editor = createTestEditor({ queryUsers: async () => [IDLESS, ...USERS] });
+    typeText(editor, '@an');
+    await vi.waitFor(() => {
+      expect(popupItems().length).toBeGreaterThan(0);
+    });
+    expect(popupItems().map((item) => item.textContent)).toEqual(['Anselma', 'Anand']);
+  });
+
+  it('planted defect: and one cannot reach the document by being clicked first', async () => {
+    editor = createTestEditor({ queryUsers: async () => [IDLESS, USERS[1]!] });
+    typeText(editor, '@an');
+    await vi.waitFor(() => {
+      expect(popupItems().length).toBeGreaterThan(0);
+    });
+    popupItems()[0]!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    const json = editor.getJSON();
+    expect(mentionNodes(json)).toEqual([{ userId: USERS[1]!.userId, label: 'Anand' }]);
+    // Reads identically either way; only the stored id tells them apart.
+    expect(String(mentionNodes(json)[0]!.userId).length).toBeGreaterThan(0);
   });
 
   it('planted defect: a candidate with no usable name is never offered', async () => {
@@ -407,11 +458,24 @@ describe('the BEM classes the contract names', () => {
   it('the stylesheet declares exactly the mention classes the code emits', () => {
     const cssPath = resolve(dirname(fileURLToPath(import.meta.url)), '../src/styles/editor.css');
     const css = readFileSync(cssPath, 'utf8');
+    // THE MATCHER IS ADEQUATE FOR THESE SIX NAMES AND SHOULD NOT BE TRUSTED
+    // WIDER. `[a-z_-]*` misses any class containing a digit or an uppercase
+    // letter, and `\s*\{` only sees a class that opens its own rule — one
+    // declared solely inside a compound or nested selector is invisible to it.
+    // A later hand adding `.mention-popup__item.is-loading` or
+    // `.mentionPopup2` would get a green from a check that never looked.
     const declared = [...css.matchAll(/\.((?:mention-popup|editor-mention)[a-z_-]*)\s*\{/g)].map(
       (match) => match[1]!,
     );
     expect(declared.sort()).toEqual(
-      ['editor-mention', 'mention-popup', 'mention-popup__item', 'mention-popup__item--selected'].sort(),
+      [
+        'editor-mention',
+        'mention-popup',
+        'mention-popup__item',
+        'mention-popup__item--selected',
+        'mention-popup__list',
+        'mention-popup__status',
+      ].sort(),
     );
   });
 
@@ -426,5 +490,105 @@ describe('the BEM classes the contract names', () => {
     expect(document.querySelectorAll('.mention-popup__item--selected')).toHaveLength(1);
     pressKey(editor, 'Enter');
     expect(editor.getHTML()).toContain('class="editor-mention"');
+  });
+});
+
+/**
+ * ACCESSIBILITY, AND WHY IT LANDS HERE RATHER THAN IN THE REACT SURFACE. The
+ * BEM contract is frozen in this file, so ARIA added later reopens it anyway;
+ * and the popup is the one place in this package where a signal exists that
+ * only sighted users receive. Before this round, which candidate Enter would
+ * take was communicated by a CSS class and by nothing else.
+ *
+ * The pattern is a combobox whose listbox lives outside the input: focus never
+ * leaves the editor, and the active option is named by `aria-activedescendant`.
+ * Everything here is asserted on the live DOM the popup actually builds.
+ */
+describe('the picker as a screen reader meets it', () => {
+  it('is a listbox of options, and the selected one says so', async () => {
+    editor = createTestEditor({ queryUsers: async () => USERS });
+    typeText(editor, '@an');
+    await vi.waitFor(() => {
+      expect(popupItems().length).toBe(2);
+    });
+    const listbox = document.querySelector('.mention-popup__list')!;
+    expect(listbox.getAttribute('role')).toBe('listbox');
+    // Detached from the text it belongs to, so it needs its own name.
+    expect(listbox.getAttribute('aria-label')).toBe('People you can mention');
+    expect(popupItems().map((item) => item.getAttribute('role'))).toEqual(['option', 'option']);
+    expect(popupItems().map((item) => item.getAttribute('aria-selected'))).toEqual([
+      'true',
+      'false',
+    ]);
+    pressKey(editor, 'ArrowDown');
+    expect(popupItems().map((item) => item.getAttribute('aria-selected'))).toEqual([
+      'false',
+      'true',
+    ]);
+  });
+
+  it('points the editor at the active option and hands the role back on exit', async () => {
+    editor = createTestEditor({ queryUsers: async () => USERS });
+    const dom = editor.view.dom;
+    // Observed, not assumed: ProseMirror sets this itself, which is why the
+    // popup saves and restores rather than setting and removing.
+    expect(dom.getAttribute('role')).toBe('textbox');
+
+    typeText(editor, '@an');
+    await vi.waitFor(() => {
+      expect(popupItems().length).toBe(2);
+    });
+    expect(dom.getAttribute('role')).toBe('combobox');
+    expect(dom.getAttribute('aria-expanded')).toBe('true');
+    expect(dom.getAttribute('aria-autocomplete')).toBe('list');
+    expect(dom.getAttribute('aria-controls')).toBe(
+      document.querySelector('.mention-popup__list')!.id,
+    );
+    // The id it names is the option carrying aria-selected="true".
+    const active = dom.getAttribute('aria-activedescendant');
+    expect(document.getElementById(active!)!.getAttribute('aria-selected')).toBe('true');
+    pressKey(editor, 'ArrowDown');
+    expect(dom.getAttribute('aria-activedescendant')).not.toBe(active);
+
+    pressKey(editor, 'Escape');
+    expect(dom.getAttribute('role')).toBe('textbox');
+    for (const name of [
+      'aria-expanded',
+      'aria-controls',
+      'aria-autocomplete',
+      'aria-haspopup',
+      'aria-activedescendant',
+    ]) {
+      expect(dom.hasAttribute(name), `${name} outlived the popup`).toBe(false);
+    }
+  });
+
+  it('announces the result count politely, and says so when there are none', async () => {
+    expect(mentionResultAnnouncement(0)).toBe('No people match');
+    expect(mentionResultAnnouncement(1)).toBe('1 person matches');
+    expect(mentionResultAnnouncement(2)).toBe('2 people match');
+
+    editor = createTestEditor({ queryUsers: async () => USERS });
+    typeText(editor, '@an');
+    await vi.waitFor(() => {
+      expect(document.querySelector('.mention-popup__status')?.textContent).toBe('2 people match');
+    });
+    const status = document.querySelector('.mention-popup__status')!;
+    expect(status.getAttribute('aria-live')).toBe('polite');
+    // Outside the listbox: a listbox's children must all be options.
+    expect(status.closest('.mention-popup__list')).toBeNull();
+  });
+
+  it('planted defect: nothing in the popup is tabbable — focus stays in the editor', async () => {
+    // A `<button>` row, which is what the plan specified, is in the tab order,
+    // so Tab from the editor moved focus into the popup — working against the
+    // `mousedown`-not-`click` handler whose whole purpose is keeping it out.
+    editor = createTestEditor({ queryUsers: async () => USERS });
+    typeText(editor, '@an');
+    await vi.waitFor(() => {
+      expect(popupItems().length).toBe(2);
+    });
+    expect(document.querySelectorAll(`.mention-popup ${TABBABLE}`)).toHaveLength(0);
+    expect(popupItems().some((item) => item.tagName === 'BUTTON')).toBe(false);
   });
 });
