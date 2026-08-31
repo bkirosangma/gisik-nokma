@@ -14,12 +14,11 @@ decision boundary.
 
 | what | value |
 |---|---|
-| `main` | `45c83eb` **as of 20:35 IST — this row goes stale by design.** Phase 1 step 4 merged (#51) |
-| last forced gate | **`45c83eb`** — 21/21, 0 cached, **995 tests**, `TURBO_EXIT=0`, node **v22.22.2**.
-  Re-established: #51 is code-bearing (30 files, +3776). Arithmetic closes 936 + 24 + 35 |
-| gate composition | domain **276** · rule-engine 278 · server **200** · app-core 130 · editor 72 · ui 31 · sync-client 8 |
+| `main` | `40c5219` **as of 21:20 IST — this row goes stale by design.** Phase 1 steps 4 (#51) and 5 (#52) merged |
+| last forced gate | **`40c5219`** — 21/21, 0 cached, **1032 tests**, `TURBO_EXIT=0`, node **v22.22.2** |
+| gate composition | domain 276 · rule-engine 278 · server **237** · app-core 130 · editor 72 · ui 31 · sync-client 8 |
 | **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
-| collision surfaces | fixtures **84** · projections **2** (`proj_entity_heads`, `proj_workflows`) · packages **6** (`editor` new) |
+| collision surfaces | fixtures **84** · projections **4** (`entity_heads`, `memberships`, `visibility`, `workflows`) · packages 6 |
 | open PRs | none at time of writing — **re-measure** |
 
 **Re-measure everything above on resume.** Recount at the sha you report; do not carry a composition
@@ -92,9 +91,19 @@ discharged in `f40a850`.
 > *"at `8209397`, not at the branch tip"* is **SUPERSEDED** — T9 was reviewed and its fixes applied, and
 > the branch merged at its tip.
 
-**Step 4 is CLOSED** — merged as `45c83eb` (#51). **Step 5 is IN FLIGHT: Plan 4 T6 → T7** (T7 floor-list).
+**Steps 4 and 5 are CLOSED** — `45c83eb` (#51) and `40c5219` (#52). **Step 6 is next: the LIFTED Plan 10
+T4**, the §11 envelope-origin closer — it extends two registration pins and obeys §8's *insert, don't
+append* rule for projection order.
 
-> ### ⚠ IN-FLIGHT BRANCH — `exec/04-t6-t7-visibility`
+**Seven gaps carried with named owners, none folded in opportunistically.** The two that bite hardest:
+**P19 guest admissions (T9)** — a guest is admitted TODAY for `ticket.created`, `visibility.set`,
+`workspace.renamed`, `comment.added`, and `visibility.set` in an append-only ledger cannot be walked back;
+and **P22 (T8)** — `canSeeResolved` takes `EffectiveRole` **by value**, so every safety property rests on
+provenance nothing enforces. TypeScript is structural, so Task 8/9/11 can each build or cache one no early
+return ever emptied. **Closer, so it is not re-litigated: a branded type** carrying a unique symbol only
+`resolveEffectiveRole` can produce — turning a silent grant into a compile error.
+
+> ### ~~⚠ IN-FLIGHT BRANCH — `exec/04-t6-t7-visibility`~~ **MERGED as `40c5219`. Kept for the rule below.**
 > **Cut from `main` at `45c83eb`. T6 (`proj_visibility`) is running.** The executor's handoff on `main`
 > may still read *"step 5 is next and nothing is in flight"* — that was true when written and goes stale
 > the moment T6 starts, because the executor deliberately does **not** commit a docs refresh underneath a
@@ -256,6 +265,23 @@ Every one below was violated by a controller that had just written it. **Assume 
   loosely found it in **all 11**. Same class as grepping for `21 behind` when the file said `20`.
   **Search for the fact in the vocabulary the other author would have used, not in yours** — and print the
   rows, because two of the twelve returned blank rather than `0`.
+- **A RIGHT ANSWER ON DEAD EVIDENCE is worse than a wrong one** — a wrong answer gets caught; a right one
+  confirms the method that produced it. P21's role/mode asymmetry was established by widening a union in
+  `packages/domain/src` and compiling `apps/server`, which resolves that package through
+  **`dist/*.d.ts`** — the edit never reached the compiler under test, so `tsc` exiting 0 was equally
+  consistent with the finding and with a blind instrument. This is the **stale-`dist`** trap in its
+  *type-level* form; the mutation form is already recorded. Both fail as a **quiet pass**, never an error.
+  **Prove the instrument can see before reading it**: rebuild, then confirm a probe (`const _probe:
+  WorkspaceRole = 'viewer'`) does NOT error. And prefer a check whose **count** discriminates — the fix
+  raised exactly two `TS2366`s, one per file, where one would have meant a single switch was load-bearing.
+- **Name the ref; don't trust the symbol.** I prescribed `git rev-list --left-right --count @{u}...HEAD`
+  to verify a push. `@{u}` is whatever upstream the branch was *created* with, and
+  `git checkout -b <n> origin/main` sets it to **`origin/main`** — so it returned `0 6` right after a
+  successful push, truthfully answering a question nobody asked. Use `origin/<branch>...HEAD`.
+- **`git cat-file` also lies from a SIBLING WORKTREE, not only the reflog.** Worktrees share one object
+  store, so an unpushed commit resolves as `commit` from the main clone and reads as landed — fooling the
+  *reviewing* session, which is the party least able to suspect it. `git branch -r --contains <sha>`
+  (empty = on no remote) is the discriminating check. Caught two unpushed rounds this way.
 - **PRINT THE ROWS, NOT THE COUNT, whenever a count is about to decide something.** Four instances in one
   day, one cause: a proxied `grep -c` silently reformatting its output; a `merge-tree` stat whose 11-line
   "difference" was **conflict markers**; a regex counting `9.1`/`9.34` out of prose *describing* a reserved
