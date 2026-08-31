@@ -14,7 +14,7 @@ state, the mutation ledger, dispatch tiers, and the review composition that was 
 |---|---|---|
 | **Plan 6a** | T1–T4 scaffold (`packages/ui`, `packages/app-core`) | **merged**, PR #16 |
 | | T5 domain gap guards | **discharged, no code** — all four targets already shipped; shapes verified (`blocked: z.boolean().optional()` at `workflow.ts:13`; `cause` with the `reopened-for-child` literal at `:144`; `docToPlainText` and `IngestResult` barrel-exported). Nothing to write. |
-| | T6 claims machinery | **committed, unmerged** — `8209397` on `exec/06a-client-core`. Implemented, fable-reviewed, three blocking items fixed, scoped re-review CLEAN. |
+| | T6 claims machinery | **MERGED** — PR #36, on `main` as `3fb22d3`. Implemented, fable-reviewed, three blocking items fixed, scoped re-review CLEAN. |
 | | T9 Board + `useLiveQuery` | **committed but NEVER REVIEWED** — it finished minutes after the fold-back order. Green (gate 621, verified by the controller, not only self-reported), 8 falsifiability proofs, but **no reviewer ever saw it**. Every other task on this branch passed implementer→reviewer→fix→scoped-re-review; this one passed none of it. Do not merge it on the strength of a green gate. |
 | | T10–T13 (List, My Work + attention strip, ticket sheet + `EditorSlot`, attachment list, reopen flow) | **not started** |
 | | T7/T8/T14/T15/T15b | deferred to Wave 3 by the original brief (need Plans 4/5) |
@@ -25,15 +25,13 @@ state, the mutation ledger, dispatch tiers, and the review composition that was 
 | **Plan 9** | T2 `extractMentionedUserIds`, T3 notification vocabulary | **not started**. T4 became eligible when Plan 4's `Queryable` landed. |
 
 **Merged PRs:** #16 scaffold · #17 env-contract gate · #19 colour-scan attribution · #23 Plan 10 prefix.
-**Unmerged:** `exec/06a-client-core`. T6 at `8209397` (gate 594) is fully reviewed; **T9 sits on top
-of it, committed and unreviewed** (gate 621 — app-core 91 → 118). The branch therefore holds two
-tiers of confidence and a merger must not treat them alike.
+**Unmerged:** `exec/06a-client-core` carries **only unreviewed work** — T9, plus this file. T6 was
+split onto its own branch at its reviewed sha and merged separately (PR #36), so `main` holds only
+reviewed work and the branch holds only unreviewed work. Nobody has to trust a label to tell them
+apart.
 
-Gate composition at HEAD: domain 230 · rule-engine 128 · server 106 · app-core 118 · ui 31 ·
-sync-client 8.
-
-> A test total is a fact about a **commit and a package set**. Quote the breakdown, never the sum —
-> two lanes reported 508 from different trees with different packages.
+Gate on `main` after #36: **594 tests, 18/18** — domain 230 · rule-engine 128 · server 106 ·
+app-core 91 · ui 31 · sync-client 8. On the branch with T9: **621** (app-core 118).
 
 ---
 
