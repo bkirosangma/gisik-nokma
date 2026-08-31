@@ -1050,6 +1050,18 @@ door** rather than reasoning about whether it was possible — reading does not 
 6 T6's version-chain asymmetry was found by a fable floor-list reviewer** after three parties missed it.
 Neither would have been found under this ruling.
 
+**A third instance, filed by the executor as evidence rather than as an argument, hours after the first
+two.** Ruling P16's load-bearing half — that `precheckParentTerminal`'s three `passed` exits had to become
+`not-evaluated` — was **missed by two of the four opus lenses**, both of which wanted to scope it out as
+Plan 6a's problem, and **caught by the refuters**. Under this ruling that collision gets one analyst and no
+refuter. On this session's own evidence the downgrade would plausibly have shipped a known-false `passed`
+— a client asserting a verdict it had not computed, which is the failure class this series is built to
+refuse.
+
+**Any further instance goes in this list.** The trade was priced twice by the owner and is not being
+re-opened; the list exists so that when it is next reviewed, it is reviewed against evidence rather than
+against recollection.
+
 The expected consequence is a **higher defect-escape rate at the last gate before `main`**, and in this
 series an escaped defect has repeatedly cost a follow-up PR. That cost lands in a different column from
 the saving, which is why it is written here.
