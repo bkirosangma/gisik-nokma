@@ -693,6 +693,23 @@ one: **that assertion currently guards a dependency's default; once the value is
 a decision. Same test, same line, different meaning, and only the second is a security property this
 repository owns.**
 
+**1b. The same assertion guards a second thing, and nobody has said so — which is how it gets lost.**
+Lane 2's addition. The attribute list is `['Max-Age=604800', 'Path=/', 'HttpOnly', 'SameSite=Lax']` and it
+carries **no `Domain` attribute**, so the session cookie is host-only: set by `pm-api.artsourced.in`, sent
+only to `pm-api.artsourced.in`. That must stay true, and the way it breaks is specific enough to name.
+A later task debugging a cookie-not-arriving problem — entirely plausible the first time the web client is
+wired against the API in a real browser — has an obvious-looking fix to hand: add `Domain=.artsourced.in`.
+**It would work.** It would also send the session cookie to every subdomain of the zone, converting
+today's "a sibling subdomain can forge a request that carries the cookie" into "a sibling subdomain
+receives the cookie directly." Strictly worse, and it would arrive looking like configuration rather than
+a security change.
+
+Because the matcher is an exact `toEqual` rather than a `toContain`, the guard already exists — adding
+`Domain` reddens it. What is missing is any statement that **preventing a `Domain` attribute is one of the
+things that assertion is for.** The list is exact, and the absence it protects matters as much as the
+presence. Say so at the assertion, or the next person to read it will see four attributes being checked
+and not the fifth being forbidden.
+
 **2. The Origin requirement is scoped to COOKIE-authenticated requests, and the stated cost disappears.**
 CSRF is a problem about **ambient credentials**. A cookie is ambient — the browser attaches it whether or
 not the page meant to. A bearer token is not: it is attached deliberately by code that had to hold it. So
@@ -744,9 +761,14 @@ and found the fact at line 83 of this document, and it is adverse. There is noth
 there; a later reader should treat it as settled and, if anything, check only whether the API has since
 moved to a different registrable domain, which is the one change that would alter it.
 
-**Recorded because the process point outlives the ruling:** a ruling that had asserted uniform confidence
-would have buried the single paragraph that needed checking, and the reviewer would have had no reason to
-look. Stating per-item confidence is what let a lane overturn the weakest part within the hour. It also
+**Recorded because the process point outlives the ruling, in Lane 2's sharper form:** per-item confidence
+did not merely make the weak paragraph *findable* — it told a reader with no budget to re-verify a whole
+ruling **where to spend one check.** "This item's bite depends on a fact nobody has established" is an
+explicit invitation to go establish it, and it cost one grep. Uniform confidence would have been cheaper
+to write and would have hidden the one paragraph that was wrong, inside a document containing its own
+refutation eighty lines up. **Stating which claim you are least sure of is how a reader with limited
+budget knows where to aim it** — the same family as enumerating absences rather than asserting
+partiality, and for the same reason: both convert a reader's attention from scanning to targeting. It also
 produced a reasoning failure worth naming, from Lane 2: **an option priced as unacceptable is sometimes an
 option scoped too widely** — it rejected a correct control because it had described that control more
 broadly than anyone had proposed it.
