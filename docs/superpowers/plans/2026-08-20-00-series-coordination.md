@@ -4327,3 +4327,214 @@ Per the standing rule that a partial-implementation marker *enumerates the absen
 partiality*: `engine-context.ts` is **deliberately untouched by Task 4**, including its comment. Editing
 that comment inside T4's diff would read as "Task 4 wired the engine", which is the misreading most
 likely to retire this entry before it is acted on.
+
+---
+
+## A projection handler may only write keys its own entity totally orders (2026-08-31, Plan 4 Task 4)
+
+**The general rule.** A projection's `apply` may write only those keys for which its own entity's event
+stream is the single, totally-ordered writer. Any key two different entity streams can write is
+order-dependent, and `readLedger` replays in `(entity_kind, entity_id, seq)` — per-entity causality
+only, with no cross-entity guarantee. So live arrival order and rebuild order disagree, `diffTable`'s
+`EXCEPT` sees a set difference, and **`verify-projections` reports drift on a table nobody corrupted.**
+
+**The instance that produced it.** Plan 4 Task 4's plan text told `membership.revoked` to delete every
+row for that user, project rows included. But `membership.granted`/`revoked` file against the
+**membership** entity and `project.member_added`/`removed` against the **project** entity, and
+`'membership' < 'project'`, so a rebuild applies every membership event before any roster event.
+Arrival `grant → member_added → revoked` leaves `{}` live and `{project row}` on rebuild.
+
+**What landed instead:** disjoint key ownership. `(ws, u, 'workspace', '')` is written only by the
+membership stream; `(ws, u, 'project', P)` only by project `P`'s stream. One totally-ordered writer per
+key, so no interleaving can change the final set. The safety property the plan wanted did not
+disappear — it moved to `resolveEffectiveRole`, which returns no projects when there is no workspace
+row. That placement is **stronger**, because it also covers the roster row a legitimate rebuild leaves
+standing, which a table-level delete could not.
+
+### The part a reader will not reconstruct: `registry.ts` beat the plan text
+
+The invariant was **already stated in the code**, at the top of
+`apps/server/src/projections/registry.ts`, verbatim: *"Table contents must be a pure function of the
+ledger's rows — never of cross-entity arrival interleaving."* The plan text violated an invariant the
+shipped code already declared.
+
+**This is worth naming because the reflex when a plan and the code disagree is to trust the plan.** It
+is the same shape as coordination doc §10's ruling on `Refusal`'s import origin — *"Plan 4's executor
+takes the import origin from the shipped code, not from the plan text"* — and it generalises past
+imports: **where a plan document and a shipped invariant disagree, the shipped invariant wins**, because
+it is the thing the rest of the system was built against and the thing a verifier actually enforces.
+
+---
+
+## Search for a fact in the vocabulary the OTHER author would have used, not in your own (2026-08-31, controller)
+
+**An over-specific search returns a false negative that looks like a finding.**
+
+Establishing whether "Features.md and test-cases/ move in the same change set" was a Plan-4 quirk or a
+series-wide constraint, a search for **Plan 4's exact phrasing** across all twelve plan files returned
+**one** hit — Plan 4 itself — which supported the conclusion "Plan 4 contradicts itself." A second pass
+searching for the *rule* rather than the *wording* found it in **all eleven numbered plans**, phrased
+differently in each: `` `Features.md`/`test-cases/` must move in the same change set `` (Plan 1),
+"stay in sync with reality in the same change set" (Plan 2), section-scoped variants in Plans 7, 10, 11.
+
+The conclusion reversed completely. Not "one plan is internally inconsistent" but **"a standing
+series-wide constraint governs every plan's task-level steps"** — so reading Plan 4's Task 12–14
+catalogue steps as exempting earlier tasks would exempt earlier tasks in *every* plan and leave the rule
+meaning nothing anywhere.
+
+**The rule: when testing whether a convention is local or global, search for the FACT in the vocabulary
+the other author would have used, not the string you happen to have in front of you.** Your phrasing
+comes from one document, and that document is the one file guaranteed to match it — so an exact-phrase
+sweep is biased toward "unique to this file" by construction.
+
+**A supporting detail from the same run:** two of the twelve files returned **blank rather than `0`**,
+which is the silent-empty mode again. It is why the second pass printed rows instead of counts, and it
+is another instance of the standing rule — **print the rows, not the count, whenever a count is about to
+decide something.**
+
+---
+
+## Ruling P19 (2026-08-31) — a guest is admitted TODAY for four event types, and the module that says otherwise is the one Task 9 will read
+
+**Owner: Plan 4 Task 9.** Recorded here and not only in a code comment, because the entire risk is
+*"if Task 9's implementer trusts that list"* — so the correction has to live in the artifact that
+implementer reads.
+
+**The measured fact, stated undimmed.** Against the gate built at `6a6203c`, a workspace **guest is
+ADMITTED** for `ticket.created`, `visibility.set`, `workspace.renamed` and `comment.added`. Positive
+controls from the same run: a guest `workflow.defined` is refused *"Your role is guest."*, and a
+non-member `ticket.created` is refused NOT_A_MEMBER — so the harness can produce refusals, and the
+admissions are real rather than a broken probe.
+
+**Why the docblock made this invisible.** `check-permission.ts`'s absence list said Task 5 *"closed the
+other three — actor identity, role and membership"*, leaving **Visibility** as the single remaining
+absence, and described the extension path as `checkVisibilityPermission` running AFTER
+`checkRolePermission`. But Plan 4 Task 9's own check list assigns **two refusals to `permission.role`**:
+
+* `ticket.created` — guests refused (`permission.role`, "Guests cannot create tickets.")
+* `visibility.set` — additionally requires project-admin rights on the ticket's project OR ticket
+  creatorship (`permission.role`)
+
+Those are **write-authority** questions and belong INSIDE `checkRolePermission`. **A visibility pass
+running after it has nowhere to put them.**
+
+**The failure this would have produced:** Task 9's implementer reads the absence list, sees role marked
+closed with only read-visibility outstanding, implements `checkVisibilityPermission` as a pure `canSee`
+gate exactly as the bullet describes, and ships. Checks #2 and #5 are never written. **A workspace guest
+can then permanently retarget any ticket they can see to `mode: 'workspace'`**, widening its audience to
+the entire workspace — in an append-only ledger, where that can only be superseded, never removed.
+
+**The general rule, which is the reusable half: NEVER LET A CATEGORY BE DECLARED CLOSED. Enumerate the
+absences.** "Role: closed" is a summary; "nothing yet asks whether a guest may create a ticket, or
+whether a `visibility.set` author holds project-admin rights or wrote the ticket" is actionable. The
+standing marker rule — *a partial-implementation marker enumerates the absences, not the partiality* —
+applies to a category being retired just as much as to one being declared partial. **A closed category
+is the one thing a later reader will not re-derive**, because there is nothing left in the text to
+prompt the question.
+
+Fixed as documentation only in T5. **The checks themselves are Task 9's**, and writing them inside T5
+would ship unreviewed authorisation logic in a reviewed diff — the same reason the P18 adapter was
+declined.
+
+---
+
+## Ruling P20 (2026-08-31) — when two refusal reasons share an identifier, asserting that identifier is not a discriminating check
+
+**`SERVER_ORIGIN_RULE` is DEFINED AS `PERMISSION_ROLE_RULE`.** Every permission refusal — identity
+spoof, envelope-origin forgery, not-a-member, admin-only, project-roster overreach — therefore reports
+the **same `rule` id**. Only the `reason` string separates them.
+
+So a test asserting only `rule` cannot tell which refusal fired, and **a test that asserts a refusal
+HAPPENED cannot tell you WHY.** Measured instance: deleting the `env.origin === 'server'` branch from
+`checkPermission` left two of three forgery cases green, because `forgedContest()` minted a fresh
+`workspaceId` and the caller was a non-member of it — the membership check T5 itself had just added
+refused the event instead, wearing the same rule id.
+
+### The sharpest detail, and the one worth carrying forward
+
+**The test that survived was the LEDGER-LEVEL one** — `it('commits nothing for the refused forgery —
+the append-only ledger never sees it')`. That is the test a security reviewer trusts **most**, precisely
+because it checks the ledger rather than a string. And it is, for exactly the same reason, **the test
+least able to distinguish WHY the row is absent.** Trustworthiness and discriminating power ran in
+opposite directions here.
+
+**The fix that works, and the one that does not.** Seeding the caller as a *member* of the forged
+workspace fixes all three cases at once: under the mutation the event then commits, the ledger row count
+goes 0 → 1, and the ledger test reddens. **Asserting `reason` would NOT have worked** — the ledger-count
+test has no reason string to assert, so the most-trusted test would have stayed green under the mutation.
+**When a check's strength comes from observing an outcome rather than a message, the only way to sharpen
+it is to remove the OTHER causes of that outcome from the fixture.**
+
+---
+
+## A test named for a property must enumerate the paths that reach it (2026-08-31, controller + serial executor)
+
+**This is the escape analysis for T5's privilege escalation, and it generalises well past that bug.**
+
+T5's first commit contained a live escalation: nothing refuses a *second* `workspace.created`, the
+founding bypass admitted one, and the bootstrap then appended `membership.granted {role:'owner'}` for
+the sender — **a stranger resolving as owner of a workspace they were never in.**
+
+The implementer *had* written a test for the property. It was named `does not bootstrap twice`. **It
+exercised only the duplicate-event-id path.** A submission with a *fresh* event id is a different path
+to the same property, and it was the one that was open. **28 tests and 11 dead mutations never touched
+it.**
+
+**Two rules, and the second is the counter-intuitive one:**
+
+1. **A test named for a property must enumerate the paths that reach that property.** A test named for
+   the property reads, to every later reviewer, as coverage *of the property* — not as coverage of the
+   one path the author happened to think of. The name is the claim; the paths are the evidence.
+2. **A mutation score is evidence about the paths exercised, not about the property.** Eleven mutations
+   died here, and every one of them died on the path that was already covered. **The high score made the
+   area look better tested, not worse** — it actively concealed the gap, because a reader who sees a
+   dense mutation table stops looking. A mutation can only kill on a path some test already walks.
+
+### Where the line actually falls — the valid half of a mutation score, kept
+
+The rule above is easy to over-correct into "mutation scores are worthless." They are not, and the
+distinction is the useful part:
+
+> **Mutate to prove an ASSERTION; enumerate paths to prove a PROPERTY.**
+
+Killing a *targeted* mutation proves something real and specific: that **this assertion** is load-bearing
+for **this** behaviour. Two good instances from this same task — reverting `sameSite` to `'strict'` and
+watching two named tests redden, and enabling `crossSubDomainCookies` and watching `Domain=localhost`
+appear in the diff — are genuine evidence, and they are why those two CSRF items count as *intent*
+rather than accident.
+
+What a kill can **never** establish is coverage across the paths that reach the property, because **a
+mutation can only kill on a path some test already walks.** A high kill count is therefore not a
+coverage claim, and a test named for a property still owes an enumeration of the routes to it.
+
+Recorded because *both* sessions were making the error in the same direction all day — one reporting
+kill counts as if they were coverage, the other asking for mutation proof repeatedly without ever
+asking which paths the mutations sat on.
+
+**And the guard that finally closed it had the same shape as the bug.** The obvious fix — ask whether
+the event's *entity* already has a head row — is defeated by a founding filed under a **fresh entity
+id** against the victim's workspace. The correct question is about the **workspace**
+(`workspaceExists`), not about one entity id. `workspaceExists` is a **required** field, so a call site
+that forgets it is a type error rather than a silently re-opened door — *prefer the check whose failure
+is loud*, applied to a function signature.
+
+---
+
+## "Tracked and pushed" — the resumer covers connection loss, not unpushed work (2026-08-31, controller)
+
+T5's five commits, including **the fix for a live privilege escalation**, sat on one machine's disk
+through an entire review cycle. Local `HEAD` was `6a6203c`; `origin/exec/04-t4-t5-permissions` was still
+`a5b761c`, the previous task's handoff commit.
+
+**Caught by a peer, not by a rule** — the controller went to verify the two escalation guards, searched
+the *remote* for `workspaceExists` and `workspaceSeq === 1`, and got **zero hits with `checkPermission`
+as a positive control returning four files.** The zero was true of the remote and false of the tree.
+
+**The gap this exposes in the safety nets:** the session-limit resumer handles connection loss, and
+processes and commits survive that fine. **It does nothing for work that was never pushed.** That is
+why the handoff protocol's phrase is "tracked **and pushed**" rather than "committed".
+
+**Rule: push at every commit inside a task, not only at the task boundary.** A `--force-with-lease`
+after a later amend costs nothing; an unpushed escalation fix costs the whole task. And **verify with
+`git branch -r --contains`** — the remote-tracking form — because the same trap applies here as
+everywhere: a sha that resolves locally says nothing about what the remote holds.
