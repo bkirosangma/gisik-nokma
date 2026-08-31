@@ -15,7 +15,7 @@ state, the mutation ledger, dispatch tiers, and the review composition that was 
 | **Plan 6a** | T1–T4 scaffold (`packages/ui`, `packages/app-core`) | **merged**, PR #16 |
 | | T5 domain gap guards | **discharged, no code** — all four targets already shipped; shapes verified (`blocked: z.boolean().optional()` at `workflow.ts:13`; `cause` with the `reopened-for-child` literal at `:144`; `docToPlainText` and `IngestResult` barrel-exported). Nothing to write. |
 | | T6 claims machinery | **MERGED** — PR #36, on `main` as `3fb22d3`. Implemented, fable-reviewed, three blocking items fixed, scoped re-review CLEAN. |
-| | T9 Board + `useLiveQuery` | **committed but NEVER REVIEWED** — it finished minutes after the fold-back order. Green (gate 621, verified by the controller, not only self-reported), 8 falsifiability proofs, but **no reviewer ever saw it**. Every other task on this branch passed implementer→reviewer→fix→scoped-re-review; this one passed none of it. Do not merge it on the strength of a green gate. |
+| | T9 Board + `useLiveQuery` | **REVIEWED 2026-08-31, and its fix round is on this branch.** It finished minutes after the fold-back order and for one day was the only task here that had passed none of implementer→reviewer→fix→scoped-re-review. It has now passed all four: one opus reviewer (`docs/lanes/plan-6a-t9-review.md`, four Important + six Minor), a fix round for the four Important, and a three-lens scoped re-review whose own findings are dispositioned in that same file. The gate figure this row used to carry ("621") was stale twice over and is deliberately gone — the composition below is anchored to a sha, because a bare number in prose is what went wrong here the first time. `PLANTED DEFECT` labels across T9's two test files: **21** (board 19 · rollup-text 2), recounted at HEAD; the row's old "8 falsifiability proofs" counted something else and never said what. |
 | | T10–T13 (List, My Work + attention strip, ticket sheet + `EditorSlot`, attachment list, reopen flow) | **not started** |
 | | T7/T8/T14/T15/T15b | deferred to Wave 3 by the original brief (need Plans 4/5) |
 | **Plan 10** | T1, T2, T3a, T8 (the prefix) | **merged**, PR #23 |
@@ -25,16 +25,30 @@ state, the mutation ledger, dispatch tiers, and the review composition that was 
 | **Plan 9** | T2 `extractMentionedUserIds`, T3 notification vocabulary | **not started**. T4 became eligible when Plan 4's `Queryable` landed. |
 
 **Merged PRs:** #16 scaffold · #17 env-contract gate · #19 colour-scan attribution · #23 Plan 10 prefix.
-**Unmerged:** `exec/06a-client-core` carries **only unreviewed work** — T9, plus this file. T6 was
-split onto its own branch at its reviewed sha and merged separately (PR #36), so `main` holds only
-reviewed work and the branch holds only unreviewed work. Nobody has to trust a label to tell them
-apart.
+**Unmerged:** `exec/06a-client-core` carried **only unreviewed work** — T9, plus this file — which was
+the point of splitting T6 onto its own branch at its reviewed sha and merging it separately (PR #36).
+That split did its job and the sentence has now expired: as of 2026-08-31 the branch carries T9's
+review, its fix round, and the response to a scoped re-review, so **nothing on it is unreviewed**.
+Kept rather than deleted because the arrangement is worth reusing — `main` holding only reviewed work
+and a branch holding only unreviewed work means nobody has to trust a label to tell them apart.
 
 **Gate, recounted at each sha rather than carried forward** (see the correction below):
 
 - **`main` @ `3fb22d3` — 631, 18/18**: app-core 91 · domain 230 · rule-engine 128 · **server 143** ·
-  ui 31 · sync-client 8
-- **branch @ HEAD — 658**: identical except app-core **118** (T9's +27)
+  ui 31 · sync-client 8. *Historical: this is where the lane folded back, and it is no longer
+  current main.*
+- **branch @ `30e3db4` — 658**: identical except app-core **118** (T9's +27). *Historical, and
+  orphaned by the rebase.*
+- **`main` @ `55ae0a1` — app-core 92**, measured with
+  `--pool=forks --poolOptions.forks.singleFork=true` in the main worktree.
+- **branch after the rebase onto `55ae0a1` — 851, 18/18**: domain 263 · rule-engine 278 ·
+  server 143 · app-core **130** · ui 31 · sync-client 8.
+
+> **The two historical rows are no longer comparable to each other, and saying so is the point.**
+> Plan 3 Chain A landed underneath (`6b2fc76`), moving domain 230 → 263 and rule-engine 128 → 278 on
+> BOTH sides. So "identical except app-core" was true of the pair it was measured on and false of
+> anything since. The app-core delta is the only figure that survives the rebase: **92 → 130**, and
+> even that is a delta, stated against a named sha, not an absolute.
 
 > **This figure was wrong in its first version and the error is instructive.** It said server 106 —
 > true at `8209397`, false at `3fb22d3`, because three server commits (`fc904f4`, `5450085`,
