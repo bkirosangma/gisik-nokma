@@ -54,8 +54,9 @@ historical in `docs/lanes/lane4-periphery-state.md`.
 
 **Phase 0 step 1 — CLOSED.** Plan 3 Chain A merged as `6b2fc76` (PR #38).
 
-**Phase 0 step 2 — COMPLETE on the branch, PR open, awaiting the controller's merge.** This is the
-whole of what is in flight. Nothing else is running.
+**Phase 0 step 2 — COMPLETE on the branch. PR #43 is OPEN against `main`, awaiting the controller's
+merge.** That is the whole of what is in flight; nothing else is running. If you are a restarted
+executor and #43 is already merged, step 2 is closed — go to step 3.
 
 **Step 3 is next:** `exec/07-editor-client`, whose T4 scoped re-review was never dispatched. Recon done
 so the next session does not pay for it: it is **20 behind / 17 ahead** of `main` (the brief's "13+
