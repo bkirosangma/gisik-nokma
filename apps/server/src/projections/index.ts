@@ -1,3 +1,4 @@
+import { projContested } from './contested.js';
 import { entityHeadsProjection } from './entity-heads.js';
 import { membershipsProjection } from './proj-memberships.js';
 import { projVisibility } from './proj-visibility.js';
@@ -13,7 +14,11 @@ import { workflowsProjection } from './workflows.js';
  * plans depend on it, so the pinned order is
  *
  *   proj_entity_heads, proj_workflows, proj_ticket_types, proj_tickets,
- *   proj_rollups, proj_memberships, proj_visibility
+ *   proj_rollups, proj_memberships, proj_visibility, proj_contested
+ *
+ * proj_contested (Plan 10 Task 4) is the one tail entry: §8's order gains it at
+ * the END, so appending IS its §8 position. That is a coincidence of where it
+ * falls, not an exception to the rule below.
  *
  * A NEW REGISTRANT INSERTS AT ITS §8 POSITION — it does not append. This
  * comment used to say "every new registrant appends", which is only true while
@@ -33,5 +38,6 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   registry.register(workflowsProjection);
   registry.register(membershipsProjection);
   registry.register(projVisibility);
+  registry.register(projContested);
   return registry;
 }

@@ -19,8 +19,8 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/04-t6-t7-visibility`**, cut from `origin/main` at `45c83eb`. **T6 AND T7 both done, reviewed, fixed.** PR open for the controller | `git log`, `git rev-parse` |
-| `main` | **`45c83eb`** (PR #51, step 4). Verified by presence, not by report: `proj-memberships.ts`, `effective-role.ts`, `bootstrap-workspace.ts`, `simple-kanban.ts`, `test-cases/06-auth-visibility.md` and Features.md §6 are all on it | `git cat-file -e`, `git show` |
+| Branch in flight | **`exec/10-t4-origin-closer`**, cut from `origin/main` at `40c5219`. Step 6 done, reviewed, Minors fixed. PR for the controller | `git log`, `git rev-parse` |
+| `main` | **`40c5219`** (PR #52, step 5). Verified by presence: `can-see.ts`, `visible-tickets.ts`, `proj-visibility.ts` all on it; `index.ts` registers FOUR projections | `git cat-file -e`, `git show` |
 | `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
 | Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, and every pre-squash sha of the Phase 0 branches | `git branch --contains`, empty = orphaned |
@@ -45,32 +45,32 @@ measured a tree strictly *behind* main and is **a control for nothing**. Do not 
 main-derived total: they are different trees, and a total that rises without decomposing is exactly what
 the coordination doc warns against.
 
-## Gate composition — recounted at the sha being reported (step 5 complete)
+## Gate composition — recounted at the sha being reported (step 6 complete)
 
-**GREEN.** `pnpm turbo run build test typecheck --force`, redirected to a file, **never piped, nothing
-chained after it** — any command following the gate in the same chain becomes the status you are shown.
+**GREEN.** Redirected to a file, **never piped, nothing chained after it** — any following command
+becomes the status you are shown, a bare `echo` included.
 
-| Measure | `main @ 45c83eb` | `0c6b8d3` (T6) | step 5 final |
-|---|---|---|---|
-| **Node** | v22.22.2 | v22.22.2 | **v22.22.2** |
-| Exit code | 0 | 0 | **0** |
-| Turbo tasks | 21/21, 0 cached | 21/21, 0 cached | **21/21, 0 cached** |
-| **Tests** | **995** | **1016** | **1032** |
-| domain | 276 | 276 | 276 |
-| rule-engine | 278 | 278 | 278 |
-| **server** | 200 | 221 | **237** |
-| app-core | 130 | 130 | 130 |
-| editor | 72 | 72 | 72 |
-| sync-client | 8 | 8 | 8 |
-| ui | 31 | 31 | 31 |
+| Measure | `main @ 40c5219` | step 6 final |
+|---|---|---|
+| **Node** | v22.22.2 | **v22.22.2** |
+| Exit code | 0 | **0** |
+| Turbo tasks | 21/21, 0 cached | **21/21, 0 cached** |
+| **Tests** | **1032** | **1070** |
+| **server** | 237 | **275** |
+| domain 276 · rule-engine 278 · app-core 130 · editor 72 · ui 31 · sync-client 8 | unchanged | unchanged |
 
-**Both deltas decompose, entirely in `server`.** 995 → 1016 (**+21**, all `proj-visibility.test.ts`);
-1016 → 1032 (**+16** = `can-see.test.ts` 12 + `visible-tickets.test.ts` 4). Every other package is
-unchanged, as it must be — step 5 touches only `apps/server`.
+**The delta decomposes: +38, entirely in `apps/server` (237 → 275)** — `contest-coherence.test.ts` 13 ·
+`contest-coherence-door.test.ts` 6 · `contested-projection.test.ts` 6 · `contests-route.test.ts` **8**
+(7 from the task + **1 added by the Minor fix**, the `open=false` refusal) · `engine-context.test.ts` +4
+· `verify-projections.test.ts` +1. Every other package is unchanged, as it must be — step 6 touches only
+`apps/server`, and the one `packages/` file it reads it does not modify.
 
-**T7's fix round delta was ZERO and that is the EXPECTED number**, not a figure to explain: both fixes
-are a semantics-preserving control-flow refactor plus prose. **A non-zero delta there would have been a
-tripwire that the refactor changed behaviour.**
+**The jsonb column was validated by OBSERVATION, not by reasoning from the type name.** The contract
+forbids `json` because it has no equality operator and the verifier's `EXCEPT` diff needs one.
+`original_event` is this repo's **first `jsonb` projection column**, so whether the ban extends to it was
+an open question. Measured: a real contest committed, `verifyProjections` clean; one live cell tampered
+via `jsonb_set` → `{clean:false, tables:['proj_contested']}`; cell restored → clean again. **jsonb
+satisfies the requirement the `json` ban is about, and the instrument was proven live in the same run.**
 
 ## What was verified about step 4's surface, so the next session does not re-pay for it
 
@@ -85,67 +85,65 @@ tripwire that the refactor changed behaviour.**
 
 ## Where I am in the serial sequence
 
-**PHASE 0 COMPLETE. STEP 4 MERGED** (PR #51, `main @ 45c83eb`, 995 tests).
+**PHASE 0 COMPLETE. STEPS 4 AND 5 MERGED** (#51 `45c83eb`, #52 `40c5219` — 1032 tests on `main`).
 
-**STEP 5 IS COMPLETE AND AWAITING MERGE.** T6 (`proj_visibility`) and T7 (`canSee`) are both done,
-reviewed, fixed and green on `exec/04-t6-t7-visibility`. **STEP 6 — the LIFTED Plan 10 T4, the §11
-closer — IS NEXT** per the dispatch brief's sequence, and nothing is in flight.
+**STEP 6 IS COMPLETE AND AWAITING MERGE** on `exec/10-t4-origin-closer`. **STEP 7 — Plan 4 T8–T14
+(T11 and T14 floor-list) — IS NEXT** per the dispatch brief, and nothing is in flight.
 
-### T6 — `proj_visibility`. Zero review findings.
+### Step 6 — the lifted Plan 10 T4. THE §11 WINDOW IS CLOSED.
 
-**The plan text's determinism test could not have failed.** It replayed the same ARRIVAL order it had
-applied, so it compared a thing with itself and asserted only that `apply` is a deterministic function.
-Underneath it: every event this projection reads is filed against a **ticket**, so canonical replay order
-is ticket-id order and under ULIDs a parent is routinely created when its children are already in the
-table. The plan's `ticket.created` resolved only the new ticket — true of arrival, false of replay.
-**Every handler now restores a table-wide invariant rather than applying a delta.**
+`proj_contested` (registered **5th**, not 8th — only four projections were live), `getContest`
+(additive only; **P18 untouched**), `GET /v1/contests`, and **the §11 envelope-coherence closer**.
 
-### T7 — `canSee`. Floor-list. One Important, one Minor, both fixed.
+**Verified by EXECUTION through both doors, not by reading the check.** A contest whose outer envelope
+is honest — a real ticket in its real workspace, so `ENTITY_WORKSPACE_MISMATCH_RULE` has nothing to
+catch — and whose embedded `payload.originalEvent` names a different ticket, and separately a different
+workspace, is refused `contest.incoherent-original` with **0 rows in `events`**, through
+`ingestBatch` AND through a real `POST /v1/events`.
 
-**P21 — the role side granted by default.** `canSeeResolved` decided the role with an if-chain and the
-mode with a `switch`: a fourth `resolvedMode` errored TS2366, a fifth `WorkspaceRole` compiled clean.
-**The unenumerated direction was GRANT.** Both `canSeeResolved` and `listVisibleTickets` now use a bare
-exhaustive `switch`; widening `WorkspaceRole` raises **two** TS2366s, one per file. **Independently
-re-verified here** with the domain package rebuilt and a `const _probe: WorkspaceRole = 'viewer'`
-compiling clean first — see below, because the original measurement was void.
+**The binding is three comparisons**: `workspaceId`, `entity.kind`, `entity.id`. One rule id with
+**three distinct reasons**, so deleting one comparison reddens a different test than deleting another
+(ruling P20 applied deliberately).
 
-**P22 — `EffectiveRole` is trusted by convention.** Every safety property rests on the value having come
-from `resolveEffectiveRole`, and **TypeScript is structural**, so any object of the right shape is
-accepted. Closer named for its implementer: **a branded/opaque type** carrying a unique symbol only
-`resolveEffectiveRole` can produce. *Owner: Task 8.* Case **6.64**.
+### THE FINDING THAT SHAPED THIS STEP, and it generalises to every remaining lifted item
 
-**The dispatch's own expectation was wrong and the implementer proved it against its own work.** The
-early return was named as the guard to watch; **the mutation that was supposed to prove it SURVIVED** —
-deleting it leaves all 16 of T7's tests green and reddens exactly one case in 237. The ruling holds, but
-**by two short-circuits, not by the early return**. The implementer withdrew the catalogue claim it had
-already written rather than keeping a sentence the evidence no longer supported.
+**T4's own plan text does not mention the window it was lifted to close.** Swept its range
+(1300–1810) for `coheren`, `binds`, `embedded`, `outer envelope`, `envelope-origin`, `§11` — **zero for
+every one**, with `projection` at 30 as the positive control. The assignment lives in the coordination
+doc and in `contests.ts`'s own docblock. **So the closer is named where a reader of the EVALUATOR looks
+and absent where a reader of the TASK looks** — an implementer following the plan faithfully ships the
+projection, the lookup and the route, and leaves the window open.
 
-### THE TRAP THAT NEARLY VOIDED P21 — read before making any type-level claim
+**Lifting a task changes WHEN it runs, not WHAT ITS TEXT SAYS.** Before dispatching any remaining lifted
+or re-sequenced item, **sweep its own range for the thing it was moved to do**; if the terms are absent,
+the dispatch must carry the obligation, because the plan text will not.
 
-**`apps/server` resolves `@gisik-nokma/domain` through `packages/domain/dist/*.d.ts`.** Widening a union
-in SOURCE does not reach the server's `tsc` at all. The review's pre-fix "exits 0" was equally consistent
-with a real finding and with **an instrument that could not see the change.** The conclusion was right;
-the evidence was not.
+### Also settled here: the sonnet reviewer default is CONDITIONAL
 
-**Rule: any claim of the form "widening this type does / does not produce a compile error over there" is
-VOID unless the package was rebuilt AND a probe proves the change is visible.** This is the stale-`dist`
-trap the coordination doc records for *mutations*, in its **type-level** form — and both halves produce a
-**quiet pass** rather than an error.
+The cost table reads *"Per-task reviewers **where the plan text is complete** | sonnet"*. That row
+carries its own precondition and it is checkable in one command. It was **false** here. So the opus
+reviewer was **not opus-by-exception** — it was the sonnet row not covering the case. Sweep the task's
+range before defaulting a reviewer to sonnet.
 
-### Step 6 — LIFTED Plan 10 T4, the §11 closer
+### Review outcome: 4 Minor, 1 Nit. No Critical, no Important — so no fix round was required.
 
-Per the dispatch brief: consumes only Plan 1's registry, Plan 10 T1's schemas (both on `main`) and
-`canSee` from step 5. **Registers a projection AFTER `proj_visibility`** — §8's order is the single
-source, and `projections/index.ts` now says registrants **insert at their §8 position**.
-**Both registration pins must be extended**: `projection-order.test.ts` (DB-free, pins names *and*
-`[name, tables]`) and the undocumented one in `entity-heads.test.ts`.
+Three Minors were fixed anyway, because each was **a surface or a sentence that lies**:
+1. `GET /v1/contests` admitted `open=false` in its enum while the handler had no `else` — a caller
+   asking for settled contests got **everything**, with a 200 and no signal. Narrowed to `['true']`
+   (a loud 400) rather than inventing a `resolved` filter this task's contract does not define.
+   **Mutation-proven: reverting the enum reddens exactly the new test.**
+2. The catalogue's ids are grouped **by surface, not by number**, so the largest is not the last line and
+   an author scanning the tail would mint a duplicate. The maximum is now stated — and **it went stale
+   within minutes** when three gaps were appended below it, so it carries an instruction to recount.
+3. 12.82 expands what the coherence check leaves free (finding 3), per P19 — never let a category look closed.
 
-### The carried gaps — owners unchanged, do NOT fold into step 6
+### The carried gaps — TEN now, none folded in, all with owners
 
-**P18** membership wiring, 6.50 (step-10 checkpoint) · **P19** guest admissions, 6.51 (T9) ·
-second `workspace.created`, 6.52 (T13) · half-founded workspace, 6.53 (T13) ·
-stale `project_id` on cross-project reparent, 6.57 (Plan 3, then T8) ·
-**P22** `EffectiveRole` provenance, 6.64 (T8) · SQL mode-side not compiler-exhaustive, 6.65 (T8).
+**P18** membership wiring 6.50 (step-10) · **P19** guest admissions 6.51 (T9) · 6.52, 6.53 (T13) ·
+6.57 (Plan 3 → T8) · **P22** `EffectiveRole` provenance 6.64 (T8) · 6.65 SQL mode-side (T8) ·
+**12.82** unbound `actorId` → `claimant_id`, unvalidated `type`/`payload` → permanent comment body ·
+**12.83** UNIQUE index with no lookup — **rejects a whole batch**, losing answers of events that already
+committed · **12.84** `entity.kind` binding has no door test though its path is live. Last three: T7.
 
 ## What step 2 actually contained
 

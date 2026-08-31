@@ -91,6 +91,32 @@ export function createEngineContext(client: PoolClient): EngineContext {
     async getWorkflowDef(workflowId, version) {
       return await getWorkflowDefFromProjection(client, workflowId, version);
     },
+    async getContest(contestedEventId) {
+      // Reads proj_contested through the ingest transaction's own client, like
+      // every other member here: a `claim.contested_resolved` must be judged
+      // against the contests committed BEFORE it, and a contest committed
+      // earlier in this same batch is one of them.
+      //
+      // `ticketId` comes from the projection's `ticket_id` — the entity the
+      // contest was filed against — which is what `contest.wrong-ticket`
+      // compares to `env.entity.id`. Null for an unknown contest, which is a
+      // TRUE statement about this server: the projection is rebuildable from
+      // the whole ledger, so "no row" means "no such contest was ever
+      // recorded", not "this context cannot see contests". That distinction is
+      // why the evaluator THROWS when this method is absent and REFUSES when it
+      // answers null — a context that cannot see contests has made no claim
+      // about the world, and answering null on its behalf would turn a wiring
+      // bug into a plausible-sounding lie.
+      const { rows } = await client.query<{ ticket_id: string; resolved: boolean }>(
+        'SELECT ticket_id, resolved FROM proj_contested WHERE contested_event_id = $1',
+        [contestedEventId],
+      );
+      const row = rows[0];
+      if (row === undefined) {
+        return null;
+      }
+      return { ticketId: row.ticket_id, resolved: row.resolved };
+    },
     async getTicketTypeDef(typeId) {
       // Null for the same reason getEntityState answers null for 'ticket':
       // proj_ticket_types does not exist yet (Plan 3 Task 9 lands the table,

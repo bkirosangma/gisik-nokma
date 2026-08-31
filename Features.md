@@ -165,3 +165,71 @@ from that table rather than taken next-free.*
   `DriveReference`, `isDriveReference()`, `DRIVE_FILE_SCOPE`, `RULE_EVIDENCE_DRIVE_REFERENCE` and its
   reason string: two statements of what a Drive reference is, pinned to each other so the second
   cannot quietly stop meaning the first. `packages/domain/src/attachment-kinds.ts`
+
+## 12. Offline sync & the apps
+
+*(Plan 10, Task 4 only — the LIFTED §11 closer and the contested-claims read path. Plan 10's own
+catalogue task (Task 18) owns §12's full body and will replace this scope note; what follows is what
+Task 4 added, and nothing else. §7/§8/§10/§11 stay absent because the coordination doc assigns
+`Features.md` sections one per implementation plan and numbering is claimed from that table, never
+taken next-free. Still absent rather than missing from this section: the snapshot writer, the replica
+bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Tasks 5–17.)*
+
+- ✅ **A contest cannot lie about which claim it is contesting** — `claim.contested` embeds the
+  refused claim whole, and the embedded claim must name the **same workspace, the same entity kind
+  and the same entity id** as the envelope carrying it. Before this, every layer validated one half
+  and none compared the halves: a contest filed on a real ticket in its real workspace could embed a
+  fabricated claim naming any other ticket in any other workspace, and it committed — a permanent,
+  un-deletable ledger entry attributing a fabricated claim to any actor, since the ledger is
+  append-only by trigger and can only ever be superseded. The check is **pure** (no database read, so
+  it cannot go stale or be defeated by a missing row) and runs on **both ingest doors**, unconditionally
+  — unlike the envelope-origin gate, which must distinguish doors because the server's own appends are
+  legitimately server-origin. `apps/server/src/sync/contest-coherence.ts`
+- ⚙️ **The server-side contest constructor** — `buildContestedClaim` reads the contest's workspace and
+  entity **off the refused claim**, so it has no parameter through which they could disagree: coherence
+  is structural there rather than checked. `checkContestCoherence` is the door that catches a contest
+  built any other way. What neither can establish, and it is named rather than implied: that the
+  embedded claim was **actually refused**, by the rule the contest names. Only the path that holds a
+  real refusal can answer that — *owner: Plan 10 Task 7, `POST /v1/sync`*. `apps/server/src/sync/contest-coherence.ts`
+- ⚙️ **Contested-claims projection (`proj_contested`)** — one row per `claim.contested`, keyed by the
+  contest event id and UNIQUE on the refused claim's id, so a sync retry finds the prior contest
+  instead of filing a second one. `claimant_id` is the actor of the **refused claim**, not of the
+  contest — the server files contests, so reading the contest's own actor would name the same person on
+  every row and empty My Work for everyone. `original_event_id` is deliberately **not** a foreign key
+  into `events`: a refused claim is never appended, so the row it would point at does not exist.
+  `apps/server/src/projections/contested.ts`
+- ⚙️ **Both writers of a contest row are one ticket's stream** — `claim.contested` and
+  `claim.contested_resolved` are both filed against the ticket, and the engine refuses
+  `contest.wrong-ticket` for a resolution aimed elsewhere, so canonical replay
+  `(entity_kind, entity_id, seq)` always puts the contest before its resolution. A resolution reaching
+  the handler with no contest row throws rather than silently doing nothing — the assertion of that
+  premise, not defensiveness: a silent no-op would leave a resolved contest showing as open forever
+  with no instrument saying so. The cost, named rather than left to be discovered: a rebuild replays the
+  whole ledger in one transaction, so one inconsistent pair means `proj_contested` cannot be rebuilt at
+  all until the ledger is superseded into consistency. `apps/server/src/projections/contested.ts`
+- ⚙️ **The verifier runs over `proj_contested` with a real row in it** — `original_event` is the repo's
+  first `jsonb` projection column, and the registry contract forbids `json` precisely because
+  `verify-projections`'s `EXCEPT` diff needs an equality operator. That jsonb has one is an argument
+  about the type; that a live `INSERT` and a shadow-schema rebuild agree through it byte for byte is an
+  observation, and the verifier's seed now makes it. Its non-emptiness is asserted separately, because a
+  clean verdict over an empty table is the check that cannot fail.
+  `apps/server/test/verify-projections.test.ts`
+- ⚙️ **`getContest` on the server engine context** — the engine's contest lookup, reading
+  `proj_contested` through the ingest transaction's own client, which is what makes
+  `contest.unknown` / `contest.wrong-ticket` / `contest.already-resolved` evaluable on this server at
+  all. `null` here means "no such contest was ever recorded", which is TRUE of a projection rebuildable
+  from the whole ledger — the reason the evaluator **throws** when the method is absent and **refuses**
+  when it answers null. Asserted through the ENGINE — the three contest refusals `contest.unknown`,
+  `contest.wrong-ticket` and `contest.already-resolved` are the whole reason the method exists, and a
+  direct call would prove the SQL runs while proving nothing about the wiring that was missing.
+  `apps/server/src/engine-context.ts`
+- ✅ **`GET /v1/contests`** — the read surface the ticket banner, My Work and the attention strip share,
+  filtered by workspace, ticket, claimant and open/resolved. Every row passes `canSee`, so a contest is
+  exactly as visible as its ticket and never more; a caller who cannot see the ticket gets an empty list
+  rather than a 403, so empty and forbidden are the same answer and the route is not an existence
+  oracle. It never builds an `EffectiveRole` by hand and never reads `proj_memberships` directly — a
+  project-scope row survives `membership.revoked` by design. `apps/server/src/sync/contests-route.ts`
+- ⚙️ **One assembled test server** — `buildTestApp(db)` builds the real app, real auth, real ingest and
+  the real projection registry, returning the app, its own OTP sender and the ungated internal ingest
+  door. It replaces four hand-copied assemblies that had to be extended one by one every time
+  `buildApp` gained a route. `apps/server/test/helpers/app.ts`

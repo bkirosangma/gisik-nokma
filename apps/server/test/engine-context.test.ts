@@ -185,6 +185,85 @@ describe('createEngineContext.getEntityState — what the server can honestly se
   });
 });
 
+/**
+ * `getContest` (Plan 10 Task 4). Asserted through the ENGINE rather than by
+ * calling the method: the evaluator is the only consumer, and the three
+ * refusals below are the whole reason the method exists. A direct call would
+ * prove the SQL runs and nothing about the wiring — and the wiring is what was
+ * missing, loudly, until this task (`evaluateClaimContestedResolved` threw
+ * "EngineContext.getContest is required" against a context that had none).
+ */
+describe('createEngineContext.getContest — the contest lookup the engine cannot work without', () => {
+  const CONTEST_TICKET = newUlid();
+  const OTHER_TICKET = newUlid();
+
+  function contestOn(ticketId: string): SubmittedEvent {
+    return submitted({
+      entity: { kind: 'ticket', id: ticketId },
+      type: 'claim.contested',
+      payload: {
+        originalEvent: submitted({
+          entity: { kind: 'ticket', id: ticketId },
+          type: 'ticket.transitioned',
+          payload: { toStateId: 'done' },
+        }),
+        rule: 'restrict-to',
+        reason: 'Only the assignee may do this.',
+      },
+    });
+  }
+
+  function resolutionOf(ticketId: string, contestedEventId: string): SubmittedEvent {
+    return submitted({
+      entity: { kind: 'ticket', id: ticketId },
+      type: 'claim.contested_resolved',
+      payload: { contestedEventId, resolution: 'discarded', note: 'stale' },
+    });
+  }
+
+  it('a resolution commits only because the context can READ the contest it names', async () => {
+    // Mutation that reddens it, naming its own site: make getContest return
+    // null unconditionally in src/engine-context.ts — the evaluator then
+    // refuses `contest.unknown` and this commit becomes a refusal.
+    const contest = { ...contestOn(CONTEST_TICKET), origin: 'server' as const };
+    const [opened] = await service().ingestBatch([contest]);
+    expect(opened).toMatchObject({ status: 'committed' });
+
+    const [resolved] = await service().ingestBatch([resolutionOf(CONTEST_TICKET, contest.id)]);
+    expect(resolved).toMatchObject({ status: 'committed' });
+  });
+
+  it('a resolution naming no recorded contest is refused contest.unknown — null means "never recorded"', async () => {
+    const [result] = await service().ingestBatch([resolutionOf(CONTEST_TICKET, newUlid())]);
+    expect(result).toMatchObject({ status: 'refused', rule: 'contest.unknown' });
+  });
+
+  it('a resolution aimed at a contest on ANOTHER ticket is refused contest.wrong-ticket', async () => {
+    // This is what makes the returned `ticketId` load-bearing rather than
+    // decorative. Mutation that reddens it: return `env.entity.id` from
+    // getContest instead of the projection's `ticket_id`.
+    const contest = { ...contestOn(OTHER_TICKET), origin: 'server' as const };
+    const [opened] = await service().ingestBatch([contest]);
+    expect(opened).toMatchObject({ status: 'committed' });
+
+    const [result] = await service().ingestBatch([resolutionOf(CONTEST_TICKET, contest.id)]);
+    expect(result).toMatchObject({ status: 'refused', rule: 'contest.wrong-ticket' });
+  });
+
+  it('a second resolution of the same contest is refused contest.already-resolved — the `resolved` column read back', async () => {
+    // Mutation that reddens it: return a hard-coded `resolved: false` from
+    // getContest. The first resolution still commits; the second one stops
+    // being refused, and history gets rewritten.
+    const ticket = newUlid();
+    const contest = { ...contestOn(ticket), origin: 'server' as const };
+    await service().ingestBatch([contest]);
+    const [first] = await service().ingestBatch([resolutionOf(ticket, contest.id)]);
+    expect(first).toMatchObject({ status: 'committed' });
+    const [second] = await service().ingestBatch([resolutionOf(ticket, contest.id)]);
+    expect(second).toMatchObject({ status: 'refused', rule: 'contest.already-resolved' });
+  });
+});
+
 describe('a role-gated transition through the shipped server context', () => {
   it('is refused for the true reason — the server has no ticket state — and never for an invented one', async () => {
     const results = await service().ingestBatch([

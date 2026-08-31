@@ -38,7 +38,7 @@ async function main(): Promise<void> {
     baseUrl: config.betterAuthUrl,
     secret: config.betterAuthSecret,
   });
-  const app = buildApp({ db: pool, ingest, auth }, { logLevel: config.logLevel });
+  const app = buildApp({ db: pool, pool, ingest, auth }, { logLevel: config.logLevel });
   await app.listen({ port: config.port, host: config.host });
 }
 

@@ -4,9 +4,34 @@ import { createIngestService } from '../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../src/projections/index.js';
 import { formatReport, verifyProjections } from '../src/tools/verify-projections.js';
 import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import { buildContestedClaim } from '../src/sync/contest-coherence.js';
 import { submittedWorkflowDefined, submittedWorkspaceCreated } from './helpers/events.js';
 
 let db: TestDatabase;
+
+/** A server-origin contest through the internal door — the only door entitled to one. */
+function contestedClaim(workspaceId: string): SubmittedEvent {
+  return buildContestedClaim({
+    originalEvent: {
+      id: newUlid(),
+      workspaceId,
+      entity: { kind: 'ticket', id: newUlid() },
+      type: 'ticket.transitioned',
+      version: 1,
+      // Keys deliberately not in alphabetical order: if jsonb's normalisation
+      // ever differed between a live INSERT and a shadow rebuild, this is the
+      // shape that would show it.
+      payload: { toStateId: 'done', note: 'unsorted keys', assignee: null },
+      actorId: newUlid(),
+      origin: 'mobile',
+      clientTime: '2026-08-20T09:00:00.000Z',
+    },
+    rule: 'workflow.transition-not-allowed',
+    reason: 'That move is not allowed from here.',
+    actorId: newUlid(),
+  });
+}
 
 beforeAll(async () => {
   db = await createTestDatabase();
@@ -23,6 +48,17 @@ beforeAll(async () => {
     // than empty — an empty table diffs clean without proving that live
     // application and ledger re-derivation produce the same jsonb.
     submittedWorkflowDefined(home.workspaceId),
+    // A CONTEST, so proj_contested is compared with a real row in it rather than
+    // empty — same reason as the workflow above, and sharper: `original_event`
+    // is the repo's FIRST jsonb projection column. The registry contract forbids
+    // `json` because it has no equality operator and this verifier diffs with
+    // EXCEPT; jsonb HAS one, which is the argument the migration makes. THIS
+    // SEED is what turns that argument into an observation — jsonb normalises
+    // key order and whitespace on ingest, so a live INSERT and a shadow-schema
+    // rebuild have to agree through EXCEPT in both directions, and an empty
+    // table would have proven neither. The unique index on original_event_id
+    // rides along through `CREATE TABLE … LIKE … INCLUDING ALL`.
+    contestedClaim(home.workspaceId),
   ]);
   if (results.some((result) => result.status !== 'committed')) {
     throw new Error('seeding failed — verifier tests need an honest baseline');
@@ -41,7 +77,23 @@ async function shadowSchemaExists(): Promise<boolean> {
 }
 
 describe('verifyProjections', () => {
+  it('the seed is NON-EMPTY in every table the clean verdict below covers', async () => {
+    // A clean verdict over empty tables is the check that cannot fail, and this
+    // file's own seed comment says so about proj_workflows. Asserted rather than
+    // trusted: if a seed ever stops committing, the verdict below stops meaning
+    // anything, and THIS is what says so, naming the table.
+    for (const table of ['proj_entity_heads', 'proj_workflows', 'proj_contested']) {
+      const { rows } = await db.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`);
+      expect(
+        rows[0]?.n,
+        `${table} is empty — a clean verdict over it proves nothing`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
   it('reports clean when live projections match their rebuild, and drops its shadow schema', async () => {
+    // proj_contested's jsonb column is diffed here in both directions, which is
+    // what earns the migration's claim that jsonb is legal where `json` is not.
     const report = await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() });
     expect(report).toEqual({ clean: true, diffs: [] });
     await expect(shadowSchemaExists()).resolves.toBe(false);
