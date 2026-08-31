@@ -1,5 +1,5 @@
 import { ticketTransitionedPayloadSchema, type EventEnvelope } from '@gisik-nokma/domain';
-import { REFUSAL_RULES } from './refusal-rules.js';
+import { REFUSAL_RULES, malformedPayloadDetail } from './refusal-rules.js';
 import { evaluateTransitionRules } from './rules/index.js';
 import { resolveCurrentStateId } from './version-map.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
@@ -29,7 +29,7 @@ export async function evaluateTicketTransitioned(
 
   const parsed = ticketTransitionedPayloadSchema.safeParse(env.payload);
   if (!parsed.success) {
-    const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
+    const detail = malformedPayloadDetail(parsed.error);
     return {
       refused: true,
       rule: REFUSAL_RULES.malformedPayload,
@@ -62,7 +62,19 @@ export async function evaluateTicketTransitioned(
     return {
       refused: true,
       rule: REFUSAL_RULES.strandedState,
-      reason: `Ticket ${ticket.id} sits in state "${resolved.unmappedStateId}" of workflow version ${ticket.workflowVersion}, which no longer exists in version ${latest.version} and no state mapping covers it.`,
+      // No version clause beside the state id, deliberately. `resolveCurrentStateId`
+      // reports the id at the point the chain BROKE, not the id it started from
+      // (`foldStateIdForward`, packages/domain/src/workflow.ts:99-101), while
+      // `ticket.workflowVersion` is the ticket's ORIGIN version. On a chain
+      // longer than two those are different versions, so "state X of version Y"
+      // named a pair that never coexisted. It coincided — and so read true — only
+      // while every stranded fixture was two-version; Plan 3's refresh-on-publish
+      // makes the divergence routine. Naming the id alone is the whole truth this
+      // refusal can tell without a backward walk, and a backward walk is
+      // forbidden: there is no such thing, and inventing one is a second set of
+      // rounding errors of exactly the kind THE ONE VERSION WALK exists to
+      // prevent. Plan 6 renders this sentence verbatim to a human.
+      reason: `Ticket ${ticket.id} sits in state "${resolved.unmappedStateId}", which no longer exists in version ${latest.version} and no state mapping covers it.`,
     };
   }
 

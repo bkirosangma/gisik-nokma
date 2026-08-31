@@ -41,7 +41,12 @@ function defined(payload: Omit<WorkflowDefinedPayload, 'id'> & { id?: string }):
   });
 }
 
-type SpyCounts = { entityState: number; childrenStates: number; workflowDef: number };
+type SpyCounts = {
+  entityState: number;
+  childrenStates: number;
+  workflowDef: number;
+  ticketTypeDef: number;
+};
 
 /**
  * `entity`/`children` default to Plan 1's original stubs (no ticket, no
@@ -59,16 +64,24 @@ function spyContext(
   const getEntityState = vi.fn(async () => opts.entity ?? null);
   const getChildrenStates = vi.fn(async () => opts.children ?? []);
   const getWorkflowDef = vi.fn(async () => latest);
+  // Counted from Plan 3 Task 5, which is the first caller: `checkTicketCreated`
+  // reads a ticket type's rank and name. Leaving it out was correct while
+  // nothing called it — and would stop being correct silently, because every
+  // "N context calls" assertion in this file would go on passing while no
+  // longer being total. A spy that is not summed is a spy that has been
+  // switched off.
+  const getTicketTypeDef = vi.fn(async () => null);
   const counts = (): SpyCounts => ({
     entityState: getEntityState.mock.calls.length,
     childrenStates: getChildrenStates.mock.calls.length,
     workflowDef: getWorkflowDef.mock.calls.length,
+    ticketTypeDef: getTicketTypeDef.mock.calls.length,
   });
   return {
-    ctx: { getEntityState, getChildrenStates, getWorkflowDef },
+    ctx: { getEntityState, getChildrenStates, getWorkflowDef, getTicketTypeDef },
     calls: () => {
       const seen = counts();
-      return seen.entityState + seen.childrenStates + seen.workflowDef;
+      return seen.entityState + seen.childrenStates + seen.workflowDef + seen.ticketTypeDef;
     },
     counts,
   };
@@ -245,6 +258,37 @@ describe('evaluateEvent — the dispatcher', () => {
     expect(calls()).toBe(0);
   });
 
+  /**
+   * The `ticket.created` arm, and the same claim in its other half: the
+   * dispatcher routes it, and the spy ledger above is TOTAL. `getTicketTypeDef`
+   * answers null here, so the check refuses `ticket.unknown-type` — the point
+   * is not the verdict but the two lookups it took to reach it. Drop
+   * `ticketTypeDef` from `counts()` and this assertion fails; that is the whole
+   * reason it is written as a whole-object comparison rather than a sum.
+   */
+  it('routes ticket.created to the hierarchy check, and the call ledger counts the type lookup', async () => {
+    const { ctx, counts } = spyContext();
+    const env = envelope({
+      type: 'ticket.created',
+      entity: { kind: 'ticket', id: '01J9GNEW000000000000000000' },
+      payload: {
+        typeId: 'task',
+        projectId: '01J9GPRJ000000000000000000',
+        parentId: null,
+        title: 'Reconcile the till',
+      },
+    });
+    await expect(evaluateEvent(env, ctx)).resolves.toEqual({
+      refused: true,
+      rule: 'ticket.unknown-type',
+      reason: "This ticket's type is not defined in this workspace.",
+    });
+    // One `getEntityState` for "does this ticket already exist", one
+    // `getTicketTypeDef` for the type. No workflow, no children: neither
+    // question is reachable once the type is unknown.
+    expect(counts()).toEqual({ entityState: 1, childrenStates: 0, workflowDef: 0, ticketTypeDef: 1 });
+  });
+
   it('routes workflow.defined to its rule module rather than passing it through', async () => {
     const { ctx, calls } = spyContext();
     const verdict = await evaluateEvent(
@@ -279,6 +323,114 @@ describe('evaluateEvent — the dispatcher', () => {
       ctx,
     );
     expect(verdict).toMatchObject({ refused: true, rule: REFUSAL_RULES.workflowStructure });
+  });
+});
+
+/**
+ * The malformed-payload detail names its SUBJECT, and these two checks are the
+ * only ones where nothing else says so.
+ *
+ * Every check that parses a payload used to build its detail from
+ * `issue.message` alone, dropping the zod path — and a zod message is a
+ * sentence fragment. The five checks Plan 3 owns each pin the corrected string
+ * in their own suite; these two are Plan 2's, and their only coverage is two
+ * fixtures asserting `reasonStartsWith` a prefix that stops at "malformed:".
+ * A fixture prefix cannot see the detail, so without these the shared
+ * `malformedPayloadDetail` could lose the path clause here and stay green.
+ *
+ * The transitioned case carries a NESTED path on purpose: `comment.text` is the
+ * only assertion in the repo that pins `path.join('.')` rather than a
+ * single-segment path, so a join changed to a comma or a space dies here.
+ */
+describe('a malformed payload names the field it is about', () => {
+  it('ticket.transitioned: a nested path is joined with dots', async () => {
+    const { ctx } = spyContext();
+    const env = envelope({
+      type: 'ticket.transitioned',
+      entity: { kind: 'ticket', id: newUlid() },
+      payload: { to: 'done', comment: { text: 5 } },
+    });
+    await expect(evaluateEvent(env, ctx)).resolves.toEqual({
+      refused: true,
+      rule: 'malformed-payload',
+      reason:
+        "This ticket.transitioned event's payload is malformed: at comment.text: Expected string, received number",
+    });
+  });
+
+  it('workflow.defined: the version that cannot be zero says which field it is', async () => {
+    const { ctx } = spyContext();
+    const id = newUlid();
+    const env = envelope({
+      type: 'workflow.defined',
+      entity: { kind: 'workflow', id },
+      payload: {
+        id,
+        version: 0,
+        name: 'Basic',
+        initialStateId: 'todo',
+        states: [{ id: 'todo', name: 'To do', category: 'open' }],
+        transitions: [],
+      },
+    });
+    await expect(evaluateEvent(env, ctx)).resolves.toEqual({
+      refused: true,
+      rule: 'malformed-payload',
+      reason:
+        "This workflow.defined event's payload is malformed: at version: Number must be greater than or equal to 1",
+    });
+  });
+
+  /**
+   * The other half of the path clause: it is OMITTED when there is no path.
+   * A payload that is not an object at all fails at the root, where
+   * `issue.path` is `[]` — rendering the clause anyway would produce
+   * "malformed: at : Expected object", which is worse than the subject-less
+   * fragment the clause exists to replace. Neither shipped fixture reaches
+   * this: both send objects, and both assert only the prefix that stops at
+   * "malformed:".
+   */
+  it('workflow.defined: a payload that is not an object at all names no field, because there is none', async () => {
+    const { ctx } = spyContext();
+    const env = envelope({
+      type: 'workflow.defined',
+      entity: { kind: 'workflow', id: newUlid() },
+      payload: 'not a definition',
+    });
+    await expect(evaluateEvent(env, ctx)).resolves.toEqual({
+      refused: true,
+      rule: 'malformed-payload',
+      reason: "This workflow.defined event's payload is malformed: Expected object, received string",
+    });
+  });
+
+  /**
+   * The SEPARATOR, pinned for the same reason and by the same argument as the
+   * structural refusal's below: every other assertion in this suite fires
+   * exactly one issue, and a one-element join is identical for any separator
+   * (`['x'].join('; ') === ['x'].join('')`), so `'; '` would otherwise be
+   * unfalsifiable in brand-new code. `ticketCreatedPayload` is the one payload
+   * here that fires two independent issues from one candidate — an empty
+   * `typeId` and a `projectId` that is not a ULID — in the order zod reports
+   * them, which is the schema's own key order. Change the join and this dies;
+   * delete this and the join is unpinned again.
+   *
+   * It also proves the path clause is per-issue rather than appended once: both
+   * fields are named, each beside its own message.
+   */
+  it('ticket.created: two issues are joined with a semicolon, each carrying its own path', async () => {
+    const { ctx } = spyContext();
+    const env = envelope({
+      type: 'ticket.created',
+      entity: { kind: 'ticket', id: newUlid() },
+      payload: { typeId: '', projectId: 'not-a-ulid', parentId: null, title: 'Two things wrong' },
+    });
+    await expect(evaluateEvent(env, ctx)).resolves.toEqual({
+      refused: true,
+      rule: 'malformed-payload',
+      reason:
+        "This ticket.created event's payload is malformed: at typeId: String must contain at least 1 character(s); at projectId: must be a ULID",
+    });
   });
 });
 
@@ -348,14 +500,14 @@ describe('the stranding refusal, and what it refuses to ask', () => {
       reason:
         'Version 2 drops state(s) "doing", "review" that version 1 has; publishing cannot see which tickets sit in which state, so every dropped state needs a stateMapping entry.',
     });
-    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1 });
+    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1, ticketTypeDef: 0 });
   });
 
   it('accepts a v2 that maps both dropped states without asking whether either is occupied', async () => {
     const { ctx, counts } = spyContext(basicV1);
     const verdict = await evaluateEvent(basicV2({ doing: 'todo', review: 'todo' }), ctx);
     expect(verdict).toEqual({ refused: false });
-    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1 });
+    expect(counts()).toEqual({ entityState: 0, childrenStates: 0, workflowDef: 1, ticketTypeDef: 0 });
   });
 });
 

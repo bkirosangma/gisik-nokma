@@ -45,7 +45,7 @@ describe('buildInMemoryContext', () => {
   it('folds prior events into ticket state: created, transitioned, assigned, field_set', async () => {
     const fx = fixture({
       priorEvents: [
-        { type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { workflowId: 'wf_basic' } },
+        { type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { typeId: 'task', projectId: 'prj_1', parentId: null, title: 'Fixture ticket t1', workflowId: 'wf_basic' } },
         { type: 'ticket.transitioned', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_b', payload: { to: 'doing' } },
         { type: 'ticket.assigned', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { assigneeId: 'user_b' } },
         { type: 'ticket.field_set', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { field: 'due_date', value: '2026-09-01' } },
@@ -57,7 +57,19 @@ describe('buildInMemoryContext', () => {
     expect(ticket.stateId).toBe('doing');
     expect(ticket.stateCategory).toBe('active');
     expect(ticket.assigneeId).toBe('user_b');
+    // The title is a field CLAIM on creation, exactly as `applyTicketEvent`
+    // records it — not a column, and not absent. `toEqual` over the whole map
+    // rather than one key is what makes that assertable: a fold that dropped
+    // the title, or one that recorded it under a different claimant or clock,
+    // fails here rather than surfacing later as a refusal quoting a raw ticket
+    // id where a title belongs.
     expect(ticket.fields).toEqual({
+      title: {
+        value: 'Fixture ticket t1',
+        actorId: 'user_a',
+        clientTime: '2026-08-20T00:00:00.000Z',
+        serverTime: '2026-08-20T00:00:00.000Z',
+      },
       due_date: {
         value: '2026-09-01',
         actorId: 'user_a',
@@ -73,7 +85,7 @@ describe('buildInMemoryContext', () => {
   it("a created ticket starts in its workflow's initialStateId", async () => {
     const fx = fixture({
       priorEvents: [
-        { type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { workflowId: 'wf_basic' } },
+        { type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { typeId: 'task', projectId: 'prj_1', parentId: null, title: 'Fixture ticket t1', workflowId: 'wf_basic' } },
       ],
     });
     const ticket = await buildInMemoryContext(fx).getEntityState('ticket', 't1');
@@ -85,8 +97,8 @@ describe('buildInMemoryContext', () => {
   it('children are found by parentId', async () => {
     const fx = fixture({
       priorEvents: [
-        { type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { workflowId: 'wf_basic' } },
-        { type: 'ticket.created', entity: { kind: 'ticket', id: 't2' }, actorId: 'user_a', payload: { workflowId: 'wf_basic', parentId: 't1' } },
+        { type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { typeId: 'task', projectId: 'prj_1', parentId: null, title: 'Fixture ticket t1', workflowId: 'wf_basic' } },
+        { type: 'ticket.created', entity: { kind: 'ticket', id: 't2' }, actorId: 'user_a', payload: { typeId: 'task', projectId: 'prj_1', title: 'Fixture ticket t2', workflowId: 'wf_basic', parentId: 't1' } },
       ],
     });
     const children = await buildInMemoryContext(fx).getChildrenStates('t1');
@@ -117,7 +129,7 @@ describe('buildInMemoryContext', () => {
   it('a field claim keeps the actor and the two clocks apart', async () => {
     const fx = fixture({
       priorEvents: [
-        { type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { workflowId: 'wf_basic' } },
+        { type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { typeId: 'task', projectId: 'prj_1', parentId: null, title: 'Fixture ticket t1', workflowId: 'wf_basic' } },
         {
           type: 'ticket.field_set',
           entity: { kind: 'ticket', id: 't1' },
@@ -156,7 +168,7 @@ describe('buildInMemoryContext', () => {
         // Pinned at 2 while the latest wf_basic is 3 and the envelope's own
         // `version` is 1 — three distinct numbers, so a transposition among
         // them is visible rather than silently right.
-        { type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { workflowId: 'wf_basic', workflowVersion: 2 } },
+        { type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { typeId: 'task', projectId: 'prj_1', parentId: null, title: 'Fixture ticket t1', workflowId: 'wf_basic', workflowVersion: 2 } },
         { type: 'ticket.transitioned', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_b', payload: { to: 'doing' } },
         { type: 'ticket.workflow_rebound', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { toWorkflowId: 'wf_other', toStateId: 'in_review' } },
       ],
@@ -333,6 +345,14 @@ describe('a typo in a fixture refuses at load rather than downgrading the discip
     ).toBe("expected: Unrecognized key(s) in object: 'reason'");
   });
 
+  // TWO issues now, and the second is the point of the presence fix: strictness
+  // catches the typo, and `payload`'s own refine catches what the typo LEFT
+  // BEHIND — an event with no claim at all. Before the refine, `z.unknown()`
+  // admitted the missing key, so a fixture whose payload key was misspelled in
+  // a way `.strict()` could not see (a prior event assembled in code, say) got
+  // an undefined payload and a malformed-payload refusal indistinguishable from
+  // a real planted defect. The two answers are deliberately the same sentence
+  // the domain envelope gives (`envelope.ts`'s `requiredPayload`).
   it('a misspelled payload key refuses instead of arriving as an undefined payload', () => {
     expect(
       malformedDetail({
@@ -344,7 +364,9 @@ describe('a typo in a fixture refuses at load rather than downgrading the discip
           paylod: { to: 'doing' },
         },
       }),
-    ).toBe("candidateEvent: Unrecognized key(s) in object: 'paylod'");
+    ).toBe(
+      "candidateEvent.payload: is required — an event with no payload is not a claim; candidateEvent: Unrecognized key(s) in object: 'paylod'",
+    );
   });
 
   // The three rows above all die on the rule-only branch's strictness. These
@@ -498,5 +520,287 @@ describe('a typo in a fixture refuses at load rather than downgrading the discip
         ],
       }).success,
     ).toBe(true);
+  });
+});
+
+/**
+ * Ruling P10, and the discriminator it turns on: **a harness schema may diverge
+ * from its domain twin in VALUE FORMAT; it may not diverge in PRESENCE.**
+ *
+ * Format divergence is deliberate and load-bearing — fixtures use `t1` and
+ * `ws_1` because a prior event enters at `evaluateEvent` and never passes
+ * `parseEvent`'s door, so tightening `z.string()` to `ulidString` would
+ * invalidate every shipped fixture for nothing. Presence divergence has no such
+ * defence: it lets a fixture stage a prior state the real create door would
+ * have refused, and the suite then proves a refusal against a world the server
+ * cannot reach.
+ *
+ * Four defects were open here, all of them silent: `parentId` optional where
+ * the domain requires it, `typeId`/`projectId`/`title` absent from the schema
+ * entirely, the envelope's own `payload` a bare `z.unknown()`, and the prior
+ * field claim's `value` the same. The last one was the worst of them — the fold
+ * carried `payload.value ?? null`, character-for-character the production
+ * fabrication it exists to catch, so no fixture could witness the difference
+ * between the two doors.
+ */
+describe('prior-event schemas mirror the domain doors in PRESENCE', () => {
+  const CANDIDATE = {
+    type: 'ticket.transitioned',
+    entity: { kind: 'ticket', id: 't1' },
+    actorId: 'user_a',
+    payload: { to: 'doing' },
+  };
+
+  /** A well-formed create in the prior dialect — the baseline every probe below differs from by one key. */
+  function created(id: string, extra: Record<string, unknown> = {}): unknown {
+    return {
+      type: 'ticket.created',
+      entity: { kind: 'ticket', id },
+      actorId: 'user_a',
+      payload: { typeId: 'task', projectId: 'prj_1', parentId: null, title: `Fixture ticket ${id}`, workflowId: 'wf_basic', ...extra },
+    };
+  }
+
+  function contextOf(priorEvents: unknown[]) {
+    return buildInMemoryContext(
+      fixtureSchema.parse({
+        name: 'presence probe',
+        workflowDefs: [wfBasic],
+        priorEvents,
+        candidateEvent: CANDIDATE,
+        expected: { refused: false },
+      }),
+    );
+  }
+
+  // --- the envelope's own payload -------------------------------------------
+  // Four assertions, not "make the key required": two of them are ACCEPTANCES,
+  // and they are the half a careless fix breaks. `null` is a claim and `{}` is
+  // an empty claim; only ABSENCE is the defect, and absent and
+  // present-but-`undefined` are the same thing on the wire.
+
+  it('an event with no payload key at all refuses at load', () => {
+    expect(
+      malformedDetail({
+        name: 'no payload',
+        workflowDefs: [wfBasic],
+        candidateEvent: { type: 'ticket.transitioned', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a' },
+        expected: { refused: false },
+      }),
+    ).toBe('candidateEvent.payload: is required — an event with no payload is not a claim');
+  });
+
+  it('an event whose payload is present but undefined refuses at load — the wire cannot tell it from absent', () => {
+    expect(
+      malformedDetail({
+        name: 'undefined payload',
+        workflowDefs: [wfBasic],
+        candidateEvent: { ...CANDIDATE, payload: undefined },
+        expected: { refused: false },
+      }),
+    ).toBe('candidateEvent.payload: is required — an event with no payload is not a claim');
+  });
+
+  it('a null payload still parses — a null claim is a claim', () => {
+    expect(
+      fixtureSchema.safeParse({
+        name: 'null payload',
+        workflowDefs: [wfBasic],
+        candidateEvent: { ...CANDIDATE, payload: null },
+        expected: { refused: false },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('an empty payload still parses — an empty claim is a claim', () => {
+    expect(
+      fixtureSchema.safeParse({
+        name: 'empty payload',
+        workflowDefs: [wfBasic],
+        candidateEvent: { ...CANDIDATE, payload: {} },
+        expected: { refused: false },
+      }).success,
+    ).toBe(true);
+  });
+
+  // --- a prior field claim's value -------------------------------------------
+
+  it('a prior field claim with no value is a fixture-authoring error, not a clearing', () => {
+    expect(() =>
+      contextOf([created('t1'), { type: 'ticket.field_set', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { field: 'due_date' } }]),
+    ).toThrow('is required — a field claim with no value would record a clearing nobody made');
+  });
+
+  it('a prior field claim whose value is present but undefined is refused the same way', () => {
+    expect(() =>
+      contextOf([
+        created('t1'),
+        { type: 'ticket.field_set', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { field: 'due_date', value: undefined } },
+      ]),
+    ).toThrow('is required — a field claim with no value would record a clearing nobody made');
+  });
+
+  it('a prior field claim clearing a field to null is folded as the claim it is', async () => {
+    const ctx = contextOf([
+      created('t1'),
+      { type: 'ticket.field_set', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_b', payload: { field: 'due_date', value: null } },
+    ]);
+    const ticket = await ctx.getEntityState('ticket', 't1');
+    if (ticket === null || ticket.kind !== 'ticket') throw new Error('expected a ticket');
+    // The claimant survives the clearing: "who emptied this, and when" is the
+    // whole reason a clearing is a claim rather than a deletion.
+    expect(ticket.fields['due_date']).toEqual({
+      value: null,
+      actorId: 'user_b',
+      clientTime: '2026-08-20T00:00:00.000Z',
+      serverTime: '2026-08-20T00:00:00.000Z',
+    });
+  });
+
+  it('a prior field claim of any other value is folded verbatim', async () => {
+    const ctx = contextOf([
+      created('t1'),
+      { type: 'ticket.field_set', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { field: 'due_date', value: {} } },
+    ]);
+    const ticket = await ctx.getEntityState('ticket', 't1');
+    if (ticket === null || ticket.kind !== 'ticket') throw new Error('expected a ticket');
+    expect(ticket.fields['due_date']?.value).toEqual({});
+  });
+
+  // --- the create payload's four domain-required keys -------------------------
+
+  it.each(['typeId', 'projectId', 'parentId', 'title'])(
+    'a prior create omitting %s is a fixture-authoring error, exactly as the real door refuses it',
+    (key) => {
+      const payload: Record<string, unknown> = {
+        typeId: 'task',
+        projectId: 'prj_1',
+        parentId: null,
+        title: 'Fixture ticket t1',
+        workflowId: 'wf_basic',
+      };
+      delete payload[key];
+      expect(() =>
+        contextOf([{ type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload }]),
+      ).toThrow(new RegExp(`"${key}"`));
+    },
+  );
+
+  it('a prior create says which project and which type it is in, rather than inheriting a constant', async () => {
+    const ctx = contextOf([created('t1', { typeId: 'story', projectId: 'prj_other' })]);
+    const ticket = await ctx.getEntityState('ticket', 't1');
+    if (ticket === null || ticket.kind !== 'ticket') throw new Error('expected a ticket');
+    // Both were hardcoded `task`/`prj_1` before this task. Plan 3's hierarchy
+    // checks read both, so a fixture that could not say either could not stage
+    // a rank refusal at all and met a cross-project refusal for a project it
+    // never chose.
+    expect(ticket.typeId).toBe('story');
+    expect(ticket.projectId).toBe('prj_other');
+  });
+
+  // --- the reparent payload ----------------------------------------------------
+
+  it('a prior reparent with no newParentId is a fixture-authoring error — absence is not "to the root"', () => {
+    expect(() =>
+      contextOf([created('t1'), { type: 'ticket.reparented', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: {} }]),
+    ).toThrow(/"newParentId"/);
+  });
+
+  it('a prior reparent to null moves the ticket to the project root', async () => {
+    const ctx = contextOf([
+      created('t1'),
+      created('t2', { parentId: 't1' }),
+      { type: 'ticket.reparented', entity: { kind: 'ticket', id: 't2' }, actorId: 'user_a', payload: { newParentId: null } },
+    ]);
+    expect((await ctx.getChildrenStates('t1')).map((child) => child.id)).toEqual([]);
+    const ticket = await ctx.getEntityState('ticket', 't2');
+    if (ticket === null || ticket.kind !== 'ticket') throw new Error('expected a ticket');
+    expect(ticket.parentId).toBeNull();
+  });
+});
+
+/**
+ * The two event types this dialect could not fold, and the method that threw
+ * because of it. `getTicketTypeDef` used to raise an exception naming this task;
+ * a fixture reaching a rank check had no definition to be judged against, and
+ * answering `null` would have made the check refuse for a reason that read
+ * entirely legitimate.
+ *
+ * Both folds are mirrored from `buildMemoryContext` deliberately (pre-flight
+ * A15/C-06): these fixtures do NOT traverse the shared reducer, so nothing but
+ * the mirroring keeps the two folds honest about what a rule sees.
+ */
+describe('buildInMemoryContext folds ticket-type.defined and ticket.reparented', () => {
+  const TASK_TYPE = { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf_basic', fields: [] };
+
+  function typeDefined(def: Record<string, unknown>): unknown {
+    return { type: 'ticket-type.defined', entity: { kind: 'ticket-type', id: def['id'] }, actorId: 'user_a', payload: def };
+  }
+
+  function contextOf(priorEvents: unknown[]) {
+    return buildInMemoryContext(
+      fixtureSchema.parse({
+        name: 'type fold probe',
+        workflowDefs: [wfBasic],
+        priorEvents,
+        candidateEvent: { type: 'ticket.transitioned', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { to: 'doing' } },
+        expected: { refused: false },
+      }),
+    );
+  }
+
+  it('getTicketTypeDef answers a defined type, and null for one this workspace never defined', async () => {
+    const ctx = contextOf([typeDefined(TASK_TYPE)]);
+    expect(await ctx.getTicketTypeDef('task')).toEqual(TASK_TYPE);
+    // `null`, not a throw, and not an invented definition: on the server this is
+    // what "no such type here" looks like, and the checks turn it into
+    // `ticket.unknown-type` / `hierarchy.parent-type-unknown` themselves.
+    expect(await ctx.getTicketTypeDef('ghost')).toBeNull();
+  });
+
+  it('last definition wins — which is what makes a rank RE-definition, and the loop it enables, reachable', async () => {
+    const ctx = contextOf([
+      typeDefined({ id: 'phase', name: 'Phase', icon: 'flag', rank: 1, workflowId: 'wf_basic', fields: [] }),
+      typeDefined({ id: 'phase', name: 'Phase', icon: 'flag', rank: 3, workflowId: 'wf_basic', fields: [] }),
+    ]);
+    expect((await ctx.getTicketTypeDef('phase'))?.rank).toBe(3);
+  });
+
+  it('a malformed type definition is a fixture-authoring error rather than a half-built type', () => {
+    expect(() => contextOf([typeDefined({ id: 'broken', name: 'Broken', icon: 'x', rank: 3, workflowId: 'wf_basic' })])).toThrow(
+      /"fields"/,
+    );
+  });
+
+  it('a reparent moves parentId and nothing else, so getChildrenStates follows it', async () => {
+    const ctx = contextOf([
+      { type: 'ticket.created', entity: { kind: 'ticket', id: 't1' }, actorId: 'user_a', payload: { typeId: 'task', projectId: 'prj_1', parentId: null, title: 'Root', workflowId: 'wf_basic' } },
+      { type: 'ticket.created', entity: { kind: 'ticket', id: 't2' }, actorId: 'user_a', payload: { typeId: 'task', projectId: 'prj_1', parentId: null, title: 'Other root', workflowId: 'wf_basic' } },
+      { type: 'ticket.created', entity: { kind: 'ticket', id: 't3' }, actorId: 'user_a', payload: { typeId: 'task', projectId: 'prj_1', parentId: 't1', title: 'Child', workflowId: 'wf_basic' } },
+      { type: 'ticket.transitioned', entity: { kind: 'ticket', id: 't3' }, actorId: 'user_b', payload: { to: 'doing' } },
+      { type: 'ticket.reparented', entity: { kind: 'ticket', id: 't3' }, actorId: 'user_a', payload: { newParentId: 't2' } },
+    ]);
+    expect((await ctx.getChildrenStates('t1')).map((child) => child.id)).toEqual([]);
+    expect((await ctx.getChildrenStates('t2')).map((child) => child.id)).toEqual(['t3']);
+    const moved = await ctx.getEntityState('ticket', 't3');
+    if (moved === null || moved.kind !== 'ticket') throw new Error('expected a ticket');
+    // A move is not a transition and not a re-creation: the status the ticket
+    // was in and the log four-eyes reads both survive it.
+    expect(moved.stateId).toBe('doing');
+    expect(moved.transitions).toHaveLength(1);
+  });
+
+  it('a reparent of a ticket that was never created is a fixture-authoring error', () => {
+    expect(() =>
+      contextOf([{ type: 'ticket.reparented', entity: { kind: 'ticket', id: 'ghost' }, actorId: 'user_a', payload: { newParentId: null } }]),
+    ).toThrow('fixture prior event touches unknown ticket ghost');
+  });
+
+  it('the fold still refuses an event type it does not understand, and names the ones it does', () => {
+    expect(() =>
+      contextOf([{ type: 'workflow.defined', entity: { kind: 'workflow', id: 'wf_basic' }, actorId: 'user_a', payload: wfBasic }]),
+    ).toThrow(
+      'fixture prior events may only be ticket-type.defined/ticket.created/ticket.transitioned/ticket.reparented/ticket.workflow_rebound/ticket.assigned/ticket.field_set; got workflow.defined',
+    );
   });
 });

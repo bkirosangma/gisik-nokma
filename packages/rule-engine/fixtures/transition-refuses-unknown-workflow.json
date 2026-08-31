@@ -2,7 +2,7 @@
   "name": "a ticket whose workflow was never published cannot be checked, so the move is refused",
   "workflowDefs": [],
   "priorEvents": [
-    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_ghost", "stateId": "todo", "stateCategory": "open" } }
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "typeId": "task", "projectId": "prj_1", "parentId": null, "title": "Fixture ticket t1", "workflowId": "wf_ghost", "stateId": "todo", "stateCategory": "open" } }
   ],
   "candidateEvent": {
     "type": "ticket.transitioned",

@@ -167,14 +167,34 @@ describe('precheckEvent — instant named-reason previews from the same engine t
     expect(result.kind === 'refused' ? result.reason : result.kind).toContain('reopen');
   });
 
-  it('passes create under a cached non-terminal parent', async () => {
+  /**
+   * INVERTED by Plan 3 Chain A (2026-08-31), and this is the BEST case the
+   * cache can offer: a parent cached, alive, and contradicting nothing. It
+   * still defers, because a `passed` would have to be an accept, and every
+   * engine accept for `ticket.created` is decided behind the ticket's own type
+   * definition (`checks/hierarchy.ts:84`) — which this cache has no store for.
+   */
+  it('defers a create under a cached non-terminal parent — the accept reads a type rank this cache cannot serve', async () => {
     const cache = createClientStateCache();
     cache.upsertTicket(ticketStateSeed({ id: PARENT, stateId: 'doing', stateCategory: 'active' }));
-    expect(await precheckEvent(createUnder(PARENT), cache)).toEqual({ kind: 'passed' });
+    expect(await precheckEvent(createUnder(PARENT), cache)).toEqual({
+      kind: 'not-evaluated',
+      why: 'missing-local-state',
+    });
   });
 
-  it('passes a create with no parent at all — nothing acquires live work', async () => {
-    expect(await precheckEvent(createUnder(null), createClientStateCache())).toEqual({ kind: 'passed' });
+  /**
+   * The no-parent path is not the exception it looks like. `hierarchy.ts:84`
+   * resolves the type BEFORE the no-parent branch at `:90`, and `:108` refuses
+   * `hierarchy.deepest-rank-parent-required` off `type.rank` — so the old
+   * unconditional `passed` was false for every type at or below the deepest
+   * rank, not merely unproven.
+   */
+  it('defers a create with no parent at all — a rank it cannot read decides whether a parent was required', async () => {
+    expect(await precheckEvent(createUnder(null), createClientStateCache())).toEqual({
+      kind: 'not-evaluated',
+      why: 'missing-local-state',
+    });
   });
 
   it('previews the same refusal when LIVE work is reparented under a cached terminal parent', async () => {
@@ -190,12 +210,20 @@ describe('precheckEvent — instant named-reason previews from the same engine t
    * only when it moves a NON-TERMINAL ticket under a terminal parent — "a
    * terminal child under a terminal parent stays legal because nothing
    * contradicts". Refusing here would invent a reopen nothing asked for.
+   *
+   * The narrow-refusal claim above is unchanged and still true. What changed
+   * (Plan 3 Chain A, 2026-08-31) is the other half: NOT REFUSING is not the
+   * same as passing, once the engine's accept for `ticket.reparented` reads a
+   * definition (`checks/hierarchy.ts:215`) this cache cannot serve.
    */
-  it('does not refuse a FINISHED ticket reparented under a terminal parent — nothing contradicts', async () => {
+  it('does not refuse a FINISHED ticket reparented under a terminal parent — but defers rather than passing', async () => {
     const cache = createClientStateCache();
     cache.upsertTicket(ticketStateSeed({ id: PARENT, stateId: 'done', stateCategory: 'terminal' }));
     cache.upsertTicket(ticketStateSeed({ id: TICKET, stateId: 'done', stateCategory: 'terminal' }));
-    expect(await precheckEvent(reparentUnder(PARENT), cache)).toEqual({ kind: 'passed' });
+    expect(await precheckEvent(reparentUnder(PARENT), cache)).toEqual({
+      kind: 'not-evaluated',
+      why: 'missing-local-state',
+    });
   });
 
   /** The seam Plan 10 reuses over its replica: the evaluator is injectable. */
@@ -461,29 +489,70 @@ describe('precheckEvent — coverage it does not have downgrades, and never fake
 });
 
 /**
- * CANARY, not a feature test. `precheckParentTerminal` answers `passed` for
- * creates and reparents WITHOUT consulting the shared engine, and that is sound
- * only while the engine has nothing to say about those two types. Plan 3 lands
- * hierarchy checks — rank order, cycles, deepest-rank, cross-project — as engine
- * cases; the day it does, a `passed` from this module starts claiming more than
- * the engine ever agreed to, and it would do so in silence. This assertion makes
- * that landing break app-core loudly instead.
+ * CANARY, RE-AIMED — superseded in place on 2026-08-31, not deleted and not
+ * greened. It fired exactly as written, and its firing is the record.
  *
- * The claims below are deliberately ones a real hierarchy rule WOULD refuse
- * (live work under a finished parent), so the canary trips on the arrival of the
- * rule rather than on the arrival of the case label.
+ * The predecessor asserted that the shared engine had nothing to say about
+ * `ticket.created` / `ticket.reparented`, so that Plan 3's landing would break
+ * `app-core` loudly rather than quietly widening what a `passed` claims
+ * (coordination §12 claim 2). Plan 3 Chain A landed both as engine cases and it
+ * tripped. Two things followed in that same change set: `precheckParentTerminal`
+ * stopped answering `passed` for either type, and `contextFromCache` gained the
+ * required fourth `EngineContext` method.
+ *
+ * THE HONEST MECHANISM, stated because the designed one is not quite what
+ * happened: it did not trip on a hierarchy RULE refusing a planted claim. It
+ * trips at the ticket's own type lookup (`checks/hierarchy.ts:84` for creation,
+ * `:215` for a reparent), which sits ahead of every hierarchy rule. So this
+ * successor must not claim to witness the rules — it witnesses the DOOR, and
+ * says so.
+ *
+ * What it pins, and why it cannot pass for an unrelated reason: it drives the
+ * REAL engine through the REAL adapter, so it fails in BOTH directions. Remove
+ * the dispatcher cases and the claim resolves without ever reaching the type
+ * door, so no rejection is thrown. Change `getTicketTypeDef` back to answering
+ * `null` and the engine refuses instead of rejecting. Either way this goes red,
+ * which is what a drift-pin is for. The hierarchy RULES themselves are pinned
+ * where they live — `packages/rule-engine/test/hierarchy.test.ts` and
+ * `reparent.test.ts`, plus the fourteen Task 8 fixtures — and are deliberately
+ * not re-asserted here, in another lane's file, over an unexported sentence.
+ *
+ * WHEN THIS ONE FAILS: the cache has grown a ticket-type store (Plan 6a) and a
+ * producer feeding it (Plan 6 Task 7). That is the prompt to route
+ * `precheckParentTerminal` through the engine and replace this a second time.
  */
-describe('CANARY: the shared engine still has nothing to say about hierarchy claims', () => {
-  it('accepts ticket.created and ticket.reparented that a hierarchy rule would refuse — when it fails, precheckParentTerminal must route through the engine', async () => {
+describe('CANARY, re-aimed: the engine now reads ticket-type definitions this cache cannot serve', () => {
+  it('rejects ticket.created and ticket.reparented at the type door — when it fails, the cache has grown types and precheckParentTerminal must route through the engine', async () => {
     const cache = createClientStateCache();
     cache.upsertTicket(ticketStateSeed({ id: PARENT, stateId: 'done', stateCategory: 'terminal' }));
     cache.upsertTicket(ticketStateSeed({ id: TICKET, stateId: 'doing', stateCategory: 'active' }));
     const ctx = contextFromCache(cache);
-    const verdicts = {
-      'ticket.created': await evaluateEvent(completeForPrecheck(createUnder(PARENT)), ctx),
-      'ticket.reparented': await evaluateEvent(completeForPrecheck(reparentUnder(PARENT)), ctx),
-    };
-    expect(verdicts).toEqual({ 'ticket.created': { refused: false }, 'ticket.reparented': { refused: false } });
+    await expect(evaluateEvent(completeForPrecheck(createUnder(PARENT)), ctx)).rejects.toThrow(
+      /ticket-type definitions/,
+    );
+    await expect(evaluateEvent(completeForPrecheck(reparentUnder(PARENT)), ctx)).rejects.toThrow(
+      /ticket-type definitions/,
+    );
+  });
+
+  /**
+   * The other half of the same landing, at the surface a caller actually meets:
+   * `precheckEvent` never lets that rejection escape, because it does not route
+   * these two types through the engine at all. The exact `toEqual` is the
+   * point — a `not.toEqual({kind:'passed'})` would pass on a refusal too.
+   */
+  it('and precheckEvent defers rather than propagating it, for the best case the cache can offer', async () => {
+    const cache = createClientStateCache();
+    cache.upsertTicket(ticketStateSeed({ id: PARENT, stateId: 'doing', stateCategory: 'active' }));
+    cache.upsertTicket(ticketStateSeed({ id: TICKET, stateId: 'doing', stateCategory: 'active' }));
+    expect(await precheckEvent(createUnder(PARENT), cache)).toEqual({
+      kind: 'not-evaluated',
+      why: 'missing-local-state',
+    });
+    expect(await precheckEvent(reparentUnder(PARENT), cache)).toEqual({
+      kind: 'not-evaluated',
+      why: 'missing-local-state',
+    });
   });
 });
 

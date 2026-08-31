@@ -1,0 +1,36 @@
+{
+  "name": "a terminal child moving under a terminal parent is accepted",
+  "notes": "The twin that keeps the refusal honest about LIVE work: a finished child under a finished parent reopens nothing and contradicts nothing, so a check keyed on the parent alone is caught here.",
+  "workflowDefs": [
+    {
+      "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "*", "to": "todo", "rules": [] },
+        { "from": "*", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "story" }, "actorId": "user-kiro",
+      "payload": { "id": "story", "name": "Story", "icon": "book", "rank": 2, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "task" }, "actorId": "user-kiro",
+      "payload": { "id": "task", "name": "Task", "icon": "check", "rank": 3, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GPAR000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "story", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Quarterly filings", "workflowId": "wf-basic" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "01J9GPAR000000000000000000" }, "actorId": "user-anselma", "payload": { "to": "done" } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GTKA000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "task", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Renew trade licence", "workflowId": "wf-basic" } },
+    { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "01J9GTKA000000000000000000" }, "actorId": "user-anselma", "payload": { "to": "done" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.reparented", "entity": { "kind": "ticket", "id": "01J9GTKA000000000000000000" }, "actorId": "user-kiro",
+    "payload": { "newParentId": "01J9GPAR000000000000000000" }
+  },
+  "expected": { "refused": false }
+}

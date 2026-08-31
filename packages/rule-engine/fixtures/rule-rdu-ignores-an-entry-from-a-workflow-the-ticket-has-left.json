@@ -27,7 +27,7 @@
     }
   ],
   "priorEvents": [
-    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_intake" } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "typeId": "task", "projectId": "prj_1", "parentId": null, "title": "Fixture ticket t1", "workflowId": "wf_intake" } },
     { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "review" } },
     { "type": "ticket.workflow_rebound", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_admin", "payload": { "toWorkflowId": "wf_review", "toStateId": "review" } }
   ],

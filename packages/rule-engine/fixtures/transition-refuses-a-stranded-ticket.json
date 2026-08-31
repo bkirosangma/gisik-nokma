@@ -24,7 +24,7 @@
     }
   ],
   "priorEvents": [
-    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_basic", "workflowVersion": 1 } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "typeId": "task", "projectId": "prj_1", "parentId": null, "title": "Fixture ticket t1", "workflowId": "wf_basic", "workflowVersion": 1 } },
     { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "doing" } }
   ],
   "candidateEvent": {
@@ -36,6 +36,6 @@
   "expected": {
     "refused": true,
     "rule": "stranded-state",
-    "reason": "Ticket t1 sits in state \"doing\" of workflow version 1, which no longer exists in version 2 and no state mapping covers it."
+    "reason": "Ticket t1 sits in state \"doing\", which no longer exists in version 2 and no state mapping covers it."
   }
 }

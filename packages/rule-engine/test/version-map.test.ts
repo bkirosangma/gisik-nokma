@@ -57,6 +57,7 @@ function chainContext(byVersion: Map<number, WorkflowDef>): {
     ctx: {
       getEntityState: vi.fn(async () => null),
       getChildrenStates: vi.fn(async () => []),
+      getTicketTypeDef: vi.fn(async () => null),
       getWorkflowDef,
     },
     versionsAsked: () => getWorkflowDef.mock.calls.map((call) => call[1]),

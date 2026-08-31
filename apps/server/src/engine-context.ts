@@ -56,11 +56,20 @@ export function createEngineContext(client: PoolClient): EngineContext {
       // refuses with "no such ticket is known", which is TRUE of this server
       // today, instead of blaming a workflow named `undefined`.
       //
-      // PLAN 3 TASK 12 is where this grows real bodies: 'ticket' from
-      // proj_tickets, 'ticket-type' from proj_ticket_types. Plan 4 owns
-      // 'membership' via proj_memberships. Until each lands, its kind stays
-      // null here, and the cast stays gone — the four identity-only kinds are
-      // returned as themselves, structurally, with the compiler checking.
+      // PLAN 3 TASK 12 is where this grows a real body for 'ticket', from
+      // proj_tickets. Plan 4 owns 'membership' via proj_memberships. Until each
+      // lands, its kind stays null here, and the cast stays gone — the four
+      // identity-only kinds are returned as themselves, structurally, with the
+      // compiler checking.
+      //
+      // 'ticket-type' is NOT on that list and never will be. This comment used
+      // to promise it a real body here too; controller ruling P3 (2026-08-28)
+      // settled the opposite — the domain union keeps 'ticket-type' as identity
+      // only, and a type's DEFINITION (rank, name, workflow binding, fields)
+      // arrives through the context's fourth method, getTicketTypeDef, which
+      // Task 12 backs with proj_ticket_types. Growing a TicketTypeState in the
+      // union is the rejected alternative; do not reach for it because this
+      // comment once pointed at it.
       const head = await readEntityHead(client, kind, id);
       if (head === null || !isIdentityOnlyKind(kind)) {
         return null;
@@ -81,6 +90,18 @@ export function createEngineContext(client: PoolClient): EngineContext {
     },
     async getWorkflowDef(workflowId, version) {
       return await getWorkflowDefFromProjection(client, workflowId, version);
+    },
+    async getTicketTypeDef(typeId) {
+      // Null for the same reason getEntityState answers null for 'ticket':
+      // proj_ticket_types does not exist yet (Plan 3 Task 9 lands the table,
+      // Task 12 wires this method to it). Null, not a throw, because this
+      // server is live — the engine's hierarchy checks then refuse with "no
+      // such ticket type is known", which is TRUE of this server today, rather
+      // than turning an ingest into a 500. It joins getEntityState('ticket')
+      // and getChildrenStates in the same change set: Task 12 replaces all
+      // three, and none may land without the others.
+      void typeId;
+      return null;
     },
   };
 }

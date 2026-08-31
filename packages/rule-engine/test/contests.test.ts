@@ -28,6 +28,14 @@ function ctx(contests: Record<string, ContestLookup>): EngineContext {
     getEntityState: async () => null,
     getChildrenStates: async () => [],
     getWorkflowDef: async () => null,
+    // Plan 3's fourth context method (controller ruling P3). REQUIRED rather than
+    // optional, unlike getContest: a rank check that cannot reach a type definition
+    // has nothing to judge against, and answering null there refuses for a reason
+    // that reads entirely legitimate. No contest path reaches it, so this throws
+    // rather than answers — the same loud-on-wiring-bug stance getContest takes below.
+    getTicketTypeDef: async () => {
+      throw new Error('contests.test: getTicketTypeDef is on no contest path');
+    },
     getContest: async (id) => contests[id] ?? null,
   };
 }
@@ -129,7 +137,8 @@ describe('evaluateClaimContestedResolved', () => {
 
   it('throws on a context without getContest — wiring bug, not a refusal', async () => {
     // No `as unknown as EngineContext` here, though the plan pins one: getContest
-    // is OPTIONAL, so this three-method literal is directly assignable. A blanket
+    // is OPTIONAL, so this literal — carrying every REQUIRED method and omitting
+    // only the optional one — is directly assignable. A blanket
     // cast in a new test buys nothing and hides everything — see the comment at
     // apps/server/src/engine-context.ts:44-51, where exactly this cast concealed
     // a live defect until transitions started arriving.
@@ -137,6 +146,9 @@ describe('evaluateClaimContestedResolved', () => {
       getEntityState: async () => null,
       getChildrenStates: async () => [],
       getWorkflowDef: async () => null,
+      getTicketTypeDef: async () => {
+        throw new Error('contests.test: getTicketTypeDef is on no contest path');
+      },
     };
     await expect(evaluateClaimContestedResolved(resolved({}), bare)).rejects.toThrow(/getContest/);
   });

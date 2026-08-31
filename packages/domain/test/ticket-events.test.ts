@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseEvent } from '../src/parse-event.js';
+import { ticketCreatedPayload, ticketFieldSetPayload } from '../src/events/ticket-events.js';
 import { makeEnvelope } from '../src/testing.js';
 
 const TICKET = '01J9GTKA000000000000000000';
@@ -31,6 +32,17 @@ function refuses(type: string, entityKind: 'ticket' | 'ticket-type' | 'workflow'
   const result = parseEvent(makeEnvelope({ type, entity: { kind: entityKind, id: TICKET }, payload }));
   expect(result.ok).toBe(false);
   return result.ok ? '' : result.code;
+}
+
+/**
+ * The sibling of `refuses` that returns what the door SAYS rather than which
+ * code it answers. A code is a branch; the message is the sentence a person
+ * reads, and the two fail independently — a reworded message keeps its code.
+ */
+function refusalMessage(type: string, payload: unknown): string {
+  const result = parseEvent(makeEnvelope({ type, entity: { kind: 'ticket', id: TICKET }, payload }));
+  expect(result.ok).toBe(false);
+  return result.ok ? '' : result.message;
 }
 
 describe('ticket event vocabulary', () => {
@@ -125,5 +137,128 @@ describe('ticket event vocabulary', () => {
     expect(refuses('ticket-type.defined', 'ticket', {
       id: 'invoice', name: 'Invoice', icon: 'receipt', rank: 3, workflowId: 'wf-basic', fields: [],
     })).toBe('entity-kind-mismatch');
+  });
+});
+
+/**
+ * The presence hole, closed. `z.unknown()` alone does NOT require the key, so
+ * `{ fieldId: 'title' }` — no `value` at all — parsed clean, and the reducer's
+ * then-`p.value ?? null` folded that absence into a null CLEARING claim: a
+ * field wiped under the actor's name and both their clocks, into an append-only
+ * table, on the strength of a claim nobody made. The coalesce has since been
+ * dropped too — `src/ticket-state.ts:211` reads `claim(p.value, env)` — because
+ * with the key required the `parse` throws first and `null ?? null` is
+ * identity, so the fold could only have restated the defect as the design.
+ *
+ * FOUR assertions rather than one "the field is required", because two of the
+ * four are ACCEPTANCES and they are the half a careless fix breaks. A schema
+ * that also refused `null` or `{}` would look correct and would quietly start
+ * refusing legitimate claims — `null` is the explicit clearing claim, and an
+ * empty claim is still a claim.
+ *
+ * The same matrix, in the same words, as `envelope.test.ts`'s "payload is
+ * required" block: two doors, one answer.
+ */
+describe('ticket.field_set value is required', () => {
+  function issues(payload: Record<string, unknown>): Array<{ path: (string | number)[]; message: string }> {
+    const result = ticketFieldSetPayload.safeParse(payload);
+    if (result.success) throw new Error('expected safeParse to fail, but it succeeded');
+    return result.error.issues.map((issue) => ({ path: issue.path, message: issue.message }));
+  }
+
+  it('planted defect: refuses an ABSENT value — the reducer would fold it into a clearing nobody claimed', () => {
+    expect(ticketFieldSetPayload.safeParse({ fieldId: 'title' }).success).toBe(false);
+    expect(issues({ fieldId: 'title' })).toContainEqual({
+      path: ['value'],
+      message: 'is required — a field claim with no value would record a clearing nobody made',
+    });
+  });
+
+  it('planted defect: refuses an explicitly undefined value — JSON erases the difference from absence', () => {
+    expect(issues({ fieldId: 'title', value: undefined })).toContainEqual({
+      path: ['value'],
+      message: 'is required — a field claim with no value would record a clearing nobody made',
+    });
+  });
+
+  it('accepts value: null — the clearing claim is a claim, made by somebody, at a time', () => {
+    expect(ticketFieldSetPayload.safeParse({ fieldId: 'amount', value: null }).success).toBe(true);
+  });
+
+  it('accepts an empty-object value — an empty claim is still a claim', () => {
+    expect(ticketFieldSetPayload.safeParse({ fieldId: 'description', value: {} }).success).toBe(true);
+  });
+
+  it('the door inherits it: parseEvent refuses a field_set carrying no value', () => {
+    expect(refuses('ticket.field_set', 'ticket', { fieldId: 'title' })).toBe('invalid-payload');
+  });
+});
+
+/**
+ * Ruling P15 — the create door was admitting precisely the state the edit door
+ * forbids. `checkTicketFieldSet` refuses a whitespace-only `title` change with
+ * `field.type-mismatch`, so `'   '` could be CREATED but never set; "the title
+ * that cannot vanish" was an edit-time rule rather than an invariant.
+ *
+ * FOUR assertions rather than one "titles must not be blank", for the reason
+ * the field_set block above gives: two of the four are ACCEPTANCES, and they
+ * are the half a careless fix breaks. A refine that trimmed instead of refusing
+ * would pass a "blank is refused" test and quietly rewrite every padded title
+ * in the ledger — putting words in the actor's mouth — so the padded case
+ * asserts the stored string BYTE FOR BYTE, exactly as `membership.test.ts` does
+ * for a workspace name. The refusal itself is the sibling's, in the sibling's
+ * words with the noun it is about: one answer across the series, not two.
+ */
+describe('ticket.created title must not be blank', () => {
+  function issues(payload: Record<string, unknown>): Array<{ path: (string | number)[]; message: string }> {
+    const result = ticketCreatedPayload.safeParse(payload);
+    if (result.success) throw new Error('expected safeParse to fail, but it succeeded');
+    return result.error.issues.map((issue) => ({ path: issue.path, message: issue.message }));
+  }
+
+  function created(title: unknown): Record<string, unknown> {
+    return { typeId: 'task', projectId: PROJECT, parentId: null, title };
+  }
+
+  it('refuses an empty title', () => {
+    expect(issues(created(''))).toContainEqual({
+      path: ['title'],
+      message: 'String must contain at least 1 character(s)',
+    });
+  });
+
+  it('planted defect: refuses a title of only spaces — .min(1) alone admits it', () => {
+    expect(ticketCreatedPayload.safeParse(created('   ')).success).toBe(false);
+    expect(issues(created('   '))).toContainEqual({
+      path: ['title'],
+      message: 'must not be blank — a title of only spaces names nothing',
+    });
+  });
+
+  it('accepts a padded real title and stores it VERBATIM — refusing blanks must not become trimming', () => {
+    expect(ticketCreatedPayload.parse(created('  Reconcile the till  '))).toEqual({
+      typeId: 'task',
+      projectId: PROJECT,
+      parentId: null,
+      title: '  Reconcile the till  ',
+    });
+  });
+
+  it('accepts an ordinary title', () => {
+    expect(ticketCreatedPayload.safeParse(created('Reconcile the till')).success).toBe(true);
+  });
+
+  it('the door inherits it: parseEvent refuses a ticket.created whose title is only spaces', () => {
+    expect(refuses('ticket.created', 'ticket', created('   '))).toBe('invalid-payload');
+    // The MESSAGE, not only the code. Until now this sentence was verified by a
+    // probe and pinned by nothing, so the code alone would have stayed green
+    // through any rewording — and this is the sentence Plan 6 renders to a
+    // person. It names the field because `parse-event.ts` renders the zod path;
+    // the same `at <path>: <message>` construction the engine's own
+    // `malformedPayloadDetail` mirrors, so the door and the engine say the path
+    // the same way.
+    expect(refusalMessage('ticket.created', created('   '))).toBe(
+      "payload for 'ticket.created' v1 is invalid at title: must not be blank — a title of only spaces names nothing",
+    );
   });
 });

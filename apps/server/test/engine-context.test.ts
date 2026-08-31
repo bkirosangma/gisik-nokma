@@ -79,7 +79,51 @@ const ticketCreated = submitted({
 
 beforeAll(async () => {
   const results = await service().ingestBatch([roleGatedWorkflow, ticketCreated]);
-  expect(results.map((result) => result.status)).toEqual(['committed', 'committed']);
+  // The create is REFUSED from Plan 3 Task 5, and this is the seam working
+  // rather than breaking. `checkTicketCreated` reads the ticket type's rank and
+  // name through `getTicketTypeDef`, and this server context answers null for
+  // every type until Task 12 backs that method with `proj_ticket_types` — so
+  // the server refuses to create a ticket whose type it cannot see, which is
+  // exactly what `createEngineContext`'s own comment on that method says it
+  // will do. Before Task 5 the event fell through the engine's `default` arm
+  // and committed unjudged; nothing consumed it, because proj_tickets does not
+  // exist yet either.
+  //
+  // TASK 12'S REVERT, in full, so it is mechanical rather than inferential.
+  // Once getTicketTypeDef reads proj_ticket_types, all FOUR of these move
+  // together and none may land without the others:
+  //
+  //   1. ADD a `ticket-type.defined` event for `task` to this batch, ahead of
+  //      the create. Without one, proj_ticket_types has no row to serve and the
+  //      create is still refused for the same reason — a context that can read
+  //      the table is not the same thing as a table with the type in it.
+  //   2. This expectation becomes ['committed', 'committed', 'committed'].
+  //   3. DELETE the refusal-object assertion immediately below.
+  //   4. DELETE the planted ticket head row further down; the create writes it.
+  //
+  // Those four join the two assertions A12/BA-3 already assigns that task.
+  expect(results.map((result) => result.status)).toEqual(['committed', 'refused']);
+  expect(results[1]).toEqual({
+    status: 'refused',
+    eventId: expect.any(String),
+    rule: 'ticket.unknown-type',
+    reason: "This ticket's type is not defined in this workspace.",
+  });
+
+  // Deleted by Task 12, step 4 above. The ticket head row the create would have
+  // written, planted for the same
+  // reason the membership row below is: the assertion it serves is about what
+  // `getEntityState` does with a head row that EXISTS. Against the
+  // `as unknown as EntityState` body this file was written to kill, a ticket
+  // WITH a head comes back looking like a TicketState whose `workflowId` is
+  // undefined — and with no head row at all that body returns null too, so the
+  // test would pass against the very defect it exists to catch.
+  await db.pool.query(
+    `INSERT INTO proj_entity_heads
+       (entity_kind, entity_id, workspace_id, head_seq, head_event_id, head_event_type, head_server_time)
+     VALUES ('ticket', $1, $2, 1, $3, 'ticket.created', '2026-08-20T09:00:01.000Z')`,
+    [TICKET, WORKSPACE, newUlid()],
+  );
 
   // The membership row Plan 4 will write for real. Planted directly because no
   // event type is bound to the `membership` kind yet, and §9's hazard needs a
@@ -94,7 +138,7 @@ beforeAll(async () => {
 });
 
 describe('createEngineContext.getEntityState — what the server can honestly serve', () => {
-  it('answers null for a ticket, because ticket state does not exist until Plan 3 Task 12', async () => {
+  it('answers null for a ticket that HAS a head row, because ticket state does not exist until Plan 3 Task 12', async () => {
     const client = await db.pool.connect();
     try {
       expect(await createEngineContext(client).getEntityState('ticket', TICKET)).toBeNull();

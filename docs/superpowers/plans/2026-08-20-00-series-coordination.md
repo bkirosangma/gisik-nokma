@@ -413,6 +413,12 @@ The copy is character-exact to the plan's canonical table, so this is an inaccur
 
 The fix is a cross-plan surface change and belongs to whichever plan next touches the fold: **`FoldedState` must carry the version the chain broke on**, so the refusal can name `"<id>" of version <breakVersion>` truthfully — or drop the version clause and name only the id. Do not "fix" it by folding the id back to the origin version; there is no backward walk, and inventing one is a second set of rounding errors of exactly the kind the ONE VERSION WALK comment forbids. First plan to author a three-version fixture will observe this directly.
 
+**Resolved by Plan 3, Task 3 (2026-08-28): the version clause is DROPPED.** Plan 3 is the plan that next touched the fold — `foldTicketToWorkflowVersion` in `packages/domain/src/ticket-state.ts` is built on `foldStateIdForward` and inherited the same inaccuracy into its own message — so the take-or-record obligation fell due here, and it was taken rather than declined. `transition.ts:65` now reads `Ticket ${id} sits in state "${unmappedStateId}", which no longer exists in version ${latest.version} and no state mapping covers it.`, and `fixtures/transition-refuses-a-stranded-ticket.json` matches it character-for-character. **The fixture COUNT is unchanged at 61** — this is a copy edit to an existing fixture, not an addition. `packages/rule-engine/src/refusal-rules.ts` and the `stranded-state` rule id are untouched, so nothing that keys on the rule moves; only the sentence a human reads changes. The reasoning now lives in a comment at the refusal site, so a later tidy-up cannot restore the clause without reading why it went.
+
+Why this half rather than the surface change: the two options are not equally priced. Dropping the clause is a two-line copy edit inside one plan's blast radius; carrying the break version on `FoldedState` retypes `workflow.ts:84` and every consumer of the union across two packages, for a sentence that would then have to explain to a human why the version it names is neither the ticket's nor the latest. **The `FoldedState` break-version change stays available and is not withdrawn** — it remains the strictly more informative answer, and the trigger that should reopen it is a support or debugging need to know *where* a chain broke rather than merely *that* it did (Plan 6's refusal rendering, or an operator tool over a corrupted store). Folding the id back to the origin version remains forbidden either way.
+
+Two consequences later plans inherit as fact. **Plan 2's canonical copy table (`docs/superpowers/plans/2026-08-20-02-workflow-engine.md:164`) is superseded for this one reason** and is deliberately left unedited — plan text is never the authority for shipped behaviour, and a landed plan document is a record of what was decided then, not a mirror of what is running now. And **the same wording discipline now applies to the fold's own stranding error**: `foldTicketToWorkflowVersion` names the break-point state id and no version beside it, for the same reason, with the same citation of `workflow.ts:99-101` at the throw site. Plan 3 also authored the series' first three-version walk (`packages/domain/test/ticket-state.test.ts`), which is where §1 predicted the divergence would first be observable directly; it is, and the fold's separate hole-in-the-chain error is what names the missing version when there is one to name.
+
 ### 2. `WorkflowDef.roles` is plain strings, so a definition can name a role that does not exist — owner needed
 
 `packages/domain/src/workflow.ts:21` types restrict-to's roles as `z.array(z.string()).optional()`, not `WorkspaceRole[]`. A definition whose restrict-to names `"wizard"` therefore validates clean, publishes, lands in `proj_workflows`, and renders in the builder as a guard — and `evaluateRestrictTo` then compares `"wizard"` against a real membership role forever, matching nobody. The transition is not guarded; it is **closed**, silently, and the refusal reason names a rule that reads entirely legitimate.
@@ -431,6 +437,12 @@ Nothing on this branch is broken: publishing refuses unmapped drops, so an unres
 
 **Plan 3 owns the decision, and it is a decision, not a bug fix.** Fail-closed (refuse the transition when any candidate entry cannot be resolved) is the safe reading and can deny a legitimate move on a store nobody has noticed is corrupt. Diagnostics-only (skip, but surface the unresolvable entry somewhere an operator sees) keeps availability and admits the control is advisory in that state. What must not survive Plan 3 is the current arrangement: fail-open, plus a committed comment asserting a precondition Plan 3 itself removes. **Whichever is chosen, that comment gets rewritten in the same change.**
 
+**Resolved by Plan 3, Task 4b (2026-08-28): FAIL-CLOSED.** An entry that cannot be resolved forward now refuses the transition. `if (!resolved.ok) continue;` is gone and the comment justifying it is gone with it. The refusal carries the four-eyes rule id — `require-different-user`, not a sixth id, because the rule vocabulary is closed and versioned (spec §4) and a client filtering on four-eyes must see this one — with the reason templated on the rule's target state exactly as the accepting path's is: `This step needs a second person, and this ticket's history cannot be read against its current workflow, so who last performed the move to "<target>" is unknown. Ask an admin to check this workflow's version history.` The **first** unresolvable candidate entry refuses, rather than the loop finishing and refusing at the end: an entry that cannot be read is a fact about the store, and continuing past it to find a resolvable match would let a later entry paper over an unreadable earlier one, which is the fail-open failure wearing a longer loop. **Guard 1 is untouched and still runs first** — an entry from a workflow the ticket has left is skipped before any resolution is attempted, because it is not unreadable, it is correctly out of scope.
+
+Why fail-closed rather than diagnostics-only: this section's own observation settles it. The path is reachable "only through corruption", and only-reachable-through-corruption is exactly the condition under which a security control should fail closed; the autonomous execution protocol's ruling 3 makes the conservative option the standing default for a question the plans do not answer. Diagnostics-only was also the more expensive half in practice — the engine is pure, returns a verdict and holds no logger, so "surface the unresolvable entry somewhere an operator sees" is a new cross-package surface, not a branch.
+
+**The comment was rewritten in the same change, as this section required**: it now states what the code does and why the old justification died — that the justification rested on the ticket's `workflowVersion` and the entry's coinciding, which refresh-on-publish ends. One correction to record beside it, found while staging the evidence: **the old precondition was weaker than this section credited even at EQUAL versions.** The ticket walks only the ONE id it currently sits in, so a version that dropped some OTHER state without mapping it strands an entry while the ticket resolves cleanly — no version divergence needed. That is the shape the new end-to-end fixture uses (`rule-rdu-refuses-a-history-it-cannot-read`), because the fixture harness has no refresh-on-publish and cannot stage the divergence shape; the unit tests (`packages/rule-engine/test/require-different-user.test.ts`) stage the divergence shape directly, ticket at the latest version folding as a no-op while a v1 entry walks a chain with a hole in it. Both reach the same line. **The fixture count moves 61 → 62 in the same commit**, and `Features.md` §4 plus cases 4.52/4.53 in `test-cases/04-workflow-engine.md` carry the user-visible copy — §4 rather than §5, because four-eyes is catalogued there (4.9, 4.28, 4.35, 4.37) and §5's ids 5.4–5.36 are reserved verbatim for Plan 3's own catalogue task.
+
 ### 4. `require-different-user` trusts the log's array order, not the `seq` each entry carries — Plan 3's projection brief
 
 The same rule ends with `// Iterating oldest-first and overwriting leaves the LAST match standing` (`require-different-user.ts:57-58`). That is correct today and it is correct *by convention*: `TicketState.transitions` is documented as appended oldest-first, and Plan 2's harness appends in order. Every entry carries a `seq` field (`packages/domain/src/entity-state.ts:38`) and **nothing in the monorepo reads it**.
@@ -438,6 +450,10 @@ The same rule ends with `// Iterating oldest-first and overwriting leaves the LA
 So the identity of "the last person to make this move" — the whole content of four-eyes — rests on a projection's append order rather than on the ordering field the data already carries. **A Plan 3 projection that appends out of order silently inverts latest-wins**, and the failure mode is not an error: it is the wrong person's id compared against the wrong actor, refusing legitimate moves and accepting self-approvals, with a green suite. There is no test that would catch it, because every fixture's log is built in order.
 
 **Plan 3's projection brief must either guarantee append order explicitly** (and say so where the guarantee is made, so a later refactor knows it is load-bearing) **or sort by `seq` at the point of use** — which is a one-line change in RDU and makes the field earn its place. The second is preferable: a guarantee that lives in one projection's implementation detail is the same durability problem this whole section is about.
+
+**Resolved by Plan 3, Task 4b (2026-08-28): RDU sorts by `seq` at the point of use** — the option this section names preferable. `evaluateRequireDifferentUser` now iterates `[...input.ticket.transitions].sort((a, b) => a.seq - b.seq)`. A COPY, because `input.ticket.transitions` is engine input and a rule that reorders the state it was handed is a defect of its own kind; ascending, because `seq` is the per-entity sequence number and so a total order within one ticket's log. The `// Iterating oldest-first and overwriting leaves the LAST match standing` comment is replaced by one saying the ordering is established here rather than inherited, and naming the hazard the field's existing-but-unread status created. **Plan 3's `proj_tickets` therefore inherits no obligation to guarantee append order for four-eyes' sake** — the guarantee no longer lives in one projection's implementation detail, which is the durability problem this whole section is about. The test that pins it is the one no fixture could be: two entries matching the watched state whose array order contradicts their `seq`, which the pre-change code answers with the wrong person.
+
+Residual for Plan 3's Task 10, unchanged: it should still SAY what order it appends in, where it appends. Four-eyes no longer depends on the answer, but a reader of `proj_tickets` still has to know whether the log in that table is ordered, and "some consumer sorts it" is not an answer a projection gets to give about its own table.
 
 ### 5. The entity↔workspace door is server-only, and Plan 10's replica must mirror it knowingly
 
@@ -466,6 +482,8 @@ Carried in the same item because it was routed with it: **`asOfWorkspaceSeq`'s s
 - **The parent-terminal invariant is inert server-side until Plan 3.** `getChildrenStates` stubs `[]` in `apps/server/src/engine-context.ts`, so the one invariant no workflow author can switch off currently refuses nothing in production. It is fully proven by fixtures against the in-memory harness, which is why the suite says nothing about it. **Plan 3 makes it real when it lands the ticket projection**, and that is the moment its fixtures stop being the only thing holding it up.
 - **Evidence-id existence is unchecked by design.** `require-evidence` proves an id was supplied, not that it points at anything. Attachments are Plan 7's and the ticket projection is Plan 3's; **whichever lands second owns the existence check**, or owns recording that it stays unchecked.
 - **Dispatch hygiene: an RTK-proxied `diff` reported "identical" for files that differed**, during a Task 10 mutation sweep — a false clean on the exact operation a mutation restoration depends on. The incident was closed by sampling the tree directly, and the compensating procedure was applied for the rest of the plan and belongs in every future one: **verify mutation restorations with `git diff` or by reading the file, never with a proxied shell `diff`.** A tool that lies about equality turns a mutation sweep into theatre.
+- **A claim on Plan 10: `checkTicketCreated` is non-idempotent under re-evaluation, and the replica is the only caller that could re-judge.** Plan 3 Task 5 added `ticket.already-exists` — a `ticket.created` for a ticket the context already holds is refused, because the shared reducer folds creation unconditionally (`packages/domain/src/ticket-state.ts:94`) and an accepted duplicate silently RESETS the fold, erasing status, collaborators, field claims and the transition log four-eyes reads. That is correct under the engine's contract: `evaluateEvent` judges a CANDIDATE against a context of already-accepted history, and an event that is already in that history is not a candidate. The server is safe (ingest evaluates once, before insert), and so is the fixture suite (only `candidateEvent` faces the engine; `priorEvents` are folded, never judged). **Plan 10's offline replica is the one place this could bite**, and Plan 3 Task 5's own justifications name it twice (`packages/rule-engine/src/checks/hierarchy.ts`, `evaluate.ts`) as a caller that enters at `evaluateEvent` without ingest's door in front of it. If the replica ever re-runs the engine over SYNCED events rather than only over pending local ones, every re-judged `ticket.created` is refused — and it will look like a hierarchy defect rather than a replay defect. **Plan 10 either judges only pending local events, or records why re-judging is safe.** The same shape applies to any later check that asks "does this already exist"; this is the first one in the series.
+
 - **`transitionSchema` admits `to: '*'`, and a dangling wildcard target publishes clean.** `packages/domain/src/workflow.ts:36` types `to` as `z.string().min(1)`, and the reference check at `packages/domain/src/validate-workflow.ts:40` is `if (ref !== '*' && !stateIds.has(ref))` — applied to **both** endpoints. The wildcard is only meaningful on `from`; on `to` it means nothing. Such an edge passes `unknown-transition-state`, contributes nothing to reachability or `terminal-no-inbound`, and can never be selected at runtime (the engine refuses `unknown-state` first), so it is inert — but it survives into `proj_workflows` and **Plan 8's builder will read it back and render an edge to nowhere**. The fix is one condition: make the check endpoint-aware, so the `'*'` exemption applies to `from` only, plus an issue code for the `to` case. Taking it or explicitly declining it both close this; leaving it unrecorded does not.
 
 ### 8. Owner ruling requested: a wildcard edge voids the rule vocabulary on every other inbound edge
@@ -1330,6 +1348,12 @@ window is a whole offline period rather than a race.
    still has nothing to say for those two types, so Plan 3's landing breaks `app-core` loudly rather
    than quietly.** It is fed claims a real hierarchy rule would refuse, so it trips on the arrival
    of a *rule*, not of a `case` label.
+
+   **DISCHARGED 2026-08-31 by ruling P16** (Plan 3 Chain A's rebase). The canary fired, the three
+   `passed` exits became `not-evaluated`, and the canary was superseded in place. One correction to
+   the sentence above, recorded so the history is not written wrong: it did **not** trip on the
+   arrival of a rule. It tripped at the ticket's own type lookup, which sits ahead of every hierarchy
+   rule — a `case` label routing to a rule-free body would have tripped it too.
 
 **Also recorded, because it is a correction to this lane's own earlier framing:** "stale local state
 over-refuses, and over-refusing is the safe direction" is **false**. Staleness under-refuses too —
@@ -3247,3 +3271,355 @@ that fails at the first live request and nowhere earlier.
 **So: no lane hard-codes an auth endpoint path, cookie name or bearer header from plan text.** Wait for
 T2's recorded values, or route through whatever T2 exports. T2 will record the verified strings in this
 document.
+
+---
+
+---
+
+## Ruling P13 (2026-08-28, controller) — a refusal id is correct for the SUBJECT it was written about, and this plan borrowed one three times
+
+Raised by Plan 3's Task 6 during execution, ruled before review because it is a correctness concern.
+
+**The ruling.** `checkTicketWorkflowRebound` must not refuse an undefined **target** workflow with
+`ticket.workflow-undefined`. That reason — *"This ticket type's workflow has not been defined yet, so the
+ticket would have no status."* — makes the ticket TYPE's binding its subject. On a migration the type's
+binding may be perfectly well defined and is beside the point; what is missing is the workflow the
+**payload** names. The sentence is false on the path, and it sends an admin to inspect a thing that is
+not broken. The branch now raises **`ticket.rebound-unknown-workflow`**, joining
+`ticket.rebound-same-workflow` and `ticket.rebound-unknown-state`, with the target workflow as its
+subject and two remedies an admin can take alone (a rebound is already in Plan 4's `ADMIN_ONLY_TYPES`).
+
+**Three authorities said otherwise and are overruled, on a distinction worth keeping.** Plan 3's canonical
+refusal table (line 77), its own body (line 2221) and its case 5.34 all specify `ticket.workflow-undefined`
+here. The **id is not wrong** — it is exactly right on `ticket.created`, where a ticket has no workflow
+except the one its type names. What is wrong is its **application** to a neighbouring path, precisely as
+the table's `ticket.unknown-type` was right until Task 5's brief pointed it at a *parent's* type. The plan
+is the argument; the spec is the authority (invariant 2, and this document's own line 204: *"a refusal that
+happens to fire for the wrong reason is not coverage"*).
+
+**The citation objection dissolved on inspection, and inspecting it is the transferable part.** The
+implementer declined to mint an id partly because case 5.34 looked externally cited. It is not: 5.34 is
+referenced only inside `2026-08-20-03-tickets-hierarchy.md:5046`. The externally-cited ids are **5.27 and
+5.30** (Plan 5, `2026-08-20-05-api-realtime-search.md:6158`) and **5.36** (this document, line 303). So the
+number stays and its description changes; nothing outside Plan 3 moves. **Check which ids are actually cited
+before treating a catalogue number as immovable** — the never-renumber rule protects three ids in this
+section, not all thirty-three.
+
+**The pattern, stated because it is now three-for-three in one plan and the lanes still transcribing plan
+text will meet it again.** P11 (a parent's undefined type answered with the *ticket's* unknown-type
+sentence), P12 (a foreign-workspace parent answered with a sentence about *projects*), and now P13 (a
+missing target workflow answered with a sentence about the *type's binding*) are one defect wearing three
+costumes:
+
+> **A refusal id carries a subject, and the subject is part of the copy.** Reusing an id for a
+> structurally similar check on a neighbouring path silently inherits a sentence that is true of something
+> and false of the path that reached it. The reader is told a fact about the wrong noun and sent to fix
+> the one thing that was never the problem.
+
+The tell is cheap and mechanical: **read the reason aloud at the line that raises it, and name the noun it
+is about.** If that noun is not what the check just failed to resolve, the id is borrowed. All three
+instances in this plan were visible that way, and all three shipped in plan text that read authoritative.
+
+**Two findings from the same task, recorded so they are not rediscovered.**
+
+- **Fixture-count arithmetic: the directory, never the plan.** Pre-flight ruling 6 tracked `61 → 63 after
+  T6`; it assumed Task 4b would add no fixture, and Task 4b added one. The base at Task 6's dispatch was
+  **62**, so the correct running total is **62 → 64 after T6**. The count-from-the-directory rule is what
+  caught it — an absolute number copied from the plan would have shipped wrong and failed the gate in
+  whichever lane merged second.
+- **A dispatch nobody tested.** Every Plan 3 check test called its function directly, so deleting a `case`
+  from `packages/rule-engine/src/evaluate.ts` left a fully mutation-proven, **unreachable** check while
+  `evaluateEvent`'s pass-through default accepted every reparent and every same-workflow rebind. Task 6
+  added **two** assertions that enter at `evaluateEvent` — `ticket.reparented` in `test/reparent.test.ts`
+  and `ticket.workflow_rebound` in `test/workflow-rebind.test.ts` — plus two `ticket-type.defined`
+  fixtures, which enter there too because `test/fixtures.test.ts:19` is `evaluateEvent(...)`.
+  *(Corrected by Task 7, which counted the shipped files. The earlier "three" conflated the two unit
+  assertions with the fixture-carried third; `test/ticket-type.test.ts` had no `evaluateEvent` entry of
+  its own, so `ticket-type.defined`'s routing rested entirely in another file and a task relocating those
+  two fixtures would have silently reopened the gap. Task 7 added that third describe and a fourth for
+  `ticket.field_set`, so the sentence is now true of the repo as well as of the intent.)*
+  **Task 7 appended to the same switch and inherited the obligation.** The shape generalises: a lane can
+  prove every branch of a check falsifiable and still never touch the one line that decides whether the
+  check runs — and a dispatch pinned only from another file is one relocation away from unpinned.
+
+---
+
+## Ruling P14 (2026-08-31, controller) — an actor-supplied id resolved with no workspace predicate, and this one is ACCEPTED rather than mislabelled
+
+Found by Plan 3 Task 6's review; **recorded here by Task 7**, the next change set, rather than at plan end —
+this series has lost rulings twice to a gitignored ledger. **Task 7 does not implement it. Task 12 does.**
+
+**P12 closed a tenancy hole on the parent. The same hole is open on the target workflow, and there it admits
+a write.** `packages/rule-engine/src/checks/workflow-rebind.ts:87` calls `ctx.getWorkflowDef(p.toWorkflowId)`
+on an id the ACTOR supplied, and there is no workspace predicate anywhere on the server path:
+
+- `apps/server/migrations/1787896601515_proj-workflows.sql:4-13` — `workspace_id` is a plain column; the PK
+  is `(workflow_id, version)`, global.
+- `apps/server/src/projections/workflows.ts:80-83` — `WHERE workflow_id = $1 ORDER BY version DESC LIMIT 1`.
+  No tenancy filter in any of the three selector branches.
+- `apps/server/src/engine-context.ts:92` — passes straight through.
+
+So a foreign workflow id RESOLVES, the target-state check runs against another workspace's state graph, and
+the event is accepted: a live ticket bound to a workflow its workspace cannot see, standing in one of that
+workflow's states. `ticket.workflow_rebound` is the first check in this plan where an actor-supplied id is
+resolved directly — creation reads the type's binding, a transition reads the ticket's own — which is why
+the class did not appear until now. P12's own shipped comment indicts it verbatim once the noun is
+substituted (`checks/hierarchy.ts:242-244`): *"The ingest door's tenancy check does not cover this: it
+guards the event's own entity, never the parent the payload names."*
+
+**Severity, against the two rulings it extends.** P11 told the actor a false sentence. P12 mislabelled a
+refusal and confirmed that an id exists somewhere they cannot see. **P14 admits the write** — the worst of
+the three, and a boundary the spec makes explicit (§6: *"Enforcement is server-side on every read and every
+sync-down"*).
+
+**Latent today, live in one specific commit.** `apps/server/src/engine-context.ts:74-76` returns null for
+every kind outside `KINDS_WHOSE_STATE_IS_ONLY_IDENTITY`, `'ticket'` among them, so `ticket.unknown` fires
+first at `workflow-rebind.ts:64` and the workflow lookup is never reached on the server. (Addendum 10 cited
+`:76-78` for this; the branch is at `:74-76` in the shipped file — checked, not inherited.) **It goes live in the same commit Task 12 lands** — the same commit
+Addendum 9 already flags for the `rowToTicketState` `workspaceId` trap, where a missing field refuses every
+parented `ticket.created`. Two independent tenancy hazards converge there; Task 12 meets both or neither.
+
+**The ruling: close it fail-closed, in Task 12.** The conservative option under the autonomous protocol is
+to refuse. The DESIGN is Task 12's — either a workspace predicate on the `EngineContext` lookups at all
+three implementations, or an equivalent that keeps the comparison inside the check — because Task 12 is
+what backs those lookups with real projections. **No unit test can pin the fix:** `buildMemoryContext` has
+no workspace notion for workflows at all, so the test home is Task 12's `apps/server/test/engine-context.test.ts`
+suite. Cost if wrong: a workspace predicate on a lookup that is already per-workspace in every legitimate
+call.
+
+**The class extends one step further, and Task 12 owns that end too.** `getTicketTypeDef(ctx, p.typeId)` on
+the create path (`checks/hierarchy.ts:84`) has the identical shape the moment Task 12 backs it with
+`proj_ticket_types` — a type id the actor supplies, resolved with no tenancy filter. Addendum 9a recorded
+the *own-entity* sibling of P12 (`hierarchy.ts:82`, `ticket.already-exists`) and ruled it non-blocking
+because both real consumers are workspace-scoped before the engine; the **actor-supplied-id** siblings were
+not considered then. They are this ruling.
+
+**The transferable tell, alongside P11–P13's.** Those three ask *"read the reason aloud — is its noun what
+the check just failed to resolve?"* This one asks a different question of the same line: **whose id is
+this?** An id the ACTOR chose, resolved through a lookup with no tenancy predicate, is a tenancy hole
+whatever the answer looks like — and it is worst where the lookup succeeding leads to an ACCEPT rather than
+to a refusal, because nothing downstream will ever mention it.
+
+---
+
+## A mutation that crosses a package boundary is inert until the package is rebuilt (2026-08-31, Lane 1 Task 8)
+
+**Found by a mutation that reported the wrong answer, and would have been reported as a finding.** Plan 3's
+end-to-end fixture for the whitespace-title refusal was mutated by deleting the refine on
+`ticketCreatedPayload.title` (`packages/domain/src/events/ticket-events.ts`) and rerunning
+`packages/rule-engine`'s fixture suite. Every fixture stayed green. Under the standing discipline — *if no
+mutation can make a fixture fail, report it, do not ship it* — that reads as a fixture that agrees without
+constraining, and the honest thing to do would have been to report it as such.
+
+It was the mutation that was wrong. `@gisik-nokma/domain`'s `exports` map points at `./dist/index.js`
+(`packages/domain/package.json`), so every package that imports it by name reads BUILT OUTPUT, not source.
+A rule-engine test therefore cannot see an unbuilt change to a domain source file at all. Rebuilding the
+domain package and rerunning turned the same mutation red immediately, at the fixture's own expected
+outcome — the candidate is ACCEPTED once the refine is gone, which is precisely the proof the fixture exists
+to give.
+
+**Binding on every task that mutates across a package boundary**, which is most of the remaining lane:
+`packages/domain` is mutated by tasks whose tests live in `packages/rule-engine` and `apps/server`, and the
+same asymmetry holds for `packages/rule-engine` read from `apps/server`.
+
+- **A same-package mutation needs no rebuild** — vitest compiles the package's own sources, and a relative
+  `../src/x.js` import sees the edit. Every mutation inside `packages/rule-engine/src` proven by this task
+  behaved correctly without one.
+- **A cross-package mutation needs `pnpm --filter <pkg> run build` before the run, and again after the
+  restore.** Skipping the second rebuild leaves a mutated `dist/` standing behind a clean `git status`,
+  which is worse than the first error: the tree reads restored and the next suite runs against the mutant.
+- **The tell is a survivor with no explanation.** A mutation that deletes a check and changes nothing is
+  either a genuinely unconstrained path or a mutation that never arrived. Distinguish them before
+  reporting: assert the mutation is live (read the built file, or watch the mutated package's OWN suite go
+  red) and only then call the surviving fixture unfalsifiable.
+
+This is the same shape as the verification-method rules above — a method that produces a confident wrong
+answer, silently. It differs from them in one respect worth naming: the wrong answer here is
+*conservative-looking*. It reports a weakness that does not exist, so it would have been believed.
+
+### Fixture count on Lane 1 at Task 8, counted (Ruling P6)
+
+`packages/rule-engine/fixtures/` held **70** `.json` files before this task and holds **84** after, a delta
+of **+14** — the thirteen the plan text specifies plus one closing Ruling P15's end-to-end residual. Both
+numbers were counted from the directory rather than derived from a tracker, with no `MERGE_HEAD`,
+`rebase-apply`, `rebase-merge` or `CHERRY_PICK_HEAD` present, so no operation was in flight — which is the
+rider's actual requirement, and not the same as a clean tree, which the count could not have had because
+the fixtures being counted were the uncommitted objects; the gate at
+`packages/rule-engine/test/fixtures.test.ts` moved in the same commit as the fixtures.
+Lane 4's cross-lane merge resolves against whatever each lane counted at its own commit, per pre-ruling 6.
+
+**Task 14 inherits two facts from this, and one instruction.** The fourteen fixtures are catalogued in
+`Features.md` §5 but **claim no new test-case ids**: thirteen of them prove scenarios Plan 3's own document
+already reserves inside 5.4–5.36, so Task 14 cites the fixture filenames from those ids rather than
+minting a second set of numbers for the same behaviour. Only the three things no plan document anticipated
+— the harness/domain presence audit, the fold extension, and Ruling P15's end-to-end proof — take new ids,
+at 5.51–5.53. New cases beyond those continue from 5.54.
+
+### The fixture prior-event dialect changed shape, and later fixture authors inherit it
+
+Any task or lane that writes a fixture with a `ticket.created` prior must now spell `typeId`, `projectId`,
+`parentId` and `title` — required, with `parentId` required-and-nullable, mirroring `ticketCreatedPayload`'s
+PRESENCE while keeping the loose string FORMAT that lets `t1` and `prj_1` work (Ruling P10). The fold no
+longer answers `prj_1`/`task` from constants, and it records the title as a field claim exactly as
+`applyTicketEvent` does — which is what makes the parent-terminal refusals quote a title rather than a raw
+ticket id. `workflowId` stays a harness-only affordance and stays required: this dialect binds a workflow
+directly because no ticket-type projection stands behind it, and the fold deliberately does NOT throw on a
+`typeId` no `ticket-type.defined` declared, so a fixture about transitions need not invent a type ladder.
+
+## Ruling P16 (2026-08-31, serial executor) — a fourth context method answered by a store that has none, and a `passed` its own landing falsified
+
+Plan 3 Chain A's rebase onto `main` merged **textually clean and semantically broken**, which is the
+collision this document predicted for Phase 0 ("the collisions appear only once one lands and the others
+rebase"). Two things had to be true at once and could not be: ruling P3 made `getTicketTypeDef` a REQUIRED
+fourth `EngineContext` method, and `main` had independently landed `packages/app-core/src/precheck.ts`
+(Plan 6a T6, `3fb22d3`) whose exported `contextFromCache` builds a THREE-method context. `tsc` caught the
+arity. Nothing caught the rest, and the rest is the ruling.
+
+### The method answers by THROWING, and the taxonomy already said so
+
+The monorepo has four `getTicketTypeDef` implementations and they already encode a rule, which was
+extracted and quoted rather than invented. **`null` is licensed only where "this workspace has no such
+type" is a TRUE statement about the store's own world**: the fixture harness earned its `null` by folding
+`ticket-type.defined` into a real map, `memory-context.ts` answers over its reducer-built map, and
+`apps/server/src/engine-context.ts` answers `null` because `proj_ticket_types` genuinely holds nothing
+today. **A throw is the answer where the context has no store at all** — where the absence is in the
+wiring, not in the world. Both throw sites say why in the same words, and the harness's own retired throw
+put it best: *"answering `null` would have made the check refuse for a reason that reads entirely
+legitimate. The throw was the placeholder telling the truth."*
+
+`ClientStateCache` has no ticket-type store whatsoever. So `null` there is not a claim about the
+workspace, it is "I do not hold it" — which this cache spells `undefined` everywhere else, and which
+`precheckEvent` turns into `not-evaluated`. Answering `null` would let the engine convert that absence
+into `ticket.unknown-type`: **a refusal manufactured out of absence**, the exact mirror of the `passed`
+that module's whole invariant forbids, and a violation of its own definition of `refused` ("the facts it
+read were server-served state this client holds").
+
+**The server's counter-example does not transfer**, and this was verified rather than assumed. That
+context answers `null` *because it is live and a throw would turn an ingest into a 500*. No live client
+path can reach this one: `precheckEvent` routes only `ticket.transitioned` to the engine, and
+`getTicketTypeDef` is reached only from `checks/hierarchy.ts` (four sites) and `checks/fields.ts:145` —
+that is, only from `ticket.created`, `ticket.reparented` and `ticket.field_set`. **Correction to a claim
+made three times during the analysis: `checkTicketWorkflowRebound` does NOT call `getTicketTypeDef`.**
+
+### The forced half nobody would have found from the build error: `passed` had to go
+
+`precheckParentTerminal` answered `passed` for `ticket.created` / `ticket.reparented` without consulting
+the engine. **§12 claim 2 pre-ruled this exact moment**: *"The moment Plan 3 lands rank, cycle,
+deepest-rank and cross-project checks as engine cases, that `passed` violates the scope sentence above."*
+It landed. The code confirms it independently and more sharply than the claim did: `checks/hierarchy.ts:84`
+resolves the ticket's **own** type ahead of every branch *including the no-parent branch at `:90`*, and
+`:108` then refuses `hierarchy.deepest-rank-parent-required` off `type.rank`. So the unconditional
+`passed` for a parentless create was not merely unproven — it was **false for every type at or below the
+deepest rank**.
+
+All three `passed` exits become `not-evaluated`. This needed **none** of the three genuinely-deferred
+absences: it is three return statements in a file the PR could not compile without touching. Scoping it
+out would have shipped a known-false answer to a user. **The `hierarchy.parent-terminal` refusal STAYS** —
+it reads only cached, server-served `stateCategory`, so it satisfies the `refused` clause, and its failure
+direction is over-refusal on an advisory surface, which the module already tolerates and names.
+
+### The canary fired, and the honest mechanism is not the designed one
+
+`precheck.test.ts`'s canary — Lane 4's tripwire for precisely this landing — went red. It is **superseded
+in place**: not deleted (that removes the tripwire) and not greened (that leaves a green suite over
+violated semantics). Recorded because writing the designed mechanism as history would be false: **it did
+not trip on a hierarchy RULE refusing a planted claim.** It trips at the ticket's own type lookup, which
+sits ahead of every hierarchy rule — so a case label routing to a rule-free body would have tripped it
+too. The successor says so, and is pinned in both directions: remove the dispatcher cases and no rejection
+is thrown; answer `null` instead of throwing and the engine refuses rather than rejects. Both go red.
+Verified by mutation, not by reasoning — reverting the throw to `null` turns it red at its own site with
+`rule: "ticket.unknown-type"`.
+
+**§12 claim 2 is DISCHARGED by this ruling.** §12 claim 1 (the two wordings for `hierarchy.parent-terminal`,
+`parentTerminalRefusal` unexported) stays **OPEN** — owner Plan 3 Chain B for the export, Plan 6 for the
+import.
+
+### Recorded with named owners, deliberately NOT fixed here
+
+- **A ticket-type store on `ClientStateCache`** — owner **Plan 6a**. It must land with a completeness
+  notion in the `markChildrenComplete` mould: a partially-fed type store answering `null` reproduces this
+  same absence-becomes-a-verdict hole in a new place.
+- **The producer feeding it** — owner **Plan 6 Task 7**, over Plan 5's ticket-types read. The identical
+  unfilled-producer position §12 already records for the child-set vouch.
+- **Routing `precheckParentTerminal` through the engine** — owner **Plan 6 Task 7**, BLOCKED on both of
+  the above; routing before them refuses `ticket.unknown-type` on every create. That change set replaces
+  the re-aimed canary a second time.
+- **THE INTERIM GAP THIS OPENS, stated plainly:** between this merge and that routing, creates and
+  reparents lose their accept preview entirely — only the parent-terminal refusal survives. That is a real
+  regression on the surface `app-core` exists to provide. The direction is deferral to the server, never a
+  bypassed guard.
+- **Preview value recoverable without the cache growing types**, surfaced here and deliberately not built:
+  `hierarchy.cross-project` is decidable from cached `parent.projectId`, and the self-parent
+  `hierarchy.cycle` from the payload alone. Owner: Plan 6 Task 7, same change set.
+- **Plan 10 reuses `precheckEvent` unchanged over its offline replica**, whose store also holds no
+  ticket-type definitions, and inherits both the throw and the hierarchy deferral. It must meet them as a
+  recorded decision rather than as a crash. Owner: Plan 10's replica `DataSource` task.
+- **`apps/server/src/engine-context.ts:94` stays `null`** — owner Plan 3 Chain B Task 12, already bound at
+  the site. Cross-reference only; do not partially wire it while fixing `app-core`.
+
+### One stale comment repaired in passing, because this branch's own work falsified it
+
+`packages/rule-engine/test/fields.test.ts` stated that the fixture harness's `getTicketTypeDef` "THROWS by
+design". **Task 8 on this same branch changed it to answer `null`.** The conclusion it supports still
+holds; its reason did not. A claim made false by one's own landing is inside scope — it is the defect
+class this branch has now caught six times, and it does not get an exemption for sitting in a test file.
+
+## Task 8's re-review, run because its first one was contaminated (2026-08-31, serial executor)
+
+`docs/plan-3-chain-b-handoff.md` recorded that T8's task review ran while a sibling controller had this
+worktree checked out to another branch for 26 seconds, and instructed a re-verification or a re-run. The
+dispatch brief for the serial executor described Chain A as "complete and reviewed clean", which the
+document contradicts; **the document wins, and this is the re-run**, against the rebased tree — which is
+also the tree that merges. Three lenses, six raw findings, one refuted, five upheld by `fable` refuters.
+
+### Fixed here
+
+**`reparent-legal-grandchild-up.json` claimed a property its staging did not have** — the third instance
+of this branch's own recurring class, a sentence beside the code that the code contradicts. Its note said
+"a real three-deep chain, so the ancestor walk actually walks". The walk starts at the NEW PARENT, and the
+fixture moved a grandchild under the ROOT grandparent — so the loop ran exactly one iteration and
+terminated. Two mutations proved it: refusing whenever the cursor has a parent, and refusing on entering a
+second iteration, **both left the whole fixture suite green**. Restaged four deep (epic → story → task →
+sub-task) with the move landing under `TKB`, whose parent is `TKA`: the walk now visits two nodes, and
+both mutations die naming this fixture at its own site. Fixture count is unchanged at 84.
+
+### Recorded with owners, not fixed
+
+- **The reparent path's rank rules have no end-to-end fixture.** Across all 84 fixtures, `hierarchy.rank`
+  and `hierarchy.deepest-rank-parent-required` appear exactly once each, **both on the created path**.
+  Neutralising either of `checkTicketReparented`'s twins leaves the whole fixture suite green. Correctly
+  classified as an UNCONSTRAINED PATH rather than a mutation that never ran — `fixtures.test.ts` imports
+  `../src/index.js`, so the mutated code executed, and the same mutations flipped `test/reparent.test.ts`
+  in the same run, which is the positive control. Both rules do have unit coverage; it is the end-to-end
+  layer that is one-sided, and the code comments make the shared refusal sentence a deliberate cross-path
+  property. Owner: **Plan 3 Task 14**.
+- **Eleven refusal ids have no end-to-end fixture, not four.** Commit `646939c` corrected a false universal
+  by naming four (`hierarchy.unknown-parent`, `hierarchy.parent-type-unknown`, `hierarchy.cross-project`,
+  `field.title-required`) and was right about those, but it is not the full inventory: `ticket.unknown`,
+  `ticket.unknown-type`, `ticket.already-exists`, `ticket.workflow-undefined`,
+  `ticket.rebound-same-workflow`, `ticket.rebound-unknown-state` and `ticket.rebound-unknown-workflow` are
+  also absent. A resumer reading that commit as the inventory would think seven ids are covered that are
+  not — the same class the commit exists to repair, one level up. `Features.md` now names all eleven.
+  Owner: **Plan 3 Task 14**.
+- **No test in the repo cites a catalogue case id**, so the `test-cases/` ↔ test citation is
+  one-directional: a test can be deleted and its case keeps its ✅. Repo-wide convention gap predating T8,
+  reported because the honest answer to "are the ✅ markers true?" is that it is unanswerable in that
+  direction. Owner: **workspace convention / Plan 11**.
+
+### A process finding, and it is the executor's own
+
+One lens reported **BLOCKING: this worktree is being concurrently mutated while the re-review runs**, and
+it was right. The reviewers were told read-only and then also told to restore anything they mutated —
+which on a SHARED tree is precisely the pattern that produced Wave 1's near-miss false tampering finding.
+The rule already existed ("mutating fan-outs get one worktree per agent, or a serialised mutation window;
+read-only lenses may share") and the executor wrote a dispatch that violated it. **A rule does not
+reliably fire on its author.**
+
+No result was corrupted, and that is luck plus discipline rather than design: the agents used
+anchor-uniqueness guards, positive controls in the same run, and md5-verified restores, and one explicitly
+identified a red run at 15:02:56 as a sibling's mutation rather than reporting it as a T8 defect — which
+is exactly the trap. Afterwards the tree was verified byte-identical to the pinned baseline (`HEAD`
+`6027d7e`, tree `e7f2cbec`, `git status` clean, empty `git diff`). **The gate that certifies this branch
+ran at 14:52, before the fan-out started, so it is uncontaminated — and was re-run afterwards on the
+verified-restored tree anyway.** Standing correction: any fan-out permitted to mutate gets a worktree per
+agent, and "read-only" in a prompt is not read-only if the same prompt also explains how to restore.
