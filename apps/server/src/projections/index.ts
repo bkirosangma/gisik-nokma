@@ -1,5 +1,6 @@
 import { entityHeadsProjection } from './entity-heads.js';
 import { membershipsProjection } from './proj-memberships.js';
+import { projVisibility } from './proj-visibility.js';
 import { createProjectionRegistry, type ProjectionRegistry } from './registry.js';
 import { workflowsProjection } from './workflows.js';
 
@@ -31,5 +32,6 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   registry.register(entityHeadsProjection);
   registry.register(workflowsProjection);
   registry.register(membershipsProjection);
+  registry.register(projVisibility);
   return registry;
 }

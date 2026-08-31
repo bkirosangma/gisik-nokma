@@ -95,6 +95,7 @@ describe('proj_entity_heads', () => {
       'proj_entity_heads',
       'proj_workflows',
       'proj_memberships',
+      'proj_visibility',
     ]);
   });
 });

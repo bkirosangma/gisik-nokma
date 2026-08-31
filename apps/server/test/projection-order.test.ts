@@ -15,22 +15,23 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  * below is the pin: EVERY later registrant extends it in the same commit that
  * registers its projection.
  *
- * "Extends" means INSERTS AT ITS §8 POSITION, not appends. proj_memberships is
- * last today only because the three §8 entries above it do not exist yet; Plan
- * 3 Chain B's proj_ticket_types, proj_tickets and proj_rollups go BEFORE it,
- * not after. Getting that wrong is not a cosmetic ordering slip — it puts
+ * "Extends" means INSERTS AT ITS §8 POSITION, not appends. proj_memberships and
+ * proj_visibility are the last two today only because the three §8 entries above
+ * them do not exist yet; Plan 3 Chain B's proj_ticket_types, proj_tickets and
+ * proj_rollups go BEFORE both, not after. Getting that wrong is not a cosmetic ordering slip — it puts
  * proj_rollups ahead of the proj_tickets rows it reads.
  *
  * Deliberately DB-free — no createTestDatabase, no pool, nothing that could
  * make this ordering contract skippable when Postgres is not running.
  */
 describe('projection registration order (coordination §8)', () => {
-  it('buildProjectionRegistry registers the pinned order: heads, workflows, memberships', () => {
+  it('buildProjectionRegistry registers the pinned order: heads, workflows, memberships, visibility', () => {
     const registry = buildProjectionRegistry();
     expect(registry.all().map((projection) => projection.name)).toEqual([
       'proj_entity_heads',
       'proj_workflows',
       'proj_memberships',
+      'proj_visibility',
     ]);
   });
 
@@ -51,6 +52,7 @@ describe('projection registration order (coordination §8)', () => {
       ['proj_entity_heads', ['proj_entity_heads']],
       ['proj_workflows', ['proj_workflows']],
       ['proj_memberships', ['proj_memberships']],
+      ['proj_visibility', ['proj_visibility']],
     ]);
   });
 });
