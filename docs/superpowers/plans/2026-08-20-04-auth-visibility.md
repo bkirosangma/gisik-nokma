@@ -1779,12 +1779,31 @@ git commit -m "proj_memberships turns membership history into effective roles: o
 > | Modify `apps/server/src/ingest/pipeline.ts` | **No such file.** `apps/server/src/ingest/ingest-service.ts`, and the insert is not linear — the gate is threaded through `commitOne` as a `ClientDoor \| null`, and `ingestClientBatch(rawEvents, sessionUserId)` gained the session |
 > | `packages/domain/src/workflows/simple-kanban.ts` | **`packages/domain/src/simple-kanban.ts`** (flat; there is no `workflows/` directory) |
 > | `projMemberships` | **`membershipsProjection`** |
+> | `PermissionContext { sessionUserId, eff }` | **gains a third, REQUIRED member: `workspaceExists: boolean`** — see below |
 > | `bootstrapWorkspace(founding: EventEnvelope, append: (env) => Promise<void>)` | **`bootstrapWorkspace(founding: FoundingEvent, append: (events: SubmittedEvent[]) => Promise<IngestResult[]>)`**, plus a pure `foundingSequence(founding)`; it lives at `apps/server/src/workspaces/bootstrap-workspace.ts` and is fired from `ingestAll`, not from a route |
 > | `ingestEvent(e, { db: pool, sessionUserId })` in the Step 6 tests | **No such export.** `ingest.ingestClientBatch([e], sessionUserId)` / `ingest.ingestBatch([e])`, returning `IngestResult[]` |
 >
-> `checkRolePermission(env, ctx)` — the PURE half — is **unchanged**, so Plan 5's samples that call it
-> (`2026-08-20-05-api-realtime-search.md:791-844`) are still correct. Task 9's are not: see the block at
-> Task 9.
+> **`PermissionContext` gained a required member, and this catches Plan 5 as well as Task 9.**
+> `checkRolePermission(env, ctx)` keeps its arity, its purity and its return type — but `ctx` now needs
+> `workspaceExists: boolean`, so **`{ sessionUserId, eff }` no longer compiles**. It is required and not
+> optional because `false` is the PERMISSIVE value: an optional field would let every call site that
+> forgot it re-open a privilege escalation while typechecking green.
+>
+> The escalation is why the field exists, and it is worth one paragraph because nothing else in the
+> system closes it. Nothing refuses a SECOND `workspace.created`: `parseEvent` accepts it, the
+> entity↔workspace guard sees no mismatch when the workspace ids agree, and `evaluateEvent` has no case
+> for the type. So the founding bypass — the one type a non-member may submit — admitted it, and the
+> founding sequence then appended `membership.granted {role: 'owner'}` for whoever sent it. Measured on
+> the first T5 commit: a stranger resolved as `owner` of a workspace they were never in, and the
+> workspace held 14 events instead of 7. `workspaceExists` asks whether the WORKSPACE has a ledger — not
+> whether the event's entity has a head row, which the sharp variant of the attack defeats with a fresh
+> entity id.
+>
+> **So Plan 5's samples ARE affected**: `roleCtx(...)` at
+> `2026-08-20-05-api-realtime-search.md:791-844` builds `{ sessionUserId, eff }` and must add
+> `workspaceExists`. (The value is irrelevant to `workspace.settings_set`, which is what those samples
+> test — it only changes the answer for `workspace.created` — but it must be present.) Task 9's samples
+> are affected twice over: see the block at Task 9.
 >
 > **Also corrected, because the plan text's reason is not the shipped system's reason:** Step 6 says the
 > workflow → types order is load-bearing because "a `ticket-type.defined` naming a workflow that has not
@@ -3635,6 +3654,12 @@ git commit -m "Direct reads enforce visibility as indistinguishable 404s; a rest
 > The line above claiming `checkPermission` has "the same signature as Task 5" is still true — it is the
 > Task 5 signature that moved. `checkVisibilityPermission` should take the same shape rather than the
 > `(db, env, ctx)` triple below, so the two halves of one gate read alike.
+>
+> **`PermissionContext` also gained a required member**, `workspaceExists: boolean`, so any `ctx` this
+> task builds by hand needs it — `{ sessionUserId, eff }` does not compile. It bounds the
+> `workspace.created` founding bypass to a workspace with no ledger; without it the bypass is a
+> privilege escalation (see the Task 5 block). Visibility has no use for the value, but it must carry
+> it through.
 >
 > Two more things Task 9 inherits from Task 5 as built:
 > - `checkRolePermission(env, ctx: PermissionContext)` is unchanged and still pure. Visibility runs

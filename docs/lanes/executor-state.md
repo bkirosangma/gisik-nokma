@@ -143,9 +143,12 @@ exist yet. **Plan 3 Chain B — step 8 — adds them and MUST INSERT.**
 3. **RULING P18 is untouched and still open** — `getEntityState('membership')` still returns `null`.
    T5 read roles through `resolveEffectiveRole` and never through the engine, exactly as scoped.
    *Owner unchanged: whoever dispatches Plan 4 Task 6 or the step-10 checkpoint.*
-4. **A second `workspace.created` still COMMITS through the internal door** (it founds nothing, which
-   is what is pinned). Refusing it outright would be a new door or engine rule and is out of T5's
-   scope. *Owner: Plan 4 Task 13, which builds `POST /v1/workspaces`.*
+4. **A second `workspace.created` still COMMITS — through the internal door, and through the CLIENT
+   door for anyone who is already a member of that workspace.** `workspace.created` is not in
+   `ADMIN_ONLY_TYPES`, so a member passes the membership check and lands at `workspaceSeq > 1`; the
+   bootstrap does not fire, so it grants nothing and is not a security item. It is still a noise event
+   nothing refuses. Refusing it outright would be a new door or engine rule and is out of T5's scope.
+   *Owner: Plan 4 Task 13, which builds `POST /v1/workspaces`.*
 5. **No `test-cases` markers on the new file, deliberately.** `3.31` is the envelope-origin gate and
    its catalogue entry names `check-permission.test.ts`; stamping it on 31 role/founding/roster tests
    would assert coverage that entry never described. Plan 4 puts its catalogue steps in Tasks 12–14.

@@ -788,6 +788,14 @@ Per Plan 4's discipline: permission refusals are PRE-engine, so their planted de
 import { describe, expect, it } from 'vitest';
 import { newUlid, type EventEnvelope } from '@gisik-nokma/domain';
 import type { EffectiveRole } from '../../src/permissions/effective-role.js';
+// ⚠️ AS-BUILT (Plan 4 Task 5, landed 2026-08-31): `checkRolePermission(env, ctx)` keeps its
+// arity, its purity and its return type, but `PermissionContext` gained a THIRD, REQUIRED
+// member — `workspaceExists: boolean`. The `roleCtx` helper below builds
+// `{ sessionUserId, eff }` and WILL NOT COMPILE; add `workspaceExists: false`. The value is
+// irrelevant here (it only changes the answer for `workspace.created`), but it is required
+// rather than optional on purpose: `false` is the permissive value, and an optional field
+// would let a forgetful call site re-open the founding-bypass escalation while typechecking
+// green. See Plan 4 Task 5's correction block.
 import { checkRolePermission } from '../../src/permissions/check-permission.js';
 
 function settingsEnvelope(actorId: string): EventEnvelope {
