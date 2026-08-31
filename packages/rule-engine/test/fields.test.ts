@@ -39,10 +39,13 @@ const ctx = (): MemoryContext => buildMemoryContext([WF], [typeDefined(INVOICE),
  * fold its way into, because `applyTicketEvent` throws on a `ticket.created`
  * whose type is unknown (`ticket-state.ts:97-99`). So the type is defined for
  * the fold and then removed from the context's own map, which is the only
- * staging a unit test has: the fixture harness's `getTicketTypeDef` THROWS by
- * design, naming Task 8 (pre-flight Addendum 5), so a fixture reaching this
- * branch would throw rather than refuse — which is why this hole is closed here
- * and not with a fixture.
+ * staging a unit test has. The conclusion is unchanged but its reason is not:
+ * Task 8 has since landed, and the fixture harness's `getTicketTypeDef` now
+ * answers `ticketTypes.get(typeId) ?? null` (`fixtures/harness.ts`) rather than
+ * throwing. A fixture still cannot stage this world, because the harness builds
+ * that map by folding `ticket-type.defined` and there is no fixture-level way
+ * to fold a `ticket.created` whose type is absent — `applyTicketEvent` throws
+ * first. So the hole is still closed here and not with a fixture.
  */
 function ctxWithoutTheTicketsType(): MemoryContext {
   const context = ctx();

@@ -1349,6 +1349,12 @@ window is a whole offline period rather than a race.
    than quietly.** It is fed claims a real hierarchy rule would refuse, so it trips on the arrival
    of a *rule*, not of a `case` label.
 
+   **DISCHARGED 2026-08-31 by ruling P16** (Plan 3 Chain A's rebase). The canary fired, the three
+   `passed` exits became `not-evaluated`, and the canary was superseded in place. One correction to
+   the sentence above, recorded so the history is not written wrong: it did **not** trip on the
+   arrival of a rule. It tripped at the ticket's own type lookup, which sits ahead of every hierarchy
+   rule — a `case` label routing to a rule-free body would have tripped it too.
+
 **Also recorded, because it is a correction to this lane's own earlier framing:** "stale local state
 over-refuses, and over-refusing is the safe direction" is **false**. Staleness under-refuses too —
 the version-chain hole above is exactly that. After both fixes the *locally detectable* subset is
@@ -3459,3 +3465,101 @@ longer answers `prj_1`/`task` from constants, and it records the title as a fiel
 ticket id. `workflowId` stays a harness-only affordance and stays required: this dialect binds a workflow
 directly because no ticket-type projection stands behind it, and the fold deliberately does NOT throw on a
 `typeId` no `ticket-type.defined` declared, so a fixture about transitions need not invent a type ladder.
+
+## Ruling P16 (2026-08-31, serial executor) — a fourth context method answered by a store that has none, and a `passed` its own landing falsified
+
+Plan 3 Chain A's rebase onto `main` merged **textually clean and semantically broken**, which is the
+collision this document predicted for Phase 0 ("the collisions appear only once one lands and the others
+rebase"). Two things had to be true at once and could not be: ruling P3 made `getTicketTypeDef` a REQUIRED
+fourth `EngineContext` method, and `main` had independently landed `packages/app-core/src/precheck.ts`
+(Plan 6a T6, `3fb22d3`) whose exported `contextFromCache` builds a THREE-method context. `tsc` caught the
+arity. Nothing caught the rest, and the rest is the ruling.
+
+### The method answers by THROWING, and the taxonomy already said so
+
+The monorepo has four `getTicketTypeDef` implementations and they already encode a rule, which was
+extracted and quoted rather than invented. **`null` is licensed only where "this workspace has no such
+type" is a TRUE statement about the store's own world**: the fixture harness earned its `null` by folding
+`ticket-type.defined` into a real map, `memory-context.ts` answers over its reducer-built map, and
+`apps/server/src/engine-context.ts` answers `null` because `proj_ticket_types` genuinely holds nothing
+today. **A throw is the answer where the context has no store at all** — where the absence is in the
+wiring, not in the world. Both throw sites say why in the same words, and the harness's own retired throw
+put it best: *"answering `null` would have made the check refuse for a reason that reads entirely
+legitimate. The throw was the placeholder telling the truth."*
+
+`ClientStateCache` has no ticket-type store whatsoever. So `null` there is not a claim about the
+workspace, it is "I do not hold it" — which this cache spells `undefined` everywhere else, and which
+`precheckEvent` turns into `not-evaluated`. Answering `null` would let the engine convert that absence
+into `ticket.unknown-type`: **a refusal manufactured out of absence**, the exact mirror of the `passed`
+that module's whole invariant forbids, and a violation of its own definition of `refused` ("the facts it
+read were server-served state this client holds").
+
+**The server's counter-example does not transfer**, and this was verified rather than assumed. That
+context answers `null` *because it is live and a throw would turn an ingest into a 500*. No live client
+path can reach this one: `precheckEvent` routes only `ticket.transitioned` to the engine, and
+`getTicketTypeDef` is reached only from `checks/hierarchy.ts` (four sites) and `checks/fields.ts:145` —
+that is, only from `ticket.created`, `ticket.reparented` and `ticket.field_set`. **Correction to a claim
+made three times during the analysis: `checkTicketWorkflowRebound` does NOT call `getTicketTypeDef`.**
+
+### The forced half nobody would have found from the build error: `passed` had to go
+
+`precheckParentTerminal` answered `passed` for `ticket.created` / `ticket.reparented` without consulting
+the engine. **§12 claim 2 pre-ruled this exact moment**: *"The moment Plan 3 lands rank, cycle,
+deepest-rank and cross-project checks as engine cases, that `passed` violates the scope sentence above."*
+It landed. The code confirms it independently and more sharply than the claim did: `checks/hierarchy.ts:84`
+resolves the ticket's **own** type ahead of every branch *including the no-parent branch at `:90`*, and
+`:108` then refuses `hierarchy.deepest-rank-parent-required` off `type.rank`. So the unconditional
+`passed` for a parentless create was not merely unproven — it was **false for every type at or below the
+deepest rank**.
+
+All three `passed` exits become `not-evaluated`. This needed **none** of the three genuinely-deferred
+absences: it is three return statements in a file the PR could not compile without touching. Scoping it
+out would have shipped a known-false answer to a user. **The `hierarchy.parent-terminal` refusal STAYS** —
+it reads only cached, server-served `stateCategory`, so it satisfies the `refused` clause, and its failure
+direction is over-refusal on an advisory surface, which the module already tolerates and names.
+
+### The canary fired, and the honest mechanism is not the designed one
+
+`precheck.test.ts`'s canary — Lane 4's tripwire for precisely this landing — went red. It is **superseded
+in place**: not deleted (that removes the tripwire) and not greened (that leaves a green suite over
+violated semantics). Recorded because writing the designed mechanism as history would be false: **it did
+not trip on a hierarchy RULE refusing a planted claim.** It trips at the ticket's own type lookup, which
+sits ahead of every hierarchy rule — so a case label routing to a rule-free body would have tripped it
+too. The successor says so, and is pinned in both directions: remove the dispatcher cases and no rejection
+is thrown; answer `null` instead of throwing and the engine refuses rather than rejects. Both go red.
+Verified by mutation, not by reasoning — reverting the throw to `null` turns it red at its own site with
+`rule: "ticket.unknown-type"`.
+
+**§12 claim 2 is DISCHARGED by this ruling.** §12 claim 1 (the two wordings for `hierarchy.parent-terminal`,
+`parentTerminalRefusal` unexported) stays **OPEN** — owner Plan 3 Chain B for the export, Plan 6 for the
+import.
+
+### Recorded with named owners, deliberately NOT fixed here
+
+- **A ticket-type store on `ClientStateCache`** — owner **Plan 6a**. It must land with a completeness
+  notion in the `markChildrenComplete` mould: a partially-fed type store answering `null` reproduces this
+  same absence-becomes-a-verdict hole in a new place.
+- **The producer feeding it** — owner **Plan 6 Task 7**, over Plan 5's ticket-types read. The identical
+  unfilled-producer position §12 already records for the child-set vouch.
+- **Routing `precheckParentTerminal` through the engine** — owner **Plan 6 Task 7**, BLOCKED on both of
+  the above; routing before them refuses `ticket.unknown-type` on every create. That change set replaces
+  the re-aimed canary a second time.
+- **THE INTERIM GAP THIS OPENS, stated plainly:** between this merge and that routing, creates and
+  reparents lose their accept preview entirely — only the parent-terminal refusal survives. That is a real
+  regression on the surface `app-core` exists to provide. The direction is deferral to the server, never a
+  bypassed guard.
+- **Preview value recoverable without the cache growing types**, surfaced here and deliberately not built:
+  `hierarchy.cross-project` is decidable from cached `parent.projectId`, and the self-parent
+  `hierarchy.cycle` from the payload alone. Owner: Plan 6 Task 7, same change set.
+- **Plan 10 reuses `precheckEvent` unchanged over its offline replica**, whose store also holds no
+  ticket-type definitions, and inherits both the throw and the hierarchy deferral. It must meet them as a
+  recorded decision rather than as a crash. Owner: Plan 10's replica `DataSource` task.
+- **`apps/server/src/engine-context.ts:94` stays `null`** — owner Plan 3 Chain B Task 12, already bound at
+  the site. Cross-reference only; do not partially wire it while fixing `app-core`.
+
+### One stale comment repaired in passing, because this branch's own work falsified it
+
+`packages/rule-engine/test/fields.test.ts` stated that the fixture harness's `getTicketTypeDef` "THROWS by
+design". **Task 8 on this same branch changed it to answer `null`.** The conclusion it supports still
+holds; its reason did not. A claim made false by one's own landing is inside scope — it is the defect
+class this branch has now caught six times, and it does not get an exemption for sitting in a test file.

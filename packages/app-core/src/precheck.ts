@@ -60,7 +60,7 @@ function notEvaluated(): PrecheckResult {
  * The caller defers, which is what it should do.
  *
  * The line the whole module is built to hold is between the last two: a
- * pre-check may never manufacture a `passed` out of ABSENCE. Three gates keep
+ * pre-check may never manufacture a `passed` out of ABSENCE. Four gates keep
  * it, and each names the absence it closes:
  *
  *  1. the moving ticket and its workflow definition must be cached at all;
@@ -72,7 +72,16 @@ function notEvaluated(): PrecheckResult {
  *     rules entirely;
  *  3. an ACCEPT into a terminal state must rest on a vouched-complete child set
  *     — the parent-terminal invariant reads an unseen child as no child, and
- *     that is the one way an accept can be conjured from nothing.
+ *     that is the one way an accept can be conjured from nothing;
+ *  4. a hierarchy claim — `ticket.created`, `ticket.reparented` — defers
+ *     ENTIRELY. Plan 3 landed both as engine cases (`evaluate.js`), and every
+ *     engine ACCEPT for either is decided behind the ticket's own type
+ *     definition (`checks/hierarchy.ts:84` for creation, `:215` for a
+ *     reparent), which is read BEFORE even the no-parent branch. This cache
+ *     holds no ticket-type definitions at all, so there is no accept for those
+ *     two types left to derive from what it holds. What survives is the
+ *     `hierarchy.parent-terminal` REFUSAL below, which reads only the cached,
+ *     server-served `stateCategory` and nothing else.
  *
  * One refusal is downgraded rather than shown: a roles-bearing `restrict-to`
  * resolves against memberships only the server holds, and refusing there would
@@ -132,6 +141,13 @@ export function completeForPrecheck(submitted: SubmittedEvent, now: () => Date =
  * verdict untrustworthy. `getChildrenStates` is the one method whose honest
  * answer ("the children I have seen") is not the one the caller wants ("all of
  * them"), which is why gate 3 exists above it.
+ *
+ * That division of labour has a PRECONDITION, and naming it here matters
+ * because the sentence above otherwise reads as blanket licence for `null`: a
+ * store to be absent FROM, and a matching gate in `precheckEvent` able to read
+ * the absence. `getTicketTypeDef` has neither — this cache has no ticket-type
+ * store, so there is nothing for a gate to interrogate — which is why that one
+ * method throws instead of participating in it.
  */
 export function contextFromCache(cache: ClientStateCache): EngineContext {
   return {
@@ -145,6 +161,46 @@ export function contextFromCache(cache: ClientStateCache): EngineContext {
     async getWorkflowDef(workflowId, version) {
       return cache.getWorkflowDef(workflowId, version) ?? null;
     },
+    // The required fourth method (ruling P3), and this cache cannot answer it.
+    // `null` is available and is the WRONG answer here. On the fixture harness,
+    // the memory context and the server, `null` means "this workspace has no
+    // such type" — a fact each of those stores actually speaks for. Here it
+    // would mean "I do not hold it", which this cache spells `undefined`
+    // everywhere else and which the gates above turn into `not-evaluated`.
+    // Answering `null` would let the engine convert that absence into
+    // `ticket.unknown-type` (`checks/hierarchy.ts:84-85`, `:215-216`,
+    // `checks/fields.ts:145-146`) — a REFUSAL manufactured out of absence, the
+    // exact mirror of the `passed` this module's whole invariant forbids, and
+    // one that fails this module's own definition of `refused`: "the facts it
+    // read were server-served state this client holds".
+    //
+    // A throw rather than `null`, and the server's counter-example does not
+    // transfer: `apps/server/src/engine-context.ts` answers `null` because it
+    // is LIVE and a throw would turn an ingest into a 500. No live path here
+    // can reach this. `precheckEvent` routes only `ticket.transitioned` to this
+    // context, and `getTicketTypeDef` is reached only from the hierarchy and
+    // field checks — `ticket.created`, `ticket.reparented`, `ticket.field_set`
+    // — none of which is on the transitioned path.
+    //
+    // THE ABSENCES, enumerated rather than called partial. None is this plan's:
+    //  1. `ClientStateCache` has no ticket-type store, and nothing feeds it
+    //     `ticket-type.defined` (owner: Plan 6a for the surface, Plan 6 Task 7
+    //     for the producer, over Plan 5's ticket-types read);
+    //  2. `precheckEvent` therefore has no gate that could downgrade a missing
+    //     definition to `not-evaluated` — there is no store to gate on;
+    //  3. `precheckParentTerminal` still answers the two hierarchy types
+    //     without the engine, so nothing yet REQUIRES this method to answer.
+    // Closing 1 and 2 is what unblocks routing 3 through the engine.
+    async getTicketTypeDef(typeId) {
+      void typeId;
+      throw new Error(
+        'contextFromCache: this client cache holds no ticket-type definitions, so it can neither ' +
+          'confirm nor deny one. Absent: (1) a ticket-type store on ClientStateCache and a ' +
+          'ticket-type.defined feed; (2) a precheckEvent gate mapping a missing definition to ' +
+          'not-evaluated; (3) precheckParentTerminal routing ticket.created / ticket.reparented ' +
+          'through the engine. Owners: Plan 6a (cache surface), Plan 6 Task 7 (producer).',
+      );
+    },
   };
 }
 
@@ -156,22 +212,47 @@ export function contextFromCache(cache: ClientStateCache): EngineContext {
  * workflow's initial state. A `ticket.reparented` carries it only when the
  * ticket being moved is itself non-terminal; a finished child under a finished
  * parent contradicts nothing, so the move stands.
+ *
+ * THIS FUNCTION NO LONGER ANSWERS `passed`, and that is gate 4 above. Plan 3
+ * Chain A landed `ticket.created` and `ticket.reparented` as engine cases, and
+ * every ACCEPT path through `checkTicketCreated` / `checkTicketReparented`
+ * consults the ticket's own type definition before any branch — so with this
+ * cache holding no ticket-type store, no accept for either type is derivable
+ * from facts this client holds. Answering `passed` from the hand-written check
+ * would claim more than the engine ever agreed to, which coordination §12
+ * claim 2 named IN ADVANCE as the moment such a `passed` violates this module's
+ * scope sentence. The three former `passed` exits are now `not-evaluated`.
+ *
+ * The `hierarchy.parent-terminal` refusal below STAYS. It reads only the
+ * cached, server-served `stateCategory` — state this client genuinely holds —
+ * so it satisfies the `refused` clause, and its failure direction is
+ * over-refusal on an advisory surface, which this module already tolerates and
+ * names elsewhere (the `restrict-to` downgrade). Routing this function through
+ * the engine is the eventual answer and is blocked on the cache growing a
+ * ticket-type store: owner Plan 6 Task 7.
  */
 function precheckParentTerminal(submitted: SubmittedEvent, cache: ClientStateCache): PrecheckResult {
   const parentId = claimedParentId(submitted);
   // The payload is not the shape the door admits, so nothing can be read off it
   // — including whether a parent is named at all.
   if (parentId === undefined) return notEvaluated();
-  if (parentId === null) return { kind: 'passed' };
+  // NOT `passed`, and the no-parent case is not the exception it looks like:
+  // `checks/hierarchy.ts:84` resolves the ticket's own type BEFORE the
+  // no-parent branch at `:90`, and `:108` then refuses
+  // `hierarchy.deepest-rank-parent-required` off `type.rank`. An unconditional
+  // `passed` here was false for every type at or below the deepest rank.
+  if (parentId === null) return notEvaluated();
 
   const parent = cache.getTicket(parentId);
   if (parent === undefined) return notEvaluated();
-  if (parent.stateCategory !== 'terminal') return { kind: 'passed' };
+  if (parent.stateCategory !== 'terminal') return notEvaluated();
 
   if (submitted.type === 'ticket.reparented') {
     const moving = cache.getTicket(submitted.entity.id);
     if (moving === undefined) return notEvaluated();
-    if (moving.stateCategory === 'terminal') return { kind: 'passed' };
+    // Not refusing is not the same as passing: the engine's accept for a
+    // reparent reads a definition this cache cannot serve.
+    if (moving.stateCategory === 'terminal') return notEvaluated();
   }
 
   return {
