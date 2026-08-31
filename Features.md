@@ -204,7 +204,16 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
   `(entity_kind, entity_id, seq)` always puts the contest before its resolution. A resolution reaching
   the handler with no contest row throws rather than silently doing nothing — the assertion of that
   premise, not defensiveness: a silent no-op would leave a resolved contest showing as open forever
-  with no instrument saying so. `apps/server/src/projections/contested.ts`
+  with no instrument saying so. The cost, named rather than left to be discovered: a rebuild replays the
+  whole ledger in one transaction, so one inconsistent pair means `proj_contested` cannot be rebuilt at
+  all until the ledger is superseded into consistency. `apps/server/src/projections/contested.ts`
+- ⚙️ **The verifier runs over `proj_contested` with a real row in it** — `original_event` is the repo's
+  first `jsonb` projection column, and the registry contract forbids `json` precisely because
+  `verify-projections`'s `EXCEPT` diff needs an equality operator. That jsonb has one is an argument
+  about the type; that a live `INSERT` and a shadow-schema rebuild agree through it byte for byte is an
+  observation, and the verifier's seed now makes it. Its non-emptiness is asserted separately, because a
+  clean verdict over an empty table is the check that cannot fail.
+  `apps/server/test/verify-projections.test.ts`
 - ⚙️ **`getContest` on the server engine context** — the engine's contest lookup, reading
   `proj_contested` through the ingest transaction's own client, which is what makes
   `contest.unknown` / `contest.wrong-ticket` / `contest.already-resolved` evaluable on this server at
