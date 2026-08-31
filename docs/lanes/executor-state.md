@@ -205,3 +205,73 @@ moment — including this file.
 `exec/06a-client-core` is **already checked out** at `~/my_projects/gisik-nokma-lanes/lane4-periphery`
 (at `30e3db4`). A `git checkout` of it from this worktree will refuse. Either work in that worktree,
 remove it first, or review from a detached checkout — decide before dispatching, not mid-flight.
+
+---
+
+## Model/effort policy — NOT recorded here, deliberately
+
+**The brief's `## MODEL & EFFORT` is the single source.** This file used to carry a full copy of the
+2026-08-31 cost ruling; it was **dropped once PR #40 landed (`615d5da`)**, which was its stated
+stopping condition. It existed only for the window in which the brief lost to a coordination doc that
+contradicted it — a window now closed at both ends: the brief's precedence clause is scoped (*the
+document wins EXCEPT on model and effort policy*), and the document's dead rows are struck and marked
+`DEAD` at their own headings.
+
+**Do not re-add a copy here.** Two sources of truth was the failure being fixed; a state file that
+also carries policy re-creates it. This file carries STATE. If policy and this file ever appear to
+disagree, the brief is right and this line is the bug.
+
+## HAZARD — CLOSED 2026-08-31, both halves
+
+Kept because the mechanism is worth more than the incident, and because it cost two rounds to find.
+
+**Closed by:** (1) the brief's precedence clause scoped to *"the document wins — EXCEPT on model and
+effort policy, where THIS BRIEF IS LATER AND WINS"*, reasoning inline so it is not tidied away as
+redundant; (2) **PR #40, `615d5da`, verified on `main`** — banner on the table, rows 615–616 struck
+with `~~top tier (Fable-class)~~ **DEAD**`, the 2026-08-28 amendment marked superseded-in-part with
+its controller-runs-Opus half intact, the narrowing struck at its heading (626) with a `This ruling is
+DEAD` blockquote directly beneath, and the floor-list line (965) corrected to an opus reviewer. One
+line still reads like a live instruction — *"a lens that returns a finding it cannot resolve escalates
+to fable"* (667) — and it is fine: it sits under the struck heading with the DEAD blockquote 40 lines
+above it, so a reader arriving in sequence has already met the marker.
+
+**Original finding, kept because the mechanism is the lesson:****Original finding, kept because the mechanism is the lesson:**
+
+The rewritten `dispatch-executor-serial.md` (2026-08-31 15:46) does carry the cost ruling — sonnet
+default, the machinery cuts, the 6-agent cap, the restart protocol. But its **READ FIRST** section
+still says the coordination doc's *"model/effort policy with the 2026-08-31 Fable narrowing"* binds,
+and then: *"Where this brief and that document disagree, **the document wins**."*
+
+The **narrowing** is the EARLIER ruling — the one that KEPT fable for refuters, the mocked-contract
+lens and floor-list reviewers. **PR #39 is still OPEN**, so `main`'s coordination doc does not carry
+the cost ruling. What it does carry (checked against `origin/main`, 16 fable mentions):
+
+| Line | What it says |
+|---|---|
+| 605–606 | table rows: mocked-contract lens and adversarial refuters at "top tier (Fable-class)" |
+| 609 | "…refuters, and floor-list task reviewers are dispatched with `model: fable` explicitly" |
+| 613 | the narrowing, framed as an owner ruling that "DOES amend the rule above" |
+| 948 | "Nine floor-list tasks remain ahead, each keeping an opus implementer and a `fable` reviewer" |
+
+So the chain a restarted executor follows is: brief says no fable → brief says the document wins →
+document says fable for three roles across nine named tasks → **fable is reinstated on the most
+expensive rows in the series, with the executor believing it is obeying the owner.**
+
+This is the two-sources-of-truth failure in a worse form than the one it replaced. A duplicated
+policy *drifts*; a policy that explicitly **defers** to a contradicting document **reverses**,
+deterministically, at the next restart.
+
+**Fixes: (1) and (2) are DONE.** The precedence clause is scoped in the brief, and PR #40 repairs the
+document at the reader's entry point rather than with another statement further down — banner on the
+table, the two rows struck and marked DEAD, the 2026-08-28 amendment marked superseded in part with
+its controller-runs-Opus half preserved, the earlier narrowing struck at its heading but kept for its
+reasoning and cost ledger, and the floor-list line corrected to an opus reviewer. **(3) #40 is an
+OWNER merge** — the topology amendment says the controller merges the executor's work and never its
+own — so it sits on a restart's critical path rather than being documentation hygiene. **The BINDING
+block above comes out when #40 is on `main`, and I will say so when I drop it.**
+
+## Step 1 CLOSED
+
+Plan 3 Chain A merged to `main` as **`6b2fc76`** (squash — `c6b4e59` is correctly NOT an ancestor).
+Verified with `git merge-base --is-ancestor`. PR #38 MERGED, CI was green, decomposition reconciled
+package-for-package with the controller's, fixtures 84/84, projections 2.
