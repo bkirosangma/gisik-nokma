@@ -120,5 +120,9 @@ export function useBoard(
   workspaceId: string,
   projectId: string,
 ): LiveQueryResult<BoardViewData> {
-  return useLiveQuery(source, workspaceId, () => source.query.getBoard(projectId));
+  // `projectId` is both the query key and the query's argument, because it is
+  // exactly what changes when the board is pointed somewhere else. Passing it
+  // as the key is what makes a project switch refetch at all — see the two
+  // effects in `useLiveQuery`.
+  return useLiveQuery(source, workspaceId, projectId, () => source.query.getBoard(projectId));
 }

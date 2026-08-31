@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no
@@ -240,7 +240,15 @@ describe('Board card — one clock, and it is not the viewer’s laptop', () => 
       view.unmount();
       return text;
     } finally {
-      process.env.TZ = original;
+      // `process.env.TZ = undefined` assigns the STRING "undefined", which ICU
+      // resolves to GMT — so the naive restore does not restore, it switches
+      // every app-core file scheduled after this one in the same worker to UTC.
+      // It corrupts ONLY when TZ was unset, which is the default here and in
+      // CI: present in exactly the runs nobody inspects, absent from the runs
+      // that would catch it. That is this helper's own defect wearing the
+      // costume the helper exists to strip off.
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
     }
   }
 
@@ -256,6 +264,19 @@ describe('Board card — one clock, and it is not the viewer’s laptop', () => 
   it('PLANTED DEFECT: no zone can move the rendered day off the recorded one', () => {
     expect(unfoldUnder('Pacific/Kiritimati')).not.toContain('20 Aug');
     expect(unfoldUnder('Pacific/Niue')).not.toContain('18 Aug');
+  });
+
+  it('PLANTED DEFECT: the zone swap hands the worker back exactly the TZ it borrowed', () => {
+    const before = process.env.TZ;
+    unfoldUnder('Pacific/Kiritimati');
+    // Under the gate's default configuration TZ is UNSET, so `before` is
+    // `undefined` and the naive `process.env.TZ = before` leaves the string
+    // "undefined" here — which ICU reads as GMT. This assertion is the one
+    // that fires; the `hasOwn` below is what distinguishes "restored to unset"
+    // from "assigned a four-letter zone name", since both print as absent in
+    // a casual log.
+    expect(process.env.TZ).toBe(before);
+    if (before === undefined) expect(Object.hasOwn(process.env, 'TZ')).toBe(false);
   });
 });
 
@@ -285,10 +306,42 @@ describe('`pending` is a client-side view flag, not a server status', () => {
  */
 const VIEWS_DIRECTORY = join(dirname(fileURLToPath(import.meta.url)), '../../src/views');
 
-const NETWORK_APIS = [/\bfetch\s*\(/, /\bXMLHttpRequest\b/, /\bnew\s+WebSocket\b/, /\bEventSource\b/];
+/**
+ * `fetch` UNQUALIFIED, not `fetch(` — an aliased reference
+ * (`const f = globalThis.fetch; f(url)`) is the same door with the handle
+ * moved, and `WebSocket` without its `new` for the same reason. The word
+ * boundary already spares `refetch`: there is no boundary between its `e` and
+ * its `f`, which the tests below hold.
+ */
+const NETWORK_APIS = [
+  /\bfetch\b/,
+  /\bXMLHttpRequest\b/,
+  /\bWebSocket\b/,
+  /\bEventSource\b/,
+  /\bsendBeacon\b/,
+];
 
-/** react, the shared packages, and relative paths inside app-core. Nothing else. */
-const ALLOWED_IMPORTS = /^(react|@gisik-nokma\/(ui|domain|rule-engine)|\.\.?\/)/;
+/**
+ * react, the shared packages, and relative paths inside app-core. Nothing else.
+ *
+ * The `(\/|$)` is the whole guard. Without it this is a PREFIX test, and
+ * `react-router-dom`, `reactive-http-transport`, `@gisik-nokma/uix-evil` and
+ * `@gisik-nokma/domain-hax` all read as allowed — a scan that names four
+ * packages and admits every package whose name begins with one of them.
+ */
+const ALLOWED_IMPORTS = /^(react(\/|$)|@gisik-nokma\/(ui|domain|rule-engine)(\/|$)|\.\.?\/)/;
+
+/**
+ * Four spellings reach a module and `from '…'` is one of them. Reading that
+ * one alone leaves `import './x.js'`, `await import('https://evil/x.js')` and
+ * `require('axios')` invisible to a guard whose whole job is to name them.
+ */
+const IMPORT_FORMS = [
+  /\bfrom\s*['"]([^'"]+)['"]/g,
+  /\bimport\s+['"]([^'"]+)['"]/g,
+  /\bimport\s*\(\s*['"]([^'"]+)['"]/g,
+  /\brequire\s*\(\s*['"]([^'"]+)['"]/g,
+];
 
 function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
@@ -300,13 +353,31 @@ function networkTells(source: string): string[] {
 }
 
 function importsOf(source: string): string[] {
-  return [...stripComments(source).matchAll(/from\s+['"]([^'"]+)['"]/g)].map((match) => match[1] ?? '');
+  const code = stripComments(source);
+  return IMPORT_FORMS.flatMap((pattern) => [...code.matchAll(pattern)].map((match) => match[1] ?? ''));
+}
+
+/**
+ * Recursive, because `src/views/<subdir>/` is a directory the flat walk scanned
+ * with nothing at all while `it('has views to scan at all')` stayed green
+ * beside it — a guard reporting success over files it never opened.
+ */
+function viewFiles(directory: string): string[] {
+  return readdirSync(directory, { recursive: true })
+    .map((entry) => String(entry))
+    .filter((name) => name.endsWith('.ts') || name.endsWith('.tsx'));
 }
 
 describe('the view-import scan is proven against planted defects before it is trusted', () => {
   it('catches a real network call', () => {
     expect(networkTells("const r = fetch('/v1/board');")).toHaveLength(1);
     expect(networkTells('const s = new WebSocket(url);')).toHaveLength(1);
+  });
+
+  it('PLANTED DEFECT: catches the same APIs reached without a call and without a `new`', () => {
+    expect(networkTells('const f = globalThis.fetch; f(url);')).toHaveLength(1);
+    expect(networkTells("navigator.sendBeacon('/v1/events', body);")).toHaveLength(1);
+    expect(networkTells('const S = globalThis.WebSocket; new S(url);')).toHaveLength(1);
   });
 
   it('is not fooled by the word in a comment, nor by "refetch"', () => {
@@ -319,10 +390,58 @@ describe('the view-import scan is proven against planted defects before it is tr
     expect(importsOf("import { A } from '../online/http.js';")).toEqual(['../online/http.js']);
     expect(importsOf("// consumed from '../online/http.js' by nobody here")).toEqual([]);
   });
+
+  it('PLANTED DEFECT: reads the three import spellings that carry no `from`', () => {
+    expect(importsOf("import './register-transport.js';")).toEqual(['./register-transport.js']);
+    expect(importsOf("await import('https://evil.example/x.js');")).toEqual([
+      'https://evil.example/x.js',
+    ]);
+    expect(importsOf("const a = require('axios');")).toEqual(['axios']);
+  });
+
+  it('PLANTED DEFECT: `import type` is an import, and a type-only door is still a door', () => {
+    expect(importsOf("import type { Something } from 'react-router-dom';")).toEqual([
+      'react-router-dom',
+    ]);
+  });
+
+  it('PLANTED DEFECT: an allowed package NAME is not an allowed package PREFIX', () => {
+    for (const specifier of [
+      'react',
+      'react/jsx-runtime',
+      '@gisik-nokma/ui',
+      '@gisik-nokma/domain',
+      '@gisik-nokma/rule-engine',
+      '../data-source.js',
+      './rollup-text.js',
+    ]) {
+      expect(ALLOWED_IMPORTS.test(specifier), `${specifier} must be allowed`).toBe(true);
+    }
+    for (const specifier of [
+      'react-router-dom',
+      'reactive-http-transport',
+      '@gisik-nokma/uix-evil',
+      '@gisik-nokma/domain-hax',
+      'axios',
+      'https://evil.example/x.js',
+    ]) {
+      expect(ALLOWED_IMPORTS.test(specifier), `${specifier} must be refused`).toBe(false);
+    }
+  });
+
+  it('PLANTED DEFECT: the file walk descends into subdirectories', () => {
+    // Uses the real tree rather than a written fixture: `src/` holds no `.tsx`
+    // of its own and `src/views/board.tsx` is reachable only by descending, so
+    // the flat walk below is this assertion's own positive control — it shows
+    // exactly what the recursion adds.
+    const parent = join(VIEWS_DIRECTORY, '..');
+    expect(viewFiles(parent)).toContain(`views${sep}board.tsx`);
+    expect(readdirSync(parent).filter((name) => name.endsWith('.tsx'))).toEqual([]);
+  });
 });
 
 describe('views never speak HTTP — the DataSource is the only seam (amendment 10)', () => {
-  const files = readdirSync(VIEWS_DIRECTORY).filter((name) => name.endsWith('.ts') || name.endsWith('.tsx'));
+  const files = viewFiles(VIEWS_DIRECTORY);
 
   it('has views to scan at all', () => {
     expect(files.length).toBeGreaterThan(0);
@@ -422,5 +541,111 @@ describe('useBoard — loads, then refetches on stream frames', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+/**
+ * F2, and the reason it needed a test rather than a mutation. `useBoard`
+ * shipped keyed on nothing: `reload` was `useCallback(…, [])` and the only
+ * effect's deps were `[source, workspaceId, debounceMs, reload]`, none of
+ * which move when `projectId` does. Pointing the Board at another project left
+ * the previous project's columns on screen AS the current project's,
+ * self-correcting only if an unrelated stream frame happened to arrive. No
+ * test varied `projectId`, so there was nothing to mutate — an UNCONSTRAINED
+ * PATH, and these three are the constraints.
+ */
+describe('useBoard — a project switch is a different question, and it gets asked', () => {
+  function Switcher({
+    source,
+    projectId,
+  }: {
+    source: ReturnType<typeof createFakeDataSource>;
+    projectId: string;
+  }) {
+    const { data } = useBoard(source, WS, projectId);
+    return <div>{data === null ? 'loading' : `board:${data.projectId}`}</div>;
+  }
+
+  it('PLANTED DEFECT: a changed projectId refetches, and the old project never renders as the new one', async () => {
+    vi.useFakeTimers();
+    try {
+      const asked: string[] = [];
+      const source = createFakeDataSource({
+        getBoard: async (projectId: string) => {
+          asked.push(projectId);
+          return { projectId, groups: [errandGroup()] };
+        },
+      });
+      const view = render(<Switcher source={source} projectId="prj_A" />);
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+      expect(asked).toEqual(['prj_A']);
+      expect(screen.getByText('board:prj_A')).toBeInTheDocument();
+
+      view.rerender(<Switcher source={source} projectId="prj_B" />);
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+      expect(asked).toEqual(['prj_A', 'prj_B']);
+      expect(screen.getByText('board:prj_B')).toBeInTheDocument();
+      expect(screen.queryByText('board:prj_A')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('PLANTED DEFECT: the switch does not re-open the stream — the subscription is keyed on the workspace', async () => {
+    vi.useFakeTimers();
+    try {
+      const source = createFakeDataSource({
+        getBoard: async (projectId: string) => ({ projectId, groups: [] }),
+      });
+      const view = render(<Switcher source={source} projectId="prj_A" />);
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+      view.rerender(<Switcher source={source} projectId="prj_B" />);
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+      // The cheap fix for the test above is to put `load` in the subscription
+      // effect's deps. It works, and it resubscribes on every project switch —
+      // and `subscribe` is called with cursor 0, so each re-open replays the
+      // whole workspace from the start. That hardcoded cursor is Plan 6 Task
+      // 8's to fix; this assertion is what stops this hook multiplying it.
+      expect(source.subscriptions).toEqual([{ workspaceId: WS, afterSeq: 0 }]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('PLANTED DEFECT: an answer arriving for the project we left is dropped, not rendered', async () => {
+    const resolvers = new Map<string, (board: BoardView) => void>();
+    const source = createFakeDataSource({
+      getBoard: (projectId: string) =>
+        new Promise<BoardView>((resolve) => {
+          resolvers.set(projectId, resolve);
+        }),
+    });
+    const view = render(<Switcher source={source} projectId="prj_A" />);
+    view.rerender(<Switcher source={source} projectId="prj_B" />);
+    expect([...resolvers.keys()]).toEqual(['prj_A', 'prj_B']);
+
+    await act(async () => {
+      resolvers.get('prj_B')?.({ projectId: 'prj_B', groups: [] });
+    });
+    expect(screen.getByText('board:prj_B')).toBeInTheDocument();
+
+    // prj_A's load was issued for a question nobody is showing any more.
+    // Rendering its answer would put project A's board under project B's
+    // heading — the same dishonesty the missing refetch caused, arriving by
+    // the other road. This guards the KEY only: two loads for the SAME key
+    // still resolve last-one-wins (F6, owner Plan 6 Task 7/8).
+    await act(async () => {
+      resolvers.get('prj_A')?.({ projectId: 'prj_A', groups: [] });
+    });
+    expect(screen.getByText('board:prj_B')).toBeInTheDocument();
+    expect(screen.queryByText('board:prj_A')).not.toBeInTheDocument();
   });
 });
