@@ -1,6 +1,6 @@
 /* @gisik-nokma/editor — document styles. BEM classes, STRUCTURAL ONLY: no
    colour of any kind lives here — no hex, no colour function, and no bare
-   keyword such as `red` either. Amendment 11's scanner
+   colour keyword either. Amendment 11's scanner
    (packages/ui/test/helpers/colour-scan.ts) already names packages/editor/src
    among its roots and catches the first two kinds; the third it does not yet
    match, which is why it is written down rather than left to the machine.

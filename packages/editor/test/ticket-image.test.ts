@@ -218,6 +218,28 @@ describe('image node', () => {
   });
 
   /**
+   * THE JSON DOOR IS LEFT OPEN ON PURPOSE (the node's docblock says why: a
+   * ProseMirror `validate` is available and forwarded, but it throws at load,
+   * so layer 3 rejects and layer 1 coerces). What must NOT survive that choice
+   * is the node emitting two spellings of one fact that DISAGREE — the exact
+   * thing the per-attribute `renderHTML` was introduced to kill. A stored
+   * `wrap: 'float-up'` renders one coerced answer in both places or neither.
+   */
+  it('renders a coerced wrap in both spellings when the stored one is junk', () => {
+    const editor = createTestEditor(undefined, {
+      type: 'doc',
+      content: [{ type: 'image', attrs: { attachmentId: IMG, wrap: 'float-up', alt: '' } }],
+    });
+    // The stored attribute is untouched — the JSON door really is open.
+    expect(imageNodes(editor.getJSON())[0]!.attrs.wrap).toBe('float-up');
+    const html = editor.getHTML();
+    expect(html).toContain('data-wrap="block"');
+    expect(html).toContain('editor-image--block');
+    expect(html).not.toContain('float-up');
+    editor.destroy();
+  });
+
+  /**
    * THE STYLESHEET IS A FOURTH SPELLING OF THE VOCABULARY and the only one
    * TypeScript cannot see. `renderHTML` builds the class from the attribute
    * (`editor-image--${wrap}`), so a mode added to `IMAGE_WRAP_MODES` without a

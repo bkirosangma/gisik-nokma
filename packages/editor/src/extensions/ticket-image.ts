@@ -74,12 +74,24 @@ declare module '@tiptap/core' {
  * spellings of one fact in the HTML, of which only one is validated on the
  * way back in. A test pins the single spelling.
  *
- * WHAT IS NOT ENFORCED HERE, DELIBERATELY. ProseMirror validates attribute
- * NAMES, not their values (the same reason `heading` cannot pin its levels —
- * see the note in schema/extensions.ts), so a doc JSON claiming
- * `{ type: 'image', attrs: { wrap: 'float-up' } }` round-trips with the
- * 'float-up' intact. Layer 1 is the editor's own doors; the server's ingest
- * gate is layer 3 and owns the stored-document question.
+ * WHAT IS NOT ENFORCED HERE, DELIBERATELY — AND NOT FOR WANT OF A MECHANISM.
+ * A doc JSON claiming `{ type: 'image', attrs: { wrap: 'float-up' } }`
+ * round-trips with the 'float-up' intact. That is a CHOICE, not a limitation
+ * of the library: an attribute spec may carry a `validate`, `checkAttrs` runs
+ * it (prosemirror-model@1.25.11 dist:2058-2066) on every `Node.fromJSON`
+ * (dist:1542), and Tiptap forwards an extension attribute's `validate` into
+ * the spec it builds (@tiptap/core@3.30.5 dist:1491). Built both ways to check
+ * it: the shipped `wrap` spec has keys ['default'] and accepts that JSON; the
+ * same node re-declared with a `validate` has ['default','validate'] and
+ * throws `RangeError: bad wrap: float-up` on the identical JSON.
+ *
+ * The reason to leave it off is what `validate` does when it fires — it THROWS
+ * AT LOAD. One stored document with a junk wrap would fail the whole editor
+ * hard rather than degrade to `block`, and choosing that is an owner's call,
+ * not a node's. So the division is: layer 3 (the server ingest gate) REJECTS
+ * a bad document at the door, and layer 1 COERCES whatever it is handed —
+ * every path this file owns, parse and render alike, ends at a member of the
+ * vocabulary even when the stored value is not one.
  */
 export const TicketImage = Node.create<TicketImageOptions>({
   name: 'image',
@@ -106,7 +118,12 @@ export const TicketImage = Node.create<TicketImageOptions>({
       wrap: {
         default: DEFAULT_IMAGE_WRAP,
         parseHTML: (element) => toImageWrapMode(element.getAttribute('data-wrap')),
-        renderHTML: (attributes) => ({ 'data-wrap': attributes.wrap }),
+        // Coerced on the way out, exactly as `renderHTML`'s class is. A stored
+        // wrap outside the vocabulary is reachable through the JSON door
+        // above, and rendering `data-wrap="float-up"` beside
+        // `editor-image--block` would be two spellings of one fact that
+        // disagree — the thing per-attribute `renderHTML` exists to prevent.
+        renderHTML: (attributes) => ({ 'data-wrap': toImageWrapMode(attributes.wrap) }),
       },
       alt: {
         default: '',

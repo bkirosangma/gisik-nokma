@@ -122,14 +122,23 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     TicketImage.configure(
       options.resolveAttachmentUrl ? { resolveAttachmentUrl: options.resolveAttachmentUrl } : {},
     ),
-    // HEADING LEVELS ARE NOT VALIDATED, AND CANNOT BE HERE. Heading resolves
-    // to `levels: [1,2,3,4,5,6]`, which governs which levels the toolbar and
-    // input rules OFFER — it is not a constraint on stored documents.
-    // ProseMirror validates attribute NAMES, not their values, so a doc
-    // claiming `{ type: 'heading', attrs: { level: 99 } }` round-trips with
-    // the 99 intact even under `errorOnInvalidContent: true`. If levels ever
-    // need enforcing, the door is the place (a server-side payload check),
-    // not the schema. A test pins the positive half: 1–6 survive a round
-    // trip, so a change that clamps or drops them fails.
+    // HEADING LEVELS ARE NOT VALIDATED HERE. Heading resolves to
+    // `levels: [1,2,3,4,5,6]`, which governs which levels the toolbar and
+    // input rules OFFER — it is not a constraint on stored documents, and it
+    // is not a `validate`. An earlier version of this comment said ProseMirror
+    // "validates attribute NAMES, not their values"; that is FALSE in the
+    // installed stack and was disproven by construction. An attribute spec may
+    // carry a `validate`, `checkAttrs` runs it (prosemirror-model@1.25.11
+    // dist:2058-2066) on every `Node.fromJSON` (dist:1542), and Tiptap
+    // forwards it from an extension attribute into the spec (@tiptap/core
+    // @3.30.5 dist:1491). Heading declares none, which is the actual reason a
+    // doc claiming `{ type: 'heading', attrs: { level: 99 } }` round-trips
+    // with the 99 intact even under `errorOnInvalidContent: true`.
+    // Adding one is not free: `validate` THROWS AT LOAD, so a single stored
+    // level-99 heading would fail the whole editor rather than degrade. The
+    // server door stays the cheaper place to enforce a range; the same trade,
+    // reasoned out for the image node's `wrap`, is in extensions/ticket-image.ts.
+    // A test pins the positive half: 1–6 survive a round trip, so a change
+    // that clamps or drops them fails.
   ];
 }

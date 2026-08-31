@@ -134,11 +134,14 @@ describe('document schema v1', () => {
    * entirely separate, and each is blind to the other's failure.
    *
    * What a document may STORE is not constrained by the `levels` option at all
-   * — ProseMirror validates attribute names, not their values, so `level: 99`
-   * round-trips intact even under `errorOnInvalidContent`, and so does level 6
-   * with Heading configured to `levels: [1,2,3]`. That mutant was run and it
-   * survived this round-trip case. Range enforcement, if it is ever wanted,
-   * belongs at the server door; it cannot be done here.
+   * — `levels` is not a `validate` and Heading declares no `validate`, so
+   * `level: 99` round-trips intact even under `errorOnInvalidContent`, and so
+   * does level 6 with Heading configured to `levels: [1,2,3]`. That mutant was
+   * run and it survived this round-trip case. (An attribute spec CAN validate
+   * its value — `checkAttrs` runs it on every `Node.fromJSON` — so "it cannot
+   * be done here" would be false; what is true is that it would THROW AT LOAD.
+   * The trade is reasoned out in src/extensions/ticket-image.ts.) Range
+   * enforcement, if it is ever wanted, is cheaper at the server door.
    *
    * What the toolbar and input rules OFFER is the `levels` option, and that is
    * where narrowing would actually show up. So the option is asserted directly
