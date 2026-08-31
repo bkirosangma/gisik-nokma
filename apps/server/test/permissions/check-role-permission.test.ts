@@ -7,6 +7,7 @@ import {
   type IngestResult,
   type SubmittedEvent,
 } from '@gisik-nokma/domain';
+import type { Pool } from 'pg';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
 import {
@@ -227,6 +228,58 @@ function ingestService(): IngestService {
     },
     projections: buildProjectionRegistry(),
   });
+}
+
+/**
+ * Hands out real clients, but refuses to hand out a SECOND one while the first
+ * is still checked out — with a named error rather than a hang.
+ *
+ * This exists to pin one line: `commitOne` passes the gate `client`, the ingest
+ * transaction's own connection, and not `deps.pool`. The pool version compiles,
+ * and every other test in this repository passes under it, because a healthy
+ * pool simply hands out a second connection and the read returns the same rows.
+ * What it costs is invisible until it is expensive:
+ *
+ * - **Correctness.** A membership change committing between the transaction's
+ *   own reads (`readEntityHead`, the engine's context) and a pool-side
+ *   membership read gives one `commitOne` a mixed view of the world, after the
+ *   workspace lock was taken precisely to stop that.
+ * - **Liveness, which is what this test can actually see.** A gate that needs a
+ *   second connection makes every ingest hold one connection while waiting for
+ *   another. At `max` concurrent ingests the pool is empty and every one of
+ *   them is waiting for a connection only another of them could release — a
+ *   deadlock that appears under load and never in a test suite.
+ *
+ * Stated plainly because the test below pins the second and not the first: a
+ * proxy cannot manufacture a concurrent commit, so the correctness half stays
+ * an argument in `check-permission.ts`'s docblock. The liveness half is enough
+ * to make the line falsifiable, which is what it did not have before.
+ */
+function poolAllowingOneClient(real: Pool): Pool {
+  let outstanding = 0;
+  return {
+    async connect() {
+      if (outstanding > 0) {
+        throw new Error(
+          'planted: something asked for a second connection while the ingest transaction held one',
+        );
+      }
+      outstanding += 1;
+      const client = await real.connect();
+      return new Proxy(client, {
+        get(target, property) {
+          if (property === 'release') {
+            return (...args: unknown[]) => {
+              outstanding -= 1;
+              return (target.release as (...a: unknown[]) => void).apply(target, args);
+            };
+          }
+          const value = Reflect.get(target, property, target) as unknown;
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    },
+  } as unknown as Pool;
 }
 
 function submitted(fields: {
@@ -600,6 +653,31 @@ describe('the gate at the client door — refusals before the rule engine', () =
       rule: PERMISSION_ROLE_RULE,
       reason: PROJECT_ROSTER_REASON,
     });
+  });
+
+  it('planted defect: the gate reads the ingest transaction, never a second connection', async () => {
+    // Set up through the ordinary service; only the gated submission runs
+    // against the one-connection pool, so the setup cannot itself trip it.
+    const setup = ingestService();
+    const { workspaceId, owner } = await foundedWorkspace(setup);
+    const member = await grantMember(setup, workspaceId, owner, 'member');
+
+    const constrained = createIngestService({
+      pool: poolAllowingOneClient(db.pool),
+      evaluate: evaluateEvent,
+      projections: buildProjectionRegistry(),
+    });
+    const event = submitted({
+      workspaceId,
+      entity: { kind: 'ticket', id: newUlid() },
+      type: 'ticket.assigned',
+      payload: { assigneeId: member },
+      actorId: member,
+    });
+
+    // Mutation: `{ db: deps.pool, ... }` at the gate call site in `commitOne`.
+    // This then rejects with the planted error above instead of committing.
+    expectCommitted(await constrained.ingestClientBatch([event], member));
   });
 
   it('the INTERNAL door is not gated — the same refused event commits through it', async () => {

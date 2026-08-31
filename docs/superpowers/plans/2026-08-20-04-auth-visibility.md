@@ -1765,6 +1765,42 @@ git commit -m "proj_memberships turns membership history into effective roles: o
 - Consumes: `Refusal` shape from `@gisik-nokma/domain` (contract-fixed: `{refused: true; rule: string; reason: string}`); `EffectiveRole`, `resolveEffectiveRole`, `hasProjectAdminRights` (Task 4); Plan 1's ingest pipeline and `evaluateEvent(env, ctx)`; `WorkflowDef` and `validateWorkflowDef` (Plan 2), `builtinTicketTypeDefs(defaultWorkflowId)` (Plan 3).
 - Produces: `PermissionContext { sessionUserId: string; eff: EffectiveRole }`; `checkRolePermission(env: EventEnvelope, ctx: PermissionContext): Refusal | null` (pure); `checkPermission(db: Queryable, env: EventEnvelope, sessionUserId: string): Promise<Refusal | null>` — the single gate the ingest pipeline calls (Task 9 extends it with visibility checks). Rule names used: `'permission.role'`, `'permission.visibility'` (Task 9). Step 6 additionally produces `SIMPLE_KANBAN_TEMPLATE: Omit<WorkflowDef, 'id' | 'version'>` and `simpleKanbanWorkflowDef(workflowId: string): WorkflowDef` in `@gisik-nokma/domain`, and `bootstrapWorkspace(founding: EventEnvelope, append: (env: EventEnvelope) => Promise<void>): Promise<EventEnvelope[]>` in `apps/server`.
 
+> ### ⚠️ AS-BUILT CORRECTIONS — Task 5 landed 2026-08-31. The code samples below are STALE; do not copy them.
+>
+> Ruling P17 requires a breaking signature change to be swept in the plan text and not only in code.
+> `SubmissionGate` was widened, so every sample in this task and in **Task 9** that calls the gate is
+> wrong. What shipped:
+>
+> | Plan text (below) | As built |
+> |---|---|
+> | `checkPermission(db, env, sessionUserId)` — three positional args | **`checkPermission(env, ctx)`** where `ctx: SubmissionContext = { db: Queryable; sessionUserId: string }` |
+> | `SubmissionGate = (env) => Refusal \| null` | **`(env, ctx: SubmissionContext) => Promise<Refusal \| null>`** — async |
+> | `import type { Refusal } from '@gisik-nokma/domain'` | **`from '@gisik-nokma/rule-engine'`** (coordination §10: the import origin comes from the shipped code) |
+> | Modify `apps/server/src/ingest/pipeline.ts` | **No such file.** `apps/server/src/ingest/ingest-service.ts`, and the insert is not linear — the gate is threaded through `commitOne` as a `ClientDoor \| null`, and `ingestClientBatch(rawEvents, sessionUserId)` gained the session |
+> | `packages/domain/src/workflows/simple-kanban.ts` | **`packages/domain/src/simple-kanban.ts`** (flat; there is no `workflows/` directory) |
+> | `projMemberships` | **`membershipsProjection`** |
+> | `bootstrapWorkspace(founding: EventEnvelope, append: (env) => Promise<void>)` | **`bootstrapWorkspace(founding: FoundingEvent, append: (events: SubmittedEvent[]) => Promise<IngestResult[]>)`**, plus a pure `foundingSequence(founding)`; it lives at `apps/server/src/workspaces/bootstrap-workspace.ts` and is fired from `ingestAll`, not from a route |
+> | `ingestEvent(e, { db: pool, sessionUserId })` in the Step 6 tests | **No such export.** `ingest.ingestClientBatch([e], sessionUserId)` / `ingest.ingestBatch([e])`, returning `IngestResult[]` |
+>
+> `checkRolePermission(env, ctx)` — the PURE half — is **unchanged**, so Plan 5's samples that call it
+> (`2026-08-20-05-api-realtime-search.md:791-844`) are still correct. Task 9's are not: see the block at
+> Task 9.
+>
+> **Also corrected, because the plan text's reason is not the shipped system's reason:** Step 6 says the
+> workflow → types order is load-bearing because "a `ticket-type.defined` naming a workflow that has not
+> been defined yet is refused". **No such refusal exists.** `checkTicketTypeDefined`
+> (`packages/rule-engine/src/checks/ticket-type.ts`) takes `_ctx` unread and checks entity kind, payload
+> shape and the built-in rank lock only. The order is kept and is still load-bearing — for ledger
+> honesty, which `bootstrap-workspace.ts` states — but do not repeat the refusal as though it fires.
+> *Owner of the missing check, if the series wants one: Plan 3 Chain B.*
+>
+> **The Step 6 test "a workspace can hold a ticket the moment it exists" was NOT written**, because
+> `proj_tickets` does not exist on main — Plan 3 Chain B has not landed. What was written instead pins
+> the ledger: the seven-event order by `workspace_seq`, the four type ids each naming the workflow
+> defined one event earlier, the founding workflow equal to `SIMPLE_KANBAN_TEMPLATE`, and the founder's
+> `owner` row in `proj_memberships`. *Owner of the missing end-to-end assertion: whoever runs the
+> step-10 integration checkpoint after Plan 3 Chain B lands.*
+
 **Planted-defect discipline for this task and Task 9:** Plan 2's fixture format (`{name, workflowDef, priorEvents, candidateEvent, expected}` in `packages/rule-engine/fixtures/`) is for *rule-engine* rules — refusals a workflow declares. Permission refusals are PRE-engine and never involve a workflowDef, so they do NOT go into that fixture directory. Their planted defects are ordinary Vitest tests in `apps/server` that construct the defective scenario (the wrong actor, the insufficient role) and assert the exact Refusal object. Same discipline, different harness — do not hunt for a fixtures folder.
 
 - [ ] **Step 1: Write the failing planted-defect tests**
@@ -3586,6 +3622,26 @@ git commit -m "Direct reads enforce visibility as indistinguishable 404s; a rest
 **Interfaces:**
 - Consumes: `canSee`, `getResolvedVisibility` (Task 7); `hasProjectAdminRights` (Task 4); `proj_tickets.created_by` (Plan 3 — the head state carries creator provenance; adapt the column name if Plan 3 spelled it differently); `VisibilitySetPayload` (Task 3).
 - Produces: `checkVisibilityPermission(db: Queryable, env: EventEnvelope, ctx: PermissionContext): Promise<Refusal | null>`; `checkPermission` (same signature as Task 5) now runs role checks then visibility checks — still the single gate the ingest pipeline calls, unchanged at the call site.
+
+> ### ⚠️ STALE CALL SIGNATURE — read before transcribing anything below (Ruling P17)
+>
+> Task 5 shipped on 2026-08-31 and **widened `checkPermission`**. Every `checkPermission(pool, env, 'usr_m')`
+> in this task's Step 1 test block is wrong and will not compile. As built:
+>
+> ```ts
+> checkPermission(env, { db: pool, sessionUserId: 'usr_m' })   // one env, one context object
+> ```
+>
+> The line above claiming `checkPermission` has "the same signature as Task 5" is still true — it is the
+> Task 5 signature that moved. `checkVisibilityPermission` should take the same shape rather than the
+> `(db, env, ctx)` triple below, so the two halves of one gate read alike.
+>
+> Two more things Task 9 inherits from Task 5 as built:
+> - `checkRolePermission(env, ctx: PermissionContext)` is unchanged and still pure. Visibility runs
+>   AFTER it, inside `checkPermission`, between the role refusal and the final `null`.
+> - The plan text's `'usr_m'` / `'tkt_1'` / `'wks_01'` fixture ids are **not ULIDs** and the envelope
+>   schema refuses them. They are fine for the pure `checkRolePermission` unit tests, which never touch
+>   `parseEvent`; anything that goes through a door needs `newUlid()`.
 
 **The checks (exact):**
 1. Only ticket-entity events are examined; everything else passed the role gate already.

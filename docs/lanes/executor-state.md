@@ -45,32 +45,39 @@ measured a tree strictly *behind* main and is **a control for nothing**. Do not 
 main-derived total: they are different trees, and a total that rises without decomposing is exactly what
 the coordination doc warns against.
 
-## Gate composition — recounted at the sha being reported, `c0e3fe0` (T4 landed)
+## Gate composition — recounted at the sha being reported (T5 landed)
 
 **Status: GREEN.** `pnpm turbo run build test typecheck --force`, redirected to a file, **never piped**
 — a piped gate reports the pipe's exit code, and this repo has already seen `| tail` return 0 over a
 failed turbo run. The general rule is broader: **ANY command after the gate in the same chain becomes
 the status you are shown**, a bare `echo` included. The summary line is the only honest signal.
 
-| Measure | `main @ 91df593` (baseline) | `c0e3fe0` (T4) |
-|---|---|---|
-| **Node** | **v22.22.2** | **v22.22.2** |
-| Gate exit code | **0** | **0** |
-| Turbo tasks | **21 of 21**, 0 cached | **21 of 21**, 0 cached |
-| **Tests** | **936** | **960** |
-| domain | 274 | 274 |
-| rule-engine | 278 | 278 |
-| **server** | 143 | **167** |
-| app-core | 130 | 130 |
-| editor | 72 | 72 |
-| sync-client | 8 | 8 |
-| ui | 31 | 31 |
+| Measure | `main @ 91df593` (baseline) | `c0e3fe0` (T4) | T5 (this branch's tip) |
+|---|---|---|---|
+| **Node** | **v22.22.2** | **v22.22.2** | **v22.22.2** |
+| Gate exit code | **0** | **0** | **0** |
+| Turbo tasks | **21 of 21**, 0 cached | **21 of 21**, 0 cached | **21 of 21**, 0 cached |
+| **Tests** | **936** | **960** | **991** |
+| domain | 274 | 274 | **276** |
+| rule-engine | 278 | 278 | 278 |
+| **server** | 143 | **167** | **196** |
+| app-core | 130 | 130 | 130 |
+| editor | 72 | 72 | 72 |
+| sync-client | 8 | 8 | 8 |
+| ui | 31 | 31 | 31 |
 
-**The delta decomposes, which is the only thing that makes it checkable:** +24, entirely in `server`
-(143 → 167) = **12** (`proj-memberships.test.ts`) + **11** (`effective-role.test.ts`) + **1** (the new
-DB-free `tables` pin added to `projection-order.test.ts`). Every other package is unchanged, as it must
-be — T4 touches only `apps/server`. A total that only rises tells you nothing; one that decomposes into
-named, expected parts is checkable by the next reader.
+**T4's delta decomposed** as +24, entirely in `server` (143 → 167) = **12** (`proj-memberships.test.ts`)
++ **11** (`effective-role.test.ts`) + **1** (the DB-free `tables` pin in `projection-order.test.ts`).
+
+**T5's delta decomposes as +31 over T4**, in two packages and no others:
+- `domain` +2 — `test/simple-kanban.test.ts`, the canonical default workflow (validates clean at
+  version 1; deep-cloned).
+- `server` +29 — **+28** `test/permissions/check-role-permission.test.ts` (new: 11 pure
+  `checkRolePermission` cases, 5 founding-sequence cases, 12 client-door/gate cases) and **+1**
+  `test/events-route.test.ts` (12 → 13: the new `401 unauthenticated` pin on `/v1/events`).
+- Everything else is COUNT-STABLE and content-changed: `ingest.test.ts` stays 19,
+  `check-permission.test.ts` stays 7, `sign-in-flows.test.ts` stays 20. Those files were edited, not
+  extended — see "what changed meaning" below.
 
 **Both figures measured under Node v22.22.2**, stated because each worktree carries its own
 `node_modules` and a native binding matches whichever Node last rebuilt it — two sessions can certify
@@ -94,8 +101,8 @@ Different trees; the 488 in particular is a control for nothing.
 
 **PHASE 0 COMPLETE.** Step 1 (`6b2fc76`, #38) · step 2 (`c93c910`, #43) · step 3 (`a3746fb`, #47).
 
-**STEP 4 IN PROGRESS on `exec/04-t4-t5-permissions`. T4 IS DONE AND COMMITTED (`c0e3fe0`), GATE GREEN.
-T5 IS NEXT AND NOTHING IS IN FLIGHT.** One PR opens after T5, not after T4.
+**STEP 4: T4 AND T5 ARE BOTH DONE AND COMMITTED on `exec/04-t4-t5-permissions`, GATE GREEN at 991.
+NOTHING IS IN FLIGHT. THE NEXT ACTION IS TO OPEN THE ONE PR** (one PR for the step, not one per task).
 
 ### T4 — done. What it landed, and the plan-text defect it had to refuse
 
@@ -121,6 +128,26 @@ covers the roster row a legitimate rebuild leaves standing, which a table-level 
 **`index.ts`'s "every new registrant appends" comment is corrected to "inserts at its §8 position."**
 Appending is right today only because the three projections sorting before `proj_memberships` do not
 exist yet. **Plan 3 Chain B — step 8 — adds them and MUST INSERT.**
+
+### Carried out of T5 with named owners — recorded, deliberately not fixed
+
+1. **The plan text's stated reason for the founding order is a refusal that does not exist.** Step 6
+   says a `ticket-type.defined` naming an undefined workflow is refused. `checkTicketTypeDefined`
+   (`packages/rule-engine/src/checks/ticket-type.ts`) takes `_ctx` unread and checks entity kind,
+   payload shape and the built-in rank lock — nothing else. The order is kept and is still load-bearing
+   (ledger honesty, stated in `bootstrap-workspace.ts`), but the justification was corrected rather
+   than repeated. *Owner of the missing check, if the series wants one: **Plan 3 Chain B**.*
+2. **Step 6's "a workspace can hold a ticket the moment it exists" test was not written**, because
+   `proj_tickets` does not exist on main. What was written pins the ledger instead. *Owner: the
+   **step-10 integration checkpoint**, after Plan 3 Chain B lands.*
+3. **RULING P18 is untouched and still open** — `getEntityState('membership')` still returns `null`.
+   T5 read roles through `resolveEffectiveRole` and never through the engine, exactly as scoped.
+   *Owner unchanged: whoever dispatches Plan 4 Task 6 or the step-10 checkpoint.*
+4. **The correctness half of the transactional-read argument is still an argument.** The new pin
+   catches a gate that needs a second CONNECTION; it cannot manufacture a concurrent commit, so
+   "a revoke committing mid-transaction is invisible to a pool-side read" remains prose in
+   `check-permission.ts`. *Owner: whoever builds the first real concurrency harness — Plan 10's sync
+   is the natural place.*
 
 ### Carried out of T4 with named owners — recorded, deliberately not fixed
 
@@ -153,7 +180,42 @@ exist yet. **Plan 3 Chain B — step 8 — adds them and MUST INSERT.**
    (repo convention), not the plan text's `projMemberships`. **T5's plan-text code imports the old name
    and must apply this rename**, alongside the three the adaptation map found.
 
-### T5 — floor-list. Opus implementer AND opus reviewer
+### T5 — DONE. What landed, what changed meaning, and what was recorded rather than fixed
+
+**Landed:** `checkRolePermission` (pure) + a widened async `checkPermission(env, ctx)`;
+`SubmissionGate` widened and threaded through `commitOne` as a single `ClientDoor | null`;
+`ingestClientBatch(rawEvents, sessionUserId)`; `requireSession` on `POST /v1/events`;
+`packages/domain/src/simple-kanban.ts`; `apps/server/src/workspaces/bootstrap-workspace.ts` fired from
+`ingestAll` on accept.
+
+**Eleven mutations run against the committed tree; ten died naming their own site on the first pass.**
+The survivor was the one that mattered: `{ db: client }` → `{ db: deps.pool }` at the gate call site
+compiled and passed the entire suite. A one-connection proxy pool now pins it (a gate needing a second
+connection deadlocks a saturated pool), and the mutation dies. **The comment was the only guard, and a
+comment is not a guard.**
+
+**Three things changed MEANING and are recorded so a reader does not read them as they were:**
+1. `check-permission.test.ts`'s five client-door cases used a forgery with a random `actorId`. The new
+   identity check runs BEFORE the envelope-origin one, so they were refusing for identity, not
+   provenance. Every forgery is now attributed to the signed-in caller: the only thing wrong with it is
+   the envelope-origin, so the refusal it draws is the one the file is named after.
+2. Seven of Plan 1's `ingest.test.ts` cases used `workspace.created` as neutral filler. It is not
+   neutral any more — a committed one appends six more events — so they use `workflow.defined`, and the
+   "two entities in one workspace" case got STRONGER (it now pins `seq` as well as `workspace_seq`,
+   which the old workspace-entity pair could not show at all).
+3. `sign-in-flows.test.ts:148`'s `toEqual` is unchanged and now says what its exactness is for.
+
+**The three CSRF items — converted to intent, not to new behaviour.** `sameSite` is SET in
+`createAuth` (`advanced.defaultCookieAttributes`) rather than inherited from better-auth's hard-coded
+`"lax"`; mutation to `'strict'` reddens `sign-in-flows.test.ts`. The `toEqual` sentence names what a
+relaxation to `toContain` would lose (a `Domain` attribute is invisible to `toContain`). **HTTP-Origin
+on product routes: the answer is still NO, and it is now a decision** recorded in `routes/events.ts` —
+`SameSite=Lax` already refuses the cross-site browser POST at 401, and the residual §7 names (a
+non-browser replaying a stolen cookie) sets any header it likes. *Residual recorded with owner: Plan 4
+T13 or Plan 11 hardening.* If the controller wanted the check built rather than decided, that is the
+one call to reverse — and it CHANGES what the door accepts, which the brief forbade.
+
+### T5 — the floor-list it was dispatched with (kept for the record)
 
 **The adaptation map's corrections, which are the difference between T5 working and T5 inventing files:**
 

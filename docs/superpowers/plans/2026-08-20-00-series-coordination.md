@@ -2481,6 +2481,14 @@ comes off the verify response, so no test needs a database read to attribute an 
 
 ### 8. The envelope-origin gate has landed — which doors it closes, and the one sentence Plan 10 must obey (origin micro-PR)
 
+> **SUPERSEDED IN PART, 2026-08-31 (Plan 4 Task 5 landed).** The gate's POSITION and the two refusal
+> strings below are unchanged and still binding. Its SIGNATURE is not: `checkPermission` is now
+> `(env, ctx: { db, sessionUserId }) => Promise<Refusal | null>`, `SubmissionGate` is async, and
+> `ingestClientBatch` takes the session as a second argument. The "server-origin refusal and nothing
+> else" sentence below is now false — the gate also checks actor identity, workspace membership and
+> role. What did NOT change: envelope-origin `'server'` is refused at the client door and admitted at
+> the internal one, which is what Plan 10's sync route must obey.
+
 The closer named in "A forgeable `origin`…" is **in**. `apps/server/src/permissions/check-permission.ts`
 holds `checkPermission(env): Refusal | null` — the server-origin refusal and nothing else — wired inside
 `commitOne` between the entity↔workspace guard and `deps.evaluate`, exactly the position the 2026-08-31
