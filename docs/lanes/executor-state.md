@@ -19,9 +19,9 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/04-t4-t5-permissions`**, cut from `origin/main` at `91df593`. **T4 is committed at `c0e3fe0`** (2 commits ahead: handoff + T4). No PR yet — step 4 opens one PR after T5 | `git log`, `git rev-parse` |
-| `main` | **`91df593`** (PR #48, docs-only). Moved from `452baa6` mid-session — refetch before trusting any main sha in this file | `git log origin/main --oneline -4` |
-| `exec/04-auth-visibility` | **REDUNDANT — safe to delete.** Its 4 commits landed on main as `31df85b`, `24fba16`, `8c4216a`, `51aba55` | `git cherry -v` → 4 × `-` |
+| Branch in flight | **`exec/04-t6-t7-visibility`**, cut from `origin/main` at `45c83eb`. **T6 committed at `0c6b8d3`** (3 commits). T7 next; one PR after T7 | `git log`, `git rev-parse` |
+| `main` | **`45c83eb`** (PR #51, step 4). Verified by presence, not by report: `proj-memberships.ts`, `effective-role.ts`, `bootstrap-workspace.ts`, `simple-kanban.ts`, `test-cases/06-auth-visibility.md` and Features.md §6 are all on it | `git cat-file -e`, `git show` |
+| `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
 | Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, and every pre-squash sha of the Phase 0 branches | `git branch --contains`, empty = orphaned |
 
@@ -92,67 +92,53 @@ above were measured at `e07a043` itself regardless, so no inference is being rel
 
 ## Where I am in the serial sequence
 
-**PHASE 0 COMPLETE.** Steps 1-3 merged (`6b2fc76` #38 · `c93c910` #43 · `a3746fb` #47).
+**PHASE 0 COMPLETE.** **STEP 4 COMPLETE AND MERGED** — PR #51, `main @ 45c83eb`, 995 tests.
 
-**STEP 4 IS COMPLETE AND AWAITING MERGE. T4 AND T5 ARE BOTH DONE, REVIEWED, FIXED AND GREEN.**
-Branch `exec/04-t4-t5-permissions`, **10 commits** ahead of `main`, pushed, PR opened for the
-controller. **STEP 5 (Plan 4 T6, T7) IS NEXT AND NOTHING IS IN FLIGHT.**
+**STEP 5 IS IN PROGRESS on `exec/04-t6-t7-visibility`. T6 IS DONE (`0c6b8d3`), REVIEWED WITH ZERO
+FINDINGS, GATE GREEN AT 1016. T7 (`canSee`) IS NEXT AND NOTHING IS IN FLIGHT.** T7 is **floor-list** —
+opus implementer AND opus reviewer. One PR after T7.
 
-### What step 4 landed
+### T6 — what it landed, and the vacuous test it had to replace
 
-**T4 — `proj_memberships`, `resolveEffectiveRole`, order pins.** Reviewed, **zero findings**.
-**T5 — the pre-engine permission gate, the founding sequence, the three CSRF items.** Floor-list
-review returned **7 findings (2 Important, 3 Minor, 2 Nit)**; the fix round closed both Importants
-plus one Minor and was verified not to have over-reached (three files, `check-permission.ts`
-**comment-only** — the code rows were printed and there are none).
+`proj_visibility` + migration + `reResolveSubtree`, registered at its §8 position with **both** pins
+extended (`projection-order.test.ts`, still DB-free, now pinning names *and* `[name, tables]`; plus the
+undocumented one in `entity-heads.test.ts`). 21 new tests, all in server.
 
-**T5's first commit contained a live privilege escalation.** Nothing refuses a *second*
-`workspace.created`; the founding bypass admitted one and the bootstrap then appended
-`membership.granted {role:'owner'}` for the sender — **a stranger resolving as owner of a workspace
-they were never in.** Closed by two guards, one per door: `ctx.workspaceExists` (a **required** field,
-so a call site that forgets it is a type error) asking whether the **workspace** has a ledger rather
-than whether the event's entity has a head row, and the bootstrap firing on
-`committed.workspaceSeq === 1`. **The guard has the same shape as the bug** — the obvious fix asks
-about the entity and is defeated by a founding filed under a *fresh entity id* against the victim's
-workspace.
+**The plan text's determinism test could not have failed.** It replayed the same ARRIVAL order it had
+applied, so it asserted only that `apply` is a deterministic function — never that the table is a pure
+function of the ledger's rows. Underneath it was a real defect: every event this projection reads is
+filed against a **ticket**, so canonical order is ticket-id order and a parent is routinely created when
+its children are already in the table. The plan's `ticket.created` resolved only the new ticket
+(*"a fresh ticket has no children"*) — true of arrival, false of replay. **Every handler now restores a
+table-wide invariant rather than applying a delta.** Ruling recorded in the coordination doc.
 
-### The four things step 4 leaves for later, each with an owner
+**Carried into T7 and beyond:** the reparent payload field is **`newParentId`**, not `parentId` — the
+plan text *and its own fixture* were self-consistently wrong, so nothing goes red until a real Plan 3
+event flows through, at which point reparent resolution silently stops working rather than erroring.
 
-1. **P18** — `getEntityState('membership')` still answers `null`; no Plan 4 task owns the wiring.
-   **Fails CLOSED** (functionality gap, not a forgery window) and is **reachable, not dormant**
-   (`restrict-to.ts:25` is a live call site). *Owner: Plan 4 T6 or the step-10 checkpoint.*
-2. **P19** — **a guest is admitted TODAY** for `ticket.created`, `visibility.set`,
-   `workspace.renamed`, `comment.added`. Two are `permission.role` questions Task 9 owes that belong
-   **inside `checkRolePermission`**; a visibility pass running after it cannot supply them.
-   *Owner: Plan 4 T9.* Catalogued as **6.51**.
-3. **A second `workspace.created` still commits** (founding nothing). *Owner: T13.* Case **6.52**.
-4. **A half-founded workspace has no repair path through either door** — closed by T5's own escalation
-   guards. *Owner: T13.* Case **6.53**.
+### T7 — `canSee`, floor-list. Plan text at line 2823
 
-### Catalogue — §6 exists now, and the numbering was NOT invented
+- **T7 is the task that joins `proj_memberships`.** T6 legitimately never touched it. **The ruling
+  stands and applies to T7 in full: read membership through `resolveEffectiveRole(db, userId,
+  workspaceId)`, NEVER a direct project-scope `SELECT`** — such a row survives `membership.revoked` by
+  design, because each key must have exactly one totally-ordered writer. Documented in three places and
+  **enforced by nothing**. If T7 joins directly, that is a ruling, not a style note.
+- **Registration/contract shapes the plan text gets wrong** (from T6's adaptation map, verified): there
+  is no `registerProjection()` function — it is `registry.register(...)` inside
+  `buildProjectionRegistry()`; migrations are raw **`.sql`**, not `.cjs`; and `Projection` requires
+  `tables`, with `apply(event: LedgerEvent, tx: PoolClient)` — **`Queryable` is deliberately NOT the
+  type for `Projection.apply`**, though it IS correct for `canSee`/`resolveEffectiveRole`.
+- **Catalogue, same change set.** Plan 4 reserves **6.1–6.42** with content per id. T6 filled **6.9,
+  6.10** and minted **6.55–6.58**. **Claim from the table** — check which reserved id names T7's surface
+  before minting; only continue past the highest minted id for what no plan document anticipated.
+- **Open question T6 raised and did not settle:** whether Task 12's catalogue intends `canSee`'s tests
+  to ride under a reserved id or to need a new one. Resolve from the plan text, not by invention.
 
-`Features.md` §6 and `test-cases/06-auth-visibility.md` were created in this change set, because the
-same-change-set rule is stated in **all eleven numbered plans** — so Plan 4's T12-14 catalogue steps
-cannot be read as exempting earlier tasks without voiding the rule everywhere.
+### The four carried gaps — owners unchanged, do NOT fold into step 5
 
-**Plan 4's own catalogue tasks reserve 6.1-6.42 verbatim.** Ids **6.5-6.8** were already assigned to
-exactly what T4/T5 built and are **filled, not duplicated**. 6.1-6.4 (identity surface, Tasks 1-3) and
-6.9-6.42 (visibility, Tasks 6-11) are **absent, not missing**. New cases continue from **6.43**.
-**Check this reservation before writing any future bucket** — Plan 3 reserves 5.4-5.36 the same way.
-
-**Every ✅ was written from the covering test's own name**, never from the implementation.
-
-### Step 5 — Plan 4 T6 (`proj_visibility`) then T7 (`canSee`), T7 is floor-list
-
-- **T6 registers `proj_visibility` AFTER `proj_memberships`** per §8. `index.ts`'s comment now says
-  **"inserts at its §8 position"** (T4 corrected the old "appends", which is a trap for Plan 3 Chain B).
-- **T6/T7 must read membership through `resolveEffectiveRole`, never `proj_memberships` directly** — a
-  bare project-scope `SELECT` returns rows for someone no longer in the workspace. This is T4's
-  implementer's own least-sure claim: the discipline is documented in three places and **nothing makes
-  it fail if ignored**. If T6 joins the table directly, that is the ruling to raise.
-- **A second, undocumented registration pin lives in `entity-heads.test.ts`** — the plan's Files list
-  does not name it, so a registrant comes back red on a file the plan never mentions. It sits in a
-  **DB-backed** file, so it goes quiet exactly when Postgres is down. *Owner: Plan 3 Chain B.*
+**P18** membership wiring (T6-or-step-10 → now: step-10 checkpoint, since T6 has passed) ·
+**P19** guest admissions, case 6.51 (T9) · second `workspace.created` still commits, 6.52 (T13) ·
+half-founded workspace with no repair path, 6.53 (T13).
 
 ## What step 2 actually contained
 

@@ -4538,3 +4538,48 @@ why the handoff protocol's phrase is "tracked **and pushed**" rather than "commi
 after a later amend costs nothing; an unpushed escalation fix costs the whole task. And **verify with
 `git branch -r --contains`** — the remote-tracking form — because the same trap applies here as
 everywhere: a sha that resolves locally says nothing about what the remote holds.
+
+---
+
+## A determinism test that replays the order it applied is vacuous (2026-08-31, Plan 4 Task 6)
+
+**Task 4 found that a projection handler may only write keys its own entity totally orders. Task 6 found
+the test that was supposed to catch such a violation, and it could not have.**
+
+The plan text's determinism test for `proj_visibility` applied a set of events, then "replayed" them and
+compared. **It replayed the same ARRIVAL order it had just applied.** Two runs of the same function over
+the same input in the same order agree trivially — so the test asserted only that `apply` is a
+deterministic *function*, which is true of almost any code, and never that the table is a pure function
+of the ledger's *rows*. It is a check whose passing outcome is unreachable for the failure it names.
+
+**And there was a live defect underneath it.** Every event `proj_visibility` reads is filed against a
+**ticket**, so `readLedger`'s canonical `(entity_kind, entity_id, seq)` order is ticket-id order — under
+ULIDs a parent is routinely created when its own children are already in the table. The plan's
+`ticket.created` handler resolved only the new ticket, reasoning *"a fresh ticket has no children, so no
+recursion"*. **True of arrival order, false of replay.** With ULIDs sorting child < grandparent <
+parent, a rebuild left the grandchild at `project`/`''` while live said `workspace`/G.
+
+### The shape of a determinism test that can actually fail
+
+**It must assert that the canonical order DIFFERS from the arrival order before it compares anything.**
+Otherwise the two orders may coincide — by fixture luck, or by ULIDs that happen to sort the way they
+were created — and the test passes without ever having exercised reordering. The harness that replaced
+it does exactly that: it asserts the orders differ, does a real ledger insert, and calls
+`rebuildProjection` rather than re-running `apply` over its own arrival sequence.
+
+**Generalisation, and it is the reason this is recorded separately from Task 4's rule:** *when a test's
+job is to detect a disagreement between two orderings, the test must first prove the two orderings are
+not the same ordering.* A comparison between a thing and itself is the most convincing green there is.
+
+**The corrective design is also worth keeping:** every handler now restores one **table-wide invariant**
+rather than applying a delta. A delta is correct only relative to a state the arrival order produced; an
+invariant is correct at any point in any order — which is what the projection contract actually demands.
+
+**Two further plan-text corrections from the same task**, both of the class §10 already rules on
+(*take the shape from the shipped code, not from the plan text*): the reparent handler read
+`payload.parentId` where the shipped schema names it **`newParentId`** — and **the plan's own fixture
+was self-consistently wrong the same way**, so nothing would have gone red until a real Plan 3 event
+flowed through, at which point reparent resolution silently stops working rather than erroring. And
+`visibility.set` is keyed on `event.entity.id`, not `payload.ticketId`: until Task 9 refuses a
+disagreement between them, keying on the payload is a **cross-entity write** and reopens exactly the
+determinism hazard above.
