@@ -1612,18 +1612,57 @@ sync code against these exact strings.
 matching on `better-auth.session_token` finds nothing in production. Both are pinned by test so a
 better-auth upgrade that renames either turns the suite red.
 
-**The CSRF rule every later plan has to live with.** better-auth refuses any non-GET request that
-**carries a `Cookie` header** unless it also carries a trusted `Origin` (or `Referer`):
+**The CSRF rule every later plan has to live with. It has TWO halves, and an earlier version of this
+entry recorded only the first — corrected here, because Plan 6 and Plan 10 read the mechanism sentence,
+not just the practical advice.**
+
+*Half one, the cookie gate.* `originCheckMiddleware` runs on every non-GET and calls `validateOrigin`,
+which returns early unless `headers.has("cookie")` (`api/middlewares/origin-check.mjs`). So a request
+**carrying a `Cookie`** needs a trusted `Origin` or `Referer`:
 403 `{"message":"Missing or null Origin","code":"MISSING_OR_NULL_ORIGIN"}` for none,
-403 `{"message":"Invalid origin","code":"INVALID_ORIGIN"}` for an untrusted one. The gate is
-`headers.has("cookie")` in `validateOrigin` (`api/middlewares/origin-check.mjs`), so a **bearer-only**
-request — no cookie — is exempt. Browsers always send `Origin`, so nothing about the product changes;
-`server.inject` sends neither unless told to. **Consequence for Tasks 5/8/12/13, Plan 6 and Plan 10:**
-authenticate route tests with the bearer token `signInWithPhone` returns (one header, no origin needed),
-or send `origin: <baseUrl>` alongside the cookie. `trustedOrigins` is left at better-auth's default — the
-origin of `baseUrl` — so **when T14's `WEB_ORIGIN` lands and the web app is served from a different
-origin than this server, that origin must be added to `trustedOrigins` or every browser cookie POST
-403s.** That wiring is not done here.
+403 `{"message":"Invalid origin","code":"INVALID_ORIGIN"}` for an untrusted one. A **bearer-only**
+request is exempt.
+
+*Half two, and it is the one a browser meets FIRST — before it has any cookie to send.*
+`formCsrfMiddleware` is mounted **per-endpoint** (`api/routes/sign-in.mjs:245` `/sign-in/email`,
+`sign-up.mjs:26` `/sign-up/email`, `plugins/magic-link/index.mjs:60` `/sign-in/magic-link`,
+`plugins/email-otp/routes.mjs:77`). Of those four, **three are registered in this configuration** — the
+email-otp plugin is not enabled — and it calls `validateOrigin(ctx, forceValidate = true)` when a
+**cookieless** request carries `Origin`, `Referer` or any `Sec-Fetch-*` header. Measured:
+`POST /sign-in/magic-link` with no cookie and `origin: https://evil.example` → **403 INVALID_ORIGIN**;
+with `sec-fetch-site: cross-site, sec-fetch-mode: navigate` → **403 CROSS_SITE_NAVIGATION_LOGIN_BLOCKED**;
+with the trusted origin → 200. `POST /phone-number/send-otp` and `POST /sign-out` carry no such
+middleware and pass the same forged `Origin`. So "bearer-only is exempt" is true of half one and **false
+as a general statement** — the exemption belongs to the endpoint as much as to the request.
+
+**Consequence for Tasks 5/8/12/13, Plan 6 and Plan 10:** authenticate route tests with the bearer token
+`signInWithPhone` returns (one header, no origin needed) — that helper's own path, `send-otp` +
+`phone-number/verify`, carries no `formCsrfMiddleware`, which is why it works with no `Origin` at all.
+A **web** client signing in by magic link must send a trusted `Origin`, which a browser does for it.
+`trustedOrigins` is left at better-auth's default — the origin of `baseUrl` — so **when T14's
+`WEB_ORIGIN` lands and the web app is served from a different origin, that origin must be added to
+`trustedOrigins`.** That wiring is not done here.
+
+**…and adding it will NOT be sufficient on its own.** The catch-all mounts `GET` and `POST` only, because
+those are the only methods better-auth's routed endpoints use. A cross-origin browser preflights every
+`application/json` POST with `OPTIONS`, and that request never reaches better-auth — measured,
+`OPTIONS /api/auth/get-session` with preflight headers answers **404 from Fastify**
+(`{"message":"Route OPTIONS:/api/auth/get-session not found","error":"Not Found","statusCode":404}`);
+`HEAD` likewise. Whoever wires CORS must answer the preflight as well as extend `trustedOrigins`. The gap
+is pinned by a test named `known gap: OPTIONS and HEAD are not mounted`, which goes red the moment CORS
+is mounted — so the fix and the pin land in one commit.
+
+**Product routes are outside better-auth's CSRF entirely, and this is a security posture nobody had
+written down.** `validateOrigin` returns immediately when there is no `ctx.request`, and
+`makeRequireSession` calls `auth.api.getSession({ headers })` — a direct API call with no request object.
+So the origin rule binds `/api/auth/*` and nothing else. Measured: `POST /v1/events` with a valid session
+cookie and no `Origin` is answered by the ingest door (200, or 400 for a bad body) — never 403. **Once
+Task 5 or 12 puts `requireSession` on `/v1/events`, a cookie-authenticated cross-site POST is defended by
+`SameSite=Lax` alone.** That is defensible — Lax does stop a cross-site POST from carrying the cookie at
+all, so the request arrives unauthenticated and meets the 401 — but it is one mechanism rather than two,
+it is a browser behaviour rather than a server check, and it does nothing for a non-browser client
+replaying a stolen cookie. Whoever adds the guard should decide deliberately whether to require an
+`Origin` on product routes too; today the answer is no, by omission rather than by decision.
 
 **`createAuth` now sets `advanced.disableOriginCheck: false`, and this is load-bearing.** better-auth's
 default for it is `isTest() ? true : false` (`context/create-context.mjs`), and `isTest()` is
@@ -1645,8 +1684,12 @@ normalising vendor error bodies at the mount would break better-auth's own clien
 
 **The mount, and the one thing that must not be copied from the plan text.** `registerAuthRoutes(app,
 auth)` registers an **encapsulated** Fastify scope with `removeAllContentTypeParsers()` + a raw `'*'`
-buffer parser, then one `['GET','POST']` catch-all at `/api/auth/*` (all 46 endpoints enumerated: every
-one is GET or POST). The plan's `JSON.stringify(request.body)` sketch does not work — with Fastify's own
+buffer parser, then one `['GET','POST']` catch-all at `/api/auth/*`. The verbs are enumerated, not
+guessed: `auth.api` carries **46 entries, 44 of which have an HTTP `path`** (`setPassword` and
+`consumePhoneNumberOTP` are server-only helpers), and the distinct methods across those 44 are exactly
+`GET` and `POST`. It also **throws at assembly** if `auth.options.baseURL` is unset rather than falling
+back to the request `Host` header — that fallback was in the first version and reintroduced exactly the
+input the line exists to exclude. The plan's `JSON.stringify(request.body)` sketch does not work — with Fastify's own
 JSON parser, `request.body` is an object, every POST reaches better-auth with no body, and 12 of the 17
 checks in `sign-in-flows.test.ts` fail. Encapsulation is what keeps that parser off `/v1/events`: hoisted
 to the root instance, the events door stops enforcing `additionalProperties: false`. Both directions are
@@ -1659,6 +1702,23 @@ proven by mutation. A later task adding routes under a new prefix inherits nothi
 builder to produce; the cost is nil because **`createAuth` opens no connection** — measured at ~2ms
 against a pool whose port nothing listens on, which is how `test/app.test.ts` stays database-free.
 All five shipped call sites are updated — four in tests, one in `src/index.ts`.
+
+**`.env.example` documented a boot-failing value and no gate could see it.** Line 35 read
+`BETTER_AUTH_SECRET=change-me` — nine characters against the new 32 floor — so an operator following the
+file's own "copy to .env and adjust" met `ConfigError` with nothing saying length was the reason.
+`pnpm check:env` passed throughout, because it proves every variable code READS is **documented**, which
+is presence, not validity. Fixed, and the class closed: `config.test.ts` now parses `.env.example` and
+feeds its documented values to `loadConfig`, so a documented value that cannot boot is a red test. The
+file's header also claimed only "Core (Plan 1)" is live, which this task made false; it now names the
+live set explicitly.
+
+**`LogOtpSender` in production has TWO faults, not one.** Beyond writing every one-time code to the
+process log, it accumulates every code ever issued in an **unbounded in-process array**
+(`otp-sender.ts`'s `sent`, which exists only so a test can read the issued code) — unbounded memory plus
+a heap-dump disclosure surface. `otp-sender.ts`'s own comment claimed no production implementation kept
+such a transcript; Task 2's assembly made that false, and the comment is corrected rather than left
+standing. Both faults are in the implementation, not the interface, so the real sender removes them
+together. Plan 11 owns the replacement.
 
 **`AppConfig` gains `betterAuthUrl` and `betterAuthSecret`**, from required `BETTER_AUTH_URL` and
 `BETTER_AUTH_SECRET` with **no defaults**. The plan's Step 9 reached for

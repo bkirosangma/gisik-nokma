@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { ConfigError, loadConfig } from '../src/config.js';
 
@@ -95,4 +97,50 @@ describe('loadConfig', () => {
       'invalid server configuration — check: LOG_LEVEL',
     );
   });
+
+  /**
+   * `.env.example` tells an operator to copy it and adjust. This proves that
+   * doing exactly that produces a server that starts.
+   *
+   * The gap it closes is specific and was real: `pnpm check:env` verifies every
+   * variable code READS is documented, which is a presence check — it has no
+   * opinion about the values. So `BETTER_AUTH_SECRET=change-me` sat in the file
+   * as a documented, gate-approved, boot-failing value, nine characters against
+   * a 32-character floor, and the operator following the instruction met
+   * `ConfigError` with nothing saying length was the reason. Presence and
+   * validity are different properties and now each has its own check.
+   */
+  it('the values documented in .env.example actually satisfy the schema', () => {
+    const path = fileURLToPath(new URL('../../../.env.example', import.meta.url));
+    const documented = parseEnvExample(readFileSync(path, 'utf8'));
+
+    // Guard against the check going quiet: if the parser stops finding the live
+    // variables, this test would pass on an empty object and prove nothing.
+    for (const key of ['DATABASE_URL', 'PORT', 'HOST', 'LOG_LEVEL', 'BETTER_AUTH_URL', 'BETTER_AUTH_SECRET']) {
+      expect(documented, `.env.example should document ${key}`).toHaveProperty(key);
+    }
+
+    expect(() => loadConfig(documented)).not.toThrow();
+    expect(loadConfig(documented).betterAuthSecret.length).toBeGreaterThanOrEqual(32);
+  });
 });
+
+/**
+ * A deliberately small `.env.example` reader: `KEY=value`, `#` comments, and a
+ * trailing `# …` note stripped off a value. It is not a dotenv implementation —
+ * no quoting, no escapes, no multi-line values — because `.env.example` uses
+ * none of those, and a parser that handled more would be untested surface.
+ */
+function parseEnvExample(text: string): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).split('#')[0]?.trim() ?? '';
+    if (value !== '') env[key] = value;
+  }
+  return env;
+}

@@ -5,10 +5,12 @@ import type { Auth } from './auth.js';
  * The vendor surface, mounted whole.
  *
  * better-auth is a Web-standard `(Request) => Promise<Response>` handler that
- * owns 46 endpoints under one prefix, so it is mounted as a catch-all rather
+ * owns every endpoint under one prefix, so it is mounted as a catch-all rather
  * than route by route. `['GET', 'POST']` is not a guess: `auth.api` was
- * enumerated over all 46 endpoints and every one of them is GET or POST — no
- * PUT, PATCH or DELETE anywhere. Some are GET where a reader would expect POST
+ * enumerated — 46 entries, 44 of which carry an HTTP `path` (`setPassword` and
+ * `consumePhoneNumberOTP` are server-only helpers), and the distinct methods
+ * across those 44 are exactly `GET` and `POST`. No PUT, PATCH or DELETE
+ * anywhere. Some are GET where a reader would expect POST
  * (`/passkey/generate-register-options`, `/magic-link/verify`), and one carries
  * a path parameter (`/reset-password/:token`), which is exactly why the mount is
  * a wildcard and not a table of paths that would need editing on every upgrade.
@@ -19,6 +21,22 @@ import type { Auth } from './auth.js';
  * the ability to point at the library's docs.
  */
 export function registerAuthRoutes(app: FastifyInstance, auth: Auth): void {
+  // Read once, at assembly, and refuse rather than improvise.
+  //
+  // The earlier shape here was `auth.options.baseURL ?? \`http://${request.headers.host}\``,
+  // and the fallback was the defect: it reintroduced the attacker-controlled
+  // Host header in exactly the situation the line exists to exclude, so the
+  // comment below promised something the code did not do unconditionally.
+  // Throwing costs a misconfigured deployment its boot instead of its integrity,
+  // and it happens here rather than inside the handler so the failure is one
+  // startup error and not a 500 on every sign-in.
+  const baseUrl = auth.options.baseURL;
+  if (baseUrl === undefined || baseUrl === '') {
+    throw new Error(
+      'registerAuthRoutes: the auth instance has no baseURL. This mount will not fall back to the request Host header — pass baseUrl to createAuth.',
+    );
+  }
+
   // Encapsulated so the body parser below cannot reach the product routes.
   // Verified, not assumed: with this scope in place `POST /v1/events` still
   // arrives parsed and still answers 400 FST_ERR_VALIDATION for an unknown key,
@@ -48,21 +66,18 @@ export function registerAuthRoutes(app: FastifyInstance, auth: Auth): void {
       method: ['GET', 'POST'],
       url: '/api/auth/*',
       handler: async (request, reply) => {
-        // The origin comes from the auth instance's own configured baseURL
-        // rather than the request's Host header, which is attacker-controlled.
+        // The origin is the configured baseURL, unconditionally — the request's
+        // Host header never reaches this URL, in any configuration.
         //
         // Stated exactly, because the tempting sentence here is a false one:
         // this is NOT closing an observed hole. Measured both ways with a forged
         // `Host: evil.example` — the magic link and the OAuth `redirect_uri` come
         // back identical, because better-auth resolves every absolute URL of its
-        // own from `options.baseURL` and never from the request. So nothing today
-        // depends on this line and NO TEST COVERS IT; it is here so that an
-        // endpoint which one day does read the request URL cannot inherit the
-        // Host header by default. The fallback exists because `baseURL` is
-        // optional in better-auth's option type, though `createAuth` always sets
-        // it.
-        const origin = auth.options.baseURL ?? `http://${request.headers.host ?? 'localhost'}`;
-        const url = new URL(request.url, origin);
+        // own from `options.baseURL` and never from the request. So no test can
+        // cover the CHOICE; what is covered is the guard above, which is what
+        // makes the choice unconditional. The point of both is that an endpoint
+        // which one day does read the request URL cannot inherit Host by default.
+        const url = new URL(request.url, baseUrl);
 
         const headers = new Headers();
         for (const [key, value] of Object.entries(request.headers)) {

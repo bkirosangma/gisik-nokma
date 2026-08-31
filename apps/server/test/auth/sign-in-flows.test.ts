@@ -1,10 +1,11 @@
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
-import type { FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app.js';
-import { createAuth } from '../../src/auth/auth.js';
+import { createAuth, type Auth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
+import { registerAuthRoutes } from '../../src/auth/routes.js';
 import { createIngestService } from '../../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -447,6 +448,73 @@ describe('cross-site protection on cookie sessions', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.body).toBe('{"success":true}');
+
+    // The only request in this suite that emits more than one Set-Cookie, and
+    // therefore the only one that can tell a correct implementation from a wrong
+    // one. Everywhere else n = 1, where forwarding `getSetCookie()` and
+    // flattening with `headers.get('set-cookie')` are indistinguishable — and the
+    // flattened form is a comma-joined string a browser parses as ONE cookie, so
+    // sign-out would clear `session_token` and leave `session_data` and
+    // `dont_remember` alive. Proven by mutation: with `.get()` in place and this
+    // assertion absent, the whole suite stays green.
+    const cleared = setCookies(res.headers);
+    expect(cleared).toHaveLength(3);
+    expect(cleared.map((entry) => entry.split('=')[0])).toEqual([
+      'better-auth.session_token',
+      'better-auth.session_data',
+      'better-auth.dont_remember',
+    ]);
+    for (const entry of cleared) expect(entry).toContain('Max-Age=0');
+  });
+
+  /**
+   * The half of the rule that is NOT "cookie or nothing", and the half a browser
+   * meets FIRST — before it has any cookie to send.
+   *
+   * `formCsrfMiddleware` is mounted per-endpoint (`api/routes/sign-in.mjs:245`,
+   * `sign-up.mjs:26`, `plugins/magic-link/index.mjs:60`,
+   * `plugins/email-otp/routes.mjs:77`; of those, `/sign-in/email`,
+   * `/sign-up/email` and `/sign-in/magic-link` are registered here — the
+   * email-otp plugin is not enabled). It calls `validateOrigin` with
+   * `forceValidate`, so a COOKIELESS request carrying `Origin`, `Referer` or any
+   * `Sec-Fetch-*` header is origin-checked anyway — while `send-otp` and
+   * `sign-out`, which carry no such middleware, are not.
+   */
+  it('origin-checks a cookieless magic-link request, and does not for send-otp', async () => {
+    const evil = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-in/magic-link',
+      headers: { origin: 'https://evil.example' },
+      payload: { email: 'csrf-a@example.test' },
+    });
+    expect(evil.statusCode).toBe(403);
+    expect(evil.body).toBe('{"message":"Invalid origin","code":"INVALID_ORIGIN"}');
+
+    const crossSite = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-in/magic-link',
+      headers: { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate' },
+      payload: { email: 'csrf-b@example.test' },
+    });
+    expect(crossSite.statusCode).toBe(403);
+    expect(crossSite.json().code).toBe('CROSS_SITE_NAVIGATION_LOGIN_BLOCKED');
+
+    const trusted = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-in/magic-link',
+      headers: { origin: BASE_URL },
+      payload: { email: 'csrf-c@example.test' },
+    });
+    expect(trusted.statusCode).toBe(200);
+
+    // No formCsrfMiddleware here: the same forged Origin passes.
+    const otpFromEvil = await app.inject({
+      method: 'POST',
+      url: '/api/auth/phone-number/send-otp',
+      headers: { origin: 'https://evil.example' },
+      payload: { phoneNumber: '+919000000013' },
+    });
+    expect(otpFromEvil.statusCode).toBe(200);
   });
 
   /**
@@ -517,6 +585,52 @@ describe('the catch-all mount', () => {
   it('forwards the vendor 404 for an unknown auth sub-path', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/auth/no-such-endpoint' });
     expect(res.statusCode).toBe(404);
+  });
+
+  /**
+   * A KNOWN GAP, pinned so it is visible rather than discovered.
+   *
+   * The catch-all mounts GET and POST because those are the only methods any of
+   * better-auth's 44 routed endpoints uses. A cross-origin browser, however,
+   * preflights every `application/json` POST with OPTIONS — and that request
+   * never reaches better-auth: Fastify answers 404 first, in Fastify's own
+   * words. So adding the web origin to `trustedOrigins` when Task 14's
+   * `WEB_ORIGIN` lands will NOT be enough on its own; the preflight has to be
+   * answered too. This test turns red the moment somebody mounts CORS, so the
+   * fix and this pin land together.
+   */
+  it('known gap: OPTIONS and HEAD are not mounted, so a CORS preflight 404s before better-auth', async () => {
+    const preflight = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/auth/get-session',
+      headers: {
+        origin: 'http://localhost:3001',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type',
+      },
+    });
+    expect(preflight.statusCode).toBe(404);
+    expect(preflight.json()).toEqual({
+      message: 'Route OPTIONS:/api/auth/get-session not found',
+      error: 'Not Found',
+      statusCode: 404,
+    });
+
+    const head = await app.inject({ method: 'HEAD', url: '/api/auth/get-session' });
+    expect(head.statusCode).toBe(404);
+  });
+
+  /**
+   * The mount refuses to improvise an origin. `createAuth` always sets `baseURL`,
+   * which is exactly why the guard needs a check of its own: without one,
+   * deleting it would be invisible until some future caller built an auth
+   * instance the other way and silently inherited the request's Host header.
+   */
+  it('refuses at assembly to mount an auth instance with no baseURL', () => {
+    const withoutBaseUrl = { options: {} } as unknown as Auth;
+    expect(() => registerAuthRoutes(Fastify(), withoutBaseUrl)).toThrowError(
+      'registerAuthRoutes: the auth instance has no baseURL. This mount will not fall back to the request Host header — pass baseUrl to createAuth.',
+    );
   });
 
   /**
