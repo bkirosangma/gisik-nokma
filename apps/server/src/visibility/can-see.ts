@@ -58,6 +58,28 @@ export interface ResolvedVisibility {
  * not implicitly appended. Locking yourself out is a legal (attributed) claim,
  * and the client warns before it is made.
  *
+ * ## Both unions are exhaustive, and the unenumerated direction is DENY
+ *
+ * The role and the mode are each walked by a BARE `switch` — no `default`, no
+ * `assertNever` helper. The `boolean` return annotation is what does the work:
+ * a member of either union that no `case` names falls out of the switch, the
+ * function ends without returning, and tsc refuses it with TS2366 ("Function
+ * lacks ending return statement"). So a role or a mode nobody has enumerated
+ * fails to COMPILE rather than picking up whatever the last branch happened to
+ * grant.
+ *
+ * This was NOT true of the role side until it was measured. The role used to be
+ * an if-chain — `null`, then `'owner'`, then `'guest'`, then everything else
+ * fell through into the member branch. Adding `| 'viewer'` to `WorkspaceRole`
+ * compiled clean and silently GRANTED the new role every `'workspace'`-mode
+ * ticket, while adding a fourth `resolvedMode` was already caught. Same
+ * function, two unions, opposite defaults. Adding `| 'viewer'` now raises
+ * TS2366 here and in `listVisibleTickets`.
+ *
+ * Do not add a `default:` to either switch to quiet a linter. A `default` is
+ * exactly the thing that restores the silent fall-through this shape exists to
+ * prevent — it converts a compile error into a runtime guess.
+ *
  * ## Determinism
  *
  * Nothing here reads a clock, a locale or a random source, and no caller may
@@ -69,20 +91,24 @@ export function canSeeResolved(eff: EffectiveRole, userId: string, v: ResolvedVi
   if (eff.workspaceRole === null) {
     return false;
   }
-  if (eff.workspaceRole === 'owner') {
-    return true;
-  }
-  if (eff.workspaceRole === 'guest') {
-    return v.resolvedMode === 'explicit' && v.resolvedUserIds.includes(userId);
-  }
-  switch (v.resolvedMode) {
-    case 'workspace':
+  // Both unions are walked by a BARE switch with no `default` — see the
+  // docblock's exhaustiveness note. Do not add one.
+  switch (eff.workspaceRole) {
+    case 'owner':
       return true;
-    case 'project':
-      // No admin bypass — deliberate, see the docblock.
-      return eff.projects.has(v.projectId);
-    case 'explicit':
-      return v.resolvedUserIds.includes(userId);
+    case 'guest':
+      return v.resolvedMode === 'explicit' && v.resolvedUserIds.includes(userId);
+    case 'admin':
+    case 'member':
+      switch (v.resolvedMode) {
+        case 'workspace':
+          return true;
+        case 'project':
+          // No admin bypass — deliberate, see the docblock.
+          return eff.projects.has(v.projectId);
+        case 'explicit':
+          return v.resolvedUserIds.includes(userId);
+      }
   }
 }
 
@@ -137,26 +163,44 @@ export async function getResolvedVisibility(
  * it is enforced by that one line — so every reader here goes through the
  * function rather than the table.
  *
- * ## Two guards stand on this path, and only one of them is observable here
+ * ## Two guards stand on this path, and what they cover is mode-dependent
  *
- * Measured, not reasoned about. `canSeeResolved` refuses a null workspace role
- * BEFORE the project set is ever consulted, so for this surface the revoked
- * member is stopped twice over: once by that short-circuit, once by
- * `resolveEffectiveRole` returning them no projects. Deleting the short-circuit
- * reddens the revoked-member case (`test/visibility/can-see.test.ts`) at its own
- * site. **Deleting `resolveEffectiveRole`'s early return instead leaves all 16
- * of this task's tests green** — and leaves the whole server suite green but for
- * one case, Task 4's own `test/permissions/effective-role.test.ts` "a revoked
- * member resolves to nothing, though the roster row survives in the table".
+ * Measured at ASSERTION level, not at test-file level — the coarser
+ * measurement is what made an earlier version of this note claim the two guards
+ * were "independent rather than redundant", which is false on the mode the
+ * ruling is actually about. `canSeeResolved` refuses a null workspace role
+ * BEFORE the project set is ever consulted; `resolveEffectiveRole` separately
+ * hands a revoked member no projects. Deleting one at a time:
  *
- * That is a fact worth writing down rather than a gap to close. No test
- * reachable from `canSee` can pin that line, because no input to it can make
- * the project set matter while the workspace role is null. A test here claiming
- * to prove the ruling would be passing for a reason unrelated to the property it
- * named. The ruling's line is covered where it lives; what is covered HERE is
- * the second guard, and the two are independent rather than redundant — the
- * early return is what protects readers with no null check of their own, such
- * as `hasProjectAdminRights`.
+ * - **Delete only the null short-circuit** → `can-see.test.ts:232`
+ *   (`workspaceMode`) fails, but **`:231` (`projectMode` — the revoked member
+ *   of the ruling) still PASSES**, because the emptied project set answers it.
+ * - **Delete only `resolveEffectiveRole`'s early return** → **nothing in this
+ *   file fails**, and the whole server suite stays green but for Task 4's own
+ *   `test/permissions/effective-role.test.ts` case "a revoked member resolves
+ *   to nothing, though the roster row survives in the table".
+ * - **Delete BOTH** → `:231` fails.
+ *
+ * So on the PROJECT-mode path the two are REDUNDANT: each alone blocks it, and
+ * only removing both produces the leak. On the WORKSPACE-mode path they are
+ * not — no project is consulted there, so the null short-circuit is the only
+ * thing standing, which is why `:232` reddens on its own. Both guards are
+ * present and the code is correct; what is recorded here is which one is doing
+ * the work on which path.
+ *
+ * The early return is still worth keeping, and for a reason that is not
+ * "independence" on this path: it protects readers that have **no null check of
+ * their own**. `hasProjectAdminRights` is the live example — it consults
+ * `eff.projects.get(projectId)?.projectAdmin` without ever asking whether the
+ * workspace role is null, so a revoked member whose surviving project row
+ * carries `project_admin = true` would answer TRUE there if the project set
+ * were not emptied upstream.
+ *
+ * No test reachable from `canSee` can pin that early return, because no input
+ * to it can make the project set matter while the workspace role is null. A
+ * test here claiming to prove the ruling would be passing for a reason
+ * unrelated to the property it named. The ruling's line is covered where it
+ * lives.
  *
  * ## The workspace is the TICKET's, not the caller's
  *
