@@ -38,6 +38,15 @@ import type { Projection } from './registry.js';
  * over. It is deliberately not a silent `return`: a silent return would leave a
  * resolved contest showing as open forever and no instrument would ever say so.
  *
+ * The COST of that choice, stated because "fails loudly" and the sentence below
+ * are the same event and only the first is obvious: `rebuildProjection` replays
+ * the whole ledger in ONE transaction, so a single inconsistent pair anywhere in
+ * a workspace's history makes a rebuild of this projection throw and roll back —
+ * an operator can no longer rebuild `proj_contested` at all until the ledger is
+ * superseded into consistency. That is the right trade (a projection that
+ * rebuilds into a quiet lie is worse than one that refuses to rebuild), but it
+ * is a trade, not a free assertion.
+ *
  * ## Unqualified table names
  *
  * `proj_contested`, never `public.proj_contested`: tools/verify-projections.ts
