@@ -583,13 +583,56 @@ The tier follows the **failure cost** of the task, not its size. "Optimised" cut
 | Core-semantics implementers: reducers, projections, engine checks, folds, stream/sync logic, view-models carrying honesty semantics | opus | high |
 | Fixture authoring and planted-defect design (falsifiability-load-bearing) | opus | high |
 | Per-task reviewers | opus | high |
-| Final whole-branch review lenses | top tier (Fable-class) | xhigh |
+| Final whole-branch review lenses — the three reading lenses | opus (owner ruling 2026-08-31, below) | max |
+| The mocked-contract lens | top tier (Fable-class) | xhigh–max |
 | Adversarial refuters; the mocked-contract lens | top tier | xhigh–max |
 | Lane controllers / orchestrators | Opus 5 (owner amendment, below) | — |
 
 **Owner amendment (2026-08-28, second ruling on this table): controller sessions run Opus 5, and "top tier" in this table means an explicit `fable` dispatch, never "the session's own model."** The original line ("controllers are top-tier deliberately") is amended on the owner's direction, with the account's weekly usage pool as the stated reason: controller sessions carry the bulk of every lane's tokens, and Fable-class spend there exhausts the shared pool fastest for the least marginal judgment. What does NOT move down: final whole-branch review lenses, adversarial refuters, and floor-list task reviewers are dispatched with `model: fable` explicitly — bounded fan-outs where the top tier's judgment is the product. If a session cannot dispatch fable, the fallback is opus at max effort, recorded in the ledger as a deviation.
 
 **Budget pressure is never grounds to thin a gate.** When the weekly pool nears its cap, the sanctioned response is to DEFER work — pause non-critical-path lanes, hold a wave until the reset — never to skip a review, drop a refuter, or de-escalate below a class floor. A lane that cannot afford its machinery does not run until it can.
+
+### Owner ruling (2026-08-31): Fable is narrowed to the absolute necessity, and this DOES amend the rule above
+
+The owner has directed that Fable-class dispatch be cut to what is strictly necessary, on the account's
+weekly pool. **This is a budget-motivated de-escalation of a gate, which "budget pressure is never grounds
+to thin a gate" forbids in as many words.** That paragraph is amended here by the owner rather than
+quietly worked around, because a contradiction between two live rules is worse than either rule being
+wrong. The controller argued against this specific change and was overruled; the argument is recorded
+below so a later reader can weigh it rather than rediscover it.
+
+**What moves down: three of the four final whole-branch review lenses, to opus at `max` effort.** They are
+the expensive half — $78.70 of the measured $117 — and the most substitutable, because their work is
+reading for the presence of correctness across a delta, which opus at max does well. The deviation-ledger
+path this document already defines for an unavailable fable dispatch becomes the normal path for them.
+
+**What does NOT move, and the reason is evidence rather than caution:**
+
+- **The adversarial refuters.** They are the cheaper half at $38.50 and they are where the top tier's
+  judgment is demonstrably the product. The §11 cross-workspace forgery was found by a refuter that
+  **committed the forgery end to end over the shipped door** rather than reasoning about whether it was
+  possible. Three layers each individually correct, no layer asking the question — that is not a finding
+  reading produces. Cutting the refuters would have saved $38.50 and cost the single most serious defect
+  found in this series.
+- **The mocked-contract lens**, kept at top tier and split out of the lens row above. A mocked contract is
+  what excuses the server from existing, and it is this series' signature failure — the one the plan
+  review found repeatedly and the one no other lens is pointed at.
+- **The floor-list task reviewers**, unchanged. Twenty-four named tasks selected precisely because a
+  plausible-looking wrong answer ships silently, which is the condition under which a tier drop is least
+  affordable.
+
+**The controller's argument against, recorded because it was overruled and may prove right.** Of the three
+levers measured on 2026-08-31, this is the smallest saving and the only one that trades away a check.
+Batching already cuts the NUMBER of Fable reviews without touching what any one of them does; concurrency
+caps and the unfollowed sonnet rows were both larger and free. The risk this accepts is not a worse review
+today but a defect escaping the last gate before `main`, which in this series has repeatedly cost a
+follow-up PR — and the accounting for that never lands in the same column as the saving.
+
+**What this does NOT relax.** Escalation still runs the other way: a task failing two fix rounds escalates
+its implementer a tier, and a lens that returns a finding it cannot resolve escalates to fable for the
+re-read. De-escalating below a class floor remains forbidden. Deferral remains the sanctioned response to
+budget pressure for everything not named here — this ruling narrows one row, it does not license lanes to
+tier down at their own discretion when the pool is tight.
 
 **The floor list** — tasks the extraction flagged as subtle enough that the implementer floor is opus-high AND the reviewer is top-tier, non-negotiable: Plan 3 T3 (reducer + fold), T10 (as-of resolution), T12 (engine-context hazard closure), and the RDU fail-closed decision · Plan 4 T5 (permission gate + bootstrap), T7 (canSee + the SQL twin that must not disagree), T11 (visibleEventsFor + purge split), T14 (invite token custody) · Plan 5 T5 (visibleTicketsWhere), T9b (all-or-nothing migrate), T14/T15 (stream hub + WS) · Plan 6 T6 (claims machinery/precheck) · Plan 7 T9 (sniffing + upload permission), T11 (ingest-transaction gates) · Plan 8's F5 amendment (the "cover" semantics are a design call) · Plan 9 T6 (the four-plan sweep) · Plan 10 T7 (sync idempotency + contests), T9 (replica fold + baseline rewrite), T14/T15 (dual-client rig + scenarios) · Plan 11 T8/T9 (the CC mapping — invariant 4, no fabricated history) and T12 (restore drill).
 
