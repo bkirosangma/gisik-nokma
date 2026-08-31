@@ -58,8 +58,9 @@ from the build failure, **not** a test failure — server tests run alone passed
 
 ## Where I am in the serial sequence
 
-**Phase 0, step 1 of 16** — `exec/03-tickets-hierarchy` (Plan 3 Chain A, T3–T8). Rebase done, gate
-green, T8 re-reviewed, PR OPEN and awaiting the controller. Nothing is in flight.
+**Phase 0, step 1 of 16 — CLOSED.** Chain A merged to `main` as `6b2fc76`.
+**Step 2 in progress:** `exec/06a-client-core` T9 is now REVIEWED (findings in
+`docs/lanes/plan-6a-t9-review.md`); its four Important fixes are **not yet applied**.
 
 Remaining order is the coordination doc's `## Serial execution` section (line 835), which is the
 authority. The dispatch brief is a copy of it and is advisory where they differ.
@@ -169,10 +170,40 @@ lenses → `fable` refuters; six findings, one refuted, five upheld.
 
 ## Next up
 
-Phase 0 step 2: `exec/06a-client-core` at `30e3db4` — T9 + STATE file only, **unreviewed**, needs a
-full review before its PR. T6 already merged as `3fb22d3`. Note the brief and the coordination doc
-differ here (the doc says merge at `8209397`); the brief is the later fact and T6 is demonstrably on
-`main`. Then step 3: `exec/07-editor-client`, whose T4 scoped re-review was never dispatched.
+**Step 2, `exec/06a-client-core` at `30e3db4` — REVIEWED, fixes outstanding.** T6 merged as
+`3fb22d3` (the doc's `8209397` predates that merge; the brief is the later fact and `3fb22d3` is
+demonstrably an ancestor of `main`). T9's review — one opus reviewer under the cost ruling, 1 of the
+6-agent cap, run in the lane4 worktree — returned **four Important and six Minor**, recorded in
+`docs/lanes/plan-6a-t9-review.md`.
+
+Remaining work on that branch, in order: **(1)** apply the four Important fixes — F1 the TZ helper
+that assigns the string `"undefined"` and switches the worker to GMT rather than restoring, F2
+`useBoard` never refetching on `projectId` change, F3 the views-never-speak-HTTP guard admitting any
+allowed *prefix*, F4 the `Features.md` merge conflict; **(2)** rebase onto `main`, where F4 must be
+resolved — `6b2fc76` rewrote the Local pre-check bullet T9 inserts beside, and it is the ONLY
+collision; **(3)** re-gate; **(4)** PR. **Do not merge on a green gate alone** — that instruction
+predates the review, and the review is now the reason it stood.
+
+Then step 3: `exec/07-editor-client`, whose T4 scoped re-review was never dispatched.
+
+## HANDOFF DELIVERY — a defect in my own protocol
+
+`docs/lanes/executor-state.md` reached `main` inside the Chain A squash (`6b2fc76`); **every update I
+made after that merge was stranded on an already-merged branch** (`exec/03-tickets-hierarchy`).
+
+**Measured, after first getting the severity wrong:** `main`'s copy is **207 lines against this
+branch's 277**, with **zero** matches for `BINDING`, `do not restart`, `cost ruling` or `sonnet`
+(positive control: `executor` hits 3 in the same grep). It predates the BINDING block **and the cost
+ruling itself** — so a restart would not have read a superseded instruction, it would have read a
+handoff written before the policy existed. **Seventy lines stranded, not three fixes.**
+
+I first reported the milder version, **because I described what I last WROTE to the file rather than
+what the file on `main` contains.** An artifact's author is the worst-placed party to say what it
+currently holds; the controller grepped `main` and found otherwise. Third instance of that shape in
+one day. The rule and the reasoning are now in the coordination doc, not only here.
+
+**RULE: once the branch carrying the handoff merges, the next update opens its own branch off `main`.**
+Verify by reading the copy **on `main`**, never the working tree.
 
 ---
 
