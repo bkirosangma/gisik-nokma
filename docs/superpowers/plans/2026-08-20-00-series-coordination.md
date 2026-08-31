@@ -2683,6 +2683,123 @@ different package sets — one tree has `editor`, the other has `sync-client`. H
 corroboration, a coincidence would have been laundered into a cross-check that survived both parties being
 careful. This is the absolute-versus-delta rule at a second axis: same failure, different dimension.
 
+**A fifth silent-wrong-answer instrument, and the one that hides inside the recovery set: an orphaned sha
+in a rebased repo does not behave like a dead link. It behaves like a live one pointing somewhere else.**
+Lane 1's, found by auditing its ledger for the survivable-clear property rather than by using it. Of 32
+shas cited across its ledger, **17 are orphaned** after four rebases — unreachable from both `HEAD` and
+`origin/main`. They still `git cat-file -e` clean and `git show` successfully, returning **pre-rebase
+content**. A resumer checking one is not handed an error; it is handed a stale tree that looks correct.
+Verified independently by the controller on four of them: all four resolve, all four fail ancestry, and a
+live HEAD passes both.
+
+**"Does it resolve" is the test that lies — and Lane 2's refinement says WHY, which matters because the
+obvious test passes on everything.** The orphans are **reflog-only**: alive in the worktree that made them,
+so `git cat-file -e` succeeds on all of them, and absent from a fresh clone, dying at the next `gc`. A lane
+that "tested its ledger" with the obvious command gets a clean bill and is still broken. So the finding is
+not *check your ledger* but **`cat-file` is the wrong question; ref-reachability is the right one** —
+`git branch --contains <sha>` (empty output means orphaned), or `git merge-base --is-ancestor <sha> HEAD`
+for the narrower ancestry form. Lane 2 measured **10 of 25** orphaned this way; Lane 1, **17 of 32**.
+Every merged task was rebase-merged, rewriting its shas a second time.
+
+Two things make this worse than the other four instruments. First, it lives in the **recovery set** — the
+artifact whose entire purpose is to be correct when everything else is gone, and which is consulted only
+when nobody has the context to notice it is wrong. Second, it rots on a schedule nobody watches: every
+rebase orphans another batch, silently. Lane 3 hit the same class with a luckier outcome — its ledger
+header named the original base after three rebases, which happened to stay reachable from `main`, so it
+was accurate **by luck rather than design** and would not have been caught by inspection either.
+
+**Remedy, and both lanes have shipped it:** a validity block at the head of the ledger carrying live
+anchors (merge-base, HEAD, ahead-count, tree state, gate, fixture count), a task-to-commit table rebuilt
+from `git log --reverse --oneline origin/main..HEAD`, an explicit instruction not to `git show` anything
+below it, and **the regeneration command**, because this will rot again at the next rebase.
+
+**A cross-package mutation run under bare `vitest` tests the stale `dist` and proves nothing.** Lane 4's,
+from T6's re-review, verified independently here. `domain`, `rule-engine` and `app-core` each export only
+`./dist/index.js` — no source export — and `app-core`'s vitest config carries no source alias. So mutating
+a `domain` or `rule-engine` SOURCE and running bare vitest exercises the last build, not the mutation.
+Lane 4 proved it live: **25/25 green with a mutated engine source, and the same mutant killed its test
+after a rebuild.**
+
+**CI is safe and the exposure is entirely local:** `turbo.json` sets `test.dependsOn: ["^build"]` and
+`ci.yml` runs `turbo build test typecheck`. `dist/` is gitignored, so the staleness exists only in a
+working tree. `pnpm -r exec vitest run` shares the hole. **Rule: cross-package mutation means
+`pnpm turbo run test`, or an explicit rebuild first.**
+
+The scope is wider than the canary that found it — every cross-package assertion rides `dist`: engine-parity
+previews, the envelope-door tests, the provenance planted defects against `formatIstInstant` and
+`istDayBounds`. **Any lane that has mutation-tested across a package boundary with bare vitest holds
+evidence worth re-running**, and a planted-defect proof is exactly the evidence that cannot be taken on
+trust, since its whole purpose is to show a check can fail.
+
+Lane 4's framing: this is the third costume of *a mutation that does not do what you think proves nothing*
+— after a regex that matched a comment, and a deletion that left no marker — and the first that crosses a
+package boundary.
+
+**The general rule, Lane 1's, and it covers a case the turbo remedy does not.** Lane 1 hit the stale-`dist`
+false green independently before the broadcast reached it — `task-8-report.md:139`, diagnosed from
+`exports` and killed by a rebuild — and then hit a SECOND false green that no build step would have
+caught: its mutation script replaced the **first** occurrence of an anchor, and `parse-event.ts` carries
+two identical `const at = …` lines, so the mutant landed in the envelope branch instead of the intended
+one. Fresh output, correct build, suite green, proving nothing — and reading exactly like an
+unfalsifiable assertion. So the rule is not about build staleness:
+
+> **A survivor with no explanation is either an unconstrained path or a mutation that never ran, and those
+> must be distinguished before either is reported.**
+
+Stale `dist` and a mis-anchored replace are two instances of *the mutation never ran*. There will be
+others — a guard clause returning early, a mutated branch no fixture enters. **A lane following only the
+turbo form will still report a mis-anchored mutant as an unfalsifiable check**, which is the more damaging
+error: it condemns a check that is fine.
+
+**The cheap corroboration that distinguishes them, also Lane 1's: every mutation you keep should produce a
+failure specific enough to identify its own site.** That is what confirms the anchor landed where intended,
+without inspecting each one. **A mutation whose failure could have come from anywhere has not proven its
+anchor.**
+
+**Never run a state-changing git command in a shell whose working directory was set for a read — and this
+is a gap neither worktree rule covers.** Controller incident, 2026-08-31: verifying Lane 1's orphaned-sha
+claim required `cd` into its worktree; the next command in the same shell was a `git checkout` of the
+controller's own branch, which swapped Lane 1's working tree out from under a live task. Reflog-measured
+window: **26 seconds** (13:24:42 to 13:25:08). Restored, and verified by both parties independently —
+branch, HEAD `11f1fb3`, 19 ahead, tree clean, fixtures 84/84, nothing uncommitted lost.
+
+The cwd was correct for the read and wrong for everything after it, and nothing announced the difference.
+Use `git -C <path>` for inspection; never a bare `checkout` after a `cd` made for another purpose.
+
+**Why the existing rules would not have caught it.** Lane 4's rule covers agents *inside* one fan-out
+sharing a tree; the per-agent isolation remedy covers mutating reviewers. **This came from outside the
+fan-out entirely — a peer with filesystem access to a lane it does not own.** Per-agent isolation would
+not have prevented it, because the controller was not one of the agents. Lane 1's framing, and it is the
+gap this rule closes.
+
+**Corollary from the same incident, Lane 1's: during an active mutation review, "tree clean" is a RACING
+check.** Its answer depends on where in the reviewer's cycle it lands. Lane 1 caught a transient
+` M checks/hierarchy.ts` and briefly read it as controller damage; it was its own reviewer mid-mutation.
+Anyone verifying a lane's state while a mutation review runs will otherwise diagnose contamination that is
+not there, or miss contamination that is. **And a contaminated review input is repaired by re-verification
+at the same tier, not by discarding the review** — which would be thinning a gate to fix someone else's
+mistake.
+
+**One more of the controller's own, recorded because it is the fifth today.** The incident report said the
+window was "roughly two minutes." It was 26 seconds, and Lane 1 measured it from the reflog because the
+controller had estimated rather than checked. An error report is a claim like any other and inherits every
+rule above it.
+
+**A sixth silent-empty mode, found inside the verification itself.** Lane 2's first check reported
+`tested=1 resolve=0 dead=1` — zsh does not word-split an unquoted parameter, so it tested the entire sha
+list as a single token. It was caught only because the count was printed beside the result. **That is the
+positive-control rule catching a failure in the checking rather than in the tooling**, which is the case
+the rule was least obviously written for and most needed in.
+
+**The general form, which is the reason this is recorded above the instrument rules rather than beside
+them: durable state that nobody has tested is not durable state.** All three lanes with ledgers asserted
+the property. Both that then tested it found it false. Lane 2's assertion was the load-bearing one — it
+was made in the same message that declined a `/clear`, so it was offered as grounds for someone else's
+decision, and it had not been run. The
+assertion is free and the test is one command. **Before any lane session is cleared, its ledger's anchors
+must be verified reachable — clearing a lane whose recovery set has rotted destroys exactly the state the
+clear was meant to preserve.**
+
 **Prefer the check whose failure is loud, even when it is slower.** Lane 3's, and it belongs above the
 individual instrument rules rather than beside them, because it is the property they all share. Four
 instruments recorded on one branch — the proxied directory search, the wrong-directory enumeration, the
