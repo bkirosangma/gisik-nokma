@@ -16,11 +16,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 | Anchor | Value | How verified |
 |---|---|---|
 | Branch | `exec/03-tickets-hierarchy` | `git rev-parse --abbrev-ref HEAD` |
-| HEAD | `646939c` | reachable, 2 refs (`git branch -a --contains`) |
-| Merge-base with `origin/main` | `308ee6e` — i.e. HEAD is a direct descendant | `git rev-list --left-right --count origin/main...HEAD` → `0 21` |
-| Ahead / behind | **21 ahead, 0 behind** | same command |
-| Remote | `origin/exec/03-tickets-hierarchy` = `646939c` | force-pushed with `--force-with-lease` |
-| Tree state | clean except the deliberate edits of the task in flight | `git status --porcelain` |
+| HEAD | `c6b4e59` | reachable (`git branch -a --contains`) |
+| Merge-base with `origin/main` | `308ee6e` — i.e. HEAD is a direct descendant | `git rev-list --left-right --count origin/main...HEAD` → `0 23` |
+| Ahead / behind | **23 ahead, 0 behind** | same command |
+| Remote | `origin/exec/03-tickets-hierarchy` = `c6b4e59` | pushed |
+| Tree state | **clean** | `git status --porcelain` empty; verified byte-identical to the pinned baseline after the review fan-out |
 | Pre-rebase HEAD | `a7388ae` — **orphaned, do not cite** | superseded by the rebase |
 
 ### Rebase verification (why this rebase is trusted)
@@ -34,7 +34,7 @@ The coordination doc was the one file both sides changed. Post-rebase it is **34
 and the branch's `## Ruling P13` (3273), `## Ruling P14` (3341) and
 `## A mutation that crosses a package boundary is inert…` (3399).
 
-## Gate composition — recounted at `646939c`
+## Gate composition — recounted at `c6b4e59`
 
 **Status: GREEN** after the P16 fix (below). It was RED on the bare rebase — not a flake, and not
 present before it: a semantic collision the textual merge could not see.
@@ -58,13 +58,13 @@ from the build failure, **not** a test failure — server tests run alone passed
 
 ## Where I am in the serial sequence
 
-**Phase 0, step 1 of 16** — `exec/03-tickets-hierarchy` (Plan 3 Chain A, T3–T8). Rebase done and
-durable; PR not yet opened.
+**Phase 0, step 1 of 16** — `exec/03-tickets-hierarchy` (Plan 3 Chain A, T3–T8). Rebase done, gate
+green, T8 re-reviewed, PR OPEN and awaiting the controller. Nothing is in flight.
 
 Remaining order is the coordination doc's `## Serial execution` section (line 835), which is the
 authority. The dispatch brief is a copy of it and is advisory where they differ.
 
-## In flight
+## Resolved this task (kept because the next reader needs the reasoning, not just the outcome)
 
 **The app-core collision, and the canary it trips.** The rebase is textually clean and semantically
 broken, in the way the coordination doc predicted for Phase 0 ("the collisions appear only once one
@@ -144,3 +144,32 @@ decided it. All three refuters returned `needs-amendment`, and the amendment mat
   whose cwd was set for a read", met in its read-only form first. Use `git -C` / absolute paths.
 - **An unquoted `--include=*.ts` was eaten by zsh** and the sweep returned "no matches found" rather
   than an error. Re-run quoted, with a positive control from the same run.
+
+## Task 8's re-review — done, and it found things
+
+Run because `docs/plan-3-chain-b-handoff.md` says T8's first review never returned and was
+contaminated, while the dispatch brief called Chain A "reviewed clean". The document wins. Three
+lenses → `fable` refuters; six findings, one refuted, five upheld.
+
+- **Fixed:** `reparent-legal-grandchild-up.json` claimed its ancestor walk "actually walks" while
+  moving a grandchild under the ROOT grandparent — one iteration. Two mutations that the note
+  describes as its target both left the suite green. Restaged four deep so the move lands under a
+  non-root; both mutations now die naming this fixture. Count unchanged at 84.
+- **Recorded, owner Plan 3 T14:** `hierarchy.rank` and `hierarchy.deepest-rank-parent-required` are
+  pinned end-to-end only on the CREATED path; and eleven refusal ids lack an end-to-end fixture where
+  commit `646939c` named four.
+- **Recorded, owner workspace/Plan 11:** no test cites a catalogue case id, so a ✅ outlives the test.
+- **The executor's own error, recorded because it will recur otherwise:** the review dispatch told
+  agents read-only *and* how to restore what they mutated — concurrent mutation on a shared tree,
+  which the standing rule forbids. A lens caught it and filed it BLOCKING, correctly. Nothing was
+  corrupted (anchor guards, same-run positive controls, md5 restores, and the tree verified identical
+  to baseline afterwards), and the certifying gate predates the fan-out — but the next mutating
+  fan-out gets a worktree per agent. **"Read-only" in a prompt is not read-only if the same prompt
+  explains how to restore.**
+
+## Next up
+
+Phase 0 step 2: `exec/06a-client-core` at `30e3db4` — T9 + STATE file only, **unreviewed**, needs a
+full review before its PR. T6 already merged as `3fb22d3`. Note the brief and the coordination doc
+differ here (the doc says merge at `8209397`); the brief is the later fact and T6 is demonstrably on
+`main`. Then step 3: `exec/07-editor-client`, whose T4 scoped re-review was never dispatched.
