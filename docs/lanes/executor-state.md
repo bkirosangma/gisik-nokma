@@ -19,9 +19,9 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/04-t4-t5-permissions`**, cut from `origin/main` at `91df593`. **T4 is committed at `c0e3fe0`** (2 commits ahead: handoff + T4). No PR yet — step 4 opens one PR after T5 | `git log`, `git rev-parse` |
-| `main` | **`91df593`** (PR #48, docs-only). Moved from `452baa6` mid-session — refetch before trusting any main sha in this file | `git log origin/main --oneline -4` |
-| `exec/04-auth-visibility` | **REDUNDANT — safe to delete.** Its 4 commits landed on main as `31df85b`, `24fba16`, `8c4216a`, `51aba55` | `git cherry -v` → 4 × `-` |
+| Branch in flight | **`exec/04-t6-t7-visibility`**, cut from `origin/main` at `45c83eb`. **T6 AND T7 both done, reviewed, fixed.** PR open for the controller | `git log`, `git rev-parse` |
+| `main` | **`45c83eb`** (PR #51, step 4). Verified by presence, not by report: `proj-memberships.ts`, `effective-role.ts`, `bootstrap-workspace.ts`, `simple-kanban.ts`, `test-cases/06-auth-visibility.md` and Features.md §6 are all on it | `git cat-file -e`, `git show` |
+| `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
 | Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, and every pre-squash sha of the Phase 0 branches | `git branch --contains`, empty = orphaned |
 
@@ -45,39 +45,32 @@ measured a tree strictly *behind* main and is **a control for nothing**. Do not 
 main-derived total: they are different trees, and a total that rises without decomposing is exactly what
 the coordination doc warns against.
 
-## Gate composition — recounted at the sha being reported, `e07a043` (step 4 complete)
+## Gate composition — recounted at the sha being reported (step 5 complete)
 
-**Status: GREEN.** `pnpm turbo run build test typecheck --force`, redirected to a file, **never piped**
-— and note the broader rule: **ANY command after the gate in the same chain becomes the status you are
-shown**, a bare `echo` included. The summary line is the only honest signal.
+**GREEN.** `pnpm turbo run build test typecheck --force`, redirected to a file, **never piped, nothing
+chained after it** — any command following the gate in the same chain becomes the status you are shown.
 
-| Measure | `main @ 91df593` | `c0e3fe0` (T4) | `e07a043` (T5 + fixes + catalogue) |
+| Measure | `main @ 45c83eb` | `0c6b8d3` (T6) | step 5 final |
 |---|---|---|---|
 | **Node** | v22.22.2 | v22.22.2 | **v22.22.2** |
 | Exit code | 0 | 0 | **0** |
 | Turbo tasks | 21/21, 0 cached | 21/21, 0 cached | **21/21, 0 cached** |
-| **Tests** | **936** | **960** | **995** |
-| domain | 274 | 274 | **276** |
+| **Tests** | **995** | **1016** | **1032** |
+| domain | 276 | 276 | 276 |
 | rule-engine | 278 | 278 | 278 |
-| **server** | 143 | 167 | **200** |
+| **server** | 200 | 221 | **237** |
 | app-core | 130 | 130 | 130 |
 | editor | 72 | 72 | 72 |
 | sync-client | 8 | 8 | 8 |
 | ui | 31 | 31 | 31 |
 
-**Both deltas decompose, which is the only thing that makes them checkable.**
-**936 → 960 (+24)**, all server: 12 `proj-memberships` + 11 `effective-role` + 1 new DB-free `tables` pin.
-**960 → 995 (+35)**: domain **+2** (`simple-kanban.test.ts`) and server **+33** = 32
-(`check-role-permission.test.ts`) + 1 (`events-route.test.ts`'s 401 pin). Every other package
-unchanged, as it must be.
+**Both deltas decompose, entirely in `server`.** 995 → 1016 (**+21**, all `proj-visibility.test.ts`);
+1016 → 1032 (**+16** = `can-see.test.ts` 12 + `visible-tickets.test.ts` 4). Every other package is
+unchanged, as it must be — step 5 touches only `apps/server`.
 
-**The fix round's delta was ZERO and that was the correct result** — it modified three existing `it`
-cases in place and added documentation; a non-zero delta there would itself have been a finding.
-
-**The final commit (`e07a043`, catalogue + rulings) touches only `Features.md`, `test-cases/` and
-`docs/`, all at repo root and outside every package.** `turbo.json` declares no `inputs`, so hashing
-falls back to package contents — **a root-level docs commit cannot move gate composition.** The figures
-above were measured at `e07a043` itself regardless, so no inference is being relied on.
+**T7's fix round delta was ZERO and that is the EXPECTED number**, not a figure to explain: both fixes
+are a semantics-preserving control-flow refactor plus prose. **A non-zero delta there would have been a
+tripwire that the refactor changed behaviour.**
 
 ## What was verified about step 4's surface, so the next session does not re-pay for it
 
@@ -92,67 +85,67 @@ above were measured at `e07a043` itself regardless, so no inference is being rel
 
 ## Where I am in the serial sequence
 
-**PHASE 0 COMPLETE.** Steps 1-3 merged (`6b2fc76` #38 · `c93c910` #43 · `a3746fb` #47).
+**PHASE 0 COMPLETE. STEP 4 MERGED** (PR #51, `main @ 45c83eb`, 995 tests).
 
-**STEP 4 IS COMPLETE AND AWAITING MERGE. T4 AND T5 ARE BOTH DONE, REVIEWED, FIXED AND GREEN.**
-Branch `exec/04-t4-t5-permissions`, **10 commits** ahead of `main`, pushed, PR opened for the
-controller. **STEP 5 (Plan 4 T6, T7) IS NEXT AND NOTHING IS IN FLIGHT.**
+**STEP 5 IS COMPLETE AND AWAITING MERGE.** T6 (`proj_visibility`) and T7 (`canSee`) are both done,
+reviewed, fixed and green on `exec/04-t6-t7-visibility`. **STEP 6 — the LIFTED Plan 10 T4, the §11
+closer — IS NEXT** per the dispatch brief's sequence, and nothing is in flight.
 
-### What step 4 landed
+### T6 — `proj_visibility`. Zero review findings.
 
-**T4 — `proj_memberships`, `resolveEffectiveRole`, order pins.** Reviewed, **zero findings**.
-**T5 — the pre-engine permission gate, the founding sequence, the three CSRF items.** Floor-list
-review returned **7 findings (2 Important, 3 Minor, 2 Nit)**; the fix round closed both Importants
-plus one Minor and was verified not to have over-reached (three files, `check-permission.ts`
-**comment-only** — the code rows were printed and there are none).
+**The plan text's determinism test could not have failed.** It replayed the same ARRIVAL order it had
+applied, so it compared a thing with itself and asserted only that `apply` is a deterministic function.
+Underneath it: every event this projection reads is filed against a **ticket**, so canonical replay order
+is ticket-id order and under ULIDs a parent is routinely created when its children are already in the
+table. The plan's `ticket.created` resolved only the new ticket — true of arrival, false of replay.
+**Every handler now restores a table-wide invariant rather than applying a delta.**
 
-**T5's first commit contained a live privilege escalation.** Nothing refuses a *second*
-`workspace.created`; the founding bypass admitted one and the bootstrap then appended
-`membership.granted {role:'owner'}` for the sender — **a stranger resolving as owner of a workspace
-they were never in.** Closed by two guards, one per door: `ctx.workspaceExists` (a **required** field,
-so a call site that forgets it is a type error) asking whether the **workspace** has a ledger rather
-than whether the event's entity has a head row, and the bootstrap firing on
-`committed.workspaceSeq === 1`. **The guard has the same shape as the bug** — the obvious fix asks
-about the entity and is defeated by a founding filed under a *fresh entity id* against the victim's
-workspace.
+### T7 — `canSee`. Floor-list. One Important, one Minor, both fixed.
 
-### The four things step 4 leaves for later, each with an owner
+**P21 — the role side granted by default.** `canSeeResolved` decided the role with an if-chain and the
+mode with a `switch`: a fourth `resolvedMode` errored TS2366, a fifth `WorkspaceRole` compiled clean.
+**The unenumerated direction was GRANT.** Both `canSeeResolved` and `listVisibleTickets` now use a bare
+exhaustive `switch`; widening `WorkspaceRole` raises **two** TS2366s, one per file. **Independently
+re-verified here** with the domain package rebuilt and a `const _probe: WorkspaceRole = 'viewer'`
+compiling clean first — see below, because the original measurement was void.
 
-1. **P18** — `getEntityState('membership')` still answers `null`; no Plan 4 task owns the wiring.
-   **Fails CLOSED** (functionality gap, not a forgery window) and is **reachable, not dormant**
-   (`restrict-to.ts:25` is a live call site). *Owner: Plan 4 T6 or the step-10 checkpoint.*
-2. **P19** — **a guest is admitted TODAY** for `ticket.created`, `visibility.set`,
-   `workspace.renamed`, `comment.added`. Two are `permission.role` questions Task 9 owes that belong
-   **inside `checkRolePermission`**; a visibility pass running after it cannot supply them.
-   *Owner: Plan 4 T9.* Catalogued as **6.51**.
-3. **A second `workspace.created` still commits** (founding nothing). *Owner: T13.* Case **6.52**.
-4. **A half-founded workspace has no repair path through either door** — closed by T5's own escalation
-   guards. *Owner: T13.* Case **6.53**.
+**P22 — `EffectiveRole` is trusted by convention.** Every safety property rests on the value having come
+from `resolveEffectiveRole`, and **TypeScript is structural**, so any object of the right shape is
+accepted. Closer named for its implementer: **a branded/opaque type** carrying a unique symbol only
+`resolveEffectiveRole` can produce. *Owner: Task 8.* Case **6.64**.
 
-### Catalogue — §6 exists now, and the numbering was NOT invented
+**The dispatch's own expectation was wrong and the implementer proved it against its own work.** The
+early return was named as the guard to watch; **the mutation that was supposed to prove it SURVIVED** —
+deleting it leaves all 16 of T7's tests green and reddens exactly one case in 237. The ruling holds, but
+**by two short-circuits, not by the early return**. The implementer withdrew the catalogue claim it had
+already written rather than keeping a sentence the evidence no longer supported.
 
-`Features.md` §6 and `test-cases/06-auth-visibility.md` were created in this change set, because the
-same-change-set rule is stated in **all eleven numbered plans** — so Plan 4's T12-14 catalogue steps
-cannot be read as exempting earlier tasks without voiding the rule everywhere.
+### THE TRAP THAT NEARLY VOIDED P21 — read before making any type-level claim
 
-**Plan 4's own catalogue tasks reserve 6.1-6.42 verbatim.** Ids **6.5-6.8** were already assigned to
-exactly what T4/T5 built and are **filled, not duplicated**. 6.1-6.4 (identity surface, Tasks 1-3) and
-6.9-6.42 (visibility, Tasks 6-11) are **absent, not missing**. New cases continue from **6.43**.
-**Check this reservation before writing any future bucket** — Plan 3 reserves 5.4-5.36 the same way.
+**`apps/server` resolves `@gisik-nokma/domain` through `packages/domain/dist/*.d.ts`.** Widening a union
+in SOURCE does not reach the server's `tsc` at all. The review's pre-fix "exits 0" was equally consistent
+with a real finding and with **an instrument that could not see the change.** The conclusion was right;
+the evidence was not.
 
-**Every ✅ was written from the covering test's own name**, never from the implementation.
+**Rule: any claim of the form "widening this type does / does not produce a compile error over there" is
+VOID unless the package was rebuilt AND a probe proves the change is visible.** This is the stale-`dist`
+trap the coordination doc records for *mutations*, in its **type-level** form — and both halves produce a
+**quiet pass** rather than an error.
 
-### Step 5 — Plan 4 T6 (`proj_visibility`) then T7 (`canSee`), T7 is floor-list
+### Step 6 — LIFTED Plan 10 T4, the §11 closer
 
-- **T6 registers `proj_visibility` AFTER `proj_memberships`** per §8. `index.ts`'s comment now says
-  **"inserts at its §8 position"** (T4 corrected the old "appends", which is a trap for Plan 3 Chain B).
-- **T6/T7 must read membership through `resolveEffectiveRole`, never `proj_memberships` directly** — a
-  bare project-scope `SELECT` returns rows for someone no longer in the workspace. This is T4's
-  implementer's own least-sure claim: the discipline is documented in three places and **nothing makes
-  it fail if ignored**. If T6 joins the table directly, that is the ruling to raise.
-- **A second, undocumented registration pin lives in `entity-heads.test.ts`** — the plan's Files list
-  does not name it, so a registrant comes back red on a file the plan never mentions. It sits in a
-  **DB-backed** file, so it goes quiet exactly when Postgres is down. *Owner: Plan 3 Chain B.*
+Per the dispatch brief: consumes only Plan 1's registry, Plan 10 T1's schemas (both on `main`) and
+`canSee` from step 5. **Registers a projection AFTER `proj_visibility`** — §8's order is the single
+source, and `projections/index.ts` now says registrants **insert at their §8 position**.
+**Both registration pins must be extended**: `projection-order.test.ts` (DB-free, pins names *and*
+`[name, tables]`) and the undocumented one in `entity-heads.test.ts`.
+
+### The carried gaps — owners unchanged, do NOT fold into step 6
+
+**P18** membership wiring, 6.50 (step-10 checkpoint) · **P19** guest admissions, 6.51 (T9) ·
+second `workspace.created`, 6.52 (T13) · half-founded workspace, 6.53 (T13) ·
+stale `project_id` on cross-project reparent, 6.57 (Plan 3, then T8) ·
+**P22** `EffectiveRole` provenance, 6.64 (T8) · SQL mode-side not compiler-exhaustive, 6.65 (T8).
 
 ## What step 2 actually contained
 

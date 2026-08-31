@@ -184,9 +184,13 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
  * - **Visibility.** Nothing asks whether the actor may SEE the entity the event
  *   touches. A member of the workspace who is on no project, or who is a guest
  *   outside every explicit audience, is still admitted here for ordinary ticket
- *   work; `permission.visibility` does not exist yet (Task 9), and
- *   `checkVisibilityPermission` will run after `checkRolePermission` inside
- *   `checkPermission` when it does — along with Task 9's check 3, the
+ *   work. The absence is UNCHANGED by Task 7 and it is worth being exact about
+ *   what did change: Task 7 built the DECISION — `canSee` / `canSeeResolved`
+ *   (`../visibility/can-see.ts`) — and no CALL. This gate asks it nothing, no
+ *   read path is enforced by it yet (Task 8), and `permission.visibility` still
+ *   does not exist (Task 9). So what Task 9 owes here is the call and the
+ *   refusal, not the decision; `checkVisibilityPermission` will run after
+ *   `checkRolePermission` inside `checkPermission` when it does — along with Task 9's check 3, the
  *   `visibility.set` whose `payload.ticketId` disagrees with `entity.id`, which
  *   is a coherence question rather than a seeing one but answers with
  *   `permission.visibility` and so belongs to the same pass. What that pass

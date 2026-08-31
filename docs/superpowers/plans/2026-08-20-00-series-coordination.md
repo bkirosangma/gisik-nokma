@@ -4538,3 +4538,212 @@ why the handoff protocol's phrase is "tracked **and pushed**" rather than "commi
 after a later amend costs nothing; an unpushed escalation fix costs the whole task. And **verify with
 `git branch -r --contains`** — the remote-tracking form — because the same trap applies here as
 everywhere: a sha that resolves locally says nothing about what the remote holds.
+
+---
+
+## A determinism test that replays the order it applied is vacuous (2026-08-31, Plan 4 Task 6)
+
+**Task 4 found that a projection handler may only write keys its own entity totally orders. Task 6 found
+the test that was supposed to catch such a violation, and it could not have.**
+
+The plan text's determinism test for `proj_visibility` applied a set of events, then "replayed" them and
+compared. **It replayed the same ARRIVAL order it had just applied.** Two runs of the same function over
+the same input in the same order agree trivially — so the test asserted only that `apply` is a
+deterministic *function*, which is true of almost any code, and never that the table is a pure function
+of the ledger's *rows*. It is a check whose passing outcome is unreachable for the failure it names.
+
+**And there was a live defect underneath it.** Every event `proj_visibility` reads is filed against a
+**ticket**, so `readLedger`'s canonical `(entity_kind, entity_id, seq)` order is ticket-id order — under
+ULIDs a parent is routinely created when its own children are already in the table. The plan's
+`ticket.created` handler resolved only the new ticket, reasoning *"a fresh ticket has no children, so no
+recursion"*. **True of arrival order, false of replay.** With ULIDs sorting child < grandparent <
+parent, a rebuild left the grandchild at `project`/`''` while live said `workspace`/G.
+
+### The shape of a determinism test that can actually fail
+
+**It must assert that the canonical order DIFFERS from the arrival order before it compares anything.**
+Otherwise the two orders may coincide — by fixture luck, or by ULIDs that happen to sort the way they
+were created — and the test passes without ever having exercised reordering. The harness that replaced
+it does exactly that: it asserts the orders differ, does a real ledger insert, and calls
+`rebuildProjection` rather than re-running `apply` over its own arrival sequence.
+
+**Generalisation, and it is the reason this is recorded separately from Task 4's rule:** *when a test's
+job is to detect a disagreement between two orderings, the test must first prove the two orderings are
+not the same ordering.* A comparison between a thing and itself is the most convincing green there is.
+
+**The corrective design is also worth keeping:** every handler now restores one **table-wide invariant**
+rather than applying a delta. A delta is correct only relative to a state the arrival order produced; an
+invariant is correct at any point in any order — which is what the projection contract actually demands.
+
+**Two further plan-text corrections from the same task**, both of the class §10 already rules on
+(*take the shape from the shipped code, not from the plan text*): the reparent handler read
+`payload.parentId` where the shipped schema names it **`newParentId`** — and **the plan's own fixture
+was self-consistently wrong the same way**, so nothing would have gone red until a real Plan 3 event
+flowed through, at which point reparent resolution silently stops working rather than erroring. And
+`visibility.set` is keyed on `event.entity.id`, not `payload.ticketId`: until Task 9 refuses a
+disagreement between them, keying on the payload is a **cross-entity write** and reopens exactly the
+determinism hazard above.
+
+---
+
+## Ruling P21 (2026-08-31, Plan 4 Task 7) — when a branch falls through, ask which way the fallthrough DECIDES
+
+**The tell is an asymmetry inside a single function, and it is measurable in one command.**
+
+`canSeeResolved` (`apps/server/src/visibility/can-see.ts`) decided the viewer's role with an if-chain
+and the resolved mode with a `switch`. Measured at `669209f`:
+
+| widening | result |
+|---|---|
+| add a fourth `resolvedMode` (`\| 'inherit'`) to `ResolvedVisibility` | **TS2366**, *"Function lacks ending return statement"* |
+| add `\| 'viewer'` to `WorkspaceRole` | **`tsc --noEmit` exits 0. No error.** |
+
+**The mode union is protected; the role union is not — and the role chain's unenumerated direction is
+GRANT.** Any role that is not `null`/`owner`/`guest` falls past those branches into the member branch
+and reads every `resolved_mode = 'workspace'` ticket, plus every explicit list naming them.
+`listVisibleTickets` restates the same decision table in SQL and takes the same fall-through, handing
+back the whole workspace-mode slice in one call.
+
+**The general rule, which is sharper than "add exhaustiveness checks":**
+
+> **When a branch falls through, ask which way the fallthrough decides. An unguarded chain whose default
+> is DENY is a bug. An unguarded chain whose default is GRANT is a latent privilege escalation waiting
+> for someone to add an enum member.**
+
+Nothing is wrong today — `WorkspaceRole` is a closed four-member union and the migration's
+`CHECK (role IN (...))` names the same four, so the branch is unreachable with current inputs. The
+defect is that the *next* person to add a read-restricted role (`viewer`, `billing`, an external
+accountant) ships a workspace-wide read leak with **nothing red and nothing failing to compile.**
+
+**And where one decision table is written twice — once in TypeScript, once in SQL — the second copy can
+silently disagree.** Whatever guards the first must guard the second, or the second must be pinned by a
+test that names why the two guards differ in kind.
+
+---
+
+## Ruling P22 (2026-08-31, Plan 4 Task 7) — `EffectiveRole` is trusted by convention, and TypeScript is structural
+
+**Every safety property verified for `canSeeResolved` rests on its `EffectiveRole` argument having been
+produced by `resolveEffectiveRole`.** That provenance is what makes `workspaceRole === null` imply an
+empty project set, and what confines `workspaceRole` to the four roles the branches enumerate.
+
+**Nothing enforces it.** `canSeeResolved` takes the value by parameter, and TypeScript is *structural* —
+any object of the right shape is accepted. Task 8's route, Task 9's ingest check and Task 11's sync
+filter can each construct or cache an `EffectiveRole` from somewhere else, inheriting a project set no
+early return has ever emptied, and **neither the compiler nor the suite would object.**
+
+**The closer, named here so its implementer does not have to invent it: make `EffectiveRole` a branded
+(opaque) type** — carrying a unique symbol property that only `resolveEffectiveRole` can produce. That
+converts *"verified by convention"* into *"unconstructable elsewhere"*, and turns every future misuse
+into a **compile error rather than a silent grant**. *Owner: the first task that calls `canSee` —
+Plan 4 Task 8.* Catalogued as an ❌ absence.
+
+### A correction to the expectation this task was dispatched with
+
+The dispatch named `resolveEffectiveRole`'s empty-project-set early return as the guard to watch, and
+told the implementer to STOP and report if the plan text routed around it. **That expectation was wrong,
+and the implementer proved it against its own work.** The trigger never fired — the plan text does route
+through `resolveEffectiveRole`, and exactly one SQL statement in all of `apps/server/src` touches
+`proj_memberships`. But **the mutation meant to prove the ruling SURVIVED**: deleting the early return
+leaves all 16 of Task 7's tests green and reddens exactly one case in the whole 237-test server suite —
+Task 4's own.
+
+The reason is structural: `canSeeResolved` and `listVisibleTickets` both short-circuit on a null
+workspace role **before** the project set is read, so nothing reachable from `canSee` can make a
+surviving roster row matter. **The ruling holds — but by two short-circuits, not by the early return.**
+That distinction is what a future reader needs, and it is recorded because the implementer **withdrew
+the catalogue claim it had already written** rather than keeping a sentence the evidence no longer
+supported. The early return is still worth keeping: it protects readers that have no null check of their
+own, such as `hasProjectAdminRights`.
+
+---
+
+## Two more instruments with unstated preconditions (2026-08-31)
+
+Both print a plausible number. Neither looks like an error. They join `merge-tree --write-tree` and the
+`(#N)` squash marker on the list of good instruments that mislead when their precondition is unstated.
+
+### `@{u}` is not a stable referent — name the ref, don't trust the symbol
+
+`git rev-list --left-right --count @{u}...HEAD` was prescribed as the check for unpushed work. Run
+immediately **after a successful push**, it returned **`0 6`**, which reads as six unpushed commits and
+sent the executor hunting for a fan-out that was still committing. Nothing was wrong.
+
+`@{u}` is whatever upstream the branch was **created** with, and `git checkout -b <name> origin/main`
+sets it to **`origin/main`**. The command truthfully answered *"how far ahead of main am I"* — the right
+question about the wrong **subject**.
+
+**Rule: name the ref — `git rev-list --left-right --count origin/<branch>...HEAD` — and repoint the
+upstream so the symbol means what a copier will assume it means.** Fixing only the invocation leaves the
+trap set for the next person.
+
+**This is a distinct family from the `merge-tree` trap.** There, the instrument answered a different
+*question* (did this conflict, not is this redundant). Here it answers the right question about a
+different *subject*. Both produce well-formed wrong answers; the first is caught by asking what the tool
+computes, the second by asking what its arguments resolve to.
+
+### `git cat-file` lies from a SIBLING WORKTREE, not only from the reflog
+
+The standing warning is that `cat-file` passes on reflog-only commits. **There is a second source, and
+it is the one that fools a REVIEWING session rather than the authoring one.** Worktrees share a single
+object store, so a commit that exists **only locally, in another worktree** resolves cleanly from the
+main clone and reads as landed. Demonstrated: `git cat-file -t 669209f` returned `commit` from both the
+executor's worktree and the main clone while the commit was on **no remote at all**.
+
+The reviewer is the party with no reason to suspect and the least ability to check, which is exactly why
+this costume is dangerous. **`git branch -r --contains <sha>` returning empty is the discriminating
+test** — it asks about the remote rather than about the object store.
+
+---
+
+## An author is the worst-placed party to report their own artifact — including the reporting sentence
+
+Recorded as the general form of what this two-session topology exists for.
+
+The executor wrote *"everything pushed as committed"* one message after staging the rule that work must
+be pushed at every commit. It was **a belief about its own action, not a check** — two commits, including
+the one carrying the gate figures, were on one machine's disk. Caught by the controller, which went to
+verify a claim and found `canSeeResolved` nowhere on the remote.
+
+The same session had, an hour earlier, correctly caught the identical class in three other places. **The
+rule does not reliably fire on its author** — not because the author is careless, but because the
+author's evidence for "I pushed" is a memory of intending to, and the reader's evidence is the remote.
+
+**So: make it a check, not an assertion, and paste the measurement.** This applies to the reporting
+sentence itself, not only to the work being reported — which is the sharpest available statement of why
+neither session can audit its own output.
+
+### The measurement that produced P21 was itself taken with a stale instrument
+
+Recorded because it nearly made a real finding unprovable, and because it is the **type-level** form of
+a trap this document already records for tests.
+
+The reviewer established P21's asymmetry by widening `WorkspaceRole` in
+`packages/domain/src/entity-state.ts` and running `tsc --noEmit` in `apps/server`. It exited 0 — which
+was read as *"the role side has no exhaustiveness guard"*. **But `apps/server` resolves
+`@gisik-nokma/domain` through `packages/domain/dist/*.d.ts`, so widening the union in SOURCE never
+reached the server's compiler at all.** Exit 0 was equally consistent with a real finding and with an
+instrument that could not see the change.
+
+The conclusion happened to be correct. **The evidence for it was not.**
+
+**The discriminating move is a positive control that proves the change is visible before you interpret
+the result:** rebuild the package, then compile a probe — `const _probe: WorkspaceRole = 'viewer'` —
+and confirm it does NOT error. A probe that fails means the widened type never arrived and the whole
+measurement is void. With the rebuild and the probe in place, the fix was verified independently: two
+`TS2366` errors, **one per file**. *One error would have meant only one of the two switches was
+load-bearing* — the count is itself the discriminator.
+
+**Generalisation: the stale-`dist` trap is not only about tests.** This document already records that a
+cross-package mutation under bare `vitest` tests the stale `dist`. The same boundary defeats
+**type-level** measurements: any claim of the form *"widening this type produces / does not produce a
+compile error over there"* is void unless the package was rebuilt and the visibility proved. Both halves
+of the trap — a mutation that never ran, and a widening that never arrived — produce a **quiet pass**
+rather than an error.
+
+**And where a decision table is written twice, the guards can differ in KIND, which is a fact to state
+rather than a defect to hide.** `listVisibleTickets`'s role dispatch is TypeScript, so it was made
+compiler-exhaustive alongside `canSeeResolved`. Its **mode** side cannot be: those values are literals
+inside a SQL string. A fourth mode therefore fails **closed** there (excluded from every non-owner list)
+while `canSeeResolved` fails to compile — **drift, not a grant**. Named in the docblock as the reason
+the two guards differ, and catalogued as an open item (6.65) rather than left as a silent asymmetry.
