@@ -15,12 +15,21 @@ async function main(): Promise<void> {
   const ingest = createIngestService({ pool, evaluate: evaluateEvent, projections });
   const auth = createAuth({
     pool,
-    // The senders that exist. `LogOtpSender` writes every one-time code to the
-    // process log, so this assembly is not deployable to anywhere a stranger can
-    // reach: real delivery through a DLT-registered SMS provider and an email
-    // transport is the deployment errand Plan 4 names and does not do. Both
-    // implement an interface, so the swap is one line each and touches nothing
-    // else.
+    // The senders that exist, and neither is deployable.
+    //
+    // `LogOtpSender` does two things a production process must not. It writes
+    // every one-time code to the process log, so anyone with log access can sign
+    // in as anyone. And it accumulates every code it has ever issued in an
+    // unbounded in-process array (`otp-sender.ts`'s `sent`) — memory that grows
+    // for the life of the process, and a heap dump that discloses the lot. The
+    // array exists so a test can read the code that was issued; nothing on this
+    // path ever reads it.
+    //
+    // Real delivery through a DLT-registered SMS provider and an email transport
+    // is the deployment errand Plan 4 names and does not do. Both are behind an
+    // interface, so the swap is one line each and touches nothing else — and
+    // both faults leave with the implementation, because neither is in the
+    // interface.
     otpSender: new LogOtpSender(),
     magicLinkSender: new LogMagicLinkSender(),
     // Both come from validated configuration, not from `process.env` with a
