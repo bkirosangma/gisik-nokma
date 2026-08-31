@@ -352,6 +352,58 @@ describe('behavioural options that spec §2 constrains', () => {
     }
   });
 
+  /**
+   * `enableContentCheck` IS THE HINGE OF A SHIPPED COMMENT and nothing pinned
+   * it. `src/extensions/ticket-image.ts` explains why the `wrap` attribute
+   * carries no ProseMirror `validate`, and the whole argument rests on what
+   * this editor does when a document fails to load: `Editor` passes
+   * `enableContentCheck` in as `errorOnInvalidContent` (core dist:6419 →
+   * `createDocument` dist:1052-1058 → `createNodeFromContent` dist:592-602),
+   * and on the false branch the catch does NOT rethrow — it warns once and
+   * returns an empty document. A later task setting the option true would
+   * silently falsify that comment, and it is the one falsification a reviewer
+   * could not catch by reading, because the comment would still be internally
+   * consistent.
+   *
+   * Asserted on the RESOLVED editor option, never on the absence of a key in
+   * the helper's source: an absent key proves nothing about what Tiptap
+   * resolved, and the gap between what a citation proves and what a sentence
+   * claims is this paragraph's entire history.
+   *
+   * The second half is the consequence, driven rather than described, so the
+   * pin and the comment cannot drift apart while both stay green. `marquee`
+   * reaches the same catch a `validate` throw would — `schema.nodeType` throws
+   * on an unknown type — so the path is the product's own, with no invented
+   * validating node in it. Note WHAT is lost: two paragraphs the user wrote,
+   * neither of which has anything to do with the node that failed.
+   */
+  it('resolves enableContentCheck false, and that is what empties an unloadable document', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const editor = createTestEditor();
+      expect(editor.options.enableContentCheck).toBe(false);
+      editor.destroy();
+
+      const loaded = createTestEditor(undefined, {
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'the GST receipt is attached' }] },
+          { type: 'marquee' },
+          { type: 'paragraph', content: [{ type: 'text', text: 'filed on the 20th' }] },
+        ],
+      });
+      const json = loaded.getJSON() as { content?: unknown[] };
+      expect(json.content).toEqual([{ type: 'paragraph' }]);
+      expect(loaded.getText()).toBe('');
+      expect(JSON.stringify(json)).not.toContain('GST');
+      expect(warn).toHaveBeenCalled();
+      expect(String(warn.mock.calls[0]?.[0])).toContain('Invalid content');
+      loaded.destroy();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('keeps openOnClick and resizable at the values the schema origin chose', () => {
     // The rest of the resolved-option sweep found nothing else contradicting a
     // stated constraint; these two are the other options the plan sets on
