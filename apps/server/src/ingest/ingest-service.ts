@@ -118,6 +118,17 @@ export type ClientIngest = Pick<IngestService, 'ingestClientBatch' | 'onEventCom
  */
 type ClientDoor = { gate: SubmissionGate; sessionUserId: string };
 
+/**
+ * What `commitOne` answers: the per-event result the caller gets, and — only
+ * when it committed — the envelope as it went into the ledger.
+ *
+ * The envelope is handed back rather than re-read because `workspaceSeq` is the
+ * only honest way to ask "did this event FOUND the workspace, or merely land in
+ * one". The per-entity `seq` on `IngestResult` cannot answer it: a second
+ * `workspace.created` filed against a fresh entity id also carries seq 1.
+ */
+type CommitOutcome = { result: IngestResult; committed: LedgerEvent | null };
+
 export function createIngestService(deps: IngestDeps): IngestService {
   const registry = deps.registry ?? domainRegistry;
   const now = deps.now ?? (() => new Date());
@@ -134,7 +145,7 @@ export function createIngestService(deps: IngestDeps): IngestService {
     }
   }
 
-  async function commitOne(submitted: SubmittedEvent, door: ClientDoor | null): Promise<IngestResult> {
+  async function commitOne(submitted: SubmittedEvent, door: ClientDoor | null): Promise<CommitOutcome> {
     const client = await deps.pool.connect();
     let rollbackFailure: Error | undefined;
     try {
@@ -174,10 +185,13 @@ export function createIngestService(deps: IngestDeps): IngestService {
       if (head !== null && head.workspaceId !== envelope.workspaceId) {
         await client.query('ROLLBACK');
         return {
-          status: 'refused',
-          eventId: envelope.id,
-          rule: ENTITY_WORKSPACE_MISMATCH_RULE,
-          reason: `This ${envelope.entity.kind} belongs to workspace ${head.workspaceId}; this event files it under workspace ${envelope.workspaceId}. An entity cannot move between workspaces.`,
+          result: {
+            status: 'refused',
+            eventId: envelope.id,
+            rule: ENTITY_WORKSPACE_MISMATCH_RULE,
+            reason: `This ${envelope.entity.kind} belongs to workspace ${head.workspaceId}; this event files it under workspace ${envelope.workspaceId}. An entity cannot move between workspaces.`,
+          },
+          committed: null,
         };
       }
 
@@ -215,13 +229,19 @@ export function createIngestService(deps: IngestDeps): IngestService {
             await door.gate(envelope, { db: client, sessionUserId: door.sessionUserId });
       if (refusal !== null) {
         await client.query('ROLLBACK');
-        return { status: 'refused', eventId: envelope.id, rule: refusal.rule, reason: refusal.reason };
+        return {
+          result: { status: 'refused', eventId: envelope.id, rule: refusal.rule, reason: refusal.reason },
+          committed: null,
+        };
       }
 
       const verdict = await deps.evaluate(envelope, createEngineContext(client));
       if (verdict.refused) {
         await client.query('ROLLBACK');
-        return { status: 'refused', eventId: envelope.id, rule: verdict.rule, reason: verdict.reason };
+        return {
+          result: { status: 'refused', eventId: envelope.id, rule: verdict.rule, reason: verdict.reason },
+          committed: null,
+        };
       }
 
       await insertEvent(client, envelope);
@@ -230,7 +250,7 @@ export function createIngestService(deps: IngestDeps): IngestService {
       }
       await client.query('COMMIT');
       notifyCommitted(envelope);
-      return { status: 'committed', eventId: envelope.id, seq, serverTime };
+      return { result: { status: 'committed', eventId: envelope.id, seq, serverTime }, committed: envelope };
     } catch (error) {
       // A ROLLBACK on a dead connection throws, and an unguarded one would
       // replace the root-cause error with its own AND skip the duplicate check
@@ -242,10 +262,13 @@ export function createIngestService(deps: IngestDeps): IngestService {
       });
       if (isUniqueViolation(error, 'events_pkey')) {
         return {
-          status: 'invalid',
-          eventId: submitted.id,
-          code: 'duplicate-event-id',
-          message: `an event with id ${submitted.id} is already in the ledger`,
+          result: {
+            status: 'invalid',
+            eventId: submitted.id,
+            code: 'duplicate-event-id',
+            message: `an event with id ${submitted.id} is already in the ledger`,
+          },
+          committed: null,
         };
       }
       throw error;
@@ -276,18 +299,27 @@ export function createIngestService(deps: IngestDeps): IngestService {
         });
         continue;
       }
-      const result = await commitOne(parsed.event, door);
+      const { result, committed } = await commitOne(parsed.event, door);
       results.push(result);
 
       // The founding sequence (Task 5). Three things about this placement are
       // load-bearing and an editor must not rearrange them:
       //
-      // 1. It fires ON ACCEPT, NEVER ON DUPLICATE. Both of Plan 11's seed CLIs
-      //    re-run by re-submitting the same deterministic `workspace.created`
-      //    id and counting `duplicate-event-id` as "already present". Hooked to
-      //    anything looser than `status === 'committed'`, every re-run would
-      //    append a second workflow and four more type definitions, and Plan
-      //    11's "re-run is a no-op" test would be a lie.
+      // 1. It fires ON ACCEPT, NEVER ON DUPLICATE, and only for the event that
+      //    actually FOUNDED the workspace. Both of Plan 11's seed CLIs re-run
+      //    by re-submitting the same deterministic `workspace.created` id and
+      //    counting `duplicate-event-id` as "already present"; hooked to
+      //    anything looser than a commit, every re-run would append a second
+      //    workflow and four more type definitions.
+      //
+      //    `workspaceSeq === 1` is the founding test, and the per-entity `seq`
+      //    is NOT: a second `workspace.created` filed against a FRESH entity id
+      //    under an existing workspace also carries seq 1, and bootstrapping it
+      //    grants its submitter `owner`. The client door refuses that event
+      //    outright (`PermissionContext.workspaceExists`); this condition is
+      //    what stops the INTERNAL door — which has no gate by design, and
+      //    which Plan 11's seeds and Task 13 both use — from doing the same
+      //    thing without one.
       // 2. It lives in the SHARED ingest path, not in a route. `POST
       //    /v1/workspaces` (Task 13) and Plan 11's seed CLIs both found
       //    workspaces and have exactly one founding sequence between them
@@ -304,8 +336,8 @@ export function createIngestService(deps: IngestDeps): IngestService {
       // index-aligned with `rawEvents`, and the server's own appends are not
       // answers to anything the client submitted. `bootstrapWorkspace` throws
       // rather than returning a value nobody reads.
-      if (result.status === 'committed' && parsed.event.type === 'workspace.created') {
-        await bootstrapWorkspace(parsed.event, (events) => ingestAll(events, null));
+      if (committed !== null && committed.type === 'workspace.created' && committed.workspaceSeq === 1) {
+        await bootstrapWorkspace(committed, (events) => ingestAll(events, null));
       }
     }
     return results;

@@ -33,6 +33,17 @@ import { testEnvelope } from '../helpers/envelope.js';
  * in this file: **envelope-origin** is `EventEnvelope.origin`, the provenance
  * enum `'web' | 'mobile' | 'desktop' | 'server'`. **HTTP-Origin** is the
  * browser `Origin` header, which is CSRF and appears nowhere in this file.
+ *
+ * NO `// test-cases N.N` MARKERS, deliberately, and this is the one thing to
+ * read before adding one. `3.31` — the nearest existing id — is the
+ * envelope-origin gate, and `test-cases/03-foundation-ledger.md` names
+ * `check-permission.test.ts` as its file. Stamping it on the role gate, the
+ * founding sequence and the project roster would assert coverage that entry
+ * never described, which is the false-marker class this repository keeps
+ * finding. The right id does not exist yet: Plan 4 puts its catalogue steps in
+ * **Tasks 12–14**, not in Task 5, and `test-cases/06-auth-visibility.md` is
+ * that bucket. *Owner: whoever executes Plan 4 Task 12, who claims the numbers
+ * from the reservation table and back-fills them here in the same change set.*
  */
 
 // ---------------------------------------------------------------------------
@@ -63,13 +74,23 @@ function env(
 
 const ticket = { kind: 'ticket' as const, id: newUlid() };
 
-describe('checkRolePermission — planted defects', () => { // test-cases 3.31
+/**
+ * A permission context for `ACTOR`. `workspaceExists` defaults to `false` — a
+ * workspace with no ledger — because that value only changes the answer for
+ * `workspace.created`, and the two cases where it decides something pass it by
+ * name rather than relying on the default.
+ */
+function ctx(role: EffectiveRole, workspaceExists = false) {
+  return { sessionUserId: ACTOR, eff: role, workspaceExists };
+}
+
+describe('checkRolePermission — planted defects', () => {
   it('refuses a claim submitted as another person', () => {
     // Mutation: delete the `env.actorId !== ctx.sessionUserId` branch. This
     // goes green-for-nothing and every other case in this file still passes,
     // which is why identity gets its own case rather than riding along.
     const e = env({ type: 'ticket.transitioned', entity: ticket, payload: {}, actorId: newUlid() });
-    expect(checkRolePermission(e, { sessionUserId: ACTOR, eff: eff('admin') })).toEqual({
+    expect(checkRolePermission(e, ctx(eff('admin')))).toEqual({
       refused: true,
       rule: PERMISSION_ROLE_RULE,
       reason: IDENTITY_SPOOF_REASON,
@@ -78,7 +99,7 @@ describe('checkRolePermission — planted defects', () => { // test-cases 3.31
 
   it("refuses a client-submitted event wearing the server's envelope-origin", () => {
     const e = env({ type: 'ticket.transitioned', entity: ticket, payload: {}, origin: 'server' });
-    expect(checkRolePermission(e, { sessionUserId: ACTOR, eff: eff('admin') })).toEqual({
+    expect(checkRolePermission(e, ctx(eff('admin')))).toEqual({
       refused: true,
       rule: PERMISSION_ROLE_RULE,
       reason: SERVER_ORIGIN_REASON,
@@ -87,7 +108,7 @@ describe('checkRolePermission — planted defects', () => { // test-cases 3.31
 
   it('refuses any claim from a non-member of the workspace', () => {
     const e = env({ type: 'ticket.transitioned', entity: ticket, payload: {} });
-    expect(checkRolePermission(e, { sessionUserId: ACTOR, eff: eff(null) })).toEqual({
+    expect(checkRolePermission(e, ctx(eff(null)))).toEqual({
       refused: true,
       rule: PERMISSION_ROLE_RULE,
       reason: NOT_A_MEMBER_REASON,
@@ -100,7 +121,25 @@ describe('checkRolePermission — planted defects', () => { // test-cases 3.31
     // `workspace.created` early return below the membership check and NO
     // workspace can ever be founded through the client door again.
     const e = env({ type: 'workspace.created', entity: { kind: 'workspace', id: WS }, payload: { name: 'New' } });
-    expect(checkRolePermission(e, { sessionUserId: ACTOR, eff: eff(null) })).toBeNull();
+    expect(checkRolePermission(e, ctx(eff(null), false))).toBeNull();
+  });
+
+  it('planted defect: refuses a NON-MEMBER founding a workspace that already exists', () => {
+    // The bypass's bound, and without it the bypass is a privilege escalation:
+    // nothing else refuses a second `workspace.created`, the engine has no case
+    // for the type, and the founding sequence would then append
+    // `membership.granted {role: 'owner'}` for whoever submitted it. Measured
+    // before the fix, end to end through the client door: the stranger resolved
+    // as `owner` of a workspace they were never in, and the workspace held 14
+    // events instead of 7.
+    // Mutation: drop `&& !ctx.workspaceExists` and this goes green while the
+    // integration twin below turns an outsider into an owner.
+    const e = env({ type: 'workspace.created', entity: { kind: 'workspace', id: WS }, payload: { name: 'New' } });
+    expect(checkRolePermission(e, ctx(eff(null), true))).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: NOT_A_MEMBER_REASON,
+    });
   });
 
   it.each(['workflow.defined', 'ticket-type.defined', 'project.created', 'ticket.workflow_rebound'] as const)(
@@ -115,7 +154,7 @@ describe('checkRolePermission — planted defects', () => { // test-cases 3.31
               ? { kind: 'project' as const, id: newUlid() }
               : { kind: 'ticket' as const, id: newUlid() };
       const e = env({ type, entity, payload: {} });
-      expect(checkRolePermission(e, { sessionUserId: ACTOR, eff: eff('member') })).toEqual({
+      expect(checkRolePermission(e, ctx(eff('member')))).toEqual({
         refused: true,
         rule: PERMISSION_ROLE_RULE,
         reason: adminOnlyReason('member'),
@@ -128,7 +167,7 @@ describe('checkRolePermission — planted defects', () => { // test-cases 3.31
     // testing only 'admin' here would leave a gate written `role !== 'admin'`
     // green while it locked every workspace OWNER out of their own workflows.
     const e = env({ type: 'workflow.defined', entity: { kind: 'workflow', id: newUlid() }, payload: {} });
-    expect(checkRolePermission(e, { sessionUserId: ACTOR, eff: eff(role) })).toBeNull();
+    expect(checkRolePermission(e, ctx(eff(role)))).toBeNull();
   });
 
   it('refuses workspace-scope membership grants from below admin', () => {
@@ -138,7 +177,7 @@ describe('checkRolePermission — planted defects', () => { // test-cases 3.31
       entity: { kind: 'membership', id: membershipId(WS, grantee) },
       payload: { userId: grantee, role: 'member' },
     });
-    expect(checkRolePermission(e, { sessionUserId: ACTOR, eff: eff('member') })).toEqual({
+    expect(checkRolePermission(e, ctx(eff('member')))).toEqual({
       refused: true,
       rule: PERMISSION_ROLE_RULE,
       reason: WORKSPACE_MEMBERSHIP_REASON,
@@ -158,9 +197,9 @@ describe('checkRolePermission — planted defects', () => { // test-cases 3.31
         entity: { kind: 'project', id: projectId },
         payload: { userId: newUlid(), projectAdmin: false },
       });
-    const ctx = { sessionUserId: ACTOR, eff: eff('member', [[mine, true]]) };
-    expect(checkRolePermission(add(mine), ctx)).toBeNull();
-    expect(checkRolePermission(add(theirs), ctx)).toEqual({
+    const asProjectAdmin = ctx(eff('member', [[mine, true]]));
+    expect(checkRolePermission(add(mine), asProjectAdmin)).toBeNull();
+    expect(checkRolePermission(add(theirs), asProjectAdmin)).toEqual({
       refused: true,
       rule: PERMISSION_ROLE_RULE,
       reason: PROJECT_ROSTER_REASON,
@@ -175,7 +214,7 @@ describe('checkRolePermission — planted defects', () => { // test-cases 3.31
       payload: { userId: grantee, role: 'guest' },
     });
     expect(
-      checkRolePermission(e, { sessionUserId: ACTOR, eff: eff('member', [[newUlid(), true]]) }),
+      checkRolePermission(e, ctx(eff('member', [[newUlid(), true]]))),
     ).toEqual({ refused: true, rule: PERMISSION_ROLE_RULE, reason: WORKSPACE_MEMBERSHIP_REASON });
   });
 
@@ -187,7 +226,7 @@ describe('checkRolePermission — planted defects', () => { // test-cases 3.31
       payload: { userId: newUlid(), projectAdmin: false },
     });
     expect(
-      checkRolePermission(e, { sessionUserId: ACTOR, eff: eff('member', [[project, false]]) }),
+      checkRolePermission(e, ctx(eff('member', [[project, false]]))),
     ).toEqual({ refused: true, rule: PERMISSION_ROLE_RULE, reason: PROJECT_ROSTER_REASON });
   });
 
@@ -196,7 +235,7 @@ describe('checkRolePermission — planted defects', () => { // test-cases 3.31
     // refused everything would pass every refusal case above.
     const e = env({ type: 'ticket.transitioned', entity: ticket, payload: {} });
     expect(
-      checkRolePermission(e, { sessionUserId: ACTOR, eff: eff('member', [[newUlid(), false]]) }),
+      checkRolePermission(e, ctx(eff('member', [[newUlid(), false]]))),
     ).toBeNull();
   });
 });
@@ -320,7 +359,7 @@ async function workspaceStream(workspaceId: string) {
   return rows;
 }
 
-describe('the founding sequence — a new workspace can hold a ticket the moment it exists', () => { // test-cases 3.31
+describe('the founding sequence — a new workspace can hold a ticket the moment it exists', () => {
   it('appends the default workflow, then the four built-in types, then the grant — in that order', async () => {
     const workspaceId = newUlid();
     const founder = newUlid();
@@ -403,6 +442,75 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
     expect(after).toBe(7);
   });
 
+  it('planted defect: a stranger cannot become owner by re-founding an existing workspace', async () => {
+    // THE ESCALATION, end to end, and it was live in this task's first commit.
+    // A second `workspace.created` is refused by nothing else in the system —
+    // `parseEvent` accepts it, the entity↔workspace guard sees no mismatch
+    // because the workspace ids agree, and `evaluateEvent` has no case for the
+    // type — so the founding bypass admitted it, it committed, and the founding
+    // sequence appended `membership.granted {role: 'owner'}` for the stranger.
+    // Measured then: the stranger resolved as `owner` and the workspace held 14
+    // events. Direct `membership.granted` is refused from below admin, so this
+    // was the only path in.
+    //
+    // The FRESH entity id is the sharp half. The obvious guards — a head-row
+    // lookup on `env.entity.id`, or the committed result's per-entity `seq` —
+    // both pass here, because this entity has never been seen. Only asking
+    // whether the WORKSPACE has a ledger catches it.
+    // Mutation: drop `&& !ctx.workspaceExists` from `checkRolePermission`.
+    const ingest = ingestService();
+    const workspaceId = newUlid();
+    const founder = newUlid();
+    const stranger = newUlid();
+    expectCommitted(await ingest.ingestBatch([founding(workspaceId, founder)]));
+
+    const reFound: SubmittedEvent = {
+      ...founding(workspaceId, stranger),
+      entity: { kind: 'workspace', id: newUlid() }, // a fresh entity, same workspace
+    };
+    expect((await ingest.ingestClientBatch([reFound], stranger))[0]).toEqual({
+      status: 'refused',
+      eventId: reFound.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: NOT_A_MEMBER_REASON,
+    });
+
+    const { rows } = await db.pool.query<{ user_id: string; role: string }>(
+      `SELECT user_id, role FROM proj_memberships
+       WHERE workspace_id = $1 AND scope_kind = 'workspace'`,
+      [workspaceId],
+    );
+    expect(rows).toEqual([{ user_id: founder, role: 'owner' }]);
+    expect((await workspaceStream(workspaceId)).length).toBe(7);
+  });
+
+  it('planted defect: the INTERNAL door does not re-found an existing workspace either', async () => {
+    // The internal door has no gate BY DESIGN, and Plan 11's seed CLIs and Task
+    // 13 both use it, so the refusal above protects nothing here. The bootstrap
+    // carries its own condition: `workspaceSeq === 1`, which is the workspace's
+    // own first event and cannot be forged by choosing a fresh entity.
+    // Mutation: relax the condition to `result.status === 'committed'` alone
+    // (or to the per-entity `seq === 1`) and the stream below goes to 13.
+    const ingest = ingestService();
+    const workspaceId = newUlid();
+    const founder = newUlid();
+    expectCommitted(await ingest.ingestBatch([founding(workspaceId, founder)]));
+
+    const second: SubmittedEvent = {
+      ...founding(workspaceId, newUlid()),
+      entity: { kind: 'workspace', id: newUlid() },
+    };
+    // It COMMITS — the internal door trusts its caller, and this is an
+    // ordinary append — but it founds nothing.
+    expectCommitted(await ingest.ingestBatch([second]));
+    expect((await workspaceStream(workspaceId)).length).toBe(8);
+    const { rows } = await db.pool.query<{ user_id: string }>(
+      `SELECT user_id FROM proj_memberships WHERE workspace_id = $1 AND scope_kind = 'workspace'`,
+      [workspaceId],
+    );
+    expect(rows).toEqual([{ user_id: founder }]);
+  });
+
   it('founds through the CLIENT door too — the gate admits the founding and not the sequence', async () => {
     // The discriminating case for the whole bootstrap design. The founding
     // sequence is envelope-origin `'server'`, which `checkRolePermission`
@@ -428,7 +536,7 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
   });
 });
 
-describe('the gate at the client door — refusals before the rule engine', () => { // test-cases 3.31
+describe('the gate at the client door — refusals before the rule engine', () => {
   /** Founds a workspace and returns the owner's id; the bootstrap makes them owner. */
   async function foundedWorkspace(ingest: IngestService) {
     const workspaceId = newUlid();

@@ -57,10 +57,10 @@ the status you are shown**, a bare `echo` included. The summary line is the only
 | **Node** | **v22.22.2** | **v22.22.2** | **v22.22.2** |
 | Gate exit code | **0** | **0** | **0** |
 | Turbo tasks | **21 of 21**, 0 cached | **21 of 21**, 0 cached | **21 of 21**, 0 cached |
-| **Tests** | **936** | **960** | **991** |
+| **Tests** | **936** | **960** | **994** |
 | domain | 274 | 274 | **276** |
 | rule-engine | 278 | 278 | 278 |
-| **server** | 143 | **167** | **196** |
+| **server** | 143 | **167** | **199** |
 | app-core | 130 | 130 | 130 |
 | editor | 72 | 72 | 72 |
 | sync-client | 8 | 8 | 8 |
@@ -69,11 +69,11 @@ the status you are shown**, a bare `echo` included. The summary line is the only
 **T4's delta decomposed** as +24, entirely in `server` (143 → 167) = **12** (`proj-memberships.test.ts`)
 + **11** (`effective-role.test.ts`) + **1** (the DB-free `tables` pin in `projection-order.test.ts`).
 
-**T5's delta decomposes as +31 over T4**, in two packages and no others:
+**T5's delta decomposes as +34 over T4**, in two packages and no others:
 - `domain` +2 — `test/simple-kanban.test.ts`, the canonical default workflow (validates clean at
   version 1; deep-cloned).
-- `server` +29 — **+28** `test/permissions/check-role-permission.test.ts` (new: 11 pure
-  `checkRolePermission` cases, 5 founding-sequence cases, 12 client-door/gate cases) and **+1**
+- `server` +32 — **+31** `test/permissions/check-role-permission.test.ts` (new: 12 pure
+  `checkRolePermission` cases, 7 founding-sequence cases, 12 client-door/gate cases) and **+1**
   `test/events-route.test.ts` (12 → 13: the new `401 unauthenticated` pin on `/v1/events`).
 - Everything else is COUNT-STABLE and content-changed: `ingest.test.ts` stays 19,
   `check-permission.test.ts` stays 7, `sign-in-flows.test.ts` stays 20. Those files were edited, not
@@ -101,8 +101,8 @@ Different trees; the 488 in particular is a control for nothing.
 
 **PHASE 0 COMPLETE.** Step 1 (`6b2fc76`, #38) · step 2 (`c93c910`, #43) · step 3 (`a3746fb`, #47).
 
-**STEP 4: T4 AND T5 ARE BOTH DONE AND COMMITTED on `exec/04-t4-t5-permissions`, GATE GREEN at 991.
-NOTHING IS IN FLIGHT. THE NEXT ACTION IS TO OPEN THE ONE PR** (one PR for the step, not one per task).
+**STEP 4: T4 AND T5 ARE BOTH DONE AND COMMITTED on `exec/04-t4-t5-permissions`, GATE GREEN at 994.
+NOTHING IS IN FLIGHT. THE NEXT ACTION IS TO OPEN THE ONE PR** (one PR for the step, not one per task). Gate green at **994**.
 
 ### T4 — done. What it landed, and the plan-text defect it had to refuse
 
@@ -143,7 +143,14 @@ exist yet. **Plan 3 Chain B — step 8 — adds them and MUST INSERT.**
 3. **RULING P18 is untouched and still open** — `getEntityState('membership')` still returns `null`.
    T5 read roles through `resolveEffectiveRole` and never through the engine, exactly as scoped.
    *Owner unchanged: whoever dispatches Plan 4 Task 6 or the step-10 checkpoint.*
-4. **The correctness half of the transactional-read argument is still an argument.** The new pin
+4. **A second `workspace.created` still COMMITS through the internal door** (it founds nothing, which
+   is what is pinned). Refusing it outright would be a new door or engine rule and is out of T5's
+   scope. *Owner: Plan 4 Task 13, which builds `POST /v1/workspaces`.*
+5. **No `test-cases` markers on the new file, deliberately.** `3.31` is the envelope-origin gate and
+   its catalogue entry names `check-permission.test.ts`; stamping it on 31 role/founding/roster tests
+   would assert coverage that entry never described. Plan 4 puts its catalogue steps in Tasks 12–14.
+   *Owner: whoever executes Plan 4 Task 12.*
+6. **The correctness half of the transactional-read argument is still an argument.** The new pin
    catches a gate that needs a second CONNECTION; it cannot manufacture a concurrent commit, so
    "a revoke committing mid-transaction is invisible to a pool-side read" remains prose in
    `check-permission.ts`. *Owner: whoever builds the first real concurrency harness — Plan 10's sync
@@ -188,7 +195,29 @@ exist yet. **Plan 3 Chain B — step 8 — adds them and MUST INSERT.**
 `packages/domain/src/simple-kanban.ts`; `apps/server/src/workspaces/bootstrap-workspace.ts` fired from
 `ingestAll` on accept.
 
-**Eleven mutations run against the committed tree; ten died naming their own site on the first pass.**
+**THE ONE THING TO READ IF YOU READ NOTHING ELSE ABOUT T5.** T5's first commit shipped a live
+**privilege escalation**, found in review and fixed in the second commit. Nothing in this system refuses
+a SECOND `workspace.created`: `parseEvent` accepts it, the entity↔workspace guard sees no mismatch when
+the workspace ids agree, and `evaluateEvent` has no case for the type. So the founding bypass — the one
+event type a non-member may submit — admitted it, and T5's own founding sequence then appended
+`membership.granted {role: 'owner'}` for whoever sent it. **Measured before the fix: a stranger resolved
+as `owner` of a workspace they were never in, and the workspace held 14 events instead of 7.** Direct
+`membership.granted` is refused from below admin, so the founding bypass was the only path in — the
+escalation was created by T5's own bootstrap, not inherited.
+
+Two guards, because two doors:
+- `PermissionContext.workspaceExists` — REQUIRED, not optional, since `false` is the permissive value —
+  bounds the bypass to a workspace with no ledger. It asks about the WORKSPACE, not the event's entity:
+  the sharp variant of the attack files its second `workspace.created` against a FRESH entity id, which
+  has no head row and whose per-entity `seq` is 1, so both obvious guards pass it.
+- The bootstrap now fires on `committed.workspaceSeq === 1`, which is what protects the INTERNAL door —
+  ungated by design, and used by Plan 11's seeds and Task 13.
+
+**The test that missed it exercised only the duplicate-event-id path.** A second `workspace.created`
+with a FRESH id is a different path, and 28 passing tests and 11 dead mutations did not touch it. Both
+directions are pinned now.
+
+**Eleven mutations run against the first commit; ten died naming their own site on the first pass.**
 The survivor was the one that mattered: `{ db: client }` → `{ db: deps.pool }` at the gate call site
 compiled and passed the entire suite. A one-connection proxy pool now pins it (a gate needing a second
 connection deadlocks a saturated pool), and the mutation dies. **The comment was the only guard, and a

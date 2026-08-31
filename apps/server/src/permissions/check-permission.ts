@@ -35,6 +35,35 @@ export function adminOnlyReason(role: string): string {
 export interface PermissionContext {
   sessionUserId: string;
   eff: EffectiveRole;
+  /**
+   * Whether this workspace ALREADY HAS A LEDGER — any committed event at all,
+   * not merely a `workspace.created` on some entity.
+   *
+   * REQUIRED, and required rather than optional-defaulting-to-`false` because
+   * `false` is the permissive value: an optional field here would let every
+   * call site that forgot it re-open the escalation below while typechecking
+   * green.
+   *
+   * It exists because the founding bypass is otherwise unbounded. `workspace.created`
+   * is the one type a non-member may submit — there is no membership to hold in
+   * a workspace that does not exist yet — and NOTHING refuses a second
+   * `workspace.created` naming a workspace that does. Without this flag a
+   * stranger who knows a workspace's ULID submits one, the bypass admits it,
+   * the entity↔workspace guard sees no mismatch, the engine has no case for the
+   * type, it commits, and the founding sequence appends
+   * `membership.granted {role: 'owner'}` for them. **Measured before the fix:
+   * the attacker resolved as `owner` of a workspace they were never in, and the
+   * workspace held 14 events instead of 7.** Direct `membership.granted` is
+   * refused from below admin, so this was the only path in — which is what made
+   * it load-bearing rather than incidental.
+   *
+   * Asked of the WORKSPACE and not of the event's entity, deliberately: a
+   * variant of the same attack files the second `workspace.created` against a
+   * FRESH entity id under the victim's `workspaceId`, which has no head row and
+   * no per-entity seq to give it away. The only question that catches both is
+   * whether this workspace has a history.
+   */
+  workspaceExists: boolean;
 }
 
 /**
@@ -103,9 +132,11 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
  *    ledger is append-only by trigger, so such a row could only ever be
  *    superseded, never removed.
  * 3. **Workspace founding.** `workspace.created` is the one type a non-member
- *    may submit: there is no membership to hold in a workspace that does not
- *    exist yet. It returns before the membership check rather than being listed
- *    as an exception inside it, so the bypass is one line a reader can see.
+ *    may submit, and ONLY into a workspace that does not exist yet — see
+ *    `PermissionContext.workspaceExists`, which is the whole difference between
+ *    a founding and a privilege escalation. It returns before the membership
+ *    check rather than being listed as an exception inside it, so the bypass is
+ *    one line a reader can see, with its one condition beside it.
  * 4. **Membership.** Everything else needs a workspace-scope role. `null` means
  *    not a member at all, and `resolveEffectiveRole` guarantees that when it is
  *    null the project set is empty too — so no project-scope row left standing
@@ -163,7 +194,7 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
   if (env.origin === 'server') {
     return refuse(SERVER_ORIGIN_REASON);
   }
-  if (env.type === 'workspace.created') {
+  if (env.type === 'workspace.created' && !ctx.workspaceExists) {
     return null; // founding a workspace needs a session, not a membership
   }
 
@@ -213,7 +244,30 @@ export async function checkPermission(
   ctx: SubmissionContext,
 ): Promise<Refusal | null> {
   const eff = await resolveEffectiveRole(ctx.db, ctx.sessionUserId, env.workspaceId);
-  return checkRolePermission(env, { sessionUserId: ctx.sessionUserId, eff });
+  return checkRolePermission(env, {
+    sessionUserId: ctx.sessionUserId,
+    eff,
+    workspaceExists: await workspaceHasLedger(ctx.db, env.workspaceId),
+  });
+}
+
+/**
+ * Has this workspace any committed history at all?
+ *
+ * `EXISTS` over `events`, not a head-row lookup on the event's own entity: the
+ * escalation this answers has a variant that files its second
+ * `workspace.created` against a fresh entity id, which has no head row. The
+ * ledger's `(workspace_id, workspace_seq)` unique index is the access path.
+ *
+ * Called inside the ingest transaction, which already holds this workspace's
+ * lock, so no concurrent founding can slip between this read and the insert.
+ */
+async function workspaceHasLedger(db: Queryable, workspaceId: string): Promise<boolean> {
+  const { rows } = await db.query<{ present: boolean }>(
+    'SELECT EXISTS (SELECT 1 FROM events WHERE workspace_id = $1) AS present',
+    [workspaceId],
+  );
+  return rows[0]?.present === true;
 }
 
 /**
