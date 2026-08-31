@@ -101,9 +101,11 @@ conclusion was false.
 
 **Catalogue, ruled 2026-08-31 — an earlier version of this line was WRONG.** It said step 4 "creates §6",
 asserted from the dispatch brief without opening Plan 4. **Plan 4's explicit catalogue steps are all in
-Tasks 12–14** (lines 4700/4866/4884/4922, 5131, 5260); T4 and T5 have none. But **Plan 4 line 32 is its
-own governing rule** — *"Features.md and test-cases/ move in the same change set as the work"* — so the
-plan contradicts itself, and a general rule at the top governs the specific steps below it. **Ruling:
+Tasks 12–14** (lines 4700/4866/4884/4922, 5131, 5260); T4 and T5 have none. But **the same-change-set rule is a series-wide
+standing constraint, not Plan 4 boilerplate** — measured, it appears in **all 11 numbered plans** (01–11),
+phrased differently in each. So if T12–14's steps meant "earlier tasks are exempt", the same inference
+would exempt earlier tasks in *every* plan and the rule would mean nothing anywhere. A general rule stated
+in eleven places governs the specific steps below it. **Ruling:
 step 4's PR creates §6 and `test-cases/06-auth-visibility.md` carrying ONLY T4's and T5's own entries**;
 T12–14 append theirs. Rationale: `proj_memberships` ships to `main` at this PR, so deferring leaves the
 catalogue not knowing about a live projection — the drift #47 was blocked for. Waiving it would make that
@@ -217,6 +219,11 @@ Every one below was violated by a controller that had just written it. **Assume 
   assertions was dead, not the test. **"Vacuous" invites deletion**, so a too-wide verdict licenses
   removing a working check. The controller propagated this one in a dispatch while simultaneously
   demanding mutation proof for the positive claim.
+- **An over-specific search returns a false negative that looks like a finding.** Searching all 12 plans
+  for Plan 4's *exact* wording of the catalogue rule found it in **one** file; searching for the rule
+  loosely found it in **all 11**. Same class as grepping for `21 behind` when the file said `20`.
+  **Search for the fact in the vocabulary the other author would have used, not in yours** — and print the
+  rows, because two of the twelve returned blank rather than `0`.
 - **PRINT THE ROWS, NOT THE COUNT, whenever a count is about to decide something.** Four instances in one
   day, one cause: a proxied `grep -c` silently reformatting its output; a `merge-tree` stat whose 11-line
   "difference" was **conflict markers**; a regex counting `9.1`/`9.34` out of prose *describing* a reserved
