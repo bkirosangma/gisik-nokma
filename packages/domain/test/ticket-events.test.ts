@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseEvent } from '../src/parse-event.js';
-import { ticketFieldSetPayload } from '../src/events/ticket-events.js';
+import { ticketCreatedPayload, ticketFieldSetPayload } from '../src/events/ticket-events.js';
 import { makeEnvelope } from '../src/testing.js';
 
 const TICKET = '01J9GTKA000000000000000000';
@@ -132,9 +132,12 @@ describe('ticket event vocabulary', () => {
 /**
  * The presence hole, closed. `z.unknown()` alone does NOT require the key, so
  * `{ fieldId: 'title' }` — no `value` at all — parsed clean, and the reducer's
- * `p.value ?? null` (`src/ticket-state.ts:201`) folded that absence into a null
- * CLEARING claim: a field wiped under the actor's name and both their clocks,
- * into an append-only table, on the strength of a claim nobody made.
+ * then-`p.value ?? null` folded that absence into a null CLEARING claim: a
+ * field wiped under the actor's name and both their clocks, into an append-only
+ * table, on the strength of a claim nobody made. The coalesce has since been
+ * dropped too — `src/ticket-state.ts:211` reads `claim(p.value, env)` — because
+ * with the key required the `parse` throws first and `null ?? null` is
+ * identity, so the fold could only have restated the defect as the design.
  *
  * FOUR assertions rather than one "the field is required", because two of the
  * four are ACCEPTANCES and they are the half a careless fix breaks. A schema
@@ -177,5 +180,64 @@ describe('ticket.field_set value is required', () => {
 
   it('the door inherits it: parseEvent refuses a field_set carrying no value', () => {
     expect(refuses('ticket.field_set', 'ticket', { fieldId: 'title' })).toBe('invalid-payload');
+  });
+});
+
+/**
+ * Ruling P15 — the create door was admitting precisely the state the edit door
+ * forbids. `checkTicketFieldSet` refuses a whitespace-only `title` change with
+ * `field.type-mismatch`, so `'   '` could be CREATED but never set; "the title
+ * that cannot vanish" was an edit-time rule rather than an invariant.
+ *
+ * FOUR assertions rather than one "titles must not be blank", for the reason
+ * the field_set block above gives: two of the four are ACCEPTANCES, and they
+ * are the half a careless fix breaks. A refine that trimmed instead of refusing
+ * would pass a "blank is refused" test and quietly rewrite every padded title
+ * in the ledger — putting words in the actor's mouth — so the padded case
+ * asserts the stored string BYTE FOR BYTE, exactly as `membership.test.ts` does
+ * for a workspace name. The refusal itself is the sibling's, in the sibling's
+ * words with the noun it is about: one answer across the series, not two.
+ */
+describe('ticket.created title must not be blank', () => {
+  function issues(payload: Record<string, unknown>): Array<{ path: (string | number)[]; message: string }> {
+    const result = ticketCreatedPayload.safeParse(payload);
+    if (result.success) throw new Error('expected safeParse to fail, but it succeeded');
+    return result.error.issues.map((issue) => ({ path: issue.path, message: issue.message }));
+  }
+
+  function created(title: unknown): Record<string, unknown> {
+    return { typeId: 'task', projectId: PROJECT, parentId: null, title };
+  }
+
+  it('refuses an empty title', () => {
+    expect(issues(created(''))).toContainEqual({
+      path: ['title'],
+      message: 'String must contain at least 1 character(s)',
+    });
+  });
+
+  it('planted defect: refuses a title of only spaces — .min(1) alone admits it', () => {
+    expect(ticketCreatedPayload.safeParse(created('   ')).success).toBe(false);
+    expect(issues(created('   '))).toContainEqual({
+      path: ['title'],
+      message: 'must not be blank — a title of only spaces names nothing',
+    });
+  });
+
+  it('accepts a padded real title and stores it VERBATIM — refusing blanks must not become trimming', () => {
+    expect(ticketCreatedPayload.parse(created('  Reconcile the till  '))).toEqual({
+      typeId: 'task',
+      projectId: PROJECT,
+      parentId: null,
+      title: '  Reconcile the till  ',
+    });
+  });
+
+  it('accepts an ordinary title', () => {
+    expect(ticketCreatedPayload.safeParse(created('Reconcile the till')).success).toBe(true);
+  });
+
+  it('the door inherits it: parseEvent refuses a ticket.created whose title is only spaces', () => {
+    expect(refuses('ticket.created', 'ticket', created('   '))).toBe('invalid-payload');
   });
 });

@@ -1,7 +1,7 @@
 import type { CustomFieldDef, EventEnvelope } from '@gisik-nokma/domain';
 import { IST_DAY_REGEX, dueDateValueSchema, ticketFieldSetPayload } from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
-import { REFUSAL_RULES } from '../refusal-rules.js';
+import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { getTicketState, getTicketTypeDef } from './context-helpers.js';
 import { ACCEPT, fieldKindRefusal, refuse } from './refusals.js';
 
@@ -75,9 +75,10 @@ function customFieldVerdict(field: CustomFieldDef, value: unknown): Accept | Ref
  * this plan.
  *
  * NOTHING HERE HAS TO INVENT AN ABSENT VALUE. `ticketFieldSetPayload` now
- * requires `value` to be present (`events/ticket-events.ts:56-61`, this task):
+ * requires `value` to be present (`events/ticket-events.ts:91-93`, this task):
  * before that, a payload omitting it parsed clean and the reducer's
- * `p.value ?? null` folded the absence into a null clearing claim nobody made.
+ * then-`p.value ?? null` folded the absence into a null clearing claim nobody
+ * made. That coalesce has since been dropped as well (`ticket-state.ts:211`).
  * The refusal for an absent value is therefore `malformed-payload` from the
  * parse below, which is the honest answer — the claim never arrived.
  */
@@ -101,7 +102,7 @@ export async function checkTicketFieldSet(env: EventEnvelope, ctx: EngineContext
   // and a crash.
   const parsed = ticketFieldSetPayload.safeParse(env.payload);
   if (!parsed.success) {
-    const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
+    const detail = malformedPayloadDetail(parsed.error);
     return {
       refused: true,
       rule: REFUSAL_RULES.malformedPayload,
@@ -149,7 +150,7 @@ export async function checkTicketFieldSet(env: EventEnvelope, ctx: EngineContext
 
   // Clearing any custom field is a legal claim, and a claim is what it stays:
   // the reducer keeps the clearer's id and both clocks, so "who emptied this,
-  // and when" survives (`ticket-state.ts:198-202`).
+  // and when" survives (`ticket-state.ts:197-211`).
   if (value === null) return ACCEPT;
   return customFieldVerdict(field, value);
 }

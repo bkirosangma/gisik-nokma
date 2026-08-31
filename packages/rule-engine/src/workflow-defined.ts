@@ -1,5 +1,5 @@
 import { validateWorkflowDef, workflowDefinedPayloadSchema, type EventEnvelope } from '@gisik-nokma/domain';
-import { REFUSAL_RULES } from './refusal-rules.js';
+import { REFUSAL_RULES, malformedPayloadDetail } from './refusal-rules.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
 
 export async function evaluateWorkflowDefined(
@@ -22,7 +22,7 @@ export async function evaluateWorkflowDefined(
 
   const parsed = workflowDefinedPayloadSchema.safeParse(env.payload);
   if (!parsed.success) {
-    const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
+    const detail = malformedPayloadDetail(parsed.error);
     return {
       refused: true,
       rule: REFUSAL_RULES.malformedPayload,

@@ -211,7 +211,7 @@ describe('checkTicketCreated', () => {
     expect(await checkTicketCreated(env, baseCtx())).toEqual({
       refused: true,
       rule: 'malformed-payload',
-      reason: "This ticket.created event's payload is malformed: must be a ULID",
+      reason: "This ticket.created event's payload is malformed: at parentId: must be a ULID",
     });
   });
 

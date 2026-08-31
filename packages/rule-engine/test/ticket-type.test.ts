@@ -135,7 +135,7 @@ describe('checkTicketTypeDefined', () => {
     expect(await checkTicketTypeDefined(env, ctx())).toEqual({
       refused: true,
       rule: 'malformed-payload',
-      reason: 'This ticket-type.defined event\'s payload is malformed: Number must be greater than or equal to 1',
+      reason: 'This ticket-type.defined event\'s payload is malformed: at rank: Number must be greater than or equal to 1',
     });
   });
 

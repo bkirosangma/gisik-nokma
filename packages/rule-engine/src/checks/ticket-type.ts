@@ -1,7 +1,7 @@
 import type { EventEnvelope } from '@gisik-nokma/domain';
 import { BUILTIN_TICKET_TYPE_SEEDS, ticketTypeDefSchema } from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
-import { REFUSAL_RULES } from '../refusal-rules.js';
+import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { ACCEPT, builtinRankRefusal, refuse } from './refusals.js';
 
 /**
@@ -34,7 +34,7 @@ export async function checkTicketTypeDefined(
 
   const parsed = ticketTypeDefSchema.safeParse(env.payload);
   if (!parsed.success) {
-    const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
+    const detail = malformedPayloadDetail(parsed.error);
     return {
       refused: true,
       rule: REFUSAL_RULES.malformedPayload,

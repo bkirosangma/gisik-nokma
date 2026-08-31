@@ -52,7 +52,7 @@ function ctxWithoutTheTicketsType(): MemoryContext {
 
 /**
  * Candidate payloads spell the key `fieldId`, which is what the DOMAIN schema
- * says (`events/ticket-events.ts:56`). The fixture harness's PRIOR-event parser
+ * says (`events/ticket-events.ts:91`). The fixture harness's PRIOR-event parser
  * spells it `field`, and the split is deliberate — controller ruling P8,
  * pre-flight A16. Neither is adapted into the other.
  */
@@ -232,19 +232,21 @@ describe('checkTicketFieldSet', () => {
 
   /**
    * The presence hole at the check's own door. `ticketFieldSetPayload` used to
-   * admit a payload with no `value` key at all, and the reducer's
-   * `p.value ?? null` turned that absence into a null CLEARING claim nobody
-   * made. The domain schema now refuses it (four assertions in
+   * admit a payload with no `value` key at all, and the reducer's then-`p.value
+   * ?? null` turned that absence into a null CLEARING claim nobody made. The
+   * domain schema now refuses it (four assertions in
    * `packages/domain/test/ticket-events.test.ts`); this is the same refusal
    * seen from where the fixture suite and Plan 10's offline replica stand,
-   * which is the only door those two ever pass.
+   * which is the only door those two ever pass. The coalesce is gone as well —
+   * `ticket-state.ts:211` reads `claim(p.value, env)`, because once the key is
+   * required the fold could only restate the closed hole as the design.
    */
   it('planted defect: a field_set carrying no value at all is refused, not folded into a clearing', async () => {
     expect(await checkTicketFieldSet(fieldSetWithNoValue('amount'), ctx())).toEqual({
       refused: true,
       rule: 'malformed-payload',
       reason:
-        "This ticket.field_set event's payload is malformed: is required — a field claim with no value would record a clearing nobody made",
+        "This ticket.field_set event's payload is malformed: at value: is required — a field claim with no value would record a clearing nobody made",
     });
   });
 

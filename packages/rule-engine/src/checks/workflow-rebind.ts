@@ -1,7 +1,7 @@
 import type { EventEnvelope } from '@gisik-nokma/domain';
 import { ticketWorkflowReboundPayload } from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
-import { REFUSAL_RULES } from '../refusal-rules.js';
+import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { getTicketState } from './context-helpers.js';
 import {
   ACCEPT,
@@ -24,7 +24,7 @@ import {
  * workflow, the workflow the payload names, and that workflow's states.
  *
  * **The payload's destination field genuinely IS `toStateId`** — the one place
- * in this vocabulary where that spelling is correct (`events/ticket-events.ts:97-100`,
+ * in this vocabulary where that spelling is correct (`events/ticket-events.ts:158-161`,
  * pre-flight A10 / Verified facts). `ticket.transitioned`'s is `to`. Both
  * spellings are real and neither is "adapted" into the other.
  *
@@ -51,7 +51,7 @@ export async function checkTicketWorkflowRebound(
 
   const parsed = ticketWorkflowReboundPayload.safeParse(env.payload);
   if (!parsed.success) {
-    const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
+    const detail = malformedPayloadDetail(parsed.error);
     return {
       refused: true,
       rule: REFUSAL_RULES.malformedPayload,
@@ -71,7 +71,7 @@ export async function checkTicketWorkflowRebound(
   // reaches any state without satisfying `restrict-to`, `require-comment`,
   // `require-evidence`, `require-field` or `require-different-user`, and without
   // the move ever appearing in the transition log four-eyes reads (the reducer
-  // deliberately appends no entry, `ticket-state.ts:223-230`). Moving inside one
+  // deliberately appends no entry, `ticket-state.ts:233-240`). Moving inside one
   // workflow already has a mechanism that honours all of those, so there is no
   // case to weigh.
   if (p.toWorkflowId === ticket.workflowId) {
@@ -89,7 +89,7 @@ export async function checkTicketWorkflowRebound(
 
   // "The ledger accepts only what it can later replay" (spec §3): the reducer
   // throws on a rebound whose destination state the target workflow does not
-  // have (`ticket-state.ts:219-222`), so an accepted one would be unprojectable.
+  // have (`ticket-state.ts:229-232`), so an accepted one would be unprojectable.
   if (!target.states.some((state) => state.id === p.toStateId)) {
     return refuse('ticket.rebound-unknown-state', reboundUnknownStateRefusal(target.name, p.toStateId, ticket.id));
   }

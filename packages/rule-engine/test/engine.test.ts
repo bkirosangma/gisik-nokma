@@ -327,6 +327,86 @@ describe('evaluateEvent — the dispatcher', () => {
 });
 
 /**
+ * The malformed-payload detail names its SUBJECT, and these two checks are the
+ * only ones where nothing else says so.
+ *
+ * Every check that parses a payload used to build its detail from
+ * `issue.message` alone, dropping the zod path — and a zod message is a
+ * sentence fragment. The five checks Plan 3 owns each pin the corrected string
+ * in their own suite; these two are Plan 2's, and their only coverage is two
+ * fixtures asserting `reasonStartsWith` a prefix that stops at "malformed:".
+ * A fixture prefix cannot see the detail, so without these the shared
+ * `malformedPayloadDetail` could lose the path clause here and stay green.
+ *
+ * The transitioned case carries a NESTED path on purpose: `comment.text` is the
+ * only assertion in the repo that pins `path.join('.')` rather than a
+ * single-segment path, so a join changed to a comma or a space dies here.
+ */
+describe('a malformed payload names the field it is about', () => {
+  it('ticket.transitioned: a nested path is joined with dots', async () => {
+    const { ctx } = spyContext();
+    const env = envelope({
+      type: 'ticket.transitioned',
+      entity: { kind: 'ticket', id: newUlid() },
+      payload: { to: 'done', comment: { text: 5 } },
+    });
+    await expect(evaluateEvent(env, ctx)).resolves.toEqual({
+      refused: true,
+      rule: 'malformed-payload',
+      reason:
+        "This ticket.transitioned event's payload is malformed: at comment.text: Expected string, received number",
+    });
+  });
+
+  it('workflow.defined: the version that cannot be zero says which field it is', async () => {
+    const { ctx } = spyContext();
+    const id = newUlid();
+    const env = envelope({
+      type: 'workflow.defined',
+      entity: { kind: 'workflow', id },
+      payload: {
+        id,
+        version: 0,
+        name: 'Basic',
+        initialStateId: 'todo',
+        states: [{ id: 'todo', name: 'To do', category: 'open' }],
+        transitions: [],
+      },
+    });
+    await expect(evaluateEvent(env, ctx)).resolves.toEqual({
+      refused: true,
+      rule: 'malformed-payload',
+      reason:
+        "This workflow.defined event's payload is malformed: at version: Number must be greater than or equal to 1",
+    });
+  });
+
+  /**
+   * The other half of the path clause: it is OMITTED when there is no path.
+   * A payload that is not an object at all fails at the root, where
+   * `issue.path` is `[]` — rendering the clause anyway would produce
+   * "malformed: at : Expected object", which is worse than the subject-less
+   * fragment the clause exists to replace. Neither shipped fixture reaches
+   * this: both send objects, and both assert only the prefix that stops at
+   * "malformed:".
+   */
+  it('workflow.defined: a payload that is not an object at all names no field, because there is none', async () => {
+    const { ctx } = spyContext();
+    const env = envelope({
+      type: 'workflow.defined',
+      entity: { kind: 'workflow', id: newUlid() },
+      payload: 'not a definition',
+    });
+    await expect(evaluateEvent(env, ctx)).resolves.toEqual({
+      refused: true,
+      rule: 'malformed-payload',
+      reason: "This workflow.defined event's payload is malformed: Expected object, received string",
+    });
+  });
+});
+
+
+/**
  * The structural refusal joins EVERY issue into one reason, separated by a
  * single space. No fixture can pin that separator: every planted definition in
  * the fixture suite is built to fire exactly one issue, and a one-element join

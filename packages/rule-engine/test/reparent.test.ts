@@ -305,7 +305,7 @@ describe('checkTicketReparented', () => {
     expect(await checkTicketReparented(env, chainCtx())).toEqual({
       refused: true,
       rule: 'malformed-payload',
-      reason: "This ticket.reparented event's payload is malformed: must be a ULID",
+      reason: "This ticket.reparented event's payload is malformed: at newParentId: must be a ULID",
     });
   });
 

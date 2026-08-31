@@ -48,7 +48,7 @@ function rebind(ticketId: string, toWorkflowId: string, toStateId: string): Even
     entity: { kind: 'ticket', id: ticketId },
     workspaceId: WS,
     // The one payload in this vocabulary whose destination field genuinely IS
-    // `toStateId` (`events/ticket-events.ts:97-100`, pre-flight A10). Spelled
+    // `toStateId` (`events/ticket-events.ts:158-161`, pre-flight A10). Spelled
     // `to` here it would not parse.
     payload: { toWorkflowId, toStateId },
   });
@@ -135,7 +135,7 @@ describe('checkTicketWorkflowRebound', () => {
   /**
    * "The ledger accepts only what it can later replay" (spec §3): the reducer
    * throws on a rebound whose destination the target workflow does not have
-   * (`ticket-state.ts:219-222`), so an accepted one would be unprojectable. The
+   * (`ticket-state.ts:229-232`), so an accepted one would be unprojectable. The
    * state named is one of the OUTGOING workflow's, which is the mistake an
    * admin authoring a cross-workflow map actually makes.
    */
@@ -173,7 +173,7 @@ describe('checkTicketWorkflowRebound', () => {
       refused: true,
       rule: 'malformed-payload',
       reason:
-        'This ticket.workflow_rebound event\'s payload is malformed: String must contain at least 1 character(s)',
+        'This ticket.workflow_rebound event\'s payload is malformed: at toStateId: String must contain at least 1 character(s)',
     });
   });
 });

@@ -1,7 +1,7 @@
 import type { EventEnvelope, TicketState } from '@gisik-nokma/domain';
 import { DEEPEST_RANK, ticketCreatedPayload, ticketReparentedPayload } from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
-import { REFUSAL_RULES } from '../refusal-rules.js';
+import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { getTicketState, getTicketTypeDef } from './context-helpers.js';
 import { ACCEPT, deepestRankParentRefusal, parentTerminalRefusal, rankRefusal, refuse } from './refusals.js';
 
@@ -62,7 +62,7 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
   // and a crash.
   const parsed = ticketCreatedPayload.safeParse(env.payload);
   if (!parsed.success) {
-    const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
+    const detail = malformedPayloadDetail(parsed.error);
     return {
       refused: true,
       rule: REFUSAL_RULES.malformedPayload,
@@ -200,7 +200,7 @@ export async function checkTicketReparented(env: EventEnvelope, ctx: EngineConte
   // front of them are the ones with no other net.
   const parsed = ticketReparentedPayload.safeParse(env.payload);
   if (!parsed.success) {
-    const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
+    const detail = malformedPayloadDetail(parsed.error);
     return {
       refused: true,
       rule: REFUSAL_RULES.malformedPayload,

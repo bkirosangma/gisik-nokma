@@ -1,5 +1,5 @@
 import { ticketTransitionedPayloadSchema, type EventEnvelope } from '@gisik-nokma/domain';
-import { REFUSAL_RULES } from './refusal-rules.js';
+import { REFUSAL_RULES, malformedPayloadDetail } from './refusal-rules.js';
 import { evaluateTransitionRules } from './rules/index.js';
 import { resolveCurrentStateId } from './version-map.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
@@ -29,7 +29,7 @@ export async function evaluateTicketTransitioned(
 
   const parsed = ticketTransitionedPayloadSchema.safeParse(env.payload);
   if (!parsed.success) {
-    const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
+    const detail = malformedPayloadDetail(parsed.error);
     return {
       refused: true,
       rule: REFUSAL_RULES.malformedPayload,

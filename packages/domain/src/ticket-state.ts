@@ -198,7 +198,17 @@ export function applyTicketEvent(
       const p = ticketFieldSetPayload.parse(env.payload);
       // A clearing claim is a claim: `value: null` keeps the clearer's id and
       // both clocks, so "who emptied this, and when" survives.
-      return { ...state, fields: { ...state.fields, [p.fieldId]: claim(p.value ?? null, env) } };
+      //
+      // `claim(p.value, env)`, with no `?? null`. The coalesce this line used to
+      // carry was how an ABSENT value became a clearing claim nobody made:
+      // `z.unknown()` did not require the key, so `{ fieldId: 'title' }` parsed
+      // clean and `undefined ?? null` wrote a null. The schema now refuses an
+      // absent or `undefined` value outright (`events/ticket-events.ts`), so the
+      // `parse` above throws before this line and the only `null` that reaches
+      // it is one somebody claimed — `null ?? null` is identity. Keeping the
+      // coalesce would state the defect as the design, and `claim` takes
+      // `unknown`, so it was never load-bearing for typing either.
+      return { ...state, fields: { ...state.fields, [p.fieldId]: claim(p.value, env) } };
     }
     case 'ticket.reparented': {
       const p = ticketReparentedPayload.parse(env.payload);
@@ -208,7 +218,7 @@ export function applyTicketEvent(
       // The one payload in this vocabulary whose destination field genuinely IS
       // `toStateId` — the outgoing and incoming workflows are unrelated graphs,
       // so the claim names where the ticket lands rather than leaving it to be
-      // guessed (events/ticket-events.ts:90-95).
+      // guessed (events/ticket-events.ts:151-156).
       const p = ticketWorkflowReboundPayload.parse(env.payload);
       const wf = deps.getWorkflow(p.toWorkflowId);
       if (!wf) {
