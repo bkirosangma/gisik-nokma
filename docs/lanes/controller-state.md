@@ -93,8 +93,39 @@ discharged in `f40a850`.
 > *"at `8209397`, not at the branch tip"* is **SUPERSEDED** — T9 was reviewed and its fixes applied, and
 > the branch merged at its tip.
 
-**Step 4 is next: Plan 4 T4 → T5**, dispatched to the executor. It carries the CSRF ruling and **creates
-`Features.md` §6 and `test-cases/06-auth-visibility.md`** — in the same change set, per the rule below.
+**Step 4 is running: Plan 4 T4 → T5.** T4 (`proj_memberships`) is committed and green; T5 widens
+`SubmissionGate` — note **T5 is NOT unstarted**, `fc904f4` landed its first branch, so review its PR as a
+widening, not a creation. **No rebase was needed:** `exec/04-auth-visibility` is redundant (see the
+`git cherry` rule below) — the recon's "31 behind / 4 ahead, two conflicts" was accurate and its
+conclusion was false.
+
+**Catalogue, ruled 2026-08-31 — an earlier version of this line was WRONG.** It said step 4 "creates §6",
+asserted from the dispatch brief without opening Plan 4. **Plan 4's explicit catalogue steps are all in
+Tasks 12–14** (lines 4700/4866/4884/4922, 5131, 5260); T4 and T5 have none. But **Plan 4 line 32 is its
+own governing rule** — *"Features.md and test-cases/ move in the same change set as the work"* — so the
+plan contradicts itself, and a general rule at the top governs the specific steps below it. **Ruling:
+step 4's PR creates §6 and `test-cases/06-auth-visibility.md` carrying ONLY T4's and T5's own entries**;
+T12–14 append theirs. Rationale: `proj_memberships` ships to `main` at this PR, so deferring leaves the
+catalogue not knowing about a live projection — the drift #47 was blocked for. Waiving it would make that
+block arbitrary.
+
+### `git cherry` before you believe an ahead-count
+
+**An ahead-count is not a work-count.** `exec/04-auth-visibility` read `31 behind / 4 ahead` with two real
+`merge-tree` conflicts — and `git cherry origin/main <branch>` prints `-` for all four commits: every one
+already upstream. `rev-list` measures commit identity, `merge-tree` measures a merge; **neither asks
+whether the content is already upstream.** Run `git cherry` FIRST for every remaining branch.
+
+**Asymmetry, because this repo squash-merges.** `-` is strong evidence of redundancy. `+` is NOT
+conclusive: a squash collapses N commits into one and destroys the per-commit patch-ids `cherry` matches,
+so `exec/03-tickets-hierarchy` reports `31/31 new` despite having merged as `6b2fc76`. A false `+` costs
+work, never loses it. **Tell them apart:** a squash landing's subject ends in `(#N)` and a rebase landing's
+does not — verified against both populations here. That is a GitHub UI convention, not a git property, so
+it is good evidence rather than proof.
+
+Measured: `exec/04-envelope-origin-gate` is the only genuinely inert branch (merge-tree byte-identical to
+`main`). `exec/04-auth-visibility` and `exec/10-prefix` are superseded AND conflicting — **merging either
+would now regress `main`**, which is a stronger statement than "redundant".
 
 ### The catalogue rule, and how I got its number wrong
 
@@ -186,6 +217,15 @@ Every one below was violated by a controller that had just written it. **Assume 
   assertions was dead, not the test. **"Vacuous" invites deletion**, so a too-wide verdict licenses
   removing a working check. The controller propagated this one in a dispatch while simultaneously
   demanding mutation proof for the positive claim.
+- **PRINT THE ROWS, NOT THE COUNT, whenever a count is about to decide something.** Four instances in one
+  day, one cause: a proxied `grep -c` silently reformatting its output; a `merge-tree` stat whose 11-line
+  "difference" was **conflict markers**; a regex counting `9.1`/`9.34` out of prose *describing* a reserved
+  range; and an idle check where a `✻` inside a "done" line made a finished session look busy. Corollary:
+  when the rows are too many to read, print the first few **and** the count — the disagreement is the signal.
+- **`git merge-tree --write-tree` writes conflict markers INTO the tree**, so comparing its output tree to
+  `main`'s answers *"did this conflict"*, never *"is this redundant"* — a conflicting branch can never
+  compare equal whatever its content. The tell for any instrument: **could it produce the answer that
+  would clear the subject?** If not, it is not a check.
 - **Verify a count by enumerating and marking, with the marker string counted as a control** so a zero
   cannot come from a sweep that matched nothing. Method from the executor, after the controller and
   Ruling P17 asserted two different wrong counts for the same thing.
