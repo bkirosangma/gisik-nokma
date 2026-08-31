@@ -2,7 +2,6 @@ import type { EventEnvelope } from '@gisik-nokma/domain';
 import { evaluateWorkflowDefined } from './workflow-defined.js';
 import { evaluateTicketTransitioned } from './transition.js';
 import { evaluateClaimContested, evaluateClaimContestedResolved } from './contests.js';
-import { checkTicketCreated } from './checks/hierarchy.js';
 import { checkTicketCreated, checkTicketReparented } from './checks/hierarchy.js';
 import { checkTicketFieldSet } from './checks/fields.js';
 import { checkTicketTypeDefined } from './checks/ticket-type.js';
