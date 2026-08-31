@@ -3802,10 +3802,18 @@ identity is not available: it is a fresh closure every render, so that refetches
 
 **Three obligations, and the third is the one that will bite:**
 
-1. **`docs/superpowers/plans/2026-08-20-06-web-client.md` carries eight 3-argument call sites and a
-   contract line documenting the old signature.** T10–T13 are executed from that text. An implementer
-   transcribing it faithfully writes code that does not compile — which is the good case; the bad
-   case is transcribing the *shape* and passing something that is not a key.
+1. ~~**`docs/superpowers/plans/2026-08-20-06-web-client.md` carries eight 3-argument call sites and a
+   contract line documenting the old signature.**~~ **DISCHARGED.** T10–T13 are executed from that
+   text, and an implementer transcribing it faithfully writes code that does not compile — which is
+   the good case; the bad case is transcribing the *shape* and passing something that is not a key.
+   Marked at every entry point a transcriber actually uses: a DEAD banner at the contract line, a
+   SUPERSEDED note inside the definition's own docblock, and an inline `P17: STALE` marker on each
+   call site. **The count was wrong in two places before it was recounted: this ruling said eight and
+   the controller's dispatch named four. There are NINE** — `useBoard`'s own (historical, T9 is
+   merged) plus eight in unwritten tasks. Verified after the edit by enumerating every
+   `useLiveQuery(` call line and checking each for a preceding marker: 9 found, 9 marked, 0 unmarked.
+   *A pointer from a correct document to a stale one does not drift; it reverses, and the reversal is
+   silent when the transcriber copies a shape rather than a signature.*
 2. **The key drives the reload; the WORKSPACE drives the subscription, and they are two effects on
    purpose.** The cheap fix — putting `load` in the subscription effect's deps — works and re-opens
    the stream on every switch, and `subscribe` is called with cursor `0`, so each re-open replays the
