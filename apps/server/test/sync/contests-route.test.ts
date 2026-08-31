@@ -158,7 +158,7 @@ describe('GET /v1/contests', () => {
       resolvedAt: null,
     });
     // The claim travels whole — provenance floor.
-    expect((contests[0].originalEvent as { id: string }).id).toBe(openOriginalId);
+    expect((contests[0]?.originalEvent as { id: string }).id).toBe(openOriginalId);
   });
 
   it('planted defect: a caller who cannot see the ticket gets NO contest — not even its existence', async () => {
@@ -197,7 +197,7 @@ describe('GET /v1/contests', () => {
       resolution: 'discarded',
       resolvedBy: memberId,
     });
-    expect(contests[0].resolvedAt).not.toBeNull();
+    expect(contests[0]?.resolvedAt).not.toBeNull();
   });
 
   it('filters by claimant for the My Work surface', async () => {
