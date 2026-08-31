@@ -16,9 +16,9 @@
     }
   ],
   "priorEvents": [
-    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_basic" } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "typeId": "task", "projectId": "prj_1", "parentId": null, "title": "Fixture ticket t1", "workflowId": "wf_basic" } },
     { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "doing" } },
-    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t2" }, "actorId": "user_a", "payload": { "workflowId": "wf_basic", "parentId": "t1" } }
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t2" }, "actorId": "user_a", "payload": { "typeId": "task", "projectId": "prj_1", "title": "Fixture ticket t2", "workflowId": "wf_basic", "parentId": "t1" } }
   ],
   "candidateEvent": {
     "type": "ticket.transitioned",

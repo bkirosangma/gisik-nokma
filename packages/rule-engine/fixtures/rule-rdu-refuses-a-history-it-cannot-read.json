@@ -1,6 +1,6 @@
 {
   "name": "four-eyes refuses when a transition-log entry cannot be read against the current workflow, instead of skipping it",
-  "notes": "A PLANTED store, and the plant is the point: v2 drops `hold` and maps nothing to it, which publishing refuses (unmapped-drop) — so this arrangement only exists through corruption, which is exactly the condition under which a security control fails closed. The ticket itself does NOT strand: it sits in `review`, which v2 still has, so the stranded-state refusal never fires and the refusal below is four-eyes' own. Two mutants both turn this fixture green with an ACCEPTANCE: skipping the unreadable entry (the old `if (!resolved.ok) continue`), and finishing the loop to refuse only when nothing matched — user_b is a genuine second person, so both let the move through.",
+  "notes": "A PLANTED store, and the plant is the point: v2 drops `hold` and maps nothing to it, which publishing refuses as `workflow-state-mapping` — so this arrangement only exists through corruption, which is exactly the condition under which a security control fails closed. The ticket itself does NOT strand: it sits in `review`, which v2 still has, so the stranded-state refusal never fires and the refusal below is four-eyes' own. Two mutants both turn this fixture green with an ACCEPTANCE: skipping the unreadable entry (the old `if (!resolved.ok) continue`), and finishing the loop to refuse only when nothing matched — user_b is a genuine second person, so both let the move through.",
   "workflowDefs": [
     {
       "id": "wf_audit", "version": 1, "name": "Audit", "initialStateId": "draft",
@@ -31,7 +31,7 @@
     }
   ],
   "priorEvents": [
-    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_audit", "workflowVersion": 1 } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "typeId": "task", "projectId": "prj_1", "parentId": null, "title": "Fixture ticket t1", "workflowId": "wf_audit", "workflowVersion": 1 } },
     { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "hold" } },
     { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "draft" } },
     { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "review" } }

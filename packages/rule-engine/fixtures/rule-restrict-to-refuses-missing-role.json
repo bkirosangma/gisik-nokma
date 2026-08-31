@@ -21,7 +21,7 @@
     { "userId": "user_a", "role": "member" }
   ],
   "priorEvents": [
-    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "workflowId": "wf_rules" } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "typeId": "task", "projectId": "prj_1", "parentId": null, "title": "Fixture ticket t1", "workflowId": "wf_rules" } },
     { "type": "ticket.transitioned", "entity": { "kind": "ticket", "id": "t1" }, "actorId": "user_a", "payload": { "to": "doing" } }
   ],
   "candidateEvent": {

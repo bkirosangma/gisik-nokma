@@ -410,7 +410,7 @@ describe('a malformed payload names the field it is about', () => {
    * exactly one issue, and a one-element join is identical for any separator
    * (`['x'].join('; ') === ['x'].join('')`), so `'; '` would otherwise be
    * unfalsifiable in brand-new code. `ticketCreatedPayload` is the one payload
-   * here that can fire two independent issues from one candidate — an empty
+   * here that fires two independent issues from one candidate — an empty
    * `typeId` and a `projectId` that is not a ULID — in the order zod reports
    * them, which is the schema's own key order. Change the join and this dies;
    * delete this and the join is unpinned again.
