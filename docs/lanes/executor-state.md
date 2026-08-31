@@ -205,3 +205,50 @@ moment — including this file.
 `exec/06a-client-core` is **already checked out** at `~/my_projects/gisik-nokma-lanes/lane4-periphery`
 (at `30e3db4`). A `git checkout` of it from this worktree will refuse. Either work in that worktree,
 remove it first, or review from a detached checkout — decide before dispatching, not mid-flight.
+
+---
+
+## BINDING: owner cost ruling, 2026-08-31 (PR #39) — supersedes the model/effort table in the brief
+
+Relayed by the controller and verified live (`gh pr view 39` — *"Removing Fable saves 15% of a bill
+that is 3.3x too large, so the machinery gets thinner too"*). The measured basis: **$113/task at 17.6
+subagents/task**, opus 85% of spend, sonnet 0%; 109 tasks remaining project to **~$12,400, 3.3x the
+project to date**. **A restart must apply this, not the brief's table.**
+
+1. **Fable is OUT entirely** — no exception. Not refuters, not the mocked-contract lens, not
+   floor-list reviewers. Opus at the stated effort is the ceiling.
+2. **Sonnet is the DEFAULT; opus is the exception.** Opus only for: core semantics (reducers,
+   projections, engine checks, folds, stream/sync, honesty-carrying view-models), fixture and
+   planted-defect design, floor-list reviewers, the final whole-branch review, and a refuter where one
+   runs at all. **If unsure, sonnet.**
+3. **Machinery depth — the larger lever.** ONE fan-out per plan; the pre-flight is retired and the
+   adaptation map becomes **one sonnet agent**. The final whole-branch review is **ONE opus
+   reviewer**, not four lenses plus refuters plus triage. **Judgment fan-outs are withdrawn as a
+   standing authorization — a collision gets ONE analyst.** Per task: implementer → reviewer; a fix
+   round only on an Important or worse; a scoped re-review only if the fix over-reached.
+   **Hard cap 6 subagents per task**; above it is an owner ask, not a judgment call.
+4. **Restarts happen at task boundaries** (this session ran 98K → 143K → 201K → 282K per request
+   across one task; subagents average 86K because each starts fresh, and session carriage is 66% of
+   spend). **The executor's side of that is this file: current, tracked, pushed, anchors verified
+   REACHABLE with `git branch --contains` — empty means orphaned — at every task boundary.**
+5. **Keep dispatch prompts lean.** A brief that inlines whole documents rebuilds the context problem
+   inside every agent it spawns.
+
+**Unchanged:** no review is skipped, only smaller ones run; class floors still exist, lower;
+escalation still runs upward; deferral is still the answer when the pool cannot fund the work; the
+executor still does not merge.
+
+**The cost is recorded rather than hidden**, and this session supplies a third data point for it
+beyond the two the ruling names. Ruling P16's load-bearing half — that `precheckParentTerminal`'s
+three `passed` exits had to become `not-evaluated` — was **missed by two of the four opus lenses,
+which wanted to scope it out, and caught by the refuters**. Under the new shape that collision gets
+one analyst and no refuter, and on this evidence the downgrade would plausibly have shipped as a
+known-false `passed`. The owner has priced this twice ("expect more escapes at the last gate"); it is
+recorded as evidence for the trade, **not** as a re-litigation of it.
+
+## Step 2 in flight
+
+`exec/06a-client-core` T9 (`e82a579`, the Board) — **one opus reviewer**, first dispatch under the new
+policy, 1 of 6 subagents. Reviewing in the lane4 worktree, so no shared-tree concurrency. Rebase onto
+`main` waits until PR #38 merges, per §8 merge order. PR #38's CI is **green**; the controller holds
+it for the owner's call on the accept-preview regression.
