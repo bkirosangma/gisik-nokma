@@ -31,9 +31,14 @@ Found 2026-08-31 by a post-merge gate that came back RED and was **not** a code 
 
 - `package.json` declares `"engines": { "node": ">=22.0.0 <23" }`. CI (`.github/workflows/ci.yml:62`)
   uses `node-version: 22`. **This machine's default `node` is v24.11.1** — outside the declared range.
-- There is **no `.nvmrc` and no `.node-version`**, so nothing pins a local shell to 22. The drift is
-  silent and permanent until someone adds one. *(Recorded as a pending item below; the controller does
-  not implement.)*
+- There is **no `.nvmrc`, no `.node-version`, no `.tool-versions` — and no `.npmrc`.** The last one is
+  the load-bearing absence: without `engine-strict=true`, **`engines` enforces nothing.** Verified under
+  v24.11.1: `pnpm exec node -v` and `pnpm run` both succeed with **no refusal and not a single warning**,
+  with the same commands under 22 as the control so the silence is not a broken probe. The declared
+  engine is decorative. *(Pending item below; the controller does not implement.)*
+- **So there are two failure modes, and the quiet one is worse.** The false RED is what this section was
+  written from — loud, and it names itself in the error text. The false GREEN is a gate that passes on an
+  unsupported Node and says nothing at all. Nobody catches that one.
 - `better-sqlite3@11.10.0` is a **native** module. Its binding matches whichever Node last rebuilt it —
   ABI **127** = Node 22, ABI **137** = Node 24. Under the wrong one, `@gisik-nokma/sync-client#test`
   fails 4/8 with `NODE_MODULE_VERSION` and **looks exactly like main being red.** It is not.
@@ -176,9 +181,12 @@ Note its wording is one-directional: a pane being ADDED also reports "a lane may
    `settings.json` or the environment). **Scope question for the owner, not the controller** — trap #5 is
    deciding a ruling's scope yourself. Not blocking; killing a productive mid-task session over an
    ambiguity is the over-caution the ruling exists to prevent.
-2. **No `.nvmrc` / `.node-version` exists** while `engines` demands `>=22 <23` and the machine defaults to
-   24. A one-line file closes it permanently. Needs an owner to assign it — the controller does not
-   implement, and it is not in any plan.
+2. **The declared Node engine is unenforced.** `engines` demands `>=22 <23`, the machine defaults to 24,
+   and there is no `.nvmrc` *and no `.npmrc`* — so without `engine-strict=true` pnpm accepts the wrong
+   Node silently. The fix is two lines (`.nvmrc` + `engine-strict=true`), but it turns an unsupported Node
+   into a hard refusal and so needs a CI run to prove it does not break the pipeline. Recorded by the
+   executor with owner **Plan 11**; surfaced here because it wants an owner decision, not a plan slot.
+   The controller does not implement.
 
 ## Controller context discipline
 
