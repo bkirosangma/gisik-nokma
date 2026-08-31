@@ -9,6 +9,7 @@ import { createIngestService, type ClientIngest, type IngestService } from '../.
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { submittedWorkspaceCreated } from '../helpers/events.js';
+import { signInWithPhone } from '../helpers/session.js';
 
 /**
  * The envelope-origin gate at the client door.
@@ -81,16 +82,6 @@ afterAll(async () => {
   await db.drop();
 });
 
-function testAuth() {
-  return createAuth({
-    pool: db.pool,
-    otpSender: new LogOtpSender(() => {}),
-    magicLinkSender: new LogMagicLinkSender(() => {}),
-    baseUrl: 'http://localhost:3000',
-    secret: 'test-secret-not-used-anywhere-real',
-  });
-}
-
 function ingestService(): IngestService {
   return createIngestService({
     pool: db.pool,
@@ -99,8 +90,30 @@ function ingestService(): IngestService {
   });
 }
 
-function app(ingest: IngestService = ingestService()) {
-  return buildApp({ db: db.pool, ingest, auth: testAuth() });
+let phoneCounter = 0;
+
+/**
+ * A running app and a caller signed into it.
+ *
+ * Every client-door case below needs one, because Task 5 put `requireSession`
+ * on `/v1/events`: without a session the door answers 401 and the gate under
+ * test never runs at all. Bearer, not cookie — a cookie-carrying POST to
+ * `/api/auth/*` needs a trusted HTTP `Origin` header, and HTTP-Origin is a
+ * different subject from this file's, which is the envelope's provenance enum.
+ */
+async function signedInApp(ingest: IngestService = ingestService()) {
+  const otp = new LogOtpSender(() => {});
+  const auth = createAuth({
+    pool: db.pool,
+    otpSender: otp,
+    magicLinkSender: new LogMagicLinkSender(() => {}),
+    baseUrl: 'http://localhost:3000',
+    secret: 'test-secret-not-used-anywhere-real',
+  });
+  const app = buildApp({ db: db.pool, ingest, auth });
+  phoneCounter += 1;
+  const user = await signInWithPhone(app, otp, `+9197000${String(phoneCounter).padStart(5, '0')}`);
+  return { app, user, headers: { authorization: `Bearer ${user.token}` } };
 }
 
 /**
@@ -153,12 +166,32 @@ async function ledgerRowsFor(eventId: string): Promise<number> {
   return rows[0]?.count ?? 0;
 }
 
+/**
+ * WHAT THESE CASES PIN AFTER TASK 5, which is not quite what they pinned before.
+ *
+ * `checkRolePermission` now runs an ACTOR-IDENTITY check ahead of the
+ * envelope-origin one, and identity is checked first because every later check
+ * depends on it. So a forgery with a random `actorId` — which is what these
+ * cases used to send — is now refused with *"You cannot submit a claim as
+ * another person."* and never reaches the branch this file is named after.
+ * That is a check quietly changing meaning, and the fix is to remove the second
+ * fault rather than to loosen the assertion: every forgery below is now
+ * attributed to the signed-in caller, so the ONLY thing wrong with it is the
+ * envelope-origin, and the refusal it draws is the one being tested.
+ *
+ * Read each case as: *given an honest actor and an honest session, a borrowed
+ * server provenance is still refused.* Mutation that reddens them: delete the
+ * `env.origin === 'server'` branch — they then answer `committed`, because
+ * nothing else about these submissions is wrong.
+ */
 describe('envelope-origin gate — the client door (POST /v1/events)', () => { // test-cases 3.31
   it('refuses a client-submitted server-origin event with the exact rule and reason', async () => {
-    const forged = forgedContest();
-    const response = await app().inject({
+    const { app, user, headers } = await signedInApp();
+    const forged = forgedContest({ actorId: user.userId });
+    const response = await app.inject({
       method: 'POST',
       url: '/v1/events',
+      headers,
       payload: { events: [forged] },
     });
 
@@ -173,20 +206,29 @@ describe('envelope-origin gate — the client door (POST /v1/events)', () => { /
   });
 
   it('commits nothing for the refused forgery — the append-only ledger never sees it', async () => {
-    const forged = forgedContest();
-    await app().inject({ method: 'POST', url: '/v1/events', payload: { events: [forged] } });
+    const { app, user, headers } = await signedInApp();
+    const forged = forgedContest({ actorId: user.userId });
+    await app.inject({ method: 'POST', url: '/v1/events', headers, payload: { events: [forged] } });
 
     expect(await ledgerRowsFor(forged.id)).toBe(0);
   });
 
   it('refuses only the forgery in a batch, and keeps results index-aligned', async () => {
-    const before = submittedWorkspaceCreated();
-    const forged = forgedContest();
-    const after = submittedWorkspaceCreated();
+    const { app, user, headers } = await signedInApp();
+    // The two honest events are workspace foundings, so each appends a founding
+    // sequence of six more events INSIDE this same batch loop (Task 5). The
+    // index alignment asserted below is therefore a stronger claim than it was:
+    // `results[i]` still answers `events[i]` even though the server appended
+    // twelve events of its own between them. A bootstrap that pushed its own
+    // results onto the array would give this test five entries, not three.
+    const before = submittedWorkspaceCreated({ actorId: user.userId });
+    const forged = forgedContest({ actorId: user.userId });
+    const after = submittedWorkspaceCreated({ actorId: user.userId });
 
-    const response = await app().inject({
+    const response = await app.inject({
       method: 'POST',
       url: '/v1/events',
+      headers,
       payload: { events: [before, forged, after] },
     });
 
@@ -215,10 +257,12 @@ describe('envelope-origin gate — the client door (POST /v1/events)', () => { /
   it.each(CLIENT_ORIGINS)(
     'still admits an ordinary %s-origin client submission through the same door',
     async (origin) => {
-      const honest = submittedWorkspaceCreated({ origin });
-      const response = await app().inject({
+      const { app, user, headers } = await signedInApp();
+      const honest = submittedWorkspaceCreated({ origin, actorId: user.userId });
+      const response = await app.inject({
         method: 'POST',
         url: '/v1/events',
+        headers,
         payload: { events: [honest] },
       });
 

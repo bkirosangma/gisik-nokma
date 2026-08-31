@@ -68,6 +68,39 @@ export function createAuth(deps: AuthDeps) {
        * origin must be added here or the browser's own cookie POSTs will 403.
        */
       disableOriginCheck: false,
+      /**
+       * `SameSite=Lax` is now a SETTING, not an observation.
+       *
+       * better-auth already emitted it — `createCookieGetter`
+       * (`better-auth/dist/cookies/index.mjs`) hard-codes
+       * `sameSite: "lax"` into the attribute defaults, and
+       * `defaultCookieAttributes` spreads over them. So this line changes no
+       * emitted byte today, which is exactly what makes it worth writing: it is
+       * the difference between a security property the product HOLDS and one it
+       * INHERITS. `SameSite=Lax` is the whole defence of a cookie-authenticated
+       * `POST /v1/events` against a cross-site submission (see
+       * `../routes/events.ts`, which records that decision) — the product routes
+       * sit outside better-auth's own CSRF middleware entirely. A vendor default
+       * that moved in an upgrade would change that defence with nothing in this
+       * repository saying so; a default that is now overridden cannot move.
+       *
+       * `crossSubDomainCookies` is deliberately left OFF, and this is the same
+       * property seen from its other side: enabling it is what makes
+       * `createCookie` emit a `Domain` attribute, and a `Domain` on the session
+       * cookie sends it to EVERY subdomain of the zone — every preview deploy,
+       * every unrelated service, anything an attacker can get hosted there.
+       * `test/auth/sign-in-flows.test.ts` pins the attribute list with `toEqual`
+       * over the WHOLE list, so adding one turns that test red.
+       *
+       * `maxAge`, `path`, `httpOnly` and `secure` are deliberately NOT restated
+       * here. `maxAge` is per-cookie and passed at each `createCookie` call, so
+       * naming it here would be shadowed for some cookies and not others; and
+       * `secure` is derived from the baseURL's protocol, which is the behaviour
+       * `sign-in-flows.test.ts` pins over http and https as two different cookie
+       * NAMES. Restating either would be a second statement of a fact this
+       * repository already has one authority for.
+       */
+      defaultCookieAttributes: { sameSite: 'lax' },
       database: {
         /**
          * Every id better-auth mints is a ULID, because a user's id is not only

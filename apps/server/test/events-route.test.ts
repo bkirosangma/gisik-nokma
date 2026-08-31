@@ -8,6 +8,7 @@ import { createIngestService } from '../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from './helpers/db.js';
 import { submittedWorkspaceCreated } from './helpers/events.js';
+import { signInWithPhone } from './helpers/session.js';
 
 let db: TestDatabase;
 
@@ -20,37 +21,78 @@ afterAll(async () => {
 });
 
 /**
- * `buildApp` requires an auth instance from Plan 4 Task 2. This file never signs
- * anyone in — `/v1/events` carries no session guard yet — so the instance exists
- * only to satisfy the assembly, over the same test database as everything else.
+ * `/v1/events` now carries `requireSession` (Plan 4 Task 5), so this file signs
+ * people in for real: the OTP sender is held rather than discarded, because
+ * `signInWithPhone` reads the issued code out of it.
+ *
+ * Bearer and not cookie, deliberately, and the reason is the CSRF rule this
+ * plan measured: a cookie-carrying POST to `/api/auth/*` must also send a
+ * trusted HTTP `Origin` or better-auth answers 403, while a bearer request
+ * sends no cookie and is exempt. (HTTP-Origin, the browser header — nothing to
+ * do with `EventEnvelope.origin`, the provenance enum the ingest gate reads.)
  */
-function testAuth() {
-  return createAuth({
+function buildServer() {
+  const otp = new LogOtpSender(() => {});
+  const auth = createAuth({
     pool: db.pool,
-    otpSender: new LogOtpSender(() => {}),
+    otpSender: otp,
     magicLinkSender: new LogMagicLinkSender(() => {}),
     baseUrl: 'http://localhost:3000',
     secret: 'test-secret-not-used-anywhere-real',
   });
-}
-
-function app() {
   const ingest = createIngestService({
     pool: db.pool,
     evaluate: evaluateEvent,
     projections: buildProjectionRegistry(),
   });
-  return buildApp({ db: db.pool, ingest, auth: testAuth() });
+  return { server: buildApp({ db: db.pool, ingest, auth }), otp };
+}
+
+function app() {
+  return buildServer().server;
+}
+
+let phoneCounter = 0;
+
+/** A signed-in caller and the app that knows them: one bearer header, no HTTP-Origin needed. */
+async function signedIn() {
+  const { server, otp } = buildServer();
+  phoneCounter += 1;
+  const user = await signInWithPhone(server, otp, `+9198000${String(phoneCounter).padStart(5, '0')}`);
+  return { server, user, headers: { authorization: `Bearer ${user.token}` } };
 }
 
 describe('POST /v1/events', () => {
-  it('answers 200 with index-aligned per-event results', async () => {
+  it('answers 401 unauthenticated with no session, and never reaches ingest', async () => {
+    // The door's identity guard, pinned on its own. Everything below this test
+    // authenticates, so without this case the whole file would prove only that
+    // a signed-in caller gets through — and a `requireSession` accidentally
+    // dropped from the route registration would turn nothing red.
+    // Mutation that reddens it: remove `preHandler: requireSession` from
+    // `registerEventRoutes` and this answers 200.
     const server = app();
-    const valid = submittedWorkspaceCreated();
-    const unknownType = { ...submittedWorkspaceCreated(), type: 'shop.opened' };
     const response = await server.inject({
       method: 'POST',
       url: '/v1/events',
+      payload: { events: [submittedWorkspaceCreated()] },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ error: 'unauthenticated' });
+    await server.close();
+  });
+
+  it('answers 200 with index-aligned per-event results', async () => {
+    const { server, user, headers } = await signedIn();
+    // `actorId` is the signed-in user: the gate refuses a claim submitted as
+    // another person before anything else, so a random actor would now be
+    // refused rather than committed and this test would be pinning the
+    // permission gate by accident instead of the route's index alignment.
+    const valid = submittedWorkspaceCreated({ actorId: user.userId });
+    const unknownType = { ...submittedWorkspaceCreated({ actorId: user.userId }), type: 'shop.opened' };
+    const response = await server.inject({
+      method: 'POST',
+      url: '/v1/events',
+      headers,
       payload: { events: [valid, unknownType] },
     });
     expect(response.statusCode).toBe(200);
@@ -189,16 +231,31 @@ describe('POST /v1/events', () => {
       },
       async reset() {},
     });
+    const otp = new LogOtpSender(() => {});
+    const auth = createAuth({
+      pool: db.pool,
+      otpSender: otp,
+      magicLinkSender: new LogMagicLinkSender(() => {}),
+      baseUrl: 'http://localhost:3000',
+      secret: 'test-secret-not-used-anywhere-real',
+    });
     const server = buildApp({
       db: db.pool,
       ingest: createIngestService({ pool: db.pool, evaluate: evaluateEvent, projections }),
-      auth: testAuth(),
+      auth,
     });
+    // Signed in, because the door now refuses an anonymous caller at 401 and a
+    // 401 would satisfy nothing this test asserts — it is about what the door
+    // says when the work behind it BREAKS, which is only reachable by a caller
+    // the door lets through.
+    phoneCounter += 1;
+    const user = await signInWithPhone(server, otp, `+9198000${String(phoneCounter).padStart(5, '0')}`);
 
     const response = await server.inject({
       method: 'POST',
       url: '/v1/events',
-      payload: { events: [submittedWorkspaceCreated()] },
+      headers: { authorization: `Bearer ${user.token}` },
+      payload: { events: [submittedWorkspaceCreated({ actorId: user.userId })] },
     });
 
     expect(response.statusCode).toBe(500);

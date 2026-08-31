@@ -8,6 +8,7 @@ export * from './ingest-result.js';
 export * from './state.js';
 export * from './workflow.js';
 export * from './validate-workflow.js';
+export * from './simple-kanban.js';
 export * from './advise-workflow.js';
 export * from './entity-state.js';
 export * from './ist-day.js';

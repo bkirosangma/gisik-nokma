@@ -20,6 +20,7 @@ import {
   nextWorkspaceSeq,
 } from '../ledger/event-store.js';
 import { checkPermission, type SubmissionGate } from '../permissions/check-permission.js';
+import { bootstrapWorkspace } from '../workspaces/bootstrap-workspace.js';
 import { readEntityHead } from '../projections/entity-heads.js';
 import type { ProjectionRegistry } from '../projections/registry.js';
 
@@ -52,6 +53,12 @@ export type IngestService = {
    * server's own appends — Task 5's workspace bootstrap, Task 14's invite
    * acceptance — may legitimately carry envelope-origin `'server'`. **An HTTP
    * route must never call this; it calls `ingestClientBatch`.**
+   *
+   * Ungated is NOT the same as inert. A committed `workspace.created` fires the
+   * founding sequence through THIS door too, whichever door the founding itself
+   * arrived at — that is what lets Plan 11's seed CLIs found a usable workspace
+   * by emitting one event, and it is why this method is not a raw append. See
+   * `ingestAll`.
    */
   ingestBatch(rawEvents: unknown[]): Promise<IngestResult[]>;
   /**
@@ -63,10 +70,15 @@ export type IngestService = {
    * Two entry points rather than a flag because the distinguishing fact is
    * which door an event arrived through, not what it says about itself.
    * `POST /v1/events` calls this; **Plan 10's `POST /v1/sync` must call it too**,
-   * or offline-originated events bypass the gate entirely. Task 5 widens the
-   * signature to carry the session the door authenticated.
+   * or offline-originated events bypass the gate entirely.
+   *
+   * `sessionUserId` is the session the door authenticated — Task 5's widening.
+   * It is REQUIRED, not optional, which is the compile-time half of the
+   * identity check: a route that has not resolved a session cannot call this at
+   * all, so "forgot the preHandler" is a type error rather than a gate that
+   * silently judged every claim against `undefined`.
    */
-  ingestClientBatch(rawEvents: unknown[]): Promise<IngestResult[]>;
+  ingestClientBatch(rawEvents: unknown[], sessionUserId: string): Promise<IngestResult[]>;
   /** Broadcast hook: fires AFTER an event's transaction commits, never for
    * refused or invalid events. Returns an unsubscribe function. Plan 5 wires
    * WebSocket fan-out onto this. */
@@ -93,6 +105,19 @@ export type IngestService = {
  */
 export type ClientIngest = Pick<IngestService, 'ingestClientBatch' | 'onEventCommitted'>;
 
+/**
+ * What the client door carries into `commitOne`: the gate, and the session it
+ * judges against.
+ *
+ * ONE nullable rather than two, deliberately. Two covarying parameters —
+ * `gate: SubmissionGate | null` beside `sessionUserId: string | null` — would
+ * make "a gate with no session" and "a session with no gate" both expressible,
+ * and the first of those is a gate comparing every `actorId` against
+ * `undefined`: a check that refuses nothing while looking like the identity
+ * check. `null` here means the internal door, and it means it exactly once.
+ */
+type ClientDoor = { gate: SubmissionGate; sessionUserId: string };
+
 export function createIngestService(deps: IngestDeps): IngestService {
   const registry = deps.registry ?? domainRegistry;
   const now = deps.now ?? (() => new Date());
@@ -109,7 +134,7 @@ export function createIngestService(deps: IngestDeps): IngestService {
     }
   }
 
-  async function commitOne(submitted: SubmittedEvent, gate: SubmissionGate | null): Promise<IngestResult> {
+  async function commitOne(submitted: SubmittedEvent, door: ClientDoor | null): Promise<IngestResult> {
     const client = await deps.pool.connect();
     let rollbackFailure: Error | undefined;
     try {
@@ -177,7 +202,17 @@ export function createIngestService(deps: IngestDeps): IngestService {
       // fact is which door the event arrived through. See
       // ../permissions/check-permission.ts for which doors this closes and,
       // more importantly, which it does not.
-      const refusal = gate === null ? null : gate(envelope);
+      const refusal =
+        door === null
+          ? null
+          : // `client`, NOT `deps.pool`. The role lookup runs inside THIS
+            // transaction, which already holds the workspace and entity locks,
+            // so it reads the world this event is about to be judged against.
+            // Handing it the pool instead would compile and pass every test
+            // while opening a window in which a concurrently-committed
+            // `membership.revoked` is invisible to the gate judging the revoked
+            // person's next claim.
+            await door.gate(envelope, { db: client, sessionUserId: door.sessionUserId });
       if (refusal !== null) {
         await client.query('ROLLBACK');
         return { status: 'refused', eventId: envelope.id, rule: refusal.rule, reason: refusal.reason };
@@ -228,7 +263,7 @@ export function createIngestService(deps: IngestDeps): IngestService {
    * claim at all is answered as `invalid` rather than as a permission refusal —
    * and so a refused event always has a real ULID `eventId` to report.
    */
-  async function ingestAll(rawEvents: unknown[], gate: SubmissionGate | null): Promise<IngestResult[]> {
+  async function ingestAll(rawEvents: unknown[], door: ClientDoor | null): Promise<IngestResult[]> {
     const results: IngestResult[] = [];
     for (const raw of rawEvents) {
       const parsed = parseEvent(raw, registry);
@@ -241,7 +276,37 @@ export function createIngestService(deps: IngestDeps): IngestService {
         });
         continue;
       }
-      results.push(await commitOne(parsed.event, gate));
+      const result = await commitOne(parsed.event, door);
+      results.push(result);
+
+      // The founding sequence (Task 5). Three things about this placement are
+      // load-bearing and an editor must not rearrange them:
+      //
+      // 1. It fires ON ACCEPT, NEVER ON DUPLICATE. Both of Plan 11's seed CLIs
+      //    re-run by re-submitting the same deterministic `workspace.created`
+      //    id and counting `duplicate-event-id` as "already present". Hooked to
+      //    anything looser than `status === 'committed'`, every re-run would
+      //    append a second workflow and four more type definitions, and Plan
+      //    11's "re-run is a no-op" test would be a lie.
+      // 2. It lives in the SHARED ingest path, not in a route. `POST
+      //    /v1/workspaces` (Task 13) and Plan 11's seed CLIs both found
+      //    workspaces and have exactly one founding sequence between them
+      //    because both come through here. Moving it to the route layer
+      //    silently breaks the seeds.
+      // 3. It appends through the INTERNAL door — `null`, no gate. The
+      //    sequence is server-origin, and `checkRolePermission` refuses
+      //    server-origin at the client door by design. Passing `door` here
+      //    instead of `null` would refuse every workspace's own bootstrap and
+      //    leave the workspace unusable, which is the failure the decision
+      //    exists to prevent.
+      //
+      // Its results are deliberately NOT pushed onto `results`: the array is
+      // index-aligned with `rawEvents`, and the server's own appends are not
+      // answers to anything the client submitted. `bootstrapWorkspace` throws
+      // rather than returning a value nobody reads.
+      if (result.status === 'committed' && parsed.event.type === 'workspace.created') {
+        await bootstrapWorkspace(parsed.event, (events) => ingestAll(events, null));
+      }
     }
     return results;
   }
@@ -250,8 +315,8 @@ export function createIngestService(deps: IngestDeps): IngestService {
     async ingestBatch(rawEvents) {
       return ingestAll(rawEvents, null);
     },
-    async ingestClientBatch(rawEvents) {
-      return ingestAll(rawEvents, checkPermission);
+    async ingestClientBatch(rawEvents, sessionUserId) {
+      return ingestAll(rawEvents, { gate: checkPermission, sessionUserId });
     },
     onEventCommitted(listener) {
       listeners.add(listener);
