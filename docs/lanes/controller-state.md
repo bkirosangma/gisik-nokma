@@ -89,6 +89,22 @@ Every one below was violated by a controller that had just written it. **Assume 
 - **A pointer from a correct document to a stale one does not drift; it reverses, deterministically.**
 - An artifact's author is the worst-placed party to report its contents.
 
+## The watch monitor — do NOT re-arm it blindly
+
+A persistent monitor runs on `origin/main`, the open-PR set, and tmux pane membership. **It survives
+`/clear`** — it is a shell child of the session process, and `/clear` ends the context, not the session.
+Its events route into a freshly cleared conversation; that was confirmed by probe, not assumed.
+
+**Check before re-arming: `pgrep -fl prev_main`.** Re-arming a live monitor gives you two and duplicate
+events on every merge. It emits only on change — long silence means nothing changed, not that it died.
+
+It costs **zero tokens** — a shell loop that wakes the session only on a real event. It replaced
+token-costing polling and is the cheapest instrument in the topology. **If it is genuinely gone**, re-arm
+change-triggered on a 180s poll against `git ls-remote origin main`, `gh pr list --state open`, and
+`tmux list-panes -s -t gisik`.
+
+Note its wording is one-directional: a pane being ADDED also reports "a lane may have exited."
+
 ## Pending owner decisions
 
 - None blocking at time of writing. **Re-measure**: `gh pr list --state open`.
