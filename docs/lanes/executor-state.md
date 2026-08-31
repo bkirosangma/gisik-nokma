@@ -208,68 +208,34 @@ remove it first, or review from a detached checkout — decide before dispatchin
 
 ---
 
-## BINDING: owner cost ruling, 2026-08-31 (PR #39) — supersedes the model/effort table in the brief
+## Model/effort policy — NOT recorded here, deliberately
 
-Relayed by the controller and verified live (`gh pr view 39` — *"Removing Fable saves 15% of a bill
-that is 3.3x too large, so the machinery gets thinner too"*). The measured basis: **$113/task at 17.6
-subagents/task**, opus 85% of spend, sonnet 0%; 109 tasks remaining project to **~$12,400, 3.3x the
-project to date**. **A restart must apply this, not the brief's table.** **This block stays until PR #40 merges** (not #39 — #39
-alone left the document self-contradictory, so my stopping condition was one PR short), and is
-deliberately a second source of truth for exactly that window — see the hazard below.
+**The brief's `## MODEL & EFFORT` is the single source.** This file used to carry a full copy of the
+2026-08-31 cost ruling; it was **dropped once PR #40 landed (`615d5da`)**, which was its stated
+stopping condition. It existed only for the window in which the brief lost to a coordination doc that
+contradicted it — a window now closed at both ends: the brief's precedence clause is scoped (*the
+document wins EXCEPT on model and effort policy*), and the document's dead rows are struck and marked
+`DEAD` at their own headings.
 
-1. **Fable is OUT entirely** — no exception. Not refuters, not the mocked-contract lens, not
-   floor-list reviewers. Opus at the stated effort is the ceiling.
-2. **Sonnet is the DEFAULT; opus is the exception.** Opus only for: core semantics (reducers,
-   projections, engine checks, folds, stream/sync, honesty-carrying view-models), fixture and
-   planted-defect design, floor-list reviewers, the final whole-branch review, and a refuter where one
-   runs at all. **If unsure, sonnet.**
-3. **Machinery depth — the larger lever.** ONE fan-out per plan; the pre-flight is retired and the
-   adaptation map becomes **one sonnet agent**. The final whole-branch review is **ONE opus
-   reviewer**, not four lenses plus refuters plus triage. **Judgment fan-outs are withdrawn as a
-   standing authorization — a collision gets ONE analyst.** Per task: implementer → reviewer; a fix
-   round only on an Important or worse; a scoped re-review only if the fix over-reached.
-   **Hard cap 6 subagents per task**; above it is an owner ask, not a judgment call.
-4. **Restarts happen at task boundaries** (this session ran 98K → 143K → 201K → 282K per request
-   across one task; subagents average 86K because each starts fresh, and session carriage is 66% of
-   spend). **The executor's side of that is this file: current, tracked, pushed, anchors verified
-   REACHABLE with `git branch --contains` — empty means orphaned — at every task boundary.**
-5. **Keep dispatch prompts lean.** A brief that inlines whole documents rebuilds the context problem
-   inside every agent it spawns.
+**Do not re-add a copy here.** Two sources of truth was the failure being fixed; a state file that
+also carries policy re-creates it. This file carries STATE. If policy and this file ever appear to
+disagree, the brief is right and this line is the bug.
 
-**Unchanged:** no review is skipped, only smaller ones run; class floors still exist, lower;
-escalation still runs upward; deferral is still the answer when the pool cannot fund the work; the
-executor still does not merge.
+## HAZARD — CLOSED 2026-08-31, both halves
 
-**The cost is recorded rather than hidden**, and this session supplies a third data point for it
-beyond the two the ruling names. Ruling P16's load-bearing half — that `precheckParentTerminal`'s
-three `passed` exits had to become `not-evaluated` — was **missed by two of the four opus lenses,
-which wanted to scope it out, and caught by the refuters**. Under the new shape that collision gets
-one analyst and no refuter, and on this evidence the downgrade would plausibly have shipped as a
-known-false `passed`. The owner has priced this twice ("expect more escapes at the last gate"); it is
-recorded as evidence for the trade, **not** as a re-litigation of it.
+Kept because the mechanism is worth more than the incident, and because it cost two rounds to find.
 
-## Step 2 in flight
+**Closed by:** (1) the brief's precedence clause scoped to *"the document wins — EXCEPT on model and
+effort policy, where THIS BRIEF IS LATER AND WINS"*, reasoning inline so it is not tidied away as
+redundant; (2) **PR #40, `615d5da`, verified on `main`** — banner on the table, rows 615–616 struck
+with `~~top tier (Fable-class)~~ **DEAD**`, the 2026-08-28 amendment marked superseded-in-part with
+its controller-runs-Opus half intact, the narrowing struck at its heading (626) with a `This ruling is
+DEAD` blockquote directly beneath, and the floor-list line (965) corrected to an opus reviewer. One
+line still reads like a live instruction — *"a lens that returns a finding it cannot resolve escalates
+to fable"* (667) — and it is fine: it sits under the struck heading with the DEAD blockquote 40 lines
+above it, so a reader arriving in sequence has already met the marker.
 
-`exec/06a-client-core` T9 (`e82a579`, the Board) — **one opus reviewer**, first dispatch under the new
-policy, 1 of 6 subagents. Reviewing in the lane4 worktree, so no shared-tree concurrency. Rebase onto
-`main` waits until PR #38 merges, per §8 merge order. PR #38's CI is **green**; the controller holds
-it for the owner's call on the accept-preview regression.
-
-## HAZARD — the acute half is CLOSED; the residual is open until PR #40
-
-**Status, verified on `origin/main` after the fixes landed:** the brief's precedence clause is now
-scoped — *"the document wins — EXCEPT on model and effort policy, where THIS BRIEF IS LATER AND
-WINS"*, with the reasoning inline so it is not removed as redundant, and `## MODEL & EFFORT` in the
-brief named as the operative policy. **So a restart is safe now**: it follows the brief's table, and
-the document's fable rows are dead by that clause whatever their heading says.
-
-**What is still open** is the document's INTERNAL contradiction, which PR #40 fixes: on `main`
-`90de0ff` (PR #39) added the cost ruling at line ~980 while the table at 605–606 still assigns
-`fable`, 609 still instructs an explicit `model: fable` dispatch, and the supersession sits **375
-lines below the table a reader hits first** — 23 fable mentions in total. Anyone reading the
-DOCUMENT directly, rather than through the brief, still meets live-looking rows.
-
-**Original finding, kept because the mechanism is the lesson:**
+**Original finding, kept because the mechanism is the lesson:****Original finding, kept because the mechanism is the lesson:**
 
 The rewritten `dispatch-executor-serial.md` (2026-08-31 15:46) does carry the cost ruling — sonnet
 default, the machinery cuts, the 6-agent cap, the restart protocol. But its **READ FIRST** section
