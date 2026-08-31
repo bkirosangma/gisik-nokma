@@ -9,86 +9,135 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > verified with `git branch --contains` (empty output = orphaned), never with `git cat-file`, which
 > passes on reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## Live anchors — 2026-08-31
+## Live anchors — 2026-08-31, rewritten after the step-4 recon was found WRONG
+
+**The previous version of this file told a restarted executor to rebase `exec/04-auth-visibility` and
+called it "the largest rebase left in the series." That instruction was live and wrong. Do not do it.**
+The branch is **fully redundant**: all four of its commits are already on `main` under different shas,
+and `git cherry -v origin/main origin/exec/04-auth-visibility` prints `-` (already upstream) for every
+one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch | none in flight — **PHASE 0 IS CLOSED**, all three of its branches merged | `gh pr list` |
-| `main` | `a3746fb` (PR #47). Phase 0: `6b2fc76` #38 · `c93c910` #43 · `a3746fb` #47, plus doc PRs #44 #45 #46 | `git log --oneline -1 origin/main` |
-| Gate anchor | **the controller is re-establishing it on `main` after #47**, the first code-bearing merge since `c93c910`. Do not carry 853 forward; take the controller's new composition, or recount. | — |
-| Node | **v22.22.2**, and state it beside every gate figure. The machine default is **v24.11.1**, outside the declared `>=22 <23`, and nothing enforces it — no `.nvmrc`, no `.npmrc`, so `pnpm` under 24 runs with no refusal and no warning. | `node -v` inside the brief's PATH export |
-| Orphaned, do not cite | `52520b0`, `72a7e3e` (step 3's two rebase tips), and every pre-squash sha of the three merged branches | `git branch --contains`, empty = orphaned |
+| Branch in flight | **`exec/04-t4-t5-permissions`**, cut from `origin/main` at `91df593`. Tree identical to main at creation (`git diff --stat origin/main HEAD` empty) | `git rev-parse`, `git diff` |
+| `main` | **`91df593`** (PR #48, docs-only). Moved from `452baa6` mid-session — refetch before trusting any main sha in this file | `git log origin/main --oneline -4` |
+| `exec/04-auth-visibility` | **REDUNDANT — safe to delete.** Its 4 commits landed on main as `31df85b`, `24fba16`, `8c4216a`, `51aba55` | `git cherry -v` → 4 × `-` |
+| Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
+| Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, and every pre-squash sha of the Phase 0 branches | `git branch --contains`, empty = orphaned |
 
-## Gate composition — recounted at the final sha
+## THE RULE THIS COST US, and it generalises to every remaining rebase
 
-**Status: GREEN.** `pnpm turbo run build test typecheck --force`, redirected to a file, **never
-piped** — a piped gate reports the pipe's exit code, and this repo has already seen `| tail` return 0
-over a failed turbo run.
+**`git cherry` belongs BEFORE the pre-rebase gate rule fires. An ahead-count is not a work-count.**
+
+`git rev-list --left-right --count` measures **commit identity**; `git merge-tree` measures **a merge**.
+Neither asks the only question that matters — *is this content already upstream?* A branch whose commits
+were rebase-merged keeps its own shas, so it reports "4 ahead" forever while contributing nothing. The
+previous recon read `30 / 4` plus two real conflicts and concluded there was a large rebase to perform.
+Both readings were accurate; the conclusion was false.
+
+**The cheapest way to make a rebase gate unnecessary is discovering there is no rebase.** For every
+remaining branch in the serial order, run `git cherry -v origin/main <branch>` FIRST. `-` on every line
+means delete the branch and start from main.
+
+**Cost of learning it late:** a pre-rebase gate was run at `5c71689` per the coordination doc's rule —
+**green, 15/15 tasks, exit 0, 488 tests, Node v22.22.2**. It is recorded here as a footnote only. It
+measured a tree strictly *behind* main and is **a control for nothing**. Do not place 488 beside any
+main-derived total: they are different trees, and a total that rises without decomposing is exactly what
+the coordination doc warns against.
+
+## Gate composition — recounted at the sha being reported, `main @ 91df593`
+
+**Status: GREEN.** `pnpm turbo run build test typecheck --force`, redirected to a file, **never piped**
+— a piped gate reports the pipe's exit code, and this repo has already seen `| tail` return 0 over a
+failed turbo run. The general rule is broader: **ANY command after the gate in the same chain becomes
+the status you are shown**, a bare `echo` included. The summary line is the only honest signal.
 
 | Measure | Value | How counted |
 |---|---|---|
-| **Node** | **v22.22.2** — every gate figure in this file was produced under it | `node -v` inside the same `export PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH"` the brief mandates. **Checked, not assumed:** this machine's *default* `node` is **v24.11.1**, outside the declared range, so a gate run without that export is a different configuration wearing the same numbers. |
-| Gate exit code | **0** | the run itself |
-| Turbo tasks | **18 successful of 18**, 0 cached | same run |
-| Tests | **853** = domain 263 + rule-engine 278 + server 143 + app-core **130** + ui 31 + sync-client 8 | summed from the six per-package lines in the same run |
-| `main` @ `55ae0a1`, app-core | **92** | measured in the main worktree with `--pool=forks --poolOptions.forks.singleFork=true` |
-| app-core delta | **92 → 130**, a delta against a named sha | the only figure that survives the rebase |
+| **Node** | **v22.22.2** | `node -v` inside the brief's PATH export, printed into the log's first line before the run. The machine default is v24.11.1 — a different configuration wearing the same numbers |
+| Gate exit code | **0** (`TURBO_EXIT=0`, written into the log immediately after the gate) | the run itself |
+| Turbo tasks | **21 successful of 21**, 0 cached | same run |
+| **Tests** | **936** | summed from the seven per-package lines in the same run |
+| Decomposition | domain **274** + rule-engine **278** + server **143** + app-core **130** + editor **72** + sync-client **8** + ui **31** = **936** | a total that only *rises* tells you nothing; one that decomposes into named parts is checkable by the next reader |
 
-**Do not carry forward the older 631/658 pair.** Plan 3 Chain A (`6b2fc76`) landed underneath and moved
-domain 230 → 263 and rule-engine 128 → 278 on *both* sides, so "identical except app-core" was true of
-the pair it was measured on and false of anything since. Both historical rows are kept and marked
-historical in `docs/lanes/lane4-periphery-state.md`.
+**This is the baseline T4's and T5's deltas are stated against.** It was measured on
+`exec/04-t4-t5-permissions` at the moment of branching, when its tree was byte-identical to `origin/main`
+(`git diff --stat origin/main HEAD` empty) — so it is a fact about main, obtained without touching the
+main worktree.
+
+**Do not carry forward 853, or 631/658.** Those were measured on trees that no longer exist. And **do not
+place the 488 from the abandoned branch's pre-rebase gate beside this figure**: different tree, not a
+control, footnote only.
+
+## What was verified about step 4's surface, so the next session does not re-pay for it
+
+| Claim | Finding | How |
+|---|---|---|
+| Coordination-doc conflict would lose content | **FALSE — nothing to re-append.** The branch's 154-line §7 block is **byte-identical** on main. The one-line diff seen initially was the extraction picking up main's *next* heading (`### 8. The envelope-origin gate has landed`) | `git diff --no-index` over both extracted blocks |
+| `app.ts` conflict would lose content | **FALSE.** Main's `app.ts` is a strict superset — it has the branch's `auth: Auth` block *and* the `ingest: ClientIngest` narrowing the branch lacks | read both blobs |
+| T5 is unstarted | **PARTLY FALSE.** T5's **first branch already landed on main** via `fc904f4`: `checkPermission`, `SERVER_ORIGIN_RULE`, `SERVER_ORIGIN_REASON`, and the `SubmissionGate` type — which its own comment says was "named as a type so Task 5 can widen it to carry the session (`(env, session)`) without every call site changing shape." **T5 WIDENS; it does not create.** | read `apps/server/src/permissions/check-permission.ts` on main |
+| T4 is unstarted | **TRUE.** `proj_memberships` appears on main only in doc comments — `registry.ts`, `engine-context.ts`, plan text. No implementation file, and `buildProjectionRegistry` registers exactly two projections | `git grep`, read `projections/index.ts` |
+| CSRF anchor line | **`sign-in-flows.test.ts:148` on `main @ 91df593`**, content confirmed: `expect(attributes).toEqual(['Max-Age=604800', 'Path=/', 'HttpOnly', 'SameSite=Lax']);` — re-verified on main, not merely on the stale branch, because T5 item 3 anchors a sentence to a line and line numbers drift across a rebase-merge | `awk` over the blob at `origin/main` |
+| `docs/` affects the gate | **NO.** `turbo.json` declares no `inputs`, and `docs/` sits outside every package, so a docs-only merge cannot move gate composition. **PRs #48 and #49 were both docs-only** — do not re-run a gate to "check" them | read `turbo.json` |
 
 ## Where I am in the serial sequence
 
 **PHASE 0 IS COMPLETE.** Step 1 Plan 3 Chain A (`6b2fc76`, #38) · step 2 Plan 6a T9 (`c93c910`, #43) ·
-step 3 Plan 7 T4 (`a3746fb`, #47). Every branch that existed when this brief was written has landed.
+step 3 Plan 7 T4 (`a3746fb`, #47).
 
-**STEP 4 IS NEXT AND NOTHING IS IN FLIGHT: Plan 4 T4 → T5.** T5 is **floor-list** — opus implementer
-AND opus reviewer; everything else sonnet, cap 6.
+**STEP 4 IS IN PROGRESS: Plan 4 T4 → T5, on `exec/04-t4-t5-permissions`, cut fresh from `main`.**
+T5 is **floor-list** — opus implementer AND opus reviewer. **T4 is opus implementer + sonnet reviewer:**
+not because it is floor-list (it is not), but because `proj_memberships` is a **projection**, and the
+model table puts core semantics — reducers, projections, engine checks, folds — at opus/high.
+**Floor-list and work-class are independent axes; a task can be opus by either.**
 
-### Step 4 recon, done so the next session does not pay for it
+### What T4 must do, from main's own text rather than from the plan alone
 
-| Fact | Value | How |
-|---|---|---|
-| Branch | `exec/04-auth-visibility`, **29 behind / 4 ahead** of `a3746fb`. **Not checked out anywhere** — `lane2-plan4`'s worktree holds `lane2-handover`, a different branch | `git rev-list --left-right --count`; `git worktree list` |
-| Conflicts on rebase | **TWO**, and one is code: **`apps/server/src/app.ts`** and the coordination doc | `git merge-tree --write-tree origin/main origin/exec/04-auth-visibility` → exit 1, 2 `CONFLICT` lines. Positive control from the same run: the same command against the now-merged `exec/07-editor-client` returns **0**, so the counter can return zero |
-| Its 4 commits | `5c71689` · `e772499` · `950131f` · `c6bafb9` — better-auth CSRF under `NODE_ENV=test`, `Set-Cookie` assertions that were all `n=1`, a `process.env` write justified by a mechanism nobody ran, and a count in a comment that expired | `git log origin/main..origin/exec/04-auth-visibility` |
-| Plan text | `docs/superpowers/plans/2026-08-20-04-auth-visibility.md` — **T4 at line 1227** (`proj_memberships` — membership history becomes effective roles), **T5 at line 1754** (pre-engine permission gate — role refusals at the ingest door, and the founding sequence behind it) | `grep '^### Task'` |
+- **`proj_memberships`** — the projection. Plan 4 text at `docs/superpowers/plans/2026-08-20-04-auth-visibility.md`
+  line 1227 (T5 at 1754).
+- **`resolveEffectiveRole`** — named by `check-permission.ts`'s comment on main: *"Task 4 lands
+  `resolveEffectiveRole`, then Task 5 fills in the role logic on top of this function."*
+- **`getEntityState('membership')` in `engine-context.ts`** — that file says Plan 4 owns `'membership'`
+  via `proj_memberships`, and its ticket analogue is explicit that projection and context method
+  *"none may land without the others."* **A `proj_memberships` that nothing reads is the
+  mocked-contract shape in miniature** — this series' signature failure, at small scale.
 
-**Rebase FIRST, then review the rebased tree**, and run the gate at the old tip before rebasing so a
-post-rebase red is attributable — both rules are in the coordination doc and step 3 is what earned
-them. 29 commits and a code conflict is the largest rebase left in the series.
+### The registration-order trap, and the one-line fix that defuses it for step 8
 
-### The three CSRF items T5 carries, with the anchor verified present
+`projections/index.ts` on main says *"every new registrant **appends**"*. That is true for T4 by luck:
+§8's order is
 
-1. **HTTP-Origin checked on cookie-authenticated product requests.**
-2. **`sameSite` set explicitly** — the cookie already emits `SameSite=Lax`, but observed output is not
-   the same thing as an explicit setting, so check the config rather than the header.
-3. **A sentence at `apps/server/test/auth/sign-in-flows.test.ts:148`** naming what the assertion
-   already forbids. Verified present on the branch, verbatim:
-   `expect(attributes).toEqual(['Max-Age=604800', 'Path=/', 'HttpOnly', 'SameSite=Lax']);`
-   Because it is `toEqual` over the WHOLE attribute list, adding `Domain=.artsourced.in` fails here —
-   and that matters because a `Domain` attribute would send the session cookie to **every subdomain of
-   the zone**. The test forbids it today by accident of exactness; the sentence makes it on purpose.
+> `proj_entity_heads, proj_workflows, proj_ticket_types, proj_tickets, proj_rollups, proj_memberships, proj_visibility`
 
-**WHAT UNITES ALL THREE, and it is the sentence to write T5 against: its job is to convert ACCIDENT
-INTO INTENT.** Every one of these is already true today and true for the wrong reason. The `Domain`
-attribute is forbidden by the exactness of a `toEqual` nobody chose for that purpose. `SameSite=Lax`
-is emitted by a default, not set by a decision. A property that holds by accident holds until someone
-tidies it — a `toEqual` relaxed to `toContain`, a default that moves in a library upgrade — and
-nothing anywhere says a security property just changed. T5 does not need to change what the system
-DOES on these three; it needs to make each one deliberate, and pinned, so the next edit that would
-undo it fails loudly instead of succeeding quietly.
+(plus `proj_projects` **before** `proj_tickets`, per the coordination doc's amendment), and since only
+the first two exist, `proj_memberships` does land at the end. **But Plan 3 Chain B — step 8 of this
+sequence — adds `proj_ticket_types`, `proj_tickets`, `proj_rollups`, which must be INSERTED BEFORE
+`proj_memberships`, not appended.** An implementer who obeys that comment breaks §8 silently.
+**T4 corrects the comment to say "inserts at its §8 position" in the same commit** that extends the
+order assertion in `test/projection-order.test.ts`. Coordination doc line 557 already anticipates this
+collision; this is the one-line change that stops it biting.
 
-**THE NAMING TRAP, and it is the one the brief says costs a round.** The HTTP `Origin` **header**
-(CSRF) and the event-envelope `origin` **field** (provenance enum) are unrelated and they meet in T5.
-Say **HTTP-Origin** or **envelope-origin** in every task, commit, review and message. Someone who
-conflates them writes a header check and believes the forgery window is closed.
+### Carried into T5 — do not rediscover
 
-**Also owned by step 4: `Features.md` §6 and `test-cases/06-auth-visibility.md`** — reserved for Plan 4
-by the coordination doc's table, and to be created **in the same change set**, which is the rule #47
-was blocked on.
+- **Widening `SubmissionGate` to `(env, session)` is a breaking signature change.** **Ruling P17 is the
+  precedent:** it owes a sweep of call sites **in the plan text**, not only in code.
+- **The three CSRF items, and the sentence that unites them.** HTTP-Origin on cookie-authenticated
+  product requests · `sameSite` set **explicitly** (check the config, not the emitted header — observed
+  output is not a setting) · a sentence at `sign-in-flows.test.ts:148`. **All three are already true, and
+  all three are true for the wrong reason.** `Domain` is forbidden by the exactness of a `toEqual` nobody
+  chose for that purpose; `SameSite=Lax` is a library default, not a decision. A property that holds by
+  accident holds until someone tidies it. **T5's job is to convert accident into intent** — pinned, so
+  the next edit that would undo it fails loudly instead of succeeding quietly. A `Domain=.artsourced.in`
+  would send the session cookie to every subdomain of the zone.
+- **THE NAMING TRAP.** The HTTP `Origin` **header** (CSRF) and the event-envelope `origin` **field**
+  (provenance enum) are unrelated and they meet in T5. Say **HTTP-Origin** or **envelope-origin** in
+  every task, commit, review and message. `check-permission.ts` on main already models this — its
+  header comment spends a paragraph on the distinction. Main also carries a coordination-doc section
+  **§8 "The envelope-origin gate has landed"**; it is about the *field*, not the header.
+- **Also owned by step 4: `Features.md` §6 and `test-cases/06-auth-visibility.md`**, created in the
+  **same change set** — the rule PR #47 was blocked on. Author them at the **end of T5** covering T4+T5's
+  surface, because every ✅ must be sourced from an assertion that exists, not from implementation.
+  **§6 is a *section* number; the never-renumber rule applies to case numbers, not section numbers.**
 
 ## What step 2 actually contained
 
