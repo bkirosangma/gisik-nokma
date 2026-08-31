@@ -14,11 +14,10 @@ decision boundary.
 
 | what | value |
 |---|---|
-| `main` | `a3746fb` **as of 19:05 IST — this row goes stale by design.** #43 → #45 → #46 → #44 → #47 |
-| last forced gate | **`a3746fb`** — 21/21, 0 cached, **936 tests**, `TURBO_EXIT=0`, node **v22.22.2**.
-  Re-established here because #47 is the first **code-bearing** merge since `c93c910`; the 853 anchor is
-  retired, not carried |
-| gate composition | domain **274** · rule-engine 278 · server 143 · app-core 130 · **editor 72** · ui 31 · sync-client 8 |
+| `main` | `45c83eb` **as of 20:35 IST — this row goes stale by design.** Phase 1 step 4 merged (#51) |
+| last forced gate | **`45c83eb`** — 21/21, 0 cached, **995 tests**, `TURBO_EXIT=0`, node **v22.22.2**.
+  Re-established: #51 is code-bearing (30 files, +3776). Arithmetic closes 936 + 24 + 35 |
+| gate composition | domain **276** · rule-engine 278 · server **200** · app-core 130 · editor 72 · ui 31 · sync-client 8 |
 | **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
 | collision surfaces | fixtures **84** · projections **2** (`proj_entity_heads`, `proj_workflows`) · packages **6** (`editor` new) |
 | open PRs | none at time of writing — **re-measure** |
@@ -93,7 +92,24 @@ discharged in `f40a850`.
 > *"at `8209397`, not at the branch tip"* is **SUPERSEDED** — T9 was reviewed and its fixes applied, and
 > the branch merged at its tip.
 
-**Step 4 is running: Plan 4 T4 → T5.** T4 (`proj_memberships`) is committed and green; T5 widens
+**Step 4 is CLOSED** — merged as `45c83eb` (#51). **Step 5 is next: Plan 4 T6 → T7** (T7 floor-list).
+T6/T7 must read membership through **`resolveEffectiveRole`**, never by joining `proj_memberships`
+directly — documented in three places and **enforced by nothing**; it is T4's implementer's own
+least-sure claim, so raise a ruling if T6 joins directly.
+
+**Four gaps carried with named owners, none silently fixed:** P18 engine-context wiring (T6 or the
+step-10 checkpoint) · **P19 guest admissions (T9)** — a guest is admitted TODAY for `ticket.created`,
+`visibility.set`, `workspace.renamed`, `comment.added`, and `visibility.set` in an append-only ledger is
+unrecoverable · a second `workspace.created` still commits (T13) · the half-founded workspace with no
+repair path (T13), **already closed by T5's escalation guards — do not read it as a regression.**
+
+**Case ids are reserved too, and I got this wrong a second time.** I ruled "cases numbered from 6.1";
+Plan 4 reserves **6.1–6.42 verbatim with content assigned per id**, and 6.5–6.8 are exactly T4's and T5's
+work. The executor filled those and continued at 6.43. **Same root error as the §6/§9 section mistake:
+assuming sequential allocation in a scheme that allocates from a table.** Claim from the table — at every
+level, sections and case ids alike.
+
+~~**Step 4 is running: Plan 4 T4 → T5.**~~ T4 (`proj_memberships`) is committed and green; T5 widens
 `SubmissionGate` — note **T5 is NOT unstarted**, `fc904f4` landed its first branch, so review its PR as a
 widening, not a creation. **No rebase was needed:** `exec/04-auth-visibility` is redundant (see the
 `git cherry` rule below) — the recon's "31 behind / 4 ahead, two conflicts" was accurate and its
