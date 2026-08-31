@@ -1148,7 +1148,12 @@ write and neither catches it.
 
 **Two adjacent facts verified at the same tree, so no lane re-derives them.** `better-auth@1.7.2`
 declares **no zod peer dependency** — zod `^4.3.6` is its own direct dep, nested, and the monorepo's
-3.25.76 is untouched; the `better-call ✕ unmet peer zod@^4.0.0` warning is cosmetic. And **passkey has
+3.25.76 is untouched. ~~The `better-call ✕ unmet peer zod@^4.0.0` warning is cosmetic.~~ **Struck
+2026-08-28: that warning is ACCURATE**, and Plan 4's execution consequences below prove it from the
+lockfile — there is exactly one `better-call` snapshot, `better-call@1.4.0(zod@3.25.76)`, so it resolved
+its optional zod peer *outside* its declared `^4.0.0`, which is precisely what pnpm reported. The claim
+here was inherited from a lane summary and was never checked against the lockfile; the corrected entry
+below is the authority. And **passkey has
 left better-auth core**: 1.7.2 exposes 54 export subpaths, none containing `passkey`, and carries no
 `@simplewebauthn/*` dependency. It ships as `@better-auth/passkey@1.7.2`, a separate package.
 `PasskeyOptions` still takes `rpID`/`rpName`, so only the specifier moves — any plan text naming
@@ -1586,3 +1591,557 @@ would put words in the actor's mouth; the ledger stores the claim as it was made
 `packages/rule-engine`: every `workspace.created` / `workspace.renamed` payload in the repo carries a
 real name (`'Convenience Corner'`, `'Gisik Nokma Build'`, `'Personal'`, `'CC HQ'`, …) and there are no
 `project.created` fixtures at all. What a sibling lane inherits on rebase is the door, not a breakage.
+
+
+## `z.unknown()` makes a key optional, and the sweep for who inherits it (2026-08-28, controller)
+
+Found by Lane 4's T1 review, swept centrally because the hole is in a **shared** schema and propagates
+by **embedding** — the shape where no single lane can see all the consumers.
+
+**The defect, proven rather than argued.** `z.unknown()` does not require the key. Probed against the
+repo's own zod build:
+
+```
+z.object({ a: z.string(), payload: z.unknown() })
+  { a: 'x' }                  -> ACCEPTED, parsed keys: ["a"]     <-- payload absent entirely
+  { a: 'x', payload: undefined } -> ACCEPTED
+  { a: 'x', payload: null }      -> ACCEPTED
+  { a: 'x', payload: {} }        -> ACCEPTED
+```
+
+`submittedEventSchema` (`packages/domain/src/envelope.ts:72`) declares `payload: z.unknown()`. So any
+schema embedding it admits an event with **no payload key at all**, and `JSON.stringify` drops absent
+and `undefined` values alike, so the wire form loses it silently. In Lane 4's instance the renderer then
+writes a literal `undefined` into a comment body that lands in an append-only table permanently.
+
+**There is a compile-time half with the same root:** `z.infer` yields `payload?: unknown`, which is not
+assignable to `SubmittedEvent`. The natural downstream unblock is a cast, and the cast erases the
+guarantee silently instead of failing. The repo already met this quirk once and handled it by hand —
+`parse-event.ts:99` reconstructs the event as `{ ...envelope.data, payload: payload.data as unknown }`
+rather than passing the inferred object through. That is the precedent; there is none for shipping the
+loose inferred type as a cross-plan contract.
+
+### The sweep: exactly two embedders, and Plan 6 is exposed to a different half
+
+Grepped across shipped code and all eleven plans.
+
+| Embedder | Where | Status |
+|---|---|---|
+| `eventEnvelopeSchema` | shipped, `envelope.ts:84`, `submittedEventSchema.extend({serverTime, seq})` | **inherits the hole. Owner: Lane 2 / Plan 4**, as a ride-along with the two `envelope.ts` amendments it is already landing in T3. Consumed today only by `envelope.ts` and its own test, so no live exploit path and not urgent — but it is a shared export and the next consumer inherits it silently. |
+| `claimContestedPayloadSchema` | Plan 10 line 309, `originalEvent: submittedEventSchema` | Lane 4's instance, in its current scope, being fixed there. |
+
+`parse-event.ts` uses the schema but is **safe**: it reconstructs with `payload` explicitly set (line 99).
+
+**Plan 6 names `submittedEventSchema` zero times** — worth stating because it was the suspected third
+consumer. Its client builds `SubmittedEvent` through `makeSubmittedFactory` (18 occurrences), i.e. it is
+exposed to the **type** half (`payload?: unknown` and the tempting cast), not the schema-embedding half.
+**The remedy there is different and the difference is load-bearing:** state the contracted type
+explicitly, and specifically do *not* reach for a `.refine` (there is no embedded schema to refine) or a
+cast (**the cast is the failure**). Lane 4 records that arriving at Plan 6 T6 with "apply the T1 fix" in
+mind would have produced exactly the cast — which is why a zero-count is worth reporting rather than
+treating as an absence of news.
+
+**Ownership, stated because a sweep result reads like an action item and this one is not everybody's.**
+Lane 4 found the defect and **correctly declined to fix the shipped half**: `packages/domain/src/envelope.ts`
+is on its MUST-not-touch list precisely because Plan 4 owes that file two amendments, and editing another
+lane's pending file in parallel is the collision class this document exists to prevent. Being already
+inside the package is not a licence to fix a neighbour's file. So the shipped half is **Lane 2's**, routed
+there explicitly rather than left to whoever noticed it; Lane 4 owns only its own embed and the Plan 6
+type half.
+
+**The test matrix, which is the part most worth a reviewer's attention** (Lane 4's formulation):
+
+```
+absent                -> REFUSED
+present-but-undefined -> REFUSED
+null                  -> ACCEPTED
+{}                    -> ACCEPTED
+```
+
+**A fix that also refuses `null` or `{}` would look correct, pass a careless review, and quietly refuse
+legitimate claims.** That is the same shape as everything else in this document — a check that fails for
+a reason unrelated to what it names — arriving inside the remedy rather than the defect.
+
+**The fix pattern** (Lane 4's, verified against the built schemas): a `.refine` on the embedded schema
+asserting `payload !== undefined`, plus stating the contracted type explicitly rather than taking
+`z.infer`. Prefer `payload !== undefined` over `'payload' in v`, **for a sharper reason than the first
+draft gave.** That draft said `in` cannot tell the two cases apart; the probe above disproves it in its
+own output — absent parses to `keys: ["a"]`, present-but-`undefined` to `keys: ["a","payload"]`, so `in`
+distinguishes them perfectly. Lane 2 reproduced this independently and supplied the real argument:
+**both cases must be refused, so one predicate covers both, and reaching for `in` invites the next reader
+to believe the distinction is meaningful when the matrix says it is not.** The recommendation is
+unchanged; the reasoning behind it was wrong, and it was wrong against data printed three lines above it.
+**Boundary that must not be over-tightened:** `payload: null` and `payload: {}` both stay **accepted** —
+null is still a claim, an empty claim is still a claim. Only absence is the defect.
+
+### `envelope.ts` settles at Plan 4 T3 — the schedule fact three lanes need
+
+Lane 2 confirms **T3 is the last amendment it has planned for `packages/domain/src/envelope.ts`**; T14's
+invite work was the other one and its share was pulled forward deliberately. After T3 lands, the file
+carries all three changes together — the owner-ratified membership composite id, `'invite'` in
+`ENTITY_KINDS`, and payload presence — and **lanes may treat that landing as the point the schema
+settles.**
+
+That is the payoff of the sequencing rule rather than a coincidence: three amendments to the schema every
+event passes through, batched into one change set so three sibling lanes rebase onto it **once**. A
+separate PR for the three-line payload fix would have cost more in rebase churn across four worktrees
+than the fix is worth — and Lane 4 declining to touch the file, despite already being inside the package
+and holding the finding, is the same discipline working from the other side. **A must-not-touch list that
+holds when the fix is small and the fixer is right there is the list doing its job, not a gap in it.**
+
+### The sweep was scoped to the wrong question — `z.unknown()` is a type assertion, not a presence assertion
+
+The sweep above asked *"who embeds `submittedEventSchema`?"* That is narrower than the defect. Lane 1
+asked the right question — *"where is `z.unknown()` used at all?"* — and found a second instance. Widening
+it again, across `packages/` **and** `apps/` rather than `packages/domain/src`, found two more. **Five
+sites, four of them the defect:**
+
+| Site | Shape | Verdict |
+|---|---|---|
+| `packages/domain/src/envelope.ts:78` | `payload: z.unknown()` | **defect** — routed to Lane 2 with Plan 4 T3 |
+| `packages/domain/src/events/ticket-events.ts:33` | `ticketFieldSetPayload.value` | **defect, and the worst of them** — see below |
+| `packages/rule-engine/src/fixtures/harness.ts:32` | the fixture envelope's `payload` | **defect** — the fixture door has the same hole as the real one |
+| `packages/rule-engine/src/fixtures/harness.ts:155` | `ticketFieldSetFixturePayloadSchema.value` | **defect** — exact twin of the `ticket-events` one |
+| `packages/domain/src/events/ticket-events.ts:38` | `commentAddedPayload.body: z.record(z.string(), z.unknown())` | **cleared** — the record itself is required; only its values are unconstrained |
+
+**The `ticketFieldSetPayload` instance fabricates a claim rather than dropping one, which is worse.**
+Plan 3's reducer does `claim(p.value ?? null, env)` (`ticket-state.ts:201`, brief-mandated). So an omitted
+`value` does not go missing — it **records a null clearing claim nobody made**, wiping a field under
+someone's name and both their clocks, into an append-only table. That is spec invariant 4 ("nothing is
+invented") violated *by the door* rather than by a renderer. `title` is masked by the follow-on
+`field.title-required`; every other field clears silently. Lane 4's instance wrote a literal `undefined`
+into permanent storage; this one writes an **attributed erasure**.
+
+**The two harness instances matter for a reason of their own.** That harness is what all 61 fixtures run
+through, so **the fixture door is currently exactly as loose as the production door** — which means no
+fixture can witness the difference between them. A falsifiability substrate that shares the defect it is
+meant to catch cannot catch it. Lane 1 owns both (it authors fixtures through that harness at T8).
+
+**The class, stated once:** `z.unknown()` says *this value may be anything*. It does **not** say *this
+value is present*. Any schema meaning "some value, contents unconstrained" must state presence
+separately. The grep is one line — `grep -rn 'z\.unknown()' packages/ apps/` — and worth running
+wherever a payload schema is authored.
+
+**All four defects take the same four-case matrix**, so the doors answer alike instead of diverging by a
+hair: absent refused, present-but-`undefined` refused, `null` accepted, `{}` accepted. Lane 1 is pinning
+its T7 to it explicitly and citing the envelope matrix as the precedent it matches. For `ticketFieldSet`
+it also lands cleanly on Plan 3's design decision 3, which already sanctions `value: null` as an explicit
+clearing claim with provenance retained — so the matrix is not a new rule there, it is the existing one
+enforced.
+
+### The harness reproduces the fabrication, and two further sweeps that fall out of it
+
+**The harness does not merely share the hole — it reproduces the fabrication character-for-character.**
+`harness.ts:294` is `value: payload.value ?? null`, the same construction as the production reducer at
+`ticket-state.ts:201`. So a fixture omitting `value` is accepted by the harness, records the identical
+fabricated null clearing claim, and therefore **agrees with production while both are wrong together.**
+That is "a fixture that agrees with the implementation without constraining it" in its purest form, and
+it is why the fix order matters.
+
+**The floor is narrower than first stated here, and Lane 1 checked rather than reasoned.**
+`fixtures.test.ts:19` is `evaluateEvent(completeCandidate(fx), buildInMemoryContext(fx))`, and
+`applyPriorEvent` (`harness.ts:201`, called from `:170`) handles **priors only**. So a **candidate-position**
+event is judged by the **real domain schema** and never by a harness payload schema — a fixture whose
+candidate is a `ticket.field_set` omitting `value` *can* prove T7's matrix today, because it reaches
+`checkTicketFieldSet` and the production door. The harness schemas gate **prior-event staging**, and that
+is where looseness actually bites: a prior can stage a world the real server could not have produced.
+
+So "a fixture cannot be the thing that proves the fix" is **true for prior-position and false for
+candidate-position**. The harness fix is still required on its own terms — a prior door looser than the
+real door is a defect regardless — but it does **not** block T7's end-to-end proof. **T7** fixes
+`ticket-events.ts:33` and proves it with unit tests *and* a candidate-position fixture; **T8** fixes the
+harness pair for the prior-staging reason, not as a precondition.
+
+**The mutation must kill the right case.** Revert to bare `z.unknown()` and watch the **absent** case fail
+specifically. A mutation that only kills present-but-`undefined` has proven a side effect of the fix
+rather than the fix — the distinction is the whole reason the matrix has four rows rather than two.
+
+#### Sweep 1 — `?? null` is a separate defect from `z.unknown()`, and only sometimes a fabrication
+
+Lane 1's point, and correct: the two co-occur here but are independent. `z.unknown()` lets the key
+vanish; `?? null` turns the vanishing into a claim. A schema could be tightened while a downstream
+`?? null` still invents from a legitimately-absent optional. Swept across `packages/` and `apps/` — ten
+sites, and the discriminator is **what `null` means in that position**:
+
+- **Seven are `Map.get(…) ?? null`** — the ordinary not-found idiom. Not claims at all.
+- **`harness.ts:226` `parentId ?? null` and `:231` `assigneeId ?? null`** — the fixture created-schema
+  declares both `.nullable().optional()`, so absent really does become null. **But that is correct
+  semantics, not fabrication:** a ticket created with no parent *is* a root ticket, one with no assignee
+  *is* unassigned. Null is the natural default of a state field there.
+- **`harness.ts:294` `value ?? null`** — the defect, because in `ticket.field_set` **null is not a default,
+  it is an act**: the clearing claim, sanctioned by design decision 3 and carrying provenance.
+
+**The rule that makes the grep usable:** `?? null` fabricates only where `null` carries the meaning of a
+**deliberate act**. Where `null` is a state field's natural absence-default, converting absent to null is
+the intended reading. That is the question to ask of each hit, and it is answerable without running
+anything.
+
+#### Sweep 2 — a third divergence between the fixture door and the real one, found in passing
+
+`ticketCreatedFixturePayloadSchema` (`harness.ts:140`) declares `parentId: z.string().nullable().optional()`
+while the shipped `ticketCreatedPayload` (`ticket-events.ts:19`) declares `parentId: ulidString.nullable()`
+— **required, not optional.** So a fixture may omit `parentId` and be accepted, where a real event
+omitting it is refused at the door. Independent of `z.unknown()`, same consequence: the fixture door is
+looser than the door it stands in for, so a fixture cannot witness a refusal the real door would make.
+Lane 1 then ran the deliberate pass this argued for, over all eleven mirrored fields, and found a
+**fourth** presence defect plus the discriminator that sorts the whole class.
+
+**`ticketCreatedFixturePayloadSchema` omits `typeId`, `projectId` and `title` entirely**, while all three
+are required in `ticketCreatedPayload` (`ticket-events.ts:17,18,20`). Worse, the existing instruction to
+T8 said to add them as **optional** keys — which would have reproduced the `parentId` presence defect
+three more times *in the act of fixing something else*. Corrected: they land **required**.
+
+#### The rule that sorts harness-versus-domain divergence in one pass
+
+> **A harness schema may diverge from its domain twin in VALUE FORMAT. It may not diverge in PRESENCE.**
+
+Format divergence is deliberate and load-bearing: fixtures use `t1`/`ws_1` because they enter at
+`evaluateEvent` and never pass `parseEvent`'s door, and tightening `z.string()` to `ulidString` would
+invalidate all 62 shipped fixtures for no gain. **Presence divergence has no purpose at all** — it only
+lets a fixture stage a prior state the real door would refuse. That settles the
+`ulidString`-versus-`z.string()` axis raised earlier: **format, therefore deliberate, therefore keep.**
+
+Applied across eleven mirrored fields without running anything: **four presence defects** (`parentId`
+optional; `typeId`/`projectId`/`title` absent; the partial envelope's `payload`; `ticketFieldSet.value`),
+**three deliberate format divergences** (assignee `min(1)`, rebound `min(1)`, short ids), **three
+deliberate harness-only affordances** (`workflowId`, the `stateId`/`stateCategory` planting overrides,
+the `field`/`fieldId` split), and **one schema still to be added** — `ticketReparented`, which must mirror
+presence as required-nullable rather than optional.
+
+**And the `?? null` discriminator prevents an over-correction inside this fix.** A T8 implementer
+tightening presence could easily "fix" `harness.ts:226`/`:231` into refusals. It must not: a ticket
+created with no parent *is* a root ticket, one with no assignee *is* unassigned. Only `value` is an act.
+The two rules are twins and are needed together — **presence, not format** decides what to tighten;
+**act, not default** decides where `?? null` is a fabrication.
+
+#### The positional rule, so a reader knows which grep hits to open
+
+Lane 1's correction to its own earlier framing, and it generalises better than the instance did:
+`z.unknown()` is dangerous **exactly where it stands as an object property's schema**, and harmless where
+it describes a container's contents. `z.record(K, z.unknown())` is safe because the *record* is the
+required thing and `z.unknown()` sits only in value position — which is why `commentAddedPayload.body`
+is cleared rather than being a fifth instance.
+
+### Byte-identical instructions target the repo file, not the plan text
+
+Recorded by Lane 4 against its own two partitions, and general. Plan 6 T6's precondition says to create
+`clock-skew.ts` from Plan 10 T1 Step 5 **verbatim**. Lane 4's implementation is about to deviate from
+that pinned text deliberately — the plan's formatter throws on two exotic ISO shapes, silently rolls
+`2026-02-30` instead of returning it verbatim, and reads non-ISO strings in the device's zone, giving
+four timezones four answers on two different days. Not reachable through the envelope door today.
+**So any byte-identical check between two plans must target the shipped repo file, never the plan text**
+— otherwise the check pins a version that was deliberately corrected. Both ends are Lane 4's here, which
+is the only reason it is cheap to notice.
+
+
+## The validating fake, the over-strict blind spot, and a fourth shape (2026-08-28, from Lane 3)
+
+### Make the fakes refuse what the real door refuses
+
+Lane 3's ruling for Plan 8, recorded here because it generalises past its lane and is probably the
+highest-leverage application of the mocked-contract law currently available: **`createFakeGateway` will
+run every submitted event through the shipped `submittedEventSchema` before accepting it.**
+
+The reasoning is the payload-presence diagnosis turned into a remedy. That defect stayed invisible
+because **a fake validates nothing, so a wrong shape only fails at a real door** — and Plan 8's fake is
+the series' most exposed seam, since every authoring test runs through it and its real server (Plan 5
+T9b) is a full wave away. The validator is a pure domain function needing no server and no database, so
+sharing it costs nothing.
+
+**This converts a fake from "the thing that excuses the server from existing" into "a local copy of the
+door."** It is the `safeParse` pin one level up, and strictly stronger: a pin only checks the payloads a
+test author remembered to check, while a validating fake checks every event it ever sees.
+
+**Verified, and it applies immediately elsewhere:** `packages/app-core/test/helpers/fake-data-source.ts`
+— shipped, Lane 4's — has an `ingest` that pushes to an array and optionally runs a script. **It
+validates nothing.** Its own header calls itself "a sanctioned mocked-contract seam" that "must never
+become the only thing that proves the contract works" — and as written it cannot refuse anything the real
+door refuses. That is the fake through which both the `toStateId` payload drift and the non-ULID seed
+`actorId`s pass silently today. **Owner: Lane 4**, as a candidate for the same treatment.
+
+### An over-strict remedy is harder to catch than an under-strict check
+
+Lane 3's observation on the four-case boundary, and it is a genuinely new axis. Every instance catalogued
+so far is a check **weaker** than its claim — it passes when it should fail, and shows up eventually as a
+production defect. The payload fix invites the opposite error: a remedy that also refuses `null` or `{}`
+**would look more rigorous and pass a careless review.**
+
+> **An over-strict remedy is harder to catch than an under-strict check, because it fails closed, and
+> failing closed looks like working.**
+
+The under-strict version surfaces as a bug. The over-strict version surfaces as a user being refused
+something legitimate — **which nobody reports as a bug in the validator.** It is diagnosed, if ever, at
+the far end of a support conversation. So "would this ever refuse something it should accept?" has to be
+asked with the same seriousness as its opposite, and the four-case matrix exists to force it.
+
+### RETRACTED: there is no fourth shape — and how a false one travelled
+
+An earlier draft of this section carried a "fourth shape": `markdownLinks: false`, added as a guard, said
+to be the very condition selecting the unguarded paste-rule branch — *a guard that enables what it
+forbids*. **Lane 3 retracted it and the retraction is right.** `markdownLinkPasteRule` **also** links
+plain URLs through its own `findPlainUrls` (extension-link@3.30.5 dist:225, 233), verified empirically
+with the option set both ways: plain URL still becomes a link either way. **No value of that option
+escapes the defect** — it selects which rule *object* implements the same behaviour. The literal sentence
+about branch selection was accurate; the reading built on it was not.
+
+The narrower thing that *is* true, recorded as a variant rather than a species: **an option that appears
+to select between a safe branch and an unsafe one may be selecting between two implementations of the
+same behaviour.** The trap is that reading the branch condition *confirms the story* — you see
+`if (opt) … else <the bad rule>` and stop, because the code agrees with you. Checking the other branch is
+what breaks it.
+
+**Why this is recorded rather than quietly deleted.** It is the day's own failure mode pointed at the
+people cataloguing it. Lane 3's implementer produced the claim, Lane 3 found it striking and forwarded it
+on that strength, and the controller amplified it into this document — **three sessions, no one spending
+the two minutes it would have taken to check.** Lane 3's statement of it is the one to keep:
+
+> **A finding that is interesting is not thereby verified, and interestingness is precisely what makes it
+> travel.**
+
+It was caught only because Lane 3 had instructed its re-reviewer to re-derive the implementer's headline
+claims independently — luck of instruction rather than a systematic guard. The systematic version, and
+the reason the review-depth ruling exists: **a claim's velocity through the lanes is not evidence, and
+the more quotable a finding is the more it needs the check nobody wanted to spend on it.**
+
+**Still true and unaffected by the retraction:** the paste path itself is real and independently
+confirmed — `addPasteRules` fires from `appendTransaction` on `uiEvent === 'paste'`, gated by none of the
+three options, live across five extensions, and it **also fires on drop**. And Lane 3's round-1 lesson
+stands: that commit closed a real hole and minted a false green check in the same breath, which is worse
+than the hole — a hole is merely open, while a false check tells the next person to stop looking.
+
+**One more ownership claim that did not hold, same species as the rest.** Lane 3 had assigned the
+paste-path decision to Plan 7 Task 5, on the grounds that Task 5 owns spec §2's "nothing silently becomes
+markup". **Task 5's brief contains zero occurrences of "paste"** — its trigger table is explicitly input
+rules, its contract is typed sequences, and its mechanism reads `undoInputRule`'s store, which paste
+rules never populate. Executed as briefed it would go green, the tripwire tests would stay green, and the
+path would ship unnoticed. The assignment read right and did not hold. Corrected: Task 5's dispatch is
+widened and **Task 12** named as the implementation site, since `enablePasteRules` is an `Editor` option
+and `TicketEditor` is where the `Editor` is constructed.
+
+
+## A forgeable `origin`, and the window Lane 4's merge opens (2026-08-28, controller ruling)
+
+Found by Lane 4 implementing Plan 10 T2. **Verified independently at the shipped tree**, because it is
+security-adjacent and a relayed security claim is worth nothing.
+
+**The gap.** `contest.server-only` refuses a `claim.contested` whose `origin` is not `'server'` — it is
+the rule stopping a client forging the system's own record of a refusal. **But nothing validates
+`origin`.** `submittedEventSchema` checks only that it is one of the four enum members
+(`envelope.ts:80`, `ORIGINS` at `:7` — and `'server'` is one of them), and `apps/server/src` merely
+**stores** it: `event-store.ts:61` in the insert column list, `:72` binding it, `:119` reading it back.
+Swept the whole of `apps/server/src` and `packages/` for any validate / overwrite / compare of `origin`:
+**zero hits.** A client that sets `origin: 'server'` walks straight past the rule.
+
+**The rule is correct and is not what changes.** The engine is shared between server and replica and
+genuinely cannot know provenance, so the check belongs at the door, not in the evaluator. This document
+already records that Plan 4's permission gate refuses forged server-origin at the gate's first lines.
+That remains the fix.
+
+**Reachability today is nil, and Lane 4's merge is exactly what changes it.** Verified: `claim.contested`
+is **not** registered in `vocabulary.ts` on `main` (zero occurrences), and **no shipped rule reads
+`origin` at all** — the only reference in `packages/rule-engine/src` is the fixture harness defaulting it
+to `'server'` (`harness.ts:100`). So a forged origin has nothing to attach to. Lane 4's T1 registers
+`claim.contested`, at which point `parseEvent` admits it and `contest.server-only` starts reading a field
+the door never checked.
+
+**Controller ruling: Lane 4 merges; the window is recorded with a named closer; Lane 2 is asked to land
+the origin check inside Plan 4 T5 rather than as a follow-up.** Reasoning, since a security window ruled
+open needs its argument written down:
+
+- Nothing is deployed and there are no users; the exposure is theoretical inside a pre-release repo, and
+  it is closed by work already scheduled in the same wave.
+- Holding Lane 4 would stall Plan 10's prefix on Plan 4's partition-A timing, for a window nobody can
+  reach.
+- **This is exactly the Plan 1 §9 shape** — register-then-gap — and the series' settled answer there was
+  a rider making the unsafe path honest, **not** a held merge. The rider is unavailable here for a good
+  reason: the fix lives in `apps/server` ingest, which is Lane 2's pending surface, and Lane 4 editing it
+  in parallel is the collision class that discipline exists to prevent.
+- So the §9 remedy applies in its other form: **name the closer, record the window, and make sure the
+  closing lane knows it is closing something rather than adding something.** Plan 4 T5 is the closer.
+
+**A second window in the same family, deliberately left open by Lane 4, and its reasoning is the
+important half.** `claim.contested_resolved` is reachable at the ingest door once T1 merges and will
+**500** until Plan 10 T4, because `createEngineContext` has no `getContest` and the evaluator throws by
+design. The attractive fix — have `getContest` return `null` — is **worse**, and Lane 4's implementer
+proved it by mutation rather than arguing it: it converts a wiring bug into a legitimate-reading refusal
+that tells a user *"no contested claim is recorded"* when the truth is that the context cannot see
+contests at all. **A loud 500 on an event nothing submits yet beats a quiet lie.** That is §9's lesson
+exactly — the silent-wrong-refusal hazard — and T4 is named as the closer.
+
+### Negative space: two fixtures are the entire net for one defect class
+
+Lane 4 had its implementer build the harness fold **the wrong way round on purpose** — filter-then-complete,
+the order the plan text invites — and ran the package. **All 61 pre-existing fixtures stayed green, and
+both unit-test files stayed 100% green.** Only the two new fixtures caught it, and the symptom was
+"still refused, wrong rule".
+
+The finding is the negative space rather than the catch: **two fixtures are the entire net in this
+repository for that defect class.** A suite of 61 that survives an inverted fold is not thereby a suite
+that tests folding. Worth doing deliberately elsewhere — mutate the thing, run everything, and count what
+actually goes red — because the number is usually smaller than the suite size suggests, and it is the
+only way to learn which parts of a suite are load-bearing.
+
+
+### The gate's placement was contradicted by a brief, and Plan 10 inherits the answer
+
+Found by Lane 2 while checking the origin gap. **Plan 4 T5's brief (line 292) states the bootstrap's
+server-origin appends bypass `checkPermission` because "the gate is the HTTP door (Step 5)".** Lane 2's
+own earlier ruling put the gate inside `commitOne` with the session threaded in. Those are different
+designs, and **this document already settled it in the other direction**: decision 15 (line 105) records
+that `IngestDeps.gates` run **inside `ingestBatch`'s transaction**, and states the consequence outright —
+*"Plan 10's `POST /v1/sync` wraps the same ingest, so a sync-refused gate violation becomes a contested
+claim with no extra wiring."*
+
+**If the gate lived only at the HTTP door, `POST /v1/sync` would bypass it entirely** and a permission
+violation arriving over the sync path would never become a contested claim — contradicting the sentence
+above and silently removing the sync-path enforcement that Plan 10's amendment 16 depends on. So: **the
+gate goes inside the ingest path; the session originates at the door and is threaded in.** Lane 2 is
+carrying the reconciliation into T5's dispatch. This is not a new decision — it is the brief being
+corrected against the document.
+
+Note the brief was already internally tensioned: three lines below the disputed sentence it says *"the
+hook lives in the shared ingest path, not in the route,"* about the bootstrap hook, for exactly the
+reason that both `POST /v1/workspaces` and Plan 11's seed CLIs go through the ingest service. The same
+argument applies to the gate and the brief did not make it.
+
+**Plan 10's lane inherits the answer** rather than re-deriving it at T7: the sync ingress is covered by
+the permission gate because the gate is in the ingest path, and `claim.contested` on a sync-path refusal
+therefore includes permission refusals, not only rule refusals.
+
+### The ULID dialect trap, third field, at the identity layer
+
+Also from Lane 2's T1: **`createAuth` never configured an id generator**, and `envelope.ts:79` has
+required `actorId: ulidString` since Plan 1. So better-auth's default user ids — which are not ULIDs —
+**would have made every event unauthorable.** Not a subtle failure; a total one, discovered only because
+the lane checked the identity library's defaults against the door rather than assuming they met it.
+
+That is the same trap recorded twice already (fixture entity ids, seed `actorId`s), now in a third field
+and from a new direction: not a test dialect meeting a real door, but a **third-party library's** default
+meeting it.
+
+**Lane 4's note on why this instance is the worst of the four is worth keeping:** the first three were
+ours to get wrong. This one was a dependency's *default* silently failing to meet a contract nobody had
+thought to check it against — **the only one that no amount of care with our own code would have
+caught.** The check that finds it is not review; it is testing the library's output against our door.
+
+**A fourth instance, and it widens the rule.** Lane 4 found it in code that had already passed a *clean*
+review, and it is not a mint site at all. `newSubmittedEvent` mints correctly via `newUlid()`. The defect
+is the **test**: `packages/domain/test/contest-events.test.ts:162` asserts
+`toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/)` — 26 Crockford characters, **missing the leading `[0-7]`** that
+`ids.ts:9`'s `ULID_REGEX` requires. So it pins *"looks ULID-ish"*, not *"passes the door"*, and an id the
+test accepts while the envelope refuses is expressible. Unreachable in practice — `ulid()`'s first
+character is timestamp-bounded below `8` until the year 10889 — but it is the day's shape again: **a
+check that does not check the property it names.**
+
+**So the rule is not about mint sites; it is about mint sites AND every assertion about a minted id.** A
+hand-written regex approximating `ULID_REGEX` is a **second definition of the format**, and second
+definitions drift silently. That is the same disease as the two copies of `formatIstInstant` the
+byte-identical rule exists to prevent, and as `@better-auth/cli` pinning the 1.4 schema whatever the
+server imports. Stated generally:
+
+> **Where a format has one authority, tests assert through the authority, not alongside it.**
+
+The domain exports `isUlid` (`ids.ts:17`) for exactly this, and asserting through it also means the test
+cannot drift when the door changes.
+
+**Lane 2's addition, which lane 4's instance does not show: composition must be ASSERTED, not merely
+performed.** `MEMBERSHIP_ID_REGEX` is built as `new RegExp(\`^${ULID_BODY}:${ULID_BODY}$\`)`
+(`ids.ts:27`), and `ids.test.ts` carries a test named *"is composed from `ULID_REGEX` rather than
+re-spelled — one origin for what a ULID is"* which compares `MEMBERSHIP_ID_REGEX.source` against the
+composed string. So **a later hand-spelling that behaves identically still fails.** Without that
+assertion the composition is a convention rather than a guarantee: someone "simplifying" the construction
+back into a literal gets a green suite, and the second definition is reintroduced silently. This is
+"state what would make it fail, then make it fail once" applied to a *convention* rather than to a check
+— and conventions are the things most likely to be tidied away by someone being helpful.
+
+**Convergence, not compliance, and worth recording as such:** Lane 2 wrote its version into T3's dispatch
+before seeing the rule recorded here. Its reasoning was "a second spelling of what a ULID is would be
+free to drift from the first"; the recorded form covers the assertion side as well as the definition
+side. Two lanes and the controller reached the same rule from three directions in one day — from a
+production regex, from a test regex, and from a swept negative.
+
+**Swept, so nobody re-runs it:** across `main` and all four lane worktrees, `packages/` and `apps/`,
+there is **exactly one** hand-written ULID-shaped regex outside `ids.ts` — the one above, which Lane 4 is
+fixing. Everywhere else asserts through the authority or not at all. A clean negative, and evidence that
+the check ran rather than that nobody looked.
+
+
+## Two findings about method, from Lane 2's T3 review (2026-08-28)
+
+Both are about *how* defects were caught rather than what they were, and both bind the controller harder
+than they bind any lane.
+
+### `grep -r` over a directory is unreliable here — and a silent empty result is not a negative
+
+Lane 2's T3 reviewer had an early directory grep **silently return nothing**, and redid every sweep with
+`find … | xargs grep` and explicit file enumeration. **Second independent confirmation this session**
+(the first is recorded in this session's own tooling notes), so it is a property of the environment
+rather than one bad invocation.
+
+Why it matters more than a tooling annoyance, in Lane 2's framing: **a silent empty result is
+indistinguishable from a true negative.** That makes directory grep exactly the wrong instrument for the
+question *"does this claim have a referent anywhere in the repo"* — which is the shape of nearly every
+cross-plan negative traded in this document. Lane 2 hit it on a sentence claiming a fixture now fails,
+which was false.
+
+**The technique alone is not the fix, and Lane 4 supplied the part that is: run a POSITIVE CONTROL.**
+Search for something you *know* is present, in the same directory, with the same invocation. That
+converts *"I found nothing"* into *"the instrument works and found nothing."* Without it, `find | xargs`
+is just a different way to get an unverified empty.
+
+**Lane 4's near-miss is the argument.** Its `process.env` sweep with a bare `grep -rn` over two
+directories returned nothing; redone with `find | xargs` it found **two files — and those two files are
+what exposed Plan 11's `check:env` gate as vacuous.** Had it trusted the empty result, it would have
+concluded the codebase reads no environment variables at all and shipped the plan's broken checker
+unchanged. So the failure mode is worse than missing a hit: **an empty result can look like confirmation
+of the very thing you are investigating.**
+
+> **An empty result without a positive control is not evidence of absence.** The control costs one
+> command.
+
+**Audited under that standard, not merely by technique.** Every sweep reported in this document this
+session used `find … | xargs grep` or per-file enumeration, and the pure-negative ones have now been
+re-run with positive controls beside them:
+
+| Negative claimed | Positive control, same invocation | Result |
+|---|---|---|
+| `@better-auth/cli` absent from Plan 11 and nine others | `ticket` across the same plan files → 104 / 23 / 301 hits | control passes; negative **stands** (only Plan 4 and this doc) |
+| No `origin` validation in `apps/server/src` + `packages/` | `workspaceId` over the same file set → 28 files | control passes; negative **stands** (0) |
+| `submittedEventSchema` absent from Plan 6 | `makeSubmittedFactory` in Plan 6 → 18 hits | control passes; negative **stands** (0) |
+
+The remaining sweeps (`z.unknown()`, `?? null`, hand-spelled ULID regexes, `better-auth` subpaths,
+schema embedders) **returned hits**, and a sweep that returns hits validates its own instrument.
+
+### The prose is the deliverable, so run the sentence
+
+Lane 2's branch produced **four separate prose claims explaining why something was safe, all false**: the
+`noEmit` assertion, a lockfile resolution key misread as a dependency edge, a caveat naming a trigger
+that cannot fire, and a sentence claiming a fixture now fails. Every one was written confidently, every
+one sat in or was headed for this durable record, and every one was caught only because a reviewer **ran
+the mechanism instead of reading it**. **The fourth was introduced by the fix for the third.**
+
+> **For every sentence asserting that something happens, is inherited, or now fails — run it. If you
+> cannot run it, do not assert it.**
+
+That is the operational form of everything else in this document, pointed at documentation rather than at
+code, and it is the rule the controller has broken most often: the corrections to this section have been
+overwhelmingly prose claims about state, ownership and history that were plausible, unchecked, and cheap
+to check. The four-instances-in-one-branch count is what makes it a rule rather than an exhortation —
+**a documentation round is a change set like any other, and its assertions are as falsifiable as code.**
+
+
+### better-auth's runtime surface is plan text until Plan 4 T2 records it
+
+Flagged by Lane 2, and it binds two other plans. **Task 1 deliberately left better-auth's *runtime*
+surface unverified** — endpoint paths, cookie name, bearer header — because establishing them needs a
+live request rather than a `.d.ts` read. T1 verified the type surface and stopped there, honestly.
+
+**Plan 6's client and Plan 10's sync both code against those exact strings**, and **until T2 lands they
+are plan text rather than fact.** Given this series' record with plan text versus shipped reality — the
+`better-auth/plugins/passkey` subpath that does not exist, the CLI pinned to a schema two minors old, an
+id generator that was never configured — a string copied from a plan into a client is exactly the shape
+that fails at the first live request and nowhere earlier.
+
+**So: no lane hard-codes an auth endpoint path, cookie name or bearer header from plan text.** Wait for
+T2's recorded values, or route through whatever T2 exports. T2 will record the verified strings in this
+document.
