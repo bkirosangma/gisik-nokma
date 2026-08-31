@@ -106,6 +106,10 @@ Full sequence in the coordination doc's `## Serial execution` section, which is 
 - **Ruling P17** (new, this merge): `useLiveQuery(source, workspaceId, queryKey, load, debounceMs)` is a
   **breaking** signature change binding Plan 6 T10–T13 and Plan 10. Its unstated invariant — *the key must
   name every input `load` closes over* — is enforced by nothing.
+  **P17's own "eight call sites" was wrong — there are NINE**, corrected in place by PR #45. The
+  controller's dispatch said four. Both counts were wrong and the five neither named (5514, 6390, 6391,
+  6395, 6396) sit in Tasks 11–13 — the only tasks not yet written, i.e. the ones that will be transcribed
+  from that text. **A count asserted in two places can be wrong in both; recount from the file.**
 
 ## Traps that cost a round each if rediscovered
 
@@ -140,6 +144,9 @@ Every one below was violated by a controller that had just written it. **Assume 
 - Over-caution has a price here. Blocking a restart on a documentation merge spends session carriage —
   66% of all spend — to protect against a risk already closed.
 - **A pointer from a correct document to a stale one does not drift; it reverses, deterministically.**
+- **Verify a count by enumerating and marking, with the marker string counted as a control** so a zero
+  cannot come from a sweep that matched nothing. Method from the executor, after the controller and
+  Ruling P17 asserted two different wrong counts for the same thing.
 - An artifact's author is the worst-placed party to report its contents. *(Corollary earned this merge:
   verifying an author's claims is cheap and it worked — every claim in the PR #43 handoff held, including
   four shas my naive `--contains` sweep called orphaned that the file itself labelled "do not cite".
