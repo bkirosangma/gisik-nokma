@@ -73,6 +73,26 @@ export type IngestService = {
   onEventCommitted(listener: CommittedEventListener): () => void;
 };
 
+/**
+ * What an HTTP route is allowed to do with ingest: submit through the GATED
+ * client door, and subscribe to commits. Deliberately NOT the whole
+ * `IngestService`.
+ *
+ * This exists because the naming asymmetry is adverse: the DANGEROUS door has
+ * the shorter, more obvious name. `ingestBatch` is what a route author reaches
+ * for by reflex, and reaching for it silently ungates every event that route
+ * accepts — for `POST /v1/sync` (Plan 10), every offline-originated event in the
+ * product. Prose across three plans and a wave boundary is not a defence a
+ * compiler can check, so the internal door is simply not in scope for a route:
+ * `ingest.ingestBatch(...)` inside a route handler is now a COMPILE error, not a
+ * documented mistake.
+ *
+ * `ingestBatch` stays exported on `IngestService` for the internal callers that
+ * legitimately use it — the workspace bootstrap (Task 5), invite acceptance
+ * (Task 14), Plan 11's seed CLIs, and tests.
+ */
+export type ClientIngest = Pick<IngestService, 'ingestClientBatch' | 'onEventCommitted'>;
+
 export function createIngestService(deps: IngestDeps): IngestService {
   const registry = deps.registry ?? domainRegistry;
   const now = deps.now ?? (() => new Date());

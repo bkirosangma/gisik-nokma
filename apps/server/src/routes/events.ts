@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { IngestService } from '../ingest/ingest-service.js';
+import type { ClientIngest } from '../ingest/ingest-service.js';
 
 export const MAX_BATCH_SIZE = 100;
 
@@ -15,7 +15,7 @@ export const MAX_BATCH_SIZE = 100;
  * silently reopen the envelope-origin forgery — a client wearing
  * `origin: 'server'` to walk past `contest.server-only`.
  */
-export function registerEventRoutes(app: FastifyInstance, ingest: IngestService): void {
+export function registerEventRoutes(app: FastifyInstance, ingest: ClientIngest): void {
   app.post(
     '/v1/events',
     {
