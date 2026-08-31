@@ -91,3 +91,58 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 - ⚙️ **Shared envelope builder** — `makeEnvelope`, the test-only envelope factory shipped from the domain package so every plan's tests build valid claims from one set of defaults. `packages/domain/src/testing.ts`
 - ⚙️ **End-to-end refusal fixtures for the ticket vocabulary** — fourteen JSON fixtures carry six of this plan's refusals — `hierarchy.rank`, `hierarchy.cycle`, `hierarchy.deepest-rank-parent-required`, `hierarchy.parent-terminal`, `field.unknown` and `field.type-mismatch` — through the real engine against a planted defect, each paired with an accepting twin so the suite cannot pass by refusing everything: the rank violation and its rank-legal twin, the deepest-rank type refused at project root under its own name, a loop closed only because a rank RE-definition made it rank-legal, the unknown field and the kind mismatch, live work arriving under a finished parent by creation and by move, the terminal child that may move under a terminal parent, a whitespace-only title refused at the payload door as `malformed-payload` rather than by the field check, a grandchild pulled up under a NON-root ancestor so the cycle walk runs a second iteration, and Plan 2's parent-terminal invariant proven in this plan's world. Each is mutation-proven: the code path it claims to pin is broken and the fixture goes red at its own expected outcome, for its own named rule. Two gaps are known and named rather than implied: the `hierarchy.rank` and `hierarchy.deepest-rank-parent-required` fixtures both sit on the CREATED path, so the reparent path's twin rules are pinned by unit tests only; and eleven of this plan's refusal ids have no end-to-end fixture at all (the four hierarchy/field ones named in the plan, plus `ticket.unknown`, `ticket.unknown-type`, `ticket.already-exists`, `ticket.workflow-undefined` and the three `ticket.rebound-*`). `packages/rule-engine/fixtures/`
 - ⚙️ **Fixture harness folds the ticket-type ladder and reparenting** — `buildInMemoryContext` folds `ticket-type.defined` (last definition wins, which is what makes a rank re-definition and the loop it enables reachable) and `ticket.reparented` (parentId and nothing else), and its `getTicketTypeDef` answers from the folded ladder instead of throwing. Both folds mirror `buildMemoryContext` deliberately: these fixtures do not traverse the shared reducer, so nothing but the mirroring keeps the two folds honest about what a rule sees. `workflow.defined` stays out of the dialect — admitting it would oblige this fold to carry the refresh-on-publish walk too, and a harness that took the event without the walk would split from the memory context at the seam the shared suite exists to weld. `packages/rule-engine/src/fixtures/harness.ts`
+
+## 9. Editor, documents & attachments
+
+*Plan 7's client half. §6/§7/§8 are reserved for Plans 4/5/6 and are deliberately absent — the
+coordination doc assigns `Features.md` sections one per implementation plan, so numbering is claimed
+from that table rather than taken next-free.*
+
+- ⚙️ **Document schema v1** — `DOC_SCHEMA_VERSION = 1`, `emptyDoc()`, `isDocJson()`, and
+  `VersionedDocument`, a replacement for Tiptap's `Document` that carries `schemaVersion` on the doc
+  node. The vocabulary is CLOSED: a set-equality test over node and mark types fails when an extension
+  adds one, so a new vocabulary item cannot arrive unnoticed. `packages/editor/src/doc.ts`,
+  `packages/editor/src/schema/versioned-document.ts`
+- ⚙️ **One extension set for every client** — `buildEditorExtensions(options)` / `EditorSchemaOptions`
+  (`queryUsers`, `resolveAttachmentUrl`, `placeholder`). The single origin of schema v1: web, desktop,
+  the RN webview bundle and every test build their list here, so the schema cannot drift between
+  clients. Everything StarterKit contributes that v1 does not name is switched off by an explicit
+  `false` rather than left to a default — `document` because it is replaced, `link` because it is
+  reconfigured, `underline` because it is not this product's vocabulary.
+  `packages/editor/src/schema/extensions.ts`
+- ✅ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
+  `**due soon**` arrives bold whether typed, pasted or dropped. `autolink`, `linkOnPaste` and
+  `markdownLinks` are all `false`, and they are not sufficient: **seven paste rules across five
+  extensions** and **eighteen input rules across ten** remain live, counted against the built
+  extension list at tiptap 3.30.5, and the two sets sit behind `enablePasteRules` /
+  `enableInputRules` — `Editor` options this function returns `Extensions` for and therefore cannot
+  reach. In tension with spec §2's "nothing silently becomes markup"; **left as it is, deliberately
+  and unruled**, with the census pinned by a test so the number cannot drift silently.
+  `packages/editor/src/schema/extensions.ts`, `packages/editor/test/rule-census.test.ts`
+- ⚙️ **Ticket image node** — `TicketImage`, `IMAGE_WRAP_MODES` (`inline-left` · `inline-right` ·
+  `block`), `ImageWrapMode`, `TicketImageOptions`. Wrap is validated per-attribute at the parse door
+  and an unrecognised value is COERCED to `block` rather than refused, because `block` is a legal
+  target and a refusal at load would empty the whole document.
+  `packages/editor/src/extensions/ticket-image.ts`
+- ⚙️ **Mention node** — `Mention`, `mentionAttrsOf`, `MentionAttrs`, `mentionSuggestionKey`. Both
+  attributes carry their own `parseHTML` and `renderHTML`, because a node-level `parseHTML().getAttrs`
+  is merged OVER by the per-attribute handlers and its returned attrs are dead code — validation
+  placed there let a crafted span store a different `userId` than the one displayed, in the field
+  notifications read. One trim-and-refuse rule covers both fields on insert, and a blank or
+  whitespace-only id is refused at the parse door too, where a node-level `false` short-circuits
+  before the merge. A present id with a missing NAME is still admitted, deliberately: refusing that
+  discards the only fact the markup carried, while refusing a blank id discards nothing.
+  `packages/editor/src/extensions/mention.ts`
+- ✅ **Mention picker** — `createMentionPopup`, `mentionResultAnnouncement`, `MentionPopupProps`,
+  `MentionPopupRenderer`. Arrow-key navigation with a selected item, Enter to insert, Escape to
+  dismiss leaving the typed text literal, mouse selection, and a candidate with a blank userId or a
+  blank name never offered. Announces its result count politely to a screen reader and hands the
+  editor's ARIA role back on exit; nothing in the popup is tabbable.
+  `packages/editor/src/extensions/mention-popup.ts`, `packages/editor/src/styles/editor.css`
+- ⚙️ **Embeddable-image vocabulary** — `EMBEDDABLE_IMAGE_MIME`, `isEmbeddableImageMime(mime)`,
+  `collectImageAttachmentIds(doc)`: one definition of which attachments a document may embed, and a
+  walker that survives whatever a hostile document hands it. `packages/domain/src/doc-embeds.ts`
+- ⚙️ **Attachment kinds and Drive references** — `AttachmentKind` (`upload` · `drive-reference`),
+  `DriveReference`, `isDriveReference()`, `DRIVE_FILE_SCOPE`, `RULE_EVIDENCE_DRIVE_REFERENCE` and its
+  reason string: two statements of what a Drive reference is, pinned to each other so the second
+  cannot quietly stop meaning the first. `packages/domain/src/attachment-kinds.ts`
