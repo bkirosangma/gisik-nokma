@@ -267,16 +267,32 @@ describe('Board card — one clock, and it is not the viewer’s laptop', () => 
   });
 
   it('PLANTED DEFECT: the zone swap hands the worker back exactly the TZ it borrowed', () => {
-    const before = process.env.TZ;
-    unfoldUnder('Pacific/Kiritimati');
-    // Under the gate's default configuration TZ is UNSET, so `before` is
-    // `undefined` and the naive `process.env.TZ = before` leaves the string
-    // "undefined" here — which ICU reads as GMT. This assertion is the one
-    // that fires; the `hasOwn` below is what distinguishes "restored to unset"
-    // from "assigned a four-letter zone name", since both print as absent in
-    // a casual log.
-    expect(process.env.TZ).toBe(before);
-    if (before === undefined) expect(Object.hasOwn(process.env, 'TZ')).toBe(false);
+    // This test SETS the two configurations rather than observing whichever it
+    // inherits, and that is not tidiness. Written the observing way — read
+    // `process.env.TZ`, unfold, assert it came back — it passed against the
+    // naive `process.env.TZ = original`, and was caught only by mutating it:
+    // the three tests above had already run, so by the time it looked, the
+    // corruption it was written to catch had ALREADY happened and its baseline
+    // was the string "undefined". Restoring "undefined" to "undefined" is a
+    // faithful restore. A check that reads ambient state cannot witness that
+    // state being corrupted.
+    const outer = process.env.TZ;
+    try {
+      // (a) the gate's default configuration, stated instead of inherited.
+      delete process.env.TZ;
+      unfoldUnder('Pacific/Kiritimati');
+      expect(Object.hasOwn(process.env, 'TZ')).toBe(false);
+      expect(process.env.TZ).toBeUndefined();
+
+      // (b) and the configuration in which the naive spelling works — which is
+      // why the defect lives in exactly the runs nobody inspects.
+      process.env.TZ = 'Pacific/Niue';
+      unfoldUnder('Pacific/Kiritimati');
+      expect(process.env.TZ).toBe('Pacific/Niue');
+    } finally {
+      if (outer === undefined) delete process.env.TZ;
+      else process.env.TZ = outer;
+    }
   });
 });
 
