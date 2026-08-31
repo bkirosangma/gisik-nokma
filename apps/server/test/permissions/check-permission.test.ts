@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid, ORIGINS, type Origin, type SubmittedEvent } from '@gisik-nokma/domain';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
-import { buildApp } from '../../src/app.js';
+import { buildApp, type AppDeps } from '../../src/app.js';
 import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
@@ -49,9 +49,27 @@ const CLIENT_ORIGINS: Origin[] = ORIGINS.filter((origin) => origin !== 'server')
  * happening, the directive becomes an UNUSED `@ts-expect-error`, and
  * `pnpm turbo run typecheck` goes red. Verified by widening it and watching
  * typecheck fail.
+ *
+ * TWO guards, because the protection has two axes and the first covers only
+ * one of them. The alias guard watches what `ClientIngest` MEANS; it says
+ * nothing about whether `AppDeps` still BINDS to it. Review proved the gap:
+ * widening `AppDeps.ingest` back to `IngestService` while leaving `ClientIngest`
+ * narrow typechecks GREEN — the first directive is still satisfied and notices
+ * nothing — and under that widening a Plan 10 registrar typed
+ * `(app, i: IngestService)` compiles green too, which is the exact scenario the
+ * narrowing exists to stop. A guard whose docblock claims "self-enforcing"
+ * while covering half of what it guards is an overclaim, so the second axis
+ * gets its own directive below.
+ *
+ * KNOWN LIMIT of the mechanism, recorded rather than fixed: `@ts-expect-error`
+ * is satisfied by the expression erroring for ANY reason, so renaming
+ * `ingestBatch` on `IngestService` would leave both directives green while the
+ * protection lapsed. Inherent to the mechanism; the docblocks are the cover.
  */
 // @ts-expect-error — a route may not reach the ungated internal append path
 type _RoutesCannotReachTheInternalDoor = ClientIngest['ingestBatch'];
+// @ts-expect-error — AppDeps.ingest must stay narrowed; see ClientIngest above.
+type _AppDepsIngestIsNarrowed = AppDeps['ingest']['ingestBatch'];
 
 let db: TestDatabase;
 
