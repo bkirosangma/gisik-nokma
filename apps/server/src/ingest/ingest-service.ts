@@ -19,6 +19,7 @@ import {
   nextSeq,
   nextWorkspaceSeq,
 } from '../ledger/event-store.js';
+import { checkPermission, type SubmissionGate } from '../permissions/check-permission.js';
 import { readEntityHead } from '../projections/entity-heads.js';
 import type { ProjectionRegistry } from '../projections/registry.js';
 
@@ -46,8 +47,26 @@ export type IngestService = {
    * and they answer `duplicate-event-id`, which is a safe ack precisely because
    * the id was client-generated. Envelope errors and rule refusals are NOT this
    * path — they ride inside results as ordinary per-event answers.
+   *
+   * This is the INTERNAL, trusted door. It applies no permission gate, so the
+   * server's own appends — Task 5's workspace bootstrap, Task 14's invite
+   * acceptance — may legitimately carry envelope-origin `'server'`. **An HTTP
+   * route must never call this; it calls `ingestClientBatch`.**
    */
   ingestBatch(rawEvents: unknown[]): Promise<IngestResult[]>;
+  /**
+   * The CLIENT door: identical to `ingestBatch` except that every event is put
+   * through `checkPermission` first, so a client cannot forge the envelope's
+   * `origin` field — the provenance enum, not the browser `Origin` header — and
+   * wear the server's own provenance.
+   *
+   * Two entry points rather than a flag because the distinguishing fact is
+   * which door an event arrived through, not what it says about itself.
+   * `POST /v1/events` calls this; **Plan 10's `POST /v1/sync` must call it too**,
+   * or offline-originated events bypass the gate entirely. Task 5 widens the
+   * signature to carry the session the door authenticated.
+   */
+  ingestClientBatch(rawEvents: unknown[]): Promise<IngestResult[]>;
   /** Broadcast hook: fires AFTER an event's transaction commits, never for
    * refused or invalid events. Returns an unsubscribe function. Plan 5 wires
    * WebSocket fan-out onto this. */
@@ -70,7 +89,7 @@ export function createIngestService(deps: IngestDeps): IngestService {
     }
   }
 
-  async function commitOne(submitted: SubmittedEvent): Promise<IngestResult> {
+  async function commitOne(submitted: SubmittedEvent, gate: SubmissionGate | null): Promise<IngestResult> {
     const client = await deps.pool.connect();
     let rollbackFailure: Error | undefined;
     try {
@@ -117,6 +136,33 @@ export function createIngestService(deps: IngestDeps): IngestService {
         };
       }
 
+      // The permission gate, and `gate` is null for every internal append.
+      //
+      // Position is a recorded ruling, not a preference (coordination doc, "A
+      // forgeable `origin`…" and "The gate's placement was contradicted by a
+      // brief"): the gate lives INSIDE the ingest path — here, after the
+      // entity↔workspace guard and before the engine — rather than at the HTTP
+      // route. Decision 15 is what makes that load-bearing: Plan 10's
+      // `POST /v1/sync` wraps this same ingest, so a permission refusal on the
+      // sync path can become a `claim.contested` with no extra wiring. A gate
+      // that lived in the route would be bypassed by sync entirely.
+      //
+      // It runs before deps.evaluate because permissions are the system's
+      // rules, not a workflow's: a permission refusal should never reach the
+      // rule engine. It runs after the entity↔workspace guard, so an event that
+      // is not honestly about its entity is told that first — the refusal that
+      // names the actual fault.
+      //
+      // Per-call rather than baked into the service, because the distinguishing
+      // fact is which door the event arrived through. See
+      // ../permissions/check-permission.ts for which doors this closes and,
+      // more importantly, which it does not.
+      const refusal = gate === null ? null : gate(envelope);
+      if (refusal !== null) {
+        await client.query('ROLLBACK');
+        return { status: 'refused', eventId: envelope.id, rule: refusal.rule, reason: refusal.reason };
+      }
+
       const verdict = await deps.evaluate(envelope, createEngineContext(client));
       if (verdict.refused) {
         await client.query('ROLLBACK');
@@ -156,23 +202,36 @@ export function createIngestService(deps: IngestDeps): IngestService {
     }
   }
 
+  /**
+   * Both entry points are this loop; they differ only in the gate they carry.
+   * Parsing stays ahead of the gate so a submission that is not a well-formed
+   * claim at all is answered as `invalid` rather than as a permission refusal —
+   * and so a refused event always has a real ULID `eventId` to report.
+   */
+  async function ingestAll(rawEvents: unknown[], gate: SubmissionGate | null): Promise<IngestResult[]> {
+    const results: IngestResult[] = [];
+    for (const raw of rawEvents) {
+      const parsed = parseEvent(raw, registry);
+      if (!parsed.ok) {
+        results.push({
+          status: 'invalid',
+          eventId: parsed.eventId,
+          code: parsed.code,
+          message: parsed.message,
+        });
+        continue;
+      }
+      results.push(await commitOne(parsed.event, gate));
+    }
+    return results;
+  }
+
   return {
     async ingestBatch(rawEvents) {
-      const results: IngestResult[] = [];
-      for (const raw of rawEvents) {
-        const parsed = parseEvent(raw, registry);
-        if (!parsed.ok) {
-          results.push({
-            status: 'invalid',
-            eventId: parsed.eventId,
-            code: parsed.code,
-            message: parsed.message,
-          });
-          continue;
-        }
-        results.push(await commitOne(parsed.event));
-      }
-      return results;
+      return ingestAll(rawEvents, null);
+    },
+    async ingestClientBatch(rawEvents) {
+      return ingestAll(rawEvents, checkPermission);
     },
     onEventCommitted(listener) {
       listeners.add(listener);

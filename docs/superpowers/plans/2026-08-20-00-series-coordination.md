@@ -2128,6 +2128,69 @@ session store outage is a 5xx, not a mass sign-out. `currentUserId` is declared 
 plan's bare token, because Tasks 8/12/13 need different halves and they must be the same person. `userId`
 comes off the verify response, so no test needs a database read to attribute an event.
 
+### 8. The envelope-origin gate has landed — which doors it closes, and the one sentence Plan 10 must obey (origin micro-PR)
+
+The closer named in "A forgeable `origin`…" is **in**. `apps/server/src/permissions/check-permission.ts`
+holds `checkPermission(env): Refusal | null` — the server-origin refusal and nothing else — wired inside
+`commitOne` between the entity↔workspace guard and `deps.evaluate`, exactly the position the 2026-08-31
+ruling names. Rule `permission.role`, reason `Only the server itself may record server-origin events.`,
+character for character as Task 5's plan text pins them.
+
+**"envelope-origin", not "HTTP Origin", and the distinction is why this entry spells it out.** The repo
+now uses "origin check" for two unrelated things. This is the event envelope's `origin` field — the
+provenance enum `'web' | 'mobile' | 'desktop' | 'server'`. It has nothing to do with the browser `Origin`
+header, CSRF, or cross-site navigation, both of which §7 above discusses a few hundred lines earlier in
+the same document. Somebody who conflates them writes a header check and believes this window is closed.
+
+**The reconciliation, because the ruling as written would have broken the bootstrap.** The ruling says
+"wired into `commitOne`", and a blanket refusal there is the obvious reading — but it is wrong, and the
+wrongness is not subtle: `packages/domain/src/testing.ts` defaults envelopes to `origin: 'server'`, four
+server test files call `ingestBatch` directly, and more importantly **the server's own future appends are
+legitimately server-origin** — Task 5's workspace bootstrap and Task 14's invite acceptance both append
+internally. T5's brief protects exactly this ("the bootstrap appends are server-origin and go through
+Plan 1's internal append path, **not** through `checkPermission`"). The two are reconcilable because the
+extraction source already carried the precondition: `checkRolePermission` only ever runs with a
+session-bearing `PermissionContext`, i.e. only on the client path. A branch extracted out of it inherits
+that precondition, and dropping it is what a blanket wiring does.
+
+**So the distinguishing fact is not the value of `origin`; it is which door the event arrived through**,
+and the door is now a named entry point rather than a route-layer `if`. `IngestService` has two:
+`ingestBatch` (INTERNAL, trusted, ungated) and `ingestClientBatch` (CLIENT, gated). The gate is passed
+per call into `commitOne`; the placement ruling is satisfied because the check still lives inside the
+ingest transaction, which is what decision 15 requires and what lets a sync-path permission refusal
+become a `claim.contested` with no extra wiring.
+
+**Doors, stated so nobody has to infer them:**
+
+- **CLOSED:** `POST /v1/events` — it calls `ingestClientBatch`. Verified by running the forgery through
+  the assembled app, not by reading the route.
+- **NOT CLOSED, by design:** direct `ingestBatch`. This is the internal append path and gating it would
+  refuse the founding sequence.
+- **NOT CLOSED, does not exist yet:** `POST /v1/sync` (Plan 10). **This is the durable instruction this
+  entry exists to add: the sync route must call `ingestClientBatch`, not `ingestBatch`.** The document
+  already settled "the gate is in the ingest path"; it did not name the wiring, and a Plan 10 author
+  reaching for the obvious `ingestBatch` would reopen the window for every offline-originated event.
+- **Still open, unchanged:** §11's envelope-coherence check (Plan 10 T4). Nothing binds a contest's
+  embedded original event to the outer envelope. The compound defect is closed at the `origin` end only.
+
+**What the module does NOT check, and why it says so in its own docblock rather than calling itself
+partial:** actor identity (the client door carries no session yet, so `actorId` is compared to nothing —
+a client may still submit a claim attributed to another person), role, membership, visibility. The ruling
+asked for the checks to be named rather than the partiality labelled; a label ages into background noise
+while a list of absences stays actionable. **Task 5 completes the gate** on top of this — Task 4 first,
+for `resolveEffectiveRole`.
+
+**Do not fold this into `IngestDeps.gates`** (decision 15's Plan 7 contract). Those are construction-time
+and unconditional — they run for every caller — so a construction-time gate cannot tell one door from
+another, which is the one thing this check must do. Tidying it there would refuse the bootstrap.
+
+**Falsifiability, run in both directions rather than argued.** The red baseline first: at `main` =
+`51aba55` the forged `claim.contested` submitted over `POST /v1/events` answered `status: 'committed'`
+with one row in `events` — the window observed open, not inferred. Then two mutations. Breaking the
+comparison (`=== 'server'` → `=== 'desktop'`) reddens the three refusal cases at their own assertion
+lines; gating the internal door (`ingestBatch` passed `checkPermission`) reddens the internal-append case
+at its own assertion. The second mutation is the one that matters: without it, a test proving only that
+the refusal fires would pass equally had the legitimate path been broken.
 
 ## `z.unknown()` makes a key optional, and the sweep for who inherits it (2026-08-28, controller)
 
