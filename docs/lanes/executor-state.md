@@ -213,7 +213,8 @@ remove it first, or review from a detached checkout — decide before dispatchin
 Relayed by the controller and verified live (`gh pr view 39` — *"Removing Fable saves 15% of a bill
 that is 3.3x too large, so the machinery gets thinner too"*). The measured basis: **$113/task at 17.6
 subagents/task**, opus 85% of spend, sonnet 0%; 109 tasks remaining project to **~$12,400, 3.3x the
-project to date**. **A restart must apply this, not the brief's table.**
+project to date**. **A restart must apply this, not the brief's table.** **This block stays until PR #39 merges, and
+is deliberately a second source of truth for exactly that window** — see the hazard below.
 
 1. **Fable is OUT entirely** — no exception. Not refuters, not the mocked-contract lens, not
    floor-list reviewers. Opus at the stated effort is the ceiling.
@@ -252,3 +253,45 @@ recorded as evidence for the trade, **not** as a re-litigation of it.
 policy, 1 of 6 subagents. Reviewing in the lane4 worktree, so no shared-tree concurrency. Rebase onto
 `main` waits until PR #38 merges, per §8 merge order. PR #38's CI is **green**; the controller holds
 it for the owner's call on the accept-preview regression.
+
+## HAZARD, open at the time of writing — a restart reinstates fable through the brief's own precedence clause
+
+**Do not restart the executor until this is closed.** Verified, not inferred:
+
+The rewritten `dispatch-executor-serial.md` (2026-08-31 15:46) does carry the cost ruling — sonnet
+default, the machinery cuts, the 6-agent cap, the restart protocol. But its **READ FIRST** section
+still says the coordination doc's *"model/effort policy with the 2026-08-31 Fable narrowing"* binds,
+and then: *"Where this brief and that document disagree, **the document wins**."*
+
+The **narrowing** is the EARLIER ruling — the one that KEPT fable for refuters, the mocked-contract
+lens and floor-list reviewers. **PR #39 is still OPEN**, so `main`'s coordination doc does not carry
+the cost ruling. What it does carry (checked against `origin/main`, 16 fable mentions):
+
+| Line | What it says |
+|---|---|
+| 605–606 | table rows: mocked-contract lens and adversarial refuters at "top tier (Fable-class)" |
+| 609 | "…refuters, and floor-list task reviewers are dispatched with `model: fable` explicitly" |
+| 613 | the narrowing, framed as an owner ruling that "DOES amend the rule above" |
+| 948 | "Nine floor-list tasks remain ahead, each keeping an opus implementer and a `fable` reviewer" |
+
+So the chain a restarted executor follows is: brief says no fable → brief says the document wins →
+document says fable for three roles across nine named tasks → **fable is reinstated on the most
+expensive rows in the series, with the executor believing it is obeying the owner.**
+
+This is the two-sources-of-truth failure in a worse form than the one it replaced. A duplicated
+policy *drifts*; a policy that explicitly **defers** to a contradicting document **reverses**,
+deterministically, at the next restart.
+
+**Fix, in order:** (1) merge PR #39 — note the topology amendment says the controller merges the
+executor's work and never its own, so #39 is an **owner** merge and is now on the restart critical
+path; (2) until then, scope the precedence clause — drop "with the 2026-08-31 Fable narrowing" and
+name the cost ruling as superseding, or carve the exception in one sentence: the document wins EXCEPT
+on model/effort policy, where the brief is later; (3) **the BINDING block above stays until #39 is on
+`main`** — today it is the only durable copy the precedence rule does not defeat, and it comes out
+the moment the first source is correct.
+
+## Step 1 CLOSED
+
+Plan 3 Chain A merged to `main` as **`6b2fc76`** (squash — `c6b4e59` is correctly NOT an ancestor).
+Verified with `git merge-base --is-ancestor`. PR #38 MERGED, CI was green, decomposition reconciled
+package-for-package with the controller's, fixtures 84/84, projections 2.
