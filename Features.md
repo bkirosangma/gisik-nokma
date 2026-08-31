@@ -210,7 +210,10 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
   `contest.unknown` / `contest.wrong-ticket` / `contest.already-resolved` evaluable on this server at
   all. `null` here means "no such contest was ever recorded", which is TRUE of a projection rebuildable
   from the whole ledger — the reason the evaluator **throws** when the method is absent and **refuses**
-  when it answers null. `apps/server/src/engine-context.ts`
+  when it answers null. Asserted through the ENGINE — the three contest refusals `contest.unknown`,
+  `contest.wrong-ticket` and `contest.already-resolved` are the whole reason the method exists, and a
+  direct call would prove the SQL runs while proving nothing about the wiring that was missing.
+  `apps/server/src/engine-context.ts`
 - ✅ **`GET /v1/contests`** — the read surface the ticket banner, My Work and the attention strip share,
   filtered by workspace, ticket, claimant and open/resolved. Every row passes `canSee`, so a contest is
   exactly as visible as its ticket and never more; a caller who cannot see the ticket gets an empty list
