@@ -188,7 +188,7 @@ export const ACCEPT: Accept = { refused: false };
  * ticket.reparented.
  *
  * This is NOT Plan 2's `parent-terminal-with-open-children`
- * (`refusal-rules.ts:14`), and neither may be renamed to the other: that one
+ * (`refusal-rules.ts:16`), and neither may be renamed to the other: that one
  * fires when a PARENT tries to enter a terminal state while children are still
  * open; this one fires when live work arrives UNDER a parent already finished.
  * Adjacent meanings, opposite directions, and a person meeting one is being
