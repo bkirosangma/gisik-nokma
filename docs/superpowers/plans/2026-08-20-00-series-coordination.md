@@ -592,6 +592,16 @@ Mechanics that ride with the protocol: lane sessions run in per-lane git worktre
 
 The tier follows the **failure cost** of the task, not its size. "Optimised" cuts both ways: no top-tier tokens spent transcribing code the plan already contains, and no mid-tier tokens spent on tenancy or security semantics where a plausible-looking wrong answer ships silently. This generalises the map Plans 1–2 proved (sonnet transcription / opus semantics / top-tier final review) to the whole parallel run.
 
+> ### SUPERSEDED TABLE — DO NOT DISPATCH FROM THIS
+> This table's `fable` / top-tier rows were removed by the **2026-08-31 cost ruling** (*"Fable out
+> entirely"*, later in this document). **Fable is not dispatched for any role.** Sonnet is the
+> default and opus the exception. The governing table is in that ruling. This one is kept because
+> later sections cite its work classes by name.
+>
+> *Recorded because a rewritten executor brief still deferred to "the document wins", and this table
+> is what a reader hits first — the supersession sat 375 lines below it. The reversal was caught by
+> the executor before a restart could act on it.*
+
 | Work class | Model | Effort |
 |---|---|---|
 | Transcription implementers (plan text carries complete code; adapt spellings per the adaptation map) | sonnet | medium |
@@ -602,15 +612,22 @@ The tier follows the **failure cost** of the task, not its size. "Optimised" cut
 | Fixture authoring and planted-defect design (falsifiability-load-bearing) | opus | high |
 | Per-task reviewers | opus | high |
 | Final whole-branch review lenses — the three reading lenses | opus (owner ruling 2026-08-31, below) | max |
-| The mocked-contract lens | top tier (Fable-class) | xhigh–max |
-| Adversarial refuters | top tier (Fable-class) | xhigh–max |
+| The mocked-contract lens | ~~top tier (Fable-class)~~ **DEAD — see the 2026-08-31 cost ruling** | — |
+| Adversarial refuters | ~~top tier (Fable-class)~~ **DEAD — see the 2026-08-31 cost ruling** | — |
 | Lane controllers / orchestrators | Opus 5 (owner amendment, below) | — |
+
+> **SUPERSEDED IN PART, 2026-08-31.** Every `fable` assignment below is DEAD. The controller-runs-Opus
+> half stands. See *"Owner ruling (2026-08-31, second and stronger): Fable out entirely"*.
 
 **Owner amendment (2026-08-28, second ruling on this table): controller sessions run Opus 5, and "top tier" in this table means an explicit `fable` dispatch, never "the session's own model."** The original line ("controllers are top-tier deliberately") is amended on the owner's direction, with the account's weekly usage pool as the stated reason: controller sessions carry the bulk of every lane's tokens, and Fable-class spend there exhausts the shared pool fastest for the least marginal judgment. What does NOT move down: final whole-branch review lenses, adversarial refuters, and floor-list task reviewers are dispatched with `model: fable` explicitly — bounded fan-outs where the top tier's judgment is the product. If a session cannot dispatch fable, the fallback is opus at max effort, recorded in the ledger as a deviation.
 
 **Budget pressure is never grounds to thin a gate.** When the weekly pool nears its cap, the sanctioned response is to DEFER work — pause non-critical-path lanes, hold a wave until the reset — never to skip a review, drop a refuter, or de-escalate below a class floor. A lane that cannot afford its machinery does not run until it can.
 
-### Owner ruling (2026-08-31): Fable is narrowed to the absolute necessity, and this DOES amend the rule above
+### ~~Owner ruling (2026-08-31): Fable is narrowed to the absolute necessity~~ — SUPERSEDED THE SAME DAY
+
+> **This ruling is DEAD.** It preserved `fable` for adversarial refuters, the mocked-contract lens and
+> floor-list reviewers. The later *"Owner ruling (2026-08-31, second and stronger): Fable out entirely"*
+> removes all three. Kept for its reasoning and its cost ledger, not for its policy.
 
 The owner has directed that Fable-class dispatch be cut to what is strictly necessary, on the account's
 weekly pool. **This is a budget-motivated de-escalation of a gate, which "budget pressure is never grounds
@@ -945,7 +962,7 @@ assertion is **recounted, never computed**.
 16. **Plan 11** *(T8/T9, T12 floor-list)* — last by construction: its interim-plumbing CI gate fails while
     Plan 10's marked shortcuts are still present.
 
-**Nine floor-list tasks remain ahead**, each keeping an opus implementer and a `fable` reviewer under the
+**Nine floor-list tasks remain ahead**, each keeping an opus implementer and an ~~`fable`~~ **opus** reviewer under the
 2026-08-31 narrowing. The seven pre-rulings survive as DECISIONS but are moot as OWNERSHIP — one executor
 cannot collide with itself, and the trap is reading "a pre-ruling covers this" and skipping the thought
 when the ruling was about *who*, not *what*.
