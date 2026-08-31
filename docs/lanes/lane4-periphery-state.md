@@ -30,8 +30,18 @@ split onto its own branch at its reviewed sha and merged separately (PR #36), so
 reviewed work and the branch holds only unreviewed work. Nobody has to trust a label to tell them
 apart.
 
-Gate on `main` after #36: **594 tests, 18/18** — domain 230 · rule-engine 128 · server 106 ·
-app-core 91 · ui 31 · sync-client 8. On the branch with T9: **621** (app-core 118).
+**Gate, recounted at each sha rather than carried forward** (see the correction below):
+
+- **`main` @ `3fb22d3` — 631, 18/18**: app-core 91 · domain 230 · rule-engine 128 · **server 143** ·
+  ui 31 · sync-client 8
+- **branch @ HEAD — 658**: identical except app-core **118** (T9's +27)
+
+> **This figure was wrong in its first version and the error is instructive.** It said server 106 —
+> true at `8209397`, false at `3fb22d3`, because three server commits (`fc904f4`, `5450085`,
+> `f3e919b`) landed underneath while this lane worked. **Five of the six packages were still
+> correct, which is precisely why the sixth was invisible.** A composition carried forward is a
+> claim about the commit it was measured at; recount it, do not transcribe it. That is this file's
+> own delta-versus-absolute rule, arriving one more time and catching its author.
 
 ---
 
@@ -132,6 +142,10 @@ reading lens finds what is written wrongly; a refuter finds what is not written 
   runs Asia/Kolkata, so the device clock printed the right day by coincidence. Only tests that swap
   `TZ` to Kiritimati and Niue killed it, turning one recorded instant into three different days. The
   same shape as fixtures whose values coincide, one level up: the *environment* was the fixture.
+- **A per-package composition is a measurement, not a fact you may carry.** This file first reported
+  server 106 at a sha where it was 143. Five of six entries stayed right across the move, so the
+  decomposition looked self-consistent and the one drifted entry hid inside it. Recount at the sha
+  you are reporting.
 - **Two measurements that disagree are information.** The gate said 1 failed; the file alone said 2
   passed. That contradiction was the finding.
 - **A familiar pattern is the easiest false story to believe.** Seeing the guard absent, I nearly
