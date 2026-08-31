@@ -2650,6 +2650,28 @@ anchors (merge-base, HEAD, ahead-count, tree state, gate, fixture count), a task
 from `git log --reverse --oneline origin/main..HEAD`, an explicit instruction not to `git show` anything
 below it, and **the regeneration command**, because this will rot again at the next rebase.
 
+**A cross-package mutation run under bare `vitest` tests the stale `dist` and proves nothing.** Lane 4's,
+from T6's re-review, verified independently here. `domain`, `rule-engine` and `app-core` each export only
+`./dist/index.js` — no source export — and `app-core`'s vitest config carries no source alias. So mutating
+a `domain` or `rule-engine` SOURCE and running bare vitest exercises the last build, not the mutation.
+Lane 4 proved it live: **25/25 green with a mutated engine source, and the same mutant killed its test
+after a rebuild.**
+
+**CI is safe and the exposure is entirely local:** `turbo.json` sets `test.dependsOn: ["^build"]` and
+`ci.yml` runs `turbo build test typecheck`. `dist/` is gitignored, so the staleness exists only in a
+working tree. `pnpm -r exec vitest run` shares the hole. **Rule: cross-package mutation means
+`pnpm turbo run test`, or an explicit rebuild first.**
+
+The scope is wider than the canary that found it — every cross-package assertion rides `dist`: engine-parity
+previews, the envelope-door tests, the provenance planted defects against `formatIstInstant` and
+`istDayBounds`. **Any lane that has mutation-tested across a package boundary with bare vitest holds
+evidence worth re-running**, and a planted-defect proof is exactly the evidence that cannot be taken on
+trust, since its whole purpose is to show a check can fail.
+
+Lane 4's framing: this is the third costume of *a mutation that does not do what you think proves nothing*
+— after a regex that matched a comment, and a deletion that left no marker — and the first that crosses a
+package boundary.
+
 **Never run a state-changing git command in a shell whose working directory was set for a read — and this
 is a gap neither worktree rule covers.** Controller incident, 2026-08-31: verifying Lane 1's orphaned-sha
 claim required `cd` into its worktree; the next command in the same shell was a `git checkout` of the
