@@ -92,7 +92,18 @@ discharged in `f40a850`.
 > *"at `8209397`, not at the branch tip"* is **SUPERSEDED** — T9 was reviewed and its fixes applied, and
 > the branch merged at its tip.
 
-**Step 4 is CLOSED** — merged as `45c83eb` (#51). **Step 5 is next: Plan 4 T6 → T7** (T7 floor-list).
+**Step 4 is CLOSED** — merged as `45c83eb` (#51). **Step 5 is IN FLIGHT: Plan 4 T6 → T7** (T7 floor-list).
+
+> ### ⚠ IN-FLIGHT BRANCH — `exec/04-t6-t7-visibility`
+> **Cut from `main` at `45c83eb`. T6 (`proj_visibility`) is running.** The executor's handoff on `main`
+> may still read *"step 5 is next and nothing is in flight"* — that was true when written and goes stale
+> the moment T6 starts, because the executor deliberately does **not** commit a docs refresh underneath a
+> reviewer reading `git diff origin/main...HEAD` (the 2026-08-28 concurrent-mutation incident).
+> **So: before restarting the executor, hand the new session this branch name.** Otherwise it reads
+> `main`, sees step 5 unstarted, and cuts a second branch duplicating T6.
+> The executor mitigated this by telling the controller in a message — which does not survive the
+> CONTROLLER being restarted. **A mitigation that lives only in a conversation is not a mitigation.**
+> It is recorded here because this file is the thing that survives.
 T6/T7 must read membership through **`resolveEffectiveRole`**, never by joining `proj_memberships`
 directly — documented in three places and **enforced by nothing**; it is T4's implementer's own
 least-sure claim, so raise a ruling if T6 joins directly.
@@ -133,6 +144,11 @@ block arbitrary.
 `merge-tree` conflicts — and `git cherry origin/main <branch>` prints `-` for all four commits: every one
 already upstream. `rev-list` measures commit identity, `merge-tree` measures a merge; **neither asks
 whether the content is already upstream.** Run `git cherry` FIRST for every remaining branch.
+
+**CONFIRMED LIVE 2026-08-31** on the first branch to test it: after #51 squash-merged,
+`git cherry origin/main origin/exec/04-t4-t5-permissions` returns **`+` for all 11** already-merged
+commits, and `main`'s subject ends in `(#51)`. A `+` from a branch whose PR landed with a `(#N)` suffix
+means nothing.
 
 **Asymmetry, because this repo squash-merges.** `-` is strong evidence of redundancy. `+` is NOT
 conclusive: a squash collapses N commits into one and destroys the per-commit patch-ids `cherry` matches,
