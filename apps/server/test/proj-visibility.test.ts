@@ -244,8 +244,12 @@ describe('proj_visibility re-resolves on the three events that can change an aud
       resolved_user_ids: [ACTOR],
       resolved_from: parent,
     });
-    // ...and so does everything below it. Delete the `own_mode === 'inherit'`
-    // prune in reResolveSubtree and BOTH of these go 'workspace'.
+    // ...and so does everything below it. The discriminating mutation is in
+    // resolveOne's own-mode branch, NOT the `own_mode === 'inherit'` prune in
+    // reResolveSubtree: deleting the prune was mutated and left every test
+    // green, because re-resolving an authored node re-derives the value it
+    // already held. The prune buys work, not truth. Make resolveOne take the
+    // parent's resolution for an authored node and these two go 'workspace'.
     expect(await resolution(child)).toMatchObject({
       resolved_mode: 'explicit',
       resolved_user_ids: [ACTOR],
@@ -369,6 +373,60 @@ describe('proj_visibility keys every write on the entity the event was filed aga
     // storing the wrong one fails here instead of passing by coincidence.
     expect(set.seq).not.toBe(set.workspaceSeq);
     expect(create.seq).not.toBe(set.seq);
+
+    // The creating handler writes seq too, and on a ticket that has only ever
+    // been created that is the ONLY write — so it is checked separately. The
+    // assertion above cannot see it: the later visibility.set overwrites the
+    // column, so the create handler could store anything at all and pass.
+    const untouched = newUlid();
+    const onlyCreated = created(untouched);
+    await applyLive([onlyCreated]);
+    const bare = await db.pool.query<{ seq: number }>(
+      'SELECT seq FROM proj_visibility WHERE ticket_id = $1',
+      [untouched],
+    );
+    expect(bare.rows[0]?.seq).toBe(onlyCreated.seq);
+    expect(onlyCreated.seq).not.toBe(onlyCreated.workspaceSeq);
+  });
+
+  /**
+   * The one place this file writes the table by hand, deliberately, and for the
+   * reason proj-memberships.test.ts gives for its own: the row being asserted
+   * about is one NO event can produce. `visibilitySetPayload` refuses `userIds`
+   * on any mode but `explicit`, so `own_user_ids` is always empty on a
+   * `workspace` or `project` row and the guard that drops the list when the mode
+   * is not `explicit` can never be exercised through the door — mutated to carry
+   * the list unconditionally, every test stayed green.
+   *
+   * It is worth keeping rather than deleting: a backfill, a migration or a later
+   * relaxation of that schema would reach this code with a list attached, and
+   * `resolved_user_ids` is what Task 7's canSee reads. So the guard is made
+   * falsifiable here instead of left decorative. `ticket.reparented` is the lever
+   * — it re-resolves the ticket it names without rewriting its authored columns,
+   * which is the only way to run resolveOne over a row this test planted.
+   */
+  it('an authored mode that is not explicit resolves to no list, even if the row carries one', async () => {
+    const parent = newUlid();
+    const planted = newUlid();
+    await applyLive([created(parent)]);
+    await db.pool.query(
+      `INSERT INTO proj_visibility
+         (ticket_id, workspace_id, project_id, parent_id, own_mode, own_user_ids,
+          resolved_mode, resolved_user_ids, resolved_from, seq)
+       VALUES ($1, $2, $3, $4, 'workspace', $5, 'workspace', $5, $1, 1)`,
+      [planted, WORKSPACE, PROJECT, parent, [ACTOR]],
+    );
+
+    await applyLive([reparented(planted, parent)]);
+
+    expect(await resolution(planted)).toEqual({
+      own_mode: 'workspace',
+      resolved_mode: 'workspace',
+      // Not the planted list. A standing audience is the whole workspace; a
+      // list beside it would be a permanent, untrue record of a hand-picked one.
+      resolved_user_ids: [],
+      resolved_from: planted,
+    });
   });
 
   it('refuses a payload it cannot honestly store rather than writing undefined', async () => {

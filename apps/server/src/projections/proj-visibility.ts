@@ -173,6 +173,15 @@ async function resolveOne(tx: PoolClient, ticketId: string): Promise<void> {
  * pruning at any child with an authored mode: an authored subtree resolves from
  * its own claim, so nothing above it can change what it sees.
  *
+ * The prune is an OPTIMISATION, and saying otherwise would be a lie a reader
+ * could act on. Deleting it changes no row: `resolveOne` on an authored node
+ * re-derives that node from its own mode, which is what it already held, and its
+ * descendants then inherit the same unchanged value. Mutating the prune away
+ * leaves all 26 tests green, and that is correct rather than a gap — what the
+ * prune buys is work, not truth. The PROPERTY "an authored subtree cannot be
+ * reached from above" lives in `resolveOne`'s own-mode branch, and mutating THAT
+ * away reddens eleven tests.
+ *
  * `visited` is a per-call local, never module state: a `parent_id` cycle would
  * otherwise recurse forever. The command side is expected to refuse a cycle;
  * this projection replays whatever the ledger holds, so it terminates on one
