@@ -1690,8 +1690,11 @@ guessed: `auth.api` carries **46 entries, 44 of which have an HTTP `path`** (`se
 `GET` and `POST`. It also **throws at assembly** if `auth.options.baseURL` is unset rather than falling
 back to the request `Host` header — that fallback was in the first version and reintroduced exactly the
 input the line exists to exclude. The plan's `JSON.stringify(request.body)` sketch does not work — with Fastify's own
-JSON parser, `request.body` is an object, every POST reaches better-auth with no body, and 12 of the 17
-checks in `sign-in-flows.test.ts` fail. Encapsulation is what keeps that parser off `/v1/events`: hoisted
+JSON parser, `request.body` is an object, every POST reaches better-auth with no body, and every check in
+`sign-in-flows.test.ts` that puts a JSON body through the mount fails — every sign-in route the product
+offers, plus the bearer token, the passkey options and the Google authorization URL. (Stated as a set and
+not a count: "12 of the 17" stood here until a later commit added three tests to that file and made both
+numbers false.) Encapsulation is what keeps that parser off `/v1/events`: hoisted
 to the root instance, the events door stops enforcing `additionalProperties: false`. Both directions are
 proven by mutation. A later task adding routes under a new prefix inherits nothing from this scope.
 
