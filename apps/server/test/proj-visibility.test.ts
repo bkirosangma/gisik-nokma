@@ -500,8 +500,17 @@ describe('proj_visibility keys every write on the entity the event was filed aga
  * parent created before its ancestor's authoring event has been replayed; an
  * authored node pruning mid-chain; a reparent moving a subtree; and a
  * set-back-to-inherit re-attaching one.
+ *
+ * THE PRECONDITION IS IN THE TITLE ON PURPOSE. The invariant argument in
+ * proj-visibility.ts determines a unique resolution only for an ACYCLIC parent
+ * graph; once `parent_id` closes a loop the invariant has several fixpoints and
+ * which one the table lands in is a function of arrival order. That is a real,
+ * reachable defect — no door on this branch refuses a cycle-creating reparent —
+ * measured and recorded as case 6.58 with its owner, not fixed here. The next
+ * describe pins only what this projection genuinely provides about a cycle,
+ * which is termination.
  */
-describe('proj_visibility is a pure function of the ledger, not of arrival order', () => {
+describe('proj_visibility is a pure function of the ledger, not of arrival order — while the parent graph is acyclic', () => {
   type Row = {
     ticket_id: string;
     parent_id: string | null;
@@ -646,6 +655,47 @@ describe('proj_visibility is a pure function of the ledger, not of arrival order
       resolved_mode: 'explicit',
       resolved_from: target,
     });
+  });
+});
+
+/**
+ * A `parent_id` cycle. The command side is expected to refuse one and, on this
+ * branch, nothing does: Plan 3's reparent command does not exist yet and the
+ * permission gate does not look at ancestry. A projection replays whatever the
+ * ledger holds, so the question is what it does when a cycle arrives.
+ *
+ * What it provides is TERMINATION, and this case claims nothing more. Removing
+ * the `visited` set in reResolveSubtree reddens exactly this case and no other
+ * — checked, rather than assumed: the first version of this comment said the
+ * unguarded walk would hang instead of failing, and it does not.
+ *
+ * It deliberately does NOT assert determinism, because determinism is FALSE
+ * here and asserting it would be the check that passes for the wrong reason.
+ * Measured on this branch, `created(G), set(G,'workspace'), created(A,G),
+ * created(B,A), reparented(A,B)` leaves live at `workspace`/G for both A and B
+ * and a rebuild at `project`/'' for both — recorded as case 6.58.
+ */
+describe('proj_visibility terminates on a parent_id cycle', () => {
+  it('a reparent that closes a loop settles instead of recursing for ever', async () => {
+    const parent = newUlid();
+    const child = newUlid();
+    await applyLive([created(parent), created(child, parent)]);
+
+    // parent now points at its own descendant: parent -> child -> parent.
+    await applyLive([reparented(parent, child)]);
+
+    const result = await db.pool.query<{ ticket_id: string; resolved_mode: string }>(
+      `SELECT ticket_id, resolved_mode FROM proj_visibility
+       WHERE ticket_id = ANY($1) ORDER BY ticket_id`,
+      [[parent, child].sort()],
+    );
+    expect(result.rows).toHaveLength(2);
+    // Every row still carries a legal resolved mode — the walk finished and
+    // left the table consistent with its own CHECK constraint. WHICH mode is
+    // deliberately not asserted; see the docblock.
+    for (const row of result.rows) {
+      expect(['workspace', 'project', 'explicit']).toContain(row.resolved_mode);
+    }
   });
 });
 

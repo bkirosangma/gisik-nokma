@@ -186,6 +186,19 @@ async function resolveOne(tx: PoolClient, ticketId: string): Promise<void> {
  * otherwise recurse forever. The command side is expected to refuse a cycle;
  * this projection replays whatever the ledger holds, so it terminates on one
  * rather than trusting that it cannot arrive.
+ *
+ * Termination is ALL it provides, and the difference matters. A cycle gives the
+ * invariant above several fixpoints, and which one the table settles in depends
+ * on arrival order — so order-independence, argued and tested here for an
+ * acyclic parent graph, is genuinely FALSE once a loop exists. Measured on this
+ * branch: `created(G), set(G,'workspace'), created(A,G), created(B,A),
+ * reparented(A,B)` leaves live at `workspace`/G for both A and B and a rebuild
+ * at `project`/'' for both. Nothing on this branch refuses the cycle-creating
+ * reparent — Plan 3's command does not exist and the gate does not look at
+ * ancestry. Recorded as case 6.58 with its owner rather than fixed here; the
+ * shape of the fix is for `resolveOne` to walk up to the nearest authored
+ * ancestor instead of reading the parent's stored resolution, which makes the
+ * answer a function of the current graph whether or not it has a loop.
  */
 export async function reResolveSubtree(
   tx: PoolClient,
