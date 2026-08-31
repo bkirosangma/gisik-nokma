@@ -227,4 +227,39 @@ describe('GET /v1/contests', () => {
     const res = await app.inject({ method: 'GET', url: '/v1/contests', headers: memberHeaders });
     expect(res.statusCode).toBe(400);
   });
+
+  /**
+   * `open=false` is REFUSED rather than silently ignored.
+   *
+   * The querystring enum used to admit `'true' | 'false'` while the handler had
+   * no `else` branch — so `open=false` returned every contest, open ones
+   * included, with a 200 and nothing saying the filter had been dropped. The
+   * enum made the API read as though the parameter were honoured on both sides,
+   * which is the worse half: a caller asking for the settled contests would have
+   * rendered the open ones into a "resolved" pane and had no way to notice.
+   *
+   * The contract is `open=<true?>` — a filter you apply or omit — so the enum was
+   * narrowed to `['true']` rather than growing an unspecified `resolved` filter
+   * that Plans 5 and 9 would then be consuming by accident.
+   *
+   * The assertions below are a pair on purpose. The 400 alone would also pass if
+   * the route had started refusing `open` outright, so the second half pins that
+   * `open=true` still works — otherwise this test would happily certify a route
+   * that had lost the filter entirely.
+   */
+  it('refuses open=false rather than silently ignoring it, and still honours open=true', async () => {
+    const refused = await app.inject({
+      method: 'GET',
+      url: `/v1/contests?workspaceId=${WS}&open=false`,
+      headers: memberHeaders,
+    });
+    expect(refused.statusCode).toBe(400);
+
+    const accepted = await app.inject({
+      method: 'GET',
+      url: `/v1/contests?workspaceId=${WS}&open=true`,
+      headers: memberHeaders,
+    });
+    expect(accepted.statusCode).toBe(200);
+  });
 });

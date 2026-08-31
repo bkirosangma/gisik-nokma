@@ -4747,3 +4747,52 @@ compiler-exhaustive alongside `canSeeResolved`. Its **mode** side cannot be: tho
 inside a SQL string. A fourth mode therefore fails **closed** there (excluded from every non-owner list)
 while `canSeeResolved` fails to compile — **drift, not a grant**. Named in the docblock as the reason
 the two guards differ, and catalogued as an open item (6.65) rather than left as a silent asymmetry.
+
+---
+
+## The sonnet reviewer default is CONDITIONAL, and the condition is checkable (2026-08-31, controller + serial executor)
+
+The cost ruling's table reads **"Per-task reviewers *where the plan text is complete* | sonnet | medium."**
+That row carries its own **stated precondition**, and the precondition is measurable in one command.
+
+For the lifted Plan 10 Task 4 it is **false**: swept T4's own range (lines 1300–1810) for `coheren`,
+`binds`, `embedded`, `outer envelope`, `envelope-origin` and `§11` — **zero hits for every one**, with
+`projection` returning 30 in the same range as the positive control, so the probe was alive and the
+absence real.
+
+**So an opus reviewer there is not opus-by-exception under a sonnet default. It is the sonnet row not
+covering the case.** The distinction matters for the cost ruling: exceptions invite argument, an
+unsatisfied precondition does not.
+
+**Procedure, because it turns a judgment call into a measurement:** before defaulting a reviewer to
+sonnet, grep the task's own line range for the security-relevant terms that task is supposed to cover,
+with a positive control from the same run. Most tasks pass. This one measurably does not.
+
+*(The older table elsewhere in this document reads "Per-task reviewers | opus | high" — superseded by
+the cost ruling, do not cite it.)*
+
+---
+
+## A closer named where the evaluator's reader looks, and absent where the task's reader looks (2026-08-31)
+
+**The lifted Plan 10 Task 4 was moved out of Plan 10's position specifically to close §11's
+envelope-coherence window. Its own plan text does not mention that window anywhere.**
+
+The assignment exists in exactly two places, and neither is the task:
+1. This document's *"Still open, unchanged: §11's envelope-coherence check (Plan 10 T4)."*
+2. `packages/rule-engine/src/contests.ts`'s docblock — *"Enforcing that coherence belongs to the
+   constructor that builds contests server-side (Plan 10 Task 4)."*
+
+**So the closer is named where a reader of the EVALUATOR would find it, and absent where a reader of the
+TASK would.** An implementer following T4's eight steps faithfully ships the projection, the engine
+lookup and the route — and leaves the window open, having done everything the task asked.
+
+**The generalisation, and it is the reason this is recorded rather than just fixed: lifting a task
+changes WHEN it runs, not WHAT ITS TEXT SAYS.** A schedule change cannot carry an obligation that lives
+only in another document. **When an obligation is assigned to a task from outside that task, the
+assignment must be written INTO the task's own text, or the next reader of that task will not perform
+it** — and the more faithful they are to the plan, the more certainly they will miss it.
+
+**Corollary for every remaining lifted or re-sequenced item in the serial order:** before dispatching
+one, sweep its own range for the thing it was moved to do. If the terms are absent, the dispatch must
+carry the obligation explicitly, because the plan text will not.

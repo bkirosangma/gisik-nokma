@@ -116,7 +116,21 @@ export function registerContestsRoute(
             workspaceId: { type: 'string' },
             ticketId: { type: 'string' },
             claimantId: { type: 'string' },
-            open: { type: 'string', enum: ['true', 'false'] },
+            /**
+             * `'true'` ONLY, deliberately. The contract is `open=<true?>` — a filter
+             * you either apply or omit. An enum admitting `'false'` read as if the
+             * parameter were honoured on both sides, while the handler below has no
+             * `else`: `open=false` returned EVERYTHING, open contests included, with
+             * a 200 and no signal the filter had been ignored. A caller asking for
+             * the settled ones would have rendered open contests into a resolved pane.
+             *
+             * Narrowed rather than implemented, because `resolved` as a filter is not
+             * in this task's contract, and inventing it here would put a second,
+             * unspecified meaning into an API Plans 5 and 9 both consume. `open=false`
+             * is now a 400 that says so — prefer the check whose failure is loud over
+             * the one that quietly does nothing.
+             */
+            open: { type: 'string', enum: ['true'] },
           },
         },
       },
