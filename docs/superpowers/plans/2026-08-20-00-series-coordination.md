@@ -662,6 +662,117 @@ The tier table above was written from judgment. This section is written from the
 
 **Sonnet is under-used against this table's own instructions.** Lane requests ran 27:1 to 69:1 Opus-over-sonnet, against a table that assigns sonnet to transcription implementers, scaffolds, migrations, barrel exports, catalogue tasks, extractors and grep verifiers. Either the dispatches are not setting the model or the work is genuinely all semantics; the first is drift and costs nothing to correct, since this table already authorises it. Lanes should audit their own dispatch models against the table before the next wave.
 
+### Ruling (2026-08-31, controller under delegated owner authority): product-route CSRF — neither option as posed
+
+Lane 2's ruling-request, raised from measurement rather than reading: `validateOrigin` returns immediately
+with no request context (`origin-check.mjs:98`) and session resolution goes through
+`auth.api.getSession({ headers })`, so better-auth's origin machinery never sees a product route. Against
+the shipped server, `POST /v1/events` with a valid session cookie and a forged `origin:
+https://evil.example` returns **200**, and a `requireSession`-protected route returns **200 with the
+resolved `userId`**. Never 403. Once `requireSession` reaches `/v1/events` (T5 or T12), cookie auth there
+rests on `SameSite=Lax` and nothing else.
+
+**The owner delegated this ruling to the controller. It is revocable in a word, like every other.**
+
+Lane 2 posed two options — ratify Lax-only, or require an `Origin` on product routes and accept that every
+non-browser caller must then send one. **Neither is taken, because the second option's cost is an artifact
+of stating it unconditionally, and the first ratifies something that is not yet a decision.**
+
+**1. `SameSite` is not currently a choice this repository has made, and that is the first thing to fix.**
+Swept `apps/server/src` file-by-file: **no `sameSite` setting exists anywhere.** The entire defence being
+proposed for ratification is an unwritten default of a dependency. If better-auth changes its default, or
+a later task sets `SameSite=None` because some cross-site client needs it, the defence vanishes and
+nothing in this repo fails. **Pin it explicitly.** Cheap, immediate, affects no caller.
+
+**The test already exists — Lane 2's correction, and it makes item 1 smaller and sharper than first
+costed.** `sign-in-flows.test.ts:148` already asserts the exact attribute list
+`['Max-Age=604800', 'Path=/', 'HttpOnly', 'SameSite=Lax']`, so the value already goes red if better-auth
+changes its default. The remaining work is the **setting**, not the test. And the reason to do it is not
+that the value would otherwise go unnoticed — it would — but Lane 2's distinction, which is the useful
+one: **that assertion currently guards a dependency's default; once the value is set explicitly it guards
+a decision. Same test, same line, different meaning, and only the second is a security property this
+repository owns.**
+
+**1b. The same assertion guards a second thing, and nobody has said so — which is how it gets lost.**
+Lane 2's addition. The attribute list is `['Max-Age=604800', 'Path=/', 'HttpOnly', 'SameSite=Lax']` and it
+carries **no `Domain` attribute**, so the session cookie is host-only: set by `pm-api.artsourced.in`, sent
+only to `pm-api.artsourced.in`. That must stay true, and the way it breaks is specific enough to name.
+A later task debugging a cookie-not-arriving problem — entirely plausible the first time the web client is
+wired against the API in a real browser — has an obvious-looking fix to hand: add `Domain=.artsourced.in`.
+**It would work.** It would also send the session cookie to every subdomain of the zone, converting
+today's "a sibling subdomain can forge a request that carries the cookie" into "a sibling subdomain
+receives the cookie directly." Strictly worse, and it would arrive looking like configuration rather than
+a security change.
+
+Because the matcher is an exact `toEqual` rather than a `toContain`, the guard already exists — adding
+`Domain` reddens it. What is missing is any statement that **preventing a `Domain` attribute is one of the
+things that assertion is for.** The list is exact, and the absence it protects matters as much as the
+presence. Say so at the assertion, or the next person to read it will see four attributes being checked
+and not the fifth being forbidden.
+
+**2. The Origin requirement is scoped to COOKIE-authenticated requests, and the stated cost disappears.**
+CSRF is a problem about **ambient credentials**. A cookie is ambient — the browser attaches it whether or
+not the page meant to. A bearer token is not: it is attached deliberately by code that had to hold it. So
+the check belongs exactly where the ambient credential is used, and nowhere else. **Require and validate
+`Origin` on product requests authenticated by cookie; require nothing of bearer-authenticated requests.**
+Lane 2's objection — that every non-browser caller must then send an `Origin` it has no reason to send —
+is true of the unconditional form and false of this one. The desktop and mobile clients are bearer-
+authenticated and are untouched.
+
+**3. Why not simply ratify Lax — and the hosting fact is SETTLED ADVERSE, not open.** Verified:
+`/v1/events` is POST-only (`routes/events.ts:12`), so Lax's top-level-GET gap does not reach it, and Lax
+is a real defence rather than a fig leaf. It is nonetheless insufficient here, and **an earlier draft of
+this ruling wrongly left that conditional on a hosting decision it called unestablished. Lane 2 found the
+decision, at line 83 of this document, in the owner sign-off table.**
+
+The product is **`pm.artsourced.in`** and the API is **`pm-api.artsourced.in`** — two sibling subdomains
+of `artsourced.in`. Line 84 puts the magic-link sender at the apex, `sign-in@artsourced.in`, explicitly
+because it is *"the established zone"* — so this is not a fresh domain bought for this product; other
+things already live on it. `SameSite` is scoped to the **registrable domain**, and `artsourced.in` is the
+registrable domain. Everything on that zone is same-site with the product, and **Lax does nothing between
+them.**
+
+**And it is worse than "the deployment happens to be adverse": the architecture REQUIRES the relaxation
+that removes the protection.** The web client at `pm.artsourced.in` calls the API at
+`pm-api.artsourced.in`. Those are cross-origin, and the session cookie must reach the API for the product
+to function at all — which works precisely because they are same-site. So the same-site relaxation is
+load-bearing for the product, cannot be tightened without breaking the web client, and any other subdomain
+of `artsourced.in` inherits it. **Lax was never going to protect this deployment, and no future hosting
+decision can rescue it short of moving the API to a different registrable domain.** Item 2 is therefore
+the only CSRF defence available on cookie-authenticated product routes — not defence-in-depth.
+
+**Owner touchpoint, flagged rather than assumed:** if the product ever ships on a domain sharing a
+registrable domain with anything untrusted — including a platform's default `*.provider.app` subdomain
+where the parent is not on the Public Suffix List — item 2 stops being defence-in-depth and becomes the
+only defence. That is a question for Plan 11's deploy, and it should be answered there rather than
+rediscovered.
+
+**Assignment.** Item 1 is small and belongs with Plan 4 T5's gate work — Lane 2. Item 2 is also T5's, as
+the second branch of the same gate, after the envelope-origin micro-PR and T4. Neither blocks the
+envelope-origin closer, which remains the nearer priority. **Note the term collision applies here in full:
+item 2 is HTTP-Origin. The micro-PR is envelope-origin. They are different fixes and this ruling asks for
+both.**
+
+**Confidence, restated after Lane 2's corrections — and the stated-uncertainty is what made them
+findable.** Item 1 unambiguous, and now smaller: the test exists, only the setting is missing. Item 2
+standard practice, cost objection dissolved by scoping. **Item 3 is now the MOST certain of the three, not
+the least** — the first draft marked its bite conditional on an unestablished hosting fact, Lane 2 went
+and found the fact at line 83 of this document, and it is adverse. There is nothing left to re-examine
+there; a later reader should treat it as settled and, if anything, check only whether the API has since
+moved to a different registrable domain, which is the one change that would alter it.
+
+**Recorded because the process point outlives the ruling, in Lane 2's sharper form:** per-item confidence
+did not merely make the weak paragraph *findable* — it told a reader with no budget to re-verify a whole
+ruling **where to spend one check.** "This item's bite depends on a fact nobody has established" is an
+explicit invitation to go establish it, and it cost one grep. Uniform confidence would have been cheaper
+to write and would have hidden the one paragraph that was wrong, inside a document containing its own
+refutation eighty lines up. **Stating which claim you are least sure of is how a reader with limited
+budget knows where to aim it** — the same family as enumerating absences rather than asserting
+partiality, and for the same reason: both convert a reader's attention from scanning to targeting. It also
+produced a reasoning failure worth naming, from Lane 2: **an option priced as unacceptable is sometimes an
+option scoped too widely** — it rejected a correct control because it had described that control more
+broadly than anyone had proposed it.
+
 ### By-catch — plan defects found by the extraction, recorded so they are not rediscovered
 
 - **Plan 11's CI YAML omits the interim-plumbing gate** its own Produces bullet promises (the failing grep for Plan 10's session shortcuts). An executor following the YAML literally ships without it.
