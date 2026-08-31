@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import { evaluateEvent } from '@gisik-nokma/rule-engine';
+import { createIngestService } from '../../src/ingest/ingest-service.js';
+import { buildProjectionRegistry } from '../../src/projections/index.js';
 import {
   checkPermission,
   NOT_A_MEMBER_REASON,
@@ -217,5 +220,92 @@ describe('checkProjectExists — every event that NAMES a project, not only tick
       rule: PROJECT_UNKNOWN_RULE,
       reason: projectUnknownReason(projectId),
     });
+  });
+});
+
+/**
+ * The existence check reads a table an earlier event in the SAME batch may have
+ * just written, which is a claim about ingest's transaction shape rather than
+ * about this check — so it is measured rather than inferred.
+ *
+ * `commitOne` opens its own connection and its own BEGIN/COMMIT per event, so a
+ * batch is a SEQUENCE of committed transactions and event 2's gate reads event
+ * 1's committed row. If ingest were ever changed to wrap a whole batch in one
+ * transaction, or to gate every event up front before committing any, this case
+ * is what would notice: a real client sends "create the project, then put people
+ * on it" as one call, and the second half would be refused for naming a project
+ * that — from the gate's point of view — did not exist yet.
+ */
+describe('a project founded EARLIER IN THE SAME BATCH is found by the check', () => {
+  it('project.created followed by project.member_added commits in one ingestClientBatch call', async () => {
+    const ingest = createIngestService({
+      pool: db.pool,
+      evaluate: evaluateEvent,
+      projections: buildProjectionRegistry(),
+    });
+
+    const workspaceId = newUlid();
+    const owner = newUlid();
+    const event = (fields: {
+      entity: SubmittedEvent['entity'];
+      type: string;
+      payload: unknown;
+    }): SubmittedEvent => ({
+      id: newUlid(),
+      workspaceId,
+      version: 1,
+      origin: 'web',
+      clientTime: '2026-08-20T09:00:00.000Z',
+      actorId: owner,
+      ...fields,
+    });
+
+    // Founded through the INTERNAL door, so the bootstrap's server-origin
+    // appends are not judged by the client gate; the founding sequence makes
+    // this actor the workspace owner.
+    const founding = await ingest.ingestBatch([
+      event({ entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.created', payload: { name: 'Founded' } }),
+    ]);
+    expect(founding[0]).toMatchObject({ status: 'committed' });
+
+    const projectId = newUlid();
+    const results = await ingest.ingestClientBatch(
+      [
+        event({ entity: { kind: 'project', id: projectId }, type: 'project.created', payload: { name: 'Same batch' } }),
+        event({
+          entity: { kind: 'project', id: projectId },
+          type: 'project.member_added',
+          payload: { userId: newUlid(), projectAdmin: false },
+        }),
+      ],
+      owner,
+    );
+
+    expect(results.map((result) => result.status)).toEqual(['committed', 'committed']);
+
+    // The control, without which this case would pass against a build that had
+    // no existence check at all: the SAME two events in the OTHER order. The
+    // roster event now names a project nothing has founded yet and is refused,
+    // and the founding behind it still commits — so what the case above
+    // measures is the check consulting the table per event, not the check being
+    // absent.
+    const reversed = newUlid();
+    const outOfOrder = await ingest.ingestClientBatch(
+      [
+        event({
+          entity: { kind: 'project', id: reversed },
+          type: 'project.member_added',
+          payload: { userId: newUlid(), projectAdmin: false },
+        }),
+        event({ entity: { kind: 'project', id: reversed }, type: 'project.created', payload: { name: 'Late' } }),
+      ],
+      owner,
+    );
+    expect(outOfOrder[0]).toMatchObject({
+      status: 'refused',
+      rule: PROJECT_UNKNOWN_RULE,
+      reason: projectUnknownReason(reversed),
+    });
+    expect(outOfOrder[1]).toMatchObject({ status: 'committed' });
   });
 });
