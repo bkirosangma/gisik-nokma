@@ -94,6 +94,9 @@ describe('proj_entity_heads', () => {
     expect(registry.all().map((projection) => projection.name)).toEqual([
       'proj_entity_heads',
       'proj_workflows',
+      // Plan 4 Task 9 Step 3b, INSERTED at its §8 position (fourth) rather
+      // than appended — see test/projection-order.test.ts, the pin of record.
+      'proj_projects',
       'proj_memberships',
       'proj_visibility',
       'proj_contested',

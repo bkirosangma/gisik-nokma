@@ -24,6 +24,7 @@ import type { EffectiveRole } from '../../src/permissions/effective-role.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { testEnvelope } from '../helpers/envelope.js';
+import { applyAll, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
 
 /**
  * The pre-engine permission gate (Plan 4 Task 5), and the founding sequence
@@ -628,6 +629,30 @@ describe('the gate at the client door — refusals before the rule engine', () =
     return user;
   }
 
+  /**
+   * A ticket every member of the workspace can SEE, seeded through the real
+   * `ticket.created` event and a real `visibility.set`.
+   *
+   * Needed since Plan 4 Task 9: the gate now refuses a ticket-entity event
+   * whose ticket the actor cannot see, and `canSee` answers false for a ticket
+   * with no `proj_visibility` row exactly as it does for an invisible one. The
+   * cases below used to file `ticket.assigned` against a bare `newUlid()`,
+   * which the visibility check now refuses — so without this the two cases
+   * would be red for a reason that has nothing to do with revocation or with
+   * connection use, which is the "refusal fires before the interesting code"
+   * failure this file's own comments warn about elsewhere.
+   *
+   * `'workspace'` mode rather than a project roster, deliberately: these cases
+   * are about the role gate and the transaction, and a project attachment would
+   * add a second thing that has to keep being true for them to stay green.
+   */
+  async function visibleTicket(workspaceId: string): Promise<string> {
+    const ticketId = newUlid();
+    await seedTicket(db.pool, { workspaceId, projectId: newUlid(), ticketId });
+    await applyAll(db.pool, [setVisibilityEnv(workspaceId, ticketId, 'workspace')]);
+    return ticketId;
+  }
+
   it('planted defect: a member ingesting workflow.defined is refused BEFORE the engine runs', async () => {
     const ingest = ingestService();
     const { workspaceId, owner } = await foundedWorkspace(ingest);
@@ -728,10 +753,11 @@ describe('the gate at the client door — refusals before the rule engine', () =
     const { workspaceId, owner } = await foundedWorkspace(ingest);
     const member = await grantMember(ingest, workspaceId, owner, 'member');
 
+    const ticketId = await visibleTicket(workspaceId);
     const ticketEvent = () =>
       submitted({
         workspaceId,
-        entity: { kind: 'ticket', id: newUlid() },
+        entity: { kind: 'ticket', id: ticketId },
         type: 'ticket.assigned',
         payload: { assigneeId: member },
         actorId: member,
@@ -844,7 +870,7 @@ describe('the gate at the client door — refusals before the rule engine', () =
     });
     const event = submitted({
       workspaceId,
-      entity: { kind: 'ticket', id: newUlid() },
+      entity: { kind: 'ticket', id: await visibleTicket(workspaceId) },
       type: 'ticket.assigned',
       payload: { assigneeId: member },
       actorId: member,

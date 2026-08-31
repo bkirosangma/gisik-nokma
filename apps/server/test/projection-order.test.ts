@@ -6,8 +6,9 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  * applies projections in insertion order inside each ingest transaction, and
  * later plans depend on the pinned order
  *
- *   proj_entity_heads, proj_workflows, proj_ticket_types, proj_tickets,
- *   proj_rollups, proj_memberships, proj_visibility, proj_contested
+ *   proj_entity_heads, proj_workflows, proj_ticket_types, proj_projects,
+ *   proj_tickets, proj_rollups, proj_memberships, proj_visibility,
+ *   proj_contested
  *
  * because a projection may read a table an earlier one wrote in the same
  * transaction (Plan 3's proj_rollups reads proj_tickets). A guarantee nothing
@@ -15,21 +16,27 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  * below is the pin: EVERY later registrant extends it in the same commit that
  * registers its projection.
  *
- * "Extends" means INSERTS AT ITS §8 POSITION, not appends. proj_memberships and
- * proj_visibility are the last two today only because the three §8 entries above
- * them do not exist yet; Plan 3 Chain B's proj_ticket_types, proj_tickets and
- * proj_rollups go BEFORE both, not after. Getting that wrong is not a cosmetic ordering slip — it puts
- * proj_rollups ahead of the proj_tickets rows it reads.
+ * "Extends" means INSERTS AT ITS §8 POSITION, not appends. Plan 4 Task 9's
+ * proj_projects is the first registrant to prove that rule rather than state it:
+ * §8 puts it fourth, proj_ticket_types (third) does not exist, so it went in
+ * BETWEEN proj_workflows and proj_memberships and both assertions below moved
+ * with it. Plan 3 Chain B's proj_ticket_types, proj_tickets and proj_rollups go
+ * BEFORE proj_memberships too, not after. Getting that wrong is not a cosmetic
+ * ordering slip — it puts proj_rollups ahead of the proj_tickets rows it reads.
  *
  * Deliberately DB-free — no createTestDatabase, no pool, nothing that could
  * make this ordering contract skippable when Postgres is not running.
  */
 describe('projection registration order (coordination §8)', () => {
-  it('buildProjectionRegistry registers the pinned order: heads, workflows, memberships, visibility, contested', () => {
+  it('buildProjectionRegistry registers the pinned order: heads, workflows, projects, memberships, visibility, contested', () => {
     const registry = buildProjectionRegistry();
     expect(registry.all().map((projection) => projection.name)).toEqual([
       'proj_entity_heads',
       'proj_workflows',
+      // Plan 4 Task 9 Step 3b. §8 position 4, INSERTED here rather than
+      // appended: the ticket-creation precondition reads it, and every §8 entry
+      // between it and proj_memberships is still unbuilt.
+      'proj_projects',
       'proj_memberships',
       'proj_visibility',
       // Plan 10 Task 4. §8's order gains one TAIL entry, so appending is its §8
@@ -55,6 +62,7 @@ describe('projection registration order (coordination §8)', () => {
     ).toEqual([
       ['proj_entity_heads', ['proj_entity_heads']],
       ['proj_workflows', ['proj_workflows']],
+      ['proj_projects', ['proj_projects']],
       ['proj_memberships', ['proj_memberships']],
       ['proj_visibility', ['proj_visibility']],
       ['proj_contested', ['proj_contested']],

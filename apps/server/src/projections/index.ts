@@ -1,6 +1,7 @@
 import { projContested } from './contested.js';
 import { entityHeadsProjection } from './entity-heads.js';
 import { membershipsProjection } from './proj-memberships.js';
+import { projProjects } from './proj-projects.js';
 import { projVisibility } from './proj-visibility.js';
 import { createProjectionRegistry, type ProjectionRegistry } from './registry.js';
 import { workflowsProjection } from './workflows.js';
@@ -13,8 +14,15 @@ import { workflowsProjection } from './workflows.js';
  * Registration order IS application order (coordination doc §8), and later
  * plans depend on it, so the pinned order is
  *
- *   proj_entity_heads, proj_workflows, proj_ticket_types, proj_tickets,
- *   proj_rollups, proj_memberships, proj_visibility, proj_contested
+ *   proj_entity_heads, proj_workflows, proj_ticket_types, proj_projects,
+ *   proj_tickets, proj_rollups, proj_memberships, proj_visibility,
+ *   proj_contested
+ *
+ * `proj_projects` is in that list by the owner decision of 2026-08-26 and was
+ * MISSING from this comment until Plan 4 Task 9 registered it — coordination
+ * doc, "the phrase is this document's own error": what omitted it was the doc
+ * comment, not the assertion. §8 is the single source; the comment and the
+ * array move together.
  *
  * proj_contested (Plan 10 Task 4) is the one tail entry: §8's order gains it at
  * the END, so appending IS its §8 position. That is a coincidence of where it
@@ -36,6 +44,10 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   const registry = createProjectionRegistry();
   registry.register(entityHeadsProjection);
   registry.register(workflowsProjection);
+  // §8 position 4. proj_ticket_types (position 3) does not exist yet, so this
+  // INSERTS here rather than appending — proj_memberships and proj_visibility
+  // below are already registered and must stay below it.
+  registry.register(projProjects);
   registry.register(membershipsProjection);
   registry.register(projVisibility);
   registry.register(projContested);
