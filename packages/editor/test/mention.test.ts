@@ -371,6 +371,30 @@ describe('the label a mention is stored with', () => {
     editor.commands.setContent(`<p><span data-mention-user-id="${USERS[0]!.userId}"></span></p>`);
     expect(mentionNodes(editor.getJSON())[0]!.label).toBe('');
   });
+
+  // The door above stays open for an id with no NAME. It is shut for a name
+  // with no ID, and the asymmetry is the whole point: refusing the first throws
+  // away the only fact the markup carried, refusing the second throws away
+  // nothing — the name survives as text — while admitting it stores a mention
+  // that renders perfectly and addresses nobody, with no downstream gate.
+  it('PLANTED DEFECT: a blank mention id is refused at the parse door, and the name survives as text', () => {
+    for (const id of ['', '   ']) {
+      editor = createTestEditor();
+      editor.commands.setContent(`<p><span data-mention-user-id="${id}">@Anselma</span></p>`);
+      expect(mentionNodes(editor.getJSON()), `id=${JSON.stringify(id)}`).toEqual([]);
+      // Not merely "no mention": the name is still readable. This is the half
+      // that makes refusal cheap, and a fix that dropped the text would fail here.
+      expect(editor.getText()).toContain('@Anselma');
+      editor.destroy();
+    }
+  });
+
+  it('PLANTED DEFECT: and the same through insertContent, which is a second door on the same wall', () => {
+    editor = createTestEditor();
+    editor.commands.insertContent('<span data-mention-user-id="">@Anselma</span>');
+    expect(mentionNodes(editor.getJSON())).toEqual([]);
+    expect(editor.getText()).toContain('@Anselma');
+  });
 });
 
 /**
@@ -453,7 +477,24 @@ describe('mention HTML, in both directions', () => {
  * builds three of them in JS, the node's `renderHTML` builds the fourth — and a
  * rename on either side leaves correct markup with no styling and nothing red.
  * Equality in both directions, so a rule for a class nobody emits is caught too.
+ *
+ * THAT SENTENCE WAS AN OVERCLAIM UNTIL THE SCOPED RE-REVIEW MEASURED IT. The
+ * emit direction spot-checked THREE of the six names, so renaming
+ * `mention-popup__status` in the popup left both tests in this block green —
+ * caught only by an unrelated accessibility test, i.e. by luck. Both directions
+ * now compare against the same `BEM_CONTRACT` list, and the emit side collects
+ * every matching class the popup actually puts in the DOM rather than asserting
+ * the three someone happened to name.
  */
+const BEM_CONTRACT = [
+  'editor-mention',
+  'mention-popup',
+  'mention-popup__item',
+  'mention-popup__item--selected',
+  'mention-popup__list',
+  'mention-popup__status',
+];
+
 describe('the BEM classes the contract names', () => {
   it('the stylesheet declares exactly the mention classes the code emits', () => {
     const cssPath = resolve(dirname(fileURLToPath(import.meta.url)), '../src/styles/editor.css');
@@ -467,29 +508,34 @@ describe('the BEM classes the contract names', () => {
     const declared = [...css.matchAll(/\.((?:mention-popup|editor-mention)[a-z_-]*)\s*\{/g)].map(
       (match) => match[1]!,
     );
-    expect(declared.sort()).toEqual(
-      [
-        'editor-mention',
-        'mention-popup',
-        'mention-popup__item',
-        'mention-popup__item--selected',
-        'mention-popup__list',
-        'mention-popup__status',
-      ].sort(),
-    );
+    expect(declared.sort()).toEqual([...BEM_CONTRACT].sort());
   });
 
-  it('and the code emits exactly those', async () => {
+  it('PLANTED DEFECT: and the code emits exactly those — all six, not the three someone named', async () => {
     editor = createTestEditor({ queryUsers: async () => USERS });
     typeText(editor, '@an');
     await vi.waitFor(() => {
       expect(popupItems().length).toBe(2);
     });
-    expect(document.querySelector('.mention-popup')).not.toBeNull();
     pressKey(editor, 'ArrowDown');
-    expect(document.querySelectorAll('.mention-popup__item--selected')).toHaveLength(1);
+
+    const emitted = new Set<string>();
+    const keep = (value: string | null | undefined) => {
+      for (const name of (value ?? '').split(/\s+/)) {
+        if (/^(?:mention-popup|editor-mention)/.test(name)) emitted.add(name);
+      }
+    };
+    const popup = document.querySelector('.mention-popup');
+    expect(popup).not.toBeNull();
+    keep(popup!.className);
+    for (const node of popup!.querySelectorAll('*')) keep(node.className);
     pressKey(editor, 'Enter');
-    expect(editor.getHTML()).toContain('class="editor-mention"');
+    for (const match of editor.getHTML().matchAll(/class="([^"]*)"/g)) keep(match[1]);
+
+    // Set equality, not containment: a class the stylesheet declares and the
+    // code stopped emitting fails here, and so does one the code emits that
+    // the contract never named.
+    expect([...emitted].sort()).toEqual([...BEM_CONTRACT].sort());
   });
 });
 

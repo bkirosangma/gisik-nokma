@@ -115,7 +115,8 @@ function mentionText(attrs: Record<string, unknown>): string {
  * guards its parse door, coercing every unknown `wrap` to `block`, and says so.
  * Nor is a `validate` needed to close this one: a node-level `getAttrs`
  * returning `false` cancels the rule outright, no load-time throw involved. The
- * real reason is that neither move available here is an improvement.
+ * real reason is that neither move available here is an improvement — FOR THE
+ * SHAPE THIS PARAGRAPH IS ABOUT, which is a PRESENT id with a missing name.
  * COERCION HAS NO LEGAL TARGET: `wrap` has a `block` to fall back to, and a
  * missing name has nothing — inventing one is precisely what the insert path
  * refuses to do. And REFUSAL DISCARDS EVIDENCE: cancelling the rule on
@@ -125,6 +126,28 @@ function mentionText(attrs: Record<string, unknown>): string {
  * repaired at all. Left open deliberately; layer 3 is where a stored mention
  * with no name gets rejected, and a test pins both doors open so this stays a
  * decision rather than an oversight.
+ *
+ * THE OTHER SHAPE IS NOT THAT SHAPE, and the scoped re-review caught this
+ * paragraph being read as if it covered both. `<span data-mention-user-id="">`
+ * and `<span data-mention-user-id="   ">` carry a name and NO id, and both
+ * halves of the reasoning above invert on them:
+ *
+ *   - Nothing is discarded by refusing. `getAttrs` returning `false` demotes
+ *     the span to the literal text `@Anselma` — the name survives, in full,
+ *     as text. The evidence-discarding argument protects an id with no name;
+ *     it says nothing about a name with no id.
+ *   - And the failure it lets through is the INVISIBLE one. A blank id stores
+ *     `{"userId":"","label":"Anselma"}`, renders `@Anselma` perfectly, reads
+ *     correctly to every human who sees it, and addresses nobody — with no
+ *     downstream gate anywhere (swept: no consumer validates a mention userId).
+ *     That is the exact defect the insert path was rewritten to close, and
+ *     leaving it open on a neighbouring door closed nothing.
+ *
+ * So a blank-or-whitespace id is refused HERE, at the node level, where a
+ * `false` short-circuits before the per-attribute handlers ever run — the one
+ * thing a node-level `getAttrs` still does after this file's own forgery fix
+ * established that its RETURNED ATTRS are dead code. A silent failure with no
+ * net under it deserves more of a guard than a loud one, not less.
  */
 export const Mention = Node.create<MentionOptions>({
   name: 'mention',
@@ -161,7 +184,22 @@ export const Mention = Node.create<MentionOptions>({
     // pasted from any web page is not one of this product's mentions, and
     // matching the bare tag would turn arbitrary markup into a claim about a
     // person. Per-attribute `parseHTML` above supplies both attrs.
-    return [{ tag: 'span[data-mention-user-id]' }];
+    //
+    // The node-level `getAttrs` returns only `false` or `null` — never an
+    // attrs object. That is not style: `injectExtensionAttributesToParseRule`
+    // merges `{ ...nodeLevelResult, ...perAttributeResults }`, so attrs
+    // returned here are overwritten, which is the forgery this file was fixed
+    // for. It checks `oldAttributes === false` BEFORE that merge, so refusal
+    // is the one verdict a node-level handler can still deliver.
+    return [
+      {
+        tag: 'span[data-mention-user-id]',
+        getAttrs: (element) =>
+          ((element as HTMLElement).getAttribute('data-mention-user-id') ?? '').trim().length === 0
+            ? false
+            : null,
+      },
+    ];
   },
 
   renderHTML({ node, HTMLAttributes }) {
