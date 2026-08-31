@@ -16,6 +16,7 @@ const brokenDb = {
 function fakeIngest(): IngestService {
   return {
     ingestBatch: async () => [],
+    ingestClientBatch: async () => [],
     onEventCommitted: () => () => {},
   };
 }
