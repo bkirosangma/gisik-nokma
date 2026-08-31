@@ -134,10 +134,15 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // @3.30.5 dist:1491). Heading declares none, which is the actual reason a
     // doc claiming `{ type: 'heading', attrs: { level: 99 } }` round-trips
     // with the 99 intact even under `errorOnInvalidContent: true`.
-    // Adding one is not free: `validate` THROWS AT LOAD, so a single stored
-    // level-99 heading would fail the whole editor rather than degrade. The
-    // server door stays the cheaper place to enforce a range; the same trade,
-    // reasoned out for the image node's `wrap`, is in extensions/ticket-image.ts.
+    // Adding one is not free, and the cost is not the obvious one. `validate`
+    // throws at load — but `enableContentCheck` defaults FALSE (core
+    // dist:6150) and is set nowhere in this repo, so the throw is CAUGHT
+    // (dist:592-602): the editor warns once and swaps in an empty document.
+    // A single stored level-99 heading would silently take every surrounding
+    // paragraph with it. That consequence was BUILT, not inferred from the
+    // throw — for the image node's `wrap`, same mechanism, and the
+    // observation is written out in extensions/ticket-image.ts. The server
+    // door stays the cheaper place to enforce a range.
     // A test pins the positive half: 1–6 survive a round trip, so a change
     // that clamps or drops them fails.
   ];

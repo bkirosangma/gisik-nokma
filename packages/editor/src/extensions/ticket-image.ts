@@ -85,13 +85,30 @@ declare module '@tiptap/core' {
  * same node re-declared with a `validate` has ['default','validate'] and
  * throws `RangeError: bad wrap: float-up` on the identical JSON.
  *
- * The reason to leave it off is what `validate` does when it fires — it THROWS
- * AT LOAD. One stored document with a junk wrap would fail the whole editor
- * hard rather than degrade to `block`, and choosing that is an owner's call,
- * not a node's. So the division is: layer 3 (the server ingest gate) REJECTS
- * a bad document at the door, and layer 1 COERCES whatever it is handed —
- * every path this file owns, parse and render alike, ends at a member of the
- * vocabulary even when the stored value is not one.
+ * THE REASON TO LEAVE IT OFF IS WHAT THAT THROW BECOMES HERE, which is a
+ * separate question from what `validate` does — the citations above prove the
+ * throw and say nothing about its fate. Traced, then built. `Editor` passes
+ * `enableContentCheck` in as `errorOnInvalidContent` (core dist:6419 →
+ * `createDocument` dist:1052-1058 → `createNodeFromContent` dist:592-602); it
+ * defaults FALSE (dist:6150) and is set nowhere in this repo; and on that
+ * branch the catch does not rethrow — it emits one `console.warn` and returns
+ * `createNodeFromContent('')`.
+ *
+ * So the trade is NOT "fail hard versus degrade to `block`". Observed, with a
+ * validating `wrap` under default options, on a document of two paragraphs of
+ * user prose either side of one bad image: the editor CONSTRUCTS, and the
+ * document comes back as `[{ type: 'paragraph' }]`. Both paragraphs are gone.
+ * The whole document is silently replaced by an empty one, the only trace is
+ * `[tiptap warn]: Invalid content.`, and the text destroyed had nothing to do
+ * with the attribute that failed. Only `enableContentCheck: true` makes
+ * construction actually throw.
+ *
+ * Silent total document loss versus degrading to `block` is a much easier call
+ * than the one an earlier version of this comment described, and it falls the
+ * same way. The division: layer 3 (the server ingest gate) REJECTS a bad
+ * document at the door, and layer 1 COERCES whatever it is handed — every path
+ * this file owns, parse and render alike, ends at a member of the vocabulary
+ * even when the stored value is not one.
  */
 export const TicketImage = Node.create<TicketImageOptions>({
   name: 'image',
