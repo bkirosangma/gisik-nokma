@@ -396,6 +396,15 @@ depended on an unchecked assumption, shipped one hour after that rule was writte
     **record the probe as the evidence, not the docblock.**
   - **The point of ruling it this way:** a docblock written for a bounded case must not become the thing
     that licenses the unbounded one. Making the code's measured behaviour the evidence is what stops that.
+  - **RESOLVED THE SAME DAY — BRANCH ONE FIRED. DO NOT RE-RUN THIS PROBE.** No new experiment was
+    needed: the fix round's own shipped test already answers it. Case 6.101 seeds ticket `foreign` in a
+    project the viewer was **never on**, asserts `canSee(viewer, foreign) === false` immediately before
+    the trigger, and then asserts ``expect(ids).toContain(`purge:${foreign}`)``. The member-side walk
+    **does** emit a purge for an entity the member's replica does not hold. **Relationship absent →
+    gate it**, accept the under-purge residual, disclose it as a sibling of 6.102. Prior audience is NOT
+    to be reconstructed (6.82/6.94). 6.101's comment must be rewritten to state the relationship
+    reasoning: it currently argues from spec §6 for the rejected conclusion, and **a false sentence a
+    maintainer reasons from is worse than a missing one.**
 
 - **Fable is not dispatched, for any role.** Sonnet default, opus by exception, hard cap **6 subagents per
   task**, one fan-out per plan, judgment fan-outs withdrawn. Cost ledger of what this trade has already
@@ -475,6 +484,20 @@ Every one below was violated by a controller that had just written it. **Assume 
   > executed. Alone, "343/343 green" is equally consistent with a coverage gap and with an unexecuted
   > path, and those two demand opposite responses (write the test vs. delete the branch). The green run
   > is only interpretable next to the red one. **Pair them or report neither.**
+- **AN INABILITY TO TELL TWO CASES APART IS A REASON TO TAKE THE SAFE BRANCH, NOT A LICENCE TO TAKE THE
+  UNSAFE ONE.** Found 2026-09-01 inside case 6.101's own comment, which argued the disclosure was correct
+  because `canSee` now is *"true of a ticket taken away and equally true of one never held, and this
+  module cannot ask the other question."* That is reasoning FROM an inability TO a permission. The module
+  cannot distinguish *lost access* from *never had access*, and it resolved the ambiguity toward the
+  disclosing branch. The guest side had already been gated for precisely this; the member side inherited
+  the same blind spot at a different radius and defended it in a comment.
+  **The tell is a sentence of the form "X and Y are indistinguishable here, so we treat both as Y" where
+  Y is the permissive case.** The valid inference from indistinguishability is always toward the
+  conservative case — here, retaining stale local data rather than emitting an id. Under-purge is
+  recoverable by a resync; a disclosure is not recoverable at all.
+  **And note where it was hiding: in a test's explanatory comment, next to a passing assertion.** The
+  test encoded the wrong behaviour AND the argument for it, so reading the test as documentation
+  propagated the defect. A green suite is not evidence the behaviour it pins is correct.
 - **THE INSTRUMENT'S SCOPE IS NARROWER THAN THE CLAIM BUILT ON IT — three instances, so stop calling it
   a coincidence.** Each time the probe was real, it ran correctly, and it answered truthfully about a
   narrower subject than the sentence written from it. **A right answer about the wrong subject.**
