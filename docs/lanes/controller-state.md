@@ -25,6 +25,31 @@ decision boundary.
 forward — five of six package counts staying right is what makes the sixth invisible. `app-core` went
 92 → 130 at this merge, which is the kind of move a carried-forward composition hides.
 
+
+## Task-level progress is now tracked — stop reconstructing it
+
+`pnpm check:tasks` (`scripts/check-task-ledger.mjs`) reports task-level completion from
+`docs/lanes/task-ledger.tsv`, one row per `### Task N:` heading across the eleven plans. **Do not
+recompute a progress figure from prose again — run the gate and quote it.**
+
+- **The denominator is derived, never typed.** 177 tasks (167 plain + 10 lettered). The earlier "167
+  total" was produced by `grep -cE '^#+ *Task '`, which returns **BLANK, not 0**, for plans 08 and 11 —
+  both have very long lines. The gate carries a positive control so a reader that drifts fails loudly
+  instead of reporting an empty backlog as clean.
+- **Two numbers, deliberately not one.** `done` = a PR naming that exact plan+task whose **merge** sha is
+  an ancestor of `origin/main`; `claimed` = asserted at plan or branch granularity only (the whole of
+  Plans 1 and 2), never counted as complete. **At `edbb940`: 17/177 verified (9.6%), 29 claimed but
+  unaudited (16.4%), 4 in-flight, 127 todo.** The familiar "~43%" folded all of those together.
+- **Evidence is the MERGE commit.** This repo squash-merges, so an implementing commit is not an ancestor
+  of main once its PR lands — recording one false-REDs a finished task. Proven by mutation: `876e170`
+  (real, on the live exec branch, in the shared object store) is correctly rejected.
+- **Rejected and recorded so it is not re-tried: fenced-code stripping.** It looks obviously right and it
+  drops the count 177 → 166, removing the real tail headings of plans 06 and 07, which carry an **odd**
+  number of ``` markers. It fails toward "more complete" while every per-plan count stays non-zero, so
+  the positive control cannot see it. Rationale is in the script header.
+- **Keep it current in the same change set as the work**, like `Features.md`. A merged PR no row cites is
+  printed every run — that is the direction that catches work landing unrecorded.
+
 ## THE ENVIRONMENT IS NOT THE DECLARED ONE — read before running a gate
 
 Found 2026-08-31 by a post-merge gate that came back RED and was **not** a code defect.
@@ -36,6 +61,23 @@ Found 2026-08-31 by a post-merge gate that came back RED and was **not** a code 
   v24.11.1: `pnpm exec node -v` and `pnpm run` both succeed with **no refusal and not a single warning**,
   with the same commands under 22 as the control so the silence is not a broken probe. The declared
   engine is decorative. *(Pending item below; the controller does not implement.)*
+  > **CORRECTED 2026-09-01 — that sentence is half wrong, and the wrong half is the one that matters.**
+  > Re-measured with v22.22.2 as the control: **`pnpm run <script>` under v24 DOES warn** —
+  > `WARN Unsupported engine: wanted: {"node":">=22.0.0 <23"} (current: {"node":"v24.11.1",...})` — and
+  > prints nothing of the kind under 22. Only `pnpm exec node -v` is genuinely silent, which is the half
+  > the original claim generalised from. **Every gate and every CI step goes through `pnpm run`**, so the
+  > signal was there the whole time, one line above output nobody reads.
+  > This does not rescue anything — it still does not REFUSE, so a wrong-Node gate still goes green — but
+  > "says nothing at all" is not the accurate description of the false GREEN, and the pending fix is
+  > smaller than recorded: `engine-strict=true` promotes an existing warning to an error rather than
+  > inventing a check. **Claim only what the probe you ran covers**: two commands were tested, they
+  > disagreed, and the summary took the quieter one for both.
+  > **OPERATIONAL FORM — use this, it is free:** the gate is not unguarded after all. Every gate and CI
+  > step runs through `pnpm run`, so **if `WARN Unsupported engine` appears anywhere in gate output, you
+  > are on the wrong Node and that run is not evidence.** Detection, not prevention — Plan 11 keeps the
+  > `.nvmrc` + `engine-strict` fix — but it means a wrong-Node gate is now readable rather than silent,
+  > which is a materially weaker version of the false-GREEN than this section originally recorded.
+  > *(Independently re-measured by the executor with v22.22.2 as its control; both sessions agree.)*
 - **So there are two failure modes, and the quiet one is worse.** The false RED is what this section was
   written from — loud, and it names itself in the error text. The false GREEN is a gate that passes on an
   unsupported Node and says nothing at all. Nobody catches that one.
@@ -129,6 +171,45 @@ return ever emptied. **Closer, so it is not re-litigated: a branded type** carry
 > any relaunched executor.**
 > **T8 closed P22**: `EffectiveRole` is branded with a module-private `unique symbol`, so a hand-built one
 > fails `TS2741`. Provenance is compiler-enforced, not conventional.
+>
+> **T10 clean (zero findings, reviewed as the ONLY check on a task whose implementer died mid-report).
+> T11 review found a CRITICAL disclosure, reported 2026-09-01; fix round dispatched, gate at T11's sha
+> 21/21, 1138 tests, server 343 — will move.** The purge walk in `visible-events-for.ts` sits OUTSIDE the
+> `canSee` branch and applies no role test, so an ordinary `visibility.set` or `ticket.reparented` on ANY
+> ticket yields `purge:<thatTicketId>` to every member AND every guest. A guest holding only ticket S,
+> after an admin re-authors unrelated ticket N's audience, syncs down `{kind:'purge', entityId:N}` — a
+> positive assertion that N exists plus roughly when, since ULIDs are timestamp-ordered. Contradicts case
+> **6.16**'s own asserted property and falsifies the module docblock's "the ticket list is not even
+> computed" on the guest path. **6.16's correction lands in the SAME change set, not the fix follow-up.**
+>
+> **DO NOT FILE THIS WITH P19.** P19 (guest admissions) is unrecoverable because the wrong facts ARE
+> ledger rows in an append-only store. This one is a read-path computation over correct rows: no ledger
+> row is wrong, so the fix is complete and retroactive the instant it lands. Filing them together
+> over-scopes the fix or under-scopes P19.
+> **GENERAL FORM, worth more than the instance — when triaging any disclosure, ask whether the wrong
+> thing was WRITTEN or COMPUTED.** Written means it is in the ledger: closed for the future, existing
+> rows superseded but never removed, and there is something to migrate. Computed means a read path
+> derived it from correct rows: fixing the path fixes every past and future read at once, and there is
+> nothing to migrate. The two look identical in a review — same severity, same guest, same leaked id —
+> and they have completely different remediation shapes.
+>
+> **RULING, stated as a condition so it does not need re-arguing:** if the fix agent derives that
+> `ScopeRevokedInstruction`'s docblock already blesses the itemised whole-workspace purge by analogy to
+> case 6.14's restricted-parent leak, **that outcome escalates to the controller before it is built on.**
+> Not because it misreads the docblock, but because of what it becomes — a precedent that a docblock
+> written for a bounded case licenses whole-set enumeration. 6.14 names one parent id to a viewer already
+> holding its child; this enumerates the entire invisible set to a party with no relationship to any of
+> it. Cardinality and relationship both differ, so it is a different shape, not a wider instance of the
+> same one. Derived the other way, no escalation.
+>
+> **T11's implementer also found the PLAN TEXT carries a dead branch, and it is the sharper finding.**
+> The plan opens `if (eff.workspaceRole === null) return;` and places the `membership.revoked` purge
+> branch inside the loop below it — but a revocation deletes the workspace-scope row, so the revoked
+> user's role IS null. The generator returns before reaching the branch written to serve exactly those
+> people, and **every ticket on that device stays there forever.** Unreachable by construction, so the
+> more faithfully an implementer transcribes the plan the more certainly they ship it. `ticket.reparented`
+> had no test at all, found by a mutation that killed nothing. **Five purge triggers, not the three the
+> executor briefed — carry the corrected count INTO T14's dispatch text**, per the standing sweep rule.
 >
 > ### ~~⚠ IN-FLIGHT — `exec/04-t6-t7-visibility`~~ **MERGED as `40c5219`. Kept for the rule below.**
 > **Cut from `main` at `45c83eb`. T6 (`proj_visibility`) is running.** The executor's handoff on `main`
@@ -356,6 +437,26 @@ Every one below was violated by a controller that had just written it. **Assume 
   assertions was dead, not the test. **"Vacuous" invites deletion**, so a too-wide verdict licenses
   removing a working check. The controller propagated this one in a dispatch while simultaneously
   demanding mutation proof for the positive claim.
+  > **THE PAIRED-MUTATION RULE — this is the demonstration the entry above never shipped.** Recorded
+  > 2026-09-01 from T11's review, the first time the discrimination was run cleanly. **A mutation that
+  > kills nothing is not evidence of anything until a mutation that DOES kill has run beside it, in the
+  > same suite and the same run.** Measured: deleting the `canSee` guard reddened **7 of 16** cases —
+  > genuinely tested — while a `throw` in the non-guest re-grant arm left **343/343 green** — never
+  > executed. Alone, "343/343 green" is equally consistent with a coverage gap and with an unexecuted
+  > path, and those two demand opposite responses (write the test vs. delete the branch). The green run
+  > is only interpretable next to the red one. **Pair them or report neither.**
+- **THE INSTRUMENT'S SCOPE IS NARROWER THAN THE CLAIM BUILT ON IT — three instances, so stop calling it
+  a coincidence.** Each time the probe was real, it ran correctly, and it answered truthfully about a
+  narrower subject than the sentence written from it. **A right answer about the wrong subject.**
+  1. `git merge-tree --write-tree` answers *"did this conflict"*; it was read as *"is this redundant"*.
+  2. `@{u}` answers *"ahead of the upstream this branch was created with"* — `origin/main` — and it was
+     read as *"pushed"*, truthfully returning `0 6` right after a successful push.
+  3. `pnpm exec node -v` answers for **`pnpm exec`**; it was read as *"pnpm"*, and `pnpm run` — the
+     command every gate actually uses — behaves differently.
+  **The check: name the subject your instrument actually ranged over, then reread your sentence and see
+  whether it names the same one.** All three passed every falsifiability test that was applied, because
+  those tests asked whether the instrument WORKED, and the instrument did work. None asked what it was
+  pointed at. Note this is the one failure class in this file that a positive control cannot catch.
 - **An over-specific search returns a false negative that looks like a finding.** Searching all 12 plans
   for Plan 4's *exact* wording of the catalogue rule found it in **one** file; searching for the rule
   loosely found it in **all 11**. Same class as grepping for `21 behind` when the file said `20`.
@@ -428,6 +529,20 @@ Confirmed by observation 2026-08-31: it fired the `60bc7ca` event into a freshly
 **Check before re-arming: `pgrep -fl prev_main`.** Re-arming a live monitor gives you two and duplicate
 events on every merge. It emits only on change — long silence means nothing changed, not that it died.
 Currently alive as **PID 78292**.
+
+> **THIRD BLIND SPOT, and it is on the event this role most needs: it cannot report the FIRST PR.**
+> The guard is `[ -n "$prev_prs" ] && [ "$prs" != "$prev_prs" ]`, and `prs` is the empty string when no
+> PR is open. So the **zero → one** transition is indistinguishable from "no previous reading" and is
+> suppressed. With the open-PR set usually at zero here, that is exactly the step-PR-appears event the
+> serial loop turns on. **Poll `gh pr list` yourself; do not wait to be told.**
+>
+> **FOURTH: `pgrep -fl prev_main` returning a PID does not mean the monitor is running.** Found alive
+> 2026-09-01 with its `git ls-remote origin main` child stuck for **5h16m** — the loop was blocked
+> inside a command substitution and had reported nothing since 04:58, while `ls-remote` run by hand
+> completed in 0.002s. Liveness is the CHILD's age, not the parent's existence:
+> `pgrep -P <monitor-pid>` and read the etime. A child older than the 180s poll means it is wedged;
+> `kill` that child and the loop resumes. Note the cost of the recovery — `prev_main`/`prev_prs` reset to
+> empty, so the first change after the kill is suppressed by the guard above.
 
 It costs **zero tokens** — a shell loop that wakes the session only on a real event. **If it is genuinely
 gone**, re-arm change-triggered on a 180s poll against `git ls-remote origin main`, `gh pr list --state

@@ -1,0 +1,206 @@
+# Task ledger — one row per `### Task N:` heading in docs/superpowers/plans/.
+#
+# Validated by `pnpm check:tasks` (scripts/check-task-ledger.mjs). The DENOMINATOR
+# is re-derived from the plan files on every run and is never hand-typed here; a
+# row for a task no plan contains, or a plan task with no row, is a hard failure.
+#
+# STATUS VOCABULARY — the done/claimed split is the honest part of this file.
+#   done       A merged PR whose title (or the controller record) names THIS plan
+#              AND task specifically, and whose merge sha is an ancestor of
+#              origin/main. Verified at task level.
+#   claimed    Completion asserted only at PLAN or BRANCH granularity — e.g. a PR
+#              titled "Plan 1: ..." covering fifteen tasks. The sha is real and is
+#              validated the same way, but the per-task mapping is INFERRED and was
+#              never audited. Never counted as complete.
+#   in-flight  Committed on a branch that has not merged. No sha is recorded,
+#              because a branch commit is not an ancestor of main after a squash.
+#   todo       Not started, or started and not recorded.
+#
+# EVIDENCE IS THE PR'S MERGE COMMIT, NEVER THE IMPLEMENTING COMMIT. This repo
+# squash-merges, so the commits that implemented a task are not ancestors of main
+# once its PR lands; recording one would false-RED every finished task.
+#
+# Status is hand-asserted and machine-validated. It is deliberately NOT derived
+# from commit or PR titles: four different formats appear in the merged set
+# ("Plan 4 Tasks 6-7", "Plan 3 Chain A (T3-T8)", "Plan 6 T6", "Plan 2:"), and this
+# repo has already recorded that commit messages are not a reliable completion
+# signal. Where a title was the only evidence, the row is `claimed`, not `done`.
+#
+plan	task	status	pr	merge_sha	note
+01	1	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	2	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	3	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	4	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	4a	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	5	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	6	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	7	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	8	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	9	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	10	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	11	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	12	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	13	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+01	14	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
+02	1	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+02	2	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+02	3	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+02	4	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+02	5	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+02	6	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+02	7	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+02	8	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+02	9	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+02	10	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+02	11	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+02	12	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+02	13	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
+03	1	claimed	13	f363b2f4	PR names the content ("the ticket type model") but no task number; branch was multi-task
+03	2	claimed	13	f363b2f4	PR names the content ("event vocabulary") but no task number; branch was multi-task
+03	3	done	38	6b2fc768	
+03	4	done	38	6b2fc768	
+03	5	done	38	6b2fc768	
+03	6	done	38	6b2fc768	
+03	7	done	38	6b2fc768	
+03	8	done	38	6b2fc768	
+03	9	todo	-	-	
+03	10	todo	-	-	
+03	11	todo	-	-	
+03	12	todo	-	-	
+03	13	todo	-	-	
+03	14	todo	-	-	
+04	1	todo	-	-	
+04	2	todo	-	-	
+04	3	todo	-	-	
+04	4	done	51	45c83eb4	
+04	5	done	51	45c83eb4	
+04	6	done	52	40c52191	
+04	7	done	52	40c52191	
+04	8	in-flight	-	-	exec/04-t8-t14-enforcement, committed on branch, PR not open
+04	9	in-flight	-	-	exec/04-t8-t14-enforcement, committed on branch, PR not open
+04	10	in-flight	-	-	exec/04-t8-t14-enforcement, committed on branch, PR not open
+04	11	in-flight	-	-	exec/04-t8-t14-enforcement, floor-list, implementer running
+04	12	todo	-	-	
+04	13	todo	-	-	
+04	14	todo	-	-	
+05	1	done	8	23361496	
+05	2	todo	-	-	
+05	3	todo	-	-	
+05	4	todo	-	-	
+05	5	todo	-	-	
+05	6	todo	-	-	
+05	7	todo	-	-	
+05	8	todo	-	-	
+05	9	todo	-	-	
+05	9b	todo	-	-	
+05	10	todo	-	-	
+05	11	todo	-	-	
+05	12	todo	-	-	
+05	13	todo	-	-	
+05	14	todo	-	-	
+05	15	todo	-	-	
+05	16	todo	-	-	
+06	1	todo	-	-	
+06	2	todo	-	-	
+06	3	todo	-	-	
+06	4	todo	-	-	
+06	5	todo	-	-	
+06	6	done	36	3fb22d3f	
+06	7	todo	-	-	
+06	8	todo	-	-	
+06	9	claimed	43	c93c9104	PR title says "Plan 6a" (a lane, not plan 06) and describes the review; exec/06a-client-core was multi-task
+06	10	todo	-	-	
+06	11	todo	-	-	
+06	12	todo	-	-	
+06	12a	todo	-	-	
+06	13	todo	-	-	
+06	14	todo	-	-	
+06	15	todo	-	-	
+06	15b	todo	-	-	
+06	16	todo	-	-	
+07	1	todo	-	-	
+07	2	todo	-	-	
+07	3	todo	-	-	
+07	4	claimed	47	a3746fb9	PR describes a scoped re-review; exec/07-editor-client was multi-task
+07	5	todo	-	-	
+07	6	todo	-	-	
+07	7	todo	-	-	
+07	8	todo	-	-	
+07	9	todo	-	-	
+07	9a	todo	-	-	
+07	10	todo	-	-	
+07	11	todo	-	-	
+07	11a	todo	-	-	
+07	12	todo	-	-	
+07	12a	todo	-	-	
+07	12b	todo	-	-	
+07	12c	todo	-	-	
+07	13	todo	-	-	
+07	13a	todo	-	-	
+07	14	todo	-	-	
+07	15	todo	-	-	
+07	16	todo	-	-	
+08	1	todo	-	-	
+08	2	todo	-	-	
+08	3	todo	-	-	
+08	4	todo	-	-	
+08	5	todo	-	-	
+08	6	todo	-	-	
+08	7	todo	-	-	
+08	8	todo	-	-	
+08	9	todo	-	-	
+08	10	todo	-	-	
+08	11	todo	-	-	
+08	12	todo	-	-	
+08	13	todo	-	-	
+08	14	todo	-	-	
+08	15	todo	-	-	
+09	1	todo	-	-	
+09	2	todo	-	-	
+09	3	todo	-	-	
+09	4	todo	-	-	
+09	5	todo	-	-	
+09	6	todo	-	-	
+09	7	todo	-	-	
+09	8	todo	-	-	
+09	9	todo	-	-	
+09	10	todo	-	-	
+09	11	todo	-	-	
+09	12	todo	-	-	
+09	13	todo	-	-	
+09	14	todo	-	-	
+09	15	todo	-	-	
+10	1	todo	-	-	
+10	2	todo	-	-	
+10	3	todo	-	-	
+10	4	done	53	33538bee	lifted to Phase 1; closes the §11 envelope-origin window
+10	5	todo	-	-	
+10	6	todo	-	-	
+10	7	todo	-	-	
+10	8	todo	-	-	
+10	9	todo	-	-	
+10	10	todo	-	-	
+10	11	todo	-	-	
+10	12	todo	-	-	
+10	13	todo	-	-	
+10	14	todo	-	-	
+10	15	todo	-	-	
+10	16	todo	-	-	
+10	17	todo	-	-	
+10	18	todo	-	-	
+11	1	todo	-	-	
+11	2	todo	-	-	
+11	3	todo	-	-	
+11	4	todo	-	-	
+11	5	todo	-	-	
+11	6	claimed	17	f6e29cf0	PR landed the env-contract gate SLICE only; dev stack + five services unverified
+11	7	todo	-	-	
+11	8	todo	-	-	
+11	9	todo	-	-	
+11	10	todo	-	-	
+11	11	todo	-	-	
+11	12	todo	-	-	
+11	13	todo	-	-	
+11	14	todo	-	-	
+11	15	todo	-	-	
+11	16	todo	-	-	
