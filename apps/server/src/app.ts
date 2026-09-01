@@ -8,6 +8,7 @@ import { registerBoardRoutes } from './routes/board.js';
 import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
 import { registerListRoutes } from './routes/list.js';
+import { registerSearchRoutes } from './routes/search.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
@@ -216,6 +217,13 @@ export function buildApp(
   // parameter, same reason as every route above it: each handler reads
   // `request.currentUserId` and resolves its whole tenancy gate from it.
   registerBuilderReadRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);
+  // Workspace-wide full text (Plan 5 Task 10) — the FIRST cross-project read
+  // here. Board, list and the builder surface all take their scope from a path
+  // parameter the door resolves; this one spans a whole workspace, so
+  // `visibleTicketsWhere` and the tenancy clause beside it are the entire
+  // boundary. Same preHandler by parameter, same reason as every route above:
+  // the handler reads `request.currentUserId` and resolves its gate from it.
+  registerSearchRoutes(app, { pool: deps.pool }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;

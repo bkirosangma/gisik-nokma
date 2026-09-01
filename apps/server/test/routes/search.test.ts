@@ -622,6 +622,37 @@ describe('GET /v1/search — the door', () => {
     expect(anonymous.json()).toEqual(UNAUTHENTICATED_BODY);
   });
 
+  it('7.101 a REPEATED query parameter arrives as an array, and every one of the three is refused rather than bound', async () => {
+    // `?q=a&q=b` is `['a','b']` by the time the handler reads it, not a string.
+    // Each of these would otherwise be bound into a text comparison or fed to
+    // `JSON.parse`, and the caller would get a 500 for a request the door owes a
+    // 400 — a refusal reached through the type system's back.
+    const workspaceId = read.world.workspaceId;
+    const repeated: Array<{ url: string; error: string }> = [
+      {
+        url: `/v1/search?workspaceId=${workspaceId}&workspaceId=${read.neighbour.workspaceId}&q=the`,
+        error: 'invalid_query',
+      },
+      { url: `/v1/search?workspaceId=${workspaceId}&q=the&q=licence`, error: 'invalid_query' },
+      { url: `/v1/search?workspaceId=${workspaceId}&q=the&filter=%7B%7D&filter=%7B%7D`, error: 'invalid_filter' },
+    ];
+    for (const { url, error } of repeated) {
+      const refused = await read.app.inject({ method: 'GET', url, headers: read.authOf('member') });
+      expect(refused.statusCode).toBe(400);
+      expect(refused.json()).toEqual({ error });
+    }
+
+    // Positive control: the single-valued spelling of all three is a 200, so the
+    // three refusals are about the repetition and not about the URLs.
+    const single = await read.app.inject({
+      method: 'GET',
+      url: `/v1/search?workspaceId=${workspaceId}&q=the&filter=%7B%7D`,
+      headers: read.authOf('member'),
+    });
+    expect(single.statusCode).toBe(200);
+    expect((single.json() as SearchResponse).hits).toHaveLength(2);
+  });
+
   it('7.25 a hostile q is a plain phrase to websearch_to_tsquery, never SQL — the tables survive and the route keeps working', async () => {
     const hostile = [
       `'); DROP TABLE proj_search; --`,

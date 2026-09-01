@@ -1,4 +1,5 @@
 import type { FilterSpec } from '@gisik-nokma/domain';
+import { FTS_CONFIG } from './fts.js';
 import type { SqlParams } from './sql-params.js';
 
 /**
@@ -93,8 +94,16 @@ export function compileFilterSpec(spec: FilterSpec, params: SqlParams): Compiled
     // websearch_to_tsquery, never to_tsquery: it parses ANY string as a
     // phrase instead of raising a syntax error, so a hostile query term
     // cannot even be turned into a 500.
+    //
+    // The configuration comes from `FTS_CONFIG` rather than a literal, so this
+    // clause and the search route (Task 10) cannot drift apart from each other:
+    // a matching rule that differs between two query sites is a search that
+    // quietly finds nothing. The migration's GENERATED column still spells its
+    // own copy — it is SQL that runs before any TypeScript exists — and is
+    // linked to this one by an executed test rather than by the compiler
+    // (`read/fts.ts` names both).
     clauses.push(
-      `t.ticket_id IN (SELECT ticket_id FROM proj_search WHERE workspace_id = t.workspace_id AND tsv @@ websearch_to_tsquery('simple', ${params.add(spec.text)}))`,
+      `t.ticket_id IN (SELECT ticket_id FROM proj_search WHERE workspace_id = t.workspace_id AND tsv @@ websearch_to_tsquery('${FTS_CONFIG}', ${params.add(spec.text)}))`,
     );
   }
   if (spec.due?.before !== undefined) {
