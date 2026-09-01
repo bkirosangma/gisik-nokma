@@ -215,6 +215,30 @@ type AttentionFixtures = {
    * puts it in.
    */
   istEveningId: string;
+  /**
+   * A ticket in the NEIGHBOUR workspace, due 2026-08-21 — inside every window
+   * this file uses.
+   *
+   * `visibleTicketsWhere` compiles to `TRUE` for an owner and carries no tenancy
+   * clause of its own (it says so), so `t.workspace_id = $n` is the ENTIRE
+   * boundary between this workspace's owner and every qualifying ticket
+   * anywhere. MEASURED: deleting that clause passed all twelve cases before this
+   * fixture existed, because the neighbour's only ticket was open, undated and
+   * freshly created — it qualified for no bucket, so there was nothing for the
+   * missing clause to leak.
+   */
+  neighbourDueId: string;
+  /**
+   * A ticket in the sibling project's second workflow, in a state that is
+   * `open` AND flagged blocked (`wf-second` v2 flags `todo`).
+   *
+   * The blocked bucket is about the FLAG and not about the category — a state
+   * somebody marked "waiting on somebody else" deserves the strip whether or not
+   * work is nominally under way in it. Every other blocked fixture in the suite
+   * is `active`, so narrowing the bucket to `stateCategory === 'active'` changed
+   * no answer before this existed.
+   */
+  openBlockedId: string;
 };
 
 async function seedAttentionFixtures(pool: Pool, world: ReadWorld): Promise<AttentionFixtures> {
@@ -230,6 +254,8 @@ async function seedAttentionFixtures(pool: Pool, world: ReadWorld): Promise<Atte
   const guestDueId = attentionTicketId(6);
   const istMidnightId = attentionTicketId(7);
   const istEveningId = attentionTicketId(8);
+  const neighbourDueId = attentionTicketId(9);
+  const openBlockedId = attentionTicketId(10);
 
   const created = (id: string, title: string): LedgerEvent =>
     makeCommitted({
@@ -343,6 +369,42 @@ async function seedAttentionFixtures(pool: Pool, world: ReadWorld): Promise<Atte
       payload: { to: 'doing' },
     }),
 
+    // `wf-second` v2: the SAME three states, with `todo` — an OPEN state — now
+    // carrying amendment 9's blocked flag. `waiting` stays unflagged here, so
+    // 7.121's composite-key fixture is untouched.
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'workflow', id: world.sibling.secondWorkflowId },
+      type: 'workflow.defined',
+      payload: {
+        id: world.sibling.secondWorkflowId,
+        version: 2,
+        name: 'Second flow',
+        initialStateId: 'todo',
+        states: [
+          { id: 'todo', name: 'Queued', category: 'open', blocked: true },
+          { id: 'waiting', name: 'Parked', category: 'active' },
+          { id: 'done', name: 'Filed', category: 'terminal' },
+        ],
+        transitions: [
+          { from: '*', to: 'todo', rules: [] },
+          { from: '*', to: 'waiting', rules: [] },
+          { from: '*', to: 'done', rules: [] },
+        ],
+      },
+    }),
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'ticket', id: openBlockedId },
+      type: 'ticket.created',
+      payload: {
+        typeId: 'chore',
+        projectId: world.sibling.projectId,
+        parentId: null,
+        title: 'Waiting on the landlord',
+      },
+    }),
+
     // The sibling project's chore ticket, into `wf-second`'s `waiting` — an
     // `active` state that is NOT flagged blocked, spelled with the same state id
     // as `wf-errands`'s `waiting`, which IS. See 7.121.
@@ -355,6 +417,31 @@ async function seedAttentionFixtures(pool: Pool, world: ReadWorld): Promise<Atte
   ];
   await applyCommitted(pool, events);
 
+  // NEXT DOOR: a ticket that would qualify for due-soon, in a workspace this
+  // workspace's owner is no member of. Seeded through the neighbour's own owner
+  // so the ledger is one a real tenancy could have produced.
+  await applyCommitted(pool, [
+    makeCommitted({
+      workspaceId: world.neighbour.workspaceId,
+      actorId: world.userIds.neighbour,
+      entity: { kind: 'ticket', id: neighbourDueId },
+      type: 'ticket.created',
+      payload: {
+        typeId: 'nb-task',
+        projectId: world.neighbour.projectId,
+        parentId: null,
+        title: 'Next Door: pay the electricity bill',
+      },
+    }),
+    makeCommitted({
+      workspaceId: world.neighbour.workspaceId,
+      actorId: world.userIds.neighbour,
+      entity: { kind: 'ticket', id: neighbourDueId },
+      type: 'ticket.field_set',
+      payload: { fieldId: 'dueDate', value: { date: '2026-08-21' } },
+    }),
+  ]);
+
   return {
     terminalDueId,
     overdueId,
@@ -365,6 +452,8 @@ async function seedAttentionFixtures(pool: Pool, world: ReadWorld): Promise<Atte
     guestDueId,
     istMidnightId,
     istEveningId,
+    neighbourDueId,
+    openBlockedId,
   };
 }
 
@@ -499,7 +588,7 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
 
     // blocked — `sharedTask` sits in `wf-errands`'s blocked-flagged `waiting`.
     // No clock is involved in this bucket at all.
-    expect(idsOf(response, 'blocked')).toEqual([read.world.sharedTaskId]);
+    expect(idsOf(response, 'blocked')).toEqual([read.world.sharedTaskId, fx.openBlockedId].sort());
     const blocked = onlyOfKind(response, 'blocked', read.world.sharedTaskId);
     expect(blocked.stateName).toBe('Waiting on counterparty');
     expect(blocked.reason).toBe('In "Waiting on counterparty" — a blocked state.');
@@ -547,6 +636,7 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     // stale one, then every due-soon one.
     expect(response.items.map((item) => item.kind)).toEqual([
       'blocked',
+      'blocked',
       'stale',
       'stale',
       'stale',
@@ -592,7 +682,7 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     // above from passing on a route that simply answered nothing.
     expect(idsOf(response, 'due-soon')).toEqual([fx.overdueId]);
     // And blocked ignores both knobs: it is a flag on a state, not a window.
-    expect(idsOf(response, 'blocked')).toEqual([read.world.sharedTaskId]);
+    expect(idsOf(response, 'blocked')).toEqual([read.world.sharedTaskId, fx.openBlockedId].sort());
   });
 
   it('7.30 PLANTED DEFECT: the hidden ticket is due tomorrow and never surfaces for the member, while the owner is warned', async () => {
@@ -695,8 +785,10 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     // Both are `active`, so the difference cannot be the category either.
     expect(rows.map((r) => r.state_category)).toEqual(['active', 'active']);
 
-    // Only the one whose OWN workflow flagged the state is blocked.
-    expect(idsOf(response, 'blocked')).toEqual([read.world.sharedTaskId]);
+    // Only the one whose OWN workflow flagged the state is blocked. The other
+    // blocked item is `openBlockedId`, which sits in `wf-second`'s `todo` — a
+    // different state id entirely, and there on its own workflow's say-so.
+    expect(idsOf(response, 'blocked')).toEqual([read.world.sharedTaskId, fx.openBlockedId].sort());
     expect(idsOf(response, 'blocked')).not.toContain(read.sibling.choreTicketId);
     // The chore ticket is visible to this member and IS in the read set — it is
     // simply not blocked. Without this the absence could be a missing row.
@@ -868,6 +960,63 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     // about TENANCY and not about having no membership anywhere.
     const own = await attention('neighbour', read.neighbour.workspaceId);
     expect(own.statusCode).toBe(200);
+  });
+
+  it('7.122 the workspace clause is the only tenancy this query has — a qualifying ticket next door never reaches the owner', async () => {
+    await claimSettings(7, 7);
+
+    // The row exists, in the OTHER workspace, with a date inside the window.
+    const { rows } = await db.pool.query<{ workspace_id: string; claim: { value: { date: string } } }>(
+      `SELECT workspace_id, fields -> 'dueDate' AS claim FROM proj_tickets WHERE ticket_id = $1`,
+      [fx.neighbourDueId],
+    );
+    expect(rows[0]!.workspace_id).toBe(read.neighbour.workspaceId);
+    expect(rows[0]!.claim.value.date).toBe('2026-08-21');
+
+    // `visibleTicketsWhere` compiles to `TRUE` for an owner and carries no
+    // tenancy clause, so for this caller the workspace predicate is the whole
+    // boundary. The owner's own qualifying tickets are the positive control that
+    // the bucket is not simply empty.
+    const owner = await strip('owner');
+    expect(idsOf(owner, 'due-soon')).not.toContain(fx.neighbourDueId);
+    expect(idsOf(owner, 'due-soon')).toContain(read.world.hiddenTaskId);
+    expect(owner.items.map((item) => item.card.workspaceId)).toEqual(
+      owner.items.map(() => read.world.workspaceId),
+    );
+
+    // And the neighbour, reading their OWN workspace, does get it — so it is
+    // reachable, just not from here.
+    const next = await attention('neighbour', read.neighbour.workspaceId);
+    expect(next.statusCode).toBe(200);
+    expect(idsOf(next.json() as AttentionResponse, 'due-soon')).toEqual([fx.neighbourDueId]);
+  });
+
+  it('7.123 blocked is a FLAG, not a category — an `open` state somebody marked blocked is on the strip', async () => {
+    await claimSettings(7, 7);
+    const response = await strip('member');
+
+    const { rows } = await db.pool.query<{ state_category: string; state_id: string }>(
+      `SELECT state_category, state_id FROM proj_tickets WHERE ticket_id = $1`,
+      [fx.openBlockedId],
+    );
+    // `open`, not `active` — every other blocked fixture in the suite is active,
+    // so without this row a bucket narrowed to `active` answers identically.
+    expect(rows[0]!.state_category).toBe('open');
+    expect(rows[0]!.state_id).toBe('todo');
+
+    const item = onlyOfKind(response, 'blocked', fx.openBlockedId);
+    expect(item.card.stateCategory).toBe('open');
+    expect(item.stateName).toBe('Queued');
+    expect(item.reason).toBe('In "Queued" — a blocked state.');
+    // The flag came from `wf-second` v2, so the LATEST definition is what was
+    // read: v1 flagged nothing at all.
+    expect(item.card.workflowId).toBe(read.sibling.secondWorkflowId);
+    // The active blocked one is still here beside it.
+    expect(idsOf(response, 'blocked')).toContain(read.world.sharedTaskId);
+    // …and it is not in either window: an open ticket with no due date and no
+    // active state entry qualifies for nothing else.
+    expect(idsOf(response, 'stale')).not.toContain(fx.openBlockedId);
+    expect(idsOf(response, 'due-soon')).not.toContain(fx.openBlockedId);
   });
 
   it('7.120 a member who may see nothing gets 200 and an empty strip; a guest gets their own slice', async () => {
