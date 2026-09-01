@@ -133,9 +133,10 @@ T13 (4551), T16 (6047).
 | T8 `GET /board` (first route) | `d6245e1`, `5a51097`, `6264776`, `dd58777`, `ccfc625`, `0c74fde` | **CLEAN — zero findings**; both door mutations die |
 | T9 `GET /tickets` (list read) | `7bab0b0`, `699aa18`, `c1f577f`, `ca6c39b`, `cc4536c`, `27f64b2`, + doc fix | CLEAN; 1 Minor (an unreproducible count) fixed. **Found and closed a real title-disclosure hole.** |
 | T9b **FLOOR-LIST** builder reads | `98a761a`, `e47bb59`, `4189247`, `8a8444d` (+3), fix round `6406048` | **2 Important + 3 Minor + 1 ruling**, all closed and PROVEN. The most productive review of the plan. |
+| T10 `GET /v1/search` (cross-project) | `1eb3f32`, `66e3549`, `9d642c0`, `82db02b`, `fa2ff11`, `6ae49e7` | CLEAN; 1 Minor (an unstable count) fixed. **Its own leak assertion could not see a leak.** |
 
 **Gate re-run by the executor rather than taken from any agent's report:** exit 0, 21/21, **0 cached**,
-**1456 tests** — domain 320 · rule-engine 280 · **server 615** · app-core 130 · editor 72 · ui 31 ·
+**1476 tests** — domain 320 · rule-engine 280 · **server 635** · app-core 130 · editor 72 · ui 31 ·
 sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**. Sum re-added by script in the same
 run rather than eyeballed: 7 packages, 1430, matches.
 
@@ -261,11 +262,34 @@ rule exists to prevent. **Recorded in the coordination doc's Plan 5 section as �
 reverse, owner Plan 8.** Also recorded there as §4: `foldStateIdForward`'s `def.stateMapping[current]`
 carries the same prototype hazard — **pre-existing and OUT of Plan 5's scope, owner Plan 3.**
 
-**NEXT: Plan 5 Task 10** — `GET /v1/search`, cross-project and visibility-filtered, plan line 3638.
-**`makeRequireSession` is still wrong at plan lines 3774, 4009, 4369, 4865 and 5915 — five sites left,
-none marked.**
+### WHAT T10 FOUND, and a rule now written into the catalogue's header
 
-Then T11 · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (3638) · T11 (3874) · T12 (4079) ·
+**The snippet-leak assertion could not see a leak.** `expect(snippet).not.toContain(secret)` **survived
+a real leak mutation**, because `ts_headline` windows onto a MATCH and never renders unmatched text —
+so the assertion was testing the headline's windowing, not the route's scoping. Replaced by two things
+that can fail: a leak pair whose secret sits *inside* a matching fragment, and the strong form —
+**the snippet must be a SUBSTRING of its own row's three columns.** Both leak mutations now die.
+This is the same shape as T2's `not.toContain` finding and T9b's `__proto__` proof: **a negative
+assertion is only as good as your ability to make it fire.**
+
+**The `simple` FTS config now has one constant** (`apps/server/src/read/fts.ts`), consumed by
+`compile-filter.ts` and the route's three uses — closing the seam T6 recorded and named T10 as owner
+of. It does NOT reach the migration's generated column (SQL predates the TypeScript); that side is
+linked *behaviourally* by a test where `licence` hits and `licences` does not, with the positive
+control in the same case.
+
+**THE COUNTING RULE, now in `test-cases/07-...md`'s header, because this file learned it twice:**
+**name the CASES a mutation kills, never the COUNT** — unless the count is deterministic AND has been
+reproduced by a second party. "Removing the `ORDER BY` reddens seven cases" was one run's artifact
+(re-runs: 15, 18, 4, 15). A "dies 6" for a visibility mutation measured **7** on re-run, the two extra
+deaths being cases whose assertions are coupled to a shared fixture query's LENGTH — a hidden
+dependency worth knowing about on its own. The one count kept is `FTS_CONFIG`→`english` = eleven,
+because it is a configuration name rather than a planner choice and a second party re-ran it.
+
+**NEXT: Plan 5 Task 11** — `GET /v1/me/work` (My Work), plan line 3874.
+**`makeRequireSession` is still wrong at plan lines 3774, 4009, 4369, 4865 and 5915.**
+
+Then T12 · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (4079) ·
 T13 (4551) · **T14 (4918, FLOOR-LIST)** · **T15 (5452, FLOOR-LIST)** · T16 (6047).
 
 ### WHAT T5 COST AND WHAT IT BOUGHT — read before dispatching any later floor-list task
