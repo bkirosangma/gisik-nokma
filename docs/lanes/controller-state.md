@@ -101,6 +101,15 @@ recompute a progress figure from prose again — run the gate and quote it.**
   drops the count 177 → 166, removing the real tail headings of plans 06 and 07, which carry an **odd**
   number of ``` markers. It fails toward "more complete" while every per-plan count stays non-zero, so
   the positive control cannot see it. Rationale is in the script header.
+- **The 13 rows moved to `done` on 2026-09-01 were evidenced per task, not per title.** `check:tasks`
+  passing proves only that the merge sha is an ancestor of `main` — **it cannot see whether the PR names
+  each task**, and that human half is the entire reason the `done`/`claimed` split exists. Marking a
+  range from a PR *title* would have been a claim wearing a verification's clothes. What was actually
+  run: `gh pr view 57 --json title,body -q '.title + "\n" + .body' | grep -oE '\b(T|Task )(8|9|1[0-4])\b' | sort -u`
+  → **T8 T9 T10 T11 T12 T13 T14, all seven present individually**; #59's per-task evidence is the
+  outcome table in the executor's own handoff, one row per T9–T14. **Do this before moving rows, and
+  cite the command** — three of #57's rows read `todo` beforehand, so a title-only edit would have
+  manufactured completions in the very instrument built to catch them.
 - **Keep it current in the same change set as the work**, like `Features.md`. A merged PR no row cites is
   printed every run — that is the direction that catches work landing unrecorded.
 
@@ -463,32 +472,46 @@ depended on an unchecked assumption, shipped one hour after that rule was writte
   DELETE rather than NARROW, and that is UPHELD. Do not restore the walk.** The escalation was written
   as an open question for a successor controller because `gisik-nokma-8d` became unreachable mid-step-7;
   it is now closed and must not be reopened without new evidence.
-  - **The fact that settles it was not in the escalation, and it is a measurement, not an argument:**
-    `git diff --stat origin/main origin/exec/04-t8-t14-enforcement -- apps/server/src/visibility/visible-events-for.ts`
-    is **495 insertions, 0 deletions**. The file is NEW on that branch. **The per-event walk never
-    shipped to `main`**, so 6.90 and 6.99 flipping ✅ → 🚫 removes nothing that was ever live, and the
-    escalation's framing — "its footprint is wider than the ruling named" — was measuring against the
-    branch's own earlier state, not against shipped behaviour. *Check whether the thing you are worried
-    about regressing was ever live before you weigh the regression.*
-  - **The blessed emitter survives.** P23 held the `ScopeRevokedInstruction` blessing at the revocation
-    boundary; that path is intact. What is gone is only the per-event subtree tombstone.
-  - **The residual is UNDER-purge — stale local retention, no disclosure.** That is the direction P23
-    explicitly accepted ("accept the under-purge residual, disclose it as a sibling of 6.102") and the
-    direction the guest side had already taken. Recording it as **6.104, owner Plan 10**, is the correct
-    disposition and is not reopened here.
-  - **The executor's refusal of the narrower project-membership gate is the load-bearing half, and it is
-    right:** being on a container is not holding the entity, so that gate fails P23's own **relationship**
-    axis and leaves the same disclosure at a smaller radius — precisely what P23 rejected for guests.
-  - **Accepted derivation:** no conforming per-event emission exists, because `proj_visibility` keeps no
-    prior audience, no payload carries a before-image, and 6.82/6.94 forbid reconstructing one. A gate
-    with no gatable predicate is a deletion wearing a condition.
+
+  **What carries the disposition, in order of weight:**
+  1. **The blessed emitter survives.** P23 held the `ScopeRevokedInstruction` blessing at the revocation
+     boundary; that path is intact. What is gone is only the per-event subtree tombstone.
+  2. **The residual is UNDER-purge — stale local retention, no disclosure.** That is the direction P23
+     explicitly named ("accept the under-purge residual, disclose it as a sibling of 6.102") and the
+     direction the guest side had already taken.
+  3. **The narrower project-membership gate is correctly refused, and this is the load-bearing half:**
+     being on a container is not holding the entity, so that gate fails P23's own **relationship** axis
+     and leaves the same disclosure at a smaller radius — precisely what P23 rejected for guests.
+  4. **No conforming per-event emission exists**, because `proj_visibility` keeps no prior audience, no
+     payload carries a before-image, and 6.82/6.94 forbid reconstructing one. **A gate with no gatable
+     predicate is a deletion wearing a condition** — so DELETE and NARROW are the same act here, and the
+     honest spelling is the one that leaves no dead branch behind.
+
+  **CORRECTION, made the same day, to how this disposition was first written down.** The first version
+  led with a measurement — *`git diff --stat origin/main origin/exec/04-t8-t14-enforcement --
+  apps/server/src/visibility/visible-events-for.ts` was 495 insertions, **0 deletions** (measured while
+  `main` was `eadc748`, before #57; re-run after #57 it prints 0/0)* — and called it "the fact that
+  settles it." **It is not.** It establishes only that the walk never shipped to `main`, so nothing live
+  regressed. **The escalation never claimed a regression.** Its own words are *"its footprint is wider
+  than THE RULING named"* and *"what it cost BEYOND 6.101"* — a forward claim about scope: the residual
+  now applies to all per-event triggers and to members, so the retention half of the gap Plan 10
+  inherits (6.104) got wider. **That claim is true, and the never-shipped fact does not touch it.** It is
+  supporting context, nothing more.
+  **The executor was told otherwise and filed it against itself as a wrong-subject instance. It was not
+  one, the attribution was withdrawn before its handoff was written, and it must not be counted in that
+  tally.** By this file's own standard — *a false sentence a maintainer reasons from is worse than a
+  missing one* — the correction belongs here at the same weight as the ruling. **A controller answering
+  an escalation must answer the claim the escalation made, not the nearest claim its evidence refutes.**
+
+  **Two further things that stand:**
   - **Do not cite case 6.100 as evidence that a purge gate exists** — it passes on the `canSee` guard
     that 6.16 already pins, not on anything purge-shaped. Stated on the case and in the test comment.
-  - **Also upheld: the executor's correction to this project's own rule.** *"Nothing may be chained after
+  - **The executor's correction to this project's own rule is upheld.** *"Nothing may be chained after
     the gate"* forbids a **trailing command in the same pipeline** stealing the status; it does **not**
     forbid reading `$?` on the next line. `pnpm turbo … > gate.log 2>&1` then `GATE_EXIT=$?` is correct
-    practice, and **an inferred exit code is a self-inflicted downgrade from a read one.** The gate
-    recorded in the anchors above was taken this way.
+    practice, and **an inferred exit code is a self-inflicted downgrade from a read one.** The gate in
+    the anchors above was taken that way.
+
 - **Fable is not dispatched, for any role.** Sonnet default, opus by exception, hard cap **6 subagents per
   task**, one fan-out per plan, judgment fan-outs withdrawn. Cost ledger of what this trade has already
   cost is in the ruling — **add to it, do not re-argue it.** Note fable was the **premium** tier the
