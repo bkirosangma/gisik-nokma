@@ -1,6 +1,7 @@
 import { membershipId, type LedgerEvent } from '@gisik-nokma/domain';
 import type { Pool } from 'pg';
 import { membershipsProjection } from '../../src/projections/proj-memberships.js';
+import { projInvites } from '../../src/projections/proj-invites.js';
 import { projProjects } from '../../src/projections/proj-projects.js';
 import { projVisibility } from '../../src/projections/proj-visibility.js';
 import { testEnvelope } from './envelope.js';
@@ -41,6 +42,19 @@ import { appendTestEvent } from './ledger.js';
  * Plan 4 Task 9 and goes FIRST of the three because §8 puts it there; it is
  * inert for every event but `project.created`, so no existing caller changes
  * behaviour, but a wrong order here would make this docblock a lie.
+ *
+ * `projInvites` joined at Plan 4 Task 14, in its §8 position (after
+ * memberships, before visibility), and it joined the HARD way: this list is
+ * hand-written, so a new projection is silently absent here until somebody
+ * notices a seeded event producing no row. It cost this task one debugging
+ * round.
+ *
+ * *Absence, deliberately not closed here: this should read
+ * `buildProjectionRegistry().all()` so a registrant cannot be missed. Doing it
+ * inside Task 14 would start applying `proj_entity_heads`, `proj_workflows` and
+ * `proj_contested` to every seeded event in twenty test files — a behaviour
+ * change to fixtures this task has no business making. Owner: whoever next
+ * touches this helper, or a dedicated cleanup.*
  */
 export async function applyAll(pool: Pool, envs: readonly LedgerEvent[]): Promise<void> {
   const client = await pool.connect();
@@ -48,6 +62,7 @@ export async function applyAll(pool: Pool, envs: readonly LedgerEvent[]): Promis
     for (const env of envs) {
       await projProjects.apply(env, client);
       await membershipsProjection.apply(env, client);
+      await projInvites.apply(env, client);
       await projVisibility.apply(env, client);
     }
   } finally {

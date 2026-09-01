@@ -20,6 +20,7 @@ import {
   SERVER_ORIGIN_REASON,
   WORKSPACE_ALREADY_FOUNDED_REASON,
   WORKSPACE_MEMBERSHIP_REASON,
+  INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON,
 } from '../../src/permissions/check-permission.js';
 import type { EffectiveRole } from '../../src/permissions/effective-role.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
@@ -281,6 +282,78 @@ describe('checkRolePermission — planted defects', () => {
     expect(
       checkRolePermission(e, ctx(eff('member', [[project, false]]))),
     ).toEqual({ refused: true, rule: PERMISSION_ROLE_RULE, reason: PROJECT_ROSTER_REASON });
+  });
+
+  /**
+   * Case 6.34 — the token-bypass defect (Plan 4 Task 14).
+   *
+   * An admin can read their workspace's own history, so they can read every
+   * pending `inviteId` in it. Without this refusal they could submit
+   * `invite.accepted { inviteId, userId: <anyone> }` and bind any outstanding
+   * invitation to any account, having never seen the link. The token is the
+   * only thing entitled to make that binding, and no client-submitted event
+   * carries one.
+   *
+   * THE ROLE MATTERS. It is asserted at `admin` and at `owner` — the two roles
+   * that reach this line with every earlier guard already passed. A non-member
+   * would be answered `NOT_A_MEMBER_REASON` several checks earlier and would
+   * prove nothing about acceptance at all, which is exactly the
+   * refusal-before-the-interesting-code trap.
+   *
+   * Mutation that this kills and nothing else does: delete the
+   * `env.type === 'invite.accepted'` branch. Every other case in this file
+   * stays green, and an admin's forged acceptance commits.
+   */
+  it('planted defect: refuses a client-submitted invite.accepted from EVERY role, admin and owner included', () => {
+    const inviteId = newUlid();
+    const e = env({
+      type: 'invite.accepted',
+      entity: { kind: 'invite', id: inviteId },
+      payload: { inviteId, userId: ACTOR },
+    });
+    for (const role of ['owner', 'admin', 'member', 'guest'] as const) {
+      expect(checkRolePermission(e, ctx(eff(role))), role).toEqual({
+        refused: true,
+        rule: PERMISSION_ROLE_RULE,
+        reason: INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON,
+      });
+    }
+  });
+
+  /**
+   * The other two invite types, and the positive control that separates "invite
+   * events are refused" from "acceptance is refused".
+   *
+   * `invite.sent` and `invite.revoked` are ordinary admin-only work — inviting
+   * somebody into a workspace is managing its membership — so an admin is
+   * ADMITTED for both and a member is refused with the admin-only sentence.
+   * Without this case, a gate that refused every `invite.*` type outright would
+   * pass the acceptance case above while silently making invitations
+   * unissuable.
+   */
+  it('invite.sent and invite.revoked are admin-only, and an admin passes both', () => {
+    const inviteId = newUlid();
+    const sent = env({
+      type: 'invite.sent',
+      entity: { kind: 'invite', id: inviteId },
+      payload: { inviteId, address: 'a@example.com', channel: 'email', role: 'member' },
+    });
+    const revoked = env({
+      type: 'invite.revoked',
+      entity: { kind: 'invite', id: inviteId },
+      payload: { inviteId },
+    });
+    for (const e of [sent, revoked]) {
+      expect(checkRolePermission(e, ctx(eff('owner')))).toBeNull();
+      expect(checkRolePermission(e, ctx(eff('admin')))).toBeNull();
+      for (const role of ['member', 'guest'] as const) {
+        expect(checkRolePermission(e, ctx(eff(role))), `${e.type} as ${role}`).toEqual({
+          refused: true,
+          rule: PERMISSION_ROLE_RULE,
+          reason: adminOnlyReason(role),
+        });
+      }
+    }
   });
 
   it('lets ordinary ticket work through — the visibility gate (Task 9) owns the rest', () => {

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { membershipId, newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { membershipId, newUlid, SIMPLE_KANBAN_TEMPLATE, type LedgerEvent } from '@gisik-nokma/domain';
 import { canSee } from '../../src/visibility/can-see.js';
 import { visibleEventsFor, type SyncItem } from '../../src/visibility/visible-events-for.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -477,7 +477,21 @@ describe('visibleEventsFor — what reaches a replica', () => {
     expect(memberItems).toContain(grant.id);
   });
 
-  it('6.93 invite events are withheld from everyone on this branch, owners included', async () => {
+  /**
+   * 6.93 CLOSED by Plan 4 Task 14, and rewritten rather than deleted.
+   *
+   * This case used to assert that invite events reached NOBODY, owners
+   * included — the fail-closed placeholder Task 11 left because the role split
+   * had no implementation to defer to and shipping a PII-bearing event to
+   * everyone in the meantime would have been the worse error. Task 14 supplies
+   * the split, so the assertion inverts: the OWNER now receives it, and who
+   * does not is case 6.38's block at the foot of this file.
+   *
+   * Kept here, at its own id, rather than folded into 6.38: an owner receiving
+   * their own workspace's invitations is the direction 6.93 was standing in for,
+   * and a reader who greps 6.93 must find what happened to it.
+   */
+  it('6.93 invite events now reach the OWNER — the fail-closed placeholder is closed by Task 14', async () => {
     const ws = newUlid();
     const owner = newUlid();
     await seedMember(db.pool, ws, owner, 'owner');
@@ -490,23 +504,27 @@ describe('visibleEventsFor — what reaches a replica', () => {
         actorId: owner,
       }),
     );
+    const inviteId = newUlid();
     const invite = await record(
       testEnvelope({
         workspaceId: ws,
-        entity: { kind: 'invite', id: newUlid() },
+        entity: { kind: 'invite', id: inviteId },
         type: 'invite.sent',
-        payload: { address: 'someone@example.com' },
+        payload: { inviteId, address: 'someone@example.com', channel: 'email', role: 'member' },
         actorId: owner,
       }),
     );
 
     const ids = idsOf(await collect(owner, ws));
-    // The positive control is the definition beside it: this owner's stream is
-    // not empty, so the invite's absence is a decision and not a dead call.
+    // The definition beside it still separates "the invite arrived" from "this
+    // owner's stream is the whole ledger unfiltered".
     expect(ids).toContain(definition.id);
-    expect(ids).not.toContain(invite.id);
-    // The address is PII (case 6.38) and nothing may carry it yet.
-    expect(JSON.stringify(await collect(owner, ws))).not.toContain('someone@example.com');
+    expect(ids).toContain(invite.id);
+    // And the address really does travel to an owner, which is the fact the
+    // withholding at every other role exists to bound. Asserted rather than
+    // implied, because "an owner sees invitations" and "an owner sees the
+    // ADDRESS on an invitation" are different disclosures.
+    expect(JSON.stringify(await collect(owner, ws))).toContain('someone@example.com');
   });
 
   it('6.100 the purge walk never hands a GUEST a ticket id — a re-authoring elsewhere in the workspace is not their business', async () => {
@@ -722,5 +740,137 @@ describe('visibleEventsFor — what reaches a replica', () => {
     // member→member re-grant, where nothing was lost at all — which is the
     // accepted count-leak recorded on `ScopeRevokedInstruction`.
     expect(ids).not.toContain(`scope-revoked:${ws}`);
+  });
+});
+
+/**
+ * Case 6.38 — `invite.sent` reaches owners and admins and nobody else.
+ *
+ * This is the FIRST event kind withheld from plain members. The reason is
+ * narrower than "invitations are sensitive": the payload carries an ADDRESS
+ * somebody gave in confidence to whoever invited them, a member has no screen
+ * that needs it and no act it enables, and an event on a replica is on a device
+ * the server does not control — no later fix retrieves it.
+ *
+ * ## The two mutations this block kills, and what each would look like
+ *
+ * - `audienceClassOf('invite')` back to `'withheld'`: the owner and admin
+ *   assertions redden. Nothing else in this file notices.
+ * - The `admin` branch written as `!isGuest`, the shape the roster branch above
+ *   uses: the MEMBER assertion reddens and every other assertion in this file —
+ *   owner, admin, guest and stranger — stays green. That is the whole point of
+ *   ranging over four roles rather than testing "a member cannot see it": the
+ *   plausible wrong implementation is right for three of the four.
+ */
+describe('invite events in sync-down (case 6.38)', () => {
+  it('reaches the owner and an admin, and not a member, a guest or a stranger', async () => {
+    const ws = newUlid();
+    const owner = newUlid();
+    const admin = newUlid();
+    const member = newUlid();
+    const guest = newUlid();
+    const stranger = newUlid();
+
+    await seedMember(db.pool, ws, owner, 'owner');
+    await seedMember(db.pool, ws, admin, 'admin');
+    await seedMember(db.pool, ws, member, 'member');
+    await seedGuest(db.pool, ws, guest);
+
+    const inviteId = newUlid();
+    const sent = await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'invite', id: inviteId },
+        type: 'invite.sent',
+        payload: { inviteId, address: 'accountant@example.com', channel: 'email', role: 'member' },
+        actorId: owner,
+      }),
+    );
+    // A workspace event beside it, and it is not decoration: it is what
+    // separates "the invite was withheld" from "this reader receives nothing".
+    // A member and a guest each have their own control below.
+    const renamed = await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'workspace', id: ws },
+        type: 'workspace.renamed',
+        payload: { name: 'The Corner' },
+        actorId: owner,
+      }),
+    );
+    // The guest's control has to be a DEFINITION: workspace events do not reach
+    // a guest either, so using the rename for them would prove nothing.
+    const workflowId = newUlid();
+    const defined = await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'workflow', id: workflowId },
+        type: 'workflow.defined',
+        payload: { ...SIMPLE_KANBAN_TEMPLATE, id: workflowId, version: 1 },
+        actorId: owner,
+      }),
+    );
+
+    for (const reader of [owner, admin]) {
+      const ids = idsOf(await collect(reader, ws));
+      expect(ids, reader === owner ? 'owner' : 'admin').toContain(sent.id);
+      expect(ids).toContain(renamed.id);
+    }
+
+    const memberIds = idsOf(await collect(member, ws));
+    expect(memberIds).not.toContain(sent.id);
+    // The control: the member is receiving this workspace's stream, just not
+    // the invitation.
+    expect(memberIds).toContain(renamed.id);
+
+    const guestIds = idsOf(await collect(guest, ws));
+    expect(guestIds).not.toContain(sent.id);
+    // The guest's own control — a definition, which reaches everyone.
+    expect(guestIds).toContain(defined.id);
+
+    // A stranger receives nothing at all, which is the null-role early return
+    // rather than this branch — asserted so the block covers every role a
+    // reader could hold.
+    expect(idsOf(await collect(stranger, ws))).toEqual([]);
+  });
+
+  it('the same rule covers invite.accepted and invite.revoked, not only invite.sent', async () => {
+    const ws = newUlid();
+    const admin = newUlid();
+    const member = newUlid();
+    await seedMember(db.pool, ws, admin, 'admin');
+    await seedMember(db.pool, ws, member, 'member');
+
+    const inviteId = newUlid();
+    const accepted = await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'invite', id: inviteId },
+        type: 'invite.accepted',
+        payload: { inviteId, userId: member },
+        actorId: member,
+        origin: 'server',
+      }),
+    );
+    const revoked = await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'invite', id: inviteId },
+        type: 'invite.revoked',
+        payload: { inviteId },
+        actorId: admin,
+      }),
+    );
+
+    const adminIds = idsOf(await collect(admin, ws));
+    expect(adminIds).toEqual(expect.arrayContaining([accepted.id, revoked.id]));
+
+    // The class is keyed on the ENTITY KIND, not on the type, so all three go
+    // together. A member does not even learn that an invitation they are
+    // themselves the subject of exists — which is right: they learn they are in
+    // the workspace from `membership.granted`, which does reach them.
+    const memberIds = idsOf(await collect(member, ws));
+    expect(memberIds).not.toContain(accepted.id);
+    expect(memberIds).not.toContain(revoked.id);
   });
 });
