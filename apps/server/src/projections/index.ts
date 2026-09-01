@@ -6,6 +6,7 @@ import { projProjects } from './proj-projects.js';
 import { projVisibility } from './proj-visibility.js';
 import { createProjectionRegistry, type ProjectionRegistry } from './registry.js';
 import { rollupsProjection } from './rollups.js';
+import { searchProjection } from './search.js';
 import { ticketsProjection } from './tickets.js';
 import { ticketTypesProjection } from './ticket-types.js';
 import { workflowsProjection } from './workflows.js';
@@ -21,7 +22,7 @@ import { workspaceSettingsProjection } from './workspace-settings.js';
  *
  *   proj_entity_heads, proj_workflows, proj_ticket_types, proj_projects,
  *   proj_tickets, proj_rollups, proj_memberships, proj_invites,
- *   proj_visibility, proj_contested, proj_workspace_settings
+ *   proj_visibility, proj_contested, proj_workspace_settings, proj_search
  *
  * `proj_projects` is in that list by the owner decision of 2026-08-26 and was
  * MISSING from this comment until Plan 4 Task 9 registered it — coordination
@@ -50,6 +51,8 @@ import { workspaceSettingsProjection } from './workspace-settings.js';
  * already past its end, so "after proj_visibility" — the plan's wording — no
  * longer picks a unique slot. It is placed by DEPENDENCY instead, which is the
  * question §8 exists to answer; see the comment on its registration below.
+ * proj_search (Plan 5 Task 6) is the second such registrant and is decided the
+ * same way.
  *
  * Whatever the position, extend the order assertion in
  * test/projection-order.test.ts in the same commit.
@@ -108,5 +111,23 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   // projection ever read this table inside a transaction, THAT is the moment
   // this position becomes load-bearing and must be justified as an adjacency.
   registry.register(workspaceSettingsProjection);
+  // APPENDED because no adjacency is load-bearing — and appended is NOT a §8
+  // position, for the same reason as the entry above: §8's order ends at
+  // proj_visibility and names none for this projection either.
+  //
+  // The dependency was read in BOTH directions before this line was written.
+  // Downward: this projection's `apply` writes proj_search and reads NO table
+  // at all — not another projection's, not its own — so nothing above it must
+  // run first. Upward: no registered projection reads proj_search inside an
+  // ingest transaction. It does already have a reader, and naming it is the
+  // more useful sentence than "nothing reads it": `compile-filter.ts`'s text
+  // clause selects from proj_search, and the `/v1/search` route (Task 12) will
+  // too — but both are READ-TIME callers on a request path, never handlers
+  // inside an ingest transaction, so neither creates an adjacency here.
+  //
+  // Should a later projection ever read this table inside a transaction, THAT
+  // is the moment this position becomes load-bearing and must be justified as
+  // an adjacency.
+  registry.register(searchProjection);
   return registry;
 }

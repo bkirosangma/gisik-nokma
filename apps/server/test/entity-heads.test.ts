@@ -126,6 +126,11 @@ describe('proj_entity_heads', () => {
       // extended projection-order.test.ts, the pin of record, and was told
       // about this one by a red suite.
       'proj_workspace_settings',
+      // Plan 5 Task 6. APPENDED, and NOT at a §8 position, for the same reason
+      // as the entry above. See projection-order.test.ts, the pin of record,
+      // for why this projection's existing READ-TIME reader
+      // (`compile-filter.ts`'s text clause) is not an adjacency.
+      'proj_search',
     ]);
   });
 });

@@ -264,11 +264,16 @@ describe('compileFilterSpec — hostile bytes never reach SQL text', () => {
  * says which of them is safe — and only a row count says whether a bound
  * parameter actually addressed what it named.
  *
- * NOTE FOR TASK 6: `proj_search` is created here as a STAND-IN with the three
- * columns this compiler's text clause depends on (`ticket_id`, `workspace_id`,
- * `tsv`). Task 6 ships the real migration; if it names those columns
- * differently, this test keeps passing and the product breaks — so Task 6 must
- * keep these three names, or change this clause with it.
+ * `proj_search` USED TO BE CREATED HERE as a stand-in, with the three columns
+ * this compiler's text clause depends on (`ticket_id`, `workspace_id`, `tsv`)
+ * and a `tsv` generated from the title alone. Plan 5 Task 6 shipped the real
+ * migration, so the stand-in is gone and this file now exercises the SHIPPED
+ * table — which is the stronger arrangement, since the note that stood here
+ * ("if Task 6 names those columns differently, this test keeps passing and the
+ * product breaks") described a seam a string-pinned compiler cannot feel. Task
+ * 6 kept all three names and the `'simple'` configuration; the real `tsv` also
+ * covers `description` and `comments`, which this file leaves empty, so every
+ * expectation below is unchanged.
  */
 describe('compileFilterSpec — executed against Postgres', () => {
   let db: TestDatabase;
@@ -338,16 +343,6 @@ describe('compileFilterSpec — executed against Postgres', () => {
 
   beforeAll(async () => {
     db = await createTestDatabase();
-    await db.pool.query(`CREATE TABLE proj_search (
-      ticket_id text PRIMARY KEY,
-      workspace_id text NOT NULL,
-      project_id text NOT NULL,
-      title text NOT NULL,
-      description text NOT NULL DEFAULT '',
-      comments text NOT NULL DEFAULT '',
-      tsv tsvector GENERATED ALWAYS AS (to_tsvector('simple', title)) STORED
-    )`);
-
     // wsA's own latest workflow blocks 'waiting'.
     await seedWorkflow(WS_A, 1, 'waiting');
     // wsB reuses the SAME workflow_id at a HIGHER version and blocks a

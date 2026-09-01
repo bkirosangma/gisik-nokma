@@ -8,7 +8,7 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  *
  *   proj_entity_heads, proj_workflows, proj_ticket_types, proj_projects,
  *   proj_tickets, proj_rollups, proj_memberships, proj_invites,
- *   proj_visibility, proj_contested, proj_workspace_settings
+ *   proj_visibility, proj_contested, proj_workspace_settings, proj_search
  *
  * because a projection may read a table an earlier one wrote in the same
  * transaction (proj_rollups reads proj_tickets, and since Task 11 that is a
@@ -44,6 +44,15 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  * is a READ-TIME function for the attention strip, called by routes, never by a
  * handler). Neither adjacency is load-bearing, so appending is correct — and
  * that is the justification, NOT a §8 position this projection does not have.
+ *
+ * Plan 5 Task 6's proj_search is the SECOND, and it is appended on the same
+ * grounds with one difference worth stating rather than smoothing over: this
+ * projection already HAS a reader. `src/read/compile-filter.ts`'s text clause
+ * selects from proj_search, and the search route (Task 12) will too. Neither is
+ * an adjacency, because both are READ-TIME callers on a request path rather
+ * than handlers inside an ingest transaction — and "no projection reads it"
+ * would have been the sentence that quietly stopped being true. Downward the
+ * answer is simpler: `searchProjection.apply` reads no table at all.
  *
  * The rule above is unchanged for anyone §8 does name: insert at your position.
  *
@@ -94,6 +103,12 @@ describe('projection registration order (coordination §8)', () => {
       // table, and none reads its table inside an ingest transaction — which is
       // the same question §8 exists to answer, asked directly.
       'proj_workspace_settings',
+      // Plan 5 Task 6. APPENDED, for the same reason and by the same question:
+      // §8 names no position for it either. `searchProjection.apply` reads no
+      // table, and no projection reads proj_search inside an ingest
+      // transaction — its readers (compile-filter's text clause, the search
+      // route) are read-time callers on a request path.
+      'proj_search',
     ]);
   });
 
@@ -124,6 +139,9 @@ describe('projection registration order (coordination §8)', () => {
       ['proj_visibility', ['proj_visibility']],
       ['proj_contested', ['proj_contested']],
       ['proj_workspace_settings', ['proj_workspace_settings']],
+      // ONE table. `tsv` is a GENERATED column of proj_search, not a table of
+      // its own, so there is nothing else here to declare.
+      ['proj_search', ['proj_search']],
     ]);
   });
 
