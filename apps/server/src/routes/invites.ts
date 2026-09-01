@@ -182,30 +182,75 @@ type InviteRow = {
  * refusal and every payload rule fire exactly as they would for any event.
  * Revocation is an ordinary `POST /v1/events` claim and needs no route here.
  *
- * ## Atomicity is unavailable, so ORDER and the STATUS CHECK replace it
+ * ## The CONSUME is atomic; only the ordering around it is a choice
  *
- * The plan says the token hash is stored "in the same transaction" as the
- * commit, and that acceptance deletes the token row "in the same transaction".
- * Neither is possible: `commitOne` takes its own pool connection, opens its own
- * transaction and commits it, and a route has no way to enlist in it. Rather
- * than pretend, the orderings are chosen so that every crash window fails safe,
- * and they are not symmetric:
+ * Two different claims were conflated here until 2026-09-01, and the module's
+ * headline sentence — *"the deletion is hygiene and the status check is the
+ * guard"* — was the false one. It is true that this route cannot enlist in the
+ * LEDGER's transaction: `commitOne` takes its own pool connection, opens its own
+ * transaction and commits it. It does not follow that nothing on this path can
+ * be atomic. `invite_tokens` is server-owned state and **not** a projection, so
+ * this module owns its transactions entirely, and one conditional statement
+ * against it is atomic in Postgres by itself:
+ *
+ * ```sql
+ * DELETE FROM invite_tokens WHERE token_hash = $1 AND expires_at > now()
+ *   RETURNING invite_id
+ * ```
+ *
+ * At most one presentation of a token can ever get a row back from that.
+ * Concurrent presentations queue on the row lock, re-evaluate when the winner
+ * commits, and match nothing. **The database decides who spent the link**, not a
+ * read this handler took a few awaits earlier.
+ *
+ * **The status check was never a guard against concurrency, only against
+ * sequence.** MEASURED at `0fd416d`, when acceptance read the status and then
+ * appended: three parallel `POST /v1/invites/<token>/accept` on ONE token from
+ * three accounts all answered 200, `proj_memberships` ended with three `admin`
+ * rows, and the ledger held 3× `invite.accepted` and 3× `membership.granted` —
+ * in 24 of 25 trials. The record concealed it, too: the projection's own
+ * `AND status = 'pending'` drops the 2nd and Nth acceptance, so
+ * `proj_invites.accepted_user_id` named ONE person while three had joined and
+ * the owner's pending list showed nothing amiss. Case 6.128.
+ *
+ * So the two checks do two different jobs and neither substitutes for the other:
+ * `openableInvite` answers *does this invitation still open anything* (unknown,
+ * lapsed, no projection row, revoked, already accepted); the conditional DELETE
+ * answers *is this the one presentation that gets to use it*.
+ *
+ * ### The orderings, and the crash windows they choose
  *
  * - **Mint appends FIRST, then stores the hash.** A crash between leaves a
  *   pending invitation with no token — dead, listable, revocable, and **no
  *   credential exists anywhere**. The reverse ordering would leave a live
  *   credential with no ledger claim behind it: unlistable, unrevocable, and
  *   able to grant membership.
- * - **Accept appends FIRST, then deletes the hash.** A crash between leaves a
- *   live token row on an invitation whose status is already `accepted` — and
- *   that opens nothing, because **this route checks the invitation's STATUS
- *   before it will act on a token**. The reverse ordering would leave the
- *   acceptor un-membered holding a link that no longer works.
+ * - **Accept CONSUMES first, then appends.** This is reversed from what the
+ *   module used to do, and the old order is precisely what admitted N joins: a
+ *   deletion that runs after the append cannot stop a second appender who is
+ *   already past the read. A crash between consume and append now leaves an
+ *   invitation that is `pending` in the ledger with no credential — the SAME
+ *   residue the mint crash leaves, already served by the pending list's LEFT
+ *   JOIN as `expiresAt: null`, revocable and re-issuable through a path that
+ *   exists today. **The harm moved from the workspace to the acceptor, and that
+ *   is the trade**: an un-membered acceptor is told to ask for another link and
+ *   the admin can see the dead invitation in their own list; N silent admin
+ *   joins that erase their own evidence has no such path.
  *
- * So the deletion is hygiene and the status check is the guard. That is
- * deliberate and it is tested by putting a token row back on an accepted
- * invitation and proving both routes still refuse — the crash the codebase
- * cannot prevent, staged on purpose.
+ * ### What is still open: a revocation in flight
+ *
+ * An atomic consume closes the multi-join and does **not** close this, because
+ * the revoke lands *after* the consume, not against it. MEASURED, 19 of 20
+ * trials: an `invite.revoked` submitted concurrently with an acceptance leaves
+ * `proj_invites.status = 'revoked'` and the joiner holding their role — the
+ * owner has positive evidence the invitation was withdrawn while the person is
+ * inside the workspace. The projection's one-way `pending` door (case 6.118)
+ * drops the losing `invite.accepted`, but `membership.granted` is a separate
+ * event on a separate entity and nothing drops it. Closing it needs the
+ * membership grant and the invitation's status decided in ONE transaction,
+ * which means reaching inside the ledger's commit — machinery this surface does
+ * not have. **Recorded as case 6.129 rather than papered over.** *Owner: Plan
+ * 10, which owns the ingest transaction boundary.*
  *
  * ## What acceptance does NOT do
  *
@@ -353,9 +398,23 @@ export function registerInviteRoutes(
       const invite = await openableInvite(deps.pool, request.params.token);
       if (invite === null) {
         // The identical body the GET sends. A second acceptance lands here
-        // because the first deleted the token row; a revoked or lapsed one
+        // because the first consumed the token row; a revoked or lapsed one
         // lands here because of the status and expiry checks. Nothing that
         // reaches this line appends anything.
+        return reply.code(404).send(INVITE_NOT_OPENABLE_BODY);
+      }
+
+      // THE CONSUME, and the only thing that makes this link single-use. The
+      // read above says the invitation still opens something; this says THIS
+      // presentation is the one that gets to open it. Losing it is a 404 with
+      // the same body — "it may have been used" is exactly what happened, and a
+      // loser learns nothing about the winner.
+      //
+      // It runs BEFORE the append on purpose; see the ordering section on the
+      // module docblock. A consume that ran after would be a deletion two
+      // appenders had already raced past.
+      const consumed = await consumeInviteToken(deps.pool, request.params.token);
+      if (consumed === null) {
         return reply.code(404).send(INVITE_NOT_OPENABLE_BODY);
       }
 
@@ -451,10 +510,9 @@ export function registerInviteRoutes(
         }
       });
 
-      // Hygiene, not the guard. If this line never runs the invitation is
-      // already `accepted` in the projection and both routes refuse it anyway.
-      await deps.pool.query('DELETE FROM invite_tokens WHERE invite_id = $1', [invite.invite_id]);
-
+      // No deletion here any more: the token row went at the consume, before a
+      // single event was appended. A second DELETE would be a no-op that read
+      // like a guard.
       return { workspaceId };
     },
   );
@@ -537,11 +595,18 @@ export function registerInviteRoutes(
  *    sides are absolute instants.
  * 3. **A projection row for the invitation.** The mint-crash residue in the
  *    other direction, and belt-and-braces.
- * 4. **`status = 'pending'`.** THE GUARD. The token row proves only that
- *    somebody holds the link; this is what says the link still opens something.
- *    It is what makes a revoked invitation's surviving token row worthless, and
- *    what makes a crash between "appended the acceptance" and "deleted the
- *    token" harmless.
+ * 4. **`status = 'pending'`.** The token row proves only that somebody holds
+ *    the link; this is what says the link still opens something. It is what
+ *    makes a revoked invitation's surviving token row worthless, and what makes
+ *    a hand-restored token row on an accepted invitation open nothing.
+ *
+ * **This resolver is a READ and it is not, by itself, a guard against two
+ * people presenting the same link at the same time** — every concurrent
+ * presentation passes all four checks, because none of them writes. The accept
+ * route pairs it with `consumeInviteToken`, which is the part the database
+ * decides. Naming that distinction here rather than leaving it implied: the
+ * sentence "the status check is the guard" was true of this function's
+ * SEQUENTIAL behaviour and false of the product, and it cost 24 of 25 trials.
  *
  * Both time comparisons are `timestamptz` against `now()` INSIDE Postgres.
  * That is deliberate and it has a consequence worth naming: the comparison is
@@ -571,4 +636,39 @@ async function openableInvite(db: Queryable, token: string): Promise<InviteRow |
     return null;
   }
   return invite;
+}
+
+/**
+ * Spend the token, atomically, and hand back the invitation it opened — or
+ * `null` if this presentation was not the one that got it.
+ *
+ * ## Why this is atomic when the acceptance sequence is not
+ *
+ * `invite_tokens` is server-owned state, not a projection, and nothing else in
+ * the product writes it. So this module owns the row's whole lifetime and does
+ * not need to enlist in the ledger's transaction to make a decision about it:
+ * ONE statement is one transaction, and a conditional `DELETE ... RETURNING`
+ * either matches the row or matches nothing.
+ *
+ * Under concurrency Postgres serialises the matching backends on the row lock.
+ * The first to commit removes the row; every other re-evaluates its `WHERE`
+ * against the committed state, finds nothing, and returns zero rows. There is
+ * no interleaving in which two callers both get an `invite_id` back, which is
+ * the property the accept route needs and the property a prior read can never
+ * provide.
+ *
+ * `expires_at > now()` is repeated here rather than trusted from the read: a
+ * token that lapsed in the milliseconds since is not one this call may spend,
+ * and re-stating the condition costs nothing because it is on the same row the
+ * statement already has to find. It also means the mutation that deletes the
+ * expiry clause from `openableInvite` does not silently survive here.
+ */
+async function consumeInviteToken(db: Queryable, token: string): Promise<string | null> {
+  const { rows } = await db.query<{ invite_id: string }>(
+    `DELETE FROM invite_tokens
+      WHERE token_hash = $1 AND expires_at > now()
+      RETURNING invite_id`,
+    [hashToken(token)],
+  );
+  return rows[0]?.invite_id ?? null;
 }
