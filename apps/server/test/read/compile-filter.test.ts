@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { FilterSpec } from '@gisik-nokma/domain';
+import { filterSpecSchema, type FilterSpec } from '@gisik-nokma/domain';
 import { BLOCKED_STATES_CTE, compileFilterSpec, likePattern } from '../../src/read/compile-filter.js';
 import { SqlParams } from '../../src/read/sql-params.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -151,13 +151,25 @@ describe('likePattern', () => {
 });
 
 /**
- * The hostile inputs. The schema refuses shapes and lengths, never bytes, so
+ * The hostile inputs. The schema refuses shapes, lengths and exactly one byte
+ * (U+0000, which Postgres text cannot carry); it never launders the rest, so
  * each of these reaches the compiler exactly as an attacker would send it —
- * with one boundary worth naming rather than glossing: the 500-character
- * string is a legal `text` value (max 500) but NOT a legal `fieldId` (max
- * 200), so in that one slot it is over the door's limit. The tests send it
- * there anyway, which tests the compiler on input stricter callers would
- * already have refused — a superset, never a false green.
+ * with one boundary worth naming rather than glossing: the 500-character string
+ * is a legal `text` and `fields[].value` (max 500 each) but is over the 200
+ * limit in the OTHER FIVE slots — `assigneeId`, `collaboratorId`, `typeId`,
+ * `stateId` and `fieldId`. The tests send it through all seven anyway, which
+ * tests the compiler on input stricter callers would already have refused — a
+ * superset, never a false green.
+ *
+ * The last five entries are here for a different reason than the first eight.
+ * They are not attacks; they are the strings that a substring check like
+ * `expect(sql).not.toContain(value)` would REDDEN on while the compiler is
+ * perfectly correct — `$1` is emitted verbatim by a correct compiler, and so
+ * are `t.`, `SELECT`, `->>` and `ESCAPE`. They are in the set to keep the
+ * assertions below honest: a guard that fires on correct code is worse than no
+ * guard, because the next person deletes it. Nothing here asserts on substrings
+ * any more; the SQL is pinned as a constant instead, which is the property the
+ * substring check was reaching for and could not state.
  */
 const HOSTILE = {
   quote: "O'Brien",
@@ -168,24 +180,54 @@ const HOSTILE = {
   unicodeEscape: "U&'\\0041' \\u0041 é",
   deleteEvents: "'); DELETE FROM events; --",
   long: 'A'.repeat(500),
+  placeholder: '$1',
+  aliasColumn: 't.assignee_id',
+  selectKeyword: 'SELECT ticket_id FROM proj_search',
+  jsonArrow: "->> 'value'",
+  escapeClause: "ESCAPE '\\'",
 } as const;
 const HOSTILE_VALUES = Object.values(HOSTILE);
 
+/**
+ * What a correct compiler emits for the seven-slot spec below, whatever bytes
+ * travel through it. Pinned as a CONSTANT rather than probed with substring
+ * assertions: "no slot's value appears in the SQL" is a claim about whether the
+ * value LOOKS LIKE SQL, and it reddens on a correct compiler the moment the
+ * value is `$1` or `t.` or `SELECT`. "The SQL does not depend on the value at
+ * all" is the claim that was actually meant, and a concatenating compiler
+ * fails it for every one of the thirteen inputs, `$1` included.
+ */
+const SEVEN_SLOT_SQL = [
+  't.assignee_id = $1',
+  't.collaborator_ids @> to_jsonb($2::text)',
+  't.type_id = $3',
+  't.state_id = $4',
+  "t.ticket_id IN (SELECT ticket_id FROM proj_search WHERE workspace_id = t.workspace_id AND tsv @@ websearch_to_tsquery('simple', $5))",
+  "t.fields -> $6::text ->> 'value' = $7",
+  "t.fields -> $8::text ->> 'value' ILIKE $9 ESCAPE '\\'",
+];
+
 describe('compileFilterSpec — hostile bytes never reach SQL text', () => {
-  it('PLANTED DEFECT: hostile fieldId and text never reach the SQL text — parameters only', () => {
+  it('PLANTED DEFECT: a hostile fieldId and text compile to the pinned SQL and travel entirely in the parameter array', () => {
     const params = new SqlParams();
     const { clauses } = compileFilterSpec(
       { text: HOSTILE.deleteEvents, fields: [{ fieldId: HOSTILE.statement, op: 'contains', value: HOSTILE.deleteEvents }] },
       params,
     );
-    const sql = clauses.join(' AND ');
-    expect(sql).not.toContain('DROP TABLE');
-    expect(sql).not.toContain('DELETE FROM');
-    expect(params.toArray()).toContain(HOSTILE.deleteEvents);
-    expect(params.toArray().some((v) => typeof v === 'string' && v.includes('DROP TABLE'))).toBe(true);
+    expect(clauses).toEqual([
+      "t.ticket_id IN (SELECT ticket_id FROM proj_search WHERE workspace_id = t.workspace_id AND tsv @@ websearch_to_tsquery('simple', $1))",
+      "t.fields -> $2::text ->> 'value' ILIKE $3 ESCAPE '\\'",
+    ]);
+    // Exact, not `toContain`: a compiler that dropped a term, doubled one, or
+    // reordered the bindings would still satisfy a containment assertion.
+    expect(params.toArray()).toEqual([
+      HOSTILE.deleteEvents,
+      HOSTILE.statement,
+      likePattern(HOSTILE.deleteEvents),
+    ]);
   });
 
-  it('no hostile byte-string appears anywhere in the compiled SQL, whichever slot it is sent through', () => {
+  it('the compiled SQL is a CONSTANT — identical for all thirteen inputs, with the bytes only ever in the parameters', () => {
     for (const hostile of HOSTILE_VALUES) {
       const params = new SqlParams();
       const { clauses } = compileFilterSpec(
@@ -202,12 +244,17 @@ describe('compileFilterSpec — hostile bytes never reach SQL text', () => {
         },
         params,
       );
-      const sql = clauses.join(' AND ');
-      expect(sql).not.toContain(hostile);
-      // …and it is genuinely present as DATA (an assertion that only checks
-      // absence passes on a compiler that dropped the term entirely).
-      expect(params.toArray().filter((v) => v === hostile).length).toBeGreaterThanOrEqual(5);
+      expect(clauses, `slot SQL varied with the value ${JSON.stringify(hostile)}`).toEqual(SEVEN_SLOT_SQL);
+      // …and the value is genuinely present as DATA, in every slot, exactly
+      // once each. An assertion that only checks the SQL passes on a compiler
+      // that dropped the term entirely; an inequality (`>= 5`) passes on one
+      // that lost two of them.
+      expect(params.toArray()).toEqual([
+        hostile, hostile, hostile, hostile, hostile, hostile, hostile, hostile,
+        likePattern(hostile),
+      ]);
     }
+    expect(HOSTILE_VALUES).toHaveLength(13);
   });
 });
 
@@ -323,6 +370,20 @@ describe('compileFilterSpec — executed against Postgres', () => {
     await seedTicket({ id: 'tkt-3', workspaceId: WS_A, stateId: 'todo', stateCategory: 'open', fields: {
       [HOSTILE.statement]: { value: HOSTILE.alwaysTrue, actorId: 'usr_01', clientTime: '2026-08-01T00:00:00.000Z', serverTime: '2026-08-01T00:00:00.000Z' },
     } });
+    // The declared-semantics fixture for `contains: ''`. `memo` carries the
+    // EMPTY string (a value, and a real `eq` target); `blank` carries JSON null
+    // (a key present with no value); no other ticket carries either key.
+    await seedTicket({ id: 'tkt-4', workspaceId: WS_A, stateId: 'todo', stateCategory: 'open', fields: {
+      memo: { value: '', actorId: 'usr_01', clientTime: '2026-08-01T00:00:00.000Z', serverTime: '2026-08-01T00:00:00.000Z' },
+      blank: { value: null, actorId: 'usr_01', clientTime: '2026-08-01T00:00:00.000Z', serverTime: '2026-08-01T00:00:00.000Z' },
+    } });
+    // A ticket in the OTHER workspace. Every `run()` below scopes to one
+    // workspace, so nothing that behaves correctly can ever see it — which is
+    // what makes it the witness for the widening demonstration: if it appears
+    // in an answer, a filter term crossed a tenant boundary.
+    await seedTicket({ id: 'tkt-b1', workspaceId: WS_B, stateId: 'doing', fields: {
+      amount: { value: '9999', actorId: 'usr_09', clientTime: '2026-08-01T00:00:00.000Z', serverTime: '2026-08-01T00:00:00.000Z' },
+    } });
 
     await db.pool.query(
       `INSERT INTO proj_search (ticket_id, workspace_id, project_id, title) VALUES
@@ -331,6 +392,21 @@ describe('compileFilterSpec — executed against Postgres', () => {
         ('tkt-3', $1, 'prj', 'Something else entirely')`,
       [WS_A],
     );
+    // MIS-FILED ON PURPOSE. tkt-4 is a WS_A ticket; its search row says WS_B.
+    //
+    // This is the only shape in which the text clause's tenancy correlation is
+    // executable, and the reason is worth stating: `proj_tickets.ticket_id` is
+    // `text NOT NULL PRIMARY KEY`, so ticket_id → workspace is a FUNCTION, and
+    // a correctly-filed neighbouring row can never satisfy an outer
+    // `t.ticket_id IN (…)` for a ticket in another tenant. Seeding a second
+    // workspace's ordinary search rows therefore reddens nothing. What the
+    // correlation defends against is projection DRIFT — a row filed under the
+    // wrong workspace — and that is what is seeded here.
+    await db.pool.query(
+      `INSERT INTO proj_search (ticket_id, workspace_id, project_id, title)
+       VALUES ('tkt-4', $1, 'prj', 'Quarterly audit')`,
+      [WS_B],
+    );
   });
 
   afterAll(async () => {
@@ -338,12 +414,14 @@ describe('compileFilterSpec — executed against Postgres', () => {
   });
 
   it('every ordinary term matches the row it names (the positive control the exclusions need)', async () => {
-    expect(await run({})).toEqual(['tkt-1', 'tkt-2', 'tkt-3']);
+    // tkt-b1 is a WS_B ticket and appears in NONE of these: every run() scopes
+    // to WS_A, which is the baseline the widening test below is measured against.
+    expect(await run({})).toEqual(['tkt-1', 'tkt-2', 'tkt-3', 'tkt-4']);
     expect(await run({ assigneeId: 'usr_01' })).toEqual(['tkt-1']);
     expect(await run({ collaboratorId: 'usr_02' })).toEqual(['tkt-1']);
-    expect(await run({ typeId: 'task' })).toEqual(['tkt-1', 'tkt-2', 'tkt-3']);
+    expect(await run({ typeId: 'task' })).toEqual(['tkt-1', 'tkt-2', 'tkt-3', 'tkt-4']);
     expect(await run({ stateId: 'doing' })).toEqual(['tkt-1']);
-    expect(await run({ stateCategory: 'open' })).toEqual(['tkt-3']);
+    expect(await run({ stateCategory: 'open' })).toEqual(['tkt-3', 'tkt-4']);
     expect(await run({ due: { before: '2026-08-31' } })).toEqual(['tkt-1']);
     expect(await run({ due: { after: '2026-08-21' } })).toEqual(['tkt-2']);
     expect(await run({ text: 'licence' })).toEqual(['tkt-1']);
@@ -365,7 +443,7 @@ describe('compileFilterSpec — executed against Postgres', () => {
     // latest-version CTE answers tkt-1 here; a workspace-correlated one
     // answers tkt-2.
     expect(await run({ blocked: true })).toEqual(['tkt-2']);
-    expect(await run({ blocked: false })).toEqual(['tkt-1', 'tkt-3']);
+    expect(await run({ blocked: false })).toEqual(['tkt-1', 'tkt-3', 'tkt-4']);
   });
 
   it('executes every hostile input as data: no error, no damage, and empty only where empty is the truth', async () => {
@@ -412,5 +490,159 @@ describe('compileFilterSpec — executed against Postgres', () => {
       await expect(run({ text: hostile })).resolves.toEqual([]);
     }
     expect(await run({ text: 'trade licence' })).toEqual(['tkt-1']);
+  });
+
+  /**
+   * The one byte the door refuses, executed. Every assertion above sends bytes
+   * the store can hold; U+0000 is the byte it cannot, and the schema's refusal
+   * is only load-bearing if the alternative is a real database error rather
+   * than a hypothesis. So the spec is built as a `FilterSpec` DIRECTLY — past
+   * the door, which is the only way to reach the compiler with a NUL at all —
+   * and the query is run.
+   */
+  describe('U+0000 — refused at the door because Postgres cannot carry it', () => {
+    const NUL = String.fromCharCode(0);
+    const withNul = `a${NUL}b`;
+
+    const slots: Array<[string, FilterSpec]> = [
+      ['assigneeId', { assigneeId: withNul }],
+      ['collaboratorId', { collaboratorId: withNul }],
+      ['typeId', { typeId: withNul }],
+      ['stateId', { stateId: withNul }],
+      ['text', { text: withNul }],
+      ['fields[].fieldId', { fields: [{ fieldId: withNul, op: 'eq', value: 'v' }] }],
+      ['fields[].value', { fields: [{ fieldId: 'memo', op: 'eq', value: withNul }] }],
+    ];
+
+    it('the door refuses it in all seven slots', () => {
+      expect(slots).toHaveLength(7);
+      for (const [name, spec] of slots) {
+        expect(filterSpecSchema.safeParse(spec).success, `${name} admitted a NUL`).toBe(false);
+      }
+    });
+
+    it('and past the door every one of those slots is a 22021, which is what the refusal is FOR', async () => {
+      for (const [name, spec] of slots) {
+        // `compileFilterSpec` is happy: it parses, compiles and binds this
+        // correctly. The failure is at the wire, which is exactly why a schema
+        // that admitted it would have moved a 400 to a 500.
+        const params = new SqlParams();
+        expect(compileFilterSpec(spec, params).clauses).toHaveLength(1);
+        await expect(run(spec), `${name} did not raise`).rejects.toMatchObject({ code: '22021' });
+      }
+    });
+
+    it('the paired positive control: the same seven specs with the NUL removed pass the door AND execute', async () => {
+      const clean: Array<[string, FilterSpec]> = [
+        ['assigneeId', { assigneeId: 'ab' }],
+        ['collaboratorId', { collaboratorId: 'ab' }],
+        ['typeId', { typeId: 'ab' }],
+        ['stateId', { stateId: 'ab' }],
+        ['text', { text: 'ab' }],
+        ['fields[].fieldId', { fields: [{ fieldId: 'ab', op: 'eq', value: 'v' }] }],
+        ['fields[].value', { fields: [{ fieldId: 'memo', op: 'eq', value: 'ab' }] }],
+      ];
+      expect(clean).toHaveLength(slots.length);
+      for (const [name, spec] of clean) {
+        expect(filterSpecSchema.safeParse(spec).success, `${name} clean spec refused`).toBe(true);
+        await expect(run(spec), `${name} clean spec raised`).resolves.toEqual([]);
+      }
+    });
+  });
+
+  /**
+   * DELIBERATELY UNSAFE — the compiler this project does NOT have.
+   *
+   * It interpolates the field id and value as quoted SQL literals instead of
+   * binding them. It exists so the `fieldId` slot has an execution-grade kill
+   * that is a WIDENED RESULT SET rather than a syntax error: a syntax error is
+   * the weak kind of evidence, because it only shows the payload produced
+   * *invalid* SQL, not that binding is what keeps the answer correct. Do not
+   * export it, do not call it from `src/`, do not "fix" it.
+   */
+  function unsafeConcatenatedFieldClause(fieldId: string, value: string): string {
+    return `t.fields -> '${fieldId}' ->> 'value' = '${value}'`;
+  }
+
+  /** Runs the unsafe clause with the SAME caller scope `run()` uses. */
+  async function runConcatenated(fieldId: string, value: string, workspaceId = WS_A): Promise<string[]> {
+    const params = new SqlParams();
+    const scope = `t.workspace_id = ${params.add(workspaceId)}`;
+    const { rows } = await db.pool.query(
+      `SELECT t.ticket_id FROM proj_tickets t WHERE ${scope} AND ${unsafeConcatenatedFieldClause(fieldId, value)}`,
+      params.toArray(),
+    );
+    // Sorted in JS: the payload's trailing `--` comments out the ORDER BY, so
+    // the reference query cannot be relied on to order its own rows.
+    return rows.map((r) => (r as { ticket_id: string }).ticket_id).sort();
+  }
+
+  it('a concatenated fieldId WIDENS the answer across the tenant boundary; the bound one narrows to nothing', async () => {
+    // Concatenated, this closes the jsonb key literal, ORs a tautology and
+    // comments away the tail — including the caller's own ORDER BY and, by
+    // precedence, the effect of the workspace scope: `(ws = $1 AND …) OR TRUE`.
+    const widening = "amount' ->> 'value' IS NOT NULL OR '1'='1' --";
+
+    // The kill, and it is a widening rather than an error: another tenant's row.
+    const leaked = await runConcatenated(widening, 'v');
+    expect(leaked).toContain('tkt-b1');
+    expect(leaked).toEqual(['tkt-1', 'tkt-2', 'tkt-3', 'tkt-4', 'tkt-b1']);
+
+    // The real compiler, same bytes: the payload is one jsonb key nothing has.
+    expect(await run({ fields: [{ fieldId: widening, op: 'eq', value: 'v' }] })).toEqual([]);
+
+    // The positive control that makes the widening evidence about the PAYLOAD
+    // rather than about the reference compiler being broken in general: on a
+    // benign field id the unsafe compiler answers exactly what the real one does.
+    expect(await runConcatenated('amount', '4200')).toEqual(['tkt-1']);
+    expect(await run({ fields: [{ fieldId: 'amount', op: 'eq', value: '4200' }] })).toEqual(['tkt-1']);
+  });
+
+  it('a mis-filed search row cannot answer out of the wrong workspace — the correlation is what refuses it', async () => {
+    // tkt-4 is a WS_A ticket whose proj_search row is filed under WS_B.
+    // With the correlation, a WS_A search for its title finds nothing.
+    expect(await run({ text: 'audit' })).toEqual([]);
+
+    // Positive control #1: the row exists and the term genuinely matches it, so
+    // the empty above is a refusal and not an absent fixture.
+    const { rows: searchRows } = await db.pool.query(
+      `SELECT ticket_id, workspace_id FROM proj_search WHERE tsv @@ websearch_to_tsquery('simple', $1)`,
+      ['audit'],
+    );
+    expect(searchRows).toEqual([{ ticket_id: 'tkt-4', workspace_id: WS_B }]);
+
+    // Positive control #2 — the killer. The SAME query with the correlation
+    // deleted returns tkt-4: that one conjunct is the whole difference, and
+    // removing it from the compiler reddens the assertion above.
+    const { rows: uncorrelated } = await db.pool.query(
+      `SELECT t.ticket_id FROM proj_tickets t
+         WHERE t.workspace_id = $1
+           AND t.ticket_id IN (SELECT ticket_id FROM proj_search WHERE tsv @@ websearch_to_tsquery('simple', $2))`,
+      [WS_A, 'audit'],
+    );
+    expect(uncorrelated.map((r) => (r as { ticket_id: string }).ticket_id)).toEqual(['tkt-4']);
+
+    // And the ordinary path still works, so the correlation has not broken search.
+    expect(await run({ text: 'licence' })).toEqual(['tkt-1']);
+  });
+
+  it("contains: '' is a field-PRESENCE predicate, exactly as the schema declares — and still cannot widen", async () => {
+    // `eq: ''` is a value claim: only the ticket whose `memo` IS the empty string.
+    expect(await run({ fields: [{ fieldId: 'memo', op: 'eq', value: '' }] })).toEqual(['tkt-4']);
+    // `contains: ''` compiles to ILIKE '%%', which every non-NULL text matches:
+    // presence, not content. It matches the empty memo…
+    expect(await run({ fields: [{ fieldId: 'memo', op: 'contains', value: '' }] })).toEqual(['tkt-4']);
+    // …and a non-empty value of another key, on the ticket that carries it.
+    expect(await run({ fields: [{ fieldId: 'notes', op: 'contains', value: '' }] })).toEqual(['tkt-1']);
+    // The two ways it does NOT widen: a key no ticket carries matches nothing,
+    // and a key present with a JSON null value matches nothing either — `->>`
+    // yields SQL NULL, and NULL ILIKE '%%' is not true.
+    expect(await run({ fields: [{ fieldId: 'no-such-field', op: 'contains', value: '' }] })).toEqual([]);
+    expect(await run({ fields: [{ fieldId: 'blank', op: 'contains', value: '' }] })).toEqual([]);
+    // The control for that last one: the key really is there.
+    const { rows } = await db.pool.query(
+      `SELECT (fields -> 'blank' -> 'value') IS NOT NULL AS present FROM proj_tickets WHERE ticket_id = 'tkt-4'`,
+    );
+    expect((rows[0] as { present: boolean }).present).toBe(true);
   });
 });

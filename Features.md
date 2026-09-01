@@ -142,13 +142,24 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-- ⚙️ **FilterSpec compiler** — one strict zod shape (`@gisik-nokma/domain`) compiled to parameterized SQL; user bytes travel only as parameters, injection-proven against planted hostile input executed against a live database. The two clauses that reach another table (`proj_search`, the blocked-states CTE) carry their own `workspace_id = t.workspace_id` correlation, so a filter term cannot answer out of a neighbouring tenant. `packages/domain/src/filter-spec.ts`, `apps/server/src/read/sql-params.ts`, `apps/server/src/read/compile-filter.ts`
+*(Plan 5, Task 2 only — the FilterSpec shape and its SQL compiler. Plan 5's own catalogue task
+(Task 16) owns §7's full body and will replace this scope note; what follows is what Task 2 added,
+and nothing else. Plan 5 Task 1 (`docToPlainText`) is catalogued in §3, beside the ledger material
+it belongs to, not here. Still absent rather than missing from this section: `workspace.settings_set`
+and its projection, the SQL visibility predicate, `proj_search`, the read models, every `/v1` read
+route (board, list, search, My Work, attention, builder reads, preferences), and the stream hub with
+its WebSocket route — Plan 5 Tasks 3–15. §8 is reserved for Plan 6 and stays absent on the same
+rule: the coordination doc assigns `Features.md` sections one per implementation plan, so numbering
+is claimed from that table rather than taken next-free.)*
+
+- ⚙️ **FilterSpec compiler** — one strict zod shape (`@gisik-nokma/domain`) compiled to parameterized SQL; user bytes travel only as parameters, injection-proven against thirteen planted hostile inputs executed against a live database. The proof is that the emitted SQL is a CONSTANT, pinned clause by clause, rather than that a value fails to appear in it — a substring check reddens on a correct compiler the moment the value is `$1`, `t.`, `SELECT`, `->>` or `ESCAPE`, and a guard that fires on correct code gets deleted. A concatenating reference compiler stands beside it in the test, only to show what the bound one prevents: the same `fieldId` payload widens its answer past the caller's workspace scope to another tenant's ticket, which is a widened result set rather than the weaker kill a syntax error would be. **The door refuses exactly one byte on sight: U+0000**, in all seven free-form string slots, because Postgres `text` cannot carry it — every other control character, DEL and a lone surrogate included, round-trips and is admitted, so the rule is "what the store can hold" and not a taste for tidy input; the executed test shows each slot raising SQLSTATE 22021 past the door, which is what makes the refusal a 400 instead of a 500. A due bound is the shared `IST_DAY_REGEX`, imported rather than restated, and constrains day SHAPE, not calendar existence — fixed-width padding is what makes the compiled text comparison chronological. `fields[].value` deliberately carries no `.min(1)`: `eq: ''` is a real claim, so `contains: ''` is a declared field-PRESENCE predicate that still cannot widen a read. The two clauses that reach another table (`proj_search`, the blocked-states CTE) carry their own `workspace_id = t.workspace_id` correlation, so a filter term cannot answer out of a neighbouring tenant — executable because `proj_tickets.ticket_id` is globally unique, which makes a correctly-filed neighbouring row harmless and projection DRIFT (a search row filed under the wrong workspace) the thing the correlation actually refuses. `packages/domain/src/filter-spec.ts`, `apps/server/src/read/sql-params.ts`, `apps/server/src/read/compile-filter.ts`
 
 ## 9. Editor, documents & attachments
 
-*Plan 7's client half. §6/§7/§8 are reserved for Plans 4/5/6 and are deliberately absent — the
-coordination doc assigns `Features.md` sections one per implementation plan, so numbering is claimed
-from that table rather than taken next-free.*
+*Plan 7's client half. §8 is reserved for Plan 6 and is deliberately absent — the coordination doc
+assigns `Features.md` sections one per implementation plan, so numbering is claimed from that table
+rather than taken next-free. (§6 and §7 were named here as absent too; both have since been opened,
+by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is unchanged.)*
 
 - ⚙️ **Document schema v1** — `DOC_SCHEMA_VERSION = 1`, `emptyDoc()`, `isDocJson()`, and
   `VersionedDocument`, a replacement for Tiptap's `Document` that carries `schemaVersion` on the doc
@@ -203,7 +214,7 @@ from that table rather than taken next-free.*
 
 *(Plan 10, Task 4 only — the LIFTED §11 closer and the contested-claims read path. Plan 10's own
 catalogue task (Task 18) owns §12's full body and will replace this scope note; what follows is what
-Task 4 added, and nothing else. §7/§8/§10/§11 stay absent because the coordination doc assigns
+Task 4 added, and nothing else. §8/§10/§11 stay absent because the coordination doc assigns
 `Features.md` sections one per implementation plan and numbering is claimed from that table, never
 taken next-free. Still absent rather than missing from this section: the snapshot writer, the replica
 bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Tasks 5–17.)*
