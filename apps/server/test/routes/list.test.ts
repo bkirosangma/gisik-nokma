@@ -28,10 +28,11 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  *
  * 1. **Pagination.** The seeded world holds three tickets a member may see —
  *    fewer than one default page — so a page-size assertion against it could
- *    only ever pass. `bulkProject` therefore carries SIXTY tickets, which is the
- *    only fixture on the branch that can tell `DEFAULT_LIMIT = 50` from
- *    `DEFAULT_LIMIT = 1000`, and its second page holds DIFFERENT ids from its
- *    first.
+ *    only ever pass. `bulkProject` therefore carries SIXTY tickets, and its
+ *    second page holds DIFFERENT ids from its first. MEASURED: changing
+ *    `DEFAULT_LIMIT` from 50 to 1000 reddens exactly one case, the one that
+ *    walks this project — so this fixture is what pins the default, and no
+ *    smaller one here would have noticed.
  * 2. **Ordering.** The contract IS `ticket_id` order, so no fixture can make the
  *    correct order differ from id order — that would be asserting the opposite
  *    of the contract. What a fixture CAN do is make id order differ from
@@ -810,6 +811,34 @@ describe('GET /v1/projects/:projectId/tickets — the door', () => {
     // their 404 is about tenancy and not about them being unauthenticated.
     expect(await idsOf('owner', read.world.projectId, { limit: 200 })).toHaveLength(5);
     expect(await idsOf('neighbour', read.neighbour.projectId)).toEqual([read.neighbour.ticketId]);
+  });
+
+  it('7.84 the board’s 404 and the list’s are the SAME body, and neither route mutates the object they share', async () => {
+    // Both routes now send one frozen `READ_NOT_FOUND_BODY`. That is what makes
+    // their refusals identical by construction rather than by two literals
+    // agreeing today — but sharing a reference across two `reply.send` calls is
+    // a thing worth checking rather than assuming, so this walks both routes,
+    // in both orders, and compares.
+    const listFirst = await getList('stranger', read.world.projectId);
+    const board = await read.app.inject({
+      method: 'GET',
+      url: `/v1/projects/${read.world.projectId}/board`,
+      headers: read.authOf('stranger'),
+    });
+    const listAgain = await getList('stranger', read.world.projectId);
+
+    expect(listFirst.statusCode).toBe(404);
+    expect(board.statusCode).toBe(404);
+    expect(board.json()).toEqual(listFirst.json());
+    // …and the second list refusal, taken AFTER the board sent the same object,
+    // is byte-for-byte what the first one was. A route that mutated the shared
+    // body would show up here and nowhere else.
+    expect(listAgain.json()).toEqual(listFirst.json());
+    expect(listAgain.headers['content-length']).toBe(listFirst.headers['content-length']);
+
+    // Positive control: this stranger is a real session, so the 404s above are
+    // the tenancy gate and not a broken app answering 404 to everything.
+    expect(await idsOf('member', read.world.projectId)).toEqual(memberVisible());
   });
 
   it('7.17 an on-workspace, off-project member gets 200 with `groups: []`, not a 404 — the workspace is the boundary, the project roster is not', async () => {
