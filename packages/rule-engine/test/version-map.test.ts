@@ -172,7 +172,7 @@ describe('resolveCurrentStateId', () => {
     expect(workflowIdsAsked()).toEqual(['wf']);
   });
 
-  it('asks inside the CALLER\'s workspace, not the ticket\'s — the scope is the event\'s (ruling P14)', async () => {
+  it("asks inside the CALLER's workspace, not the ticket's — the scope is the event's (ruling P14)", async () => {
     // `ticketAt` sits in `ws_1`; `SCOPE` is `ws_event`. The two differ on
     // purpose. Reading the tenancy off the ticket — `resolveStateIdForward(ticket, …)`
     // type-checks, because a `TicketState` satisfies `TenantScope` structurally —

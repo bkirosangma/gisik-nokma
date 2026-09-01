@@ -53,10 +53,11 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   registry.register(workflowsProjection);
   // §8 position 3 (Plan 3 Chain B Task 9). It INSERTS above proj_projects,
   // which had been immediately after proj_workflows only because this position
-  // was empty. Nothing registered below reads proj_ticket_types today — Task 12
-  // wires the engine context onto it — but proj_tickets (position 5) resolves a
-  // ticket's type inside the same ingest transaction, so the ladder is applied
-  // before anything that could ask about it.
+  // was empty. Nothing registered BELOW reads proj_ticket_types — the engine
+  // context reads it (Task 12 wired `getTicketTypeDef` onto it) and that runs
+  // before any projection — but proj_tickets (position 5) resolves a ticket's
+  // type inside the same ingest transaction, so the ladder is applied before
+  // anything that could ask about it.
   registry.register(ticketTypesProjection);
   // §8 position 4.
   registry.register(projProjects);

@@ -47,8 +47,8 @@ import { getWorkflowDefFromProjection, getWorkflowDefsInForce } from './workflow
  *    (2026-08-26). It is the plan's **Open question 11**, scoped out
  *    deliberately rather than smuggled in: the fix is not symmetric with the
  *    workflow one, because giving proj_ticket_types history means changing its
- *    primary key, and `getTicketTypeFromDb` has readers in Task 12's engine
- *    context and in Plans 4–5. Recorded **UNASSIGNED** in
+ *    primary key, and `getTicketTypeFromDb` has readers in the engine context
+ *    (Task 12) and in Plans 4–5. Recorded **UNASSIGNED** in
  *    `docs/plan-3-chain-b-handoff.md`: no plan in the series has an open task on
  *    that table's key, and parking it on one that has none would be a handoff
  *    nobody receives.
