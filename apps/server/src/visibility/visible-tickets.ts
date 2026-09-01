@@ -1,70 +1,57 @@
 import type { Queryable } from '../db/queryable.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
+import { SqlParams } from '../read/sql-params.js';
+import { visibleTicketsWhere } from '../read/visible-where.js';
 
 /**
- * Every ticket in one workspace that this viewer may see — the same decision
- * table as `canSeeResolved`, expressed as one SQL predicate so a list never
- * does N round-trips.
+ * Every ticket in one workspace that this viewer may see — one round trip,
+ * against `visibleTicketsWhere`.
+ *
+ * ## The decision table used to be WRITTEN HERE, and is not any more
+ *
+ * This function carried the SQL half of Plan 4's read table inline: three
+ * hand-written queries, one per role branch. Plan 5 Task 5 needs the same
+ * predicate for the list, board, search, attention and My Work endpoints, and
+ * writing it a second time would have made a THIRD copy of a table this
+ * function's own docblock already flagged as said twice. So the clause was
+ * EXTRACTED to `../read/visible-where.ts` and this function became one of its
+ * callers. Everything that was claimed here about exhaustiveness, about the
+ * mode side not being compiler-checkable, and about admins getting no bypass
+ * moved with it — those are claims about the predicate, and leaving them here
+ * describing a switch that no longer exists would be the drift the extraction
+ * was for.
+ *
+ * Behaviour is unchanged and that is checked rather than asserted:
+ * `test/visibility/visible-tickets.test.ts` is untouched by this change and
+ * still passes, including the owner-bypass, cross-workspace and guest-inherits
+ * cases.
  *
  * ## The rows are `proj_visibility`'s, and that is a fact about today
  *
  * The plan text has this function joining `proj_tickets` and returning ticket
- * rows. **`proj_tickets` does not exist on this branch** — Plan 3 Task 12 owns
- * it and has not run — so the join is not written, and no migration for it is
- * invented here: a table this plan authored would be a second, competing
- * definition of Plan 3's projection. What comes back is the visibility row,
- * which carries `ticket_id`, `project_id` and the resolved audience. The
- * declared contract is `Array<Record<string, unknown>>` and Task 8's route
- * reads `ticket_id`, so the shape change is invisible to the published
- * interface; when `proj_tickets` lands, this becomes
+ * rows. `proj_tickets` did not exist when this was written (Plan 3 Task 12 has
+ * since landed it); what comes back is still the visibility row, which carries
+ * `ticket_id`, `project_id` and the resolved audience. The declared contract is
+ * `Array<Record<string, unknown>>` and Task 8's route reads `ticket_id`, so the
+ * shape is invisible to the published interface. When a caller needs ticket
+ * columns this becomes
  * `SELECT t.* FROM proj_tickets t JOIN proj_visibility v USING (ticket_id)`
- * with the same WHERE clause and the same tests. Recorded as case 6.61.
+ * with the same WHERE clause and the same tests — which is exactly the shape
+ * Plan 5's read endpoints build, through the same predicate. Recorded as case
+ * 6.61.
  *
- * ## This function is the decision table SAID TWICE
+ * ## The workspace clause is this function's, not the predicate's
  *
- * Once in `canSeeResolved`, once in SQL — the two-sources-of-truth shape this
- * series keeps catching. It is kept because the SQL is what makes a list one
- * round trip against an indexed predicate rather than a workspace-sized read
- * filtered in memory, and the cost is paid by a test rather than by a comment:
- * `test/visibility/visible-tickets.test.ts` asserts, for EVERY viewer class in
- * one fixture, both the exact id set expected and that `canSee` agrees ticket
- * by ticket. Per-viewer expectations alone would not catch a branch that
- * disagrees; the cross-check alone can agree vacuously on two empty answers.
- * Both, together, are what stop the copies drifting.
+ * `visibleTicketsWhere` carries no tenancy of its own — for an owner it
+ * compiles to `TRUE` — so the `v.workspace_id = $n` below is the only thing
+ * scoping an owner's read to one workspace. It is bound through the same
+ * `SqlParams` so its `$n` and the predicate's cannot drift apart.
  *
- * ## The role side is compiler-exhaustive; the mode side, here, cannot be
- *
- * The two copies of the decision table must fail the same way when somebody
- * widens a union, and for the ROLE they now do. The role is dispatched in
- * TypeScript, so it is walked by the same BARE `switch` with no `default` that
- * `canSeeResolved` uses: the `Promise<Array<Record<string, unknown>>>`
- * annotation means a role no `case` names ends the function without returning,
- * and tsc refuses it with TS2366. Adding `| 'viewer'` to `WorkspaceRole`
- * reddens BOTH files. Before this, both copies carried the same if-chain and
- * the same fall-through, and a new role was silently handed the member branch —
- * here, that is the whole `'workspace'`-mode slice of the workspace in one
- * round trip.
- *
- * **The guards differ in kind on the MODE side, and that difference is not
- * fixable here.** `canSeeResolved` switches on `resolvedMode`, so a fourth mode
- * raises TS2366 there. In this function the modes are string literals inside a
- * SQL string — `'workspace'`, `'project'`, `'explicit'` — which the compiler
- * cannot see at all. A fourth mode would be a silent no-match, so it fails
- * CLOSED (rows excluded from every non-owner list) rather than granting; the
- * copies would drift, not leak. What catches that is the cross-check in
- * `test/visibility/visible-tickets.test.ts` — every viewer class asserted both
- * against an exact id set and against `canSee` ticket by ticket — and only if
- * the fixture is extended to carry the new mode. Recorded as case 6.65.
- *
- * ## Membership through `resolveEffectiveRole`, never a direct SELECT
- *
- * A project-scope `proj_memberships` row survives a revocation by design (see
- * `canSee`'s docblock and `../permissions/effective-role.ts`). `eff.projects`
- * below is empty for anyone with no workspace role, which is where the guard
- * lives; `$3::text[]` is therefore `{}` for a revoked member and matches no
- * project. The `workspaceRole === null` early return makes that moot, and both
- * are kept: the return is the honest answer, the empty array is the reason a
- * mistake in the return would still not leak project-mode tickets.
+ * The `workspaceRole === null` early return is kept as well as the predicate's
+ * `'FALSE'`: it is the honest answer without a round trip, and the predicate is
+ * the reason a mistake here would still not leak. `eff.projects` is empty for
+ * anyone with no workspace role (`resolveEffectiveRole`), so even the member
+ * branch would match no project.
  */
 export async function listVisibleTickets(
   db: Queryable,
@@ -76,53 +63,14 @@ export async function listVisibleTickets(
     return [];
   }
 
-  // A BARE switch with no `default`, exactly as in `canSeeResolved` — see the
-  // exhaustiveness note above. Do not add one.
-  switch (eff.workspaceRole) {
-    // The owner reads the whole workspace (owner decision 2026-08-27) — the
-    // same disclosed power `canSeeResolved` grants, and the reason an owner
-    // viewer is one of the classes the cross-check enumerates.
-    case 'owner': {
-      const { rows } = await db.query<Record<string, unknown>>(
-        `SELECT v.* FROM proj_visibility v
-         WHERE v.workspace_id = $1
-         ORDER BY v.ticket_id`,
-        [workspaceId],
-      );
-      return rows;
-    }
-
-    // A guest reaches explicit lists and nothing else — no project clause here
-    // at all, matching canSeeResolved's guest branch, which does not consult
-    // eff.projects either.
-    case 'guest': {
-      const { rows } = await db.query<Record<string, unknown>>(
-        `SELECT v.* FROM proj_visibility v
-         WHERE v.workspace_id = $1
-           AND v.resolved_mode = 'explicit'
-           AND $2 = ANY (v.resolved_user_ids)
-         ORDER BY v.ticket_id`,
-        [workspaceId, userId],
-      );
-      return rows;
-    }
-
-    // member and admin: identical, because an admin gets no read bypass.
-    case 'admin':
-    case 'member': {
-      const memberProjects = [...eff.projects.keys()];
-      const { rows } = await db.query<Record<string, unknown>>(
-        `SELECT v.* FROM proj_visibility v
-         WHERE v.workspace_id = $1
-           AND (
-             v.resolved_mode = 'workspace'
-             OR (v.resolved_mode = 'project' AND v.project_id = ANY ($3::text[]))
-             OR (v.resolved_mode = 'explicit' AND $2 = ANY (v.resolved_user_ids))
-           )
-         ORDER BY v.ticket_id`,
-        [workspaceId, userId, memberProjects],
-      );
-      return rows;
-    }
-  }
+  const params = new SqlParams();
+  const workspaceClause = `v.workspace_id = ${params.add(workspaceId)}`;
+  const visibleClause = visibleTicketsWhere(eff, userId, params);
+  const { rows } = await db.query<Record<string, unknown>>(
+    `SELECT v.* FROM proj_visibility v
+      WHERE ${workspaceClause} AND ${visibleClause}
+      ORDER BY v.ticket_id`,
+    params.toArray(),
+  );
+  return rows;
 }
