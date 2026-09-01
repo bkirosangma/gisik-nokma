@@ -298,7 +298,7 @@ describe('stream hub — live tail', () => {
     ]);
   });
 
-  it('7.32 filters every drain for the subscription\'s OWN user', async () => {
+  it('7.32/7.134 filters every drain for the subscription\'s OWN user', async () => {
     const shared = newUlid();
     const secret = newUlid();
     const other = newUlid();
