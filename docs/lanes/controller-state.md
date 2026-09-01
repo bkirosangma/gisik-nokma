@@ -10,16 +10,17 @@ decision boundary.
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
-## Anchors — verified 2026-08-31, at `c93c910`
+## Anchors — verified 2026-09-01, at `1003d8d`
 
 | what | value |
 |---|---|
-| `main` | `27dba39` **as of 05:10 IST 1 Sep — goes stale by design.** #50 (this file) merged after `33538be` |
-| last forced gate | **`33538be`** — 21/21, 0 cached, **1070 tests**, `TURBO_EXIT=0`, node **v22.22.2**. Still valid at `27dba39`: delta is doc-only |
+| `main` | `1003d8d` **as of 10:53 IST 1 Sep — goes stale by design.** #55 (task ledger) merged after `edbb940` |
+| last forced gate | **`1003d8d`** — 21/21, 0 cached, **1070 tests**, `TURBO_EXIT=0`, node **v22.22.2**, 15.6s. Re-run here rather than carried: #55 put `package.json` and `scripts/check-task-ledger.mjs` in the delta, so the **previous "still valid, delta is doc-only" reasoning stopped applying** — the anchor moved because the argument for keeping it expired, not because anything went red. Composition unchanged from `33538be`. |
 | gate composition | domain 276 · rule-engine 278 · server **275** · app-core 130 · editor 72 · ui 31 · sync-client 8 |
 | **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
 | collision surfaces | fixtures **84** · projections **5** (`contested`, `entity_heads`, `memberships`, `visibility`, `workflows`) · packages 6 |
-| open PRs | none at time of writing — **re-measure** |
+| open PRs | none at time of writing — **re-measure, and do not wait for the monitor to tell you.** Its guard suppresses the zero → one transition, which is the step-PR-appears event |
+| task ledger | **13 done · 33 claimed · 4 in-flight · 127 todo** of **177** (`pnpm check:tasks`). Quote it; do not reconstruct a percentage from prose |
 
 **Re-measure everything above on resume.** Recount at the sha you report; do not carry a composition
 forward — five of six package counts staying right is what makes the sixth invisible. `app-core` went
@@ -165,9 +166,10 @@ return ever emptied. **Closer, so it is not re-litigated: a branded type** carry
 `resolveEffectiveRole` can produce — turning a silent grant into a compile error.
 
 > ### ⚠ IN-FLIGHT NOW — `exec/04-t8-t14-enforcement` (step 7)
-> **Cut from `main` at `33538be`, 7 commits, pushed.** T8, T9, T10 landed; **T11 (floor-list) running**;
+> **Cut from `main` at `33538be`, 7 commits, pushed.** T8, T9, T10 landed; **T11 reviewed, fix round running**;
 > T12 + **T13 (BLIND — its dispatch must carry 6.52/6.53)** then T14 (floor-list) follow. Branch gate
-> **1115 tests**. `main`'s executor handoff is a step behind and does not name this branch — **hand it to
+> **1138 tests at T11's sha and still moving — the fix round will change it.** `main`'s executor handoff is a
+> step behind and does not name this branch — **hand it to
 > any relaunched executor.**
 > **T8 closed P22**: `EffectiveRole` is branded with a module-private `unique symbol`, so a hand-built one
 > fails `TS2741`. Provenance is compiler-enforced, not conventional.
@@ -367,6 +369,43 @@ depended on an unchecked assumption, shipped one hour after that rule was writte
 
 ## Standing owner rulings currently in force
 
+- **RULING P23 (2026-09-01) — the `ScopeRevokedInstruction` blessing is SCOPE-WIDE ONLY; 6.101's
+  per-event extension is settled by PROBE, not by the docblock.** Raised by the executor when the
+  escalation condition set for it actually fired — the fix agent derived that the docblock *does* bless
+  the itemised purge and kept the behaviour on that basis.
+  - **Accepted:** the guest-side fix (`!isGuest` gate). M1 reddens exactly 2, M6 reddens 6 with 6.100
+    green because it is an exclusion — each side killed only by the mutation that touches it.
+  - **Blessing HOLDS at the revocation boundary, and is not reopened.** The decisive source is that
+    `Features.md` line 120 **had already shipped this rule**, making the guest-side behaviour a failure
+    to honour an existing contract rather than the fix inventing an allowance. A fix round does not
+    reopen a shipped contract.
+  - **It does NOT carry the per-event subtree purge.** The argument for extending it reasons about
+    **cardinality only**, and the 6.14 precedent rests on cardinality **and relationship** — 6.14 is
+    tolerable because the viewer ALREADY HOLDS THE CHILD. Drop the relationship axis and 6.14 stops being
+    a precedent for anything; it degrades into "small leaks are fine", which is not what it says.
+    The cardinality half is itself the wrong-subject class: *"one subtree per event is smaller than the
+    whole workspace at once"* compares a **per-emission** quantity against a **per-boundary** one. The
+    per-event walk fires far more often and nobody has measured the integral over a sync window.
+  - **THE PROBE THAT SETTLES IT — and it needs no prior-audience reconstruction, so the 6.82/6.94
+    second-definition ban does not block it.** The question is not historical: *does the member-side walk
+    ever emit a purge for an entity that member's replica does not hold?* Build it like the probe that
+    found the original Critical — member M, ticket N in a subtree M cannot see and never held, fire the
+    trigger, read M's sync-down. **`purge:N` appears** → blessing does not reach it, gate it and disclose
+    the under-purge residual as a sibling of 6.102 (stale local data is the safe direction, and the guest
+    side already chose it). **Never appears** → relationship holds, it IS 6.14's shape, land it and
+    **record the probe as the evidence, not the docblock.**
+  - **The point of ruling it this way:** a docblock written for a bounded case must not become the thing
+    that licenses the unbounded one. Making the code's measured behaviour the evidence is what stops that.
+  - **RESOLVED THE SAME DAY — BRANCH ONE FIRED. DO NOT RE-RUN THIS PROBE.** No new experiment was
+    needed: the fix round's own shipped test already answers it. Case 6.101 seeds ticket `foreign` in a
+    project the viewer was **never on**, asserts `canSee(viewer, foreign) === false` immediately before
+    the trigger, and then asserts ``expect(ids).toContain(`purge:${foreign}`)``. The member-side walk
+    **does** emit a purge for an entity the member's replica does not hold. **Relationship absent →
+    gate it**, accept the under-purge residual, disclose it as a sibling of 6.102. Prior audience is NOT
+    to be reconstructed (6.82/6.94). 6.101's comment must be rewritten to state the relationship
+    reasoning: it currently argues from spec §6 for the rejected conclusion, and **a false sentence a
+    maintainer reasons from is worse than a missing one.**
+
 - **Fable is not dispatched, for any role.** Sonnet default, opus by exception, hard cap **6 subagents per
   task**, one fan-out per plan, judgment fan-outs withdrawn. Cost ledger of what this trade has already
   cost is in the ruling — **add to it, do not re-argue it.** Note fable was the **premium** tier the
@@ -445,6 +484,20 @@ Every one below was violated by a controller that had just written it. **Assume 
   > executed. Alone, "343/343 green" is equally consistent with a coverage gap and with an unexecuted
   > path, and those two demand opposite responses (write the test vs. delete the branch). The green run
   > is only interpretable next to the red one. **Pair them or report neither.**
+- **AN INABILITY TO TELL TWO CASES APART IS A REASON TO TAKE THE SAFE BRANCH, NOT A LICENCE TO TAKE THE
+  UNSAFE ONE.** Found 2026-09-01 inside case 6.101's own comment, which argued the disclosure was correct
+  because `canSee` now is *"true of a ticket taken away and equally true of one never held, and this
+  module cannot ask the other question."* That is reasoning FROM an inability TO a permission. The module
+  cannot distinguish *lost access* from *never had access*, and it resolved the ambiguity toward the
+  disclosing branch. The guest side had already been gated for precisely this; the member side inherited
+  the same blind spot at a different radius and defended it in a comment.
+  **The tell is a sentence of the form "X and Y are indistinguishable here, so we treat both as Y" where
+  Y is the permissive case.** The valid inference from indistinguishability is always toward the
+  conservative case — here, retaining stale local data rather than emitting an id. Under-purge is
+  recoverable by a resync; a disclosure is not recoverable at all.
+  **And note where it was hiding: in a test's explanatory comment, next to a passing assertion.** The
+  test encoded the wrong behaviour AND the argument for it, so reading the test as documentation
+  propagated the defect. A green suite is not evidence the behaviour it pins is correct.
 - **THE INSTRUMENT'S SCOPE IS NARROWER THAN THE CLAIM BUILT ON IT — three instances, so stop calling it
   a coincidence.** Each time the probe was real, it ran correctly, and it answered truthfully about a
   narrower subject than the sentence written from it. **A right answer about the wrong subject.**
@@ -453,6 +506,13 @@ Every one below was violated by a controller that had just written it. **Assume 
      read as *"pushed"*, truthfully returning `0 6` right after a successful push.
   3. `pnpm exec node -v` answers for **`pnpm exec`**; it was read as *"pnpm"*, and `pnpm run` — the
      command every gate actually uses — behaves differently.
+  4. `git checkout -- <path>` restores from the **INDEX**; the sentence built on it was *"restored to
+     HEAD"*. After an earlier `git checkout <sha> -- <path>` staged the old content, the "restore"
+     truthfully put the PRE-FIX files back and reported success. Found by the executor 2026-09-01,
+     caught by reading the files for named markers rather than by trusting the command's exit.
+  **SUB-PATTERN, now two of the four: a git command that takes an IMPLICIT ref resolves a different one
+  than the writer assumed, and reports success either way** (`@{u}`, `checkout --`). **So name the ref:**
+  `git checkout HEAD -- <path>`, `origin/<branch>...HEAD`. Never the bare implicit form.
   **The check: name the subject your instrument actually ranged over, then reread your sentence and see
   whether it names the same one.** All three passed every falsifiability test that was applied, because
   those tests asked whether the instrument WORKED, and the instrument did work. None asked what it was
