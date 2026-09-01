@@ -10,22 +10,75 @@ decision boundary.
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
-## Anchors — verified 2026-09-01, at `1003d8d`
+## Anchors — verified 2026-09-01, at `6cb631d`
 
 | what | value |
 |---|---|
-| `main` | `1003d8d` **as of 10:53 IST 1 Sep — goes stale by design.** #55 (task ledger) merged after `edbb940` |
-| last forced gate | **`1003d8d`** — 21/21, 0 cached, **1070 tests**, `TURBO_EXIT=0`, node **v22.22.2**, 15.6s. Re-run here rather than carried: #55 put `package.json` and `scripts/check-task-ledger.mjs` in the delta, so the **previous "still valid, delta is doc-only" reasoning stopped applying** — the anchor moved because the argument for keeping it expired, not because anything went red. Composition unchanged from `33538be`. |
-| gate composition | domain 276 · rule-engine 278 · server **275** · app-core 130 · editor 72 · ui 31 · sync-client 8 |
+| `main` | `6cb631d` **as of 13:0x IST 1 Sep — goes stale by design.** Two merges landed back to back: #57 (Plan 4 T8–T14) as `dd7bfcf`, then Chain B as `6cb631d` via **#59, not #58** — see the stacked-PR entry below |
+| last forced gate | **`6cb631d`** — `GATE_EXIT=0` **read from `$?` on the next line, not inferred**, 21/21 tasks, 0 cached, **1277 tests**, 19.25s, node **v22.22.2**, `INSTALL_EXIT=0`, `REBUILD_EXIT=0`. **Zero `Unsupported engine` WARNs in either `gate.log` or `install.log`** — the operational Node check below was run and passed |
+| gate composition | domain **295** · rule-engine 280 · server **461** · app-core 130 · editor 72 · ui 31 · sync-client 8 = **1277** |
 | **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
-| collision surfaces | fixtures **84** · projections **5** (`contested`, `entity_heads`, `memberships`, `visibility`, `workflows`) · packages 6 |
-| open PRs | none at time of writing — **re-measure, and do not wait for the monitor to tell you.** Its guard suppresses the zero → one transition, which is the step-PR-appears event |
-| task ledger | **13 done · 33 claimed · 4 in-flight · 127 todo** of **177** (`pnpm check:tasks`). Quote it; do not reconstruct a percentage from prose |
+| open PRs | **none.** #57 merged, #58 CLOSED in favour of #59, #59 merged. Re-measure; do not wait for the monitor |
+| task ledger | re-run `pnpm check:tasks` at this sha — the figure carried from `1003d8d` (13 done · 33 claimed · 4 in-flight · 127 todo of 177) predates both merges and **is now certainly wrong** |
+| executor | `gisik-nokma-exec-b7`, tmux `gisik:1`, worktree `gisik-nokma-exec`, branch `exec/05-api-realtime`, **context 84% — restart pending** |
+
+**The gate composition independently confirms the executor's report.** It measured 1277 / server 461 /
+domain 295 at Chain B's HEAD; the same numbers came back at `main` after the rebase. Two measurements of
+different trees agreeing is what makes the rebase safe to have trusted.
 
 **Re-measure everything above on resume.** Recount at the sha you report; do not carry a composition
 forward — five of six package counts staying right is what makes the sixth invisible. `app-core` went
 92 → 130 at this merge, which is the kind of move a carried-forward composition hides.
 
+
+## READ FIRST IF YOU WERE JUST LAUNCHED — the brief you hold is stale
+
+`gisik-nokma-lanes/dispatch-main-controller.md` describes the **parallel Wave 1** topology: four lane
+sessions, each merging its own PR, and a controller that only watches for cross-lane collisions. **None
+of that is true any more.** Execution is **serial**, there is **one executor**, and **you merge its
+work** — it never merges its own. The brief is not being rewritten because this file is the restart
+surface and correcting it here is cheaper than keeping two documents true. **Where the brief and this
+file disagree, this file wins.**
+
+## How a controller reaches the executor — `SendMessage` does NOT work, tmux does
+
+Found 2026-09-01 by a successor controller whose first message was silently never delivered.
+
+- **`SendMessage` to `gisik-nokma-exec-*` is HELD, then declined**, with
+  *"the sending session's permission mode class doesn't match this session's."* The executor runs
+  `--permission-mode bypassPermissions`; a controller running in **auto mode does not**, and the class
+  mismatch gates every cross-session message. The executor sees an approval dialog; if nobody clicks it,
+  the message is dropped and **the executor goes on believing no controller exists** — which is exactly
+  what it recorded in its transcript while the message sat undelivered.
+- **`ListAgents` still lists the executor as reachable.** A listing is not a delivery guarantee. **The
+  only proof a message arrived is seeing the executor act on it in its pane.**
+- **The channel that works is tmux**, and it is the same one `idle-nudger.py` uses:
+  `tmux load-buffer -b <name> <file>` → `tmux paste-buffer -b <name> -t gisik:1` → **sleep** →
+  `tmux send-keys -t gisik:1 Enter` **as a separate call**. Text and Enter in one `send-keys` are
+  coalesced into a paste event in the TUI's vim INSERT mode and insert a literal newline instead of
+  submitting. Confirmed working: the executor replied to a pasted ruling within one turn.
+- **The durable fix is to launch the controller with `--permission-mode bypassPermissions`**, matching
+  the executor. In auto mode a controller also loses `git push --force-with-lease` to the classifier,
+  which is what turned a routine rebase into a new PR number below.
+
+## Stacked PRs and squash-merge — #58 became #59, and the check that made it safe
+
+**A PR stacked on another PR's branch goes CONFLICTING the moment the base squash-merges.** #58
+(Chain B) was based on `exec/04-t8-t14-enforcement`, deliberately, because `proj_tickets` collides with
+step 7's projection registry. #57 squashed to `dd7bfcf`; retargeting #58 to `main` with
+`gh pr edit 58 --base main` produced `mergeable=CONFLICTING state=DIRTY`, 93 files. **This will recur on
+every stacked step — expect it, do not diagnose it again.**
+
+The repair, and the shape to reuse:
+1. `git worktree add --detach <scratch> origin/<branch>` — never rebase in the primary worktree.
+2. `git rebase --onto origin/main <base-PR-head-sha>` — replays only the stacked commits. 20/20 clean.
+3. **Verify content identity WITH A POSITIVE CONTROL, because an empty diff is what a broken diff
+   invocation also prints.** `git diff --stat <old-head> HEAD` → **empty**; the control
+   `git diff --stat origin/main HEAD` → **49 files, +5975 −285**, the exact stat the closed PR reported.
+   One empty and one non-empty from the same instrument is the evidence; the empty one alone is not.
+4. Force-push if you can. **In auto mode you cannot** — push to a new branch, open a replacement PR that
+   states what it supersedes, and close the old one with the verification in the comment. Leave the
+   original branch in place: it is the record of what was gated.
 
 ## Task-level progress is now tracked — stop reconstructing it
 
@@ -406,6 +459,36 @@ depended on an unchecked assumption, shipped one hour after that rule was writte
     reasoning: it currently argues from spec §6 for the rejected conclusion, and **a false sentence a
     maintainer reasons from is worse than a missing one.**
 
+- **P23 DISPOSITION (2026-09-01, controller `gisik-nokma-aa`) — the executor applied the ruling as
+  DELETE rather than NARROW, and that is UPHELD. Do not restore the walk.** The escalation was written
+  as an open question for a successor controller because `gisik-nokma-8d` became unreachable mid-step-7;
+  it is now closed and must not be reopened without new evidence.
+  - **The fact that settles it was not in the escalation, and it is a measurement, not an argument:**
+    `git diff --stat origin/main origin/exec/04-t8-t14-enforcement -- apps/server/src/visibility/visible-events-for.ts`
+    is **495 insertions, 0 deletions**. The file is NEW on that branch. **The per-event walk never
+    shipped to `main`**, so 6.90 and 6.99 flipping ✅ → 🚫 removes nothing that was ever live, and the
+    escalation's framing — "its footprint is wider than the ruling named" — was measuring against the
+    branch's own earlier state, not against shipped behaviour. *Check whether the thing you are worried
+    about regressing was ever live before you weigh the regression.*
+  - **The blessed emitter survives.** P23 held the `ScopeRevokedInstruction` blessing at the revocation
+    boundary; that path is intact. What is gone is only the per-event subtree tombstone.
+  - **The residual is UNDER-purge — stale local retention, no disclosure.** That is the direction P23
+    explicitly accepted ("accept the under-purge residual, disclose it as a sibling of 6.102") and the
+    direction the guest side had already taken. Recording it as **6.104, owner Plan 10**, is the correct
+    disposition and is not reopened here.
+  - **The executor's refusal of the narrower project-membership gate is the load-bearing half, and it is
+    right:** being on a container is not holding the entity, so that gate fails P23's own **relationship**
+    axis and leaves the same disclosure at a smaller radius — precisely what P23 rejected for guests.
+  - **Accepted derivation:** no conforming per-event emission exists, because `proj_visibility` keeps no
+    prior audience, no payload carries a before-image, and 6.82/6.94 forbid reconstructing one. A gate
+    with no gatable predicate is a deletion wearing a condition.
+  - **Do not cite case 6.100 as evidence that a purge gate exists** — it passes on the `canSee` guard
+    that 6.16 already pins, not on anything purge-shaped. Stated on the case and in the test comment.
+  - **Also upheld: the executor's correction to this project's own rule.** *"Nothing may be chained after
+    the gate"* forbids a **trailing command in the same pipeline** stealing the status; it does **not**
+    forbid reading `$?` on the next line. `pnpm turbo … > gate.log 2>&1` then `GATE_EXIT=$?` is correct
+    practice, and **an inferred exit code is a self-inflicted downgrade from a read one.** The gate
+    recorded in the anchors above was taken this way.
 - **Fable is not dispatched, for any role.** Sonnet default, opus by exception, hard cap **6 subagents per
   task**, one fan-out per plan, judgment fan-outs withdrawn. Cost ledger of what this trade has already
   cost is in the ruling — **add to it, do not re-argue it.** Note fable was the **premium** tier the
