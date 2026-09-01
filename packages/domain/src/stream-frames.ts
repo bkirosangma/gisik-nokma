@@ -17,6 +17,44 @@ import { ledgerEventSchema, type LedgerEvent } from './ledger-event.js';
  *   {type:'error', workspaceId|null, code, message}
  * ```
  *
+ * **A subscribe's first drain ends with exactly ONE of `caught-up` or
+ * `scope-revoked`, never both and never neither.** A client state machine that
+ * waits for `caught-up` before it renders would hang forever on the revocation
+ * path, so the alternative is stated here rather than left to be discovered:
+ * `scope-revoked` is TERMINAL for that subscription (`stream/hub.ts`), it
+ * carries no cursor, and the correct client move after it is a fresh bootstrap,
+ * not a resume.
+ *
+ * The `error` frame is declared here and emitted by the ROUTE (Task 15), not by
+ * the hub: the hub answers a duplicate subscription with a discriminated string
+ * and lets the route frame it, and `bad-message` and `not-a-member` are
+ * decisions only the door can make. Nothing in Task 14 produces an `error`
+ * frame.
+ *
+ * ## A SECOND expression of this protocol already exists, and it disagrees
+ *
+ * `packages/app-core/src/data-source.ts` declares `StreamItem`, written against
+ * coordination amendments 13 + 19 before any server emitted a frame. It is not
+ * imported from here and it differs from what the server actually sends in
+ * three ways, each of which breaks a replica quietly rather than loudly:
+ *
+ * - its event frame carries `EventEnvelope`, so it has **no `workspaceSeq`** —
+ *   a client holding only that cannot compute the `afterSeq` it must send back,
+ *   which is the whole resume protocol;
+ * - it has **no `scope-revoked` member**, so the one instruction that tells a
+ *   removed device to empty itself arrives as an unknown `type` and is dropped;
+ * - its `code` is a bare `string` rather than `StreamErrorCode`, so a
+ *   misspelled code is a runtime surprise instead of a compile error.
+ *
+ * It is left standing rather than edited here: `DataSource` is a cross-plan
+ * contract and this task has no business rewriting the client seam. But it is
+ * exactly the shape of failure this series has already recorded in its own
+ * words — *a mocked contract is the thing that excuses the server from
+ * existing* — so it is named here, where the plan that consumes it will be
+ * reading. **`StreamItem` should be replaced by `ServerStreamFrame`, not
+ * re-synchronised with it.** *Owner: Plan 10 (the replica `DataSource`), with
+ * Plan 6 affected.*
+ *
  * ## `afterSeq` is the WORKSPACE cursor, and that is why the event frame
  * ## carries a `LedgerEvent` rather than the plan's `EventEnvelope`
  *
