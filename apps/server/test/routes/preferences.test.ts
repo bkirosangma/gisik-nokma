@@ -795,7 +795,19 @@ describe('/v1/me/preferences — server-owned view preferences', () => {
       `INSERT INTO user_preferences (user_id, workspace_id, doc, updated_at)
        VALUES ($1, $2, $3, now())
        ON CONFLICT (user_id, workspace_id) DO UPDATE SET doc = EXCLUDED.doc`,
-      [read.userIds.member, read.world.workspaceId, JSON.stringify({ savedFilters: 'not-an-array' })],
+      [
+        read.userIds.member,
+        read.world.workspaceId,
+        // TWO ways of being unreadable, and the second is load-bearing: a
+        // top-level key `preferencesDocSchema` does not admit. The recovery
+        // below then proves the upsert REPLACES rather than merges — a shallow
+        // `jsonb ||` would keep `theme`, and the next GET would 500 again.
+        // MEASURED: with the merge in place this case is the one that reddens,
+        // and it is the only one that does, because every document the door
+        // accepts carries all three top-level keys and a shallow merge of those
+        // three IS a replace.
+        JSON.stringify({ savedFilters: 'not-an-array', theme: 'dark' }),
+      ],
     );
 
     const response = await get('member');
@@ -805,12 +817,21 @@ describe('/v1/me/preferences — server-owned view preferences', () => {
     expect(response.body).not.toContain('user_preferences');
     expect(response.body).not.toContain('not-an-array');
 
-    // A PUT still works — it replaces the unreadable document rather than being
-    // blocked by it, which is the only recovery a client has.
+    // A PUT still works — it REPLACES the unreadable document rather than being
+    // blocked by it or merged into it, which is the only recovery a client has.
+    // The stored row is read back from the table too, so "replaced" is a fact
+    // about the row and not about what the reader chose to show.
     expect((await put('member', EMPTY_PREFERENCES)).statusCode).toBe(200);
     const recovered = await get('member');
     expect(recovered.statusCode).toBe(200);
     expect(recovered.json()).toEqual(EMPTY_PREFERENCES);
+    expect(await storedDoc(read.userIds.member, read.world.workspaceId)).toEqual(EMPTY_PREFERENCES);
+    const { rows: afterKeys } = await db.pool.query<{ keys: string[] }>(
+      `SELECT ARRAY(SELECT jsonb_object_keys(doc)) AS keys
+         FROM user_preferences WHERE user_id = $1 AND workspace_id = $2`,
+      [read.userIds.member, read.world.workspaceId],
+    );
+    expect(afterKeys[0]?.keys.sort()).toEqual(['grouping', 'listColumns', 'savedFilters']);
 
     // Positive control for the 500: another member's row, written the same way
     // with a VALID document, reads 200 — so the failure is the document and not
