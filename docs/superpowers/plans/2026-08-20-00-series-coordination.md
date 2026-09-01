@@ -5507,3 +5507,44 @@ per-user repair. Case 7.132 executes the behaviour so the cost is visible rather
 are an array and stay one — so a duplicate is a client-side confusion rather than a server-side
 ambiguity, and refusing it would be the door enforcing a rule only the renderer needs. **Owner: Plan
 6**, which renders the list.
+
+### 7. Task 14 fix round (2026-09-02): the stream suite's tenancy coverage is an ARTIFACT OF TEST ORDER
+
+**Owner: Plan 4** — the predicate is `visibility/visible-events-for.ts`'s, not the hub's, and this is
+recorded rather than fixed for that reason.
+
+`visibleEventsFor` opens with `SELECT … FROM events WHERE workspace_id = $1 AND workspace_seq > $2`.
+Removing the `workspace_id` clause **and its parameter**, so the mutation genuinely runs rather than
+failing to bind, reddened exactly ONE case in `apps/server/test/stream/hub-integration.test.ts` — and
+only incidentally.
+
+**Case 7.134 survives the mutation because it runs FIRST in the file.** The `events` table is
+append-only and refuses `TRUNCATE`, so every case mints a fresh workspace into a table that keeps
+everything the earlier cases wrote; at the moment 7.134 runs, no other workspace's rows exist for a
+workspace-blind query to pick up. Every case after it can see the mutation only because of the
+fixtures that ran before it. Nothing in the file *asserts* tenancy: re-ordering the cases, or running
+one with `.only`, removes the coverage in silence and no assertion changes.
+
+The honest fix is one case that seeds TWO workspaces itself and asserts that the second's events
+reach no subscriber of the first — a fact about the filter, independent of what ran before it. It is
+deliberately not added from a Plan 5 task: the predicate belongs to Plan 4, and a Plan 4 case can
+also cover the visibility suite, which has the same exposure. Recorded in the test file's header as
+well, where the next reader of that suite will meet it.
+
+### 8. Task 14 fix round (2026-09-02): `StreamSocket.terminate()` is declared, faked, and CALLED BY NOTHING
+
+**Owner: Task 15 (the `WS /v1/stream` route)** — named so its author does not assume the hub already
+terminates sockets.
+
+`StreamSocket` in `apps/server/src/stream/hub.ts` declares `terminate(): void`, and
+`test/helpers/stream-socket.ts` implements it, but no path in the hub invokes it. Every place the hub
+gives up on a peer — the slow-consumer bound, a drain that threw — goes through
+`close(code, reason)`, so the connection is closed with a protocol code (1013, 1011) and the client
+can tell why it happened. That is the right default and is not changing.
+
+The caller with a genuine reason to `terminate()` is the one Task 15 owns: a heartbeat that has timed
+out has no peer left to negotiate a close handshake with, and `ws`'s `close()` on a dead socket waits
+for a reply that never comes. **Task 15 should either wire `terminate()` to the heartbeat timeout or
+delete it from the interface** — it is currently an unmeasured affordance that reads, to anyone
+looking at the type, as though the hub already uses it. A Nit, recorded because leaving it silent is
+how a later plan comes to trust it.
