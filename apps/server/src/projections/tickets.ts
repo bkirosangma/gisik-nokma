@@ -308,7 +308,7 @@ async function refreshTicketsForWorkflow(db: PoolClient, event: LedgerEvent): Pr
   const oldest = rows.reduce((lowest, row) => Math.min(lowest, row.workflow_version), target.version);
   const cache = new Map<number, WorkflowDef>();
   for (let version = oldest + 1; version < target.version; version += 1) {
-    const def = await getWorkflowDefFromProjection(db, workflowId, version);
+    const def = await getWorkflowDefFromProjection(db, event.workspaceId, workflowId, version);
     if (def !== null) {
       cache.set(version, def);
     }

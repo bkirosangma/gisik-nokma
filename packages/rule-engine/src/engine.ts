@@ -24,10 +24,58 @@ export type Verdict = Accept | Refusal;
  */
 export type ContestLookup = { ticketId: string; resolved: boolean };
 
+/**
+ * The tenancy a DEFINITION lookup is asked inside — always the workspace of the
+ * event under evaluation, never the workspace of a state a check has just
+ * resolved.
+ *
+ * Controller ruling P14 (2026-08-31) is what put it here, and only on the two
+ * lookups below that take it. Both resolve an id the ACTOR chose —
+ * `getWorkflowDef(p.toWorkflowId)` on the rebind path, `getTicketTypeDef(p.typeId)`
+ * on the create path — and neither answer carries a workspace for a check to
+ * compare against afterwards: a `WorkflowDef` and a `TicketTypeDef` are
+ * definitions, not entities. So the predicate cannot live in the check the way
+ * ruling P12's parent guard does (`checks/hierarchy.ts`,
+ * `parent.workspaceId !== env.workspaceId`), and a store keyed globally answered
+ * a foreign id — the target-state check then ran against ANOTHER WORKSPACE'S
+ * state graph and the rebind was ACCEPTED. The predicate lives on the lookup so
+ * that no check can be the one that forgets it.
+ *
+ * An object rather than a bare `workspaceId: string` parameter, deliberately: a
+ * second ULID-shaped string beside `workflowId` is a silent swap that compiles,
+ * and an object beside a string is not.
+ *
+ * `EventEnvelope` satisfies it structurally, so every check passes `env`. **So
+ * does `TicketState`, and that is the one misuse the compiler cannot catch** —
+ * `ctx.getWorkflowDef(parent, parent.workflowId)` would type-check and would ask
+ * the question the PARENT's tenancy answers instead of the event's. A resolved
+ * state's `workspaceId` is the fact being CHECKED; it is never the fact doing
+ * the checking. The two sites where that temptation is real are the
+ * parent-terminal reason lookups in `checks/hierarchy.ts`, where the id and the
+ * version come off the parent and only the scope comes off the event.
+ */
+export type TenantScope = { readonly workspaceId: string };
+
 export type EngineContext = {
+  /**
+   * UNSCOPED, and deliberately (controller rulings P12 and P14 together). The
+   * answer is an `EntityState` that carries its own `workspaceId`, so the
+   * tenancy comparison stays in the check — `checks/hierarchy.ts` refuses
+   * `hierarchy.unknown-parent` when `parent.workspaceId !== env.workspaceId` —
+   * where it is one readable line and a test can plant a foreign parent and
+   * watch it be refused. Adding a scope here would make that guard UNREACHABLE:
+   * the reader would refuse the foreign parent on its own, the guard would
+   * become a branch no input can take, and the assertion that pins it would
+   * then pass with `workspaceId` missing from the server's row mapper — which
+   * is the total-outage trap `apps/server/src/projections/tickets.ts` documents.
+   * A check that cannot fail is this series' signature defect; this is the one
+   * place where NOT adding a predicate is what keeps a check falsifiable.
+   */
   getEntityState(kind: EventEnvelope['entity']['kind'], id: string): Promise<EntityState | null>;
+  /** UNSCOPED for the same reason as `getEntityState`: every answer carries its own `workspaceId`. */
   getChildrenStates(ticketId: string): Promise<TicketState[]>;
-  getWorkflowDef(workflowId: string, version?: number): Promise<WorkflowDef | null>;
+  /** SCOPED (ruling P14) — see `TenantScope`. */
+  getWorkflowDef(scope: TenantScope, workflowId: string, version?: number): Promise<WorkflowDef | null>;
   /**
    * Look up a recorded contested claim by the `claim.contested` event id.
    * Additive (Plan 10): implemented by the server context over its contest
@@ -56,14 +104,23 @@ export type EngineContext = {
    * existing `getEntityState` reader. `getEntityState('ticket-type', id)` keeps
    * answering identity-only FOREVER; the definition arrives here.
    *
-   * Three implementations, and they must not drift: the reducer-backed memory
-   * context (`./memory-context.js`, Plan 3 Task 4 — the first), the fixture
-   * harness (`./fixtures/harness.js`, Task 8), and the server's Postgres-backed
-   * context over `proj_ticket_types` (`apps/server/src/engine-context.ts`,
-   * Task 12). The two later ones throw or answer null until their task lands,
-   * loudly rather than quietly.
+   * FOUR implementations, and they must not drift (ruling P9, discharged by
+   * Plan 3 Chain B Task 12): the reducer-backed memory context
+   * (`./memory-context.js`, Plan 3 Task 4 — the first), the fixture harness
+   * (`./fixtures/harness.js`, Task 8), the server's Postgres-backed context over
+   * `proj_ticket_types` (`apps/server/src/engine-context.ts`, Task 12 — it
+   * answers for real as of that task), and the client cache adapter
+   * (`packages/app-core/src/precheck.ts`), which THROWS because it holds no
+   * ticket-type store at all and `null` there would manufacture a refusal out of
+   * an absence. Every note before this one said THREE; the fourth was counted
+   * when Task 12 changed this signature and the compiler named every
+   * implementation.
+   *
+   * SCOPED (ruling P14) — see `TenantScope`. A type id is a slug the ACTOR
+   * chose (`epic`, `task`, `bug`), so an unscoped lookup hands one tenancy
+   * another's rank, workflow binding and field list.
    */
-  getTicketTypeDef(typeId: string): Promise<TicketTypeDef | null>;
+  getTicketTypeDef(scope: TenantScope, typeId: string): Promise<TicketTypeDef | null>;
 };
 
 /**

@@ -158,7 +158,14 @@ export function contextFromCache(cache: ClientStateCache): EngineContext {
     async getChildrenStates(ticketId) {
       return cache.childrenOf(ticketId);
     },
-    async getWorkflowDef(workflowId, version) {
+    // `scope` is UNREAD: a client cache holds the one workspace this device is
+    // signed into, so there is no second tenancy to keep apart. The parameter is
+    // the server's (controller ruling P14) and is carried here because one
+    // signature across every implementation is what keeps them from drifting.
+    // Note that `ClientStateCache.getWorkflowDef` (`./cache.ts`) and
+    // `DataSource.getWorkflowDef` (`./data-source.ts`) are DIFFERENT methods on
+    // different types; only the `EngineContext` one takes a scope.
+    async getWorkflowDef(_scope, workflowId, version) {
       return cache.getWorkflowDef(workflowId, version) ?? null;
     },
     // The required fourth method (ruling P3), and this cache cannot answer it.
@@ -191,7 +198,7 @@ export function contextFromCache(cache: ClientStateCache): EngineContext {
     //  3. `precheckParentTerminal` still answers the two hierarchy types
     //     without the engine, so nothing yet REQUIRES this method to answer.
     // Closing 1 and 2 is what unblocks routing 3 through the engine.
-    async getTicketTypeDef(typeId) {
+    async getTicketTypeDef(_scope, typeId) {
       void typeId;
       throw new Error(
         'contextFromCache: this client cache holds no ticket-type definitions, so it can neither ' +

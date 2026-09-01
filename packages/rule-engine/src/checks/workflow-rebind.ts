@@ -84,7 +84,20 @@ export async function checkTicketWorkflowRebound(
   // workflow has not been defined yet…"), which sent an admin to inspect a
   // binding that was not broken. Controller ruling P13; same defect class as
   // P11 and P12, third instance.
-  const target = await ctx.getWorkflowDef(p.toWorkflowId);
+  //
+  // SCOPED TO `env`, and this line is the whole of controller ruling P14. It is
+  // the only `getWorkflowDef` call in the engine that resolves an id the ACTOR
+  // supplied — creation reads the TYPE's binding, a transition and both
+  // parent-terminal reasons read a resolved row's — and until Task 12 the
+  // server's store was keyed `(workflow_id, version)` globally with no tenancy
+  // predicate in any selector branch. A foreign workflow id therefore resolved,
+  // the `toStateId` check below ran against another workspace's state graph, and
+  // the rebind was ACCEPTED: a live ticket bound to a workflow its own workspace
+  // cannot see. The scope is the EVENT's workspace, not `ticket.workspaceId` —
+  // the two are equal here only because ingest's entity to workspace guard
+  // refuses the event otherwise, and resting on that would be a true statement
+  // about a neighbouring subject.
+  const target = await ctx.getWorkflowDef(env, p.toWorkflowId);
   if (!target) return refuse('ticket.rebound-unknown-workflow', reboundUnknownWorkflowRefusal(p.toWorkflowId));
 
   // "The ledger accepts only what it can later replay" (spec §3): the reducer

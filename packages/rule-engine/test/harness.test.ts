@@ -7,6 +7,15 @@ import {
   type Fixture,
 } from '../src/fixtures/harness.js';
 
+/**
+ * The tenancy every definition lookup is asked inside (controller ruling P14,
+ * Task 12). This harness READS it nowhere — a fixture is one workspace's world —
+ * so the value is inert here and the parameter exists only because one signature
+ * across the four `EngineContext` implementations is what stops them drifting.
+ * P14's fix is pinned where it can fail: `apps/server/test/engine-context.test.ts`.
+ */
+const SCOPE = { workspaceId: 'ws_1' } as const;
+
 const wfBasic = {
   id: 'wf_basic',
   version: 1,
@@ -116,9 +125,9 @@ describe('buildInMemoryContext', () => {
     const v2 = { ...wfBasic, version: 2, name: 'Basic v2' };
     const fx = fixture({ workflowDefs: [wfBasic, v2] });
     const ctx = buildInMemoryContext(fx);
-    expect((await ctx.getWorkflowDef('wf_basic'))?.version).toBe(2);
-    expect((await ctx.getWorkflowDef('wf_basic', 1))?.name).toBe('Basic');
-    expect(await ctx.getWorkflowDef('wf_ghost')).toBeNull();
+    expect((await ctx.getWorkflowDef(SCOPE, 'wf_basic'))?.version).toBe(2);
+    expect((await ctx.getWorkflowDef(SCOPE, 'wf_basic', 1))?.name).toBe('Basic');
+    expect(await ctx.getWorkflowDef(SCOPE, 'wf_ghost')).toBeNull();
   });
 
   // Coordination doc §6: a fixture whose pairs all coincide cannot see a
@@ -751,11 +760,11 @@ describe('buildInMemoryContext folds ticket-type.defined and ticket.reparented',
 
   it('getTicketTypeDef answers a defined type, and null for one this workspace never defined', async () => {
     const ctx = contextOf([typeDefined(TASK_TYPE)]);
-    expect(await ctx.getTicketTypeDef('task')).toEqual(TASK_TYPE);
+    expect(await ctx.getTicketTypeDef(SCOPE, 'task')).toEqual(TASK_TYPE);
     // `null`, not a throw, and not an invented definition: on the server this is
     // what "no such type here" looks like, and the checks turn it into
     // `ticket.unknown-type` / `hierarchy.parent-type-unknown` themselves.
-    expect(await ctx.getTicketTypeDef('ghost')).toBeNull();
+    expect(await ctx.getTicketTypeDef(SCOPE, 'ghost')).toBeNull();
   });
 
   it('last definition wins — which is what makes a rank RE-definition, and the loop it enables, reachable', async () => {
@@ -763,7 +772,7 @@ describe('buildInMemoryContext folds ticket-type.defined and ticket.reparented',
       typeDefined({ id: 'phase', name: 'Phase', icon: 'flag', rank: 1, workflowId: 'wf_basic', fields: [] }),
       typeDefined({ id: 'phase', name: 'Phase', icon: 'flag', rank: 3, workflowId: 'wf_basic', fields: [] }),
     ]);
-    expect((await ctx.getTicketTypeDef('phase'))?.rank).toBe(3);
+    expect((await ctx.getTicketTypeDef(SCOPE, 'phase'))?.rank).toBe(3);
   });
 
   it('a malformed type definition is a fixture-authoring error rather than a half-built type', () => {

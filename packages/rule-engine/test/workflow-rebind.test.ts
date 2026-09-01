@@ -128,7 +128,7 @@ describe('checkTicketWorkflowRebound', () => {
     // `ticket.created` whose type's workflow is undefined, `ticket-state.ts:103-107`),
     // which is exactly why asserting it costs one line and leaving it implicit
     // cost the claim its evidence.
-    expect(await ctx().getWorkflowDef(TASK.workflowId)).not.toBeNull();
+    expect(await ctx().getWorkflowDef({ workspaceId: WS }, TASK.workflowId)).not.toBeNull();
     expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ops', 'shipped'), ctx())).toEqual({ refused: false });
   });
 

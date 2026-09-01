@@ -92,9 +92,9 @@ describe('proj_workflows', () => {
       await workflowsProjection.apply(V1, client);
       await workflowsProjection.apply(V2, client);
     });
-    expect((await getWorkflowDefFromProjection(db.pool, WORKFLOW))?.version).toBe(2);
-    expect((await getWorkflowDefFromProjection(db.pool, WORKFLOW, 1))?.name).toBe('Basic');
-    expect(await getWorkflowDefFromProjection(db.pool, GHOST_WORKFLOW)).toBeNull();
+    expect((await getWorkflowDefFromProjection(db.pool, WORKSPACE, WORKFLOW))?.version).toBe(2);
+    expect((await getWorkflowDefFromProjection(db.pool, WORKSPACE, WORKFLOW, 1))?.name).toBe('Basic');
+    expect(await getWorkflowDefFromProjection(db.pool, WORKSPACE, GHOST_WORKFLOW)).toBeNull();
   });
 
   it('stores the full payload, stateMapping included — the version walk needs the intermediates', async () => {
@@ -117,7 +117,7 @@ describe('proj_workflows', () => {
       await workflowsProjection.apply(V1, client);
       await workflowsProjection.apply(dropping, client);
     });
-    const stored = await getWorkflowDefFromProjection(db.pool, WORKFLOW);
+    const stored = await getWorkflowDefFromProjection(db.pool, WORKSPACE, WORKFLOW);
     expect(stored?.stateMapping).toEqual({ doing: 'todo' });
   });
 
@@ -131,19 +131,19 @@ describe('proj_workflows', () => {
     // versions the table has grown by the time the replay runs — this is the
     // whole reason the column exists.
     expect(
-      (await getWorkflowDefFromProjection(db.pool, WORKFLOW, { asOfWorkspaceSeq: 25 }))?.version,
+      (await getWorkflowDefFromProjection(db.pool, WORKSPACE, WORKFLOW, { asOfWorkspaceSeq: 25 }))?.version,
     ).toBe(1);
     // On the publish position itself the new version is already in force: the
     // definition and the event that carries it are one and the same fact.
     expect(
-      (await getWorkflowDefFromProjection(db.pool, WORKFLOW, { asOfWorkspaceSeq: 40 }))?.version,
+      (await getWorkflowDefFromProjection(db.pool, WORKSPACE, WORKFLOW, { asOfWorkspaceSeq: 40 }))?.version,
     ).toBe(2);
     expect(
-      (await getWorkflowDefFromProjection(db.pool, WORKFLOW, { asOfWorkspaceSeq: 999 }))?.version,
+      (await getWorkflowDefFromProjection(db.pool, WORKSPACE, WORKFLOW, { asOfWorkspaceSeq: 999 }))?.version,
     ).toBe(2);
     // Before the workflow existed there is no honest answer but "none".
     expect(
-      await getWorkflowDefFromProjection(db.pool, WORKFLOW, { asOfWorkspaceSeq: 9 }),
+      await getWorkflowDefFromProjection(db.pool, WORKSPACE, WORKFLOW, { asOfWorkspaceSeq: 9 }),
     ).toBeNull();
   });
 
@@ -172,7 +172,7 @@ describe('proj_workflows', () => {
       payload: { name: 'CC HQ' },
     };
     await withClient((client) => workflowsProjection.apply(other, client));
-    expect(await getWorkflowDefFromProjection(db.pool, WORKFLOW)).toBeNull();
+    expect(await getWorkflowDefFromProjection(db.pool, WORKSPACE, WORKFLOW)).toBeNull();
   });
 
   it('replaying the same event is a no-op — rebuilds are deterministic', async () => {
