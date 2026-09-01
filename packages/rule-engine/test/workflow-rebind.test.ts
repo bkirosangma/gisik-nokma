@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { EventEnvelope, PublishedWorkflowDef } from '@gisik-nokma/domain';
+import type { EventEnvelope, PublishedWorkflowDef, TicketState } from '@gisik-nokma/domain';
 import { makeEnvelope } from '@gisik-nokma/domain';
 import { buildMemoryContext } from '../src/memory-context.js';
 import { checkTicketWorkflowRebound } from '../src/checks/workflow-rebind.js';
 import { evaluateEvent } from '../src/evaluate.js';
-import { PROJECT, TASK, WF, WS, created, typeDefined } from '../src/checks/test-support.js';
+import type { EngineContext } from '../src/engine.js';
+import { OTHER_WS, PROJECT, TASK, WF, WS, created, typeDefined } from '../src/checks/test-support.js';
 
 const T = '01J9GTKT000000000000000000';
 const GHOST = '01J9GGHT000000000000000000';
@@ -220,5 +221,61 @@ describe('evaluateEvent dispatches ticket.workflow_rebound', () => {
       reason:
         "Ticket 01J9GTKT000000000000000000 is already on this workflow. Moving within a workflow is a transition, so that it can be checked against the workflow's own rules.",
     });
+  });
+});
+
+/**
+ * Controller ruling P14's residual risk, made falsifiable — the one misuse the
+ * compiler cannot catch.
+ *
+ * `TicketState` satisfies `TenantScope` structurally, so
+ * `ctx.getWorkflowDef(ticket, p.toWorkflowId)` on the line below type-checks and
+ * asks the question the TICKET's tenancy answers instead of the event's. It is
+ * behaviour-preserving on every live path — ingest's entity-to-workspace guard
+ * refuses an event filed against a ticket homed elsewhere, so the two are equal
+ * by the time the engine runs — which means a mutation of that line survives the
+ * whole suite unless something drives the two apart deliberately. This does.
+ *
+ * A hand-built context rather than `buildMemoryContext`: that context derives a
+ * ticket's workspace from the event that created it, so the divergence this case
+ * needs cannot be staged through it.
+ */
+describe('the scope threaded into the target-workflow lookup', () => {
+  const ticketElsewhere: TicketState = {
+    kind: 'ticket',
+    id: T,
+    workspaceId: OTHER_WS,
+    projectId: PROJECT,
+    typeId: 'task',
+    parentId: null,
+    workflowId: 'wf-basic',
+    workflowVersion: 1,
+    stateId: 'todo',
+    stateCategory: 'open',
+    assigneeId: null,
+    collaboratorIds: [],
+    fields: {},
+    transitions: [],
+  };
+
+  it("is the EVENT's workspace, never the resolved ticket's", async () => {
+    const asked: string[] = [];
+    const spy: EngineContext = {
+      getEntityState: async (kind, id) => (kind === 'ticket' && id === T ? ticketElsewhere : null),
+      getChildrenStates: async () => [],
+      getWorkflowDef: async (scope, workflowId) => {
+        asked.push(scope.workspaceId);
+        return workflowId === 'wf-ops' ? WF_OPS : null;
+      },
+      getTicketTypeDef: async () => TASK,
+    };
+
+    expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ops', 'shipped'), spy)).toEqual({
+      refused: false,
+    });
+    // `WS` is the rebind envelope's workspace; `OTHER_WS` is the ticket's. The
+    // assertion is which one reached the store.
+    expect(asked).toEqual([WS]);
+    expect(asked).not.toContain(OTHER_WS);
   });
 });
