@@ -43,7 +43,44 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  *      `projectLead` off the project their assigned ticket lives in, and the
  *      SAME ticket that was in their answer a moment ago is gone from it;
  *    - 7.108 visibility NARROWED after assignment — a `visibility.set` drops the
- *      guest from a list they are still the assignee of.
+ *      guest from a list they are still the assignee of;
+ *    - 7.113 a workspace ADMIN, who gets no read bypass, is the assignee of a
+ *      project-mode row in a project they are on — and their whole answer is
+ *      three empty groups at 200.
+ *
+ * ## The three door answers, and which case pins each
+ *
+ * - **401** `{error:'unauthenticated'}` — no session, and a FORGED bearer alike
+ *   (7.110), with the same URL answering 200 once a real session is attached.
+ * - **404** — a caller outside the workspace, the owner of a NEIGHBOUR
+ *   workspace, and a nonexistent workspace id, byte-identical down to
+ *   `content-length` against the frozen `READ_NOT_FOUND_BODY` (7.111).
+ * - **200 with an empty result** — a MEMBER who may see nothing (7.113). The
+ *   emptiness is the visibility predicate answering, not the door, which is why
+ *   that case seeds a row the caller IS the assignee of and reads it back from
+ *   `proj_tickets` before asserting it absent. 7.113 also holds the two answers
+ *   side by side: the admin's 200-and-empty against the stranger's 404.
+ *
+ * ## Which role cells this file exercises
+ *
+ * All eight of the shared world's. `owner` (the visibility predicate compiled to
+ * `TRUE`, so the tenancy clause is the only boundary left, 7.103/7.106);
+ * `member` (the three-armed disjunction, 7.26/7.27/7.105); `outsider` (a
+ * workspace member with an EMPTY `eff.projects`, 7.104); `guest` (the explicit
+ * arm alone, and an audience narrowing under it, 7.108); `admin` (the cell that
+ * proves an admin shares the MEMBER branch rather than the owner's bypass,
+ * 7.113 — MEASURED: adding `case 'admin'` to `visibleTicketsWhere`'s owner arm
+ * reddens 7.113 and nothing else); `projectLead` (a plain workspace member whose
+ * project roster row is then DELETED, 7.26/7.107); `stranger` and `neighbour`
+ * (the two 404s, 7.111).
+ *
+ * One over-permissive mutation is NOT caught here and is recorded rather than
+ * left to look covered: giving the `guest` branch the member clause's project
+ * disjunct passes all fourteen cases, because every guest fixture here is
+ * explicit-mode and `eff.projects` is empty for a guest anyway. It reddens five
+ * of the ten cases in `test/read/visible-where.test.ts`, which is the file that
+ * owns the predicate and seeds a guest ON a project roster for exactly this.
+ * MEASURED, both halves.
  *
  * ## The scope is ONE workspace, and the tenancy clause is the only thing holding it
  *
@@ -90,7 +127,7 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * are this task's problem — the rule `list.test.ts` and `search.test.ts` both
  * follow.
  *
- * ## Three cases MUTATE the world, and they are declared last on purpose
+ * ## Three cases MUTATE the world, and they are declared after their readers
  *
  * 7.26's second case transitions the mover, 7.107 removes `projectLead` from a
  * project and 7.108 narrows a guest's list. Each touches only fixtures belonging
@@ -162,6 +199,13 @@ type MyWorkFixtures = {
   ownerOrderIds: string[];
   /** owner, but in the NEIGHBOUR workspace. The tenancy row. */
   ownerNeighbourId: string;
+  /**
+   * admin, seeded project, project-mode — and `admin` is on NO project, so this
+   * is a row they are the assignee of and may not read. It is what makes their
+   * empty answer the VISIBILITY PREDICATE answering rather than "nobody gave
+   * this person any work".
+   */
+  adminProjectId: string;
 };
 
 const OWNER_ORDER_COUNT = 5;
@@ -192,6 +236,7 @@ async function seedMyWorkFixtures(pool: Pool, world: ReadWorld): Promise<MyWorkF
   const leadExplicitId = myWorkTicketId(8);
   const ownerOrderIds = Array.from({ length: OWNER_ORDER_COUNT }, (_, i) => myWorkTicketId(9 + i));
   const ownerNeighbourId = myWorkTicketId(9 + OWNER_ORDER_COUNT);
+  const adminProjectId = myWorkTicketId(10 + OWNER_ORDER_COUNT);
 
   /** `ticket.created` + `ticket.assigned` for one ticket of type `task`. */
   const assigned = (id: string, title: string, assigneeId: string, inProject: string): LedgerEvent[] => [
@@ -250,6 +295,8 @@ async function seedMyWorkFixtures(pool: Pool, world: ReadWorld): Promise<MyWorkF
     ...assigned(leadMoverId, 'Approve the sibling budget', projectLead, world.sibling.projectId),
     ...assigned(leadExplicitId, 'Sign the vendor addendum', projectLead, projectId),
     explicitTo(leadExplicitId, [owner, projectLead]),
+
+    ...assigned(adminProjectId, 'Audit the petty cash float', world.userIds.admin, projectId),
   ];
 
   // DESCENDING, deliberately: created newest-id-first so a route with no
@@ -309,6 +356,7 @@ async function seedMyWorkFixtures(pool: Pool, world: ReadWorld): Promise<MyWorkF
     leadExplicitId,
     ownerOrderIds,
     ownerNeighbourId,
+    adminProjectId,
   };
 }
 
@@ -459,6 +507,45 @@ describe('GET /v1/me/work — what is mine', () => {
     expect(response.body).toContain('Countersign the lease');
   });
 
+  it('7.113 a workspace ADMIN gets 200 with three EMPTY groups — an admin has no read bypass, and the emptiness is the predicate rather than the door', async () => {
+    const response = await myWork('admin');
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as MyWorkResponse;
+
+    // The third door answer, and the only all-empty one in this file: the gate
+    // asked about the WORKSPACE and this caller is a member of it, so they are
+    // let in and then shown nothing.
+    expect(body.groups).toEqual({ open: [], active: [], terminal: [] });
+    // The envelope still names what was asked, so an empty answer is legible
+    // rather than indistinguishable from a route that lost its body.
+    expect(body.workspaceId).toBe(read.world.workspaceId);
+
+    // The emptiness is the VISIBILITY PREDICATE, not "nobody gave this person
+    // work": there IS a ticket assigned to them, read back from the table to
+    // prove the seeder wrote it, and `admin` is on no project so a project-mode
+    // row is not theirs to read. An admin gets NO bypass — that is
+    // `visibleTicketsWhere`'s member branch, deliberately shared.
+    const { rows } = await db.pool.query<{ workspace_id: string; assignee_id: string }>(
+      `SELECT workspace_id, assignee_id FROM proj_tickets WHERE ticket_id = $1`,
+      [fx.adminProjectId],
+    );
+    expect(rows).toEqual([
+      { workspace_id: read.world.workspaceId, assignee_id: read.userIds.admin },
+    ]);
+    expect(response.body).not.toContain(fx.adminProjectId);
+    expect(response.body).not.toContain('petty cash');
+
+    // Positive control: the SAME url, a caller who may see rows, a non-empty
+    // answer — so the three empty arrays are this viewer's answer and not the
+    // route's only one.
+    expect((await groupIds('member')).open).toEqual([fx.memberOpenId, fx.memberSiblingOpenId]);
+
+    // And the distinction this cell exists for: a member with nothing visible is
+    // 200-and-empty, while somebody outside the workspace is 404. Two different
+    // answers to two different questions, in one case.
+    expect((await myWork('stranger')).statusCode).toBe(404);
+  });
+
   it('7.27 PLANTED DEFECT: the hidden ticket assigned to the member never appears — assignment is not visibility', async () => {
     const response = await myWork('member');
     expect(response.statusCode).toBe(200);
@@ -473,11 +560,13 @@ describe('GET /v1/me/work — what is mine', () => {
     expect(response.body).not.toContain('Salary review');
     expect(response.body).not.toContain('zebra-confidential');
 
-    // THE CONTROL TWIN, in the same body: `memberOpen` is the same project, the
-    // same type, the same state, assigned to the same person by the same
-    // seeder — everything about it is identical to the hidden ticket EXCEPT its
-    // resolved visibility mode. It is present, so the absence above is the
-    // visibility predicate and nothing else.
+    // THE CONTROL TWIN, in the same body: `memberOpen` matches the hidden ticket
+    // on the four things this route filters by — the same project, the same
+    // type, the same state category, the same assignee — and differs in its
+    // RESOLVED VISIBILITY MODE. Stated exactly that way rather than as
+    // "identical except": the two come from different seeders and the hidden
+    // one also carries a comment and a due-date claim, none of which this route
+    // reads. It is present, so the absence above is the visibility predicate.
     expect(everyId).toContain(fx.memberOpenId);
     expect(response.body).toContain(fx.memberOpenId);
     expect(response.body).toContain('Reconcile the cash book');

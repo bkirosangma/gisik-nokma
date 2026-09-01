@@ -477,13 +477,19 @@ table rather than taken next-free.)*
   hands a handler every query key that arrives whether the route declared it or not: a member sending
   `userId`, `user_id`, `assigneeId`, `viewerId` and `as`, all naming the owner, gets a response
   byte-identical to the one that names nobody, headers and `content-length` included. **Being
-  ASSIGNED a ticket is not being allowed to SEE it**, and the two come apart in four reachable ways
+  ASSIGNED a ticket is not being allowed to SEE it**, and the two come apart in five reachable ways
   the route is measured against rather than one: a ticket explicitly shared with somebody else and
-  assigned to you anyway; a project-mode ticket assigned to a workspace member who is on no project;
-  the same person taken off that project afterwards by `project.member_removed`, which drops the
-  ticket out of an answer that held it a moment earlier; and an audience NARROWED by a later
-  `visibility.set` while the assignee stays the assignee. Each is asserted beside the row that DID
-  come back, so an absence is the predicate answering and not an empty route. Scope is ONE workspace,
+  assigned to you anyway; a project-mode ticket assigned to a workspace member who was NEVER on that
+  project; a DIFFERENT person taken off a project they were on by `project.member_removed`, which
+  drops their own assigned ticket out of an answer that held it a moment earlier (those two are not
+  one case — a project roster row survives a revocation by design, so only a viewer who once had one
+  exercises that path); an audience NARROWED by a later `visibility.set` while the assignee stays the
+  assignee; and a workspace ADMIN, who shares the member branch and gets no read bypass, assigned a
+  row they may not read. Each is asserted beside the row that DID come back, so an absence is the
+  predicate answering and not an empty route. The last of them is also **the door's third answer**:
+  that admin gets **200 with three empty groups** rather than a 404, beside a stranger's 404 in the
+  same case — the door asks about the WORKSPACE, and what is inside it is the predicate's business.
+  Scope is ONE workspace,
   pinned: cross-workspace aggregation is a client concern (one call per workspace), and since
   `visibleTicketsWhere` compiles to `TRUE` for an owner, `t.workspace_id` is that caller's entire
   boundary — a ticket in a neighbouring tenancy assigned to this workspace's owner is read back from
