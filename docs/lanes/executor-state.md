@@ -19,8 +19,8 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/03-chain-b`**, cut from step 7's tip. **STEP 8 COMPLETE — Chain B T9–T14 all done.** Step 7 is **PR #57, unmerged** | `git log` |
-| `main` | **`1003d8d`** per the controller (#55 merged). **REFETCH AND RE-VERIFY BY PRESENCE** before trusting it — main has moved under this file three times today | `git fetch`, `git cat-file -e` |
+| Branch in flight | **`exec/05-api-realtime`**, cut from Chain B's tip. **STEP 9 (Plan 5) IN PROGRESS — batch A only.** | `git log` |
+| `main` | **`6cb631d`** — steps 7 and 8 are BOTH MERGED (#57 → `dd7bfcf`, Chain B → `6cb631d` via **#59**, not #58; a force-push to my branch was denied to the controller, so the PR number changed for permission reasons, not content). **REFETCH before trusting this** | `git log origin/main` |
 | `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
 | Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, and every pre-squash sha of the Phase 0 branches | `git branch --contains`, empty = orphaned |
@@ -83,118 +83,97 @@ satisfies the requirement the `json` ban is about, and the instrument was proven
 | CSRF anchor line | **`sign-in-flows.test.ts:148` on `main @ 91df593`**, content confirmed: `expect(attributes).toEqual(['Max-Age=604800', 'Path=/', 'HttpOnly', 'SameSite=Lax']);` — re-verified on main, not merely on the stale branch, because T5 item 3 anchors a sentence to a line and line numbers drift across a rebase-merge | `awk` over the blob at `origin/main` |
 | `docs/` affects the gate | **NO.** `turbo.json` declares no `inputs`, and `docs/` sits outside every package, so a docs-only merge cannot move gate composition. **PRs #48 and #49 were both docs-only** — do not re-run a gate to "check" them | read `turbo.json` |
 
-## OPEN ESCALATION — the controller session ENDED before this could be delivered
-
-**`gisik-nokma-8d` became unreachable mid-step-7.** This was written as a message, could not be sent,
-and is recorded here instead. **A successor controller must read this before merging step 7's PR.**
-
-### Ruling P23 was applied as DELETE, not as NARROW, and its footprint is wider than the ruling named
-
-The ruling said the member-side per-event purge **must be gated**, naming case **6.101**. The
-implementing agent **deleted the per-event subtree walk entirely**, and flagged the interpretation
-against its own work as its least-sure claim.
-
-**Its derivation, which I judge sound:** a purge may only name an entity the recipient could previously
-see; the module **cannot ask** that question (`proj_visibility` keeps no prior audience, no payload
-carries a before-image); and it **may not reconstruct** the answer (cases 6.82/6.94, the
-second-definition ban). Those three together leave **no conforming per-event emission at all**, so
-nothing survives to gate.
-
-**What it cost beyond 6.101, which is the part needing a controller's eye:**
-* four test blocks deleted; cases **6.90** and **6.99** flipped ✅ → 🚫;
-* **per-event tombstones removed for MEMBERS AS WELL AS GUESTS** — recorded as **6.104**, sibling of
-  6.102, **owner Plan 10**, phrased as an absence.
-
-So the under-purge residual accepted for one case now applies to **all** per-event triggers, and the
-retention half of a gap Plan 10 must close got **harder**, not easier.
-
-**A narrower gate was considered and declined, and this is the load-bearing judgement:** gating the purge
-on the viewer being **on the ticket's project** has a far smaller blast radius, and was refused because
-*being on a container is not holding the entity* — it fails the ruling's own **relationship** axis and
-leaves the same disclosure at a smaller radius, which is exactly what the ruling rejected for guests.
-**I agree with that refusal.**
-
-**REVERSAL IS CHEAP AND EXACT IF A CONTROLLER DISAGREES:** the agent's mutation 1 — re-adding the deleted
-walk — is the precise restoration diff, and it reddens both 6.101 cases and nothing else.
-
-### And the signature defect appeared inside the fix for it
-
-The agent's own mutation sweep **falsified two sentences it had already committed**, and it corrected
-them in place rather than dropping them. The surviving consequence: **case 6.100 now passes for a reason
-its own name does not describe** — it is held by the `canSee` guard that case 6.16 already pins, not by
-anything purge-shaped. Stated on the case and in the test comment, with a warning **not to cite 6.100 as
-evidence that a purge gate exists.**
-
-### A rule of this project was misapplied, and the correction belongs with it
-
-*"Nothing may be chained after the gate"* was read as forbidding `$?` capture, so that agent **inferred**
-exit 0 from four secondary facts. **The rule is about a trailing command in the same pipeline stealing
-the status.** Reading `$?` on the next line is the correct practice:
-
-```
-pnpm turbo run build test typecheck --force > gate.log 2>&1
-GATE_EXIT=$?
-```
-
-**An inferred exit code is a self-inflicted downgrade from a read one.** Re-run here with a captured
-exit: **TURBO_EXIT=0, 21/21, 1161 tests, zero `Unsupported engine` WARNs, durations in seconds.**
-
 ## Where I am in the serial sequence
 
-**PHASE 0 + STEPS 4, 5, 6 MERGED. STEPS 7 AND 8 ARE COMPLETE AND UNMERGED**, because the controller
-session ended mid-step-7 and no successor has appeared. **I do not merge; that is the whole reason a
-second session exists.**
+**STEPS 7 AND 8 ARE MERGED.** `main` = **`6cb631d`**. **RULING P23 IS SETTLED — see below.**
 
-| | branch | state |
-|---|---|---|
-| **Step 7** Plan 4 T8–T14 | `exec/04-t8-t14-enforcement` | **PR #57 OPEN**, 1225 tests |
-| **Step 8** Plan 3 Chain B T9–T14 | `exec/03-chain-b` | **complete, 19 commits on top of step 7**, needs a PR |
+**STEP 9 (Plan 5, the hinge, 17 tasks) IS IN PROGRESS on `exec/05-api-realtime`.**
+**BATCH A ONLY IS DONE: T1 and T2, plus T2's fix round. T3 ONWARD IS NOT STARTED.**
 
-**Step 8 is branched FROM step 7, not from `main`** — deliberately: `proj_tickets` collides with step 7
-on the projection registry, and step 7's cases 6.57/6.61 reference it. **Merge #57 first, then Chain B.**
+Gate at HEAD: **exit 0 READ (not inferred), 21/21, 1321 tests**, zero `Unsupported engine` WARNs.
+domain 314 · rule-engine 280 · **server 486** · app-core 130 · editor 72 · ui 31 · sync-client 8.
 
-Gate at Chain B's HEAD: **exit 0 READ, 21/21, 1277 tests**, zero `Unsupported engine` WARNs.
-domain 295 · rule-engine 280 · **server 461** · app-core 130 · editor 72 · ui 31 · sync-client 8.
-**TEN projections**, counted by printing the `registry.register(` rows — **do not quote that number
-without recounting**; an earlier dispatch of mine said six when there were seven.
+### THE SEAM — exactly where a successor picks up
 
-### Chain B — what each task found
+**Plan 5 has THREE commits of its own**, all after Chain B's tip `8858f28`:
 
-| task | outcome |
+| sha | task |
 |---|---|
-| **T9** `proj_ticket_types` | 0 findings. Found **the plan's own upsert was non-deterministic**: a type's key is its PAYLOAD's id filed at fresh entity ULIDs, so **many entity streams write one projection key** |
-| **T10** `proj_tickets` (floor-list) | **Critical** — a `✅` citing a test **nobody had written**, over a branch nothing constrained. Fix found a **second** stale citation the same commit had created |
-| **T11** `proj_rollups` | 0 findings. Found **two plan-text defects**, and reported a survivor **with its reason** rather than papering over it |
-| **T12** `EngineContext` (floor-list) | **First attempt DIED mid-edit** — 3 Criticals incl. never opening its own main file. Retry closed all 11. **P14 is CLOSED** |
-| **T13** history route | 1 Important — **my dispatch's fault** (see below). Converted **two survivors into killers** rather than excusing them |
-| **T14** catalogue | Reconciled 31 reserved ids against what shipped; corrected two to match the test rather than the plan |
+| `6d15e50` | **T1** `docToPlainText` — closed a termination gap the pulled-forward walker shipped with |
+| `96a6ff3` | **T2** FilterSpec + the injection-proof compiler |
+| `400fbfc` | **T2's fix round** — the NUL byte, and a guard that fired on correct code |
 
-### P14 IS CLOSED — verified in source, not taken from a report
+**Four files are Plan 5's whole surface so far:** `packages/domain/src/doc-text.ts` (+31),
+`packages/domain/src/filter-spec.ts` (+63), `apps/server/src/read/compile-filter.ts` (+116),
+`apps/server/src/read/sql-params.ts` (+27). `Features.md` **§7** and
+`test-cases/07-api-realtime-search.md` were **opened by T2 in its own change set.**
 
-All three `proj_workflows` selector branches now read `WHERE workspace_id = $1 AND workflow_id = $2`.
-Tenancy arrives as a **`TenantScope` parameter on the method**, leaving `createEngineContext(client)`
-untouched as the handoff required. The obvious alternative was checked and **reproduces P14 exactly** —
-deriving a type's tenancy from its own head row fails because `proj_entity_heads`' key is global.
-**Ruling P3 held**: `getEntityState('ticket-type')` stayed identity-only despite the plan text
-instructing the rejected alternative at three lines.
+**NEXT: Plan 5 Task 3** (`workspace.settings_set`, plan line 628), then T4 (883).
+**Floor-list in this plan: T5 (1213), T9b (3183), T14 (4918), T15 (5452).**
 
-### A DISPATCH ERROR OF MINE, recorded because the rule is the point
+### `git cherry` IS USELESS ON THIS BRANCH RIGHT NOW — and that is the rule working
 
-**I told T13 not to touch the catalogue because T14 would reconcile it.** Its reviewer correctly called
-that an Important: T13 shipped a route while §5 still said the route did not exist. **"The next task
-will fix it" is precisely the follow-up the same-change-set rule forbids.** T14 did close it minutes
-later — which is why it is recorded rather than re-run — but the drift window was real and I created it.
+It marks **all 60** commits `+` although 58 are merged, because **#57 and #59 were SQUASHED**.
+Main's subjects carry the **`(#57)` / `(#59)` suffix**, which is the marker that tells you the `+` is
+uninformative. **Rebase onto `origin/main` before doing anything else; do not conclude from `cherry`.**
 
-### Carried, unfixed, with owners
+### What batch A found — both defects were in code or plan text that predated the task
 
-**`getContest` reads `proj_contested` unscoped** — a fourth instance of P14's class, **executed** by the
-reviewer; narrower than P14 because two other guards bite. *Owner: Plan 10 T7.* ·
-**The ticket-type ladder is not as-of** (Plan 3's own Open question 11) — UNASSIGNED ·
-**P9 `'ticket-type'` parity** diverges between harness and memory-context · **`getEntityState('ticket')`'s
-fail-closed branch is unreachable by any input**, so its tenancy argument is untested — kept and recorded
-so it is not mistaken for a tested predicate · **`routes/tickets.ts:347`'s `ORDER BY seq` has the same
-unfalsifiability T13 fixed in its own route, and `tickets-read.test.ts` carries no `seq` assertion at
-all.** *Owner: Plan 4.*
+* **T1:** the pulled-forward `docToPlainText` had **unbounded recursion** while its own docblock said
+  *"Total function… never throws."* Three hostile inputs (self-referential node, nested one, 100k-deep
+  chain) all threw `RangeError` **against the real exported function**. Fixed with a depth cap rather
+  than a seen-node set, because **a seen-set would misrender a document that legitimately reuses one JS
+  object in two tree positions.**
+* **T2:** the plan's own blocked-states CTE used `DISTINCT ON (workflow_id)` across all of
+  `proj_workflows`. The PK is `(workflow_id, version)` **globally**, so workspace A holding `('wf',1)`
+  and B holding `('wf',2)` means **A's `blocked` filter read A's tickets against B's flags** — a
+  **second consumer** of the same global key whose reader half was ruling P14. Fixed by correlating on
+  the ticket row's own workspace, which nothing an actor sends can aim.
+* **T2's answer to "which identifiers can vary": NONE — the allowlist is the empty set.** And it was
+  honest about the limit: the base tenancy scope stays the caller's, **"and yes, a caller can forget
+  it"**, with a test enumerating all twelve terms that fails if a new one reaches another table
+  uncorrelated.
+* **The fix round closed two Importants:** a **U+0000 the schema admitted and Postgres cannot carry**
+  (SQLSTATE 22021 — a door accepting what the store cannot hold turns a 400 into a 500), and §7's
+  arrival making two neighbouring scope notes false.
+
+### A REVIEW FINDING WORTH CARRYING INTO EVERY LATER TASK
+
+`expect(sql).not.toContain(hostile)` **measures whether the value LOOKS LIKE SQL, not whether it was
+concatenated.** Add `'$1'` to the hostile set and a **correct** compiler fails — it emits
+`t.assignee_id = $1` and binds the string safely. **A guard that fires on correct code is worse than no
+guard, because the next person deletes it.** The meaning lives in the paired execution assertion.
+
+### Three method results from batch A's fix round, worth more than the fixes
+
+* **A review nit's stated mechanism was REFUTED, and a working one substituted.** N3 proposed seeding a
+  second workspace's ordinary `proj_search` rows to make a tenancy correlation executable. That cannot
+  work: `proj_tickets.ticket_id` is a **primary key**, so ticket_id → workspace is a *function*, and a
+  correctly-filed neighbouring row can never satisfy the outer predicate. The reachable failure is
+  projection **drift** — a WS_A ticket whose `proj_search` row is filed under WS_B. Correlated → `[]`;
+  uncorrelated → the foreign row. **A reviewer's proposed experiment is a claim like any other.**
+* **N5's premise was PROVEN, not accepted.** The deleted `not.toContain` guard was restored as a
+  mutation and **failed against the correct, unmodified compiler** (`Expected: "$1"`). Replaced by a
+  pinned SQL constant plus **exact** parameter-array equality — the old `>= 5` would pass on a compiler
+  that had lost two bindings.
+* **The NUL rule was measured, not assumed.** BEL, TAB, LF, CR, ESC, DEL and a lone surrogate all
+  round-trip through Postgres; **only 0x00 raises 22021.** So the door refuses exactly what the store
+  cannot hold, rather than inventing a control-character policy nothing downstream needs. A mutation
+  widening the guard to all C0 controls is killed by a test named `refuses ONLY NUL`.
+
+## RULING P23 — SETTLED. Do not reopen; do not restore the walk.
+
+**DELETE upheld, not narrow.** What carries it, in the controller's weight order:
+1. the **blessed scope-wide emitter survives**;
+2. the residual is **under-purge** — the direction P23 explicitly named;
+3. **refusing the project-membership gate is correct**, because *being on a container is not holding the
+   entity*;
+4. **no gatable predicate exists**, so a gate here would be a deletion wearing a condition.
+
+**6.104 stands, owner Plan 10.** *(A supporting figure of 495 insertions / 0 deletions was offered and
+then withdrawn by the controller: it was measured at `eadc748`, before #57, and re-run now prints 0/0.
+It is context, not the reason — and the escalation's actual claim was forward-looking, about the
+residual reaching all per-event triggers and members, which that figure does not touch.)*
 
 ## What step 2 actually contained
 
