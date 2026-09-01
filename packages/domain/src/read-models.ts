@@ -76,10 +76,17 @@ export type StateProvenance = {
  * counted on its own line: `terminalChildren + uncategorizedChildren <=
  * totalChildren`, and a client rendering "5 of 8 done" while
  * `uncategorizedChildren > 0` is rendering a number it was told is incomplete.
- * In a ledger written through the shipped door it is always 0 — one ingest
- * transaction writes both projections or neither — so a nonzero value is a
- * projection disagreement, made countable rather than either invented away or
- * thrown on. See `apps/server/src/visibility/rollup.ts` (case 6.83).
+ *
+ * It is 0 whenever BOTH projections are current with the ledger — the condition,
+ * stated instead of the shorter and slightly false "always 0 in the product".
+ * One ingest transaction writes both or rolls back, and `rebuildProjection`
+ * replays the WHOLE ledger into one projection inside one transaction, so
+ * neither path can leave a partial set. What CAN is a caller that advances one
+ * and not the other: a fixture applying a subset of the registry
+ * (`test/helpers/seed.ts`'s `applyAll`), or a truncation of one table alone.
+ * So a nonzero value means one projection is behind, made countable rather than
+ * either invented away or thrown on. See `apps/server/src/visibility/rollup.ts`
+ * (case 6.83).
  */
 export type TicketRollup = {
   totalChildren: number;

@@ -109,8 +109,12 @@ import { canSeeResolved } from './can-see.js';
  * into crashes while proving nothing about the product.
  *
  * Counted, it is a true statement about those fixtures ("nine children, none of
- * them known to be done") and a countable integrity signal in the product,
- * where it is always 0. `terminal + uncategorized <= total`.
+ * them known to be done") and a countable integrity signal everywhere else. It
+ * is 0 whenever both projections are current with the ledger — which is the
+ * condition, not "always 0 in the product": one ingest transaction writes both
+ * or rolls back, and `rebuildProjection` replays the whole ledger into one
+ * projection inside one transaction, so what makes this nonzero is a caller
+ * that advances one table and not the other. `terminal + uncategorized <= total`.
  */
 export interface RollupView {
   /** ALL direct children. Never filtered by visibility — that is the honesty. */

@@ -29,14 +29,22 @@ export const PROJ_TICKET_COLUMNS =
   't.workflow_id, t.state_id, t.state_category, t.assignee_id, t.collaborator_ids, t.fields';
 
 /**
- * Test/route convenience: rows for explicit ids, in `ticket_id` order.
+ * Rows for explicit ids, in `ticket_id` order.
  *
- * Carries no `workspace_id` predicate BECAUSE IT CARRIES NO AUDIENCE DECISION
- * either — it is a by-id fetch for callers that already hold the ids, not a
- * list. Every route reaching a card set does so through
- * `listVisibleTickets` / `visibleTicketsWhere`, which is where the workspace
- * clause and the visibility predicate both live. Nothing here may become a
- * second door.
+ * **THIS FUNCTION APPLIES NO WORKSPACE PREDICATE AND NO VISIBILITY PREDICATE.
+ * Its caller must supply both.** That is stated as an obligation rather than as
+ * reassurance, because the whole chain below it defers the same way and nothing
+ * in this file closes the loop: `stateProvenanceFor` is a by-id read over the
+ * ledger, and `rollupFor` is workspace-blind by design (case 6.84). Hand
+ * `assembleTicketCards` a row from another tenancy and it will assemble a full
+ * card for it.
+ *
+ * That is correct for what these are — a by-id fetch and an assembler, not a
+ * door — and it is why every route reaching a card set must arrive through
+ * `listVisibleTickets` / `visibleTicketsWhere`, where the workspace clause and
+ * the one visibility decision both live. `PROJ_TICKET_COLUMNS` is exported for
+ * those routes to build their OWN scoped `SELECT` with; this convenience is not
+ * the thing to reach for when a request supplies the ids.
  */
 export async function fetchTicketRows(db: Queryable, ticketIds: string[]): Promise<ProjTicketRow[]> {
   const { rows } = await db.query<ProjTicketRow>(
