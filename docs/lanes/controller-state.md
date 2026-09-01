@@ -138,13 +138,23 @@ recompute a progress figure from prose again — run the gate and quote it.**
   total" was produced by `grep -cE '^#+ *Task '`, which returns **BLANK, not 0**, for plans 08 and 11 —
   both have very long lines. The gate carries a positive control so a reader that drifts fails loudly
   instead of reporting an empty backlog as clean.
-- **Two numbers, deliberately not one.** `done` = a PR naming that exact plan+task whose **merge** sha is
-  an ancestor of `origin/main`; `claimed` = asserted at plan or branch granularity only (the whole of
-  Plans 1 and 2), never counted as complete. **At `edbb940`: 17/177 verified (9.6%), 29 claimed but
-  unaudited (16.4%), 4 in-flight, 127 todo.** The familiar "~43%" folded all of those together.
-- **Evidence is the MERGE commit.** This repo squash-merges, so an implementing commit is not an ancestor
-  of main once its PR lands — recording one false-REDs a finished task. Proven by mutation: `876e170`
-  (real, on the live exec branch, in the shared object store) is correctly rejected.
+- **Two numbers, deliberately not one.** ~~`done` = a PR **naming** that exact plan+task~~ **WIDENED by
+  owner ruling 2026-09-02, because the original definition promoted ZERO rows whose work had shipped:**
+  `done` = **the commit that introduced the task's declared artefact to `main`**, identified from the
+  task's own `Files:` block and confirmed to belong to that task's PR. `claimed` = asserted at plan or
+  branch granularity only, never counted as complete — **currently 0, and see the audit section for why
+  the status is kept anyway.**
+  Why the widening was forced: **#3's and #4's bodies name none of their own 28 tasks.** Every
+  task-shaped string in either refers to a *different plan*. The old definition was unsatisfiable by the
+  very PRs it was meant to adjudicate.
+- **Evidence is the commit that PUT THE ARTEFACT ON MAIN — which is the merge sha only under a squash.**
+  ~~This repo squash-merges~~ — true from #51 onward, **false of #3, #4 and #13**, which were
+  rebase-merged and whose recorded `mergeCommit` is the LAST commit of the replayed chain: 3 files for
+  #3, 1 for #4, both documentation. Recording it passes the ancestry check while pointing at a commit
+  containing none of the work. **And do not infer merge style from an ancestry count** — a rebase that
+  replays commits rewrites their shas and reports 0/N exactly like a squash. Use
+  `gh api repos/<o>/<r>/commits/<sha>/pulls`. Recording an unmerged implementing sha still false-REDs,
+  and the ancestry check still catches it: proven by mutation with the live exec branch tip.
 - **Rejected and recorded so it is not re-tried: fenced-code stripping.** It looks obviously right and it
   drops the count 177 → 166, removing the real tail headings of plans 06 and 07, which carry an **odd**
   number of ``` markers. It fails toward "more complete" while every per-plan count stays non-zero, so
@@ -824,205 +834,66 @@ open`, and `tmux list-panes -s -t gisik`.
 
 Note its wording is one-directional: a pane being ADDED also reports "a lane may have exited."
 
-## OWNER-APPROVED, QUEUED — audit the 33 `claimed` rows, at the step-9 boundary
+## ✅ THE LEDGER AUDIT IS DONE — executed 2026-09-02, NOT at the step-9 boundary
 
-**Approved by the owner 2026-09-01 (~20:10 IST): "take it when the step-9 merge is done."** Recorded
-here rather than carried in the conversation, because *a mitigation that lives only in a conversation is
-not a mitigation* — this file's own rule, and a controller restart is what collects on it.
+**`pnpm check:tasks` at this commit: `VERIFIED COMPLETE: 72/177 (40.7%)`, `claimed: 0`, `todo: 105`.**
+Quoted from the gate, not computed here. Was 26/177 (14.7%) with 33 claimed.
 
-**TRIGGER: after the step-9 PR merges**, in the same window as the executor restart and the re-anchor.
-**NOT before**, and the reason is specific: `task-ledger.tsv` is **the one file both sessions write**, and
-the executor is on a live branch. Editing it mid-step buys a conflict on the step PR for zero
-information. Nothing about this work is urgent; its whole value is that the number stops lying.
+### THE REASON THIS WAITED FOR STEP 9 WAS FALSE, AND I WROTE IT
 
-**Scope, as approved:** promote what the evidence supports among the 33, and fix the two instrument
-errors below in the same PR. Docs-only, so it merges under the controller's own rule.
+I recorded, and told the owner, that the audit had to wait because *"`task-ledger.tsv` is the one file
+both sessions write."* **It is not. It is controller-only.** Measured three ways: the executor's live
+branch does not touch it (three-dot diff, empty); only **two commits in the file's entire history**
+modify it, #55 which created it and #60, both controller PRs; the executor maintains
+`executor-state.md` and the coordination doc instead. The owner asked *"will the audits happen after
+plan 5 merge?"* — and the honest answer was that the constraint I had invented did not exist.
 
-**Why it is worth a session at all: 28 of the 33 are two PRs.** Plans 1 (15 rows, #3) and 2 (13 rows,
-#4). The remaining five are 03/T1, 03/T2 (#13), 06/T9 (#43), 07/T4 (#47), 11/T6 (#17). Auditing the two
-moves verified completion from **14.7% to roughly 30%** with no product code written.
+**And the first check I ran on it was wrong in the same family as everything else in this file.**
+`git diff --name-only origin/main origin/exec/05-api-realtime -- docs/` reported `controller-state.md`
+as changed by the branch. **It was changed by `main`** — by my own four doc PRs since the fork.
+**Two-dot compares two trees; three-dot compares against the merge base.** Use `origin/main...<branch>`
+whenever the question is *"what did the BRANCH change."* Third instance of *name the ref, don't trust
+the symbol* in one session.
 
-### The finding that makes it cheap — #3 and #4 were REBASE-merged, not squashed
+**GENERAL FORM, and it is the expensive one: a constraint you invented is still a constraint you must
+re-derive before obeying.** This one delayed approved work behind seven unrelated tasks, was repeated
+to the owner as fact, and was only caught because the owner asked a scheduling question. **The
+inherited rules in this file get re-measured on every restart; the ones a controller writes mid-session
+get obeyed.**
 
-Measured with a control, because the whole series has been assuming otherwise:
+### WHAT WAS APPLIED — 46 rows, all with per-row artefact evidence
 
-| PR | branch commits that are ancestors of `origin/main` |
-|---|---|
-| #3 (Plan 1) | **28 of 28** |
-| #4 (Plan 2) | **22 of 22** |
-| **#57 — control, squash-merged** | **0 of 38** |
+- **32 promoted `claimed` → `done`**: Plans 1 (15) and 2 (13) per Ruling A, plus 03/T1, 03/T2,
+  06/T9, 07/T4.
+- **14 promoted `todo` → `done`**: 04/T1–T3 · 06/T1–T4 · 07/T1–T3 · 10/T1, T2, T3, T8. These were
+  rows whose work had landed with **no ledger row citing it** — and `check:tasks` had been printing
+  their PRs (#20, #22, #30, #16, #47, #23) in its unattributed-PR list on every run, under the
+  understated figure, unread.
+- **1 demoted `claimed` → `todo`**: **11/T6.** `docker-compose.dev.yml` was never added to `main`.
+  The only row in the ledger that was concealing work which had not shipped — and the entire
+  justification for the `done`/`claimed` split existing.
 
-So for the 28 rows, **every implementing commit is on `main` with its own subject** (`Scaffold the
-pnpm/Turborepo workspace`, `parseEvent and the versioned event-type registry`, `proj_entity_heads: the
-reference projection`, …). The audit is a read of ~50 subjects against ~28 task headings — no
-archaeology, because nothing was collapsed.
+### 3 OF THE 17 CANDIDATES WERE REFUSED — and the reason generalises
 
-### TWO INSTRUMENT ERRORS THIS UNCOVERED — fix both in that same PR
+**07/T16, 10/T18 and 11/T14 stay `todo`** although every declared artefact is present. Each is a
+**final-catalogue-and-verification task**, and its files exist because *earlier tasks in the same plan
+catalogued themselves* — the same-change-set rule is series-wide, so `test-cases/NN.md` exists from
+task 1 onward. Plan 10 has 13 tasks unrun; Plan 11 has 15; PR #10's own subject calls itself a
+**"CI skeleton."**
 
-1. **The evidence sha for those 28 rows does not point at the work, and it looks like fraud when you
-   open it.** GitHub sets `mergeCommit` on a rebase-merge to the **last commit of the chain**. For #3
-   that commit touches **3 files**; for #4, **1 file** — both documentation. Ancestry holds, so
-   `check:tasks` is right and the rows are not bogus. **But an auditor who reads the sha's diff finds a
-   docs commit and concludes the row was fabricated** — a trap laid directly in the path of the audit
-   being scheduled here. Whoever does this work must audit the PR's **commit range**, never the merge
-   sha's own diff.
-2. **`scripts/check-task-ledger.mjs`'s stated rationale is over-general.** Its header reads *"WHY `done`
-   IS VALIDATED AGAINST A MERGE COMMIT, NOT THE IMPLEMENTING COMMIT — This repo squash-merges."* True
-   from #51 onward; **false of #3 and #4, the two PRs the 28 rows depend on.** The decision it justifies
-   is still correct — recording the merge commit is safe under both merge styles — so this is **a wrong
-   reason under a right decision**, which is the kind that survives review and misleads the next reader.
-   Correct the paragraph; do not change the check.
+> **THE RULE: artefact presence is NOT evidence for a task whose job is to catalogue or verify OTHER
+> tasks.** Such a task cannot be complete while the things it must sweep do not exist, whatever its
+> files say. Check the structural precondition — *have the tasks it catalogues actually run?* — never
+> the file. This is the `docToPlainText` precedent in its second costume: a file on `main` that a
+> different task put there. It would have promoted 3 rows wrongly, and the two instruments that
+> approved the other 14 (artefact present, declared tests present) both said yes to all three.
 
-### MEASURED BEFORE THIS PR MERGED — the bodies do NOT name their tasks, so a widening is REQUIRED
+### The instrument that did this, and its guards — all four proven to fire
 
-`done` is defined as *"a PR **naming that exact plan+task**"*. **Measured: neither body satisfies it.**
-Every task-shaped string in #3's and #4's bodies is incidental prose, and most point at a *different
-plan's* tasks:
-
-| PR | every task mention in the body | what it actually refers to |
-|---|---|---|
-| #3 | `Task 1`, `Task 10`, `Plan 3 Task 12`, `Plan 3 Task 2→12` | one pre-flight typecheck note; the rest are **Plan 3's** tasks |
-| #4 | `"Task 13"`, `Task 2-vs-Task 12` | a **stale attribution** the body itself flags for repointing, and **Plan 3's** ordering decision |
-
-**So the existing definition promotes ZERO of the 28**, and reading the count (4 and 3) instead of the
-rows would have said the opposite. *(Printed the rows. The count lied — again.)*
-
-**The commit range carries it instead, and carries it well.** Plan 1's 15 task headings against #3's 28
-subjects: **15 of 15 map, in plan order**, several near-verbatim — `### Task 8: Projection framework —
-registry and rebuild` against `Projection framework: a registry of deterministic apply/reset read models
-and a rebuild`; `### Task 9: proj_entity_heads — the reference projection` against `proj_entity_heads:
-the reference projection`. Fix-up commits cluster behind their parent task (three behind T4a, three
-behind T5, three behind T10).
-
-**⚠ THIS WAS AN OWNER DECISION, NOT THE AUDITOR'S — `done` is the number every other figure keys off.**
-- **(A) Widen `done`** to accept a range-internal commit, recording **that commit's sha per row**.
-- **(B) Leave them `claimed`** and record that the evidence outran the definition.
-
-### ✅ OWNER RULED (A) — 2026-09-01, ~20:20 IST: "go with A. Widen done."
-
-**And the method got better than the one (A) was proposed with. Do not use subject-matching.**
-The proposal said *"a commit whose **subject** matches the task heading."* Subject-matching could not
-resolve Plan 2 T2 at all. **Map on the ARTEFACT the task's own `Files:` block declares it creates**, then
-find the commit that ADDED that path (`git log origin/main --diff-filter=A -- <path>`) and require the
-result to be **inside that PR's commit set**. Mechanical, per-task, and it discriminates: it found that
-**Plan 2 T1 and T2 landed in ONE commit (`aa33c70`)** — invisible to subject-matching, and the two are
-still separately evidenced because they name different files (`workflow.ts` vs `entity-state.ts`).
-
-### THE MAPPING — measured 2026-09-01, ready to apply. 27 of 28 on declared artefacts.
-
-| Plan 1 | commit | | Plan 2 | commit |
-|---|---|---|---|---|
-| T1 | `0dd4de7` | | T1 | `aa33c70` |
-| T2 | `08f150f` | | T2 | `aa33c70` *(combined with T1)* |
-| T3 | `22bfc88` | | T3 | `41b3620` |
-| T4 | `6b7ffc0` | | T4 | `e25ee66` |
-| T4a | `c5a866c` | | T5 | `186a172` |
-| T5 | `f0d27b3` | | T6 | `91739a2` |
-| T6 | `58cf28c` | | **T7** | **`c18ce5a` — SUBJECT+POSITION, see below** |
-| T7 | `3baf418` | | T8 | `0353081` |
-| T8 | `314ba87` | | T9 | `155650a` |
-| T9 | `386bd6c` | | T10 | `8a4940f` |
-| T10 | `99dd467` | | T11 | `df17d4a` |
-| T11 | `e41508c` | | T12 | `6d6612c` |
-| T12 | `09f1e3e` | | T13 | `c33d94a` |
-| T13 | `560bad6` | | | |
-| T14 | `1272d2b` | | | |
-
-**Plan 2 T7 is the one row that is NOT artefact-evidenced, and it must be recorded as such rather than
-blended in.** Its `Files:` block is *`Modify: transition.ts`* plus "3 fixture files" with no paths — it
-creates nothing addressable. Evidence is subject (`Parents cannot outrun children` ↔ *"The parent-terminal
-invariant"*) **plus position**: it is the only commit touching `transition.ts` between T6's `91739a2` and
-T8's `0353081`. That is weaker than the other 27. **Either mark it `claimed` still, or mark it `done`
-with the note naming the weaker basis — do not let it inherit the strength of the rows around it.**
-
-**Three rows needed a placeholder resolved, and it is a plan-text artefact, not a gap:** Plan 1 T6/T9 and
-Plan 2 T12 declare `apps/server/migrations/<timestamp>_*.sql` **literally**. Resolve by suffix against
-`git ls-tree`; all three then land on a single in-range commit (`58cf28c`, `386bd6c`, `6d6612c`).
-
-> **⚠ MY OWN AUDIT SCRIPT PRODUCED A WELL-FORMED FALSE ANSWER, and it is this file's most-repeated class.**
-> It filtered declared paths with `'/' in c` to drop prose, which **silently dropped every ROOT-LEVEL
-> file** — so Plan 1 T1 reported `UNMAPPED (task declares no created file)`. T1 declares four:
-> `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `tsconfig.base.json`, **all added by `0dd4de7`**.
-> The output was well-formed, plausible, and wrong, and it failed toward *"there is nothing here"* —
-> the direction nobody questions. Caught only by opening the task's own `Files:` block by hand.
-> **When a mapping instrument reports NOTHING for a row, read the row before believing it.**
-
-## THE AUDIT IS BIGGER THAN RULING A SCOPED IT — owner widened it 2026-09-02
-
-**Owner: "schedule the audit of those 5 claimed rows too."** Measuring those five led straight into a
-much larger finding, so the scope below supersedes the 28-row plan without replacing it.
-
-### 1. The other five `claimed` rows — 4 promotable, 1 is REAL UNFINISHED WORK
-
-| row | verdict |
-|---|---|
-| 03/T1 | `b0fda11` — artefact `packages/domain/src/ticket-types.ts`. PR #13 |
-| 03/T2 | `3aec0a0` — artefact `events/ticket-events.ts`, `testing.ts`. PR #13 |
-| 06/T9 | `c93c910` — artefacts `views/board.tsx`, `use-live-query.ts`, `rollup-text.ts`. **= #43's merge sha** |
-| 07/T4 | `a3746fb` — artefacts `extensions/mention.ts`, `mention-popup.ts`. **= #47's merge sha** |
-| **11/T6** | **NOT PROMOTABLE. `docker-compose.dev.yml` was NEVER ADDED to `main`.** The row's own note said so — *"landed the env-contract gate SLICE only; dev stack + five services unverified"* — and the artefact test confirms it independently. **This row should move `claimed` → `todo`, not → `done`.** It is the only place in the ledger where a `claimed` row was hiding work that genuinely did not ship. |
-
-### 2. MY MERGE-STYLE DISCRIMINATOR WAS WRONG, and I published it before testing it
-
-I wrote that "0 of N branch commits on `main`" means **squash-merged**. **False.** A rebase-merge that
-actually replays commits *rewrites their shas*, so it also reports 0/N. #3 and #4 reported 28/28 and
-22/22 only because those rebases were fast-forwards. **PR #13 reports 0/4 and was rebase-merged** — its
-artefacts are on `main` as `b0fda11`/`3aec0a0`, and its recorded merge sha `f363b2f` is a docs commit,
-the same last-commit-of-chain pattern as #3/#4.
-**The reliable instrument is `gh api repos/<o>/<r>/commits/<sha>/pulls`**, which names the PR a commit
-belongs to regardless of merge style. Use it; do not infer merge style from ancestry counts.
-**And the rule that actually generalises, stated once:** *the commit that introduced this task's declared
-artefact to `main`, confirmed to belong to this task's PR.* For a squash that commit IS the merge sha;
-for a rebase it is a distinct commit. Both are the same rule.
-
-### 3. THE LEDGER UNDERSTATES REALITY, AND THE GATE HAS BEEN PRINTING THE PROOF ALL ALONG
-
-**Swept all 118 `todo` rows with the artefact test. 17 have EVERY declared artefact already on `main`,
-1 is partial, 92 are genuinely absent, 8 declare no artefact and cannot be tested this way.**
-
-    plan 04 T1, T2, T3        plan 06 T1, T2, T3, T4        plan 07 T1, T2, T3, T16
-    plan 10 T1, T2, T3, T8, T18                             plan 11 T14
-    partial: plan 07 T11a (1 of 2 artefacts present)
-
-**The owner asked "what are Plan 4's 3 remaining tasks and why are they left." They are not left.**
-T1 landed as `06e5061` (PR **#20**), T2 as `31df85b` (PR **#30**), T3 as `ef410ea` (PR **#22**). All
-three are recorded `todo` with no PR cited.
-
-**And this is the part that indicts the process, not the data: `check:tasks` already prints #20, #22 and
-#30 in its unattributed-merged-PR list, on every single run, directly below the 14.7% figure.** The
-script header even names this as the direction that catches work landing unrecorded. The instrument
-worked. **Nobody read the half of its output that was not a number.** Every session that quoted 14.7%
-— including this one, repeatedly — printed the evidence of its own understatement in the same command.
-
-### 4. THE HONEST PROJECTION, AND WHY IT IS NOT A PROMISE
-
-26 done today · +28 (Plans 1–2) · +4 (03/T1, 03/T2, 06/T9, 07/T4) · +17 (todo rows with artefacts on
-main) = **~75/177 ≈ 42%**, before step 9 merges. Minus 11/T6, which moves the other way.
-
-**Do not quote 42% until each row is confirmed individually.** *"An artefact is on `main`"* is WEAKER
-than *"the task is complete"*: a file can be created by a neighbouring task, pulled forward, or landed
-as a scaffold with the task's real behaviour still unwritten — `docToPlainText` is the proven precedent,
-shipped early by #8 and still carrying an unbounded-recursion defect T1 had to fix. The 17 are
-**candidates**, on exactly the footing the 28 were before they were checked one at a time.
-
-> **THE COINCIDENCE MUST BE STATED, NOT QUIETLY ENJOYED.** The old discredited figure was **"~43%"**,
-> and this file dismissed it for folding `done`, `claimed` and `in-flight` together without evidence.
-> The evidence-based sweep lands at **~42%**. **That does NOT vindicate the old method** — it reached a
-> near-identical number by over-counting unverified claims, which is a different error that happened to
-> cancel out. Two roads to the same place, one of them still wrong. Recorded because the temptation to
-> read this as "we were right all along" is exactly the kind of thing this file exists to refuse.
-
-### WHAT REMAINS TO DO AT THE STEP-9 BOUNDARY — mechanical, the thinking is done
-
-1. Apply the 28 rows to `task-ledger.tsv`: status `claimed` → `done`, `merge_sha` → **the per-task commit
-   above**, note → the declared artefact that evidences it. (Plan 2 T7 per its caveat.)
-2. Rewrite `check-task-ledger.mjs`'s header: the `done` definition now admits range-internal artefact
-   evidence, **and** the *"This repo squash-merges"* rationale is corrected — false of #3 and #4.
-3. Correct this file's own `done` definition at the ledger section (line ~142) to match.
-4. **Then the widened scope above**: the 4 further claimed rows, `11/T6` demoted to `todo`, and the 17
-   todo candidates confirmed ONE AT A TIME before any is promoted.
-5. Re-run `pnpm check:tasks` and quote it — **and read the unattributed-PR list underneath it, which is
-   the half of that output this project has never once read.**
+Idempotent by construction: a row already in its target state **with the expected sha** is a no-op; the
+same row with a **wrong** sha still errors. Every guard was mutation-tested against scratch copies with
+a passing control beside it — non-ancestor sha, wrong starting status, missing row, wrong sha under
+idempotency. **The working tree was never used as a test fixture.**
 
 ## Pending owner decisions
 

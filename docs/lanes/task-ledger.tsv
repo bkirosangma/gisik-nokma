@@ -27,36 +27,36 @@
 # signal. Where a title was the only evidence, the row is `claimed`, not `done`.
 #
 plan	task	status	pr	merge_sha	note
-01	1	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	2	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	3	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	4	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	4a	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	5	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	6	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	7	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	8	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	9	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	10	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	11	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	12	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	13	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-01	14	claimed	3	569fd41e	PR title asserts the whole plan; per-task mapping never audited
-02	1	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-02	2	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-02	3	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-02	4	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-02	5	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-02	6	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-02	7	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-02	8	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-02	9	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-02	10	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-02	11	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-02	12	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-02	13	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-03	1	claimed	13	f363b2f4	PR names the content ("the ticket type model") but no task number; branch was multi-task
-03	2	claimed	13	f363b2f4	PR names the content ("event vocabulary") but no task number; branch was multi-task
+01	1	done	3	0dd4de7	artefact: package.json, pnpm-workspace.yaml, turbo.json, tsconfig.base.json
+01	2	done	3	08f150f	artefact: packages/domain/src/envelope.ts, ids.ts
+01	3	done	3	22bfc88	artefact: packages/domain/src/parse-event.ts, registry.ts, vocabulary.ts
+01	4	done	3	6b7ffc0	artefact: packages/domain/src/state.ts, packages/rule-engine/package.json
+01	4a	done	3	c5a866c	artefact: packages/domain/src/ist-day.ts
+01	5	done	3	f0d27b3	artefact: apps/server/src/config.ts, db.ts
+01	6	done	3	58cf28c	artefact: migrations/1787841717635_events-and-snapshots.sql, test/helpers/db.ts
+01	7	done	3	3baf418	artefact: apps/server/src/ledger/event-store.ts, snapshot-store.ts
+01	8	done	3	314ba87	artefact: apps/server/src/projections/registry.ts, rebuild.ts
+01	9	done	3	386bd6c	artefact: migrations/1787847393435_proj-entity-heads.sql, projections/entity-heads.ts
+01	10	done	3	99dd467	artefact: apps/server/src/ingest/ingest-service.ts, engine-context.ts
+01	11	done	3	e41508c	artefact: apps/server/src/routes/events.ts
+01	12	done	3	09f1e3e	artefact: apps/server/src/tools/verify-projections.ts
+01	13	done	3	560bad6	artefact: apps/server/test/fixtures/ledger-fixture.ts
+01	14	done	3	1272d2b	artefact: test-cases/03-foundation-ledger.md
+02	1	done	4	aa33c70	artefact: packages/domain/src/workflow.ts
+02	2	done	4	aa33c70	artefact: packages/domain/src/entity-state.ts (same commit as T1, distinct file)
+02	3	done	4	41b3620	artefact: packages/domain/src/validate-workflow.ts, advise-workflow.ts
+02	4	done	4	e25ee66	artefact: packages/rule-engine/src/fixtures/harness.ts
+02	5	done	4	186a172	artefact: packages/rule-engine/src/evaluate.ts, workflow-defined.ts, refusal-rules.ts
+02	6	done	4	91739a2	artefact: packages/rule-engine/src/transition.ts, version-map.ts
+02	7	done	4	c18ce5a	WEAKER BASIS: modify-only task, no declared artefact. Subject + position (sole transition.ts commit between 91739a2 and 0353081)
+02	8	done	4	0353081	artefact: packages/rule-engine/src/rules/require-comment.ts, types.ts, index.ts
+02	9	done	4	155650a	artefact: packages/rule-engine/src/rules/require-evidence.ts, require-field.ts
+02	10	done	4	8a4940f	artefact: packages/rule-engine/src/rules/restrict-to.ts
+02	11	done	4	df17d4a	artefact: packages/rule-engine/src/rules/require-different-user.ts
+02	12	done	4	6d6612c	artefact: migrations/1787896601515_proj-workflows.sql, projections/workflows.ts
+02	13	done	4	c33d94a	artefact: test-cases/04-workflow-engine.md
+03	1	done	13	b0fda11	artefact: packages/domain/src/ticket-types.ts (PR #13, rebase-merged)
+03	2	done	13	3aec0a0	artefact: packages/domain/src/events/ticket-events.ts, testing.ts (PR #13, rebase-merged)
 03	3	done	38	6b2fc768	
 03	4	done	38	6b2fc768	
 03	5	done	38	6b2fc768	
@@ -69,9 +69,9 @@ plan	task	status	pr	merge_sha	note
 03	12	done	59	6cb631d0	
 03	13	done	59	6cb631d0	
 03	14	done	59	6cb631d0	
-04	1	todo	-	-	
-04	2	todo	-	-	
-04	3	todo	-	-	
+04	1	done	-	06e5061	artefact: apps/server/src/auth/auth.ts + senders + db/queryable.ts (PR #20)
+04	2	done	-	31df85b	artefact: apps/server/src/auth/routes.ts, require-session.ts (PR #30)
+04	3	done	-	ef410ea	artefact: packages/domain/src/events/membership.ts, visibility.ts (PR #22)
 04	4	done	51	45c83eb4	
 04	5	done	51	45c83eb4	
 04	6	done	52	40c52191	
@@ -100,15 +100,15 @@ plan	task	status	pr	merge_sha	note
 05	14	todo	-	-	
 05	15	todo	-	-	
 05	16	todo	-	-	
-06	1	todo	-	-	
-06	2	todo	-	-	
-06	3	todo	-	-	
-06	4	todo	-	-	
+06	1	done	-	2e9f405	artefact: packages/ui scaffold + tokens (PR #16)
+06	2	done	-	2e9f405	artefact: packages/ui/test/helpers/colour-scan.ts, token-discipline.test.ts (PR #16)
+06	3	done	-	2e9f405	artefact: all 8 declared components + ui.css, each verified present (PR #16)
+06	4	done	-	2e9f405	artefact: packages/app-core scaffold, DataSource interface (PR #16)
 06	5	todo	-	-	
 06	6	done	36	3fb22d3f	
 06	7	todo	-	-	
 06	8	todo	-	-	
-06	9	claimed	43	c93c9104	PR title says "Plan 6a" (a lane, not plan 06) and describes the review; exec/06a-client-core was multi-task
+06	9	done	43	c93c910	artefact: packages/app-core/src/views/board.tsx, use-live-query.ts, rollup-text.ts (= PR #43 squash sha)
 06	10	todo	-	-	
 06	11	todo	-	-	
 06	12	todo	-	-	
@@ -118,10 +118,10 @@ plan	task	status	pr	merge_sha	note
 06	15	todo	-	-	
 06	15b	todo	-	-	
 06	16	todo	-	-	
-07	1	todo	-	-	
-07	2	todo	-	-	
-07	3	todo	-	-	
-07	4	claimed	47	a3746fb9	PR describes a scoped re-review; exec/07-editor-client was multi-task
+07	1	done	-	a3746fb	artefact: packages/editor scaffold + document schema (PR #47, multi-task branch)
+07	2	done	-	a3746fb	artefact: packages/domain/src/doc-embeds.ts (PR #47)
+07	3	done	-	a3746fb	artefact: packages/editor/src/extensions/ticket-image.ts (PR #47)
+07	4	done	47	a3746fb	artefact: packages/editor/src/extensions/mention.ts, mention-popup.ts (= PR #47 squash sha)
 07	5	todo	-	-	
 07	6	todo	-	-	
 07	7	todo	-	-	
@@ -170,14 +170,14 @@ plan	task	status	pr	merge_sha	note
 09	13	todo	-	-	
 09	14	todo	-	-	
 09	15	todo	-	-	
-10	1	todo	-	-	
-10	2	todo	-	-	
-10	3	todo	-	-	
+10	1	done	-	b62be74	artefact: packages/domain/src/events/contest-events.ts (PR #23, subject names it)
+10	2	done	-	b62be74	artefact: packages/rule-engine/src/contests.ts (PR #23, subject names it)
+10	3	done	-	b62be74	artefact: apps/server/src/sync/stream-seq.ts (PR #23, subject names it)
 10	4	done	53	33538bee	lifted to Phase 1; closes the §11 envelope-origin window
 10	5	todo	-	-	
 10	6	todo	-	-	
 10	7	todo	-	-	
-10	8	todo	-	-	
+10	8	done	-	b62be74	artefact: packages/sync-client scaffold (PR #23, subject names it)
 10	9	todo	-	-	
 10	10	todo	-	-	
 10	11	todo	-	-	
@@ -193,7 +193,7 @@ plan	task	status	pr	merge_sha	note
 11	3	todo	-	-	
 11	4	todo	-	-	
 11	5	todo	-	-	
-11	6	claimed	17	f6e29cf0	PR landed the env-contract gate SLICE only; dev stack + five services unverified
+11	6	todo	-	-	artefact docker-compose.dev.yml was NEVER added to main; PR #17 landed the env-contract gate slice only
 11	7	todo	-	-	
 11	8	todo	-	-	
 11	9	todo	-	-	
