@@ -215,7 +215,7 @@ export function buildApp(
   // type population a publish mapping is built from. Same preHandler by
   // parameter, same reason as every route above it: each handler reads
   // `request.currentUserId` and resolves its whole tenancy gate from it.
-  registerBuilderReadRoutes(app, { pool: deps.pool }, requireSession);
+  registerBuilderReadRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;

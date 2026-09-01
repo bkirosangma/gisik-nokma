@@ -1,7 +1,9 @@
-import type { FastifyInstance, FastifyRequest, preHandlerHookHandler } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
 import { z } from 'zod';
+import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type {
   MemberListResponse,
+  MigrationOutcome,
   PublishedWorkflowDef,
   StateOccupancyResponse,
   TicketTypeDef,
@@ -12,6 +14,7 @@ import type {
   WorkspaceMember,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
+import type { ClientIngest } from '../ingest/ingest-service.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { getWorkflowDefFromProjection } from '../projections/workflows.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
@@ -315,9 +318,42 @@ export async function readTypePopulation(
   return rows[0]?.population ?? 0;
 }
 
+/**
+ * The bulk rebind's body. Parsed HERE with zod rather than declared as a
+ * Fastify body schema, and the difference is the door.
+ *
+ * Fastify runs schema validation BEFORE `preHandler`, so a declared body schema
+ * would answer a malformed request with 400 before `requireSession` had asked
+ * who was calling — an unauthenticated stranger would learn that this route
+ * exists and what its body looks like. Every other refusal on this surface runs
+ * the door first (Task 9's case 7.83), and a write route that re-homes other
+ * people's work is the last place to make an exception. Parsing in the handler
+ * puts the session check, then the admin check, then the parse, in that order.
+ *
+ * `.strict()`: an unknown key is refused rather than dropped, the same intent
+ * `app.ts`'s `removeAdditional: false` declares for every schema-validated door.
+ */
+const migrateBodySchema = z
+  .object({
+    fromWorkflowId: z.string().min(1),
+    toWorkflowId: z.string().min(1),
+    stateMap: z.record(z.string().min(1), z.string().min(1)),
+  })
+  .strict();
+
+/** The refusal rules this route can answer with, before any event exists. */
+export const MIGRATION_RULES = {
+  /** `fromWorkflowId === toWorkflowId`. */
+  sameWorkflow: 'migration.same-workflow',
+  /** A `stateMap` target the destination workflow does not define. */
+  unknownTargetState: 'migration.unknown-target-state',
+  /** An occupied state the `stateMap` does not cover — the dialog's contract. */
+  unmappedState: 'migration.unmapped-state',
+} as const;
+
 export function registerBuilderReadRoutes(
   app: FastifyInstance,
-  deps: { pool: Queryable },
+  deps: { pool: Queryable; ingest: ClientIngest },
   requireSession: preHandlerHookHandler,
 ): void {
   /**
@@ -478,6 +514,169 @@ export function registerBuilderReadRoutes(
         count: await readTypePopulation(deps.pool, workspaceId, typeId, workflowId),
       };
       return body;
+    },
+  );
+
+  /** A refusal decided before any event was built: 422, and nothing appended. */
+  function refuse(reply: FastifyReply, rule: string, reason: string): FastifyReply {
+    const body: MigrationOutcome = { status: 'refused', rule, reason };
+    return reply.code(422).send(body);
+  }
+
+  /**
+   * The bulk rebind — the migration half of this task, and the only route here
+   * that writes.
+   *
+   * ## It orchestrates; it never bypasses
+   *
+   * Every ticket moves by one `ticket.workflow_rebound` submitted through the
+   * ORDINARY client door, `ingestClientBatch`. That is where the honesty already
+   * lives: the event is in Plan 4's `ADMIN_ONLY_TYPES`, and Plan 3's checks
+   * refuse an unknown target workflow or an unknown target state per event. This
+   * route adds no authority of its own — it decides WHICH events to submit, and
+   * refuses the whole request before submitting any if the request could not
+   * honestly produce them.
+   *
+   * ## Its own admin gate, ahead of building anything
+   *
+   * Deferring the role question to ingest would still refuse a member — but only
+   * after five envelopes had been built and five refusals returned, and the
+   * caller could not tell that from a route with a gate. Case 7.45 asks for the
+   * refusal "before a single event is built", so the gate is here, it runs
+   * first, and it answers 404 on the same terms as state-occupancy and
+   * population: 404 is what the two sibling admin-only routes on this path
+   * prefix answer, and it leaks strictly less than the 403 Plan 4's invite list
+   * uses. Recorded as a decision because the plan text names no status for it.
+   *
+   * ## "All-or-nothing" — what actually ships, and what does not
+   *
+   * The plan says "All-or-nothing inside ONE TRANSACTION: the batch commits
+   * together or refuses together." **That is not what this route does, and it
+   * cannot be from here.** `ingestClientBatch` commits one transaction PER
+   * EVENT — that is its published contract, the thing that lets one bad event in
+   * a batch fail without rolling back its neighbours — and a route may not reach
+   * the internal append path at all (`AppDeps.ingest` is narrowed to
+   * `ClientIngest` precisely so it cannot).
+   *
+   * What ships instead is Task 16's case 7.45, which is the achievable half:
+   * every question that could refuse this batch is asked UP FRONT, over the
+   * whole ticket set, before one envelope exists — so a refusal appends nothing,
+   * and the answered `count` equals the events appended. The remaining window is
+   * stated rather than papered over: if ingest refuses or fails PART WAY through
+   * a batch it accepted the pre-flight of, earlier tickets stay moved. Nothing
+   * this route can construct reaches that window — the pre-flight covers every
+   * refusal `checkTicketWorkflowRebound` can produce — but an infrastructure
+   * failure mid-batch is not a refusal and is not covered. Recorded against the
+   * plan's Task 9b text: closing it needs a batch-scoped ingest transaction,
+   * which is a change to the ingest service and not to this route.
+   */
+  app.post<{ Params: { workspaceId: string; typeId: string } }>(
+    '/v1/workspaces/:workspaceId/ticket-types/:typeId/migrate',
+    { preHandler: requireSession },
+    async (request, reply) => {
+      const { workspaceId, typeId } = request.params;
+      if ((await door(request, workspaceId, 'admins-only')) === null) {
+        return reply.code(404).send(READ_NOT_FOUND_BODY);
+      }
+      const parsed = migrateBodySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'invalid', message: parsed.error.issues[0]?.message ?? 'malformed body' });
+      }
+      const { fromWorkflowId, toWorkflowId, stateMap } = parsed.data;
+
+      // Three actor-supplied ids, all three resolved against the workspace the
+      // door just approved. `proj_workflows` is keyed `(workflow_id, version)`
+      // GLOBALLY (ruling P14), so an unscoped destination lookup would let an
+      // admin bind their own workspace's live tickets to a definition belonging
+      // to the tenant next door — which their workspace then cannot read.
+      if (!(await ticketTypeExists(deps.pool, workspaceId, typeId))) {
+        return reply.code(404).send(READ_NOT_FOUND_BODY);
+      }
+      const source = await getWorkflowDefFromProjection(deps.pool, workspaceId, fromWorkflowId);
+      const target = await getWorkflowDefFromProjection(deps.pool, workspaceId, toWorkflowId);
+      if (source === null || target === null) {
+        return reply.code(404).send(READ_NOT_FOUND_BODY);
+      }
+
+      // Refused here rather than per event: the engine refuses a rebind to the
+      // workflow a ticket is already on, and permitting it within one workflow
+      // would be a universal transition-rule bypass. Asking once means the batch
+      // is never built.
+      if (fromWorkflowId === toWorkflowId) {
+        return refuse(
+          reply,
+          MIGRATION_RULES.sameWorkflow,
+          `A migration moves a type's tickets between two workflows; this one names ${fromWorkflowId} as both source and destination.`,
+        );
+      }
+
+      const targetStates = new Set(target.states.map((state) => state.id));
+      const unknownTargets = [...new Set(Object.values(stateMap))].filter((id) => !targetStates.has(id)).sort();
+      if (unknownTargets[0] !== undefined) {
+        return refuse(
+          reply,
+          MIGRATION_RULES.unknownTargetState,
+          `Workflow "${target.name}" has no state ${unknownTargets.map((id) => `"${id}"`).join(', ')}, so the map cannot send anything there.`,
+        );
+      }
+
+      const { rows: tickets } = await deps.pool.query<{ ticket_id: string; state_id: string }>(
+        `SELECT ticket_id, state_id
+           FROM proj_tickets
+          WHERE workspace_id = $1 AND type_id = $2 AND workflow_id = $3
+          ORDER BY ticket_id`,
+        [workspaceId, typeId, fromWorkflowId],
+      );
+
+      // Every OCCUPIED state needs a target. Occupancy is read from the tickets
+      // actually being moved rather than from the source definition, so a state
+      // the definition still carries but nobody is in does not have to be
+      // mapped, and a state the definition no longer carries but somebody IS in
+      // still does. The dialog's contract is about work, not about shapes.
+      const unmapped = [...new Set(tickets.map((row) => row.state_id))]
+        .filter((stateId) => stateMap[stateId] === undefined)
+        .sort();
+      if (unmapped[0] !== undefined) {
+        return refuse(
+          reply,
+          MIGRATION_RULES.unmappedState,
+          `Tickets are sitting in ${unmapped.map((id) => `"${id}"`).join(', ')} and the map gives ${unmapped.length === 1 ? 'it' : 'them'} no target. Every occupied state needs one.`,
+        );
+      }
+
+      const events: SubmittedEvent[] = tickets.map((row) => ({
+        id: newUlid(),
+        workspaceId,
+        entity: { kind: 'ticket', id: row.ticket_id },
+        type: 'ticket.workflow_rebound',
+        version: 1,
+        // `stateMap[row.state_id]` is defined for every row — the unmapped check
+        // above is what makes that true, and it is checked over the same rows.
+        payload: { toWorkflowId, toStateId: stateMap[row.state_id] },
+        actorId: request.currentUserId,
+        // envelope-origin `'web'`: a person's claim that they migrated this
+        // type, not the server's own record. The gate refuses a client-submitted
+        // event wearing the server's provenance.
+        origin: 'web',
+        clientTime: new Date().toISOString(),
+      }));
+
+      const results = await deps.ingest.ingestClientBatch(events, request.currentUserId);
+      const failure = results.find((result) => result.status !== 'committed');
+      if (failure !== undefined) {
+        // Reachable only through the window the docblock names: every refusal
+        // `checkTicketWorkflowRebound` can produce was asked up front over this
+        // exact ticket set. It is answered rather than swallowed because a
+        // partial migration the caller was not told about is worse than either
+        // population.
+        return refuse(
+          reply,
+          failure.status === 'refused' ? failure.rule : `ingest.${failure.code}`,
+          failure.status === 'refused' ? failure.reason : failure.message,
+        );
+      }
+      const outcome: MigrationOutcome = { status: 'migrated', count: results.length };
+      return outcome;
     },
   );
 }

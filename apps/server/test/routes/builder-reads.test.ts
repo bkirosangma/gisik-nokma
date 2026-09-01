@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import {
+  membershipId,
   newUlid,
   type MemberListResponse,
   type StateOccupancyResponse,
@@ -11,6 +12,7 @@ import {
 } from '@gisik-nokma/domain';
 import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
 import { READ_NOT_FOUND_BODY } from '../../src/read/membership.js';
+import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
 
@@ -458,5 +460,285 @@ describe('GET /v1/workspaces/:workspaceId/ticket-types/:typeId/population', () =
     expect((await get('stranger', '/ticket-types/task/population')).statusCode).toBe(404);
     // POSITIVE CONTROL: the well-formed request from the entitled caller.
     expect((await population('owner', 'task', 'wf-errands')).statusCode).toBe(200);
+  });
+});
+
+/**
+ * `POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate` — the bulk
+ * rebind, and the only route on this surface that WRITES.
+ *
+ * ## These cases mutate the world, and they are last for that reason
+ *
+ * Everything above this point is read-only and order-independent. A successful
+ * migration moves live tickets between workflows, which changes what the
+ * occupancy and population reads answer, so these cases sit at the end of the
+ * file and each states what it left behind. Where a case needs a number it did
+ * not seed, it READS it rather than restating a constant that the case above it
+ * may have moved.
+ *
+ * ## The access decision here is MINE, not the plan's — and it is the strict one
+ *
+ * The plan gives this route two answers, `200` and `422`, and never says what a
+ * non-admin gets. `ticket.workflow_rebound` is in Plan 4's `ADMIN_ONLY_TYPES`,
+ * so ingest would refuse a member's events anyway — but Task 16's case 7.45
+ * requires the refusal to arrive "before a single event is built", which is
+ * exactly what deferring to ingest does not do. So the route carries its own
+ * gate, and it answers **404** rather than the 403 `GET /v1/workspaces/:id/invites`
+ * uses: 404 is what the two sibling admin-only routes on this same path prefix
+ * answer, it leaks strictly less, and choosing the permissive reading on a
+ * surface that re-homes other people's work is not a call to make silently.
+ */
+describe('POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', () => {
+  function migrate(
+    role: ReadRole,
+    typeId: string,
+    body: unknown,
+    workspaceId = read.world.workspaceId,
+  ): Promise<InjectResponse> {
+    return read.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${workspaceId}/ticket-types/${typeId}/migrate`,
+      headers: read.authOf(role),
+      payload: body as Record<string, unknown>,
+    });
+  }
+
+  async function ledgerSize(): Promise<number> {
+    const { rows } = await db.pool.query<{ n: number }>('SELECT count(*)::int AS n FROM events');
+    return rows[0]?.n ?? 0;
+  }
+
+  async function populationOf(typeId: string, workflowId: string): Promise<number> {
+    const body = await okJson<TypePopulationResponse>(
+      'owner',
+      `/ticket-types/${typeId}/population?workflowId=${workflowId}`,
+    );
+    return body.count;
+  }
+
+  it('7.45 PLANTED DEFECT: a plain member is refused before a single event is built', async () => {
+    // A COMPLETE, VALID migration — the same body the owner is about to have
+    // accepted — so nothing but the caller distinguishes the refusals below
+    // from the acceptance beneath them.
+    const request = { fromWorkflowId: 'wf-second', toWorkflowId: 'wf-errands', stateMap: { todo: 'todo' } };
+    const before = await ledgerSize();
+
+    const refusals: InjectResponse[] = [];
+    for (const role of ['member', 'guest', 'outsider', 'stranger', 'neighbour'] as const) {
+      const response = await migrate(role, 'chore', request);
+      expect([role, response.statusCode]).toEqual([role, 404]);
+      expect(response.json()).toEqual(READ_NOT_FOUND_BODY);
+      refusals.push(response);
+    }
+    for (const refusal of refusals.slice(1)) {
+      expect(comparableHeaders(refusal)).toEqual(comparableHeaders(refusals[0] as InjectResponse));
+    }
+    // Not one event was built. Asserting the STATUS alone would survive a route
+    // with no gate of its own: ingest refuses `ticket.workflow_rebound` from a
+    // member too (`ADMIN_ONLY_TYPES`), so the caller would still see an error
+    // while five envelopes had been constructed and one refusal per ticket
+    // returned. The ledger is what tells those two apart.
+    expect(await ledgerSize()).toBe(before);
+
+    // POSITIVE CONTROL, in the same test, and the reason the zero above is not
+    // free: the identical body from the owner COMMITS, and the ledger moves by
+    // exactly the one ticket `chore` has.
+    const accepted = await migrate('owner', 'chore', request);
+    expect(accepted.statusCode).toBe(200);
+    expect(accepted.json()).toEqual({ status: 'migrated', count: 1 });
+    expect(await ledgerSize()).toBe(before + 1);
+    expect(await populationOf('chore', 'wf-errands')).toBe(1);
+    expect(await populationOf('chore', 'wf-second')).toBe(0);
+  });
+
+  it('7.86 a migration may not name a workflow or a type from the tenancy next door', async () => {
+    const before = await ledgerSize();
+    const complete = { fromWorkflowId: 'wf-errands', toWorkflowId: 'wf-second', stateMap: { todo: 'todo', doing: 'waiting', waiting: 'waiting' } };
+
+    // The neighbour's workflow as the DESTINATION — the direction that matters
+    // most, because accepting it would bind live tickets to a definition their
+    // own workspace cannot see (the exact shape ruling P14 was raised over).
+    expect((await migrate('owner', 'task', { ...complete, toWorkflowId: read.neighbour.workflowId })).statusCode).toBe(404);
+    // As the SOURCE, and as the TYPE.
+    expect((await migrate('owner', 'task', { ...complete, fromWorkflowId: read.neighbour.workflowId })).statusCode).toBe(404);
+    expect((await migrate('owner', 'nb-task', complete)).statusCode).toBe(404);
+    expect(await ledgerSize()).toBe(before);
+
+    // POSITIVE CONTROL: the same route, same caller, ids that ARE in this
+    // workspace — it reaches the domain logic and refuses there instead, so the
+    // three 404s above are the tenancy scope and not a route that 404s
+    // everything it is sent.
+    const inWorkspace = await migrate('owner', 'task', { ...complete, stateMap: { todo: 'todo' } });
+    expect(inWorkspace.statusCode).toBe(422);
+    expect((inWorkspace.json() as { rule: string }).rule).toBe('migration.unmapped-state');
+  });
+
+  it('7.45 refuses up front and appends nothing: an unmapped occupied state, the same workflow twice, a target state the destination has no such state', async () => {
+    const before = await ledgerSize();
+    const populationBefore = await populationOf('task', 'wf-errands');
+    // A NON-ZERO positive control for the "nothing appended" assertions: there
+    // really are tickets on the table, so a refusal that appended nothing is a
+    // refusal rather than an empty batch.
+    expect(populationBefore).toBe(5);
+
+    // `doing` is occupied — the GST task sits there — and the map does not name
+    // it. Every occupied state needs a target; that is the dialog's contract.
+    const unmapped = await migrate('owner', 'task', {
+      fromWorkflowId: 'wf-errands',
+      toWorkflowId: 'wf-second',
+      stateMap: { todo: 'todo', waiting: 'waiting' },
+    });
+    expect(unmapped.statusCode).toBe(422);
+    const unmappedBody = unmapped.json() as { status: string; rule: string; reason: string };
+    expect(unmappedBody.status).toBe('refused');
+    expect(unmappedBody.rule).toBe('migration.unmapped-state');
+    // The refusal NAMES the state, because a dialog that cannot say which state
+    // is unmapped cannot ask the author to map it.
+    expect(unmappedBody.reason).toContain('doing');
+
+    // The same workflow twice. The engine refuses `ticket.workflow_rebound` to
+    // the workflow a ticket is already on (`ticket.rebound-same-workflow`), so
+    // without this the whole batch would be built and refused one at a time.
+    const same = await migrate('owner', 'task', {
+      fromWorkflowId: 'wf-errands',
+      toWorkflowId: 'wf-errands',
+      stateMap: { todo: 'todo', doing: 'doing', waiting: 'waiting' },
+    });
+    expect(same.statusCode).toBe(422);
+    expect((same.json() as { rule: string }).rule).toBe('migration.same-workflow');
+
+    // A target the destination workflow does not have. `wf-second` carries
+    // todo / waiting / done and no `doing`.
+    const unknownTarget = await migrate('owner', 'task', {
+      fromWorkflowId: 'wf-errands',
+      toWorkflowId: 'wf-second',
+      stateMap: { todo: 'todo', doing: 'doing', waiting: 'waiting' },
+    });
+    expect(unknownTarget.statusCode).toBe(422);
+    const unknownBody = unknownTarget.json() as { rule: string; reason: string };
+    expect(unknownBody.rule).toBe('migration.unknown-target-state');
+    expect(unknownBody.reason).toContain('doing');
+
+    // A malformed body is a 400 and not a refusal, and it too appends nothing.
+    expect((await migrate('owner', 'task', { fromWorkflowId: 'wf-errands', toWorkflowId: 'wf-second' })).statusCode).toBe(400);
+    expect((await migrate('owner', 'task', { fromWorkflowId: 'wf-errands', toWorkflowId: 'wf-second', stateMap: { todo: 7 } })).statusCode).toBe(400);
+    expect((await migrate('owner', 'task', { fromWorkflowId: 'wf-errands', toWorkflowId: 'wf-second', stateMap: {}, extra: 1 })).statusCode).toBe(400);
+
+    expect(await ledgerSize()).toBe(before);
+    expect(await populationOf('task', 'wf-errands')).toBe(populationBefore);
+  });
+
+  it('7.45 a complete map lands one ticket.workflow_rebound per ticket through ordinary ingest, and the count answered equals the events appended', async () => {
+    const before = await ledgerSize();
+    const fromBefore = await populationOf('task', 'wf-errands');
+    const toBefore = await populationOf('task', 'wf-second');
+    expect([fromBefore, toBefore]).toEqual([5, 0]);
+
+    const response = await migrate('owner', 'task', {
+      fromWorkflowId: 'wf-errands',
+      toWorkflowId: 'wf-second',
+      // `doing` has no counterpart in `wf-second`, so the author maps it onto
+      // `waiting` — which is the whole reason the dialog exists.
+      stateMap: { todo: 'todo', doing: 'waiting', waiting: 'waiting' },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: 'migrated', count: 5 });
+
+    // The count is not a number the route made up: the ledger grew by exactly
+    // that many events, and every one of them is the type this route claims to
+    // submit — through the ORDINARY ingest path, which is where the honesty
+    // already lives.
+    expect(await ledgerSize()).toBe(before + 5);
+    const { rows } = await db.pool.query<{ type: string; n: number }>(
+      `SELECT type, count(*)::int AS n FROM events
+        WHERE workspace_id = $1 AND type = 'ticket.workflow_rebound'
+        GROUP BY type`,
+      [read.world.workspaceId],
+    );
+    expect(rows[0]?.n).toBe(6); // the five here, plus the one `chore` migration above
+
+    // The populations moved, both ends, and the mapping was applied rather than
+    // the state carried across: the GST task was in `doing`, which `wf-second`
+    // has no such state, so it must now be in `waiting`.
+    expect(await populationOf('task', 'wf-errands')).toBe(0);
+    expect(await populationOf('task', 'wf-second')).toBe(5);
+    const occupancy = await okJson<StateOccupancyResponse>('owner', '/workflows/wf-second/state-occupancy');
+    expect(occupancy.counts).toEqual({ todo: 3, waiting: 2, done: 0 });
+    const { rows: gst } = await db.pool.query<{ workflow_id: string; state_id: string }>(
+      'SELECT workflow_id, state_id FROM proj_tickets WHERE ticket_id = $1',
+      [read.world.taskInEpicId],
+    );
+    expect(gst[0]).toEqual({ workflow_id: 'wf-second', state_id: 'waiting' });
+  });
+});
+
+describe('GET /v1/workspaces/:workspaceId/members — the roster after a revocation', () => {
+  /**
+   * LAST IN THE FILE, and it writes: it revokes `member`'s workspace grant.
+   * Everything above it reads `member` as a current member, so it could not sit
+   * anywhere else.
+   *
+   * The subject is the one thing about `proj_memberships` that a roster query
+   * can get wrong in a way no ordinary case would notice. `membership.revoked`
+   * deletes the WORKSPACE-scope row only — it may not touch the project roster
+   * rows, because those belong to the project entity's stream and a cross-entity
+   * delete would make the table's contents depend on arrival interleaving
+   * (`projections/proj-memberships.ts`). So a revoked person keeps two
+   * project-scope rows in this world, each carrying role `'member'`, and the
+   * plan text's roster — a `DISTINCT ON (user_id)` fold across both scopes —
+   * would read one of them and hand the revoked person back as a current
+   * member of the workspace.
+   */
+  it('7.87 a revoked member disappears from the roster even though their project rows survive', async () => {
+    const beforeRoster = await okJson<MemberListResponse>('owner', '/members');
+    // POSITIVE CONTROL first, and it is what makes the absence below a change:
+    // this person IS on the roster right now.
+    expect(beforeRoster.members.map((m) => m.userId)).toContain(read.userIds.member);
+
+    const { rows: seqRows } = await db.pool.query<{ entity_seq: number | null; ws_seq: number | null }>(
+      `SELECT (SELECT max(seq) FROM events WHERE entity_kind = 'membership' AND entity_id = $2) AS entity_seq,
+              (SELECT max(workspace_seq) FROM events WHERE workspace_id = $1) AS ws_seq`,
+      [read.world.workspaceId, membershipId(read.world.workspaceId, read.userIds.member)],
+    );
+    // The positions are read from the ledger rather than taken from
+    // `makeCommitted`'s process-local counters: the migration cases above
+    // appended through REAL ingest, so those counters are behind the database
+    // and a stale `workspace_seq` would collide on the ledger's unique index.
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: read.world.workspaceId,
+        actorId: read.userIds.owner,
+        entity: { kind: 'membership', id: membershipId(read.world.workspaceId, read.userIds.member) },
+        type: 'membership.revoked',
+        payload: { userId: read.userIds.member },
+        seq: (seqRows[0]?.entity_seq ?? 0) + 1,
+        workspaceSeq: (seqRows[0]?.ws_seq ?? 0) + 1,
+      }),
+    ]);
+
+    // The project-scope rows SURVIVED — this is the state the hazard lives in,
+    // asserted rather than assumed, so the case below is about the query and
+    // not about a projection that happened to clean up.
+    const { rows: survivors } = await db.pool.query<{ scope_kind: string; role: string }>(
+      'SELECT scope_kind, role FROM proj_memberships WHERE workspace_id = $1 AND user_id = $2 ORDER BY project_id',
+      [read.world.workspaceId, read.userIds.member],
+    );
+    expect(survivors).toEqual([
+      { scope_kind: 'project', role: 'member' },
+      { scope_kind: 'project', role: 'member' },
+    ]);
+
+    const afterRoster = await okJson<MemberListResponse>('owner', '/members');
+    expect(afterRoster.members.map((m) => m.userId)).not.toContain(read.userIds.member);
+    // And the roster is not merely empty: the other three are all still there.
+    expect(Object.fromEntries(afterRoster.members.map((m) => [m.userId, m.role]))).toEqual({
+      [read.userIds.owner]: 'owner',
+      [read.userIds.outsider]: 'member',
+      [read.userIds.guest]: 'guest',
+    });
+    // The revoked person's own read is refused too, which is `requireMember`
+    // answering rather than this query — included because a roster that still
+    // listed them would be the same defect seen from the other side.
+    expect((await get('member', '/members')).statusCode).toBe(404);
   });
 });
