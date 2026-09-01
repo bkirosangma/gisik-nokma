@@ -142,13 +142,13 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-*(Plan 5, Tasks 2–3 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
-replace this scope note; what follows is what Tasks 2 and 3 added, and nothing else. Plan 5 Task 1
+*(Plan 5, Tasks 2–4 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
+replace this scope note; what follows is what Tasks 2, 3 and 4 added, and nothing else. Plan 5 Task 1
 (`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here. Still
-absent rather than missing from this section: the `proj_workspace_settings` projection and reader,
+absent rather than missing from this section:
 the SQL visibility predicate, `proj_search`, the read models, every `/v1` read route (board, list,
 search, My Work, attention, builder reads, preferences), and the stream hub with its WebSocket route
-— Plan 5 Tasks 4–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
+— Plan 5 Tasks 5–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
 doc assigns `Features.md` sections one per implementation plan, so numbering is claimed from that
 table rather than taken next-free.)*
 
@@ -166,6 +166,33 @@ table rather than taken next-free.)*
   the same rule id and a different reason — which is the better answer, since naming the setting
   would disclose it to someone holding nothing in this workspace. `packages/domain/src/events/workspace-settings.ts`,
   `apps/server/src/permissions/check-permission.ts`
+- ⚙️ **`proj_workspace_settings` and `getWorkspaceSettings`** — the thresholds as a rebuildable
+  projection with the last claim's provenance kept. A row exists only once somebody has CLAIMED
+  something: the defaults are supplied at READ time and the answer carries `provenance: null`, because
+  a default is not a claim and there is nobody to attribute it to. Both threshold columns are NULLable
+  so a partial claim can say nothing about the other knob — the upsert's
+  `COALESCE(EXCLUDED.x, existing.x)` is the partial-update semantics itself, not defensiveness, and a
+  stored default would be indistinguishable from a deliberate claim of 7. The reader coalesces on NULL
+  and never on falsiness, since `dueSoonDays: 0` is a legal claim. Blind last-writer-wins is safe here
+  for a stated reason rather than by luck: the table's key IS the workspace the events are filed
+  against, so each key has exactly one totally-ordered writer and canonical replay order is that
+  writer's own claim order. **Registered LAST, and the append is a dependency decision rather than a
+  §8 position** — coordination §8's canonical order stops at `proj_visibility` and `proj_contested` is
+  already past its end, so "after `proj_visibility`" no longer picks a unique slot; this projection
+  reads no other projection's table and none reads its table inside an ingest transaction
+  (`getWorkspaceSettings` is a read-time function), so neither adjacency is load-bearing.
+  `apps/server/src/projections/workspace-settings.ts`,
+  `apps/server/migrations/1788272876259_proj-workspace-settings.sql`,
+  `apps/server/src/projections/index.ts`
+- ⚙️ **Shared ledger-seeding test helpers** — `makeCommitted` / `applyCommitted` / `resetEntitySeqs`,
+  the fixture every Plan 5 read-model task seeds through. `makeCommitted`'s per-entity `seq` restarts
+  at 1 for each entity, exactly as `nextSeq` assigns it, with the per-workspace `workspaceSeq` cursor
+  climbing beside it, exactly as `nextWorkspaceSeq` does — a process-monotonic counter in either place
+  would still be unique, still satisfy both of the ledger's unique constraints, and still hide a
+  handler that confused an entity's history with its workspace's stream. Both clocks default to a
+  fresh instant per call so a test can tell WHICH claim last wrote a row. `applyCommitted` commits one
+  transaction per event through the live registry, which is the unit ingest commits in.
+  `apps/server/test/helpers/apply.ts`
 
 ## 9. Editor, documents & attachments
 

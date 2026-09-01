@@ -117,6 +117,15 @@ describe('proj_entity_heads', () => {
       'proj_invites',
       'proj_visibility',
       'proj_contested',
+      // Plan 5 Task 4. APPENDED, and NOT at a §8 position: §8's order ends at
+      // proj_visibility and proj_contested already sits past it, so there is no
+      // slot to insert into and "after proj_visibility" no longer names one.
+      // The append is decided by dependency instead — this projection reads no
+      // other projection's table, and none reads its table inside an ingest
+      // transaction. And this copy of the pin did its job again: the registrant
+      // extended projection-order.test.ts, the pin of record, and was told
+      // about this one by a red suite.
+      'proj_workspace_settings',
     ]);
   });
 });
