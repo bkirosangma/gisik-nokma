@@ -121,6 +121,18 @@ function isWorkspaceAdmin(eff: EffectiveRole): boolean {
  * the answer is a function of the workspace's contents rather than of whichever
  * row Postgres returned first — and `latestWorkflowDefs` sorts again anyway, so
  * the two agree instead of one silently depending on the other.
+ *
+ * ## MEASURED: this predicate alone is not falsifiable, because a second one
+ * ## stands behind it
+ *
+ * Removing `workspace_id = $1` here reddens NOTHING in
+ * `test/routes/builder-reads.test.ts` — the ids widen to every tenant's, and
+ * then `latestWorkflowDefs` (workspace-scoped, ruling P14) drops every one it
+ * cannot resolve in this workspace, so the answer is unchanged. Removing BOTH
+ * scopes reddens three cases. So this is defence in depth with the load on the
+ * SECOND layer, reported that way rather than left looking covered: a reviewer
+ * who deletes this line will see a green suite and should, and a reviewer who
+ * deletes the other one will not.
  */
 export async function workflowIdsOf(db: Queryable, workspaceId: string): Promise<string[]> {
   const { rows } = await db.query<{ workflow_id: string }>(
@@ -249,10 +261,24 @@ export async function readMembers(
  * same reason: a ticket silently absent from a mapping dialog is a lie with a
  * longer fuse than a state id nobody recognises.
  *
- * `workspace_id` AND `workflow_id` are both bound. Neither is redundant: the
- * definition was already resolved workspace-scoped, but this query reaches a
- * different table on an id the ACTOR supplied, and `proj_tickets`' primary key
- * is `ticket_id` alone with `workspace_id` a plain column.
+ * ## MEASURED: the `workspace_id` predicate here is NOT falsifiable, and why
+ *
+ * Removing it reddens nothing, and no fixture at any layer could change that.
+ * A `workflow_id` cannot exist in two workspaces at once: the ledger's
+ * `events_entity_seq_unique` is `(entity_kind, entity_id, seq)` GLOBALLY, so a
+ * second workspace's `('workflow', 'wf-errands', 1)` is rejected by the ledger
+ * before any projection sees it, and ingest's entity-to-workspace guard refuses
+ * an entity that tries to move. `read-app.ts` records the consequence from the
+ * other side — the neighbour workspace's ids are all prefixed `nb-` because a
+ * collision would fail the SEED rather than the assertion. So `workflow_id` is
+ * globally partitioned by workspace, and filtering on it already implies the
+ * tenancy.
+ *
+ * The predicate stays for the reason `board.ts` keeps its unfalsifiable
+ * `workspace_id` clause: it costs one bound parameter, and the day a projection
+ * bug or a direct internal append produces a row whose `workspace_id` and
+ * `workflow_id` disagree, this is the query that must not count it. Stated
+ * plainly rather than defended by a case that cannot exist.
  */
 export async function readStateOccupancy(
   db: Queryable,
