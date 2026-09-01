@@ -41,6 +41,21 @@ export type TestStream = {
    * this recorder inherits it because it parses with the same schema.
    */
   raw: string[];
+  /**
+   * Every frame that FAILED `serverStreamFrameSchema`, with the issue paths.
+   *
+   * Not an error channel — a measurement. This branch's shared read world seeds
+   * `workflow` and `ticket-type` entities under FIXED ids (`wf-errands`,
+   * `epic`, `task`), and `eventEnvelopeSchema` requires a non-membership
+   * `entity.id` to be a ULID, so those envelopes cannot satisfy the published
+   * frame schema. The fixtures reach the ledger through `makeCommitted`, which
+   * writes past the envelope check; the product's own founding sequence mints
+   * ULIDs for both kinds (`workspaces/bootstrap-workspace.ts`). The stream is
+   * the first surface that hands whole envelopes back to a client, so it is the
+   * first place the disagreement is visible at all. 7.157 pins the violation
+   * set to exactly that class.
+   */
+  schemaViolations: Array<{ raw: string; issues: string[] }>;
   socket: WebSocket;
   /** Protocol-level pings the SERVER sent us. `ws` answers them automatically. */
   pings: number;
@@ -79,6 +94,7 @@ export function openStream(
   });
   const frames: ServerStreamFrame[] = [];
   const raw: string[] = [];
+  let lastClose: { code: number; reason: string } | undefined;
   const waiters: Array<{
     match: (frame: ServerStreamFrame) => boolean;
     resolve: (frame: ServerStreamFrame) => void;
@@ -87,6 +103,7 @@ export function openStream(
   const stream: TestStream = {
     frames,
     raw,
+    schemaViolations: [],
     socket,
     pings: 0,
     pongs: 0,
@@ -101,7 +118,19 @@ export function openStream(
           return;
         }
         const timer = setTimeout(
-          () => reject(new Error(`no matching frame within ${timeoutMs}ms; saw: ${raw.join('\n')}`)),
+          () =>
+            reject(
+              new Error(
+                // The socket's STATE is in the message on purpose: the most
+                // common reason a frame never arrives is that the hub gave up
+                // on the socket (1011 on a drain that threw, 1013 on a slow
+                // consumer), and a bare "no matching frame" reads as a missing
+                // feature when it is actually a closed connection.
+                `no matching frame within ${timeoutMs}ms` +
+                  ` [readyState=${socket.readyState}${lastClose === undefined ? '' : `, closed ${lastClose.code} ${lastClose.reason}`}]` +
+                  `; saw: ${raw.join('\n')}`,
+              ),
+            ),
           timeoutMs,
         );
         waiters.push({
@@ -126,6 +155,9 @@ export function openStream(
       }),
   };
 
+  socket.on('close', (code, reason) => {
+    lastClose = { code, reason: reason.toString() };
+  });
   socket.on('ping', () => {
     stream.pings += 1;
   });
@@ -135,11 +167,28 @@ export function openStream(
   socket.on('message', (data) => {
     const text = data.toString();
     raw.push(text);
-    // Parsed through the PUBLISHED schema, exactly as `stream-socket.ts` does
-    // for the hub's own writes: Plans 6, 9 and 10 will mock this protocol, and
-    // a frame the real server emits that the published shape refuses is the
+    const value: unknown = JSON.parse(text);
+    // Checked against the PUBLISHED schema, exactly as `stream-socket.ts`
+    // checks the hub's own writes: Plans 6, 9 and 10 will mock this protocol,
+    // and a frame the real server emits that the published shape refuses is the
     // failure this series has already recorded in its own words.
-    const frame = serverStreamFrameSchema.parse(JSON.parse(text)) as ServerStreamFrame;
+    //
+    // RECORDED, NOT THROWN, and the difference cost an hour. A listener that
+    // throws here throws inside `ws`'s `Receiver._write` callback, which is
+    // then never called back: the receiver STALLS permanently, every later
+    // frame is silently dropped, and the close handshake never completes
+    // either — so a suite that should have failed in milliseconds instead hung
+    // for a minute per case and reported a timeout rather than the schema
+    // error underneath it. A recorder must never throw on the socket's own
+    // thread; it records and lets the case assert.
+    const parsed = serverStreamFrameSchema.safeParse(value);
+    if (!parsed.success) {
+      stream.schemaViolations.push({
+        raw: text,
+        issues: parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`),
+      });
+    }
+    const frame = (parsed.success ? parsed.data : value) as ServerStreamFrame;
     frames.push(frame);
     const index = waiters.findIndex((w) => w.match(frame));
     if (index >= 0) {

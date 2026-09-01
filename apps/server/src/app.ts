@@ -17,6 +17,8 @@ import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
 import { registerContestsRoute } from './sync/contests-route.js';
+import { createStreamHub } from './stream/hub.js';
+import { registerStreamRoute, type StreamRouteDeps } from './stream/routes.js';
 import type { Queryable } from './db/queryable.js';
 
 export type HealthDb = { query(sql: string): Promise<unknown> };
@@ -99,6 +101,22 @@ export type AppDeps = {
    * threaded through `AppDeps`.
    */
   now?: () => Date;
+  /**
+   * The knobs `WS /v1/stream` exposes — heartbeat interval, per-user connection
+   * budget, and the two seams that make the heartbeat testable without a
+   * sleep (`schedule`, `onHeartbeat`).
+   *
+   * One optional field rather than four, because they are one subject and a
+   * caller either cares about the stream's timing or does not. Every default
+   * lives in `registerStreamRoute`, so this stays UNDEFAULTED here for the same
+   * reason `now` does: one definition of each real value, in the module that
+   * owns it.
+   *
+   * `now` is deliberately NOT in here. The stream's deadline and the attention
+   * strip's Indian day are the same clock — a server does not get to be at two
+   * times at once — and giving the stream its own would make that expressible.
+   */
+  stream?: Omit<StreamRouteDeps, 'pool' | 'hub' | 'now'>;
 };
 
 export function buildApp(
@@ -268,6 +286,26 @@ export function buildApp(
   // under, and there is deliberately no parameter by which a caller could name
   // somebody else's.
   registerPreferencesRoutes(app, { pool: deps.pool }, requireSession);
+  // The realtime fan-out (Plan 5 Tasks 14–15) — the FIRST thing here that is
+  // not a request/response at all, and the first that decides who ELSE hears
+  // about a change. The hub is created HERE, beside the ingest service whose
+  // commits it listens to: `onEventCommitted` is on `ClientIngest`, so the
+  // narrowed door is enough and the route still cannot reach the internal
+  // append path. Same preHandler by parameter as every route above it, and here
+  // it is the whole door — `stream/hub.ts` authorizes nobody by design.
+  const hub = createStreamHub({
+    pool: deps.pool,
+    onEventCommitted: (listener) => deps.ingest.onEventCommitted(listener),
+  });
+  // A hub outlives a request, so it has to be let go of explicitly: `close()`
+  // drops the commit-feed subscription and every socket's subscriptions. Without
+  // this, a test file that builds several apps over one database leaves a live
+  // listener on each ingest service it ever made.
+  app.addHook('onClose', () => {
+    hub.close();
+  });
+  app.decorate('streamHub', hub);
+  registerStreamRoute(app, { ...deps.stream, pool: deps.pool, hub, now: deps.now }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;

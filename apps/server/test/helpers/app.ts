@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
-import { buildApp } from '../../src/app.js';
+import { buildApp, type AppDeps } from '../../src/app.js';
 import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
@@ -53,6 +53,16 @@ export type BuildTestAppOverrides = {
    * is seeded with instants measured from it.
    */
   now?: () => Date;
+  /**
+   * `AppDeps.stream` — the heartbeat interval, the per-user connection budget,
+   * and the two seams (`schedule`, `onHeartbeat`) that let a test drive the
+   * heartbeat instead of waiting on one. Off by default, so an app built here
+   * heartbeats on a real `setInterval` exactly as the shipped one does;
+   * `stream-route.test.ts` builds its own app with all four, because the shared
+   * read world's clock is FROZEN and a deadline measured against a constant
+   * never expires.
+   */
+  stream?: AppDeps['stream'];
 };
 
 /**
@@ -107,6 +117,7 @@ export function buildTestApp(
       // Undefaulted: `registerAttentionRoutes` owns the real-clock default, and
       // passing `undefined` here is what lets it.
       now: overrides.now,
+      stream: overrides.stream,
     },
     overrides.logStream === undefined ? {} : { logLevel: 'info', logStream: overrides.logStream },
   );

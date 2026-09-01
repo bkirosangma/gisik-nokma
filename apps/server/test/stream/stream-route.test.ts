@@ -1,7 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import type { FastifyInstance } from 'fastify';
-import { newUlid, type IngestResult, type ServerStreamFrame } from '@gisik-nokma/domain';
+import {
+  newUlid,
+  serverStreamFrameSchema,
+  type IngestResult,
+  type ServerStreamFrame,
+} from '@gisik-nokma/domain';
 import type { StreamHub } from '../../src/stream/hub.js';
 import {
   NOT_A_MEMBER_ERROR,
@@ -124,6 +129,9 @@ async function submit(app: FastifyInstance, role: ReadRole, events: SubmittedEve
         workspaceId: event.workspaceId ?? read.world.workspaceId,
         version: 1,
         origin: 'web',
+        // REQUIRED by `eventEnvelopeSchema` — an event with no `clientTime` is
+        // answered `malformed-envelope` at the door, not committed.
+        clientTime: new Date().toISOString().replace(/\.\d{3}Z$/, '.000Z'),
         actorId: read.userIds[role],
         entity: event.entity,
         type: event.type,
@@ -236,9 +244,82 @@ describe('WS /v1/stream — the door, the frames and the heartbeat', () => {
     expect(since).toContain(read.world.taskInEpicId);
   });
 
-  it('7.146 PLANTED DEFECT: a revocation mid-stream reaches the subscriber as purges for the whole subtree, and the revoking event is NOT itself leaked', async () => {
-    // A fresh epic and child through the product's own door, so this case
-    // narrows nothing the seeded world's other cases measure.
+  it('7.146 PLANTED DEFECT: a revocation mid-stream reaches the subscriber as purge frames for exactly what they lost, over the open socket', async () => {
+    // `projectLead` and the SIBLING project, deliberately: this case takes
+    // somebody off a project for good, and doing that to `member` or to the
+    // seeded project would change the world every other case in this file — and
+    // every other Plan 5 suite standing on `read-app.ts` — is measuring.
+    // Nothing else here uses `projectLead`.
+    const stream = await connect('projectLead');
+    stream.subscribe(read.world.workspaceId, 0);
+    await stream.next((frame) => frame.type === 'caught-up');
+    // They hold both of the sibling project's tickets to begin with — without
+    // this the purges below would be instructions to forget something they
+    // never had.
+    expect(stream.raw.join('\n')).toContain(read.sibling.ticketId);
+    expect(stream.raw.join('\n')).toContain(read.sibling.choreTicketId);
+
+    await submit(read.app, 'owner', [
+      {
+        entity: { kind: 'project', id: read.sibling.projectId },
+        type: 'project.member_removed',
+        payload: { userId: read.userIds.projectLead },
+      },
+    ]);
+    await stream.next(
+      (frame) => frame.type === 'purge' && frame.entityId === read.sibling.ticketId,
+    );
+    await stream.next(
+      (frame) => frame.type === 'purge' && frame.entityId === read.sibling.choreTicketId,
+    );
+    const purges = stream.frames.filter((frame) => frame.type === 'purge');
+    expect(purges.every((frame) => frame.workspaceId === read.world.workspaceId)).toBe(true);
+    // The socket lives on and the subscription with it — a narrowing inside a
+    // workspace is a retraction, not an eviction. `scope-revoked` is the other
+    // instruction and it is NOT this one.
+    expect(stream.socket.readyState).toBe(stream.socket.OPEN);
+    expect(stream.frames.filter((frame) => frame.type === 'scope-revoked')).toEqual([]);
+
+    // And the narrowing really narrowed: the next event on a ticket they just
+    // lost does not arrive. The ordering event is a PROJECT founding, not
+    // another ticket: `projectLead` was on the sibling project and no other, so
+    // after the removal there is no ticket left in the workspace they may see —
+    // a ticket-shaped control here would be absent for the same reason the
+    // subject of the test is, and would prove nothing. A project founding
+    // reaches every non-guest member, so it orders the silence without
+    // depending on the visibility this case just took away.
+    const before = stream.raw.length;
+    const freshProjectId = newUlid();
+    await submit(read.app, 'owner', [
+      {
+        entity: { kind: 'ticket', id: read.sibling.ticketId },
+        type: 'ticket.field_set',
+        payload: dueDate('2026-09-10'),
+      },
+      {
+        entity: { kind: 'project', id: freshProjectId },
+        type: 'project.created',
+        payload: { name: 'Founded after the removal' },
+      },
+    ]);
+    await stream.next(
+      (frame) => frame.type === 'event' && frame.envelope.entity.id === freshProjectId,
+    );
+    expect(stream.raw.slice(before).join('\n')).not.toContain('2026-09-10');
+    expect(stream.raw.slice(before).join('\n')).not.toContain(read.sibling.ticketId);
+  });
+
+  it('7.158 RECORDED, NOT FIXED: a per-TICKET narrowing mid-stream sends no purge at all — the events simply stop, and the replica keeps what it may no longer see', async () => {
+    // *Owner: Plan 4 (`visibility/visible-events-for.ts`), which records this in
+    // its own words as case 6.104 — "the under-purge that leaves … the
+    // member-side sibling of 6.102".* The plan text for this task asserts the
+    // opposite: it expects `visibility.set` to yield purge frames for the epic
+    // and its inheriting child. That per-event purge walk WAS in
+    // `visibleEventsFor` and was removed by the controller's ruling on case
+    // 6.101 — it disclosed ids for tickets the recipient stood in no
+    // relationship to — so on this branch the narrowing is silent. FOLLOW THE
+    // BRANCH: this case pins what the code does, which is the honest shape of
+    // the residual, and it turns red the day the gap is closed.
     const epicId = newUlid();
     const childId = newUlid();
     await submit(read.app, 'owner', [
@@ -257,8 +338,6 @@ describe('WS /v1/stream — the door, the frames and the heartbeat', () => {
     const stream = await connect('member');
     stream.subscribe(read.world.workspaceId, 0);
     await stream.next((frame) => frame.type === 'caught-up');
-    // The member can see both to begin with — without this the purges below
-    // would be instructions to forget something they never had.
     expect(stream.raw.join('\n')).toContain(epicId);
     expect(stream.raw.join('\n')).toContain(childId);
 
@@ -269,21 +348,43 @@ describe('WS /v1/stream — the door, the frames and the heartbeat', () => {
         type: 'visibility.set',
         payload: { ticketId: epicId, mode: 'explicit', userIds: [read.userIds.owner] },
       },
+      // A visible event committed AFTER the narrowing, so the silence is
+      // ordered by a frame that arrived rather than by a timer.
+      {
+        entity: { kind: 'ticket', id: read.world.taskInEpicId },
+        type: 'ticket.field_set',
+        payload: dueDate('2026-09-12'),
+      },
     ]);
-    await stream.next((frame) => frame.type === 'purge' && frame.entityId === epicId);
-    // The CHILD inherits, so the subtree goes too — a purge of the epic alone
-    // would leave the member holding a ticket they may no longer see.
-    await stream.next((frame) => frame.type === 'purge' && frame.entityId === childId);
-
-    const purges = stream.frames.filter((frame) => frame.type === 'purge');
-    expect(purges.every((frame) => frame.workspaceId === read.world.workspaceId)).toBe(true);
-    // The event that revoked is itself invisible now, so it must not ride the
-    // stream. Asserted over the BYTES since the purge frames name the same ids.
+    await stream.next(
+      (frame) =>
+        frame.type === 'event' &&
+        (frame.envelope.payload as { value?: { date?: string } }).value?.date === '2026-09-12',
+    );
     const since = stream.raw.slice(before).join('\n');
+    // No purge, no scope-revoked, and not the revoking event either: the client
+    // is told nothing and goes on holding a subtree it may no longer see.
+    expect(since).not.toContain('"type":"purge"');
+    expect(since).not.toContain('scope-revoked');
     expect(since).not.toContain('visibility.set');
-    // …with the positive control that the bytes are not empty: the purges are
-    // in them.
-    expect(since).toContain('"type":"purge"');
+    expect(since).not.toContain(epicId);
+    // The positive control for four absences in a row: the bytes are not empty
+    // and the stream is live.
+    expect(since).toContain(read.world.taskInEpicId);
+
+    // What the narrowing DID do, so this is not merely "nothing happened": the
+    // subtree stops arriving. The child inherits, so it goes too.
+    const quiet = stream.raw.length;
+    await submit(read.app, 'owner', [
+      { entity: { kind: 'ticket', id: childId }, type: 'ticket.field_set', payload: dueDate('2026-09-13') },
+      { entity: { kind: 'ticket', id: read.world.taskInEpicId }, type: 'ticket.field_set', payload: dueDate('2026-09-14') },
+    ]);
+    await stream.next(
+      (frame) =>
+        frame.type === 'event' &&
+        (frame.envelope.payload as { value?: { date?: string } }).value?.date === '2026-09-14',
+    );
+    expect(stream.raw.slice(quiet).join('\n')).not.toContain('2026-09-13');
   });
 
   it('7.147 the door refuses at the HANDSHAKE: no session and a forged bearer both draw HTTP 401 before any socket exists, byte-identical to each other, while a real session upgrades', async () => {
@@ -375,7 +476,21 @@ describe('WS /v1/stream — the door, the frames and the heartbeat', () => {
         (frame.envelope.payload as { value?: { date?: string } }).value?.date === '2026-09-01',
     );
     expect(stream.raw.slice(before)).toEqual([]);
-    expect(stream.frames.filter((frame) => frame.type === 'event')).toEqual([]);
+    // Narrowed to the workspace they were REFUSED — their own workspace's
+    // catch-up legitimately filled this socket with events, and that is the
+    // positive control that keeps the emptiness below from being an idle
+    // connection.
+    expect(
+      stream.frames.filter(
+        (frame) => frame.type === 'event' && frame.envelope.workspaceId === read.world.workspaceId,
+      ),
+    ).toEqual([]);
+    expect(
+      stream.frames.filter(
+        (frame) =>
+          frame.type === 'event' && frame.envelope.workspaceId === read.neighbour.workspaceId,
+      ).length,
+    ).toBeGreaterThan(0);
   });
 
   it('7.149 malformed frames are answered with bad-message and the socket keeps serving', async () => {
@@ -467,26 +582,33 @@ describe('WS /v1/stream — the door, the frames and the heartbeat', () => {
       code: 'already-subscribed',
       message: expect.any(String),
     });
-    // The refusal did not re-run catch-up: still exactly one caught-up.
-    expect(stream.frames.filter((frame) => frame.type === 'caught-up')).toHaveLength(1);
+    // The refusal did not re-run catch-up: still exactly one caught-up PER
+    // WORKSPACE, which is the protocol's own rule (`stream-frames.ts`: a
+    // subscribe's first drain ends with exactly one of caught-up or
+    // scope-revoked, never both and never neither).
+    expect(stream.frames.filter((frame) => frame.type === 'caught-up')).toHaveLength(2);
   });
 
   it('7.153 a closed socket leaves no subscription behind in the hub', async () => {
-    const beforeStats = hub.stats();
+    // Absolute numbers, from a quiescent hub. `afterEach` closes the client's
+    // end of every earlier socket, but the SERVER's release happens on its own
+    // close event a turn later, so a relative baseline read here races that
+    // release and is off by one at random. Waiting for zero is what makes the
+    // reading a fact.
+    await waitFor(() => hub.stats().sockets === 0);
+
     const stream = await connect('member');
     stream.subscribe(read.world.workspaceId, 0);
     await stream.next((frame) => frame.type === 'caught-up');
-    const held = hub.stats();
-    // The positive control for the zero below: while the socket is open the hub
-    // is holding something, so "nothing held" afterwards is a release and not a
-    // hub that never held anything.
-    expect(held.sockets).toBe(beforeStats.sockets + 1);
-    expect(held.subscriptions).toBe(beforeStats.subscriptions + 1);
+    // The positive control for the zeroes below: while the socket is open the
+    // hub is holding all three, so "nothing held" afterwards is a release and
+    // not a hub that never held anything.
+    expect(hub.stats()).toEqual({ sockets: 1, subscriptions: 1, workspaces: 1 });
 
     await stream.close();
     openStreams.splice(openStreams.indexOf(stream), 1);
-    await waitFor(() => hub.stats().sockets === beforeStats.sockets);
-    expect(hub.stats()).toEqual(beforeStats);
+    await waitFor(() => hub.stats().sockets === 0);
+    expect(hub.stats()).toEqual({ sockets: 0, subscriptions: 0, workspaces: 0 });
   });
 
   it('7.154 an entity BORN after caught-up arrives, though its per-entity seq is 1 and far below the cursor', async () => {
@@ -513,6 +635,42 @@ describe('WS /v1/stream — the door, the frames and the heartbeat', () => {
     // new entity is 1, far below the cursor catch-up left behind.
     expect(born.envelope.seq).toBe(1);
     expect(born.envelope.workspaceSeq).toBeGreaterThan(caughtUp.seq);
+  });
+
+  it('7.157 RECORDED, NOT FIXED: every frame satisfies the published schema except the envelopes whose entity ids this world seeds past the door', async () => {
+    const stream = await connect('member');
+    stream.subscribe(read.world.workspaceId, 0);
+    await stream.next((frame) => frame.type === 'caught-up');
+
+    // *Owner: whoever owns `test/helpers/read-scenario.ts` — Plan 5 Task 8's
+    // shared world.* `eventEnvelopeSchema` requires a non-membership
+    // `entity.id` to be a ULID, and the product's own founding sequence obeys
+    // it (`bootstrap-workspace.ts` mints `newUlid()` for both the workflow and
+    // every ticket type). The world seeds `wf-errands`, `epic`, `task` — fixed
+    // ids that reach the ledger only because `makeCommitted` writes past the
+    // envelope check — so those rows are a ledger no door would have admitted,
+    // and the stream is the first surface that hands them back to a client. It
+    // is NOT fixed here: four suites assert on `wf-errands` and `epic` by name,
+    // and renaming a fixture to satisfy this task's schema check would make
+    // this suite pass by rewriting what the others measure.
+    //
+    // What IS asserted is the BOUNDARY: every violation is that one class, so
+    // this stays a known, bounded disagreement rather than a place any future
+    // malformed frame can hide.
+    expect(stream.schemaViolations.length).toBeGreaterThan(0);
+    for (const violation of stream.schemaViolations) {
+      expect(violation.issues).toEqual(['envelope.entity.id: must be a ULID']);
+      const { envelope } = JSON.parse(violation.raw) as {
+        envelope: { entity: { kind: string } };
+      };
+      expect(['workflow', 'ticket-type']).toContain(envelope.entity.kind);
+    }
+    // The positive control for that `toEqual`: the check CAN fire on something
+    // else. A frame the world does not produce is fed through the same schema
+    // and lands a different issue, so the loop above is a filter and not a
+    // predicate that accepts everything.
+    const forged = { type: 'caught-up', workspaceId: read.world.workspaceId, seq: -1 };
+    expect(() => serverStreamFrameSchema.parse(forged)).toThrow();
   });
 
   it('7.155 the route is a WEBSOCKET route: a plain HTTP GET on the same path is 404 for a signed-in caller and 401 without a session', async () => {
