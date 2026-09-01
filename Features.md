@@ -142,12 +142,12 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-*(Plan 5, Tasks 2–9b so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
-replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7, 8, 9 and 9b added, and nothing else. Plan 5
+*(Plan 5, Tasks 2–10 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
+replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7, 8, 9, 9b and 10 added, and nothing else. Plan 5
 Task 1 (`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here.
 Still absent rather than missing from this section: every `/v1` read
-route EXCEPT the board, the list and the builder surface (search, My Work, attention, preferences), and the stream hub with
-its WebSocket route — Plan 5 Tasks 10–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
+route EXCEPT the board, the list, the builder surface and search (My Work, attention, preferences), and the stream hub with
+its WebSocket route — Plan 5 Tasks 11–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
 doc assigns `Features.md` sections one per implementation plan, so numbering is claimed from that
 table rather than taken next-free.)*
 
@@ -430,6 +430,40 @@ table rather than taken next-free.)*
   lands `ticket.rebound-same-workflow` mid-batch. One batch-scoped ingest transaction closes both,
   and it belongs to the ingest service rather than here.
   `apps/server/src/routes/builder-reads.ts`, `packages/domain/src/read-models.ts`
+- ✅ **`GET /v1/search` — workspace-wide, visibility-filtered full text** — one ranked answer over
+  `proj_search`'s title, description and comments, each hit a `TicketCard` and a `ts_headline`
+  snippet with the match marked `**…**`. **The first CROSS-PROJECT read in the product**, and its
+  boundary is exactly two conjuncts rather than the three the board and the list stand behind: there
+  is no project clause to hide behind, so `t.workspace_id` and Plan 4's `visibleTicketsWhere` are the
+  whole of it. That makes the tenancy clause falsifiable here for the first time — for a plain member
+  the visibility predicate's first arm is `resolved_mode = 'workspace'`, which a NEIGHBOURING
+  workspace's ticket satisfies, so widening the clause hands one tenant's member another tenant's
+  row. The workspace is named in the query string but is never the actor's word for it: `requireMember`
+  answering with a role in it is what makes it usable, and a caller who names a workspace they do not
+  belong to draws the same frozen `not_found` body as one naming a workspace that does not exist.
+  Ranked by `ts_rank_cd` (title beats description beats comment, through the projection's A/B/C
+  weights) with ties broken by ticket id, and cut to **fifty with no pagination** — a cut, not a
+  page, so the fifty-first match is reached by narrowing the query and not by asking again. The cut
+  is applied to (workspace ∩ visible ∩ match ∩ filter) and to nothing else. **No aggregate is emitted
+  at all** — no total, no result count, and no rank number, which would put a measurement of
+  relevance on the page that nobody claimed. `q` (1–500 characters, no U+0000) is THE text term and a
+  `filter` carrying its own `text` key is refused `invalid_filter` rather than merged: two text terms
+  make a result set the caller can only half explain. Every query value is type-checked before it is
+  used, because `?q=a&q=b` arrives as an array and would otherwise be a 500 for a request the door
+  owes a 400. `apps/server/src/routes/search.ts`, `apps/server/src/app.ts`
+- ⚙️ **`FTS_CONFIG` and `searchTermSchema` — one name each for a matching rule and a search term** —
+  the text-search configuration is a matching rule, so it has to be the same on both sides or it is
+  not a rule: `to_tsvector` decides what lexemes are stored and `websearch_to_tsquery` decides what
+  is looked for, and two sides that disagree produce a search that quietly finds nothing rather than
+  an error anybody notices. `FTS_CONFIG` gives the query sites (the FilterSpec compiler's text
+  clause, and the search route's match, ranking and headline) one name for `'simple'` instead of a
+  fourth literal. It does NOT reach the migration's GENERATED column — that is SQL which runs before
+  any TypeScript exists — so that side stays linked by an executed test rather than by the compiler,
+  which the constant's own docblock states rather than implies. `searchTermSchema` is the same
+  arrangement for the two doors into that query: `q` and a FilterSpec's `text` share one statement of
+  length and of the NUL refusal, the second being load-bearing — a `q` carrying U+0000 is not a bad
+  search, it is SQLSTATE 22021 raised inside the route, a 500 reached through a value that parsed and
+  bound correctly the whole way. `apps/server/src/read/fts.ts`, `packages/domain/src/filter-spec.ts`
 
 ## 9. Editor, documents & attachments
 
