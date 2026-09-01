@@ -6,6 +6,7 @@ import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
 import { registerEventRoutes } from './routes/events.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
+import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
 import { registerContestsRoute } from './sync/contests-route.js';
@@ -171,6 +172,15 @@ export function buildApp(
   // each enforcing visibility server-side. Same preHandler by parameter, same
   // reason: all three handlers read `request.currentUserId`.
   registerTicketRoutes(app, { pool: deps.pool }, requireSession);
+  // One ticket's history at a workspace-free path (Plan 3 Task 13) — the ledger
+  // filtered to that ticket, paged by `afterSeq`/`limit`, as
+  // `TicketHistoryEvent`s. It is NOT a duplicate of the `/events` door
+  // registered directly above: different path, different contract, both owed by
+  // their plans, and `routes/ticket-history.ts` carries the argument plus the
+  // cross-route agreement test that keeps the two from drifting. Same
+  // preHandler by parameter, same reason as its three neighbours: the handler
+  // reads `request.currentUserId`.
+  registerTicketHistoryRoute(app, { pool: deps.pool }, requireSession);
   // The founding door and the workspace directory (Plan 4 Task 13). It takes
   // `deps.ingest` — the NARROWED `ClientIngest`, same as the events door — so
   // the route that creates workspaces cannot reach the internal append path
