@@ -152,8 +152,32 @@ export type ServerStreamFrame =
  * recorded signature failure is that "a mocked contract is the thing that
  * excuses the server from existing". A hand-written fake that omits
  * `envelope.workspaceSeq`, or invents a `scope-revoked.projectId`, satisfies a
- * loosely-read TYPE and fails HERE. Point the fake at this schema and it cannot
- * be more permissive than the server.
+ * loosely-read TYPE and fails HERE.
+ *
+ * ## Where the strictness stops — measured, and NOT what an earlier draft claimed
+ *
+ * This docblock used to end "point the fake at this schema and it cannot be more
+ * permissive than the server." That is false, and the boundary is worth stating
+ * exactly because Plans 6, 9 and 10 are the readers:
+ *
+ * - the OUTER frame object of every member is `.strict()`, so an unknown
+ *   TOP-LEVEL frame key is refused;
+ * - the ENVELOPE inside the event frame is NOT. `ledgerEventSchema` is
+ *   `eventEnvelopeSchema.and(…)` over a plain non-strict `z.object`, so an
+ *   unknown ENVELOPE key is **silently STRIPPED, not refused** — a fake (or a
+ *   server) that adds one parses clean and the key disappears from the result;
+ * - `payload` is `z.unknown()` by design, so payload CONTENTS pass through
+ *   untouched and this schema says nothing about them. `parseEvent` is what
+ *   validates a payload; `envelope.ts` states that where the envelope is
+ *   declared.
+ *
+ * So a mock CAN be more permissive than the server in exactly one place: extra
+ * envelope keys. The server's own frames are held tighter than this by the
+ * recording socket in `apps/server/test/helpers/stream-socket.ts`, which
+ * compares the parse RESULT against the bytes and refuses anything the schema
+ * dropped — a recorder's check, not this schema's, and it does not travel to a
+ * consumer that only imports this file. A consumer that needs the guarantee
+ * should `.strict()` the envelope on its own side rather than assume it here.
  */
 export const serverStreamFrameSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('event'), envelope: ledgerEventSchema }).strict(),

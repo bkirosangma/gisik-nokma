@@ -6,7 +6,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { resetTestSequences, testEnvelope } from '../helpers/envelope.js';
 import { appendTestEvent } from '../helpers/ledger.js';
 import { applyAll, seedMember, seedTicket } from '../helpers/seed.js';
-import { fakeSocket, frameIds, type FakeSocket } from '../helpers/stream-socket.js';
+import { fakeSocket, frameIds, rawSince, type FakeSocket } from '../helpers/stream-socket.js';
 
 /**
  * Plan 5 Task 14 — the hub against a REAL database and the REAL
@@ -32,6 +32,16 @@ import { fakeSocket, frameIds, type FakeSocket } from '../helpers/stream-socket.
  * the ledger assigned, because it is the resume cursor and it is the one field
  * a hand-written fake has nothing true to put in.
  *
+ * ## Disclosure is asserted over the BYTES, never over `socket.frames`
+ *
+ * `socket.frames` holds the PARSE of each frame, and the parse strips: the
+ * outer frame object is strict, but the envelope inside is not, so a key the
+ * schema does not declare vanishes on the way into the recording rather than
+ * failing. Every "this id did not reach that subscriber" claim below therefore
+ * reads `rawSince(socket, n)` — the exact strings the hub passed to `send` —
+ * and `n` is captured BEFORE the commit under test. `stream-socket.ts` states
+ * the boundary in full.
+ *
  * ## Two residuals this file PINS rather than fixes
  *
  * 1. `caught-up.seq` is the position of the last envelope YIELDED to that
@@ -46,6 +56,25 @@ import { fakeSocket, frameIds, type FakeSocket } from '../helpers/stream-socket.
  *    kept receiving. That is deliberate — the instruction says "empty this
  *    scope", and the client's correct next move is a bootstrap, not more tail
  *    — and it is what bounds the instruction for an ex-member. See `hub.ts`.
+ *
+ * ## RECORDED, NOT FIXED — this suite's tenancy coverage is an artifact of TEST ORDER
+ *
+ * *Owner: Plan 4 (`visibility/visible-events-for.ts`, whose predicate it is).*
+ * Measured at the Task 14 fix round (2026-09-02): removing the `workspace_id`
+ * predicate from `visibleEventsFor`'s SELECT — with its parameter, so the
+ * mutation genuinely ran — reddened exactly ONE case here, and only
+ * incidentally. **7.134 survives it because it runs FIRST in this file**, and
+ * `events` is append-only and refuses TRUNCATE, so at that moment no other
+ * workspace's rows exist for a workspace-blind query to pick up. Every case
+ * after it mints a fresh workspace into a table that already holds the earlier
+ * ones, which is the only reason any of them can see the mutation at all.
+ *
+ * So nothing in this file *asserts* tenancy; a later case observes it as a side
+ * effect of the fixtures that ran before it, and re-ordering the file or
+ * running one case with `.only` would take that away silently. The honest fix
+ * is a case that seeds TWO workspaces itself and asserts the second's events
+ * reach no subscriber of the first — deliberately not added here, because the
+ * predicate under test belongs to Plan 4 and this task's scope is the hub.
  */
 
 let db: TestDatabase;
@@ -122,7 +151,7 @@ const eventFrames = (socket: FakeSocket): LedgerEvent[] =>
   socket.frames.flatMap((f) => (f.type === 'event' ? [f.envelope] : []));
 
 describe('stream hub over the real visibility filter', () => {
-  it('7.32 filters the fan-out PER SUBSCRIBER on both the catch-up and the live path', async () => {
+  it('7.134 filters the fan-out PER SUBSCRIBER on both the catch-up and the live path', async () => {
     const ws = newUlid();
     const mine = newUlid();
     const theirs = newUlid();
@@ -148,6 +177,10 @@ describe('stream hub over the real visibility filter', () => {
     const { hub, commit } = realHub();
     const insiderSocket = fakeSocket();
     const outsiderSocket = fakeSocket();
+    // Nothing has been written yet, so this is 0 — stated as a capture anyway,
+    // because the live half below captures a non-zero one and the two
+    // assertions must be the same assertion over different ranges.
+    const beforeCatchUp = outsiderSocket.raw.length;
     await hub.subscribe(insider, insiderSocket, ws, 0);
     await hub.subscribe(outsider, outsiderSocket, ws, 0);
 
@@ -160,13 +193,16 @@ describe('stream hub over the real visibility filter', () => {
     expect(outsiderIds).toContain(onShared.id);
     expect(insiderIds).toContain(onWithheld.id);
     expect(outsiderIds).not.toContain(onWithheld.id);
-    // Not merely the payload: the withheld TICKET's id must not appear in any
-    // field of any frame that reached the outsider.
-    expect(JSON.stringify(outsiderSocket.frames)).not.toContain(withheld);
+    // Not merely the payload: the withheld TICKET's id must not appear anywhere
+    // in the BYTES the hub wrote to the outsider — not in a declared field, and
+    // not in one the frame schema would have stripped out of `frames` before
+    // any assertion could see it.
+    expect(rawSince(outsiderSocket, beforeCatchUp)).not.toContain(withheld);
 
     // The live path is the same drain, and this is where a hub that filtered
     // catch-up and broadcast the tail would come apart — every assertion above
     // would still pass.
+    const beforeLive = outsiderSocket.raw.length;
     const liveWithheld = await record(ticketEvent(ws, withheld, 'still not everyone', insider));
     const liveShared = await record(ticketEvent(ws, shared, 'still everyone', insider));
     commit(liveWithheld);
@@ -178,7 +214,9 @@ describe('stream hub over the real visibility filter', () => {
     );
     expect(frameIds(outsiderSocket)).toContain(liveShared.id);
     expect(frameIds(outsiderSocket)).not.toContain(liveWithheld.id);
-    expect(JSON.stringify(outsiderSocket.frames)).not.toContain(withheld);
+    // Over the LIVE range alone, so the catch-up frames cannot carry this
+    // assertion for it.
+    expect(rawSince(outsiderSocket, beforeLive)).not.toContain(withheld);
 
     // Every field of the event frame came off a real ledger row, `workspaceSeq`
     // included — the resume cursor, assigned inside the appending transaction
@@ -191,7 +229,7 @@ describe('stream hub over the real visibility filter', () => {
     hub.close();
   });
 
-  it('7.32 caught-up carries the last position YIELDED to that subscriber, which can lag the workspace high-water', async () => {
+  it('7.135 caught-up carries the last position YIELDED to that subscriber, which can lag the workspace high-water', async () => {
     const ws = newUlid();
     const mine = newUlid();
     const theirs = newUlid();
@@ -227,7 +265,7 @@ describe('stream hub over the real visibility filter', () => {
     hub.close();
   });
 
-  it('7.32 a stranger to the workspace is told nothing but their own cursor back', async () => {
+  it('7.136 a stranger to the workspace is told nothing but their own cursor back', async () => {
     const ws = newUlid();
     const prj = newUlid();
     const member = newUlid();
@@ -259,7 +297,7 @@ describe('stream hub over the real visibility filter', () => {
     hub.close();
   });
 
-  it('7.32 a narrowing that lands MID-SUBSCRIPTION reaches the subscriber as purge frames', async () => {
+  it('7.137 a narrowing that lands MID-SUBSCRIPTION reaches the subscriber as purge frames', async () => {
     const ws = newUlid();
     const prj = newUlid();
     const viewer = newUlid();
@@ -315,7 +353,7 @@ describe('stream hub over the real visibility filter', () => {
     hub.close();
   });
 
-  it('7.32 an ex-member is told the scope went ONCE, and the subscription ends there', async () => {
+  it('7.138 an ex-member is told the scope went ONCE, and the subscription ends there', async () => {
     const ws = newUlid();
     const prj = newUlid();
     const viewer = newUlid();
@@ -334,6 +372,16 @@ describe('stream hub over the real visibility filter', () => {
     expect(frameIds(socket)).toContain(held.id);
     expect(hub.stats()).toEqual({ sockets: 2, subscriptions: 2, workspaces: 1 });
 
+    // Captured BEFORE the commit, and this is the whole assertion. The earlier
+    // spelling sliced `frames.slice(-1)` — the LAST frame, which is always the
+    // `scope-revoked` itself, whose published shape is `{type, workspaceId}`
+    // and which structurally CANNOT carry a ticket id. Any purge frames emitted
+    // ahead of it in the same drain fell outside the slice, so the assertion
+    // carrying this task's central disclosure decision could not fire: an
+    // over-permissive `visibleEventsFor` yielding one `{kind:'purge'}` per
+    // ticket row before the revocation — the exact count-and-existence leak the
+    // one-frame design exists to prevent — passed the whole stream suite.
+    const beforeRevocation = socket.raw.length;
     const revoked = await record(revocationEnv(ws, viewer));
     commit(revoked);
     await hub.settled();
@@ -341,7 +389,11 @@ describe('stream hub over the real visibility filter', () => {
     // Not the revoking event itself, and not a ticket list: an ex-member is
     // answered at scope level or not at all (`visible-events-for.ts`, 6.100).
     expect(frameIds(socket)).not.toContain(revoked.id);
-    expect(JSON.stringify(socket.frames.slice(-1))).not.toContain(ticket);
+    // ONE frame, and it names no ticket. Per-id purges would tell an external
+    // party how many tickets existed in a scope they were never shown — the
+    // reason `scope-revoked` is one frame (owner decision 2026-08-27,
+    // `visible-events-for.ts` 6.100–6.104, `stream-frames.ts`).
+    expect(rawSince(socket, beforeRevocation)).not.toContain(ticket);
 
     // ONCE. Their cursor cannot advance — the filter yields them nothing that
     // carries one — so without a terminal subscription every later commit in
