@@ -142,12 +142,12 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-*(Plan 5, Tasks 2–8 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
-replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7 and 8 added, and nothing else. Plan 5
+*(Plan 5, Tasks 2–9 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
+replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7, 8 and 9 added, and nothing else. Plan 5
 Task 1 (`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here.
 Still absent rather than missing from this section: every `/v1` read
-route EXCEPT the board (list, search, My Work, attention, builder reads, preferences), and the stream hub with
-its WebSocket route — Plan 5 Tasks 9–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
+route EXCEPT the board and the list (search, My Work, attention, builder reads, preferences), and the stream hub with
+its WebSocket route — Plan 5 Tasks 10–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
 doc assigns `Features.md` sections one per implementation plan, so numbering is claimed from that
 table rather than taken next-free.)*
 
@@ -307,6 +307,61 @@ table rather than taken next-free.)*
   door, and nonzero only where a fixture seeds some projections and not others. The single-ticket read
   returns the view verbatim, so both fields appear in its response body.
   `apps/server/src/visibility/rollup.ts`
+- ✅ **`GET /v1/projects/:projectId/board`** — one project's board. Columns are the states of the
+  workflows **in use by the tickets this caller may see** — not every workflow the workspace has
+  defined — with every state of a used workflow present whether or not anybody is in it, ordered by
+  workflow id then by the order the publisher authored the states, cards by ticket id. Two workflows
+  on one board sit side by side, so a state id they both use is two distinct columns and a card never
+  appears under the other workflow's copy of its own state. The `blocked`
+  flag is read off the definition, never derived from a category: the seeded `waiting` state is
+  `active` AND blocked while a second workflow's `waiting` is `active` and not. Cards are `TicketCard`s, so each unfolds to
+  who claimed its state and when by both clocks, and a parent carries its four-field rollup. The
+  visibility filter is `visibleTicketsWhere` — the one SQL expression of the decision table, consumed
+  and not restated. `apps/server/src/routes/board.ts`
+- ✅ **The board's door: 401, 404, 404, 200** — no session is `401 {error:'unauthenticated'}`; an
+  unknown project id and a caller who is not a member of the project's workspace are both
+  `404 {error:'not_found'}`, indistinguishable down to `content-length`, because a 403 would confirm
+  the project exists to somebody with no business knowing it does. A member of that workspace who is
+  NOT on the project passes the gate and gets **200 with an empty board** — the gate asks about the
+  workspace, so a project's existence is not a secret from somebody already inside the tenancy, and
+  the emptiness is the visibility predicate answering rather than the door.
+  `apps/server/src/routes/board.ts`
+- ⚙️ **The shared read world for route tests** — `buildReadTestApp(db)` stands the real app up through
+  `buildTestApp`, signs six users in over the wire, seeds the shared scenario under the ids those
+  sessions answered, and adds two fixtures the scenario deliberately lacks: a SIBLING project in the
+  same workspace (without which a workspace board and a project board are the same bytes — measured)
+  and a NEIGHBOUR workspace with its own owner (without which a "member of any workspace" gate would
+  pass every tenancy test). `apps/server/test/helpers/read-app.ts`
+- ✅ **`GET /v1/projects/:projectId/tickets` — the project list read** — one project's tickets as a
+  filtered, grouped, keyset-paged flat list, behind the board's door and the same visibility
+  predicate. It CONSUMES rather than re-expresses: `visibleTicketsWhere` for Plan 4's decision table,
+  `compileFilterSpec` for every actor-supplied byte, `latestWorkflowDefs` (workspace-scoped, ruling
+  P14) for state names. `filter` is URL-encoded JSON validated by `filterSpecSchema`; `groupBy`
+  defaults to `flat`; `limit` defaults to 50 and caps at 200; pagination is keyset by `ticket_id`
+  with `cursor` = the last id of the previous page. Hierarchy is children-by-parent-query:
+  `parentId=<id>` answers direct children, `parentId=root` answers roots, absent answers the project;
+  children are not inlined. Grouping is applied PER PAGE, so a key may recur on a later page and
+  clients merge by `key` — the alternative would make a page boundary depend on the grouping, so one
+  cursor would mean different things under different `groupBy` values. **Grouping by `epic` resolves
+  on the epic RANK read from `BUILTIN_TICKET_TYPE_SEEDS`, never on the id `'epic'`**, so a workspace
+  that renamed its top rung ("Initiative") gets its own headings (owner sign-off 2026-08-20).
+  **The epic walk carries the visibility predicate and the tenancy clause**, which the plan's version
+  did not: a group's key is a ticket id and its LABEL IS THAT TICKET'S TITLE, so a walk that climbed
+  the parent chain without asking Plan 4's question would hand a caller who may see a child the title
+  of an ancestor they may not — reachable rather than theoretical, because a child authors its own
+  audience and stops inheriting. An invisible link STOPS the walk (the caller gets `no-epic`) rather
+  than being climbed over, which would report a grouping whose reason the caller cannot see; the
+  title is read inside the same walk rather than by a second unscoped query. Spec line 117's
+  "existence, no title" is the line held: the ancestor's ID is still disclosed on the child's own
+  `parentId`, which `TicketCard` declares a decided trade. An empty answer is `groups: []` — a group
+  is a bucket of cards, so a bucket with no cards would assert that something is there to look in,
+  and it is what an off-project member gets. Refusals are named `400`s (`invalid_filter`,
+  `invalid_grouping`, `invalid_limit`) that echo no zod issue list, since a refusal quoting what it
+  refused is a mirror an attacker can aim — **and they are answered AFTER the door**, reversing the
+  plan's order so an unauthorised caller cannot exercise the parser at all. The 404 body is now the
+  shared `READ_NOT_FOUND_BODY` beside `requireMember`, so the board's and the list's refusals are one
+  object rather than two literals identical by coincidence.
+  `apps/server/src/routes/list.ts`, `apps/server/src/read/membership.ts`, `apps/server/src/app.ts`
 
 ## 9. Editor, documents & attachments
 
@@ -431,28 +486,3 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
   the real projection registry, returning the app, its own OTP sender and the ungated internal ingest
   door. It replaces four hand-copied assemblies that had to be extended one by one every time
   `buildApp` gained a route. `apps/server/test/helpers/app.ts`
-- ✅ **`GET /v1/projects/:projectId/board`** — one project's board. Columns are the states of the
-  workflows **in use by the tickets this caller may see** — not every workflow the workspace has
-  defined — with every state of a used workflow present whether or not anybody is in it, ordered by
-  workflow id then by the order the publisher authored the states, cards by ticket id. Two workflows
-  on one board sit side by side, so a state id they both use is two distinct columns and a card never
-  appears under the other workflow's copy of its own state. The `blocked`
-  flag is read off the definition, never derived from a category: the seeded `waiting` state is
-  `active` AND blocked while a second workflow's `waiting` is `active` and not. Cards are `TicketCard`s, so each unfolds to
-  who claimed its state and when by both clocks, and a parent carries its four-field rollup. The
-  visibility filter is `visibleTicketsWhere` — the one SQL expression of the decision table, consumed
-  and not restated. `apps/server/src/routes/board.ts`
-- ✅ **The board's door: 401, 404, 404, 200** — no session is `401 {error:'unauthenticated'}`; an
-  unknown project id and a caller who is not a member of the project's workspace are both
-  `404 {error:'not_found'}`, indistinguishable down to `content-length`, because a 403 would confirm
-  the project exists to somebody with no business knowing it does. A member of that workspace who is
-  NOT on the project passes the gate and gets **200 with an empty board** — the gate asks about the
-  workspace, so a project's existence is not a secret from somebody already inside the tenancy, and
-  the emptiness is the visibility predicate answering rather than the door.
-  `apps/server/src/routes/board.ts`
-- ⚙️ **The shared read world for route tests** — `buildReadTestApp(db)` stands the real app up through
-  `buildTestApp`, signs six users in over the wire, seeds the shared scenario under the ids those
-  sessions answered, and adds two fixtures the scenario deliberately lacks: a SIBLING project in the
-  same workspace (without which a workspace board and a project board are the same bytes — measured)
-  and a NEIGHBOUR workspace with its own owner (without which a "member of any workspace" gate would
-  pass every tenancy test). `apps/server/test/helpers/read-app.ts`

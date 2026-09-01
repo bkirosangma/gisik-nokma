@@ -118,10 +118,20 @@ const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 /**
  * A hand-built ticket id, valid against `ULID_REGEX` and ordered by `index`.
  *
- * `newUlid()` is monotonic, so ids minted in a loop come out in insertion order
- * and an ordering assertion over them agrees with a route that has no `ORDER BY`
- * at all. These are built instead, and the seed inserts them BACKWARDS: id order
- * and insertion order are then opposites, and only one of them is the contract.
+ * `newUlid()` will not do, for two separate reasons and it is worth naming both.
+ *
+ * Ids minted in a loop come out ROUGHLY in insertion order, because the ULID's
+ * leading 48 bits are a millisecond clock — so an ordering assertion over them
+ * agrees with a route that has no `ORDER BY` at all, and proves nothing. These
+ * are built instead, and the seed inserts them BACKWARDS: id order and insertion
+ * order are then exact opposites, and only one of them is the contract.
+ *
+ * And only ROUGHLY: within a single millisecond the remaining 80 bits are
+ * RANDOM, not a counter, so two ids minted in the same tick sort either way.
+ * That is not a nuance — it is what made the cursor case in this file a coin
+ * flip until it was measured (see its comment, and the commit that fixed it).
+ * Hence `.sort()` wherever a seeded id set is asserted, and hence these
+ * hand-built ids wherever an ORDER is the thing under test.
  */
 function bulkTicketId(index: number): string {
   const suffix = `${CROCKFORD[Math.floor(index / CROCKFORD.length)]}${CROCKFORD[index % CROCKFORD.length]}`;
@@ -587,7 +597,7 @@ describe('GET /v1/projects/:projectId/tickets — pagination and ordering', () =
     expect(tail.nextCursor).toBeNull();
   });
 
-  it('7.80 cards come back in TICKET_ID order and not in the order the ledger wrote them', async () => {
+  it('7.81 cards come back in TICKET_ID order and not in the order the ledger wrote them', async () => {
     const page = await listOf('member', fixtures.bulkProjectId, { limit: BULK_COUNT });
     expect(ids(page)).toEqual(fixtures.bulkIdsSorted);
     // The fixture's whole point, stated as an assertion so it cannot rot: these
@@ -597,7 +607,7 @@ describe('GET /v1/projects/:projectId/tickets — pagination and ordering', () =
     expect(ids(page)).not.toEqual(fixtures.bulkIdsInsertionOrder);
   });
 
-  it('7.80 the cursor is an input, not a key: a foreign, an invisible and a hostile cursor each narrow and none widens', async () => {
+  it('7.82 the cursor is an input, not a key: a foreign, an invisible and a hostile cursor each narrow and none widens', async () => {
     // Positive control first: a cursor BELOW every id answers the whole visible
     // list, so the narrowings below are the clause working rather than a route
     // that answers nothing whenever a cursor is present.
@@ -813,7 +823,7 @@ describe('GET /v1/projects/:projectId/tickets — the door', () => {
     expect(await idsOf('member', read.world.projectId)).toEqual(memberVisible());
   });
 
-  it('7.80 the door answers BEFORE the query is parsed: a stranger sending nonsense gets the tenancy 404, a member gets the 400', async () => {
+  it('7.83 the door answers BEFORE the query is parsed: a stranger sending nonsense gets the tenancy 404, a member gets the 400', async () => {
     const stranger = await getList('stranger', read.world.projectId, { groupBy: 'priority', limit: 0 });
     expect(stranger.statusCode).toBe(404);
     expect(stranger.json()).toEqual({ error: 'not_found' });
