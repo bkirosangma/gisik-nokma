@@ -127,8 +127,19 @@ export type PreferencesDoc = z.infer<typeof preferencesDocSchema>;
  * for a missing row, so a test comparing against it compares against the thing
  * the server actually answers.
  */
-export const EMPTY_PREFERENCES: PreferencesDoc = Object.freeze({
-  savedFilters: Object.freeze([]) as PreferencesDoc['savedFilters'],
-  listColumns: Object.freeze({}) as PreferencesDoc['listColumns'],
-  grouping: Object.freeze({}) as PreferencesDoc['grouping'],
-});
+function emptyPreferences(): PreferencesDoc {
+  const doc: PreferencesDoc = { savedFilters: [], listColumns: {}, grouping: {} };
+  // Each container frozen as well as the document: `Object.freeze` is shallow,
+  // and a caller that pushed into `EMPTY_PREFERENCES.savedFilters` would be
+  // editing every future "this person has saved nothing" answer at once. Done
+  // through a function with a typed local rather than a cast on a frozen
+  // literal, because `Object.freeze([])` is `readonly never[]`, which is NOT
+  // assignable to `SavedFilter[]` — the cast that hides that is exactly the
+  // unsoundness this constant should not need.
+  Object.freeze(doc.savedFilters);
+  Object.freeze(doc.listColumns);
+  Object.freeze(doc.grouping);
+  return Object.freeze(doc);
+}
+
+export const EMPTY_PREFERENCES: PreferencesDoc = emptyPreferences();

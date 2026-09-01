@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Response as InjectResponse } from 'light-my-request';
+import type { FastifyInstance } from 'fastify';
 import {
   EMPTY_PREFERENCES,
   membershipId,
@@ -91,6 +91,13 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * rows they touch, and 7.132 deletes what it wrote — vitest runs a file's cases
  * in declaration order.
  */
+
+/**
+ * Derived from `inject` rather than imported from `light-my-request`, which is
+ * Fastify's own transitive dependency and not this package's: the same shape
+ * `my-work.test.ts` and `attention.test.ts` use.
+ */
+type InjectResponse = Awaited<ReturnType<FastifyInstance['inject']>>;
 
 let db: TestDatabase;
 let read: ReadWorld;
