@@ -7,16 +7,27 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from './helpers/db.js';
 
 /**
- * The seam the coordination doc's Plan 1 consequences §9 names, and the window
- * this PR opens: registering `ticket.transitioned` makes transitions ingestible
- * on `main`, ten tasks before Plan 3 Task 12 gives the server real entity
- * state. Until it does, `getEntityState` must answer honestly about what it
- * can and cannot serve — these tests are what makes "honestly" falsifiable.
+ * The seam the coordination doc's Plan 1 consequences §9 named, and the commit
+ * that closes it. Registering `ticket.transitioned` made transitions ingestible
+ * ten tasks before the server had entity state to judge them against; until
+ * Plan 3 Chain B Task 12 the honest answer was null, and the assertions here
+ * were what made "honestly" falsifiable.
  *
- * Against the body this PR replaces (`readEntityHead(...) as unknown as
- * EntityState | null`), every assertion below fails: the head POINTER comes
- * back for every kind, so a ticket looks like a TicketState with no
+ * Task 12 gives `getEntityState('ticket')`, `getChildrenStates` and
+ * `getTicketTypeDef` real bodies over proj_tickets and proj_ticket_types — in
+ * ONE change set, because a context that resolves a parent and then reports it
+ * childless refuses nothing while looking like it has checked. The assertions
+ * that pinned the nulls are INVERTED here rather than deleted, so the file still
+ * reads as the history of what this server could answer and when.
+ *
+ * Against the body two commits ago (`readEntityHead(...) as unknown as
+ * EntityState | null`), every assertion below still fails: the head POINTER
+ * comes back for every kind, so a ticket looks like a TicketState with no
  * `workflowId` and a membership looks like a MembershipState with no `role`.
+ *
+ * `'membership'` stays null — Plan 4's proj_memberships owns it — which is why
+ * the role-gated transition at the foot of this file is refused by `restrict-to`
+ * naming a role the actor cannot be shown to hold.
  */
 let db: TestDatabase;
 
@@ -71,6 +82,23 @@ const roleGatedWorkflow = submitted({
   },
 });
 
+/**
+ * Revert step 1 of the four this file's previous version listed for Task 12.
+ * **Rank 3**, the built-in `task` rank: at `DEEPEST_RANK` (4) or below it the
+ * create below is refused `hierarchy.deepest-rank-parent-required` for having no
+ * parent, and the debugging would be of a type lookup that was working.
+ */
+const taskTypeDefined = submitted({
+  // A FRESH ENTITY ULID, not the type key: the envelope schema requires a ULID
+  // entity id, and a ticket type's projection key is its PAYLOAD's `id`. The two
+  // are deliberately different things — `test/proj-ticket-types.test.ts` turns
+  // that decoupling into its own case — which is also what lets two workspaces
+  // define the same type key, the scenario the tenancy tests below rest on.
+  entity: { kind: 'ticket-type', id: newUlid() },
+  type: 'ticket-type.defined',
+  payload: { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: WORKFLOW, fields: [] },
+});
+
 const ticketCreated = submitted({
   entity: { kind: 'ticket', id: TICKET },
   type: 'ticket.created',
@@ -78,52 +106,25 @@ const ticketCreated = submitted({
 });
 
 beforeAll(async () => {
-  const results = await service().ingestBatch([roleGatedWorkflow, ticketCreated]);
-  // The create is REFUSED from Plan 3 Task 5, and this is the seam working
-  // rather than breaking. `checkTicketCreated` reads the ticket type's rank and
-  // name through `getTicketTypeDef`, and this server context answers null for
-  // every type until Task 12 backs that method with `proj_ticket_types` — so
-  // the server refuses to create a ticket whose type it cannot see, which is
-  // exactly what `createEngineContext`'s own comment on that method says it
-  // will do. Before Task 5 the event fell through the engine's `default` arm
-  // and committed unjudged; nothing consumed it, because proj_tickets does not
-  // exist yet either.
+  const results = await service().ingestBatch([roleGatedWorkflow, taskTypeDefined, ticketCreated]);
+  // ALL THREE COMMIT, and that is Task 12's four-step revert carried out in
+  // full — the previous version of this file listed the steps so they would be
+  // mechanical rather than inferential, and here they are:
   //
-  // TASK 12'S REVERT, in full, so it is mechanical rather than inferential.
-  // Once getTicketTypeDef reads proj_ticket_types, all FOUR of these move
-  // together and none may land without the others:
+  //   1. a `ticket-type.defined` for `task` was ADDED ahead of the create.
+  //      Without one, proj_ticket_types has no row to serve and the create is
+  //      still refused `ticket.unknown-type` for a reason that has nothing to do
+  //      with the wiring — a context that can read the table is not the same
+  //      thing as a table with the type in it.
+  //   2. this expectation became three commits.
+  //   3. the refusal-object assertion that stood here was DELETED.
+  //   4. the ticket head row planted below it was DELETED; the create writes it,
+  //      and it writes the proj_tickets row the head used to stand in for.
   //
-  //   1. ADD a `ticket-type.defined` event for `task` to this batch, ahead of
-  //      the create. Without one, proj_ticket_types has no row to serve and the
-  //      create is still refused for the same reason — a context that can read
-  //      the table is not the same thing as a table with the type in it.
-  //   2. This expectation becomes ['committed', 'committed', 'committed'].
-  //   3. DELETE the refusal-object assertion immediately below.
-  //   4. DELETE the planted ticket head row further down; the create writes it.
-  //
-  // Those four join the two assertions A12/BA-3 already assigns that task.
-  expect(results.map((result) => result.status)).toEqual(['committed', 'refused']);
-  expect(results[1]).toEqual({
-    status: 'refused',
-    eventId: expect.any(String),
-    rule: 'ticket.unknown-type',
-    reason: "This ticket's type is not defined in this workspace.",
-  });
-
-  // Deleted by Task 12, step 4 above. The ticket head row the create would have
-  // written, planted for the same
-  // reason the membership row below is: the assertion it serves is about what
-  // `getEntityState` does with a head row that EXISTS. Against the
-  // `as unknown as EntityState` body this file was written to kill, a ticket
-  // WITH a head comes back looking like a TicketState whose `workflowId` is
-  // undefined — and with no head row at all that body returns null too, so the
-  // test would pass against the very defect it exists to catch.
-  await db.pool.query(
-    `INSERT INTO proj_entity_heads
-       (entity_kind, entity_id, workspace_id, head_seq, head_event_id, head_event_type, head_server_time)
-     VALUES ('ticket', $1, $2, 1, $3, 'ticket.created', '2026-08-20T09:00:01.000Z')`,
-    [TICKET, WORKSPACE, newUlid()],
-  );
+  // The create committing is itself the discriminator: it resolves `task`
+  // through `getTicketTypeDef`, and that method answered null unconditionally
+  // until this task.
+  expect(results.map((result) => result.status)).toEqual(['committed', 'committed', 'committed']);
 
   // The membership row Plan 4 will write for real. Planted directly because no
   // event type is bound to the `membership` kind yet, and §9's hazard needs a
@@ -138,10 +139,41 @@ beforeAll(async () => {
 });
 
 describe('createEngineContext.getEntityState — what the server can honestly serve', () => {
-  it('answers null for a ticket that HAS a head row, because ticket state does not exist until Plan 3 Task 12', async () => {
+  it('serves the WHOLE TicketState for a ticket the projections hold — inverted by Task 12', async () => {
+    // THE FIRST OF THE TWO ASSERTIONS THIS TASK INVERTS. It read
+    // `.toBeNull()`, under a name saying ticket state "does not exist until
+    // Plan 3 Task 12". It exists now.
+    //
+    // Asserted field by field rather than `not.toBeNull()`: the defect this
+    // file was written against returned a head POINTER that is not null either,
+    // and `workflowId`/`stateCategory` are exactly the fields it lacked. The
+    // pair `kind` and `workspaceId` is the total-outage trap `rowToTicketState`
+    // documents — `undefined !== env.workspaceId` is always true, so a mapper
+    // dropping either refuses every parented create while sounding like a
+    // tenancy refusal.
     const client = await db.pool.connect();
     try {
-      expect(await createEngineContext(client).getEntityState('ticket', TICKET)).toBeNull();
+      const ticket = await createEngineContext(client).getEntityState('ticket', TICKET);
+      expect(ticket).toMatchObject({
+        kind: 'ticket',
+        id: TICKET,
+        workspaceId: WORKSPACE,
+        projectId: PROJECT,
+        typeId: 'task',
+        parentId: null,
+        workflowId: WORKFLOW,
+        stateId: 'todo',
+        stateCategory: 'open',
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  it('answers null for a ticket id nothing ever created — the control that keeps the answer above about THIS ticket', async () => {
+    const client = await db.pool.connect();
+    try {
+      expect(await createEngineContext(client).getEntityState('ticket', newUlid())).toBeNull();
     } finally {
       client.release();
     }
@@ -265,23 +297,34 @@ describe('createEngineContext.getContest — the contest lookup the engine canno
 });
 
 describe('a role-gated transition through the shipped server context', () => {
-  it('is refused for the true reason — the server has no ticket state — and never for an invented one', async () => {
+  it('now reaches the role gate and is refused BY IT — §9 observed where §9 predicted', async () => {
     const results = await service().ingestBatch([
       submitted({ entity: { kind: 'ticket', id: TICKET }, type: 'ticket.transitioned', payload: { to: 'done' } }),
     ]);
 
-    // Against the cast this PR removes, the same batch is refused as
-    // `unknown-workflow`, reasoning "Ticket <id> uses workflow undefined, but
-    // no published definition of that workflow is known." — a sentence that
-    // names a workflow called `undefined`, blames the workflow for a defect in
-    // the context, and reads entirely legitimate to whoever receives it. That
-    // is the silent failure §9 describes, observed one step earlier than §9
-    // predicted: the ticket lookup lies before the role gate is ever reached.
+    // THE SECOND OF THE TWO ASSERTIONS THIS TASK INVERTS, and the refusal moved
+    // one layer DOWN rather than away.
+    //
+    // It used to expect `unknown-ticket` — "no such ticket is known" — which was
+    // true of a server whose `getEntityState('ticket')` answered null, and which
+    // meant the role gate at the end of this transition was never reached. The
+    // ticket resolves now, its workflow resolves, the `todo -> done` edge is
+    // found, and `restrict-to` asks the question §9 was always about: is the
+    // actor an admin here? The server cannot say they are — `'membership'` is
+    // Plan 4's proj_memberships and still answers null — so the move is refused
+    // naming the role it wanted. The refusal is honest about its own subject,
+    // which is the whole property this file exists to hold.
+    //
+    // Against the `as unknown as EntityState` cast two commits ago, the same
+    // batch was refused `unknown-workflow`, reasoning "Ticket <id> uses workflow
+    // undefined, but no published definition of that workflow is known." — a
+    // sentence naming a workflow called `undefined` and blaming it for a defect
+    // in the context.
     expect(results[0]).toEqual({
       status: 'refused',
       eventId: expect.any(String),
-      rule: 'unknown-ticket',
-      reason: `This event moves ticket ${TICKET}, but no such ticket is known.`,
+      rule: 'restrict-to',
+      reason: `Only anyone with the role admin may make this move, and ${ACTOR} is not among them.`,
     });
   });
 });
