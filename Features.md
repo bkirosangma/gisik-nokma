@@ -201,7 +201,12 @@ table rather than taken next-free.)*
   expressions of one rule remain — `canSeeResolved` in TypeScript, this one in SQL, kept because the
   SQL is what makes a list one round trip rather than a workspace-sized read filtered in memory — and
   what stops them drifting is an agreement test that compares an exact id set per viewer AND
-  cross-checks `canSee` ticket by ticket. A non-member compiles to `FALSE` and an owner to `TRUE`, so
+  cross-checks `canSee` ticket by ticket. With one limit now stated rather than left implied: the
+  cross-check is STRUCTURALLY BLIND wherever both implementations ignore the same input — for a
+  guest, neither consults `eff.projects`, so they agree whatever the fixture holds — and there the
+  only thing that discriminates is a fixture putting the viewer in the state the branch could get
+  wrong. A guest on a project roster is that fixture, and it is what makes an over-permissive guest
+  branch (one that gained the member clause's project disjunct) fail rather than pass the suite. A non-member compiles to `FALSE` and an owner to `TRUE`, so
   the predicate carries NO tenancy of its own and every caller must supply its own
   `workspace_id = $n`; the parameters are built inside the branches, since a value bound for a branch
   that returns a constant would have no `$n` to reference it. The role is walked by a bare `switch`

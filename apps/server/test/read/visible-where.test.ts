@@ -28,7 +28,7 @@ import { scenarioUsers, seedReadScenario, type ReadScenario } from '../helpers/r
  * docblock enumerates all four absences. Run against it alone, the agreement
  * test below would pass with the entire `'workspace'` disjunct deleted AND with
  * the owner branch replaced by the member rules: neither path is reached, so
- * neither mutation could fail. So this file AUGMENTS the world with four
+ * neither mutation could fail. So this file AUGMENTS the world with five
  * things, and each exists to make one specific mutation die:
  *
  * - `wsWideTaskId` — the only workspace-mode ticket. Deleting
@@ -41,6 +41,17 @@ import { scenarioUsers, seedReadScenario, type ReadScenario } from '../helpers/r
  * - `admin` on that second project — a viewer whose slice differs from both the
  *   member's and the outsider's, so `case 'admin'` is exercised and not merely
  *   compiled.
+ * - **the GUEST on the first project.** Without it the guest's project set is
+ *   EMPTY, and `case 'guest'` rewritten as
+ *   `(v.resolved_mode = 'project' AND v.project_id = ANY ($n)) OR explicit` —
+ *   an over-permissive guest branch — passes the whole server suite. Measured,
+ *   not supposed. With the roster row, that mutation hands the guest
+ *   `world.epicId` and dies on `guest x project`. The `canSee` cross-check
+ *   cannot substitute here: BOTH implementations ignore `eff.projects` for a
+ *   guest, so they agree whatever the fixture holds. The state is reachable
+ *   through the shipped door — `project.member_added` gates on the ACTOR's
+ *   project-admin rights, and nothing refuses a guest as the TARGET of a
+ *   roster add.
  *
  * And `neighbourTaskId` sits in a DIFFERENT workspace, workspace-mode. The
  * predicate carries no tenancy clause of its own — for an owner it compiles to
@@ -48,23 +59,40 @@ import { scenarioUsers, seedReadScenario, type ReadScenario } from '../helpers/r
  * between the owner of one workspace and the whole table. A caller who drops
  * that clause fails here.
  *
- * ## The twelve cells, and the one that is not seeded
+ * ## The twelve cells, what stands behind each, and the one still unseeded
  *
  * Four role branches (null, guest, member/admin, owner) times three resolved
  * modes. All twelve are asserted below, by row, in "every cell of the decision
  * table is reached" — as a grid, not as prose, because a cell nobody can point
- * at is a cell nobody covered.
+ * at is a cell nobody covered. Each cell's ticket is first checked, against
+ * `proj_visibility`, to actually stand in the mode its own label names: a
+ * ticket that drifted into another mode would keep answering `false` and the
+ * cell would keep passing while testing nothing. That guard reads the DATABASE
+ * — the one it replaced compared JS literals with the JS literals they were
+ * built from and could not fail.
  *
  * `member` and `admin` are ONE `case` in the predicate and one `case` in
  * `canSeeResolved`, so the admin viewer is seeded to prove that branch is
  * reached by an admin at all rather than to cover a fourth row. Of the four
  * admin cells, three are fixtured (workspace; project on it; project off it;
- * explicit not listed — four, in fact). **`admin x explicit, LISTED` is the one
- * combination no fixture here seeds**: no explicit list names the admin. It
+ * explicit not listed — four, in fact). **`admin x explicit, LISTED` is now the
+ * one combination no fixture here seeds**: no explicit list names the admin. It
  * exercises no code the identical `member x explicit, listed` cell does not,
  * and the two cells that actually discriminate admin from owner — project-off-it
  * and explicit-not-listed — are both seeded and both asserted false. Named
  * rather than counted as covered.
+ *
+ * **This paragraph used to say "the one combination", and that was FALSE — it
+ * was two.** The other was `guest x project`: the cell existed and asserted
+ * false, but for a guest whose project set was empty, which no implementation
+ * of that branch could get wrong. That one was load-bearing in a way the admin
+ * one is not, and the difference is the whole rule for reading this grid. An
+ * unseeded cell is harmless only when it reaches no code some seeded cell
+ * already reaches — true of `admin x explicit, listed`, which shares a `case`
+ * with `member x explicit, listed` and therefore compiles to the identical
+ * clause. `guest x project` had its OWN branch, and an unseeded state there was
+ * a cell that could not discriminate. The guest is now on a project (see the
+ * fifth augmentation above) and the cell has teeth.
  */
 
 let db: TestDatabase;
@@ -111,6 +139,15 @@ async function seedAugmentation(target: Pool, w: ReadScenario): Promise<Augmenta
     // The admin is on the SECOND project and on nothing else — the owner is on
     // neither, which is what makes the owner's reach of it a bypass.
     makeCommitted({ ...ws, entity: { kind: 'project', id: otherProjectId }, type: 'project.member_added', payload: { userId: admin, projectAdmin: false } }),
+    // The GUEST, on the FIRST project — the state that makes `guest x project`
+    // able to discriminate at all. Reachable through the shipped door:
+    // `project.member_added` is gated only on the ACTOR's project-admin rights
+    // (the owner has them), and `checkRolePermission` refuses a guest only as
+    // the actor of `ticket.created`, never as the TARGET of a roster add. The
+    // row is project-scope with role hardcoded 'member', so the guest's
+    // WORKSPACE role stays 'guest' and their project set becomes
+    // {w.projectId} — which is where `world.epicId` lives.
+    makeCommitted({ ...ws, entity: { kind: 'project', id: w.projectId }, type: 'project.member_added', payload: { userId: w.guest, projectAdmin: false } }),
     makeCommitted({ ...ws, entity: { kind: 'ticket', id: wsWideTaskId }, type: 'ticket.created', payload: { typeId: 'task', projectId: w.projectId, parentId: null, title: 'Pin the holiday list on the door' } }),
     makeCommitted({ ...ws, entity: { kind: 'ticket', id: wsWideTaskId }, type: 'visibility.set', payload: { ticketId: wsWideTaskId, mode: 'workspace' } }),
     // No visibility.set: a root with no authored mode resolves to the project
@@ -183,6 +220,28 @@ function allTickets(): string[] {
 }
 
 const sorted = (ids: readonly string[]): string[] => [...ids].sort();
+
+const RESOLVED_MODES = ['workspace', 'project', 'explicit'] as const;
+
+/**
+ * The resolved mode a cell's own NAME claims — the first word after `' x '`, so
+ * `'null x explicit (listed for others)'` claims `'explicit'` and
+ * `'owner x project, off it (bypass)'` claims `'project'`.
+ *
+ * Read off the label rather than carried in a fifth tuple slot on purpose: the
+ * label is what a failure message prints and what a reader believes, so it is
+ * the claim worth checking against the database. A label that names no known
+ * mode throws rather than silently comparing against `undefined` — which would
+ * be a new tautology in the place the old one was removed from.
+ */
+function claimedMode(cell: string): string {
+  const after = cell.split(' x ')[1] ?? '';
+  const word = after.split(/[\s,]/)[0] ?? '';
+  if (!(RESOLVED_MODES as readonly string[]).includes(word)) {
+    throw new Error(`cell label names no resolved mode: ${cell}`);
+  }
+  return word;
+}
 
 async function sqlVisibleSet(userId: string): Promise<string[]> {
   const eff = await resolveEffectiveRole(pool, userId, world.workspaceId);
@@ -272,9 +331,17 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
     };
 
     // Each entry is one cell: [cell, viewer's slice, ticket standing in that
-    // mode, whether the table says yes]. A cell whose ticket does not exist
-    // would read as `false` here for the wrong reason, so `allTickets()`
-    // membership is asserted first.
+    // mode, whether the table says yes]. A cell whose ticket stands in a
+    // DIFFERENT mode than its name claims would read as `false` here for the
+    // wrong reason and go on passing, so the mode named in each label is
+    // checked against `proj_visibility` first — a read of database state, not
+    // of the JS literals this file also builds the cells from. The guard this
+    // replaced asked whether the ticket id was in `allTickets()`, which came
+    // from the same literals and so was true by construction: deleting
+    // `memberOnlyTaskId`'s `visibility.set` (making it project-mode by root
+    // default) left every test in this file green while `owner x explicit, not
+    // listed (bypass)` silently stopped testing the bypass. Measured both ways
+    // — under the guard below the same deletion reddens, naming that cell.
     const cells: ReadonlyArray<readonly [string, Set<string>, string, boolean]> = [
       ['null x workspace', slices.stranger, extra.wsWideTaskId, false],
       ['null x project', slices.stranger, world.epicId, false],
@@ -304,11 +371,46 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
       ['owner x explicit, not listed (bypass)', slices.owner, extra.memberOnlyTaskId, true],
     ];
 
-    const seeded = new Set(allTickets());
+    const { rows } = await pool.query(
+      `SELECT ticket_id, resolved_mode FROM proj_visibility WHERE ticket_id = ANY ($1::text[])`,
+      [allTickets()],
+    );
+    const modeOf = new Map(
+      (rows as { ticket_id: string; resolved_mode: string }[]).map((r) => [
+        r.ticket_id,
+        r.resolved_mode,
+      ]),
+    );
+
     for (const [cell, slice, ticketId, expectedVisible] of cells) {
-      expect({ cell, seeded: seeded.has(ticketId) }).toEqual({ cell, seeded: true });
+      // The mode the CELL NAME claims — the first word after ' x ' — against
+      // the mode the DATABASE holds. A ticket with no `proj_visibility` row at
+      // all yields `undefined` and fails here, so this also subsumes the
+      // existence check it replaced.
+      expect({ cell, mode: modeOf.get(ticketId) }).toEqual({ cell, mode: claimedMode(cell) });
       expect({ cell, visible: slice.has(ticketId) }).toEqual({ cell, visible: expectedVisible });
     }
+  });
+
+  it('a guest ON a project roster still sees only what they are explicitly listed on', async () => {
+    // The premise first, because without it this test is a second copy of "a
+    // guest sees only what was explicitly shared" and passes whether or not the
+    // roster row exists. It also pins something that cannot be assumed: the
+    // project-scope row (role hardcoded 'member') does NOT clobber the
+    // workspace-scope 'guest' row — the two are distinct rows and
+    // resolveEffectiveRole keeps them apart.
+    const eff = await resolveEffectiveRole(pool, world.guest, world.workspaceId);
+    expect({ role: eff.workspaceRole, onProject: eff.projects.has(world.projectId) }).toEqual({
+      role: 'guest',
+      onProject: true,
+    });
+
+    // …and the guest's slice is unchanged by it. `world.epicId` is project-mode
+    // in exactly the project the guest is now on, so a guest branch that gained
+    // the member clause's project disjunct would hand it over here.
+    expect(await sqlVisibleSet(world.guest)).toEqual([world.guestTaskId]);
+    expect(await sqlVisibleSet(world.guest)).not.toContain(world.epicId);
+    expect(await canSee(pool, world.guest, world.epicId)).toBe(false);
   });
 
   it('PLANTED DEFECT: the explicit-mode ticket that omits the member never surfaces for them', async () => {
@@ -364,6 +466,23 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
       params.toArray(),
     );
     expect(rows).toEqual([]);
+
+    // The POSITIVE CONTROL that makes that `[]` evidence. An empty result alone
+    // cannot tell "bound, and correctly matched nothing" apart from "the clause
+    // is broken and matches nothing for an unrelated reason" — the fail-closed
+    // mode that keeps a visibility suite green while every explicit share is
+    // silently dead. So the same clause shape, compiled for the REAL guest
+    // through a fresh SqlParams (the positional binder cannot be reused: the
+    // `$n` would misalign), must return exactly the ticket shared with them.
+    const live = new SqlParams();
+    const liveClause = visibleTicketsWhere(eff, world.guest, live);
+    const { rows: liveRows } = await pool.query(
+      `SELECT t.ticket_id FROM proj_tickets t
+       JOIN proj_visibility v ON v.ticket_id = t.ticket_id
+       WHERE ${liveClause}`,
+      live.toArray(),
+    );
+    expect(liveRows.map((r) => (r as { ticket_id: string }).ticket_id)).toEqual([world.guestTaskId]);
   });
 });
 
