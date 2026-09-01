@@ -46,6 +46,13 @@ export type BuildTestAppOverrides = {
    * registry that ships" differ in a way no test could name.
    */
   projections?: ProjectionRegistry;
+  /**
+   * Freezes the clock the ATTENTION strip computes against (`AppDeps.now`).
+   * Off by default, so an app built here reads the real clock exactly as the
+   * shipped one does; `read-app.ts` pins it to `SCENARIO_NOW` because that world
+   * is seeded with instants measured from it.
+   */
+  now?: () => Date;
 };
 
 /**
@@ -97,6 +104,9 @@ export function buildTestApp(
       // is the only route into `ingestBatch` any handler has.
       serverAppend: (events) => ingest.ingestBatch(events),
       webOrigin: TEST_WEB_ORIGIN,
+      // Undefaulted: `registerAttentionRoutes` owns the real-clock default, and
+      // passing `undefined` here is what lets it.
+      now: overrides.now,
     },
     overrides.logStream === undefined ? {} : { logLevel: 'info', logStream: overrides.logStream },
   );

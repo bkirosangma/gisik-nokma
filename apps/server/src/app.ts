@@ -4,6 +4,7 @@ import type { Auth } from './auth/auth.js';
 import { registerAuthRoutes } from './auth/routes.js';
 import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
+import { registerAttentionRoutes } from './routes/attention.js';
 import { registerBoardRoutes } from './routes/board.js';
 import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
@@ -84,6 +85,19 @@ export type AppDeps = {
    * them silently.
    */
   webOrigin: string;
+  /**
+   * The clock the ATTENTION strip computes against. Optional, and the only
+   * dependency here that a test would ever want to freeze: the strip is the one
+   * read whose answer changes while the database does not, so a test that could
+   * not pin `now` would be asserting against the day it happened to run.
+   *
+   * There is deliberately no default here. `registerAttentionRoutes` owns it, so
+   * "the real clock" is defined once; a second default in this file would be a
+   * second thing to keep in step. Every other route on this branch reads no
+   * clock at all, which is why this is one optional field rather than a `Clock`
+   * threaded through `AppDeps`.
+   */
+  now?: () => Date;
 };
 
 export function buildApp(
@@ -233,6 +247,16 @@ export function buildApp(
   // answer, and there is deliberately no parameter by which a caller could name
   // somebody else's.
   registerMyWorkRoutes(app, { pool: deps.pool }, requireSession);
+  // The attention strip (Plan 5 Task 12) — the first read that is COMPUTED from
+  // the stored claims AND THE CLOCK, and stored nowhere: blocked flags, an IST
+  // staleness window and an IST due window, with the two thresholds read from
+  // the workspace's own `workspace.settings_set` claim rather than from
+  // constants. `deps.now` is threaded through UNDEFAULTED on purpose — the
+  // default lives in `registerAttentionRoutes`, so there is one definition of
+  // the real clock. Same preHandler by parameter, same reason as every route
+  // above it: the handler reads `request.currentUserId` and resolves its whole
+  // tenancy gate from it.
+  registerAttentionRoutes(app, { pool: deps.pool, now: deps.now }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;

@@ -2,6 +2,7 @@ import type { FieldClaim, WorkspaceRole } from './entity-state.js';
 import type { PublishedWorkflowDef, StateCategory } from './workflow.js';
 import type { Grouping } from './filter-spec.js';
 import type { TicketTypeDef } from './ticket-types.js';
+import type { WorkspaceSettings } from './events/workspace-settings.js';
 
 /**
  * The read models every `/v1` read route serves and every client renders
@@ -228,10 +229,28 @@ export type AttentionItem =
     }
   | { kind: 'due-soon'; card: TicketCard; due: DueDateClaim; windowDays: number; reason: string };
 
+/**
+ * The attention strip, as the server computes it at `generatedAt` and never
+ * stores it.
+ *
+ * `settings` is the WHOLE `WorkspaceSettings`, provenance included, rather than
+ * the plan text's bare `{ staleDays, dueSoonDays }` pair. That pair is this
+ * file's own rule broken: it gives "the defaults are in force because nobody has
+ * configured this workspace" and "somebody claimed 7 and 7" the same value, and
+ * a client rendering "stale after 7 days" then cannot say whether anyone chose
+ * it. `getWorkspaceSettings` already keeps the two apart — `provenance: null`
+ * means never claimed, and the defaults live in the reader rather than in the
+ * table for exactly that reason — so carrying its answer whole is the change
+ * that stops discarding a distinction one layer below the layer that made it.
+ * The same call `TicketDueDate` makes about a due date somebody deleted.
+ *
+ * `generatedAt` names the moment the judgment was made, and is the only honest
+ * thing a computed strip can return: everything below it expires.
+ */
 export type AttentionResponse = {
   workspaceId: string;
   generatedAt: string;
-  settings: { staleDays: number; dueSoonDays: number };
+  settings: WorkspaceSettings;
   items: AttentionItem[];
 };
 

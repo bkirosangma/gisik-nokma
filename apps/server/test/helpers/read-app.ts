@@ -4,7 +4,7 @@ import { membershipId, newUlid, type LedgerEvent } from '@gisik-nokma/domain';
 import { buildTestApp } from './app.js';
 import type { TestDatabase } from './db.js';
 import { applyCommitted, makeCommitted } from './apply.js';
-import { seedReadScenario, type ReadScenario } from './read-scenario.js';
+import { SCENARIO_NOW, seedReadScenario, type ReadScenario } from './read-scenario.js';
 import { signInWithPhone } from './session.js';
 
 /**
@@ -196,7 +196,12 @@ const ROLES: ReadRole[] = [
 ];
 
 export async function buildReadTestApp(db: TestDatabase): Promise<ReadWorld> {
-  const { app, otp } = buildTestApp(db);
+  // The clock is FROZEN at `SCENARIO_NOW`, which is the instant this world's
+  // fixtures are measured from: `taskInEpic` entered `doing` nineteen Indian
+  // days before it and carries a due date five days after it. Only the attention
+  // strip (Task 12) reads it — every other route in Tasks 8–15 reads no clock at
+  // all — so this pins that one route's answer and changes nothing else.
+  const { app, otp } = buildTestApp(db, { now: () => SCENARIO_NOW });
   await app.ready();
 
   const userIds = {} as Record<ReadRole, string>;

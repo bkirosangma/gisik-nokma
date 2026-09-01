@@ -579,13 +579,13 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     // read straight back out of the projection.
     const { rows } = await db.pool.query<{
       state_category: string;
-      claim: { date: string } | null;
+      claim: { value: { date: string } | null } | null;
     }>(
       `SELECT state_category, fields -> 'dueDate' AS claim FROM proj_tickets WHERE ticket_id = $1`,
       [fx.terminalDueId],
     );
     expect(rows[0]!.state_category).toBe('terminal');
-    expect(rows[0]!.claim?.date).toBe('2026-08-21');
+    expect(rows[0]!.claim?.value?.date).toBe('2026-08-21');
     // …and a ticket whose date is FURTHER away is in the answer, so the window
     // itself is open for business.
     expect(idsOf(response, 'due-soon')).toContain(fx.dueOn23Id);
