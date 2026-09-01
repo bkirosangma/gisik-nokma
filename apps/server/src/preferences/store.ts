@@ -67,6 +67,16 @@ export async function getPreferences(
  * here it is even narrower — one person rather than one workspace's event
  * stream.
  *
+ * **`updated_at` is UNCONSTRAINED by any test, and is reported as such** rather
+ * than left looking covered: it is on no response, read by nothing, and deleting
+ * `updated_at = now()` from the `DO UPDATE` branch survives every case in
+ * `preferences.test.ts` (the column stays NOT NULL because the INSERT branch
+ * still fills it). It is kept because an operator asking "when did this person
+ * last change their view" has no event to ask, and the honest way to keep it is
+ * to say that nothing here would notice if it stopped moving. Asserting it would
+ * mean comparing two `now()` readings taken a round trip apart, which is a clock
+ * assertion in a file whose whole point is that it makes none.
+ *
  * `doc` is passed as `JSON.stringify(doc)` rather than the object: node-postgres
  * would serialise it anyway, and being explicit is what makes the parameter's
  * type obvious at the call site. The value has already passed

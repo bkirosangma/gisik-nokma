@@ -83,13 +83,22 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * `search.test.ts`, `board.test.ts` and `list.test.ts` make. `attention.test.ts`
  * is where the IST rules bind.
  *
- * ## Two cases MUTATE state other cases read, and are declared last
+ * ## Which cases MUTATE state later cases read — stated exactly, because it is
+ * ## not the usual "declared last"
  *
+ * Every case before 7.125 cleans up after itself (`DELETE FROM
+ * user_preferences`), so the file's first half is order-independent. From 7.125
+ * on it is NOT: 7.125 leaves the owner's and the member's documents in place,
  * 7.126 seeds `member` into the NEIGHBOUR workspace so one person can hold two
- * documents, and 7.132 writes a corrupt row straight into `user_preferences` to
- * prove the read validates. Both are declared after every case that reads the
- * rows they touch, and 7.132 deletes what it wrote — vitest runs a file's cases
- * in declaration order.
+ * documents and leaves three rows standing, and 7.127, 7.128, 7.129, 7.130 and
+ * 7.132 all read or assert against what those two left. 7.132 additionally
+ * writes a corrupt row directly and replaces it through the route.
+ *
+ * That is a real coupling and it is named rather than implied: vitest runs a
+ * file's cases in declaration order, so the file passes as written and a single
+ * case run alone with `-t` may not. The alternative — re-seeding a document per
+ * case — would have cost the one thing 7.126 exists to show, which is that two
+ * people and two workspaces keep four separate documents at the same time.
  */
 
 /**
@@ -333,13 +342,23 @@ describe('/v1/me/preferences — server-owned view preferences', () => {
     // ordinary seeding path raises it by exactly one, so the unchanged count
     // above is the preferences write and not a query that always answers the
     // same number.
+    // A NEUTRAL marker: a ticket in the sibling project, which nothing in this
+    // file reads. Deliberately not a membership or roster event — `read-app.ts`
+    // documents `admin` as being on NO project so a workspace-role gate can be
+    // told from a project-membership one, and a counter that just needs to move
+    // by one is no reason to dissolve an invariant of the shared world.
     const marker: LedgerEvent[] = [
       makeCommitted({
         workspaceId: read.world.workspaceId,
         actorId: read.world.owner,
-        entity: { kind: 'project', id: read.world.projectId },
-        type: 'project.member_added',
-        payload: { userId: read.userIds.admin, projectAdmin: false },
+        entity: { kind: 'ticket', id: newUlid() },
+        type: 'ticket.created',
+        payload: {
+          typeId: 'task',
+          projectId: read.sibling.projectId,
+          parentId: null,
+          title: 'Ledger marker for the preferences no-events case',
+        },
       }),
     ];
     await applyCommitted(db.pool, marker);
@@ -765,6 +784,63 @@ describe('/v1/me/preferences — server-owned view preferences', () => {
     // just under the limit, is a 200 — so the refusals are bounds and not the
     // route's only answer.
     expect((await put('member', EMPTY_PREFERENCES)).statusCode).toBe(200);
+  });
+
+  it('7.133 U+0000 is refused at the door because the STORE cannot hold it — the 400 is standing in front of a 500', async () => {
+    const NUL = String.fromCharCode(0);
+    const prior = await storedDoc(read.userIds.member, read.world.workspaceId);
+    const withNul = {
+      savedFilters: [{ id: 'sf1', name: `My${NUL}filter`, filterSpec: {} }],
+      listColumns: {},
+      grouping: {},
+    };
+
+    const refused = await put('member', withNul);
+    expect(refused.statusCode).toBe(400);
+    expect(refused.json()).toEqual({ error: 'invalid_preferences' });
+    expect(await storedDoc(read.userIds.member, read.world.workspaceId)).toEqual(prior);
+
+    // THE CONTROL THAT MAKES THAT A GUARD RATHER THAN A DECORATION: the exact
+    // same bytes, sent to the exact same store the route would have sent them
+    // to, are REJECTED by Postgres with SQLSTATE 22P05. So the door's 400 is
+    // standing in front of a 500 that would otherwise be reached through a
+    // value that parsed, bound and serialised correctly the whole way — the
+    // same statement `filter-spec.ts` makes for `text` and 22021, executed here
+    // for `jsonb`.
+    await expect(
+      db.pool.query('SELECT $1::jsonb AS doc', [JSON.stringify(withNul)]),
+    ).rejects.toMatchObject({ code: '22P05' });
+
+    // The same refusal in the other two slots the FilterSpec does not cover.
+    for (const body of [
+      { savedFilters: [{ id: `sf${NUL}`, name: 'ok', filterSpec: {} }], listColumns: {}, grouping: {} },
+      { savedFilters: [], listColumns: { [read.world.projectId]: [`status${NUL}`] }, grouping: {} },
+    ]) {
+      const response = await put('member', body);
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ error: 'invalid_preferences' });
+      await expect(
+        db.pool.query('SELECT $1::jsonb AS doc', [JSON.stringify(body)]),
+      ).rejects.toMatchObject({ code: '22P05' });
+    }
+
+    // THE SECOND CONTROL, and the statement of the rule's SCOPE: the bound is
+    // "what the store can hold", not a taste for tidy input. BEL and a newline
+    // in the same slots are a 200 that round-trips unchanged, and the same
+    // `SELECT $1::jsonb` accepts them.
+    const odd = `a${String.fromCharCode(7)}b\nc`;
+    const admitted = {
+      savedFilters: [{ id: 'sf1', name: odd, filterSpec: {} }],
+      listColumns: { [read.world.projectId]: [odd] },
+      grouping: {},
+    };
+    const accepted = await put('member', admitted);
+    expect(accepted.statusCode).toBe(200);
+    expect(await get('member').then((r) => r.json())).toEqual(admitted);
+    const { rows } = await db.pool.query<{ doc: unknown }>('SELECT $1::jsonb AS doc', [
+      JSON.stringify(admitted),
+    ]);
+    expect(rows[0]?.doc).toEqual(admitted);
   });
 
   it('7.131 membership is the WHOLE gate — a guest writes their own preferences like anyone else', async () => {

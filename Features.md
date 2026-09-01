@@ -525,8 +525,10 @@ table rather than taken next-free.)*
   first, which is why the test also exercises the path no parser guards (a row written as raw jsonb
   with a `__proto__` key is refused on the way OUT rather than answered). Every string slot refuses
   U+0000 through `filter-spec.ts`'s own exported guard, imported rather than respelled, because jsonb
-  raises SQLSTATE 22P05 for it in a key or a value (measured) — so the refusal is a 400 a caller can
-  read instead of a 500. An unset preference reads as `EMPTY_PREFERENCES` and the collapse is
+  raises SQLSTATE 22P05 for it in a key or a value — so the refusal is a 400 a caller can
+  read instead of a 500, and that is EXECUTED rather than asserted: each refusal stands beside the
+  same bytes sent at the same store, rejected there with 22P05, with BEL and a newline admitted and
+  round-tripped in the same case to hold the rule at "what the store can hold". An unset preference reads as `EMPTY_PREFERENCES` and the collapse is
   deliberate and typed: unlike `proj_workspace_settings`, "never saved" and "saved empty" are one
   answer, because there is nobody to attribute and no screen that could show the difference. The door
   is the shared one — 401 for no session and for a forged bearer, 400 `invalid_query` for a missing,
