@@ -599,21 +599,45 @@ describe('GET /v1/projects/:projectId/tickets — pagination and ordering', () =
       expect(memberVisible()).toContain(id);
     }
 
-    // A cursor naming a ticket this viewer may NOT see. It does not become a
-    // key to it, and it does not lift the visibility predicate for the rows
-    // after it either — the owner's answer to the same cursor is the proof
-    // that there IS something after it to be leaked.
-    const hidden = await getList('member', read.world.projectId, {
-      cursor: read.world.hiddenTaskId,
-    });
+    // A cursor naming a ticket this viewer may NOT see does not become a key to
+    // it. The cursor is chosen at runtime as the owner-visible id immediately
+    // BELOW the hidden one, so the hidden ticket is the very next row of the
+    // owner's walk — which is what makes the member's answer a refusal rather
+    // than an empty tail. `newUlid()` is NOT monotonic within a millisecond, so
+    // the seed's mint order is not its id order and this has to be computed
+    // from the ids rather than assumed from the order they were written.
+    const ownerVisible = [
+      read.world.epicId,
+      read.world.taskInEpicId,
+      read.world.sharedTaskId,
+      read.world.hiddenTaskId,
+      read.world.guestTaskId,
+    ].sort();
+    const justBelowHidden =
+      ownerVisible.filter((id) => id < read.world.hiddenTaskId).pop() ?? '0';
+
+    // The positive control: for the owner, the next row after this cursor IS
+    // the hidden ticket, so there is demonstrably something there to leak.
+    const ownerNext = await idsOf('owner', read.world.projectId, { cursor: justBelowHidden });
+    expect(ownerNext[0]).toBe(read.world.hiddenTaskId);
+
+    const hidden = await getList('member', read.world.projectId, { cursor: justBelowHidden });
     expect(hidden.statusCode).toBe(200);
     expect(hidden.body).not.toContain(read.world.hiddenTaskId);
     expect(hidden.body).not.toContain('Salary review');
     expect(ids(hidden.json() as ListResponse)).toEqual(
-      memberVisible().filter((id) => id > read.world.hiddenTaskId),
+      memberVisible().filter((id) => id > justBelowHidden),
     );
-    expect(await idsOf('owner', read.world.projectId, { cursor: read.world.hiddenTaskId })).toEqual(
-      [read.world.guestTaskId].filter((id) => id > read.world.hiddenTaskId),
+
+    // …and handing back the invisible id ITSELF as the cursor is the same
+    // narrowing conjunct, not a key to the row it names.
+    const asCursor = await getList('member', read.world.projectId, {
+      cursor: read.world.hiddenTaskId,
+    });
+    expect(asCursor.statusCode).toBe(200);
+    expect(asCursor.body).not.toContain(read.world.hiddenTaskId);
+    expect(ids(asCursor.json() as ListResponse)).toEqual(
+      memberVisible().filter((id) => id > read.world.hiddenTaskId),
     );
 
     // A hostile cursor is a bound parameter like every other value: no 500, no
