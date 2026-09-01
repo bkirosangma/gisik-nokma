@@ -14,13 +14,13 @@ decision boundary.
 
 | what | value |
 |---|---|
-| `main` | `6cb631d` **as of 13:0x IST 1 Sep — goes stale by design.** Two merges landed back to back: #57 (Plan 4 T8–T14) as `dd7bfcf`, then Chain B as `6cb631d` via **#59, not #58** — see the stacked-PR entry below |
+| `main` | `00cb2e0` **as of 19:30 IST 1 Sep — goes stale by design.** (#60, this file's own previous update, merged on top of `6cb631d`.) Two merges landed back to back: #57 (Plan 4 T8–T14) as `dd7bfcf`, then Chain B as `6cb631d` via **#59, not #58** — see the stacked-PR entry below |
 | last forced gate | **`6cb631d`** — `GATE_EXIT=0` **read from `$?` on the next line, not inferred**, 21/21 tasks, 0 cached, **1277 tests**, 19.25s, node **v22.22.2**, `INSTALL_EXIT=0`, `REBUILD_EXIT=0`. **Zero `Unsupported engine` WARNs in either `gate.log` or `install.log`** — the operational Node check below was run and passed |
 | gate composition | domain **295** · rule-engine 280 · server **461** · app-core 130 · editor 72 · ui 31 · sync-client 8 = **1277** |
 | **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
-| open PRs | **none.** #57 merged, #58 CLOSED in favour of #59, #59 merged. Re-measure; do not wait for the monitor |
-| task ledger | re-run `pnpm check:tasks` at this sha — the figure carried from `1003d8d` (13 done · 33 claimed · 4 in-flight · 127 todo of 177) predates both merges and **is now certainly wrong** |
-| executor | `gisik-nokma-exec-b7`, tmux `gisik:1`, worktree `gisik-nokma-exec`, branch `exec/05-api-realtime`, **context 84% — restart pending** |
+| open PRs | **none.** #57, #59 and #60 merged; #58 CLOSED in favour of #59. Re-measure; do not wait for the monitor |
+| task ledger | **26 done · 33 claimed · 0 in-flight · 118 todo** of 177 (`pnpm check:tasks`), evidenced per task, not per PR title — see the ledger section. Re-run it at your own sha; step 9 will move it again |
+| executor | **RESTARTED 19:30 IST, fresh session**, tmux `gisik:1`, worktree `gisik-nokma-exec`, branch `exec/05-api-realtime` at `95004e1`, context **85% → 7%**. Mid **step 9 (Plan 5)**: batch A done (T1, T2, T2 fix round), **next is Plan 5 Task 3, plan line 628** |
 
 **The gate composition independently confirms the executor's report.** It measured 1277 / server 461 /
 domain 295 at Chain B's HEAD; the same numbers came back at `main` after the rebase. Two measurements of
@@ -39,6 +39,41 @@ of that is true any more.** Execution is **serial**, there is **one executor**, 
 work** — it never merges its own. The brief is not being rewritten because this file is the restart
 surface and correcting it here is cheaper than keeping two documents true. **Where the brief and this
 file disagree, this file wins.**
+
+## Restarting the executor MID-STEP — main's handoff is not current, and the override is what bridges it
+
+Done 2026-09-01 at 19:30 IST, at the owner's direction, because the executor hit 85% context in the
+middle of step 9 rather than at a step boundary. **The documented trigger — restart after merging its
+step PR — could not fire, because there was no step PR: Plan 5 is 17 tasks and only batch A was done.**
+
+**The precondition "handoff current on `main`" CANNOT be met mid-step, and pretending otherwise loses
+the work.** `main`'s `executor-state.md` stopped at step 8. Plan 5's three commits and the whole
+step-9 seam existed only on `exec/05-api-realtime`, which **did not exist on `origin` at all** until
+the executor was told to push it — `git ls-remote origin refs/heads/exec/05-api-realtime` returned
+empty. A relaunch before that push would have destroyed step 9 outright, and the fresh session would
+have read `main`, concluded nothing was in flight, and been confidently wrong.
+
+**The sequence that works, mid-step:**
+1. **Tell the executor it is being restarted and to flush a handoff FIRST** — covering which tasks
+   landed, which branch carries them, and exactly where the seam is. Then stop. No PR, no merge.
+2. **Poll `git ls-remote origin refs/heads/<branch>` for the push, not the executor's TUI.** A remote
+   ref appearing is a fact; a pane saying "pushed" is a claim.
+3. **Read the handoff yourself before killing anything** — confirm it covers the seam, not merely that
+   a push happened. This one named three commits, four files with line counts, the next task *by plan
+   line number*, and the floor-list tasks. That is the bar.
+4. **Relaunch with an OVERRIDE appended after the brief**, naming the branch and sha and stating that
+   `main` is NOT current. Put the position in it — tasks done, next task, plan line — so the fresh
+   session can *check* the handoff rather than take it on faith. Launch from a script via
+   `tmux new-window -d -t gisik:1 -n exec -c <worktree> <script>`; do not try to type a multi-line
+   prompt through `send-keys`.
+5. **Name the CURRENT `main` sha in the override, and expect to be caught if you do not.** This
+   override said `6cb631d`; #60 merged in the interval and the fresh executor's first line was
+   *"main has moved: origin/main is 00cb2e0, not 6cb631d as the override states."* Harmless here, and a
+   good sign about the session — but it is a stale sha in a live instruction, which is the exact defect
+   this file opens by warning about.
+
+**Result: context 85% → 7%, on branch, mid-step, nothing lost.** Cost of the whole manoeuvre was one
+handoff commit.
 
 ## How a controller reaches the executor — `SendMessage` does NOT work, tmux does
 
