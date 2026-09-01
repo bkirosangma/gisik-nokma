@@ -4878,3 +4878,308 @@ exactly the two hand-build sites the ruling predicted, both in tests.
 **The deferral licence was not needed — but it was still the right thing to grant**, and the reasoning
 stands for the next closer of this kind: a brand covering some construction sites and not others *looks*
 enforced, which is worse than an honestly unenforced convention.
+
+---
+
+## The sweep for an externally-assigned obligation must DISCRIMINATE, not just confirm (2026-08-31)
+
+Step 6 established that **lifting a task changes when it runs, not what its text says**, and that any
+obligation assigned to a task from outside must be carried by the dispatch. Applied to Plan 4 Tasks
+8–14, the sweep produced three results and **the discriminating one is worth more than the confirming
+ones**:
+
+| task | range | terms swept | result | control |
+|---|---|---|---|---|
+| **T8** | 3292–3635 | `branded`, `opaque`, `EffectiveRole`, `exhaustive` | **all 0 — BLIND** | `404`=12, `proj_tickets`=4 |
+| **T13** | 5008–5244 | `already exists`, `half-founded`, `repair` | **all 0 — BLIND** | `workspace.created`=4 |
+| **T9** | 3635–4039 | `guest`, `visibility.set`, `project-admin`, `creatorship` | **all present — SIGHTED** | `permission.role`=9 |
+
+**The rule this yields:**
+
+> **A BLIND task needs the obligation carried in the dispatch. A SIGHTED one needs only the urgency
+> explained.**
+
+Without that distinction the sweep degenerates into pasting every standing ruling into every dispatch —
+which **buries the two that genuinely are not in the text** among a dozen that are. The sweep's value is
+in the zeros, and a zero is only legible beside a control.
+
+*(Two sessions ran this sweep independently and got different counts for `guest` — 22 vs 30 — because one
+counted matching LINES and the other matching OCCURRENCES. Immaterial here, and worth noting anyway: two
+correct answers to two different questions, which is the `@{u}` family again. The discrimination held
+under both.)*
+
+### The correction this produced to Ruling P19's own framing
+
+P19 was being read — by both sessions — as *"Task 9 must remember to write these checks."* **That was
+never the risk.** The sweep shows the checks are natively in T9's text; P19 was *derived from* T9's own
+check list. The actual hazard was that **Task 5's absence list declared the category "role" CLOSED**,
+which would have told T9's implementer there was nothing left to do.
+
+**That list was corrected in step 4, so P19 is HANDLED, not merely ASSIGNED.** Those are different
+states, and a later reader seeing "P19, owner T9" would otherwise re-derive the wrong worry and go
+looking for missing checks that are present.
+
+**Generalisation: when a ruling names an owner, say whether the owner still has WORK or only has a
+DEPENDENCY that has since been satisfied.** An owner line is not a status.
+
+---
+
+## A half-applied opaque type is worse than the convention it replaces (2026-08-31)
+
+Recorded when Ruling P22's closer — branding `EffectiveRole` so only `resolveEffectiveRole` can produce
+one — was dispatched to Plan 4 Task 8 **with an explicit licence to defer.**
+
+**The reasoning, which generalises past this instance:** a brand that covers some construction sites and
+not others **looks enforced**. A reader seeing an opaque type reasonably stops checking provenance by
+hand — that is the entire point of the type — so a partial brand withdraws the human check while
+supplying only part of the machine one. The convention it replaced was at least honestly unenforced.
+
+**This is the same family as a vacuous test and a blind instrument: the failure is not the absence of
+protection but the FALSE APPEARANCE of it.** Each of the three passes something that looks like a check
+and answers a question nobody asked.
+
+So the dispatch said: brand it if genuinely mechanical; **if it ripples into surfaces Task 8 does not
+own, say so plainly and leave 6.64 recorded with the mechanism named.** An honest deferral is not a miss
+here, and must not be read as one.
+
+---
+
+## A right answer from an over-specific sweep, caught by re-running it in the author's vocabulary (2026-09-01)
+
+**The blind/sighted sweep for Plan 4 Task 13 returned the correct verdict on evidence that did not
+support it**, and it was caught only because the controller's own rule — *search for the fact in the
+vocabulary the OTHER author would have used, not in yours* — was applied a second time.
+
+**First pass**, using the phrasing from the catalogue entry: `"already exists"` → **0**, `repair` → 0,
+`half-founded` → 0. Verdict: T13 is blind to case 6.52. **Second pass**, in the plan author's own
+vocabulary: `duplicate` → **2**, `already` → **1**, `founding` → 12.
+
+Reading the rows rather than the counts settles it, and the distinction is the whole point:
+
+* T13's text **does** cover a **re-submitted SAME event id** — case 6.26, *"re-submitting the same
+  founding event id answers `duplicate-event-id` and bootstraps nothing a second time."*
+* Case **6.52** is a second `workspace.created` carrying a **FRESH id**, which still commits.
+
+**Those are different paths, and the difference is exactly what step 4's privilege escalation turned
+on.** A same-id duplicate has `committed === null`, so the bootstrap never re-fires; a fresh id walks a
+path the same-id guard never sees. The escalation survived 28 tests and 11 dead mutations precisely
+because its own test exercised the same-id path and was named for the property.
+
+**So the verdict "blind to 6.52" is right, and the first pass's zeros were not the reason.** Had the
+plan author happened to write "already exists", the first sweep would have returned a hit and produced
+the *wrong* verdict — sighted — on a task whose text addresses a neighbouring path and not this one.
+
+### Two rules, and the second is the sharper
+
+1. **Run the sweep twice: once in your vocabulary, once in the author's.** A single exact-phrase sweep is
+   biased toward "absent" by construction, in the same way an exact-phrase sweep across many files is
+   biased toward "unique to this file".
+2. **A hit is not the end of the sweep — READ THE ROW.** A near-miss hit is more dangerous than a zero,
+   because it reads as coverage. Here, `duplicate` × 2 would have retired the finding, and both hits are
+   about a different path than the one at issue. **The sweep's output is a place to look, not an answer.**
+
+**Consequence for T13's dispatch:** it must say explicitly that the plan covers the same-id duplicate and
+is silent on the fresh-id one — because an implementer who greps their own text, finds 6.26, and
+concludes the duplicate case is handled will ship 6.52 open, having checked.
+
+---
+
+## Pair a mutation that kills nothing with one that kills, or report neither (2026-09-01, floor-list review of Plan 4 T11)
+
+**"343/343 still green" is equally consistent with a coverage gap and with a mutation that never ran, and
+those two demand opposite responses.** One says write a test; the other says the check you were about to
+condemn is fine. The record already carries the principle; this is the first run that ships a
+**demonstration**, in one suite, in one sitting:
+
+| mutation | result | what it establishes |
+|---|---|---|
+| **M-A** — delete the `canSee` guard around `yield env` | **7 of 16 cases redden**, both arms of case 6.16 by name | the visibility filter is genuinely exercised |
+| **M-B** — `throw` in the non-guest re-grant arm | **343/343 green, TURBO_EXIT=0** | that arm is an **unexecuted path** |
+
+**M-B alone proves nothing. Beside M-A it proves everything** — the harness runs, the file is reached,
+the suite is live, so a survivor is a real gap rather than a dead instrument.
+
+> **THE RULE: a mutation that kills nothing is not evidence until a mutation that DOES kill has run
+> beside it, in the same suite, in the same run.**
+
+Same family as the stale-`dist` entry and the right-answer-on-dead-evidence entry, and this is their
+operational form: **before believing a survivor, prove the instrument can kill.**
+
+---
+
+## Two guest disclosures in this record are NOT the same class — do not file them together
+
+Both are Critical, both name a guest, and **their remedies differ completely.** A reader who groups them
+will over-scope one and under-scope the other.
+
+| | **P19 — guest admissions** | **T11 — purge disclosure** |
+|---|---|---|
+| What is wrong | **ledger rows** written by an under-gated door | a **read-path computation** over correct rows |
+| Store | append-only by trigger | derived, recomputed per request |
+| Remedy | closes the door for the FUTURE; existing rows can only be **superseded, never removed** | **complete AND retroactive the moment it lands** |
+
+**No ledger row is wrong in the T11 case.** The events are correct; the generator was deriving a purge
+list from them without a role test. Fix the derivation and every past and future sync is correct — there
+is nothing to migrate, supersede or apologise for.
+
+**The general form, which is why this distinction is worth a section:** *when triaging a disclosure, ask
+whether the wrong thing was WRITTEN or COMPUTED.* A written wrong is permanent in an append-only store
+and its blast radius is every reader forever; a computed wrong dies with the code that computed it.
+
+---
+
+## `pnpm run` DOES warn on the wrong Node — the shared record said otherwise, and it was measured wrong
+
+`docs/lanes/controller-state.md` recorded that pnpm accepts an unsupported Node *"with no refusal and not
+a single warning."* **Half true, and the false half is the load-bearing one.** Re-measured today with
+v22.22.2 as the control:
+
+| command | Node v24.11.1 | Node v22.22.2 (control) |
+|---|---|---|
+| `pnpm run` | **`WARN Unsupported engine: wanted: {"node":">=22.0.0 <23"} (current: {"node":"v24.11.1",…})`** | silent |
+| `pnpm exec` | **silent** | silent |
+
+**Every gate runs through `pnpm run`.** So the gate is NOT unguarded: **if `WARN Unsupported engine`
+appears anywhere in gate output, you are on the wrong Node and the run is not evidence.** That upgrades
+the Node gap from *"nothing enforces it"* to *"the output names it, if you read it"* — which is a
+detection, not a prevention, and still argues for the `.nvmrc` + `engine-strict` fix owned by Plan 11.
+
+**How the original error happened is the reusable part:** the earlier probe used `pnpm exec node -v`,
+observed silence, and generalised to "pnpm". **The instrument was real and its scope was narrower than
+the claim built on it** — the `@{u}` family again, right answer about the wrong subject.
+
+---
+
+## A dead branch in plan text is worse than a missing one, and transcription fidelity makes it worse still
+
+Plan 4 Task 11's text opens `if (eff.workspaceRole === null) return;` and places the
+`membership.revoked` purge branch **inside the loop below that return**. But a revocation deletes the
+workspace-scope row — **the revoked user's role IS null.** The generator returns before ever reaching the
+branch written to serve exactly those people.
+
+**Consequence had it shipped as written: every ticket on a revoked user's device stays there forever.**
+The code looks complete, reviews as complete, and is unreachable by construction.
+
+**And the more faithfully an implementer transcribes the plan, the more certainly they ship it** — which
+inverts the usual assumption that fidelity to a reviewed plan is the safe path. **State this in the PR as
+a PLAN-TEXT defect, not an implementation one**, or the next reader credits the implementer with a bug
+they in fact caught.
+
+**Also found here: five purge triggers, not three** — `visibility.set`, `ticket.reparented`, the
+inheriting subtree under either, `project.member_removed`, `membership.revoked`. The brief said three.
+**Carry the corrected count into later dispatches in WRITING**: an obligation discovered outside a task's
+text does not reach the next implementer unless it is written into that text.
+
+---
+
+## THE FAILURE CLASS A POSITIVE CONTROL CANNOT CATCH: a true answer about the wrong subject (2026-09-01)
+
+Three instances in one session, and separating them from the rest of this document is the point of the
+entry — **every other trap here is caught by asking whether the instrument works. This one is not,
+because in all three cases the instrument worked perfectly.**
+
+| instrument | what it truthfully answered | what the sentence written from it claimed |
+|---|---|---|
+| `git merge-tree --write-tree` vs a tree | **"did this conflict"** — it writes conflict markers INTO the tree | *"is this branch redundant"* — a conflicting branch can never compare equal, whatever its content |
+| `git rev-list --left-right --count @{u}...HEAD` | **"how far ahead of the upstream this branch was CREATED with"** — `-b <name> origin/main` sets that to `origin/main` | *"is my work pushed"* — it returned **`0 6` immediately after a successful push** |
+| `pnpm exec node -v` | **"does `pnpm exec` warn"** — it does not | *"does pnpm warn"* — `pnpm run` **does**, and every gate runs through `pnpm run` |
+
+**None of these is a broken tool, a stale instrument, or an eaten glob.** Each ran correctly, returned a
+true value, and was read as answering a neighbouring question.
+
+### Why this is structurally different from everything else recorded here
+
+**All three passed every falsifiability check this project applies.** Positive controls, mutation
+evidence, print-the-rows, rebuild-and-probe — **every one of those asks whether the INSTRUMENT WORKS.**
+In all three cases it did. **Not one of them asks what the instrument was POINTED AT.**
+
+So a positive control is *structurally incapable* of catching this class, which is precisely why it
+recurs. A control confirms the probe can produce a signal; it says nothing about whether the signal is
+about your subject.
+
+### The check, and it has to be a different shape
+
+> **Name the subject your instrument actually ranged over. Then reread your sentence and check it names
+> the same subject.**
+
+Not "did this run correctly" but "what, exactly, was measured". `merge-tree` ranged over a *merge*;
+`@{u}` over *whatever upstream the branch was born with*; `pnpm exec` over *`pnpm exec`*. Each sentence
+silently widened to *branch redundancy*, *pushed-ness*, *pnpm*.
+
+**Corollaries earned the same day:**
+* **Name the ref, don't trust the symbol.** `@{u}` is not a stable referent — say `origin/<branch>`, and
+  repoint the upstream so the symbol means what a copier will assume.
+* **A generalisation from one command to its family is a new claim and needs its own probe.** `exec` to
+  `run` was one word and inverted the conclusion.
+* **The instrument's own scope belongs in the sentence.** *"`pnpm exec` is silent"* would have been true
+  and harmless; *"pnpm is silent"* was neither.
+
+---
+
+## Ruling P23 (2026-09-01) — RESOLVED. Do not re-run this probe.
+
+**Disposition, stated so nothing downstream is ambiguous:**
+* The **guest-side** purge disclosure is **gated** (`!isGuest`). Closed.
+* The **member-side PER-EVENT** purge from the subtree walk is **gated too**. The under-purge residual —
+  an entity that genuinely became invisible may not be purged, leaving stale local data until a full
+  resync — is **disclosed** as a sibling of case 6.102, **owner Plan 10**.
+* The **scope-wide** itemised purge at the revocation boundary **stands, untouched.** Its blessing is
+  carried by three corroborating sources, one of which (`Features.md`) had **already shipped the rule** —
+  so the guest-side behaviour was a failure to honour an existing contract, not a fix inventing an
+  allowance. **A fix round is not the place to reopen a shipped contract.**
+* **Prior audience is NOT reconstructed** — cases 6.82/6.94's second-definition ban holds.
+
+**The probe that settled it was already in the suite.** No new experiment was run: the shipped case 6.101
+seeds a ticket in a project the viewer was **never on**, asserts `canSee(...) === false`, and then
+asserts `purge:<that id>` IS yielded. Relationship absent, therefore branch one. **Better than a fresh
+experiment, because it is already in the suite and cannot drift out of it.**
+
+### The reason the extension failed, and it is not "unconvincing"
+
+The precedent (case 6.14) is tolerable on **cardinality AND relationship**, and **relationship is the
+axis doing the work**: 6.14 is acceptable because the viewer **already holds the child**, so the id names
+something they have a relationship to. **Drop that axis and 6.14 degenerates into "small leaks are
+fine", which is not what it says.**
+
+The cardinality half was also unsound on its own terms: *"one subtree per event is smaller than the whole
+workspace at once"* compares a **per-emission** quantity against a **per-boundary** one — the
+wrong-subject class again. The per-event walk fires far more often, and **nobody measured the integral
+over a sync window.** An unmeasured integral is not an argument; it is a reading nobody took.
+
+---
+
+## An inability to tell two cases apart is a reason to take the SAFE branch, not a licence to take the unsafe one
+
+**The most valuable thing to come out of P23, and it was hiding in a test's explanatory comment beside a
+passing assertion.**
+
+Case 6.101's comment defended the disclosure like this: `canSee` asked NOW is *"true of a ticket taken
+away and equally true of one never held, and this module cannot ask the other question."* True — and
+then it reasoned **from that inability to a permission to disclose.**
+
+**The valid inference from indistinguishability always runs toward the conservative case.** Here the
+asymmetry is total and settles it without further argument: **under-purge is recoverable by a resync; a
+disclosure is not recoverable at all.** The module cannot distinguish *lost access* from *never held*, so
+it must treat both as *never held* and withhold.
+
+### The tell, written down so it is recognisable in advance rather than in hindsight
+
+> **A sentence of the form "X and Y are indistinguishable here, so we treat both as Y" — where Y is the
+> PERMISSIVE case.**
+
+The same sentence with Y as the restrictive case is sound engineering. The permissive form is a defect
+wearing the costume of a limitation, and it reads as candid — it *admits* the module cannot tell — which
+is exactly what makes it persuasive.
+
+### Where it was hiding is half the lesson
+
+**In a test's explanatory comment, beside a passing assertion.** The test pinned the wrong behaviour AND
+shipped the argument for it, so anyone reading the test as documentation propagates the defect rather
+than catching it. **A green suite is not evidence that the behaviour it pins is correct** — an
+uncomfortable sentence for a project that leans on its suite as hard as this one, and the reason the
+remedy was to **rewrite the comment**, not merely flip the assertion. A false sentence a maintainer
+reasons from is worse than a missing one.
+
+**And note the guest side had already been gated for this exact reason.** The member side inherited the
+same blind spot at a smaller radius and kept it, because the radius made the argument feel different when
+the structure was identical.
