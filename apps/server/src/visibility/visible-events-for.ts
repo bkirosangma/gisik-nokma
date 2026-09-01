@@ -178,7 +178,7 @@ export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction;
  * Do not add a `default:` to quiet a linter. That restores exactly the silent
  * fall-through this shape exists to prevent.
  */
-type AudienceClass = 'ticket' | 'roster' | 'workspace' | 'definition' | 'withheld';
+type AudienceClass = 'ticket' | 'roster' | 'workspace' | 'definition' | 'admin' | 'withheld';
 
 function audienceClassOf(kind: EntityKind): AudienceClass {
   switch (kind) {
@@ -195,16 +195,19 @@ function audienceClassOf(kind: EntityKind): AudienceClass {
     case 'ticket-type':
       return 'definition';
     case 'invite':
-      // WITHHELD FROM EVERYONE on this branch, deliberately fail-closed.
-      // `invite.sent` carries an email address — PII — and Plan 4's own
-      // reserved case 6.38 says it reaches owners and admins in sync-down and
-      // nobody else. That role split is not built here (its file,
-      // `test/sync/visible-events.test.ts`, does not exist on this branch), and
-      // shipping the event to every member in the meantime would disclose the
-      // address the case exists to protect. Sending nothing costs a replica an
-      // invite list it has no screen for yet.
-      // *Owner: Plan 4 Task 13 (invites), case 6.38.*
-      return 'withheld';
+      // Owners and admins only (Plan 4 Task 14, case 6.38). Until that task this
+      // branch returned `'withheld'` — fail-closed, because `invite.sent`
+      // carries a personal address and the role split had no implementation to
+      // defer to. It has one now.
+      //
+      // This is the FIRST event kind withheld from plain members, and the reason
+      // is narrower than "invites are sensitive": the payload contains an
+      // address somebody gave in confidence to whoever invited them, and a
+      // member has no screen that needs it and no act it enables. The smaller
+      // the audience of a PII-bearing event, the better — and the switch's
+      // default-deny shape already supported a new class, which is why adding
+      // one is three lines rather than a redesign.
+      return 'admin';
   }
 }
 
@@ -446,6 +449,21 @@ export async function* visibleEventsFor(
       }
       case 'workspace': {
         if (!isGuest) {
+          yield env;
+        }
+        break;
+      }
+      case 'admin': {
+        // `isAdmin`, NOT `!isGuest`. The two differ by exactly the plain
+        // MEMBER, who is the whole audience this class exists to exclude — so
+        // writing it the roster branch's way would ship every invited person's
+        // address to every member and every test above would still pass.
+        //
+        // Read off `eff`, which `resolveEffectiveRole` produced and which the
+        // null-role early return above has already narrowed: reaching this line
+        // means the reader holds a role in this workspace. A hand-built
+        // `EffectiveRole` cannot get here — the type is branded.
+        if (eff.workspaceRole === 'owner' || eff.workspaceRole === 'admin') {
           yield env;
         }
         break;

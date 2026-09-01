@@ -9,6 +9,9 @@ import { buildProjectionRegistry } from '../../src/projections/index.js';
 import type { ProjectionRegistry } from '../../src/projections/registry.js';
 import type { TestDatabase } from './db.js';
 
+/** The `WEB_ORIGIN` every test app mints invitation links against. */
+export const TEST_WEB_ORIGIN = 'http://localhost:3001';
+
 export type TestApp = {
   app: FastifyInstance;
   /** The OTP sender THIS app issues codes through — `signInWithPhone` reads it. */
@@ -29,6 +32,13 @@ export type TestApp = {
  * the real `buildApp`, the real auth, the real gated ingest.
  */
 export type BuildTestAppOverrides = {
+  /**
+   * Turns the app's logger ON and captures what it writes. Off by default, as
+   * every other test file expects; `invites.test.ts` uses it to OBSERVE that
+   * the invitation token is redacted out of the request log rather than
+   * inferring it from the serializer's source.
+   */
+  logStream?: NodeJS.WritableStream;
   /**
    * Replaces `buildProjectionRegistry()`. A caller that passes this owns
    * registering the real projections it still wants — the default is NOT merged
@@ -76,5 +86,19 @@ export function buildTestApp(
     evaluate: evaluateEvent,
     projections: overrides.projections ?? buildProjectionRegistry(),
   });
-  return { app: buildApp({ db: db.pool, pool: db.pool, ingest, auth }), otp, ingest };
+  const app = buildApp(
+    {
+      db: db.pool,
+      pool: db.pool,
+      ingest,
+      auth,
+      // The internal door as a named capability, exactly as `src/index.ts`
+      // passes it: `ingest` reaches the app narrowed to `ClientIngest`, so this
+      // is the only route into `ingestBatch` any handler has.
+      serverAppend: (events) => ingest.ingestBatch(events),
+      webOrigin: TEST_WEB_ORIGIN,
+    },
+    overrides.logStream === undefined ? {} : { logLevel: 'info', logStream: overrides.logStream },
+  );
+  return { app, otp, ingest };
 }

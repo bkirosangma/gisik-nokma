@@ -1,5 +1,6 @@
 import { projContested } from './contested.js';
 import { entityHeadsProjection } from './entity-heads.js';
+import { projInvites } from './proj-invites.js';
 import { membershipsProjection } from './proj-memberships.js';
 import { projProjects } from './proj-projects.js';
 import { projVisibility } from './proj-visibility.js';
@@ -15,8 +16,8 @@ import { workflowsProjection } from './workflows.js';
  * plans depend on it, so the pinned order is
  *
  *   proj_entity_heads, proj_workflows, proj_ticket_types, proj_projects,
- *   proj_tickets, proj_rollups, proj_memberships, proj_visibility,
- *   proj_contested
+ *   proj_tickets, proj_rollups, proj_memberships, proj_invites,
+ *   proj_visibility, proj_contested
  *
  * `proj_projects` is in that list by the owner decision of 2026-08-26 and was
  * MISSING from this comment until Plan 4 Task 9 registered it — coordination
@@ -49,6 +50,14 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   // below are already registered and must stay below it.
   registry.register(projProjects);
   registry.register(membershipsProjection);
+  // §8 position amended by Plan 4 Task 14: proj_invites slots directly AFTER
+  // proj_memberships. Nothing in this task's own path depends on that
+  // adjacency — the invite projection reads no other projection's table — but
+  // acceptance appends `membership.granted` and `project.member_added` in the
+  // same ingest run, and putting the invitation's own status ahead of the
+  // roster rows it causes keeps application order matching causal order for
+  // anyone reading the two tables inside one transaction.
+  registry.register(projInvites);
   registry.register(projVisibility);
   registry.register(projContested);
   return registry;

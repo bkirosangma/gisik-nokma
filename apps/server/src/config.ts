@@ -25,6 +25,18 @@ const configSchema = z.object({
    * A warning nobody reads is not a control, so it is refused instead.
    */
   BETTER_AUTH_SECRET: z.string().min(32),
+  /**
+   * Where the product's web client lives. It is the HOST OF EVERY INVITATION
+   * LINK this server mints (`routes/invites.ts`), so a wrong value produces
+   * links that go somewhere else and an absent one produces links to
+   * `undefined/invite/<token>` — with the credential already spent on a URL
+   * nobody can follow, and no way to get it back.
+   *
+   * Required with NO default, for that reason. `.env.example` has documented it
+   * since Plan 11's section was written ahead of its reader; Plan 4 Task 14 is
+   * the reader arriving, so it moves into the LIVE set there in the same change.
+   */
+  WEB_ORIGIN: z.string().url(),
 });
 
 export type AppConfig = {
@@ -34,6 +46,7 @@ export type AppConfig = {
   logLevel: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
   betterAuthUrl: string;
   betterAuthSecret: string;
+  webOrigin: string;
 };
 
 export class ConfigError extends Error {}
@@ -51,5 +64,6 @@ export function loadConfig(env: NodeJS.ProcessEnv | Record<string, string>): App
     logLevel: parsed.data.LOG_LEVEL,
     betterAuthUrl: parsed.data.BETTER_AUTH_URL,
     betterAuthSecret: parsed.data.BETTER_AUTH_SECRET,
+    webOrigin: parsed.data.WEB_ORIGIN,
   };
 }

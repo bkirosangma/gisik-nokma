@@ -38,7 +38,20 @@ async function main(): Promise<void> {
     baseUrl: config.betterAuthUrl,
     secret: config.betterAuthSecret,
   });
-  const app = buildApp({ db: pool, pool, ingest, auth }, { logLevel: config.logLevel });
+  const app = buildApp(
+    {
+      db: pool,
+      pool,
+      ingest,
+      auth,
+      // The internal door, handed over as a named capability. `ingest` above is
+      // the same object, narrowed to `ClientIngest` on the way in, so no route
+      // but the one that was given this can reach the ungated path.
+      serverAppend: (events) => ingest.ingestBatch(events),
+      webOrigin: config.webOrigin,
+    },
+    { logLevel: config.logLevel },
+  );
   await app.listen({ port: config.port, host: config.host });
 }
 

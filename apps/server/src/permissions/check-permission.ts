@@ -80,6 +80,23 @@ export const TICKET_NOT_VISIBLE_REASON = 'This ticket is not visible to you.';
 /** Task 9 check 5. Reported as `permission.role`: it is authority, not audience. */
 export const VISIBILITY_AUTHORITY_REASON =
   "Only a project admin or the ticket's creator can change who sees this ticket.";
+/**
+ * Task 14. `invite.accepted` is refused from EVERY client envelope-origin, at
+ * every role including owner.
+ *
+ * Acceptance is the moment an address-shaped claim becomes a person, and the
+ * only thing entitled to make that binding is possession of the link's token.
+ * A client-submitted `invite.accepted` names an `inviteId` and a `userId` and
+ * carries no token at all — so without this refusal an admin who reads an
+ * inviteId out of the workspace's own history could bind any pending invitation
+ * to any user, themselves included, having never seen the link. The event id and
+ * the inviteId are both in the ledger by design; only the token is not.
+ *
+ * It is a `permission.role` refusal because it is about WHO may make this claim
+ * (nobody, from a client), not about what may be seen.
+ */
+export const INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON =
+  'Acceptance is recorded by the server when the invited person opens their link.';
 /** Task 9 Step 3b. Names the project, because the id is the thing the sender got wrong. */
 export function projectUnknownReason(projectId: string): string {
   return `There is no project ${projectId} in this workspace.`;
@@ -169,6 +186,20 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
   'ticket-type.defined',
   'project.created',
   'ticket.workflow_rebound',
+  // Task 14. Inviting somebody into a workspace, and withdrawing that
+  // invitation, are membership management — the same question
+  // `membership.granted` answers, asked one step earlier about a person who has
+  // no user id yet. They are here rather than in the `membership.granted` branch
+  // below because that branch is keyed on the two membership TYPES, and an
+  // invite is filed against the invite entity; the answer is the same either
+  // way, and `ADMIN_ONLY_TYPES` is where a type-keyed answer belongs.
+  //
+  // `invite.accepted` is deliberately NOT here. It is not admin-only, it is
+  // client-refused outright — see INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON and
+  // the check below. Adding it here would make an admin's forged acceptance
+  // COMMIT, which is the exact escalation that check exists to stop.
+  'invite.sent',
+  'invite.revoked',
 ]);
 
 /**
@@ -272,12 +303,46 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
  *   product decision no plan in this series has taken, and adding a type to
  *   `ADMIN_ONLY_TYPES` on this task's own authority would be taking it.
  * - **Every non-ticket, non-workspace entity's ordinary events.** Check 1 is an
- *   entity-kind filter, so `workflow`, `ticket-type`, `project` and `membership`
- *   events get the role gate and nothing more. That is right for the types the
- *   role gate already names and unexamined for any it does not.
+ *   entity-kind filter, so `workflow`, `ticket-type`, `project`, `membership`
+ *   and now `invite` events get the role gate and nothing more. That is right
+ *   for the types the role gate already names and unexamined for any it does
+ *   not. **Task 14 narrowed this entry rather than closing it**: all three
+ *   invite types are now named by the role gate — `invite.sent` and
+ *   `invite.revoked` in `ADMIN_ONLY_TYPES`, `invite.accepted` refused from every
+ *   client door — so the sub-question "who may emit an invite event" is
+ *   answered. The entry stays open for `workflow`, `ticket-type`, `project` and
+ *   `membership`, whose ordinary events are still unexamined beyond the types
+ *   `ADMIN_ONLY_TYPES` and the two membership branches happen to name.
+ * - **An invitation's ADDRESS is unchecked, and nothing rate-limits issuance.**
+ *   Task 14 refuses a blank address and refuses `owner`, and stops there. An
+ *   admin may invite the same address a thousand times, or an address that
+ *   reaches nobody, and this gate has no opinion — every one of those is an
+ *   attributed claim by somebody who could already grant membership directly.
+ *   What makes it an absence rather than an emergency is that issuance needs
+ *   admin already; what makes it worth naming is that each issuance mints a
+ *   credential. *Owner: Plan 11, which owns rate limiting
+ *   (`RATE_LIMIT_*` in `.env.example`) and delivery.*
+ * - **Nothing checks that an invitation's promised projects still exist, or
+ *   that they belong to the inviting workspace.** `invite.sent.projectIds` is
+ *   shape-checked (ULIDs) and never resolved. `checkProjectExists` runs on
+ *   `project.member_added` — but acceptance appends those through the INTERNAL
+ *   door, where no gate runs, so a project deleted or mistyped between
+ *   invitation and acceptance lands a roster row for a project that is not
+ *   there. It is inert today for the same reason a stranger's roster row is —
+ *   `resolveEffectiveRole` yields it and `canSee` finds no tickets under it —
+ *   but it is inert by a guarantee elsewhere rather than by a refusal here.
+ *   *Owner: Plan 4 Task 14's successor, or Plan 6 at the invite-mint screen,
+ *   which is where a bad project id would be caught before it was promised.*
  * - **The read paths and sync-down.** This module is the INGEST door. Task 8
- *   enforces `canSee` on the three ticket read routes; sync-down filtering is
- *   Task 11 and is not built. A door that does not exist cannot be closed, and
+ *   enforces `canSee` on the three ticket read routes; sync-down filtering IS
+ *   built (`../visibility/visible-events-for.ts`, Task 11 — this entry said
+ *   "is not built" until Task 14 corrected it, and a stale absence is worse
+ *   than none because it sends the next reader to build a thing that exists).
+ *   Task 14 adds the invite read routes to the list of doors this module does
+ *   not guard: `GET /v1/workspaces/:workspaceId/invites` enforces owner/admin
+ *   itself, and `GET /v1/invites/:token` is deliberately session-free, because
+ *   the token IS the credential. A door that does not exist cannot be closed,
+ *   and
  *   `POST /v1/sync` (Plan 10) must call `ingestClientBatch` when it is built or
  *   offline-originated events bypass all of the above.
  * - **Project scope on membership grants, beyond existence.** Task 9 Step 3b
@@ -388,6 +453,22 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
 
   if (ADMIN_ONLY_TYPES.has(env.type) && !isWorkspaceAdmin) {
     return refuse(adminOnlyReason(role));
+  }
+  // Task 14. Refused from every client door at every role, owner included.
+  //
+  // Position is load-bearing in one direction: it must sit AFTER the membership
+  // check above, so an ADMIN reaches it. Put ahead of that check it would still
+  // refuse everyone, but the test proving it would be indistinguishable from a
+  // test proving `NOT_A_MEMBER_REASON`, and the escalation this closes is
+  // specifically an admin's — somebody who can already read the workspace's
+  // history, and therefore already knows every pending inviteId in it.
+  //
+  // There is no `isWorkspaceAdmin` here and there must not be. An owner is not
+  // more entitled to bind an invitation to a user than a guest is: the
+  // entitlement is possession of the link, which no client-submitted event can
+  // demonstrate.
+  if (env.type === 'invite.accepted') {
+    return refuse(INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON);
   }
   // Membership is workspace-scoped only now (owner decision 2026-08-27), so
   // this is one question rather than a branch on scope: managing who is IN the

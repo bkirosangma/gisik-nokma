@@ -1,10 +1,11 @@
 import Fastify from 'fastify';
-import type { FastifyError, FastifyInstance } from 'fastify';
+import type { FastifyError, FastifyInstance, FastifyRequest } from 'fastify';
 import type { Auth } from './auth/auth.js';
 import { registerAuthRoutes } from './auth/routes.js';
 import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
 import { registerEventRoutes } from './routes/events.js';
+import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
 import { registerContestsRoute } from './sync/contests-route.js';
@@ -56,11 +57,75 @@ export type AppDeps = {
    * await.
    */
   auth: Auth;
+  /**
+   * The INTERNAL, ungated append path — for invite acceptance and nothing else.
+   *
+   * A separate, differently-named field rather than a widening of `ingest` back
+   * to `IngestService`. The narrowing above exists because the dangerous door
+   * has the shorter name and a route author reaches for it by reflex; undoing it
+   * to serve one route would ungate every future route too. A named capability
+   * has to be passed deliberately, at one call site, and shows up in a diff.
+   *
+   * Acceptance genuinely needs it: every event in the acceptance sequence is
+   * refused at the client door by design (`routes/invites.ts` enumerates the
+   * three). It is FORCED, not chosen.
+   */
+  serverAppend: ServerAppend;
+  /**
+   * Where the product's web client lives (`WEB_ORIGIN`) — the host of the
+   * invitation links this server mints. Required rather than defaulted: a wrong
+   * or absent value produces links that go nowhere, and a default would produce
+   * them silently.
+   */
+  webOrigin: string;
 };
 
-export function buildApp(deps: AppDeps, options: { logLevel?: string } = {}): FastifyInstance {
+export function buildApp(
+  deps: AppDeps,
+  /**
+   * `logStream` is a real operational option (a transport, a file) and it is
+   * also the only way the token redaction above can be OBSERVED rather than
+   * inferred: without a stream to read back, a test could assert the serializer
+   * function in isolation and never learn whether it was wired in.
+   */
+  options: { logLevel?: string; logStream?: NodeJS.WritableStream } = {},
+): FastifyInstance {
   const app = Fastify({
-    logger: options.logLevel === undefined ? false : { level: options.logLevel },
+    logger:
+      options.logLevel === undefined
+        ? false
+        : {
+            level: options.logLevel,
+            ...(options.logStream === undefined ? {} : { stream: options.logStream }),
+            serializers: {
+              /**
+               * MEASURED, not assumed: Fastify's default `info` request line
+               * carries `req.url` verbatim, and `GET /v1/invites/:token` carries
+               * an invitation CREDENTIAL in that path. Without this serializer
+               * every issued link lands in the process log of any deployment
+               * running at `info` or below, and log access becomes workspace
+               * access.
+               *
+               * The route cannot be reshaped instead — it is Plan 6's pinned
+               * contract, consumed verbatim — so the log is what changes. The
+               * rest of the path survives, so the operator still sees which
+               * route was called.
+               *
+               * Everything else here reproduces Fastify's own default request
+               * serializer: dropping a field would quietly remove operational
+               * detail nobody asked to lose.
+               */
+              req(request: FastifyRequest) {
+                return {
+                  method: request.method,
+                  url: redactInviteToken(request.url),
+                  host: request.headers.host,
+                  remoteAddress: request.socket.remoteAddress,
+                  remotePort: request.socket.remotePort,
+                };
+              },
+            },
+          },
     // The events door refuses what it does not understand: silent scalar→array wrapping violated the stated non-array→400 contract.
     // Unknown keys are refused, not silently dropped: `additionalProperties: false` declares reject-intent; AJV's removeAdditional default would have silently stripped them instead.
     ajv: { customOptions: { coerceTypes: false, removeAdditional: false } },
@@ -112,6 +177,16 @@ export function buildApp(deps: AppDeps, options: { logLevel?: string } = {}): Fa
   // either, and the same preHandler by parameter, for the same reason: both
   // handlers read `request.currentUserId`.
   registerWorkspaceRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);
+  // The invitation surface (Plan 4 Task 14): issue, read a link, accept a link,
+  // list what is outstanding. It takes BOTH doors — the gated `ingest` for
+  // issuance, so the admin-only refusal fires exactly as it would on
+  // `POST /v1/events`, and the named `serverAppend` for acceptance, whose three
+  // events are all refused at the client door by design.
+  registerInviteRoutes(
+    app,
+    { pool: deps.pool, ingest: deps.ingest, serverAppend: deps.serverAppend, webOrigin: deps.webOrigin },
+    requireSession,
+  );
   registerAuthRoutes(app, deps.auth);
 
   return app;

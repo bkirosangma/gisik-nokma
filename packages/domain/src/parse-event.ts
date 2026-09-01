@@ -135,8 +135,58 @@ export function parseEvent(
     }
   }
 
+  // The same coherence question for INVITES (Plan 4 Task 14), and it is the
+  // same defect with a different entity kind: all three invite types carry an
+  // `inviteId` in the payload AND are filed against the invite entity, so an
+  // event filed at invite A whose payload names invite B parses cleanly without
+  // this. The server's entity↔workspace guard cannot catch it (both invites are
+  // in the same workspace), and the head row only exists once something has
+  // landed — so the first mis-filed `invite.revoked` commits against A while
+  // meaning B, and the projection, which keys on `payload.inviteId`, revokes B
+  // while A's stream carries the claim. Two answers to "was this invitation
+  // revoked", in an append-only ledger where neither can be taken back.
+  //
+  // Here rather than in the permission layer, deliberately: an offline replica
+  // enters at `evaluateEvent` and never reaches a permission check, and this is
+  // a question about whether the claim is well-formed at all — the same
+  // argument that put the membership half of decision 5 in this function.
+  //
+  // It reads the PARSED payload for the same reason the membership check does:
+  // reading `inviteId` off raw JSON would report an id mismatch when the real
+  // complaint is that `inviteId` is not a ULID.
+  if (entity.kind === 'invite') {
+    const inviteId = readInviteId(payload.data);
+    if (inviteId === null) {
+      return {
+        ok: false,
+        code: 'malformed-envelope',
+        message: `This invite event is filed at entity '${entity.id}' but its payload names no invite — every invite event carries the inviteId it is about.`,
+        eventId: envelope.data.id,
+      };
+    }
+    if (entity.id !== inviteId) {
+      return {
+        ok: false,
+        code: 'malformed-envelope',
+        message: `This invite event is filed at entity '${entity.id}', but it is about invite '${inviteId}' — an invite's entity id IS its inviteId. Filing it anywhere else splits one invitation into two histories.`,
+        eventId: envelope.data.id,
+      };
+    }
+  }
+
   const event: SubmittedEvent = { ...envelope.data, payload: payload.data as unknown };
   return { ok: true, event };
+}
+
+/** The `inviteId` a validated payload claims, or null when it names none. */
+function readInviteId(payload: unknown): string | null {
+  if (typeof payload === 'object' && payload !== null && 'inviteId' in payload) {
+    const inviteId = (payload as { inviteId: unknown }).inviteId;
+    if (typeof inviteId === 'string') {
+      return inviteId;
+    }
+  }
+  return null;
 }
 
 /** The `userId` a validated payload claims, or null when it names none. */

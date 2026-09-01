@@ -42,7 +42,18 @@ function offlineAuth(): ReturnType<typeof createAuth> {
 
 describe('GET /healthz', () => {
   it('answers ok when the database responds', async () => {
-    const app = buildApp({ db: healthyDb, pool: offlinePool, ingest: fakeIngest(), auth: offlineAuth() });
+    const app = buildApp({
+      db: healthyDb,
+      pool: offlinePool,
+      ingest: fakeIngest(),
+      auth: offlineAuth(),
+      // Plan 4 Task 14. Both fields are REQUIRED on `AppDeps`, so every
+      // hand-assembled app in the suite had to name them — which is the
+      // narrowing working: a route that needs the internal append door gets it
+      // by being handed one, never by reaching for it.
+      serverAppend: async () => [],
+      webOrigin: 'http://localhost:3001',
+    });
     const response = await app.inject({ method: 'GET', url: '/healthz' });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: 'ok' });
@@ -50,7 +61,14 @@ describe('GET /healthz', () => {
   });
 
   it('planted defect: answers 503 unavailable when the database is down — never a fake ok', async () => {
-    const app = buildApp({ db: brokenDb, pool: offlinePool, ingest: fakeIngest(), auth: offlineAuth() });
+    const app = buildApp({
+      db: brokenDb,
+      pool: offlinePool,
+      ingest: fakeIngest(),
+      auth: offlineAuth(),
+      serverAppend: async () => [],
+      webOrigin: 'http://localhost:3001',
+    });
     const response = await app.inject({ method: 'GET', url: '/healthz' });
     expect(response.statusCode).toBe(503);
     expect(response.json()).toEqual({ status: 'unavailable' });

@@ -45,7 +45,14 @@ function buildServer() {
     evaluate: evaluateEvent,
     projections: buildProjectionRegistry(),
   });
-  return { server: buildApp({ db: db.pool, pool: db.pool, ingest, auth }), otp };
+  return { server: buildApp({
+    db: db.pool,
+    pool: db.pool,
+    ingest,
+    auth,
+    serverAppend: (events) => ingest.ingestBatch(events),
+    webOrigin: 'http://localhost:3001',
+  }), otp };
 }
 
 function app() {
@@ -239,11 +246,14 @@ describe('POST /v1/events', () => {
       baseUrl: 'http://localhost:3000',
       secret: 'test-secret-not-used-anywhere-real',
     });
+    const brokenIngest = createIngestService({ pool: db.pool, evaluate: evaluateEvent, projections });
     const server = buildApp({
       db: db.pool,
       pool: db.pool,
-      ingest: createIngestService({ pool: db.pool, evaluate: evaluateEvent, projections }),
+      ingest: brokenIngest,
       auth,
+      serverAppend: (events) => brokenIngest.ingestBatch(events),
+      webOrigin: 'http://localhost:3001',
     });
     // Signed in, because the door now refuses an anonymous caller at 401 and a
     // 401 would satisfy nothing this test asserts — it is about what the door
