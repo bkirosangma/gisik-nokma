@@ -179,8 +179,20 @@ export function createStreamHub(deps: StreamHubDeps): StreamHub {
     socket.close(code, reason);
   }
 
+  /**
+   * There is deliberately NO `if (sub.ended) return` here, and its absence is
+   * load-bearing rather than an oversight.
+   *
+   * The hub once carried FOUR `sub.ended` guards — this one, the drain's, the
+   * caught-up condition's, and the pump loop's — and mutation testing killed
+   * none of them: each masked the others, so removing any one changed no
+   * observable behaviour. A guard no test can reach is not defence in depth, it
+   * is unmeasured code that a later reader trusts. Exactly two remain, on the
+   * two paths that can actually send after a socket has gone — the drain's next
+   * iteration, and the caught-up that would follow it — and each of those two
+   * is killed on its own by the mid-drain disconnect case in `hub.test.ts`.
+   */
   function send(sub: Subscription, frame: ServerStreamFrame): void {
-    if (sub.ended) return;
     if (sub.socket.bufferedAmount > maxBuffered) {
       closeSocket(sub.socket, STREAM_CLOSE_CODES.slowConsumer, 'slow-consumer');
       return;
@@ -244,7 +256,7 @@ export function createStreamHub(deps: StreamHubDeps): StreamHub {
           // this reader; see the residual recorded in the test file.
           send(sub, { type: 'caught-up', workspaceId: sub.workspaceId, seq: sub.cursor });
         }
-      } while (sub.dirty && !sub.ended);
+      } while (sub.dirty);
     } catch (error) {
       deps.onError?.(error);
       closeSocket(sub.socket, STREAM_CLOSE_CODES.internalError, 'stream-error');

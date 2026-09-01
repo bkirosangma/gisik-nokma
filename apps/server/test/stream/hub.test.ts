@@ -90,11 +90,30 @@ type ScriptedItem = LedgerEvent | ScriptedInstruction;
 
 type Script = {
   ledger: ScriptedItem[];
+  /** Every `(userId, workspaceId, afterSeq)` the hub asked for, in order. */
+  drains?: Array<{ userId: string; workspaceId: string; afterSeq: number }>;
   /** Per-user visibility: a user absent from the map sees everything. */
   hiddenFrom?: Map<string, ReadonlySet<string>>;
   /** Fires once, in the middle of the first drain — a commit landing mid-catch-up. */
   midDrain?: () => void;
+  /**
+   * Suspends the drain after `afterItems` items and resolves `reached`, so a
+   * test can act while a drain is genuinely in flight. Without a real
+   * suspension point the scripted filter drains to completion in one turn and
+   * "a subscription that ends mid-drain stops sending" has no way to be false.
+   */
+  pause?: { afterItems: number; reached: Deferred; release: Deferred };
 };
+
+type Deferred = { promise: Promise<void>; resolve: () => void };
+
+function deferred(): Deferred {
+  let resolve!: () => void;
+  const promise = new Promise<void>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
 
 /**
  * A `visibleEventsFor` stand-in over a mutable ledger: yields items past
@@ -109,6 +128,7 @@ function scriptedVisibleEvents(script: Script): VisibleEventsFn {
     workspaceId: string,
     afterSeq: number,
   ): AsyncGenerator<SyncItem> {
+    script.drains?.push({ userId, workspaceId, afterSeq });
     const hidden = script.hiddenFrom?.get(userId) ?? new Set<string>();
     let yielded = 0;
     for (const item of [...script.ledger]) {
@@ -128,6 +148,10 @@ function scriptedVisibleEvents(script: Script): VisibleEventsFn {
         continue;
       }
       yielded += 1;
+      if (script.pause !== undefined && yielded === script.pause.afterItems) {
+        script.pause.reached.resolve();
+        await script.pause.release.promise;
+      }
       if (yielded === 1 && !midDrainFired && script.midDrain !== undefined) {
         midDrainFired = true;
         script.midDrain();
@@ -240,6 +264,40 @@ describe('stream hub — live tail', () => {
     expect(socket.frames).toHaveLength(3);
   });
 
+  it('a commit in another workspace does not even DRAIN this subscription', async () => {
+    // The frames-based version of this claim is not enough on its own: a hub
+    // that woke every subscription on every commit would still send nothing,
+    // because `visibleEventsFor`'s own `workspace_id = $1` answers empty for a
+    // cursor that is already current. So the assertion has to be about WORK,
+    // not about output — one wasteful ledger re-scan per subscriber per commit,
+    // across every workspace the process holds, is the defect that hides behind
+    // a green frame count. Measured as a survivor first, then fixtured.
+    const drains: Array<{ userId: string; workspaceId: string; afterSeq: number }> = [];
+    const t1 = newUlid();
+    const { hub, commit, ledger } = hubWith({ ledger: [event(WS_A, t1, 11)], drains });
+    const socket = fakeSocket();
+    await hub.subscribe(USER, socket, WS_A, 0);
+    expect(drains).toEqual([{ userId: USER, workspaceId: WS_A, afterSeq: 0 }]);
+
+    const foreign = event(WS_B, newUlid(), 12);
+    ledger.push(foreign);
+    commit(foreign);
+    await hub.settled();
+    expect(drains).toHaveLength(1);
+
+    // The positive control, over the same subscription: a commit that DOES name
+    // this workspace drains it, so the silence above is the index answering
+    // rather than a commit feed that was never connected.
+    const mine = event(WS_A, t1, 12);
+    ledger.push(mine);
+    commit(mine);
+    await hub.settled();
+    expect(drains).toEqual([
+      { userId: USER, workspaceId: WS_A, afterSeq: 0 },
+      { userId: USER, workspaceId: WS_A, afterSeq: 11 },
+    ]);
+  });
+
   it('filters every drain for the subscription\'s OWN user', async () => {
     const shared = newUlid();
     const secret = newUlid();
@@ -329,6 +387,49 @@ describe('stream hub — live tail', () => {
     expect(await hub.subscribe(USER, socket, WS_A, 0)).toBe('already-subscribed');
     // Refused means REFUSED: no second catch-up ran for WS_A.
     expect(socket.frames.filter((f) => f.type === 'caught-up')).toHaveLength(2);
+  });
+});
+
+describe('stream hub — a subscriber that goes away mid-drain', () => {
+  it('stops sending the moment the socket is dropped, caught-up included', async () => {
+    // Resource lifecycle, and the case no test fails on by accident: a drain is
+    // an `await` over a database, and the peer can vanish inside it. Four
+    // separate `sub.ended` guards existed before this case and ALL FOUR
+    // survived mutation, because the scripted filter drained to completion in a
+    // single turn and the socket could never leave mid-flight. Measured as
+    // survivors first, then fixtured — the suspension point is what makes the
+    // claim falsifiable at all.
+    const t1 = newUlid();
+    const ledger: ScriptedItem[] = [event(WS_A, t1, 11), event(WS_A, t1, 12), event(WS_A, t1, 13)];
+    const paused = { afterItems: 1, reached: deferred(), release: deferred() };
+    const { hub } = hubWith({ ledger, pause: paused });
+    const socket = fakeSocket();
+
+    const subscribing = hub.subscribe(USER, socket, WS_A, 0);
+    await paused.reached.promise;
+    expect(types(socket)).toEqual(['event']);
+
+    hub.dropSocket(socket);
+    paused.release.resolve();
+    await subscribing;
+    await hub.settled();
+
+    // Neither the two remaining events nor the caught-up that would otherwise
+    // have followed them.
+    expect(types(socket)).toEqual(['event']);
+    expect(hub.stats()).toEqual({ sockets: 0, subscriptions: 0, workspaces: 0 });
+
+    // The positive control: the SAME script, undropped, delivers all three and
+    // catches up. Without it, a hub that sent one frame and stopped would pass
+    // everything above.
+    const open = { afterItems: 1, reached: deferred(), release: deferred() };
+    const second = hubWith({ ledger: [...ledger], pause: open });
+    const alive = fakeSocket();
+    const stillSubscribing = second.hub.subscribe(USER, alive, WS_A, 0);
+    await open.reached.promise;
+    open.release.resolve();
+    await stillSubscribing;
+    expect(types(alive)).toEqual(['event', 'event', 'event', 'caught-up']);
   });
 });
 
