@@ -12,6 +12,7 @@ import {
 } from '@gisik-nokma/domain';
 import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
 import { READ_NOT_FOUND_BODY } from '../../src/read/membership.js';
+import { INVALID_VERSION_BODY } from '../../src/routes/builder-reads.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
@@ -98,6 +99,12 @@ async function okJson<T>(role: ReadRole, path: string, workspaceId?: string): Pr
  * `content-length` above all must match: a length that differed would itself be
  * the oracle even if both bodies parsed equal. (`board.test.ts`'s precedent.)
  */
+/** How many events the ledger holds — the oracle for "nothing was appended". */
+async function ledgerRows(): Promise<number> {
+  const { rows } = await db.pool.query<{ n: number }>('SELECT count(*)::int AS n FROM events');
+  return rows[0]?.n ?? 0;
+}
+
 function comparableHeaders(response: InjectResponse): Record<string, unknown> {
   const { date: _date, ...rest } = response.headers;
   return rest;
@@ -181,7 +188,7 @@ describe('GET /v1/workspaces/:workspaceId/workflows/:workflowId', () => {
     for (const bad of ['one', '0', '-1', '1.5', '', ' ']) {
       const response = await get('member', `/workflows/wf-errands?version=${encodeURIComponent(bad)}`);
       expect([bad, response.statusCode]).toEqual([bad, 400]);
-      expect(response.json()).toEqual({ error: 'invalid_version' });
+      expect(response.json()).toEqual(INVALID_VERSION_BODY);
     }
     // A version that was never published is a 404 and not an empty body.
     expect((await get('member', '/workflows/wf-errands?version=7')).statusCode).toBe(404);
@@ -230,7 +237,7 @@ describe('GET /v1/workspaces/:workspaceId/workflows/:workflowId', () => {
     // never validates the version at all.
     const member = await get('member', '/workflows/wf-errands?version=one');
     expect(member.statusCode).toBe(400);
-    expect(member.json()).toEqual({ error: 'invalid_version' });
+    expect(member.json()).toEqual(INVALID_VERSION_BODY);
   });
 });
 
@@ -503,11 +510,6 @@ describe('POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', () => 
     });
   }
 
-  async function ledgerSize(): Promise<number> {
-    const { rows } = await db.pool.query<{ n: number }>('SELECT count(*)::int AS n FROM events');
-    return rows[0]?.n ?? 0;
-  }
-
   async function populationOf(typeId: string, workflowId: string): Promise<number> {
     const body = await okJson<TypePopulationResponse>(
       'owner',
@@ -521,7 +523,7 @@ describe('POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', () => 
     // accepted — so nothing but the caller distinguishes the refusals below
     // from the acceptance beneath them.
     const request = { fromWorkflowId: 'wf-second', toWorkflowId: 'wf-errands', stateMap: { todo: 'todo' } };
-    const before = await ledgerSize();
+    const before = await ledgerRows();
 
     const refusals: InjectResponse[] = [];
     for (const role of ['member', 'guest', 'outsider', 'stranger', 'neighbour'] as const) {
@@ -538,7 +540,7 @@ describe('POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', () => 
     // member too (`ADMIN_ONLY_TYPES`), so the caller would still see an error
     // while five envelopes had been constructed and one refusal per ticket
     // returned. The ledger is what tells those two apart.
-    expect(await ledgerSize()).toBe(before);
+    expect(await ledgerRows()).toBe(before);
 
     // POSITIVE CONTROL, in the same test, and the reason the zero above is not
     // free: the identical body from the owner COMMITS, and the ledger moves by
@@ -546,13 +548,13 @@ describe('POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', () => 
     const accepted = await migrate('owner', 'chore', request);
     expect(accepted.statusCode).toBe(200);
     expect(accepted.json()).toEqual({ status: 'migrated', count: 1 });
-    expect(await ledgerSize()).toBe(before + 1);
+    expect(await ledgerRows()).toBe(before + 1);
     expect(await populationOf('chore', 'wf-errands')).toBe(1);
     expect(await populationOf('chore', 'wf-second')).toBe(0);
   });
 
   it('7.86 a migration may not name a workflow or a type from the tenancy next door', async () => {
-    const before = await ledgerSize();
+    const before = await ledgerRows();
     const complete = { fromWorkflowId: 'wf-errands', toWorkflowId: 'wf-second', stateMap: { todo: 'todo', doing: 'waiting', waiting: 'waiting' } };
 
     // The neighbour's workflow as the DESTINATION — the direction that matters
@@ -562,7 +564,7 @@ describe('POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', () => 
     // As the SOURCE, and as the TYPE.
     expect((await migrate('owner', 'task', { ...complete, fromWorkflowId: read.neighbour.workflowId })).statusCode).toBe(404);
     expect((await migrate('owner', 'nb-task', complete)).statusCode).toBe(404);
-    expect(await ledgerSize()).toBe(before);
+    expect(await ledgerRows()).toBe(before);
 
     // POSITIVE CONTROL: the same route, same caller, ids that ARE in this
     // workspace — it reaches the domain logic and refuses there instead, so the
@@ -574,7 +576,7 @@ describe('POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', () => 
   });
 
   it('7.45 refuses up front and appends nothing: an unmapped occupied state, the same workflow twice, a target state the destination has no such state', async () => {
-    const before = await ledgerSize();
+    const before = await ledgerRows();
     const populationBefore = await populationOf('task', 'wf-errands');
     // A NON-ZERO positive control for the "nothing appended" assertions: there
     // really are tickets on the table, so a refusal that appended nothing is a
@@ -624,12 +626,12 @@ describe('POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', () => 
     expect((await migrate('owner', 'task', { fromWorkflowId: 'wf-errands', toWorkflowId: 'wf-second', stateMap: { todo: 7 } })).statusCode).toBe(400);
     expect((await migrate('owner', 'task', { fromWorkflowId: 'wf-errands', toWorkflowId: 'wf-second', stateMap: {}, extra: 1 })).statusCode).toBe(400);
 
-    expect(await ledgerSize()).toBe(before);
+    expect(await ledgerRows()).toBe(before);
     expect(await populationOf('task', 'wf-errands')).toBe(populationBefore);
   });
 
   it('7.45 a complete map lands one ticket.workflow_rebound per ticket through ordinary ingest, and the count answered equals the events appended', async () => {
-    const before = await ledgerSize();
+    const before = await ledgerRows();
     const fromBefore = await populationOf('task', 'wf-errands');
     const toBefore = await populationOf('task', 'wf-second');
     expect([fromBefore, toBefore]).toEqual([5, 0]);
@@ -648,7 +650,7 @@ describe('POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', () => 
     // that many events, and every one of them is the type this route claims to
     // submit — through the ORDINARY ingest path, which is where the honesty
     // already lives.
-    expect(await ledgerSize()).toBe(before + 5);
+    expect(await ledgerRows()).toBe(before + 5);
     const { rows } = await db.pool.query<{ type: string; n: number }>(
       `SELECT type, count(*)::int AS n FROM events
         WHERE workspace_id = $1 AND type = 'ticket.workflow_rebound'
@@ -740,5 +742,135 @@ describe('GET /v1/workspaces/:workspaceId/members — the roster after a revocat
     // answering rather than this query — included because a roster that still
     // listed them would be the same defect seen from the other side.
     expect((await get('member', '/members')).statusCode).toBe(404);
+  });
+});
+
+describe('POST …/migrate — a state id that is also a property of Object.prototype', () => {
+  /**
+   * LAST, and it seeds a workflow of its own: a state whose id is `toString`.
+   *
+   * `workflowStateSchema` declares `id: z.string().min(1)` and nothing more, so
+   * this is a state an admin can define through the shipped builder, and a
+   * ticket can sit in it. The `stateMap` arrives as a plain JSON object, and
+   * `stateMap['toString']` is `Object.prototype.toString` — a function, not
+   * `undefined`. A coverage check written as `stateMap[stateId] === undefined`
+   * therefore reads that state as MAPPED, and the one guarantee this route
+   * makes about refusals ("nothing is appended") is walked straight past: the
+   * batch is built, the tickets whose states were genuinely mapped COMMIT, and
+   * the one carrying a function as its `toStateId` is refused by zod at ingest —
+   * a partial migration, which is two populations nobody chose.
+   *
+   * Two tickets, deliberately: with one the damage is invisible, because the
+   * single event is refused and the ledger is unchanged either way. The second
+   * ticket is what turns a wrong rule name into a half-migrated type.
+   */
+  it('7.88 an occupied state named after an Object.prototype member is UNMAPPED, and the batch is refused with nothing appended', async () => {
+    const workflowId = 'wf-proto';
+    const typeId = 'proto';
+    const mappedTicketId = newUlid();
+    const prototypeTicketId = newUlid();
+    const { rows: seqRows } = await db.pool.query<{ ws_seq: number | null }>(
+      'SELECT max(workspace_seq) AS ws_seq FROM events WHERE workspace_id = $1',
+      [read.world.workspaceId],
+    );
+    let workspaceSeq = (seqRows[0]?.ws_seq ?? 0) + 1;
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.userIds.owner };
+    const next = (): number => workspaceSeq++;
+
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'workflow', id: workflowId },
+        type: 'workflow.defined',
+        workspaceSeq: next(),
+        payload: {
+          id: workflowId,
+          version: 1,
+          name: 'Prototype pollution flow',
+          initialStateId: 'ok',
+          states: [
+            { id: 'ok', name: 'Fine', category: 'open' },
+            // The whole point. Also a legal state id today.
+            { id: 'toString', name: 'Inherited', category: 'open' },
+            { id: 'done', name: 'Done', category: 'terminal' },
+          ],
+          transitions: [
+            { from: '*', to: 'ok', rules: [] },
+            { from: '*', to: 'toString', rules: [] },
+            { from: '*', to: 'done', rules: [] },
+          ],
+        },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket-type', id: typeId },
+        type: 'ticket-type.defined',
+        workspaceSeq: next(),
+        payload: { id: typeId, name: 'Proto', icon: 'ghost', rank: 5, workflowId, fields: [] },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: mappedTicketId },
+        type: 'ticket.created',
+        workspaceSeq: next(),
+        payload: { typeId, projectId: read.world.projectId, parentId: null, title: 'Stays in a real state' },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: prototypeTicketId },
+        type: 'ticket.created',
+        workspaceSeq: next(),
+        payload: { typeId, projectId: read.world.projectId, parentId: null, title: 'Parked in toString' },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: prototypeTicketId },
+        type: 'ticket.transitioned',
+        workspaceSeq: next(),
+        payload: { to: 'toString' },
+      }),
+    ]);
+
+    // The world is as described: one ticket in `ok`, one in `toString`.
+    const occupancy = await okJson<StateOccupancyResponse>('owner', `/workflows/${workflowId}/state-occupancy`);
+    expect(occupancy.counts).toEqual({ ok: 1, toString: 1, done: 0 });
+
+    const before = await ledgerRows();
+    const response = await read.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${read.world.workspaceId}/ticket-types/${typeId}/migrate`,
+      headers: read.authOf('owner'),
+      // `ok` is genuinely mapped. `toString` is NOT in this object — it is only
+      // reachable through the prototype chain.
+      payload: { fromWorkflowId: workflowId, toWorkflowId: 'wf-errands', stateMap: { ok: 'todo' } },
+    });
+
+    expect(response.statusCode).toBe(422);
+    const body = response.json() as { status: string; rule: string; reason: string };
+    expect(body.status).toBe('refused');
+    expect(body.rule).toBe('migration.unmapped-state');
+    expect(body.reason).toContain('toString');
+    // NOTHING APPENDED — and this is the assertion that fails on a route using
+    // `stateMap[stateId] === undefined`, because the genuinely-mapped ticket
+    // commits before its neighbour is refused.
+    expect(await ledgerRows()).toBe(before);
+    const { rows } = await db.pool.query<{ ticket_id: string; workflow_id: string }>(
+      'SELECT ticket_id, workflow_id FROM proj_tickets WHERE ticket_id = ANY ($1::text[]) ORDER BY ticket_id',
+      [[mappedTicketId, prototypeTicketId].sort()],
+    );
+    expect(rows.map((row) => row.workflow_id)).toEqual([workflowId, workflowId]);
+
+    // POSITIVE CONTROL: name the state honestly and the same batch commits, so
+    // the refusal above is the coverage check answering and not a route that
+    // refuses everything with an unusual state id in it.
+    const accepted = await read.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${read.world.workspaceId}/ticket-types/${typeId}/migrate`,
+      headers: read.authOf('owner'),
+      payload: { fromWorkflowId: workflowId, toWorkflowId: 'wf-errands', stateMap: { ok: 'todo', toString: 'doing' } },
+    });
+    expect(accepted.statusCode).toBe(200);
+    expect(accepted.json()).toEqual({ status: 'migrated', count: 2 });
+    expect(await ledgerRows()).toBe(before + 2);
   });
 });

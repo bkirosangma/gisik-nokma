@@ -109,6 +109,20 @@ export const INVALID_VERSION_BODY = { error: 'invalid_version' } as const;
  */
 export const INVALID_WORKFLOW_ID_BODY = { error: 'invalid_workflow_id' } as const;
 
+/**
+ * The one body a malformed migration request draws.
+ *
+ * A FIXED sentence, echoing no zod issue: "a refusal quoting what it refused is
+ * a mirror an attacker can aim" is the rule Task 9's list route states and
+ * `INVALID_NAME_BODY` in `workspaces.ts` already follows. The 422 refusals below
+ * are a different thing and do quote — they name a state the CALLER's own map
+ * left uncovered, which is the dialog's contract and not a reflection of input.
+ */
+export const INVALID_MIGRATION_BODY = {
+  error: 'invalid',
+  message: 'A migration needs fromWorkflowId, toWorkflowId and a stateMap of state id to state id.',
+} as const;
+
 function isWorkspaceAdmin(eff: EffectiveRole): boolean {
   return eff.workspaceRole === 'owner' || eff.workspaceRole === 'admin';
 }
@@ -605,10 +619,21 @@ export function registerBuilderReadRoutes(
         return reply.code(404).send(READ_NOT_FOUND_BODY);
       }
       const parsed = migrateBodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.code(400).send({ error: 'invalid', message: parsed.error.issues[0]?.message ?? 'malformed body' });
-      }
-      const { fromWorkflowId, toWorkflowId, stateMap } = parsed.data;
+      if (!parsed.success) return reply.code(400).send(INVALID_MIGRATION_BODY);
+      const { fromWorkflowId, toWorkflowId } = parsed.data;
+      // A MAP, built from the body's OWN entries, and this is not a style
+      // preference. `stateMap` arrives as a plain object, so `stateMap[stateId]`
+      // walks the prototype chain: a ticket parked in a state whose id is
+      // `toString` — legal, since `workflowStateSchema` declares
+      // `id: z.string().min(1)` and nothing more — reads back as
+      // `Object.prototype.toString`, which is not `undefined`. A coverage check
+      // written that way calls the state MAPPED, builds the batch, commits every
+      // genuinely-mapped ticket, and has the odd one refused by zod at ingest
+      // for carrying a function as its `toStateId`. That is the partial
+      // migration this route exists to prevent, reached through the one check
+      // that makes "a refusal appends nothing" true. MEASURED, and pinned by
+      // case 7.88, which reddens on the indexed form.
+      const stateMap = new Map(Object.entries(parsed.data.stateMap));
 
       // Three actor-supplied ids, all three resolved against the workspace the
       // door just approved. `proj_workflows` is keyed `(workflow_id, version)`
@@ -637,7 +662,7 @@ export function registerBuilderReadRoutes(
       }
 
       const targetStates = new Set(target.states.map((state) => state.id));
-      const unknownTargets = [...new Set(Object.values(stateMap))].filter((id) => !targetStates.has(id)).sort();
+      const unknownTargets = [...new Set(stateMap.values())].filter((id) => !targetStates.has(id)).sort();
       if (unknownTargets[0] !== undefined) {
         return refuse(
           reply,
@@ -660,7 +685,7 @@ export function registerBuilderReadRoutes(
       // mapped, and a state the definition no longer carries but somebody IS in
       // still does. The dialog's contract is about work, not about shapes.
       const unmapped = [...new Set(tickets.map((row) => row.state_id))]
-        .filter((stateId) => stateMap[stateId] === undefined)
+        .filter((stateId) => !stateMap.has(stateId))
         .sort();
       if (unmapped[0] !== undefined) {
         return refuse(
@@ -676,9 +701,10 @@ export function registerBuilderReadRoutes(
         entity: { kind: 'ticket', id: row.ticket_id },
         type: 'ticket.workflow_rebound',
         version: 1,
-        // `stateMap[row.state_id]` is defined for every row — the unmapped check
-        // above is what makes that true, and it is checked over the same rows.
-        payload: { toWorkflowId, toStateId: stateMap[row.state_id] },
+        // `stateMap.get(row.state_id)` is defined for every row — the unmapped
+        // check above is what makes that true, and it is asked over these exact
+        // rows with the same own-key lookup this line uses.
+        payload: { toWorkflowId, toStateId: stateMap.get(row.state_id) },
         actorId: request.currentUserId,
         // envelope-origin `'web'`: a person's claim that they migrated this
         // type, not the server's own record. The gate refuses a client-submitted
