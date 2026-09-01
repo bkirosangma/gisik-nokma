@@ -142,12 +142,12 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-*(Plan 5, Tasks 2–10 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
-replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7, 8, 9, 9b and 10 added, and nothing else. Plan 5
+*(Plan 5, Tasks 2–11 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
+replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7, 8, 9, 9b, 10 and 11 added, and nothing else. Plan 5
 Task 1 (`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here.
 Still absent rather than missing from this section: every `/v1` read
-route EXCEPT the board, the list, the builder surface and search (My Work, attention, preferences), and the stream hub with
-its WebSocket route — Plan 5 Tasks 11–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
+route EXCEPT the board, the list, the builder surface, search and My Work (attention, preferences), and the stream hub with
+its WebSocket route — Plan 5 Tasks 12–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
 doc assigns `Features.md` sections one per implementation plan, so numbering is claimed from that
 table rather than taken next-free.)*
 
@@ -464,6 +464,38 @@ table rather than taken next-free.)*
   length and of the NUL refusal, the second being load-bearing — a `q` carrying U+0000 is not a bad
   search, it is SQLSTATE 22021 raised inside the route, a 500 reached through a value that parsed and
   bound correctly the whole way. `apps/server/src/read/fts.ts`, `packages/domain/src/filter-spec.ts`
+
+- ✅ **`GET /v1/me/work` — assigned-to-me, across every project in one workspace** — the three state
+  categories as `groups.open` / `groups.active` / `groups.terminal`, each holding `TicketCard`s in
+  ticket-id order. **The first PER-VIEWER read in the product**, and that changes what its viewer id
+  is: the board, the list, the builder surface and search all answer "what is in this container" and
+  let the caller's identity only NARROW the answer, while this one answers "what is MINE", so the
+  session's user is the FILTER (`t.assignee_id`) and the SECURITY BOUNDARY (the explicit-list arm of
+  `visibleTicketsWhere`, and the role `requireMember` resolved) at once. It therefore has exactly one
+  source — `request.currentUserId` — and the route offers no parameter by which a caller could name
+  somebody else's queue. That is proven by execution rather than by the signature, because Fastify
+  hands a handler every query key that arrives whether the route declared it or not: a member sending
+  `userId`, `user_id`, `assigneeId`, `viewerId` and `as`, all naming the owner, gets a response
+  byte-identical to the one that names nobody, headers and `content-length` included. **Being
+  ASSIGNED a ticket is not being allowed to SEE it**, and the two come apart in four reachable ways
+  the route is measured against rather than one: a ticket explicitly shared with somebody else and
+  assigned to you anyway; a project-mode ticket assigned to a workspace member who is on no project;
+  the same person taken off that project afterwards by `project.member_removed`, which drops the
+  ticket out of an answer that held it a moment earlier; and an audience NARROWED by a later
+  `visibility.set` while the assignee stays the assignee. Each is asserted beside the row that DID
+  come back, so an absence is the predicate answering and not an empty route. Scope is ONE workspace,
+  pinned: cross-workspace aggregation is a client concern (one call per workspace), and since
+  `visibleTicketsWhere` compiles to `TRUE` for an owner, `t.workspace_id` is that caller's entire
+  boundary — a ticket in a neighbouring tenancy assigned to this workspace's owner is read back from
+  `proj_tickets` to prove it exists before being asserted absent. Nothing here reads a clock: the
+  grouping key is a column, not a date. The response nests under `groups` so Plan 10's additive
+  `contested` key arrives beside it without reshaping anything; claims in transit are client-local
+  outbox state merged in by Plan 6's `DataSource` and are deliberately never served here. Grouping
+  chooses its bucket through a bare `switch` rather than by indexing an object with the column value
+  — `__proto__` resolves through an accessor onto `Object.prototype` — though the honest statement is
+  that `proj_tickets`' `CHECK (state_category IN ('open','active','terminal'))` is what is
+  load-bearing there and the switch is depth. `apps/server/src/routes/my-work.ts`,
+  `apps/server/src/app.ts`
 
 ## 9. Editor, documents & attachments
 
