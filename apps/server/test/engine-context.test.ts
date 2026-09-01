@@ -466,7 +466,7 @@ describe('createEngineContext — the tenancy predicate on the two ACTOR-supplie
     }
   });
 
-  it('a rebind naming ANOTHER workspace\'s workflow is refused, and the same event onto a workflow of its own commits', async () => {
+  it("a rebind naming ANOTHER workspace's workflow is refused, and the same event onto a workflow of its own commits", async () => {
     // THE HOLE, end to end. `ctx.getWorkflowDef(p.toWorkflowId)` resolves an id
     // straight off the payload. Without the predicate `OTHER_WORKFLOW` resolves,
     // `shipped` is one of its states, and the rebind is ACCEPTED — a live ticket

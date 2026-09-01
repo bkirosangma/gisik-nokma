@@ -899,11 +899,17 @@ describe('proj_tickets', () => {
 
 /**
  * A TEST-LOCAL `EngineContext` over proj_tickets, proj_ticket_types and
- * proj_workflows. It is NOT Task 12 landing early: nothing under
- * `src/engine-context.ts` moves in this change set, and `createEngineContext`
- * goes on answering null for `getEntityState('ticket')` and `getTicketTypeDef`
- * until T12 aligns all three `EngineContext` implementations in one change set
- * (controller ruling P9).
+ * proj_workflows. It was NOT Task 12 landing early — nothing under
+ * `src/engine-context.ts` moved in the change set that introduced it, and the
+ * shipped context went on answering null for `getEntityState('ticket')` and
+ * `getTicketTypeDef`. Task 12 has since landed, aligning all FOUR
+ * implementations (controller ruling P9; every note before that task said
+ * three, and the fourth — `contextFromCache` in `packages/app-core/src/precheck.ts`
+ * — was counted when the signature change made the compiler name them all).
+ *
+ * It stays test-local rather than being replaced by `createEngineContext`: this
+ * file's subject is the PROJECTION, and reaching for the shipped context would
+ * make every assertion here depend on a second module's wiring.
  *
  * `getEntityState` is deliberately UNSCOPED by workspace, because that is the
  * lookup the shipped interface forces — `getEntityState(kind, id)` has no
@@ -914,8 +920,10 @@ describe('proj_tickets', () => {
  * the exact defect this file is here to catch.
  *
  * `getChildrenStates` answers empty rather than reading the table: the
- * parent-terminal invariant that consumes it is T12's to wire, and a half-wired
- * context here would be a second opinion about a contract T12 owns.
+ * parent-terminal invariant that consumes it is wired on the SHIPPED context
+ * (Task 12), and a second opinion here would be a second implementation of a
+ * contract that already has one — `apps/server/test/engine-context.test.ts` is
+ * where that invariant is asserted against Postgres.
  */
 function testLocalContext(client: PoolClient, workspaceId: string): EngineContext {
   return {

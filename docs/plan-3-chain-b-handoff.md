@@ -26,10 +26,12 @@ Fixture gate: **84**, matching the directory. Full gate: **18/18 turbo tasks gre
 **Outstanding on Chain A:** Task 8's task review had not returned when the lane wound down, and its
 conclusions need one caveat — see "Contamination window" below. Chain A's PR was not opened.
 
-## Chain B — Tasks 9–13, then T14. **Tasks 9, 10 and 11 have landed; 12, 13 and T14 are outstanding.**
+## Chain B — Tasks 9–13, then T14. **Tasks 9, 10, 11 and 12 have landed; 13 and T14 are outstanding.**
 
 Task 9 shipped `proj_ticket_types`, Task 10 `proj_tickets`, Task 11 `proj_rollups` — all three registered at their
-coordination §8 positions (3, 5 and 6), with both order pins extended each time. The heading above said "None
+coordination §8 positions (3, 5 and 6), with both order pins extended each time. **Task 12 shipped the server
+`EngineContext` over all three**, closing rulings P14 and P9 and inverting the two assertions that pinned the
+opposite. The heading above said "None
 started" through the first two of those, which is the shape of stale-absolute this lane keeps producing; it is
 corrected here rather than left for a resumer to disbelieve.
 
@@ -113,6 +115,84 @@ per test file, so lanes cannot collide).
 and **5.27, 5.30 and 5.36 are cited by other documents and may not be renumbered.** Next free id is what
 the file's own scope note says. **T14 must fold 5.43 into the corrected 5.34** rather than catalogue
 both. The plan's canonical refusal table is **six ids behind** what shipped.
+
+
+## Task 12's outcome, and what it left for others (2026-09-01)
+
+### Rulings discharged
+
+- **P14 — CLOSED, on the reader, in both places.** `EngineContext.getWorkflowDef` and `getTicketTypeDef` take a
+  `TenantScope` (`{ workspaceId }` — an object, so a transposition with the ULID-shaped id beside it does not
+  compile) and every check passes `env`. `getWorkflowDefFromProjection` gained `workspaceId` as its second
+  parameter, matching the three reader neighbours already spelled `(db, workspaceId, id)`. Test home:
+  `apps/server/test/engine-context.test.ts`, cases 5.65 and 5.66, each with the control that keeps it about
+  tenancy. **Where tenancy comes from, and why an actor cannot choose it:** `env.workspaceId` is gated twice
+  before the engine — the permission gate resolves the SESSION user's effective role in it and refuses a
+  non-member (`permissions/check-permission.ts`), and ingest's entity-to-workspace guard refuses an event about
+  an entity homed elsewhere. **Neither closes P14**, and that is the point: an admin of their own workspace
+  passes both and then names another workspace's workflow id. The predicate on the reader is the only thing
+  that refuses that.
+- **P9 — DISCHARGED, and the divergences are stated per kind rather than smoothed over.** All four
+  implementations moved in one change set: the server's, `fixtures/harness.ts`, `memory-context.ts`, and
+  `contextFromCache` (`packages/app-core/src/precheck.ts`), which the previous attempt missed entirely.
+  - `getEntityState('ticket')` — real in all four (cache-backed in `contextFromCache`). ALIGNED.
+  - `getEntityState('membership')` — server null (Plan 4 owes the wiring, ruling P18), harness real from its
+    fixture roster, memory-context null, precheck null. The harness is where restrict-to's 61 fixtures live;
+    the server's null is what makes `restrict-to` refuse on the server path today.
+  - `getEntityState` on the four identity-only kinds — the server answers `{kind,id}` from a head row;
+    `memory-context` answers only for `'ticket-type'`, from its own inventory; the harness answers none;
+    `contextFromCache` answers none. **They are not the same predicate and were deliberately not aligned onto
+    the server's**: the server's is "an entity with this id has committed events ANYWHERE", because
+    `proj_entity_heads`' key is `(entity_kind, entity_id)` — global — while the in-memory ones would be "this
+    workspace defined it", which is the stronger and more honest claim. Aligning downward would have been
+    aligning onto the weaker one. Latent rather than live: no check in the engine reads existence for
+    `workspace`, `project`, `workflow` or `ticket-type`.
+  - `getTicketTypeDef` — four different behaviours, on purpose: the server scoped and null for a type this
+    workspace never defined; the harness and `memory-context` by key, each holding one workspace's world;
+    `contextFromCache` THROWS, because `null` there would manufacture a refusal out of "I do not hold it".
+  - `getChildrenStates` — real in all four, direct children only.
+- **P3 — held against the plan text.** `getEntityState('ticket-type')` stays identity-only. The plan's Task 12
+  brief instructs the rejected alternative at lines 4552, 4621 and 4680 (`return getTicketTypeFromDb(db,
+  workspaceId, id)` from `getEntityState`); it was not followed, and no `TicketTypeState` was grown.
+- **The T12 total-outage trap — CONFIRMED, not assumed.** `rowToTicketState` populates both `workspaceId` and
+  `kind: 'ticket'`; Task 10 landed both with the argument beside them, and case 5.18 now names the two fields
+  in an assertion rather than checking non-null.
+
+### One contradiction this server now carries, recorded because it cannot be closed here
+
+`getEntityState('ticket-type', 'task')` answers `{kind, id}` off a GLOBAL head row while
+`getTicketTypeDef(env, 'task')` — scoped — answers null for the same id in the same evaluation. Two doors,
+opposite claims. Closing it needs a scope on `getEntityState`, and adding one is what would make ruling P12's
+parent guard a branch no input can take. **Owner: whoever gives `proj_entity_heads` a per-tenant key.** Latent
+today, for the reason in the P9 entry above.
+
+### RECORDED, not fixed — six source comments in Plan 4's lane that name Task 12 and are false
+
+Task 12 did not edit them, following Task 10's and Task 11's precedent for another plan's files. Every one says
+some form of "`proj_tickets` does not exist on this branch (Plan 3 Task 12 owns it)". Two things are wrong with
+that sentence and have been since Task 10: the table is **Task 10's**, and it **exists**. Whoever owns these
+read paths corrects them:
+
+| File | What it says |
+|---|---|
+| `apps/server/src/visibility/visible-tickets.ts` (~12) | "**`proj_tickets` does not exist on this branch** — Plan 3 Task 12 owns it" |
+| `apps/server/src/visibility/visible-events-for.ts` (~480, ~486) | "does not exist here (Plan 3 Task 12 owns it)"; "*Owner: Plan 3 Task 12 (`proj_tickets`), case 6.94*" |
+| `apps/server/src/visibility/rollup.ts` (~53) | "`proj_rollups`, Task 12 owns `proj_tickets`), and no migration for either is …" — both tables exist and both have migrations |
+| `apps/server/src/permissions/check-permission.ts` (~626) | "…does not exist on this branch (Plan 3 Task 12 owns it)" |
+| `apps/server/src/routes/tickets.ts` (~25, ~41) | "**`proj_tickets` does not exist on this branch.** Plan 3 Task 12 owns it"; "case 6.66, owner Plan 3 Task 12" |
+| `apps/server/test/routes/tickets-read.test.ts` (~27), `apps/server/test/helpers/seed.ts` (~213) | the same sentence in two test files |
+
+This is item 3 and item 4 of the section below, widened: those two recorded `Features.md` §6 and
+`visibility/rollup.ts` alone, and the same sentence turns out to be in five more places.
+
+### RECORDED, not fixed — case 6.25 went stale in Plan 4's catalogue
+
+`apps/server/test/routes/workspaces.test.ts` said a founded workspace "still cannot hold a ticket on this
+branch", naming this exact wiring as the reason. Task 12 **inverted that assertion**, because a test that fails
+cannot be left standing and the file itself listed the condition under which it flips. The reserved text of
+**case 6.25 — "a founded workspace accepts a ticket immediately" — is now the true one**, and whatever
+`test-cases/06-*.md` says about it was written against the refusal. **Owner: Plan 4.** Task 12 did not edit
+§6 or its catalogue file.
 
 ## RECORDED, not fixed — carried out of Task 10's floor-list fix round and Task 11 (2026-09-01)
 

@@ -39,7 +39,8 @@ import type { Projection } from './registry.js';
  * The rejected alternative was proj_workflows' shape: one row per definition
  * event, the reader taking `ORDER BY defined_workspace_seq DESC LIMIT 1`. It is
  * equally deterministic, but the consumer this table exists for is a
- * point-lookup inside the ingest transaction (Task 12's `getTicketTypeDef`), and
+ * point-lookup inside the ingest transaction (`getTicketTypeDef` on the engine
+ * context, wired by Task 12), and
  * proj_workflows keeps every version because the engine's version WALK needs the
  * intermediates. Nothing needs a superseded type definition, so the history
  * would be rows kept for no reader.
@@ -98,9 +99,12 @@ export const ticketTypesProjection: Projection = {
  * P14 names the general shape — an id the ACTOR supplies, resolved through a
  * lookup with no tenancy predicate — and names `getTicketTypeDef(ctx, p.typeId)`
  * on the create path as an instance of it. The predicate lives here so the
- * caller cannot forget it; wiring the engine context onto this reader is Task
- * 12's, and until it happens `createEngineContext.getTicketTypeDef` still
- * answers null for reasons of its own.
+ * caller cannot forget it, and Plan 3 Chain B Task 12 wired
+ * `createEngineContext.getTicketTypeDef` onto it — which is what turned the
+ * predicate from a precaution into the thing that refuses. The sentence this
+ * replaces said the wiring was still owed and that the context "still answers
+ * null for reasons of its own"; both stopped being true at that task, and the
+ * cross-tenant case that proves it is in `test/engine-context.test.ts`.
  */
 export async function getTicketTypeFromDb(
   db: Queryable,
