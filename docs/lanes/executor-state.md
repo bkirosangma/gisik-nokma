@@ -121,10 +121,73 @@ implementer AND opus reviewer. **Remaining floor-list in this plan: T5 (1213), T
 T15 (5452).** Then T6 (1579), T7 (1821), T8 (2315), T9 (2657), T10 (3638), T11 (3874), T12 (4079),
 T13 (4551), T16 (6047).
 
-### IN FLIGHT RIGHT NOW: Plan 5 Task 5, workflow run `w5x2ap3b3` (opus implementer + opus reviewer)
+### NOTHING IS IN FLIGHT. T3, T4 AND T5 ARE ALL DONE, REVIEWED, AND PUSHED.
 
-**A successor must `git log --oneline -3` BEFORE re-dispatching T5** — the implementer may already
-have committed. The commit is the record; this line is only the warning.
+| Task | Commits | Review outcome |
+|---|---|---|
+| T3 `workspace.settings_set` | `f57f084`, doc fix `597b8be` | clean, 1 Minor (fixed) |
+| T4 `proj_workspace_settings` | `2e4c54e`, doc fix `0a140fa` | clean, 1 Minor (fixed) |
+| T5 **FLOOR-LIST** visibility predicate | `34c62fd`, `e582909`, `6a19638`, fix round `2f24959` | 1 **Important** + 2 Minor, all fixed and PROVEN |
+
+**Gate at `2f24959`, re-run by the executor rather than taken from the agent's report:** exit 0, 21/21,
+**0 cached**, **1362 tests** — domain 320 · rule-engine 280 · **server 521** · app-core 130 · editor 72
+· ui 31 · sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**. (The three lines matching
+`fail` are test *names* containing "failure", not failures.)
+
+**NEXT: Plan 5 Task 6** — `proj_search`, the full-text projection, plan line 1579.
+
+### WHAT T5 COST AND WHAT IT BOUGHT — read before dispatching any later floor-list task
+
+**The first T5 implementer DIED on a transient network error** (ENOTFOUND) after ~15 minutes, leaving
+four untracked, unreviewed, uncommitted files. Nothing was lost only because the resume dispatch handed
+them over as **untrusted drafts with a keep/fix/delete decision per file**, rather than either deleting
+them or silently inheriting them. It rewrote one (the draft had duplicated the decision table instead of
+extracting it), kept two, and fixed one. **The standing lesson is in every dispatch from now on:
+COMMIT EARLY AND OFTEN — an uncommitted increment is the only thing a dropped connection can destroy.**
+
+**The extraction worked and is proved rather than asserted.** `listVisibleTickets` now consumes
+`visibleTicketsWhere`; `grep -rn "resolved_mode" apps/server/src/` finds the table in SQL **nowhere
+else**. The proof is a mutation: break the builder and `test/visibility/visible-tickets.test.ts` — a
+file the implementer never touched — goes red.
+
+**A plan-text defect worth carrying: the plan's Task-5 decision table and its sample predicate are both
+WRONG ABOUT THE OWNER.** They collapse owner into "member/admin/owner"; three implemented sites say
+owner is a separate always-yes row (`can-see.ts:101`, its own table, `visible-tickets.test.ts:88`). A
+predicate transcribed from the plan fails on the first owner fixture. **Owner compiles to `'TRUE'`.**
+
+**And `resolved_user_ids` is `text[]`, not jsonb** (`1787961300000_proj-visibility.sql:28`) — so
+`$n = ANY (...)`, NOT the plan's `@> to_jsonb(...)`, which raises 42883.
+
+### THE FINDING THAT ONLY A FLOOR-LIST REVIEW WOULD HAVE CAUGHT
+
+An **over-permissive guest branch survived all 520 server tests.** The predicate was correct; the
+suite could not have told you if it were not. Two reasons, and the second is the transferable one:
+
+1. the `guest x project` cell only ever asked about a guest whose project set was EMPTY — an answer no
+   implementation of that branch could get wrong; and
+2. **the `canSee`-vs-SQL agreement oracle is STRUCTURALLY BLIND wherever both implementations ignore
+   the same input.** Neither consults `eff.projects` for a guest, so they agree whatever the fixture
+   holds. **An agreement test between two implementations cannot see a rule they both ignore** —
+   generalise this to every later oracle-shaped test in this plan.
+
+Closed by seeding a guest onto a project roster and asserting their slice is unchanged. **Proven, not
+asserted:** the same mutation now fails naming `guest x project`, `visible: false` vs `true`.
+
+Two Minors closed with it: a `seeded` guard that was a JS-literal tautology (it compared literals to
+literals and could not fail — replaced by reading each cell ticket's real `resolved_mode` back out of
+`proj_visibility`), and an injection assertion that was live only in the over-permissive direction and
+now carries a positive control.
+
+### RECORDED, NOT FIXED — owner: permissions / a Plan 4-line ruling
+
+**Can an owner add a GUEST to a project roster with `projectAdmin: true`?** `check-permission.ts:488-494`
+gates `project.member_added` on the **actor's** `hasProjectAdminRights` and constrains the **target's**
+role not at all. `hasProjectAdminRights` returns true for `eff.projects.get(projectId)?.projectAdmin`,
+so such a guest would hold project-admin rights — roster changes and `visibility.set` on that project —
+**while `visibleTicketsWhere` and `canSeeResolved` still show them nothing.** The READ side's inertness
+for a guest is now proven (T5's new fixture). **The COMMAND side is not, and was not executed.** Stated
+as a question, not a confirmed defect. It surfaced only because T5's fix needed that event as a means
+to an end.
 
 ### THE REGISTRATION PIN: ENUMERATED, because "three places" was a reading and it was imprecise
 
