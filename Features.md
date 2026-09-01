@@ -142,12 +142,12 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-*(Plan 5, Tasks 2–7 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
-replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6 and 7 added, and nothing else. Plan 5
+*(Plan 5, Tasks 2–8 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
+replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7 and 8 added, and nothing else. Plan 5
 Task 1 (`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here.
 Still absent rather than missing from this section: every `/v1` read
-route (board, list, search, My Work, attention, builder reads, preferences), and the stream hub with
-its WebSocket route — Plan 5 Tasks 8–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
+route EXCEPT the board (list, search, My Work, attention, builder reads, preferences), and the stream hub with
+its WebSocket route — Plan 5 Tasks 9–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
 doc assigns `Features.md` sections one per implementation plan, so numbering is claimed from that
 table rather than taken next-free.)*
 
@@ -431,3 +431,26 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
   the real projection registry, returning the app, its own OTP sender and the ungated internal ingest
   door. It replaces four hand-copied assemblies that had to be extended one by one every time
   `buildApp` gained a route. `apps/server/test/helpers/app.ts`
+- ✅ **`GET /v1/projects/:projectId/board`** — one project's board. Columns are the states of the
+  workflows **in use by the tickets this caller may see** — not every workflow the workspace has
+  defined — with every state of a used workflow present whether or not anybody is in it, ordered by
+  workflow id then by the order the publisher authored the states, cards by ticket id. The `blocked`
+  flag is read off the definition, never derived from a category: the seeded `waiting` state is
+  `active` AND blocked while `doing` is `active` and not. Cards are `TicketCard`s, so each unfolds to
+  who claimed its state and when by both clocks, and a parent carries its four-field rollup. The
+  visibility filter is `visibleTicketsWhere` — the one SQL expression of the decision table, consumed
+  and not restated. `apps/server/src/routes/board.ts`
+- ✅ **The board's door: 401, 404, 404, 200** — no session is `401 {error:'unauthenticated'}`; an
+  unknown project id and a caller who is not a member of the project's workspace are both
+  `404 {error:'not_found'}`, indistinguishable down to `content-length`, because a 403 would confirm
+  the project exists to somebody with no business knowing it does. A member of that workspace who is
+  NOT on the project passes the gate and gets **200 with an empty board** — the gate asks about the
+  workspace, so a project's existence is not a secret from somebody already inside the tenancy, and
+  the emptiness is the visibility predicate answering rather than the door.
+  `apps/server/src/routes/board.ts`
+- ⚙️ **The shared read world for route tests** — `buildReadTestApp(db)` stands the real app up through
+  `buildTestApp`, signs six users in over the wire, seeds the shared scenario under the ids those
+  sessions answered, and adds two fixtures the scenario deliberately lacks: a SIBLING project in the
+  same workspace (without which a workspace board and a project board are the same bytes — measured)
+  and a NEIGHBOUR workspace with its own owner (without which a "member of any workspace" gate would
+  pass every tenancy test). `apps/server/test/helpers/read-app.ts`

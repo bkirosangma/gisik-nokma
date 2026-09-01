@@ -137,14 +137,29 @@ export async function readBoard(
  * Cards whose `(workflow, state)` no published definition names, shown under a
  * column of their own rather than dropped.
  *
- * Two ways in, and neither is currently reachable: a `state_id` absent from its
- * workflow's latest definition (Plan 3's refresh-on-publish folds every row
- * forward, owner decision 2026-08-26), or a `workflow_id` `latestWorkflowDefs`
- * could not resolve at all. The second is the reason this pass is not deleted
- * as dead code: an unresolvable workflow id yields NO columns from the loop
- * above, so without this every one of its tickets would vanish from the board
- * silently. A board that hides work it cannot classify is worse than one that
- * shows it under an ugly heading.
+ * ## MEASURED: no test constrains this pass, and no seed at any layer can
+ *
+ * Deleting the call to it leaves all twelve cases in `test/routes/board.test.ts`
+ * green — an unconstrained path, reported as one rather than left to look
+ * covered. It is unconstrained because it is unreachable, and unreachable
+ * further down than the plan says. The plan (Task 8, "See Open question 8")
+ * rules out the first road — a `state_id` absent from its workflow's latest
+ * definition — at the LEDGER, because Plan 3's refresh-on-publish folds every
+ * row on that workflow forward (owner decision 2026-08-26). But both roads are
+ * already closed one layer below that, inside the reducer every projection
+ * runs: `applyTicketEvent` THROWS on `ticket.transitioned` to a state its
+ * workflow does not carry ("has no state") and throws again if the workflow
+ * itself is missing ("vanished — replay integrity is broken"). So neither a
+ * hostile client, nor an engine-bypassing `applyCommitted` seed, nor a direct
+ * internal append can put a straggler row in `proj_tickets`. Only a corrupted
+ * table or a future reducer that stops throwing could.
+ *
+ * It stays anyway, and the reason is the one `assembleTicketCards` gives for
+ * throwing rather than skipping: a card silently missing from a board is a lie
+ * with a longer fuse. If a straggler row ever does exist, the loop above emits
+ * NO column for it and every one of its tickets disappears from the board with
+ * no error anywhere. Recorded against the plan's Open question 8, which owns
+ * the decision of whether this becomes a throw instead.
  *
  * The column's `name` is the bare state id — there is no definition to read a
  * human name from, and inventing one would print a label nobody authored. The
