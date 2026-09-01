@@ -54,15 +54,77 @@ function service() {
 }
 
 function submitted(partial: Pick<SubmittedEvent, 'entity' | 'type' | 'payload'>): SubmittedEvent {
+  return submittedIn(WORKSPACE, partial);
+}
+
+/**
+ * The same envelope in a NAMED workspace. Every tenancy case below needs two
+ * workspaces, and `submitted`'s closed-over `WORKSPACE` is exactly the thing a
+ * cross-tenant assertion must not be able to fall back on.
+ */
+function submittedIn(
+  workspaceId: string,
+  partial: Pick<SubmittedEvent, 'entity' | 'type' | 'payload'>,
+): SubmittedEvent {
   return {
     id: newUlid(),
-    workspaceId: WORKSPACE,
+    workspaceId,
     version: 1,
     actorId: ACTOR,
     origin: 'web',
     clientTime: '2026-08-20T09:00:00.000Z',
     ...partial,
   };
+}
+
+/** A two-state workflow with no rules on any edge, so a transition tests the invariant and not a gate. */
+function openWorkflow(id: string): SubmittedEvent['payload'] {
+  return {
+    id,
+    version: 1,
+    name: 'Plain',
+    initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' },
+      { id: 'shipped', name: 'Shipped', category: 'terminal' },
+    ],
+    transitions: [
+      { from: 'todo', to: 'shipped', rules: [] },
+      { from: 'shipped', to: 'todo', rules: [] },
+    ],
+  };
+}
+
+function typeDefinedIn(
+  workspaceId: string,
+  def: { id: string; rank: number; workflowId: string },
+): SubmittedEvent {
+  return submittedIn(workspaceId, {
+    entity: { kind: 'ticket-type', id: newUlid() },
+    type: 'ticket-type.defined',
+    payload: {
+      id: def.id,
+      name: def.id[0]?.toUpperCase() + def.id.slice(1),
+      icon: 'check',
+      rank: def.rank,
+      workflowId: def.workflowId,
+      fields: [],
+    },
+  });
+}
+
+function createdIn(
+  workspaceId: string,
+  ticketId: string,
+  typeId: string,
+  parentId: string | null,
+  projectId: string,
+): SubmittedEvent {
+  return submittedIn(workspaceId, {
+    entity: { kind: 'ticket', id: ticketId },
+    type: 'ticket.created',
+    payload: { typeId, projectId, parentId, title: `Ticket ${typeId}` },
+  });
 }
 
 /** A workflow whose only move is guarded by a role — §9's exact scenario. */
@@ -326,5 +388,264 @@ describe('a role-gated transition through the shipped server context', () => {
       rule: 'restrict-to',
       reason: `Only anyone with the role admin may make this move, and ${ACTOR} is not among them.`,
     });
+  });
+});
+
+/**
+ * CONTROLLER RULING P14, and its test home — the handoff says so, because no
+ * unit test in `@gisik-nokma/rule-engine` can pin it: `buildMemoryContext` and
+ * the fixture harness are each built from ONE workspace's events and have no
+ * second tenancy to confuse. The hole is a property of a SHARED STORE keyed
+ * globally, so it is only reachable where the store is.
+ *
+ * The shape, in one sentence: two of the four context reads resolve an id the
+ * ACTOR supplied, and neither answer carries a workspace for a check to compare
+ * against afterwards. `proj_workflows`' key is `(workflow_id, version)` and a
+ * ticket type's key is a slug an admin chose, so before the predicates a foreign
+ * id RESOLVED and the check that followed ran against another workspace's state
+ * graph.
+ *
+ * Latent until this task and live in the same commit that closes it: both holes
+ * are only reachable once `getEntityState('ticket')` and `getTicketTypeDef`
+ * answer, which is Task 12.
+ *
+ * Every case here goes through `service().ingestBatch` — the INTERNAL door. The
+ * client door would refuse `ticket.workflow_rebound` at `permission.role` before
+ * the engine ever ran (it is in `ADMIN_ONLY_TYPES`), and a refusal for the wrong
+ * reason is not evidence about a predicate. What these cases prove is the
+ * PREDICATE, not the gate.
+ */
+describe('createEngineContext — the tenancy predicate on the two ACTOR-supplied lookups (ruling P14)', () => {
+  const OTHER_WS = newUlid();
+  const OTHER_WORKFLOW = newUlid();
+  const HOME_WORKFLOW_2 = newUlid();
+  const OTHER_PROJECT = newUlid();
+  const REBIND_TICKET = newUlid();
+
+  beforeAll(async () => {
+    const results = await service().ingestBatch([
+      submittedIn(OTHER_WS, {
+        entity: { kind: 'workflow', id: OTHER_WORKFLOW },
+        type: 'workflow.defined',
+        payload: openWorkflow(OTHER_WORKFLOW),
+      }),
+      submittedIn(WORKSPACE, {
+        entity: { kind: 'workflow', id: HOME_WORKFLOW_2 },
+        type: 'workflow.defined',
+        payload: openWorkflow(HOME_WORKFLOW_2),
+      }),
+      // The SAME type key defined in each workspace, which is what makes the
+      // create-path case below about tenancy and not about a missing type. It is
+      // possible because a ticket type's entity id is a fresh ULID while its
+      // projection key is the payload's `id`.
+      typeDefinedIn(OTHER_WS, { id: 'gadget', rank: 3, workflowId: OTHER_WORKFLOW }),
+      createdIn(WORKSPACE, REBIND_TICKET, 'task', null, PROJECT),
+    ]);
+    expect(results.map((result) => result.status)).toEqual([
+      'committed',
+      'committed',
+      'committed',
+      'committed',
+    ]);
+  });
+
+  it('resolves a workflow id inside the ASKING workspace, never inside the one that owns it', async () => {
+    // Three ways, mirroring case 5.16's control shape: found in the workspace
+    // that holds it, NOT found from another, and not found anywhere for an id
+    // nobody defined. Without the first, a reader that always answered null
+    // would pass; without the third, one that answered null only for this
+    // particular id would.
+    const client = await db.pool.connect();
+    try {
+      const ctx = createEngineContext(client);
+      expect(await ctx.getWorkflowDef({ workspaceId: OTHER_WS }, OTHER_WORKFLOW)).not.toBeNull();
+      expect(await ctx.getWorkflowDef({ workspaceId: WORKSPACE }, OTHER_WORKFLOW)).toBeNull();
+      expect(await ctx.getWorkflowDef({ workspaceId: OTHER_WS }, newUlid())).toBeNull();
+    } finally {
+      client.release();
+    }
+  });
+
+  it('a rebind naming ANOTHER workspace\'s workflow is refused, and the same event onto a workflow of its own commits', async () => {
+    // THE HOLE, end to end. `ctx.getWorkflowDef(p.toWorkflowId)` resolves an id
+    // straight off the payload. Without the predicate `OTHER_WORKFLOW` resolves,
+    // `shipped` is one of its states, and the rebind is ACCEPTED — a live ticket
+    // in WORKSPACE bound to a workflow WORKSPACE cannot see, its board column and
+    // its transition rules now another tenant's.
+    //
+    // Mutation that reddens it, naming its own site: drop `workspace_id` from
+    // the first selector branch of `getWorkflowDefFromProjection`.
+    const [foreign] = await service().ingestBatch([
+      submittedIn(WORKSPACE, {
+        entity: { kind: 'ticket', id: REBIND_TICKET },
+        type: 'ticket.workflow_rebound',
+        payload: { toWorkflowId: OTHER_WORKFLOW, toStateId: 'shipped' },
+      }),
+    ]);
+    expect(foreign).toMatchObject({ status: 'refused', rule: 'ticket.rebound-unknown-workflow' });
+
+    // The positive control, and it is the same event differing only in WHOSE
+    // workflow it names. Without it this file would prove that rebinds are
+    // refused, which is not the property.
+    const [own] = await service().ingestBatch([
+      submittedIn(WORKSPACE, {
+        entity: { kind: 'ticket', id: REBIND_TICKET },
+        type: 'ticket.workflow_rebound',
+        payload: { toWorkflowId: HOME_WORKFLOW_2, toStateId: 'shipped' },
+      }),
+    ]);
+    expect(own).toMatchObject({ status: 'committed' });
+  });
+
+  it('a create naming a type key ANOTHER workspace defined is refused, and the same key commits where it was defined', async () => {
+    // The create path's instance of the same shape — `getTicketTypeDef(ctx, p.typeId)`
+    // resolving an actor-chosen slug. `gadget` exists in OTHER_WS and nowhere
+    // else. Unscoped, WORKSPACE would receive OTHER_WS's rank, workflow binding
+    // and field list, and the ticket would be created onto a workflow its own
+    // workspace has never published.
+    //
+    // Mutation that reddens it: pass a literal workspace id, or the row's own,
+    // to `getTicketTypeFromDb` in `createEngineContext.getTicketTypeDef`.
+    const [foreign] = await service().ingestBatch([
+      createdIn(WORKSPACE, newUlid(), 'gadget', null, PROJECT),
+    ]);
+    expect(foreign).toMatchObject({ status: 'refused', rule: 'ticket.unknown-type' });
+
+    const [athome] = await service().ingestBatch([
+      createdIn(OTHER_WS, newUlid(), 'gadget', null, OTHER_PROJECT),
+    ]);
+    expect(athome).toMatchObject({ status: 'committed' });
+
+    // And a key nothing defined anywhere, so "refused" above is the workspace
+    // clause rather than a reader that always says null.
+    const [nowhere] = await service().ingestBatch([
+      createdIn(OTHER_WS, newUlid(), 'nonesuch', null, OTHER_PROJECT),
+    ]);
+    expect(nowhere).toMatchObject({ status: 'refused', rule: 'ticket.unknown-type' });
+  });
+
+  it("a parent in another workspace RESOLVES, and P12's guard is what refuses it — which is why the ticket lookup stays global", async () => {
+    // The other side of the same ruling, and the reason `getEntityState` takes
+    // no scope. The foreign parent is FOUND here — that is the point — and
+    // `checkTicketCreated` refuses it by comparing `parent.workspaceId` to
+    // `env.workspaceId`. Scope the reader and this guard becomes a branch no
+    // input can take: it would go on passing with `workspaceId` dropped from
+    // `rowToTicketState`, which is the total-outage trap.
+    const foreignParent = newUlid();
+    const [seeded] = await service().ingestBatch([
+      createdIn(OTHER_WS, foreignParent, 'gadget', null, OTHER_PROJECT),
+    ]);
+    expect(seeded).toMatchObject({ status: 'committed' });
+
+    // Asserted directly as well as through the check: the context really does
+    // serve a ticket from a workspace other than the asking one. If it did not,
+    // the refusal below would be the SAME refusal for the opposite reason.
+    const client = await db.pool.connect();
+    try {
+      const state = await createEngineContext(client).getEntityState('ticket', foreignParent);
+      expect(state).toMatchObject({ kind: 'ticket', id: foreignParent, workspaceId: OTHER_WS });
+    } finally {
+      client.release();
+    }
+
+    const [crossTenant] = await service().ingestBatch([
+      createdIn(WORKSPACE, newUlid(), 'task', foreignParent, PROJECT),
+    ]);
+    expect(crossTenant).toMatchObject({ status: 'refused', rule: 'hierarchy.unknown-parent' });
+
+    // The second way of not existing, one refusal (ruling P12): a parent id
+    // nothing ever created is refused with the same rule and never with a
+    // sentence that confirms the id exists somewhere.
+    const [absentParent] = await service().ingestBatch([
+      createdIn(WORKSPACE, newUlid(), 'task', newUlid(), PROJECT),
+    ]);
+    expect(absentParent).toMatchObject({ status: 'refused', rule: 'hierarchy.unknown-parent' });
+  });
+});
+
+/**
+ * INVARIANT 3 AGAINST POSTGRES — case 5.13's second half, and case 5.18.
+ *
+ * The fixture suite already proves the parent-terminal refusal against
+ * `buildInMemoryContext`. What it cannot prove is that the SERVER answers the
+ * same question the same way, because the server's answer comes from two SQL
+ * reads that did not exist until this task. `getChildrenStates` returned `[]`
+ * unconditionally, so this invariant refused nothing on this server while every
+ * fixture went on passing.
+ *
+ * Its own workflow, with no rule on any edge: `roleGatedWorkflow` above guards
+ * `todo -> done` with `restrict-to`, and a child that cannot move for a
+ * PERMISSION reason would make every assertion here pass without the invariant
+ * ever being consulted.
+ */
+describe('createEngineContext — direct children and the parent-terminal invariant, against Postgres', () => {
+  const FAMILY_WF = newUlid();
+  const FAMILY_PROJECT = newUlid();
+  const PARENT = newUlid();
+  const CHILD_A = newUlid();
+  const CHILD_B = newUlid();
+  const GRANDCHILD = newUlid();
+
+  beforeAll(async () => {
+    const results = await service().ingestBatch([
+      submitted({
+        entity: { kind: 'workflow', id: FAMILY_WF },
+        type: 'workflow.defined',
+        payload: openWorkflow(FAMILY_WF),
+      }),
+      typeDefinedIn(WORKSPACE, { id: 'saga', rank: 2, workflowId: FAMILY_WF }),
+      typeDefinedIn(WORKSPACE, { id: 'chore', rank: 3, workflowId: FAMILY_WF }),
+      typeDefinedIn(WORKSPACE, { id: 'errand', rank: 4, workflowId: FAMILY_WF }),
+      createdIn(WORKSPACE, PARENT, 'saga', null, FAMILY_PROJECT),
+      createdIn(WORKSPACE, CHILD_A, 'chore', PARENT, FAMILY_PROJECT),
+      createdIn(WORKSPACE, CHILD_B, 'chore', PARENT, FAMILY_PROJECT),
+      createdIn(WORKSPACE, GRANDCHILD, 'errand', CHILD_A, FAMILY_PROJECT),
+    ]);
+    // Every one of these has to commit, and asserting it is not ceremony: a
+    // family that failed to assemble would leave the invariant below with
+    // nothing to refuse, and the refusal-then-acceptance sequence would still
+    // read as if it had worked.
+    expect(results.map((result) => result.status)).toEqual(Array(8).fill('committed'));
+  });
+
+  it('serves DIRECT children only — the grandchild exists, is a descendant, and is not counted', async () => {
+    const client = await db.pool.connect();
+    try {
+      const children = await createEngineContext(client).getChildrenStates(PARENT);
+      expect(children.map((child) => child.id).sort()).toEqual([CHILD_A, CHILD_B].sort());
+      expect(children.map((child) => child.stateCategory)).toEqual(['open', 'open']);
+      // The grandchild is real and reachable through its own parent, so "direct"
+      // is a claim about the query and not about an empty subtree.
+      expect((await createEngineContext(client).getChildrenStates(CHILD_A)).map((c) => c.id)).toEqual([
+        GRANDCHILD,
+      ]);
+    } finally {
+      client.release();
+    }
+  });
+
+  it('refuses the parent going terminal while a child is open, and accepts once every child is settled', async () => {
+    const shipped = (id: string): SubmittedEvent =>
+      submitted({ entity: { kind: 'ticket', id }, type: 'ticket.transitioned', payload: { to: 'shipped' } });
+
+    // Settle the grandchild first: CHILD_A is itself a parent, and the same
+    // invariant would refuse its move for its own open child. That is the
+    // invariant holding at two levels, which is what makes DIRECT children
+    // sufficient by induction.
+    expect(await service().ingestBatch([shipped(GRANDCHILD)])).toMatchObject([{ status: 'committed' }]);
+    expect(await service().ingestBatch([shipped(CHILD_A)])).toMatchObject([{ status: 'committed' }]);
+
+    // CHILD_B is still open. Mutation that reddens this line, naming its own
+    // site: return `[]` from `createEngineContext.getChildrenStates` — the shape
+    // this method had until this task — and the refusal becomes a commit.
+    expect(await service().ingestBatch([shipped(PARENT)])).toMatchObject([
+      { status: 'refused', rule: 'parent-terminal-with-open-children' },
+    ]);
+
+    expect(await service().ingestBatch([shipped(CHILD_B)])).toMatchObject([{ status: 'committed' }]);
+
+    // The accepting twin, and the reason the refusal above is about open
+    // children rather than about parents: nothing else changed.
+    expect(await service().ingestBatch([shipped(PARENT)])).toMatchObject([{ status: 'committed' }]);
   });
 });
