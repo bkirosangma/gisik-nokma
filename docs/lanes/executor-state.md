@@ -128,13 +128,21 @@ T13 (4551), T16 (6047).
 | T3 `workspace.settings_set` | `f57f084`, doc fix `597b8be` | clean, 1 Minor (fixed) |
 | T4 `proj_workspace_settings` | `2e4c54e`, doc fix `0a140fa` | clean, 1 Minor (fixed) |
 | T5 **FLOOR-LIST** visibility predicate | `34c62fd`, `e582909`, `6a19638`, fix round `2f24959` | 1 **Important** + 2 Minor, all fixed and PROVEN |
+| T6 `proj_search` (tsvector) | `a21448d`, `91ea648` | **CLEAN — zero findings** |
 
-**Gate at `2f24959`, re-run by the executor rather than taken from the agent's report:** exit 0, 21/21,
-**0 cached**, **1362 tests** — domain 320 · rule-engine 280 · **server 521** · app-core 130 · editor 72
-· ui 31 · sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**. (The three lines matching
-`fail` are test *names* containing "failure", not failures.)
+**Gate at `91ea648`, re-run by the executor rather than taken from any agent's report:** exit 0, 21/21,
+**0 cached**, **1375 tests** — domain 320 · rule-engine 280 · **server 534** · app-core 130 · editor 72
+· ui 31 · sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**.
 
-**NEXT: Plan 5 Task 6** — `proj_search`, the full-text projection, plan line 1579.
+**NEXT: Plan 5 Task 7** — read models: state provenance, workflow defs, the TicketCard view-model,
+plan line 1821. **The adaptation map's `RollupView` drift lands HERE:** the plan reads
+`rollupView.terminal`, and main's `RollupView` is `{total, restrictedCount}` — there is no `terminal`,
+`open` or `active` field. Compile-break, so it announces itself, but the SEMANTIC question it hides is
+where `terminalChildren` is supposed to come from at all.
+
+Then T8 (2315) · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (3638) · T11 (3874) · T12 (4079) ·
+T13 (4551) · **T14 (4918, FLOOR-LIST)** · **T15 (5452, FLOOR-LIST)** · T16 (6047).
+**Remember `makeRequireSession` is imported from the WRONG module in every route snippet from T8 on.**
 
 ### WHAT T5 COST AND WHAT IT BOUGHT — read before dispatching any later floor-list task
 
@@ -211,14 +219,37 @@ the right way — a planted live corruption inside its own test file, reported a
 `missingFromLive: 1, extraInLive: 1` scoped to that one table. **Every later registrant owes the same
 proof somewhere, or its verifier coverage is a check that cannot fail.**
 
-### FOR TASK 6 SPECIFICALLY — `tsvector` is a new column-type class here
+### TASK 6 IS DONE AND THE `tsvector` QUESTION IS ANSWERED — this note is retired, not pending
 
-`proj_search` introduces `tsvector`, which no projection in this repo has used. The verifier diffs
-live against a shadow rebuild with `EXCEPT`, and **`EXCEPT` requires an equality operator** — that
-requirement is the whole reason `json` is banned as a projection column type. `jsonb` was admitted only
-after Plan 5's step-6 predecessor PROVED it by execution rather than reasoning from the type name.
-**T6 owes `tsvector` the same proof: plant a live corruption, watch the verifier name that table, then
-restore and watch it go clean again.** Do not reason from the type name in either direction.
+**`tsvector` DOES support the verifier.** Proven by execution, twice, independently: the implementer
+planted a live corruption and the reviewer re-ran it with a DIFFERENT corruption string to rule out a
+canned fixture. Both saw `proj_search: 1 row(s) missing from live, 1 extra in live`, then clean again
+after `rebuildProjection`. **`EXCEPT` executes over `tsvector`** — a missing equality operator would
+have raised `could not identify an equality operator for type tsvector`, not returned a wrong answer —
+and `CREATE TABLE (LIKE … INCLUDING ALL)` carries the GENERATED column and its GIN index into the
+shadow schema, so the tsvector genuinely participates in the diff.
+
+**Review was CLEAN — zero findings.** All three pin arrays extended and confirmed by mutation (register
+the projection one slot early and all three redden). Registration APPENDED on dependency grounds:
+`searchProjection.apply` reads no table at all, and no projection reads `proj_search` in a transaction.
+It does have readers — `compile-filter.ts:97` and the future Task 12 route — but both are read-time on
+a request path, never handlers, so neither creates an adjacency. The comment says that rather than
+implying a §8 slot exists.
+
+**A seam was found that would have reddened the gate:** `compile-filter.test.ts` had been creating its
+own stand-in `proj_search`, so the real migration collided with `relation "proj_search" already
+exists`. Task 2 had left a note asking Task 6 to keep the column names — it did, the stand-in is gone,
+and that test now runs against the shipped table.
+
+### RECORDED, NOT FIXED — owner: Plan 5 Task 12 (the search route)
+
+**The `'simple'` text-search configuration is pinned in THREE unlinked places and nothing forces them
+to move together:** the migration's generated column, `compile-filter.ts:97`'s
+`websearch_to_tsquery('simple', …)`, and the search test's own helper. They agree today (checked). A
+change to the QUERY side alone would leave the projection green while search quietly stopped matching.
+No shared constant was invented, deliberately — Task 12 writes the search route and is the task that
+should decide where such a constant lives, with the route in front of it. **If Task 12 does not, this
+is the seam that rots.**
 
 ### THE FORWARD HAZARD T4 CREATED, and it is this series' signature failure — owner: STEP 10
 
