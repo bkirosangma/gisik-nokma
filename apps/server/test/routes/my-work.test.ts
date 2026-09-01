@@ -399,8 +399,17 @@ describe('GET /v1/me/work — what is mine', () => {
     // are both visible to the member and neither is theirs.
     const everyCard = [...body.groups.open, ...body.groups.active, ...body.groups.terminal];
     expect(everyCard.map((c) => c.assigneeId)).toEqual(everyCard.map(() => read.userIds.member));
+    expect(everyCard.map((c) => c.ticketId)).not.toContain(read.world.sharedTaskId);
+    expect(everyCard.map((c) => c.ticketId)).not.toContain(read.world.epicId);
     expect(response.body).not.toContain(read.world.sharedTaskId);
-    expect(response.body).not.toContain(read.world.epicId);
+    expect(response.body).not.toContain('Renew the trade licence');
+    // The EPIC's id is deliberately not checked as a substring, and that is a
+    // correction rather than a gap: it is the `parentId` of the card that IS
+    // theirs, so it appears in the body as a field OF a card the member owns.
+    // A body-substring check cannot tell that from a leak; the card-id check
+    // above can, so that is the one that carries the claim. (Measured: the
+    // substring form failed on correct code.)
+    expect(everyCard.map((c) => c.parentId)).toContain(read.world.epicId);
 
     // A card, not a stub: the fields a My Work strip actually renders are here.
     const active = body.groups.active[0];

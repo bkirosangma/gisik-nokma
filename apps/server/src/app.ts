@@ -8,6 +8,7 @@ import { registerBoardRoutes } from './routes/board.js';
 import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
 import { registerListRoutes } from './routes/list.js';
+import { registerMyWorkRoutes } from './routes/my-work.js';
 import { registerSearchRoutes } from './routes/search.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
@@ -224,6 +225,14 @@ export function buildApp(
   // boundary. Same preHandler by parameter, same reason as every route above:
   // the handler reads `request.currentUserId` and resolves its gate from it.
   registerSearchRoutes(app, { pool: deps.pool }, requireSession);
+  // My Work (Plan 5 Task 11) — the first PER-VIEWER read: not "what is in this
+  // container" but "what is mine", so the session's user id is the filter as
+  // well as the security boundary. Registered with the same preHandler by
+  // parameter as every route above it, and here that matters most: the handler
+  // does not merely read `request.currentUserId`, that id IS the subject of the
+  // answer, and there is deliberately no parameter by which a caller could name
+  // somebody else's.
+  registerMyWorkRoutes(app, { pool: deps.pool }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;
