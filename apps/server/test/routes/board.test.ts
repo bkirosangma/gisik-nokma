@@ -257,6 +257,22 @@ describe('GET /v1/projects/:projectId/board — the door', () => {
     expect(theirs.body).toContain(read.neighbour.ticketId);
   });
 
+  it('7.17 the board is ONE PROJECT’s, not the workspace’s: a sibling project’s ticket the member may see is absent, and present on its own board', async () => {
+    const ours = await getBoard('member', read.world.projectId);
+    expect(ours.body).not.toContain(read.sibling.ticketId);
+    expect(ours.body).not.toContain(read.sibling.ticketTitle);
+    expect(ours.body).toContain(read.world.epicId);
+
+    // The positive control that makes the absence mean project scope rather
+    // than invisibility: the SAME viewer sees this ticket on the sibling
+    // project's own board. Without it, a ticket nobody could see would satisfy
+    // the three assertions above and prove nothing.
+    const sibling = await boardOf('member', read.sibling.projectId);
+    expect(cardIds(sibling)).toEqual([read.sibling.ticketId]);
+    expect(sibling.projectId).toBe(read.sibling.projectId);
+    expect(sibling.workspaceId).toBe(read.world.workspaceId);
+  });
+
   it('7.17 no session is 401 and never a board — the same URL with a session is 200', async () => {
     const anonymous = await read.app.inject({
       method: 'GET',

@@ -51,6 +51,27 @@ import { signInWithPhone } from './session.js';
  */
 export type ReadRole = 'owner' | 'member' | 'outsider' | 'guest' | 'stranger' | 'neighbour';
 
+/**
+ * A SECOND project inside the seeded workspace, with one ticket of its own and
+ * both `owner` and `member` on its roster.
+ *
+ * `seedReadScenario`'s docblock lists "no second project" among the twelve
+ * things its world does not contain, and for a route keyed on a project id that
+ * absence is load-bearing: with one project per workspace, a board that dropped
+ * its `project_id` clause entirely and filtered on `workspace_id` alone answers
+ * exactly the same bytes, and no test can tell a project board from a workspace
+ * board. MEASURED — that mutation passed all eleven cases before this existed.
+ *
+ * The ticket is visible to `member` (project mode, and they are on the roster),
+ * so it is a card they COULD see that must not appear on the other project's
+ * board. A ticket nobody could see would make the same mutation pass again.
+ */
+export type SiblingProject = {
+  projectId: string;
+  ticketId: string;
+  ticketTitle: string;
+};
+
 export type NeighbourWorkspace = {
   workspaceId: string;
   projectId: string;
@@ -62,6 +83,7 @@ export type NeighbourWorkspace = {
 export type ReadWorld = {
   app: FastifyInstance;
   world: ReadScenario;
+  sibling: SiblingProject;
   neighbour: NeighbourWorkspace;
   userIds: Record<ReadRole, string>;
   tokens: Record<ReadRole, string>;
@@ -99,16 +121,40 @@ export async function buildReadTestApp(db: TestDatabase): Promise<ReadWorld> {
     outsider: userIds.outsider,
     guest: userIds.guest,
   });
+  const sibling = await seedSiblingProject(db.pool, world);
   const neighbour = await seedNeighbourWorkspace(db.pool, userIds.neighbour);
 
   return {
     app,
     world,
+    sibling,
     neighbour,
     userIds,
     tokens,
     authOf: (role) => ({ authorization: `Bearer ${tokens[role]}` }),
   };
+}
+
+/** See `SiblingProject` — the same workspace, a different project. */
+export async function seedSiblingProject(
+  pool: Pool,
+  world: ReadScenario,
+): Promise<SiblingProject> {
+  const projectId = newUlid();
+  const ticketId = newUlid();
+  const ticketTitle = 'Sibling project marker';
+  const ws = { workspaceId: world.workspaceId, actorId: world.owner };
+
+  const events: LedgerEvent[] = [
+    makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.created', payload: { name: 'Licences' } }),
+    makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.member_added', payload: { userId: world.owner, projectAdmin: true } }),
+    makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.member_added', payload: { userId: world.member, projectAdmin: false } }),
+    // Reuses the workspace's already-defined `task` type and `wf-errands`
+    // workflow: re-emitting either would collide on events_entity_seq_unique.
+    makeCommitted({ ...ws, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.created', payload: { typeId: 'task', projectId, parentId: null, title: ticketTitle } }),
+  ];
+  await applyCommitted(pool, events);
+  return { projectId, ticketId, ticketTitle };
 }
 
 /**
