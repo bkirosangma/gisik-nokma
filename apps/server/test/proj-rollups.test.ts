@@ -271,7 +271,7 @@ describe('proj_rollups', () => {
    * and a reader who takes the column for the invariant's number would then
    * ship a parent that refuses closes it should allow.
    */
-  it('counts DIRECT children per category — a grandchild is its own parent\'s child, never this one\'s', async () => {
+  it('counts DIRECT children per category — a grandchild belongs to the parent above it, never to this one', async () => {
     // ONE ledger applied in prefixes, never two overlapping ones: a second
     // `ticket.created` for a ticket that exists rebuilds it from scratch
     // (`applyTicketEvent`), silently discarding the transitions this case is
@@ -450,7 +450,7 @@ describe('proj_rollups', () => {
    * The rebind case in the rebuild-and-diff below is the second killer for the
    * same omission; this one is the direct statement of it.
    */
-  it('a child rebound onto another workflow moves its parent\'s counts, though nothing transitioned and nothing reparented', async () => {
+  it('a child rebound onto another workflow moves the counts of the parent above it, though nothing transitioned and nothing reparented', async () => {
     const ledger = asLedger([...SEED, WF_OTHER_V1, rebound(CHILD_A, WF_OTHER, 'closed')]);
 
     await applyAll(ledger.slice(0, SEED.length + 1));
