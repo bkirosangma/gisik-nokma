@@ -19,7 +19,7 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/03-chain-b`**, cut from step 7's tip. **STEP 8 in progress** — Chain B T9, T10 done. Step 7 is **PR #57, unmerged** (its branch `exec/04-t8-t14-enforcement`) | `git log` |
+| Branch in flight | **`exec/03-chain-b`**, cut from step 7's tip. **STEP 8 COMPLETE — Chain B T9–T14 all done.** Step 7 is **PR #57, unmerged** | `git log` |
 | `main` | **`1003d8d`** per the controller (#55 merged). **REFETCH AND RE-VERIFY BY PRESENCE** before trusting it — main has moved under this file three times today | `git fetch`, `git cat-file -e` |
 | `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
@@ -141,61 +141,60 @@ exit: **TURBO_EXIT=0, 21/21, 1161 tests, zero `Unsupported engine` WARNs, durati
 
 ## Where I am in the serial sequence
 
-**PHASE 0 + STEPS 4, 5, 6 MERGED.** **STEP 7 IS COMPLETE — PR #57, UNMERGED**, because the controller
-session (`gisik-nokma-8d`) **ended mid-step**. See the OPEN ESCALATION section above; a successor must
-read it before merging #57.
+**PHASE 0 + STEPS 4, 5, 6 MERGED. STEPS 7 AND 8 ARE COMPLETE AND UNMERGED**, because the controller
+session ended mid-step-7 and no successor has appeared. **I do not merge; that is the whole reason a
+second session exists.**
 
-**STEP 8 (Plan 3 Chain B) IS IN PROGRESS** on `exec/03-chain-b`, **branched from step 7's tip, not from
-`main`** — deliberately: Chain B's `proj_tickets` collides with step 7 on the projection registry and its
-order pins, and step 7's cases 6.57/6.61 already reference it. Branching from main would have guaranteed
-a conflict. **If #57 merges unchanged, this rebases trivially.**
+| | branch | state |
+|---|---|---|
+| **Step 7** Plan 4 T8–T14 | `exec/04-t8-t14-enforcement` | **PR #57 OPEN**, 1225 tests |
+| **Step 8** Plan 3 Chain B T9–T14 | `exec/03-chain-b` | **complete, 19 commits on top of step 7**, needs a PR |
 
-Gate at HEAD: **exit 0 READ, 21/21, 1242 tests, zero `Unsupported engine` WARNs.**
+**Step 8 is branched FROM step 7, not from `main`** — deliberately: `proj_tickets` collides with step 7
+on the projection registry, and step 7's cases 6.57/6.61 reference it. **Merge #57 first, then Chain B.**
 
-| Chain B task | state |
+Gate at Chain B's HEAD: **exit 0 READ, 21/21, 1277 tests**, zero `Unsupported engine` WARNs.
+domain 295 · rule-engine 280 · **server 461** · app-core 130 · editor 72 · ui 31 · sync-client 8.
+**TEN projections**, counted by printing the `registry.register(` rows — **do not quote that number
+without recounting**; an earlier dispatch of mine said six when there were seven.
+
+### Chain B — what each task found
+
+| task | outcome |
 |---|---|
-| **T9** `proj_ticket_types` | **DONE**, 0 review findings |
-| **T10** `proj_tickets` (floor-list) | **DONE**, 1 Critical + 4 more, all fixed |
-| **T11** `proj_rollups` | **NOT STARTED** |
-| **T12** server `EngineContext` (floor-list) | **NOT STARTED — the most hazardous task in the plan** |
-| **T13** `GET /v1/tickets/:id/history` | **NOT STARTED** |
-| **T14** catalogue | **NOT STARTED** |
+| **T9** `proj_ticket_types` | 0 findings. Found **the plan's own upsert was non-deterministic**: a type's key is its PAYLOAD's id filed at fresh entity ULIDs, so **many entity streams write one projection key** |
+| **T10** `proj_tickets` (floor-list) | **Critical** — a `✅` citing a test **nobody had written**, over a branch nothing constrained. Fix found a **second** stale citation the same commit had created |
+| **T11** `proj_rollups` | 0 findings. Found **two plan-text defects**, and reported a survivor **with its reason** rather than papering over it |
+| **T12** `EngineContext` (floor-list) | **First attempt DIED mid-edit** — 3 Criticals incl. never opening its own main file. Retry closed all 11. **P14 is CLOSED** |
+| **T13** history route | 1 Important — **my dispatch's fault** (see below). Converted **two survivors into killers** rather than excusing them |
+| **T14** catalogue | Reconciled 31 reserved ids against what shipped; corrected two to match the test rather than the plan |
 
-### T12 — READ `docs/plan-3-chain-b-handoff.md` BEFORE STARTING IT, NOT DURING
+### P14 IS CLOSED — verified in source, not taken from a report
 
-Two independent tenancy hazards converge on that one commit, **and both go live in it**:
+All three `proj_workflows` selector branches now read `WHERE workspace_id = $1 AND workflow_id = $2`.
+Tenancy arrives as a **`TenantScope` parameter on the method**, leaving `createEngineContext(client)`
+untouched as the handoff required. The obvious alternative was checked and **reproduces P14 exactly** —
+deriving a type's tenancy from its own head row fails because `proj_entity_heads`' key is global.
+**Ruling P3 held**: `getEntityState('ticket-type')` stayed identity-only despite the plan text
+instructing the rejected alternative at three lines.
 
-1. **P14 — a tenancy hole that ADMITS a write.** `ctx.getWorkflowDef(p.toWorkflowId)` in
-   `checks/workflow-rebind.ts` resolves an **actor-supplied** workflow id with **no workspace predicate
-   anywhere on the server path** — verified at HEAD: all three `proj_workflows` selector branches read
-   `WHERE workflow_id = $1` and nothing else. A foreign id resolves, the target-state check runs against
-   **another workspace's state graph**, and the event is **accepted**. Latent only because
-   `getEntityState('ticket')` answers null today — **it goes live in the same commit T12 lands.**
-   Ruled fail-closed. No unit test can pin it (`buildMemoryContext` has no workspace notion for
-   workflows), so the test home is T12's `engine-context` suite.
-2. **The total-outage trap.** `rowToTicketState` must populate `workspaceId` **and** `kind: 'ticket'`.
-   `undefined !== env.workspaceId` is always true, so a missing field refuses **every parented
-   `ticket.created`** while presenting as a tenancy refusal rather than a mapping bug.
-   *(T10 landed `rowToTicketState`; confirm it carries both before assuming T12 inherits them.)*
+### A DISPATCH ERROR OF MINE, recorded because the rule is the point
 
-**And the brief's own warning: T12's plan text instructs, at three lines, the alternative Plan 3's lane
-explicitly REJECTED. An implementer following it faithfully undoes ruling P3.**
-**Ruling P9**: T12 must align **all three** `EngineContext` implementations in ONE change set.
+**I told T13 not to touch the catalogue because T14 would reconcile it.** Its reviewer correctly called
+that an Important: T13 shipped a route while §5 still said the route did not exist. **"The next task
+will fix it" is precisely the follow-up the same-change-set rule forbids.** T14 did close it minutes
+later — which is why it is recorded rather than re-run — but the drift window was real and I created it.
 
-### Corrections this step made to THIS FILE and to my own dispatches
+### Carried, unfixed, with owners
 
-* **I wrote "SIX projections registered" in a dispatch. There were SEVEN** — I omitted `projInvites`,
-  which step 7's own T14 added. **Nine now.** Verified by printing the rows, not computing.
-  **A stale absolute, carried by me, one step after recording the rule against it.**
-  **Recount from `projections/index.ts` before quoting any figure here.**
-* **A `✅` cited a test that did not exist** (case 5.58), and the fix round then found a **second** stale
-  citation (5.55) that T10's own commit had created — so the floor list was **incomplete, not merely
-  unaddressed**. All 23 quoted citations in `test-cases/05-tickets-hierarchy.md` were then audited.
-  **A citation is a claim; grep for it before shipping it.**
-* **A review premise was falsified by measurement.** The review said a v3 fold would be the
-  intermediate-version cache's first exercise. It is not — publishing refuses any version that is not
-  exactly `latest + 1`, and refresh-on-publish folds every row, so a row is at most one version behind.
-  The case that exercises the cache had to be **planted**, because the door cannot produce it.
+**`getContest` reads `proj_contested` unscoped** — a fourth instance of P14's class, **executed** by the
+reviewer; narrower than P14 because two other guards bite. *Owner: Plan 10 T7.* ·
+**The ticket-type ladder is not as-of** (Plan 3's own Open question 11) — UNASSIGNED ·
+**P9 `'ticket-type'` parity** diverges between harness and memory-context · **`getEntityState('ticket')`'s
+fail-closed branch is unreachable by any input**, so its tenancy argument is untested — kept and recorded
+so it is not mistaken for a tested predicate · **`routes/tickets.ts:347`'s `ORDER BY seq` has the same
+unfalsifiability T13 fixed in its own route, and `tickets-read.test.ts` carries no `seq` assertion at
+all.** *Owner: Plan 4.*
 
 ## What step 2 actually contained
 
