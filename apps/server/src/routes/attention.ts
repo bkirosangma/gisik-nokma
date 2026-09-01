@@ -1,5 +1,10 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import type { AttentionItem, AttentionResponse, TicketCard } from '@gisik-nokma/domain';
+import type {
+  AttentionItem,
+  AttentionResponse,
+  PublishedWorkflowDef,
+  TicketCard,
+} from '@gisik-nokma/domain';
 import { istDayBounds, istDayOf } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
@@ -124,6 +129,24 @@ function istDaysBetween(fromDay: string, toDay: string): number {
  * belongs INSIDE `rollupFor`"). Recorded here rather than fixed, with the same
  * owner.
  *
+ * ## RECORDED, NOT DECIDED: the blocked flag is read from the CURRENT definition
+ *
+ * `latestWorkflowDefs` resolves each workflow to its latest published version,
+ * so a ticket's blocked-ness is judged against the definition in force NOW and
+ * not against the one in force when it entered its state. Republishing a
+ * workflow that newly flags a state therefore re-classifies every ticket already
+ * sitting in it, with no event on any of their own streams — and un-flagging it
+ * takes them off the strip the same way.
+ *
+ * That is defensible for a strip whose whole contract is "what needs attention
+ * NOW", and it is the same reader every other read route on this branch uses. It
+ * is nonetheless a SEMANTICS DECISION nobody has made: the plan text does not
+ * address it, and the alternative — pinning each ticket to the version its state
+ * entry was claimed under — is a different, also-defensible product. It is
+ * recorded here rather than settled, and belongs to whoever rules on read-surface
+ * semantics for this plan series (the coordination doc). `attention.test.ts`
+ * 7.123 OBSERVES the current behaviour; it is not evidence anybody chose it.
+ *
  * ## EXTENSION POINT (Plan 10)
  *
  * Contested claims join this strip as a FOURTH, additive item kind once
@@ -238,13 +261,22 @@ export async function readAttention(
  * means the state is in `blockedStateKeys`, which was built from these same
  * definitions, so the lookup cannot miss — but if it ever did, the id is a true
  * statement about the ticket while `''` would be a name nobody gave sitting
- * where a real one goes. `defs` is a `Map`, and the state list is walked rather
+ * where a real one goes.
+ *
+ * **That fallback is UNCONSTRAINED by any test and is reported as such**, the
+ * way `readMyWork`'s own unreachable `throw` is: no fixture can reach it while
+ * the two lookups agree by construction, so nothing in the suite would notice if
+ * it silently started firing. It is reachable only if `blockedStateKeys` and
+ * this walk are ever fed different definition maps.
+ *
+ * `defs` is typed `Map<string, PublishedWorkflowDef>` and NOT the structural
+ * shape this function happens to read. A narrower structural parameter compiles
+ * today and keeps compiling against a shape nothing produces — the day `states`
+ * grows a field this should consult, or `name` is spelled differently, the
+ * mismatch would be silent. It is a `Map` and the state list is walked rather
  * than indexed, so nothing here is an object keyed by stored data.
  */
-function stateNameOf(
-  defs: Map<string, { states: Array<{ id: string; name: string }> }>,
-  card: TicketCard,
-): string {
+function stateNameOf(defs: Map<string, PublishedWorkflowDef>, card: TicketCard): string {
   return defs.get(card.workflowId)?.states.find((state) => state.id === card.stateId)?.name ??
     card.stateId;
 }

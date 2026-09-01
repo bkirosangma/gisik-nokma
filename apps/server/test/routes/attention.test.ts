@@ -1008,8 +1008,12 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     expect(item.card.stateCategory).toBe('open');
     expect(item.stateName).toBe('Queued');
     expect(item.reason).toBe('In "Queued" — a blocked state.');
-    // The flag came from `wf-second` v2, so the LATEST definition is what was
-    // read: v1 flagged nothing at all.
+    // The flag came from `wf-second` v2 — v1 flagged nothing at all — so this
+    // OBSERVES that the current definition is what the strip reads. That is
+    // behaviour inherited from `latestWorkflowDefs`, not a decision anybody has
+    // made about whether a republished workflow should re-classify tickets
+    // already sitting in a state; `routes/attention.ts` records the question and
+    // names its owner. Read this line as a description, never as pinned intent.
     expect(item.card.workflowId).toBe(read.sibling.secondWorkflowId);
     // The active blocked one is still here beside it.
     expect(idsOf(response, 'blocked')).toContain(read.world.sharedTaskId);
