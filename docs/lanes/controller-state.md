@@ -873,13 +873,39 @@ archaeology, because nothing was collapsed.
    reason under a right decision**, which is the kind that survives review and misleads the next reader.
    Correct the paragraph; do not change the check.
 
-### The open question this work must answer before it promotes anything
+### MEASURED BEFORE THIS PR MERGED — the bodies do NOT name their tasks, so a widening is REQUIRED
 
-`done` is defined as *"a PR **naming that exact plan+task**"*. **Whether #3's and #4's bodies name tasks
-individually is NOT yet measured.** If they do not, the honest outcomes are to promote on the commit
-range as a **stated widening of the definition**, or to leave the rows `claimed` and record why —
-**not** to quietly promote 28 rows and leave the definition reading as though it was satisfied. That
-would be the ledger's own founding defect, committed by the instrument built to prevent it.
+`done` is defined as *"a PR **naming that exact plan+task**"*. **Measured: neither body satisfies it.**
+Every task-shaped string in #3's and #4's bodies is incidental prose, and most point at a *different
+plan's* tasks:
+
+| PR | every task mention in the body | what it actually refers to |
+|---|---|---|
+| #3 | `Task 1`, `Task 10`, `Plan 3 Task 12`, `Plan 3 Task 2→12` | one pre-flight typecheck note; the rest are **Plan 3's** tasks |
+| #4 | `"Task 13"`, `Task 2-vs-Task 12` | a **stale attribution** the body itself flags for repointing, and **Plan 3's** ordering decision |
+
+**So the existing definition promotes ZERO of the 28**, and reading the count (4 and 3) instead of the
+rows would have said the opposite. *(Printed the rows. The count lied — again.)*
+
+**The commit range carries it instead, and carries it well.** Plan 1's 15 task headings against #3's 28
+subjects: **15 of 15 map, in plan order**, several near-verbatim — `### Task 8: Projection framework —
+registry and rebuild` against `Projection framework: a registry of deterministic apply/reset read models
+and a rebuild`; `### Task 9: proj_entity_heads — the reference projection` against `proj_entity_heads:
+the reference projection`. Fix-up commits cluster behind their parent task (three behind T4a, three
+behind T5, three behind T10).
+
+**⚠ THIS IS AN OWNER DECISION, NOT THE AUDITOR'S — `done` is the number every other figure keys off.**
+The choice is:
+- **(A) Widen `done`** to accept *a commit on `main`, inside the PR's range, whose subject matches the
+  task heading* — and **record that commit's sha per row**, not the PR's merge sha. Promotes ~28. The
+  widening must be written into `check-task-ledger.mjs`'s header and this file, in the same change set.
+- **(B) Leave them `claimed`** and record that the evidence exists but the definition does not reach it.
+  Verified stays 14.7%.
+
+**What is NOT on the table: promoting 28 rows while the definition still reads as though a PR had named
+them.** That is the ledger's founding defect — a completion figure asserted at a granularity nobody
+checked — committed by the instrument built to catch it. **Recommendation: (A), with the per-row commit
+sha as the evidence**, because it is strictly more auditable than what the `done` rows carry today.
 
 ## Pending owner decisions
 
