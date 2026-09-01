@@ -824,6 +824,63 @@ open`, and `tmux list-panes -s -t gisik`.
 
 Note its wording is one-directional: a pane being ADDED also reports "a lane may have exited."
 
+## OWNER-APPROVED, QUEUED — audit the 33 `claimed` rows, at the step-9 boundary
+
+**Approved by the owner 2026-09-01 (~20:10 IST): "take it when the step-9 merge is done."** Recorded
+here rather than carried in the conversation, because *a mitigation that lives only in a conversation is
+not a mitigation* — this file's own rule, and a controller restart is what collects on it.
+
+**TRIGGER: after the step-9 PR merges**, in the same window as the executor restart and the re-anchor.
+**NOT before**, and the reason is specific: `task-ledger.tsv` is **the one file both sessions write**, and
+the executor is on a live branch. Editing it mid-step buys a conflict on the step PR for zero
+information. Nothing about this work is urgent; its whole value is that the number stops lying.
+
+**Scope, as approved:** promote what the evidence supports among the 33, and fix the two instrument
+errors below in the same PR. Docs-only, so it merges under the controller's own rule.
+
+**Why it is worth a session at all: 28 of the 33 are two PRs.** Plans 1 (15 rows, #3) and 2 (13 rows,
+#4). The remaining five are 03/T1, 03/T2 (#13), 06/T9 (#43), 07/T4 (#47), 11/T6 (#17). Auditing the two
+moves verified completion from **14.7% to roughly 30%** with no product code written.
+
+### The finding that makes it cheap — #3 and #4 were REBASE-merged, not squashed
+
+Measured with a control, because the whole series has been assuming otherwise:
+
+| PR | branch commits that are ancestors of `origin/main` |
+|---|---|
+| #3 (Plan 1) | **28 of 28** |
+| #4 (Plan 2) | **22 of 22** |
+| **#57 — control, squash-merged** | **0 of 38** |
+
+So for the 28 rows, **every implementing commit is on `main` with its own subject** (`Scaffold the
+pnpm/Turborepo workspace`, `parseEvent and the versioned event-type registry`, `proj_entity_heads: the
+reference projection`, …). The audit is a read of ~50 subjects against ~28 task headings — no
+archaeology, because nothing was collapsed.
+
+### TWO INSTRUMENT ERRORS THIS UNCOVERED — fix both in that same PR
+
+1. **The evidence sha for those 28 rows does not point at the work, and it looks like fraud when you
+   open it.** GitHub sets `mergeCommit` on a rebase-merge to the **last commit of the chain**. For #3
+   that commit touches **3 files**; for #4, **1 file** — both documentation. Ancestry holds, so
+   `check:tasks` is right and the rows are not bogus. **But an auditor who reads the sha's diff finds a
+   docs commit and concludes the row was fabricated** — a trap laid directly in the path of the audit
+   being scheduled here. Whoever does this work must audit the PR's **commit range**, never the merge
+   sha's own diff.
+2. **`scripts/check-task-ledger.mjs`'s stated rationale is over-general.** Its header reads *"WHY `done`
+   IS VALIDATED AGAINST A MERGE COMMIT, NOT THE IMPLEMENTING COMMIT — This repo squash-merges."* True
+   from #51 onward; **false of #3 and #4, the two PRs the 28 rows depend on.** The decision it justifies
+   is still correct — recording the merge commit is safe under both merge styles — so this is **a wrong
+   reason under a right decision**, which is the kind that survives review and misleads the next reader.
+   Correct the paragraph; do not change the check.
+
+### The open question this work must answer before it promotes anything
+
+`done` is defined as *"a PR **naming that exact plan+task**"*. **Whether #3's and #4's bodies name tasks
+individually is NOT yet measured.** If they do not, the honest outcomes are to promote on the commit
+range as a **stated widening of the definition**, or to leave the rows `claimed` and record why —
+**not** to quietly promote 28 rows and leave the definition reading as though it was satisfied. That
+would be the ledger's own founding defect, committed by the instrument built to prevent it.
+
 ## Pending owner decisions
 
 1. ~~**The executor's advisor is running on Fable.**~~ **RESOLVED, no owner action needed** — its status
