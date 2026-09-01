@@ -142,12 +142,13 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-*(Plan 5, Tasks 2–12 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
-replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7, 8, 9, 9b, 10, 11 and 12 added, and nothing else. Plan 5
+*(Plan 5, Tasks 2–13 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
+replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7, 8, 9, 9b, 10, 11, 12 and 13 added, and nothing else. Plan 5
 Task 1 (`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here.
-Still absent rather than missing from this section: every `/v1` read
-route EXCEPT the board, the list, the builder surface, search, My Work and the attention strip (preferences), and the stream hub with
-its WebSocket route — Plan 5 Tasks 13–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
+Still absent rather than missing from this section: the stream hub and its WebSocket route — Plan 5
+Tasks 14–15. Every `/v1` surface this plan owes EXCEPT those two is now here: the board, the list,
+the builder surface, search, My Work, the attention strip and view preferences. §8 is reserved for
+Plan 6 and stays absent on the same rule: the coordination
 doc assigns `Features.md` sections one per implementation plan, so numbering is claimed from that
 table rather than taken next-free.)*
 
@@ -506,6 +507,39 @@ table rather than taken next-free.)*
   that `proj_tickets`' `CHECK (state_category IN ('open','active','terminal'))` is what is
   load-bearing there and the switch is depth. `apps/server/src/routes/my-work.ts`,
   `apps/server/src/app.ts`
+- ✅ **View preferences — `GET`/`PUT /v1/me/preferences?workspaceId=`** — saved filters, per-project
+  list columns and per-project grouping, as **server-owned per-user rows and NOT ledger events**
+  (coordination amendment 14). The exception to everything-is-an-attributed-claim is STATED in three
+  places and made falsifiable in one: preferences arrange the record rather than say anything about
+  it, so there is nothing to attribute and nothing to replay, and the test asserts a PUT appends ZERO
+  events — with two controls in the same case, because "no events were written" and "the request did
+  nothing" are otherwise the same two numbers (the ledger count is non-zero before, an appended event
+  moves it, and the preferences row is there afterwards). The subject is the SESSION and no parameter
+  can name another: five spellings of "act as the owner" on both verbs answer byte-for-byte what the
+  request naming nobody answers, and the owner's row is read back out of the table to prove the
+  impersonating WRITE moved the caller's own document instead. A PUT is a FULL REPLACE, pinned,
+  because a merge cannot express a deletion. **The record keys are `ulidString`, not `z.string()`,
+  and that is a guard rather than tidiness** — MEASURED on zod 3.25.76, a permissive record parses
+  `{"__proto__": [...]}` SUCCESSFULLY and answers `{}`, so a full-replace PUT would store and return
+  a document the caller never sent; over HTTP Fastify's secure JSON parser refuses that one key
+  first, which is why the test also exercises the path no parser guards (a row written as raw jsonb
+  with a `__proto__` key is refused on the way OUT rather than answered). Every string slot refuses
+  U+0000 through `filter-spec.ts`'s own exported guard, imported rather than respelled, because jsonb
+  raises SQLSTATE 22P05 for it in a key or a value (measured) — so the refusal is a 400 a caller can
+  read instead of a 500. An unset preference reads as `EMPTY_PREFERENCES` and the collapse is
+  deliberate and typed: unlike `proj_workspace_settings`, "never saved" and "saved empty" are one
+  answer, because there is nobody to attribute and no screen that could show the difference. The door
+  is the shared one — 401 for no session and for a forged bearer, 400 `invalid_query` for a missing,
+  empty or repeated `workspaceId`, the frozen `READ_NOT_FOUND_BODY` 404 for a non-member, and
+  membership resolved BEFORE the body is parsed, so an unauthorised caller's payload is never read
+  and their 404 does not depend on what they sent. There is no role gate above membership: a guest
+  writes their own preferences like anyone else. Four malformed requests stay distinguishable — bad
+  bytes are Fastify's `FST_ERR_CTP_INVALID_JSON_BODY`, no content type is 415, a body past the 1 MiB
+  limit is 413 (measured, and the ONLY bound on how much a caller may store — no second cap was
+  invented), and a parsed-but-wrong document is this route's own `invalid_preferences`.
+  `packages/domain/src/preferences.ts`, `apps/server/src/preferences/store.ts`,
+  `apps/server/src/routes/preferences.ts`,
+  `apps/server/migrations/1788295700000_user-preferences.sql`, `apps/server/src/app.ts`
 
 ## 9. Editor, documents & attachments
 
