@@ -660,8 +660,15 @@ async function openableInvite(db: Queryable, token: string): Promise<InviteRow |
  * `expires_at > now()` is repeated here rather than trusted from the read: a
  * token that lapsed in the milliseconds since is not one this call may spend,
  * and re-stating the condition costs nothing because it is on the same row the
- * statement already has to find. It also means the mutation that deletes the
- * expiry clause from `openableInvite` does not silently survive here.
+ * statement already has to find.
+ *
+ * The repetition is a genuine ALTERNATIVE and not decoration, and the mutation
+ * rows say which way round. Dropping this clause alone kills nothing — the read
+ * has already refused a lapsed token before control gets here. Dropping the
+ * READ's clause alone now kills one case where it used to kill two, because
+ * THIS clause catches the accept path. Dropping both kills both. So neither
+ * copy is load-bearing on its own and the pair is; whoever removes one should
+ * know the other is the only thing left.
  */
 async function consumeInviteToken(db: Queryable, token: string): Promise<string | null> {
   const { rows } = await db.query<{ invite_id: string }>(
