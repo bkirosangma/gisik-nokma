@@ -10,6 +10,7 @@ import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
 import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
+import { registerPreferencesRoutes } from './routes/preferences.js';
 import { registerSearchRoutes } from './routes/search.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
@@ -257,6 +258,16 @@ export function buildApp(
   // above it: the handler reads `request.currentUserId` and resolves its whole
   // tenancy gate from it.
   registerAttentionRoutes(app, { pool: deps.pool, now: deps.now }, requireSession);
+  // View preferences (Plan 5 Task 13) — the FIRST WRITE surface among these
+  // routes, and the one thing this server stores that is NOT an attributed
+  // claim: preferences arrange the record rather than say anything about it
+  // (coordination amendment 14), so they are per-user rows and a PUT appends no
+  // events. It takes `deps.pool` and the same preHandler by parameter as every
+  // route above it, and here that is load-bearing twice over: the handler does
+  // not merely read `request.currentUserId`, that id is the KEY it writes
+  // under, and there is deliberately no parameter by which a caller could name
+  // somebody else's.
+  registerPreferencesRoutes(app, { pool: deps.pool }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;
