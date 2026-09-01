@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newUlid, type LedgerEvent, type ServerStreamFrame } from '@gisik-nokma/domain';
-import { serverStreamFrameSchema } from '@gisik-nokma/domain';
+import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
 import type { Queryable } from '../../src/db/queryable.js';
+import {
+  fakeSocket,
+  framesAbout,
+  frameTypes as types,
+  rawSocket,
+  type FakeSocket,
+} from '../helpers/stream-socket.js';
 import type { SyncItem } from '../../src/visibility/visible-events-for.js';
 import {
   createStreamHub,
   type StreamHubDeps,
-  type StreamSocket,
   type VisibleEventsFn,
 } from '../../src/stream/hub.js';
 
@@ -75,36 +80,6 @@ function event(workspaceId: string, entityId: string, workspaceSeq: number): Led
     seq: 1,
     workspaceSeq,
   };
-}
-
-type FakeSocket = StreamSocket & {
-  frames: ServerStreamFrame[];
-  closes: Array<{ code: number; reason: string }>;
-  buffered: number;
-};
-
-function fakeSocket(): FakeSocket {
-  const socket: FakeSocket = {
-    frames: [],
-    closes: [],
-    buffered: 0,
-    get bufferedAmount() {
-      return socket.buffered;
-    },
-    send(data: string) {
-      // Parsed through the published schema, not `JSON.parse` alone: every
-      // frame this hub emits must be one a Plan 10 replica can accept, and a
-      // shape drift would otherwise only show up in that plan's session.
-      socket.frames.push(serverStreamFrameSchema.parse(JSON.parse(data)) as ServerStreamFrame);
-    },
-    close(code: number, reason: string) {
-      socket.closes.push({ code, reason });
-    },
-    terminate() {
-      socket.closes.push({ code: -1, reason: 'terminated' });
-    },
-  };
-  return socket;
 }
 
 /** What a scripted ledger may hold: envelopes and Plan 4's two instructions. */
@@ -184,34 +159,6 @@ function hubWith(script: Script, overrides: Partial<StreamHubDeps> = {}) {
     wasUnsubscribed: () => unsubscribed,
   };
 }
-
-/**
- * A socket that records what was written WITHOUT putting it through
- * `serverStreamFrameSchema`.
- *
- * Used by exactly one case: the prototype-key one. `serverStreamFrameSchema`
- * types every frame's `workspaceId` as a ULID, so a frame naming `__proto__`
- * is refused by the published protocol — which is the right answer, and which
- * makes the validating socket above unable to observe the hub's keying at all
- * (the parse throws, the pump catches it, and the socket is closed 1011 with no
- * frames). This one steps around the wire layer to look at the data structure
- * underneath it.
- */
-function rawSocket(): FakeSocket {
-  const socket = fakeSocket();
-  socket.send = (data: string) => {
-    socket.frames.push(JSON.parse(data) as ServerStreamFrame);
-  };
-  return socket;
-}
-
-const types = (socket: FakeSocket): string[] => socket.frames.map((f) => f.type);
-
-/** Every frame about one workspace, whichever field of the frame names it. */
-const framesAbout = (socket: FakeSocket, workspaceId: string): ServerStreamFrame[] =>
-  socket.frames.filter((f) =>
-    f.type === 'event' ? f.envelope.workspaceId === workspaceId : f.workspaceId === workspaceId,
-  );
 
 describe('stream hub — catch-up', () => {
   it('drains past the cursor, then sends caught-up once carrying the WORKSPACE cursor', async () => {
