@@ -6,6 +6,7 @@ import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
 import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
+import type { ProjectionRegistry } from '../../src/projections/registry.js';
 import type { TestDatabase } from './db.js';
 
 export type TestApp = {
@@ -14,6 +15,27 @@ export type TestApp = {
   otp: LogOtpSender;
   /** The full, UNGATED ingest service, for tests that need the internal door. */
   ingest: IngestService;
+};
+
+/**
+ * The one thing a caller may swap, and the reason it is a parameter rather than
+ * a fifth hand-assembled copy of this function.
+ *
+ * `workspace-bootstrap-failure.test.ts` needs an ingest whose projection set
+ * contains one that FAILS partway through the founding sequence — there is no
+ * other way to observe what a half-landed bootstrap actually does to the HTTP
+ * caller, and reasoning about it from the absence of a `try/catch` is an
+ * inference rather than an observation. Everything else stays the real thing:
+ * the real `buildApp`, the real auth, the real gated ingest.
+ */
+export type BuildTestAppOverrides = {
+  /**
+   * Replaces `buildProjectionRegistry()`. A caller that passes this owns
+   * registering the real projections it still wants — the default is NOT merged
+   * in, because a silent merge would make "the registry under test" and "the
+   * registry that ships" differ in a way no test could name.
+   */
+  projections?: ProjectionRegistry;
 };
 
 /**
@@ -37,7 +59,10 @@ export type TestApp = {
  * server's own appends reach the ledger), so it is handed back here, once,
  * beside the app rather than reassembled with different dependencies.
  */
-export function buildTestApp(db: TestDatabase): TestApp {
+export function buildTestApp(
+  db: TestDatabase,
+  overrides: BuildTestAppOverrides = {},
+): TestApp {
   const otp = new LogOtpSender(() => {});
   const auth = createAuth({
     pool: db.pool,
@@ -49,7 +74,7 @@ export function buildTestApp(db: TestDatabase): TestApp {
   const ingest = createIngestService({
     pool: db.pool,
     evaluate: evaluateEvent,
-    projections: buildProjectionRegistry(),
+    projections: overrides.projections ?? buildProjectionRegistry(),
   });
   return { app: buildApp({ db: db.pool, pool: db.pool, ingest, auth }), otp, ingest };
 }

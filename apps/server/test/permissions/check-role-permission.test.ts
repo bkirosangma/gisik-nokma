@@ -664,6 +664,61 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
     expect((await workspaceStream(fresh)).length).toBe(7);
   });
 
+  it('a REDELIVERED founding envelope — same event id, client door — is refused, not idempotently acked', async () => {
+    // CASE 6.105, which until now had no covering test: it was written down
+    // from reading `check-permission.ts` — a check-mark citing a SOURCE file,
+    // the direction this catalogue's own rule forbids, and the direction four
+    // wrong check-marks in §9 were once written in. This is the behaviour change
+    // case 6.52 bought, and it is now run rather than read.
+    //
+    // It is NOT the case above. That one submits a FRESH event id (and a fresh
+    // entity) and is refused because the workspace already exists. This one
+    // submits THE SAME ENVELOPE TWICE — same event id, same entity id — which
+    // is the path a redelivering client takes, and the two are exactly the
+    // distinction this task's escalation turned on. Before the `workspace.created`
+    // refusal landed, this answered `duplicate-event-id`, an `invalid` result
+    // and a safe idempotent ack; it now answers a permission refusal, because
+    // `checkRolePermission` runs before `insertEvent` and only the primary key
+    // can tell a redelivery from a fresh claim.
+    //
+    // BOTH submissions go through the CLIENT door, deliberately: the first
+    // establishes that this envelope founded this workspace through this door,
+    // so the second's different answer cannot be the door changing underneath
+    // it. Mutation: delete the `env.type === 'workspace.created'` refusal in
+    // `checkRolePermission` and this reddens on the FIRST assertion — the
+    // redelivery goes back to `duplicate-event-id`.
+    const ingest = ingestService();
+    const workspaceId = newUlid();
+    const founder = newUlid();
+    const envelope = founding(workspaceId, founder);
+
+    expectCommitted(await ingest.ingestClientBatch([envelope], founder));
+    expect((await workspaceStream(workspaceId)).length).toBe(7);
+
+    // The redelivery. The founder now holds `owner`, so every earlier guard in
+    // the gate passes on its own and the refusal can only be the new branch.
+    expect((await ingest.ingestClientBatch([envelope], founder))[0]).toEqual({
+      status: 'refused',
+      eventId: envelope.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: WORKSPACE_ALREADY_FOUNDED_REASON,
+    });
+    expect((await workspaceStream(workspaceId)).length).toBe(7);
+
+    // THE DISCRIMINATOR, and without it "refused" is equally consistent with an
+    // id the gate never got to. The SAME envelope through the INTERNAL door —
+    // where nothing in `checkRolePermission` runs — still answers
+    // `duplicate-event-id`, which is proof the id genuinely is in the ledger and
+    // that what changed at the client door is the gate and nothing else. It is
+    // also the door Plan 11's seed CLIs use, and case 6.26 depends on this
+    // answer staying what it is.
+    expect((await ingest.ingestBatch([envelope]))[0]).toMatchObject({
+      status: 'invalid',
+      code: 'duplicate-event-id',
+    });
+    expect((await workspaceStream(workspaceId)).length).toBe(7);
+  });
+
   it('founds through the CLIENT door too — the gate admits the founding and not the sequence', async () => {
     // The discriminating case for the whole bootstrap design. The founding
     // sequence is envelope-origin `'server'`, which `checkRolePermission`
