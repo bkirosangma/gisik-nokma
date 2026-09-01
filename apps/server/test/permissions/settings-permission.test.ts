@@ -82,9 +82,11 @@ describe('workspace.settings_set permission', () => {
       reason: NOT_A_MEMBER_REASON,
     });
 
-    // The point of the case, stated as the comparison itself: same rule, different
-    // reason. If either half ever changed to match the other this line reddens even
-    // though both objects above would still be well-formed refusals.
+    // The point of the case, restated as the comparison. REDUNDANT on purpose and
+    // labelled as such: the two exact equalities above already pin both reasons, so
+    // nothing can redden these three lines while those two hold. They document what
+    // the case is about; they are not a second guard, and calling them one would be
+    // the same overclaim the old title made.
     expect(guest.rule).toBe(stranger.rule);
     expect(guest.reason).not.toBe(stranger.reason);
     // ...and the stranger's reason does not name the setting, which is the disclosure
