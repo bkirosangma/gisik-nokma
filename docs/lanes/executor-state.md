@@ -19,7 +19,7 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/04-t8-t14-enforcement`**, rebased onto `origin/main` at `eadc748`. **Step 7 COMPLETE — T8 through T14 all done, reviewed, fixed.** PR for a controller | `git log`, `git rev-parse` |
+| Branch in flight | **`exec/03-chain-b`**, cut from step 7's tip. **STEP 8 in progress** — Chain B T9, T10 done. Step 7 is **PR #57, unmerged** (its branch `exec/04-t8-t14-enforcement`) | `git log` |
 | `main` | **`1003d8d`** per the controller (#55 merged). **REFETCH AND RE-VERIFY BY PRESENCE** before trusting it — main has moved under this file three times today | `git fetch`, `git cat-file -e` |
 | `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
@@ -141,49 +141,61 @@ exit: **TURBO_EXIT=0, 21/21, 1161 tests, zero `Unsupported engine` WARNs, durati
 
 ## Where I am in the serial sequence
 
-**PHASE 0 + STEPS 4, 5, 6 MERGED. STEP 7 IS COMPLETE AND AWAITING A CONTROLLER.**
-`main` = `eadc748`. Branch = `exec/04-t8-t14-enforcement`, rebased onto it, **0 behind**.
-Gate at HEAD: **exit 0 READ (not inferred), 21/21, 1225 tests, zero `Unsupported engine` WARNs.**
+**PHASE 0 + STEPS 4, 5, 6 MERGED.** **STEP 7 IS COMPLETE — PR #57, UNMERGED**, because the controller
+session (`gisik-nokma-8d`) **ended mid-step**. See the OPEN ESCALATION section above; a successor must
+read it before merging #57.
 
-**STEP 8 — Plan 3 Chain B (T9–T13, then T14) — IS NEXT.** Read `docs/plan-3-chain-b-handoff.md`
-**BEFORE** starting it, not during: two independent tenancy hazards converge on Task 12, and **Task 12's
-brief instructs at three lines the alternative Plan 3's lane explicitly rejected** — an implementer
-following it faithfully undoes ruling P3.
+**STEP 8 (Plan 3 Chain B) IS IN PROGRESS** on `exec/03-chain-b`, **branched from step 7's tip, not from
+`main`** — deliberately: Chain B's `proj_tickets` collides with step 7 on the projection registry and its
+order pins, and step 7's cases 6.57/6.61 already reference it. Branching from main would have guaranteed
+a conflict. **If #57 merges unchanged, this rebases trivially.**
 
-### Step 7 — all seven tasks, what each found
+Gate at HEAD: **exit 0 READ, 21/21, 1242 tests, zero `Unsupported engine` WARNs.**
 
-| task | outcome |
+| Chain B task | state |
 |---|---|
-| **T8** read enforcement | 0 findings. **Closed Ruling P22** — `EffectiveRole` branded; a hand-built one fails `TS2741` (verified here, not taken from the review) |
-| **T9** ingest permissions | 0 findings. `proj_projects` **inserted** at its §8 position (six projections). Its plan text would have **reopened the step-4 escalation** by omitting `workspaceExists` |
-| **T10** rollup honesty | 0 findings. Its implementer **died mid-report to machine sleep**; work recovered, not re-run |
-| **T11** `visibleEventsFor` | **CRITICAL** — purge walk disclosed ticket ids to guests and members with no relationship to them. Gated. **Ruling P23** |
-| **T12** security proofs | 0 findings |
-| **T13** founding route | 1 Important, 1 Minor — both *claims asserted without an executed check*. Fixed by **making the checks exist**: a mid-bootstrap fault was injected and a real 500 + clean retry observed |
-| **T14** invites | **CRITICAL** — a single-use token admitted **N concurrent acceptances**, 24/25 trials. Fixed atomically; reproduction committed **RED first** |
+| **T9** `proj_ticket_types` | **DONE**, 0 review findings |
+| **T10** `proj_tickets` (floor-list) | **DONE**, 1 Critical + 4 more, all fixed |
+| **T11** `proj_rollups` | **NOT STARTED** |
+| **T12** server `EngineContext` (floor-list) | **NOT STARTED — the most hazardous task in the plan** |
+| **T13** `GET /v1/tickets/:id/history` | **NOT STARTED** |
+| **T14** catalogue | **NOT STARTED** |
 
-### THE THROUGH-LINE OF THIS STEP, and it is one class
+### T12 — READ `docs/plan-3-chain-b-handoff.md` BEFORE STARTING IT, NOT DURING
 
-**A true statement about one subject, applied to a neighbouring one.** Seven instances now, and the last
-one **caused** a Critical rather than merely misreporting one: *"atomicity is unavailable here"* was true
-of the **ledger** and false of the **token**, and it licensed shipping a permanent multi-admin door.
+Two independent tenancy hazards converge on that one commit, **and both go live in it**:
 
-**The tell is the word "here".** A scope word is exactly where a subject silently widens.
-*"Atomicity is unavailable **here**"*; *"the instrument is inert **here**"* — one task apart.
+1. **P14 — a tenancy hole that ADMITS a write.** `ctx.getWorkflowDef(p.toWorkflowId)` in
+   `checks/workflow-rebind.ts` resolves an **actor-supplied** workflow id with **no workspace predicate
+   anywhere on the server path** — verified at HEAD: all three `proj_workflows` selector branches read
+   `WHERE workflow_id = $1` and nothing else. A foreign id resolves, the target-state check runs against
+   **another workspace's state graph**, and the event is **accepted**. Latent only because
+   `getEntityState('ticket')` answers null today — **it goes live in the same commit T12 lands.**
+   Ruled fail-closed. No unit test can pin it (`buildMemoryContext` has no workspace notion for
+   workflows), so the test home is T12's `engine-context` suite.
+2. **The total-outage trap.** `rowToTicketState` must populate `workspaceId` **and** `kind: 'ticket'`.
+   `undefined !== env.workspaceId` is always true, so a missing field refuses **every parented
+   `ticket.created`** while presenting as a tenancy refusal rather than a mapping bug.
+   *(T10 landed `rowToTicketState`; confirm it carries both before assuming T12 inherits them.)*
 
-**A positive control cannot catch this class**: a control asks whether the instrument works, never what
-it was pointed at. It was caught, twice, only because **two parties with different habitual contexts
-measured the same thing and disagreed.**
+**And the brief's own warning: T12's plan text instructs, at three lines, the alternative Plan 3's lane
+explicitly REJECTED. An implementer following it faithfully undoes ruling P3.**
+**Ruling P9**: T12 must align **all three** `EngineContext` implementations in ONE change set.
 
-### What is carried, unfixed, with owners — recount before trusting this list
+### Corrections this step made to THIS FILE and to my own dispatches
 
-**P18** membership wiring 6.50 (step-10 checkpoint) · **6.52/6.53** founding duplicates + repair path
-(T13 examined both; 6.53 stays ❌ with its inference now named) · **6.57**, **6.61** (Plan 3 T12) ·
-**6.65** SQL mode-side · **6.102**, **6.104** purge retention (Plan 10) · **6.123**, **6.131** invite
-issuance limits and token sweep (Plan 11) · **6.130 revoke-in-flight race — recorded UNASSIGNED**, and
-deliberately so: closing it needs the grant and the status in one transaction inside `commitOne`, which
-is Plan 1's surface, and **no plan in the series has an open task there.** Parking it on Plan 10 would
-have been a handoff nobody receives. · **12.82–12.84** (Plan 10 T7).
+* **I wrote "SIX projections registered" in a dispatch. There were SEVEN** — I omitted `projInvites`,
+  which step 7's own T14 added. **Nine now.** Verified by printing the rows, not computing.
+  **A stale absolute, carried by me, one step after recording the rule against it.**
+  **Recount from `projections/index.ts` before quoting any figure here.**
+* **A `✅` cited a test that did not exist** (case 5.58), and the fix round then found a **second** stale
+  citation (5.55) that T10's own commit had created — so the floor list was **incomplete, not merely
+  unaddressed**. All 23 quoted citations in `test-cases/05-tickets-hierarchy.md` were then audited.
+  **A citation is a claim; grep for it before shipping it.**
+* **A review premise was falsified by measurement.** The review said a v3 fold would be the
+  intermediate-version cache's first exercise. It is not — publishing refuses any version that is not
+  exactly `latest + 1`, and refresh-on-publish folds every row, so a row is at most one version behind.
+  The case that exercises the cache had to be **planted**, because the door cannot produce it.
 
 ## What step 2 actually contained
 
