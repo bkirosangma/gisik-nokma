@@ -7,14 +7,21 @@ import type {
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
-import { requireMember, workspaceOfProject } from '../read/membership.js';
+import { READ_NOT_FOUND_BODY, requireMember, workspaceOfProject } from '../read/membership.js';
 import { SqlParams } from '../read/sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
 import { visibleTicketsWhere } from '../read/visible-where.js';
 import { latestWorkflowDefs } from '../read/workflow-defs.js';
 
-/** The one body this route refuses with, and the only one. */
-export const BOARD_NOT_FOUND_BODY = { error: 'not_found' } as const;
+/**
+ * The one body this route refuses with, and the only one.
+ *
+ * It is now the SHARED `READ_NOT_FOUND_BODY` rather than a literal of its own:
+ * Task 9's list route owes the same indistinguishable 404, and two independently
+ * spelled objects are identical by coincidence until one of them is edited. The
+ * name stays, because it is what this route's own docblock and its tests call it.
+ */
+export const BOARD_NOT_FOUND_BODY = READ_NOT_FOUND_BODY;
 
 /**
  * One project's board: every state of every workflow in use as a column, each

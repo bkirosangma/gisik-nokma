@@ -6,6 +6,7 @@ import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
 import { registerBoardRoutes } from './routes/board.js';
 import { registerEventRoutes } from './routes/events.js';
+import { registerListRoutes } from './routes/list.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
@@ -203,6 +204,10 @@ export function buildApp(
   // parameter, same reason as its neighbours: the handler reads
   // `request.currentUserId`, and its whole tenancy gate is resolved from it.
   registerBoardRoutes(app, { pool: deps.pool }, requireSession);
+  // The project list (Plan 5 Task 9) — the same project's tickets as a filtered,
+  // grouped, keyset-paged flat list. Registered beside the board rather than
+  // inside it: same door, same visibility predicate, different arrangement.
+  registerListRoutes(app, { pool: deps.pool }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;

@@ -2,6 +2,19 @@ import type { Queryable } from '../db/queryable.js';
 import { resolveEffectiveRole, type EffectiveRole } from '../permissions/effective-role.js';
 
 /**
+ * The ONE body every read route behind this gate refuses with.
+ *
+ * A single frozen object rather than a literal per route, because the property
+ * these routes owe is that their two refusals — "no such project" and "not your
+ * workspace" — are BYTE-IDENTICAL, and that a caller cannot tell one route's
+ * refusal from another's. Two separately-spelled `{ error: 'not_found' }`
+ * constants have that property by coincidence and lose it the first time one of
+ * them grows a field. It lives here, beside `requireMember`, because this is
+ * where the decision to answer 404 is made.
+ */
+export const READ_NOT_FOUND_BODY = { error: 'not_found' } as const;
+
+/**
  * A project's workspace; `null` = no such project.
  *
  * Read routes take a project id from the URL and must know which workspace to

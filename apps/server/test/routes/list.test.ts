@@ -413,18 +413,33 @@ describe('GET /v1/projects/:projectId/tickets — groupings', () => {
     expect(grouped['no-epic']?.cards ?? []).not.toContain(fixtures.underInitiativeId);
   });
 
-  it('7.80 PLANTED DEFECT: an epic-rank ancestor the caller may NOT see never becomes their group key or label — the walk is visibility-filtered too', async () => {
+  it('7.80 PLANTED DEFECT: an epic-rank ancestor the caller may NOT see never becomes their group key or LABEL — the walk carries the visibility predicate too', async () => {
     const response = await getList('member', fixtures.epicProjectId, { groupBy: 'epic', limit: 200 });
     expect(response.statusCode).toBe(200);
-    // Positive controls: the body carries the child, so the two absences below
-    // mean absence rather than an error page with nothing in it.
+    // Positive controls: the body carries the child, so the absences below mean
+    // absence rather than an error page with nothing in it.
     expect(response.body).toContain(fixtures.visibleChildId);
     expect(response.body).toContain('Visible child of a hidden epic');
 
-    expect(response.body).not.toContain(fixtures.hiddenEpicId);
+    // THE TITLE is what a grouping leaks, and it is the thing spec line 117
+    // refuses: "existence, no title". It appears nowhere.
     expect(response.body).not.toContain(fixtures.hiddenEpicTitle);
-    const grouped = byKey(response.json() as ListResponse);
+    const list = response.json() as ListResponse;
+    const grouped = byKey(list);
+    expect(list.groups.map((group) => group.key)).not.toContain(fixtures.hiddenEpicId);
+    expect(list.groups.map((group) => group.label)).not.toContain(fixtures.hiddenEpicTitle);
     expect(grouped['no-epic']?.cards).toEqual([fixtures.visibleChildId]);
+
+    // The ID, on the other hand, IS disclosed — on the child's own `parentId`,
+    // and deliberately. `TicketCard`'s docblock states it as a decided trade
+    // ("a viewer who cannot see the parent still gets its id here … spec line
+    // 117, 'existence, no title'"), so this assertion is not a concession: it is
+    // the boundary of the disclosure, pinned, so that the day the product moves
+    // that line this case says so rather than passing quietly.
+    const child = list.groups
+      .flatMap((group) => group.cards)
+      .find((card) => card.ticketId === fixtures.visibleChildId);
+    expect(child?.parentId).toBe(fixtures.hiddenEpicId);
 
     // The positive control that makes the member's `no-epic` a REFUSAL and not
     // a route that groups nothing: the owner, who may see the epic, gets it as
