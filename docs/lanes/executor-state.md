@@ -136,9 +136,11 @@ T13 (4551), T16 (6047).
 | T10 `GET /v1/search` (cross-project) | `1eb3f32`, `66e3549`, `9d642c0`, `82db02b`, `fa2ff11`, `6ae49e7` | CLEAN; 1 Minor (an unstable count) fixed. **Its own leak assertion could not see a leak.** |
 | T11 `GET /v1/me/work` | `4de353f`, `6ec5084`, `32d9df7`, `9afa6ca` | **CLEAN — zero findings.** Reviewer re-ran 8 mutations; all matched. |
 | T12 `GET /attention` (computed) | `347ded7`, `59cd86b`, `fdf7875`, `2d61b13`, `4f97a43`, `d14cf76` | **CLEAN — zero findings.** Reviewer re-ran 10 mutations; all matched. |
+| T13 `/v1/me/preferences` (first WRITE) | `f136086`…`820b575` (7) | **CLEAN — zero findings.** Five items recorded to the coordination doc (§6a-6e). |
+| T14 **FLOOR-LIST** stream frames + hub | `11877e2`…`449a979` (5), fix round `d6a9a2c`, `619a9a7`, `b9b4184`, `7361fbc` | **2 Important + 4 Minor + 1 Nit**, all closed. Hub itself sound; both Importants were in the TESTS. |
 
 **Gate re-run by the executor rather than taken from any agent's report:** exit 0, 21/21, **0 cached**,
-**1504 tests** — domain 320 · rule-engine 280 · **server 663** · app-core 130 · editor 72 · ui 31 ·
+**1555 tests** — domain 335 · rule-engine 280 · **server 699** · app-core 130 · editor 72 · ui 31 ·
 sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**. Sum re-added by script in the same
 run rather than eyeballed: 7 packages, 1430, matches.
 
@@ -316,11 +318,58 @@ reader every route on this branch uses — but the plan does not address it and 
 equally defensible product. Shipped as-is; the test comment was deliberately downgraded to a
 description of behaviour so no future reader mistakes it for pinned intent.
 
-**NEXT: Plan 5 Task 13** — `/v1/me/preferences`, server-owned view preferences, plan line 4551.
-Then **T14 (4918, FLOOR-LIST)** stream frames + hub, **T15 (5452, FLOOR-LIST)** the WS route, T16 (6047).
-**`makeRequireSession` is still wrong at plan lines 4369, 4865 and 5915.**
+### T14's FLOOR-LIST REVIEW — the hub was sound; both Importants were DEAD ASSERTIONS
 
-Then T13 · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (4079) ·
+**The hub itself survived everything.** The fan-out is genuinely per-subscriber; a neighbour
+workspace's owner and a workspace guest, probed against the REAL filter and a real database, each
+received nothing but their own cursor echoed back, with a member in the same case as the positive
+control. Narrowing mid-subscription is honoured and the guard that makes it work dies when removed.
+
+**Important 1: the assertion guarding this task's central disclosure decision could not fire.**
+`expect(JSON.stringify(socket.frames.slice(-1))).not.toContain(ticket)` — and `slice(-1)` is always
+the `scope-revoked` frame, whose shape is `{type, workspaceId}` and which **structurally cannot carry a
+ticket id**. Purge frames emitted before it fall outside the slice. That one assertion carries the
+entire reason `scope-revoked` is ONE frame rather than per-id purges (per-id purges tell an outsider
+how many tickets existed in a scope they were never shown).
+
+**Important 2: the recording socket asserted against a SANITIZED COPY, not the bytes sent.**
+`fakeSocket.send` pushed the schema's *parse result*. The outer frame is `.strict()`, but the envelope
+inside is **not**, so unknown envelope keys were silently stripped — the hub could attach an
+attacker-chosen key to every envelope on the wire and 21/21 passed. **Two docblocks stated the opposite
+as a load-bearing guarantee to Plans 6, 9 and 10**, which is what made it Important rather than Minor.
+Now the raw string is recorded alongside, disclosure is asserted over the raw, and the recorder also
+proves the parse stripped nothing.
+
+**THE METHOD MOMENT WORTH KEEPING: the fix round REFUTED the reviewer's evidence while confirming the
+finding.** The reviewer's stated mutation was **inert in that fixture** — at that `afterSeq`,
+`stream.rows` holds only the revocation row, so there were no ticket rows to itemise and the mutation
+emitted nothing. Its "passes 21 tests" was therefore not evidence about the dead assertion at all. The
+finding was real; its proof was mis-attributed. A substitute mutation that actually fires was built,
+and the fix proven by a **before/after pair under ONE mutation, varying only the assertion spelling** —
+which isolates the fix from the choice of mutation. *A finding whose mechanism is refuted is not
+therefore worthless: refute the mechanism, then ask what the observation was evidence of.*
+
+### RECORDED — two items a later party owns
+
+- **The stream suite's tenancy coverage is an ARTIFACT OF TEST ORDER — owner Plan 4.** Removing the
+  workspace predicate from `visibleEventsFor` (with its param, so the mutation genuinely ran) reddened
+  only one case, incidentally: **7.134 survives because it runs FIRST and `events` is append-only, so
+  no other workspace's rows exist yet.** Re-ordering, or a `.only`, removes the coverage silently.
+- **`StreamSocket.terminate()` is declared and faked but called by nothing — owner Task 15.** Every hub
+  give-up path uses `close(code, reason)`; the real caller is a heartbeat timeout, which T15 owns.
+
+### T13 RECORDED FIVE CROSS-PLAN ITEMS — the controller should see §6b before Plan 6 runs
+
+Coordination doc §6a-6e. **§6b is the one that matters: Plan 6 declares an INCOMPATIBLE
+`UserPreferences`** (`{version, projects, savedFilters[].filter}` against the server's
+`{savedFilters[].filterSpec, listColumns, grouping}`). Informationally equivalent, so it is a naming
+conflict rather than a design one — **but it needs a ruling before Plan 6 Task 10.** §6a narrowed
+record keys `string`→`ulidString`, forced by measurement: **zod 3.25.76 parses `{"__proto__": …}`
+SUCCESSFULLY into `{}`**, so a full-replace PUT would have stored and answered a document nobody sent.
+
+**NEXT: Plan 5 Task 15** — WS `/v1/stream`, the route, heartbeat and planted stream defect, plan line
+5452. **FLOOR-LIST.** Then T16 (6047), the catalogue task, and the branch is complete.
+**`makeRequireSession` is still wrong at plan line 5915.** · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (4079) ·
 T13 (4551) · **T14 (4918, FLOOR-LIST)** · **T15 (5452, FLOOR-LIST)** · T16 (6047).
 
 ### WHAT T5 COST AND WHAT IT BOUGHT — read before dispatching any later floor-list task
