@@ -215,6 +215,25 @@ export function registerStreamRoute(
    * global bucket that refuses everyone past the cap while still looking like a
    * per-user one. 7.152 is written to catch exactly that: user A is filled to
    * the cap and refused, and user B's FIRST socket opens in the same case.
+   *
+   * ## What this bound does NOT do, stated rather than left to be discovered
+   *
+   * *Owner: this task — the trade is chosen here.* The count is read in this
+   * hook and incremented in the ws handler, so N handshakes IN FLIGHT at once
+   * all read a count taken before any of them was admitted, and a burst can
+   * land a few over the cap. That is deliberate: closing it means holding a
+   * reservation from the preHandler and releasing it if the upgrade never
+   * completes, which trades a coarse bound for a leak with a slower clock and a
+   * worse failure mode — a reservation never released is a user permanently
+   * locked out of their own stream. What the bound is for is the steady state,
+   * where a client reconnecting in a loop would otherwise accumulate sockets
+   * without limit; it is not a rate limiter and does not pretend to be.
+   *
+   * The other half of the same question: one connection's SUBSCRIPTION count is
+   * bounded by how many workspaces the caller is actually a member of, because
+   * the hub refuses a duplicate per workspace and this route refuses one for a
+   * workspace they are not in. A caller can therefore hold as many
+   * subscriptions as they have memberships, and no more.
    */
   const requireConnectionBudget = async (
     request: FastifyRequest,
