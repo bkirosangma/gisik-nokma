@@ -35,14 +35,45 @@
 // 0-by-design and 0-because-the-reader-broke must be distinguishable on the face
 // of the report, so it prints as an explicit `0` row and never as a blank line.
 //
-// WHY `done` IS VALIDATED AGAINST A MERGE COMMIT, NOT THE IMPLEMENTING COMMIT
-// --------------------------------------------------------------------------
-// This repo squash-merges. A squash collapses N branch commits into one new
-// commit, so the commit that implemented a task is NOT an ancestor of main
-// after its PR lands -- `git cherry` reports `+` for all 11 commits of a branch
-// that demonstrably merged. Recording the implementing sha would therefore
-// false-RED every finished task. The ledger records the PR's merge commit, and
-// the check is `git merge-base --is-ancestor <sha> origin/main`.
+// WHY `done` IS VALIDATED AGAINST A COMMIT REACHABLE FROM origin/main
+// -------------------------------------------------------------------
+// The check is `git merge-base --is-ancestor <sha> origin/main`, and the sha is
+// whichever commit put this task's work on main. That is deliberately looser
+// than "the PR's merge commit", and the reason is a correction:
+//
+// CORRECTED 2026-09-02. This header used to say "This repo squash-merges" and
+// justified recording the PR's merge commit on that basis. That is true from
+// #51 onward and FALSE of #3, #4 and #13 -- the PRs behind 30 of the ledger's
+// rows -- which were REBASE-merged. Two consequences the old text got wrong:
+//
+//   1. Under a rebase-merge, GitHub sets the PR's mergeCommit to the LAST
+//      commit of the replayed chain. For #3 that commit touches 3 files and for
+//      #4 exactly 1, both documentation. Recording it satisfies the ancestry
+//      check while pointing at a commit that contains none of the work, so an
+//      auditor who opens the sha's diff concludes the row was fabricated.
+//   2. Do NOT infer merge style from "how many branch commits are ancestors of
+//      main". A rebase that replays commits rewrites their shas and reports 0/N,
+//      exactly like a squash. #3 and #4 report 28/28 and 22/22 only because
+//      those rebases were fast-forwards. The instrument that answers reliably is
+//      `gh api repos/<o>/<r>/commits/<sha>/pulls`, which names the owning PR
+//      regardless of merge style.
+//
+// So the rule, stated once and covering both merge styles: record THE COMMIT
+// THAT INTRODUCED THIS TASK'S DECLARED ARTEFACT TO main, confirmed to belong to
+// this task's PR. Under a squash that is the merge sha; under a rebase it is a
+// distinct commit inside the chain. Recording a raw implementing sha from an
+// unmerged branch still false-REDs, and the ancestry check still catches it.
+//
+// WHAT COUNTS AS EVIDENCE (widened by owner ruling, 2026-09-02)
+// -------------------------------------------------------------
+// `done` originally required "a PR NAMING that exact plan+task". Measured: the
+// bodies of #3 and #4 name none of their own 28 tasks -- every task-shaped
+// string in them refers to another plan -- so that definition promoted zero
+// rows whose work had demonstrably shipped. The owner widened it to artefact
+// evidence: the commit above, identified from the task's own `Files:` block.
+// One row (02/T7) declares no artefact and is evidenced by subject plus
+// position; its note says so, because a weaker basis must not read as a
+// stronger one.
 //
 // origin/main, not main, and not `git cat-file`: worktrees share one object
 // store, so an unpushed commit from a sibling worktree resolves fine with
@@ -73,6 +104,15 @@ const STATUSES = new Set(['done', 'claimed', 'in-flight', 'todo']);
 // one that must name evidence. `claimed` may carry evidence -- and it is
 // validated the same way when present -- but its point is that the task-level
 // mapping was never audited, so it must NOT be counted as finished.
+//
+// `claimed` is EMPTY as of 2026-09-02, and keeping the status is deliberate:
+// all 33 rows were audited, 32 promoted on artefact evidence and one (11/T6)
+// DEMOTED to `todo` because its artefact (docker-compose.dev.yml) was never
+// added to main at all. That one row is the whole justification for the split
+// existing -- a `claimed` row concealing work that had not shipped, which no
+// count of merged PRs would ever have surfaced. Do not remove the status
+// because it currently reads zero; it is the landing place for the next
+// plan-granularity assertion, and zero is the value it is supposed to hold.
 const REQUIRES_EVIDENCE = new Set(['done']);
 
 const fail = [];
