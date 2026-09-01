@@ -166,6 +166,39 @@ return ever emptied. **Closer, so it is not re-litigated: a branded type** carry
 > **T8 closed P22**: `EffectiveRole` is branded with a module-private `unique symbol`, so a hand-built one
 > fails `TS2741`. Provenance is compiler-enforced, not conventional.
 >
+> **T10 clean (zero findings, reviewed as the ONLY check on a task whose implementer died mid-report).
+> T11 review found a CRITICAL disclosure, reported 2026-09-01; fix round dispatched, gate at T11's sha
+> 21/21, 1138 tests, server 343 — will move.** The purge walk in `visible-events-for.ts` sits OUTSIDE the
+> `canSee` branch and applies no role test, so an ordinary `visibility.set` or `ticket.reparented` on ANY
+> ticket yields `purge:<thatTicketId>` to every member AND every guest. A guest holding only ticket S,
+> after an admin re-authors unrelated ticket N's audience, syncs down `{kind:'purge', entityId:N}` — a
+> positive assertion that N exists plus roughly when, since ULIDs are timestamp-ordered. Contradicts case
+> **6.16**'s own asserted property and falsifies the module docblock's "the ticket list is not even
+> computed" on the guest path. **6.16's correction lands in the SAME change set, not the fix follow-up.**
+>
+> **DO NOT FILE THIS WITH P19.** P19 (guest admissions) is unrecoverable because the wrong facts ARE
+> ledger rows in an append-only store. This one is a read-path computation over correct rows: no ledger
+> row is wrong, so the fix is complete and retroactive the instant it lands. Filing them together
+> over-scopes the fix or under-scopes P19.
+>
+> **RULING, stated as a condition so it does not need re-arguing:** if the fix agent derives that
+> `ScopeRevokedInstruction`'s docblock already blesses the itemised whole-workspace purge by analogy to
+> case 6.14's restricted-parent leak, **that outcome escalates to the controller before it is built on.**
+> Not because it misreads the docblock, but because of what it becomes — a precedent that a docblock
+> written for a bounded case licenses whole-set enumeration. 6.14 names one parent id to a viewer already
+> holding its child; this enumerates the entire invisible set to a party with no relationship to any of
+> it. Cardinality and relationship both differ, so it is a different shape, not a wider instance of the
+> same one. Derived the other way, no escalation.
+>
+> **T11's implementer also found the PLAN TEXT carries a dead branch, and it is the sharper finding.**
+> The plan opens `if (eff.workspaceRole === null) return;` and places the `membership.revoked` purge
+> branch inside the loop below it — but a revocation deletes the workspace-scope row, so the revoked
+> user's role IS null. The generator returns before reaching the branch written to serve exactly those
+> people, and **every ticket on that device stays there forever.** Unreachable by construction, so the
+> more faithfully an implementer transcribes the plan the more certainly they ship it. `ticket.reparented`
+> had no test at all, found by a mutation that killed nothing. **Five purge triggers, not the three the
+> executor briefed — carry the corrected count INTO T14's dispatch text**, per the standing sweep rule.
+>
 > ### ~~⚠ IN-FLIGHT — `exec/04-t6-t7-visibility`~~ **MERGED as `40c5219`. Kept for the rule below.**
 > **Cut from `main` at `45c83eb`. T6 (`proj_visibility`) is running.** The executor's handoff on `main`
 > may still read *"step 5 is next and nothing is in flight"* — that was true when written and goes stale
@@ -392,6 +425,14 @@ Every one below was violated by a controller that had just written it. **Assume 
   assertions was dead, not the test. **"Vacuous" invites deletion**, so a too-wide verdict licenses
   removing a working check. The controller propagated this one in a dispatch while simultaneously
   demanding mutation proof for the positive claim.
+  > **THE PAIRED-MUTATION RULE — this is the demonstration the entry above never shipped.** Recorded
+  > 2026-09-01 from T11's review, the first time the discrimination was run cleanly. **A mutation that
+  > kills nothing is not evidence of anything until a mutation that DOES kill has run beside it, in the
+  > same suite and the same run.** Measured: deleting the `canSee` guard reddened **7 of 16** cases —
+  > genuinely tested — while a `throw` in the non-guest re-grant arm left **343/343 green** — never
+  > executed. Alone, "343/343 green" is equally consistent with a coverage gap and with an unexecuted
+  > path, and those two demand opposite responses (write the test vs. delete the branch). The green run
+  > is only interpretable next to the red one. **Pair them or report neither.**
 - **An over-specific search returns a false negative that looks like a finding.** Searching all 12 plans
   for Plan 4's *exact* wording of the catalogue rule found it in **one** file; searching for the rule
   loosely found it in **all 11**. Same class as grepping for `21 behind` when the file said `20`.
