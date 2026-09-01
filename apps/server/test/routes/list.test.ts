@@ -476,6 +476,25 @@ describe('GET /v1/projects/:projectId/tickets — groupings', () => {
     expect(type['task']?.cards).toEqual([read.world.taskInEpicId, read.world.sharedTaskId].sort());
   });
 
+  it('7.19 a status key is COMPOSITE: two workflows sharing the state id `todo` are two groups, each with its own label', async () => {
+    // The seeded project has ONE workflow, so its status keys pin the FORMAT
+    // and nothing else — a route keyed on the bare state id passes there. The
+    // sibling project carries a second workflow that deliberately repeats
+    // `todo`, which is the only fixture on the branch where merging the two
+    // shows up as a wrong answer rather than a differently-spelled key.
+    const status = byKey(await listOf('member', read.sibling.projectId, { groupBy: 'status' }));
+    expect(status).toEqual({
+      [`${read.world.workflowId}:todo`]: { label: 'To do', cards: [read.sibling.ticketId] },
+      [`${read.sibling.secondWorkflowId}:todo`]: {
+        label: 'Queued',
+        cards: [read.sibling.choreTicketId],
+      },
+    });
+    // Said as a property too: two groups, not one, and the same state id in both.
+    expect(Object.keys(status)).toHaveLength(2);
+    expect(Object.keys(status).every((key) => key.endsWith(':todo'))).toBe(true);
+  });
+
   it('7.19 a grouping ARRANGES the same matched set — every grouping of one project holds exactly the same card ids', async () => {
     const flat = await idsOf('member', read.world.projectId);
     for (const groupBy of ['status', 'assignee', 'type', 'epic']) {
