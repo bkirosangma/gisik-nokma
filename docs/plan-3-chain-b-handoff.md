@@ -290,3 +290,41 @@ sibling controller while T8's reviewer was running. State was verified restored 
 reviewer's activity after 13:25:26 is provably against the correct tree; what it read **during** the
 window is unknown. **Whoever resumes should re-verify T8's file-based findings** rather than treating
 that review as clean — or simply re-run it.
+
+---
+
+## Recorded by Task 12's review — a fourth unscoped reader, same class as P14 (2026-09-01)
+
+**`getContest` is the one `EngineContext` method that resolves an actor-supplied id against a store that
+HAS a `workspace_id` column and reads it unscoped:**
+`SELECT ticket_id, resolved FROM proj_contested WHERE contested_event_id = $1`.
+
+**Executed by the reviewer, not argued:** workspace B opens a contest against a ticket id with no head
+row yet, so a `proj_contested` row is written with `workspace_id = B`. An admin of workspace **A** then
+files `claim.contested_resolved` naming that `contestedEventId`. The reader resolves **B's row**.
+
+**Why it is Minor rather than the Critical P14 was:** two other guards narrow it — the evaluator's own
+`contest.ticketId !== env.entity.id` check, and ingest's entity↔workspace guard. P14 had neither, which
+is exactly why P14 admitted a write and this one is a much narrower window.
+
+**It is the same class all the same, and it was omitted from the very docblock that enumerates "what is
+scoped, what is not, and why the difference is not an oversight."** An enumeration that misses a member
+is worse than no enumeration: it reads as complete.
+
+***Owner: Plan 10 Task 7*** — it owns `POST /v1/sync` and the contest surface, and the coherence closer
+already landed there. **Not fixed here**: `proj_contested` is Plan 10's table, Task 12 is Plan 3's, and
+the same-class argument is a reason to record it precisely rather than to reach into another plan's
+surface during a floor-list task.
+
+### Two further Nits from the same review, recorded so they are not rediscovered
+
+* **P9 parity, `'ticket-type'`:** `buildInMemoryContext` (harness) answers `null` where `memory-context`
+  fifty lines away answers `{kind, id}` under a comment reading *"Identity ONLY, exactly as the server
+  answers"*. Latent — no engine check reads existence for that kind — but if one ever does, **the
+  fixture suite (the plan's own falsifiability instrument) would refuse where the server accepts.**
+* **`getEntityState('ticket')`'s two-step** — `readEntityHead` then a workspace-scoped row read — is
+  behaviourally identical to a plain unscoped read, because nothing in the vocabulary can make a head row
+  and its ticket row disagree about the workspace. The fail-closed branch is **unreachable by any input**,
+  so its tenancy argument is unconstrained by any test. Disclosed by the implementer as surviving
+  mutation M5. Keeping it is defensible; **it is recorded so it is not later mistaken for a tested
+  predicate.**
