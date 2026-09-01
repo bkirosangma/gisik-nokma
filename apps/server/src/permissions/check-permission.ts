@@ -1,4 +1,9 @@
-import { ticketCreatedPayload, visibilitySetPayload, type EventEnvelope } from '@gisik-nokma/domain';
+import {
+  inviteSentPayload,
+  ticketCreatedPayload,
+  visibilitySetPayload,
+  type EventEnvelope,
+} from '@gisik-nokma/domain';
 import type { Refusal } from '@gisik-nokma/rule-engine';
 import type { Queryable } from '../db/queryable.js';
 import { projectExists } from '../projections/proj-projects.js';
@@ -533,15 +538,42 @@ export interface VisibilityContext extends PermissionContext {
  * project into existence, and asking whether it exists first would make
  * founding one impossible.
  */
-function projectNamedBy(env: EventEnvelope): string | null {
+/**
+ * Every project this event names, in payload order.
+ *
+ * A LIST rather than the single id this returned until Plan 4 Task 14, because
+ * `invite.sent` names as many as an admin typed. Returning the first one only
+ * would make the check pass for an invitation whose second project was a typo,
+ * which is the shape a "checks the first element" bug always takes.
+ *
+ * `invite.sent` is here rather than left to acceptance, and the difference is
+ * MEASURED. Acceptance appends `project.member_added` through the INTERNAL
+ * door, where no gate runs, so a promised project belonging to ANOTHER
+ * workspace reached `readEntityHead`, tripped the entity↔workspace guard, threw
+ * out of the acceptance sequence and answered the joining person **500 — after
+ * `invite.accepted` and `membership.granted` had already committed**. They were
+ * a member, the screen said it had failed, and a retry answered 404 because the
+ * invitation's status was already `accepted`. Refusing at issuance is what
+ * makes that unreachable: with no `project.deleted` event anywhere in the
+ * product, a project that exists when the invitation is minted still exists
+ * when it is accepted.
+ *
+ * Ordering is inherited rather than re-decided: `checkPermission` runs
+ * `checkRolePermission` first, so a plain member issuing an invitation with a
+ * bad project id is told they may not invite — the honest reason — and only an
+ * admin ever reaches this refusal.
+ */
+function projectsNamedBy(env: EventEnvelope): readonly string[] {
   switch (env.type) {
     case 'ticket.created':
-      return ticketCreatedPayload.parse(env.payload).projectId;
+      return [ticketCreatedPayload.parse(env.payload).projectId];
     case 'project.member_added':
     case 'project.member_removed':
-      return env.entity.id;
+      return [env.entity.id];
+    case 'invite.sent':
+      return inviteSentPayload.parse(env.payload).projectIds ?? [];
     default:
-      return null;
+      return [];
   }
 }
 
@@ -576,14 +608,15 @@ function projectNamedBy(env: EventEnvelope): string | null {
  * not use this check to enumerate which project ids exist in it.
  */
 export async function checkProjectExists(db: Queryable, env: EventEnvelope): Promise<Refusal | null> {
-  const projectId = projectNamedBy(env);
-  if (projectId === null) {
-    return null;
+  // Payload order, and the FIRST unknown one is reported: the sender fixes one
+  // id at a time, and a refusal naming an arbitrary member of the set would be
+  // a worse instruction than one naming the first thing wrong.
+  for (const projectId of projectsNamedBy(env)) {
+    if (!(await projectExists(db, env.workspaceId, projectId))) {
+      return refuseWith(PROJECT_UNKNOWN_RULE, projectUnknownReason(projectId));
+    }
   }
-  if (await projectExists(db, env.workspaceId, projectId)) {
-    return null;
-  }
-  return refuseWith(PROJECT_UNKNOWN_RULE, projectUnknownReason(projectId));
+  return null;
 }
 
 /**

@@ -136,6 +136,42 @@ async function eventCount(workspaceId: string): Promise<number> {
   return rows[0]?.n ?? 0;
 }
 
+/** Found a project through the product's own door, asserting it committed. */
+async function foundProject(owner: Caller, workspaceId: string, name = 'Books'): Promise<string> {
+  const projectId = newUlid();
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: owner.headers,
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity: { kind: 'project', id: projectId },
+          type: 'project.created',
+          version: 1,
+          payload: { name },
+          actorId: owner.userId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  expect((res.json() as { results: Array<{ status: string }> }).results[0]?.status, res.body).toBe('committed');
+  return projectId;
+}
+
+async function projectRowsOf(workspaceId: string, userId: string): Promise<string[]> {
+  const { rows } = await db.pool.query<{ project_id: string }>(
+    `SELECT project_id FROM proj_memberships
+      WHERE workspace_id = $1 AND user_id = $2 AND scope_kind = 'project' ORDER BY project_id`,
+    [workspaceId, userId],
+  );
+  return rows.map((row) => row.project_id);
+}
+
 async function workspaceRoleOf(workspaceId: string, userId: string): Promise<string | null> {
   const { rows } = await db.pool.query<{ role: string }>(
     `SELECT role FROM proj_memberships
@@ -256,11 +292,19 @@ describe('POST /v1/workspaces/:workspaceId/invites — issuance (case 6.32)', ()
     expect(body.message).toContain('cannot put a guest on a project; share tickets with visibility.set instead');
 
     // Two positive controls, each differing in exactly one field: the same
-    // guest invitation WITHOUT projects, and the same projects on a MEMBER
+    // guest invitation WITHOUT projects, and the same project on a MEMBER
     // invitation. Without them the refusal above is equally consistent with
     // "guest invitations are broken" and "projectIds is broken".
+    //
+    // A REAL project, founded here. It used to be a bare `newUlid()`, which
+    // stopped being admissible when the gate began resolving promised projects
+    // (case 6.127) — and that is the control doing its job: it went red the
+    // moment a second, unrelated refusal could reach the same call, which is
+    // exactly when a control that named no project would have started passing
+    // for the wrong reason.
+    const realProject = await foundProject(owner, workspaceId);
     expect((await mint(owner, workspaceId, { role: 'guest' })).statusCode).toBe(201);
-    expect((await mint(owner, workspaceId, { role: 'member', projectIds: [newUlid()] })).statusCode).toBe(201);
+    expect((await mint(owner, workspaceId, { role: 'member', projectIds: [realProject] })).statusCode).toBe(201);
   });
 
   it('planted defect: an invitation cannot confer ownership', async () => {
@@ -558,28 +602,7 @@ describe('POST /v1/invites/:token/accept — the grant it promised (case 6.37)',
   it('appends invite.accepted, the grant and the promised project rows, all attributed to the acceptor', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
-    const projectId = newUlid();
-    const project = await app.inject({
-      method: 'POST',
-      url: '/v1/events',
-      headers: owner.headers,
-      payload: {
-        events: [
-          {
-            id: newUlid(),
-            workspaceId,
-            entity: { kind: 'project', id: projectId },
-            type: 'project.created',
-            version: 1,
-            payload: { name: 'Books' },
-            actorId: owner.userId,
-            origin: 'web',
-            clientTime: new Date().toISOString(),
-          },
-        ],
-      },
-    });
-    expect((project.json() as { results: Array<{ status: string }> }).results[0]?.status).toBe('committed');
+    const projectId = await foundProject(owner, workspaceId);
 
     const { inviteId, token } = await mintOk(owner, workspaceId, {
       address: 'bookkeeper@example.com',
@@ -884,6 +907,160 @@ describe('GET /v1/workspaces/:workspaceId/invites — the pending list (case 6.4
     });
     expect(res.statusCode).toBe(403);
     expect(res.body).not.toContain('elsewhere@example.com');
+  });
+});
+
+/**
+ * The two holes the mutation sweep did not reach, found by inspection and then
+ * MEASURED before either fix was written. Both are the same class: a refusal
+ * keyed on the wrong subject.
+ */
+describe('the promised projects (cases 6.126, 6.127)', () => {
+  /**
+   * 6.126 — `inviteSentPayload` refuses `projectIds` on a GUEST invitation, but
+   * that refusal keys on the INVITATION's role. An existing guest accepting a
+   * perfectly legal MEMBER invitation carrying a project is a different subject
+   * entirely, and it was the way the 2026-08-27 collapse's inert association
+   * grew back.
+   *
+   * MEASURED before the fix: the guest kept their guest role (the no-role-change
+   * rule) AND got the project row, with no event looking wrong anywhere.
+   */
+  it('planted defect: an existing GUEST accepting a member invitation gets no project row', async () => {
+    const owner = await signedIn();
+    const workspaceId = await found(owner);
+    const projectId = await foundProject(owner, workspaceId);
+
+    const guest = await joinViaInvite(owner, workspaceId, 'guest');
+    expect(await workspaceRoleOf(workspaceId, guest.userId)).toBe('guest');
+
+    const upgrade = await mintOk(owner, workspaceId, {
+      address: 'upgrade@example.com',
+      role: 'member',
+      projectIds: [projectId],
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/v1/invites/${upgrade.token}/accept`,
+      headers: guest.headers,
+    });
+    expect(res.statusCode, res.body).toBe(200);
+
+    // Still a guest — the no-role-change rule — and therefore holding no
+    // project row, which is what the guest-invitation refusal means.
+    expect(await workspaceRoleOf(workspaceId, guest.userId)).toBe('guest');
+    expect(await projectRowsOf(workspaceId, guest.userId)).toEqual([]);
+
+    // THE POSITIVE CONTROL, same workspace, same project, same invitation
+    // shape: a NEWCOMER accepting it does get the row. Without it, "no project
+    // row" is equally consistent with acceptance no longer appending any.
+    const newcomer = await signedIn();
+    const second = await mintOk(owner, workspaceId, {
+      address: 'newcomer2@example.com',
+      role: 'member',
+      projectIds: [projectId],
+    });
+    expect(
+      (await app.inject({ method: 'POST', url: `/v1/invites/${second.token}/accept`, headers: newcomer.headers }))
+        .statusCode,
+    ).toBe(200);
+    expect(await workspaceRoleOf(workspaceId, newcomer.userId)).toBe('member');
+    expect(await projectRowsOf(workspaceId, newcomer.userId)).toEqual([projectId]);
+
+    // And an existing plain MEMBER does get it too — the withholding is about
+    // being a guest, not about already being in the workspace.
+    const member = await joinViaInvite(owner, workspaceId, 'member');
+    const third = await mintOk(owner, workspaceId, {
+      address: 'existing-member@example.com',
+      role: 'member',
+      projectIds: [projectId],
+    });
+    expect(
+      (await app.inject({ method: 'POST', url: `/v1/invites/${third.token}/accept`, headers: member.headers }))
+        .statusCode,
+    ).toBe(200);
+    expect(await projectRowsOf(workspaceId, member.userId)).toEqual([projectId]);
+  });
+
+  /**
+   * 6.127 — a promised project that does not exist in this workspace is refused
+   * at ISSUANCE, before a credential is ever minted.
+   *
+   * MEASURED before the fix, with a project belonging to ANOTHER workspace: the
+   * invitation minted cleanly, and acceptance appended `invite.accepted` and
+   * `membership.granted`, then hit the entity↔workspace guard on
+   * `project.member_added` — through the INTERNAL door, where no gate runs —
+   * threw out of the sequence, and answered the joining person **500 after they
+   * had already become a member**. The screen said it failed; a retry answered
+   * 404, because the invitation's status was already `accepted`.
+   *
+   * Issuance is the right place and it is sufficient: there is no
+   * `project.deleted` event anywhere in the product, so a project that exists
+   * when an invitation is minted still exists when it is accepted.
+   */
+  it('planted defect: an invitation naming a project of ANOTHER workspace is refused at issuance', async () => {
+    const ownerA = await signedIn();
+    const workspaceA = await found(ownerA, 'A');
+    const ownerB = await signedIn();
+    const workspaceB = await found(ownerB, 'B');
+    const projectInB = await foundProject(ownerB, workspaceB, 'B books');
+
+    const before = await eventCount(workspaceA);
+    const refused = await mint(ownerA, workspaceA, { address: 'x@example.com', projectIds: [projectInB] });
+    expect(refused.statusCode).toBe(422);
+    expect(refused.json()).toMatchObject({
+      status: 'refused',
+      rule: 'project.unknown',
+      reason: `There is no project ${projectInB} in this workspace.`,
+    });
+    // Nothing appended, and — the point — no credential minted for a claim that
+    // could not have been honoured.
+    expect(await eventCount(workspaceA)).toBe(before);
+    const { rows } = await db.pool.query<{ n: number }>(
+      "SELECT count(*)::int AS n FROM proj_invites WHERE workspace_id = $1 AND address = 'x@example.com'",
+      [workspaceA],
+    );
+    expect(rows[0]?.n).toBe(0);
+
+    // A never-founded id is refused identically — the check is existence in
+    // THIS workspace, which covers both shapes with one question.
+    const invented = newUlid();
+    const alsoRefused = await mint(ownerA, workspaceA, { address: 'y@example.com', projectIds: [invented] });
+    expect(alsoRefused.statusCode).toBe(422);
+    expect((alsoRefused.json() as { reason: string }).reason).toBe(
+      `There is no project ${invented} in this workspace.`,
+    );
+
+    // THE POSITIVE CONTROL: workspace A's OWN project, everything else
+    // identical, is admitted.
+    const projectInA = await foundProject(ownerA, workspaceA, 'A books');
+    expect((await mint(ownerA, workspaceA, { address: 'z@example.com', projectIds: [projectInA] })).statusCode).toBe(201);
+
+    // And the SECOND element is checked too, not only the first — the shape a
+    // "checks the head of the list" bug always takes.
+    const both = await mint(ownerA, workspaceA, {
+      address: 'w@example.com',
+      projectIds: [projectInA, invented],
+    });
+    expect(both.statusCode).toBe(422);
+    expect((both.json() as { reason: string }).reason).toBe(
+      `There is no project ${invented} in this workspace.`,
+    );
+  });
+
+  /**
+   * The ordering, which is inherited from `checkPermission` rather than decided
+   * here: the role gate runs before the project check, so a plain member with a
+   * bad project id is told the thing they can actually act on — that they may
+   * not issue invitations at all.
+   */
+  it('a plain member with a bad project id is told they may not invite, not that the project is unknown', async () => {
+    const owner = await signedIn();
+    const workspaceId = await found(owner);
+    const member = await joinViaInvite(owner, workspaceId, 'member');
+    const refused = await mint(member, workspaceId, { address: 'q@example.com', projectIds: [newUlid()] });
+    expect(refused.statusCode).toBe(422);
+    expect(refused.json()).toMatchObject({ rule: 'permission.role' });
   });
 });
 

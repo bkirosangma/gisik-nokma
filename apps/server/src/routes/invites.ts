@@ -404,11 +404,27 @@ export function registerInviteRoutes(
           ),
         );
       }
-      // Deliberately still appended for an existing member: the invitation
-      // promised these projects and an admin authored that promise. What is
-      // withheld from an existing member is only the ROLE change — see the
-      // module docblock.
-      for (const projectId of invite.project_ids) {
+      // The projects the invitation promised — appended for a newcomer and for
+      // an existing NON-GUEST member, because an admin authored that promise
+      // and putting a member on a project is coherent with any role they hold.
+      //
+      // **Withheld from someone who is a GUEST and stays one**, and that is the
+      // hole this guard closes rather than a nicety. `inviteSentPayload` refuses
+      // `projectIds` on a guest INVITATION — "a guest reaches work through
+      // visibility.set explicit lists, so a project association would promise
+      // something membership no longer means" — but that refusal keys on the
+      // invitation's role, not on the acceptor's. MEASURED before this line
+      // existed: an existing guest accepting a perfectly legal MEMBER invitation
+      // carrying a project kept their guest role (the rule above) and got the
+      // project row anyway, so the 2026-08-27 collapse's inert association grew
+      // back through the accept door with no event looking wrong.
+      //
+      // Written against the role the person will actually HOLD, not against the
+      // invitation's — the invitation's role is the field that was already
+      // checked and already insufficient.
+      const resultingRole = existing.workspaceRole ?? invite.role;
+      const projectIds = resultingRole === 'guest' ? [] : invite.project_ids;
+      for (const projectId of projectIds) {
         sequence.push(
           serverEvent({ kind: 'project', id: projectId }, 'project.member_added', {
             userId,
