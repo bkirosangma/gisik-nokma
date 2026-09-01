@@ -34,13 +34,23 @@ import { signInWithPhone } from '../helpers/session.js';
  * assertion with no control passes on an empty result), ordered by the
  * per-entity `seq`, and unsummarised.
  *
- * ## The ordering test inserts out of order ON PURPOSE
+ * ## The ordering assertion here CANNOT falsify `ORDER BY seq ASC`, and its
+ * ## proof lives next door
  *
- * `testEnvelope` mints `seq` ascending in build order and `appendTestEvent`
- * inserts in call order, so in every other file physical row order and `seq`
- * order coincide — and against that fixture, deleting `ORDER BY seq ASC`
- * changes NOTHING and the ordering claim is unfalsifiable. The ordering case
- * below therefore builds its events 2, 3, 4 and inserts them 4, 3, 2.
+ * The case below builds its claims 2, 3, 4 and stores them 4, 3, 2, so the heap
+ * really is out of order — measured, `ctid` beside `seq`. It still survives
+ * deleting the route's `ORDER BY`, because `EXPLAIN (ANALYZE)` on the route's
+ * own query shows an `Index Scan using events_entity_seq_unique`, and that
+ * index is `(entity_kind, entity_id, seq)`: it emits seq order whether or not
+ * the query asks. The seq assertion is kept — it is the ordinary-conditions
+ * statement of the contract — but it is NOT the evidence, and this note is here
+ * so nobody later reads it as evidence.
+ *
+ * The evidence is `ticket-history-ordering.test.ts`, which takes the index
+ * plans away at the database level, validates that it really did (its
+ * unordered control asserts the exact heap order it gets back), and only then
+ * asserts the route answers ascending. Deleting `ORDER BY seq ASC` reddens two
+ * cases there and nothing here.
  *
  * ## Paging edges live in two instruments, deliberately
  *
@@ -177,11 +187,14 @@ async function memberWithTicket(): Promise<{
 }
 
 describe('GET /v1/tickets/:id/history — the ledger, filtered to one ticket', () => {
-  it('returns this ticket claims only, seq-ordered, though they were stored out of order', async () => {
-    // The ORDER BY is the thing under test, so the fixture must be able to
-    // falsify it: the three claims are BUILT 2, 3, 4 (testEnvelope mints seq in
-    // build order) and STORED 4, 3, 2. Physical row order is therefore
-    // 1, 4, 3, 2 and a dropped `ORDER BY seq ASC` reddens this immediately.
+  it('serves this ticket claims and no others, in seq order', async () => {
+    // The claims are BUILT 2, 3, 4 (testEnvelope mints seq in build order) and
+    // STORED 4, 3, 2, so heap order is 1, 4, 3, 2. That is NOT enough to
+    // falsify the route's `ORDER BY` — the planner picks the
+    // (entity_kind, entity_id, seq) unique index and sorts it for free; see the
+    // file docblock and `ticket-history-ordering.test.ts`, which is where the
+    // ordering is actually proven. What this case does constrain is the FILTER:
+    // one ticket's claims, all of them, none of anybody else's.
     const { ws, prj, headers, ticketId } = await memberWithTicket();
     const second = claim(ws, ticketId, 'ticket.field_set', { fieldId: 'dueDate', value: 'x' });
     const third = claim(ws, ticketId, 'ticket.transitioned', { to: 'doing' });

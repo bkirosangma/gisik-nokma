@@ -286,6 +286,17 @@ export function registerTicketHistoryRoute(
       // PER-ENTITY sequence, which is this entity's own history in the order it
       // was made. Not `workspace_seq`: that orders the workspace's whole
       // stream, and interleaves other entities' claims into the gaps.
+      //
+      // `ORDER BY seq ASC` is NOT redundant with the index, and the difference
+      // is only observable if you take the index away. Measured: the planner
+      // chooses `Index Scan using events_entity_seq_unique`
+      // (entity_kind, entity_id, seq), which emits seq order for free, so
+      // deleting this clause changes no result at any table size an ordinary
+      // test can build. `test/routes/ticket-history-ordering.test.ts` disables
+      // index, index-only and bitmap plans on its database — proving it did, by
+      // asserting the exact heap order an unordered copy of this query returns
+      // — and then holds the route to ascending. That is where deleting this
+      // clause reddens.
       const { rows } = await deps.pool.query<HistoryRow>(
         `SELECT id, type, version, payload, actor_id, origin, client_time, server_time, seq
          FROM events
