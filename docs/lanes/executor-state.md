@@ -19,11 +19,11 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/05-api-realtime`**, cut from Chain B's tip. **STEP 9 (Plan 5) IN PROGRESS — batch A only.** | `git log` |
-| `main` | **`6cb631d`** — steps 7 and 8 are BOTH MERGED (#57 → `dd7bfcf`, Chain B → `6cb631d` via **#59**, not #58; a force-push to my branch was denied to the controller, so the PR number changed for permission reasons, not content). **REFETCH before trusting this** | `git log origin/main` |
+| Branch in flight | **`exec/05-api-realtime` @ `c3b1090`** — **REBASED ONTO `origin/main` 2026-09-01.** **STEP 9 (Plan 5) IN PROGRESS.** | `git log`, `git branch -r --contains` |
+| `main` | **`00cb2e0`** — steps 7 and 8 BOTH MERGED (#57 → `dd7bfcf`, Chain B → `6cb631d` via **#59**, not #58), then the controller's docs-only **#60 → `00cb2e0`**. **REFETCH before trusting this** | `git log origin/main` |
 | `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
-| Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, and every pre-squash sha of the Phase 0 branches | `git branch --contains`, empty = orphaned |
+| Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, every pre-squash sha of the Phase 0 branches, and **NEW 2026-09-01: `6d15e50`, `96a6ff3`, `400fbfc`, `95004e1`** — Plan 5 batch A's PRE-REBASE shas, killed by the rebase below. An earlier version of this very file cited all four as live. | `git branch --contains`, empty = orphaned |
 
 ## THE RULE THIS COST US, and it generalises to every remaining rebase
 
@@ -85,23 +85,28 @@ satisfies the requirement the `json` ban is about, and the instrument was proven
 
 ## Where I am in the serial sequence
 
-**STEPS 7 AND 8 ARE MERGED.** `main` = **`6cb631d`**. **RULING P23 IS SETTLED — see below.**
+**STEPS 7 AND 8 ARE MERGED.** `main` = **`00cb2e0`**. **RULING P23 IS SETTLED — see below.**
 
 **STEP 9 (Plan 5, the hinge, 17 tasks) IS IN PROGRESS on `exec/05-api-realtime`.**
 **BATCH A ONLY IS DONE: T1 and T2, plus T2's fix round. T3 ONWARD IS NOT STARTED.**
 
-Gate at HEAD: **exit 0 READ (not inferred), 21/21, 1321 tests**, zero `Unsupported engine` WARNs.
-domain 314 · rule-engine 280 · **server 486** · app-core 130 · editor 72 · ui 31 · sync-client 8.
+Gate **re-run at the post-rebase sha `c3b1090`**, not carried over from the pre-rebase run:
+**exit 0 READ (not inferred), 21/21 (0 cached), 1321 tests**, zero `Unsupported engine` WARNs,
+**Node v22.22.2**. domain 314 · rule-engine 280 · **server 486** · app-core 130 · editor 72 · ui 31 ·
+sync-client 8. (Sum checks: 314+280+486+130+72+31+8 = 1321.) The rebase moved only docs, so composition
+could not have shifted — but it was measured rather than argued, because *docs-only* was itself a claim.
 
 ### THE SEAM — exactly where a successor picks up
 
-**Plan 5 has THREE commits of its own**, all after Chain B's tip `8858f28`:
+**Plan 5 has THREE commits of its own**, now sitting directly on `origin/main` (`00cb2e0`) after the
+rebase. **These are the POST-rebase shas; the pre-rebase ones are orphaned and listed in the anchors
+table above:**
 
 | sha | task |
 |---|---|
-| `6d15e50` | **T1** `docToPlainText` — closed a termination gap the pulled-forward walker shipped with |
-| `96a6ff3` | **T2** FilterSpec + the injection-proof compiler |
-| `400fbfc` | **T2's fix round** — the NUL byte, and a guard that fired on correct code |
+| `b5a776c` | **T1** `docToPlainText` — closed a termination gap the pulled-forward walker shipped with |
+| `3c107c4` | **T2** FilterSpec + the injection-proof compiler |
+| `9286404` | **T2's fix round** — the NUL byte, and a guard that fired on correct code |
 
 **Four files are Plan 5's whole surface so far:** `packages/domain/src/doc-text.ts` (+31),
 `packages/domain/src/filter-spec.ts` (+63), `apps/server/src/read/compile-filter.ts` (+116),
@@ -111,11 +116,45 @@ domain 314 · rule-engine 280 · **server 486** · app-core 130 · editor 72 · 
 **NEXT: Plan 5 Task 3** (`workspace.settings_set`, plan line 628), then T4 (883).
 **Floor-list in this plan: T5 (1213), T9b (3183), T14 (4918), T15 (5452).**
 
-### `git cherry` IS USELESS ON THIS BRANCH RIGHT NOW — and that is the rule working
+### RECORDED BEFORE THEY WERE NEEDED — two plan/as-built drifts found by reading, not by failing
 
-It marks **all 60** commits `+` although 58 are merged, because **#57 and #59 were SQUASHED**.
-Main's subjects carry the **`(#57)` / `(#59)` suffix**, which is the marker that tells you the `+` is
-uninformative. **Rebase onto `origin/main` before doing anything else; do not conclude from `cherry`.**
+Both were found while orienting for T3, before any implementer ran. Recorded here so a restart does not
+re-pay for them, and because the second is **not T3's to fix.**
+
+* **T3's registration snippet is stale, and its AS-BUILT annotation proves the plan was patched
+  incompletely.** The snippet registers `{type, version, payloadSchema}`. As-built,
+  `EventTypeRegistration` also carries **`entityKind?`**, and `parse-event.ts:79` enforces it at the
+  door. It is **optional**, so the plan's snippet *compiles and its tests pass* — which is the trap:
+  omitting it admits a `workspace.settings_set` envelope pointed at `entity.kind: 'ticket'`, and
+  **nothing in T3's supplied test suite can tell the two apart** (`parsed.ok === true` either way).
+  The task carries an explicit AS-BUILT correction for a *different* drift in the same code block (Plan
+  4 T5's `workspaceExists`). **An AS-BUILT annotation is evidence the plan was reviewed, not that it was
+  reviewed completely** — treat one as a signal to check the rest of the snippet, not as a clearance.
+* **T5 will be tempted into a THIRD copy of the visibility decision table — owner Plan 5 T5.**
+  `apps/server/src/visibility/visible-tickets.ts` is on main and already expresses that table in SQL;
+  its own docblock names the hazard: *"Once in `canSeeResolved`, once in SQL — the two-sources-of-truth
+  shape."* T5 produces `visibleTicketsWhere(eff, userId, params): string`, which **does not exist**
+  (main has `listVisibleTickets`, an async query function, not a predicate builder), and neither do
+  `workspaceOfProject` / `requireMember`. So T5 is genuinely create — but it must **extract from**
+  `visible-tickets.ts`, not re-derive beside it. Checked because Plan 4's T5 turned out to *widen*
+  rather than create; this one does not, and that was measured rather than assumed.
+
+### THE REBASE IS DONE — do not re-run it, and here is why `cherry` said what it said
+
+**Performed 2026-09-01: `git rebase --onto origin/main 8858f28`.** Four commits, replayed clean, zero
+conflicts. **Not 62** — the branch is Chain B's tip plus four, and Chain B's content was already on main
+under `6cb631d`, so only the four were ever mine to move.
+
+**The verification that makes this trustworthy is a diff, not the rebase's own success message:**
+`git diff --stat 95004e1 c3b1090` prints **exactly two files** — `docs/lanes/controller-state.md` and
+`docs/lanes/task-ledger.tsv`, i.e. the controller's docs-only `00cb2e0` and nothing else. That is
+positive evidence the branch already carried step 7's and Chain B's content **byte-identically**: had it
+not, source files would appear in that diff. A clean rebase alone would not have shown me this.
+
+`git cherry` marked all 60 pre-rebase commits `+` although 58 were merged, because **#57 and #59 were
+SQUASHED**. Main's subjects carry the **`(#57)` / `(#59)` suffix** — that suffix is the marker telling
+you the `+` is uninformative. **Post-rebase the branch is 4 ahead of `origin/main` and `cherry` is
+meaningful again.**
 
 ### What batch A found — both defects were in code or plan text that predated the task
 
