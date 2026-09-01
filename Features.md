@@ -142,15 +142,55 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-*(Plan 5, Tasks 2–15 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
-replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7, 8, 9, 9b, 10, 11, 12, 13, 14 and 15 added, and nothing else. Plan 5
-Task 1 (`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here.
-Every `/v1` surface this plan owes is now here: the board, the list,
-the builder surface, search, My Work, the attention strip, view preferences, and — as of Task 15 —
-the WebSocket route itself, which is what finally MOUNTS the hub Task 14 built. §8 is reserved for
-Plan 6 and stays absent on the same rule: the coordination
-doc assigns `Features.md` sections one per implementation plan, so numbering is claimed from that
-table rather than taken next-free.)*
+*(**Plan 5, complete: Tasks 1–16.** Task 16 is this plan's catalogue task and has now run, so this
+note is the replacement it owed rather than the placeholder that stood here. Every `/v1` surface Plan
+5 promised is present: the board, the project list, the builder read surface and the one write that
+belongs with it (the bulk workflow rebind), search, My Work, the attention strip, view preferences,
+and the WebSocket route that mounts the hub. Plan 5 Task 1 (`docToPlainText`) keeps its bullet in §3,
+beside the ledger material it belongs to, on the precedent §3 already records for Plan 6's and Plan
+10's pulled-forward bullets; its test cases are **7.1, 7.2 and 7.159** in
+`test-cases/07-api-realtime-search.md`. §8, §10 and §11 stay absent because the coordination doc
+assigns `Features.md` sections one per implementation plan, so numbering is claimed from that table
+rather than taken next-free.)*
+
+*What this surface does **not** do — enumerated, because a partial surface that only calls itself
+partial tells a reader nothing about which half they have. Every item below is a decision with a
+reason on record, not an oversight:*
+
+- *Search answers the **top 50, unpaginated**, ordered by `ts_rank_cd` then ticket id, and its
+  configuration is `FTS_CONFIG = 'simple'` — **nothing is stemmed, in any language**. Both were
+  settled deliberately rather than deferred: stemming one language while not stemming the others
+  would rank dishonestly for an audience that writes in more than one. Pagination stays additive
+  (`hits` is already an array) and a language-aware configuration is a reindex, not a shape change.*
+- *My Work is **per workspace** (`?workspaceId=`). There is no cross-workspace aggregation on the
+  server; a client that wants one loops. A server-side join would need cross-workspace session
+  scoping this series has not defined, and inventing it inside a view endpoint is how scoping rules
+  end up owned by nobody.*
+- *View preferences are **full-replace `PUT`** per (user, workspace). There is no per-key `PATCH` and
+  no merge: last-write-wins on one person's own view arrangement can lose an arrangement, never
+  truth.*
+- *The board answers **`columns: []`** for a project with no visible tickets. Columns are derived from
+  the workflows in use by tickets THIS CALLER may see, so inventing them from a default would show a
+  viewer columns derived from tickets they cannot see. The first-run empty state is Plan 6's, as copy
+  rather than as scaffolding.*
+- *Attention reasons are **English template strings**, and there is no localisation. The structured
+  fields (`stateName`, `thresholdDays`, `windowDays`, `due`) carry everything a later localisation
+  needs to re-render without a server change; the standing rule is that no surface parses the English.*
+- *The stream has **no load or soak coverage** — throughput, memory ceilings and reconnect storms are
+  Plan 11's deployment concern (case 7.35, 🚫). The bounds this plan owns are proven as correctness
+  instead: the per-user connection budget, the slow-consumer `1013` close, the payload bound on an
+  oversized frame, and the heartbeat that terminates a silent peer.*
+- *Two stream gaps are **recorded and unfixed**, each with a named owner, rather than quietly absent.
+  A per-TICKET narrowing mid-stream sends **no purge frame at all** — the events simply stop and a
+  replica keeps a subtree it may no longer see (case 7.158; owner Plan 4,
+  `visibility/visible-events-for.ts`, which records it as case 6.104). And the shared read world
+  seeds fixed entity ids (`wf-errands`, `epic`, `task`) that reach the ledger past the door's ULID
+  rule, so those envelopes fail the published frame schema (case 7.157; owner
+  `test/helpers/read-scenario.ts`).*
+- *The **envelope** inside a stream frame is not `.strict()` — the outer frame object is, but an
+  unknown ENVELOPE key is silently stripped by the published schema, and it is the test recorder
+  rather than the schema that catches a hub leaking one. A Plan 6/9/10 mock importing only the schema
+  must `.strict()` the envelope on its own side (case 7.142).*
 
 - ⚙️ **FilterSpec compiler** — one strict zod shape (`@gisik-nokma/domain`) compiled to parameterized SQL; user bytes travel only as parameters, injection-proven against thirteen planted hostile inputs executed against a live database. The proof is that the emitted SQL is a CONSTANT, pinned clause by clause, rather than that a value fails to appear in it — a substring check reddens on a correct compiler the moment the value is `$1`, `t.`, `SELECT`, `->>` or `ESCAPE`, and a guard that fires on correct code gets deleted. A concatenating reference compiler stands beside it in the test, only to show what the bound one prevents: the same `fieldId` payload widens its answer past the caller's workspace scope to another tenant's ticket, which is a widened result set rather than the weaker kill a syntax error would be. **The door refuses exactly one byte on sight: U+0000**, in all seven free-form string slots, because Postgres `text` cannot carry it — every other control character, DEL and a lone surrogate included, round-trips and is admitted, so the rule is "what the store can hold" and not a taste for tidy input; the executed test shows each slot raising SQLSTATE 22021 past the door, which is what makes the refusal a 400 instead of a 500. A due bound is the shared `IST_DAY_REGEX`, imported rather than restated, and constrains day SHAPE, not calendar existence — fixed-width padding is what makes the compiled text comparison chronological. `fields[].value` deliberately carries no `.min(1)`: `eq: ''` is a real claim, so `contains: ''` is a declared field-PRESENCE predicate that still cannot widen a read. The two clauses that reach another table (`proj_search`, the blocked-states CTE) carry their own `workspace_id = t.workspace_id` correlation, so a filter term cannot answer out of a neighbouring tenant — executable because `proj_tickets.ticket_id` is globally unique, which makes a correctly-filed neighbouring row harmless and projection DRIFT (a search row filed under the wrong workspace) the thing the correlation actually refuses. `packages/domain/src/filter-spec.ts`, `apps/server/src/read/sql-params.ts`, `apps/server/src/read/compile-filter.ts`
 - ⚙️ **`workspace.settings_set` v1** — the attention strip's two thresholds (`staleDays`,
@@ -507,6 +547,35 @@ table rather than taken next-free.)*
   that `proj_tickets`' `CHECK (state_category IN ('open','active','terminal'))` is what is
   load-bearing there and the switch is depth. `apps/server/src/routes/my-work.ts`,
   `apps/server/src/app.ts`
+- ✅ **`GET /v1/workspaces/:workspaceId/attention`** — the attention strip, **computed at read time and
+  stored nowhere**. Three buckets in a fixed order: `blocked` (visible tickets in a state their OWN
+  workflow flagged, whatever the category — the flag is looked up by the composite
+  `` `${workflowId}:${stateId}` `` key, because a state id is unique only within its workflow, and a
+  blocked `open` state is on the strip exactly as a blocked `active` one is), `stale` (visible tickets
+  in an `active` state entered on or before the IST day `staleDays` back, carrying `enteredStateAt`,
+  `daysInFlight` and `thresholdDays`), and `due-soon` (visible NON-TERMINAL tickets whose due-date
+  CLAIM falls on or before the IST day `dueSoonDays` ahead, overdue included, carrying the whole
+  `DueDateClaim`). Every item carries a plain-language `reason`. Nothing is materialised because a
+  stored strip would freeze a judgment that expires the moment it is written; `generatedAt` names the
+  computation moment, and the clock arrives as `AppDeps.now` so a test can pin it. **Both windows are
+  INDIAN days** (owner decision 2026-08-20): boundaries come from `istDayBounds` compared half-open,
+  day counts subtract `istDayOf` results, and nothing divides a millisecond difference by 86 400 000
+  or slices ten characters off an ISO string — both answer the UTC question, which this product does
+  not ask. The two thresholds are read from the workspace's own `workspace.settings_set` claim, never
+  from the constants, and the response carries the WHOLE `WorkspaceSettings` including its provenance,
+  so "the defaults are in force because nobody configured this" stays tellable from "somebody claimed
+  7". The strip emits no count fields; what a client renders as a count is a bucket length, and every
+  row in every bucket came through `visibleTicketsWhere`, so no count can include a ticket the viewer
+  cannot see. The door is the shared one: 401 for no session and for a forged bearer, an
+  indistinguishable 404 for a non-member and for an unknown workspace, and 200-with-an-empty-`items`
+  for a member who may see nothing. Contested claims join as a fourth, additive item kind in Plan 10.
+  `apps/server/src/routes/attention.ts`
+- ⚙️ **`AppDeps.now`** — the clock the attention strip computes against, threaded through `buildApp`
+  UNDEFAULTED so the one definition of "the real clock" lives in `registerAttentionRoutes`. It exists
+  because the strip is the only read on this surface whose answer changes while the database does not:
+  a test that could not pin `now` would be asserting against the day it happened to run.
+  `buildReadTestApp` freezes it at `SCENARIO_NOW`, the instant the shared world's fixtures were always
+  measured from. `apps/server/src/app.ts`, `apps/server/test/helpers/read-app.ts`
 - ✅ **View preferences — `GET`/`PUT /v1/me/preferences?workspaceId=`** — saved filters, per-project
   list columns and per-project grouping, as **server-owned per-user rows and NOT ledger events**
   (coordination amendment 14). The exception to everything-is-an-attributed-claim is STATED in three
@@ -680,33 +749,3 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
   the real projection registry, returning the app, its own OTP sender and the ungated internal ingest
   door. It replaces four hand-copied assemblies that had to be extended one by one every time
   `buildApp` gained a route. `apps/server/test/helpers/app.ts`
-
-- ✅ **`GET /v1/workspaces/:workspaceId/attention`** — the attention strip, **computed at read time and
-  stored nowhere**. Three buckets in a fixed order: `blocked` (visible tickets in a state their OWN
-  workflow flagged, whatever the category — the flag is looked up by the composite
-  `` `${workflowId}:${stateId}` `` key, because a state id is unique only within its workflow, and a
-  blocked `open` state is on the strip exactly as a blocked `active` one is), `stale` (visible tickets
-  in an `active` state entered on or before the IST day `staleDays` back, carrying `enteredStateAt`,
-  `daysInFlight` and `thresholdDays`), and `due-soon` (visible NON-TERMINAL tickets whose due-date
-  CLAIM falls on or before the IST day `dueSoonDays` ahead, overdue included, carrying the whole
-  `DueDateClaim`). Every item carries a plain-language `reason`. Nothing is materialised because a
-  stored strip would freeze a judgment that expires the moment it is written; `generatedAt` names the
-  computation moment, and the clock arrives as `AppDeps.now` so a test can pin it. **Both windows are
-  INDIAN days** (owner decision 2026-08-20): boundaries come from `istDayBounds` compared half-open,
-  day counts subtract `istDayOf` results, and nothing divides a millisecond difference by 86 400 000
-  or slices ten characters off an ISO string — both answer the UTC question, which this product does
-  not ask. The two thresholds are read from the workspace's own `workspace.settings_set` claim, never
-  from the constants, and the response carries the WHOLE `WorkspaceSettings` including its provenance,
-  so "the defaults are in force because nobody configured this" stays tellable from "somebody claimed
-  7". The strip emits no count fields; what a client renders as a count is a bucket length, and every
-  row in every bucket came through `visibleTicketsWhere`, so no count can include a ticket the viewer
-  cannot see. The door is the shared one: 401 for no session and for a forged bearer, an
-  indistinguishable 404 for a non-member and for an unknown workspace, and 200-with-an-empty-`items`
-  for a member who may see nothing. Contested claims join as a fourth, additive item kind in Plan 10.
-  `apps/server/src/routes/attention.ts`
-- ⚙️ **`AppDeps.now`** — the clock the attention strip computes against, threaded through `buildApp`
-  UNDEFAULTED so the one definition of "the real clock" lives in `registerAttentionRoutes`. It exists
-  because the strip is the only read on this surface whose answer changes while the database does not:
-  a test that could not pin `now` would be asserting against the day it happened to run.
-  `buildReadTestApp` freezes it at `SCENARIO_NOW`, the instant the shared world's fixtures were always
-  measured from. `apps/server/src/app.ts`, `apps/server/test/helpers/read-app.ts`
