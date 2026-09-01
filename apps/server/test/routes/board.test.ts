@@ -183,13 +183,19 @@ describe('GET /v1/projects/:projectId/board — visibility', () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain(read.world.hiddenTaskId);
     expect(response.body).toContain('Salary review');
-    expect(cardIds(response.json() as BoardResponse)).toEqual([
-      read.world.epicId,
-      read.world.taskInEpicId,
-      read.world.sharedTaskId,
-      read.world.hiddenTaskId,
-      read.world.guestTaskId,
-    ].sort());
+    // Asserted per COLUMN, not as one flat list: the flat list would also pass
+    // for a board that put every card in one column. The three `todo` ids are
+    // ULIDs minted at seed time, so their relative order is `ticket_id` order —
+    // the documented card ordering — and `.sort()` is how that is spelled.
+    const board = response.json() as BoardResponse;
+    expect(
+      Object.fromEntries(board.columns.map((c) => [c.stateId, c.cards.map((card) => card.ticketId)])),
+    ).toEqual({
+      todo: [read.world.epicId, read.world.hiddenTaskId, read.world.guestTaskId].sort(),
+      doing: [read.world.taskInEpicId],
+      waiting: [read.world.sharedTaskId],
+      done: [],
+    });
   });
 
   it('7.17 a guest gets the whole board of their slice: every column of the workflow, holding only the ticket they were named on', async () => {

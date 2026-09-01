@@ -4,6 +4,7 @@ import type { Auth } from './auth/auth.js';
 import { registerAuthRoutes } from './auth/routes.js';
 import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
+import { registerBoardRoutes } from './routes/board.js';
 import { registerEventRoutes } from './routes/events.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
@@ -197,6 +198,11 @@ export function buildApp(
     { pool: deps.pool, ingest: deps.ingest, serverAppend: deps.serverAppend, webOrigin: deps.webOrigin },
     requireSession,
   );
+  // The project board (Plan 5 Task 8) — one column per state of every workflow
+  // in use, cards filtered to what the caller may see. Same preHandler by
+  // parameter, same reason as its neighbours: the handler reads
+  // `request.currentUserId`, and its whole tenancy gate is resolved from it.
+  registerBoardRoutes(app, { pool: deps.pool }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;
