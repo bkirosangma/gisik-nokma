@@ -5,6 +5,7 @@ import {
   type MemberListResponse,
   type StateOccupancyResponse,
   type TicketTypeListResponse,
+  type TypePopulationResponse,
   type WorkflowListResponse,
   type WorkflowResponse,
 } from '@gisik-nokma/domain';
@@ -371,5 +372,91 @@ describe('GET /v1/workspaces/:workspaceId/workflows/:workflowId/state-occupancy'
     for (const refusal of refusals) {
       expect(comparableHeaders(refusal)).toEqual(comparableHeaders(unknownWorkflow));
     }
+  });
+});
+
+describe('GET /v1/workspaces/:workspaceId/ticket-types/:typeId/population', () => {
+  function population(role: ReadRole, typeId: string, workflowId: string, workspaceId?: string) {
+    return get(role, `/ticket-types/${typeId}/population?workflowId=${encodeURIComponent(workflowId)}`, workspaceId);
+  }
+
+  it('7.44 answers how many tickets of the type are PINNED to that workflow, zeroes included', async () => {
+    const task = (await population('owner', 'task', 'wf-errands')).json() as TypePopulationResponse;
+    expect(task).toEqual({
+      workspaceId: read.world.workspaceId,
+      typeId: 'task',
+      workflowId: 'wf-errands',
+      count: 5,
+    });
+
+    // The ZERO and its positive control, on the same type: `chore` is bound to
+    // `wf-second` and its one ticket sits there, so asking about `wf-errands`
+    // is a real pairing that holds nothing. A count that ignored the workflow
+    // would answer 1 to both.
+    expect(((await population('owner', 'chore', 'wf-errands')).json() as TypePopulationResponse).count).toBe(0);
+    expect(((await population('owner', 'chore', 'wf-second')).json() as TypePopulationResponse).count).toBe(1);
+    // And one that ignored the TYPE would answer 6 here — every ticket on
+    // `wf-errands` — rather than the epic's own 1.
+    expect(((await population('owner', 'epic', 'wf-errands')).json() as TypePopulationResponse).count).toBe(1);
+  });
+
+  it('7.44 is admin-only on state-occupancy’s exact terms — members, guests and strangers get the same 404', async () => {
+    const entitled = await population('owner', 'task', 'wf-errands');
+    expect(entitled.statusCode).toBe(200);
+
+    const refusals: InjectResponse[] = [];
+    for (const role of ['member', 'guest', 'outsider', 'stranger', 'neighbour'] as const) {
+      const response = await population(role, 'task', 'wf-errands');
+      expect([role, response.statusCode]).toEqual([role, 404]);
+      expect(response.json()).toEqual(READ_NOT_FOUND_BODY);
+      refusals.push(response);
+    }
+    // An unknown type read by the person who IS entitled: the same bytes, so a
+    // member cannot tell "not for you" from "no such type".
+    const unknownType = await population('owner', 'no-such-type', 'wf-errands');
+    expect(unknownType.statusCode).toBe(404);
+    for (const refusal of refusals) {
+      expect(comparableHeaders(refusal)).toEqual(comparableHeaders(unknownType));
+    }
+  });
+
+  it('7.86 neither the type id nor the workflow id may resolve out of a neighbouring tenancy', async () => {
+    // Both ids exist — in the NEIGHBOUR's workspace — and both are refused from
+    // here. `proj_ticket_types` is keyed `(workspace_id, type_id)` so its own
+    // key carries the scope, but `proj_workflows` is keyed globally and
+    // `proj_tickets` is keyed on `ticket_id` alone, so neither is safe to
+    // resolve on an actor-supplied id without a workspace correlation.
+    expect((await population('owner', 'nb-task', 'nb-workflow')).statusCode).toBe(404);
+    expect((await population('owner', 'task', 'nb-workflow')).statusCode).toBe(404);
+    expect((await population('owner', 'nb-task', 'wf-errands')).statusCode).toBe(404);
+
+    // POSITIVE CONTROL: the neighbour's own owner reads the same pairing in
+    // their own workspace and gets the count, so the three 404s above are the
+    // tenancy scope answering and not a route that refuses these ids to anyone.
+    const own = (await population('neighbour', 'nb-task', 'nb-workflow', read.neighbour.workspaceId)).json() as TypePopulationResponse;
+    expect(own).toEqual({
+      workspaceId: read.neighbour.workspaceId,
+      typeId: 'nb-task',
+      workflowId: 'nb-workflow',
+      count: 1,
+    });
+  });
+
+  it('7.85 the door answers before `workflowId` is validated, and a missing one is a 400 rather than a guess', async () => {
+    // No `workflowId` at all. The route will not fall back to the TYPE's own
+    // binding: a ticket pins its workflow at creation, so the type's binding is
+    // what NEW tickets get and answering with it would be a different number
+    // wearing this one's name.
+    const member = await get('owner', '/ticket-types/task/population');
+    expect(member.statusCode).toBe(400);
+    expect(member.json()).toEqual({ error: 'invalid_workflow_id' });
+    expect((await get('owner', '/ticket-types/task/population?workflowId=')).statusCode).toBe(400);
+
+    // The same malformed request from a non-admin gets the tenancy 404, not the
+    // 400 — the door runs first, so nobody unauthorised reaches the parser.
+    expect((await get('member', '/ticket-types/task/population')).statusCode).toBe(404);
+    expect((await get('stranger', '/ticket-types/task/population')).statusCode).toBe(404);
+    // POSITIVE CONTROL: the well-formed request from the entitled caller.
+    expect((await population('owner', 'task', 'wf-errands')).statusCode).toBe(200);
   });
 });

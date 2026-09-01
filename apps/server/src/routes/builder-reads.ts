@@ -6,6 +6,7 @@ import type {
   StateOccupancyResponse,
   TicketTypeDef,
   TicketTypeListResponse,
+  TypePopulationResponse,
   WorkflowListResponse,
   WorkflowResponse,
   WorkspaceMember,
@@ -92,6 +93,18 @@ const versionSchema = z.coerce.number().int().positive();
 
 /** The one body a malformed `?version=` draws. Built once, so route and test name one object. */
 export const INVALID_VERSION_BODY = { error: 'invalid_version' } as const;
+
+/**
+ * The one body an absent or empty `?workflowId=` draws on the population route.
+ *
+ * A 400 rather than a fallback to the TYPE's own binding, and that is the whole
+ * point of the parameter: a ticket pins its workflow at CREATION (owner decision
+ * 2026-08-27), so the type's binding is what new tickets get and may already
+ * differ from where the live ones sit. Answering with it would be a different
+ * number wearing this one's name, at exactly the moment a publish is about to
+ * move work on the strength of it.
+ */
+export const INVALID_WORKFLOW_ID_BODY = { error: 'invalid_workflow_id' } as const;
 
 function isWorkspaceAdmin(eff: EffectiveRole): boolean {
   return eff.workspaceRole === 'owner' || eff.workspaceRole === 'admin';
@@ -260,6 +273,48 @@ export async function readStateOccupancy(
   return counts;
 }
 
+/**
+ * Whether this workspace defines this ticket type.
+ *
+ * `proj_ticket_types` is keyed `(workspace_id, type_id)`, so the scope is in the
+ * key here — unlike `proj_workflows`. The predicate is written out anyway,
+ * because a reader must not have to know which of two neighbouring tables
+ * carries its tenancy in the key and which carries it in a plain column.
+ */
+export async function ticketTypeExists(db: Queryable, workspaceId: string, typeId: string): Promise<boolean> {
+  const { rows } = await db.query(
+    'SELECT 1 FROM proj_ticket_types WHERE workspace_id = $1 AND type_id = $2',
+    [workspaceId, typeId],
+  );
+  return rows.length > 0;
+}
+
+/**
+ * How many tickets of one type are pinned to one workflow.
+ *
+ * Both ids came from the URL and both have already been resolved against this
+ * workspace by the caller; the `workspace_id` predicate is bound here regardless
+ * because `proj_tickets`' primary key is `ticket_id` ALONE, so nothing about
+ * this table's shape scopes a count on its own.
+ *
+ * `::int` on the count: `createPool` installs an int8 parser, but saying it in
+ * the SQL means the JSON carries a number no matter which pool this runs on.
+ */
+export async function readTypePopulation(
+  db: Queryable,
+  workspaceId: string,
+  typeId: string,
+  workflowId: string,
+): Promise<number> {
+  const { rows } = await db.query<{ population: number }>(
+    `SELECT count(*)::int AS population
+       FROM proj_tickets
+      WHERE workspace_id = $1 AND type_id = $2 AND workflow_id = $3`,
+    [workspaceId, typeId, workflowId],
+  );
+  return rows[0]?.population ?? 0;
+}
+
 export function registerBuilderReadRoutes(
   app: FastifyInstance,
   deps: { pool: Queryable },
@@ -383,6 +438,44 @@ export function registerBuilderReadRoutes(
         workspaceId,
         workflowId,
         counts: await readStateOccupancy(deps.pool, workspaceId, def),
+      };
+      return body;
+    },
+  );
+
+  app.get<{ Params: { workspaceId: string; typeId: string }; Querystring: { workflowId?: string } }>(
+    '/v1/workspaces/:workspaceId/ticket-types/:typeId/population',
+    { preHandler: requireSession },
+    async (request, reply) => {
+      const { workspaceId, typeId } = request.params;
+      // Admin-only, on state-occupancy's exact terms and for its exact reason:
+      // the honest number is the whole workspace's, counted over tickets the
+      // caller may not see, so there is no per-viewer variant to serve instead.
+      // The door precedes the query parse here too (case 7.83's order).
+      if ((await door(request, workspaceId, 'admins-only')) === null) {
+        return reply.code(404).send(READ_NOT_FOUND_BODY);
+      }
+      const workflowId = request.query.workflowId;
+      if (typeof workflowId !== 'string' || workflowId === '') {
+        return reply.code(400).send(INVALID_WORKFLOW_ID_BODY);
+      }
+      // BOTH actor-supplied ids are resolved against the caller's workspace
+      // before anything is counted, and an unknown one is the same 404 as an
+      // unauthorised caller. Counting first would answer 0 for a type this
+      // workspace has never defined and for a workflow belonging to the tenant
+      // next door — a zero that looks like an answer, at the moment a mapping
+      // dialog is deciding there is nothing to move.
+      if (!(await ticketTypeExists(deps.pool, workspaceId, typeId))) {
+        return reply.code(404).send(READ_NOT_FOUND_BODY);
+      }
+      if ((await getWorkflowDefFromProjection(deps.pool, workspaceId, workflowId)) === null) {
+        return reply.code(404).send(READ_NOT_FOUND_BODY);
+      }
+      const body: TypePopulationResponse = {
+        workspaceId,
+        typeId,
+        workflowId,
+        count: await readTypePopulation(deps.pool, workspaceId, typeId, workflowId),
       };
       return body;
     },
