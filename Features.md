@@ -142,12 +142,12 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-*(Plan 5, Tasks 2–11 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
-replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7, 8, 9, 9b, 10 and 11 added, and nothing else. Plan 5
+*(Plan 5, Tasks 2–12 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
+replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7, 8, 9, 9b, 10, 11 and 12 added, and nothing else. Plan 5
 Task 1 (`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here.
 Still absent rather than missing from this section: every `/v1` read
-route EXCEPT the board, the list, the builder surface, search and My Work (attention, preferences), and the stream hub with
-its WebSocket route — Plan 5 Tasks 12–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
+route EXCEPT the board, the list, the builder surface, search, My Work and the attention strip (preferences), and the stream hub with
+its WebSocket route — Plan 5 Tasks 13–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
 doc assigns `Features.md` sections one per implementation plan, so numbering is claimed from that
 table rather than taken next-free.)*
 
@@ -280,7 +280,11 @@ table rather than taken next-free.)*
   state category nothing knows, so a "5 of 8 done" is never rendered off evidence for only six of
   them. `StateProvenance.cause` is `null` without such an arm, and the type says why: every state was
   claimed by exactly one event, so "the claim named no cause" is a complete statement about a claim
-  that exists. `packages/domain/src/read-models.ts`
+  that exists. `AttentionResponse.settings` is the third: it carries the whole `WorkspaceSettings`,
+  provenance included, rather than a bare `{staleDays, dueSoonDays}` pair, because that pair gives
+  "nobody has configured this workspace, so 7 is the default" and "somebody claimed 7" the same value
+  — and `getWorkspaceSettings` had already kept them apart one layer down.
+  `packages/domain/src/read-models.ts`
 - ⚙️ **`stateProvenanceFor` / `latestWorkflowDefs` / `blockedStateKeys` / `assembleTicketCards`** — the
   server-side readers that turn `proj_tickets` rows into cards. Provenance is the claim that produced
   each ticket's CURRENT state — the latest `ticket.transitioned`, or `ticket.created` if never
@@ -626,3 +630,33 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
   the real projection registry, returning the app, its own OTP sender and the ungated internal ingest
   door. It replaces four hand-copied assemblies that had to be extended one by one every time
   `buildApp` gained a route. `apps/server/test/helpers/app.ts`
+
+- ✅ **`GET /v1/workspaces/:workspaceId/attention`** — the attention strip, **computed at read time and
+  stored nowhere**. Three buckets in a fixed order: `blocked` (visible tickets in a state their OWN
+  workflow flagged, whatever the category — the flag is looked up by the composite
+  `` `${workflowId}:${stateId}` `` key, because a state id is unique only within its workflow, and a
+  blocked `open` state is on the strip exactly as a blocked `active` one is), `stale` (visible tickets
+  in an `active` state entered on or before the IST day `staleDays` back, carrying `enteredStateAt`,
+  `daysInFlight` and `thresholdDays`), and `due-soon` (visible NON-TERMINAL tickets whose due-date
+  CLAIM falls on or before the IST day `dueSoonDays` ahead, overdue included, carrying the whole
+  `DueDateClaim`). Every item carries a plain-language `reason`. Nothing is materialised because a
+  stored strip would freeze a judgment that expires the moment it is written; `generatedAt` names the
+  computation moment, and the clock arrives as `AppDeps.now` so a test can pin it. **Both windows are
+  INDIAN days** (owner decision 2026-08-20): boundaries come from `istDayBounds` compared half-open,
+  day counts subtract `istDayOf` results, and nothing divides a millisecond difference by 86 400 000
+  or slices ten characters off an ISO string — both answer the UTC question, which this product does
+  not ask. The two thresholds are read from the workspace's own `workspace.settings_set` claim, never
+  from the constants, and the response carries the WHOLE `WorkspaceSettings` including its provenance,
+  so "the defaults are in force because nobody configured this" stays tellable from "somebody claimed
+  7". The strip emits no count fields; what a client renders as a count is a bucket length, and every
+  row in every bucket came through `visibleTicketsWhere`, so no count can include a ticket the viewer
+  cannot see. The door is the shared one: 401 for no session and for a forged bearer, an
+  indistinguishable 404 for a non-member and for an unknown workspace, and 200-with-an-empty-`items`
+  for a member who may see nothing. Contested claims join as a fourth, additive item kind in Plan 10.
+  `apps/server/src/routes/attention.ts`
+- ⚙️ **`AppDeps.now`** — the clock the attention strip computes against, threaded through `buildApp`
+  UNDEFAULTED so the one definition of "the real clock" lives in `registerAttentionRoutes`. It exists
+  because the strip is the only read on this surface whose answer changes while the database does not:
+  a test that could not pin `now` would be asserting against the day it happened to run.
+  `buildReadTestApp` freezes it at `SCENARIO_NOW`, the instant the shared world's fixtures were always
+  measured from. `apps/server/src/app.ts`, `apps/server/test/helpers/read-app.ts`
