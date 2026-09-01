@@ -63,12 +63,12 @@ plan	task	status	pr	merge_sha	note
 03	6	done	38	6b2fc768	
 03	7	done	38	6b2fc768	
 03	8	done	38	6b2fc768	
-03	9	todo	-	-	
-03	10	todo	-	-	
-03	11	todo	-	-	
-03	12	todo	-	-	
-03	13	todo	-	-	
-03	14	todo	-	-	
+03	9	done	59	6cb631d0	
+03	10	done	59	6cb631d0	
+03	11	done	59	6cb631d0	
+03	12	done	59	6cb631d0	
+03	13	done	59	6cb631d0	
+03	14	done	59	6cb631d0	
 04	1	todo	-	-	
 04	2	todo	-	-	
 04	3	todo	-	-	
@@ -76,13 +76,13 @@ plan	task	status	pr	merge_sha	note
 04	5	done	51	45c83eb4	
 04	6	done	52	40c52191	
 04	7	done	52	40c52191	
-04	8	in-flight	-	-	exec/04-t8-t14-enforcement, committed on branch, PR not open
-04	9	in-flight	-	-	exec/04-t8-t14-enforcement, committed on branch, PR not open
-04	10	in-flight	-	-	exec/04-t8-t14-enforcement, committed on branch, PR not open
-04	11	in-flight	-	-	exec/04-t8-t14-enforcement, floor-list, implementer running
-04	12	todo	-	-	
-04	13	todo	-	-	
-04	14	todo	-	-	
+04	8	done	57	dd7bfcfd	
+04	9	done	57	dd7bfcfd	
+04	10	done	57	dd7bfcfd	
+04	11	done	57	dd7bfcfd	
+04	12	done	57	dd7bfcfd	
+04	13	done	57	dd7bfcfd	
+04	14	done	57	dd7bfcfd	
 05	1	done	8	23361496	
 05	2	todo	-	-	
 05	3	todo	-	-	
