@@ -19,8 +19,8 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/10-t4-origin-closer`**, cut from `origin/main` at `40c5219`. Step 6 done, reviewed, Minors fixed. PR for the controller | `git log`, `git rev-parse` |
-| `main` | **`40c5219`** (PR #52, step 5). Verified by presence: `can-see.ts`, `visible-tickets.ts`, `proj-visibility.ts` all on it; `index.ts` registers FOUR projections | `git cat-file -e`, `git show` |
+| Branch in flight | **`exec/04-t8-t14-enforcement`**, rebased onto `origin/main` at `eadc748`. **Step 7 COMPLETE — T8 through T14 all done, reviewed, fixed.** PR for a controller | `git log`, `git rev-parse` |
+| `main` | **`1003d8d`** per the controller (#55 merged). **REFETCH AND RE-VERIFY BY PRESENCE** before trusting it — main has moved under this file three times today | `git fetch`, `git cat-file -e` |
 | `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
 | Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, and every pre-squash sha of the Phase 0 branches | `git branch --contains`, empty = orphaned |
@@ -83,67 +83,107 @@ satisfies the requirement the `json` ban is about, and the instrument was proven
 | CSRF anchor line | **`sign-in-flows.test.ts:148` on `main @ 91df593`**, content confirmed: `expect(attributes).toEqual(['Max-Age=604800', 'Path=/', 'HttpOnly', 'SameSite=Lax']);` — re-verified on main, not merely on the stale branch, because T5 item 3 anchors a sentence to a line and line numbers drift across a rebase-merge | `awk` over the blob at `origin/main` |
 | `docs/` affects the gate | **NO.** `turbo.json` declares no `inputs`, and `docs/` sits outside every package, so a docs-only merge cannot move gate composition. **PRs #48 and #49 were both docs-only** — do not re-run a gate to "check" them | read `turbo.json` |
 
+## OPEN ESCALATION — the controller session ENDED before this could be delivered
+
+**`gisik-nokma-8d` became unreachable mid-step-7.** This was written as a message, could not be sent,
+and is recorded here instead. **A successor controller must read this before merging step 7's PR.**
+
+### Ruling P23 was applied as DELETE, not as NARROW, and its footprint is wider than the ruling named
+
+The ruling said the member-side per-event purge **must be gated**, naming case **6.101**. The
+implementing agent **deleted the per-event subtree walk entirely**, and flagged the interpretation
+against its own work as its least-sure claim.
+
+**Its derivation, which I judge sound:** a purge may only name an entity the recipient could previously
+see; the module **cannot ask** that question (`proj_visibility` keeps no prior audience, no payload
+carries a before-image); and it **may not reconstruct** the answer (cases 6.82/6.94, the
+second-definition ban). Those three together leave **no conforming per-event emission at all**, so
+nothing survives to gate.
+
+**What it cost beyond 6.101, which is the part needing a controller's eye:**
+* four test blocks deleted; cases **6.90** and **6.99** flipped ✅ → 🚫;
+* **per-event tombstones removed for MEMBERS AS WELL AS GUESTS** — recorded as **6.104**, sibling of
+  6.102, **owner Plan 10**, phrased as an absence.
+
+So the under-purge residual accepted for one case now applies to **all** per-event triggers, and the
+retention half of a gap Plan 10 must close got **harder**, not easier.
+
+**A narrower gate was considered and declined, and this is the load-bearing judgement:** gating the purge
+on the viewer being **on the ticket's project** has a far smaller blast radius, and was refused because
+*being on a container is not holding the entity* — it fails the ruling's own **relationship** axis and
+leaves the same disclosure at a smaller radius, which is exactly what the ruling rejected for guests.
+**I agree with that refusal.**
+
+**REVERSAL IS CHEAP AND EXACT IF A CONTROLLER DISAGREES:** the agent's mutation 1 — re-adding the deleted
+walk — is the precise restoration diff, and it reddens both 6.101 cases and nothing else.
+
+### And the signature defect appeared inside the fix for it
+
+The agent's own mutation sweep **falsified two sentences it had already committed**, and it corrected
+them in place rather than dropping them. The surviving consequence: **case 6.100 now passes for a reason
+its own name does not describe** — it is held by the `canSee` guard that case 6.16 already pins, not by
+anything purge-shaped. Stated on the case and in the test comment, with a warning **not to cite 6.100 as
+evidence that a purge gate exists.**
+
+### A rule of this project was misapplied, and the correction belongs with it
+
+*"Nothing may be chained after the gate"* was read as forbidding `$?` capture, so that agent **inferred**
+exit 0 from four secondary facts. **The rule is about a trailing command in the same pipeline stealing
+the status.** Reading `$?` on the next line is the correct practice:
+
+```
+pnpm turbo run build test typecheck --force > gate.log 2>&1
+GATE_EXIT=$?
+```
+
+**An inferred exit code is a self-inflicted downgrade from a read one.** Re-run here with a captured
+exit: **TURBO_EXIT=0, 21/21, 1161 tests, zero `Unsupported engine` WARNs, durations in seconds.**
+
 ## Where I am in the serial sequence
 
-**PHASE 0 COMPLETE. STEPS 4 AND 5 MERGED** (#51 `45c83eb`, #52 `40c5219` — 1032 tests on `main`).
+**PHASE 0 + STEPS 4, 5, 6 MERGED. STEP 7 IS COMPLETE AND AWAITING A CONTROLLER.**
+`main` = `eadc748`. Branch = `exec/04-t8-t14-enforcement`, rebased onto it, **0 behind**.
+Gate at HEAD: **exit 0 READ (not inferred), 21/21, 1225 tests, zero `Unsupported engine` WARNs.**
 
-**STEP 6 IS COMPLETE AND AWAITING MERGE** on `exec/10-t4-origin-closer`. **STEP 7 — Plan 4 T8–T14
-(T11 and T14 floor-list) — IS NEXT** per the dispatch brief, and nothing is in flight.
+**STEP 8 — Plan 3 Chain B (T9–T13, then T14) — IS NEXT.** Read `docs/plan-3-chain-b-handoff.md`
+**BEFORE** starting it, not during: two independent tenancy hazards converge on Task 12, and **Task 12's
+brief instructs at three lines the alternative Plan 3's lane explicitly rejected** — an implementer
+following it faithfully undoes ruling P3.
 
-### Step 6 — the lifted Plan 10 T4. THE §11 WINDOW IS CLOSED.
+### Step 7 — all seven tasks, what each found
 
-`proj_contested` (registered **5th**, not 8th — only four projections were live), `getContest`
-(additive only; **P18 untouched**), `GET /v1/contests`, and **the §11 envelope-coherence closer**.
+| task | outcome |
+|---|---|
+| **T8** read enforcement | 0 findings. **Closed Ruling P22** — `EffectiveRole` branded; a hand-built one fails `TS2741` (verified here, not taken from the review) |
+| **T9** ingest permissions | 0 findings. `proj_projects` **inserted** at its §8 position (six projections). Its plan text would have **reopened the step-4 escalation** by omitting `workspaceExists` |
+| **T10** rollup honesty | 0 findings. Its implementer **died mid-report to machine sleep**; work recovered, not re-run |
+| **T11** `visibleEventsFor` | **CRITICAL** — purge walk disclosed ticket ids to guests and members with no relationship to them. Gated. **Ruling P23** |
+| **T12** security proofs | 0 findings |
+| **T13** founding route | 1 Important, 1 Minor — both *claims asserted without an executed check*. Fixed by **making the checks exist**: a mid-bootstrap fault was injected and a real 500 + clean retry observed |
+| **T14** invites | **CRITICAL** — a single-use token admitted **N concurrent acceptances**, 24/25 trials. Fixed atomically; reproduction committed **RED first** |
 
-**Verified by EXECUTION through both doors, not by reading the check.** A contest whose outer envelope
-is honest — a real ticket in its real workspace, so `ENTITY_WORKSPACE_MISMATCH_RULE` has nothing to
-catch — and whose embedded `payload.originalEvent` names a different ticket, and separately a different
-workspace, is refused `contest.incoherent-original` with **0 rows in `events`**, through
-`ingestBatch` AND through a real `POST /v1/events`.
+### THE THROUGH-LINE OF THIS STEP, and it is one class
 
-**The binding is three comparisons**: `workspaceId`, `entity.kind`, `entity.id`. One rule id with
-**three distinct reasons**, so deleting one comparison reddens a different test than deleting another
-(ruling P20 applied deliberately).
+**A true statement about one subject, applied to a neighbouring one.** Seven instances now, and the last
+one **caused** a Critical rather than merely misreporting one: *"atomicity is unavailable here"* was true
+of the **ledger** and false of the **token**, and it licensed shipping a permanent multi-admin door.
 
-### THE FINDING THAT SHAPED THIS STEP, and it generalises to every remaining lifted item
+**The tell is the word "here".** A scope word is exactly where a subject silently widens.
+*"Atomicity is unavailable **here**"*; *"the instrument is inert **here**"* — one task apart.
 
-**T4's own plan text does not mention the window it was lifted to close.** Swept its range
-(1300–1810) for `coheren`, `binds`, `embedded`, `outer envelope`, `envelope-origin`, `§11` — **zero for
-every one**, with `projection` at 30 as the positive control. The assignment lives in the coordination
-doc and in `contests.ts`'s own docblock. **So the closer is named where a reader of the EVALUATOR looks
-and absent where a reader of the TASK looks** — an implementer following the plan faithfully ships the
-projection, the lookup and the route, and leaves the window open.
+**A positive control cannot catch this class**: a control asks whether the instrument works, never what
+it was pointed at. It was caught, twice, only because **two parties with different habitual contexts
+measured the same thing and disagreed.**
 
-**Lifting a task changes WHEN it runs, not WHAT ITS TEXT SAYS.** Before dispatching any remaining lifted
-or re-sequenced item, **sweep its own range for the thing it was moved to do**; if the terms are absent,
-the dispatch must carry the obligation, because the plan text will not.
+### What is carried, unfixed, with owners — recount before trusting this list
 
-### Also settled here: the sonnet reviewer default is CONDITIONAL
-
-The cost table reads *"Per-task reviewers **where the plan text is complete** | sonnet"*. That row
-carries its own precondition and it is checkable in one command. It was **false** here. So the opus
-reviewer was **not opus-by-exception** — it was the sonnet row not covering the case. Sweep the task's
-range before defaulting a reviewer to sonnet.
-
-### Review outcome: 4 Minor, 1 Nit. No Critical, no Important — so no fix round was required.
-
-Three Minors were fixed anyway, because each was **a surface or a sentence that lies**:
-1. `GET /v1/contests` admitted `open=false` in its enum while the handler had no `else` — a caller
-   asking for settled contests got **everything**, with a 200 and no signal. Narrowed to `['true']`
-   (a loud 400) rather than inventing a `resolved` filter this task's contract does not define.
-   **Mutation-proven: reverting the enum reddens exactly the new test.**
-2. The catalogue's ids are grouped **by surface, not by number**, so the largest is not the last line and
-   an author scanning the tail would mint a duplicate. The maximum is now stated — and **it went stale
-   within minutes** when three gaps were appended below it, so it carries an instruction to recount.
-3. 12.82 expands what the coherence check leaves free (finding 3), per P19 — never let a category look closed.
-
-### The carried gaps — TEN now, none folded in, all with owners
-
-**P18** membership wiring 6.50 (step-10) · **P19** guest admissions 6.51 (T9) · 6.52, 6.53 (T13) ·
-6.57 (Plan 3 → T8) · **P22** `EffectiveRole` provenance 6.64 (T8) · 6.65 SQL mode-side (T8) ·
-**12.82** unbound `actorId` → `claimant_id`, unvalidated `type`/`payload` → permanent comment body ·
-**12.83** UNIQUE index with no lookup — **rejects a whole batch**, losing answers of events that already
-committed · **12.84** `entity.kind` binding has no door test though its path is live. Last three: T7.
+**P18** membership wiring 6.50 (step-10 checkpoint) · **6.52/6.53** founding duplicates + repair path
+(T13 examined both; 6.53 stays ❌ with its inference now named) · **6.57**, **6.61** (Plan 3 T12) ·
+**6.65** SQL mode-side · **6.102**, **6.104** purge retention (Plan 10) · **6.123**, **6.131** invite
+issuance limits and token sweep (Plan 11) · **6.130 revoke-in-flight race — recorded UNASSIGNED**, and
+deliberately so: closing it needs the grant and the status in one transaction inside `commitOne`, which
+is Plan 1's surface, and **no plan in the series has an open task there.** Parking it on Plan 10 would
+have been a handoff nobody receives. · **12.82–12.84** (Plan 10 T7).
 
 ## What step 2 actually contained
 

@@ -11,6 +11,7 @@ import {
 import { buildTestApp } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { submittedWorkspaceCreated } from '../helpers/events.js';
+import { applyAll, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
 import { signInWithPhone } from '../helpers/session.js';
 
 /**
@@ -201,11 +202,22 @@ describe('§11 closer — the CLIENT door (POST /v1/events)', () => {
   let phoneCounter = 0;
 
   /**
-   * A signed-in caller who FOUNDED their workspace, so the permission gate has
-   * nothing left to refuse: identity matches, membership is `owner` (the
-   * founding sequence grants it), and the forgery below wears an honest
-   * envelope-origin. Any of those missing and the gate refuses first, and this
-   * describe block would be pinning Plan 4 Task 5 rather than the §11 closer.
+   * A signed-in caller who FOUNDED their workspace AND owns a ticket they can
+   * see, so the permission gate has nothing left to refuse: identity matches,
+   * membership is `owner` (the founding sequence grants it), the forgery below
+   * wears an honest envelope-origin, and the ticket it is filed against is one
+   * the caller may act on. Any of those missing and the gate refuses first, and
+   * this describe block would be pinning Plan 4 rather than the §11 closer.
+   *
+   * The visible ticket arrived with Plan 4 Task 9. A `claim.contested` is filed
+   * against a TICKET entity, so the visibility check now examines it — and
+   * `canSee` answers false for a ticket with no `proj_visibility` row exactly as
+   * it does for one the caller may not see. Against the bare `newUlid()` this
+   * file used to contest, the client-door case drew `permission.visibility`
+   * instead of the coherence refusal: the gate had something to say after all.
+   * The fixture is repaired rather than the assertion loosened, which is the
+   * same remedy this file's sibling (`test/permissions/check-permission.ts`)
+   * records for the identity and membership faults it removed before.
    *
    * The founding is ASSERTED, never assumed.
    */
@@ -223,14 +235,23 @@ describe('§11 closer — the CLIENT door (POST /v1/events)', () => {
     });
     const body = response.json() as { results: Array<{ status: string }> };
     expect(body.results[0]).toMatchObject({ status: 'committed' });
-    return { app, headers, user, workspaceId: founding.workspaceId };
+
+    const ticketId = newUlid();
+    await seedTicket(db.pool, {
+      workspaceId: founding.workspaceId,
+      projectId: newUlid(),
+      ticketId,
+    });
+    await applyAll(db.pool, [setVisibilityEnv(founding.workspaceId, ticketId, 'workspace')]);
+
+    return { app, headers, user, workspaceId: founding.workspaceId, ticketId };
   }
 
   it('refuses a client contest embedding a claim about a different ticket — the gate having nothing to say', async () => {
-    const { app, headers, user, workspaceId } = await founder();
+    const { app, headers, user, workspaceId, ticketId } = await founder();
     const forged = contest({
       workspaceId,
-      ticketId: newUlid(),
+      ticketId,
       actorId: user.userId,
       // An HONEST envelope-origin. 'server' here would draw Plan 4's
       // `permission.role` refusal first and this case would prove nothing about
@@ -261,10 +282,10 @@ describe('§11 closer — the CLIENT door (POST /v1/events)', () => {
     // forged its provenance is told the fault it can actually fix, and Plan 4's
     // gate keeps owning that refusal. Mutation that reddens it: move the
     // coherence check above the gate in commitOne.
-    const { app, headers, user, workspaceId } = await founder();
+    const { app, headers, user, workspaceId, ticketId } = await founder();
     const forged = contest({
       workspaceId,
-      ticketId: newUlid(),
+      ticketId,
       actorId: user.userId,
       origin: 'server',
       embedded: { ticketId: newUlid() },

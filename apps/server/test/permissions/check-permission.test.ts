@@ -110,7 +110,14 @@ async function signedInApp(ingest: IngestService = ingestService()) {
     baseUrl: 'http://localhost:3000',
     secret: 'test-secret-not-used-anywhere-real',
   });
-  const app = buildApp({ db: db.pool, pool: db.pool, ingest, auth });
+  const app = buildApp({
+    db: db.pool,
+    pool: db.pool,
+    ingest,
+    auth,
+    serverAppend: (events) => ingest.ingestBatch(events),
+    webOrigin: 'http://localhost:3001',
+  });
   phoneCounter += 1;
   const user = await signInWithPhone(app, otp, `+9197000${String(phoneCounter).padStart(5, '0')}`);
   return { app, user, headers: { authorization: `Bearer ${user.token}` } };

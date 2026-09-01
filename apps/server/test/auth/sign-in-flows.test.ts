@@ -64,7 +64,14 @@ function buildServer(baseUrl: string): {
     evaluate: evaluateEvent,
     projections: buildProjectionRegistry(),
   });
-  return { app: buildApp({ db: db.pool, pool: db.pool, ingest, auth }), otp: otpSender, magic: magicLinkSender };
+  return { app: buildApp({
+    db: db.pool,
+    pool: db.pool,
+    ingest,
+    auth,
+    serverAppend: (events) => ingest.ingestBatch(events),
+    webOrigin: 'http://localhost:3001',
+  }), otp: otpSender, magic: magicLinkSender };
 }
 
 /** `set-cookie` arrives as a string when there is one and an array when there are several. */

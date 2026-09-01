@@ -1,15 +1,49 @@
-import type { EventEnvelope } from '@gisik-nokma/domain';
+import {
+  inviteSentPayload,
+  ticketCreatedPayload,
+  visibilitySetPayload,
+  type EventEnvelope,
+} from '@gisik-nokma/domain';
 import type { Refusal } from '@gisik-nokma/rule-engine';
 import type { Queryable } from '../db/queryable.js';
+import { projectExists } from '../projections/proj-projects.js';
+import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
 import { hasProjectAdminRights, resolveEffectiveRole, type EffectiveRole } from './effective-role.js';
 
 /**
  * The one rule id every pre-engine permission refusal reports. Plan 4 Task 5's
  * plan text pins it, and Plan 6's UI maps rule names to what a person is shown,
  * so it gets one origin here rather than a literal at each call site that a
- * rename could half-land. Task 9 adds `permission.visibility` beside it.
+ * rename could half-land. Task 9 added `permission.visibility` and
+ * `project.unknown` beside it.
  */
 export const PERMISSION_ROLE_RULE = 'permission.role';
+
+/**
+ * The rule id for every refusal about WHO MAY SEE the thing an event touches,
+ * plus the one coherence question that rides with it (a `visibility.set` whose
+ * payload names a ticket other than the entity it is filed against).
+ *
+ * It is a SECOND id rather than a reuse of `permission.role` because the two
+ * answer different questions and Plan 6's UI maps rule names to what a person
+ * is shown: "you are not allowed to do this" and "this is not yours to see" are
+ * different sentences, and the second must never imply the ticket exists to
+ * someone told the first.
+ *
+ * Note what does NOT get this id: Task 9's checks 2 and 5 are write-AUTHORITY
+ * questions that happen to be answered during the visibility pass, and they
+ * report `permission.role`. See `checkVisibilityPermission`.
+ */
+export const PERMISSION_VISIBILITY_RULE = 'permission.visibility';
+
+/**
+ * The rule id for "the project this event names was never founded" (Task 9
+ * Step 3b; owner decision 2026-08-26). Its own id, deliberately: reported as
+ * `permission.role` it would be indistinguishable from the membership refusal
+ * it exists to replace, and the whole point of the check is that the honest
+ * reason wins where both would fire.
+ */
+export const PROJECT_UNKNOWN_RULE = 'project.unknown';
 
 /**
  * The envelope-origin refusal's rule and reason, character for character.
@@ -23,9 +57,55 @@ export const SERVER_ORIGIN_REASON = 'Only the server itself may record server-or
 /** Refusal reasons, spelled once. Plan text pins every one of these sentences. */
 export const IDENTITY_SPOOF_REASON = 'You cannot submit a claim as another person.';
 export const NOT_A_MEMBER_REASON = 'You are not a member of this workspace.';
+/**
+ * Plan 4 Task 13, case 6.52. The member half of the founding bound — the
+ * non-member half is `NOT_A_MEMBER_REASON` above, and the two stay separate
+ * sentences because they name different faults: one says you do not belong
+ * here, the other says the thing you are claiming has already happened.
+ */
+export const WORKSPACE_ALREADY_FOUNDED_REASON =
+  'This workspace has already been founded; it cannot be founded again.';
 export const WORKSPACE_MEMBERSHIP_REASON =
   'Only a workspace owner or admin can manage workspace membership.';
 export const PROJECT_ROSTER_REASON = 'Only a project admin can manage who is on this project.';
+/** Task 9 check 2, the guest half — answered in `checkRolePermission`, which owes it. */
+export const GUESTS_CANNOT_CREATE_TICKETS_REASON = 'Guests cannot create tickets.';
+/** Task 9 check 2, the project half. No admin shortcut: an admin joins the project first, attributed. */
+export const NOT_ON_PROJECT_REASON =
+  'You are not a member of this project, so you cannot create tickets in it.';
+/** Task 9 check 3. A claim must name the ticket it rides on. */
+export const VISIBILITY_CLAIM_MISMATCH_REASON = 'This claim does not name the ticket it is attached to.';
+/**
+ * Task 9 check 4, and the ONE sentence answering both "you may not see it" and
+ * "there is no such ticket" — `canSee` cannot tell them apart by design
+ * (`../visibility/can-see.ts`), and giving them different sentences here would
+ * rebuild the existence oracle Task 8's 404s removed one layer up.
+ */
+export const TICKET_NOT_VISIBLE_REASON = 'This ticket is not visible to you.';
+/** Task 9 check 5. Reported as `permission.role`: it is authority, not audience. */
+export const VISIBILITY_AUTHORITY_REASON =
+  "Only a project admin or the ticket's creator can change who sees this ticket.";
+/**
+ * Task 14. `invite.accepted` is refused from EVERY client envelope-origin, at
+ * every role including owner.
+ *
+ * Acceptance is the moment an address-shaped claim becomes a person, and the
+ * only thing entitled to make that binding is possession of the link's token.
+ * A client-submitted `invite.accepted` names an `inviteId` and a `userId` and
+ * carries no token at all — so without this refusal an admin who reads an
+ * inviteId out of the workspace's own history could bind any pending invitation
+ * to any user, themselves included, having never seen the link. The event id and
+ * the inviteId are both in the ledger by design; only the token is not.
+ *
+ * It is a `permission.role` refusal because it is about WHO may make this claim
+ * (nobody, from a client), not about what may be seen.
+ */
+export const INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON =
+  'Acceptance is recorded by the server when the invited person opens their link.';
+/** Task 9 Step 3b. Names the project, because the id is the thing the sender got wrong. */
+export function projectUnknownReason(projectId: string): string {
+  return `There is no project ${projectId} in this workspace.`;
+}
 /** `role` is the actor's own workspace role — the refusal names what they are, not only what they are not. */
 export function adminOnlyReason(role: string): string {
   return `Only a workspace owner or admin can do this. Your role is ${role}.`;
@@ -80,7 +160,18 @@ export interface SubmissionContext {
 }
 
 function refuse(reason: string): Refusal {
-  return { refused: true, rule: PERMISSION_ROLE_RULE, reason };
+  return refuseWith(PERMISSION_ROLE_RULE, reason);
+}
+
+/**
+ * A refusal under a rule id other than `permission.role`.
+ *
+ * `refuse` above is deliberately kept as the one-argument form: the role gate
+ * has exactly one id and a two-argument call there would invite a caller to
+ * pass the wrong one. Everything that needs a different id says so.
+ */
+function refuseWith(rule: string, reason: string): Refusal {
+  return { refused: true, rule, reason };
 }
 
 /**
@@ -100,6 +191,20 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
   'ticket-type.defined',
   'project.created',
   'ticket.workflow_rebound',
+  // Task 14. Inviting somebody into a workspace, and withdrawing that
+  // invitation, are membership management — the same question
+  // `membership.granted` answers, asked one step earlier about a person who has
+  // no user id yet. They are here rather than in the `membership.granted` branch
+  // below because that branch is keyed on the two membership TYPES, and an
+  // invite is filed against the invite entity; the answer is the same either
+  // way, and `ADMIN_ONLY_TYPES` is where a type-keyed answer belongs.
+  //
+  // `invite.accepted` is deliberately NOT here. It is not admin-only, it is
+  // client-refused outright — see INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON and
+  // the check below. Adding it here would make an admin's forged acceptance
+  // COMMIT, which is the exact escalation that check exists to stop.
+  'invite.sent',
+  'invite.revoked',
 ]);
 
 /**
@@ -141,8 +246,9 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
  *    not a member at all, and `resolveEffectiveRole` guarantees that when it is
  *    null the project set is empty too — so no project-scope row left standing
  *    by a legitimate rebuild can confer anything here.
- * 5. **Role.** Admin-only types, workspace membership management, and project
- *    roster management, each with the sentence that names what was missing.
+ * 5. **Role.** Admin-only types, workspace membership management, project
+ *    roster management, and a guest's ticket-creation ceiling (Task 9 check 2,
+ *    guest half), each with the sentence that names what was missing.
  *
  * ## What this does NOT check — named, not summarised
  *
@@ -154,53 +260,108 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
  *
  * What Task 5 closed, precisely, is checks 1–5 above: actor identity (1),
  * envelope-origin (2), the founding bypass bounded by `workspaceExists` (3),
- * workspace membership (4), and inside the role check (5) three questions and
- * exactly three — admin-only event TYPES, workspace-membership management, and
- * project-roster management. "Role" as a whole is NOT closed, and saying it was
- * is the trap this list previously set: role is several questions, and an
- * implementer who reads it as one goes looking for somewhere other than
- * `checkRolePermission` to put the ones still missing.
+ * workspace membership (4), and inside the role check (5) three questions —
+ * admin-only event TYPES, workspace-membership management, and project-roster
+ * management. Task 9 added a fourth to check 5 (a guest may not create
+ * tickets), and closed elsewhere in this module, under the ratified orderings
+ * their own docblocks name, the three items this list carried as 5a–5c and the
+ * whole of the visibility entry. "Role" as a whole is STILL NOT closed, and
+ * saying it was is the trap this list previously set: role is several
+ * questions, and an implementer who reads it as one goes looking for somewhere
+ * other than `checkRolePermission` to put the ones still missing.
  *
- * - **Write authority on a project, and a guest's write ceiling.** Nothing here
- *   asks who may CREATE a ticket or who may RETARGET one's audience. Plan 4
- *   Task 9's own check list
- *   (`docs/superpowers/plans/2026-08-20-04-auth-visibility.md`, "The checks
- *   (exact)") assigns three refusals to `permission.role`, and a
- *   `permission.role` refusal has to be made by the function that owns that
- *   rule id: these belong INSIDE `checkRolePermission`, added to check 5's
- *   sequence. A visibility pass running after it cannot supply them.
- *   5a. Nothing asks whether the actor is a GUEST when `env.type` is
- *       `ticket.created` (Task 9 check 2 — "Guests cannot create tickets.").
- *   5b. Nothing asks whether a non-guest is ON the target project when
- *       `env.type` is `ticket.created` (Task 9 check 2, and deliberately with
- *       no admin shortcut: an admin joins the project first, attributed, and
- *       creates afterwards).
- *   5c. Nothing asks whether the actor holds project-admin rights on the
- *       ticket's project, or created the ticket, when `env.type` is
- *       `visibility.set` (Task 9 check 5). Nothing here stands between such an
- *       event and a widened audience, and the ledger is append-only by trigger:
- *       a widening can be superseded, never removed.
+ * ### Removed from this register by Task 9, and where each one went
  *
- * - **Visibility.** Nothing asks whether the actor may SEE the entity the event
- *   touches. A member of the workspace who is on no project, or who is a guest
- *   outside every explicit audience, is still admitted here for ordinary ticket
- *   work. The absence is UNCHANGED by Task 7 and it is worth being exact about
- *   what did change: Task 7 built the DECISION — `canSee` / `canSeeResolved`
- *   (`../visibility/can-see.ts`) — and no CALL. This gate asks it nothing, no
- *   read path is enforced by it yet (Task 8), and `permission.visibility` still
- *   does not exist (Task 9). So what Task 9 owes here is the call and the
- *   refusal, not the decision; `checkVisibilityPermission` will run after
- *   `checkRolePermission` inside `checkPermission` when it does — along with Task 9's check 3, the
- *   `visibility.set` whose `payload.ticketId` disagrees with `entity.id`, which
- *   is a coherence question rather than a seeing one but answers with
- *   `permission.visibility` and so belongs to the same pass. What that pass
- *   does NOT cover is 5a–5c above: those are write-authority questions, they
- *   answer with `permission.role`, and nothing that runs after the role check
- *   can make a refusal the role check owed.
+ * Recorded rather than deleted, because two of the three did NOT land where
+ * this list said they would, and a reader who finds them missing from
+ * `checkRolePermission` needs to be told why rather than left to conclude they
+ * were dropped.
  *
- * Each closed check is numbered above rather than deleted silently, and each
- * open one is numbered into the sequence it belongs to, so the diff between
- * "absent" and "present" stays legible in both directions.
+ * - **5a — a guest creating a ticket.** Closed HERE, in `checkRolePermission`,
+ *   exactly as this register asked. It needs no lookup.
+ * - **5b — a non-guest on the target project.** Closed in
+ *   `checkVisibilityPermission`, still reporting `permission.role`. It must be
+ *   sequenced after `checkProjectExists` (owner decision 2026-08-26), and a
+ *   pure function cannot run after a database read.
+ * - **5c — project-admin rights or creatorship on `visibility.set`.** Closed in
+ *   `checkVisibilityPermission`, still reporting `permission.role`. It must run
+ *   after `canSee` or it is an existence oracle — see that function's docblock.
+ * - **Visibility.** Closed: `checkVisibilityPermission` calls `canSee` for
+ *   every ticket-entity event, and `permission.visibility` now exists.
+ *
+ * The register's underlying rule is intact and is worth restating in the form
+ * that survived: a `permission.role` refusal must be made by code that OWNS
+ * that rule id. Both gate halves and all three id constants live in this one
+ * module, and every refusal is built from an exported constant, so no half can
+ * invent its own string.
+ *
+ * ### Still absent — questions nothing in this module asks
+ *
+ * - **Every WORKSPACE-entity event but `workspace.created`.** MEASURED on main
+ *   at Task 9: a workspace GUEST is ADMITTED for `workspace.renamed`. It is not
+ *   in `ADMIN_ONLY_TYPES`, it is not membership or roster management, and
+ *   Task 9's check 1 examines ticket entities only — so nothing anywhere asks
+ *   who may rename a workspace. Renaming is not destructive and the ledger
+ *   attributes it, which is why this is an absence and not an emergency; but a
+ *   guest renaming the container they were invited into is nobody's intent.
+ *   Deliberately NOT closed here: which roles may rename a workspace is a
+ *   product decision no plan in this series has taken, and adding a type to
+ *   `ADMIN_ONLY_TYPES` on this task's own authority would be taking it.
+ * - **Every non-ticket, non-workspace entity's ordinary events.** Check 1 is an
+ *   entity-kind filter, so `workflow`, `ticket-type`, `project`, `membership`
+ *   and now `invite` events get the role gate and nothing more. That is right
+ *   for the types the role gate already names and unexamined for any it does
+ *   not. **Task 14 narrowed this entry rather than closing it**: all three
+ *   invite types are now named by the role gate — `invite.sent` and
+ *   `invite.revoked` in `ADMIN_ONLY_TYPES`, `invite.accepted` refused from every
+ *   client door — so the sub-question "who may emit an invite event" is
+ *   answered. The entry stays open for `workflow`, `ticket-type`, `project` and
+ *   `membership`, whose ordinary events are still unexamined beyond the types
+ *   `ADMIN_ONLY_TYPES` and the two membership branches happen to name.
+ * - **An invitation's ADDRESS is unchecked, and nothing rate-limits issuance.**
+ *   Task 14 refuses a blank address and refuses `owner`, and stops there. An
+ *   admin may invite the same address a thousand times, or an address that
+ *   reaches nobody, and this gate has no opinion — every one of those is an
+ *   attributed claim by somebody who could already grant membership directly.
+ *   What makes it an absence rather than an emergency is that issuance needs
+ *   admin already; what makes it worth naming is that each issuance mints a
+ *   credential. *Owner: Plan 11, which owns rate limiting
+ *   (`RATE_LIMIT_*` in `.env.example`) and delivery.*
+ * - **Nothing checks that an invitation's promised projects still exist, or
+ *   that they belong to the inviting workspace.** `invite.sent.projectIds` is
+ *   shape-checked (ULIDs) and never resolved. `checkProjectExists` runs on
+ *   `project.member_added` — but acceptance appends those through the INTERNAL
+ *   door, where no gate runs, so a project deleted or mistyped between
+ *   invitation and acceptance lands a roster row for a project that is not
+ *   there. It is inert today for the same reason a stranger's roster row is —
+ *   `resolveEffectiveRole` yields it and `canSee` finds no tickets under it —
+ *   but it is inert by a guarantee elsewhere rather than by a refusal here.
+ *   *Owner: Plan 4 Task 14's successor, or Plan 6 at the invite-mint screen,
+ *   which is where a bad project id would be caught before it was promised.*
+ * - **The read paths and sync-down.** This module is the INGEST door. Task 8
+ *   enforces `canSee` on the three ticket read routes; sync-down filtering IS
+ *   built (`../visibility/visible-events-for.ts`, Task 11 — this entry said
+ *   "is not built" until Task 14 corrected it, and a stale absence is worse
+ *   than none because it sends the next reader to build a thing that exists).
+ *   Task 14 adds the invite read routes to the list of doors this module does
+ *   not guard: `GET /v1/workspaces/:workspaceId/invites` enforces owner/admin
+ *   itself, and `GET /v1/invites/:token` is deliberately session-free, because
+ *   the token IS the credential. A door that does not exist cannot be closed,
+ *   and
+ *   `POST /v1/sync` (Plan 10) must call `ingestClientBatch` when it is built or
+ *   offline-originated events bypass all of the above.
+ * - **Project scope on membership grants, beyond existence.** Task 9 Step 3b
+ *   validates that a project named by `project.member_added` /
+ *   `project.member_removed` EXISTS. Nothing asks whether the user being added
+ *   is a member of the workspace that owns it — a roster row for a stranger is
+ *   inert today, because `resolveEffectiveRole` yields no projects without a
+ *   workspace role, but it is inert by a guarantee elsewhere rather than by a
+ *   refusal here.
+ *
+ * Each closed check is accounted for above rather than deleted silently, and
+ * each open one is stated as a question nobody asks rather than as a degree of
+ * doneness, so the diff between "absent" and "present" stays legible in both
+ * directions.
  *
  * ## Which doors this closes
  *
@@ -244,8 +405,75 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
   }
   const isWorkspaceAdmin = role === 'owner' || role === 'admin';
 
+  // A workspace is founded ONCE. Reached only when `workspaceExists` is true
+  // AND the actor holds a role — the two cases the bypass above and the
+  // membership check below have already let through — so this closes the last
+  // client-door path on which a `workspace.created` naming an already-founded
+  // workspace commits (case 6.52). A NON-member re-founding is still answered
+  // `NOT_A_MEMBER_REASON` by the check above, unchanged and still pinned: the
+  // two refusals name different faults and are deliberately not merged.
+  //
+  // ## Why refuse at all, when the escalation is already stopped
+  //
+  // The escalation (the `workspaceExists` bound above, and `workspaceSeq === 1`
+  // in `ingestAll`) is about the GRANT — a second founding never re-fires the
+  // bootstrap, so nobody becomes owner. What was still open was the EVENT: a
+  // member, admin or guest of a founded workspace could append an unlimited
+  // number of `workspace.created` claims to its ledger, each of them false on
+  // its face — the workspace's history already proves it was founded, and
+  // coordination §11 means a mis-filed claim can never be taken back, only
+  // superseded. It is also read: `workspaces/workspace-name.ts` folds
+  // `workspace.created`/`workspace.renamed` for the directory's name, so a
+  // second founding is not inert noise, it changes an answer a person sees.
+  // With this line, `workspaceSeq === 1` becomes the second line of that
+  // defence rather than the only one.
+  //
+  // ## Two things this deliberately does NOT do
+  //
+  // - **It is not applied at the internal door.** `checkRolePermission` runs
+  //   only from `ingestClientBatch`. The internal door's second
+  //   `workspace.created` still commits and still founds nothing — measured by
+  //   `check-role-permission.test.ts`'s "the INTERNAL door does not re-found an
+  //   existing workspace either", which this must not redden. That door is the
+  //   server's own, and Task 5's bootstrap and Plan 11's seeds use it.
+  // - **It is not reachable from `POST /v1/workspaces`.** That route mints the
+  //   workspace ULID server-side and refuses a body that names one, so a
+  //   route-originated founding always has `workspaceExists === false`. The
+  //   door this closes is `POST /v1/events` (and, when it is built, Plan 10's
+  //   `POST /v1/sync`, which must call `ingestClientBatch`).
+  //
+  // ## The one behaviour change, stated rather than discovered
+  //
+  // A MEMBER re-delivering their OWN founding envelope — same event id, through
+  // the client door — used to answer `duplicate-event-id` (an `invalid` result,
+  // and a safe idempotent ack) and now answers this refusal, because the gate
+  // runs before `insertEvent` and only the primary key knows a redelivery from
+  // a fresh claim. No caller in the product does this today: `POST
+  // /v1/workspaces` mints a fresh id per call and Plan 11's seeds re-submit
+  // through the ungated internal door, where nothing here runs. **Plan 10's
+  // sync path is the one that will care**, and it is flagged in case 6.105.
+  if (env.type === 'workspace.created') {
+    return refuse(WORKSPACE_ALREADY_FOUNDED_REASON);
+  }
+
   if (ADMIN_ONLY_TYPES.has(env.type) && !isWorkspaceAdmin) {
     return refuse(adminOnlyReason(role));
+  }
+  // Task 14. Refused from every client door at every role, owner included.
+  //
+  // Position is load-bearing in one direction: it must sit AFTER the membership
+  // check above, so an ADMIN reaches it. Put ahead of that check it would still
+  // refuse everyone, but the test proving it would be indistinguishable from a
+  // test proving `NOT_A_MEMBER_REASON`, and the escalation this closes is
+  // specifically an admin's — somebody who can already read the workspace's
+  // history, and therefore already knows every pending inviteId in it.
+  //
+  // There is no `isWorkspaceAdmin` here and there must not be. An owner is not
+  // more entitled to bind an invitation to a user than a guest is: the
+  // entitlement is possession of the link, which no client-submitted event can
+  // demonstrate.
+  if (env.type === 'invite.accepted') {
+    return refuse(INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON);
   }
   // Membership is workspace-scoped only now (owner decision 2026-08-27), so
   // this is one question rather than a branch on scope: managing who is IN the
@@ -265,6 +493,259 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
       return refuse(PROJECT_ROSTER_REASON);
     }
   }
+  // A guest's write ceiling on ticket creation (Task 9 check 2, guest half).
+  // MEASURED before this line existed: a workspace guest was ADMITTED for
+  // `ticket.created` here, and the visibility pass could not have covered it —
+  // `ticket.created` names no existing ticket, so there is no audience to ask
+  // about, and the refusal is owed by the role check.
+  //
+  // Only the guest half lives here. The other half of check 2 — is a non-guest
+  // ON the target project — is NOT in this function, and that is forced rather
+  // than chosen: the owner decision of 2026-08-26 requires the project
+  // EXISTENCE check to run before the project MEMBERSHIP check so the honest
+  // reason wins where both would fire, and existence is a database question
+  // this pure function cannot ask. It runs in `checkVisibilityPermission`,
+  // after `checkProjectExists`, and still reports `permission.role`.
+  if (env.type === 'ticket.created' && role === 'guest') {
+    return refuse(GUESTS_CANNOT_CREATE_TICKETS_REASON);
+  }
+  return null;
+}
+
+/**
+ * What a check that reads projections needs on top of a role: the handle.
+ *
+ * Deliberately `PermissionContext` PLUS `db` rather than a separate shape, so
+ * the two halves of one gate carry one context. `workspaceExists` rides along
+ * unused by visibility — required, not optional, for the reason its own
+ * docblock gives — because a second context type would be a second place to
+ * forget it.
+ */
+export interface VisibilityContext extends PermissionContext {
+  db: Queryable;
+}
+
+/**
+ * The project this event NAMES, or null if it names none.
+ *
+ * `membership.granted` / `membership.revoked` name no project: membership is
+ * workspace-scoped since the 2026-08-27 collapse, and their payload schema
+ * refuses a scope outright. Project association is the two roster events below,
+ * and they are filed AGAINST the project entity, so the id is `env.entity.id`
+ * and not a payload read.
+ *
+ * `project.created` returns null on purpose — it is the event bringing the
+ * project into existence, and asking whether it exists first would make
+ * founding one impossible.
+ */
+/**
+ * Every project this event names, in payload order.
+ *
+ * A LIST rather than the single id this returned until Plan 4 Task 14, because
+ * `invite.sent` names as many as an admin typed. Returning the first one only
+ * would make the check pass for an invitation whose second project was a typo,
+ * which is the shape a "checks the first element" bug always takes.
+ *
+ * `invite.sent` is here rather than left to acceptance, and the difference is
+ * MEASURED. Acceptance appends `project.member_added` through the INTERNAL
+ * door, where no gate runs, so a promised project belonging to ANOTHER
+ * workspace reached `readEntityHead`, tripped the entity↔workspace guard, threw
+ * out of the acceptance sequence and answered the joining person **500 — after
+ * `invite.accepted` and `membership.granted` had already committed**. They were
+ * a member, the screen said it had failed, and a retry answered 404 because the
+ * invitation's status was already `accepted`. Refusing at issuance is what
+ * makes that unreachable: with no `project.deleted` event anywhere in the
+ * product, a project that exists when the invitation is minted still exists
+ * when it is accepted.
+ *
+ * Ordering is inherited rather than re-decided: `checkPermission` runs
+ * `checkRolePermission` first, so a plain member issuing an invitation with a
+ * bad project id is told they may not invite — the honest reason — and only an
+ * admin ever reaches this refusal.
+ */
+function projectsNamedBy(env: EventEnvelope): readonly string[] {
+  switch (env.type) {
+    case 'ticket.created':
+      return [ticketCreatedPayload.parse(env.payload).projectId];
+    case 'project.member_added':
+    case 'project.member_removed':
+      return [env.entity.id];
+    case 'invite.sent':
+      return inviteSentPayload.parse(env.payload).projectIds ?? [];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Does the project this event names exist in this workspace? (Task 9 Step 3b;
+ * owner decision 2026-08-26.)
+ *
+ * ## What covered this by accident, and why that was not coverage
+ *
+ * `checkVisibilityPermission` refuses an actor who is not on the target
+ * project, so a fabricated `projectId` was usually refused — nobody is a member
+ * of a project that does not exist. But `ctx.eff.projects` is built from
+ * `project.member_added`, which accepts any ULID as a project scope without
+ * validating it either. Grant yourself membership on a project id nobody
+ * founded and the ticket was ACCEPTED: it landed in `proj_visibility` with a
+ * dangling `project_id`, on no board and in no project list, and nobody was
+ * told. That is the path the hole was actually reachable through, which is why
+ * this check covers the roster events too and not only ticket creation.
+ *
+ * ## The ordering is the point
+ *
+ * This runs BEFORE the project-membership check, so where both would fire the
+ * honest reason wins: a person creating a ticket in a project that does not
+ * exist is told the project does not exist, not that they are not a member of
+ * it. A refusal that happens to fire for the wrong reason is not coverage — it
+ * leaves the gap open on every path where the coincidence does not hold, and
+ * tells the user something false on the paths where it does.
+ *
+ * It runs AFTER `checkRolePermission`, so a non-member of the WORKSPACE is
+ * still told `NOT_A_MEMBER_REASON` first. That is deliberate and is the bound
+ * on the ordering claim above: someone with no standing in the workspace may
+ * not use this check to enumerate which project ids exist in it.
+ */
+export async function checkProjectExists(db: Queryable, env: EventEnvelope): Promise<Refusal | null> {
+  // Payload order, and the FIRST unknown one is reported: the sender fixes one
+  // id at a time, and a refusal naming an arbitrary member of the set would be
+  // a worse instruction than one naming the first thing wrong.
+  for (const projectId of projectsNamedBy(env)) {
+    if (!(await projectExists(db, env.workspaceId, projectId))) {
+      return refuseWith(PROJECT_UNKNOWN_RULE, projectUnknownReason(projectId));
+    }
+  }
+  return null;
+}
+
+/**
+ * Who created this ticket, read from the LEDGER rather than from a projection.
+ *
+ * There is no projection to read it from: `proj_tickets` does not exist on this
+ * branch (Plan 3 Task 12 owns it) and `proj_visibility` has no creator column.
+ * Inventing one here would be a second, competing definition of another plan's
+ * head state — the same thing Task 8 refused to do for a ticket's title.
+ *
+ * The ledger is not a fallback, it is the primary source: `events.actor_id` on
+ * the `ticket.created` row IS the creatorship claim, and every projection that
+ * will ever carry `created_by` derives it from exactly this row. Reading
+ * `events` from this module has precedent in `workspaceHasLedger` below, and
+ * the access path is the `UNIQUE (entity_kind, entity_id, seq)` index.
+ *
+ * `ORDER BY seq LIMIT 1` rather than a bare read: a ticket has exactly one
+ * `ticket.created` today, and taking the FIRST is the answer that stays correct
+ * if a re-creation claim ever becomes expressible.
+ *
+ * Returns null for a ticket with no creating event, which is not the same as
+ * "the caller is not the creator" only because `sessionUserId` is a non-empty
+ * string and can never equal null.
+ */
+async function getTicketCreator(db: Queryable, ticketId: string): Promise<string | null> {
+  const { rows } = await db.query<{ actor_id: string }>(
+    `SELECT actor_id FROM events
+     WHERE entity_kind = 'ticket' AND entity_id = $1 AND type = 'ticket.created'
+     ORDER BY seq
+     LIMIT 1`,
+    [ticketId],
+  );
+  return rows[0]?.actor_id ?? null;
+}
+
+/**
+ * The visibility-dependent half of the gate (Plan 4 Task 9). Async because it
+ * reads projections and the ledger; runs after `checkRolePermission` and after
+ * `checkProjectExists`, still before the rule engine.
+ *
+ * ## The five checks, in the order a refusal should be met
+ *
+ * 1. **Ticket-entity events only.** Everything else passed the role gate
+ *    already and has no audience to ask about.
+ * 2. **`ticket.created`.** The actor must be ON the target project. There is
+ *    deliberately NO admin shortcut: an admin who wants to create work in a
+ *    project joins it first, which is an attributed event, rather than reaching
+ *    in unrecorded. The guest half of this check is not here — it is in
+ *    `checkRolePermission`, which owes it and can answer it purely.
+ * 3. **`visibility.set` coherence.** A claim whose `payload.ticketId` disagrees
+ *    with the entity it is filed against is refused BEFORE anything is looked
+ *    up: it does not name the ticket it rides on, so there is no question to
+ *    ask yet. `proj_visibility` keys on the entity regardless (case 6.55), so
+ *    without this refusal one ticket's stream authors another ticket's audience.
+ * 4. **Everything else about a ticket** — transition, assign, comment, field
+ *    set, reparent, and `visibility.set` itself — requires `canSee`. This is
+ *    also exactly the guest constraint: a guest's `canSee` is true only for
+ *    tickets an explicit list names them in, so "guests may only act on tickets
+ *    explicitly visible to them" falls out of the same line rather than needing
+ *    a guest branch of its own.
+ * 5. **`visibility.set` authority.** Project-admin rights on the ticket's own
+ *    project, or ticket creatorship. Reported as `permission.role`.
+ *
+ * ## Why checks 2 and 5 report `permission.role` from HERE
+ *
+ * They are write-AUTHORITY questions, not audience questions, and the register
+ * in `checkRolePermission` above says such refusals are owed by the role check.
+ * Two ratified decisions move them anyway, and neither is a preference:
+ *
+ * - **Check 2's project half** must run after `checkProjectExists` (owner
+ *   decision 2026-08-26), and that check reads a table. A pure function cannot
+ *   be sequenced after a database read.
+ * - **Check 5 must run after check 4**, or it becomes an EXISTENCE ORACLE. Run
+ *   first, it answers a workspace admin differently for a ticket that does not
+ *   exist (no resolved visibility, no creator → the authority refusal) than for
+ *   one that exists and is invisible to them (they hold admin rights → the
+ *   audience refusal). Task 8 spent a whole commit making those two cases
+ *   indistinguishable on the read path; rebuilding the distinction at the
+ *   ingest door would put the oracle back one layer down.
+ *
+ * What the register's rule was really protecting is that a `permission.role`
+ * refusal must come from the code that owns that id — and it does: both
+ * functions and both id constants live in this one module. The rule ids are
+ * exported constants with one origin, so neither half can drift into inventing
+ * its own string.
+ */
+export async function checkVisibilityPermission(
+  env: EventEnvelope,
+  ctx: VisibilityContext,
+): Promise<Refusal | null> {
+  if (env.entity.kind !== 'ticket') {
+    return null;
+  }
+
+  if (env.type === 'ticket.created') {
+    // The project exists — checkProjectExists ran first — so this refusal now
+    // means what it says rather than standing in for a nonexistent project.
+    const payload = ticketCreatedPayload.parse(env.payload);
+    if (!ctx.eff.projects.has(payload.projectId)) {
+      return refuse(NOT_ON_PROJECT_REASON);
+    }
+    return null;
+  }
+
+  if (env.type === 'visibility.set') {
+    const payload = visibilitySetPayload.parse(env.payload);
+    if (payload.ticketId !== env.entity.id) {
+      return refuseWith(PERMISSION_VISIBILITY_RULE, VISIBILITY_CLAIM_MISMATCH_REASON);
+    }
+  }
+
+  if (!(await canSee(ctx.db, ctx.sessionUserId, env.entity.id))) {
+    return refuseWith(PERMISSION_VISIBILITY_RULE, TICKET_NOT_VISIBLE_REASON);
+  }
+
+  if (env.type === 'visibility.set') {
+    // The project is the TICKET's, read from its own resolved row — never the
+    // actor's, and never a project id from the payload, which this event does
+    // not carry and could not be trusted with if it did.
+    const visibility = await getResolvedVisibility(ctx.db, env.entity.id);
+    const creatorId = await getTicketCreator(ctx.db, env.entity.id);
+    const allowed =
+      (visibility !== null && hasProjectAdminRights(ctx.eff, visibility.projectId)) ||
+      ctx.sessionUserId === creatorId;
+    if (!allowed) {
+      return refuse(VISIBILITY_AUTHORITY_REASON);
+    }
+  }
+
   return null;
 }
 
@@ -276,19 +757,39 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
  * someone no longer in the workspace (see `./effective-role.ts`, and the table
  * comment on the migration). `resolveEffectiveRole` is the only safe reader.
  *
- * Task 9 extends this with the visibility-dependent checks, between the role
- * refusal and the `null` below.
+ * Three passes, one context, and the ORDER is load-bearing at both seams:
+ *
+ * 1. `checkRolePermission` — pure, and first because a claim from someone who
+ *    is not here at all should not cause a single lookup.
+ * 2. `checkProjectExists` — before any membership question about a project, so
+ *    a nonexistent project is reported as one (owner decision 2026-08-26).
+ * 3. `checkVisibilityPermission` — the audience questions, plus the two write-
+ *    authority questions that had to be sequenced after a database read.
+ *
+ * The call site is unchanged: this is still the one `SubmissionGate` the ingest
+ * pipeline applies at the client door.
  */
 export async function checkPermission(
   env: EventEnvelope,
   ctx: SubmissionContext,
 ): Promise<Refusal | null> {
   const eff = await resolveEffectiveRole(ctx.db, ctx.sessionUserId, env.workspaceId);
-  return checkRolePermission(env, {
+  const permissionContext: VisibilityContext = {
+    db: ctx.db,
     sessionUserId: ctx.sessionUserId,
     eff,
     workspaceExists: await workspaceHasLedger(ctx.db, env.workspaceId),
-  });
+  };
+
+  const roleRefusal = checkRolePermission(env, permissionContext);
+  if (roleRefusal !== null) {
+    return roleRefusal;
+  }
+  const projectRefusal = await checkProjectExists(ctx.db, env);
+  if (projectRefusal !== null) {
+    return projectRefusal;
+  }
+  return checkVisibilityPermission(env, permissionContext);
 }
 
 /**

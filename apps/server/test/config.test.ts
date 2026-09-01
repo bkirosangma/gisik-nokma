@@ -9,6 +9,7 @@ const VALID_ENV = {
   // 34 characters, over better-auth's own 32-character floor, and obviously not
   // a key anything real is signed with.
   BETTER_AUTH_SECRET: 'test-secret-not-used-anywhere-real',
+  WEB_ORIGIN: 'http://localhost:3001',
 };
 
 describe('loadConfig', () => {
@@ -21,6 +22,7 @@ describe('loadConfig', () => {
       logLevel: 'info',
       betterAuthUrl: 'http://localhost:3000',
       betterAuthSecret: 'test-secret-not-used-anywhere-real',
+      webOrigin: 'http://localhost:3001',
     });
   });
 
@@ -99,6 +101,46 @@ describe('loadConfig', () => {
   });
 
   /**
+   * `WEB_ORIGIN` became LIVE with Plan 4 Task 14: it is the host of every
+   * invitation link the server mints. Absent, links would read
+   * `undefined/invite/<token>` — with the credential already spent on a URL
+   * nobody can follow and no way to get it back — so it is required with no
+   * default, exactly like the two auth variables above.
+   */
+  it('planted defect: a missing WEB_ORIGIN is refused with the variable named', () => {
+    const { WEB_ORIGIN: _omitted, ...withoutWebOrigin } = VALID_ENV;
+    expect(() => loadConfig(withoutWebOrigin)).toThrowError(ConfigError);
+    expect(() => loadConfig(withoutWebOrigin)).toThrowError(
+      'invalid server configuration — check: WEB_ORIGIN',
+    );
+  });
+
+  /**
+   * The refusal, and the exact bound of it — MEASURED rather than assumed.
+   *
+   * `z.string().url()` delegates to the WHATWG URL parser, which accepts
+   * anything with a scheme. `'localhost:3001'` therefore PASSES: the parser
+   * reads `localhost:` as the scheme and `3001` as the path. That is not a
+   * mistake this test papers over; it is stated, because an invitation link
+   * built on it would read `localhost:3001/invite/<token>` and go nowhere, and
+   * a reader who assumed `.url()` meant "an http(s) origin" would be wrong.
+   *
+   * `BETTER_AUTH_URL` above has had exactly the same bound since Task 2.
+   * *Absence, owner Plan 11: neither variable is constrained to an http(s)
+   * scheme with a host and no path.*
+   */
+  it('planted defect: a WEB_ORIGIN with no scheme at all is refused with the variable named', () => {
+    expect(() => loadConfig({ ...VALID_ENV, WEB_ORIGIN: 'not a url' })).toThrowError(
+      'invalid server configuration — check: WEB_ORIGIN',
+    );
+    expect(() => loadConfig({ ...VALID_ENV, WEB_ORIGIN: '' })).toThrowError(
+      'invalid server configuration — check: WEB_ORIGIN',
+    );
+    // The bound, stated: a scheme is all `.url()` asks for.
+    expect(loadConfig({ ...VALID_ENV, WEB_ORIGIN: 'localhost:3001' }).webOrigin).toBe('localhost:3001');
+  });
+
+  /**
    * `.env.example` tells an operator to copy it and adjust. This proves that
    * doing exactly that produces a server that starts.
    *
@@ -116,7 +158,15 @@ describe('loadConfig', () => {
 
     // Guard against the check going quiet: if the parser stops finding the live
     // variables, this test would pass on an empty object and prove nothing.
-    for (const key of ['DATABASE_URL', 'PORT', 'HOST', 'LOG_LEVEL', 'BETTER_AUTH_URL', 'BETTER_AUTH_SECRET']) {
+    for (const key of [
+      'DATABASE_URL',
+      'PORT',
+      'HOST',
+      'LOG_LEVEL',
+      'BETTER_AUTH_URL',
+      'BETTER_AUTH_SECRET',
+      'WEB_ORIGIN',
+    ]) {
       expect(documented, `.env.example should document ${key}`).toHaveProperty(key);
     }
 

@@ -1,8 +1,11 @@
 import { membershipId, type LedgerEvent } from '@gisik-nokma/domain';
 import type { Pool } from 'pg';
 import { membershipsProjection } from '../../src/projections/proj-memberships.js';
+import { projInvites } from '../../src/projections/proj-invites.js';
+import { projProjects } from '../../src/projections/proj-projects.js';
 import { projVisibility } from '../../src/projections/proj-visibility.js';
 import { testEnvelope } from './envelope.js';
+import { appendTestEvent } from './ledger.js';
 
 /**
  * Scenario seeds for Plan 4's visibility tests: build the membership and
@@ -33,20 +36,65 @@ import { testEnvelope } from './envelope.js';
  * the whole batch keeps the seeding on a single connection, which is also what
  * a real ingest transaction gives a projection.
  *
- * Projections are applied in the registry's own order — memberships before
- * visibility (coordination doc §8) — so a seed cannot pass under an order the
- * product never uses.
+ * Projections are applied in the registry's own order — projects, then
+ * memberships, then visibility (coordination doc §8) — so a seed cannot pass
+ * under an order the product never uses. `projProjects` joined the list at
+ * Plan 4 Task 9 and goes FIRST of the three because §8 puts it there; it is
+ * inert for every event but `project.created`, so no existing caller changes
+ * behaviour, but a wrong order here would make this docblock a lie.
+ *
+ * `projInvites` joined at Plan 4 Task 14, in its §8 position (after
+ * memberships, before visibility), and it joined the HARD way: this list is
+ * hand-written, so a new projection is silently absent here until somebody
+ * notices a seeded event producing no row. It cost this task one debugging
+ * round.
+ *
+ * *Absence, deliberately not closed here: this should read
+ * `buildProjectionRegistry().all()` so a registrant cannot be missed. Doing it
+ * inside Task 14 would start applying `proj_entity_heads`, `proj_workflows` and
+ * `proj_contested` to every seeded event in twenty test files — a behaviour
+ * change to fixtures this task has no business making. Owner: whoever next
+ * touches this helper, or a dedicated cleanup.*
  */
 export async function applyAll(pool: Pool, envs: readonly LedgerEvent[]): Promise<void> {
   const client = await pool.connect();
   try {
     for (const env of envs) {
+      await projProjects.apply(env, client);
       await membershipsProjection.apply(env, client);
+      await projInvites.apply(env, client);
       await projVisibility.apply(env, client);
     }
   } finally {
     client.release();
   }
+}
+
+/**
+ * Found a project, through the real `project.created` event.
+ *
+ * Needed since Plan 4 Task 9 Step 3b: `checkProjectExists` refuses any event
+ * naming a project `proj_projects` has no row for, so a seed that grants
+ * membership on a project id nobody founded now produces a `project.unknown`
+ * refusal rather than the refusal the test meant to observe. That is the check
+ * working — and it is exactly why every refusal test here must found its
+ * project first, so the refusal under test is the one that fires.
+ */
+export async function seedProject(
+  pool: Pool,
+  workspaceId: string,
+  projectId: string,
+  name = `Project ${projectId}`,
+): Promise<void> {
+  await applyAll(pool, [
+    testEnvelope({
+      workspaceId,
+      entity: { kind: 'project', id: projectId },
+      type: 'project.created',
+      payload: { name },
+      actorId: SEED_ACTOR,
+    }),
+  ]);
 }
 
 /** The actor every seed attributes its claims to. Any ULID; the tests never assert it. */
@@ -148,7 +196,18 @@ export interface SeedTicketArgs {
 }
 
 /**
- * Creates the ticket in `proj_visibility` via the real `ticket.created` event.
+ * Creates the ticket in `proj_visibility` via the real `ticket.created` event,
+ * AND appends that event to the ledger.
+ *
+ * The ledger append arrived with Plan 4 Task 9 and is not decoration.
+ * Creatorship — Task 9's check 5 — has no projection to read on this branch:
+ * `proj_tickets` does not exist and `proj_visibility` has no creator column, so
+ * `check-permission.ts` reads `events.actor_id` on the ticket's own
+ * `ticket.created` row. A fixture that only applied the projection would leave
+ * every creator lookup answering null, and the creator cases below would pass
+ * or fail for a reason unrelated to creatorship. It also makes
+ * `workspaceHasLedger` answer truthfully for a workspace that has tickets in
+ * it, which is what a real workspace looks like.
  *
  * The plan text's version also INSERTed a `proj_tickets` head row; that table
  * does not exist on this branch (Plan 3 Task 12 owns it), and its `ticket.created`
@@ -158,20 +217,20 @@ export interface SeedTicketArgs {
  * parse before it reaches any assertion.
  */
 export async function seedTicket(pool: Pool, args: SeedTicketArgs): Promise<void> {
-  await applyAll(pool, [
-    testEnvelope({
-      workspaceId: args.workspaceId,
-      entity: { kind: 'ticket', id: args.ticketId },
-      type: 'ticket.created',
-      payload: {
-        typeId: args.typeId ?? 'task',
-        projectId: args.projectId,
-        parentId: args.parentId ?? null,
-        title: args.title ?? `Ticket ${args.ticketId}`,
-      },
-      actorId: args.createdBy ?? SEED_ACTOR,
-    }),
-  ]);
+  const created = testEnvelope({
+    workspaceId: args.workspaceId,
+    entity: { kind: 'ticket', id: args.ticketId },
+    type: 'ticket.created',
+    payload: {
+      typeId: args.typeId ?? 'task',
+      projectId: args.projectId,
+      parentId: args.parentId ?? null,
+      title: args.title ?? `Ticket ${args.ticketId}`,
+    },
+    actorId: args.createdBy ?? SEED_ACTOR,
+  });
+  await appendTestEvent(pool, created);
+  await applyAll(pool, [created]);
 }
 
 /**

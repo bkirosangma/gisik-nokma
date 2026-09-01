@@ -18,12 +18,15 @@ import {
   PERMISSION_ROLE_RULE,
   PROJECT_ROSTER_REASON,
   SERVER_ORIGIN_REASON,
+  WORKSPACE_ALREADY_FOUNDED_REASON,
   WORKSPACE_MEMBERSHIP_REASON,
+  INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON,
 } from '../../src/permissions/check-permission.js';
 import type { EffectiveRole } from '../../src/permissions/effective-role.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { testEnvelope } from '../helpers/envelope.js';
+import { applyAll, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
 
 /**
  * The pre-engine permission gate (Plan 4 Task 5), and the founding sequence
@@ -56,6 +59,13 @@ import { testEnvelope } from '../helpers/envelope.js';
 const WS = newUlid();
 const ACTOR = newUlid();
 
+/**
+ * A hand-built `EffectiveRole` for `checkRolePermission`, which is pure and is
+ * driven here across every role. The cast is required since Plan 4 Task 8
+ * branded the type (ruling P22, case 6.64): a hand-builder must now assert at a
+ * greppable site rather than satisfy the shape structurally. Sound here because
+ * the value never leaves this file's pure calls.
+ */
 function eff(
   workspaceRole: EffectiveRole['workspaceRole'],
   projects: Array<[string, boolean]> = [],
@@ -63,7 +73,7 @@ function eff(
   return {
     workspaceRole,
     projects: new Map(projects.map(([id, projectAdmin]) => [id, { projectAdmin }])),
-  };
+  } as unknown as EffectiveRole;
 }
 
 function env(
@@ -140,6 +150,50 @@ describe('checkRolePermission — planted defects', () => {
       rule: PERMISSION_ROLE_RULE,
       reason: NOT_A_MEMBER_REASON,
     });
+  });
+
+  it.each(['owner', 'admin', 'member', 'guest'] as const)(
+    'planted defect: refuses a %s of the workspace founding it a SECOND time',
+    (role) => {
+      // CASE 6.52, the half the `workspaceExists` bound left open. That bound
+      // answers a NON-member (the case above); a member of any role walked
+      // straight past it — `workspace.created` is not in `ADMIN_ONLY_TYPES`, it
+      // is not a membership or roster event, and check 1 is a ticket-entity
+      // filter — so the claim reached the engine, which has no case for the
+      // type, and COMMITTED. It founded nothing (`workspaceSeq === 1` in
+      // `ingestAll` is what stops the grant), but the workspace's history then
+      // carried a second, false founding claim that §11 can never take back —
+      // and `workspaces/workspace-name.ts` reads exactly those events for the
+      // directory's name, so it was not inert noise either.
+      //
+      // Walked over all FOUR roles rather than one, because the branch it
+      // closes is reached by every non-null role and a single role would leave
+      // three unexamined. Mutation: delete the `env.type === 'workspace.created'`
+      // refusal and all four go green while the integration twin below lets an
+      // owner append a second founding to their own ledger.
+      const e = env({ type: 'workspace.created', entity: { kind: 'workspace', id: WS }, payload: { name: 'Again' } });
+      expect(checkRolePermission(e, ctx(eff(role), true))).toEqual({
+        refused: true,
+        rule: PERMISSION_ROLE_RULE,
+        reason: WORKSPACE_ALREADY_FOUNDED_REASON,
+      });
+    },
+  );
+
+  it('the two founding refusals name different faults, and the non-member one is unchanged', () => {
+    // The discriminator, in one place: a stranger is told they do not belong
+    // here; a member is told the thing they are claiming has already happened.
+    // Merging them into one sentence would make the mutation "move the new
+    // refusal above the membership check" invisible — it would still refuse,
+    // with the wrong reason, which is the failure mode this file exists to
+    // catch. Mutation: return `NOT_A_MEMBER_REASON` from the new branch and
+    // only this case goes red.
+    const e = env({ type: 'workspace.created', entity: { kind: 'workspace', id: WS }, payload: { name: 'Again' } });
+    const stranger = checkRolePermission(e, ctx(eff(null), true));
+    const member = checkRolePermission(e, ctx(eff('member'), true));
+    expect(stranger).toMatchObject({ reason: NOT_A_MEMBER_REASON });
+    expect(member).toMatchObject({ reason: WORKSPACE_ALREADY_FOUNDED_REASON });
+    expect(NOT_A_MEMBER_REASON).not.toBe(WORKSPACE_ALREADY_FOUNDED_REASON);
   });
 
   it.each(['workflow.defined', 'ticket-type.defined', 'project.created', 'ticket.workflow_rebound'] as const)(
@@ -228,6 +282,78 @@ describe('checkRolePermission — planted defects', () => {
     expect(
       checkRolePermission(e, ctx(eff('member', [[project, false]]))),
     ).toEqual({ refused: true, rule: PERMISSION_ROLE_RULE, reason: PROJECT_ROSTER_REASON });
+  });
+
+  /**
+   * Case 6.34 — the token-bypass defect (Plan 4 Task 14).
+   *
+   * An admin can read their workspace's own history, so they can read every
+   * pending `inviteId` in it. Without this refusal they could submit
+   * `invite.accepted { inviteId, userId: <anyone> }` and bind any outstanding
+   * invitation to any account, having never seen the link. The token is the
+   * only thing entitled to make that binding, and no client-submitted event
+   * carries one.
+   *
+   * THE ROLE MATTERS. It is asserted at `admin` and at `owner` — the two roles
+   * that reach this line with every earlier guard already passed. A non-member
+   * would be answered `NOT_A_MEMBER_REASON` several checks earlier and would
+   * prove nothing about acceptance at all, which is exactly the
+   * refusal-before-the-interesting-code trap.
+   *
+   * Mutation that this kills and nothing else does: delete the
+   * `env.type === 'invite.accepted'` branch. Every other case in this file
+   * stays green, and an admin's forged acceptance commits.
+   */
+  it('planted defect: refuses a client-submitted invite.accepted from EVERY role, admin and owner included', () => {
+    const inviteId = newUlid();
+    const e = env({
+      type: 'invite.accepted',
+      entity: { kind: 'invite', id: inviteId },
+      payload: { inviteId, userId: ACTOR },
+    });
+    for (const role of ['owner', 'admin', 'member', 'guest'] as const) {
+      expect(checkRolePermission(e, ctx(eff(role))), role).toEqual({
+        refused: true,
+        rule: PERMISSION_ROLE_RULE,
+        reason: INVITE_ACCEPTANCE_IS_THE_SERVERS_REASON,
+      });
+    }
+  });
+
+  /**
+   * The other two invite types, and the positive control that separates "invite
+   * events are refused" from "acceptance is refused".
+   *
+   * `invite.sent` and `invite.revoked` are ordinary admin-only work — inviting
+   * somebody into a workspace is managing its membership — so an admin is
+   * ADMITTED for both and a member is refused with the admin-only sentence.
+   * Without this case, a gate that refused every `invite.*` type outright would
+   * pass the acceptance case above while silently making invitations
+   * unissuable.
+   */
+  it('invite.sent and invite.revoked are admin-only, and an admin passes both', () => {
+    const inviteId = newUlid();
+    const sent = env({
+      type: 'invite.sent',
+      entity: { kind: 'invite', id: inviteId },
+      payload: { inviteId, address: 'a@example.com', channel: 'email', role: 'member' },
+    });
+    const revoked = env({
+      type: 'invite.revoked',
+      entity: { kind: 'invite', id: inviteId },
+      payload: { inviteId },
+    });
+    for (const e of [sent, revoked]) {
+      expect(checkRolePermission(e, ctx(eff('owner')))).toBeNull();
+      expect(checkRolePermission(e, ctx(eff('admin')))).toBeNull();
+      for (const role of ['member', 'guest'] as const) {
+        expect(checkRolePermission(e, ctx(eff(role))), `${e.type} as ${role}`).toEqual({
+          refused: true,
+          rule: PERMISSION_ROLE_RULE,
+          reason: adminOnlyReason(role),
+        });
+      }
+    }
   });
 
   it('lets ordinary ticket work through — the visibility gate (Task 9) owns the rest', () => {
@@ -571,6 +697,101 @@ describe('the founding sequence — a new workspace can hold a ticket the moment
     expect(rows).toEqual([{ user_id: founder }]);
   });
 
+  it('planted defect: the FOUNDER cannot append a second founding to their own workspace', async () => {
+    // CASE 6.52 end to end, and the actor is deliberately the OWNER rather than
+    // a fresh member: every earlier guard in `checkRolePermission` passes on its
+    // own for them — the actor IS the session user, the envelope-origin is
+    // `'web'`, and their role is not null — so the refusal cannot be the
+    // identity, provenance or membership check firing early. That is what makes
+    // it a measurement of the new branch and not of one already proven.
+    //
+    // The FRESH entity id is kept from the escalation case above: the obvious
+    // near-misses (a head-row lookup on `env.entity.id`, or the per-entity
+    // `seq`) both pass here because this entity has never been seen.
+    // Mutation: delete the `workspace.created` refusal in `checkRolePermission`
+    // and the stream below goes from 7 to 8.
+    const ingest = ingestService();
+    const workspaceId = newUlid();
+    const founder = newUlid();
+    expectCommitted(await ingest.ingestBatch([founding(workspaceId, founder)]));
+
+    const again: SubmittedEvent = {
+      ...founding(workspaceId, founder),
+      entity: { kind: 'workspace', id: newUlid() },
+    };
+    expect((await ingest.ingestClientBatch([again], founder))[0]).toEqual({
+      status: 'refused',
+      eventId: again.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: WORKSPACE_ALREADY_FOUNDED_REASON,
+    });
+    expect((await workspaceStream(workspaceId)).length).toBe(7);
+
+    // POSITIVE CONTROL, in the same suite and the same door: the SAME person
+    // founding a workspace that does not exist yet still commits, and still
+    // gets the whole sequence. Without it, "the client door refuses every
+    // `workspace.created`" — which would break the product's only founding
+    // path — passes this test.
+    const fresh = newUlid();
+    expectCommitted(await ingest.ingestClientBatch([founding(fresh, founder)], founder));
+    expect((await workspaceStream(fresh)).length).toBe(7);
+  });
+
+  it('a REDELIVERED founding envelope — same event id, client door — is refused, not idempotently acked', async () => {
+    // CASE 6.105, which until now had no covering test: it was written down
+    // from reading `check-permission.ts` — a check-mark citing a SOURCE file,
+    // the direction this catalogue's own rule forbids, and the direction four
+    // wrong check-marks in §9 were once written in. This is the behaviour change
+    // case 6.52 bought, and it is now run rather than read.
+    //
+    // It is NOT the case above. That one submits a FRESH event id (and a fresh
+    // entity) and is refused because the workspace already exists. This one
+    // submits THE SAME ENVELOPE TWICE — same event id, same entity id — which
+    // is the path a redelivering client takes, and the two are exactly the
+    // distinction this task's escalation turned on. Before the `workspace.created`
+    // refusal landed, this answered `duplicate-event-id`, an `invalid` result
+    // and a safe idempotent ack; it now answers a permission refusal, because
+    // `checkRolePermission` runs before `insertEvent` and only the primary key
+    // can tell a redelivery from a fresh claim.
+    //
+    // BOTH submissions go through the CLIENT door, deliberately: the first
+    // establishes that this envelope founded this workspace through this door,
+    // so the second's different answer cannot be the door changing underneath
+    // it. Mutation: delete the `env.type === 'workspace.created'` refusal in
+    // `checkRolePermission` and this reddens on the FIRST assertion — the
+    // redelivery goes back to `duplicate-event-id`.
+    const ingest = ingestService();
+    const workspaceId = newUlid();
+    const founder = newUlid();
+    const envelope = founding(workspaceId, founder);
+
+    expectCommitted(await ingest.ingestClientBatch([envelope], founder));
+    expect((await workspaceStream(workspaceId)).length).toBe(7);
+
+    // The redelivery. The founder now holds `owner`, so every earlier guard in
+    // the gate passes on its own and the refusal can only be the new branch.
+    expect((await ingest.ingestClientBatch([envelope], founder))[0]).toEqual({
+      status: 'refused',
+      eventId: envelope.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: WORKSPACE_ALREADY_FOUNDED_REASON,
+    });
+    expect((await workspaceStream(workspaceId)).length).toBe(7);
+
+    // THE DISCRIMINATOR, and without it "refused" is equally consistent with an
+    // id the gate never got to. The SAME envelope through the INTERNAL door —
+    // where nothing in `checkRolePermission` runs — still answers
+    // `duplicate-event-id`, which is proof the id genuinely is in the ledger and
+    // that what changed at the client door is the gate and nothing else. It is
+    // also the door Plan 11's seed CLIs use, and case 6.26 depends on this
+    // answer staying what it is.
+    expect((await ingest.ingestBatch([envelope]))[0]).toMatchObject({
+      status: 'invalid',
+      code: 'duplicate-event-id',
+    });
+    expect((await workspaceStream(workspaceId)).length).toBe(7);
+  });
+
   it('founds through the CLIENT door too — the gate admits the founding and not the sequence', async () => {
     // The discriminating case for the whole bootstrap design. The founding
     // sequence is envelope-origin `'server'`, which `checkRolePermission`
@@ -619,6 +840,30 @@ describe('the gate at the client door — refusals before the rule engine', () =
       ]),
     );
     return user;
+  }
+
+  /**
+   * A ticket every member of the workspace can SEE, seeded through the real
+   * `ticket.created` event and a real `visibility.set`.
+   *
+   * Needed since Plan 4 Task 9: the gate now refuses a ticket-entity event
+   * whose ticket the actor cannot see, and `canSee` answers false for a ticket
+   * with no `proj_visibility` row exactly as it does for an invisible one. The
+   * cases below used to file `ticket.assigned` against a bare `newUlid()`,
+   * which the visibility check now refuses — so without this the two cases
+   * would be red for a reason that has nothing to do with revocation or with
+   * connection use, which is the "refusal fires before the interesting code"
+   * failure this file's own comments warn about elsewhere.
+   *
+   * `'workspace'` mode rather than a project roster, deliberately: these cases
+   * are about the role gate and the transaction, and a project attachment would
+   * add a second thing that has to keep being true for them to stay green.
+   */
+  async function visibleTicket(workspaceId: string): Promise<string> {
+    const ticketId = newUlid();
+    await seedTicket(db.pool, { workspaceId, projectId: newUlid(), ticketId });
+    await applyAll(db.pool, [setVisibilityEnv(workspaceId, ticketId, 'workspace')]);
+    return ticketId;
   }
 
   it('planted defect: a member ingesting workflow.defined is refused BEFORE the engine runs', async () => {
@@ -721,10 +966,11 @@ describe('the gate at the client door — refusals before the rule engine', () =
     const { workspaceId, owner } = await foundedWorkspace(ingest);
     const member = await grantMember(ingest, workspaceId, owner, 'member');
 
+    const ticketId = await visibleTicket(workspaceId);
     const ticketEvent = () =>
       submitted({
         workspaceId,
-        entity: { kind: 'ticket', id: newUlid() },
+        entity: { kind: 'ticket', id: ticketId },
         type: 'ticket.assigned',
         payload: { assigneeId: member },
         actorId: member,
@@ -837,7 +1083,7 @@ describe('the gate at the client door — refusals before the rule engine', () =
     });
     const event = submitted({
       workspaceId,
-      entity: { kind: 'ticket', id: newUlid() },
+      entity: { kind: 'ticket', id: await visibleTicket(workspaceId) },
       type: 'ticket.assigned',
       payload: { assigneeId: member },
       actorId: member,
