@@ -894,18 +894,67 @@ and a rebuild`; `### Task 9: proj_entity_heads — the reference projection` aga
 the reference projection`. Fix-up commits cluster behind their parent task (three behind T4a, three
 behind T5, three behind T10).
 
-**⚠ THIS IS AN OWNER DECISION, NOT THE AUDITOR'S — `done` is the number every other figure keys off.**
-The choice is:
-- **(A) Widen `done`** to accept *a commit on `main`, inside the PR's range, whose subject matches the
-  task heading* — and **record that commit's sha per row**, not the PR's merge sha. Promotes ~28. The
-  widening must be written into `check-task-ledger.mjs`'s header and this file, in the same change set.
-- **(B) Leave them `claimed`** and record that the evidence exists but the definition does not reach it.
-  Verified stays 14.7%.
+**⚠ THIS WAS AN OWNER DECISION, NOT THE AUDITOR'S — `done` is the number every other figure keys off.**
+- **(A) Widen `done`** to accept a range-internal commit, recording **that commit's sha per row**.
+- **(B) Leave them `claimed`** and record that the evidence outran the definition.
 
-**What is NOT on the table: promoting 28 rows while the definition still reads as though a PR had named
-them.** That is the ledger's founding defect — a completion figure asserted at a granularity nobody
-checked — committed by the instrument built to catch it. **Recommendation: (A), with the per-row commit
-sha as the evidence**, because it is strictly more auditable than what the `done` rows carry today.
+### ✅ OWNER RULED (A) — 2026-09-01, ~20:20 IST: "go with A. Widen done."
+
+**And the method got better than the one (A) was proposed with. Do not use subject-matching.**
+The proposal said *"a commit whose **subject** matches the task heading."* Subject-matching could not
+resolve Plan 2 T2 at all. **Map on the ARTEFACT the task's own `Files:` block declares it creates**, then
+find the commit that ADDED that path (`git log origin/main --diff-filter=A -- <path>`) and require the
+result to be **inside that PR's commit set**. Mechanical, per-task, and it discriminates: it found that
+**Plan 2 T1 and T2 landed in ONE commit (`aa33c70`)** — invisible to subject-matching, and the two are
+still separately evidenced because they name different files (`workflow.ts` vs `entity-state.ts`).
+
+### THE MAPPING — measured 2026-09-01, ready to apply. 27 of 28 on declared artefacts.
+
+| Plan 1 | commit | | Plan 2 | commit |
+|---|---|---|---|---|
+| T1 | `0dd4de7` | | T1 | `aa33c70` |
+| T2 | `08f150f` | | T2 | `aa33c70` *(combined with T1)* |
+| T3 | `22bfc88` | | T3 | `41b3620` |
+| T4 | `6b7ffc0` | | T4 | `e25ee66` |
+| T4a | `c5a866c` | | T5 | `186a172` |
+| T5 | `f0d27b3` | | T6 | `91739a2` |
+| T6 | `58cf28c` | | **T7** | **`c18ce5a` — SUBJECT+POSITION, see below** |
+| T7 | `3baf418` | | T8 | `0353081` |
+| T8 | `314ba87` | | T9 | `155650a` |
+| T9 | `386bd6c` | | T10 | `8a4940f` |
+| T10 | `99dd467` | | T11 | `df17d4a` |
+| T11 | `e41508c` | | T12 | `6d6612c` |
+| T12 | `09f1e3e` | | T13 | `c33d94a` |
+| T13 | `560bad6` | | | |
+| T14 | `1272d2b` | | | |
+
+**Plan 2 T7 is the one row that is NOT artefact-evidenced, and it must be recorded as such rather than
+blended in.** Its `Files:` block is *`Modify: transition.ts`* plus "3 fixture files" with no paths — it
+creates nothing addressable. Evidence is subject (`Parents cannot outrun children` ↔ *"The parent-terminal
+invariant"*) **plus position**: it is the only commit touching `transition.ts` between T6's `91739a2` and
+T8's `0353081`. That is weaker than the other 27. **Either mark it `claimed` still, or mark it `done`
+with the note naming the weaker basis — do not let it inherit the strength of the rows around it.**
+
+**Three rows needed a placeholder resolved, and it is a plan-text artefact, not a gap:** Plan 1 T6/T9 and
+Plan 2 T12 declare `apps/server/migrations/<timestamp>_*.sql` **literally**. Resolve by suffix against
+`git ls-tree`; all three then land on a single in-range commit (`58cf28c`, `386bd6c`, `6d6612c`).
+
+> **⚠ MY OWN AUDIT SCRIPT PRODUCED A WELL-FORMED FALSE ANSWER, and it is this file's most-repeated class.**
+> It filtered declared paths with `'/' in c` to drop prose, which **silently dropped every ROOT-LEVEL
+> file** — so Plan 1 T1 reported `UNMAPPED (task declares no created file)`. T1 declares four:
+> `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `tsconfig.base.json`, **all added by `0dd4de7`**.
+> The output was well-formed, plausible, and wrong, and it failed toward *"there is nothing here"* —
+> the direction nobody questions. Caught only by opening the task's own `Files:` block by hand.
+> **When a mapping instrument reports NOTHING for a row, read the row before believing it.**
+
+### WHAT REMAINS TO DO AT THE STEP-9 BOUNDARY — mechanical, the thinking is done
+
+1. Apply the 28 rows to `task-ledger.tsv`: status `claimed` → `done`, `merge_sha` → **the per-task commit
+   above**, note → the declared artefact that evidences it. (Plan 2 T7 per its caveat.)
+2. Rewrite `check-task-ledger.mjs`'s header: the `done` definition now admits range-internal artefact
+   evidence, **and** the *"This repo squash-merges"* rationale is corrected — false of #3 and #4.
+3. Correct this file's own `done` definition at the ledger section (line ~142) to match.
+4. Re-run `pnpm check:tasks` and quote it. Expect **54 done**, 5 claimed, 118 todo of 177 ≈ **30.5%**.
 
 ## Pending owner decisions
 
