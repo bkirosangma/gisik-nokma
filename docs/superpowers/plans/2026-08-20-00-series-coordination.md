@@ -5326,3 +5326,69 @@ class produced a wrong *report*. This one produced a wrong *product*.
   alone killed nothing, dropping it from `openableInvite` alone killed one, and dropping **both** killed
   two. The two clauses are alternatives and neither is load-bearing alone — a fact only visible because
   the pair was run together rather than the survivor being reported by itself.
+
+## Plan 5 execution consequences (2026-09-01) — two contract widenings and one owner question
+
+Recorded by the serial executor at Plan 5 Task 7, in the same change set that made them, per the
+executor brief's rule that anything outside a task's scope is **recorded with a named owner rather
+than fixed silently**. Both reviews of Task 7 were clean; these are not defects. They are shape
+changes a later plan compiles against, and the expensive version of this note is the one written
+after Plan 6 fails to build.
+
+### 1. `TicketRollup` is FOUR fields, not the three Plan 5 specified — binding on Plans 6, 9 and 10
+
+Shipped shape:
+
+```ts
+type TicketRollup = {
+  totalChildren: number;        // over ALL children, viewer-invariant
+  terminalChildren: number;     // over ALL children, viewer-invariant
+  restrictedCount: number;      // per-viewer — what the disclosure is honest WITH
+  uncategorizedChildren: number; // children whose category nothing knows
+};
+```
+
+`uncategorizedChildren` is the added one and it is **not padding**. The rollup counts categories via
+`LEFT JOIN proj_tickets`, and that join CAN miss — commonly in fixtures that seed a subset of the
+registry (`test/helpers/seed.ts`'s `applyAll` seeds four projections, not `proj_tickets`). Folding a
+miss into "not done" would have been a view-model quietly asserting something it does not know, which
+is the exact failure Task 7 exists to prevent. So the miss is **counted and named**. Plans 6/9/10 render
+this through the `DataSource`: **a renderer that shows `terminalChildren` of `totalChildren` without
+consulting `uncategorizedChildren` is showing a progress bar that is silently incomplete.**
+
+### 2. `RollupView` gained `terminal` and `uncategorized`, and a SHIPPED ROUTE'S BODY CHANGED
+
+`apps/server/src/visibility/rollup.ts`'s `RollupView` was `{total, restrictedCount}`. Plan 5's text
+assumed `{total, open, active, terminal, restrictedCount}` and read `rollupView.terminal`, which did
+not exist — caught by the adaptation map before an implementer met it. It is now
+`{total, terminal, uncategorized, restrictedCount}`; `open` and `active` stay absent because nothing
+reads them.
+
+**The consequence that reaches outside Plan 5:** `GET /v1/workspaces/:ws/tickets/:id` returns the view
+verbatim, so **that response body now carries two additional keys.** Additive, so no client breaks —
+but it is Plan 4's read path, changed by a Plan 5 task. **Owner: Plan 4's read path.**
+
+The alternative — sourcing `terminalChildren` from the shipped `proj_rollups.terminal_children` column
+— looked free and was **ruled out by measurement, not taste.** `rollupFor` walks
+`proj_visibility WHERE parent_id = $1` with **no workspace clause** (deliberately, case 6.84: dropping
+a cross-workspace child would understate a total this design exists to keep honest), while `getRollup`
+and `recomputeParent` are `workspace_id`-scoped. The two enumerate **different child sets**, so a
+`totalChildren` from one table beside a `restrictedCount` from the other can emit
+`restrictedCount > totalChildren`. A test builds the cross-workspace child and watches the two counts
+part, 2 against 1 — closing case 6.83, open since Plan 3's handoff.
+
+### 3. OWNER QUESTION, not a ruling: does the done-count cross the visibility boundary?
+
+`terminalChildren` counts children **the viewer cannot see** — strictly more disclosure than
+`totalChildren`, which reveals existence; this reveals state. The implementer and the reviewer arrived
+at the same reading independently, and **both flagged the same uncertainty**, which is why it is here
+rather than buried.
+
+The support is the product design doc, line 116: *"5 of 8 done · 2 restricted … nothing pretended
+absent."* It reads unambiguously as a done-count over all children. But it is a brief's **illustrative
+phrase, not a ruling on this API shape.**
+
+**Conservative default in force: shipped as the spec's plain reading says.** If the owner reads that
+line more narrowly, `terminalChildren` becomes per-viewer and the disclosure argument collapses. The
+change would be local — one `LEFT JOIN` predicate and its tests — so this is cheap to reverse and is
+recorded rather than escalated.

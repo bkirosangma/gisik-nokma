@@ -129,18 +129,36 @@ T13 (4551), T16 (6047).
 | T4 `proj_workspace_settings` | `2e4c54e`, doc fix `0a140fa` | clean, 1 Minor (fixed) |
 | T5 **FLOOR-LIST** visibility predicate | `34c62fd`, `e582909`, `6a19638`, fix round `2f24959` | 1 **Important** + 2 Minor, all fixed and PROVEN |
 | T6 `proj_search` (tsvector) | `a21448d`, `91ea648` | **CLEAN — zero findings** |
+| T7 read models / TicketCard | `36c3d85`, `0422b20`, `41bb405` | **CLEAN — zero findings**; 18 mutations, 17 killed, 1 survivor correctly diagnosed as an unconstrained path |
 
-**Gate at `91ea648`, re-run by the executor rather than taken from any agent's report:** exit 0, 21/21,
-**0 cached**, **1375 tests** — domain 320 · rule-engine 280 · **server 534** · app-core 130 · editor 72
+**Gate at `41bb405`, re-run by the executor rather than taken from any agent's report:** exit 0, 21/21,
+**0 cached**, **1387 tests** — domain 320 · rule-engine 280 · **server 546** · app-core 130 · editor 72
 · ui 31 · sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**.
 
-**NEXT: Plan 5 Task 7** — read models: state provenance, workflow defs, the TicketCard view-model,
-plan line 1821. **The adaptation map's `RollupView` drift lands HERE:** the plan reads
-`rollupView.terminal`, and main's `RollupView` is `{total, restrictedCount}` — there is no `terminal`,
-`open` or `active` field. Compile-break, so it announces itself, but the SEMANTIC question it hides is
-where `terminalChildren` is supposed to come from at all.
+### THE CONTROLLER SHOULD SEE THIS BEFORE MERGING — recorded in the coordination doc, not escalated
 
-Then T8 (2315) · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (3638) · T11 (3874) · T12 (4079) ·
+Task 7 made **two additive cross-plan contract widenings** and left **one owner question**. All three
+are written up in the coordination doc's new section *"Plan 5 execution consequences (2026-09-01)"*.
+In one line each:
+
+1. **`TicketRollup` is four fields, not three** — `uncategorizedChildren` was added, and it is not
+   padding: a renderer showing `terminalChildren` of `totalChildren` without consulting it is showing
+   a silently incomplete progress bar. **Binding on Plans 6, 9, 10.**
+2. **`RollupView` gained two fields, so `GET /v1/workspaces/:ws/tickets/:id`'s body carries two more
+   keys** — additive, but it is Plan 4's route changed by a Plan 5 task.
+3. **OWNER QUESTION: `terminalChildren` counts children the viewer cannot see.** Shipped per the
+   product design doc's plain reading (line 116, *"5 of 8 done · 2 restricted"*), which is an
+   illustrative phrase rather than a ruling. **Cheap to reverse** — one JOIN predicate and its tests.
+   The implementer and the reviewer reached this reading independently and both flagged the same
+   doubt, which is why it is recorded rather than left implicit.
+
+**This did NOT meet the bar to interrupt the controller** (no Critical or Important, and step 9's
+scope is unchanged), so it is written where the interface authority lives instead.
+
+**NEXT: Plan 5 Task 8** — `GET /v1/projects/:projectId/board`, plan line 2315. **This is the first
+route task, so the `makeRequireSession` drift starts biting HERE and recurs through T15.**
+
+Then T9 (2657) · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (3638) · T11 (3874) · T12 (4079) ·
 T13 (4551) · **T14 (4918, FLOOR-LIST)** · **T15 (5452, FLOOR-LIST)** · T16 (6047).
 **Remember `makeRequireSession` is imported from the WRONG module in every route snippet from T8 on.**
 
