@@ -11,7 +11,8 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  *   proj_visibility, proj_contested
  *
  * because a projection may read a table an earlier one wrote in the same
- * transaction (Plan 3's proj_rollups reads proj_tickets). A guarantee nothing
+ * transaction (proj_rollups reads proj_tickets, and since Task 11 that is a
+ * shipped dependency rather than a forecast one). A guarantee nothing
  * asserts is a guarantee that drifts on the first re-ordering, so the array
  * below is the pin: EVERY later registrant extends it in the same commit that
  * registers its projection.
@@ -24,15 +25,18 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  * that inserted before it — §8 position 3, so proj_projects moved down one.
  * Chain B Task 10's proj_tickets is the third, and the first to insert into
  * the MIDDLE of the array — §8 position 5, between proj_projects and
- * proj_memberships. proj_rollups goes BEFORE proj_memberships too, not after.
- * Getting that wrong is not a cosmetic ordering slip — it puts proj_rollups
- * ahead of the proj_tickets rows it reads.
+ * proj_memberships. Chain B Task 11's proj_rollups is the fourth: §8 position
+ * 6, directly after proj_tickets and BEFORE proj_memberships, not after it.
+ * Getting that one wrong would not have been a cosmetic ordering slip — it puts
+ * proj_rollups ahead of the proj_tickets rows it reads, in the ingest
+ * transaction AND in the verifier's shadow rebuild, which replays projections
+ * in this same order into `verify_shadow`.
  *
  * Deliberately DB-free — no createTestDatabase, no pool, nothing that could
  * make this ordering contract skippable when Postgres is not running.
  */
 describe('projection registration order (coordination §8)', () => {
-  it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, tickets, memberships, invites, visibility, contested', () => {
+  it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, tickets, rollups, memberships, invites, visibility, contested', () => {
     const registry = buildProjectionRegistry();
     expect(registry.all().map((projection) => projection.name)).toEqual([
       'proj_entity_heads',
@@ -48,9 +52,17 @@ describe('projection registration order (coordination §8)', () => {
       // and proj_memberships, which is neither end of this array. It must sit
       // BELOW proj_workflows and proj_ticket_types (it resolves a ticket's type
       // and its workflow definition in the same ingest transaction) and ABOVE
-      // proj_rollups, which Task 11 will insert directly after it because that
+      // proj_rollups, which Task 11 inserted directly after it because that
       // projection reads these rows for the same event.
       'proj_tickets',
+      // Plan 3 Chain B Task 11. §8 position 6. The adjacency directly under
+      // proj_tickets is the only one this entry cannot survive losing, and it
+      // is depended on in three places: the ingest transaction, the live
+      // projection-outer rebuild, and the verifier's shadow rebuild, which
+      // replays projections in THIS order into `verify_shadow` — so the ticket
+      // table proj_rollups reads there is complete only because proj_tickets
+      // was replayed before it.
+      'proj_rollups',
       'proj_memberships',
       // Plan 4 Task 14. §8 amended to slot it directly after proj_memberships,
       // so this INSERTS above proj_visibility rather than appending.
@@ -82,6 +94,7 @@ describe('projection registration order (coordination §8)', () => {
       ['proj_ticket_types', ['proj_ticket_types']],
       ['proj_projects', ['proj_projects']],
       ['proj_tickets', ['proj_tickets']],
+      ['proj_rollups', ['proj_rollups']],
       ['proj_memberships', ['proj_memberships']],
       // ONE table, and `invite_tokens` — created by the same migration — is
       // deliberately not it. See the second assertion in this file.

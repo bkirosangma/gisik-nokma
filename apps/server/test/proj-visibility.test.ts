@@ -809,6 +809,21 @@ describe('proj_visibility under verify-projections', () => {
       rows[0]?.n,
       'proj_tickets is empty — the clean verdict below proves nothing about it',
     ).toBeGreaterThan(0);
+    // proj_rollups (Plan 3 Chain B Task 11) rides in on the same ledger and
+    // needs its own witness for the same reason: this file's `created(child,
+    // parent)` gives at least one ticket a parent, so the table has rows, and a
+    // clean verdict over it means something. It is also the one place the
+    // VERIFIER — rather than `rebuildProjection` — exercises this projection's
+    // dependency on registration order: under `search_path = verify_shadow,
+    // public` the ticket table it counts is `verify_shadow.proj_tickets`, which
+    // is complete only because proj_tickets is replayed into the shadow first.
+    const rollups = await db.pool.query<{ n: number }>(
+      'SELECT count(*)::int AS n FROM proj_rollups',
+    );
+    expect(
+      rollups.rows[0]?.n,
+      'proj_rollups is empty — the clean verdict below proves nothing about it',
+    ).toBeGreaterThan(0);
 
     expect(await verifyProjections({ pool: db.pool, projections })).toEqual({
       clean: true,
