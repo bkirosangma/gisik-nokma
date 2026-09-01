@@ -5,6 +5,7 @@ import { membershipsProjection } from './proj-memberships.js';
 import { projProjects } from './proj-projects.js';
 import { projVisibility } from './proj-visibility.js';
 import { createProjectionRegistry, type ProjectionRegistry } from './registry.js';
+import { ticketTypesProjection } from './ticket-types.js';
 import { workflowsProjection } from './workflows.js';
 
 /**
@@ -36,7 +37,9 @@ import { workflowsProjection } from './workflows.js';
  * proj_tickets and proj_rollups all belong ABOVE proj_memberships, which is
  * already registered below. Appending them would put proj_rollups before
  * proj_tickets in application order, and proj_rollups reads proj_tickets inside
- * the same ingest transaction.
+ * the same ingest transaction. Plan 3 Chain B Task 9 is the first of the three
+ * to arrive, and it inserted at position 3 — above proj_projects, which had
+ * been sitting at position 2 in the array only because position 3 was empty.
  *
  * Whatever the position, extend the order assertion in
  * test/projection-order.test.ts in the same commit.
@@ -45,9 +48,14 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   const registry = createProjectionRegistry();
   registry.register(entityHeadsProjection);
   registry.register(workflowsProjection);
-  // §8 position 4. proj_ticket_types (position 3) does not exist yet, so this
-  // INSERTS here rather than appending — proj_memberships and proj_visibility
-  // below are already registered and must stay below it.
+  // §8 position 3 (Plan 3 Chain B Task 9). It INSERTS above proj_projects,
+  // which had been immediately after proj_workflows only because this position
+  // was empty. Nothing registered below reads proj_ticket_types today — Task 12
+  // wires the engine context onto it — but proj_tickets (position 5) resolves a
+  // ticket's type inside the same ingest transaction, so the ladder is applied
+  // before anything that could ask about it.
+  registry.register(ticketTypesProjection);
+  // §8 position 4.
   registry.register(projProjects);
   registry.register(membershipsProjection);
   // §8 position amended by Plan 4 Task 14: proj_invites slots directly AFTER

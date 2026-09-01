@@ -94,8 +94,13 @@ describe('proj_entity_heads', () => {
     expect(registry.all().map((projection) => projection.name)).toEqual([
       'proj_entity_heads',
       'proj_workflows',
+      // Plan 3 Chain B Task 9, INSERTED at its §8 position (third) — above
+      // proj_projects, which was directly under proj_workflows only while this
+      // position was empty. See test/projection-order.test.ts, the pin of
+      // record.
+      'proj_ticket_types',
       // Plan 4 Task 9 Step 3b, INSERTED at its §8 position (fourth) rather
-      // than appended — see test/projection-order.test.ts, the pin of record.
+      // than appended.
       'proj_projects',
       'proj_memberships',
       // Plan 4 Task 14, §8 amended to slot it directly after proj_memberships,
