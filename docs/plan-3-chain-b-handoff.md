@@ -328,3 +328,108 @@ surface during a floor-list task.
   so its tenancy argument is unconstrained by any test. Disclosed by the implementer as surviving
   mutation M5. Keeping it is defensible; **it is recorded so it is not later mistaken for a tested
   predicate.**
+
+---
+
+## Task 13's outcome, and what it left for others (2026-09-01)
+
+`GET /v1/tickets/:id/history` shipped: `apps/server/src/routes/ticket-history.ts`, registered in
+`buildApp` (ruling P7 — there is no `server.ts`), tested by
+`apps/server/test/routes/ticket-history.test.ts` (17) and
+`apps/server/test/routes/ticket-history-ordering.test.ts` (2). **T14 is the only Chain B task left.**
+
+### The method rule this task earned, and it generalises past this route
+
+**An `ORDER BY` over a column the chosen index already sorts is unfalsifiable, and it looks tested.**
+
+The obvious instrument does not work. Storing the claims out of order (built 2, 3, 4; stored 4, 3, 2)
+leaves the heap genuinely backwards — measured, `ctid` beside `seq`: `(0,1)=4, (0,2)=3, (0,3)=2,
+(0,4)=1` — and deleting `ORDER BY seq ASC` from the route still killed **nothing**, because
+`EXPLAIN (ANALYZE)` shows
+
+    Index Scan using events_entity_seq_unique on events
+      Index Cond: entity_kind = 'ticket' AND entity_id = $1 AND seq > $2
+
+and that index is `(entity_kind, entity_id, seq)`. The scan emits seq order whether or not the query
+asks for it, at any table size a test can afford to build.
+
+**What does work:** turn `enable_indexscan`, `enable_indexonlyscan` and `enable_bitmapscan` off **on the
+test database**, before the app pool opens its first connection (an `ALTER DATABASE … SET` reaches new
+sessions only, so it runs on a separate admin client). Every plan is then a sequential scan emitting
+heap order.
+
+**And the instrument must validate itself, or it is decoration.** The case first runs the route's exact
+`WHERE` with **no** `ORDER BY` and asserts the exact heap order comes back (`1, 4, 3, 2`). If the
+settings silently failed to apply, that line reddens and names what it got, instead of leaving every
+later assertion passing for the old reason. Only then is the route held to `1, 2, 3, 4`. Deleting the
+route's `ORDER BY` now reddens two cases there and none anywhere else.
+
+This is not a claim that the product runs unindexed. It is how "the route's ordering is
+plan-independent" is *observed* — which matters because the planner may choose differently after an
+`ANALYZE`, at scale, or under a different predicate.
+
+### RECORDED, not fixed — the same hole is open in Plan 4's `/events` door. Owner: **Plan 4.**
+
+`apps/server/src/routes/tickets.ts:347` orders `GET /v1/workspaces/:workspaceId/tickets/:ticketId/events`
+by `ORDER BY seq` over the same table and the same index prefix, so the clause is unfalsifiable there
+for exactly the reason above. It is worse than unfalsifiable: **`tickets-read.test.ts` contains no `seq`
+assertion at all** (grepped), so the ordering of the neighbouring history door is not merely untested by
+a weak instrument — it is unasserted. `visibility/visible-events-for.ts:350`'s
+`ORDER BY workspace_seq ASC` sits over `events_workspace_seq_unique (workspace_id, workspace_seq)` and
+is the same class again.
+
+Not fixed here: those are Plan 4's and Plan 10's files, following the precedent T10, T11 and T12 each
+set. The recipe above is the whole fix.
+
+### RECORDED, not fixed — four sentences in `Features.md` §6 and `test-cases/06` that T13 made incomplete. Owner: **Plan 4.**
+
+None is outright false; all four read as complete and are no longer. §6 is Plan 4's and was not edited.
+
+| Where | What it says | Why it is now incomplete |
+|---|---|---|
+| §6, "Reads enforce visibility…" | enumerates `…/tickets`, `…/tickets/:ticketId` and `…/tickets/:ticketId/events` as the doors behind `requireSession` deferring to `canSee` | There is now a **fourth** ticket read door with the identical property. The handoff's own rule about the `getContest` omission applies: *an enumeration that misses a member is worse than no enumeration.* |
+| §6, "Provenance is never redacted…" | "ticket history is the ledger, filtered … `apps/server/src/routes/tickets.ts`" | Two doors now serve one ticket's ledger; the file reference names one of them |
+| §6, "A served row goes out through an allow-list…" | "the **history endpoint** is deliberately not trimmed the same way" | Singular and definite where there are now two; both are untrimmed, so the claim holds of both |
+| `test-cases/06`, case 6.67 | "**The route's `:workspaceId` means something.**" | True of that route and unchanged. But the product now has a ticket read path with **no** `:workspaceId`, so the section no longer implies every ticket read is workspace-scoped |
+
+### RECORDED, not fixed — the one door whose answer a client cannot file by workspace. Owner: **Plan 5.**
+
+`TicketHistoryEvent` carries no `workspaceId`, and the path carries none either, so
+`GET /v1/tickets/:id/history` is the only ticket read surface in the product whose response cannot be
+filed under a workspace without a second lookup. That is precisely the hazard `loadTicketRow`'s docblock
+names for the neighbouring route — "a client cache, a breadcrumb, a later rollup". It is **not a
+security hole**: `canSee` resolves the role in the workspace the ticket's own row names, which is the
+only workspace the request has, and the cross-workspace refusal is tested. The contract
+`{ ticketId, events }` is the plan's, pinned, so no field was added. Plan 5 owns the board that will
+consume this.
+
+### Deviations from the plan text, for T14's catalogue
+
+- **`apps/server/src/server.ts` does not exist** (P7). The route registers in `buildApp` as
+  `registerTicketHistoryRoute(app, { pool }, requireSession)` — the shipped convention, not the plan's
+  `ticketHistoryRoutes(app, { db })` Fastify plugin. No `AppDeps` field was added; `pool` was already
+  there.
+- **The plan's `SELECT 1 FROM proj_tickets` existence check is NOT written.** `canSee` is the only
+  guard, and that is the design rather than a shortcut: `canSee` answers `false` alike for invisible and
+  for absent, so one branch produces one 404 body and indistinguishability is structural. A second
+  notion of existence, answered from a different table than the audience decision reads, is how the
+  oracle Plan 4 Task 8 closed gets reopened. (It is also true that `seedTicket`/`applyAll` write no
+  `proj_tickets` row, so the plan's check would have 404'd every fixture — but that is the smaller
+  reason, and `applyAll` must **not** be extended to fix it: its own docblock scopes that out.)
+- **The 400 body is corrected.** The plan's `'afterSeq and limit must be non-negative integers'` is
+  false about `limit`, since `0` is non-negative and `limit=0` is refused. Shipped:
+  `'afterSeq must be a whole number from 0, and limit a whole number from 1'`. **Case 5.19's text was
+  written against the plan's string.**
+- **`afterSeq` is bounded ABOVE, which the plan text did not do.** `^\d+$` accepts
+  `99999999999999999999`, `seq` is `bigint`, and pg raises `value out of range for type bigint` — a 500
+  out of a query string. The bound (`Number.MAX_SAFE_INTEGER`) makes it a 400, and the case dies without
+  it.
+- **Paging edges, stated:** `limit=0` → 400; a negative, a decimal, junk, or a repeated parameter
+  (Fastify hands an array) → 400; `limit` above `MAX_LIMIT` (1000) → clamped, answered; `afterSeq` past
+  the end → `200 { ticketId, events: [] }`; no `limit` → `DEFAULT_LIMIT` (200).
+- **The clamp is unit-tested only, and that is disclosed rather than papered over.** `limit=999999` and
+  `limit=1000` return the same rows from any ledger this suite can afford to build, so no HTTP
+  assertion can tell a working clamp from a missing one. `parsePaging` is exported and the clamped
+  **value** is asserted; the route cases assert only what HTTP can see.
+- **Catalogue:** of the 19 cases shipped, the plan's catalogue anticipated **5.19 and 5.25 only**. The
+  rest need fresh ids from the file's own scope note.

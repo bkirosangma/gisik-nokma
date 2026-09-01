@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import pg from 'pg';
-import { newUlid } from '@gisik-nokma/domain';
+import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
 import type { FastifyInstance } from 'fastify';
 import { buildTestApp } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -60,6 +60,14 @@ let app: FastifyInstance;
 let headers: { authorization: string };
 let ticketId: string;
 let ws: string;
+/**
+ * The three claims this file stores BACKWARDS, minted in `beforeAll` so neither
+ * case depends on the other having run. `tickets-read.test.ts` states the rule:
+ * an assertion that breaks the day someone inserts a test above it breaks for a
+ * reason unrelated to what it names, and the paging case below reads seq 2 and
+ * 3, which only the appends produce.
+ */
+let stored: { second: LedgerEvent; third: LedgerEvent; fourth: LedgerEvent };
 
 /** The three settings, applied to the database so every NEW session inherits them. */
 const NO_INDEX_PLANS = ['enable_indexscan', 'enable_indexonlyscan', 'enable_bitmapscan'] as const;
@@ -89,6 +97,20 @@ beforeAll(async () => {
   await seedMember(db.pool, ws, user.userId, 'member', [{ projectId: prj }]);
   ticketId = newUlid();
   await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId });
+
+  // BUILT 2, 3, 4 (`testEnvelope` mints seq in build order); STORED 4, 3, 2.
+  const claim = (to: string): LedgerEvent =>
+    testEnvelope({
+      workspaceId: ws,
+      entity: { kind: 'ticket', id: ticketId },
+      type: 'ticket.transitioned',
+      payload: { to },
+      actorId: newUlid(),
+    });
+  stored = { second: claim('doing'), third: claim('review'), fourth: claim('done') };
+  for (const env of [stored.fourth, stored.third, stored.second]) {
+    await appendTestEvent(db.pool, env);
+  }
 });
 
 afterAll(async () => {
@@ -98,14 +120,11 @@ afterAll(async () => {
 
 describe('GET /v1/tickets/:id/history — the ordering is the route decision, not the plan', () => {
   it('answers seq-ascending under a plan that emits rows newest-stored-first', async () => {
-    // Built 2, 3, 4 (testEnvelope mints seq in build order); STORED 4, 3, 2.
-    const second = testEnvelope({ workspaceId: ws, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.transitioned', payload: { to: 'doing' }, actorId: newUlid() });
-    const third = testEnvelope({ workspaceId: ws, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.transitioned', payload: { to: 'review' }, actorId: newUlid() });
-    const fourth = testEnvelope({ workspaceId: ws, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.transitioned', payload: { to: 'done' }, actorId: newUlid() });
+    const { second, third, fourth } = stored;
+    // The fixture is only backwards if these really are 2, 3, 4 — a build order
+    // that drifted would leave the heap accidentally sorted and the control
+    // below would be the thing that caught it.
     expect([second.seq, third.seq, fourth.seq]).toEqual([2, 3, 4]);
-    for (const env of [fourth, third, second]) {
-      await appendTestEvent(db.pool, env);
-    }
 
     // THE INSTRUMENT'S OWN CONTROL. The route's exact WHERE, without the
     // ORDER BY. If the settings did not take, this comes back ascending and the
@@ -116,7 +135,7 @@ describe('GET /v1/tickets/:id/history — the ordering is the route decision, no
       [ticketId, 0, 200],
     );
     // Heap order is `1, 4, 3, 2`: `seedTicket` appended the `ticket.created`
-    // first, then this case stored 4, 3, 2. That is not ascending, which is the
+    // first, then `beforeAll` stored 4, 3, 2. That is not ascending, which is the
     // whole requirement on this control — it is asserted EXACTLY rather than as
     // "not sorted", so a settings change that restored index order reddens here
     // and names what it got.
