@@ -134,9 +134,11 @@ T13 (4551), T16 (6047).
 | T9 `GET /tickets` (list read) | `7bab0b0`, `699aa18`, `c1f577f`, `ca6c39b`, `cc4536c`, `27f64b2`, + doc fix | CLEAN; 1 Minor (an unreproducible count) fixed. **Found and closed a real title-disclosure hole.** |
 | T9b **FLOOR-LIST** builder reads | `98a761a`, `e47bb59`, `4189247`, `8a8444d` (+3), fix round `6406048` | **2 Important + 3 Minor + 1 ruling**, all closed and PROVEN. The most productive review of the plan. |
 | T10 `GET /v1/search` (cross-project) | `1eb3f32`, `66e3549`, `9d642c0`, `82db02b`, `fa2ff11`, `6ae49e7` | CLEAN; 1 Minor (an unstable count) fixed. **Its own leak assertion could not see a leak.** |
+| T11 `GET /v1/me/work` | `4de353f`, `6ec5084`, `32d9df7`, `9afa6ca` | **CLEAN — zero findings.** Reviewer re-ran 8 mutations; all matched. |
+| T12 `GET /attention` (computed) | `347ded7`, `59cd86b`, `fdf7875`, `2d61b13`, `4f97a43`, `d14cf76` | **CLEAN — zero findings.** Reviewer re-ran 10 mutations; all matched. |
 
 **Gate re-run by the executor rather than taken from any agent's report:** exit 0, 21/21, **0 cached**,
-**1476 tests** — domain 320 · rule-engine 280 · **server 635** · app-core 130 · editor 72 · ui 31 ·
+**1504 tests** — domain 320 · rule-engine 280 · **server 663** · app-core 130 · editor 72 · ui 31 ·
 sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**. Sum re-added by script in the same
 run rather than eyeballed: 7 packages, 1430, matches.
 
@@ -286,10 +288,39 @@ deaths being cases whose assertions are coupled to a shared fixture query's LENG
 dependency worth knowing about on its own. The one count kept is `FTS_CONFIG`→`english` = eleven,
 because it is a configuration name rather than a planner choice and a second party re-ran it.
 
-**NEXT: Plan 5 Task 11** — `GET /v1/me/work` (My Work), plan line 3874.
-**`makeRequireSession` is still wrong at plan lines 3774, 4009, 4369, 4865 and 5915.**
+### T11 AND T12 — what is worth carrying forward from two clean tasks
 
-Then T12 · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (4079) ·
+**T11 (`/me/work`) is the endpoint whose FILTER IS its security boundary.** The viewer id comes from
+the session only. Because Fastify hands over undeclared query keys anyway, the test *sends*
+`userId`/`user_id`/`assigneeId`/`viewerId`/`as` naming the owner and pins the response
+**byte-identical** to the one naming nobody — and the impersonation mutation (`raw.userId ??
+request.currentUserId`) dies on that case alone, with the owner's queue visibly leaking. **Being
+assigned a ticket is not being allowed to see it**, proven five ways: hidden/explicit, never-on-project,
+removed-from-project after assignment, visibility narrowed after assignment, and admin-without-bypass.
+
+**T12 (attention) is the first task on this branch where the CLOCK is load-bearing**, and it is the
+first to take the standing TZ rule seriously. The IST arithmetic is measured from **four directions**
+(18:35Z/18:31Z twins, the exact-midnight bound, a 19:30 IST evening entry, and a read a millisecond
+either side of 18:30Z) and each direction has a mutation that dies naming it. **Four mutations SURVIVED
+on first run** — staleness `>=`→`>`, the tenancy clause, `daysInFlight` as a millisecond quotient, and
+blocked-narrowed-to-active — and each was closed with a new fixture and re-run rather than explained
+away. That is the discipline working: *a survivor is a missing fixture until proven otherwise.*
+
+**The clock is now injectable**: `AppDeps.now` (optional, undefaulted) and `BuildTestAppOverrides.now`,
+with `read-app.ts` frozen at `SCENARIO_NOW`. **T14 and T15 will need this** — a heartbeat is a clock.
+
+**Recorded, owner = the coordination doc:** `latestWorkflowDefs` resolves the NEWEST published version,
+so republishing a workflow that newly flags a state re-classifies tickets already sitting in it **with
+no event on their own streams.** Defensible for a "what needs attention now" strip, and it is the
+reader every route on this branch uses — but the plan does not address it and version-pinning is an
+equally defensible product. Shipped as-is; the test comment was deliberately downgraded to a
+description of behaviour so no future reader mistakes it for pinned intent.
+
+**NEXT: Plan 5 Task 13** — `/v1/me/preferences`, server-owned view preferences, plan line 4551.
+Then **T14 (4918, FLOOR-LIST)** stream frames + hub, **T15 (5452, FLOOR-LIST)** the WS route, T16 (6047).
+**`makeRequireSession` is still wrong at plan lines 4369, 4865 and 5915.**
+
+Then T13 · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (4079) ·
 T13 (4551) · **T14 (4918, FLOOR-LIST)** · **T15 (5452, FLOOR-LIST)** · T16 (6047).
 
 ### WHAT T5 COST AND WHAT IT BOUGHT — read before dispatching any later floor-list task
