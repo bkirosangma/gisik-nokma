@@ -160,9 +160,11 @@ table rather than taken next-free.)*
   either knob alone or both together, at least one required, `.strict()` against unknown keys,
   integers only in `[1, 365]` for `staleDays` and `[0, 365]` for `dueSoonDays`. Registered with
   `entityKind: 'workspace'`, so `parseEvent`'s kind guard refuses a settings claim filed against
-  anything else. Who may make the claim: workspace `owner` or `admin` only, refused
-  `permission.role` naming the setting by name for everyone below that — a member, guest or
-  non-member alike. `packages/domain/src/events/workspace-settings.ts`,
+  anything else. Who may make the claim: workspace `owner` or `admin` only. A
+  member or guest is refused `permission.role` naming the setting by name; a **non-member is
+  refused earlier**, by the `role === null` branch that precedes every per-type case, so it carries
+  the same rule id and a different reason — which is the better answer, since naming the setting
+  would disclose it to someone holding nothing in this workspace. `packages/domain/src/events/workspace-settings.ts`,
   `apps/server/src/permissions/check-permission.ts`
 
 ## 9. Editor, documents & attachments

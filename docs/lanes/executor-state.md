@@ -116,6 +116,35 @@ table above:**
 **NEXT: Plan 5 Task 3** (`workspace.settings_set`, plan line 628), then T4 (883).
 **Floor-list in this plan: T5 (1213), T9b (3183), T14 (4918), T15 (5452).**
 
+## THE PLAN 5 ADAPTATION MAP — three compile-breaks, one of them at EIGHT sites
+
+Run 2026-09-01, one sonnet agent, read-only against `git show origin/main:<path>` blobs (never the
+working tree, because an implementer was editing it concurrently). **Positive control: 26 cross-module
+symbols checked and found to MATCH main exactly** — a map reporting drifts and no matches would mean a
+broken method rather than a broken plan, so the matches are the evidence the misses are real.
+
+| Task | Symbol | Plan assumes | Main actually has |
+|---|---|---|---|
+| **T7** | `RollupView` (`src/visibility/rollup.ts`) | `{total, open, active, terminal, restrictedCount}`; the snippet reads `rollupView.terminal` for `TicketRollup.terminalChildren` | **`{total, restrictedCount}` — two fields.** No `terminal`, `open` or `active` exists on the type or on what `rollupFor` returns |
+| **T8 + 7 more** | `makeRequireSession` | `import … from '../auth/routes.js'` | Exported **only** from `src/auth/require-session.ts`; `auth/routes.ts` exports `registerAuthRoutes` and nothing else |
+| **T5** | `EffectiveRole` | a plain literal `{workspaceRole: null, projects: new Map()}` | **A required unexported unique-symbol brand `readonly [RESOLVED]: true` (Ruling P22).** No object literal can satisfy it structurally; main's own tests write `as unknown as EffectiveRole` |
+
+**The `makeRequireSession` one is the expensive one and it is why this map paid for itself.** The wrong
+import recurs **verbatim at plan lines 2527 (T8), 2956 (T9), 3442 (T10), 3774 (T11), 4009 (T12), 4369
+(T13), 4865 (T14's test helper) and 5915 (T15)** — every route-registration snippet in the plan. Only
+the T8 occurrence (line 2632) carries an inline self-correction; **the other seven are unmarked.** Seven
+separate implementers would each have hit it cold. Fix it at every site without re-deriving it.
+
+**All three are compile-break, i.e. self-announcing — and the map went looking for the dangerous class
+and reported the null.** It specifically hunted a T3-style *silent-wrong* (an optional field the
+snippet omits, which compiles and passes while behaving differently) across T4–T16 and found none,
+having checked `EventEnvelope`'s 11 required fields against `makeCommitted`'s literal, the
+refresh-on-publish fold-forward that T8's "unreachable now" claim rests on, and all 10
+`PROJ_TICKET_COLUMNS` against the live `CREATE TABLE`. **A reported null with its method named is worth
+more than a silent omission** — but note it is a null, not a proof, and the map states its own gaps:
+T4's and T6's full code bodies, T9/T9b's route-handler bodies, and T13's preferences SQL were not
+swept beyond their import blocks.
+
 ### RECORDED BEFORE THEY WERE NEEDED — two plan/as-built drifts found by reading, not by failing
 
 Both were found while orienting for T3, before any implementer ran. Recorded here so a restart does not
