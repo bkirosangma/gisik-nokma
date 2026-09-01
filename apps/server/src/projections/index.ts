@@ -5,6 +5,9 @@ import { membershipsProjection } from './proj-memberships.js';
 import { projProjects } from './proj-projects.js';
 import { projVisibility } from './proj-visibility.js';
 import { createProjectionRegistry, type ProjectionRegistry } from './registry.js';
+import { rollupsProjection } from './rollups.js';
+import { ticketsProjection } from './tickets.js';
+import { ticketTypesProjection } from './ticket-types.js';
 import { workflowsProjection } from './workflows.js';
 
 /**
@@ -34,9 +37,12 @@ import { workflowsProjection } from './workflows.js';
  * the registrants happen to arrive in §8 order and stops being true at the
  * first one that does not. Plan 3 Chain B is that one: proj_ticket_types,
  * proj_tickets and proj_rollups all belong ABOVE proj_memberships, which is
- * already registered below. Appending them would put proj_rollups before
+ * already registered below. Appending them would have put proj_rollups before
  * proj_tickets in application order, and proj_rollups reads proj_tickets inside
- * the same ingest transaction.
+ * the same ingest transaction. Plan 3 Chain B Task 9 is the first of the three
+ * to arrive, and it inserted at position 3 — above proj_projects, which had
+ * been sitting at position 2 in the array only because position 3 was empty.
+ * All three have now landed; the sentence above is history, not a pending item.
  *
  * Whatever the position, extend the order assertion in
  * test/projection-order.test.ts in the same commit.
@@ -45,10 +51,34 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   const registry = createProjectionRegistry();
   registry.register(entityHeadsProjection);
   registry.register(workflowsProjection);
-  // §8 position 4. proj_ticket_types (position 3) does not exist yet, so this
-  // INSERTS here rather than appending — proj_memberships and proj_visibility
-  // below are already registered and must stay below it.
+  // §8 position 3 (Plan 3 Chain B Task 9). It INSERTS above proj_projects,
+  // which had been immediately after proj_workflows only because this position
+  // was empty. Nothing registered BELOW reads proj_ticket_types — the engine
+  // context reads it (Task 12 wired `getTicketTypeDef` onto it) and that runs
+  // before any projection — but proj_tickets (position 5) resolves a ticket's
+  // type inside the same ingest transaction, so the ladder is applied before
+  // anything that could ask about it.
+  registry.register(ticketTypesProjection);
+  // §8 position 4.
   registry.register(projProjects);
+  // §8 position 5 (Plan 3 Chain B Task 10). It INSERTS above proj_memberships,
+  // which has been registered since Plan 4 and sits at position 7. Two
+  // adjacencies are load-bearing and neither is with proj_memberships: it must
+  // apply AFTER proj_workflows and proj_ticket_types, because it resolves a
+  // ticket's type and the workflow definition in force inside the same ingest
+  // transaction; and it must apply BEFORE proj_rollups (position 6, Task 11),
+  // which reads the rows this projection has just written for the same event.
+  registry.register(ticketsProjection);
+  // §8 position 6 (Plan 3 Chain B Task 11). The adjacency with proj_tickets
+  // directly above is the one this projection cannot survive without, and it is
+  // load-bearing in THREE places rather than one: the ingest transaction, where
+  // this reads the ticket rows the same event just wrote; `rebuildProjection`,
+  // which replays this projection alone against the live ticket table; and
+  // `tools/verify-projections.ts`, which rebuilds every projection into a
+  // shadow schema IN THIS ORDER — under `search_path = verify_shadow, public`
+  // the ticket table this reads is the shadow copy, and it is complete only
+  // because proj_tickets was replayed first.
+  registry.register(rollupsProjection);
   registry.register(membershipsProjection);
   // §8 position amended by Plan 4 Task 14: proj_invites slots directly AFTER
   // proj_memberships. Nothing in this task's own path depends on that

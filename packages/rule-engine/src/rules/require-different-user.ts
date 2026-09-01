@@ -66,6 +66,7 @@ export const evaluateRequireDifferentUser: RuleEvaluator<
     // refusal below.
     if (entry.workflowId !== input.ticket.workflowId) continue;
     const resolved = await resolveStateIdForward(
+      input.env,
       input.ticket.workflowId,
       entry.toStateId,
       entry.workflowVersion,

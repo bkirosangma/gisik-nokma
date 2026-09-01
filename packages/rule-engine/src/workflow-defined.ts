@@ -48,7 +48,7 @@ export async function evaluateWorkflowDefined(
     };
   }
 
-  const latest = await ctx.getWorkflowDef(payload.id);
+  const latest = await ctx.getWorkflowDef(env, payload.id);
   if (latest === null) {
     if (payload.version !== 1) {
       return {

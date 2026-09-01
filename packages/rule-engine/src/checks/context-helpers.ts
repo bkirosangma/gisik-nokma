@@ -1,5 +1,5 @@
 import type { TicketState, TicketTypeDef } from '@gisik-nokma/domain';
-import type { EngineContext } from '../engine.js';
+import type { EngineContext, TenantScope } from '../engine.js';
 
 /**
  * Typed reads over `EngineContext`, so no check has to restate how a kind is
@@ -30,7 +30,19 @@ export async function getTicketState(ctx: EngineContext, id: string): Promise<Ti
  * The wrapper exists so that no check reaches for the wrong door by habit: the
  * two lookups sit side by side here, named for what they return, and the shape
  * of each answer is a compile error away from the other.
+ *
+ * SCOPED, and `getTicketState` above is deliberately NOT (controller rulings
+ * P14 and P12, Task 12). A type id is a slug the ACTOR chose — `epic`, `task`
+ * and `bug` exist in most workspaces at once — and a `TicketTypeDef` carries no
+ * workspace for a caller to compare afterwards, so an unscoped lookup hands one
+ * tenancy another's rank, workflow binding and field list. A `TicketState` does
+ * carry one, which is why the ticket lookup stays global and ruling P12's guard
+ * in `hierarchy.ts` is what does the comparing — and stays reachable.
  */
-export async function getTicketTypeDef(ctx: EngineContext, id: string): Promise<TicketTypeDef | null> {
-  return ctx.getTicketTypeDef(id);
+export async function getTicketTypeDef(
+  ctx: EngineContext,
+  scope: TenantScope,
+  id: string,
+): Promise<TicketTypeDef | null> {
+  return ctx.getTicketTypeDef(scope, id);
 }

@@ -261,20 +261,21 @@ describe('POST /v1/workspaces — the founding door', () => {
     expect((await workspaceStream(second))[0]?.payload['name']).toBe('Two');
   });
 
-  it("a founded workspace still cannot hold a ticket on this branch — and it is not the founding sequence's fault", async () => {
-    // CASE 6.25, HONESTLY. Its reserved text says a founded workspace accepts a
-    // ticket immediately. **It does not on this branch, and cannot**:
-    // `createEngineContext.getTicketTypeDef` returns null unconditionally
-    // because `proj_ticket_types` does not exist (Plan 3 Chain B owns it), so
-    // `checkTicketCreated` refuses `ticket.unknown-type` for EVERY ticket in
-    // EVERY workspace, founded or not.
+  it('a founded workspace holds a ticket immediately — case 6.25, whole at last', async () => {
+    // CASE 6.25, and this assertion is INVERTED by Plan 3 Chain B Task 12.
     //
-    // Writing the reserved case as a passing assertion would therefore have
-    // needed the refusal to be the expected answer while the case NAME promised
-    // acceptance — the signature defect this branch keeps catching. So the case
-    // measures the real state of the world instead, and pins the discriminator:
-    // the four type definitions ARE in the ledger, which is the half Task 13
-    // owns, and the refusal comes from the half it does not.
+    // It used to expect `refused / ticket.unknown-type`, under a name that said
+    // a founded workspace "still cannot hold a ticket on this branch". That was
+    // true and was measured rather than promised: `createEngineContext`
+    // answered null for every ticket type because nothing wired it to
+    // `proj_ticket_types`, so `checkTicketCreated` refused EVERY ticket in EVERY
+    // workspace, founded or not. Task 12 wired it, and the reserved text — "a
+    // founded workspace accepts a ticket immediately" — is now the true one.
+    //
+    // The discriminator survives the inversion, pointing the other way: the four
+    // type definitions in the ledger are the half Plan 4's founding sequence
+    // owns, and the resolution of `task` against them is the half Task 12 owns.
+    // A commit here needs both.
     const { userId, headers } = await signedIn();
     const workspaceId = await found(headers);
     const projectId = newUlid();
@@ -343,14 +344,27 @@ describe('POST /v1/workspaces — the founding door', () => {
       payload: { events: [ticket] },
     });
     expect(ticketRes.json()).toMatchObject({
-      results: [{ status: 'refused', eventId: ticket.id, rule: 'ticket.unknown-type' }],
+      results: [{ status: 'committed', eventId: ticket.id }],
     });
 
-    // The discriminator: `task` really is defined in this workspace's ledger,
-    // by the founding sequence, bound to the workspace's only workflow. The
-    // refusal above is `getTicketTypeDef` answering null, not a missing type.
+    // The premise, still asserted: `task` really is defined in this workspace's
+    // ledger, by the founding sequence, bound to the workspace's only workflow.
+    // Without those four events the create would be refused `ticket.unknown-type`
+    // by a context that reads the table correctly and finds nothing in it — "a
+    // context that can read the table is not the same thing as a table with the
+    // type in it".
     const rows = await workspaceStream(workspaceId);
     expect(rows.slice(2, 6).map((row) => row.payload['id'])).toEqual(['epic', 'story', 'task', 'sub-task']);
+
+    // And the create really resolved that type rather than committing past the
+    // check: the projected row carries the workflow the founding sequence bound
+    // `task` to, which only `getTicketTypeDef` could have supplied.
+    const founded = await db.pool.query<{ workflow_id: string; state_id: string }>(
+      'SELECT workflow_id, state_id FROM proj_tickets WHERE ticket_id = $1',
+      [ticket.entity.id],
+    );
+    expect(founded.rows[0]?.workflow_id).toBe(rows[1]?.payload['id']);
+    expect(founded.rows[0]?.state_id).toBe(rows[1]?.payload['initialStateId']);
   });
 });
 

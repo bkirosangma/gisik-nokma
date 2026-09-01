@@ -8,6 +8,16 @@ import type {
 import { makeEnvelope } from '@gisik-nokma/domain';
 import { buildMemoryContext } from '../src/memory-context.js';
 
+/**
+ * The tenancy every definition lookup is asked inside (controller ruling P14,
+ * Task 12). This context READS it nowhere — it is built from one workspace's
+ * events — so the value is inert here and the parameter exists only because one
+ * signature across the four `EngineContext` implementations is what stops them
+ * drifting. P14's fix is pinned where it can fail: `apps/server/test/engine-context.test.ts`.
+ */
+const SCOPE = { workspaceId: 'ws_1' } as const;
+
+
 const PROJECT = '01J9GPRJ000000000000000000';
 const PARENT = '01J9GPAR000000000000000000';
 const PARENT2 = '01J9GPAT000000000000000000';
@@ -197,8 +207,8 @@ describe('buildMemoryContext', () => {
       typeDefined({ ...TASK, rank: 3 }),
       typeDefined({ ...TASK, rank: 5 }),
     ]);
-    expect(await ctx.getTicketTypeDef('task')).toEqual({ ...TASK, rank: 5 });
-    expect(await ctx.getTicketTypeDef('ghost')).toBeNull();
+    expect(await ctx.getTicketTypeDef(SCOPE, 'task')).toEqual({ ...TASK, rank: 5 });
+    expect(await ctx.getTicketTypeDef(SCOPE, 'ghost')).toBeNull();
   });
 
   it('does not serve memberships — this context is a SECOND context, not a replacement', async () => {
@@ -213,24 +223,24 @@ describe('buildMemoryContext', () => {
 
   it('resolves seeded workflows: latest by default, null for one never seen', async () => {
     const ctx = buildMemoryContext([WF], []);
-    expect(await ctx.getWorkflowDef('wf-basic')).toEqual(WF);
-    expect(await ctx.getWorkflowDef('wf-ghost')).toBeNull();
+    expect(await ctx.getWorkflowDef(SCOPE, 'wf-basic')).toEqual(WF);
+    expect(await ctx.getWorkflowDef(SCOPE, 'wf-ghost')).toBeNull();
   });
 
   it('folds workflow.defined events from priorEvents alongside seeds', async () => {
     const wf2: PublishedWorkflowDef = { ...WF, id: 'wf-two' };
     const ctx = buildMemoryContext([WF], [published(wf2)]);
-    expect(await ctx.getWorkflowDef('wf-two')).toEqual(wf2);
-    expect(await ctx.getWorkflowDef('wf-basic')).toEqual(WF);
+    expect(await ctx.getWorkflowDef(SCOPE, 'wf-two')).toEqual(wf2);
+    expect(await ctx.getWorkflowDef(SCOPE, 'wf-basic')).toEqual(WF);
   });
 
   it('getWorkflowDef answers an explicit version with THAT version, not the latest', async () => {
     const wfV2: PublishedWorkflowDef = { ...WF, version: 2, name: 'Basic v2' };
     const ctx = buildMemoryContext([WF], [published(wfV2)]);
-    expect((await ctx.getWorkflowDef('wf-basic'))?.version).toBe(2);
-    expect((await ctx.getWorkflowDef('wf-basic', 1))?.name).toBe('Basic');
-    expect((await ctx.getWorkflowDef('wf-basic', 2))?.name).toBe('Basic v2');
-    expect(await ctx.getWorkflowDef('wf-basic', 7)).toBeNull();
+    expect((await ctx.getWorkflowDef(SCOPE, 'wf-basic'))?.version).toBe(2);
+    expect((await ctx.getWorkflowDef(SCOPE, 'wf-basic', 1))?.name).toBe('Basic');
+    expect((await ctx.getWorkflowDef(SCOPE, 'wf-basic', 2))?.name).toBe('Basic v2');
+    expect(await ctx.getWorkflowDef(SCOPE, 'wf-basic', 7)).toBeNull();
   });
 
   it('"latest" is the highest version, not the last one published', async () => {
@@ -239,7 +249,7 @@ describe('buildMemoryContext', () => {
     // answer a different question than the harness for the same inputs.
     const wfV2: PublishedWorkflowDef = { ...WF, version: 2, name: 'Basic v2' };
     const ctx = buildMemoryContext([WF], [published(wfV2), published(WF)]);
-    expect((await ctx.getWorkflowDef('wf-basic'))?.version).toBe(2);
+    expect((await ctx.getWorkflowDef(SCOPE, 'wf-basic'))?.version).toBe(2);
     expect(ctx.workflowVersions.get('wf-basic')?.map((def) => def.version)).toEqual([1, 2]);
   });
 

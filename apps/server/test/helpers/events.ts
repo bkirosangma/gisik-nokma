@@ -50,6 +50,42 @@ export function submittedWorkflowDefined(workspaceId: string): SubmittedEvent {
 }
 
 /**
+ * A valid `ticket-type.defined` submission for a CUSTOM type inside an existing
+ * workspace — custom, so the built-in rank lock in `checkTicketTypeDefined` has
+ * nothing to say about its rank.
+ *
+ * The entity id is a fresh ULID and the payload's `id` is the type key, exactly
+ * as `foundingSequence` files the four built-ins: a non-membership `entity.id`
+ * must match `ULID_REGEX` (`envelope.ts`), so the stable key can never be the
+ * entity id. `proj_ticket_types` folds by the payload key, which is why that
+ * table resolves last-definition-wins on the workspace stream position rather
+ * than on application order.
+ */
+export function submittedTicketTypeDefined(workspaceId: string): SubmittedEvent {
+  return {
+    id: newUlid(),
+    workspaceId,
+    entity: { kind: 'ticket-type', id: newUlid() },
+    type: 'ticket-type.defined',
+    version: 1,
+    payload: {
+      id: 'invoice',
+      name: 'Invoice',
+      icon: 'receipt',
+      rank: 3,
+      workflowId: 'wf-basic',
+      // A select field, so the jsonb column carries a nested array rather than
+      // an empty one — an empty `fields` would diff clean without saying
+      // anything about how a real definition normalises.
+      fields: [{ id: 'stage', name: 'Stage', type: 'select', options: ['Draft', 'Sent', 'Paid'] }],
+    },
+    actorId: newUlid(),
+    origin: 'web',
+    clientTime: '2026-08-20T09:00:00.000Z',
+  };
+}
+
+/**
  * Completes a submission into a full ledger event the way ingest would.
  * `workspaceSeq` defaults to `seq`: these fixtures are workspace entities, so
  * the per-entity and per-workspace counters coincide. Tests that need them to
