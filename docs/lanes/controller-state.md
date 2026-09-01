@@ -824,6 +824,89 @@ open`, and `tmux list-panes -s -t gisik`.
 
 Note its wording is one-directional: a pane being ADDED also reports "a lane may have exited."
 
+## OWNER-APPROVED, QUEUED — audit the 33 `claimed` rows, at the step-9 boundary
+
+**Approved by the owner 2026-09-01 (~20:10 IST): "take it when the step-9 merge is done."** Recorded
+here rather than carried in the conversation, because *a mitigation that lives only in a conversation is
+not a mitigation* — this file's own rule, and a controller restart is what collects on it.
+
+**TRIGGER: after the step-9 PR merges**, in the same window as the executor restart and the re-anchor.
+**NOT before**, and the reason is specific: `task-ledger.tsv` is **the one file both sessions write**, and
+the executor is on a live branch. Editing it mid-step buys a conflict on the step PR for zero
+information. Nothing about this work is urgent; its whole value is that the number stops lying.
+
+**Scope, as approved:** promote what the evidence supports among the 33, and fix the two instrument
+errors below in the same PR. Docs-only, so it merges under the controller's own rule.
+
+**Why it is worth a session at all: 28 of the 33 are two PRs.** Plans 1 (15 rows, #3) and 2 (13 rows,
+#4). The remaining five are 03/T1, 03/T2 (#13), 06/T9 (#43), 07/T4 (#47), 11/T6 (#17). Auditing the two
+moves verified completion from **14.7% to roughly 30%** with no product code written.
+
+### The finding that makes it cheap — #3 and #4 were REBASE-merged, not squashed
+
+Measured with a control, because the whole series has been assuming otherwise:
+
+| PR | branch commits that are ancestors of `origin/main` |
+|---|---|
+| #3 (Plan 1) | **28 of 28** |
+| #4 (Plan 2) | **22 of 22** |
+| **#57 — control, squash-merged** | **0 of 38** |
+
+So for the 28 rows, **every implementing commit is on `main` with its own subject** (`Scaffold the
+pnpm/Turborepo workspace`, `parseEvent and the versioned event-type registry`, `proj_entity_heads: the
+reference projection`, …). The audit is a read of ~50 subjects against ~28 task headings — no
+archaeology, because nothing was collapsed.
+
+### TWO INSTRUMENT ERRORS THIS UNCOVERED — fix both in that same PR
+
+1. **The evidence sha for those 28 rows does not point at the work, and it looks like fraud when you
+   open it.** GitHub sets `mergeCommit` on a rebase-merge to the **last commit of the chain**. For #3
+   that commit touches **3 files**; for #4, **1 file** — both documentation. Ancestry holds, so
+   `check:tasks` is right and the rows are not bogus. **But an auditor who reads the sha's diff finds a
+   docs commit and concludes the row was fabricated** — a trap laid directly in the path of the audit
+   being scheduled here. Whoever does this work must audit the PR's **commit range**, never the merge
+   sha's own diff.
+2. **`scripts/check-task-ledger.mjs`'s stated rationale is over-general.** Its header reads *"WHY `done`
+   IS VALIDATED AGAINST A MERGE COMMIT, NOT THE IMPLEMENTING COMMIT — This repo squash-merges."* True
+   from #51 onward; **false of #3 and #4, the two PRs the 28 rows depend on.** The decision it justifies
+   is still correct — recording the merge commit is safe under both merge styles — so this is **a wrong
+   reason under a right decision**, which is the kind that survives review and misleads the next reader.
+   Correct the paragraph; do not change the check.
+
+### MEASURED BEFORE THIS PR MERGED — the bodies do NOT name their tasks, so a widening is REQUIRED
+
+`done` is defined as *"a PR **naming that exact plan+task**"*. **Measured: neither body satisfies it.**
+Every task-shaped string in #3's and #4's bodies is incidental prose, and most point at a *different
+plan's* tasks:
+
+| PR | every task mention in the body | what it actually refers to |
+|---|---|---|
+| #3 | `Task 1`, `Task 10`, `Plan 3 Task 12`, `Plan 3 Task 2→12` | one pre-flight typecheck note; the rest are **Plan 3's** tasks |
+| #4 | `"Task 13"`, `Task 2-vs-Task 12` | a **stale attribution** the body itself flags for repointing, and **Plan 3's** ordering decision |
+
+**So the existing definition promotes ZERO of the 28**, and reading the count (4 and 3) instead of the
+rows would have said the opposite. *(Printed the rows. The count lied — again.)*
+
+**The commit range carries it instead, and carries it well.** Plan 1's 15 task headings against #3's 28
+subjects: **15 of 15 map, in plan order**, several near-verbatim — `### Task 8: Projection framework —
+registry and rebuild` against `Projection framework: a registry of deterministic apply/reset read models
+and a rebuild`; `### Task 9: proj_entity_heads — the reference projection` against `proj_entity_heads:
+the reference projection`. Fix-up commits cluster behind their parent task (three behind T4a, three
+behind T5, three behind T10).
+
+**⚠ THIS IS AN OWNER DECISION, NOT THE AUDITOR'S — `done` is the number every other figure keys off.**
+The choice is:
+- **(A) Widen `done`** to accept *a commit on `main`, inside the PR's range, whose subject matches the
+  task heading* — and **record that commit's sha per row**, not the PR's merge sha. Promotes ~28. The
+  widening must be written into `check-task-ledger.mjs`'s header and this file, in the same change set.
+- **(B) Leave them `claimed`** and record that the evidence exists but the definition does not reach it.
+  Verified stays 14.7%.
+
+**What is NOT on the table: promoting 28 rows while the definition still reads as though a PR had named
+them.** That is the ledger's founding defect — a completion figure asserted at a granularity nobody
+checked — committed by the instrument built to catch it. **Recommendation: (A), with the per-row commit
+sha as the evidence**, because it is strictly more auditable than what the `done` rows carry today.
+
 ## Pending owner decisions
 
 1. ~~**The executor's advisor is running on Fable.**~~ **RESOLVED, no owner action needed** — its status
