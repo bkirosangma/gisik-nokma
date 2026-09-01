@@ -182,7 +182,7 @@ Mirrors `Features.md` §6. Status: `❌` not covered · `✅` covered · `🟡` 
 - **6.125** ❌ **`applyAll` in `test/helpers/seed.ts` hand-lists the projections it applies, so a new registrant is silently absent until somebody notices a seeded event producing no row.** It cost this task one debugging round. It should read `buildProjectionRegistry().all()`. Not done here: that would start applying `proj_entity_heads`, `proj_workflows` and `proj_contested` to every seeded event in twenty test files — a fixture behaviour change Task 14 has no business making. *Owner: whoever next touches that helper, or a dedicated cleanup.*
 
 
-**Task 14's mutation sweep, RUN rather than reasoned.** Eleven mutations, each applied to the shipped source, run against the FULL server suite (42 files, 406 tests) at Node v22.22.2, and restored by `git checkout HEAD -- <named path>` with the restore verified by reading the file back for a named marker. Rows, not counts.
+**Task 14's mutation sweep, RUN rather than reasoned.** Fourteen mutations, each applied to the shipped source, run against the FULL server suite (42 files, 406 tests) at Node v22.22.2, and restored by `git checkout HEAD -- <named path>` with the restore verified by reading the file back for a named marker. Rows, not counts.
 
 | # | Mutation | Killed |
 |---|---|---|
@@ -197,7 +197,8 @@ Mirrors `Features.md` §6. Status: `❌` not covered · `✅` covered · `🟡` 
 | M9 | add `invite_tokens` to `projInvites.tables` | 2 — both `projection-order.test.ts` pins. The rebuild/verify cases 6.117 do NOT notice, and that is worth stating: `reset()` names its table literally rather than looping over `tables`, so a surplus entry is a false DECLARATION rather than an immediately destructive act. The destruction arrives with the next editor who makes `reset()` match the declaration, which is exactly why the declaration is pinned. |
 | M10 | `invite_tokens.created_at` written as the epoch | **NOTHING — a real survivor, retained.** The column is written and never read; it is provenance an operator may want and no behaviour depends on it. **Its killer ran on the same statement in the same run:** writing `expires_at` as the epoch in that same `INSERT` reddened twelve cases across every describe block in the invite suite. So the survivor is a survivor because nothing reads the column, not because the run was inert. |
 | M12 | drop the `resultingRole === 'guest'` guard on the promised project rows | 1 — case 6.126, and nothing else. |
-| M13 | drop `invite.sent` from `projectsNamedBy` | see below. |
+| M13 | drop `invite.sent` from `projectsNamedBy` | 1 — case 6.127. |
+| M14 | `checkProjectExists` reads only `projectsNamedBy(env)[0]` instead of looping | 1 — case 6.127's second-element assertion, which is the only thing in the suite that can see the difference. |
 | M11 | the pending list's `ORDER BY … DESC` → `ASC` | **Nothing, on the first pass — a genuine survivor, paired in one run with M6 to prove the suite was live.** Then CLOSED rather than recorded: 6.42 now mints a second pending invitation and asserts newest-first, and the same mutation reddens it. An invite-mint screen listing oldest-first shows an admin the invitation they are least likely to be looking for. |
 
 
