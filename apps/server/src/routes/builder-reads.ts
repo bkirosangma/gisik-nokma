@@ -51,10 +51,12 @@ import { latestWorkflowDefs } from '../read/workflow-defs.js';
  *    type's name and icon. Being STRICTER than the plan here would break a
  *    guest's view of the one ticket they were invited to, so the plan's reading
  *    is followed rather than tightened.
- * 2. **Any member, with guests WITHHELD from non-admin callers** — `/members`.
- *    A guest is a person invited to one shared ticket, not a member of the
- *    roster, and handing every member a directory of them leaks who else the
- *    workspace is talking to. Owners and admins — who manage people — see them.
+ * 2. **Any NON-GUEST member, with guests WITHHELD from non-admin callers** —
+ *    `/members`. A guest is a person invited to one shared ticket, not a member
+ *    of the roster, and handing every member a directory of them leaks who else
+ *    the workspace is talking to. Owners and admins — who manage people — see
+ *    them. That a guest may not CALL the route either is an executor ruling
+ *    taken where the plan was silent, argued at the route below.
  * 3. **Owner/admin only** — `/state-occupancy` and `/population`. The plan gates
  *    both, and its reason is worth keeping in view: the honest number is the
  *    WHOLE workspace's, including tickets the caller may not see, so there is no
@@ -222,6 +224,11 @@ export async function readTicketTypes(db: Queryable, workspaceId: string): Promi
  * than a branch between two query strings, so there is exactly one statement to
  * read and no second copy to drift.
  *
+ * A guest is not among the callers this reader ever runs for: the route's door
+ * refuses them outright (executor ruling, 2026-09-02), so the two populations
+ * this function serves are admin (guests included) and non-guest member (guests
+ * withheld). Case 7.91 is the refusal; case 7.39 is the withholding.
+ *
  * ## The join is INNER, and that is a decision
  *
  * A membership naming a user id with no `"user"` row is DROPPED rather than
@@ -275,6 +282,29 @@ export async function readMembers(
  * same reason: a ticket silently absent from a mapping dialog is a lie with a
  * longer fuse than a state id nobody recognises.
  *
+ * ## A `Map`, because one legal state id cannot be an object key
+ *
+ * The accumulator was a plain `{}` and it dropped a whole state. `toString` was
+ * SAFE there — a plain assignment creates an own property that shadows the
+ * prototype's method — which is exactly why case 7.88 stayed green over it. But
+ * `__proto__` is not a method on `Object.prototype`, it is an ACCESSOR PAIR
+ * whose setter ignores any value that is neither an object nor null. So
+ * `counts['__proto__'] = 0` on a `{}` wrote nothing, created no own key, threw
+ * nothing, and the state — with every live ticket in it — was simply absent
+ * from the response. MEASURED end to end: with a ticket sitting in a
+ * `__proto__` state and `proj_tickets.state_id` holding that string, this route
+ * answered `{"counts":{"ok":1,"done":0}}`.
+ *
+ * `workflowStateSchema` is `id: z.string().min(1)` and every other state lookup
+ * in the engine and the domain is a `.find`, a `.some` or a `Set`, so
+ * `__proto__` is a legal state id everywhere except an indexed object — and
+ * this was the last one on the surface. It is also a state a type cannot
+ * migrate OFF: Fastify parses bodies with `secure-json-parse`, which refuses a
+ * `__proto__` key before the handler runs, so the bulk rebind answers an opaque
+ * 400 and never its own named refusal. A state that cannot be migrated away
+ * from and cannot be seen is the pair that makes this a defect rather than an
+ * oddity. Pinned by case 7.89.
+ *
  * ## MEASURED: the `workspace_id` predicate here is NOT falsifiable, and why
  *
  * Removing it reddens nothing, and no fixture at any layer could change that.
@@ -299,9 +329,9 @@ export async function readStateOccupancy(
   workspaceId: string,
   def: PublishedWorkflowDef,
 ): Promise<Record<string, number>> {
-  const counts: Record<string, number> = {};
+  const counts = new Map<string, number>();
   for (const state of def.states) {
-    counts[state.id] = 0;
+    counts.set(state.id, 0);
   }
   const { rows } = await db.query<{ state_id: string; occupants: number }>(
     `SELECT state_id, count(*)::int AS occupants
@@ -311,9 +341,15 @@ export async function readStateOccupancy(
     [workspaceId, def.id],
   );
   for (const row of rows) {
-    counts[row.state_id] = row.occupants;
+    counts.set(row.state_id, row.occupants);
   }
-  return counts;
+  // `Object.fromEntries`, not the Map, and not a `{}` accumulated into: it
+  // creates every key as an OWN DATA PROPERTY (CreateDataPropertyOrThrow), so
+  // the accessor case above survives the conversion, while what leaves this
+  // function is an ordinary object that `JSON.stringify` serialises and
+  // `JSON.parse` restores key for key. A `Map` returned directly would
+  // serialise as `{}`.
+  return Object.fromEntries(counts);
 }
 
 /**
@@ -342,6 +378,29 @@ export async function ticketTypeExists(db: Queryable, workspaceId: string, typeI
  *
  * `::int` on the count: `createPool` installs an int8 parser, but saying it in
  * the SQL means the JSON carries a number no matter which pool this runs on.
+ *
+ * ## MEASURED: and NO TEST CONSTRAINS IT — the third such predicate on this
+ * ## surface, said plainly for the same reason as the other two
+ *
+ * The paragraph above explains why the predicate is PRESENT. It does not
+ * explain — and a reader would otherwise assume — that something checks it.
+ * Nothing does: removing `workspace_id = $1` here, with `$2`/`$3` renumbered
+ * (`SqlParams` is POSITIONAL — leaving the parameter behind shifts every `$n`
+ * and Postgres refuses the bind, which is a mutation that never ran), reddens
+ * NOTHING in `test/routes/builder-reads.test.ts`. Structurally, for the same
+ * reason `readStateOccupancy`'s does not: both actor-supplied ids are resolved
+ * against the caller's workspace BEFORE this runs — `ticketTypeExists` and
+ * `getWorkflowDefFromProjection`, each workspace-scoped — and a `workflow_id`
+ * is globally partitioned by workspace anyway (the ledger's
+ * `events_entity_seq_unique` is global, so a second tenant cannot publish the
+ * same one). No fixture at any layer can produce a row this predicate would
+ * exclude and the two resolutions would not.
+ *
+ * So a future refactorer who deletes this line and sees a green suite must read
+ * that green as STRUCTURAL rather than as evidence. Keep it for what it costs
+ * (one bound parameter) against what it catches on the day a projection bug or
+ * a direct internal append writes a row whose `workspace_id` and `workflow_id`
+ * disagree.
  */
 export async function readTypePopulation(
   db: Queryable,
@@ -400,18 +459,22 @@ export function registerBuilderReadRoutes(
    * The door, asked once per handler. Returns the caller's `EffectiveRole` in
    * the workspace named by the URL, or `null` meaning "answer 404".
    *
-   * `admin` is a REQUIRED argument rather than an optional flag: every route on
-   * this surface has an answer to "must this caller be an admin", and a default
-   * would let a new route inherit the permissive one by saying nothing.
+   * `access` is a REQUIRED argument rather than an optional flag: every route on
+   * this surface has an answer to "who may call this", and a default would let a
+   * new route inherit the permissive one by saying nothing. Three values, one
+   * per access level named in this module's header, and the name is `access`
+   * rather than `admin` because the middle level is about guests and not about
+   * admin-ness.
    */
   async function door(
     request: FastifyRequest,
     workspaceId: string,
-    admin: 'members-only' | 'admins-only',
+    access: 'members-only' | 'no-guests' | 'admins-only',
   ): Promise<EffectiveRole | null> {
     const eff = await requireMember(deps.pool, request.currentUserId, workspaceId);
     if (eff === null) return null;
-    if (admin === 'admins-only' && !isWorkspaceAdmin(eff)) return null;
+    if (access === 'no-guests' && eff.workspaceRole === 'guest') return null;
+    if (access === 'admins-only' && !isWorkspaceAdmin(eff)) return null;
     return eff;
   }
 
@@ -485,7 +548,23 @@ export function registerBuilderReadRoutes(
     { preHandler: requireSession },
     async (request, reply) => {
       const { workspaceId } = request.params;
-      const eff = await door(request, workspaceId, 'members-only');
+      // EXECUTOR RULING (2026-09-02), and a CONSERVATIVE DEFAULT where the plan
+      // was silent: a guest may not call this route at all.
+      //
+      // The plan settles who is HIDDEN from the listing and never says who may
+      // CALL it, so this fell through to the blanket "not a member -> 404",
+      // under which a guest passed `requireMember` and received the workspace's
+      // entire non-guest staff directory — user ids and display names, none of
+      // it about the one ticket they were invited to. The withholding rule's own
+      // rationale decides it: a guest is "a person invited to one shared ticket,
+      // not a member of the workspace's roster", and handing that person the
+      // full directory is the mirror of the leak the rule exists to prevent. The
+      // roster's stated purpose — the people a `require-different-user` rule may
+      // name — is workflow-builder work, which is owner/admin work.
+      //
+      // Cheap to reverse: this argument and one enum value. Recorded in the
+      // coordination doc's "Plan 5 execution consequences" section.
+      const eff = await door(request, workspaceId, 'no-guests');
       if (eff === null) return reply.code(404).send(READ_NOT_FOUND_BODY);
       const body: MemberListResponse = {
         workspaceId,

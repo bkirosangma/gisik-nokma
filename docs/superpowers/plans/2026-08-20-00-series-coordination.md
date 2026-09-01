@@ -5392,3 +5392,71 @@ phrase, not a ruling on this API shape.**
 line more narrowly, `terminalChildren` becomes per-viewer and the disclosure argument collapses. The
 change would be local — one `LEFT JOIN` predicate and its tests — so this is cheap to reverse and is
 recorded rather than escalated.
+
+### 4. The prototype-key class, swept across Plan 5's own files — one fixed, one recorded
+
+Added at the Task 9b fix round (2026-09-02). A state id, a field id and a filter key are all
+`z.string().min(1)` and nothing more, so **any plain object indexed by one of them can be walked
+into `Object.prototype`.** Two distinct failure modes, and they are not the same bug:
+
+- **A method** (`toString`, `valueOf`, `constructor`) — a READ finds an inherited function where the
+  code expected `undefined`. A WRITE is safe: plain assignment creates an own property that shadows
+  the method. This is what case 7.88 closed in the bulk rebind's `stateMap`.
+- **`__proto__`** — an ACCESSOR PAIR. A read finds `Object.prototype`; a **write of a non-object is
+  silently discarded**, creating no own key and throwing nothing. This is what case 7.89 closed in
+  `readStateOccupancy`, where a whole state and its live tickets were absent from the response.
+
+**Swept:** every source file Plan 5 created — `routes/{board,list,builder-reads}.ts`,
+`read/{compile-filter,membership,sql-params,state-provenance,ticket-cards,visible-where,workflow-defs}.ts`,
+`projections/{search,workspace-settings}.ts`, `domain/src/{filter-spec,read-models}.ts` and
+`domain/src/events/workspace-settings.ts`. Every other keyed collection on the surface is already a
+`Map` or a `Set` (`blockedStateKeys`, the board's `byColumn`, the list's `buckets` and `epics`,
+`stateProvenanceFor`, `latestWorkflowDefs`). `ticket-cards.ts` reads `row.fields['title']` and
+`row.fields['dueDate']` from an actor-keyed object, but the INDEX is a fixed literal that is not on
+`Object.prototype`, so it is not an instance of this class. **`readStateOccupancy` was the only one,
+and it is fixed.**
+
+**RECORDED, NOT FIXED — outside Plan 5's files.** `foldStateIdForward` in
+`packages/domain/src/workflow.ts:120` reads `def.stateMapping[current]`, where `current` is a state
+id that came from a ticket and `stateMapping` is a plain object parsed out of a stored definition
+(`stateMappingSchema = z.record(z.string(), z.string())`, which constrains neither key nor prototype).
+A ticket parked in a state called `toString` therefore folds through a version whose mapping does not
+name it and reads `Object.prototype.toString` as the target: `mapped !== undefined`, so the walk
+continues with a FUNCTION in a variable TypeScript believes is a `string`, and the refusal that
+eventually comes out carries that function as its `unmappedStateId` instead of the state id it is
+required to name. **Owner: Plan 3, which owns THE ONE VERSION WALK** (that docblock's own words —
+the engine, the server's refresh-on-publish and Plan 10's replica all route through this function, so
+a fix here is a fix in three places and must not be made from a Plan 5 task). **Plan 8 is the first
+plan that can author a `stateMapping` at all**, so it is the plan that makes the hazard reachable
+through a shipped door, and the natural place to close it is the same one-line change made twice here.
+Not fixed from this fix round on purpose: reaching outside the task's files is what hides compounds,
+and this one is a wrong refusal MESSAGE rather than a wrong refusal.
+
+### 5. EXECUTOR RULING (2026-09-02): a guest may NOT call `GET /v1/workspaces/:id/members`
+
+A ruling on a genuine ambiguity, not a defect report, and a **conservative default taken where the
+plan is silent.**
+
+Plan 5 Task 9b settles who is **HIDDEN** from the roster listing — guests are withheld from
+non-admin callers — and never says who may **CALL** it. So the caller question fell through to this
+surface's blanket "not a member → 404", under which a guest passes `requireMember` like anyone else.
+The shipped consequence was that a guest invited to ONE shared ticket received the workspace's entire
+non-guest staff directory, user ids and display names, and nothing in that response is about their
+ticket.
+
+The withholding rule's own stated rationale decides it: a guest is *"a person invited to one shared
+ticket, not a member of the workspace's roster"*, and handing that person the full directory is the
+mirror of the leak the rule exists to prevent. The roster's stated purpose — *"the people a
+`require-different-user` rule can name"* — is workflow-builder work, which is owner/admin work.
+
+**Shipped:** the `/members` door is `no-guests`; a guest draws the same `READ_NOT_FOUND_BODY`, with
+the same headers, that every other refusal on this prefix answers. Case 7.91 asserts the refusal and
+carries three positive controls (the same guest still reads `/workflows` and `/ticket-types`; a
+non-guest member still reads the roster). The assertion that previously pinned the permissive
+behaviour — case 7.39's third case, "a guest asking for the roster gets the non-guest members" — is
+replaced by it rather than left standing beside a contradiction.
+
+**Cheap to reverse:** one enum value at `door()` and that one case. If the owner reads the plan the
+other way, a guest gets the guest-withheld roster back and nothing else moves. **Owner: Plan 8's
+workflow builder**, which is the consumer that actually needs the roster, and the plan that would
+notice if guests were meant to have it.

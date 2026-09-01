@@ -37,7 +37,7 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * | `/workflows` | any member, GUESTS INCLUDED | plan: a guest's shared ticket cannot render its status without the definition |
  * | `/workflows/:id` | same | same |
  * | `/ticket-types` | same | same argument, one step along: a shared ticket renders its type's name and icon |
- * | `/members` | any member — but GUESTS ARE WITHHELD from non-admin callers | plan: the roster is not a directory of who else the workspace is talking to |
+ * | `/members` | any NON-GUEST member — and GUESTS ARE WITHHELD from non-admin callers | plan for the withholding: the roster is not a directory of who else the workspace is talking to. That a guest may not CALL it is an EXECUTOR RULING (case 7.91) taken where the plan is silent |
  * | `/workflows/:id/state-occupancy` | owner/admin ONLY | plan: the honest number is the whole workspace's, so there is no per-viewer variant |
  * | `/ticket-types/:id/population` | owner/admin ONLY | plan: "on state-occupancy's exact terms and for its exact reason" |
  * | `POST …/migrate` | owner/admin ONLY | NOT in the plan text — see the migrate describe block |
@@ -50,10 +50,15 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * ## One database, one seed, and the mutating cases go LAST
  *
  * `seedReadScenario` refuses a second seed into one database, so this file takes
- * one `createTestDatabase` and seeds once through `buildReadTestApp`. Two cases
- * at the END of this file DO write to the ledger — the successful migration and
- * the revocation — and they are last on purpose, with the reasons stated where
- * they sit. Everything above them is read-only and order-independent.
+ * one `createTestDatabase` and seeds once through `buildReadTestApp`. The cases
+ * that WRITE to the ledger all sit at the END, and each states what it leaves
+ * behind where it sits: the migrate block (which moves live tickets between
+ * workflows), the revocation (7.87, which removes `member`'s workspace grant),
+ * and the two prototype-key blocks (7.88 and 7.89, which each seed a workflow,
+ * a type and tickets of their own). Everything above them is read-only and
+ * order-independent. 7.90 sits among the read-only cases deliberately: its one
+ * write-shaped call is a migration refused on the merits, and it asserts the
+ * ledger row count is unchanged across the whole case.
  *
  * ## Nothing here moves with `TZ`
  *
@@ -283,10 +288,16 @@ describe('GET /v1/workspaces/:workspaceId/members', () => {
     const byUser = Object.fromEntries(body.members.map((m) => [m.userId, m.role]));
     expect(byUser).toEqual({
       [read.userIds.owner]: 'owner',
+      [read.userIds.admin]: 'admin',
       [read.userIds.member]: 'member',
       [read.userIds.outsider]: 'member',
+      [read.userIds.projectLead]: 'member',
       [read.userIds.guest]: 'guest',
     });
+    // All four `WorkspaceRole` values travel, which is what `seedRoleAxis`
+    // exists for: before it, `admin` appeared nowhere in the world and the role
+    // column could have been a two-valued field for all this case knew.
+    expect(new Set(Object.values(byUser))).toEqual(new Set(['owner', 'admin', 'member', 'guest']));
     // The neighbour is a member of a different workspace and appears nowhere.
     expect(byUser[read.userIds.neighbour]).toBeUndefined();
     expect(byUser[read.userIds.stranger]).toBeUndefined();
@@ -303,38 +314,69 @@ describe('GET /v1/workspaces/:workspaceId/members', () => {
     expect(Object.values(vendorNames).every((name) => typeof name === 'string' && name.length > 0)).toBe(true);
   });
 
-  it('7.39 PLANTED DEFECT: a plain member never sees the guest — not the row, not the id — while the owner does', async () => {
-    const asMember = await get('member', '/members');
-    expect(asMember.statusCode).toBe(200);
-    // Not the id anywhere in the bytes, which also covers a route that withheld
-    // the ROLE but kept the row.
-    expect(asMember.body).not.toContain(read.userIds.guest);
-    const memberRoster = asMember.json() as MemberListResponse;
-    expect(memberRoster.members.map((m) => m.role)).not.toContain('guest');
-    // POSITIVE CONTROL: the member's roster is not empty — the other three are
-    // all there, so the guest's absence is a withholding and not a broken read.
-    expect(Object.fromEntries(memberRoster.members.map((m) => [m.userId, m.role]))).toEqual({
+  it('7.39 PLANTED DEFECT: a plain member never sees the guest — not the row, not the id — while an owner AND an admin do', async () => {
+    const nonGuestRoster = {
       [read.userIds.owner]: 'owner',
+      [read.userIds.admin]: 'admin',
       [read.userIds.member]: 'member',
       [read.userIds.outsider]: 'member',
-    });
+      [read.userIds.projectLead]: 'member',
+    };
+    for (const role of ['member', 'outsider', 'projectLead'] as const) {
+      const withheld = await get(role, '/members');
+      expect([role, withheld.statusCode]).toEqual([role, 200]);
+      // Not the id anywhere in the bytes, which also covers a route that
+      // withheld the ROLE but kept the row.
+      expect([role, withheld.body.includes(read.userIds.guest)]).toEqual([role, false]);
+      const roster = withheld.json() as MemberListResponse;
+      expect(roster.members.map((m) => m.role)).not.toContain('guest');
+      // POSITIVE CONTROL: the roster is not empty — the other five are all
+      // there, so the guest's absence is a withholding and not a broken read.
+      expect(Object.fromEntries(roster.members.map((m) => [m.userId, m.role]))).toEqual(nonGuestRoster);
+    }
 
-    const asOwner = await get('owner', '/members');
-    expect(asOwner.body).toContain(read.userIds.guest);
-    expect(
-      (asOwner.json() as MemberListResponse).members.find((m) => m.userId === read.userIds.guest)?.role,
-    ).toBe('guest');
+    // `projectLead` above is the cell that makes the withholding a WORKSPACE
+    // role question: they are project admin of the sibling project, and they
+    // are still refused the guest. Both admin-shaped callers below see them.
+    for (const role of ['owner', 'admin'] as const) {
+      const privileged = await get(role, '/members');
+      expect([role, privileged.statusCode]).toEqual([role, 200]);
+      expect([role, privileged.body.includes(read.userIds.guest)]).toEqual([role, true]);
+      expect([
+        role,
+        (privileged.json() as MemberListResponse).members.find((m) => m.userId === read.userIds.guest)?.role,
+      ]).toEqual([role, 'guest']);
+    }
   });
 
-  it('7.39 a guest asking for the roster gets the non-guest members and never their own kind, including themselves', async () => {
-    const response = await get('guest', '/members');
-    expect(response.statusCode).toBe(200);
-    expect(response.body).not.toContain(read.userIds.guest);
-    const body = response.json() as MemberListResponse;
-    expect(body.members.map((m) => m.role)).not.toContain('guest');
-    expect(body.members.map((m) => m.userId).sort()).toEqual(
-      [read.userIds.owner, read.userIds.member, read.userIds.outsider].sort(),
-    );
+  it('7.91 EXECUTOR RULING: a guest may not call the roster at all, and gets the surface’s ordinary 404', async () => {
+    // The plan settles who is HIDDEN from this listing and never says who may
+    // CALL it, so a guest passed `requireMember` and received the workspace's
+    // whole non-guest staff directory — ids and display names, none of it about
+    // the one ticket they were invited to. Conservative default taken where the
+    // plan is silent; cheap to reverse. Recorded in the coordination doc.
+    const guest = await get('guest', '/members');
+    expect(guest.statusCode).toBe(404);
+    expect(guest.json()).toEqual(READ_NOT_FOUND_BODY);
+    // The refusal is the SAME one every other refusal on this prefix answers —
+    // headers included, so nobody learns the roster exists by being refused
+    // differently from a stranger.
+    const stranger = await get('stranger', '/members');
+    expect(stranger.statusCode).toBe(404);
+    expect(comparableHeaders(guest)).toEqual(comparableHeaders(stranger));
+    // No id of anybody's leaks in the refusal body.
+    for (const id of [read.userIds.owner, read.userIds.member, read.userIds.outsider]) {
+      expect(guest.body).not.toContain(id);
+    }
+
+    // POSITIVE CONTROL, and it is what stops this passing for a broken guest
+    // session: the SAME guest, the SAME workspace, still reads the two surfaces
+    // the plan does give them — a shared ticket cannot render without these.
+    expect((await get('guest', '/workflows')).statusCode).toBe(200);
+    expect((await get('guest', '/ticket-types')).statusCode).toBe(200);
+    // And a non-guest member still gets the roster, so the 404 is about being a
+    // guest and not about the route.
+    expect((await get('member', '/members')).statusCode).toBe(200);
   });
 });
 
@@ -470,6 +512,91 @@ describe('GET /v1/workspaces/:workspaceId/ticket-types/:typeId/population', () =
   });
 });
 
+describe('the admin gate — which admin-ness the three admin-only surfaces mean', () => {
+  /**
+   * The predicate `isWorkspaceAdmin` is `workspaceRole === 'owner' || 'admin'`,
+   * and until this case nothing in the suite could tell it from a wider one.
+   *
+   * MEASURED on this branch: widening it to
+   * `owner || admin || [...eff.projects.values()].some((p) => p.projectAdmin)`
+   * — a helper of exactly that shape is one import away, `hasProjectAdminRights`
+   * in `permissions/effective-role.ts` — passed EVERY case in this file. The
+   * reason was the fixture, not the predicate: `read-app.ts` had no plain
+   * workspace member who was a project admin, so every project-admin caller in
+   * the world was already a workspace owner and the two readings agreed on all
+   * of them. `seedRoleAxis` adds that cell (`projectLead`) and this case is
+   * where it is spent.
+   *
+   * The `admin` half is the same argument from the other side: the world held
+   * no `admin`-role member at all, so `|| eff.workspaceRole === 'admin'` had no
+   * caller that could reach it and "an admin may read the occupancy" was proved
+   * only through `owner`. Deleting that disjunct now reddens this case and 7.39,
+   * each naming `admin`. MEASURED.
+   */
+  it('7.90 a project admin who is a plain workspace member is refused all three, and a workspace admin is admitted to all three', async () => {
+    // The fixture is what this case claims it is, read from the projection
+    // rather than assumed from the seed: a WORKSPACE-scope row saying `member`,
+    // and a PROJECT-scope row carrying the admin flag. Without this the refusals
+    // below would also pass for a person who was never made a project admin.
+    const { rows: cells } = await db.pool.query<{ scope_kind: string; role: string; project_admin: boolean }>(
+      `SELECT scope_kind, role, project_admin FROM proj_memberships
+        WHERE workspace_id = $1 AND user_id = $2 ORDER BY scope_kind`,
+      [read.world.workspaceId, read.userIds.projectLead],
+    );
+    expect(cells).toEqual([
+      { scope_kind: 'project', role: 'member', project_admin: true },
+      { scope_kind: 'workspace', role: 'member', project_admin: false },
+    ]);
+
+    const before = await ledgerRows();
+    // A body that would REACH the handler and be refused by one of its own
+    // rules, so the gate is the only thing separating the two callers below —
+    // and nothing is appended either way.
+    const sameWorkflow = { fromWorkflowId: 'wf-errands', toWorkflowId: 'wf-errands', stateMap: { todo: 'todo' } };
+    const migrateAs = (role: ReadRole): Promise<InjectResponse> =>
+      read.app.inject({
+        method: 'POST',
+        url: `/v1/workspaces/${read.world.workspaceId}/ticket-types/task/migrate`,
+        headers: read.authOf(role),
+        payload: sameWorkflow,
+      });
+
+    const refused: InjectResponse[] = [
+      await get('projectLead', '/workflows/wf-errands/state-occupancy'),
+      await get('projectLead', '/ticket-types/task/population?workflowId=wf-errands'),
+      await migrateAs('projectLead'),
+    ];
+    for (const response of refused) {
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual(READ_NOT_FOUND_BODY);
+    }
+    // Byte-identical to what a total stranger draws on the same prefix: project
+    // admin-ness buys not even the knowledge that the workflow is there.
+    const stranger = await get('stranger', '/workflows/wf-errands/state-occupancy');
+    expect(comparableHeaders(refused[0] as InjectResponse)).toEqual(comparableHeaders(stranger));
+
+    // The `admin` role passes all three. The occupancy and population answers
+    // are asserted EQUAL TO THE OWNER'S, not merely 200: a gate that admitted
+    // an admin to a route which then served them a narrowed number would be a
+    // different defect wearing this one's status code.
+    const adminOccupancy = await okJson<StateOccupancyResponse>('admin', '/workflows/wf-errands/state-occupancy');
+    const ownerOccupancy = await okJson<StateOccupancyResponse>('owner', '/workflows/wf-errands/state-occupancy');
+    expect(adminOccupancy).toEqual(ownerOccupancy);
+    const adminPopulation = await okJson<TypePopulationResponse>('admin', '/ticket-types/task/population?workflowId=wf-errands');
+    expect(adminPopulation).toEqual(
+      await okJson<TypePopulationResponse>('owner', '/ticket-types/task/population?workflowId=wf-errands'),
+    );
+    // Past the migrate gate and into the route's own refusal, which is what a
+    // 404 could not tell us: the admin was admitted, then refused on the merits.
+    const adminMigrate = await migrateAs('admin');
+    expect(adminMigrate.statusCode).toBe(422);
+    expect((adminMigrate.json() as { rule: string }).rule).toBe('migration.same-workflow');
+
+    // Nothing this case did wrote anything.
+    expect(await ledgerRows()).toBe(before);
+  });
+});
+
 /**
  * `POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate` — the bulk
  * rebind, and the only route on this surface that WRITES.
@@ -535,11 +662,30 @@ describe('POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate', () => 
     for (const refusal of refusals.slice(1)) {
       expect(comparableHeaders(refusal)).toEqual(comparableHeaders(refusals[0] as InjectResponse));
     }
-    // Not one event was built. Asserting the STATUS alone would survive a route
-    // with no gate of its own: ingest refuses `ticket.workflow_rebound` from a
-    // member too (`ADMIN_ONLY_TYPES`), so the caller would still see an error
-    // while five envelopes had been constructed and one refusal per ticket
-    // returned. The ledger is what tells those two apart.
+    // Not one event was built.
+    //
+    // The two assertions in this case catch DIFFERENT things, and an earlier
+    // version of this comment (and catalogue entry 7.45) had them the wrong way
+    // round — it called the ledger count the load-bearing one and the status
+    // assertion the one a missing gate would survive.
+    //
+    // MEASURED, by widening THIS route's door from `admins-only` to
+    // `members-only`: the member's refusal becomes a 422, and the
+    // `toEqual([role, 404])` above fails on its FIRST iteration. That is the
+    // observed half. The test aborts there, so the ledger assertion below was
+    // never reached and its behaviour under that mutation is NOT measured — it
+    // is READ OFF `ingest/ingest-service.ts`, which calls `insertEvent` only
+    // after a verdict passes, and `ticket.workflow_rebound` from a non-admin
+    // never passes one (`ADMIN_ONLY_TYPES`), so the count would have been
+    // unchanged. Either way the STATUS assertion is what catches a widened
+    // gate; the ledger count says nothing about this route's own gate.
+    //
+    // What the ledger assertion does prove is the other half of the contract,
+    // and no status code can: that a refusal appends NOTHING. It reddens on a
+    // route that built the batch and let ingest refuse it one event at a time
+    // in a world where some of those events would commit — the partial
+    // migration case 7.88 exists for. Both assertions stay; each is now named
+    // for what it actually catches.
     expect(await ledgerRows()).toBe(before);
 
     // POSITIVE CONTROL, in the same test, and the reason the zero above is not
@@ -732,10 +878,12 @@ describe('GET /v1/workspaces/:workspaceId/members — the roster after a revocat
 
     const afterRoster = await okJson<MemberListResponse>('owner', '/members');
     expect(afterRoster.members.map((m) => m.userId)).not.toContain(read.userIds.member);
-    // And the roster is not merely empty: the other three are all still there.
+    // And the roster is not merely empty: the other five are all still there.
     expect(Object.fromEntries(afterRoster.members.map((m) => [m.userId, m.role]))).toEqual({
       [read.userIds.owner]: 'owner',
+      [read.userIds.admin]: 'admin',
       [read.userIds.outsider]: 'member',
+      [read.userIds.projectLead]: 'member',
       [read.userIds.guest]: 'guest',
     });
     // The revoked person's own read is refused too, which is `requireMember`
@@ -872,5 +1020,164 @@ describe('POST …/migrate — a state id that is also a property of Object.prot
     expect(accepted.statusCode).toBe(200);
     expect(accepted.json()).toEqual({ status: 'migrated', count: 2 });
     expect(await ledgerRows()).toBe(before + 2);
+  });
+});
+
+describe('GET …/state-occupancy — a state id that is an ACCESSOR on Object.prototype', () => {
+  /**
+   * 7.88's sibling, and the half it did not cover.
+   *
+   * 7.88 fixed the `stateMap` lookup, where `toString` was the demonstration.
+   * `toString` is SAFE in `readStateOccupancy`'s seeded object, and that is why
+   * 7.88 is green there: a plain `counts['toString'] = 0` creates an OWN
+   * property that shadows the prototype's method, and `JSON.stringify` emits it.
+   *
+   * `__proto__` is not a method, it is an ACCESSOR PAIR on `Object.prototype`,
+   * and its setter silently ignores a value that is neither an object nor null.
+   * So `counts['__proto__'] = 0` on a `{}` creates NO own key, writes nothing,
+   * throws nothing, and the state — with every live ticket in it — is simply
+   * absent from the response. Confirmed in plain node: `c['__proto__']=0;
+   * c['toString']=1` leaves `Object.keys(c)` as `['toString']` alone.
+   *
+   * `workflowStateSchema` is `id: z.string().min(1)` and every other state
+   * lookup in the engine and the domain is a `.find`, a `.some` or a `Set`, so
+   * `__proto__` is a legal state id everywhere except this one indexed object.
+   * Plan 8's publish-mapping dialog is built from exactly this response, so an
+   * author would never be shown the state and could delete it believing it
+   * empty.
+   *
+   * ## Why there is no migrate-half control here, unlike 7.88
+   *
+   * There cannot be one. Fastify parses JSON bodies with `secure-json-parse`,
+   * which REFUSES a `__proto__` key outright, so a migration naming this state
+   * never reaches the handler — it draws an opaque 400 from the parser. That is
+   * asserted below as the consequence it is: a type holding a `__proto__` state
+   * is permanently unmigratable through this route, which is precisely why the
+   * occupancy read must not also hide it. The controls that make the count
+   * evidence are the sibling state in the same response and the `proj_tickets`
+   * row read straight out of the database.
+   */
+  it('7.89 PLANTED DEFECT: a `__proto__` state and the live ticket in it are REPORTED, not silently dropped from the counts object', async () => {
+    const workflowId = 'wf-accessor';
+    const typeId = 'accessor';
+    const okTicketId = newUlid();
+    const protoTicketId = newUlid();
+    const { rows: seqRows } = await db.pool.query<{ ws_seq: number | null }>(
+      'SELECT max(workspace_seq) AS ws_seq FROM events WHERE workspace_id = $1',
+      [read.world.workspaceId],
+    );
+    let workspaceSeq = (seqRows[0]?.ws_seq ?? 0) + 1;
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.userIds.owner };
+    const next = (): number => workspaceSeq++;
+
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'workflow', id: workflowId },
+        type: 'workflow.defined',
+        workspaceSeq: next(),
+        payload: {
+          id: workflowId,
+          version: 1,
+          name: 'Accessor flow',
+          initialStateId: 'ok',
+          states: [
+            { id: 'ok', name: 'Fine', category: 'open' },
+            // A legal state id today, and the one an indexed object cannot hold.
+            { id: '__proto__', name: 'Inherited accessor', category: 'active' },
+            { id: 'done', name: 'Done', category: 'terminal' },
+          ],
+          transitions: [
+            { from: '*', to: 'ok', rules: [] },
+            { from: '*', to: '__proto__', rules: [] },
+            { from: '*', to: 'done', rules: [] },
+          ],
+        },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket-type', id: typeId },
+        type: 'ticket-type.defined',
+        workspaceSeq: next(),
+        payload: { id: typeId, name: 'Accessor', icon: 'ghost', rank: 6, workflowId, fields: [] },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: okTicketId },
+        type: 'ticket.created',
+        workspaceSeq: next(),
+        payload: { typeId, projectId: read.world.projectId, parentId: null, title: 'Stays in a real state' },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: protoTicketId },
+        type: 'ticket.created',
+        workspaceSeq: next(),
+        payload: { typeId, projectId: read.world.projectId, parentId: null, title: 'Parked in __proto__' },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: protoTicketId },
+        type: 'ticket.transitioned',
+        workspaceSeq: next(),
+        payload: { to: '__proto__' },
+      }),
+    ]);
+
+    // The world really is in that shape, read from the table rather than
+    // inferred from the seed: the ticket's `state_id` IS the accessor's name.
+    const { rows: parked } = await db.pool.query<{ state_id: string }>(
+      'SELECT state_id FROM proj_tickets WHERE ticket_id = $1',
+      [protoTicketId],
+    );
+    expect(parked[0]?.state_id).toBe('__proto__');
+
+    const response = await get('owner', `/workflows/${workflowId}/state-occupancy`);
+    expect(response.statusCode).toBe(200);
+    // The EXPECTED object is built with a computed key on purpose. Written as
+    // the literal `{ __proto__: 1 }` this would be the prototype-setter form,
+    // which creates no own property — the expectation would collapse to
+    // `{ ok: 1, done: 0 }` and pass against the very defect this case exists
+    // for. `toEqual` would then be a check that cannot fail.
+    expect((response.json() as StateOccupancyResponse).counts).toEqual({
+      ok: 1,
+      ['__proto__']: 1,
+      done: 0,
+    });
+    // And the SERIALISER is in the proof: the bytes on the wire carry the key.
+    // A response object that held it while `JSON.stringify` dropped it would
+    // satisfy the assertion above and still ship an occupancy the dialog cannot
+    // see.
+    expect(response.body).toContain('"__proto__":1');
+    // `ok: 1` and `done: 0` in the same object are the positive controls: an
+    // occupancy that answered nothing at all cannot pass by agreeing about the
+    // accessor.
+
+    // RECORDED, not fixed: the escape hatch is shut. Fastify's body parser
+    // refuses a `__proto__` key before the handler runs, so this type cannot be
+    // migrated off `wf-accessor` through the bulk rebind at all — an opaque 400
+    // from the parser, not one of this route's own named refusals.
+    const before = await ledgerRows();
+    const blocked = await read.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${read.world.workspaceId}/ticket-types/${typeId}/migrate`,
+      headers: read.authOf('owner'),
+      payload: { fromWorkflowId: workflowId, toWorkflowId: 'wf-errands', stateMap: { ok: 'todo', ['__proto__']: 'doing' } },
+    });
+    expect(blocked.statusCode).toBe(400);
+    expect(await ledgerRows()).toBe(before);
+    // POSITIVE CONTROL for that 400: the same route, same caller, the same body
+    // WITHOUT the accessor key reaches the handler and is refused by this
+    // route's own rule instead — so the 400 above is the parser and not a
+    // migrate endpoint that refuses everything.
+    const reached = await read.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${read.world.workspaceId}/ticket-types/${typeId}/migrate`,
+      headers: read.authOf('owner'),
+      payload: { fromWorkflowId: workflowId, toWorkflowId: 'wf-errands', stateMap: { ok: 'todo' } },
+    });
+    expect(reached.statusCode).toBe(422);
+    expect((reached.json() as { rule: string }).rule).toBe('migration.unmapped-state');
+    expect(await ledgerRows()).toBe(before);
   });
 });

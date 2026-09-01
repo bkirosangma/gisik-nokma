@@ -48,8 +48,20 @@ import { signInWithPhone } from './session.js';
  *   member of ANY workspace" would pass it. The neighbour is the cell that
  *   fails such a gate, and their own project is the positive control that keeps
  *   their 404 from being a route that 404s everything.
+ * - `admin` — workspace role `admin`, on no project. See `seedRoleAxis`.
+ * - `projectLead` — workspace role `member`, and project ADMIN of the sibling
+ *   project. See `seedRoleAxis`; this is the cell that separates a workspace
+ *   admin gate from a project admin gate.
  */
-export type ReadRole = 'owner' | 'member' | 'outsider' | 'guest' | 'stranger' | 'neighbour';
+export type ReadRole =
+  | 'owner'
+  | 'member'
+  | 'outsider'
+  | 'guest'
+  | 'stranger'
+  | 'neighbour'
+  | 'admin'
+  | 'projectLead';
 
 /**
  * A SECOND project inside the seeded workspace, with one ticket of its own and
@@ -97,6 +109,49 @@ export type SiblingProject = {
   choreTicketTitle: string;
 };
 
+/**
+ * The ROLE AXIS: two people the seeded world had no cell for, and without whom
+ * two predicates on the builder surface cannot be told from wider ones.
+ *
+ * `SiblingProject`'s docblock makes exactly this argument twice already — once
+ * for the second project ("with one project per workspace, a board that dropped
+ * its `project_id` clause answers exactly the same bytes … MEASURED") and once
+ * for the second workflow. It was never made for the ROLE axis, and the gap it
+ * left is measurable:
+ *
+ * - **`projectLead`** — a plain workspace `member` who IS project admin of the
+ *   sibling project. Before this cell existed, every project-admin caller in the
+ *   world was ALSO the workspace owner (`owner` is both; `member` is
+ *   `projectAdmin: false` on both projects). So widening `isWorkspaceAdmin` to
+ *   `owner || admin || [...eff.projects.values()].some((p) => p.projectAdmin)`
+ *   — a helper of exactly that shape is already exported one import away, as
+ *   `hasProjectAdminRights` in `permissions/effective-role.ts` — passed EVERY
+ *   case in `builder-reads.test.ts`. MEASURED, on this branch, before this
+ *   seeder existed. `projectLead` is the caller that variant admits and the
+ *   shipped predicate refuses, and case 7.90 is where it is asserted.
+ * - **`admin`** — workspace role `admin`, the only value of `WorkspaceRole` the
+ *   world did not contain at all. Without it "an admin sees guests" and "an
+ *   admin may read the occupancy" were proved through `owner` alone, so the
+ *   `|| eff.workspaceRole === 'admin'` disjunct had no caller in any fixture
+ *   that could reach it — nothing in the suite could tell the predicate from its
+ *   own deletion. With this cell it reddens: deleting that disjunct fails 7.39
+ *   and 7.90, each naming `admin`. MEASURED after the cell existed; the "before"
+ *   is by inspection, since a role no fixture holds cannot be exercised. It is
+ *   on NO project, deliberately: an admin who was also a project member could
+ *   not tell a workspace-role gate from a project-membership one, which is the
+ *   mirror of `projectLead`'s job.
+ *
+ * Neither person owns or is named on any ticket, and neither is added to the
+ * SEEDED project — only to the sibling. The seeded project's card sets are
+ * asserted verbatim by the board and list suites, and a fixture that changes
+ * what an existing case measures is a fixture that makes the suite pass by
+ * declaration order (`SiblingProject`'s rule, followed here).
+ */
+export type RoleAxis = {
+  /** The project `projectLead` administers — the sibling, never the seeded one. */
+  projectId: string;
+};
+
 export type NeighbourWorkspace = {
   workspaceId: string;
   projectId: string;
@@ -109,6 +164,7 @@ export type ReadWorld = {
   app: FastifyInstance;
   world: ReadScenario;
   sibling: SiblingProject;
+  roleAxis: RoleAxis;
   neighbour: NeighbourWorkspace;
   userIds: Record<ReadRole, string>;
   tokens: Record<ReadRole, string>;
@@ -124,9 +180,20 @@ const PHONES: Record<ReadRole, string> = {
   guest: '+911111111104',
   stranger: '+911111111105',
   neighbour: '+911111111106',
+  admin: '+911111111107',
+  projectLead: '+911111111108',
 };
 
-const ROLES: ReadRole[] = ['owner', 'member', 'outsider', 'guest', 'stranger', 'neighbour'];
+const ROLES: ReadRole[] = [
+  'owner',
+  'member',
+  'outsider',
+  'guest',
+  'stranger',
+  'neighbour',
+  'admin',
+  'projectLead',
+];
 
 export async function buildReadTestApp(db: TestDatabase): Promise<ReadWorld> {
   const { app, otp } = buildTestApp(db);
@@ -147,12 +214,18 @@ export async function buildReadTestApp(db: TestDatabase): Promise<ReadWorld> {
     guest: userIds.guest,
   });
   const sibling = await seedSiblingProject(db.pool, world);
+  // AFTER the sibling: `projectLead` is put on that project, which must exist.
+  const roleAxis = await seedRoleAxis(db.pool, world, sibling, {
+    admin: userIds.admin,
+    projectLead: userIds.projectLead,
+  });
   const neighbour = await seedNeighbourWorkspace(db.pool, userIds.neighbour);
 
   return {
     app,
     world,
     sibling,
+    roleAxis,
     neighbour,
     userIds,
     tokens,
@@ -212,6 +285,45 @@ export async function seedSiblingProject(
   ];
   await applyCommitted(pool, events);
   return { projectId, ticketId, ticketTitle, secondWorkflowId, choreTicketId, choreTicketTitle };
+}
+
+/** See `RoleAxis` — the two role cells the seeded world has no other instance of. */
+export async function seedRoleAxis(
+  pool: Pool,
+  world: ReadScenario,
+  sibling: SiblingProject,
+  users: { admin: string; projectLead: string },
+): Promise<RoleAxis> {
+  const ws = { workspaceId: world.workspaceId, actorId: world.owner };
+  const events: LedgerEvent[] = [
+    // Workspace-scope grants, no `scope` field on either: `membership.granted`
+    // refuses one outright after the scope collapse (owner decision
+    // 2026-08-27), exactly as `read-scenario.ts` seeds its four.
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'membership', id: membershipId(world.workspaceId, users.admin) },
+      type: 'membership.granted',
+      payload: { userId: users.admin, role: 'admin' },
+    }),
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'membership', id: membershipId(world.workspaceId, users.projectLead) },
+      type: 'membership.granted',
+      payload: { userId: users.projectLead, role: 'member' },
+    }),
+    // The whole point of this seeder: `projectAdmin: true` held by somebody
+    // whose WORKSPACE role is plain `member`. `project.member_added` is the only
+    // writer of that flag, and it continues the sibling project's own entity
+    // stream — which is why this seeder runs after `seedSiblingProject`.
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'project', id: sibling.projectId },
+      type: 'project.member_added',
+      payload: { userId: users.projectLead, projectAdmin: true },
+    }),
+  ];
+  await applyCommitted(pool, events);
+  return { projectId: sibling.projectId };
 }
 
 /**

@@ -372,8 +372,12 @@ table rather than taken next-free.)*
   levels it sits at. **Any member, guests included**, reads the workflow roster, one definition, and
   the ticket types: a guest already receives definition events on the stream and their shared
   ticket cannot render its status, name or icon without them. **The roster withholds guests from
-  non-admin callers** — a guest is a person invited to one shared ticket, not a member of the
-  workspace's directory. **Occupancy and population are owner/admin only**, because the honest
+  non-admin callers, and refuses a guest CALLER outright** — a guest is a person invited to one
+  shared ticket, not a member of the workspace's directory, and handing that person the full
+  non-guest staff directory is the mirror of the leak the withholding rule exists to prevent. The
+  plan settles who is hidden and never says who may call, so the caller half is an **executor
+  ruling: a conservative default, cheap to reverse**, and a refused guest gets the surface's
+  ordinary 404. **Occupancy and population are owner/admin only**, because the honest
   number counts tickets the caller may not see and there is no per-viewer variant to serve instead.
   The admin refusal is **404 and never 403**, on `requireMember`'s own grounds: a 403 would confirm
   a workflow exists to somebody with no business knowing it, so a plain member, a guest, an
@@ -381,7 +385,14 @@ table rather than taken next-free.)*
   answers before the query string is parsed** on both routes that take one (Task 9's order, not the
   plan's). Occupancy reports every state of the definition, zeroes included, because a mapping
   dialog that omitted an empty state would invite an author to delete a state that holds work
-  tomorrow. Population takes an explicit `?workflowId=` and refuses to fall back to the type's own
+  tomorrow — and **every state means every state, `__proto__` included**: the counts are accumulated
+  in a `Map` and converted with `Object.fromEntries`, because `counts['__proto__'] = 0` on a plain
+  object reaches `Object.prototype`'s ACCESSOR, whose setter ignores a number, so the state and
+  every live ticket in it vanished from the response with nothing thrown. `toString` was safe there
+  (plain assignment shadows a method with an own property) and that is exactly why it read as
+  covered. Recorded rather than closed beside it: such a state cannot be migrated away either, since
+  Fastify's `secure-json-parse` refuses a `__proto__` key in the body before the handler runs.
+  Population takes an explicit `?workflowId=` and refuses to fall back to the type's own
   binding — a ticket pins its workflow at creation, so the binding is what NEW tickets get and
   answering with it would be a different number wearing this one's name. `displayName` is
   better-auth's `"user"."name"` verbatim; the route invents no fallback and formats no phone number
