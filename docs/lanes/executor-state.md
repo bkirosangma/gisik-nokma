@@ -113,8 +113,33 @@ table above:**
 `apps/server/src/read/sql-params.ts` (+27). `Features.md` **§7** and
 `test-cases/07-api-realtime-search.md` were **opened by T2 in its own change set.**
 
-**NEXT: Plan 5 Task 3** (`workspace.settings_set`, plan line 628), then T4 (883).
-**Floor-list in this plan: T5 (1213), T9b (3183), T14 (4918), T15 (5452).**
+**T3 AND T4 ARE DONE AND REVIEWED.** Commits: T3 `f57f084`, its doc correction `597b8be`, T4 `2e4c54e`,
+T4's doc correction + honest-helper docblock in the commit after it.
+
+**NEXT: Plan 5 Task 5** (the SQL visibility predicate, plan line 1213) — **FLOOR-LIST**: opus
+implementer AND opus reviewer. **Remaining floor-list in this plan: T5 (1213), T9b (3183), T14 (4918),
+T15 (5452).** Then T6 (1579), T7 (1821), T8 (2315), T9 (2657), T10 (3638), T11 (3874), T12 (4079),
+T13 (4551), T16 (6047).
+
+### THE FORWARD HAZARD T4 CREATED, and it is this series' signature failure — owner: STEP 10
+
+`applyCommitted` in `apps/server/test/helpers/apply.ts` is the seeding path for **every read model in
+Tasks 5–15**. Its docblock said *"seeds envelopes the way ingest would."* **It does not.** Verified
+against `ingest-service.ts`: real ingest also takes `lockWorkspace` + `lockEntity` (`:157-158`), reads
+the seqs from the DB via `nextWorkspaceSeq`/`nextSeq` rather than a process map, runs
+`checkPermission`, runs the rule engine, runs `bootstrapWorkspace`, and calls `notifyCommitted`.
+`applyCommitted` does `insertEvent` plus projections, and nothing else.
+
+The docblock now **enumerates those six absences** rather than calling itself simplified — *a
+partial-implementation marker enumerates the absences, not the partiality*. The consequence, written
+where the next eleven tasks will read it: **a read model green against this helper is proven correct
+about ROWS and proven nothing about whether those rows are reachable through the shipped door.**
+
+**This is exactly "a mocked contract is the thing that excuses the server from existing."** It is
+recorded, not fixed — closing it is the **integration checkpoint (sequence step 10)**, which is the
+step that exists for it. One absence is a live trap rather than a philosophical one and is called out
+by name: the seq map starts at 0 regardless of what the database already holds, so seeding into a
+non-fresh database silently collides.
 
 ## THE PLAN 5 ADAPTATION MAP — three compile-breaks, one of them at EIGHT sites
 

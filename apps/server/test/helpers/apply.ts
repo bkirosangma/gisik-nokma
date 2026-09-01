@@ -104,13 +104,44 @@ export function makeCommitted(
 }
 
 /**
- * Seeds envelopes the way ingest would: into the ledger AND through every
- * registered projection, one transaction per event, in registry order.
+ * Seeds envelopes into the ledger AND through every registered projection, one
+ * transaction per event, in registry order.
  *
  * One transaction per event rather than one for the batch, because that is the
  * unit ingest commits in and it is the unit a projection's cross-table read
  * sees. A batch transaction would let a projection read rows a LATER event
  * wrote, which no live ingest can do.
+ *
+ * ## What this does NOT do, enumerated — it is not "ingest in miniature"
+ *
+ * This helper reproduces ingest's LEDGER-AND-PROJECTION half and nothing else.
+ * Every read model in Tasks 5–15 is tested against a world seeded here, so the
+ * absences below are the exact shape of what those tests CANNOT catch. They are
+ * listed rather than summarised as "simplified", because a partial
+ * implementation has to name its absences to be safely relied on:
+ *
+ * - **No `lockWorkspace` / `lockEntity`.** Ingest takes both before numbering
+ *   (`ingest-service.ts:157-158`). Nothing here is concurrency-safe, and no
+ *   test built on it can observe a race the locks exist to prevent.
+ * - **The seqs are minted in a process-local map, not read from the database.**
+ *   Ingest calls `nextWorkspaceSeq`/`nextSeq`, which are `max(...) + 1` over the
+ *   ledger. So seeding into a database that ALREADY holds events for an entity
+ *   collides: the map starts at 0 no matter what is stored. One fresh database
+ *   per file, or pass explicit seqs.
+ * - **No `checkPermission`.** Anything at all commits here, including events the
+ *   shipped door refuses. A fixture is therefore never evidence that a client
+ *   could have produced the world it describes.
+ * - **No rule engine (`deps.evaluate`).** No refusal, no invariant, no advice.
+ * - **No `bootstrapWorkspace`.** A `workspace.created` seeded here does NOT get
+ *   the founding side effects a real one gets — no seeded membership, no builtin
+ *   ticket types. A test needing those must seed them explicitly.
+ * - **No `notifyCommitted`.** Nothing reaches the stream hub, so Tasks 14/15
+ *   cannot use this path to prove a frame was published.
+ *
+ * The consequence to hold on to: a read model that is green against this helper
+ * has been proven correct about ROWS, and proven nothing about whether those
+ * rows are reachable through the shipped door. Closing that gap is the
+ * integration checkpoint's job, not this helper's.
  */
 export async function applyCommitted(pool: Pool, envelopes: LedgerEvent[]): Promise<void> {
   const registry = buildProjectionRegistry();
