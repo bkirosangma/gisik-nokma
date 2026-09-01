@@ -53,4 +53,57 @@ describe('docToPlainText', () => {
     expect(docToPlainText({ type: 'doc', content: [{ type: 'text' }] })).toBe('');
     expect(docToPlainText([p(text('an array is not a doc'))])).toBe('');
   });
+
+  it('terminates on a root node that is its own descendant, no editor can produce this', () => {
+    const cyclic: Record<string, unknown> = { type: 'doc' };
+    cyclic.content = [cyclic];
+    let result = '';
+    expect(() => {
+      result = docToPlainText(cyclic);
+    }).not.toThrow();
+    expect(typeof result).toBe('string');
+  });
+
+  it('terminates on a cycle one level down, not just a root special-case', () => {
+    const cyclicParagraph: Record<string, unknown> = { type: 'paragraph' };
+    cyclicParagraph.content = [text('x'), cyclicParagraph];
+    const wrapper = doc(cyclicParagraph);
+    let result = '';
+    expect(() => {
+      result = docToPlainText(wrapper);
+    }).not.toThrow();
+    expect(typeof result).toBe('string');
+  });
+
+  it('terminates on a chain deeper than any stack, with no cycle at all', () => {
+    let node: Record<string, unknown> = p(text('bottom'));
+    for (let i = 0; i < 100_000; i++) {
+      node = { type: 'paragraph', content: [node] };
+    }
+    let result = '';
+    expect(() => {
+      result = docToPlainText(doc(node));
+    }).not.toThrow();
+    expect(typeof result).toBe('string');
+  });
+
+  it('still renders ordinary, non-adversarial nesting fully — the cap does not truncate real documents', () => {
+    // Real ProseMirror nesting from this product's own schema (see
+    // packages/editor's document schema v1) never approaches the cap: a
+    // blockquote containing a bulletList containing a listItem containing a
+    // paragraph is 4 levels. This checks the cap is far above that, not at it.
+    let nested = p(text('deep but real'));
+    for (let i = 0; i < 20; i++) {
+      nested = { type: 'blockquote', content: [nested] } as unknown as ReturnType<typeof p>;
+    }
+    expect(docToPlainText(doc(nested))).toBe('deep but real');
+  });
+
+  it('renders two blocks that legitimately share one text node object, not just visually identical ones', () => {
+    // A depth cap must not be a "seen node" set: valid ProseMirror trees can
+    // reuse one JS object reference across two positions in the tree (e.g. a
+    // shared template fragment), and that is not a cycle.
+    const shared = text('reused');
+    expect(docToPlainText(doc(p(shared), p(shared)))).toBe('reused\nreused');
+  });
 });
