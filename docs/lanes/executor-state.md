@@ -131,11 +131,12 @@ T13 (4551), T16 (6047).
 | T6 `proj_search` (tsvector) | `a21448d`, `91ea648` | **CLEAN — zero findings** |
 | T7 read models / TicketCard | `36c3d85`, `0422b20`, `41bb405` | **CLEAN — zero findings**; 18 mutations, 17 killed, 1 survivor correctly diagnosed as an unconstrained path |
 | T8 `GET /board` (first route) | `d6245e1`, `5a51097`, `6264776`, `dd58777`, `ccfc625`, `0c74fde` | **CLEAN — zero findings**; both door mutations die |
+| T9 `GET /tickets` (list read) | `7bab0b0`, `699aa18`, `c1f577f`, `ca6c39b`, `cc4536c`, `27f64b2`, + doc fix | CLEAN; 1 Minor (an unreproducible count) fixed. **Found and closed a real title-disclosure hole.** |
 
-**Gate at `0c74fde`, re-run by the executor rather than taken from any agent's report:** exit 0, 21/21,
-**0 cached**, **1400 tests** — domain 320 · rule-engine 280 · **server 559** · app-core 130 · editor 72
-· ui 31 · sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**. Sum re-added in the same
-run rather than eyeballed: 7 packages, 1400, matches.
+**Gate re-run by the executor rather than taken from any agent's report:** exit 0, 21/21, **0 cached**,
+**1430 tests** — domain 320 · rule-engine 280 · **server 589** · app-core 130 · editor 72 · ui 31 ·
+sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**. Sum re-added by script in the same
+run rather than eyeballed: 7 packages, 1430, matches.
 
 ### THE CONTROLLER SHOULD SEE THIS BEFORE MERGING — recorded in the coordination doc, not escalated
 
@@ -193,11 +194,35 @@ tokens** — the plan text says otherwise.
 `{ pool, auth }` deps shape was NOT adopted — **the branch convention is preHandler-by-parameter and
 Tasks 9-15 should follow T8, not the plan.**
 
-**NEXT: Plan 5 Task 9** — `GET /v1/projects/:projectId/tickets`, the list read, plan line 2657.
-**`makeRequireSession` is still wrong at plan lines 2956, 3442, 3774, 4009, 4369, 4865 and 5915 —
-seven sites, none of them marked.**
+### WHAT TASK 9 FOUND — a disclosure the plan text would have shipped
 
-Then T9b (3183, FLOOR-LIST) · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (3638) · T11 (3874) · T12 (4079) ·
+**The plan's `epicAncestors`/`epicTitles` CTE carried no visibility and no tenancy clause.** A group's
+key is a ticket id and **its LABEL is that ticket's title** — so the walk would hand a caller who may
+see a child the *title of an ancestor they may not see*. Reachable rather than theoretical: a child
+authors its own audience and stops inheriting. Closed by putting `visibleTicketsWhere` into **both**
+CTE terms and stopping at an invisible link (`no-epic`). Forcing that predicate to `TRUE` puts
+"Confidential programme" back as a group label — and the reviewer isolated that mutation to the epic
+walk alone, confirming it is enforced there and not merely inherited from the page query.
+
+**And a flake the implementer wrote, then caught, and that generalises to this whole branch:**
+**`newUlid()` is NOT monotonic within a millisecond** — the low 80 bits are random. A cursor
+expectation derived from seeded order passed about half the time, and when it passed it sometimes
+passed **vacuously** (the derived expectation collapsed to `[]`). **Any assertion on this branch that
+assumes mint order equals id order is a coin flip.** Fixed here by computing the cursor from the ids;
+the implementer's own guess is that other seeded-order assumptions exist elsewhere on the branch.
+
+**The Minor, fixed, and it is the recurring class:** the catalogue said removing `ORDER BY` "reddens
+seven cases." The reviewer re-ran it four times: 15, 18, 4, 15 — never 7. A query with no `ORDER BY`
+has **no ordering guarantee**, so which assertions redden is a planner detail. 7.81 now states the
+reproducible claim ("it reddens *something* here") and says explicitly that a count is not a fact about
+this suite. **A number measured once is not a measurement.**
+
+**NEXT: Plan 5 Task 9b** — builder read and migration surface, plan line 3183. **FLOOR-LIST: opus
+implementer AND opus reviewer.**
+**`makeRequireSession` is still wrong at plan lines 3442, 3774, 4009, 4369, 4865 and 5915 — six sites
+left, none marked.**
+
+Then T10 (3638) · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (3638) · T11 (3874) · T12 (4079) ·
 T13 (4551) · **T14 (4918, FLOOR-LIST)** · **T15 (5452, FLOOR-LIST)** · T16 (6047).
 
 ### WHAT T5 COST AND WHAT IT BOUGHT — read before dispatching any later floor-list task
