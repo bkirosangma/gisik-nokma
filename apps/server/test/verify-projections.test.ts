@@ -45,13 +45,45 @@ beforeAll(async () => {
     projections: buildProjectionRegistry(),
   });
   const home = submittedWorkspaceCreated();
+  // Hoisted out of the batch because the ticket seed below needs its id: a
+  // ticket type binds to a workflow BY ID, and `submittedTicketTypeDefined`'s
+  // own binding (`wf-basic`) names no workflow this seed publishes — a ticket of
+  // that type would be refused `ticket.workflow-undefined`, which is a true
+  // refusal about a seed and would have looked like a defect in the context.
+  const workflow = submittedWorkflowDefined(home.workspaceId);
+  const workflowId = (workflow.payload as { id: string }).id;
+  const project = newUlid();
+  const parentTicket = newUlid();
+  const childTicket = newUlid();
+  const ticketType = (id: string, rank: number): SubmittedEvent => ({
+    id: newUlid(),
+    workspaceId: home.workspaceId,
+    entity: { kind: 'ticket-type', id: newUlid() },
+    type: 'ticket-type.defined',
+    version: 1,
+    payload: { id, name: id, icon: 'check', rank, workflowId, fields: [] },
+    actorId: newUlid(),
+    origin: 'web',
+    clientTime: '2026-08-20T09:00:00.000Z',
+  });
+  const createdTicket = (ticketId: string, typeId: string, parentId: string | null): SubmittedEvent => ({
+    id: newUlid(),
+    workspaceId: home.workspaceId,
+    entity: { kind: 'ticket', id: ticketId },
+    type: 'ticket.created',
+    version: 1,
+    payload: { typeId, projectId: project, parentId, title: `Seed ${typeId}` },
+    actorId: newUlid(),
+    origin: 'web',
+    clientTime: '2026-08-20T09:00:00.000Z',
+  });
   const results = await ingest.ingestBatch([
     home,
     submittedWorkspaceCreated(),
     // A workflow, so proj_workflows is compared with a real row in it rather
     // than empty — an empty table diffs clean without proving that live
     // application and ledger re-derivation produce the same jsonb.
-    submittedWorkflowDefined(home.workspaceId),
+    workflow,
     // A CONTEST, so proj_contested is compared with a real row in it rather than
     // empty — same reason as the workflow above, and sharper: `original_event`
     // is the repo's FIRST jsonb projection column. The registry contract forbids
@@ -72,6 +104,32 @@ beforeAll(async () => {
     // INSERT and the shadow-schema rebuild must agree through EXCEPT in both
     // directions on more than a scalar.
     submittedTicketTypeDefined(home.workspaceId),
+    // A PARENT AND A CHILD, so proj_tickets and proj_rollups are compared with
+    // real rows in them rather than empty (Plan 3 Chain B Task 12 — the two
+    // notes below used to say this file could not do it, and named the wiring
+    // that had to land first). proj_tickets carries THREE jsonb columns and the
+    // title claim fills one of them on creation; the transition fills the second
+    // with a log entry, so the live INSERT and the shadow rebuild have to agree
+    // through EXCEPT in both directions on more than a scalar.
+    //
+    // The child is what makes proj_rollups non-empty at all: it stores one row
+    // per PARENT, so a ticket at project root leaves the table empty and adding
+    // it to the list below would have been the check that cannot pass.
+    ticketType('saga', 2),
+    ticketType('chore', 3),
+    createdTicket(parentTicket, 'saga', null),
+    createdTicket(childTicket, 'chore', parentTicket),
+    {
+      id: newUlid(),
+      workspaceId: home.workspaceId,
+      entity: { kind: 'ticket', id: childTicket },
+      type: 'ticket.transitioned',
+      version: 1,
+      payload: { to: 'done' },
+      actorId: newUlid(),
+      origin: 'web',
+      clientTime: '2026-08-20T09:00:00.000Z',
+    },
   ]);
   if (results.some((result) => result.status !== 'committed')) {
     throw new Error('seeding failed — verifier tests need an honest baseline');
@@ -96,25 +154,16 @@ describe('verifyProjections', () => {
     // trusted: if a seed ever stops committing, the verdict below stops meaning
     // anything, and THIS is what says so, naming the table.
     //
-    // proj_tickets is NOT on this list and is knowingly EMPTY here, which the
-    // clean verdict below therefore proves nothing about. It cannot be seeded
-    // through this file's door: a real `ticket.created` needs
-    // `ctx.getTicketTypeDef` to resolve, and `createEngineContext` answers null
-    // for it until Plan 3 Task 12, so ingest refuses every ticket with
-    // `ticket.unknown-type`. Hand-inserting a row would be seeding a shape
-    // ingest never produced. Task 10 gave that table its own projection-outer
-    // rebuild-and-diff over the LIVE tables instead
-    // (`test/proj-tickets.test.ts`), which is the stricter instrument for it;
-    // TASK 12 SHOULD ADD `proj_tickets` HERE once a ticket can be ingested.
+    // proj_tickets and proj_rollups JOINED THIS LIST in Plan 3 Chain B Task 12,
+    // which is the task the two notes that stood here named. They said this file
+    // could not seed a ticket — a real `ticket.created` needs
+    // `ctx.getTicketTypeDef` to resolve and `createEngineContext` answered null
+    // for every type — and that proj_rollups must not be added before a seeded
+    // ticket HAD A PARENT, because it stores one row per parent and a ticket at
+    // project root leaves it empty. Both conditions are met above: the context
+    // reads proj_ticket_types now, and the seed is a parent with one child.
     //
-    // proj_rollups (Task 11) is empty here for the STRICTER version of the same
-    // reason and must not be added before proj_tickets is: it counts children
-    // out of proj_tickets, so it stays empty even if a childless ticket could
-    // be ingested. TASK 12 SHOULD ADD IT HERE TOO, and only once the seed
-    // creates a ticket WITH A PARENT — a ticket at project root leaves this
-    // table empty and the assertion would be the check that cannot pass.
-    //
-    // Empty HERE is not the same as unverified. `test/proj-visibility.test.ts`
+    // `test/proj-visibility.test.ts` also
     // plants a ledger by hand — its definitions in `beforeAll`, so they are in
     // force for the creations that follow — rebuilds every projection and runs
     // THIS verifier over it, which is where proj_tickets' three jsonb columns
@@ -126,6 +175,8 @@ describe('verifyProjections', () => {
       'proj_workflows',
       'proj_contested',
       'proj_ticket_types',
+      'proj_tickets',
+      'proj_rollups',
     ]) {
       const { rows } = await db.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`);
       expect(
