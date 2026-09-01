@@ -821,6 +821,21 @@ describe('GET /v1/workspaces/:workspaceId/invites — the pending list (case 6.4
       expiresAt: pending.expiresAt,
     });
 
+    // NEWEST FIRST, and asserted rather than assumed — the mutation sweep found
+    // this ordering unpinned (`DESC` → `ASC` killed nothing) and this is the
+    // assertion that closes it. An invite-mint screen listing oldest-first
+    // shows an admin the invitation they are least likely to be looking for.
+    const later = await mintOk(owner, workspaceId, { address: 'later@example.com' });
+    const listed = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/invites`,
+      headers: owner.headers,
+    });
+    expect((listed.json() as { invites: Array<{ inviteId: string }> }).invites.map((row) => row.inviteId)).toEqual([
+      later.inviteId,
+      pending.inviteId,
+    ]);
+
     // A read must never become an issuance. Asserted against the whole body,
     // and against ALL THREE tokens, because the leak worth catching is a list
     // that re-serves a credential for an invitation the reader did not mint.
