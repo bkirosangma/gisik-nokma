@@ -947,6 +947,71 @@ Plan 2 T12 declare `apps/server/migrations/<timestamp>_*.sql` **literally**. Res
 > the direction nobody questions. Caught only by opening the task's own `Files:` block by hand.
 > **When a mapping instrument reports NOTHING for a row, read the row before believing it.**
 
+## THE AUDIT IS BIGGER THAN RULING A SCOPED IT — owner widened it 2026-09-02
+
+**Owner: "schedule the audit of those 5 claimed rows too."** Measuring those five led straight into a
+much larger finding, so the scope below supersedes the 28-row plan without replacing it.
+
+### 1. The other five `claimed` rows — 4 promotable, 1 is REAL UNFINISHED WORK
+
+| row | verdict |
+|---|---|
+| 03/T1 | `b0fda11` — artefact `packages/domain/src/ticket-types.ts`. PR #13 |
+| 03/T2 | `3aec0a0` — artefact `events/ticket-events.ts`, `testing.ts`. PR #13 |
+| 06/T9 | `c93c910` — artefacts `views/board.tsx`, `use-live-query.ts`, `rollup-text.ts`. **= #43's merge sha** |
+| 07/T4 | `a3746fb` — artefacts `extensions/mention.ts`, `mention-popup.ts`. **= #47's merge sha** |
+| **11/T6** | **NOT PROMOTABLE. `docker-compose.dev.yml` was NEVER ADDED to `main`.** The row's own note said so — *"landed the env-contract gate SLICE only; dev stack + five services unverified"* — and the artefact test confirms it independently. **This row should move `claimed` → `todo`, not → `done`.** It is the only place in the ledger where a `claimed` row was hiding work that genuinely did not ship. |
+
+### 2. MY MERGE-STYLE DISCRIMINATOR WAS WRONG, and I published it before testing it
+
+I wrote that "0 of N branch commits on `main`" means **squash-merged**. **False.** A rebase-merge that
+actually replays commits *rewrites their shas*, so it also reports 0/N. #3 and #4 reported 28/28 and
+22/22 only because those rebases were fast-forwards. **PR #13 reports 0/4 and was rebase-merged** — its
+artefacts are on `main` as `b0fda11`/`3aec0a0`, and its recorded merge sha `f363b2f` is a docs commit,
+the same last-commit-of-chain pattern as #3/#4.
+**The reliable instrument is `gh api repos/<o>/<r>/commits/<sha>/pulls`**, which names the PR a commit
+belongs to regardless of merge style. Use it; do not infer merge style from ancestry counts.
+**And the rule that actually generalises, stated once:** *the commit that introduced this task's declared
+artefact to `main`, confirmed to belong to this task's PR.* For a squash that commit IS the merge sha;
+for a rebase it is a distinct commit. Both are the same rule.
+
+### 3. THE LEDGER UNDERSTATES REALITY, AND THE GATE HAS BEEN PRINTING THE PROOF ALL ALONG
+
+**Swept all 118 `todo` rows with the artefact test. 17 have EVERY declared artefact already on `main`,
+1 is partial, 92 are genuinely absent, 8 declare no artefact and cannot be tested this way.**
+
+    plan 04 T1, T2, T3        plan 06 T1, T2, T3, T4        plan 07 T1, T2, T3, T16
+    plan 10 T1, T2, T3, T8, T18                             plan 11 T14
+    partial: plan 07 T11a (1 of 2 artefacts present)
+
+**The owner asked "what are Plan 4's 3 remaining tasks and why are they left." They are not left.**
+T1 landed as `06e5061` (PR **#20**), T2 as `31df85b` (PR **#30**), T3 as `ef410ea` (PR **#22**). All
+three are recorded `todo` with no PR cited.
+
+**And this is the part that indicts the process, not the data: `check:tasks` already prints #20, #22 and
+#30 in its unattributed-merged-PR list, on every single run, directly below the 14.7% figure.** The
+script header even names this as the direction that catches work landing unrecorded. The instrument
+worked. **Nobody read the half of its output that was not a number.** Every session that quoted 14.7%
+— including this one, repeatedly — printed the evidence of its own understatement in the same command.
+
+### 4. THE HONEST PROJECTION, AND WHY IT IS NOT A PROMISE
+
+26 done today · +28 (Plans 1–2) · +4 (03/T1, 03/T2, 06/T9, 07/T4) · +17 (todo rows with artefacts on
+main) = **~75/177 ≈ 42%**, before step 9 merges. Minus 11/T6, which moves the other way.
+
+**Do not quote 42% until each row is confirmed individually.** *"An artefact is on `main`"* is WEAKER
+than *"the task is complete"*: a file can be created by a neighbouring task, pulled forward, or landed
+as a scaffold with the task's real behaviour still unwritten — `docToPlainText` is the proven precedent,
+shipped early by #8 and still carrying an unbounded-recursion defect T1 had to fix. The 17 are
+**candidates**, on exactly the footing the 28 were before they were checked one at a time.
+
+> **THE COINCIDENCE MUST BE STATED, NOT QUIETLY ENJOYED.** The old discredited figure was **"~43%"**,
+> and this file dismissed it for folding `done`, `claimed` and `in-flight` together without evidence.
+> The evidence-based sweep lands at **~42%**. **That does NOT vindicate the old method** — it reached a
+> near-identical number by over-counting unverified claims, which is a different error that happened to
+> cancel out. Two roads to the same place, one of them still wrong. Recorded because the temptation to
+> read this as "we were right all along" is exactly the kind of thing this file exists to refuse.
+
 ### WHAT REMAINS TO DO AT THE STEP-9 BOUNDARY — mechanical, the thinking is done
 
 1. Apply the 28 rows to `task-ledger.tsv`: status `claimed` → `done`, `merge_sha` → **the per-task commit
@@ -954,7 +1019,10 @@ Plan 2 T12 declare `apps/server/migrations/<timestamp>_*.sql` **literally**. Res
 2. Rewrite `check-task-ledger.mjs`'s header: the `done` definition now admits range-internal artefact
    evidence, **and** the *"This repo squash-merges"* rationale is corrected — false of #3 and #4.
 3. Correct this file's own `done` definition at the ledger section (line ~142) to match.
-4. Re-run `pnpm check:tasks` and quote it. Expect **54 done**, 5 claimed, 118 todo of 177 ≈ **30.5%**.
+4. **Then the widened scope above**: the 4 further claimed rows, `11/T6` demoted to `todo`, and the 17
+   todo candidates confirmed ONE AT A TIME before any is promoted.
+5. Re-run `pnpm check:tasks` and quote it — **and read the unattributed-PR list underneath it, which is
+   the half of that output this project has never once read.**
 
 ## Pending owner decisions
 
