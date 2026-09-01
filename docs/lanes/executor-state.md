@@ -83,6 +83,62 @@ satisfies the requirement the `json` ban is about, and the instrument was proven
 | CSRF anchor line | **`sign-in-flows.test.ts:148` on `main @ 91df593`**, content confirmed: `expect(attributes).toEqual(['Max-Age=604800', 'Path=/', 'HttpOnly', 'SameSite=Lax']);` — re-verified on main, not merely on the stale branch, because T5 item 3 anchors a sentence to a line and line numbers drift across a rebase-merge | `awk` over the blob at `origin/main` |
 | `docs/` affects the gate | **NO.** `turbo.json` declares no `inputs`, and `docs/` sits outside every package, so a docs-only merge cannot move gate composition. **PRs #48 and #49 were both docs-only** — do not re-run a gate to "check" them | read `turbo.json` |
 
+## OPEN ESCALATION — the controller session ENDED before this could be delivered
+
+**`gisik-nokma-8d` became unreachable mid-step-7.** This was written as a message, could not be sent,
+and is recorded here instead. **A successor controller must read this before merging step 7's PR.**
+
+### Ruling P23 was applied as DELETE, not as NARROW, and its footprint is wider than the ruling named
+
+The ruling said the member-side per-event purge **must be gated**, naming case **6.101**. The
+implementing agent **deleted the per-event subtree walk entirely**, and flagged the interpretation
+against its own work as its least-sure claim.
+
+**Its derivation, which I judge sound:** a purge may only name an entity the recipient could previously
+see; the module **cannot ask** that question (`proj_visibility` keeps no prior audience, no payload
+carries a before-image); and it **may not reconstruct** the answer (cases 6.82/6.94, the
+second-definition ban). Those three together leave **no conforming per-event emission at all**, so
+nothing survives to gate.
+
+**What it cost beyond 6.101, which is the part needing a controller's eye:**
+* four test blocks deleted; cases **6.90** and **6.99** flipped ✅ → 🚫;
+* **per-event tombstones removed for MEMBERS AS WELL AS GUESTS** — recorded as **6.104**, sibling of
+  6.102, **owner Plan 10**, phrased as an absence.
+
+So the under-purge residual accepted for one case now applies to **all** per-event triggers, and the
+retention half of a gap Plan 10 must close got **harder**, not easier.
+
+**A narrower gate was considered and declined, and this is the load-bearing judgement:** gating the purge
+on the viewer being **on the ticket's project** has a far smaller blast radius, and was refused because
+*being on a container is not holding the entity* — it fails the ruling's own **relationship** axis and
+leaves the same disclosure at a smaller radius, which is exactly what the ruling rejected for guests.
+**I agree with that refusal.**
+
+**REVERSAL IS CHEAP AND EXACT IF A CONTROLLER DISAGREES:** the agent's mutation 1 — re-adding the deleted
+walk — is the precise restoration diff, and it reddens both 6.101 cases and nothing else.
+
+### And the signature defect appeared inside the fix for it
+
+The agent's own mutation sweep **falsified two sentences it had already committed**, and it corrected
+them in place rather than dropping them. The surviving consequence: **case 6.100 now passes for a reason
+its own name does not describe** — it is held by the `canSee` guard that case 6.16 already pins, not by
+anything purge-shaped. Stated on the case and in the test comment, with a warning **not to cite 6.100 as
+evidence that a purge gate exists.**
+
+### A rule of this project was misapplied, and the correction belongs with it
+
+*"Nothing may be chained after the gate"* was read as forbidding `$?` capture, so that agent **inferred**
+exit 0 from four secondary facts. **The rule is about a trailing command in the same pipeline stealing
+the status.** Reading `$?` on the next line is the correct practice:
+
+```
+pnpm turbo run build test typecheck --force > gate.log 2>&1
+GATE_EXIT=$?
+```
+
+**An inferred exit code is a self-inflicted downgrade from a read one.** Re-run here with a captured
+exit: **TURBO_EXIT=0, 21/21, 1161 tests, zero `Unsupported engine` WARNs, durations in seconds.**
+
 ## Where I am in the serial sequence
 
 **PHASE 0 + STEPS 4, 5, 6 MERGED.** #51 `45c83eb` · #52 `40c5219` · #53 `33538be` · then controller
