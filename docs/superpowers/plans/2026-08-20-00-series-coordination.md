@@ -5183,3 +5183,52 @@ reasons from is worse than a missing one.
 **And note the guest side had already been gated for this exact reason.** The member side inherited the
 same blind spot at a smaller radius and kept it, because the radius made the argument feel different when
 the structure was identical.
+
+---
+
+## Three sweeps of one question, three different answers — and the middle one nearly won (2026-09-01)
+
+Sweeping Plan 4 Task 14 for whether its text addresses invite-token **lifetime**:
+
+| pass | method | result | verdict |
+|---|---|---|---|
+| 1 | `expiry`, `expire`, `single-use`, `reuse` — my vocabulary | all **0** | BLIND |
+| 2 | plus `ttl`, `consumed`, `one-time` — the author's likely vocabulary | **`ttl` = 4** | *"sighted, my first pass was over-specific"* |
+| 3 | same terms, **word boundaries**, with `invite` = 37 as control | `ttl` **0** | **BLIND — pass 1 was right** |
+
+**Pass 2's four hits were the letters `ttl` inside the word `SETTLED`.** `se`**`TTL`**`ed`. The count was
+real, the substring was really there, and the sentence built on it — *"T14 addresses token TTL"* — was
+false. **It would have retired a genuine finding, and it arrived wearing the authority of a
+self-correction**, which is the part that makes it dangerous: pass 2 felt like the standing rule
+*"search in the author's vocabulary"* working, and rules that have just been validated are the ones
+least likely to be re-checked.
+
+### This is the wrong-subject class again, at the token level
+
+`awk 'index($0,"ttl")'` truthfully answered **"which lines contain those three characters anywhere"**.
+It was read as **"which lines mention TTL"**. Same shape as `merge-tree`, `@{u}`, `pnpm exec` and
+`git checkout --`: a real instrument, a true answer, a narrower subject than the sentence.
+
+**Instance five, and the first where the two subjects differ only by tokenisation** — which is why the
+usual corrective (name the subject) is not enough on its own here. The subject *sounds* identical:
+"lines mentioning ttl". The difference lives entirely in what counts as a mention.
+
+### The rules
+
+1. **A substring search is not a word search.** For any short term — three or four letters, or one that
+   is a common fragment — use a boundary-anchored pattern:
+   `$0 ~ "(^|[^a-zA-Z])" t "([^a-zA-Z]|$)"`. `ttl`, `id`, `key`, `arg`, `sec`, `env`, `run` are all
+   fragments of ordinary English or of each other.
+2. **A hit is not the end of a sweep — READ THE ROW.** This is now recorded twice, and both times the
+   count was real and the rows disagreed with it. Pass 2's rows were about *settled owner decisions* and
+   had nothing to do with tokens.
+3. **A self-correction gets the same scrutiny as the claim it corrects.** Pass 2 reversed a finding and
+   was believed *because* it looked like a rule being applied. **A correction is a new claim, with its
+   own instrument, and it needs its own control.**
+
+**The finding that survives:** Plan 4 Task 14's text says the invite token is a credential that never
+enters the ledger, and that `invite_tokens` is a server-owned table deliberately excluded from
+`reset()` — both good and both about *storage*. It says nothing about **expiry**, **single-use**, or
+**consumption on acceptance**. An invite token with neither is a **durable, replayable credential**:
+anyone who ever sees the link joins at the granted role, repeatedly, forever. **Carried into batch 4's
+dispatch in writing, because the plan text will not raise it.**

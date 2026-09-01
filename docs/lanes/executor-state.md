@@ -19,8 +19,8 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/10-t4-origin-closer`**, cut from `origin/main` at `40c5219`. Step 6 done, reviewed, Minors fixed. PR for the controller | `git log`, `git rev-parse` |
-| `main` | **`40c5219`** (PR #52, step 5). Verified by presence: `can-see.ts`, `visible-tickets.ts`, `proj-visibility.ts` all on it; `index.ts` registers FOUR projections | `git cat-file -e`, `git show` |
+| Branch in flight | **`exec/04-t8-t14-enforcement`**, cut from `origin/main` at `33538be`. Step 7 (Plan 4 T8–T14) in progress | `git log`, `git rev-parse` |
+| `main` | **`1003d8d`** per the controller (#55 merged). **REFETCH AND RE-VERIFY BY PRESENCE** before trusting it — main has moved under this file three times today | `git fetch`, `git cat-file -e` |
 | `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
 | Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, and every pre-squash sha of the Phase 0 branches | `git branch --contains`, empty = orphaned |
@@ -85,65 +85,64 @@ satisfies the requirement the `json` ban is about, and the instrument was proven
 
 ## Where I am in the serial sequence
 
-**PHASE 0 COMPLETE. STEPS 4 AND 5 MERGED** (#51 `45c83eb`, #52 `40c5219` — 1032 tests on `main`).
+**PHASE 0 + STEPS 4, 5, 6 MERGED.** #51 `45c83eb` · #52 `40c5219` · #53 `33538be` · then controller
+doc PRs. **STEP 7 (Plan 4 T8–T14) IS IN PROGRESS** on `exec/04-t8-t14-enforcement`. **NO PR YET.**
 
-**STEP 6 IS COMPLETE AND AWAITING MERGE** on `exec/10-t4-origin-closer`. **STEP 7 — Plan 4 T8–T14
-(T11 and T14 floor-list) — IS NEXT** per the dispatch brief, and nothing is in flight.
+### Step 7 batches — DONE and REMAINING. Count them; I miscounted this once.
 
-### Step 6 — the lifted Plan 10 T4. THE §11 WINDOW IS CLOSED.
+| batch | tasks | state |
+|---|---|---|
+| 1 | **T8, T9** | **DONE.** Zero review findings each |
+| 2 | **T10, T11** | **DONE.** T10 zero findings; T11 floor-list found a **Critical**, fixed |
+| 3 | **6.101 gating + T12 + T13** | **IN FLIGHT** at the time of writing |
+| 4 | **T14** (floor-list) | **NOT STARTED** |
 
-`proj_contested` (registered **5th**, not 8th — only four projections were live), `getContest`
-(additive only; **P18 untouched**), `GET /v1/contests`, and **the §11 envelope-coherence closer**.
+**T14 IS ALL THAT REMAINS after batch 3.** Then step 7's PR.
 
-**Verified by EXECUTION through both doors, not by reading the check.** A contest whose outer envelope
-is honest — a real ticket in its real workspace, so `ENTITY_WORKSPACE_MISMATCH_RULE` has nothing to
-catch — and whose embedded `payload.originalEvent` names a different ticket, and separately a different
-workspace, is refused `contest.incoherent-original` with **0 rows in `events`**, through
-`ingestBatch` AND through a real `POST /v1/events`.
+### What batches 1–2 landed, and the two rulings that came out of them
 
-**The binding is three comparisons**: `workspaceId`, `entity.kind`, `entity.id`. One rule id with
-**three distinct reasons**, so deleting one comparison reddens a different test than deleting another
-(ruling P20 applied deliberately).
+* **T8** — read enforcement: an invisible ticket reads as a 404 **indistinguishable from nonexistent**;
+  restricted-parent placeholder; provenance unredacted. **And it CLOSED Ruling P22** by branding
+  `EffectiveRole` with a module-private `unique symbol`. **Verified independently here, not taken from
+  the review:** a hand-built one fails with `TS2741: Property '[RESOLVED]' is missing`.
+* **T9** — visibility-dependent ingest permissions; `proj_projects` **INSERTED** at its §8 position (six
+  projections now). Its plan text would have **reopened the step-4 escalation** — Step 3's sample rebuilt
+  the permission context omitting `workspaceExists`.
+* **T10** — rollup honesty. Its implementer **died mid-report to machine sleep**; its work was coherent
+  and was recovered rather than re-run, and its reviewer was told it was the **only** check.
+* **T11** — `visibleEventsFor`. **Floor-list review found a Critical**: the purge walk sat outside the
+  `canSee` branch, so any `visibility.set` yielded `purge:<id>` to every member AND guest, naming tickets
+  they never held. Gated. **Ruling P23 resolved on branch one** — the member-side *per-event* purge is
+  gated too; the *scope-wide* purge at the revocation boundary **stands** (Features.md had already
+  shipped that rule); prior audience is **not** reconstructed (6.82/6.94 ban).
 
-### THE FINDING THAT SHAPED THIS STEP, and it generalises to every remaining lifted item
+### TWO INFRASTRUCTURE FACTS THAT MAKE A GATE RESULT MEANINGLESS — read before believing any red or green
 
-**T4's own plan text does not mention the window it was lifted to close.** Swept its range
-(1300–1810) for `coheren`, `binds`, `embedded`, `outer envelope`, `envelope-origin`, `§11` — **zero for
-every one**, with `projection` at 30 as the positive control. The assignment lives in the coordination
-doc and in `contests.ts`'s own docblock. **So the closer is named where a reader of the EVALUATOR looks
-and absent where a reader of the TASK looks** — an implementer following the plan faithfully ships the
-projection, the lookup and the route, and leaves the window open.
+1. **`pmset` sleep is ONE MINUTE.** A suspended run reports failures with **multi-hundred-second
+   durations** and 30,000ms hook timeouts. **A test that "fails" in 900 seconds has not failed — it was
+   interrupted.** This produced a completely false RED on this branch; the same tree ran **327/327 in
+   5.5 seconds** with a hold asserted. **A fan-out died to this: 2.9 hours, 871,598 subagent tokens,
+   ZERO agents completed** — while its first agent had produced a complete, gate-clean commit.
+   **ASSERT `caffeinate -i -t <seconds covering the whole run>` BEFORE ANY FAN-OUT and check
+   `pmset -g assertions` shows it.** Do NOT edit `pmset` — that is the owner's configuration.
+2. **If `WARN Unsupported engine` appears anywhere in gate output, the run is VOID.** Measured with
+   controls: `pnpm run` **warns** under v24, `pnpm exec` is **silent**, v22 is silent. Every gate uses
+   `pnpm run`. So the gate is **not unguarded — only unread.**
 
-**Lifting a task changes WHEN it runs, not WHAT ITS TEXT SAYS.** Before dispatching any remaining lifted
-or re-sequenced item, **sweep its own range for the thing it was moved to do**; if the terms are absent,
-the dispatch must carry the obligation, because the plan text will not.
+### BATCH 4 — T14 (Invites). FLOOR-LIST: opus implementer AND opus reviewer.
 
-### Also settled here: the sonnet reviewer default is CONDITIONAL
+Plan text at **line 5244**. Two obligations its own text does NOT carry:
 
-The cost table reads *"Per-task reviewers **where the plan text is complete** | sonnet"*. That row
-carries its own precondition and it is checkable in one command. It was **false** here. So the opus
-reviewer was **not opus-by-exception** — it was the sonnet row not covering the case. Sweep the task's
-range before defaulting a reviewer to sonnet.
-
-### Review outcome: 4 Minor, 1 Nit. No Critical, no Important — so no fix round was required.
-
-Three Minors were fixed anyway, because each was **a surface or a sentence that lies**:
-1. `GET /v1/contests` admitted `open=false` in its enum while the handler had no `else` — a caller
-   asking for settled contests got **everything**, with a 200 and no signal. Narrowed to `['true']`
-   (a loud 400) rather than inventing a `resolved` filter this task's contract does not define.
-   **Mutation-proven: reverting the enum reddens exactly the new test.**
-2. The catalogue's ids are grouped **by surface, not by number**, so the largest is not the last line and
-   an author scanning the tail would mint a duplicate. The maximum is now stated — and **it went stale
-   within minutes** when three gaps were appended below it, so it carries an instruction to recount.
-3. 12.82 expands what the coherence check leaves free (finding 3), per P19 — never let a category look closed.
-
-### The carried gaps — TEN now, none folded in, all with owners
-
-**P18** membership wiring 6.50 (step-10) · **P19** guest admissions 6.51 (T9) · 6.52, 6.53 (T13) ·
-6.57 (Plan 3 → T8) · **P22** `EffectiveRole` provenance 6.64 (T8) · 6.65 SQL mode-side (T8) ·
-**12.82** unbound `actorId` → `claimant_id`, unvalidated `type`/`payload` → permanent comment body ·
-**12.83** UNIQUE index with no lookup — **rejects a whole batch**, losing answers of events that already
-committed · **12.84** `entity.kind` binding has no door test though its path is live. Last three: T7.
+1. **FIVE purge triggers, not three** — `visibility.set`, `ticket.reparented`, the inheriting subtree
+   under either, `project.member_removed`, `membership.revoked`. The earlier brief said three; T11 found
+   two more, one of which was **unreachable in the plan's own code**.
+2. **THE TOKEN HAS NO LIFETIME AND NO SINGLE-USE SEMANTICS IN THE PLAN TEXT.** Established with a
+   **word-boundary** sweep and `invite`=37 as control: `ttl` 0, `expire` 0, `expiry` 0, `single-use` 0,
+   `one-time` 0. The text says the token is a credential that never enters the ledger and that
+   `invite_tokens` is deliberately excluded from `reset()` — both about **storage**, neither about
+   **lifetime**. **An invite token with no expiry and no single-use guard is a durable, replayable
+   credential**: anyone who ever sees the link joins at the granted role, repeatedly, forever.
+   **BEWARE: a naive `ttl` substring sweep returns 4 — they are the letters inside `SETTLED`.**
 
 ## What step 2 actually contained
 
