@@ -40,6 +40,9 @@ const GRANDCHILD = '01J9GCHB000000000000000000';
 const SIBLING_PARENT = '01J9GSBP000000000000000000';
 const FOREIGN_PARENT = '01J9GFPA000000000000000000';
 const NEWBORN = '01J9GNEW000000000000000000';
+// A ticket id nothing ever creates. The door cases below apply events AGAINST
+// it, so it must never appear in proj_tickets.
+const GHOST = '01J9GGHO000000000000000000';
 const ACTOR = '01J9GACT000000000000000000';
 
 // Workflow ids are ENTITY ULIDs, and the payload's `id` is the same value — the
@@ -113,6 +116,26 @@ const WF_BASIC_V2_DROPS_DOING = workflowDefined(WS, WF_BASIC, {
     { from: '*', to: 'done', rules: [] },
   ],
   stateMapping: { doing: 'todo' },
+});
+
+/**
+ * v3 drops To do in turn and maps everyone standing in it to Triage — the
+ * SECOND link of a version chain, so a ticket still sitting at v1 has to be
+ * walked doing → todo → triage rather than mapped once.
+ */
+const WF_BASIC_V3_DROPS_TODO = workflowDefined(WS, WF_BASIC, {
+  version: 3,
+  name: 'Basic',
+  initialStateId: 'triage',
+  states: [
+    { id: 'triage', name: 'Triage', category: 'open' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [
+    { from: '*', to: 'triage', rules: [] },
+    { from: '*', to: 'done', rules: [] },
+  ],
+  stateMapping: { todo: 'triage' },
 });
 
 /**
@@ -439,17 +462,151 @@ describe('proj_tickets', () => {
     });
   });
 
+  /**
+   * ## THE REFUSAL REGISTERING THIS TABLE MADE REACHABLE, and why the skip is
+   * BY NAME
+   *
+   * `evaluateEvent` has no case for `ticket.assigned`, either collaborator
+   * event, `comment.added` or `attachment.added`, so all five fall through to
+   * `{ refused: false }` with **no existence check** and the server commits
+   * them against a ticket that was never created —
+   * `test/permissions/check-role-permission.test.ts` ingests two such
+   * `ticket.assigned` events today and both are COMMITTED. The reducer throws
+   * on any non-`ticket.created` event for a ticket it has not seen, and is
+   * right to; but with this projection registered that throw happens inside the
+   * ingest transaction, which turns a submission the product accepts into a 500
+   * and leaves the table unrebuildable from a ledger the product itself wrote.
+   *
+   * So the skip is by NAME, against what the door actually covers — and that is
+   * a claim about the SET, not about the symptom. This case constrains the set
+   * in both directions, which is what makes it a fact rather than a
+   * description:
+   *
+   *   the five the door leaves open → SKIPPED, and skipped means no row written
+   *   the four the door guards      → the reducer's throw survives
+   *   any of the five on a ticket that EXISTS → still folded (the control that
+   *                                            says the skip is the missing
+   *                                            ticket, not the projection
+   *                                            ignoring assignments)
+   *
+   * Measured: replacing the set with the shorter-reading
+   * `event.type !== 'ticket.created'` — which covers the same types today, and
+   * which the whole server suite tolerated before this case existed — turns the
+   * four guarded assertions red. Removing the skip entirely reddens
+   * `check-role-permission.test.ts` instead. Neither mutation is visible
+   * without both halves.
+   */
+  it('an event the door leaves unguarded is skipped for a ticket that never existed, while a door-guarded one still throws', async () => {
+    await applyAll(asLedger(SEED));
+    // One ledger, numbered past SEED, so every event below carries a
+    // workspaceSeq at which the definitions this projection resolves are in
+    // force. A bare `asLedger([draft])` would restart at 1 and resolve nothing.
+    const after = (draft: Draft): LedgerEvent => asLedger([...SEED, draft]).at(-1)!;
+
+    // The door leaves these five with no existence check at all.
+    const unguarded: Draft[] = [
+      ticketEvent(GHOST, 'ticket.assigned', { assigneeId: 'user-anselma' }),
+      ticketEvent(GHOST, 'ticket.collaborator_added', { userId: 'user-kiro' }),
+      ticketEvent(GHOST, 'ticket.collaborator_removed', { userId: 'user-kiro' }),
+      ticketEvent(GHOST, 'comment.added', { body: { text: 'nothing to say' } }),
+      ticketEvent(GHOST, 'attachment.added', {
+        kind: 'upload',
+        attachmentId: newUlid(),
+        filename: 'challan.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 12,
+        sha256: 'a'.repeat(64),
+      }),
+    ];
+    // ...and refuses each of these with `ticket.unknown` before it can reach a
+    // ledger, which is exactly why the reducer's throw stays for them.
+    const guarded: Draft[] = [
+      ticketEvent(GHOST, 'ticket.transitioned', { to: 'done' }),
+      ticketEvent(GHOST, 'ticket.reparented', { newParentId: PARENT }),
+      ticketEvent(GHOST, 'ticket.field_set', { fieldId: 'dueDate', value: { date: '2026-09-30' } }),
+      ticketEvent(GHOST, 'ticket.workflow_rebound', {
+        toWorkflowId: WF_BASIC,
+        toStateId: 'todo',
+      }),
+    ];
+
+    await withClient(async (client) => {
+      for (const draft of unguarded) {
+        await ticketsProjection.apply(after(draft), client);
+        // "Did not throw" is not "wrote nothing" — a skip that inserted a
+        // half-built row would satisfy the first and be the outage.
+        expect(await getTicketStateFromDb(client, WS, GHOST)).toBeNull();
+      }
+
+      for (const draft of guarded) {
+        await expect(ticketsProjection.apply(after(draft), client)).rejects.toThrow(
+          `applyTicketEvent: ${draft.type} for ticket ${GHOST} that was never created`,
+        );
+      }
+
+      // The control. Every one of the five is still FOLDED against a ticket
+      // that exists, so the skip above is the missing ticket and not this
+      // projection quietly ignoring assignments and collaborators.
+      await ticketsProjection.apply(
+        after(ticketEvent(CHILD, 'ticket.assigned', { assigneeId: 'user-anselma' })),
+        client,
+      );
+      await ticketsProjection.apply(
+        after(ticketEvent(CHILD, 'ticket.collaborator_added', { userId: 'user-kiro' })),
+        client,
+      );
+      expect(await getTicketStateFromDb(client, WS, CHILD)).toMatchObject({
+        assigneeId: 'user-anselma',
+        collaboratorIds: ['user-kiro'],
+      });
+      await ticketsProjection.apply(
+        after(ticketEvent(CHILD, 'ticket.collaborator_removed', { userId: 'user-kiro' })),
+        client,
+      );
+      expect((await getTicketStateFromDb(client, WS, CHILD))?.collaboratorIds).toEqual([]);
+      // `comment.added` and `attachment.added` return the state UNCHANGED, so
+      // "folded" for them means the row is still there and still says what it
+      // said — asserted rather than skipped, because the branch that returns
+      // before the row is read has to be identical for a ticket that exists.
+      await ticketsProjection.apply(
+        after(ticketEvent(CHILD, 'comment.added', { body: { text: 'filed' } })),
+        client,
+      );
+      expect(await getTicketStateFromDb(client, WS, CHILD)).toMatchObject({
+        assigneeId: 'user-anselma',
+        stateId: 'todo',
+      });
+    });
+  });
+
   // A ticket pins the workflow it was created under — owner decision 2026-08-26.
 
-  it('re-pointing a type at a different workflow leaves existing tickets on the old one', async () => {
+  it('re-pointing a type at a different workflow leaves existing tickets on the old one, while new tickets of that type get the new one', async () => {
     // ONE ledger, not two: asLedger numbers workspaceSeq from 1 each call, and
     // this projection resolves definitions AS OF that number.
     await applyAll(
-      asLedger([...SEED, WF_OTHER_V1, typeDefined(WS, 'task', 3, WF_OTHER)]),
+      asLedger([
+        ...SEED,
+        WF_OTHER_V1,
+        typeDefined(WS, 'task', 3, WF_OTHER),
+        // Created AFTER the re-point, on the same ledger, so the only thing
+        // that differs between it and CHILD is where in the stream it sits.
+        created(WS, NEWBORN, 'task', null, 'File TDS'),
+      ]),
     );
 
     const state = await getTicketStateFromDb(db.pool, WS, CHILD);
     expect(state).toMatchObject({ workflowId: WF_BASIC, stateId: 'todo', workflowVersion: 1 });
+    // The other half of the owner's decision, and it was previously asserted by
+    // nothing: a re-binding changes what NEW tickets get. Without this, the case
+    // passed equally well against a projection that ignored the binding
+    // entirely, which is the opposite defect from the one above.
+    expect(await getTicketStateFromDb(db.pool, WS, NEWBORN)).toMatchObject({
+      workflowId: WF_OTHER,
+      workflowVersion: 1,
+      stateId: 'intake',
+      stateCategory: 'open',
+    });
     // And the type really did move, or this passes for the wrong reason.
     expect((await getTicketTypeFromDb(db.pool, WS, 'task'))?.workflowId).toBe(WF_OTHER);
   });
@@ -483,6 +640,17 @@ describe('proj_tickets', () => {
     });
     expect((await getTicketStateFromDb(db.pool, WS, GRANDCHILD))?.workflowId).toBe(WF_BASIC);
   });
+
+  // NOTE, so neither case above is read as proving more than it does: both
+  // assert the LIVE path. On a RE-DERIVATION a re-bound type still resolves its
+  // NEW workflow for a ticket the live path bound to the old one — `loadDeps`
+  // reads `proj_ticket_types`, which is last-definition-wins with no history to
+  // ask as-of. That is the plan's Open question 11, scoped out deliberately,
+  // and it is the one place the "pure function of the ledger prefix" claim does
+  // not hold. It is NOT asserted here: the only rebuild case in this file is
+  // also the only one that writes to `events` (see its docstring below), and a
+  // second writer would replay through the first. Recorded UNASSIGNED in
+  // `docs/plan-3-chain-b-handoff.md`; `tickets.ts`' header carries the reasoning.
 
   // Refresh on publish — owner decision 2026-08-26, design decision 10.
 
@@ -526,6 +694,124 @@ describe('proj_tickets', () => {
     expect(state?.transitions).toEqual([
       { toStateId: 'doing', actorId: ACTOR, seq: 2, workflowId: WF_BASIC, workflowVersion: 1 },
     ]);
+  });
+
+  /**
+   * ## A THIRD VERSION, and the measurement that says what the intermediate
+   * cache is for
+   *
+   * `refreshTicketsForWorkflow` fetches every version strictly between the
+   * OLDEST row's and the target's, once for the whole batch, and hands them to
+   * `foldTicketToWorkflowVersion` — which throws "the version chain has a hole"
+   * for any version that supplier cannot produce.
+   *
+   * The reviewer's premise was that a v3 fold is that cache's first exercise.
+   * It is not, and this case is what says so: publishing refuses any version
+   * that is not exactly `latest + 1` (`workflow-defined.ts`), and refresh-on-
+   * publish folds EVERY row on the workflow in the publishing transaction — so
+   * a row is at most one version behind whenever a `workflow.defined` arrives,
+   * `oldest + 1 < target.version` is false, and the loop body never runs. The
+   * assertion after v2's publish is that claim stated as a fact about the rows
+   * rather than as an argument. Measured: neutering the cache to supply nothing
+   * leaves this case green.
+   *
+   * The chain is still real work — `doing` is mapped to `todo` by v2 and `todo`
+   * to `triage` by v3, so the ticket that transitioned under v1 arrives at
+   * `triage` by two mappings applied in order, not by one.
+   */
+  it('a third published version folds every ticket one publish at a time, so no row is ever two versions behind', async () => {
+    const drafts = [
+      ...SEED,
+      ticketEvent(CHILD, 'ticket.transitioned', { to: 'doing' }),
+      WF_BASIC_V2_DROPS_DOING,
+      WF_BASIC_V3_DROPS_TODO,
+    ];
+    const ledger = asLedger(drafts);
+    const v2Publish = ledger[drafts.indexOf(WF_BASIC_V2_DROPS_DOING)]!;
+
+    await withClient(async (client) => {
+      for (const event of ledger) {
+        await workflowsProjection.apply(event, client);
+        await ticketTypesProjection.apply(event, client);
+        await ticketsProjection.apply(event, client);
+        if (event === v2Publish) {
+          // THE REACHABILITY ASSERTION. Every row is already at v2 before v3 is
+          // published, so v3 finds nothing lagging by two. If refresh-on-publish
+          // ever stops folding the whole workflow, this is what goes red — and
+          // the planted case below is what the code does when it does.
+          const versions = (await ticketRows()).map((row) => row['workflow_version']);
+          expect(versions).toEqual([2, 2, 2]);
+        }
+      }
+    });
+
+    // Two mappings applied in order: doing → todo (v2) → triage (v3).
+    expect(await getTicketStateFromDb(db.pool, WS, CHILD)).toMatchObject({
+      stateId: 'triage',
+      stateCategory: 'open',
+      workflowVersion: 3,
+    });
+    // And the two that never moved walked todo → triage through v3 alone.
+    expect(await getTicketStateFromDb(db.pool, WS, PARENT)).toMatchObject({
+      stateId: 'triage',
+      workflowVersion: 3,
+    });
+    // The transition log still says what the actor did, in the vocabulary they
+    // did it in — a fold moves the ticket, never the evidence.
+    expect((await getTicketStateFromDb(db.pool, WS, CHILD))?.transitions).toEqual([
+      { toStateId: 'doing', actorId: ACTOR, seq: 2, workflowId: WF_BASIC, workflowVersion: 1 },
+    ]);
+  });
+
+  /**
+   * ## PLANTED: a row two versions behind, which is the only thing the cache is
+   * for
+   *
+   * The case above proves the door cannot produce a two-version lag, so this
+   * one plants it, in the same idiom as the planted-defect rebuild below:
+   * proj_workflows receives all three publishes and proj_tickets is not handed
+   * v2's. The rows therefore meet v3 still at v1, `oldest + 1 < target.version`
+   * is true for the first time, and the walk needs a definition NEITHER the row
+   * nor the target carries.
+   *
+   * What it pins is the supply, not the arithmetic: making the cache produce
+   * nothing turns this red with `foldTicketToWorkflowVersion: workflow "…"
+   * version 2 is missing — the version chain has a hole`, which is the fold's
+   * own sentence for a gap in the ledger rather than a silently unmapped drop.
+   * Everything else in the file stays green under that mutation, which is
+   * exactly why this case had to exist.
+   */
+  it('planted: a row two versions behind is walked through the intermediate version the cache supplies', async () => {
+    const drafts = [
+      ...SEED,
+      ticketEvent(CHILD, 'ticket.transitioned', { to: 'doing' }),
+      WF_BASIC_V2_DROPS_DOING,
+      WF_BASIC_V3_DROPS_TODO,
+    ];
+    const ledger = asLedger(drafts);
+    const withheld = ledger[drafts.indexOf(WF_BASIC_V2_DROPS_DOING)]!;
+
+    await withClient(async (client) => {
+      for (const event of ledger) {
+        // proj_workflows still stores v2 — the intermediate EXISTS to be
+        // fetched. Only this table is denied the refresh it would have run.
+        await workflowsProjection.apply(event, client);
+        await ticketTypesProjection.apply(event, client);
+        if (event !== withheld) {
+          await ticketsProjection.apply(event, client);
+        }
+      }
+    });
+
+    // doing → todo through the WITHHELD v2, then todo → triage through v3. A
+    // fold that consulted only the target would have nothing to map `doing`
+    // with and would report an unmapped drop instead.
+    expect(await getTicketStateFromDb(db.pool, WS, CHILD)).toMatchObject({
+      stateId: 'triage',
+      stateCategory: 'open',
+      workflowVersion: 3,
+    });
+    expect((await ticketRows()).map((row) => row['workflow_version'])).toEqual([3, 3, 3]);
   });
 
   /**
