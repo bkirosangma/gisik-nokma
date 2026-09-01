@@ -13,6 +13,7 @@ export * from './advise-workflow.js';
 export * from './entity-state.js';
 export * from './ist-day.js';
 export * from './doc-text.js';
+export * from './filter-spec.js';
 export * from './ticket-types.js';
 export * from './events/ticket-events.js';
 export * from './events/membership.js';

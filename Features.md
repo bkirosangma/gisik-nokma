@@ -140,6 +140,10 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 - ⚙️ **The gate names the Node it ran under** — `engines` is declared in the root manifest alone, so pnpm's `WARN Unsupported engine` never fires for a per-package script and an absent warning proved nothing (measured under Node v24: silent). A test inside the run asserts `process.version` against the root manifest's own range, parsed rather than restated, and its failure message names the Node. `apps/server/test/node-version.test.ts`
 - ✅ **The invitation token does not reach the process log** — the token travels in the URL path, because `GET /v1/invites/:token` is the pinned client contract, and Fastify's default `info` request line carries `req.url` verbatim (measured). A `req` serializer redacts that one segment and leaves every other path alone, so log access does not become workspace access. `apps/server/src/app.ts`, `apps/server/src/routes/invites.ts`
 
+## 7. API, realtime & search
+
+- ⚙️ **FilterSpec compiler** — one strict zod shape (`@gisik-nokma/domain`) compiled to parameterized SQL; user bytes travel only as parameters, injection-proven against planted hostile input executed against a live database. The two clauses that reach another table (`proj_search`, the blocked-states CTE) carry their own `workspace_id = t.workspace_id` correlation, so a filter term cannot answer out of a neighbouring tenant. `packages/domain/src/filter-spec.ts`, `apps/server/src/read/sql-params.ts`, `apps/server/src/read/compile-filter.ts`
+
 ## 9. Editor, documents & attachments
 
 *Plan 7's client half. §6/§7/§8 are reserved for Plans 4/5/6 and are deliberately absent — the
