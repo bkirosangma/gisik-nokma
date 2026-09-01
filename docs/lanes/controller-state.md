@@ -25,6 +25,31 @@ decision boundary.
 forward — five of six package counts staying right is what makes the sixth invisible. `app-core` went
 92 → 130 at this merge, which is the kind of move a carried-forward composition hides.
 
+
+## Task-level progress is now tracked — stop reconstructing it
+
+`pnpm check:tasks` (`scripts/check-task-ledger.mjs`) reports task-level completion from
+`docs/lanes/task-ledger.tsv`, one row per `### Task N:` heading across the eleven plans. **Do not
+recompute a progress figure from prose again — run the gate and quote it.**
+
+- **The denominator is derived, never typed.** 177 tasks (167 plain + 10 lettered). The earlier "167
+  total" was produced by `grep -cE '^#+ *Task '`, which returns **BLANK, not 0**, for plans 08 and 11 —
+  both have very long lines. The gate carries a positive control so a reader that drifts fails loudly
+  instead of reporting an empty backlog as clean.
+- **Two numbers, deliberately not one.** `done` = a PR naming that exact plan+task whose **merge** sha is
+  an ancestor of `origin/main`; `claimed` = asserted at plan or branch granularity only (the whole of
+  Plans 1 and 2), never counted as complete. **At `edbb940`: 17/177 verified (9.6%), 29 claimed but
+  unaudited (16.4%), 4 in-flight, 127 todo.** The familiar "~43%" folded all of those together.
+- **Evidence is the MERGE commit.** This repo squash-merges, so an implementing commit is not an ancestor
+  of main once its PR lands — recording one false-REDs a finished task. Proven by mutation: `876e170`
+  (real, on the live exec branch, in the shared object store) is correctly rejected.
+- **Rejected and recorded so it is not re-tried: fenced-code stripping.** It looks obviously right and it
+  drops the count 177 → 166, removing the real tail headings of plans 06 and 07, which carry an **odd**
+  number of ``` markers. It fails toward "more complete" while every per-plan count stays non-zero, so
+  the positive control cannot see it. Rationale is in the script header.
+- **Keep it current in the same change set as the work**, like `Features.md`. A merged PR no row cites is
+  printed every run — that is the direction that catches work landing unrecorded.
+
 ## THE ENVIRONMENT IS NOT THE DECLARED ONE — read before running a gate
 
 Found 2026-08-31 by a post-merge gate that came back RED and was **not** a code defect.

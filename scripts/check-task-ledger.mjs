@@ -82,6 +82,22 @@ const note = (section, rows) => fail.push({ section, rows });
 // One entry per `### Task N:` heading, keyed `<plan>/<task>`. Task ids carry an
 // optional letter (4a, 12c) -- ten of the 177 do -- so the id is kept as text
 // and never coerced to a number.
+//
+// DO NOT ADD FENCED-CODE-BLOCK STRIPPING HERE. It is the obvious next thought --
+// these plans are mostly code, so a quoted `### Task N:` inside an example would
+// inflate the count -- and it was tried and measured. Toggling `inFence` on
+// /^\s*```/ drops the total from 177 to 166. The eleven it removes are not quoted
+// examples: they are the real tail-end headings of plans 06 and 07 (Tasks 13, 14,
+// 15, 15b, 16 and 12c, 13, 13a, 14, 15, 16). Both files carry an ODD number of
+// ``` markers -- 305 and 287 -- so parity flips at some unmatched fence and every
+// heading after it reads as quoted.
+//
+// Note which way that fails: it removes tasks, so the ledger looks MORE complete
+// and every per-plan count stays non-zero, which means the positive control below
+// cannot see it. An instrument that errs toward "clean" while its own control
+// stays green is exactly the failure this gate was built to stop. Zero headings
+// currently sit inside a balanced fence, so the naive reader is also the correct
+// one; if that ever changes, fix the unbalanced fences in the plans first.
 const tasks = new Map();
 const perPlan = new Map();
 
