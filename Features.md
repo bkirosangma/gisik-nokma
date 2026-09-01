@@ -142,13 +142,12 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-*(Plan 5, Tasks 2–4 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
-replace this scope note; what follows is what Tasks 2, 3 and 4 added, and nothing else. Plan 5 Task 1
-(`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here. Still
-absent rather than missing from this section:
-the SQL visibility predicate, `proj_search`, the read models, every `/v1` read route (board, list,
-search, My Work, attention, builder reads, preferences), and the stream hub with its WebSocket route
-— Plan 5 Tasks 5–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
+*(Plan 5, Tasks 2–5 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
+replace this scope note; what follows is what Tasks 2, 3, 4 and 5 added, and nothing else. Plan 5
+Task 1 (`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here.
+Still absent rather than missing from this section: `proj_search`, the read models, every `/v1` read
+route (board, list, search, My Work, attention, builder reads, preferences), and the stream hub with
+its WebSocket route — Plan 5 Tasks 6–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
 doc assigns `Features.md` sections one per implementation plan, so numbering is claimed from that
 table rather than taken next-free.)*
 
@@ -193,6 +192,45 @@ table rather than taken next-free.)*
   fresh instant per call so a test can tell WHICH claim last wrote a row. `applyCommitted` commits one
   transaction per event through the live registry, which is the unit ingest commits in.
   `apps/server/test/helpers/apply.ts`
+- ⚙️ **`visibleTicketsWhere` — the read visibility table as one SQL predicate** — the clause every
+  set-based read filters through (list, board, search, attention, My Work), against `proj_visibility`
+  joined as `v`. It is an EXTRACTION, not a new expression: the SQL half of this table already sat
+  inline inside `listVisibleTickets`, so the clause moved out and that function became a caller —
+  there is no parallel SQL copy left beside it. Stated exactly, because the honest version is smaller
+  than the tidy one: this removed a THIRD copy and did not produce a single source of truth. Two
+  expressions of one rule remain — `canSeeResolved` in TypeScript, this one in SQL, kept because the
+  SQL is what makes a list one round trip rather than a workspace-sized read filtered in memory — and
+  what stops them drifting is an agreement test that compares an exact id set per viewer AND
+  cross-checks `canSee` ticket by ticket. A non-member compiles to `FALSE` and an owner to `TRUE`, so
+  the predicate carries NO tenancy of its own and every caller must supply its own
+  `workspace_id = $n`; the parameters are built inside the branches, since a value bound for a branch
+  that returns a constant would have no `$n` to reference it. The role is walked by a bare `switch`
+  with no `default`, which is measured rather than described: adding a fifth `WorkspaceRole` raises
+  TS2366 here and in `can-see.ts`, while the if-chain it replaced reddened only `can-see.ts` and
+  silently handed the new role the member branch. The mode side cannot have that guard — the modes are
+  string literals inside SQL, invisible to tsc — so a fourth mode fails CLOSED and the agreement test
+  is what would catch it. `apps/server/src/read/visible-where.ts`,
+  `apps/server/src/visibility/visible-tickets.ts`
+- ⚙️ **Read-route membership gate** — `requireMember` answers the caller's `EffectiveRole` in a
+  workspace or `null` meaning 404 (never 403: a 403 confirms the workspace exists to somebody with no
+  business knowing it does), and `workspaceOfProject` resolves a URL's project id to the workspace the
+  role must be resolved in — so a route never trusts a workspace id the caller also supplied, which is
+  the mistake `canSee` avoids by taking no `workspaceId` parameter at all. Membership comes through
+  `resolveEffectiveRole` and never a direct roster SELECT, because a project-scope row survives a
+  revocation by design. `apps/server/src/read/membership.ts`
+- ⚙️ **`seedReadScenario` — the seeded world Plan 5's read tasks share** — one workspace, one project,
+  a workflow carrying a blocked-flagged state, an epic with a child, an explicitly shared ticket, a
+  planted hidden ticket the owner alone is named in (with a confidential comment and a due date), and
+  a guest-shared ticket. Like `applyCommitted`, it ENUMERATES what it does not contain rather than
+  calling itself simplified — no workspace-mode ticket, no admin, no second project, no revoked
+  membership, no attachments or workspace settings, one workspace only — because those absences are
+  the exact shape of what the tests built on it cannot catch, and each read task must seed for itself
+  whatever its own decision table needs. It seeds memberships explicitly, since a `workspace.created`
+  applied this way gets none of the founding side effects a real one gets. It refuses a second seed
+  into the same database with the sentence that names the fix, rather than surfacing a raw
+  `events_entity_seq_unique` violation. `SCENARIO_NOW` is Z-suffixed on purpose and its own test
+  proves the suffix load-bearing under three zones, probe first.
+  `apps/server/test/helpers/read-scenario.ts`
 
 ## 9. Editor, documents & attachments
 
