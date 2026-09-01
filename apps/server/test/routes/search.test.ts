@@ -78,6 +78,25 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * that helper is the shared world for Tasks 8–15 and every fixture in it is
  * justified for all of them; sixty rows of limit bait are this task's problem.
  *
+ * ## Which role cells this file actually exercises, and which it cannot
+ *
+ * Six of the shared world's eight: `owner` (the visibility predicate compiled to
+ * `TRUE`, so the tenancy clause is the only boundary left), `member` (the
+ * three-armed disjunction), `outsider` (a workspace member with an EMPTY
+ * `eff.projects` — the cell that makes the project-roster arm falsifiable, since
+ * deleting it would admit every project-mode row to them and 7.97 reddens),
+ * `guest` (the explicit-list arm alone), `stranger` (the 404) and `neighbour`
+ * (the tenancy 404, with their own workspace as the control).
+ *
+ * `admin` and `projectLead` are NOT exercised here, and that is stated rather
+ * than left to look like coverage. Neither can discriminate anything on this
+ * route: `admin` shares the `member` case in `visibleTicketsWhere` by design
+ * (an admin gets no read bypass) and is on no project, so its answer is
+ * `outsider`'s exactly; `projectLead` is a plain workspace member on the sibling
+ * project, which `member` is on too, so its answer is `member`'s. They are the
+ * cells that separate a workspace-admin gate from a project-admin gate, and this
+ * route has neither gate.
+ *
  * ## Nothing on this response moves with `TZ`
  *
  * Same statement `board.test.ts` and `list.test.ts` make. A hit is a card plus a
