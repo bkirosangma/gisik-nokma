@@ -9,7 +9,8 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
-    "check:env": "node scripts/check-env-example.mjs"
+    "check:env": "node scripts/check-env-example.mjs",
+    "check:tasks": "node scripts/check-task-ledger.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.0"
