@@ -265,6 +265,26 @@ async function seedSearchFixtures(pool: Pool, world: ReadWorld): Promise<SearchF
   };
 }
 
+/**
+ * The exact text `ts_headline` is given for one row: its three `proj_search`
+ * columns joined the way the route joins them.
+ *
+ * This is the file's strongest statement about snippets, and it exists because
+ * the weaker ones were MEASURED not to hold. `not.toContain(secret)` misses a
+ * leak whose words the headline window did not reach, and "the snippet mentions
+ * my own number" misses a source that appends foreign text AFTER the row's own.
+ * A snippet that is a SUBSTRING of this string cannot contain a syllable from
+ * any other row, whatever the window did.
+ */
+function headlineSource(title: string, description = '', comments = ''): string {
+  return `${title} \u2014 ${description} \u2014 ${comments}`;
+}
+
+/** A snippet with the `**` marks removed — the text that was actually shown. */
+function unmarked(snippet: string): string {
+  return snippet.replaceAll('**', '');
+}
+
 // ---------------------------------------------------------------------------
 // Request helpers
 // ---------------------------------------------------------------------------
@@ -482,9 +502,10 @@ describe('GET /v1/search — finding text across a workspace', () => {
     // all different, do catch it.
     const hits = (response.json() as SearchResponse).hits;
     for (const hit of hits) {
-      const ownNumber = hit.card.title.split(' ')[2] as string;
       expect(hit.snippet).toContain('**wombat**');
-      expect(hit.snippet).toContain(ownNumber);
+      // A SUBSTRING of this row's own three columns, so no syllable of any
+      // other row can be in it whatever the headline window did.
+      expect(headlineSource(hit.card.title)).toContain(unmarked(hit.snippet).trimEnd());
     }
     expect(new Set(hits.map((hit) => hit.snippet)).size).toBe(50);
 
@@ -509,6 +530,9 @@ describe('GET /v1/search — finding text across a workspace', () => {
     expect(hits.map((hit) => hit.card.ticketId)).toEqual([fixtures.leakVisibleId]);
     expect(hits[0]?.snippet).toContain('**Pangolin**');
     expect(hits[0]?.snippet).not.toContain('chinchilla');
+    expect(headlineSource('Pangolin survey outstanding')).toContain(
+      unmarked(hits[0]?.snippet ?? 'nothing').trimEnd(),
+    );
     expect(response.body).not.toContain('chinchilla');
     expect(response.body).not.toContain(fixtures.leakHiddenId);
 
