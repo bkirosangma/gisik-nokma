@@ -153,16 +153,31 @@ export async function getRollup(
 }
 
 /**
- * Recompute ONE parent's direct-children counts from proj_tickets, and drop its
- * row when it has none left.
+ * Recompute ONE parent's direct-children counts from proj_tickets.
  *
- * Two statements, and both are needed. The upsert's `HAVING count(*) > 0`
- * declines to write a row for a childless parent — the aggregate query would
- * otherwise return one row of zeros, which the table's own CHECK forbids and
- * which would be an invented parent. The DELETE is what removes a row that was
- * already there when the last child left, and it is guarded by the same
- * `NOT EXISTS` rather than by "the upsert wrote nothing", because a statement
- * cannot ask what the previous one decided.
+ * ONE statement, and the file used to carry a second: a
+ * `DELETE … WHERE NOT EXISTS (SELECT 1 FROM proj_tickets WHERE parent_id = $2)`
+ * meant to drop the row of a parent that had just lost its last child. **It
+ * could never fire, and a mutation deleting it killed nothing while two other
+ * mutations killed in the same run** — so it was a statement that passed for a
+ * reason unrelated to the property it named. Every one of this function's three
+ * call sites hands it a parent that demonstrably HAS a child at that moment:
+ * `recomputeParentOf` reads the parent off a ticket row that names it, and both
+ * scans select `DISTINCT parent_id … WHERE parent_id IS NOT NULL` out of
+ * proj_tickets. `NOT EXISTS` was therefore always false.
+ *
+ * The row of an emptied parent is removed by `recomputeProject`'s
+ * project-scoped DELETE instead, and that is not an accident of layering: the
+ * ONLY way a parent loses its last child is a `ticket.reparented` — nothing in
+ * the vocabulary deletes a ticket — and a reparent is exactly the event that
+ * recomputes the whole project. Should a delete or an archive event ever join
+ * the vocabulary, it joins the trigger table in this file's header and brings
+ * its own emptying path with it.
+ *
+ * The remaining statement's `HAVING count(*) > 0` is what declines to write a
+ * row for a childless parent at all: the aggregate would otherwise return one
+ * row of zeros, which the table's own CHECK forbids and which would be an
+ * invented parent.
  *
  * `min(project_id)` is EXACT, not an arbitrary pick from a group: every child
  * of one parent is in that parent's project, because `hierarchy.cross-project`
@@ -202,13 +217,6 @@ async function recomputeParent(
        open_children = EXCLUDED.open_children,
        active_children = EXCLUDED.active_children,
        terminal_children = EXCLUDED.terminal_children`,
-    [workspaceId, parentId],
-  );
-  await tx.query(
-    `DELETE FROM proj_rollups
-      WHERE workspace_id = $1 AND parent_ticket_id = $2
-        AND NOT EXISTS (
-          SELECT 1 FROM proj_tickets WHERE workspace_id = $1 AND parent_id = $2)`,
     [workspaceId, parentId],
   );
 }
@@ -262,11 +270,17 @@ async function recomputeParentOf(tx: PoolClient, event: LedgerEvent): Promise<vo
  * new parent and the ticket are all in this one project. The extra parents cost
  * an idempotent rewrite each and nothing else.
  *
- * The trailing DELETE is what empties the OLD parent's row when the reparent
- * took its last child — `recomputeParent` above only ever visits parents that
- * still have children, so nothing in the loop would have reached it. It is also
- * what handles a detach to root: `ticketReparentedPayload.newParentId` is
- * nullable, and a ticket moved to project root is a child of nobody.
+ * The trailing DELETE is THE ONLY DELETE IN THIS FILE, and it is what empties
+ * the OLD parent's row when the reparent took its last child. `recomputeParent`
+ * only ever visits parents that still have children, so nothing in the loop
+ * above would have reached it — and a per-parent DELETE beside that upsert was
+ * measurably unreachable, which is why it is not there any more. It also
+ * handles a detach to root: `ticketReparentedPayload.newParentId` is nullable,
+ * and a ticket moved to project root is a child of nobody.
+ *
+ * That makes this one statement load-bearing for both ways a parent can lose
+ * its last child, and a reparent is the only event that can do either — nothing
+ * in the vocabulary deletes a ticket.
  */
 async function recomputeProject(
   tx: PoolClient,
