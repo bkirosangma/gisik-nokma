@@ -55,8 +55,8 @@ plan	task	status	pr	merge_sha	note
 02	11	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
 02	12	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
 02	13	claimed	4	9f3ba5ad	PR title asserts the whole plan; per-task mapping never audited
-03	1	done	13	f363b2f4	
-03	2	done	13	f363b2f4	
+03	1	claimed	13	f363b2f4	PR names the content ("the ticket type model") but no task number; branch was multi-task
+03	2	claimed	13	f363b2f4	PR names the content ("event vocabulary") but no task number; branch was multi-task
 03	3	done	38	6b2fc768	
 03	4	done	38	6b2fc768	
 03	5	done	38	6b2fc768	
@@ -108,7 +108,7 @@ plan	task	status	pr	merge_sha	note
 06	6	done	36	3fb22d3f	
 06	7	todo	-	-	
 06	8	todo	-	-	
-06	9	done	43	c93c9104	
+06	9	claimed	43	c93c9104	PR title says "Plan 6a" (a lane, not plan 06) and describes the review; exec/06a-client-core was multi-task
 06	10	todo	-	-	
 06	11	todo	-	-	
 06	12	todo	-	-	
@@ -121,7 +121,7 @@ plan	task	status	pr	merge_sha	note
 07	1	todo	-	-	
 07	2	todo	-	-	
 07	3	todo	-	-	
-07	4	done	47	a3746fb9	
+07	4	claimed	47	a3746fb9	PR describes a scoped re-review; exec/07-editor-client was multi-task
 07	5	todo	-	-	
 07	6	todo	-	-	
 07	7	todo	-	-	

@@ -61,6 +61,17 @@ Found 2026-08-31 by a post-merge gate that came back RED and was **not** a code 
   v24.11.1: `pnpm exec node -v` and `pnpm run` both succeed with **no refusal and not a single warning**,
   with the same commands under 22 as the control so the silence is not a broken probe. The declared
   engine is decorative. *(Pending item below; the controller does not implement.)*
+  > **CORRECTED 2026-09-01 — that sentence is half wrong, and the wrong half is the one that matters.**
+  > Re-measured with v22.22.2 as the control: **`pnpm run <script>` under v24 DOES warn** —
+  > `WARN Unsupported engine: wanted: {"node":">=22.0.0 <23"} (current: {"node":"v24.11.1",...})` — and
+  > prints nothing of the kind under 22. Only `pnpm exec node -v` is genuinely silent, which is the half
+  > the original claim generalised from. **Every gate and every CI step goes through `pnpm run`**, so the
+  > signal was there the whole time, one line above output nobody reads.
+  > This does not rescue anything — it still does not REFUSE, so a wrong-Node gate still goes green — but
+  > "says nothing at all" is not the accurate description of the false GREEN, and the pending fix is
+  > smaller than recorded: `engine-strict=true` promotes an existing warning to an error rather than
+  > inventing a check. **Claim only what the probe you ran covers**: two commands were tested, they
+  > disagreed, and the summary took the quieter one for both.
 - **So there are two failure modes, and the quiet one is worse.** The false RED is what this section was
   written from — loud, and it names itself in the error text. The false GREEN is a gate that passes on an
   unsupported Node and says nothing at all. Nobody catches that one.
@@ -453,6 +464,20 @@ Confirmed by observation 2026-08-31: it fired the `60bc7ca` event into a freshly
 **Check before re-arming: `pgrep -fl prev_main`.** Re-arming a live monitor gives you two and duplicate
 events on every merge. It emits only on change — long silence means nothing changed, not that it died.
 Currently alive as **PID 78292**.
+
+> **THIRD BLIND SPOT, and it is on the event this role most needs: it cannot report the FIRST PR.**
+> The guard is `[ -n "$prev_prs" ] && [ "$prs" != "$prev_prs" ]`, and `prs` is the empty string when no
+> PR is open. So the **zero → one** transition is indistinguishable from "no previous reading" and is
+> suppressed. With the open-PR set usually at zero here, that is exactly the step-PR-appears event the
+> serial loop turns on. **Poll `gh pr list` yourself; do not wait to be told.**
+>
+> **FOURTH: `pgrep -fl prev_main` returning a PID does not mean the monitor is running.** Found alive
+> 2026-09-01 with its `git ls-remote origin main` child stuck for **5h16m** — the loop was blocked
+> inside a command substitution and had reported nothing since 04:58, while `ls-remote` run by hand
+> completed in 0.002s. Liveness is the CHILD's age, not the parent's existence:
+> `pgrep -P <monitor-pid>` and read the etime. A child older than the 180s poll means it is wedged;
+> `kill` that child and the loop resumes. Note the cost of the recovery — `prev_main`/`prev_prs` reset to
+> empty, so the first change after the kill is suppressed by the guard above.
 
 It costs **zero tokens** — a shell loop that wakes the session only on a real event. **If it is genuinely
 gone**, re-arm change-triggered on a 180s poll against `git ls-remote origin main`, `gh pr list --state
