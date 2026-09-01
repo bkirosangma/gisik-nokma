@@ -6,6 +6,7 @@ import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
 import { registerEventRoutes } from './routes/events.js';
 import { registerTicketRoutes } from './routes/tickets.js';
+import { registerWorkspaceRoutes } from './routes/workspaces.js';
 import { registerContestsRoute } from './sync/contests-route.js';
 import type { Queryable } from './db/queryable.js';
 
@@ -105,6 +106,12 @@ export function buildApp(deps: AppDeps, options: { logLevel?: string } = {}): Fa
   // each enforcing visibility server-side. Same preHandler by parameter, same
   // reason: all three handlers read `request.currentUserId`.
   registerTicketRoutes(app, { pool: deps.pool }, requireSession);
+  // The founding door and the workspace directory (Plan 4 Task 13). It takes
+  // `deps.ingest` — the NARROWED `ClientIngest`, same as the events door — so
+  // the route that creates workspaces cannot reach the internal append path
+  // either, and the same preHandler by parameter, for the same reason: both
+  // handlers read `request.currentUserId`.
+  registerWorkspaceRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;

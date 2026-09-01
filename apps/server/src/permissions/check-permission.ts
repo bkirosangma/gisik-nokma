@@ -52,6 +52,14 @@ export const SERVER_ORIGIN_REASON = 'Only the server itself may record server-or
 /** Refusal reasons, spelled once. Plan text pins every one of these sentences. */
 export const IDENTITY_SPOOF_REASON = 'You cannot submit a claim as another person.';
 export const NOT_A_MEMBER_REASON = 'You are not a member of this workspace.';
+/**
+ * Plan 4 Task 13, case 6.52. The member half of the founding bound — the
+ * non-member half is `NOT_A_MEMBER_REASON` above, and the two stay separate
+ * sentences because they name different faults: one says you do not belong
+ * here, the other says the thing you are claiming has already happened.
+ */
+export const WORKSPACE_ALREADY_FOUNDED_REASON =
+  'This workspace has already been founded; it cannot be founded again.';
 export const WORKSPACE_MEMBERSHIP_REASON =
   'Only a workspace owner or admin can manage workspace membership.';
 export const PROJECT_ROSTER_REASON = 'Only a project admin can manage who is on this project.';
@@ -326,6 +334,57 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
     return refuse(NOT_A_MEMBER_REASON);
   }
   const isWorkspaceAdmin = role === 'owner' || role === 'admin';
+
+  // A workspace is founded ONCE. Reached only when `workspaceExists` is true
+  // AND the actor holds a role — the two cases the bypass above and the
+  // membership check below have already let through — so this closes the last
+  // client-door path on which a `workspace.created` naming an already-founded
+  // workspace commits (case 6.52). A NON-member re-founding is still answered
+  // `NOT_A_MEMBER_REASON` by the check above, unchanged and still pinned: the
+  // two refusals name different faults and are deliberately not merged.
+  //
+  // ## Why refuse at all, when the escalation is already stopped
+  //
+  // The escalation (the `workspaceExists` bound above, and `workspaceSeq === 1`
+  // in `ingestAll`) is about the GRANT — a second founding never re-fires the
+  // bootstrap, so nobody becomes owner. What was still open was the EVENT: a
+  // member, admin or guest of a founded workspace could append an unlimited
+  // number of `workspace.created` claims to its ledger, each of them false on
+  // its face — the workspace's history already proves it was founded, and
+  // coordination §11 means a mis-filed claim can never be taken back, only
+  // superseded. It is also read: `workspaces/workspace-name.ts` folds
+  // `workspace.created`/`workspace.renamed` for the directory's name, so a
+  // second founding is not inert noise, it changes an answer a person sees.
+  // With this line, `workspaceSeq === 1` becomes the second line of that
+  // defence rather than the only one.
+  //
+  // ## Two things this deliberately does NOT do
+  //
+  // - **It is not applied at the internal door.** `checkRolePermission` runs
+  //   only from `ingestClientBatch`. The internal door's second
+  //   `workspace.created` still commits and still founds nothing — measured by
+  //   `check-role-permission.test.ts`'s "the INTERNAL door does not re-found an
+  //   existing workspace either", which this must not redden. That door is the
+  //   server's own, and Task 5's bootstrap and Plan 11's seeds use it.
+  // - **It is not reachable from `POST /v1/workspaces`.** That route mints the
+  //   workspace ULID server-side and refuses a body that names one, so a
+  //   route-originated founding always has `workspaceExists === false`. The
+  //   door this closes is `POST /v1/events` (and, when it is built, Plan 10's
+  //   `POST /v1/sync`, which must call `ingestClientBatch`).
+  //
+  // ## The one behaviour change, stated rather than discovered
+  //
+  // A MEMBER re-delivering their OWN founding envelope — same event id, through
+  // the client door — used to answer `duplicate-event-id` (an `invalid` result,
+  // and a safe idempotent ack) and now answers this refusal, because the gate
+  // runs before `insertEvent` and only the primary key knows a redelivery from
+  // a fresh claim. No caller in the product does this today: `POST
+  // /v1/workspaces` mints a fresh id per call and Plan 11's seeds re-submit
+  // through the ungated internal door, where nothing here runs. **Plan 10's
+  // sync path is the one that will care**, and it is flagged in case 6.105.
+  if (env.type === 'workspace.created') {
+    return refuse(WORKSPACE_ALREADY_FOUNDED_REASON);
+  }
 
   if (ADMIN_ONLY_TYPES.has(env.type) && !isWorkspaceAdmin) {
     return refuse(adminOnlyReason(role));
