@@ -187,6 +187,34 @@ type AttentionFixtures = {
   dueOn23Id: string;
   /** Explicit `[owner, guest]`, due 2026-08-21 — the guest's own slice of the strip. */
   guestDueId: string;
+  /**
+   * Entered `doing` at 2026-08-13T18:30:00.000Z — IST midnight EXACTLY, the
+   * instant the half-open window's upper bound is. Six Indian days back.
+   *
+   * It exists because the boundary is half-open and nothing else in this file
+   * sits ON it: MEASURED, relaxing `>= staleCutoffUtc` to `> staleCutoffUtc`
+   * passed all twelve cases before this fixture, because an exact-midnight entry
+   * is the only input the two comparisons disagree about. The endpoint belongs
+   * to the NEXT day (`istDayBounds`: `endUtc` is not part of the day), so this
+   * ticket is six days old and not stale at seven.
+   */
+  istMidnightId: string;
+  /**
+   * Entered `doing` at 2026-08-13T14:00:00.000Z — 19:30 IST on the 13th, SEVEN
+   * Indian days before 2026-08-20.
+   *
+   * It exists to separate a COUNT OF DAYS from a count of 24-hour spans. Only
+   * 6 days and 22 hours of elapsed time separate that instant from
+   * `SCENARIO_NOW`, so `(now - entered) / 86_400_000` floors to SIX while the
+   * calendar says seven — and it is seven that "in flight for a week" means to
+   * the person reading the strip. MEASURED: with `daysInFlight` computed as that
+   * quotient, all twelve cases passed before this fixture existed, because every
+   * other entry here happens EARLIER in the Indian day than the reading instant,
+   * where the two agree. The same instant also decides MEMBERSHIP: the quotient
+   * calls it 6.92 days and leaves it out of a 7-day window the IST comparison
+   * puts it in.
+   */
+  istEveningId: string;
 };
 
 async function seedAttentionFixtures(pool: Pool, world: ReadWorld): Promise<AttentionFixtures> {
@@ -200,6 +228,8 @@ async function seedAttentionFixtures(pool: Pool, world: ReadWorld): Promise<Atte
   const istFresh6Id = attentionTicketId(4);
   const dueOn23Id = attentionTicketId(5);
   const guestDueId = attentionTicketId(6);
+  const istMidnightId = attentionTicketId(7);
+  const istEveningId = attentionTicketId(8);
 
   const created = (id: string, title: string): LedgerEvent =>
     makeCommitted({
@@ -285,6 +315,34 @@ async function seedAttentionFixtures(pool: Pool, world: ReadWorld): Promise<Atte
       payload: { ticketId: guestDueId, mode: 'explicit', userIds: [owner, guest] },
     }),
 
+    created(istMidnightId, 'Collect the weighing scale'),
+    // EXACTLY IST midnight. `istDayBounds('2026-08-13').endUtc` is this instant
+    // and the day does NOT contain it, so this entry belongs to 2026-08-14 —
+    // six Indian days back, inside a 7-day window. The half-open comparison is
+    // the only thing that says so.
+    makeCommitted({
+      ...ws,
+      actorId: member,
+      clientTime: '2026-08-13T18:30:00.000Z',
+      serverTime: '2026-08-13T18:30:00.000Z',
+      entity: { kind: 'ticket', id: istMidnightId },
+      type: 'ticket.transitioned',
+      payload: { to: 'doing' },
+    }),
+
+    created(istEveningId, 'Balance the evening float'),
+    // 19:30 IST on the 13th: seven Indian days back, but only 6 days 22 hours of
+    // elapsed time. A millisecond quotient floors that to six.
+    makeCommitted({
+      ...ws,
+      actorId: member,
+      clientTime: '2026-08-13T14:00:00.000Z',
+      serverTime: '2026-08-13T14:00:00.000Z',
+      entity: { kind: 'ticket', id: istEveningId },
+      type: 'ticket.transitioned',
+      payload: { to: 'doing' },
+    }),
+
     // The sibling project's chore ticket, into `wf-second`'s `waiting` — an
     // `active` state that is NOT flagged blocked, spelled with the same state id
     // as `wf-errands`'s `waiting`, which IS. See 7.121.
@@ -305,6 +363,8 @@ async function seedAttentionFixtures(pool: Pool, world: ReadWorld): Promise<Atte
     istFresh6Id,
     dueOn23Id,
     guestDueId,
+    istMidnightId,
+    istEveningId,
   };
 }
 
@@ -447,7 +507,9 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     // stale — 19 Indian days for the seeded child, 7 for the IST fixture. The
     // 6-day one is inside the window and is NOT here; 7.42 is where that pair
     // is the point rather than a by-product.
-    expect(idsOf(response, 'stale')).toEqual([read.world.taskInEpicId, fx.istStale7Id].sort());
+    expect(idsOf(response, 'stale')).toEqual(
+      [read.world.taskInEpicId, fx.istStale7Id, fx.istEveningId].sort(),
+    );
     const stale = onlyOfKind(response, 'stale', read.world.taskInEpicId);
     expect(stale.enteredStateAt).toBe('2026-08-01T09:00:05.000Z');
     expect(stale.daysInFlight).toBe(19);
@@ -485,6 +547,7 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     // stale one, then every due-soon one.
     expect(response.items.map((item) => item.kind)).toEqual([
       'blocked',
+      'stale',
       'stale',
       'stale',
       'due-soon',
@@ -661,8 +724,27 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     // 18:35Z on the 12th is seven Indian days back: stale. Naive UTC math labels
     // it 2026-08-12, counts eight, and would also alarm — so the kill is the
     // 18:31Z twin, which UTC math counts as seven and wrongly alarms about.
-    expect(idsOf(atSeven, 'stale')).toEqual([read.world.taskInEpicId, fx.istStale7Id].sort());
+    expect(idsOf(atSeven, 'stale')).toEqual(
+      [read.world.taskInEpicId, fx.istStale7Id, fx.istEveningId].sort(),
+    );
+
+    // A COUNT OF DAYS, not of 24-hour spans. 19:30 IST on the 13th is seven
+    // Indian days before the 20th, and only 6 days 22 hours of elapsed time, so
+    // `(now - entered) / 86_400_000` floors to six and would both mislabel this
+    // ticket and leave it out of the window altogether.
+    const evening = onlyOfKind(atSeven, 'stale', fx.istEveningId);
+    expect(evening.enteredStateAt).toBe('2026-08-13T14:00:00.000Z');
+    expect(evening.daysInFlight).toBe(7);
+    expect(evening.reason).toBe(
+      'In an active state since 2026-08-13 — past the 7-day staleness threshold.',
+    );
     expect(idsOf(atSeven, 'stale')).not.toContain(fx.istFresh6Id);
+    // …and neither is the one that entered at EXACTLY IST midnight. The window
+    // is half-open — `istDayBounds(day).endUtc` is the next day's first instant
+    // and not part of `day` — so an entry landing on the bound is six days old,
+    // not seven. MEASURED: relaxing the comparison to `>` admits it and nothing
+    // else in this file notices.
+    expect(idsOf(atSeven, 'stale')).not.toContain(fx.istMidnightId);
     const staleItem = onlyOfKind(atSeven, 'stale', fx.istStale7Id);
     expect(staleItem.enteredStateAt).toBe('2026-08-12T18:35:00.000Z');
     expect(staleItem.daysInFlight).toBe(7);
@@ -677,6 +759,8 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     await claimSettings(6, 7);
     const atSix = await strip('member');
     expect(idsOf(atSix, 'stale')).toContain(fx.istFresh6Id);
+    expect(idsOf(atSix, 'stale')).toContain(fx.istMidnightId);
+    expect(onlyOfKind(atSix, 'stale', fx.istMidnightId).daysInFlight).toBe(6);
     const freshItem = onlyOfKind(atSix, 'stale', fx.istFresh6Id);
     expect(freshItem.daysInFlight).toBe(6);
     expect(freshItem.enteredStateAt).toBe('2026-08-13T18:31:00.000Z');
