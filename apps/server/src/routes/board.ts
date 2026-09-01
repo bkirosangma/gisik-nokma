@@ -139,7 +139,7 @@ export async function readBoard(
  *
  * ## MEASURED: no test constrains this pass, and no seed at any layer can
  *
- * Deleting the call to it leaves all twelve cases in `test/routes/board.test.ts`
+ * Deleting the call to it leaves all thirteen cases in `test/routes/board.test.ts`
  * green — an unconstrained path, reported as one rather than left to look
  * covered. It is unconstrained because it is unreachable, and unreachable
  * further down than the plan says. The plan (Task 8, "See Open question 8")
