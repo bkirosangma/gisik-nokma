@@ -531,10 +531,16 @@ describe('visibleEventsFor — what reaches a replica', () => {
     // an admin re-authors its audience. `visibility.set` is the event that used
     // to start the subtree walk for everyone alike. The walk was first gated on
     // `!isGuest` to close this case, and has since been removed outright
-    // (6.101), so what holds this exclusion now is the walk's ABSENCE — which
-    // is why the mutation that reddens it is re-adding the walk, not deleting a
-    // gate. Recorded so nobody reads the surviving `!isGuest` tests as this
-    // case's pin.
+    // (6.101).
+    //
+    // MEASURED, and not the flattering answer: re-adding the walk leaves this
+    // case GREEN, because the walk as it last shipped carried the `!isGuest`
+    // gate. What reddens it is dropping the `canSee` guard on ticket events —
+    // the guest is then handed the `visibility.set` ENVELOPE, whose entity id
+    // is `foreign`, and the stringify finds it. So this assertion is real and
+    // worth keeping, but it is held by the guard 6.16 already pins, not by
+    // anything purge-shaped. Do not cite this case as evidence that a purge
+    // gate exists; there is none left to gate. (6.97 carries the numbers.)
     await record(setVisibilityEnv(ws, foreign, 'explicit', [newUlid()], admin));
 
     const items = await collect(guest, ws, mine.workspaceSeq - 1);
