@@ -14,8 +14,8 @@ decision boundary.
 
 | what | value |
 |---|---|
-| `main` | `33538be` **as of 22:05 IST — this row goes stale by design.** Phase 1 steps 4/5/6 merged (#51/#52/#53) |
-| last forced gate | **`33538be`** — 21/21, 0 cached, **1070 tests**, `TURBO_EXIT=0`, node **v22.22.2** |
+| `main` | `27dba39` **as of 05:10 IST 1 Sep — goes stale by design.** #50 (this file) merged after `33538be` |
+| last forced gate | **`33538be`** — 21/21, 0 cached, **1070 tests**, `TURBO_EXIT=0`, node **v22.22.2**. Still valid at `27dba39`: delta is doc-only |
 | gate composition | domain 276 · rule-engine 278 · server **275** · app-core 130 · editor 72 · ui 31 · sync-client 8 |
 | **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
 | collision surfaces | fixtures **84** · projections **5** (`contested`, `entity_heads`, `memberships`, `visibility`, `workflows`) · packages 6 |
@@ -122,7 +122,15 @@ provenance nothing enforces. TypeScript is structural, so Task 8/9/11 can each b
 return ever emptied. **Closer, so it is not re-litigated: a branded type** carrying a unique symbol only
 `resolveEffectiveRole` can produce — turning a silent grant into a compile error.
 
-> ### ~~⚠ IN-FLIGHT BRANCH — `exec/04-t6-t7-visibility`~~ **MERGED as `40c5219`. Kept for the rule below.**
+> ### ⚠ IN-FLIGHT NOW — `exec/04-t8-t14-enforcement` (step 7)
+> **Cut from `main` at `33538be`, 7 commits, pushed.** T8, T9, T10 landed; **T11 (floor-list) running**;
+> T12 + **T13 (BLIND — its dispatch must carry 6.52/6.53)** then T14 (floor-list) follow. Branch gate
+> **1115 tests**. `main`'s executor handoff is a step behind and does not name this branch — **hand it to
+> any relaunched executor.**
+> **T8 closed P22**: `EffectiveRole` is branded with a module-private `unique symbol`, so a hand-built one
+> fails `TS2741`. Provenance is compiler-enforced, not conventional.
+>
+> ### ~~⚠ IN-FLIGHT — `exec/04-t6-t7-visibility`~~ **MERGED as `40c5219`. Kept for the rule below.**
 > **Cut from `main` at `45c83eb`. T6 (`proj_visibility`) is running.** The executor's handoff on `main`
 > may still read *"step 5 is next and nothing is in flight"* — that was true when written and goes stale
 > the moment T6 starts, because the executor deliberately does **not** commit a docs refresh underneath a
@@ -233,6 +241,48 @@ by the implementer would have caught this.
 **Standing instruction: before dispatching any remaining lifted or re-sequenced item, sweep its own range
 for the thing it was moved to do**, with a control term. Cheap, and it is the only check that fires before
 the work rather than after it.
+
+## THE MACHINE WAS ASLEEP — read before diagnosing any stall
+
+**`pmset sleep 1` on BATTERY** (AC is `0`/never). A laptop on battery idle-sleeps after **one minute**,
+freezing every session, every launchd agent and every `sleep` timer, **with no error recorded anywhere**.
+
+**Evidence, from a 120-second agent's own log:** 16 gaps of 8–47 minutes overnight. Measured cost of one
+occurrence: **2.9 h and ~871K subagent tokens for zero completed agents.** A `sleep 1432` observed still
+alive at 59:11 is the same signature. **This is the mechanism behind both "idle executor" incidents that
+were previously attributed to session behaviour.**
+
+**Owner keeps the laptop plugged in (2026-09-01) — AC never sleeps, so this is closed by power, not
+software.** `pmset` was NOT modified; changing owner power settings is not the controller's call.
+
+### Three watchdogs, all launchd, all verified with controls before enabling
+
+| agent | covers | why the others cannot |
+|---|---|---|
+| `com.kiro.claude-limit-resumer` | quota exhaustion | matches a transcript limit-error signature (45 min) |
+| `com.kiro.claude-net-resumer` | connectivity loss | different signature + reachability gate (180 s) |
+| `com.kiro.claude-idle-nudger` | **a turn that just ended** | leaves **no transcript trace at all** (120 s) |
+
+The nudger hashes the pane's content area (**status bar stripped** — it carries a live token counter, so
+including it makes every pane look permanently active), and holds a **self-expiring** `caffeinate` so a
+dead agent cannot pin the laptop awake. READMEs and disable steps in `~/.claude/scripts/`.
+
+**It shipped with a bug worth remembering: it counted 4 identical *samples* and assumed they were 120 s
+apart.** Across sleep gaps they were 45+ minutes apart, so both its "IDLE" detections were false — the
+pane was identical because the machine was stopped. **Fixed to wall-clock, and it now treats an oversized
+sweep gap as a sleep event and resets rather than counting across it.** An instrument whose meaning
+depended on an unchecked assumption, shipped one hour after that rule was written down.
+
+## Spend — measured 2026-09-01, and it indicts this role
+
+**$1,072 across 3,785 orchestrator requests since 31 Aug, 100% `claude-opus-5`.**
+
+- **Cache reads are 68% of it** ($725; 1.45 **billion** tokens). Output is 12%. The bill is re-sending
+  history, not generating text — so context growth costs money *directly*.
+- **This controller alone is $416 — 39% of everything**, 1.4× the executor it spends the day policing.
+- **Subagents are NOT in that figure.** No sidechain records exist on disk (`~/.claude/projects`, 46
+  files; `~/.claude/tasks`, none since 31 Aug). One *failed* fan-out was reported at 871K tokens. **Real
+  spend is materially higher and is not measurable from artifacts.**
 
 ## Standing owner rulings currently in force
 
