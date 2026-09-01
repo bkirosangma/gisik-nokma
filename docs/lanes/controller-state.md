@@ -369,6 +369,34 @@ depended on an unchecked assumption, shipped one hour after that rule was writte
 
 ## Standing owner rulings currently in force
 
+- **RULING P23 (2026-09-01) — the `ScopeRevokedInstruction` blessing is SCOPE-WIDE ONLY; 6.101's
+  per-event extension is settled by PROBE, not by the docblock.** Raised by the executor when the
+  escalation condition set for it actually fired — the fix agent derived that the docblock *does* bless
+  the itemised purge and kept the behaviour on that basis.
+  - **Accepted:** the guest-side fix (`!isGuest` gate). M1 reddens exactly 2, M6 reddens 6 with 6.100
+    green because it is an exclusion — each side killed only by the mutation that touches it.
+  - **Blessing HOLDS at the revocation boundary, and is not reopened.** The decisive source is that
+    `Features.md` line 120 **had already shipped this rule**, making the guest-side behaviour a failure
+    to honour an existing contract rather than the fix inventing an allowance. A fix round does not
+    reopen a shipped contract.
+  - **It does NOT carry the per-event subtree purge.** The argument for extending it reasons about
+    **cardinality only**, and the 6.14 precedent rests on cardinality **and relationship** — 6.14 is
+    tolerable because the viewer ALREADY HOLDS THE CHILD. Drop the relationship axis and 6.14 stops being
+    a precedent for anything; it degrades into "small leaks are fine", which is not what it says.
+    The cardinality half is itself the wrong-subject class: *"one subtree per event is smaller than the
+    whole workspace at once"* compares a **per-emission** quantity against a **per-boundary** one. The
+    per-event walk fires far more often and nobody has measured the integral over a sync window.
+  - **THE PROBE THAT SETTLES IT — and it needs no prior-audience reconstruction, so the 6.82/6.94
+    second-definition ban does not block it.** The question is not historical: *does the member-side walk
+    ever emit a purge for an entity that member's replica does not hold?* Build it like the probe that
+    found the original Critical — member M, ticket N in a subtree M cannot see and never held, fire the
+    trigger, read M's sync-down. **`purge:N` appears** → blessing does not reach it, gate it and disclose
+    the under-purge residual as a sibling of 6.102 (stale local data is the safe direction, and the guest
+    side already chose it). **Never appears** → relationship holds, it IS 6.14's shape, land it and
+    **record the probe as the evidence, not the docblock.**
+  - **The point of ruling it this way:** a docblock written for a bounded case must not become the thing
+    that licenses the unbounded one. Making the code's measured behaviour the evidence is what stops that.
+
 - **Fable is not dispatched, for any role.** Sonnet default, opus by exception, hard cap **6 subagents per
   task**, one fan-out per plan, judgment fan-outs withdrawn. Cost ledger of what this trade has already
   cost is in the ruling — **add to it, do not re-argue it.** Note fable was the **premium** tier the
@@ -455,6 +483,13 @@ Every one below was violated by a controller that had just written it. **Assume 
      read as *"pushed"*, truthfully returning `0 6` right after a successful push.
   3. `pnpm exec node -v` answers for **`pnpm exec`**; it was read as *"pnpm"*, and `pnpm run` — the
      command every gate actually uses — behaves differently.
+  4. `git checkout -- <path>` restores from the **INDEX**; the sentence built on it was *"restored to
+     HEAD"*. After an earlier `git checkout <sha> -- <path>` staged the old content, the "restore"
+     truthfully put the PRE-FIX files back and reported success. Found by the executor 2026-09-01,
+     caught by reading the files for named markers rather than by trusting the command's exit.
+  **SUB-PATTERN, now two of the four: a git command that takes an IMPLICIT ref resolves a different one
+  than the writer assumed, and reports success either way** (`@{u}`, `checkout --`). **So name the ref:**
+  `git checkout HEAD -- <path>`, `origin/<branch>...HEAD`. Never the bare implicit form.
   **The check: name the subject your instrument actually ranged over, then reread your sentence and see
   whether it names the same one.** All three passed every falsifiability test that was applied, because
   those tests asked whether the instrument WORKED, and the instrument did work. None asked what it was
