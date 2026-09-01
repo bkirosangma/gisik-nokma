@@ -1,8 +1,9 @@
 # Cross-lane controller — live state
 
 **This file is the controller's restart surface.** A controller relaunched from
-`gisik-nokma-lanes/dispatch-main-controller.md` recovers only what is written here. Refreshed at every
-decision boundary.
+`gisik-nokma-lanes/dispatch-controller-serial.md` recovers only what is written here. Refreshed at every
+decision boundary. *(The brief was renamed 2026-09-01: `dispatch-main-controller.md` is the dead
+parallel-wave one. The "READ FIRST" section below still applies to anyone holding the old file.)*
 
 > **Shas in narrative prose below are facts about when they were written.** Verify anchors with
 > `git branch --contains` — empty output means orphaned. `git cat-file` passes on reflog-only commits and
@@ -10,21 +11,33 @@ decision boundary.
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
-## Anchors — verified 2026-09-01, at `6cb631d`
+## Anchors — re-measured 2026-09-01 ~19:40 IST, at `3720eeb`
 
 | what | value |
 |---|---|
-| `main` | `00cb2e0` **as of 19:30 IST 1 Sep — goes stale by design.** (#60, this file's own previous update, merged on top of `6cb631d`.) Two merges landed back to back: #57 (Plan 4 T8–T14) as `dd7bfcf`, then Chain B as `6cb631d` via **#59, not #58** — see the stacked-PR entry below |
-| last forced gate | **`6cb631d`** — `GATE_EXIT=0` **read from `$?` on the next line, not inferred**, 21/21 tasks, 0 cached, **1277 tests**, 19.25s, node **v22.22.2**, `INSTALL_EXIT=0`, `REBUILD_EXIT=0`. **Zero `Unsupported engine` WARNs in either `gate.log` or `install.log`** — the operational Node check below was run and passed |
-| gate composition | domain **295** · rule-engine 280 · server **461** · app-core 130 · editor 72 · ui 31 · sync-client 8 = **1277** |
+| `main` | **`3720eeb`** (#61, this file's own previous update) **— goes stale by design; refetch.** The run of merges behind it: #57 (Plan 4 T8–T14) → `dd7bfcf`, Chain B → `6cb631d` via **#59, not #58**, controller docs #60 → `00cb2e0`, controller docs #61 → `3720eeb` |
+| last forced gate | **still `6cb631d`** — `GATE_EXIT=0` **read from `$?` on the next line, not inferred**, 21/21 tasks, 0 cached, **1277 tests**, 19.25s, node **v22.22.2**, `INSTALL_EXIT=0`, `REBUILD_EXIT=0`, zero `Unsupported engine` WARNs. **NOT re-run at `3720eeb`, and that is a decision with evidence** — see the row below |
+| **why the gate anchor survives two merges** | `git diff --name-only 6cb631d origin/main` prints **exactly two rows**, `docs/lanes/controller-state.md` and `docs/lanes/task-ledger.tsv`. `turbo.json` declares no `inputs` and `docs/` is outside every package, so a docs-only delta cannot move composition. **Re-run this before the next SOURCE merge; do not inherit it** — the anchor expired once already (#55 had `package.json` in its delta) |
+| gate composition | domain **295** · rule-engine 280 · server **461** · app-core 130 · editor 72 · ui 31 · sync-client 8 = **1277**, at `6cb631d` |
 | **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
-| open PRs | **none.** #57, #59 and #60 merged; #58 CLOSED in favour of #59. Re-measure; do not wait for the monitor |
-| task ledger | **26 done · 33 claimed · 0 in-flight · 118 todo** of 177 (`pnpm check:tasks`), evidenced per task, not per PR title — see the ledger section. Re-run it at your own sha; step 9 will move it again |
-| executor | **RESTARTED 19:30 IST, fresh session**, tmux `gisik:1`, worktree `gisik-nokma-exec`, branch `exec/05-api-realtime` at `95004e1`, context **85% → 7%**. Mid **step 9 (Plan 5)**: batch A done (T1, T2, T2 fix round), **next is Plan 5 Task 3, plan line 628** |
+| open PRs | **none** (`gh pr list --state open` empty, with `--state all` returning rows as the control). Re-measure; **do not wait for the monitor, which is blind to zero→one** — see the monitor section |
+| task ledger | **26 done · 33 claimed · 0 in-flight · 118 todo** of 177 (`pnpm check:tasks`), unchanged at this sha because #60 and #61 completed no tasks. Evidenced per task, not per PR title — see the ledger section |
+| executor | **ALIVE and healthy**, tmux `gisik:1`, worktree `gisik-nokma-exec`, branch **`exec/05-api-realtime` at `5e541ab`** (advanced from `95004e1` by its own handoff fix — **the branch NAME is the load-bearing part, the sha here is not**), context **13%**. Mid **step 9 (Plan 5)**: batch A done (T1, T2, T2 fix round); **T3 is running now** in a background Workflow alongside a read-only T4–T16 adaptation map |
 
-**The gate composition independently confirms the executor's report.** It measured 1277 / server 461 /
-domain 295 at Chain B's HEAD; the same numbers came back at `main` after the rebase. Two measurements of
-different trees agreeing is what makes the rebase safe to have trusted.
+**Anchor rows carried forward untouched are the ones to distrust.** Only `main`, the open-PR set, the
+ledger and the executor were re-measured here; the gate row is *deliberately* not re-run, and it states
+the evidence for that rather than asserting freshness.
+
+> **THE INSTRUMENT THAT SETTLED THE DOCS-ONLY CHECK WAS NOT THE ONE I FIRST READ.** `git diff --name-only
+> 6cb631d origin/main | grep -v '^docs/'` came back as the literal string `--- Changes ---`, and
+> `| wc -l` on the same pipeline said **5** for a two-file diff: **`rtk` proxies `git` through the hook
+> and reformats its output**, so every count and filter downstream is computed over prose, not rows. The
+> positive control I ran beside it (`dd7bfcf..main` non-empty) **passed, and proved nothing** — it went
+> through the same proxy, so it established that `grep` was alive, not that the input was raw. What
+> actually settled it was `rtk proxy git diff --name-only`, printing the two rows.
+> **This is the "right answer about the wrong subject" class from the list below, hit again by the check
+> written to avoid it.** Operational form: **`rtk proxy` any git plumbing whose OUTPUT you are about to
+> count, filter, or diff** — and print the rows.
 
 **Re-measure everything above on resume.** Recount at the sha you report; do not carry a composition
 forward — five of six package counts staying right is what makes the sixth invisible. `app-core` went
@@ -197,8 +210,25 @@ fixture, and no test on `main` varies it."* It is worse than that: the environme
 Controller of a **two-session serial topology**: this session plus one executor. The wave schedule is
 superseded (see the coordination doc's serial-execution section).
 
-- **The controller merges the executor's work and NEVER its own.** Its own doc PRs go to the owner. This
-  is the check the two-session split exists to provide.
+- **The controller merges the executor's work.** The executor never merges its own — *that* is the check
+  the two-session split exists to provide, and it is untouched.
+  > ~~**and NEVER its own. Its own doc PRs go to the owner.**~~ **SUPERSEDED 2026-09-01 — and it was
+  > superseded by PRACTICE before anyone wrote it down, which is why a successor found this file
+  > contradicting itself.** This sentence sat ~250 lines above an anchors table recording that this
+  > file's own previous two updates merged as **#60** and **#61**, controller-authored and
+  > controller-merged. `dispatch-controller-serial.md` grants it explicitly (*"This includes your own
+  > doc PRs"*).
+  > **The replacement is a substitution, not a deletion, because the original check still has a job.**
+  > What licenses a controller merging its own PR is two properties *together*:
+  > **(a) it is docs-only by construction** — the controller does not implement plan tasks, so its diff
+  > cannot reach a package; and **(b) independent CI green at the exact head sha.** Verify (a) the same
+  > way the gate anchor is verified — `rtk proxy git diff --name-only origin/main HEAD`, read as rows.
+  > **A controller PR that touches anything outside `docs/` falls back to the original rule and goes to
+  > the owner.** Deleting the sentence outright would have lost that fallback.
+  > *(Recording the tie-break honestly: `gh pr view 60/61 --json author,mergedBy` returns
+  > `bkirosangma` for both fields, because both sessions act through the owner's single `gh`
+  > credential. **That query cannot discriminate controller from owner and should not be cited as if it
+  > could** — the discriminating evidence is the session record plus the brief.)*
 - Auto-merge is re-granted: a PR that passed its machinery **and** an independent CI run green merges
   without a per-PR ask. `gh pr checks <n>` — **pending is not green.** Prefer
   `gh api repos/<o>/<r>/commits/<head-sha>/check-runs` — it names the conclusion at the exact sha.
@@ -262,7 +292,20 @@ provenance nothing enforces. TypeScript is structural, so Task 8/9/11 can each b
 return ever emptied. **Closer, so it is not re-litigated: a branded type** carrying a unique symbol only
 `resolveEffectiveRole` can produce — turning a silent grant into a compile error.
 
-> ### ⚠ IN-FLIGHT NOW — `exec/04-t8-t14-enforcement` (step 7)
+> ### ⚠ IN-FLIGHT NOW — `exec/05-api-realtime` (step 9, Plan 5, 17 tasks)
+> **No PR yet, and there will not be one until the step completes** — this is the state in which the
+> restart trigger cannot fire (see the mid-step section at the top). Branch is 4 commits ahead of
+> `origin/main`, rebased onto it by the executor. Batch A (T1, T2, T2's fix round) is done; **T3 is
+> running now.** The executor's handoff on this branch is the current one; `main`'s is a step behind.
+>
+> **CHECK AT MERGE TIME, not before — do not interrupt a running turn for it.** The executor is running
+> a background `Workflow` (adaptation map T4–T16 + T3 implement/review). The standing ruling is **one
+> fan-out per plan, hard cap 6 subagents per task**, and **batch A's fix round already ran review lenses
+> on Plan 5** — so this may be Plan 5's second fan-out. It is a budget question, not a correctness one:
+> read the handoff's own account when the step PR lands, and if the budget is genuinely spent, say so
+> then rather than re-litigating it mid-task.
+>
+> ### ~~⚠ IN-FLIGHT — `exec/04-t8-t14-enforcement` (step 7)~~ **MERGED as `dd7bfcf` via #57.** Kept for the rulings below.
 > **Cut from `main` at `33538be`, 7 commits, pushed.** T8, T9, T10 landed; **T11 reviewed, fix round running**;
 > T12 + **T13 (BLIND — its dispatch must carry 6.52/6.53)** then T14 (floor-list) follow. Branch gate
 > **1138 tests at T11's sha and still moving — the fix round will change it.** `main`'s executor handoff is a
@@ -710,7 +753,13 @@ idle when it should be working."**
 5-second sample). It tracks the clock, not activity, so a monitor built on it reports "active" forever —
 **including for a dead session.** An idle detector structurally incapable of detecting idleness.
 A workable signal is hashing `capture-pane` output (a working pane animates, an idle prompt does not);
-unbuilt, because the threshold needs tuning against how long a legitimate fan-out stays quiet.
+~~unbuilt, because the threshold needs tuning against how long a legitimate fan-out stays quiet.~~
+**BUILT — that is `com.kiro.claude-idle-nudger` in the table above, and it is the instrument that closes
+this gap.** Verified loaded 2026-09-01 19:40 IST alongside the other two:
+`launchctl list | grep -i claude` → `com.kiro.claude-idle-nudger`, `com.kiro.claude-limit-resumer`,
+`com.kiro.claude-net-resumer`, all present. **Check this after every controller relaunch too** — unlike
+the shell monitor these are launchd agents and genuinely do outlive the session, but that is a fact to
+confirm rather than assume, and the nudger was still being debugged the morning of the same day.
 
 **Second blind spot, demonstrated by the monitor itself.** The controller killed the `exec` window and
 relaunched a fresh session into a new window of the same name. The monitor reported **no** `LANE PANES
@@ -729,7 +778,31 @@ Confirmed by observation 2026-08-31: it fired the `60bc7ca` event into a freshly
 
 **Check before re-arming: `pgrep -fl prev_main`.** Re-arming a live monitor gives you two and duplicate
 events on every merge. It emits only on change — long silence means nothing changed, not that it died.
-Currently alive as **PID 78292**.
+~~Currently alive as **PID 78292**.~~
+
+> **BUT IT DOES NOT SURVIVE A CONTROLLER RELAUNCH, AND THAT IS THE CASE THIS ENTRY WAS MISSING.**
+> Found 2026-09-01 by the controller that replaced `gisik-nokma-aa`: `pgrep -fl prev_main` returned
+> **nothing at all**. "Survives `/clear`" and "survives a relaunch" are opposite consequences of the
+> *same* fact — the monitor is a child of the **session process**. `/clear` ends the context and keeps
+> the process; **an owner relaunch (or `tmux kill-window`) ends the process and takes every child with
+> it.** The old entry recorded the reassuring half and pinned a PID that could not outlive its parent.
+> **So: expect it ABSENT after any controller relaunch, and re-arm as a startup step** — the
+> `pgrep` check is for the `/clear` case only. And note the ordering hazard: the controller is relaunched
+> at exactly the moments the repo is most likely to move.
+
+**The re-armed version fixes the zero→one guard; the script is not the one described above.** Live as of
+2026-09-01 19:40 IST, source in the session scratchpad (`ctl-watch.sh`), three changes:
+1. `prev_prs` / `prev_main` initialise to a **sentinel**, not `""`. The old guard `[ -n "$prev_prs" ]`
+   is false whenever no PR is open, which suppressed **exactly the step-PR-appears event the serial loop
+   turns on** (the third blind spot below). The sentinel suppresses only the startup emission.
+2. Every remote call is wrapped in **`perl -e 'alarm shift; exec @ARGV'`** — there is **no `timeout` or
+   `gtimeout` binary on this machine** (checked; both absent), so this is what stops a wedged
+   `ls-remote` freezing the loop for hours the way one did for 5h16m.
+3. It watches the exec window by **presence** (`window_index` 1), so a session *dying* emits even though
+   the pane-NAME set is blind to a session being *replaced* (the second blind spot).
+
+**Its reader was proven live before it was trusted:** `--state open` returned empty while the identical
+query at `--state all` returned #61/#60/#59. An empty open-PR set that is a real zero, not a broken probe.
 
 > **THIRD BLIND SPOT, and it is on the event this role most needs: it cannot report the FIRST PR.**
 > The guard is `[ -n "$prev_prs" ] && [ "$prs" != "$prev_prs" ]`, and `prs` is the empty string when no
