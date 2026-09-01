@@ -109,6 +109,68 @@ and **5.27, 5.30 and 5.36 are cited by other documents and may not be renumbered
 the file's own scope note says. **T14 must fold 5.43 into the corrected 5.34** rather than catalogue
 both. The plan's canonical refusal table is **six ids behind** what shipped.
 
+## RECORDED, not fixed — carried out of Task 10's floor-list fix round (2026-09-01)
+
+Three items. None is fixable inside Task 10's surface, and each was previously recorded only in a
+commit message or a code comment — which is the shape Finding 4 of that review was about.
+
+### 1. The ticket-TYPE ladder is not as-of. Open question 11. Owner: **UNASSIGNED, deliberately.**
+
+`proj_tickets`' `loadDeps` resolves the WORKFLOW as of the applying event's `workspace_seq`
+(`getWorkflowDefsInForce`) and the ticket TYPE as of **now** (`getTicketTypeLadderFromDb`, which takes
+no sequence number). So the table is a pure function of the ledger prefix for workflow versioning, and
+for type binding **only until somebody re-points a ticket type at another workflow**: after that,
+replaying the `ticket.created` resolves the NEW `workflowId` for a ticket the live path bound to the
+old one. That is live-versus-rebuild divergence — the class that has bitten three projections in this
+series — and it contradicts the owner's own 2026-08-26 decision that a re-binding affects new tickets
+only.
+
+The fix is not symmetric with the workflow one. `proj_workflows` keeps every version keyed
+`(workflow_id, version)`, so as-of is a `WHERE` clause; `proj_ticket_types` is last-definition-wins
+with **one row per type** and no history at all, so as-of needs a primary-key change, and
+`getTicketTypeFromDb` has readers in Task 12's engine context and in Plans 4–5. Plan 3's own Open
+question 11 scoped it out on exactly that reasoning.
+
+**UNASSIGNED with a reason, following the 6.130 precedent:** no plan in the series has an open task on
+that table's key. Parking it on Plan 4 or Plan 10 would be a handoff nobody receives. Whoever opens the
+type-versioning work takes it.
+
+The claim is now narrowed everywhere it was overstated — `apps/server/src/projections/tickets.ts`
+(header point 1 and `loadDeps`' closing docstring), `Features.md` §5's `proj_tickets` bullet, and a NOTE
+beside the two live-path cases in `apps/server/test/proj-tickets.test.ts`. **It is not asserted by a
+test**: the only rebuild case in that file is also the only one that may write to `events` (a second
+writer would replay through the first, and that case's own length assertion is what guards it).
+
+### 2. Nothing refuses an assignment of nothing to somebody. Owner: **the controller to assign.**
+
+`evaluateEvent` has no case for `ticket.assigned`, `ticket.collaborator_added`,
+`ticket.collaborator_removed`, `comment.added` or `attachment.added`, so all five fall through to
+`{ refused: false }` with **no existence check**, and the server commits them against a ticket that was
+never created — `apps/server/test/permissions/check-role-permission.test.ts` ingests two such
+`ticket.assigned` events and both are committed, not refused. Registering `proj_tickets` made that
+latent gap live: folding one would throw inside the ingest transaction, so `proj_tickets` skips those
+five **by name** when the ticket is absent, while the four types the door DOES guard keep the reducer's
+throw. Case **5.58** constrains that set in both directions now — the five skip and write no row, the
+four throw, and all five still fold against a ticket that exists.
+
+The projection's skip is a containment, not a fix. When the refusal lands, the set becomes unreachable
+rather than wrong and the two lines can go. **No plan document owns this refusal**, which is why it is
+here rather than parked.
+
+### 3. `Features.md` §6 is Plan 4's and now carries three false sentences. Owner: **Plan 4.**
+
+Task 10 correctly did not touch another plan's section. Three of its sentences stopped being true when
+`proj_tickets` landed:
+
+| Where | What it says | Why it is false |
+|---|---|---|
+| §6 preamble | "no ticket titles exist to serve, because `proj_tickets` is Plan 3 Task 12's" | The table is **Task 10's** and it shipped; titles are queryable |
+| `listVisibleTickets` bullet | "**`proj_tickets` does not exist on this branch**" | It does |
+| Rollup-honesty bullet | "neither table exists on this branch (Plan 3 Tasks 11 and 12)" | Half of it does; `proj_rollups` (Task 11) is still absent |
+
+Whoever merges Chain B into a branch carrying §6 must correct all three in the same change set, or §6
+will read as evidence that the table is missing.
+
 ## Contamination window (affects Task 8's review only)
 
 This worktree was checked out to another branch for 26 seconds (13:24:42–13:25:08 on 2026-08-31) by a

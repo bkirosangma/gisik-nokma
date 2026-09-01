@@ -26,13 +26,32 @@ import { getWorkflowDefFromProjection, getWorkflowDefsInForce } from './workflow
  *
  * ## Two things a definition-resolving projection has to get right
  *
- * 1. It resolves every definition **as of the event it is applying**, never as
- *    of now (design decision 10, owner decision 2026-08-26). Plan 1's verifier
- *    rebuilds projection-OUTER — one projection at a time over the whole ledger
- *    — so proj_workflows is already at its newest version before this table
- *    replays its first event. Asking "latest" there re-derives a table that
- *    disagrees with the live one after any republish, and throws outright once a
- *    version has dropped a state a replayed transition names.
+ * 1. It resolves the WORKFLOW definition **as of the event it is applying**,
+ *    never as of now (design decision 10, owner decision 2026-08-26). Plan 1's
+ *    verifier rebuilds projection-OUTER — one projection at a time over the
+ *    whole ledger — so proj_workflows is already at its newest version before
+ *    this table replays its first event. Asking "latest" there re-derives a
+ *    table that disagrees with the live one after any republish, and throws
+ *    outright once a version has dropped a state a replayed transition names.
+ *
+ *    **The TICKET-TYPE lookup is NOT as-of, and "every definition" would be a
+ *    false sentence here.** `getTicketTypeLadderFromDb` takes no sequence
+ *    number and reads what proj_ticket_types holds NOW, because that table is
+ *    last-definition-wins with no history to ask (`./ticket-types.ts`). So this
+ *    table is a pure function of the ledger prefix for workflow versioning, and
+ *    for type binding only until somebody re-points a ticket type at another
+ *    workflow: after that, replaying the `ticket.created` resolves the NEW
+ *    `workflowId` for a ticket the live path bound to the old one — the
+ *    live-versus-rebuild drift class this series has already met three times,
+ *    and it contradicts the owner's own "a re-binding affects new tickets only"
+ *    (2026-08-26). It is the plan's **Open question 11**, scoped out
+ *    deliberately rather than smuggled in: the fix is not symmetric with the
+ *    workflow one, because giving proj_ticket_types history means changing its
+ *    primary key, and `getTicketTypeFromDb` has readers in Task 12's engine
+ *    context and in Plans 4–5. Recorded **UNASSIGNED** in
+ *    `docs/plan-3-chain-b-handoff.md`: no plan in the series has an open task on
+ *    that table's key, and parking it on one that has none would be a handoff
+ *    nobody receives.
  * 2. It consumes `workflow.defined` and folds every row on that workflow
  *    forward (refresh on publish). A stored `state_category` that a new version
  *    has redefined is a lie that rollups, board columns and the overdue sweep
@@ -218,9 +237,14 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
  * would be the reducer's own `is not defined` throw, which names the ledger for
  * a loader's omission.
  *
- * `asOfWorkspaceSeq` is this event's own position in the workspace stream: the
- * definitions resolved are the ones that were in force when the event happened,
- * never the newest.
+ * `asOfWorkspaceSeq` is this event's own position in the workspace stream, and
+ * it reaches ONE of the two lookups. The WORKFLOW set is the one that was in
+ * force when the event happened, never the newest. The TICKET-TYPE ladder is
+ * whatever proj_ticket_types holds NOW: that table is last-definition-wins with
+ * no history, so there is no as-of question it can answer (`./ticket-types.ts`).
+ * Do not read this loader as "every definition as of the event" — the second
+ * half of point 1 in this file's header names the drift that costs, why it is
+ * not fixed here, and where it is recorded.
  */
 async function loadDeps(db: PoolClient, event: LedgerEvent): Promise<TicketStateDeps> {
   const types = await getTicketTypeLadderFromDb(db, event.workspaceId);
