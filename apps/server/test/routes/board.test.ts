@@ -138,6 +138,40 @@ describe('GET /v1/projects/:projectId/board — the columns', () => {
     });
   });
 
+  it('7.13 two workflows on one board sit side by side: a repeated state id is TWO columns, each holding only its own workflow’s card, and the blocked flag does not cross', async () => {
+    const board = await boardOf('member', read.sibling.projectId);
+
+    expect(
+      board.columns.map((c) => ({ workflowId: c.workflowId, stateId: c.stateId, name: c.name, blocked: c.blocked })),
+    ).toEqual([
+      // Ordered by workflow id, then by the order each publisher authored their
+      // states. `todo` and `waiting` each appear TWICE — once per workflow —
+      // and `waiting` is blocked under one and not the other, which is what a
+      // flag keyed on a bare state id would get wrong.
+      { workflowId: 'wf-errands', stateId: 'todo', name: 'To do', blocked: false },
+      { workflowId: 'wf-errands', stateId: 'doing', name: 'Doing', blocked: false },
+      { workflowId: 'wf-errands', stateId: 'waiting', name: 'Waiting on counterparty', blocked: true },
+      { workflowId: 'wf-errands', stateId: 'done', name: 'Done', blocked: false },
+      { workflowId: 'wf-second', stateId: 'todo', name: 'Queued', blocked: false },
+      { workflowId: 'wf-second', stateId: 'waiting', name: 'Parked', blocked: false },
+      { workflowId: 'wf-second', stateId: 'done', name: 'Filed', blocked: false },
+    ]);
+
+    // Each card under its OWN workflow's column and nowhere else. A board that
+    // matched on state id alone would put both tickets in both `todo`s.
+    expect(
+      board.columns.map((c) => [`${c.workflowId}:${c.stateId}`, c.cards.map((card) => card.ticketId)]),
+    ).toEqual([
+      ['wf-errands:todo', [read.sibling.ticketId]],
+      ['wf-errands:doing', []],
+      ['wf-errands:waiting', []],
+      ['wf-errands:done', []],
+      ['wf-second:todo', [read.sibling.choreTicketId]],
+      ['wf-second:waiting', []],
+      ['wf-second:done', []],
+    ]);
+  });
+
   it('7.14 the card carries who claimed its state by both clocks, and the epic carries its four-field rollup', async () => {
     const board = await boardOf('member', read.world.projectId);
     const doing = board.columns.find((c) => c.stateId === 'doing');
@@ -268,7 +302,7 @@ describe('GET /v1/projects/:projectId/board — the door', () => {
     // project's own board. Without it, a ticket nobody could see would satisfy
     // the three assertions above and prove nothing.
     const sibling = await boardOf('member', read.sibling.projectId);
-    expect(cardIds(sibling)).toEqual([read.sibling.ticketId]);
+    expect(cardIds(sibling)).toEqual([read.sibling.ticketId, read.sibling.choreTicketId]);
     expect(sibling.projectId).toBe(read.sibling.projectId);
     expect(sibling.workspaceId).toBe(read.world.workspaceId);
   });

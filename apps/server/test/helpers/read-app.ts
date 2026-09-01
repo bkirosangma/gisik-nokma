@@ -65,11 +65,36 @@ export type ReadRole = 'owner' | 'member' | 'outsider' | 'guest' | 'stranger' | 
  * The ticket is visible to `member` (project mode, and they are on the roster),
  * so it is a card they COULD see that must not appear on the other project's
  * board. A ticket nobody could see would make the same mutation pass again.
+ *
+ * ## It also carries the only SECOND WORKFLOW in the suite
+ *
+ * `seedReadScenario` defines exactly one workflow and binds both its ticket
+ * types to it, so without this every board in every test has one workflow and
+ * the board's `card.workflowId === workflowId` filter is unconstrained: deleting
+ * it leaves every case green while, on a real two-workflow board, every card
+ * lands in EVERY workflow's column that happens to share its state id. MEASURED.
+ * That is the hazard `blockedStateKeys`'s docblock names in words — "a state id
+ * is only unique within its workflow" — so the second workflow deliberately
+ * repeats two of the first's state ids (`todo`, `waiting`) and flags NEITHER as
+ * blocked, while `wf-errands.waiting` IS blocked. One board then shows the same
+ * state id twice, once blocked and once not, and a flag that leaked between
+ * workflows has somewhere to be seen.
+ *
+ * It lives on the SIBLING project rather than the seeded one on purpose: the
+ * seeded project's exact column and card sets are asserted by four cases, and a
+ * fixture that changes what an existing case measures is a fixture that makes
+ * the suite pass by declaration order.
  */
 export type SiblingProject = {
   projectId: string;
+  /** `task` → `wf-errands`, the workspace's first workflow. Lands in `todo`. */
   ticketId: string;
   ticketTitle: string;
+  /** The SECOND workflow, defined here and used by nothing else. */
+  secondWorkflowId: string;
+  /** `chore` → `wf-second`. Lands in that workflow's own `todo`. */
+  choreTicketId: string;
+  choreTicketTitle: string;
 };
 
 export type NeighbourWorkspace = {
@@ -143,6 +168,9 @@ export async function seedSiblingProject(
   const projectId = newUlid();
   const ticketId = newUlid();
   const ticketTitle = 'Sibling project marker';
+  const secondWorkflowId = 'wf-second';
+  const choreTicketId = newUlid();
+  const choreTicketTitle = 'Second workflow marker';
   const ws = { workspaceId: world.workspaceId, actorId: world.owner };
 
   const events: LedgerEvent[] = [
@@ -152,9 +180,38 @@ export async function seedSiblingProject(
     // Reuses the workspace's already-defined `task` type and `wf-errands`
     // workflow: re-emitting either would collide on events_entity_seq_unique.
     makeCommitted({ ...ws, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.created', payload: { typeId: 'task', projectId, parentId: null, title: ticketTitle } }),
+    // `wf-second` sorts after `wf-errands`, so a board carrying both has a
+    // deterministic column order to assert rather than a set to sort.
+    makeCommitted({
+      ...ws,
+      entity: { kind: 'workflow', id: secondWorkflowId },
+      type: 'workflow.defined',
+      payload: {
+        id: secondWorkflowId,
+        version: 1,
+        name: 'Second flow',
+        initialStateId: 'todo',
+        states: [
+          // `todo` and `waiting` repeat ids `wf-errands` also uses, and
+          // `waiting` is NOT blocked here while it IS there. Both repetitions
+          // are the point: they are what a workflow-blind column filter or a
+          // leaking blocked flag would show up in.
+          { id: 'todo', name: 'Queued', category: 'open' },
+          { id: 'waiting', name: 'Parked', category: 'active' },
+          { id: 'done', name: 'Filed', category: 'terminal' },
+        ],
+        transitions: [
+          { from: '*', to: 'todo', rules: [] },
+          { from: '*', to: 'waiting', rules: [] },
+          { from: '*', to: 'done', rules: [] },
+        ],
+      },
+    }),
+    makeCommitted({ ...ws, entity: { kind: 'ticket-type', id: 'chore' }, type: 'ticket-type.defined', payload: { id: 'chore', name: 'Chore', icon: 'broom', rank: 3, workflowId: secondWorkflowId, fields: [] } }),
+    makeCommitted({ ...ws, entity: { kind: 'ticket', id: choreTicketId }, type: 'ticket.created', payload: { typeId: 'chore', projectId, parentId: null, title: choreTicketTitle } }),
   ];
   await applyCommitted(pool, events);
-  return { projectId, ticketId, ticketTitle };
+  return { projectId, ticketId, ticketTitle, secondWorkflowId, choreTicketId, choreTicketTitle };
 }
 
 /**

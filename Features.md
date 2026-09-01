@@ -434,9 +434,11 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
 - ✅ **`GET /v1/projects/:projectId/board`** — one project's board. Columns are the states of the
   workflows **in use by the tickets this caller may see** — not every workflow the workspace has
   defined — with every state of a used workflow present whether or not anybody is in it, ordered by
-  workflow id then by the order the publisher authored the states, cards by ticket id. The `blocked`
+  workflow id then by the order the publisher authored the states, cards by ticket id. Two workflows
+  on one board sit side by side, so a state id they both use is two distinct columns and a card never
+  appears under the other workflow's copy of its own state. The `blocked`
   flag is read off the definition, never derived from a category: the seeded `waiting` state is
-  `active` AND blocked while `doing` is `active` and not. Cards are `TicketCard`s, so each unfolds to
+  `active` AND blocked while a second workflow's `waiting` is `active` and not. Cards are `TicketCard`s, so each unfolds to
   who claimed its state and when by both clocks, and a parent carries its four-field rollup. The
   visibility filter is `visibleTicketsWhere` — the one SQL expression of the decision table, consumed
   and not restated. `apps/server/src/routes/board.ts`
