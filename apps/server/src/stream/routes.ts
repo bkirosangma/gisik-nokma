@@ -262,12 +262,21 @@ export function registerStreamRoute(
           // tick that sends the second one. It dies on the tick after.
           if (now().getTime() - lastHeardAt > 2 * heartbeatMs) {
             deps.onHeartbeat?.({ kind: 'timeout' });
-            heartbeat.stop();
-            release();
             // The one caller of `terminate()` in the product. No close frame:
             // a peer that has answered nothing for three intervals is not
             // reading one, and waiting for its close handshake is how a dead
             // socket stays half-open.
+            //
+            // Nothing is torn down HERE, deliberately. `terminate()` still
+            // emits `close` locally, so `teardown` below runs and is the ONE
+            // site that stops the tick, returns the budget and drops the socket
+            // from the hub. An earlier draft repeated `heartbeat.stop()` and
+            // `release()` on this line; MEASURED by deleting them, that pair
+            // changed no observable behaviour and no test could tell them from
+            // their own removal — the same finding `hub.ts` records about its
+            // four `sub.ended` guards, and the same answer. 7.151 constrains
+            // the surviving site from this path: after the termination the
+            // scheduler holds one tick and the hub holds nothing.
             socket.terminate();
             return;
           }

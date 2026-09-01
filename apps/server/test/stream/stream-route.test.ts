@@ -775,7 +775,25 @@ describe('WS /v1/stream — the heartbeat, driven by the injected clock', () => 
       // ONE app, ONE clock, ONE tick list: the silent peer's death is what
       // makes the answering peer's survival mean anything, and they can only
       // be compared if the same tick reached both.
+      // The silent peer holds a real SUBSCRIPTION before it goes quiet. Without
+      // one, the hub's stats after the termination would be zero because they
+      // were always zero, and the leak assertion at the end of this case would
+      // be measuring nothing. The workspace is founded through the product's own
+      // door on this app, since this app's database rows are the shared world's
+      // but this user is nobody in it.
+      const founded = await server.app.inject({
+        method: 'POST',
+        url: '/v1/workspaces',
+        headers,
+        payload: { name: 'Heartbeat shop' },
+      });
+      expect(founded.statusCode).toBe(201);
+      const workspaceId = (founded.json() as { workspaceId: string }).workspaceId;
+
       const silent = await openStream(server.port, headers, { autoPong: false });
+      silent.subscribe(workspaceId, 0);
+      await silent.next((frame) => frame.type === 'caught-up');
+      expect(server.hub.stats()).toEqual({ sockets: 1, subscriptions: 1, workspaces: 1 });
       const healthy = await openStream(server.port, headers);
       expect(ticks).toHaveLength(2);
       expect(ticks.every((entry) => entry.everyMs === heartbeatMs)).toBe(true);
@@ -827,8 +845,13 @@ describe('WS /v1/stream — the heartbeat, driven by the injected clock', () => 
       expect(healthy.socket.readyState).toBe(healthy.socket.OPEN);
 
       // The terminated peer left nothing behind — its tick is gone from the
-      // scheduler, so a timed-out socket cannot go on being pinged forever.
+      // scheduler, so a timed-out socket cannot go on being pinged forever, and
+      // the hub is holding none of its subscription either. `terminate()` sends
+      // no close frame, so this is the path where a leak is most plausible: it
+      // works because `ws` still emits `close` locally and teardown runs on it.
       expect(ticks).toHaveLength(1);
+      await waitFor(() => server.hub.stats().sockets === 0);
+      expect(server.hub.stats()).toEqual({ sockets: 0, subscriptions: 0, workspaces: 0 });
       await healthy.close();
     } finally {
       await server.close();
