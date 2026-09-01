@@ -72,6 +72,12 @@ Found 2026-08-31 by a post-merge gate that came back RED and was **not** a code 
   > smaller than recorded: `engine-strict=true` promotes an existing warning to an error rather than
   > inventing a check. **Claim only what the probe you ran covers**: two commands were tested, they
   > disagreed, and the summary took the quieter one for both.
+  > **OPERATIONAL FORM — use this, it is free:** the gate is not unguarded after all. Every gate and CI
+  > step runs through `pnpm run`, so **if `WARN Unsupported engine` appears anywhere in gate output, you
+  > are on the wrong Node and that run is not evidence.** Detection, not prevention — Plan 11 keeps the
+  > `.nvmrc` + `engine-strict` fix — but it means a wrong-Node gate is now readable rather than silent,
+  > which is a materially weaker version of the false-GREEN than this section originally recorded.
+  > *(Independently re-measured by the executor with v22.22.2 as its control; both sessions agree.)*
 - **So there are two failure modes, and the quiet one is worse.** The false RED is what this section was
   written from — loud, and it names itself in the error text. The false GREEN is a gate that passes on an
   unsupported Node and says nothing at all. Nobody catches that one.
@@ -180,6 +186,12 @@ return ever emptied. **Closer, so it is not re-litigated: a branded type** carry
 > ledger rows in an append-only store. This one is a read-path computation over correct rows: no ledger
 > row is wrong, so the fix is complete and retroactive the instant it lands. Filing them together
 > over-scopes the fix or under-scopes P19.
+> **GENERAL FORM, worth more than the instance — when triaging any disclosure, ask whether the wrong
+> thing was WRITTEN or COMPUTED.** Written means it is in the ledger: closed for the future, existing
+> rows superseded but never removed, and there is something to migrate. Computed means a read path
+> derived it from correct rows: fixing the path fixes every past and future read at once, and there is
+> nothing to migrate. The two look identical in a review — same severity, same guest, same leaked id —
+> and they have completely different remediation shapes.
 >
 > **RULING, stated as a condition so it does not need re-arguing:** if the fix agent derives that
 > `ScopeRevokedInstruction`'s docblock already blesses the itemised whole-workspace purge by analogy to
@@ -433,6 +445,18 @@ Every one below was violated by a controller that had just written it. **Assume 
   > executed. Alone, "343/343 green" is equally consistent with a coverage gap and with an unexecuted
   > path, and those two demand opposite responses (write the test vs. delete the branch). The green run
   > is only interpretable next to the red one. **Pair them or report neither.**
+- **THE INSTRUMENT'S SCOPE IS NARROWER THAN THE CLAIM BUILT ON IT — three instances, so stop calling it
+  a coincidence.** Each time the probe was real, it ran correctly, and it answered truthfully about a
+  narrower subject than the sentence written from it. **A right answer about the wrong subject.**
+  1. `git merge-tree --write-tree` answers *"did this conflict"*; it was read as *"is this redundant"*.
+  2. `@{u}` answers *"ahead of the upstream this branch was created with"* — `origin/main` — and it was
+     read as *"pushed"*, truthfully returning `0 6` right after a successful push.
+  3. `pnpm exec node -v` answers for **`pnpm exec`**; it was read as *"pnpm"*, and `pnpm run` — the
+     command every gate actually uses — behaves differently.
+  **The check: name the subject your instrument actually ranged over, then reread your sentence and see
+  whether it names the same one.** All three passed every falsifiability test that was applied, because
+  those tests asked whether the instrument WORKED, and the instrument did work. None asked what it was
+  pointed at. Note this is the one failure class in this file that a positive control cannot catch.
 - **An over-specific search returns a false negative that looks like a finding.** Searching all 12 plans
   for Plan 4's *exact* wording of the catalogue rule found it in **one** file; searching for the rule
   loosely found it in **all 11**. Same class as grepping for `21 behind` when the file said `20`.
