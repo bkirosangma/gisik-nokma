@@ -45,43 +45,87 @@ import { canSeeResolved } from './can-see.js';
  * drifting from the one visibility decision; `canSee` alone can agree with it
  * vacuously; both together cannot.
  *
- * ## `open` / `active` / `terminal` are ABSENT, not zero and not null
+ * ## `terminal` LANDED here (case 6.82 closed); `open` / `active` are still ABSENT
  *
- * The "5 of 8 **done**" half needs a per-category count over the children, which
- * means each child's `state_category` — and that lives in `proj_tickets`, via
- * `proj_rollups`. **Neither table exists on this branch** (Plan 3 Task 11 owns
- * `proj_rollups`, Task 12 owns `proj_tickets`), and no migration for either is
- * invented here: a table this plan authored would be a second, competing
- * definition of another plan's projection.
+ * The "5 of 8 **done**" half needs a per-category count over the children,
+ * which means each child's `state_category`. That column lives in
+ * `proj_tickets`, and neither it nor `proj_rollups` existed when this file was
+ * written — hence case 6.82's note that they were left off the TYPE rather than
+ * shipped as `0` or `null`, "so the compiler demands a decision at every
+ * construction site the day Plan 3 Task 11 lands". Both tables have since
+ * landed and Plan 5 Task 7's `TicketCard` is the first construction site that
+ * needs the number, so the decision is made here:
  *
- * They are left off the TYPE rather than shipped as `0` or `null`, and the
- * distinction is the point. A `0` would be a lie — "0 done" while five are done
- * is worse than saying nothing. A `null` still invites a client to render the
- * phrase. An absent key means the compiler demands a decision at every
- * construction site the day Plan 3 Task 11 lands, which is this codebase's
- * established idiom (the branded `EffectiveRole`, the bare exhaustive switches).
- * Recorded as case 6.82, owner Plan 3 Task 11.
+ * - `terminal` is now a field, counted over the SAME child rows this function
+ *   already enumerates (see the join note below).
+ * - `open` and `active` remain absent, for 6.82's original reason and no other.
+ *   Nothing reads them yet, and a count nobody asked for would be a third
+ *   number to keep honest for free.
  *
- * ## When `proj_rollups` lands, this does NOT become a column rename
+ * A `0` in place of a real count would have been the exact failure this file is
+ * named against — "0 done" while five are done is worse than saying nothing.
  *
- * Plan 4's own cross-plan note (its line 46) names the columns
- * `ticket_id, open_count, active_count, terminal_count`. **That is not Plan 3's
- * table.** Plan 3 Task 11's migration creates `proj_rollups` with
- * `parent_ticket_id` (primary key), `workspace_id`, `project_id`,
- * `total_children`, `open_children`, `active_children`, `terminal_children`.
- * Two consequences worth writing down before someone codes against the wrong
- * one:
+ * ## `terminal` discloses MORE than `total` does, and the spec says so
  *
- * - Plan 3 stores `total_children` DIRECTLY, so `total` comes from that column
- *   — not from `open + active + terminal` as Plan 4's text computes it.
- * - `total` here is "children `proj_visibility` knows about"; Plan 3's is
- *   "children `proj_tickets` knows about". Nothing today guarantees those two
- *   sets are equal, so the substitution is **not** a no-op and must be measured
- *   rather than assumed. Case 6.83, owner Plan 3 Task 11.
+ * `total` leaks the EXISTENCE of children a viewer cannot reach. `terminal`
+ * additionally leaks something about their STATE. That is a bigger disclosure
+ * and it is deliberate, not inherited from `total`'s precedent:
+ * `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md` line 116 —
+ * "Derived parent progress is computed server-side over *all* children. A
+ * viewer who cannot see two of them reads '5 of 8 done · 2 restricted' — true
+ * counts, restriction named, nothing pretended absent." The "5" is a count over
+ * all eight. `restrictedCount` is what keeps it honest.
+ *
+ * ## The category is JOINED onto this enumeration; it is NOT read from `proj_rollups`
+ *
+ * `proj_rollups` already stores `terminal_children` per parent, and taking the
+ * number from there would be the obvious move. It is wrong, and case 6.83 asked
+ * for the reason to be MEASURED rather than assumed. It now has been
+ * (`test/read/ticket-cards.test.ts`, "MEASURES case 6.83"): the two tables do
+ * not enumerate the same children.
+ *
+ * - This function reads `proj_visibility WHERE parent_id = $1` with **no
+ *   workspace clause** — deliberately, see the cross-workspace note below.
+ * - `getRollup` and `recomputeParent` are both `workspace_id = $1`-scoped.
+ *
+ * So a cross-workspace child (case 6.84, reachable today) is in one count and
+ * not the other. Mixing a `total` from one table with a `restrictedCount` from
+ * the other can therefore emit `restrictedCount > total`, which is an
+ * incoherent triple rather than a small inaccuracy. One enumeration answers all
+ * four numbers instead: a `LEFT JOIN proj_tickets` onto the rows already being
+ * walked, so the child set is literally the same rows.
+ *
+ * ## `uncategorized` — the join's miss, counted rather than swallowed
+ *
+ * A child `proj_visibility` knows and `proj_tickets` has no row for has an
+ * UNKNOWN category. Counting it as non-terminal would understate "done" while
+ * looking exactly like a true count, which is this file's signature defect
+ * entered from a new side. Throwing was considered and declined: the state is
+ * unreachable through the shipped door (one ingest transaction writes both
+ * projections or rolls back, and `applyTicketEvent` throws on a
+ * `ticket.created` it cannot fold), but it is COMMON in fixtures that seed only
+ * some projections — `test/helpers/seed.ts`'s `applyAll` applies four of them
+ * and not `proj_tickets` — so a throw would convert honest partial fixtures
+ * into crashes while proving nothing about the product.
+ *
+ * Counted, it is a true statement about those fixtures ("nine children, none of
+ * them known to be done") and a countable integrity signal in the product,
+ * where it is always 0. `terminal + uncategorized <= total`.
  */
 export interface RollupView {
   /** ALL direct children. Never filtered by visibility — that is the honesty. */
   total: number;
+  /**
+   * Direct children whose `proj_tickets.state_category` is `'terminal'`.
+   * Over ALL children, including ones this viewer may not see — spec line 116.
+   */
+  terminal: number;
+  /**
+   * Direct children `proj_tickets` has no row for, so their category is
+   * unknown. Counted in `total`; counted in neither `terminal` nor its
+   * complement. Always 0 for a ledger written through the shipped door.
+   */
+  uncategorized: number;
   /** Direct children THIS viewer may NOT see. Per-viewer — computed at read, never stored. */
   restrictedCount: number;
 }
@@ -92,6 +136,8 @@ type ChildRow = {
   project_id: string;
   resolved_mode: 'workspace' | 'project' | 'explicit';
   resolved_user_ids: string[];
+  /** From the LEFT JOIN: `null` when `proj_tickets` has no row for this child. */
+  state_category: 'open' | 'active' | 'terminal' | null;
 };
 
 /**
@@ -156,10 +202,19 @@ export async function rollupFor(
   viewerId: string,
   ticketId: string,
 ): Promise<RollupView | null> {
+  // LEFT, and joined on ticket_id ALONE. The child set is proj_visibility's and
+  // this join may only ANNOTATE it, never shrink it — an inner join would
+  // silently drop a child out of a TRUE TOTAL. ticket_id is globally unique in
+  // both tables, so adding a workspace-scoped join condition would strip the
+  // category off a cross-workspace child (case 6.84) and turn a known 'done'
+  // into an `uncategorized`.
   const { rows } = await db.query<ChildRow>(
-    `SELECT ticket_id, workspace_id, project_id, resolved_mode, resolved_user_ids
-     FROM proj_visibility WHERE parent_id = $1
-     ORDER BY ticket_id`,
+    `SELECT v.ticket_id, v.workspace_id, v.project_id, v.resolved_mode, v.resolved_user_ids,
+            t.state_category
+     FROM proj_visibility v
+     LEFT JOIN proj_tickets t ON t.ticket_id = v.ticket_id
+     WHERE v.parent_id = $1
+     ORDER BY v.ticket_id`,
     [ticketId],
   );
   if (rows.length === 0) {
@@ -171,8 +226,20 @@ export async function rollupFor(
   // N round-trips for an answer that cannot differ within a workspace.
   const roleByWorkspace = new Map<string, EffectiveRole>();
   let restrictedCount = 0;
+  let terminal = 0;
+  let uncategorized = 0;
 
   for (const child of rows) {
+    // Counted BEFORE the audience question and never inside it: the category
+    // half is a fact about the parent's children, the restriction half is a
+    // fact about the viewer, and the whole point of this file is that the two
+    // are not computed from one another.
+    if (child.state_category === null) {
+      uncategorized += 1;
+    } else if (child.state_category === 'terminal') {
+      terminal += 1;
+    }
+
     let eff = roleByWorkspace.get(child.workspace_id);
     if (eff === undefined) {
       eff = await resolveEffectiveRole(db, viewerId, child.workspace_id);
@@ -194,5 +261,5 @@ export async function rollupFor(
   // `rows.length`, and the loop above never touches it: the total is a fact
   // about the PARENT, and the one thing that must not be reconstructed from the
   // per-viewer pass — that reconstruction IS the defect this task is named for.
-  return { total: rows.length, restrictedCount };
+  return { total: rows.length, terminal, uncategorized, restrictedCount };
 }

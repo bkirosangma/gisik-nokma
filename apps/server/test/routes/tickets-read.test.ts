@@ -264,10 +264,21 @@ describe('the single read carries the rollup — true totals with the restrictio
 
     const res = await get(`/v1/workspaces/${ws}/tickets/${parentId}`, headers);
     expect(res.statusCode).toBe(200);
-    // `toEqual` is exact, so an `open`/`active`/`terminal` grown here would
-    // redden — those need `proj_tickets` and are deliberately absent from the
-    // shape rather than zeroed (cases 6.82, 6.83).
-    expect(res.json().rollup).toEqual({ total: 3, restrictedCount: 1 });
+    // `toEqual` is exact, so an `open`/`active` grown on the shape would redden
+    // — those are still absent from `RollupView` (case 6.82). `terminal` and
+    // `uncategorized` landed with Plan 5 Task 7 and appear here because this
+    // route returns the view verbatim.
+    //
+    // `terminal: 0, uncategorized: 3` is TRUE of this fixture rather than a
+    // placeholder: `applyAll` does not seed `proj_tickets`, so no child here has
+    // a known state category, and `uncategorized` is what says that out loud
+    // instead of letting a 0 read as "none of them are done".
+    expect(res.json().rollup).toEqual({
+      total: 3,
+      terminal: 0,
+      uncategorized: 3,
+      restrictedCount: 1,
+    });
 
     // The non-vacuity control, in the same test: the restricted child really is
     // one this viewer is refused, so "3 · 2 · 1" is not an arithmetic accident
