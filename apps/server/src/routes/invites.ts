@@ -249,8 +249,10 @@ type InviteRow = {
  * event on a separate entity and nothing drops it. Closing it needs the
  * membership grant and the invitation's status decided in ONE transaction,
  * which means reaching inside the ledger's commit — machinery this surface does
- * not have. **Recorded as case 6.130 rather than papered over.** *Owner: Plan
- * 10, which owns the ingest transaction boundary.*
+ * not have. **Recorded as case 6.130 rather than papered over.** *Owner:
+ * UNASSIGNED, and said so rather than parked on a plan that would not receive
+ * it — the fix belongs in `commitOne` (`../ingest/ingest-service.ts`), Plan 1's
+ * surface, and no plan in the series has an open task there.*
  *
  * ## What acceptance does NOT do
  *
