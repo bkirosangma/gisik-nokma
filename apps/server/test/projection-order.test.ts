@@ -22,7 +22,9 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  * proj_memberships, both assertions below moving with it. Plan 3 Chain B Task
  * 9's proj_ticket_types is the second, and the first to insert ABOVE an entry
  * that inserted before it — §8 position 3, so proj_projects moved down one.
- * proj_tickets and proj_rollups go BEFORE proj_memberships too, not after.
+ * Chain B Task 10's proj_tickets is the third, and the first to insert into
+ * the MIDDLE of the array — §8 position 5, between proj_projects and
+ * proj_memberships. proj_rollups goes BEFORE proj_memberships too, not after.
  * Getting that wrong is not a cosmetic ordering slip — it puts proj_rollups
  * ahead of the proj_tickets rows it reads.
  *
@@ -30,7 +32,7 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  * make this ordering contract skippable when Postgres is not running.
  */
 describe('projection registration order (coordination §8)', () => {
-  it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, memberships, invites, visibility, contested', () => {
+  it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, tickets, memberships, invites, visibility, contested', () => {
     const registry = buildProjectionRegistry();
     expect(registry.all().map((projection) => projection.name)).toEqual([
       'proj_entity_heads',
@@ -42,6 +44,13 @@ describe('projection registration order (coordination §8)', () => {
       // Plan 4 Task 9 Step 3b. §8 position 4, itself INSERTED rather than
       // appended when it landed: the ticket-creation precondition reads it.
       'proj_projects',
+      // Plan 3 Chain B Task 10. §8 position 5 — INSERTED between proj_projects
+      // and proj_memberships, which is neither end of this array. It must sit
+      // BELOW proj_workflows and proj_ticket_types (it resolves a ticket's type
+      // and its workflow definition in the same ingest transaction) and ABOVE
+      // proj_rollups, which Task 11 will insert directly after it because that
+      // projection reads these rows for the same event.
+      'proj_tickets',
       'proj_memberships',
       // Plan 4 Task 14. §8 amended to slot it directly after proj_memberships,
       // so this INSERTS above proj_visibility rather than appending.
@@ -72,6 +81,7 @@ describe('projection registration order (coordination §8)', () => {
       ['proj_workflows', ['proj_workflows']],
       ['proj_ticket_types', ['proj_ticket_types']],
       ['proj_projects', ['proj_projects']],
+      ['proj_tickets', ['proj_tickets']],
       ['proj_memberships', ['proj_memberships']],
       // ONE table, and `invite_tokens` — created by the same migration — is
       // deliberately not it. See the second assertion in this file.

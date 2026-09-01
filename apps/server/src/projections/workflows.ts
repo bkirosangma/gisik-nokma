@@ -106,3 +106,72 @@ export async function getWorkflowDefFromProjection(
   }
   return workflowDefinedPayloadSchema.parse(row.definition);
 }
+
+/**
+ * A BY-ID lookup over every workflow this workspace had in force at a stream
+ * position — the plural of `getWorkflowDefFromProjection(…, { asOfWorkspaceSeq })`,
+ * asked once instead of once per id.
+ *
+ * It exists because `TicketStateDeps.getWorkflow(workflowId)` is a PURE BY-ID
+ * LOOKUP and the reducer is the only thing that knows which id an event needs
+ * (`packages/domain/src/ticket-state.ts`, controller ruling P1). A loader that
+ * pre-selects "the ticket's workflow" resolves null on the one event the
+ * migration exists for — `ticket.workflow_rebound` asks for the PAYLOAD's
+ * `toWorkflowId`, a workflow the ticket is not on yet — and the reducer then
+ * throws a sentence blaming the ledger for a loader's omission. Handing the
+ * reducer everything in force removes the question rather than answering it.
+ *
+ * Parsing is LAZY and memoized: a workspace's whole definition set is fetched,
+ * but only the definitions actually asked for pay `workflowDefinedPayloadSchema`.
+ * A ticket event asks for at most one.
+ *
+ * WORKSPACE-SCOPED, and that is not belt-and-braces. `getWorkflowDefFromProjection`
+ * states a PRECONDITION on `asOfWorkspaceSeq` — the position must come from the
+ * same workspace stream as the workflow, because cursors restart at 1 per
+ * workspace and positions from different streams are not comparable. A query
+ * that ranges over every workspace's workflows cannot satisfy that precondition
+ * by construction, so the predicate is what makes the as-of question well
+ * posed here. It is NOT a fix for controller ruling P14, which is about an
+ * actor-supplied workflow id resolving through an unscoped reader on the engine
+ * path; that reader and that path are Task 12's.
+ */
+export type WorkflowDefLookup = {
+  get(workflowId: string): PublishedWorkflowDef | undefined;
+};
+
+export async function getWorkflowDefsInForce(
+  db: PoolClient | Pool,
+  workspaceId: string,
+  asOfWorkspaceSeq: number,
+): Promise<WorkflowDefLookup> {
+  const { rows } = await db.query<{ workflow_id: string; definition: unknown }>(
+    // DISTINCT ON takes the first row of each workflow_id group under the
+    // ORDER BY, so `version DESC` makes that "the greatest version published at
+    // or before this position" — the same question, and the same answer, as the
+    // singular reader's as-of branch.
+    `SELECT DISTINCT ON (workflow_id) workflow_id, definition
+       FROM proj_workflows
+      WHERE workspace_id = $1 AND published_workspace_seq <= $2
+      ORDER BY workflow_id, version DESC`,
+    [workspaceId, asOfWorkspaceSeq],
+  );
+  const raw = new Map<string, unknown>(rows.map((row) => [row.workflow_id, row.definition]));
+  const parsed = new Map<string, PublishedWorkflowDef>();
+  return {
+    get(workflowId) {
+      const already = parsed.get(workflowId);
+      if (already !== undefined) {
+        return already;
+      }
+      if (!raw.has(workflowId)) {
+        return undefined;
+      }
+      // Parsed rather than cast, exactly as the singular reader does: a row
+      // written before a schema change should fail loudly here rather than
+      // reach the reducer shaped like a WorkflowDef and not being one.
+      const def = workflowDefinedPayloadSchema.parse(raw.get(workflowId));
+      parsed.set(workflowId, def);
+      return def;
+    },
+  };
+}

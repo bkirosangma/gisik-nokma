@@ -11,8 +11,74 @@ import { testEnvelope } from './helpers/envelope.js';
 
 let db: TestDatabase;
 
+/**
+ * The workflow and the ticket type every `created()` below depends on, planted
+ * ONCE at the head of this file's ledger.
+ *
+ * They are not scenery. `events` is append-only across the whole file, and the
+ * verify case at the bottom rebuilds EVERY registered projection over the whole
+ * ledger — including Plan 3 Task 10's proj_tickets, which folds `ticket.created`
+ * through the shared reducer and throws when the ticket's type, or that type's
+ * workflow, is not defined. The engine refuses `ticket.unknown-type` at the
+ * door, so a ledger holding a creation whose type was never defined is one the
+ * product could not have written, and re-deriving it SHOULD fail.
+ *
+ * In `beforeAll` rather than inside that case, because the definitions have to
+ * carry the LOWEST workspace stream positions in the file: proj_tickets resolves
+ * a workflow AS OF the applying event's position, so a definition published
+ * after a creation is not in force for it. `resetTestSequences()` is not called
+ * here (see below), so the counter climbs monotonically and "first written" is
+ * "lowest position".
+ */
+const WORKFLOW = newUlid();
+
 beforeAll(async () => {
   db = await createTestDatabase();
+  const client = await db.pool.connect();
+  try {
+    await insertEvent(
+      client,
+      testEnvelope({
+        workspaceId: WORKSPACE,
+        entity: { kind: 'workflow', id: WORKFLOW },
+        type: 'workflow.defined',
+        payload: {
+          id: WORKFLOW,
+          version: 1,
+          name: 'Basic',
+          initialStateId: 'todo',
+          states: [
+            { id: 'todo', name: 'To do', category: 'open' },
+            { id: 'done', name: 'Done', category: 'terminal' },
+          ],
+          transitions: [{ from: 'todo', to: 'done', rules: [] }],
+        },
+        actorId: ACTOR,
+      }),
+    );
+    await insertEvent(
+      client,
+      testEnvelope({
+        workspaceId: WORKSPACE,
+        // A fresh entity ULID with the payload's `id` carrying the type key —
+        // foundingSequence's shape, and the only one the envelope schema
+        // permits. TYPE_ID is what `created()` names.
+        entity: { kind: 'ticket-type', id: newUlid() },
+        type: 'ticket-type.defined',
+        payload: {
+          id: TYPE_ID,
+          name: 'Task',
+          icon: 'check',
+          rank: 3,
+          workflowId: WORKFLOW,
+          fields: [],
+        },
+        actorId: ACTOR,
+      }),
+    );
+  } finally {
+    client.release();
+  }
 });
 
 afterAll(async () => {
@@ -728,6 +794,22 @@ describe('proj_visibility under verify-projections', () => {
     for (const projection of projections.all()) {
       await rebuildProjection(projection.name, { pool: db.pool, projections });
     }
+    // proj_tickets is NON-EMPTY before the verdict below is trusted. This case
+    // is where that table meets the real verifier: the definitions planted in
+    // beforeAll make every ticket.created in this file's ledger fold into
+    // proj_tickets, so the EXCEPT diff compares its three jsonb columns live
+    // against a shadow-schema rebuild, in both directions. A clean verdict over
+    // an empty table is the check that cannot fail, and this series has iterated
+    // one twice; drop the beforeAll definitions or stop folding creations and
+    // the verdict would stay clean while proving nothing about this table.
+    const { rows } = await db.pool.query<{ n: number }>(
+      'SELECT count(*)::int AS n FROM proj_tickets',
+    );
+    expect(
+      rows[0]?.n,
+      'proj_tickets is empty — the clean verdict below proves nothing about it',
+    ).toBeGreaterThan(0);
+
     expect(await verifyProjections({ pool: db.pool, projections })).toEqual({
       clean: true,
       diffs: [],

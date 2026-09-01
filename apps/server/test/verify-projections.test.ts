@@ -95,6 +95,25 @@ describe('verifyProjections', () => {
     // file's own seed comment says so about proj_workflows. Asserted rather than
     // trusted: if a seed ever stops committing, the verdict below stops meaning
     // anything, and THIS is what says so, naming the table.
+    //
+    // proj_tickets is NOT on this list and is knowingly EMPTY here, which the
+    // clean verdict below therefore proves nothing about. It cannot be seeded
+    // through this file's door: a real `ticket.created` needs
+    // `ctx.getTicketTypeDef` to resolve, and `createEngineContext` answers null
+    // for it until Plan 3 Task 12, so ingest refuses every ticket with
+    // `ticket.unknown-type`. Hand-inserting a row would be seeding a shape
+    // ingest never produced. Task 10 gave that table its own projection-outer
+    // rebuild-and-diff over the LIVE tables instead
+    // (`test/proj-tickets.test.ts`), which is the stricter instrument for it;
+    // TASK 12 SHOULD ADD `proj_tickets` HERE once a ticket can be ingested.
+    //
+    // Empty HERE is not the same as unverified. `test/proj-visibility.test.ts`
+    // plants a ledger by hand — its definitions in `beforeAll`, so they are in
+    // force for the creations that follow — rebuilds every projection and runs
+    // THIS verifier over it, which is where proj_tickets' three jsonb columns
+    // are actually diffed live against a shadow rebuild in both directions.
+    // That case carries its own non-empty assertion, for the reason this one
+    // does.
     for (const table of [
       'proj_entity_heads',
       'proj_workflows',

@@ -5,6 +5,7 @@ import { membershipsProjection } from './proj-memberships.js';
 import { projProjects } from './proj-projects.js';
 import { projVisibility } from './proj-visibility.js';
 import { createProjectionRegistry, type ProjectionRegistry } from './registry.js';
+import { ticketsProjection } from './tickets.js';
 import { ticketTypesProjection } from './ticket-types.js';
 import { workflowsProjection } from './workflows.js';
 
@@ -57,6 +58,14 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   registry.register(ticketTypesProjection);
   // §8 position 4.
   registry.register(projProjects);
+  // §8 position 5 (Plan 3 Chain B Task 10). It INSERTS above proj_memberships,
+  // which has been registered since Plan 4 and sits at position 7. Two
+  // adjacencies are load-bearing and neither is with proj_memberships: it must
+  // apply AFTER proj_workflows and proj_ticket_types, because it resolves a
+  // ticket's type and the workflow definition in force inside the same ingest
+  // transaction; and it must apply BEFORE proj_rollups (position 6, Task 11),
+  // which reads the rows this projection has just written for the same event.
+  registry.register(ticketsProjection);
   registry.register(membershipsProjection);
   // §8 position amended by Plan 4 Task 14: proj_invites slots directly AFTER
   // proj_memberships. Nothing in this task's own path depends on that

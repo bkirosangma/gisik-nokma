@@ -137,3 +137,71 @@ export async function getTicketTypeFromDb(
     fields: row.fields,
   });
 }
+
+/**
+ * A BY-ID lookup over this workspace's whole type ladder — the plural of
+ * `getTicketTypeFromDb`, asked once instead of once per key.
+ *
+ * Same shape and same reason as `getWorkflowDefsInForce`
+ * (`./workflows.ts`): `TicketStateDeps.getTicketType(typeId)` is a by-id
+ * lookup, and the reducer is the only thing that knows which id an event needs.
+ * The `ticket.created` branch asks for the payload's own `typeId` TODAY, so a
+ * point lookup would answer it — but "today" is a scope word, and a loader
+ * that pre-selects one id answers `undefined` for any other, at which point the
+ * reducer throws `unknown ticket type "…" — the engine must refuse
+ * ticket.created before it reaches a projection`, blaming the door for the
+ * loader's omission. A ladder is four built-ins plus a workspace's custom
+ * types; handing the reducer all of it removes the question.
+ *
+ * Parsing is LAZY and memoized: only the types actually asked for pay
+ * `ticketTypeDefSchema`.
+ *
+ * Workspace-scoped for the reason its singular sibling is — a type key is an
+ * actor-chosen slug, so `invoice` exists in many workspaces at once.
+ */
+export type TicketTypeLookup = {
+  get(typeId: string): TicketTypeDef | undefined;
+};
+
+export async function getTicketTypeLadderFromDb(
+  db: Queryable,
+  workspaceId: string,
+): Promise<TicketTypeLookup> {
+  const { rows } = await db.query<{
+    type_id: string;
+    name: string;
+    icon: string;
+    rank: number;
+    workflow_id: string;
+    fields: unknown;
+  }>(
+    `SELECT type_id, name, icon, rank, workflow_id, fields
+       FROM proj_ticket_types
+      WHERE workspace_id = $1`,
+    [workspaceId],
+  );
+  const raw = new Map(rows.map((row) => [row.type_id, row]));
+  const parsed = new Map<string, TicketTypeDef>();
+  return {
+    get(typeId) {
+      const already = parsed.get(typeId);
+      if (already !== undefined) {
+        return already;
+      }
+      const row = raw.get(typeId);
+      if (row === undefined) {
+        return undefined;
+      }
+      const def = ticketTypeDefSchema.parse({
+        id: row.type_id,
+        name: row.name,
+        icon: row.icon,
+        rank: row.rank,
+        workflowId: row.workflow_id,
+        fields: row.fields,
+      });
+      parsed.set(typeId, def);
+      return def;
+    },
+  };
+}
