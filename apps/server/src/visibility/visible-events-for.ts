@@ -11,6 +11,39 @@ import { canSee } from './can-see.js';
  * user. It is not an assertion that the ticket was deleted: the ticket may be
  * alive and being worked on by people who can still see it. It says only that
  * this replica may no longer hold it.
+ *
+ * ## What a purge may name, and what it may not
+ *
+ * Naming a ticket the recipient never held is NOT a harmless no-op that the
+ * replica quietly ignores. It is a positive assertion that the ticket EXISTS,
+ * pushed to a device, and ULIDs are timestamp-ordered so the id dates it too.
+ * The rule is therefore about the RECIPIENT, not about the id:
+ *
+ * - **A guest, and anyone the range put OUT of the workspace, is never handed a
+ *   ticket id at all** — not itemised over a scope, and not one at a time by
+ *   the subtree walk. Spec §6 calls guests external collaborators ("the
+ *   accountant, the supplier"), and an external party learning the shape of
+ *   work they were never shown is the disclosure `ScopeRevokedInstruction`
+ *   exists to avoid. Both are answered at scope level, or not at all.
+ * - **A member or an admin still standing inside the workspace may be handed
+ *   one they never held.** That is not an oversight: spec §6 decided it — "within
+ *   a workspace, the existence-leak is the honest trade; full concealment was
+ *   considered and declined" — and case 6.14 is the same trade at the read door.
+ *   Cases 6.100 and 6.101 pin that it really happens, so it is a disclosed
+ *   behaviour rather than one a later reader rediscovers as a bug.
+ *
+ * ## Why "could this recipient see it BEFORE?" is not the test
+ *
+ * It is the question one would rather ask, and this module cannot ask it.
+ * `proj_visibility` stores the audience that applies NOW and keeps no prior
+ * value (its migration has no history column), and neither payload carries a
+ * before-image: `visibilitySetPayload` is the new mode and list,
+ * `ticketReparentedPayload` is the new parent alone. Reconstructing the
+ * pre-event audience would mean re-deriving the projection's own `resolve()`
+ * rule here, against a ledger lookback — a second definition of visibility that
+ * can disagree with the table every other door reads. That is exactly the ban
+ * cases 6.82 and 6.94 already recorded, and it is refused here for the same
+ * reason. The role line above is the whole of the rule.
  */
 export interface PurgeInstruction {
   kind: 'purge';
@@ -24,11 +57,30 @@ export interface PurgeInstruction {
  * Per-id purges tell the recipient how many tickets a scope contained,
  * INCLUDING ids they never held. For someone still standing inside the
  * workspace that is a minor count-leak, consistent with the restricted-parent
- * existence-leak spec §6 already accepts (case 6.14). For someone who has just
- * been put OUT of the workspace, or who is only a guest in it, it is an
- * external party learning the size of work they were never shown, and losing
- * access is not a thing that should teach them it. The ticket list is not even
- * COMPUTED on those paths, so nothing counts it.
+ * existence-leak spec §6 already accepts (case 6.14) — and the itemised branch
+ * below deliberately keeps it rather than widening this instruction to cover
+ * it. For someone who has just been put OUT of the workspace, or who is only a
+ * guest in it, it is an external party learning the size of work they were
+ * never shown, and losing access is not a thing that should teach them it.
+ *
+ * ## "No ticket list is computed on those paths" is now true of the GENERATOR
+ *
+ * It used to be a claim about this branch alone, and as a claim about the
+ * module it was FALSE. The subtree purge walk sat outside every role test, so
+ * an ordinary `visibility.set` or `ticket.reparented` on ANY ticket in the
+ * workspace handed a guest `purge:<thatTicketId>` for a ticket they had never
+ * held and could never see (case 6.100). The walk is now gated on `!isGuest`
+ * beside it, and the null-role path returns before the loop is entered, so a
+ * guest and an ex-member reach no code anywhere in this file that names a
+ * ticket id.
+ *
+ * That gate leaves one thing undone, deliberately and in the safe direction: a
+ * guest un-shared from a ticket they legitimately held now receives no
+ * tombstone for it, and keeps it until a full resync. Retention is recoverable
+ * and disclosure is not — an id on a device the server does not control is
+ * never retrieved — so the trade is taken this way round.
+ * *Owner: Plan 10 (the WS catch-up/purge protocol and the snapshot-bounded
+ * bootstrap), case 6.102.*
  *
  * The replica's handling is a local delete by scope, so it is idempotent in the
  * same way a purge is.
@@ -355,7 +407,16 @@ export async function* visibleEventsFor(
         // descendant out of their view — and an event they cannot see is
         // usually exactly the one that did it, which is why the purge walk is
         // outside the `canSee` branch rather than inside it.
-        if (VISIBILITY_AFFECTING.has(env.type)) {
+        //
+        // It is NOT outside the ROLE test, and it used to be. This walk names
+        // ticket ids one at a time, and `nowInvisibleInheritSubtree` answers
+        // "cannot see NOW", which is true of a ticket taken away and equally
+        // true of one never held. Run for a guest it therefore disclosed every
+        // ticket in the workspace that anyone re-authored (case 6.100) — to the
+        // one class of recipient `PurgeInstruction`'s docblock says may never be
+        // handed an id. Guests are answered at scope level or not at all; the
+        // retention that leaves them is recorded on `ScopeRevokedInstruction`.
+        if (!isGuest && VISIBILITY_AFFECTING.has(env.type)) {
           yield* purge(await nowInvisibleInheritSubtree(db, userId, env.entity.id));
         }
         break;
@@ -367,6 +428,24 @@ export async function* visibleEventsFor(
             // later in this same range (case 6.5: a re-grant restores). What
             // they lost is whatever the new role no longer reaches — which for
             // a re-grant down to guest is most of the workspace.
+            //
+            // The two arms are the `PurgeInstruction` role line, applied to a
+            // whole workspace. A guest is an external collaborator and gets the
+            // scope instruction. Someone re-granted at a NON-guest role is
+            // standing inside the workspace, where spec §6 already declined
+            // full concealment, so they get the itemised list — which is worth
+            // itemising: an OWNER re-granted as a member really does lose the
+            // owner bypass, and those are genuine retractions of tickets that
+            // were on the device (case 6.103).
+            //
+            // The itemised list also names ids they never held, and on one
+            // shape it names NOTHING ELSE: a member revoked and re-granted at
+            // `member` inside one window has lost nothing at all — the
+            // revocation deletes only the workspace-scope row and the project
+            // rows survive it — so every id emitted is one they never held.
+            // That is the accepted count-leak, stated rather than hidden; the
+            // alternative, widening `scope-revoked` to cover it, would wipe a
+            // replica that lost nothing.
             if (isGuest) {
               yield { kind: 'scope-revoked', workspaceId };
             } else {

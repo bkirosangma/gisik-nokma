@@ -272,21 +272,30 @@ describe('visibleEventsFor — what reaches a replica', () => {
     const inLost = newUlid();
     const inKept = newUlid();
     const workspaceWide = newUlid();
-    const neverHeld = newUlid();
+    const neverHeldInKept = newUlid();
+    const neverHeldInLost = newUlid();
     await seedMember(db.pool, ws, viewer, 'member', [{ projectId: lost }, { projectId: kept }]);
     await seedTicket(db.pool, { workspaceId: ws, projectId: lost, ticketId: inLost });
     await seedTicket(db.pool, { workspaceId: ws, projectId: kept, ticketId: inKept });
     await seedTicket(db.pool, { workspaceId: ws, projectId: lost, ticketId: workspaceWide });
-    await seedTicket(db.pool, { workspaceId: ws, projectId: kept, ticketId: neverHeld });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: kept, ticketId: neverHeldInKept });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: lost, ticketId: neverHeldInLost });
     // A workspace-mode ticket that happens to live in the lost project: losing
     // the project does not take it away, and a purge naming it would delete
     // something the member may still read.
     await applyAll(db.pool, [setVisibilityEnv(ws, workspaceWide, 'workspace')]);
-    // In the KEPT project and invisible to this viewer both before and after —
-    // the discriminator between a project-scoped scan and a workspace-wide one.
-    // Without it, widening the scan to the whole workspace passes every other
-    // assertion here, because nothing else in the workspace is invisible.
-    await applyAll(db.pool, [setVisibilityEnv(ws, neverHeld, 'explicit', [newUlid()])]);
+    // In the KEPT project and invisible to this viewer both before and after.
+    // What it discriminates is the SCOPE OF THE SCAN — widening it to the whole
+    // workspace reddens the line below, because nothing else in the workspace
+    // is invisible. It is NOT, and never was, a control for "never held, never
+    // purged": the same ticket planted in the LOST project IS purged, which is
+    // the pair asserted below.
+    await applyAll(db.pool, [setVisibilityEnv(ws, neverHeldInKept, 'explicit', [newUlid()])]);
+    // The twin, in the LOST project. Invisible to this viewer before the
+    // removal and after it, so nothing took it away and it was never on this
+    // device.
+    await applyAll(db.pool, [setVisibilityEnv(ws, neverHeldInLost, 'explicit', [newUlid()])]);
+    expect(await canSee(db.pool, viewer, neverHeldInLost)).toBe(false);
 
     const removal = await record(
       testEnvelope({
@@ -305,10 +314,18 @@ describe('visibleEventsFor — what reaches a replica', () => {
     // member (so this is not "yield only purges").
     expect(ids).not.toContain(`purge:${inKept}`);
     expect(ids).not.toContain(`purge:${workspaceWide}`);
-    // Never on this device, so never purged from it: a purge naming it would
-    // tell the member a ticket exists in a project they are still on and cannot
-    // see — the count-leak the scope-level instruction exists to avoid.
-    expect(ids).not.toContain(`purge:${neverHeld}`);
+    // The scan is PROJECT-SCOPED, so it never reaches the KEPT project's
+    // invisible ticket. That is the whole of what this line proves. The comment
+    // it replaces read "never on this device, so never purged from it", which
+    // was false as a guarantee — the twin below is exactly as never-held and is
+    // purged, because `nowInvisibleTicketsInScope` asks `canSee` NOW and cannot
+    // tell a ticket taken away from one never held.
+    expect(ids).not.toContain(`purge:${neverHeldInKept}`);
+    // The real guarantee, pinned rather than described: inside the lost scope a
+    // member IS told an id they never held. Disclosed, not accidental — spec §6
+    // declined full concealment within a workspace and this viewer is still
+    // standing in it (`PurgeInstruction`'s docblock, cases 6.14 and 6.101).
+    expect(ids).toContain(`purge:${neverHeldInLost}`);
     expect(ids).toContain(removal.id);
   });
 
@@ -604,5 +621,177 @@ describe('visibleEventsFor — what reaches a replica', () => {
     expect(ids).not.toContain(invite.id);
     // The address is PII (case 6.38) and nothing may carry it yet.
     expect(JSON.stringify(await collect(owner, ws))).not.toContain('someone@example.com');
+  });
+
+  it('6.100 the purge walk never hands a GUEST a ticket id — a re-authoring elsewhere in the workspace is not their business', async () => {
+    const ws = newUlid();
+    const prj = newUlid();
+    const guest = newUlid();
+    const admin = newUlid();
+    const shared = newUlid();
+    const foreign = newUlid();
+    await seedGuest(db.pool, ws, guest);
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: shared });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: foreign });
+    await applyAll(db.pool, [setVisibilityEnv(ws, shared, 'explicit', [guest])]);
+    await applyAll(db.pool, [setVisibilityEnv(ws, foreign, 'explicit', [newUlid()])]);
+    // Asserted, so the case is about a ticket that really was out of reach and
+    // not about a fixture that forgot to share one.
+    expect(await canSee(db.pool, guest, shared)).toBe(true);
+    expect(await canSee(db.pool, guest, foreign)).toBe(false);
+
+    const mine = await record(ticketEvent(ws, 'comment.added', shared, { body: 'for you' }, admin));
+    // Routine activity by someone else, on a ticket this guest has never held:
+    // an admin re-authors its audience. `visibility.set` is visibility-affecting,
+    // so this is the event that used to start the walk for everyone alike.
+    await record(setVisibilityEnv(ws, foreign, 'explicit', [newUlid()], admin));
+
+    const items = await collect(guest, ws, mine.workspaceSeq - 1);
+    // The positive control FIRST: this guest's stream is non-empty over this
+    // range, so the exclusion below is a decision and not an empty result —
+    // without it the assertion passes against a filter that yields nothing.
+    expect(idsOf(items)).toContain(mine.id);
+    // Not `not.toContain('purge:…')` — the id must not appear in ANY field of
+    // ANY item, the standard 6.16 holds the envelopes to. A guest is an
+    // external collaborator (spec §6); an id pushed to their device is a
+    // standing assertion that the ticket exists, and ULIDs date it too.
+    expect(JSON.stringify(items)).not.toContain(foreign);
+  });
+
+  it('6.101 a MEMBER is handed the id of a ticket in a project they were never on — the spec §6 trade, pinned rather than left to be rediscovered', async () => {
+    const ws = newUlid();
+    const mine = newUlid();
+    const theirs = newUlid();
+    const viewer = newUlid();
+    const held = newUlid();
+    const foreign = newUlid();
+    await seedMember(db.pool, ws, viewer, 'member', [{ projectId: mine }]);
+    await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: held });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: foreign });
+    expect(await canSee(db.pool, viewer, held)).toBe(true);
+    expect(await canSee(db.pool, viewer, foreign)).toBe(false);
+
+    const seen = await record(ticketEvent(ws, 'comment.added', held, { body: 'mine' }, viewer));
+    const reauthored = await record(setVisibilityEnv(ws, foreign, 'explicit', [newUlid()]));
+
+    const ids = idsOf(await collect(viewer, ws, seen.workspaceSeq - 1));
+    // The positive control, in the same call.
+    expect(ids).toContain(seen.id);
+    // The EVENT is still withheld — it is about a ticket this member cannot see.
+    expect(ids).not.toContain(reauthored.id);
+    // The tombstone names the id anyway, and that is the disclosed behaviour:
+    // `nowInvisibleInheritSubtree` asks `canSee` NOW, which is true of a ticket
+    // taken away and equally true of one never held, and this module cannot ask
+    // the other question — `proj_visibility` keeps no prior audience and neither
+    // payload carries a before-image (`PurgeInstruction`'s docblock). Spec §6
+    // decided the trade for someone standing INSIDE the workspace; case 6.14 is
+    // the same trade at the read door. Anyone narrowing this must argue with
+    // that sentence rather than change the line quietly.
+    expect(ids).toContain(`purge:${foreign}`);
+  });
+
+  it('6.101 the same through `ticket.reparented`, and the guest standing beside them receives neither the event nor the id', async () => {
+    const ws = newUlid();
+    const mine = newUlid();
+    const theirs = newUlid();
+    const viewer = newUlid();
+    const guest = newUlid();
+    const held = newUlid();
+    const sharedWithGuest = newUlid();
+    const foreignParent = newUlid();
+    const foreign = newUlid();
+    await seedMember(db.pool, ws, viewer, 'member', [{ projectId: mine }]);
+    await seedGuest(db.pool, ws, guest);
+    await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: held });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: sharedWithGuest });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: foreignParent });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: foreign });
+    await applyAll(db.pool, [setVisibilityEnv(ws, sharedWithGuest, 'explicit', [guest])]);
+    // Out of reach of BOTH, and by two different branches of `canSee`: the
+    // member is not on its project, the guest is named by no list.
+    expect(await canSee(db.pool, viewer, foreign)).toBe(false);
+    expect(await canSee(db.pool, guest, foreign)).toBe(false);
+
+    const memberControl = await record(
+      ticketEvent(ws, 'comment.added', held, { body: 'mine' }, viewer),
+    );
+    const guestControl = await record(
+      ticketEvent(ws, 'comment.added', sharedWithGuest, { body: 'yours' }, viewer),
+    );
+    // The OTHER visibility-affecting type, on a ticket neither of them holds.
+    await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'ticket', id: foreign },
+        type: 'ticket.reparented',
+        payload: { newParentId: foreignParent },
+        actorId: newUlid(),
+      }),
+    );
+
+    const memberIds = idsOf(await collect(viewer, ws, memberControl.workspaceSeq - 1));
+    expect(memberIds).toContain(memberControl.id);
+    expect(memberIds).toContain(`purge:${foreign}`);
+
+    // One event, one workspace, two recipients: the ONLY difference is the role,
+    // which is the whole of the rule `PurgeInstruction` states.
+    const guestItems = await collect(guest, ws, memberControl.workspaceSeq - 1);
+    expect(idsOf(guestItems)).toContain(guestControl.id);
+    expect(JSON.stringify(guestItems)).not.toContain(foreign);
+  });
+
+  it('6.103 an OWNER re-granted as a member inside one window is told, ticket by ticket, what the owner bypass used to reach', async () => {
+    const ws = newUlid();
+    const theirs = newUlid();
+    const viewer = newUlid();
+    const openToAll = newUlid();
+    const projectOnly = newUlid();
+    const explicitElsewhere = newUlid();
+    // No projects: the owner reads everything in the workspace by the bypass
+    // alone (owner decision 2026-08-27), so the downgrade takes real tickets
+    // away rather than merely renaming the role.
+    await seedMember(db.pool, ws, viewer, 'owner');
+    await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: openToAll });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: projectOnly });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: explicitElsewhere });
+    await applyAll(db.pool, [setVisibilityEnv(ws, openToAll, 'workspace')]);
+    await applyAll(db.pool, [setVisibilityEnv(ws, explicitElsewhere, 'explicit', [newUlid()])]);
+    // All three were on this device a moment ago. Without this the purges below
+    // would be naming tickets that were never held — a different case (6.101),
+    // and the one that makes an itemised list look gratuitous.
+    expect(await canSee(db.pool, viewer, openToAll)).toBe(true);
+    expect(await canSee(db.pool, viewer, projectOnly)).toBe(true);
+    expect(await canSee(db.pool, viewer, explicitElsewhere)).toBe(true);
+
+    const opener = await record(
+      ticketEvent(ws, 'comment.added', openToAll, { body: 'still readable' }, viewer),
+    );
+    await record(revocationEnv(ws, viewer));
+    await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'membership', id: membershipId(ws, viewer) },
+        type: 'membership.granted',
+        payload: { userId: viewer, role: 'member' },
+        actorId: newUlid(),
+      }),
+    );
+
+    const ids = idsOf(await collect(viewer, ws, opener.workspaceSeq - 1));
+    // GENUINE retractions: the owner bypass was the only thing serving these
+    // two, and a member on no project reaches neither.
+    expect(ids).toContain(`purge:${projectOnly}`);
+    expect(ids).toContain(`purge:${explicitElsewhere}`);
+    // The control that separates this from "purge everything you hold": the
+    // workspace-mode ticket survives the downgrade and is not named.
+    expect(ids).not.toContain(`purge:${openToAll}`);
+    expect(ids).toContain(opener.id);
+    // And NOT the scope instruction. That is the guest answer (6.92); this
+    // recipient is standing inside the workspace, where spec §6 declined full
+    // concealment, so they get the itemised list. The list also names ids they
+    // never held — none in this fixture, all of them in the degenerate
+    // member→member re-grant, where nothing was lost at all — which is the
+    // accepted count-leak recorded on `ScopeRevokedInstruction`.
+    expect(ids).not.toContain(`scope-revoked:${ws}`);
   });
 });
