@@ -410,9 +410,14 @@ table rather than taken next-free.)*
   UP FRONT over the whole ticket set, so a refusal appends nothing and the answered count equals the
   events appended. Three such refusals, each `422 {status:'refused', rule, reason}`:
   `migration.same-workflow`, `migration.unknown-target-state`, and `migration.unmapped-state`
-  naming the states that have no target. The remaining window is named rather than closed: an
-  infrastructure failure part way through a batch that passed pre-flight leaves earlier tickets
-  moved, and closing it needs a batch-scoped ingest transaction rather than a change here.
+  naming the states that have no target. **The `stateMap` is read by its OWN keys** — a state id may
+  legally be `toString`, and plain-object indexing would read `Object.prototype.toString` as a
+  mapping, call the state covered, and commit the batch's other tickets while that one was refused
+  at ingest. Two windows are named rather than closed: an infrastructure failure part way through a
+  batch that passed pre-flight, and a TOCTOU — the pre-flight covers every refusal the engine can
+  produce only as of the instant it read the ticket rows, so a concurrent rebind of one of them
+  lands `ticket.rebound-same-workflow` mid-batch. One batch-scoped ingest transaction closes both,
+  and it belongs to the ingest service rather than here.
   `apps/server/src/routes/builder-reads.ts`, `packages/domain/src/read-models.ts`
 
 ## 9. Editor, documents & attachments
