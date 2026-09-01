@@ -5460,3 +5460,50 @@ replaced by it rather than left standing beside a contradiction.
 other way, a guest gets the guest-withheld roster back and nothing else moves. **Owner: Plan 8's
 workflow builder**, which is the consumer that actually needs the roster, and the plan that would
 notice if guests were meant to have it.
+
+### 6. Preferences (Task 13): a contract NARROWED, a shape Plan 6 disagrees with, and three residues
+
+Added at Plan 5 Task 13 (2026-09-02), in the same change set. Nothing here is a defect in the
+shipped code; all five are things a later plan compiles or reasons against, recorded rather than
+decided by an executor.
+
+**6a. `listColumns` and `grouping` keys are ULIDs, not arbitrary strings — a TIGHTENING of amendment
+14. Owner: this document.** The plan text declares `Record<string, …>` "keyed by project id". The
+shipped schema keys both records with `ulidString`, and that is a guard rather than tidiness:
+MEASURED on zod 3.25.76, `z.record(z.string(), …).parse(JSON.parse('{"__proto__": ["status"]}'))`
+**succeeds and answers `{}`** — the key is assigned onto a plain object, goes through
+`Object.prototype`'s accessor, and creates no own property. Under a full-replace PUT the server would
+then store, and answer, a document the caller never sent. With the ULID key schema the same document
+is refused at the door. Every project id in this product is a bare ULID (`ids.ts`: `membership` is the
+one entity kind whose id is not), so nothing legitimate is refused — but a client that PUTs a
+non-ULID key now gets a 400 where the plan text implied a 200. Cheap to widen: one constant in
+`packages/domain/src/preferences.ts`, and the domain test names what widening it costs.
+
+**6b. Plan 6 declares a DIFFERENT preferences shape, and it will not compile against the server's.**
+Plan 6's `UserPreferences` is `{ version: 1; projects: Record<string, ProjectViewPrefs>; savedFilters:
+SavedFilter[] }` with `ProjectViewPrefs = { columns; grouping }` and `SavedFilter.filter`; Plan 5 Task
+13 ships `{ savedFilters: [{ id, name, filterSpec }]; listColumns; grouping }` — no `version`, the
+per-project pair split across two records, and the saved filter's field spelled `filterSpec`. The
+server's is the one with a table, a route and tests behind it; Plan 6's is plan text with fakes.
+**Owner: this document**, to rule which shape the `DataSource` carries before Plan 6's Task 10 is
+executed. Whoever rules should note that the two are informationally equivalent — the mapping is
+mechanical either way — so the cost is a decision, not a migration.
+
+**6c. A revoked member's preferences row survives, unreachable and uncollected.** `user_preferences`
+has no foreign keys (matching every projection table here) and preferences are not events, so the
+purge tombstones `visibleEventsFor` emits on membership loss do not reach this table: the row stays,
+the door answers that person 404, and nothing ever deletes it. Harmless for storage at this scale and
+NOT harmless as a statement — it is per-user data outliving the relationship that justified it.
+**Owner: Plan 11's deployment/retention work**, which is where data lifecycle belongs.
+
+**6d. A future tightening of `preferencesDocSchema` bricks existing rows with a 500 for that user
+until they save again.** `getPreferences` re-validates on the way OUT, deliberately: answering
+`EMPTY_PREFERENCES` on a parse failure would silently discard somebody's saved filters, and answering
+the raw row would hand a client a shape its types forbid. There is no migration path and no
+per-user repair. Case 7.132 executes the behaviour so the cost is visible rather than discovered.
+**Owner: whoever next changes that schema.**
+
+**6e. Duplicate `savedFilters[].id` is unrefused.** The server never indexes by that id — the filters
+are an array and stay one — so a duplicate is a client-side confusion rather than a server-side
+ambiguity, and refusing it would be the door enforcing a rule only the renderer needs. **Owner: Plan
+6**, which renders the list.
