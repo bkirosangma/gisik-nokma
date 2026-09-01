@@ -119,6 +119,20 @@ type SearchFixtures = {
   bulkInvisibleIds: string[];
   /** The other fifty-five, in `ticket_id` order. */
   bulkVisibleIds: string[];
+  /**
+   * The LEAK PAIR: one `pangolin` ticket the member may see and one they may
+   * not, the invisible one carrying `pangolin` in a COMMENT right beside a word
+   * that appears nowhere else (`chinchilla`).
+   *
+   * The bulk fixture's `aardvark` comments cannot do this job, and it was
+   * MEASURED that they cannot: a snippet source widened to reach other rows
+   * still windows onto a MATCH, so text carrying no match is simply never shown
+   * and the assertion passes on a route that is leaking. Here the secret sits
+   * INSIDE a matching fragment, so a widened source has something the headline
+   * will actually pick.
+   */
+  leakVisibleId: string;
+  leakHiddenId: string;
 };
 
 const BULK_COUNT = 60;
@@ -184,6 +198,8 @@ async function seedSearchFixtures(pool: Pool, world: ReadWorld): Promise<SearchF
   const invisibleOffsets = new Set(BULK_INVISIBLE_OFFSETS);
   const bulkInvisibleIds = bulkIds.filter((_id, offset) => invisibleOffsets.has(offset));
   const bulkVisibleIds = bulkIds.filter((_id, offset) => !invisibleOffsets.has(offset));
+  const leakVisibleId = searchTicketId(2);
+  const leakHiddenId = searchTicketId(3);
 
   const ticket = (id: string, title: string): LedgerEvent =>
     makeCommitted({
@@ -212,6 +228,14 @@ async function seedSearchFixtures(pool: Pool, world: ReadWorld): Promise<SearchF
     ticket(rankCommentId, 'Nothing notable here'),
     comment(rankCommentId, 'a quokka was seen'),
     ticket(rankTitleId, 'Quokka census overdue'),
+
+    // The leak pair. The hidden one's comment carries the search term AND the
+    // secret in one fragment, which is the only shape that catches a snippet
+    // whose source reached past its own row.
+    ticket(leakVisibleId, 'Pangolin survey outstanding'),
+    ticket(leakHiddenId, 'Pangolin ledger'),
+    comment(leakHiddenId, 'pangolin counts beside chinchilla receipts'),
+    ownerOnly(leakHiddenId),
   ];
 
   // Inserted BACKWARDS: id order and insertion order are exact opposites, so a
@@ -229,7 +253,16 @@ async function seedSearchFixtures(pool: Pool, world: ReadWorld): Promise<SearchF
   }
 
   await applyCommitted(pool, events);
-  return { projectId, rankTitleId, rankCommentId, bulkIds, bulkInvisibleIds, bulkVisibleIds };
+  return {
+    projectId,
+    rankTitleId,
+    rankCommentId,
+    bulkIds,
+    bulkInvisibleIds,
+    bulkVisibleIds,
+    leakVisibleId,
+    leakHiddenId,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -434,11 +467,26 @@ describe('GET /v1/search — finding text across a workspace', () => {
     // The five are absent by id AND by the word that exists only in their
     // comments — in a body carrying fifty of their visible neighbours, so this
     // is not an empty answer being read as safety.
-    const body = (await seededSearch('member', 'wombat')).body;
+    const response = await seededSearch('member', 'wombat');
+    const body = response.body;
     for (const invisible of fixtures.bulkInvisibleIds) {
       expect(body).not.toContain(invisible);
     }
     expect(body).not.toContain('aardvark');
+
+    // EVERY snippet is a window over ITS OWN row's text. MEASURED, and the
+    // measurement is why these two lines exist: the `not.toContain('aardvark')`
+    // above does NOT catch a snippet built from the whole workspace's text,
+    // because a headline windows onto a MATCH and the leaked words had none.
+    // Fifty snippets each carrying their own ticket's number, and fifty that are
+    // all different, do catch it.
+    const hits = (response.json() as SearchResponse).hits;
+    for (const hit of hits) {
+      const ownNumber = hit.card.title.split(' ')[2] as string;
+      expect(hit.snippet).toContain('**wombat**');
+      expect(hit.snippet).toContain(ownNumber);
+    }
+    expect(new Set(hits.map((hit) => hit.snippet)).size).toBe(50);
 
     // Positive controls, both directions: the owner searching the same word gets
     // the first fifty of all SIXTY (a different, overlapping, non-empty set), and
@@ -447,6 +495,32 @@ describe('GET /v1/search — finding text across a workspace', () => {
     expect(await hitIds('owner', 'aardvark')).toEqual(fixtures.bulkInvisibleIds);
     // …and the member searching it gets nothing at all.
     expect(await hitIds('member', 'aardvark')).toEqual([]);
+  });
+
+  it('7.102 the snippet is a window over the row it is attached to — a term matching inside an INVISIBLE row’s comment brings none of that comment back', async () => {
+    // `pangolin` matches two tickets: one the member may see (title only) and
+    // one they may not (title AND a comment reading "pangolin counts filed
+    // beside chinchilla receipts"). So the member's own hit HAS a snippet,
+    // and the text a leak would show is a MATCHING fragment rather than an
+    // off-match blob a headline would skip whether the route leaked or not.
+    const response = await seededSearch('member', 'pangolin');
+    expect(response.statusCode).toBe(200);
+    const hits = (response.json() as SearchResponse).hits;
+    expect(hits.map((hit) => hit.card.ticketId)).toEqual([fixtures.leakVisibleId]);
+    expect(hits[0]?.snippet).toContain('**Pangolin**');
+    expect(hits[0]?.snippet).not.toContain('chinchilla');
+    expect(response.body).not.toContain('chinchilla');
+    expect(response.body).not.toContain(fixtures.leakHiddenId);
+
+    // Positive control: the owner sees both, and the hidden one's snippet DOES
+    // carry the secret — so the member's snippet lacks it because of who is
+    // asking, not because `ts_headline` never shows a comment.
+    const owner = await seededSearch('owner', 'pangolin');
+    const ownerHits = (owner.json() as SearchResponse).hits;
+    expect(ownerHits.map((hit) => hit.card.ticketId).sort()).toEqual(
+      [fixtures.leakVisibleId, fixtures.leakHiddenId].sort(),
+    );
+    expect(owner.body).toContain('chinchilla');
   });
 
   it('7.24 PLANTED DEFECT: the hidden ticket is unfindable by its confidential comment — no hit, no snippet, no id in the body', async () => {
