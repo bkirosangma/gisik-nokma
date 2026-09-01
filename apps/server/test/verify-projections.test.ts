@@ -6,7 +6,11 @@ import { formatReport, verifyProjections } from '../src/tools/verify-projections
 import { createTestDatabase, type TestDatabase } from './helpers/db.js';
 import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import { buildContestedClaim } from '../src/sync/contest-coherence.js';
-import { submittedWorkflowDefined, submittedWorkspaceCreated } from './helpers/events.js';
+import {
+  submittedTicketTypeDefined,
+  submittedWorkflowDefined,
+  submittedWorkspaceCreated,
+} from './helpers/events.js';
 
 let db: TestDatabase;
 
@@ -59,6 +63,15 @@ beforeAll(async () => {
     // table would have proven neither. The unique index on original_event_id
     // rides along through `CREATE TABLE … LIKE … INCLUDING ALL`.
     contestedClaim(home.workspaceId),
+    // A TICKET TYPE, so proj_ticket_types is compared with a real row in it
+    // rather than empty — same reason as the two above, and the reason the
+    // prompt for Plan 3 Task 9 calls the registry-driven verifier's trap: a
+    // check that iterates the registry proves nothing for a projection whose
+    // table the seed never filled. Its `fields` column is this file's SECOND
+    // jsonb projection column, carrying a nested options array, so the live
+    // INSERT and the shadow-schema rebuild must agree through EXCEPT in both
+    // directions on more than a scalar.
+    submittedTicketTypeDefined(home.workspaceId),
   ]);
   if (results.some((result) => result.status !== 'committed')) {
     throw new Error('seeding failed — verifier tests need an honest baseline');
@@ -82,7 +95,12 @@ describe('verifyProjections', () => {
     // file's own seed comment says so about proj_workflows. Asserted rather than
     // trusted: if a seed ever stops committing, the verdict below stops meaning
     // anything, and THIS is what says so, naming the table.
-    for (const table of ['proj_entity_heads', 'proj_workflows', 'proj_contested']) {
+    for (const table of [
+      'proj_entity_heads',
+      'proj_workflows',
+      'proj_contested',
+      'proj_ticket_types',
+    ]) {
       const { rows } = await db.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`);
       expect(
         rows[0]?.n,

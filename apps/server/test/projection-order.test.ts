@@ -17,25 +17,30 @@ import { buildProjectionRegistry } from '../src/projections/index.js';
  * registers its projection.
  *
  * "Extends" means INSERTS AT ITS §8 POSITION, not appends. Plan 4 Task 9's
- * proj_projects is the first registrant to prove that rule rather than state it:
- * §8 puts it fourth, proj_ticket_types (third) does not exist, so it went in
- * BETWEEN proj_workflows and proj_memberships and both assertions below moved
- * with it. Plan 3 Chain B's proj_ticket_types, proj_tickets and proj_rollups go
- * BEFORE proj_memberships too, not after. Getting that wrong is not a cosmetic
- * ordering slip — it puts proj_rollups ahead of the proj_tickets rows it reads.
+ * proj_projects was the first registrant to prove that rule rather than state
+ * it: §8 puts it fourth, and it went in BETWEEN proj_workflows and
+ * proj_memberships, both assertions below moving with it. Plan 3 Chain B Task
+ * 9's proj_ticket_types is the second, and the first to insert ABOVE an entry
+ * that inserted before it — §8 position 3, so proj_projects moved down one.
+ * proj_tickets and proj_rollups go BEFORE proj_memberships too, not after.
+ * Getting that wrong is not a cosmetic ordering slip — it puts proj_rollups
+ * ahead of the proj_tickets rows it reads.
  *
  * Deliberately DB-free — no createTestDatabase, no pool, nothing that could
  * make this ordering contract skippable when Postgres is not running.
  */
 describe('projection registration order (coordination §8)', () => {
-  it('buildProjectionRegistry registers the pinned order: heads, workflows, projects, memberships, invites, visibility, contested', () => {
+  it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, memberships, invites, visibility, contested', () => {
     const registry = buildProjectionRegistry();
     expect(registry.all().map((projection) => projection.name)).toEqual([
       'proj_entity_heads',
       'proj_workflows',
-      // Plan 4 Task 9 Step 3b. §8 position 4, INSERTED here rather than
-      // appended: the ticket-creation precondition reads it, and every §8 entry
-      // between it and proj_memberships is still unbuilt.
+      // Plan 3 Chain B Task 9. §8 position 3, INSERTED ABOVE proj_projects,
+      // which had been sitting directly under proj_workflows only because this
+      // position was empty.
+      'proj_ticket_types',
+      // Plan 4 Task 9 Step 3b. §8 position 4, itself INSERTED rather than
+      // appended when it landed: the ticket-creation precondition reads it.
       'proj_projects',
       'proj_memberships',
       // Plan 4 Task 14. §8 amended to slot it directly after proj_memberships,
@@ -65,6 +70,7 @@ describe('projection registration order (coordination §8)', () => {
     ).toEqual([
       ['proj_entity_heads', ['proj_entity_heads']],
       ['proj_workflows', ['proj_workflows']],
+      ['proj_ticket_types', ['proj_ticket_types']],
       ['proj_projects', ['proj_projects']],
       ['proj_memberships', ['proj_memberships']],
       // ONE table, and `invite_tokens` — created by the same migration — is
