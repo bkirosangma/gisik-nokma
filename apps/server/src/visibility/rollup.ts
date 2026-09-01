@@ -23,14 +23,27 @@ import { canSeeResolved } from './can-see.js';
  * slice — is the defect this task is named for, and it is invisible to any test
  * that only ever asks one viewer.
  *
- * ## `visibleCount` is counted, never derived
+ * ## There is no `visibleCount`, and it was REMOVED rather than never tried
  *
- * It is not `total - restrictedCount`. Both counters are incremented
- * independently in the same pass over the children, so `visible + restricted ===
- * total` is a real cross-check on that enumeration rather than an identity the
- * code just wrote. Deriving it by subtraction would make every such assertion
- * vacuous — a check that passes for a reason unrelated to the property it names,
- * which is this series' signature defect.
+ * A third field carrying "children this viewer may see" shipped first, counted
+ * in the same pass rather than derived, on the argument that
+ * `visible + restricted === total` would then be a real cross-check on the
+ * enumeration instead of an identity the code just wrote. **That argument was
+ * measured and it is false.** Replacing the counter with
+ * `visibleCount: rows.length - restrictedCount` is behaviour-equivalent for a
+ * correct implementation, so the mutation killed NOTHING in the whole server
+ * suite, and anything a dropped child would have caused was already caught by
+ * the exact `restrictedCount` assertions. The invariant was decoration, and a
+ * derivable field defended by a decorative assertion is the shape this series
+ * exists to refuse — so the field is gone, not kept with the claim quietly
+ * softened. Case 6.88.
+ *
+ * The enumeration does get a second witness, and it is an independent one
+ * rather than arithmetic: the cases cross-check `restrictedCount` against
+ * `canSee` child by child, the same pairing `listVisibleTickets` is held to
+ * (cases 6.63, 6.65). A literal expectation alone cannot catch this function
+ * drifting from the one visibility decision; `canSee` alone can agree with it
+ * vacuously; both together cannot.
  *
  * ## `open` / `active` / `terminal` are ABSENT, not zero and not null
  *
@@ -69,8 +82,6 @@ import { canSeeResolved } from './can-see.js';
 export interface RollupView {
   /** ALL direct children. Never filtered by visibility — that is the honesty. */
   total: number;
-  /** Direct children THIS viewer may see. Counted, not `total - restrictedCount`. */
-  visibleCount: number;
   /** Direct children THIS viewer may NOT see. Per-viewer — computed at read, never stored. */
   restrictedCount: number;
 }
@@ -95,7 +106,7 @@ type ChildRow = {
  * childless parents are ABSENT from `proj_rollups`, not zeroed (Plan 3 case
  * 5.17) — so `null` will keep meaning the same thing when the table lands.
  *
- * A `{ total: 0, visibleCount: 0, restrictedCount: 0 }` would be worse than
+ * A `{ total: 0, restrictedCount: 0 }` would be worse than
  * uninformative: it asserts a parent-with-no-children where the system has no
  * evidence there is a parent at all.
  *
@@ -159,7 +170,6 @@ export async function rollupFor(
   // parent are nearly always in one workspace, and a per-child resolve would be
   // N round-trips for an answer that cannot differ within a workspace.
   const roleByWorkspace = new Map<string, EffectiveRole>();
-  let visibleCount = 0;
   let restrictedCount = 0;
 
   for (const child of rows) {
@@ -168,24 +178,21 @@ export async function rollupFor(
       eff = await resolveEffectiveRole(db, viewerId, child.workspace_id);
       roleByWorkspace.set(child.workspace_id, eff);
     }
-    // Two counters, both incremented here. Neither is derived from the other —
-    // see the note on `visibleCount`.
-    if (
-      canSeeResolved(eff, viewerId, {
-        workspaceId: child.workspace_id,
-        projectId: child.project_id,
-        resolvedMode: child.resolved_mode,
-        resolvedUserIds: child.resolved_user_ids,
-      })
-    ) {
-      visibleCount += 1;
-    } else {
+    // The audience question is `canSeeResolved`'s, exactly as everywhere else —
+    // no SQL and no branch here restates who may see what.
+    const visible = canSeeResolved(eff, viewerId, {
+      workspaceId: child.workspace_id,
+      projectId: child.project_id,
+      resolvedMode: child.resolved_mode,
+      resolvedUserIds: child.resolved_user_ids,
+    });
+    if (!visible) {
       restrictedCount += 1;
     }
   }
 
-  // `rows.length` and not `visibleCount + restrictedCount`: the total is a fact
-  // about the parent that must not be reconstructed from the per-viewer pass,
-  // or a bug in that pass would silently move the total too.
-  return { total: rows.length, visibleCount, restrictedCount };
+  // `rows.length`, and the loop above never touches it: the total is a fact
+  // about the PARENT, and the one thing that must not be reconstructed from the
+  // per-viewer pass — that reconstruction IS the defect this task is named for.
+  return { total: rows.length, restrictedCount };
 }

@@ -238,8 +238,9 @@ describe('GET /v1/workspaces/:workspaceId/tickets — the viewer’s slice, filt
 
 describe('the single read carries the rollup — true totals with the restriction named', () => {
   it('a parent whose children the viewer only partly sees is told the TRUE total beside what it may not reach', async () => {
-    // Three different numbers on purpose (total 3 · visible 2 · restricted 1):
-    // a fixture where any two coincided would let a swap through.
+    // Three different numbers on purpose — three children, two this viewer can
+    // reach, one it cannot: a fixture where any two coincided would let a swap
+    // through.
     const ws = newUlid();
     const mine = newUlid();
     const theirs = newUlid();
@@ -266,7 +267,7 @@ describe('the single read carries the rollup — true totals with the restrictio
     // `toEqual` is exact, so an `open`/`active`/`terminal` grown here would
     // redden — those need `proj_tickets` and are deliberately absent from the
     // shape rather than zeroed (cases 6.82, 6.83).
-    expect(res.json().rollup).toEqual({ total: 3, visibleCount: 2, restrictedCount: 1 });
+    expect(res.json().rollup).toEqual({ total: 3, restrictedCount: 1 });
 
     // The non-vacuity control, in the same test: the restricted child really is
     // one this viewer is refused, so "3 · 2 · 1" is not an arithmetic accident

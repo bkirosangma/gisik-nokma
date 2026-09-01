@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
+import { canSee } from '../../src/visibility/can-see.js';
 import { rollupFor, type RollupView } from '../../src/visibility/rollup.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import {
@@ -33,15 +34,24 @@ import {
  *
  * A count that equals a maximum because the fixture is tidy is this project's
  * recorded failure. For the flagship class (a member on one of the two
- * projects) the fixture yields `total 9 · visible 6 · restricted 3` — no two of
- * which can be swapped without a case noticing. Across the classes the
- * restricted count takes **six distinct values** (0, 2, 3, 5, 8, 9), so a
- * mutation cannot satisfy the suite by moving to any one constant.
+ * projects) the fixture yields a total of 9 over 6 children they can reach and
+ * 3 they cannot — three different numbers, so no two can be swapped without a
+ * case noticing. Across the classes the restricted count takes **six distinct
+ * values** (0, 2, 3, 5, 8, 9), so a mutation cannot satisfy the suite by moving
+ * to any one constant. `total === restricted` for an outsider is the one
+ * coincidence the semantics FORCE, which is why the discrimination does not
+ * rest on that class.
  *
- * `total === visible` for the owner and `total === restricted` for an outsider
- * are the two coincidences the semantics FORCE — an owner sees everything, a
- * non-member nothing — and they are why those two classes are not the ones the
- * discrimination rests on.
+ * ## `restrictedCount` is cross-checked against `canSee`, child by child
+ *
+ * A literal expectation alone cannot catch `rollupFor` drifting from the one
+ * visibility decision; `canSee` alone can agree with it vacuously about two
+ * empty answers. Both together cannot, which is the pairing
+ * `listVisibleTickets` is already held to (cases 6.63, 6.65). This REPLACED an
+ * earlier `visible + restricted === total` invariant over a counted
+ * `visibleCount` field: mutating that counter to `total - restrictedCount` was
+ * measured to kill NOTHING in the whole server suite, so the invariant was
+ * decoration and the field it defended was removed (case 6.88).
  *
  * ## What is deliberately not here
  *
@@ -83,9 +93,9 @@ beforeEach(async () => {
  * - 1 × `explicit` naming a stranger — the owner alone.
  *
  * Nine is not a round number on purpose: with eight, a member off every project
- * would have seen four and been refused four, and a swap of `visibleCount` and
- * `restrictedCount` would have gone unnoticed on exactly the class that is
- * meant to catch the admin-no-bypass rule.
+ * would have reached four and been refused four, and a swap of the reached and
+ * refused counts would have gone unnoticed on exactly the class that is meant
+ * to catch the admin-no-bypass rule.
  */
 async function seedFamily(): Promise<{
   ws: string;
@@ -153,15 +163,15 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     // `outsider` is granted nothing at all.
 
     const classes: Array<[string, string, RollupView]> = [
-      ['owner — the disclosed workspace-wide read', owner, { total: 9, visibleCount: 9, restrictedCount: 0 }],
-      ['member on project A', onA, { total: 9, visibleCount: 6, restrictedCount: 3 }],
-      ['member on projects A and B', onAB, { total: 9, visibleCount: 7, restrictedCount: 2 }],
-      ['member on no project', offAll, { total: 9, visibleCount: 4, restrictedCount: 5 }],
+      ['owner — the disclosed workspace-wide read', owner, { total: 9, restrictedCount: 0 }],
+      ['member on project A', onA, { total: 9, restrictedCount: 3 }],
+      ['member on projects A and B', onAB, { total: 9, restrictedCount: 2 }],
+      ['member on no project', offAll, { total: 9, restrictedCount: 5 }],
       // Identical to the plain member above: an admin gets NO read bypass.
-      ['workspace admin on no project', adminOffAll, { total: 9, visibleCount: 4, restrictedCount: 5 }],
-      ['guest — one explicit list and nothing else', guestUser, { total: 9, visibleCount: 1, restrictedCount: 8 }],
-      ['non-member', outsider, { total: 9, visibleCount: 0, restrictedCount: 9 }],
-      ['revoked member, project row surviving', revoked, { total: 9, visibleCount: 0, restrictedCount: 9 }],
+      ['workspace admin on no project', adminOffAll, { total: 9, restrictedCount: 5 }],
+      ['guest — one explicit list and nothing else', guestUser, { total: 9, restrictedCount: 8 }],
+      ['non-member', outsider, { total: 9, restrictedCount: 9 }],
+      ['revoked member, project row surviving', revoked, { total: 9, restrictedCount: 9 }],
     ];
 
     const observed: Array<[string, RollupView | null]> = [];
@@ -181,11 +191,25 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     const restricted = observed.map(([, r]) => r?.restrictedCount);
     expect([...new Set(restricted)].sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual([0, 2, 3, 5, 8, 9]);
 
-    // The enumeration cross-check: `visibleCount` is COUNTED, not derived from
-    // `total - restrictedCount`, so this catches a pass that dropped a child
-    // rather than restating an identity the code just wrote.
-    for (const [name, r] of observed) {
-      expect([name, (r?.visibleCount ?? 0) + (r?.restrictedCount ?? 0)]).toEqual([name, 9]);
+    // The INDEPENDENT witness: `canSee`, child by child, for every class. The
+    // literal table above cannot catch this function drifting from the one
+    // visibility decision, and `canSee` alone could agree with it vacuously —
+    // so the count is rebuilt from `canSee` and both are asserted, with a
+    // non-vacuity check that nine children were really enumerated.
+    const childIds = (
+      await db.pool.query<{ ticket_id: string }>(
+        'SELECT ticket_id FROM proj_visibility WHERE parent_id = $1',
+        [parent],
+      )
+    ).rows.map((r) => r.ticket_id);
+    expect(childIds).toHaveLength(9);
+
+    for (const [name, viewer, expected] of classes) {
+      let viaCanSee = 0;
+      for (const childId of childIds) {
+        if (!(await canSee(db.pool, viewer, childId))) viaCanSee += 1;
+      }
+      expect([name, viaCanSee]).toEqual([name, expected.restrictedCount]);
     }
   });
 
@@ -195,9 +219,21 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     await seedMember(db.pool, ws, onA, 'member', [{ projectId: prjA }]);
 
     const rollup = await rollupFor(db.pool, onA, parent);
-    // Three DIFFERENT numbers, so no two of them can be swapped silently.
-    expect(rollup).toEqual({ total: 9, visibleCount: 6, restrictedCount: 3 });
-    expect(new Set([rollup?.total, rollup?.visibleCount, rollup?.restrictedCount]).size).toBe(3);
+    expect(rollup).toEqual({ total: 9, restrictedCount: 3 });
+
+    // Nine children, six this member can reach, three it cannot: three
+    // DIFFERENT numbers, so no two can be swapped silently. The six comes from
+    // `canSee` rather than from `total - restrictedCount`, which would only
+    // restate the line above it.
+    const children = (
+      await db.pool.query<{ ticket_id: string }>(
+        'SELECT ticket_id FROM proj_visibility WHERE parent_id = $1',
+        [parent],
+      )
+    ).rows.map((r) => r.ticket_id);
+    let reachable = 0;
+    for (const id of children) if (await canSee(db.pool, onA, id)) reachable += 1;
+    expect([children.length, reachable, rollup?.restrictedCount]).toEqual([9, 6, 3]);
   });
 });
 
@@ -221,11 +257,7 @@ describe('rollupFor — what null means, and what it must not invent', () => {
     await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: parent });
     await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: child, parentId: parent });
     await applyAll(db.pool, [setVisibilityEnv(ws, child, 'workspace')]);
-    expect(await rollupFor(db.pool, viewer, parent)).toEqual({
-      total: 1,
-      visibleCount: 1,
-      restrictedCount: 0,
-    });
+    expect(await rollupFor(db.pool, viewer, parent)).toEqual({ total: 1, restrictedCount: 0 });
   });
 
   it('a ticket that never existed is the same null as a leaf — no existence oracle one layer down', async () => {
@@ -275,15 +307,11 @@ describe('rollupFor — the role is resolved in each CHILD’s own workspace', (
     // The B child counts toward the TRUE total — dropping it would understate a
     // number this task exists to keep honest — and is restricted, because the
     // viewer holds no role in B.
-    expect(await rollupFor(db.pool, viewer, parent)).toEqual({
-      total: 3,
-      visibleCount: 2,
-      restrictedCount: 1,
-    });
+    expect(await rollupFor(db.pool, viewer, parent)).toEqual({ total: 3, restrictedCount: 1 });
 
     // This case does not depend on which child sorts first, which is why it can
-    // be written against minted ULIDs: resolving one role from the first row
-    // gives 0/3 if that row is B's and 3/0 if it is A's, and both differ from
-    // 2/1.
+    // be written against minted ULIDs: resolving ONE role from the first row
+    // restricts all three children if that row is B's and none of them if it is
+    // A's, and both differ from the one asserted.
   });
 });
