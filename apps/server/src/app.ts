@@ -5,6 +5,7 @@ import { registerAuthRoutes } from './auth/routes.js';
 import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
 import { registerBoardRoutes } from './routes/board.js';
+import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
 import { registerListRoutes } from './routes/list.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
@@ -208,6 +209,13 @@ export function buildApp(
   // grouped, keyset-paged flat list. Registered beside the board rather than
   // inside it: same door, same visibility predicate, different arrangement.
   registerListRoutes(app, { pool: deps.pool }, requireSession);
+  // The builder read surface (Plan 5 Task 9b) — the workflow roster, one
+  // definition by version, the ticket types bound to them, the workspace roster
+  // with guests withheld from non-admins, and the admin-only state occupancy and
+  // type population a publish mapping is built from. Same preHandler by
+  // parameter, same reason as every route above it: each handler reads
+  // `request.currentUserId` and resolves its whole tenancy gate from it.
+  registerBuilderReadRoutes(app, { pool: deps.pool }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;

@@ -1,6 +1,7 @@
-import type { FieldClaim } from './entity-state.js';
-import type { StateCategory } from './workflow.js';
+import type { FieldClaim, WorkspaceRole } from './entity-state.js';
+import type { PublishedWorkflowDef, StateCategory } from './workflow.js';
 import type { Grouping } from './filter-spec.js';
+import type { TicketTypeDef } from './ticket-types.js';
 
 /**
  * The read models every `/v1` read route serves and every client renders
@@ -233,3 +234,79 @@ export type AttentionResponse = {
   settings: { staleDays: number; dueSoonDays: number };
   items: AttentionItem[];
 };
+
+/**
+ * ## The builder's read surface (Plan 5 Task 9b)
+ *
+ * Plan 8's workflow builder consumes these through Plan 6's `DataSource.query`.
+ * They are the SHAPE of a workspace — its workflows, its ticket types, its
+ * roster, and how much live work sits in each state — rather than the work
+ * itself, so none of them passes through the ticket visibility predicate. The
+ * access decision therefore lives entirely at the door, and it differs per
+ * route; `apps/server/src/routes/builder-reads.ts` is where it is written down.
+ *
+ * The definition and type payloads travel VERBATIM (`PublishedWorkflowDef`,
+ * `TicketTypeDef`) rather than as flattened view models: the builder loads one
+ * onto a canvas and republishes it, so any field this surface dropped would be
+ * a field the next publish silently deleted.
+ */
+export type WorkflowListResponse = { workspaceId: string; workflows: PublishedWorkflowDef[] };
+
+export type WorkflowResponse = { workspaceId: string; workflow: PublishedWorkflowDef };
+
+export type TicketTypeListResponse = { workspaceId: string; ticketTypes: TicketTypeDef[] };
+
+/**
+ * `displayName` is whatever better-auth's `"user"."name"` holds — the vendor
+ * owns identity (Plan 4), and this surface neither invents a fallback nor
+ * formats a phone number into a name. It is not nullable because a roster row
+ * with no name is not something this read may produce: see `readMembers`, which
+ * states what it does when the join finds nothing.
+ */
+export type WorkspaceMember = { userId: string; displayName: string; role: WorkspaceRole };
+
+export type MemberListResponse = { workspaceId: string; members: WorkspaceMember[] };
+
+/**
+ * Tickets currently sitting in each state of one workflow. Counts cover the
+ * WHOLE workspace, not the caller's view — the route is admin-only for exactly
+ * that reason, so there is no per-viewer variant to drift out of step. Every
+ * state of the resolved definition appears, zeroes included: a mapping dialog
+ * that silently omitted an empty state would invite an author to delete a state
+ * that turns out to hold work tomorrow.
+ */
+export type StateOccupancyResponse = {
+  workspaceId: string;
+  workflowId: string;
+  counts: Record<string, number>;
+};
+
+/**
+ * How many tickets of one type are PINNED to one workflow — `proj_tickets`
+ * filtered on both, because a ticket pins its workflow at creation (owner
+ * decision 2026-08-27) and re-pointing the type's binding changes only what new
+ * tickets get. Admin-only on `StateOccupancyResponse`'s exact terms.
+ *
+ * `count: 0` is a real answer here and not a collapse of "no such type": the
+ * route resolves the type and the workflow first and answers 404 if either is
+ * unknown in this workspace, so a zero always means "this pairing exists and
+ * holds nothing".
+ */
+export type TypePopulationResponse = {
+  workspaceId: string;
+  typeId: string;
+  workflowId: string;
+  count: number;
+};
+
+/**
+ * The bulk rebind's answer — the shape Plan 8's gateway already pinned, served
+ * verbatim rather than renegotiated.
+ *
+ * A union rather than a `count` that goes to 0 on refusal: "nothing moved
+ * because nothing needed to" and "nothing moved because the batch was refused"
+ * are different facts, and a caller must not have to guess which happened.
+ */
+export type MigrationOutcome =
+  | { status: 'migrated'; count: number }
+  | { status: 'refused'; rule: string; reason: string };
