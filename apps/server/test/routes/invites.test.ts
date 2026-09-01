@@ -596,6 +596,143 @@ describe('unknown, revoked, spent and lapsed links are indistinguishable (case 6
   });
 });
 
+// ──────────────────────────────────────────────────── one token, one winner ──
+
+/**
+ * Case 6.128 — N SIMULTANEOUS presentations of one link, and the property no
+ * sequential test can see.
+ *
+ * ## Why the sequential cases above could not find this
+ *
+ * "Accept, then accept again" passes whether the consume is atomic or not: by
+ * the time the second call reads, the first has already appended and the
+ * projection already says `accepted`. The defect lives entirely in the window
+ * between the read and the append, and only a caller that is INSIDE that window
+ * when another caller reads can enter it.
+ *
+ * MEASURED at `0fd416d`, before the fix, with exactly this test: three parallel
+ * accepts on ONE token, three `200`s, three `admin` rows in `proj_memberships`,
+ * three `invite.accepted` and three `membership.granted` in the ledger — in 24
+ * of 25 trials. And the record concealed it: the projection's `AND status =
+ * 'pending'` guard silently drops the 2nd and 3rd `invite.accepted`, so
+ * `proj_invites.accepted_user_id` named ONE person while three had joined, and
+ * the owner's pending list showed nothing at all.
+ *
+ * ## What makes these presentations genuinely concurrent
+ *
+ * `app.inject` returns a promise and the handler awaits the database several
+ * times before it appends, so `Promise.all` over three injects really does
+ * interleave three handlers in one event loop. They are not sharing one
+ * connection either: `createPool` builds a `pg.Pool` with `max: 10`, so the
+ * three statements reach Postgres on three separate backends and the winner is
+ * decided by a row lock rather than by JavaScript ordering.
+ *
+ * ## Why a fresh workspace per trial
+ *
+ * Reusing one workspace would make trial 2 prove nothing: the trial-1 winner is
+ * a member by then, and 6.116's rule says an existing member's acceptance
+ * appends NO `membership.granted` at all — the grant count would move for a
+ * reason that has nothing to do with the race. So the three acceptors are
+ * created once (they hold no role in a workspace that did not exist when they
+ * signed in) and the WORKSPACE and the INVITATION are fresh every trial.
+ *
+ * Every trial's outcome is collected and the whole run is asserted at the end,
+ * rather than failing on the first breach: a race that fires in 24 of 25 trials
+ * and a race that fires in 1 of 25 are different facts about the product, and
+ * `expect(breaches).toEqual([])` reports which one it saw.
+ */
+describe('one token admits exactly one acceptance, under genuine concurrency (case 6.128)', () => {
+  const TRIALS = 25;
+  const PRESENTERS = 3;
+
+  /** `invite.accepted` / `membership.granted` filed for these people, by type. */
+  async function grantsIn(workspaceId: string, userIds: string[]): Promise<{ accepted: number; granted: number }> {
+    const { rows } = await db.pool.query<{ type: string; n: number }>(
+      `SELECT type, count(*)::int AS n FROM events
+        WHERE workspace_id = $1
+          AND type IN ('invite.accepted', 'membership.granted')
+          AND payload ->> 'userId' = ANY($2::text[])
+        GROUP BY type`,
+      [workspaceId, userIds],
+    );
+    const of = (type: string) => rows.find((row) => row.type === type)?.n ?? 0;
+    return { accepted: of('invite.accepted'), granted: of('membership.granted') };
+  }
+
+  it(`${PRESENTERS} parallel acceptances of one token yield ONE join and ${PRESENTERS - 1} refusals, ${TRIALS} trials`, async () => {
+    const owner = await signedIn();
+    const presenters: Caller[] = [];
+    for (let i = 0; i < PRESENTERS; i += 1) {
+      presenters.push(await signedIn());
+    }
+    const presenterIds = presenters.map((p) => p.userId);
+
+    type Breach = {
+      trial: number;
+      codes: number[];
+      roles: Array<string | null>;
+      accepted: number;
+      granted: number;
+      acceptedUserId: string | null;
+      wrongBody: boolean;
+    };
+    const breaches: Breach[] = [];
+
+    for (let trial = 0; trial < TRIALS; trial += 1) {
+      const workspaceId = await found(owner, `Race ${trial}`);
+      const { inviteId, token } = await mintOk(owner, workspaceId, {
+        address: `race-${trial}@example.com`,
+        role: 'admin',
+      });
+
+      const responses = await Promise.all(
+        presenters.map((presenter) =>
+          app.inject({ method: 'POST', url: `/v1/invites/${token}/accept`, headers: presenter.headers }),
+        ),
+      );
+
+      const codes = responses.map((res) => res.statusCode);
+      const roles = await Promise.all(presenterIds.map((userId) => workspaceRoleOf(workspaceId, userId)));
+      const { accepted, granted } = await grantsIn(workspaceId, presenterIds);
+      const { rows: inviteRows } = await db.pool.query<{ status: string; accepted_user_id: string | null }>(
+        'SELECT status, accepted_user_id FROM proj_invites WHERE invite_id = $1',
+        [inviteId],
+      );
+      const acceptedUserId = inviteRows[0]?.accepted_user_id ?? null;
+      // A refusal must be THE dead-link 404 and not a 500 that happens not to
+      // be 200 — a not-200 check would pass on a server that crashed.
+      const wrongBody = responses.some(
+        (res) =>
+          res.statusCode !== 200 &&
+          (res.statusCode !== 404 ||
+            JSON.stringify(res.json()) !== JSON.stringify(INVITE_NOT_OPENABLE_BODY)),
+      );
+
+      const oneWinner =
+        codes.filter((code) => code === 200).length === 1 &&
+        roles.filter((role) => role !== null).length === 1 &&
+        accepted === 1 &&
+        granted === 1 &&
+        acceptedUserId !== null &&
+        roles[presenterIds.indexOf(acceptedUserId)] === 'admin' &&
+        !wrongBody;
+      if (!oneWinner) {
+        breaches.push({ trial, codes, roles, accepted, granted, acceptedUserId, wrongBody });
+      }
+    }
+
+    const tally = breaches
+      .map((b) => `t${b.trial}: ${b.codes.filter((c) => c === 200).length}×200, ` +
+        `${b.roles.filter((r) => r !== null).length} roles, ` +
+        `${b.accepted}×invite.accepted, ${b.granted}×membership.granted`)
+      .join('; ');
+    expect(
+      breaches,
+      `${breaches.length} of ${TRIALS} trials admitted more or fewer than one acceptance — ${tally}`,
+    ).toEqual([]);
+  }, 300_000);
+});
+
 // ─────────────────────────────────────────────────────────────── acceptance ──
 
 describe('POST /v1/invites/:token/accept — the grant it promised (case 6.37)', () => {
