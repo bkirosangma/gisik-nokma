@@ -142,11 +142,11 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-*(Plan 5, Tasks 2–9 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
-replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7, 8 and 9 added, and nothing else. Plan 5
+*(Plan 5, Tasks 2–9b so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
+replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6, 7, 8, 9 and 9b added, and nothing else. Plan 5
 Task 1 (`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here.
 Still absent rather than missing from this section: every `/v1` read
-route EXCEPT the board and the list (search, My Work, attention, builder reads, preferences), and the stream hub with
+route EXCEPT the board, the list and the builder surface (search, My Work, attention, preferences), and the stream hub with
 its WebSocket route — Plan 5 Tasks 10–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
 doc assigns `Features.md` sections one per implementation plan, so numbering is claimed from that
 table rather than taken next-free.)*
@@ -362,6 +362,58 @@ table rather than taken next-free.)*
   shared `READ_NOT_FOUND_BODY` beside `requireMember`, so the board's and the list's refusals are one
   object rather than two literals identical by coincidence.
   `apps/server/src/routes/list.ts`, `apps/server/src/read/membership.ts`, `apps/server/src/app.ts`
+- ✅ **The builder read surface — `GET /v1/workspaces/:id/workflows`, `/workflows/:id`,
+  `/ticket-types`, `/members`, `/workflows/:id/state-occupancy`, `/ticket-types/:id/population`** —
+  what a workspace IS, as opposed to what work is in it, so Plan 8's builder can author against
+  definitions it can read. What makes this surface different from the board and the list is that
+  **none of it passes through `visibleTicketsWhere`**: a definition has no audience, a roster row is
+  not a ticket, and an occupancy count is deliberately the whole workspace's — so the door is not
+  the first of two defences here, it is the only one, and each route names which of three access
+  levels it sits at. **Any member, guests included**, reads the workflow roster, one definition, and
+  the ticket types: a guest already receives definition events on the stream and their shared
+  ticket cannot render its status, name or icon without them. **The roster withholds guests from
+  non-admin callers** — a guest is a person invited to one shared ticket, not a member of the
+  workspace's directory. **Occupancy and population are owner/admin only**, because the honest
+  number counts tickets the caller may not see and there is no per-viewer variant to serve instead.
+  The admin refusal is **404 and never 403**, on `requireMember`'s own grounds: a 403 would confirm
+  a workflow exists to somebody with no business knowing it, so a plain member, a guest, an
+  off-project member and a stranger all get the shared frozen `READ_NOT_FOUND_BODY`. **The door
+  answers before the query string is parsed** on both routes that take one (Task 9's order, not the
+  plan's). Occupancy reports every state of the definition, zeroes included, because a mapping
+  dialog that omitted an empty state would invite an author to delete a state that holds work
+  tomorrow. Population takes an explicit `?workflowId=` and refuses to fall back to the type's own
+  binding — a ticket pins its workflow at creation, so the binding is what NEW tickets get and
+  answering with it would be a different number wearing this one's name. `displayName` is
+  better-auth's `"user"."name"` verbatim; the route invents no fallback and formats no phone number
+  into a name, and a membership with no user row is dropped rather than listed nameless. The roster
+  reads **workspace-scope rows only**: `membership.revoked` deletes the workspace row and leaves the
+  project roster rows standing by design, so the plan text's fold across both scopes would hand a
+  revoked person back as a current member. Every actor-supplied id — a workflow id, a type id — is
+  resolved against the workspace the door approved, never one the caller sent (ruling P14:
+  `proj_workflows` is keyed `(workflow_id, version)` globally).
+  `apps/server/src/routes/builder-reads.ts`, `packages/domain/src/read-models.ts`,
+  `apps/server/src/app.ts`
+- ✅ **The bulk workflow rebind — `POST /v1/workspaces/:id/ticket-types/:typeId/migrate`** — the
+  admin action a publish mapping dialog ends in: every ticket of one type on one workflow moved to
+  another, each mapped by `stateMap[ticket.state_id]`. It **orchestrates and never bypasses** — one
+  `ticket.workflow_rebound` per ticket through the ordinary client ingest door, where the honesty
+  already lives (the event is in Plan 4's `ADMIN_ONLY_TYPES` and Plan 3's checks refuse an unknown
+  target per event). It carries **its own admin gate ahead of building anything**, because deferring
+  to ingest would refuse a member only after a batch of envelopes had been built; it answers 404,
+  matching the two sibling admin-only routes on this path prefix. Its body is parsed by zod inside
+  the handler rather than declared as a Fastify schema, because Fastify validates before
+  `preHandler` and a declared schema would answer a stranger's malformed body before the session was
+  resolved. **It is NOT all-or-nothing inside one transaction, as the plan text asks**:
+  `ingestClientBatch` commits one transaction per event by published contract, and a route cannot
+  reach the internal append path (`AppDeps.ingest` is narrowed to `ClientIngest` for exactly that
+  reason). What ships is the achievable half — every question that could refuse the batch is asked
+  UP FRONT over the whole ticket set, so a refusal appends nothing and the answered count equals the
+  events appended. Three such refusals, each `422 {status:'refused', rule, reason}`:
+  `migration.same-workflow`, `migration.unknown-target-state`, and `migration.unmapped-state`
+  naming the states that have no target. The remaining window is named rather than closed: an
+  infrastructure failure part way through a batch that passed pre-flight leaves earlier tickets
+  moved, and closing it needs a batch-scoped ingest transaction rather than a change here.
+  `apps/server/src/routes/builder-reads.ts`, `packages/domain/src/read-models.ts`
 
 ## 9. Editor, documents & attachments
 
