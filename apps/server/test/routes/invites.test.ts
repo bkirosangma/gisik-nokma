@@ -599,7 +599,7 @@ describe('unknown, revoked, spent and lapsed links are indistinguishable (case 6
 // ──────────────────────────────────────────────────── one token, one winner ──
 
 /**
- * Case 6.128 — N SIMULTANEOUS presentations of one link, and the property no
+ * Case 6.129 — N SIMULTANEOUS presentations of one link, and the property no
  * sequential test can see.
  *
  * ## Why the sequential cases above could not find this
@@ -641,7 +641,7 @@ describe('unknown, revoked, spent and lapsed links are indistinguishable (case 6
  * and a race that fires in 1 of 25 are different facts about the product, and
  * `expect(breaches).toEqual([])` reports which one it saw.
  */
-describe('one token admits exactly one acceptance, under genuine concurrency (case 6.128)', () => {
+describe('one token admits exactly one acceptance, under genuine concurrency (case 6.129)', () => {
   const TRIALS = 25;
   const PRESENTERS = 3;
 

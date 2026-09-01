@@ -211,7 +211,7 @@ type InviteRow = {
  * in 24 of 25 trials. The record concealed it, too: the projection's own
  * `AND status = 'pending'` drops the 2nd and Nth acceptance, so
  * `proj_invites.accepted_user_id` named ONE person while three had joined and
- * the owner's pending list showed nothing amiss. Case 6.128.
+ * the owner's pending list showed nothing amiss. Case 6.129.
  *
  * So the two checks do two different jobs and neither substitutes for the other:
  * `openableInvite` answers *does this invitation still open anything* (unknown,
@@ -249,7 +249,7 @@ type InviteRow = {
  * event on a separate entity and nothing drops it. Closing it needs the
  * membership grant and the invitation's status decided in ONE transaction,
  * which means reaching inside the ledger's commit — machinery this surface does
- * not have. **Recorded as case 6.129 rather than papered over.** *Owner: Plan
+ * not have. **Recorded as case 6.130 rather than papered over.** *Owner: Plan
  * 10, which owns the ingest transaction boundary.*
  *
  * ## What acceptance does NOT do

@@ -47,7 +47,7 @@ COMMENT ON TABLE proj_invites IS 'Projection: one row per invitation, from invit
 COMMENT ON COLUMN proj_invites.address IS 'The address the invitation names — a CLAIM about where to reach somebody, never an assertion about who they are. PII: sync-down withholds invite events from everyone but owners and admins (src/visibility/visible-events-for.ts), and the pending-invite read route applies the same rule.';
 COMMENT ON COLUMN proj_invites.role IS 'admin|member|guest. `owner` is absent by omission and deliberately: an invitation cannot make somebody the owner of a workspace they have not yet entered.';
 COMMENT ON COLUMN proj_invites.project_ids IS 'The projects the invitation promised, appended as project.member_added rows at acceptance. Always empty for a guest invite — the domain schema refuses the combination, because a guest reaches work through visibility.set explicit lists and a project association would promise something membership no longer means.';
-COMMENT ON COLUMN proj_invites.status IS 'pending|accepted|revoked. THE load-bearing guard on the accept route: the token row proves only that somebody holds the link, and this column is what says the link still opens anything. A transition out of pending is terminal — the projection refuses to move an accepted or revoked invite, so the first terminal claim in ledger order is the one that stands.';
+COMMENT ON COLUMN proj_invites.status IS 'pending|accepted|revoked. What says the link still opens ANYTHING: the token row proves only that somebody holds it. It is NOT what makes a link single-use — a read cannot stop two people presenting the same token at once, and until 2026-09-01 three concurrent acceptances all passed this check and all committed. Single-use is the conditional DELETE on invite_tokens (see src/routes/invites.ts). A transition out of pending is terminal — the projection refuses to move an accepted or revoked invite, so the first terminal claim in ledger order is the one that stands.';
 COMMENT ON COLUMN proj_invites.invited_at IS 'The RECEIVED instant (events.server_time) of the invite.sent claim, never a clock read at apply time — a projection that read a clock would not be a pure function of the ledger and every rebuild would disagree with live.';
 
 -- The credential store. NOT a projection. Never in `projInvites.tables`.
@@ -83,13 +83,26 @@ COMMENT ON TABLE invite_tokens IS 'Server-owned credential store for invitation 
 COMMENT ON COLUMN invite_tokens.token_hash IS 'sha256(token), hex. The raw token exists only in the 201 that minted it. Lookup is by hash, so nothing on the read path ever needs the plaintext at rest.';
 COMMENT ON COLUMN invite_tokens.expires_at IS 'When this link stops opening anything. Set at mint to created_at + the INVITE_TOKEN_TTL constant in src/routes/invites.ts. The DURATION is a product decision the series has not taken and the constant records that; the MECHANISM is not optional, because an invitation link with no clock is a durable replayable credential that anyone who ever sees it — a forwarded email, a screenshot, a shared browser — can use forever.';
 
--- The row is DELETED at acceptance: a spent credential does not linger. That
--- deletion is a convenience, not the guard. It cannot be atomic with the events
--- it follows (ingest opens its own connection and transaction, which a route
--- cannot enlist in), so a crash between them leaves a live token row on an
--- already-accepted invite. What closes that window is `proj_invites.status`,
--- which the accept route checks before it will open anything — see
--- src/routes/invites.ts.
+-- The row is DELETED at acceptance, and that deletion IS the guard that makes a
+-- link single-use. It is one conditional statement --
+--
+--   DELETE FROM invite_tokens WHERE token_hash = $1 AND expires_at > now()
+--     RETURNING invite_id
+--
+-- -- and one statement is one transaction, so at most one presentation of a
+-- token can ever get a row back from it: concurrent presentations queue on the
+-- row lock, re-evaluate once the winner commits, and match nothing.
+--
+-- This table is where that is POSSIBLE, and the reason is the same reason it is
+-- not a projection: it is server-owned state, nothing else writes it, and the
+-- route owns its transactions here outright. The route genuinely cannot enlist
+-- in the LEDGER's transaction (ingest opens its own connection), and until
+-- 2026-09-01 that true sentence was generalised into a false one -- that the
+-- deletion could not be atomic at all, so ordering plus the status check
+-- replaced atomicity. Measured under that arrangement: three parallel
+-- acceptances of ONE token, three 200s and three admin memberships, in 24 of 25
+-- trials. `proj_invites.status` closes the SEQUENTIAL window; only this DELETE
+-- closes the concurrent one. See src/routes/invites.ts and case 6.129.
 
 -- Down Migration
 
