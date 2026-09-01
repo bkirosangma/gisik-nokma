@@ -10,16 +10,17 @@ decision boundary.
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
-## Anchors — verified 2026-08-31, at `c93c910`
+## Anchors — verified 2026-09-01, at `1003d8d`
 
 | what | value |
 |---|---|
-| `main` | `27dba39` **as of 05:10 IST 1 Sep — goes stale by design.** #50 (this file) merged after `33538be` |
-| last forced gate | **`33538be`** — 21/21, 0 cached, **1070 tests**, `TURBO_EXIT=0`, node **v22.22.2**. Still valid at `27dba39`: delta is doc-only |
+| `main` | `1003d8d` **as of 10:53 IST 1 Sep — goes stale by design.** #55 (task ledger) merged after `edbb940` |
+| last forced gate | **`1003d8d`** — 21/21, 0 cached, **1070 tests**, `TURBO_EXIT=0`, node **v22.22.2**, 15.6s. Re-run here rather than carried: #55 put `package.json` and `scripts/check-task-ledger.mjs` in the delta, so the **previous "still valid, delta is doc-only" reasoning stopped applying** — the anchor moved because the argument for keeping it expired, not because anything went red. Composition unchanged from `33538be`. |
 | gate composition | domain 276 · rule-engine 278 · server **275** · app-core 130 · editor 72 · ui 31 · sync-client 8 |
 | **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
 | collision surfaces | fixtures **84** · projections **5** (`contested`, `entity_heads`, `memberships`, `visibility`, `workflows`) · packages 6 |
-| open PRs | none at time of writing — **re-measure** |
+| open PRs | none at time of writing — **re-measure, and do not wait for the monitor to tell you.** Its guard suppresses the zero → one transition, which is the step-PR-appears event |
+| task ledger | **13 done · 33 claimed · 4 in-flight · 127 todo** of **177** (`pnpm check:tasks`). Quote it; do not reconstruct a percentage from prose |
 
 **Re-measure everything above on resume.** Recount at the sha you report; do not carry a composition
 forward — five of six package counts staying right is what makes the sixth invisible. `app-core` went
@@ -165,9 +166,10 @@ return ever emptied. **Closer, so it is not re-litigated: a branded type** carry
 `resolveEffectiveRole` can produce — turning a silent grant into a compile error.
 
 > ### ⚠ IN-FLIGHT NOW — `exec/04-t8-t14-enforcement` (step 7)
-> **Cut from `main` at `33538be`, 7 commits, pushed.** T8, T9, T10 landed; **T11 (floor-list) running**;
+> **Cut from `main` at `33538be`, 7 commits, pushed.** T8, T9, T10 landed; **T11 reviewed, fix round running**;
 > T12 + **T13 (BLIND — its dispatch must carry 6.52/6.53)** then T14 (floor-list) follow. Branch gate
-> **1115 tests**. `main`'s executor handoff is a step behind and does not name this branch — **hand it to
+> **1138 tests at T11's sha and still moving — the fix round will change it.** `main`'s executor handoff is a
+> step behind and does not name this branch — **hand it to
 > any relaunched executor.**
 > **T8 closed P22**: `EffectiveRole` is branded with a module-private `unique symbol`, so a hand-built one
 > fails `TS2741`. Provenance is compiler-enforced, not conventional.
