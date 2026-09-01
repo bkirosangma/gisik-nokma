@@ -541,19 +541,25 @@ describe('unknown, revoked, spent and lapsed links are indistinguishable (case 6
   });
 
   /**
-   * The crash this codebase cannot prevent, staged on purpose (case 6.112).
+   * A token row that outlives the acceptance it belongs to, staged on purpose
+   * (case 6.112).
    *
-   * The token row is deleted at acceptance, and that deletion cannot be atomic
-   * with the events it follows: ingest opens its own connection and transaction
-   * and a route cannot enlist in it. So a crash between them leaves a LIVE token
-   * row on an already-accepted invitation. This puts the row back by hand and
-   * proves both routes still refuse — which is what makes `proj_invites.status`
-   * the guard and the deletion mere hygiene.
+   * The route cannot enlist in the LEDGER's transaction — `commitOne` opens its
+   * own — so an acceptance that appended and then died before its own cleanup
+   * is conceivable, and an operator restoring a backup can produce the same
+   * row. This puts one back by hand and proves both routes still refuse.
    *
-   * Mutating the DELETE statement away leaves every other case in this file
-   * green and reddens exactly this one.
+   * **What this case proves and what it does NOT.** It proves the SEQUENTIAL
+   * property: `proj_invites.status` is what says the invitation no longer opens
+   * anything, so a resurrected token row is worthless. It does not prove the
+   * link is single-use, and the headline this case used to carry — "the status
+   * check is the guard, the deletion is hygiene" — was false of the product for
+   * exactly that reason. A read cannot stop two people presenting one link at
+   * the same time; the conditional consume can, and case 6.129 is where that
+   * lives. Both checks ship, and mutating either one reddens cases the other
+   * does not.
    */
-  it('a surviving token row on an accepted invitation opens nothing — the status check is the guard, not the delete', async () => {
+  it('a surviving token row on an accepted invitation opens nothing — the status check says the invitation is over', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const { inviteId, token } = await mintOk(owner, workspaceId, { address: 'crash@example.com' });
