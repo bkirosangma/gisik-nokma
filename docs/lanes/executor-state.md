@@ -121,6 +121,42 @@ implementer AND opus reviewer. **Remaining floor-list in this plan: T5 (1213), T
 T15 (5452).** Then T6 (1579), T7 (1821), T8 (2315), T9 (2657), T10 (3638), T11 (3874), T12 (4079),
 T13 (4551), T16 (6047).
 
+### IN FLIGHT RIGHT NOW: Plan 5 Task 5, workflow run `w5x2ap3b3` (opus implementer + opus reviewer)
+
+**A successor must `git log --oneline -3` BEFORE re-dispatching T5** — the implementer may already
+have committed. The commit is the record; this line is only the warning.
+
+### THE REGISTRATION PIN: ENUMERATED, because "three places" was a reading and it was imprecise
+
+T4's implementer found a second pin the expensive way — a red gate, 1 failed / 502 passed — and
+recorded "three places" in its commit message, which is not somewhere a later subagent reads. The
+count was never enumerated, so it is enumerated here. **The actionable answer is THREE ASSERTION
+ARRAYS ACROSS TWO FILES**, not three files:
+
+| File | What it holds | Extend on registering? |
+|---|---|---|
+| `apps/server/test/projection-order.test.ts` | **TWO** `toEqual([...])` arrays, lines 56 and 113. DB-free on purpose. The pin of record. | **YES — both arrays** |
+| `apps/server/test/entity-heads.test.ts:92` | ONE array. Postgres-bound, so it **goes silent exactly when the database is down** | **YES** |
+| `apps/server/src/projections/index.ts` | Comments only, no assertion | Prose, not a gate |
+| `apps/server/test/verify-projections.test.ts:173-179` | **NOT an order pin.** A non-emptiness anti-vacuity list of the six tables its fixture seeds — *"a clean verdict over it proves nothing"* | **No** — but see below |
+| `apps/server/test/determinism.test.ts` | Single-table usage, no list | No |
+
+**The `verify-projections` row is the one worth reading twice.** It does not need extending, but a
+projection absent from it gets a **vacuous `clean: true`** from that suite, because the verifier
+returns clean over an empty table. `proj_workspace_settings` is absent from it and T4 covered the gap
+the right way — a planted live corruption inside its own test file, reported as
+`missingFromLive: 1, extraInLive: 1` scoped to that one table. **Every later registrant owes the same
+proof somewhere, or its verifier coverage is a check that cannot fail.**
+
+### FOR TASK 6 SPECIFICALLY — `tsvector` is a new column-type class here
+
+`proj_search` introduces `tsvector`, which no projection in this repo has used. The verifier diffs
+live against a shadow rebuild with `EXCEPT`, and **`EXCEPT` requires an equality operator** — that
+requirement is the whole reason `json` is banned as a projection column type. `jsonb` was admitted only
+after Plan 5's step-6 predecessor PROVED it by execution rather than reasoning from the type name.
+**T6 owes `tsvector` the same proof: plant a live corruption, watch the verifier name that table, then
+restore and watch it go clean again.** Do not reason from the type name in either direction.
+
 ### THE FORWARD HAZARD T4 CREATED, and it is this series' signature failure — owner: STEP 10
 
 `applyCommitted` in `apps/server/test/helpers/apply.ts` is the seeding path for **every read model in
