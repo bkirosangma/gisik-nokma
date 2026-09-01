@@ -234,6 +234,41 @@ describe('GET /v1/tickets/:id/history — the ledger, filtered to one ticket', (
     expect(otherBody.events.slice(1).map((e) => e.id)).toEqual([otherClaim.id]);
   });
 
+  it('excludes a claim filed against a different ENTITY KIND under the same id', async () => {
+    // `entity_kind = 'ticket'` in the WHERE survived being deleted until this
+    // case existed: entity ids are ULIDs, so no ordinary fixture makes a
+    // non-ticket entity share a ticket id, and the predicate was an
+    // unconstrained path rather than a tested one. The ledger itself imposes no
+    // such uniqueness — `events_entity_seq_unique` is (kind, id, seq), so the
+    // two rows below coexist happily and even share `seq`.
+    //
+    // The forgery is the point: this is what the predicate is FOR, and a claim
+    // about a project is not part of a ticket history however the id was
+    // chosen. Mutation: drop `entity_kind = 'ticket'` and the impostor arrives
+    // in the page.
+    const { ws, headers, ticketId } = await memberWithTicket();
+    const impostor = testEnvelope({
+      workspaceId: ws,
+      entity: { kind: 'project', id: ticketId },
+      type: 'project.created',
+      payload: { name: 'not a ticket claim' },
+      actorId: newUlid(),
+    });
+    await appendTestEvent(db.pool, impostor);
+
+    // The control: the row really is in the ledger under that id, so the
+    // exclusion below is an exclusion and not an absence.
+    const stored = await db.pool.query<{ entity_kind: string }>(
+      'SELECT entity_kind FROM events WHERE id = $1',
+      [impostor.id],
+    );
+    expect(stored.rows.map((r) => r.entity_kind)).toEqual(['project']);
+
+    const body = history(await get(`/v1/tickets/${ticketId}/history`, headers));
+    expect(body.events.map((e) => e.id)).not.toContain(impostor.id);
+    expect(body.events.map((e) => e.type)).toEqual(['ticket.created']);
+  });
+
   it('serves every field of a claim unsummarised, with the actor and both clocks', async () => {
     // Mutation: drop any field from the mapper, or render either clock any way
     // but the ISO instant (`String(row.client_time)` yields the Asia/Kolkata
