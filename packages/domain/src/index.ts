@@ -27,3 +27,4 @@ export * from './ticket-state.js';
 export * from './workflow-helpers.js';
 export * from './doc-embeds.js';
 export * from './attachment-kinds.js';
+export * from './events/workspace-settings.js';

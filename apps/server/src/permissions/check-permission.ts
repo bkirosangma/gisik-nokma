@@ -509,6 +509,14 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
   if (env.type === 'ticket.created' && role === 'guest') {
     return refuse(GUESTS_CANNOT_CREATE_TICKETS_REASON);
   }
+  // Plan 5 Task 3. The attention strip's thresholds are workspace-scoped
+  // configuration, so the gate is the same owner/admin question `ADMIN_ONLY_TYPES`
+  // answers — kept as its own case rather than folded into that set because the
+  // refusal text names the setting rather than the generic admin-only reason
+  // `adminOnlyReason` produces (the settings test pins this exact sentence).
+  if (env.type === 'workspace.settings_set' && !isWorkspaceAdmin) {
+    return refuse('Only a workspace owner or admin can change workspace settings.');
+  }
   return null;
 }
 

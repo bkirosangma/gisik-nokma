@@ -22,6 +22,7 @@ import {
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
 import { visibilitySetPayload } from './events/visibility.js';
+import { workspaceSettingsSetPayloadSchema } from './events/workspace-settings.js';
 import {
   inviteAcceptedPayload,
   inviteRevokedPayload,
@@ -292,4 +293,17 @@ domainRegistry.register({
   version: 1,
   entityKind: 'invite',
   payloadSchema: inviteRevokedPayload,
+});
+
+/**
+ * The workspace settings vocabulary (Plan 5 Task 3). The attention strip's
+ * two thresholds, claimed against the workspace itself — `entityKind:
+ * 'workspace'` so `parseEvent`'s kind guard refuses a settings claim filed
+ * against anything else (coordination doc §11).
+ */
+domainRegistry.register({
+  type: 'workspace.settings_set',
+  version: 1,
+  entityKind: 'workspace',
+  payloadSchema: workspaceSettingsSetPayloadSchema,
 });

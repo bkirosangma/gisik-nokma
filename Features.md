@@ -142,17 +142,28 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-*(Plan 5, Task 2 only — the FilterSpec shape and its SQL compiler. Plan 5's own catalogue task
-(Task 16) owns §7's full body and will replace this scope note; what follows is what Task 2 added,
-and nothing else. Plan 5 Task 1 (`docToPlainText`) is catalogued in §3, beside the ledger material
-it belongs to, not here. Still absent rather than missing from this section: `workspace.settings_set`
-and its projection, the SQL visibility predicate, `proj_search`, the read models, every `/v1` read
-route (board, list, search, My Work, attention, builder reads, preferences), and the stream hub with
-its WebSocket route — Plan 5 Tasks 3–15. §8 is reserved for Plan 6 and stays absent on the same
-rule: the coordination doc assigns `Features.md` sections one per implementation plan, so numbering
-is claimed from that table rather than taken next-free.)*
+*(Plan 5, Tasks 2–3 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
+replace this scope note; what follows is what Tasks 2 and 3 added, and nothing else. Plan 5 Task 1
+(`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here. Still
+absent rather than missing from this section: the `proj_workspace_settings` projection and reader,
+the SQL visibility predicate, `proj_search`, the read models, every `/v1` read route (board, list,
+search, My Work, attention, builder reads, preferences), and the stream hub with its WebSocket route
+— Plan 5 Tasks 4–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
+doc assigns `Features.md` sections one per implementation plan, so numbering is claimed from that
+table rather than taken next-free.)*
 
 - ⚙️ **FilterSpec compiler** — one strict zod shape (`@gisik-nokma/domain`) compiled to parameterized SQL; user bytes travel only as parameters, injection-proven against thirteen planted hostile inputs executed against a live database. The proof is that the emitted SQL is a CONSTANT, pinned clause by clause, rather than that a value fails to appear in it — a substring check reddens on a correct compiler the moment the value is `$1`, `t.`, `SELECT`, `->>` or `ESCAPE`, and a guard that fires on correct code gets deleted. A concatenating reference compiler stands beside it in the test, only to show what the bound one prevents: the same `fieldId` payload widens its answer past the caller's workspace scope to another tenant's ticket, which is a widened result set rather than the weaker kill a syntax error would be. **The door refuses exactly one byte on sight: U+0000**, in all seven free-form string slots, because Postgres `text` cannot carry it — every other control character, DEL and a lone surrogate included, round-trips and is admitted, so the rule is "what the store can hold" and not a taste for tidy input; the executed test shows each slot raising SQLSTATE 22021 past the door, which is what makes the refusal a 400 instead of a 500. A due bound is the shared `IST_DAY_REGEX`, imported rather than restated, and constrains day SHAPE, not calendar existence — fixed-width padding is what makes the compiled text comparison chronological. `fields[].value` deliberately carries no `.min(1)`: `eq: ''` is a real claim, so `contains: ''` is a declared field-PRESENCE predicate that still cannot widen a read. The two clauses that reach another table (`proj_search`, the blocked-states CTE) carry their own `workspace_id = t.workspace_id` correlation, so a filter term cannot answer out of a neighbouring tenant — executable because `proj_tickets.ticket_id` is globally unique, which makes a correctly-filed neighbouring row harmless and projection DRIFT (a search row filed under the wrong workspace) the thing the correlation actually refuses. `packages/domain/src/filter-spec.ts`, `apps/server/src/read/sql-params.ts`, `apps/server/src/read/compile-filter.ts`
+- ⚙️ **`workspace.settings_set` v1** — the attention strip's two thresholds (`staleDays`,
+  `dueSoonDays`, `DEFAULT_STALE_DAYS = 7`, `DEFAULT_DUE_SOON_DAYS = 7`), claimed as an attributed
+  event against the workspace itself rather than assumed or hardcoded — a threshold is a claim about
+  what deserves attention, so it gets provenance like everything else. Partial-update semantics:
+  either knob alone or both together, at least one required, `.strict()` against unknown keys,
+  integers only in `[1, 365]` for `staleDays` and `[0, 365]` for `dueSoonDays`. Registered with
+  `entityKind: 'workspace'`, so `parseEvent`'s kind guard refuses a settings claim filed against
+  anything else. Who may make the claim: workspace `owner` or `admin` only, refused
+  `permission.role` naming the setting by name for everyone below that — a member, guest or
+  non-member alike. `packages/domain/src/events/workspace-settings.ts`,
+  `apps/server/src/permissions/check-permission.ts`
 
 ## 9. Editor, documents & attachments
 
