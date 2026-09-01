@@ -23,10 +23,19 @@ import { applyAll, seedGuest, seedMember, seedTicket, setVisibilityEnv } from '.
  *
  * An event yielded to a replica is on a device the server does not control. No
  * later fix retrieves it. So the failures this file is built against are, in
- * order: an event about a ticket the viewer cannot see; the ticket's ID leaking
- * in an envelope field while its payload is withheld (the existence oracle case
- * 6.12 closed at the read door); and a tombstone that never arrives, which
- * leaves the data on the device forever.
+ * order: an event about a ticket the viewer cannot see; and the ticket's ID
+ * leaking in an envelope field while its payload is withheld (the existence
+ * oracle case 6.12 closed at the read door).
+ *
+ * A tombstone that never arrives used to sit third on that list. It is no
+ * longer a failure this file is built against, and that is a decision rather
+ * than an omission: the per-event purge walk emitted ids for entities the
+ * recipient stood in no relationship to (6.100, 6.101) and could not be gated
+ * on the property it needed, so it is gone and the missing tombstones it leaves
+ * are cases 6.102 and 6.104, owned by Plan 10. The two directions are not
+ * symmetric — stale local data is corrected by the next full resync, and a
+ * disclosed id never is — so this file hardens the disclosure side and
+ * deliberately declines to pin the retention side.
  *
  * ## Fixture rules this file obeys
  *
@@ -152,118 +161,6 @@ describe('visibleEventsFor — what reaches a replica', () => {
     expect(JSON.stringify(items)).not.toContain(hidden);
   });
 
-  it('6.17 revocation by visibility.set yields a purge tombstone INSTEAD of the event', async () => {
-    const ws = newUlid();
-    const prj = newUlid();
-    const viewer = newUlid();
-    const ticket = newUlid();
-    await seedMember(db.pool, ws, viewer, 'member', [{ projectId: prj }]);
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: ticket });
-    // Held by this member a moment ago — the control that makes the purge mean
-    // something: there was something on the device to take away.
-    expect(await canSee(db.pool, viewer, ticket)).toBe(true);
-
-    const revoke = await record(setVisibilityEnv(ws, ticket, 'explicit', [newUlid()]));
-
-    expect(await canSee(db.pool, viewer, ticket)).toBe(false);
-    // Exactly the tombstone, and NOT the visibility.set event itself — that
-    // event is about a ticket this viewer may no longer see.
-    expect(await collect(viewer, ws, revoke.workspaceSeq - 1)).toEqual([
-      { kind: 'purge', entityId: ticket },
-    ]);
-  });
-
-  it('6.17 an ancestor revocation purges the whole INHERITING subtree, and 6.90 leaves an authored one standing', async () => {
-    const ws = newUlid();
-    const prj = newUlid();
-    const viewer = newUlid();
-    const parent = newUlid();
-    const child = newUlid();
-    const grandchild = newUlid();
-    const authored = newUlid();
-    await seedMember(db.pool, ws, viewer, 'member', [{ projectId: prj }]);
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: parent });
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: child, parentId: parent });
-    await seedTicket(db.pool, {
-      workspaceId: ws,
-      projectId: prj,
-      ticketId: grandchild,
-      parentId: child,
-    });
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: authored, parentId: parent });
-    // `authored` decides for itself, so nothing above it can change its audience.
-    await applyAll(db.pool, [setVisibilityEnv(ws, authored, 'workspace')]);
-
-    const revoke = await record(setVisibilityEnv(ws, parent, 'explicit', [newUlid()]));
-
-    const items = await collect(viewer, ws, revoke.workspaceSeq - 1);
-    // TWO levels of inheritance, so a walk that stopped at the direct children
-    // would drop `grandchild` and leave it on the device forever.
-    expect(idsOf(items).sort()).toEqual(
-      [`purge:${parent}`, `purge:${child}`, `purge:${grandchild}`].sort(),
-    );
-    // The positive control for the prune: `authored` is still VISIBLE, so
-    // purging it would have deleted a ticket this member may still read.
-    expect(await canSee(db.pool, viewer, authored)).toBe(true);
-    expect(idsOf(items)).not.toContain(`purge:${authored}`);
-  });
-
-  it('6.17 a REPARENT under an unreachable parent purges the moved subtree; a reparent that keeps it visible purges nothing', async () => {
-    const ws = newUlid();
-    const prj = newUlid();
-    const viewer = newUlid();
-    const unreachable = newUlid();
-    const openParent = newUlid();
-    const moved = newUlid();
-    const movedChild = newUlid();
-    const staysPut = newUlid();
-    await seedMember(db.pool, ws, viewer, 'member', [{ projectId: prj }]);
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: unreachable });
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: openParent });
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: moved });
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: movedChild, parentId: moved });
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: staysPut });
-    await applyAll(db.pool, [setVisibilityEnv(ws, unreachable, 'explicit', [newUlid()])]);
-    // Both are on this member's device right now — the reparent is what takes
-    // them away, so a fixture where they were already invisible would prove
-    // nothing.
-    expect(await canSee(db.pool, viewer, moved)).toBe(true);
-    expect(await canSee(db.pool, viewer, movedChild)).toBe(true);
-
-    const reparent = await record(
-      testEnvelope({
-        workspaceId: ws,
-        entity: { kind: 'ticket', id: moved },
-        type: 'ticket.reparented',
-        payload: { newParentId: unreachable },
-        actorId: viewer,
-      }),
-    );
-    // The control in the same window: a reparent onto a parent the viewer CAN
-    // reach must purge nothing, or "purges on every reparent" would pass.
-    const harmless = await record(
-      testEnvelope({
-        workspaceId: ws,
-        entity: { kind: 'ticket', id: staysPut },
-        type: 'ticket.reparented',
-        payload: { newParentId: openParent },
-        actorId: viewer,
-      }),
-    );
-
-    const ids = idsOf(await collect(viewer, ws, reparent.workspaceSeq - 1));
-    // The moved ticket AND the subtree that inherits from it.
-    expect(ids).toContain(`purge:${moved}`);
-    expect(ids).toContain(`purge:${movedChild}`);
-    // `staysPut` is still visible, so its own reparent event comes through as
-    // an ordinary event and draws no tombstone.
-    expect(ids).toContain(harmless.id);
-    expect(ids).not.toContain(`purge:${staysPut}`);
-    // And the event that did the damage is not itself yielded: it is about a
-    // ticket this viewer may no longer see.
-    expect(ids).not.toContain(reparent.id);
-  });
-
   it('6.17 losing a PROJECT purges that project’s now-invisible tickets and nothing else', async () => {
     const ws = newUlid();
     const lost = newUlid();
@@ -324,39 +221,68 @@ describe('visibleEventsFor — what reaches a replica', () => {
     // The real guarantee, pinned rather than described: inside the lost scope a
     // member IS told an id they never held. Disclosed, not accidental — spec §6
     // declined full concealment within a workspace and this viewer is still
-    // standing in it (`PurgeInstruction`'s docblock, cases 6.14 and 6.101).
+    // standing in it (`PurgeInstruction`'s docblock, cases 6.14 and 6.103).
+    // This is the SCOPE boundary, where that trade is settled: it fires once,
+    // for a NAMED scope taken from a NAMED person, and every id it can emit is
+    // bounded by that scope. The per-EVENT version of the same trade was struck
+    // down for having no such bound and no relationship to the recipient
+    // (6.101); this one was explicitly not reopened.
     expect(ids).toContain(`purge:${neverHeldInLost}`);
     expect(ids).toContain(removal.id);
   });
 
-  it('6.95 two revocations touching one ticket in the same window yield ONE purge for it', async () => {
+  it('6.95 two SCOPE revocations touching one ticket in the same window yield ONE purge for it', async () => {
     const ws = newUlid();
     const prj = newUlid();
     const viewer = newUlid();
-    const parent = newUlid();
-    const child = newUlid();
+    const inProject = newUlid();
     await seedMember(db.pool, ws, viewer, 'member', [{ projectId: prj }]);
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: parent });
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: child, parentId: parent });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: inProject });
+    // Project-mode and this member is on the project, so the ticket is on the
+    // device right now: the tombstone below is a genuine retraction rather than
+    // an id they never held.
+    expect(await canSee(db.pool, viewer, inProject)).toBe(true);
 
-    // TWO events on the SAME parent inside one window. Both are
-    // visibility-affecting, so the subtree walk runs twice and reaches `parent`
-    // and its inheriting `child` a second time.
+    // TWO scope boundaries inside one window, the second scan a SUPERSET of the
+    // first: losing the project scans that project, and the revoke/re-grant
+    // pair then scans the whole workspace over the same ticket. Reached twice,
+    // emitted once.
     //
-    // The obvious fixture — revoke the parent, then revoke the child — does NOT
-    // exercise this: the filter judges visibility AS OF NOW, so by query time
-    // the child's own mode is `explicit` and the parent's walk prunes at it,
-    // reaching each ticket exactly once. It was written that way first and the
-    // dedup mutation survived it.
-    const first = await record(setVisibilityEnv(ws, parent, 'explicit', [newUlid()]));
-    await record(setVisibilityEnv(ws, parent, 'explicit', [newUlid()]));
+    // The fixture that used to reach the dedup was two `visibility.set`s on one
+    // parent, driving the per-event subtree walk twice. That walk is gone
+    // (6.101), so the property is re-pinned on the emitters that remain — and
+    // the walk's departure is exactly why it had to be: a dedup case whose only
+    // route to the branch has been deleted is a check that cannot fail.
+    const removal = await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'project', id: prj },
+        type: 'project.member_removed',
+        payload: { userId: viewer },
+        actorId: newUlid(),
+      }),
+    );
+    const revoked = await record(revocationEnv(ws, viewer));
+    const regranted = await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'membership', id: membershipId(ws, viewer) },
+        type: 'membership.granted',
+        payload: { userId: viewer, role: 'member' },
+        actorId: newUlid(),
+      }),
+    );
 
     // Exact, and in stream order: a replica handed the same tombstone twice is
     // not harmed, but the contract says deduplicated per call, and an exact
-    // list is the only assertion that can tell one from two.
-    expect(await collect(viewer, ws, first.workspaceSeq - 1)).toEqual([
-      { kind: 'purge', entityId: parent },
-      { kind: 'purge', entityId: child },
+    // list is the only assertion that can tell one from two. The three roster
+    // events beside it are the positive control — the call is not empty, and
+    // the single purge is a decision rather than a stream that yields nothing.
+    expect(idsOf(await collect(viewer, ws, removal.workspaceSeq - 1))).toEqual([
+      `purge:${inProject}`,
+      removal.id,
+      revoked.id,
+      regranted.id,
     ]);
   });
 
@@ -420,46 +346,6 @@ describe('visibleEventsFor — what reaches a replica', () => {
     // not, so the narrowing really happened.
     expect(ids).toContain(stillMine.id);
     expect(ids).not.toContain(before.id);
-  });
-
-  it('6.99 a CYCLE in the parent graph terminates the subtree walk instead of hanging the stream', async () => {
-    const ws = newUlid();
-    const prj = newUlid();
-    const viewer = newUlid();
-    const root = newUlid();
-    const a = newUlid();
-    const b = newUlid();
-    await seedMember(db.pool, ws, viewer, 'member', [{ projectId: prj }]);
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: root });
-    await applyAll(db.pool, [setVisibilityEnv(ws, root, 'workspace')]);
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: a, parentId: root });
-    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: b, parentId: a });
-
-    // Case 6.58's own fixture: this closes A → B → A. Nothing on this branch
-    // refuses it — Plan 3's reparent command does not exist and the gate does
-    // not look at ancestry — so the cycle is reachable from real data today.
-    // `ticket.reparented` is itself visibility-affecting, so THIS event is what
-    // starts the descending walk into the loop it just created.
-    const reparent = await record(
-      testEnvelope({
-        workspaceId: ws,
-        entity: { kind: 'ticket', id: a },
-        type: 'ticket.reparented',
-        payload: { newParentId: b },
-        actorId: viewer,
-      }),
-    );
-
-    // Termination is the property. Without the `seen` guard this call never
-    // returns: A's child is B, B's child is A, and both inherit.
-    const ids = idsOf(await collect(viewer, ws, reparent.workspaceSeq - 1));
-    // Each id at most once, so a guard that terminated by some other means
-    // (a depth cap, say) could not pass by re-emitting the loop a few times.
-    expect(new Set(ids).size).toBe(ids.length);
-    // Non-vacuity: the window really did carry the cycle-closing event, so the
-    // walk was entered rather than skipped. Without this the case passes
-    // against a filter that yields nothing at all.
-    expect(ids).toContain(reparent.id);
   });
 
   it('6.89 a non-member of the workspace receives nothing at all', async () => {
@@ -642,8 +528,13 @@ describe('visibleEventsFor — what reaches a replica', () => {
 
     const mine = await record(ticketEvent(ws, 'comment.added', shared, { body: 'for you' }, admin));
     // Routine activity by someone else, on a ticket this guest has never held:
-    // an admin re-authors its audience. `visibility.set` is visibility-affecting,
-    // so this is the event that used to start the walk for everyone alike.
+    // an admin re-authors its audience. `visibility.set` is the event that used
+    // to start the subtree walk for everyone alike. The walk was first gated on
+    // `!isGuest` to close this case, and has since been removed outright
+    // (6.101), so what holds this exclusion now is the walk's ABSENCE — which
+    // is why the mutation that reddens it is re-adding the walk, not deleting a
+    // gate. Recorded so nobody reads the surviving `!isGuest` tests as this
+    // case's pin.
     await record(setVisibilityEnv(ws, foreign, 'explicit', [newUlid()], admin));
 
     const items = await collect(guest, ws, mine.workspaceSeq - 1);
@@ -658,7 +549,7 @@ describe('visibleEventsFor — what reaches a replica', () => {
     expect(JSON.stringify(items)).not.toContain(foreign);
   });
 
-  it('6.101 a MEMBER is handed the id of a ticket in a project they were never on — the spec §6 trade, pinned rather than left to be rediscovered', async () => {
+  it('6.101 the per-event purge walk is GONE: a MEMBER is never handed the id of a ticket in a project they were never on', async () => {
     const ws = newUlid();
     const mine = newUlid();
     const theirs = newUlid();
@@ -668,29 +559,53 @@ describe('visibleEventsFor — what reaches a replica', () => {
     await seedMember(db.pool, ws, viewer, 'member', [{ projectId: mine }]);
     await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: held });
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: foreign });
+    // Asserted, so this is a ticket that really was out of reach and not a
+    // fixture that forgot to seed one. It measures the RELATIONSHIP the ruling
+    // turns on: `foreign` was never on this device — the viewer is on none of
+    // its project and no list names them — so there is nothing this recipient
+    // holds that its id could name.
     expect(await canSee(db.pool, viewer, held)).toBe(true);
     expect(await canSee(db.pool, viewer, foreign)).toBe(false);
 
     const seen = await record(ticketEvent(ws, 'comment.added', held, { body: 'mine' }, viewer));
+    // Routine activity by someone else, on a ticket this member has never held:
+    // a re-authoring of its audience. `visibility.set` is what used to start the
+    // subtree walk.
     const reauthored = await record(setVisibilityEnv(ws, foreign, 'explicit', [newUlid()]));
 
-    const ids = idsOf(await collect(viewer, ws, seen.workspaceSeq - 1));
-    // The positive control, in the same call.
-    expect(ids).toContain(seen.id);
-    // The EVENT is still withheld — it is about a ticket this member cannot see.
-    expect(ids).not.toContain(reauthored.id);
-    // The tombstone names the id anyway, and that is the disclosed behaviour:
-    // `nowInvisibleInheritSubtree` asks `canSee` NOW, which is true of a ticket
-    // taken away and equally true of one never held, and this module cannot ask
-    // the other question — `proj_visibility` keeps no prior audience and neither
-    // payload carries a before-image (`PurgeInstruction`'s docblock). Spec §6
-    // decided the trade for someone standing INSIDE the workspace; case 6.14 is
-    // the same trade at the read door. Anyone narrowing this must argue with
-    // that sentence rather than change the line quietly.
-    expect(ids).toContain(`purge:${foreign}`);
+    const items = await collect(viewer, ws, seen.workspaceSeq - 1);
+    // The positive control FIRST: this member's stream is non-empty over this
+    // range, so both exclusions below are decisions and not an empty result —
+    // without it they pass against a filter that yields nothing.
+    expect(idsOf(items)).toContain(seen.id);
+    // The EVENT is withheld: it is about a ticket this member cannot see.
+    expect(idsOf(items)).not.toContain(reauthored.id);
+    // And the ID does not travel either. Not `not.toContain('purge:…')` — the
+    // id must not appear in ANY field of ANY item, the standard 6.16 and 6.100
+    // hold the stream to, because an item naming the ticket and withholding
+    // everything else is still the oracle.
+    //
+    // **This reverses what the case asserted before, and the reason is
+    // RELATIONSHIP, not size.** It used to pin the id as arriving, arguing from
+    // spec §6's within-a-workspace existence-leak and from case 6.14. The
+    // controller rejected that reading of 6.14: 6.14 is tolerable because the
+    // viewer ALREADY HOLDS THE CHILD whose unreachable parent's id it
+    // discloses, so the id names something they stand in a relationship to;
+    // strip that axis and 6.14 reduces to "small leaks are fine", which is not
+    // what it says. The two `canSee` assertions above are the measurement that
+    // the axis is absent here. So this was case 6.100's guest disclosure at a
+    // smaller radius, and it is closed the same way — by not walking at all,
+    // since the gate it would have needed ("could they see it BEFORE") is one
+    // this module cannot ask and may not reconstruct (6.82, 6.94).
+    //
+    // What that costs is an under-purge, recorded as case 6.104 and NOT pinned
+    // by a test here: a ticket genuinely taken away now outlives its tombstone
+    // until a full resync. Stale local data is recoverable; an id on a device
+    // the server does not control is not.
+    expect(JSON.stringify(items)).not.toContain(foreign);
   });
 
-  it('6.101 the same through `ticket.reparented`, and the guest standing beside them receives neither the event nor the id', async () => {
+  it('6.101 the same through `ticket.reparented`, and the guest standing beside them is now answered identically', async () => {
     const ws = newUlid();
     const mine = newUlid();
     const theirs = newUlid();
@@ -708,7 +623,8 @@ describe('visibleEventsFor — what reaches a replica', () => {
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: foreign });
     await applyAll(db.pool, [setVisibilityEnv(ws, sharedWithGuest, 'explicit', [guest])]);
     // Out of reach of BOTH, and by two different branches of `canSee`: the
-    // member is not on its project, the guest is named by no list.
+    // member is not on its project, the guest is named by no list. Neither
+    // holds it, so neither may be told its id.
     expect(await canSee(db.pool, viewer, foreign)).toBe(false);
     expect(await canSee(db.pool, guest, foreign)).toBe(false);
 
@@ -718,7 +634,8 @@ describe('visibleEventsFor — what reaches a replica', () => {
     const guestControl = await record(
       ticketEvent(ws, 'comment.added', sharedWithGuest, { body: 'yours' }, viewer),
     );
-    // The OTHER visibility-affecting type, on a ticket neither of them holds.
+    // The OTHER visibility-affecting type, on a ticket neither of them holds —
+    // the second of the two events that used to start the walk.
     await record(
       testEnvelope({
         workspaceId: ws,
@@ -729,12 +646,17 @@ describe('visibleEventsFor — what reaches a replica', () => {
       }),
     );
 
-    const memberIds = idsOf(await collect(viewer, ws, memberControl.workspaceSeq - 1));
-    expect(memberIds).toContain(memberControl.id);
-    expect(memberIds).toContain(`purge:${foreign}`);
+    const memberItems = await collect(viewer, ws, memberControl.workspaceSeq - 1);
+    expect(idsOf(memberItems)).toContain(memberControl.id);
+    expect(JSON.stringify(memberItems)).not.toContain(foreign);
 
-    // One event, one workspace, two recipients: the ONLY difference is the role,
-    // which is the whole of the rule `PurgeInstruction` states.
+    // One event, one workspace, two recipients. The ROLE used to be the whole
+    // of the rule at this site and no longer is: the member half of this pair
+    // used to assert `purge:${foreign}` PRESENT while the guest half asserted
+    // it absent, and the ruling collapsed the difference. Both halves are kept
+    // and both now assert absence, because the case's job is to hold the two
+    // recipients against the SAME event — what changed is the answer, not the
+    // question. The role still splits their streams elsewhere (6.91).
     const guestItems = await collect(guest, ws, memberControl.workspaceSeq - 1);
     expect(idsOf(guestItems)).toContain(guestControl.id);
     expect(JSON.stringify(guestItems)).not.toContain(foreign);
@@ -757,8 +679,9 @@ describe('visibleEventsFor — what reaches a replica', () => {
     await applyAll(db.pool, [setVisibilityEnv(ws, openToAll, 'workspace')]);
     await applyAll(db.pool, [setVisibilityEnv(ws, explicitElsewhere, 'explicit', [newUlid()])]);
     // All three were on this device a moment ago. Without this the purges below
-    // would be naming tickets that were never held — a different case (6.101),
-    // and the one that makes an itemised list look gratuitous.
+    // would be naming tickets that were never held — 6.17's `neverHeldInLost`,
+    // the count-leak this branch accepts at a scope boundary — and that is the
+    // shape that makes an itemised list look gratuitous.
     expect(await canSee(db.pool, viewer, openToAll)).toBe(true);
     expect(await canSee(db.pool, viewer, projectOnly)).toBe(true);
     expect(await canSee(db.pool, viewer, explicitElsewhere)).toBe(true);

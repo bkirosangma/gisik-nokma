@@ -7,32 +7,57 @@ import { canSee } from './can-see.js';
 /**
  * "This ticket is gone — delete whatever you hold for it."
  *
- * Emitted when something in the streamed range took a ticket AWAY from this
- * user. It is not an assertion that the ticket was deleted: the ticket may be
- * alive and being worked on by people who can still see it. It says only that
- * this replica may no longer hold it.
+ * Emitted when a SCOPE BOUNDARY inside the streamed range took a ticket away
+ * from this user: a `membership.revoked` they were re-granted after, or a
+ * `project.member_removed` naming them. It is not an assertion that the ticket
+ * was deleted — the ticket may be alive and being worked on by people who can
+ * still see it. It says only that this replica may no longer hold it.
  *
- * ## What a purge may name, and what it may not
+ * ## A purge is a per-BOUNDARY instruction, and only a per-boundary one
  *
- * Naming a ticket the recipient never held is NOT a harmless no-op that the
- * replica quietly ignores. It is a positive assertion that the ticket EXISTS,
- * pushed to a device, and ULIDs are timestamp-ordered so the id dates it too.
- * The rule is therefore about the RECIPIENT, not about the id:
+ * There used to be a second emitter, and it is gone: a per-EVENT walk that ran
+ * on every `visibility.set` and `ticket.reparented`, purging that event's
+ * ticket plus every inheriting descendant this user cannot see NOW (controller
+ * ruling on case 6.101). The two emitters look identical from the outside and
+ * are not, so the reasoning is kept here rather than left in a review.
+ *
+ * Naming a ticket the recipient never held is NOT a harmless no-op the replica
+ * quietly ignores. It is a positive assertion that the ticket EXISTS, pushed to
+ * a device, and ULIDs are timestamp-ordered so the id dates it too. What makes
+ * that tolerable anywhere is RELATIONSHIP, not size. Case 6.14 serves a visible
+ * child's unreachable parent as `{ kind: 'restricted', id }`, and it is
+ * tolerable because the viewer ALREADY HOLDS THE CHILD — the id names something
+ * they stand in a relationship to. Drop that axis and 6.14 degenerates into
+ * "small leaks are fine", which is not what it says.
+ *
+ * The walk had no such axis, and its own test proved it: case 6.101 seeded a
+ * ticket in a project the viewer was NEVER on, asserted `canSee` false, and the
+ * walk emitted `purge:<thatTicket>` regardless — an id for an entity the
+ * recipient stands in no relationship to whatever. The cardinality defence
+ * ("only a few ids") does not repair it either: it compares a PER-EMISSION
+ * quantity against the scope branch's PER-BOUNDARY one, which are different
+ * subjects, and nobody measured the walk's integral over a sync window. It is
+ * the guest disclosure (case 6.100) at a smaller radius, and it is closed the
+ * same way — by not walking.
+ *
+ * ## What survives, and on which axis
  *
  * - **A guest, and anyone the range put OUT of the workspace, is never handed a
- *   ticket id at all** — not itemised over a scope, and not one at a time by
- *   the subtree walk. Spec §6 calls guests external collaborators ("the
+ *   ticket id at all.** Spec §6 calls guests external collaborators ("the
  *   accountant, the supplier"), and an external party learning the shape of
  *   work they were never shown is the disclosure `ScopeRevokedInstruction`
- *   exists to avoid. Both are answered at scope level, or not at all.
- * - **A member or an admin still standing inside the workspace may be handed
- *   one they never held.** That is not an oversight: spec §6 decided it — "within
- *   a workspace, the existence-leak is the honest trade; full concealment was
- *   considered and declined" — and case 6.14 is the same trade at the read door.
- *   Cases 6.100 and 6.101 pin that it really happens, so it is a disclosed
- *   behaviour rather than one a later reader rediscovers as a bug.
+ *   exists to avoid. They are answered at scope level, or not at all.
+ * - **At a scope-revocation boundary, a member or an admin still standing
+ *   inside the workspace may be handed an id they never held.** That is settled
+ *   and is NOT the walk's trade wearing different clothes: it fires once, when
+ *   a NAMED scope is taken from a NAMED person, and every id it can emit is
+ *   bounded by that scope. Spec §6 decided it — "within a workspace, the
+ *   existence-leak is the honest trade; full concealment was considered and
+ *   declined" — and cases 6.17 and 6.103 pin that it really happens, so it is a
+ *   disclosed behaviour rather than one a later reader rediscovers as a bug.
  *
- * ## Why "could this recipient see it BEFORE?" is not the test
+ * ## Why "could this recipient see it BEFORE?" is not the test, and what
+ * ## refusing to approximate it costs
  *
  * It is the question one would rather ask, and this module cannot ask it.
  * `proj_visibility` stores the audience that applies NOW and keeps no prior
@@ -43,7 +68,18 @@ import { canSee } from './can-see.js';
  * rule here, against a ledger lookback — a second definition of visibility that
  * can disagree with the table every other door reads. That is exactly the ban
  * cases 6.82 and 6.94 already recorded, and it is refused here for the same
- * reason. The role line above is the whole of the rule.
+ * reason.
+ *
+ * So the walk could not be gated on the one property it needed, and it is
+ * removed rather than approximated on some weaker one. The cost is an
+ * UNDER-purge, taken deliberately: a member un-shared by a plain
+ * `visibility.set`, or moved under an unreachable parent by a
+ * `ticket.reparented`, now receives no tombstone and keeps the stale copy until
+ * a full resync. Stale local data is the safe direction — an id on a device the
+ * server does not control is never retrieved, while retained data is corrected
+ * by the next bootstrap.
+ * *Owner: Plan 10 (the WS catch-up/purge protocol), case 6.104 — the sibling of
+ * 6.102, which records the identical residual on the guest side.*
  */
 export interface PurgeInstruction {
   kind: 'purge';
@@ -56,31 +92,34 @@ export interface PurgeInstruction {
  *
  * Per-id purges tell the recipient how many tickets a scope contained,
  * INCLUDING ids they never held. For someone still standing inside the
- * workspace that is a minor count-leak, consistent with the restricted-parent
- * existence-leak spec §6 already accepts (case 6.14) — and the itemised branch
- * below deliberately keeps it rather than widening this instruction to cover
- * it. For someone who has just been put OUT of the workspace, or who is only a
- * guest in it, it is an external party learning the size of work they were
- * never shown, and losing access is not a thing that should teach them it.
+ * workspace that is the existence-leak spec §6 already accepts (case 6.14),
+ * bounded here by the named scope and fired once at a named boundary — and the
+ * itemised branch below deliberately keeps it rather than widening this
+ * instruction to cover it. For someone who has just been put OUT of the
+ * workspace, or who is only a guest in it, it is an external party learning the
+ * size of work they were never shown, and losing access is not a thing that
+ * should teach them it.
  *
- * ## "No ticket list is computed on those paths" is now true of the GENERATOR
+ * ## No ticket list is computed on a guest's path, or on an ex-member's
  *
- * It used to be a claim about this branch alone, and as a claim about the
- * module it was FALSE. The subtree purge walk sat outside every role test, so
+ * That used to be a claim about this branch alone, and as a claim about the
+ * MODULE it was false. The subtree purge walk sat outside every role test, so
  * an ordinary `visibility.set` or `ticket.reparented` on ANY ticket in the
  * workspace handed a guest `purge:<thatTicketId>` for a ticket they had never
- * held and could never see (case 6.100). The walk is now gated on `!isGuest`
- * beside it, and the null-role path returns before the loop is entered, so a
- * guest and an ex-member reach no code anywhere in this file that names a
- * ticket id.
+ * held and could never see (case 6.100). It was first gated on `!isGuest`, and
+ * the controller then struck the walk entirely (case 6.101), so the sentence is
+ * now true of the whole file: with the null-role path returning before the loop
+ * and no per-event walk left, a guest and an ex-member reach no code anywhere
+ * here that names a ticket id.
  *
- * That gate leaves one thing undone, deliberately and in the safe direction: a
- * guest un-shared from a ticket they legitimately held now receives no
- * tombstone for it, and keeps it until a full resync. Retention is recoverable
- * and disclosure is not — an id on a device the server does not control is
- * never retrieved — so the trade is taken this way round.
+ * The guest's residual is unchanged and still deliberate: a guest un-shared
+ * from a ticket they legitimately held receives no tombstone for it, and keeps
+ * it until a full resync. Retention is recoverable and disclosure is not — an
+ * id on a device the server does not control is never retrieved — so the trade
+ * is taken this way round.
  * *Owner: Plan 10 (the WS catch-up/purge protocol and the snapshot-bounded
- * bootstrap), case 6.102.*
+ * bootstrap), case 6.102.* Since the walk went, MEMBERS carry the same residual
+ * for the same reason, recorded beside it as case 6.104.
  *
  * The replica's handling is a local delete by scope, so it is idempotent in the
  * same way a purge is.
@@ -118,9 +157,6 @@ export interface ScopeRevokedInstruction {
  * this contract without reading this file.
  */
 export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction;
-
-/** The event types that can move a ticket, or a subtree under it, out of view. */
-const VISIBILITY_AFFECTING: ReadonlySet<string> = new Set(['visibility.set', 'ticket.reparented']);
 
 /**
  * Who an event about this entity kind is for, before any per-ticket question is
@@ -192,66 +228,6 @@ function isRevocationOf(row: EventRow, userId: string): boolean {
     row.type === 'membership.revoked' &&
     payload?.userId === userId
   );
-}
-
-/**
- * `ticketId` plus every INHERITING descendant under it that this user cannot
- * see now. The walk prunes at authored descendants, exactly like
- * re-resolution: their audience is their own and cannot have changed from
- * above.
- *
- * ## The prune is an optimisation; the safety comes from `canSee`
- *
- * Recorded because Plan 4 already learned it once, on the projection side
- * (case 6.10): deleting the `own_mode === 'inherit'` test leaves this
- * function's results IDENTICAL, because walking into an authored subtree
- * re-asks `canSee`, which re-derives the audience that subtree already had.
- * The property "an authored subtree is not purged by its ancestor's
- * revocation" is enforced by `canSee`, not by this line, and case 6.90 asserts
- * that property rather than the line. Nothing here can pin the prune, and a
- * test claiming to would be passing for a reason unrelated to the property it
- * named.
- *
- * ## The `seen` guard is NOT the same kind of line, and it is load-bearing
- *
- * The parent graph on this branch **can contain a cycle** and nothing refuses
- * one: case 6.58 measures `A → B → A` arriving through a `ticket.reparented`,
- * states that Plan 3's reparent command does not exist yet and the permission
- * gate does not look at ancestry, and calls the cycle reachable today. This
- * walk descends `parent_id`, so a cycle is not a wrong ANSWER here, it is
- * unbounded recursion on a request path — a hang inside the generator that
- * serves sync-down, reached from data the projection already admits. The
- * projection itself terminates on a cycle (6.58 pins that); this function has
- * to terminate for its own reasons, and the guard is what does it. Case 6.99
- * builds the cycle and mutating the guard away reddens it.
- */
-async function nowInvisibleInheritSubtree(
-  db: Queryable,
-  userId: string,
-  ticketId: string,
-): Promise<string[]> {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  const walk = async (id: string): Promise<void> => {
-    if (seen.has(id)) {
-      return;
-    }
-    seen.add(id);
-    if (!(await canSee(db, userId, id))) {
-      out.push(id);
-    }
-    const result = await db.query<{ ticket_id: string; own_mode: string }>(
-      'SELECT ticket_id, own_mode FROM proj_visibility WHERE parent_id = $1 ORDER BY ticket_id',
-      [id],
-    );
-    for (const child of result.rows) {
-      if (child.own_mode === 'inherit') {
-        await walk(child.ticket_id);
-      }
-    }
-  };
-  await walk(ticketId);
-  return out;
 }
 
 /**
@@ -403,22 +379,21 @@ export async function* visibleEventsFor(
         if (await canSee(db, userId, env.entity.id)) {
           yield env;
         }
-        // Even an event this user CAN see may have flipped an inheriting
-        // descendant out of their view — and an event they cannot see is
-        // usually exactly the one that did it, which is why the purge walk is
-        // outside the `canSee` branch rather than inside it.
+        // NO per-event purge here, and there used to be one — this is the site
+        // the controller's ruling on case 6.101 emptied, so the absence is
+        // marked rather than left to look like an omission.
         //
-        // It is NOT outside the ROLE test, and it used to be. This walk names
-        // ticket ids one at a time, and `nowInvisibleInheritSubtree` answers
-        // "cannot see NOW", which is true of a ticket taken away and equally
-        // true of one never held. Run for a guest it therefore disclosed every
-        // ticket in the workspace that anyone re-authored (case 6.100) — to the
-        // one class of recipient `PurgeInstruction`'s docblock says may never be
-        // handed an id. Guests are answered at scope level or not at all; the
-        // retention that leaves them is recorded on `ScopeRevokedInstruction`.
-        if (!isGuest && VISIBILITY_AFFECTING.has(env.type)) {
-          yield* purge(await nowInvisibleInheritSubtree(db, userId, env.entity.id));
-        }
+        // It walked this event's ticket and every inheriting descendant and
+        // emitted a purge for each the user cannot see NOW, which is true of a
+        // ticket taken away and equally true of one never held. For a guest
+        // that disclosed every ticket anyone re-authored (6.100); for a member
+        // it disclosed tickets in projects they were never on (6.101) — an id
+        // for an entity the recipient stands in no relationship to, which is
+        // the axis case 6.14 actually turns on. The gate it needed is "could
+        // they see it BEFORE", which this module cannot ask and may not
+        // reconstruct (`PurgeInstruction`'s docblock, cases 6.82 and 6.94), so
+        // the walk is removed rather than approximated. The under-purge that
+        // leaves is case 6.104, the member-side sibling of 6.102.
         break;
       }
       case 'roster': {
