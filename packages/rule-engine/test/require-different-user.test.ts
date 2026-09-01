@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { makeEnvelope, type TicketState, type WorkflowDef } from '@gisik-nokma/domain';
 import { evaluateRequireDifferentUser } from '../src/rules/require-different-user.js';
 import { resolveCurrentStateId } from '../src/version-map.js';
-import type { EngineContext } from '../src/engine.js';
+import type { EngineContext, TenantScope } from '../src/engine.js';
 import type { TransitionRuleInput } from '../src/rules/types.js';
 
 /**
@@ -52,7 +52,7 @@ function contextServing(byVersion: Map<number, WorkflowDef>, latest: WorkflowDef
     getEntityState: vi.fn(async () => null),
     getChildrenStates: vi.fn(async () => []),
     getTicketTypeDef: vi.fn(async () => null),
-    getWorkflowDef: vi.fn(async (_workflowId: string, version?: number) =>
+    getWorkflowDef: vi.fn(async (_scope: TenantScope, _workflowId: string, version?: number) =>
       version === undefined ? latest : (byVersion.get(version) ?? null),
     ),
   };
@@ -136,7 +136,10 @@ describe('require-different-user fails CLOSED on a history it cannot read', () =
 
     // The premise, asserted rather than assumed: the ticket does NOT strand, so
     // nothing upstream refuses first and this refusal is four-eyes' own.
-    await expect(resolveCurrentStateId(ticket, v3, ctx)).resolves.toEqual({ ok: true, stateId: 'review' });
+    await expect(resolveCurrentStateId({ workspaceId: 'ws_1' }, ticket, v3, ctx)).resolves.toEqual({
+      ok: true,
+      stateId: 'review',
+    });
 
     // A different person from every actor in the log, so the pre-change code
     // accepts cleanly and the mutation proof fails at this assertion rather

@@ -165,8 +165,16 @@ export function buildMemoryContext(
     // latest. Mirrors `harness.ts:194-197`. The engine's forward walk fetches
     // intermediates by exact version, and answering "latest" to that question is
     // a wrong answer that looks like an answer.
-    getWorkflowDef: async (workflowId, version) =>
+    // `scope` is UNREAD here, and that is honest rather than lazy: this context
+    // is built from ONE workspace's events by its caller, so it has no second
+    // tenancy to keep apart and no predicate to apply. It takes the parameter
+    // because the SERVER needs it (ruling P14) and one signature across the four
+    // implementations is what stops them drifting — which is also why no unit
+    // test in this package can pin P14's fix, and why its test home is
+    // `apps/server/test/engine-context.test.ts`.
+    getWorkflowDef: async (_scope, workflowId, version) =>
       (version === undefined ? (workflows.get(workflowId) ?? null) : versionOf(workflowId, version)),
-    getTicketTypeDef: async (typeId) => ticketTypes.get(typeId) ?? null,
+    /** `scope` UNREAD for the same reason as `getWorkflowDef` directly above. */
+    getTicketTypeDef: async (_scope, typeId) => ticketTypes.get(typeId) ?? null,
   };
 }

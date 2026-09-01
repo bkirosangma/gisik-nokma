@@ -240,7 +240,7 @@ describe('checkTicketReparented', () => {
       getChildrenStates: async () => [],
       getWorkflowDef: async () => WF,
       // The moved ticket's own type resolves; the parent's does not.
-      getTicketTypeDef: async (typeId) => (typeId === 'task' ? TASK : null),
+      getTicketTypeDef: async (_scope, typeId) => (typeId === 'task' ? TASK : null),
     };
     expect(await checkTicketReparented(reparent(C, OTHER), ctx)).toEqual({
       refused: true,
@@ -469,7 +469,7 @@ describe('checkTicketReparented — which refusal names the event when two are a
       },
       getChildrenStates: async () => [],
       getWorkflowDef: async () => WF,
-      getTicketTypeDef: async (typeId) => (typeId === 'task' ? TASK : null),
+      getTicketTypeDef: async (_scope, typeId) => (typeId === 'task' ? TASK : null),
     };
     expect(await checkTicketReparented(reparent(C, OTHER), ctx)).toEqual({
       refused: true,

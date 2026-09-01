@@ -81,10 +81,10 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
   // second opinion); the door that keeps it out is here.
   if ((await getTicketState(ctx, env.entity.id)) !== null) return refuse('ticket.already-exists');
 
-  const type = await getTicketTypeDef(ctx, p.typeId);
+  const type = await getTicketTypeDef(ctx, env, p.typeId);
   if (!type) return refuse('ticket.unknown-type');
 
-  const workflow = await ctx.getWorkflowDef(type.workflowId);
+  const workflow = await ctx.getWorkflowDef(env, type.workflowId);
   if (!workflow) return refuse('ticket.workflow-undefined');
 
   if (p.parentId === null) {
@@ -128,7 +128,7 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
   // to answer `ticket.unknown-type` — "This ticket's type is not defined in
   // this workspace." — which is false the moment it can fire: this ticket's
   // type resolved above, or we never got here. Controller ruling P11.
-  const parentType = await getTicketTypeDef(ctx, parent.typeId);
+  const parentType = await getTicketTypeDef(ctx, env, parent.typeId);
   if (!parentType) return refuse('hierarchy.parent-type-unknown');
   if (type.rank <= parentType.rank) {
     return refuse('hierarchy.rank', rankRefusal(type.name, parentType.name));
@@ -139,7 +139,11 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
   // only names the state for the reason, so it falls back to raw ids rather
   // than blocking the refusal on a missing definition.
   if (parent.stateCategory === 'terminal') {
-    const parentDef = await ctx.getWorkflowDef(parent.workflowId, parent.workflowVersion);
+    // `env` is the scope, `parent` supplies only the id and the version. Passing
+    // `parent` here would compile — `TicketState` satisfies `TenantScope` — and
+    // would ask the question the PARENT's tenancy answers, which is the fact
+    // this check has just VERIFIED rather than the fact that authorises a read.
+    const parentDef = await ctx.getWorkflowDef(env, parent.workflowId, parent.workflowVersion);
     const stateName = parentDef?.states.find((s) => s.id === parent.stateId)?.name ?? parent.stateId;
     const titleClaim = parent.fields['title']?.value;
     const parentTitle = typeof titleClaim === 'string' ? titleClaim : parent.id;
@@ -212,7 +216,7 @@ export async function checkTicketReparented(env: EventEnvelope, ctx: EngineConte
   const ticket = await getTicketState(ctx, env.entity.id);
   if (!ticket) return refuse('ticket.unknown');
 
-  const type = await getTicketTypeDef(ctx, ticket.typeId);
+  const type = await getTicketTypeDef(ctx, env, ticket.typeId);
   if (!type) return refuse('ticket.unknown-type');
 
   if (p.newParentId === null) {
@@ -272,7 +276,7 @@ export async function checkTicketReparented(env: EventEnvelope, ctx: EngineConte
   // The PARENT's type, and the parent is the subject. Not `ticket.unknown-type`
   // — that sentence is false on every path that reaches here, because this
   // ticket's own type resolved above (controller ruling P11).
-  const parentType = await getTicketTypeDef(ctx, newParent.typeId);
+  const parentType = await getTicketTypeDef(ctx, env, newParent.typeId);
   if (!parentType) return refuse('hierarchy.parent-type-unknown');
   if (type.rank <= parentType.rank) {
     return refuse('hierarchy.rank', rankRefusal(type.name, parentType.name));
@@ -284,7 +288,10 @@ export async function checkTicketReparented(env: EventEnvelope, ctx: EngineConte
   // `stateCategory`; the def lookup only NAMES the state for the reason, so a
   // missing definition degrades to raw ids rather than blocking the refusal.
   if (newParent.stateCategory === 'terminal' && ticket.stateCategory !== 'terminal') {
-    const parentDef = await ctx.getWorkflowDef(newParent.workflowId, newParent.workflowVersion);
+    // `env` is the scope; `newParent` supplies the id and the version only. See
+    // the same line in `checkTicketCreated` for why passing `newParent` compiles
+    // and is wrong.
+    const parentDef = await ctx.getWorkflowDef(env, newParent.workflowId, newParent.workflowVersion);
     const stateName = parentDef?.states.find((s) => s.id === newParent.stateId)?.name ?? newParent.stateId;
     const titleClaim = newParent.fields['title']?.value;
     const parentTitle = typeof titleClaim === 'string' ? titleClaim : newParent.id;

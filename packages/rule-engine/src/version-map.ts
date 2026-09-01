@@ -1,5 +1,5 @@
 import { foldStateIdForward, type FoldedState, type TicketState, type WorkflowDef } from '@gisik-nokma/domain';
-import type { EngineContext } from './engine.js';
+import type { EngineContext, TenantScope } from './engine.js';
 
 /**
  * The engine's name for domain's FoldedState. It is an alias, not a copy:
@@ -30,8 +30,17 @@ export type ResolvedState = FoldedState;
  * difference is a few extra reads on a store where publishing's mandatory
  * stateMapping has already been violated. Correctness first, and that path is
  * a corrupted or planted store, not a live one.
+ *
+ * `scope` is the workspace of the EVENT under evaluation, threaded through
+ * rather than taken off the ticket (controller ruling P14, Task 12). The two
+ * agree on every live path — ingest's entity to workspace guard refuses an
+ * event filed against a ticket in another workspace before the engine runs —
+ * and reading it off the ticket instead would be the "true statement about a
+ * neighbouring subject" this series keeps paying for: the ticket's tenancy is a
+ * fact the checks VERIFY, never the fact that authorises a definition read.
  */
 export async function resolveStateIdForward(
+  scope: TenantScope,
   workflowId: string,
   stateId: string,
   fromVersion: number,
@@ -40,7 +49,7 @@ export async function resolveStateIdForward(
 ): Promise<ResolvedState> {
   const intermediates = new Map<number, WorkflowDef>();
   for (let version = fromVersion + 1; version < latest.version; version += 1) {
-    const def = await ctx.getWorkflowDef(workflowId, version);
+    const def = await ctx.getWorkflowDef(scope, workflowId, version);
     if (def !== null) intermediates.set(version, def);
   }
   return foldStateIdForward(stateId, fromVersion, latest, (version) => intermediates.get(version) ?? null);
@@ -57,9 +66,10 @@ export async function resolveStateIdForward(
  * answer is a refusal, not a guess.
  */
 export async function resolveCurrentStateId(
+  scope: TenantScope,
   ticket: TicketState,
   latest: WorkflowDef,
   ctx: EngineContext,
 ): Promise<ResolvedState> {
-  return resolveStateIdForward(ticket.workflowId, ticket.stateId, ticket.workflowVersion, latest, ctx);
+  return resolveStateIdForward(scope, ticket.workflowId, ticket.stateId, ticket.workflowVersion, latest, ctx);
 }

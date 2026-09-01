@@ -410,7 +410,7 @@ describe('ingestBatch', () => {
       const state = await ctx.getEntityState(env.entity.kind, env.entity.id);
       existence.push(state === null ? null : state.kind);
       if (env.entity.kind === 'workflow') {
-        const def = await ctx.getWorkflowDef(env.entity.id);
+        const def = await ctx.getWorkflowDef(env, env.entity.id);
         versions.push(def === null ? null : def.version);
       }
       return { refused: false };

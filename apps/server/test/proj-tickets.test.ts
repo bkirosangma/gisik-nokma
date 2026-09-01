@@ -930,11 +930,16 @@ function testLocalContext(client: PoolClient, workspaceId: string): EngineContex
     async getChildrenStates() {
       return [];
     },
-    async getWorkflowDef(workflowId, version) {
-      return await getWorkflowDefFromProjection(client, workflowId, version);
+    // SCOPED from the caller's `scope`, not from this helper's closed-over
+    // `workspaceId` (controller ruling P14, Task 12). The two coincide in this
+    // file; taking the closure would make that coincidence the reason the
+    // assertions pass and would answer a different question than the shipped
+    // server context does.
+    async getWorkflowDef(scope, workflowId, version) {
+      return await getWorkflowDefFromProjection(client, scope.workspaceId, workflowId, version);
     },
-    async getTicketTypeDef(typeId) {
-      return await getTicketTypeFromDb(client, workspaceId, typeId);
+    async getTicketTypeDef(scope, typeId) {
+      return await getTicketTypeFromDb(client, scope.workspaceId, typeId);
     },
   };
 }

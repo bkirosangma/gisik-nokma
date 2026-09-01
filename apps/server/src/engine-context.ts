@@ -88,8 +88,8 @@ export function createEngineContext(client: PoolClient): EngineContext {
       void ticketId;
       return [];
     },
-    async getWorkflowDef(workflowId, version) {
-      return await getWorkflowDefFromProjection(client, workflowId, version);
+    async getWorkflowDef(scope, workflowId, version) {
+      return await getWorkflowDefFromProjection(client, scope.workspaceId, workflowId, version);
     },
     async getContest(contestedEventId) {
       // Reads proj_contested through the ingest transaction's own client, like
@@ -117,7 +117,8 @@ export function createEngineContext(client: PoolClient): EngineContext {
       }
       return { ticketId: row.ticket_id, resolved: row.resolved };
     },
-    async getTicketTypeDef(typeId) {
+    async getTicketTypeDef(scope, typeId) {
+      void scope;
       // Null for the same reason getEntityState answers null for 'ticket':
       // proj_ticket_types does not exist yet (Plan 3 Task 9 lands the table,
       // Task 12 wires this method to it). Null, not a throw, because this

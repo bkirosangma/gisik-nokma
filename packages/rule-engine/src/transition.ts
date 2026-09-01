@@ -48,7 +48,7 @@ export async function evaluateTicketTransitioned(
   }
   const ticket = entity;
 
-  const latest = await ctx.getWorkflowDef(ticket.workflowId);
+  const latest = await ctx.getWorkflowDef(env, ticket.workflowId);
   if (latest === null) {
     return {
       refused: true,
@@ -57,7 +57,7 @@ export async function evaluateTicketTransitioned(
     };
   }
 
-  const resolved = await resolveCurrentStateId(ticket, latest, ctx);
+  const resolved = await resolveCurrentStateId(env, ticket, latest, ctx);
   if (!resolved.ok) {
     return {
       refused: true,

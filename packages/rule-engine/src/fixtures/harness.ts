@@ -297,7 +297,14 @@ export function buildInMemoryContext(fx: Fixture): EngineContext {
     async getChildrenStates(ticketId) {
       return [...tickets.values()].filter((ticket) => ticket.parentId === ticketId);
     },
-    async getWorkflowDef(workflowId, version) {
+    /**
+     * `scope` is UNREAD. A fixture is one workspace's world (`ws_1` unless the
+     * fixture overrides it), so there is no second tenancy here to keep apart
+     * and no predicate to apply — the parameter exists because the SERVER needs
+     * it (controller ruling P14) and one signature across the four
+     * implementations is what stops them drifting.
+     */
+    async getWorkflowDef(_scope, workflowId, version) {
       if (version !== undefined) return defs.get(`${workflowId}@${version}`) ?? null;
       return latestOf(workflowId);
     },
@@ -332,7 +339,7 @@ export function buildInMemoryContext(fx: Fixture): EngineContext {
      * `hierarchy.parent-type-unknown` when it is the PARENT's type that is
      * missing — both of which a fixture can now stage deliberately.
      */
-    async getTicketTypeDef(typeId) {
+    async getTicketTypeDef(_scope, typeId) {
       return ticketTypes.get(typeId) ?? null;
     },
   };

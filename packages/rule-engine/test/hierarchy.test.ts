@@ -283,7 +283,7 @@ describe('checkTicketCreated', () => {
       getChildrenStates: async () => [],
       getWorkflowDef: async () => WF,
       // The candidate's own type resolves; the parent's does not.
-      getTicketTypeDef: async (typeId) => (typeId === 'task' ? TASK : null),
+      getTicketTypeDef: async (_scope, typeId) => (typeId === 'task' ? TASK : null),
     };
     expect(await checkTicketCreated(created(NEW, 'task', PARENT), ctx)).toEqual({
       refused: true,
@@ -446,7 +446,7 @@ describe('checkTicketCreated — which refusal names the event when two are avai
       getEntityState: async (kind, id) => (kind === 'ticket' && id === PARENT ? foreignOrphan : null),
       getChildrenStates: async () => [],
       getWorkflowDef: async () => WF,
-      getTicketTypeDef: async (typeId) => (typeId === 'task' ? TASK : null),
+      getTicketTypeDef: async (_scope, typeId) => (typeId === 'task' ? TASK : null),
     };
     expect(await checkTicketCreated(created(NEW, 'task', PARENT, PROJECT), ctx)).toEqual({
       refused: true,

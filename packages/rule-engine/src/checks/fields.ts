@@ -142,7 +142,7 @@ export async function checkTicketFieldSet(env: EventEnvelope, ctx: EngineContext
 
   // Now, and only now, is the ticket's own TYPE the subject: everything below
   // asks what this type declared.
-  const type = await getTicketTypeDef(ctx, ticket.typeId);
+  const type = await getTicketTypeDef(ctx, env, ticket.typeId);
   if (!type) return refuse('ticket.unknown-type');
 
   const field = type.fields.find((f) => f.id === p.fieldId);
