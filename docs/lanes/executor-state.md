@@ -130,10 +130,12 @@ T13 (4551), T16 (6047).
 | T5 **FLOOR-LIST** visibility predicate | `34c62fd`, `e582909`, `6a19638`, fix round `2f24959` | 1 **Important** + 2 Minor, all fixed and PROVEN |
 | T6 `proj_search` (tsvector) | `a21448d`, `91ea648` | **CLEAN — zero findings** |
 | T7 read models / TicketCard | `36c3d85`, `0422b20`, `41bb405` | **CLEAN — zero findings**; 18 mutations, 17 killed, 1 survivor correctly diagnosed as an unconstrained path |
+| T8 `GET /board` (first route) | `d6245e1`, `5a51097`, `6264776`, `dd58777`, `ccfc625`, `0c74fde` | **CLEAN — zero findings**; both door mutations die |
 
-**Gate at `41bb405`, re-run by the executor rather than taken from any agent's report:** exit 0, 21/21,
-**0 cached**, **1387 tests** — domain 320 · rule-engine 280 · **server 546** · app-core 130 · editor 72
-· ui 31 · sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**.
+**Gate at `0c74fde`, re-run by the executor rather than taken from any agent's report:** exit 0, 21/21,
+**0 cached**, **1400 tests** — domain 320 · rule-engine 280 · **server 559** · app-core 130 · editor 72
+· ui 31 · sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**. Sum re-added in the same
+run rather than eyeballed: 7 packages, 1400, matches.
 
 ### THE CONTROLLER SHOULD SEE THIS BEFORE MERGING — recorded in the coordination doc, not escalated
 
@@ -155,12 +157,48 @@ In one line each:
 **This did NOT meet the bar to interrupt the controller** (no Critical or Important, and step 9's
 scope is unchanged), so it is written where the interface authority lives instead.
 
-**NEXT: Plan 5 Task 8** — `GET /v1/projects/:projectId/board`, plan line 2315. **This is the first
-route task, so the `makeRequireSession` drift starts biting HERE and recurs through T15.**
+### THE AUTH CONTRACT T8 SET — every later route in this plan should match it, and it is measured
 
-Then T9 (2657) · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (3638) · T11 (3874) · T12 (4079) ·
+**T8 is the first route, so its door shape is the precedent.** Verified by execution and by mutation,
+not by reading:
+
+| caller | answer |
+|---|---|
+| no session (and a FORGED bearer) | **401** `{error:'unauthenticated'}` — forged-bearer proves the session is *resolved*, not merely present |
+| valid session, **different workspace** | **404** |
+| projectId that does not exist | **404 — byte-identical.** Status, body, and every header but `date`, `content-length` included |
+| workspace member **not on** the project | **200, `columns: []`** — the emptiness is the visibility predicate answering, not the door |
+
+**The boundary is the WORKSPACE, and the identical-404 is the point.** A 403 would confirm the project
+exists. A stranger, a neighbouring workspace's owner, and a nonexistent id are indistinguishable — and
+the neighbour gets 200 on their own project in the same test, so the 404 is not a blanket refusal.
+
+**Both door mutations die, and their SHAPES were recorded rather than just their redness:** deleting
+the `preHandler` turns 401 into 404 (no `currentUserId` → null role → 404); making `requireMember`
+return unconditionally turns 404 into **200 with an empty board**, which is precisely the existence
+oracle the identical-404 exists to prevent.
+
+**Two survivors, both correctly diagnosed as unconstrained paths rather than reported as defects:** the
+route's own `t.workspace_id` clause (unfalsifiable because ingest already refuses a ledger whose two
+scopes disagree — kept as belt-and-braces, documented as such) and `appendStragglerColumns`
+(unreachable because the reducer throws on a transition to a state its workflow lacks — **owner: the
+plan's Open question 8**, which owns whether it becomes a throw).
+
+**A REUSABLE HARNESS LANDED:** `apps/server/test/helpers/read-app.ts` — the shared read world for
+Tasks 8-15. **Note it takes a `TestDatabase`, not a `Pool`, and returns the whole world including
+tokens** — the plan text says otherwise.
+
+**MORE PLAN-TEXT DEFECTS, for T9-T15:** `migrateTestDb` / `testPool` / `truncateAll` **do not exist**;
+`latestWorkflowDefs` takes a `workspaceId`; `TicketRollup` is four fields; and the plan's
+`{ pool, auth }` deps shape was NOT adopted — **the branch convention is preHandler-by-parameter and
+Tasks 9-15 should follow T8, not the plan.**
+
+**NEXT: Plan 5 Task 9** — `GET /v1/projects/:projectId/tickets`, the list read, plan line 2657.
+**`makeRequireSession` is still wrong at plan lines 2956, 3442, 3774, 4009, 4369, 4865 and 5915 —
+seven sites, none of them marked.**
+
+Then T9b (3183, FLOOR-LIST) · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (3638) · T11 (3874) · T12 (4079) ·
 T13 (4551) · **T14 (4918, FLOOR-LIST)** · **T15 (5452, FLOOR-LIST)** · T16 (6047).
-**Remember `makeRequireSession` is imported from the WRONG module in every route snippet from T8 on.**
 
 ### WHAT T5 COST AND WHAT IT BOUGHT — read before dispatching any later floor-list task
 
