@@ -39,6 +39,27 @@ const NO_NUL = 'must not contain U+0000 — Postgres text cannot carry a NUL byt
 const noNul = (schema: z.ZodString) => schema.refine(hasNoNul, NO_NUL);
 
 /**
+ * What a FULL-TEXT SEARCH TERM is, stated once.
+ *
+ * There are two doors into the same `websearch_to_tsquery` call: a `FilterSpec`'s
+ * own `text` key, compiled by `compile-filter.ts`, and `GET /v1/search`'s `q`,
+ * which the search route declares to be THE text term (a filter carrying its own
+ * `text` beside `q` is refused outright, `invalid_filter` — one text source, no
+ * ambiguity). Two doors with two separately-written bounds would be two answers
+ * to "how long may a search term be" and two answers to the NUL question, free
+ * to drift the day one of them is widened.
+ *
+ * The NUL refusal is the load-bearing half and the reason this is a shared
+ * schema rather than a shared number. `q` travels as a bound parameter into
+ * `websearch_to_tsquery`, so a `q` carrying U+0000 is not a bad search, it is
+ * SQLSTATE 22021 raised inside the route — a 500 reached through a value that
+ * parsed, bound and compiled correctly the whole way. Refusing it at the door
+ * makes it the 400 the caller can read. `test/routes/search.test.ts` sends the
+ * byte and asserts the status is 400 and not 500.
+ */
+export const searchTermSchema = noNul(z.string().min(1).max(500));
+
+/**
  * `value` is the one string slot with NO `.min(1)`, and that is a decision
  * rather than an omission: `{ op: 'eq', value: '' }` is a real claim — "this
  * field's value is the empty string" — so the identifier slots' reasoning ("an
@@ -91,7 +112,7 @@ export const filterSpecSchema = z
     stateId: noNul(z.string().min(1).max(200)).optional(),
     stateCategory: stateCategorySchema.optional(),
     blocked: z.boolean().optional(),
-    text: noNul(z.string().min(1).max(500)).optional(),
+    text: searchTermSchema.optional(),
     /**
      * A due bound is a day claim in the shape the STORED claim carries, and the
      * pattern is imported rather than restated: `IST_DAY_REGEX` in this
