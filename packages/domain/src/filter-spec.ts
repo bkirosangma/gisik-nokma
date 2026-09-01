@@ -36,7 +36,19 @@ export type Grouping = z.infer<typeof groupingSchema>;
 const NUL = '\u0000';
 const hasNoNul = (value: string): boolean => !value.includes(NUL);
 const NO_NUL = 'must not contain U+0000 — Postgres text cannot carry a NUL byte';
-const noNul = (schema: z.ZodString) => schema.refine(hasNoNul, NO_NUL);
+/**
+ * EXPORTED so `preferences.ts` can apply the same refusal to the two string
+ * slots the schemas in this file do not reach (a saved filter's `id` and
+ * `name`, and a stored column id), rather than spelling the rule a second time.
+ *
+ * The reason transfers exactly, and it was re-measured for the second store
+ * before this was exported: a preferences document lands in a `jsonb` column,
+ * and `SELECT $1::jsonb` raises SQLSTATE 22P05 ("unsupported Unicode escape
+ * sequence") for U+0000 in a KEY or a VALUE, while BEL and LF round-trip. Same
+ * byte, same store, same "what the store can hold" bound — so one statement of
+ * it, imported, rather than two free to drift.
+ */
+export const noNul = (schema: z.ZodString) => schema.refine(hasNoNul, NO_NUL);
 
 /**
  * What a FULL-TEXT SEARCH TERM is, stated once.
