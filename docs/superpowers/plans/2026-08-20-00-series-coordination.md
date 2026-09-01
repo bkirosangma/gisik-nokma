@@ -5232,3 +5232,97 @@ enters the ledger, and that `invite_tokens` is a server-owned table deliberately
 **consumption on acceptance**. An invite token with neither is a **durable, replayable credential**:
 anyone who ever sees the link joins at the granted role, repeatedly, forever. **Carried into batch 4's
 dispatch in writing, because the plan text will not raise it.**
+
+---
+
+## The wrong-subject class caught in BOTH directions, about one instrument, within an hour (2026-09-01)
+
+The standing rule says: *if `WARN Unsupported engine` appears in gate output you are on the wrong Node and
+the run is void.* Task 14's implementer reported the instrument **inert** — that `pnpm run` in a workspace
+package prints no warning under Node v24, because `engines` lives only in the **root** manifest and
+`pnpm run` reads the manifest of the package it is invoked in. It added `test/node-version.test.ts` to
+replace the instrument it believed was dead.
+
+**Both parties measured truthfully. Both generalised past their subject. In opposite directions.**
+
+| # | invocation | Node v24 | who measured it |
+|---|---|---|---|
+| A | bare `pnpm run` in `apps/server` | **1 WARN** | — |
+| B | `pnpm run typecheck` in `apps/server` | **0 WARNs** | the agent — **claim correct** |
+| C | **`pnpm turbo run typecheck --force` at the repo ROOT — the actual gate** | **1 WARN** | the executor — **rule correct** |
+| D | control: C under v22.22.2 | **0 WARNs** | — |
+
+**The agent measured B and wrote "the instrument is inert here." It never ran C, which is the only
+invocation the rule was ever about.** The executor measured C and wrote "pnpm run warns." It never ran B,
+which is where a reader following a package-local workflow would look.
+
+**Neither statement is false. Neither is adequate.** And note A vs B: the *same command* in the *same
+directory* differs by whether a script name follows it.
+
+### Why this instance is worth its own entry
+
+**The class was already recorded, with five instances and a stated check — and it still caught both
+sessions, on the same instrument, in the same hour, while both were consciously applying the rule.**
+Knowing about the trap is demonstrably not sufficient protection against it.
+
+The reason it recurs is structural: **naming your subject requires already suspecting that a
+neighbouring subject exists.** The executor did not think "root versus package" because the gate is
+always run from root; the agent did not think "package versus root" because it was working inside a
+package. **Each party's habitual context silently supplied the scope of the sentence.**
+
+### What actually caught it
+
+**Not a control** — both measurements had controls and both controls passed. It was caught because two
+parties with different habitual contexts measured the same instrument and **disagreed**, and the
+disagreement was investigated rather than adjudicated. That is not a technique available to one session
+alone, and it is the clearest argument yet for the two-session split.
+
+**The nearest single-session substitute, and it is weaker: enumerate the invocations that matter before
+measuring any of them.** Here: root vs package, with-script-name vs without. Then measure each and put
+the table in the record rather than a sentence.
+
+### Disposition
+
+**The standing rule STANDS, unchanged** — the gate runs from root, C warns, D is silent. **And T14's
+`node-version.test.ts` is kept**, because a test that asserts its own Node inside the gate is stronger
+than a warning a reader must notice: it fails loudly rather than printing quietly. Verified both
+directions by its author — green on v22.22.2, and on v24.11.1 it fails naming the version.
+**Its justification is corrected in place: the instrument was never inert for the gate.**
+
+**A footnote, because it happened in the very act of checking this:** the executor's first attempt at C
+used `timeout`, which does not exist on this machine, so the command exited 127 and reported *0 WARNs* —
+a wrong answer from a command that never ran, produced while investigating wrong answers from commands
+that did. Caught by reading the exit code instead of the WARN count.
+
+### Instance seven, and this one CAUSED a Critical rather than merely misreporting one
+
+Plan 4 Task 14 shipped a single-use invite token that admitted **N concurrent acceptances** — measured
+at **24 of 25 trials**: three parallel presentations of one token, three `admin` rows, three
+`membership.granted` events. The projection's `AND status = 'pending'` then dropped every acceptance but
+the first, so the record named **one** acceptor while three joined. **A defect that erased its own
+evidence.**
+
+**Its root cause was this class.** The task had reasoned that atomic consumption was unavailable because
+`commitOne` opens its own connection and a route cannot enlist in its transaction. **That is TRUE — of
+the LEDGER.** It was generalised into a claim about **the token**, and `invite_tokens` is server-owned,
+is not a projection, and nothing else writes it: the route owns its transactions there outright. One
+conditional statement — `DELETE ... WHERE token_hash = $1 AND expires_at > now() RETURNING` — is one
+transaction, and concurrent presentations queue on the row lock and match nothing.
+
+**So the sentence "atomicity is unavailable here" was a true fact about one subject, applied to a
+neighbouring one, and it licensed shipping a permanent multi-admin door.** Every earlier instance of this
+class produced a wrong *report*. This one produced a wrong *product*.
+
+**The tell, had anyone been looking for it: the word "here".** *"Atomicity is unavailable **here**"* —
+`here` is a scope word, and a scope word is exactly where a subject silently widens. Same shape as
+*"the instrument is inert **here**"* one task earlier.
+
+**Two method results from the same round worth keeping:**
+* **The reproduction was committed RED before the fix** (`5575c9a`, *"one invitation token, three
+  parallel presentations, three admins"*). A test that has been seen to fail for the stated reason is
+  worth more than one that has only ever passed — and a *sequential* accept-then-accept test passed on
+  the broken code and would have shipped it.
+* **A survivor was retained with its killer named in the same round:** dropping expiry from the consume
+  alone killed nothing, dropping it from `openableInvite` alone killed one, and dropping **both** killed
+  two. The two clauses are alternatives and neither is load-bearing alone — a fact only visible because
+  the pair was run together rather than the survivor being reported by itself.

@@ -19,7 +19,7 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/04-t8-t14-enforcement`**, cut from `origin/main` at `33538be`. Step 7 (Plan 4 T8–T14) in progress | `git log`, `git rev-parse` |
+| Branch in flight | **`exec/04-t8-t14-enforcement`**, rebased onto `origin/main` at `eadc748`. **Step 7 COMPLETE — T8 through T14 all done, reviewed, fixed.** PR for a controller | `git log`, `git rev-parse` |
 | `main` | **`1003d8d`** per the controller (#55 merged). **REFETCH AND RE-VERIFY BY PRESENCE** before trusting it — main has moved under this file three times today | `git fetch`, `git cat-file -e` |
 | `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
@@ -141,64 +141,49 @@ exit: **TURBO_EXIT=0, 21/21, 1161 tests, zero `Unsupported engine` WARNs, durati
 
 ## Where I am in the serial sequence
 
-**PHASE 0 + STEPS 4, 5, 6 MERGED.** #51 `45c83eb` · #52 `40c5219` · #53 `33538be` · then controller
-doc PRs. **STEP 7 (Plan 4 T8–T14) IS IN PROGRESS** on `exec/04-t8-t14-enforcement`. **NO PR YET.**
+**PHASE 0 + STEPS 4, 5, 6 MERGED. STEP 7 IS COMPLETE AND AWAITING A CONTROLLER.**
+`main` = `eadc748`. Branch = `exec/04-t8-t14-enforcement`, rebased onto it, **0 behind**.
+Gate at HEAD: **exit 0 READ (not inferred), 21/21, 1225 tests, zero `Unsupported engine` WARNs.**
 
-### Step 7 batches — DONE and REMAINING. Count them; I miscounted this once.
+**STEP 8 — Plan 3 Chain B (T9–T13, then T14) — IS NEXT.** Read `docs/plan-3-chain-b-handoff.md`
+**BEFORE** starting it, not during: two independent tenancy hazards converge on Task 12, and **Task 12's
+brief instructs at three lines the alternative Plan 3's lane explicitly rejected** — an implementer
+following it faithfully undoes ruling P3.
 
-| batch | tasks | state |
-|---|---|---|
-| 1 | **T8, T9** | **DONE.** Zero review findings each |
-| 2 | **T10, T11** | **DONE.** T10 zero findings; T11 floor-list found a **Critical**, fixed |
-| 3 | **6.101 gating + T12 + T13** | **IN FLIGHT** at the time of writing |
-| 4 | **T14** (floor-list) | **NOT STARTED** |
+### Step 7 — all seven tasks, what each found
 
-**T14 IS ALL THAT REMAINS after batch 3.** Then step 7's PR.
+| task | outcome |
+|---|---|
+| **T8** read enforcement | 0 findings. **Closed Ruling P22** — `EffectiveRole` branded; a hand-built one fails `TS2741` (verified here, not taken from the review) |
+| **T9** ingest permissions | 0 findings. `proj_projects` **inserted** at its §8 position (six projections). Its plan text would have **reopened the step-4 escalation** by omitting `workspaceExists` |
+| **T10** rollup honesty | 0 findings. Its implementer **died mid-report to machine sleep**; work recovered, not re-run |
+| **T11** `visibleEventsFor` | **CRITICAL** — purge walk disclosed ticket ids to guests and members with no relationship to them. Gated. **Ruling P23** |
+| **T12** security proofs | 0 findings |
+| **T13** founding route | 1 Important, 1 Minor — both *claims asserted without an executed check*. Fixed by **making the checks exist**: a mid-bootstrap fault was injected and a real 500 + clean retry observed |
+| **T14** invites | **CRITICAL** — a single-use token admitted **N concurrent acceptances**, 24/25 trials. Fixed atomically; reproduction committed **RED first** |
 
-### What batches 1–2 landed, and the two rulings that came out of them
+### THE THROUGH-LINE OF THIS STEP, and it is one class
 
-* **T8** — read enforcement: an invisible ticket reads as a 404 **indistinguishable from nonexistent**;
-  restricted-parent placeholder; provenance unredacted. **And it CLOSED Ruling P22** by branding
-  `EffectiveRole` with a module-private `unique symbol`. **Verified independently here, not taken from
-  the review:** a hand-built one fails with `TS2741: Property '[RESOLVED]' is missing`.
-* **T9** — visibility-dependent ingest permissions; `proj_projects` **INSERTED** at its §8 position (six
-  projections now). Its plan text would have **reopened the step-4 escalation** — Step 3's sample rebuilt
-  the permission context omitting `workspaceExists`.
-* **T10** — rollup honesty. Its implementer **died mid-report to machine sleep**; its work was coherent
-  and was recovered rather than re-run, and its reviewer was told it was the **only** check.
-* **T11** — `visibleEventsFor`. **Floor-list review found a Critical**: the purge walk sat outside the
-  `canSee` branch, so any `visibility.set` yielded `purge:<id>` to every member AND guest, naming tickets
-  they never held. Gated. **Ruling P23 resolved on branch one** — the member-side *per-event* purge is
-  gated too; the *scope-wide* purge at the revocation boundary **stands** (Features.md had already
-  shipped that rule); prior audience is **not** reconstructed (6.82/6.94 ban).
+**A true statement about one subject, applied to a neighbouring one.** Seven instances now, and the last
+one **caused** a Critical rather than merely misreporting one: *"atomicity is unavailable here"* was true
+of the **ledger** and false of the **token**, and it licensed shipping a permanent multi-admin door.
 
-### TWO INFRASTRUCTURE FACTS THAT MAKE A GATE RESULT MEANINGLESS — read before believing any red or green
+**The tell is the word "here".** A scope word is exactly where a subject silently widens.
+*"Atomicity is unavailable **here**"*; *"the instrument is inert **here**"* — one task apart.
 
-1. **`pmset` sleep is ONE MINUTE.** A suspended run reports failures with **multi-hundred-second
-   durations** and 30,000ms hook timeouts. **A test that "fails" in 900 seconds has not failed — it was
-   interrupted.** This produced a completely false RED on this branch; the same tree ran **327/327 in
-   5.5 seconds** with a hold asserted. **A fan-out died to this: 2.9 hours, 871,598 subagent tokens,
-   ZERO agents completed** — while its first agent had produced a complete, gate-clean commit.
-   **ASSERT `caffeinate -i -t <seconds covering the whole run>` BEFORE ANY FAN-OUT and check
-   `pmset -g assertions` shows it.** Do NOT edit `pmset` — that is the owner's configuration.
-2. **If `WARN Unsupported engine` appears anywhere in gate output, the run is VOID.** Measured with
-   controls: `pnpm run` **warns** under v24, `pnpm exec` is **silent**, v22 is silent. Every gate uses
-   `pnpm run`. So the gate is **not unguarded — only unread.**
+**A positive control cannot catch this class**: a control asks whether the instrument works, never what
+it was pointed at. It was caught, twice, only because **two parties with different habitual contexts
+measured the same thing and disagreed.**
 
-### BATCH 4 — T14 (Invites). FLOOR-LIST: opus implementer AND opus reviewer.
+### What is carried, unfixed, with owners — recount before trusting this list
 
-Plan text at **line 5244**. Two obligations its own text does NOT carry:
-
-1. **FIVE purge triggers, not three** — `visibility.set`, `ticket.reparented`, the inheriting subtree
-   under either, `project.member_removed`, `membership.revoked`. The earlier brief said three; T11 found
-   two more, one of which was **unreachable in the plan's own code**.
-2. **THE TOKEN HAS NO LIFETIME AND NO SINGLE-USE SEMANTICS IN THE PLAN TEXT.** Established with a
-   **word-boundary** sweep and `invite`=37 as control: `ttl` 0, `expire` 0, `expiry` 0, `single-use` 0,
-   `one-time` 0. The text says the token is a credential that never enters the ledger and that
-   `invite_tokens` is deliberately excluded from `reset()` — both about **storage**, neither about
-   **lifetime**. **An invite token with no expiry and no single-use guard is a durable, replayable
-   credential**: anyone who ever sees the link joins at the granted role, repeatedly, forever.
-   **BEWARE: a naive `ttl` substring sweep returns 4 — they are the letters inside `SETTLED`.**
+**P18** membership wiring 6.50 (step-10 checkpoint) · **6.52/6.53** founding duplicates + repair path
+(T13 examined both; 6.53 stays ❌ with its inference now named) · **6.57**, **6.61** (Plan 3 T12) ·
+**6.65** SQL mode-side · **6.102**, **6.104** purge retention (Plan 10) · **6.123**, **6.131** invite
+issuance limits and token sweep (Plan 11) · **6.130 revoke-in-flight race — recorded UNASSIGNED**, and
+deliberately so: closing it needs the grant and the status in one transaction inside `commitOne`, which
+is Plan 1's surface, and **no plan in the series has an open task there.** Parking it on Plan 10 would
+have been a handoff nobody receives. · **12.82–12.84** (Plan 10 T7).
 
 ## What step 2 actually contained
 
