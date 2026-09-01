@@ -105,6 +105,10 @@ describe('proj_entity_heads', () => {
       // Plan 3 Chain B Task 10, §8 position 5 — INSERTED between proj_projects
       // and proj_memberships.
       'proj_tickets',
+      // Plan 3 Chain B Task 11, §8 position 6 — directly after proj_tickets,
+      // whose rows it reads inside the same transaction, and still ABOVE
+      // proj_memberships.
+      'proj_rollups',
       'proj_memberships',
       // Plan 4 Task 14, §8 amended to slot it directly after proj_memberships,
       // so it too INSERTS rather than appends. This copy of the pin is exactly

@@ -107,6 +107,13 @@ describe('verifyProjections', () => {
     // (`test/proj-tickets.test.ts`), which is the stricter instrument for it;
     // TASK 12 SHOULD ADD `proj_tickets` HERE once a ticket can be ingested.
     //
+    // proj_rollups (Task 11) is empty here for the STRICTER version of the same
+    // reason and must not be added before proj_tickets is: it counts children
+    // out of proj_tickets, so it stays empty even if a childless ticket could
+    // be ingested. TASK 12 SHOULD ADD IT HERE TOO, and only once the seed
+    // creates a ticket WITH A PARENT — a ticket at project root leaves this
+    // table empty and the assertion would be the check that cannot pass.
+    //
     // Empty HERE is not the same as unverified. `test/proj-visibility.test.ts`
     // plants a ledger by hand — its definitions in `beforeAll`, so they are in
     // force for the creations that follow — rebuilds every projection and runs

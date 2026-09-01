@@ -26,7 +26,12 @@ Fixture gate: **84**, matching the directory. Full gate: **18/18 turbo tasks gre
 **Outstanding on Chain A:** Task 8's task review had not returned when the lane wound down, and its
 conclusions need one caveat — see "Contamination window" below. Chain A's PR was not opened.
 
-## Chain B — Tasks 9–13, then T14. None started.
+## Chain B — Tasks 9–13, then T14. **Tasks 9, 10 and 11 have landed; 12, 13 and T14 are outstanding.**
+
+Task 9 shipped `proj_ticket_types`, Task 10 `proj_tickets`, Task 11 `proj_rollups` — all three registered at their
+coordination §8 positions (3, 5 and 6), with both order pins extended each time. The heading above said "None
+started" through the first two of those, which is the shape of stale-absolute this lane keeps producing; it is
+corrected here rather than left for a resumer to disbelieve.
 
 Needs Postgres 16 on **54329** (compose from the main checkout; `createTestDatabase` mints a database
 per test file, so lanes cannot collide).
@@ -109,10 +114,12 @@ and **5.27, 5.30 and 5.36 are cited by other documents and may not be renumbered
 the file's own scope note says. **T14 must fold 5.43 into the corrected 5.34** rather than catalogue
 both. The plan's canonical refusal table is **six ids behind** what shipped.
 
-## RECORDED, not fixed — carried out of Task 10's floor-list fix round (2026-09-01)
+## RECORDED, not fixed — carried out of Task 10's floor-list fix round and Task 11 (2026-09-01)
 
-Three items. None is fixable inside Task 10's surface, and each was previously recorded only in a
-commit message or a code comment — which is the shape Finding 4 of that review was about.
+Four items. Items 1–3 came out of Task 10 and none is fixable inside its surface; each was previously
+recorded only in a commit message or a code comment, which is the shape Finding 4 of that review was
+about. Item 4 came out of Task 11, which also UPDATED item 3 rather than leaving a recorded finding that
+had itself gone stale.
 
 ### 1. The ticket-TYPE ladder is not as-of. Open question 11. Owner: **UNASSIGNED, deliberately.**
 
@@ -160,16 +167,41 @@ here rather than parked.
 ### 3. `Features.md` §6 is Plan 4's and now carries three false sentences. Owner: **Plan 4.**
 
 Task 10 correctly did not touch another plan's section. Three of its sentences stopped being true when
-`proj_tickets` landed:
+`proj_tickets` landed, and **Task 11 made the last of them false in its second half too** — this entry is
+updated rather than left standing, because a recorded finding that has itself gone stale is the same defect
+one level up:
 
 | Where | What it says | Why it is false |
 |---|---|---|
 | §6 preamble | "no ticket titles exist to serve, because `proj_tickets` is Plan 3 Task 12's" | The table is **Task 10's** and it shipped; titles are queryable |
 | `listVisibleTickets` bullet | "**`proj_tickets` does not exist on this branch**" | It does |
-| Rollup-honesty bullet | "neither table exists on this branch (Plan 3 Tasks 11 and 12)" | Half of it does; `proj_rollups` (Task 11) is still absent |
+| Rollup-honesty bullet | "neither table exists on this branch (Plan 3 Tasks 11 and 12)" | **Both now exist**: `proj_tickets` shipped with Task 10, `proj_rollups` with Task 11 |
 
 Whoever merges Chain B into a branch carrying §6 must correct all three in the same change set, or §6
-will read as evidence that the table is missing.
+will read as evidence that the tables are missing.
+
+### 4. The same sentence in Plan 4's SOURCE, not just its section. Owner: **Plan 4.**
+
+`apps/server/src/visibility/rollup.ts` (the docblock above `RollupView`, around line 52) says
+**"Neither table exists on this branch"** of `proj_tickets` and `proj_rollups`. That was half false after
+Task 10 and is now wholly false. Task 11 did not edit it, following Task 10's precedent for another plan's
+file — the correction belongs with whoever owns that read path, because it lands in the same docblock as
+the design decision it explains, and a drive-by edit would conflict with Plan 4's own lane.
+
+The same docblock names two open cases whose OWNER IS WRITTEN AS "Plan 3 Task 11" and whose work is not in
+Task 11's file list, so neither is done and neither is Task 11's to do:
+
+- **6.82** — `RollupView` ships with `total` and `restrictedCount` only; `open` / `active` / `terminal` are
+  deliberately absent from the type rather than zeroed, "so the compiler demands a decision at every
+  construction site the day Plan 3 Task 11 lands". Task 11 landed the table. Nothing wires it, and Task 11's
+  brief creates the migration, the projection, the registration and the test — nothing under
+  `src/visibility/`.
+- **6.83** — whether `proj_visibility`'s notion of "children" equals `proj_tickets`', which the docblock
+  says "must be measured rather than assumed" before `RollupView.total` is served from `proj_rollups.total_children`.
+  Still unmeasured.
+
+Both are Plan 4's read path. Recorded here because the docblock points at a task that has now finished
+without them.
 
 ## Contamination window (affects Task 8's review only)
 
