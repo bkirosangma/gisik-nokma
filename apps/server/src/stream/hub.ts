@@ -9,6 +9,16 @@ import {
 export type StreamSocket = {
   send(data: string): void;
   close(code: number, reason: string): void;
+  /**
+   * RECORDED, NOT USED. *Owner: Task 15 (the route).* Declared here and faked
+   * in `test/helpers/stream-socket.ts`, and **called by nothing in the hub** —
+   * every path that gives up on a peer goes through `close(code, reason)`, so
+   * the connection is closed with a protocol code and the client can tell why.
+   * The route owns the heartbeat, and a heartbeat that has timed out is the one
+   * caller with a reason to drop a socket that is no longer answering rather
+   * than negotiate with it. Named so Task 15 does not assume the hub already
+   * does this.
+   */
   terminate(): void;
   readonly bufferedAmount: number;
 };
@@ -222,7 +232,14 @@ export function createStreamHub(deps: StreamHubDeps): StreamHub {
               `stream: scope-revoked carried a projectId (${item.projectId}) and the frame has no field for it`,
             );
           }
-          send(sub, { type: 'scope-revoked', workspaceId: item.workspaceId });
+          // `sub.workspaceId`, not `item.workspaceId`: the hub registered the
+          // former and vouches for it, while the latter is whatever the
+          // injectable filter seam yielded — and this module's header says it
+          // holds no second opinion about anything the filter says. They
+          // coincide today, which is exactly why the less trustworthy spelling
+          // would survive unnoticed. The `purge` two lines above already reads
+          // `sub.workspaceId`.
+          send(sub, { type: 'scope-revoked', workspaceId: sub.workspaceId });
           // Terminal — see the header. Ends this workspace's subscription and
           // leaves the socket and its other subscriptions alone.
           detach(sub);
@@ -256,7 +273,15 @@ export function createStreamHub(deps: StreamHubDeps): StreamHub {
           // this reader; see the residual recorded in the test file.
           send(sub, { type: 'caught-up', workspaceId: sub.workspaceId, seq: sub.cursor });
         }
-      } while (sub.dirty);
+        // `!sub.ended` is the plan's `!sub.closed` under this file's name for
+        // the flag. Without it a commit that lands while a drain is suspended
+        // leaves `dirty` set, and a drain that then ENDS the subscription
+        // (`scope-revoked` detaches) still runs the loop once more: a whole
+        // fresh `visibleEventsFor` — a full `workspace_seq > cursor` scan —
+        // materialised and thrown away on a detached subscription. No frame
+        // escapes; the drain's own `sub.ended` guard is its first statement.
+        // It is wasted work, and the unit case below counts the drains.
+      } while (sub.dirty && !sub.ended);
     } catch (error) {
       deps.onError?.(error);
       closeSocket(sub.socket, STREAM_CLOSE_CODES.internalError, 'stream-error');

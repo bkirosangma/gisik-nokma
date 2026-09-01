@@ -185,7 +185,7 @@ function hubWith(script: Script, overrides: Partial<StreamHubDeps> = {}) {
 }
 
 describe('stream hub — catch-up', () => {
-  it('drains past the cursor, then sends caught-up once carrying the WORKSPACE cursor', async () => {
+  it('7.32 drains past the cursor, then sends caught-up once carrying the WORKSPACE cursor', async () => {
     const t1 = newUlid();
     const { hub } = hubWith({
       ledger: [event(WS_A, t1, 11), event(WS_A, t1, 12), event(WS_A, t1, 13)],
@@ -202,14 +202,14 @@ describe('stream hub — catch-up', () => {
     expect(socket.frames[2]).toEqual({ type: 'caught-up', workspaceId: WS_A, seq: 13 });
   });
 
-  it('answers caught-up at the client cursor when there is nothing to catch up', async () => {
+  it('7.32 answers caught-up at the client cursor when there is nothing to catch up', async () => {
     const { hub } = hubWith({ ledger: [] });
     const socket = fakeSocket();
     await hub.subscribe(USER, socket, WS_A, 7);
     expect(socket.frames).toEqual([{ type: 'caught-up', workspaceId: WS_A, seq: 7 }]);
   });
 
-  it('a commit landing MID-DRAIN is re-drained rather than lost', async () => {
+  it('7.32 a commit landing MID-DRAIN is re-drained rather than lost', async () => {
     const t1 = newUlid();
     const ledger: ScriptedItem[] = [event(WS_A, t1, 11), event(WS_A, t1, 12)];
     let late: LedgerEvent | undefined;
@@ -239,7 +239,7 @@ describe('stream hub — catch-up', () => {
 });
 
 describe('stream hub — live tail', () => {
-  it('re-drains from the cursor on a commit, only for the subscribed workspace, and never re-sends caught-up', async () => {
+  it('7.32 re-drains from the cursor on a commit, only for the subscribed workspace, and never re-sends caught-up', async () => {
     const t1 = newUlid();
     const { hub, commit, ledger } = hubWith({ ledger: [event(WS_A, t1, 11)] });
     const socket = fakeSocket();
@@ -264,7 +264,7 @@ describe('stream hub — live tail', () => {
     expect(socket.frames).toHaveLength(3);
   });
 
-  it('a commit in another workspace does not even DRAIN this subscription', async () => {
+  it('7.141 a commit in another workspace does not even DRAIN this subscription', async () => {
     // The frames-based version of this claim is not enough on its own: a hub
     // that woke every subscription on every commit would still send nothing,
     // because `visibleEventsFor`'s own `workspace_id = $1` answers empty for a
@@ -298,7 +298,7 @@ describe('stream hub — live tail', () => {
     ]);
   });
 
-  it('filters every drain for the subscription\'s OWN user', async () => {
+  it('7.32 filters every drain for the subscription\'s OWN user', async () => {
     const shared = newUlid();
     const secret = newUlid();
     const other = newUlid();
@@ -330,7 +330,7 @@ describe('stream hub — live tail', () => {
     expect(seen(theirs)).toEqual([shared]);
   });
 
-  it('keys workspaces by Map, so a workspace id that is also an Object.prototype member cannot collide', async () => {
+  it('7.142 keys workspaces by Map, so a workspace id that is also an Object.prototype member cannot collide', async () => {
     // `subscribeFrameSchema` refuses these at the door and
     // `serverStreamFrameSchema` refuses a frame that names one, so no such id
     // can travel the real wire. This is the THIRD defence, and it is the one
@@ -371,7 +371,7 @@ describe('stream hub — live tail', () => {
     expect(delivered).toEqual([WS_A, hostile, hostile]);
   });
 
-  it('demultiplexes several workspaces on one socket and refuses a duplicate subscription', async () => {
+  it('7.32 demultiplexes several workspaces on one socket and refuses a duplicate subscription', async () => {
     const tA = newUlid();
     const tB = newUlid();
     const { hub } = hubWith({
@@ -391,7 +391,7 @@ describe('stream hub — live tail', () => {
 });
 
 describe('stream hub — a subscriber that goes away mid-drain', () => {
-  it('stops sending the moment the socket is dropped, caught-up included', async () => {
+  it('7.140 stops sending the moment the socket is dropped, caught-up included', async () => {
     // Resource lifecycle, and the case no test fails on by accident: a drain is
     // an `await` over a database, and the peer can vanish inside it. Four
     // separate `sub.ended` guards existed before this case and ALL FOUR
@@ -434,7 +434,7 @@ describe('stream hub — a subscriber that goes away mid-drain', () => {
 });
 
 describe('stream hub — revocation', () => {
-  it('passes a purge instruction through as a frame, and a purge does not move the cursor', async () => {
+  it('7.32 passes a purge instruction through as a frame, and a purge does not move the cursor', async () => {
     const t1 = newUlid();
     const gone = newUlid();
     const { hub } = hubWith({
@@ -452,7 +452,7 @@ describe('stream hub — revocation', () => {
     ]);
   });
 
-  it('ends the subscription when a scope is revoked — one frame, no cursor, nothing after it', async () => {
+  it('7.138 ends the subscription when a scope is revoked — one frame, no cursor, nothing after it', async () => {
     // `scope-revoked` means "empty your replica for this scope". There is no
     // resume cursor on the far side of that, so no `caught-up` follows and the
     // subscription is TERMINAL: the client's correct response is to bootstrap,
@@ -504,7 +504,68 @@ describe('stream hub — revocation', () => {
     expect(await world.hub.subscribe(USER, socket, WS_A, 12)).toBe('subscribed');
   });
 
-  it('refuses a project-scoped revocation instead of widening it to the whole workspace', async () => {
+  it('7.143 does not re-drain a subscription its own drain just ENDED, with a commit pending', async () => {
+    // The pump's loop condition is `sub.dirty && !sub.ended`, and only this
+    // fixture separates the two halves. A commit that lands while a drain is
+    // SUSPENDED sets `dirty`; if that same drain then ENDS the subscription
+    // (`scope-revoked` detaches), `dirty` is still true when the loop re-tests
+    // it. No frame escapes — the drain's own `sub.ended` guard is its first
+    // statement — so the cost is invisible in the frames and visible only in
+    // the WORK: a second `visibleEventsFor`, a full `workspace_seq > cursor`
+    // scan of the ledger, materialised and thrown away. Asserted on `drains`
+    // for exactly that reason, the way 7.141 is.
+    const t1 = newUlid();
+    const drains: Array<{ userId: string; workspaceId: string; afterSeq: number }> = [];
+    const paused = { afterItems: 1, reached: deferred(), release: deferred() };
+    const world = hubWith({
+      ledger: [event(WS_A, t1, 11), { kind: 'scope-revoked', workspaceId: WS_A, atSeq: 11 }],
+      drains,
+      pause: paused,
+    });
+    const socket = fakeSocket();
+    const subscribing = world.hub.subscribe(USER, socket, WS_A, 0);
+    await paused.reached.promise;
+
+    // Lands while the drain is suspended: the pump is already running, so this
+    // only marks the subscription dirty and returns.
+    const late = event(WS_A, t1, 12);
+    world.ledger.push(late);
+    world.commit(late);
+    paused.release.resolve();
+    await subscribing;
+    await world.hub.settled();
+
+    expect(types(socket)).toEqual(['event', 'scope-revoked']);
+    expect(drains).toHaveLength(1);
+
+    // The positive control, and `toHaveLength(1)` above is worth nothing
+    // without it — a hub that never re-drained at all would pass it. The SAME
+    // suspension and the SAME mid-drain commit, minus the revocation: the
+    // subscription lives, so the pending commit MUST cost a second drain, and
+    // the event it carried arrives after the catch-up.
+    const liveDrains: Array<{ userId: string; workspaceId: string; afterSeq: number }> = [];
+    const open = { afterItems: 1, reached: deferred(), release: deferred() };
+    const alive = hubWith({
+      ledger: [event(WS_A, t1, 11)],
+      drains: liveDrains,
+      pause: open,
+    });
+    const aliveSocket = fakeSocket();
+    const stillSubscribing = alive.hub.subscribe(USER, aliveSocket, WS_A, 0);
+    await open.reached.promise;
+    const alsoLate = event(WS_A, t1, 12);
+    alive.ledger.push(alsoLate);
+    alive.commit(alsoLate);
+    open.release.resolve();
+    await stillSubscribing;
+    await alive.hub.settled();
+
+    expect(liveDrains).toHaveLength(2);
+    expect(liveDrains[1]?.afterSeq).toBe(11);
+    expect(types(aliveSocket)).toEqual(['event', 'caught-up', 'event']);
+  });
+
+  it('7.139 refuses a project-scoped revocation instead of widening it to the whole workspace', async () => {
     // `ScopeRevokedInstruction` admits a `projectId` and no emitter produces
     // one, which is why the frame's is `?: never`. If one ever appears, sending
     // a bare `{scope-revoked, workspaceId}` would tell the replica to empty a
@@ -542,7 +603,7 @@ describe('stream hub — revocation', () => {
 });
 
 describe('stream hub — failure and lifecycle', () => {
-  it('closes 1013 and detaches a consumer that has stopped reading', async () => {
+  it('7.32 closes 1013 and detaches a consumer that has stopped reading', async () => {
     const t1 = newUlid();
     const { hub, commit, ledger } = hubWith({ ledger: [event(WS_A, t1, 11)] }, { maxBufferedBytes: 10 });
     const socket = fakeSocket();
@@ -566,7 +627,7 @@ describe('stream hub — failure and lifecycle', () => {
     expect(hub.stats()).toEqual({ sockets: 0, subscriptions: 0, workspaces: 0 });
   });
 
-  it('closes 1011 and reports when a drain throws', async () => {
+  it('7.32 closes 1011 and reports when a drain throws', async () => {
     const onError = vi.fn();
     const boom = new Error('the ledger went away');
     const hub = createStreamHub({
@@ -586,7 +647,7 @@ describe('stream hub — failure and lifecycle', () => {
     expect(hub.stats()).toEqual({ sockets: 0, subscriptions: 0, workspaces: 0 });
   });
 
-  it('dropSocket detaches every workspace on that socket and leaves nothing behind', async () => {
+  it('7.32 dropSocket detaches every workspace on that socket and leaves nothing behind', async () => {
     const t1 = newUlid();
     const { hub, commit, ledger } = hubWith({ ledger: [event(WS_A, t1, 11), event(WS_B, t1, 11)] });
     const socket = fakeSocket();
@@ -613,7 +674,7 @@ describe('stream hub — failure and lifecycle', () => {
     expect(await hub.subscribe(USER, socket, WS_A, 12)).toBe('subscribed');
   });
 
-  it('close() lets go of the commit feed and of every subscription', async () => {
+  it('7.32 close() lets go of the commit feed and of every subscription', async () => {
     const t1 = newUlid();
     const world = hubWith({ ledger: [event(WS_A, t1, 11)] });
     const socket = fakeSocket();

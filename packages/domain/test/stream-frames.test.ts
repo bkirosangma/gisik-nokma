@@ -53,12 +53,12 @@ function ledgerEvent(overrides: Partial<LedgerEvent> = {}): LedgerEvent {
 }
 
 describe('subscribeFrameSchema', () => {
-  it('accepts a well-formed subscribe frame', () => {
+  it('7.32 accepts a well-formed subscribe frame', () => {
     const frame = { type: 'subscribe', workspaceId: WORKSPACE, afterSeq: 0 };
     expect(subscribeFrameSchema.parse(frame)).toEqual(frame);
   });
 
-  it('refuses wrong types, negative cursors, non-ULID workspaces and unknown keys', () => {
+  it('7.32/7.142 refuses wrong types, negative cursors, non-ULID workspaces and unknown keys', () => {
     // The positive control for every refusal below: one field changed at a time
     // from a frame that IS accepted, so a schema that refused everything would
     // fail the case above rather than pass this one vacuously.
@@ -93,13 +93,13 @@ describe('subscribeFrameSchema', () => {
 });
 
 describe('close codes', () => {
-  it('pins the protocol close codes', () => {
+  it('7.32 pins the protocol close codes', () => {
     expect(STREAM_CLOSE_CODES).toEqual({ unauthorized: 1008, slowConsumer: 1013, internalError: 1011 });
   });
 });
 
 describe('serverStreamFrameSchema', () => {
-  it('accepts every frame the server can send, round-tripping each unchanged', () => {
+  it('7.142 accepts every frame the server can send, round-tripping each unchanged', () => {
     const frames: ServerStreamFrame[] = [
       { type: 'event', envelope: ledgerEvent() },
       { type: 'purge', workspaceId: WORKSPACE, entityId: TICKET },
@@ -115,7 +115,7 @@ describe('serverStreamFrameSchema', () => {
     }
   });
 
-  it('refuses an event frame whose envelope carries no workspaceSeq — the resume cursor a fake omits', () => {
+  it('7.142 refuses an event frame whose envelope carries no workspaceSeq — the resume cursor a fake omits', () => {
     const withCursor = { type: 'event', envelope: ledgerEvent({ workspaceSeq: 7 }) };
     // Positive control: identical but for the one field.
     expect(serverStreamFrameSchema.parse(withCursor)).toEqual(withCursor);
@@ -133,7 +133,7 @@ describe('serverStreamFrameSchema', () => {
     ).toThrow();
   });
 
-  it('refuses a scope-revoked frame carrying a projectId, because no emitter produces one', () => {
+  it('7.139/7.142 refuses a scope-revoked frame carrying a projectId, because no emitter produces one', () => {
     const wholeWorkspace = { type: 'scope-revoked', workspaceId: WORKSPACE };
     expect(serverStreamFrameSchema.parse(wholeWorkspace)).toEqual(wholeWorkspace);
     expect(() =>
@@ -141,7 +141,7 @@ describe('serverStreamFrameSchema', () => {
     ).toThrow();
   });
 
-  it('refuses unknown frame types, unknown keys and unknown error codes', () => {
+  it('7.142 refuses unknown frame types, unknown keys and unknown error codes', () => {
     expect(() =>
       serverStreamFrameSchema.parse({ type: 'heartbeat', workspaceId: WORKSPACE }),
     ).toThrow();
@@ -163,7 +163,7 @@ describe('serverStreamFrameSchema', () => {
 });
 
 describe('ledgerEventSchema', () => {
-  it('accepts a LedgerEvent and refuses the same value with the workspace cursor removed', () => {
+  it('7.142 accepts a LedgerEvent and refuses the same value with the workspace cursor removed', () => {
     const event = ledgerEvent();
     expect(ledgerEventSchema.parse(event)).toEqual(event);
     const { workspaceSeq: _dropped, ...withoutCursor } = event;
