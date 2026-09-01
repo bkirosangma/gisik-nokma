@@ -142,12 +142,12 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 
 ## 7. API, realtime & search
 
-*(Plan 5, Tasks 2–6 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
-replace this scope note; what follows is what Tasks 2, 3, 4, 5 and 6 added, and nothing else. Plan 5
+*(Plan 5, Tasks 2–7 so far. Plan 5's own catalogue task (Task 16) owns §7's full body and will
+replace this scope note; what follows is what Tasks 2, 3, 4, 5, 6 and 7 added, and nothing else. Plan 5
 Task 1 (`docToPlainText`) is catalogued in §3, beside the ledger material it belongs to, not here.
-Still absent rather than missing from this section: the read models, every `/v1` read
+Still absent rather than missing from this section: every `/v1` read
 route (board, list, search, My Work, attention, builder reads, preferences), and the stream hub with
-its WebSocket route — Plan 5 Tasks 7–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
+its WebSocket route — Plan 5 Tasks 8–15. §8 is reserved for Plan 6 and stays absent on the same rule: the coordination
 doc assigns `Features.md` sections one per implementation plan, so numbering is claimed from that
 table rather than taken next-free.)*
 
@@ -266,6 +266,47 @@ table rather than taken next-free.)*
   `events_entity_seq_unique` violation. `SCENARIO_NOW` is Z-suffixed on purpose and its own test
   proves the suffix load-bearing under three zones, probe first.
   `apps/server/test/helpers/read-scenario.ts`
+- ⚙️ **Read-model view types** — the shapes every `/v1` read route serves and Plans 6/9/10 render
+  through the `DataSource`: `TicketCard`, `StateProvenance`, `TransitionCause`, `TicketRollup`,
+  `TicketDueDate`/`DueDateClaim`, and the response envelopes (`BoardResponse`, `ListResponse`,
+  `SearchResponse`, `MyWorkResponse`, `AttentionResponse` and their parts). The standard they are held
+  to is that **no field may collapse two different facts into one value** — never-claimed, claimed
+  then withdrawn, and withheld-from-this-viewer all stay tellable apart, and where a type cannot tell
+  two of them apart it SAYS so in the type rather than in a docblock. Two fields are that rule applied
+  rather than described: `TicketDueDate` is a three-arm union (claimed / cleared / never-claimed) with
+  **no null arm**, because `ticket.field_set` with `value: null` is an attributed clearing whose actor
+  and clocks the reducer keeps on purpose, and a `DueDateClaim | null` would give that act the same
+  value as a ticket nobody ever dated; and `TicketRollup.uncategorizedChildren` counts children whose
+  state category nothing knows, so a "5 of 8 done" is never rendered off evidence for only six of
+  them. `StateProvenance.cause` is `null` without such an arm, and the type says why: every state was
+  claimed by exactly one event, so "the claim named no cause" is a complete statement about a claim
+  that exists. `packages/domain/src/read-models.ts`
+- ⚙️ **`stateProvenanceFor` / `latestWorkflowDefs` / `blockedStateKeys` / `assembleTicketCards`** — the
+  server-side readers that turn `proj_tickets` rows into cards. Provenance is the claim that produced
+  each ticket's CURRENT state — the latest `ticket.transitioned`, or `ticket.created` if never
+  transitioned — batched as one `DISTINCT ON … ORDER BY entity_id, seq DESC` over the ledger, carrying
+  the actor, BOTH clocks and the reopen `cause`. An id with no claim is ABSENT from the map, never
+  mapped to an anonymous one, and the assembler THROWS on the absence: a projected ticket whose state
+  nobody claimed means `proj_tickets` and the ledger disagree. It throws on a missing or non-string
+  title claim for the same reason — `''` would be a title nobody typed sitting exactly where a real
+  one goes. `latestWorkflowDefs` is **workspace-scoped** (the shipped reader requires it, ruling P14)
+  and `blockedStateKeys` keys on `` `${workflowId}:${stateId}` `` because a state id is unique only
+  within its workflow. `apps/server/src/read/state-provenance.ts`,
+  `apps/server/src/read/workflow-defs.ts`, `apps/server/src/read/ticket-cards.ts`
+- ⚙️ **`RollupView.terminal` and `RollupView.uncategorized`** — the "5 of 8 **done**" half of the
+  rollup, closing case 6.82 at the moment its own note said it would close ("the day Plan 3 Task 11
+  lands"). `terminal` counts children **the viewer cannot see**, which discloses more than `total`
+  does — existence versus state — and that is the spec's own decision (product design line 116, "true
+  counts, restriction named, nothing pretended absent"), stated rather than inherited from `total`'s
+  precedent. `open`/`active` stay absent for 6.82's original reason: nothing reads them. The category
+  is JOINED onto the rows `rollupFor` already walks (`LEFT JOIN proj_tickets`), never read from
+  `proj_rollups`, because case 6.83 has now been MEASURED: `rollupFor` carries no workspace clause and
+  `getRollup` does, so a cross-workspace child (case 6.84) is in one enumeration and not the other, and
+  mixing them can emit `restrictedCount > totalChildren`. The join's miss is COUNTED as `uncategorized`
+  rather than folded into the not-done side; it is always 0 for a ledger written through the shipped
+  door, and nonzero only where a fixture seeds some projections and not others. The single-ticket read
+  returns the view verbatim, so both fields appear in its response body.
+  `apps/server/src/visibility/rollup.ts`
 
 ## 9. Editor, documents & attachments
 

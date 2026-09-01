@@ -242,8 +242,14 @@ describe('stateProvenanceFor', () => {
     expect(map.get(world.epicId)?.actorId).toBe(world.owner);
     expect(map.size).toBe(1);
 
-    // The empty input short-circuits without a query, and the line above is
-    // what makes this zero mean "asked nothing" rather than "answers nothing".
+    // Empty in, empty out — the CONTRACT, and it is stated as the contract
+    // rather than as a claim about the early return that implements it.
+    // Measured: deleting `if (ticketIds.length === 0) return provenance` kills
+    // nothing, because `entity_id = ANY('{}'::text[])` answers no rows either
+    // way. That early return is a saved round trip, not a semantic guard, and
+    // saying otherwise here would defend a branch with an assertion that cannot
+    // see it. What the line above DOES do is stop this zero being "a reader
+    // that answers nothing", by putting a real id's answer in the same test.
     expect((await stateProvenanceFor(db.pool, [])).size).toBe(0);
   });
 });
