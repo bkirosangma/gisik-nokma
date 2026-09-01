@@ -132,9 +132,10 @@ T13 (4551), T16 (6047).
 | T7 read models / TicketCard | `36c3d85`, `0422b20`, `41bb405` | **CLEAN — zero findings**; 18 mutations, 17 killed, 1 survivor correctly diagnosed as an unconstrained path |
 | T8 `GET /board` (first route) | `d6245e1`, `5a51097`, `6264776`, `dd58777`, `ccfc625`, `0c74fde` | **CLEAN — zero findings**; both door mutations die |
 | T9 `GET /tickets` (list read) | `7bab0b0`, `699aa18`, `c1f577f`, `ca6c39b`, `cc4536c`, `27f64b2`, + doc fix | CLEAN; 1 Minor (an unreproducible count) fixed. **Found and closed a real title-disclosure hole.** |
+| T9b **FLOOR-LIST** builder reads | `98a761a`, `e47bb59`, `4189247`, `8a8444d` (+3), fix round `6406048` | **2 Important + 3 Minor + 1 ruling**, all closed and PROVEN. The most productive review of the plan. |
 
 **Gate re-run by the executor rather than taken from any agent's report:** exit 0, 21/21, **0 cached**,
-**1430 tests** — domain 320 · rule-engine 280 · **server 589** · app-core 130 · editor 72 · ui 31 ·
+**1456 tests** — domain 320 · rule-engine 280 · **server 615** · app-core 130 · editor 72 · ui 31 ·
 sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**. Sum re-added by script in the same
 run rather than eyeballed: 7 packages, 1430, matches.
 
@@ -217,12 +218,54 @@ has **no ordering guarantee**, so which assertions redden is a planner detail. 7
 reproducible claim ("it reddens *something* here") and says explicitly that a count is not a fact about
 this suite. **A number measured once is not a measurement.**
 
-**NEXT: Plan 5 Task 9b** — builder read and migration surface, plan line 3183. **FLOOR-LIST: opus
-implementer AND opus reviewer.**
-**`makeRequireSession` is still wrong at plan lines 3442, 3774, 4009, 4369, 4865 and 5915 — six sites
-left, none marked.**
+### WHAT THE T9b FLOOR-LIST REVIEW PAID FOR — two Importants an ordinary review would have missed
 
-Then T10 (3638) · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (3638) · T11 (3874) · T12 (4079) ·
+**1. A `__proto__` state id, and every live ticket in it, VANISHED from the occupancy read.** The
+implementer had already found and fixed the sibling hazard for `toString` one function below — and
+`toString` is exactly the value that made the fix look complete, because **plain assignment creates an
+own property that shadows the prototype method.** `__proto__` does not: `Object.prototype.__proto__`
+is an **accessor whose setter silently ignores a non-object value**, so `counts['__proto__'] = 0`
+creates no own key and `JSON.stringify` omits it. Verified in bare node:
+`c['__proto__']=0; c['toString']=1` → `Object.keys(c)` is `["toString"]`.
+
+**The reviewer found it by re-running the implementer's own corruption proof with a DIFFERENT value.**
+That is the generalisable move: *a proof run with one value proves that value.*
+
+Driven end-to-end through the shipped doors — the state committed, a ticket transitioned into it,
+`proj_tickets.state_id` held `__proto__`, and the read answered `{"counts":{"ok":1,"done":0}}`. Plan 8's
+publish-mapping dialog is built from that response, so an author would never be shown the state and
+could delete it believing it empty. **The escape hatch was shut too:** naming the key in a migrate body
+is refused by Fastify's parser with an opaque 400, making the type permanently unmigratable.
+
+**And the fix round caught a second-order version of the same trap:** a *literal* `{ __proto__: 1 }` in
+the expected object collapses the same way, so the assertion would have passed against the defect. It
+uses a **computed** key. **The test for a `__proto__` bug can have the `__proto__` bug.**
+
+**2. The admin gate's DEFINITION was unconstrained.** The predicate was correct, but widening it to
+admit any project admin **passed all 24 cases** — because the fixture had no plain workspace member who
+was a project admin, and the permissive variant is exported two lines away in `effective-role.ts`.
+Closed by seeding that cell; the mutation now fails naming that caller. The world also had **no
+`admin`-role viewer at all**, so `|| workspaceRole === 'admin'` had no caller that could reach it —
+also seeded, and deleting the disjunct now reddens.
+
+### RULING RECORDED — a guest may NOT call `GET /v1/workspaces/:id/members`
+
+**Executor ruling, conservative default, taken where the plan is silent.** The plan settles who is
+HIDDEN from the listing and never says who may CALL it, so it fell through to the blanket
+"not a member → 404", under which a guest passes. A guest invited to ONE shared ticket was receiving
+the workspace's entire non-guest staff directory, and nothing in that response is about their ticket.
+
+The withholding rule's own rationale decides it: a guest is *"a person invited to one shared ticket,
+not a member of the workspace's roster"*, so handing them the directory is the mirror of the leak that
+rule exists to prevent. **Recorded in the coordination doc's Plan 5 section as §5, stated as cheap to
+reverse, owner Plan 8.** Also recorded there as §4: `foldStateIdForward`'s `def.stateMapping[current]`
+carries the same prototype hazard — **pre-existing and OUT of Plan 5's scope, owner Plan 3.**
+
+**NEXT: Plan 5 Task 10** — `GET /v1/search`, cross-project and visibility-filtered, plan line 3638.
+**`makeRequireSession` is still wrong at plan lines 3774, 4009, 4369, 4865 and 5915 — five sites left,
+none marked.**
+
+Then T11 · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (3638) · T11 (3874) · T12 (4079) ·
 T13 (4551) · **T14 (4918, FLOOR-LIST)** · **T15 (5452, FLOOR-LIST)** · T16 (6047).
 
 ### WHAT T5 COST AND WHAT IT BOUGHT — read before dispatching any later floor-list task
