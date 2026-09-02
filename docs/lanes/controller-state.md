@@ -62,15 +62,31 @@ wrong tree for one of them.
 
 | | primary (`main`) | exec worktree |
 |---|---|---|
-| nodes / edges / communities | **2151 / 4987 / 108** | 2261 / 5319 / 116 |
-| built from | `main` source at `4194172` | `exec/11-plan6-remainder` |
+| nodes / edges | **3133 / 5999** (hook, whole-repo) — was 2151/4987 code-only | 2261 / 5319 (code-only) |
+| built from | `main` at `4194172`, **then rebuilt whole-repo by the hook** | `exec/11-plan6-remainder` (code-only, manual) |
 | outputs | `graphify-out/GRAPH_REPORT.md`, `graph.html`, `graph.json` | same |
 
-**It is a SNAPSHOT and NOTHING REBUILDS IT.** There is no PostToolUse hook and no git hook —
-`graphify hook install` exists and was deliberately **not** run mid-step. **Check staleness before
-trusting it**: `git diff --name-only <the sha above> origin/main` — if anything outside `docs/` appears,
-rebuild. Verified at `e56f3e6`: the only delta is `.gitignore`, so the graph still describes main's
-source.
+**A POST-COMMIT HOOK NOW REBUILDS IT — installed 2026-09-02 on the owner's instruction.**
+`graphify hook install` writes `post-commit` and `post-checkout` into `.git/hooks`. **Measured before
+being left in place: commit latency 0.74s, because the hook launches the rebuild in the BACKGROUND**
+(log: `~/.cache/graphify-rebuild.log`). It is incremental and AST-only, so still **zero LLM tokens**.
+
+> **⚠ `.git/hooks` IS SHARED WITH THE EXEC WORKTREE** — `git -C <exec> rev-parse --git-path hooks`
+> resolves to the primary's. So the executor's commits fire it too. That is why the 0.74s was measured
+> first rather than assumed; a foreground rebuild would have taxed every commit of a session that makes
+> dozens per step. A `post-commit` failure cannot abort a commit, so the downside is bounded to noise.
+
+> **⚠ AND THE HOOK'S SCOPE IS NOT THE SCOPE I BUILT.** My manual run was code-only (`apps/` +
+> `packages/`) → **2151 nodes**. The hook rebuilds the **WHOLE REPO** → **3133 nodes**: 1151 `packages`,
+> 1000 `apps`, plus **653 `docs`, 172 `reference` (the FROZEN upstream snapshot), 53 `test-cases`, 35
+> `scripts`.** Still free — AST parses markdown structurally, no LLM — but **`reference/` is noise by
+> construction** and the graph is broader and less focused than the code-only one. **Filter by
+> `source_file` when querying; do not assume a node is ours.** Recorded because the numbers in any older
+> note will not match what is on disk, and the mismatch is the hook, not drift.
+
+**The merge driver that `hook install` also registers was REMOVED**, along with the `.gitattributes` it
+wrote: it targets `graphify-out/graph.json`, which is **gitignored, so the driver can never fire.** Dead
+config that would have sat untracked in `git status` forever.
 
 **Rebuild is FREE and takes about a minute** — a code-only corpus (`apps/` + `packages/`) has zero docs,
 so graphify skips semantic extraction entirely and runs pure AST. **0 LLM tokens, no subagents.** Scope
