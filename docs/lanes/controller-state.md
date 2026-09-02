@@ -53,6 +53,65 @@ This closes the §6b deadline item.
 > places including a production docblock, and a "no coverage anywhere" claim falsified by a test that
 > exists. **Prose is not exempt from the falsifiability law, and it is the part no gate runs.**
 
+## A STRUCTURAL GRAPH EXISTS — and it is gitignored, so nothing else will tell you
+
+Built 2026-09-02 on the owner's instruction. **`graphify-out/` is in `.gitignore` (PR #73), so it does
+NOT arrive with a clone or a fetch — this section is the only durable pointer to it.** Both worktrees
+have their own, which is correct: they sit on different branches, so a shared graph would describe the
+wrong tree for one of them.
+
+| | primary (`main`) | exec worktree |
+|---|---|---|
+| nodes / edges / communities | **2151 / 4987 / 108** | 2261 / 5319 / 116 |
+| built from | `main` source at `4194172` | `exec/11-plan6-remainder` |
+| outputs | `graphify-out/GRAPH_REPORT.md`, `graph.html`, `graph.json` | same |
+
+**It is a SNAPSHOT and NOTHING REBUILDS IT.** There is no PostToolUse hook and no git hook —
+`graphify hook install` exists and was deliberately **not** run mid-step. **Check staleness before
+trusting it**: `git diff --name-only <the sha above> origin/main` — if anything outside `docs/` appears,
+rebuild. Verified at `e56f3e6`: the only delta is `.gitignore`, so the graph still describes main's
+source.
+
+**Rebuild is FREE and takes about a minute** — a code-only corpus (`apps/` + `packages/`) has zero docs,
+so graphify skips semantic extraction entirely and runs pure AST. **0 LLM tokens, no subagents.** Scope
+it to code; the 13 plan documents are 3.8 MB of prose and are what makes a full run expensive.
+
+**HONEST LIMITS, so it is not over-trusted.** The **15 `.sql` migrations contributed NOTHING**
+(`tree_sitter_sql` not installed), 84 files produced zero nodes (mostly `.json` fixtures, expected), and
+with semantic extraction skipped there are **no INFERRED edges at all** — only what the AST could prove.
+**It is a structural map, not a conceptual one, and an absent edge is not evidence of no relationship.**
+
+> **THE FINDING WORTH KEEPING, because it arrived from an instrument that knows nothing about this
+> project's history.** The top god nodes by edge count are **test infrastructure, not production code**:
+> `TestDatabase` (61), `createTestDatabase()` (61), `testEnvelope()` (45), `makeCommitted()` (28), with
+> **`applyCommitted()` at #10 with 25 edges.** Step 10 reached *"the test seam is more connected than the
+> shipped door"* by reading routes. The graph reaches it by counting edges. **Two independent
+> instruments, same conclusion** — which is worth more than either alone.
+
+### The workspace CLAUDE.md is WRONG about graphify — do not act on it
+
+`/Users/kiro/my_projects/CLAUDE.md` asserts three things that were measured false 2026-09-02:
+a cross-repo graph at `my_projects/graphify-out/` (**does not exist**), a **PostToolUse hook that
+auto-rebuilds** (**there is no graphify PostToolUse hook at all**), and an instruction to read
+`graphify-out/GRAPH_REPORT.md` before architecture questions (there was no graph until today).
+
+**Why nobody noticed for weeks:** the one hook that does exist is
+`[ -f graphify-out/graph.json ] && echo '{...}' || true`. **With no graph it evaluates to `true` and
+emits nothing** — it fails silently by construction, so its absence is indistinguishable from its
+success. Same family as a `grep` filter that can only match good news. The `HISTORY:` blocks in Read
+results are **claude-mem** and the `SEMANTIC:` blocks are **semble**; both work, which is exactly why the
+third missing leg looked normal.
+
+### The cheap scan that replaces graphifying the plans
+
+**Do NOT graphify the 13 plan documents to hunt cross-plan contract collisions.** A targeted scan does it
+better, in seconds, for zero tokens: extract every `interface`/`type` declaration per plan, normalise
+away comments and ordering, and report only where the **shapes** differ — not merely where the name
+recurs. Measured 2026-09-02: **55 names in 2+ plans → 45 with differing shapes → 13 spanning two
+unexecuted plans → 1 live (`SavedFilter`, now Ruling P26), 2 real-but-later (Plan 7's boundary), 1 false
+positive.** Filtering by shape rather than name cut the candidate list by 76%. Script:
+`scratchpad/collide.py`. **Re-run it before dispatching each remaining plan.**
+
 ## READ FIRST IF YOU WERE JUST LAUNCHED — the brief you hold is stale
 
 `gisik-nokma-lanes/dispatch-main-controller.md` describes the **parallel Wave 1** topology: four lane
