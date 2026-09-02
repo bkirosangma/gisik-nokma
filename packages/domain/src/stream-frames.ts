@@ -35,25 +35,37 @@ import { ledgerEventSchema, type LedgerEvent } from './ledger-event.js';
  *
  * `packages/app-core/src/data-source.ts` declares `StreamItem`, written against
  * coordination amendments 13 + 19 before any server emitted a frame. It is not
- * imported from here and it differs from what the server actually sends in
- * three ways, each of which breaks a replica quietly rather than loudly:
+ * imported from here, and it differed from what the server actually sends in
+ * three ways, each of which broke a replica quietly rather than loudly:
  *
- * - its event frame carries `EventEnvelope`, so it has **no `workspaceSeq`** —
+ * - its event frame carried `EventEnvelope`, so it had **no `workspaceSeq`** —
  *   a client holding only that cannot compute the `afterSeq` it must send back,
- *   which is the whole resume protocol;
- * - it has **no `scope-revoked` member**, so the one instruction that tells a
- *   removed device to empty itself arrives as an unknown `type` and is dropped;
+ *   which is the whole resume protocol. **CLOSED 2026-09-02, Plan 6 Task 8:**
+ *   the member now carries `LedgerEvent`. `EventEnvelope` itself was NOT
+ *   widened — it is the contract-pinned wire type, and `LedgerEvent` is exactly
+ *   it plus the cursor, so the change is a widening on the client side alone;
+ * - it had **no `scope-revoked` member**, so the one instruction that tells a
+ *   removed device to empty itself arrived as an unknown `type` and was dropped.
+ *   **CLOSED 2026-09-02, Plan 6 Task 8:** it is a fifth member and copies the
+ *   `projectId?: never` below verbatim rather than softening it to an optional
+ *   `string`;
  * - its `code` is a bare `string` rather than `StreamErrorCode`, so a
- *   misspelled code is a runtime surprise instead of a compile error.
+ *   misspelled code is a runtime surprise instead of a compile error. **STILL
+ *   OPEN**, and it is the only one of the three that is.
  *
- * It is left standing rather than edited here: `DataSource` is a cross-plan
- * contract and this task has no business rewriting the client seam. But it is
- * exactly the shape of failure this series has already recorded in its own
- * words — *a mocked contract is the thing that excuses the server from
- * existing* — so it is named here, where the plan that consumes it will be
- * reading. **`StreamItem` should be replaced by `ServerStreamFrame`, not
- * re-synchronised with it.** *Owner: Plan 10 (the replica `DataSource`), with
- * Plan 6 affected.*
+ * The two that closed were closed by widening, not by replacement, and the
+ * end-state judgement here is unchanged: **`StreamItem` should be REPLACED by
+ * `ServerStreamFrame`, not re-synchronised with it.** *Owner: Plan 10 (the
+ * replica `DataSource`).* Plan 6 Task 8 took only the two widenings its own
+ * consumer could not work without, because a client that drops revocations and
+ * cannot name its resume cursor is broken today, while the replacement moves a
+ * cross-plan contract and belongs to the plan that owns the other implementer.
+ *
+ * The reason the drift was found at all, recorded because it is the transferable
+ * part: this docblock's claims were pinned as executable cases in
+ * `apps/server/test/integration/client-contract.test.ts`, deriving the client's
+ * shape from its source TEXT. Those cases went red on the reconciliation, which
+ * is how a prose claim gets to be evidence.
  *
  * ## `afterSeq` is the WORKSPACE cursor, and that is why the event frame
  * ## carries a `LedgerEvent` rather than the plan's `EventEnvelope`

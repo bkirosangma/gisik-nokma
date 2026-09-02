@@ -603,6 +603,11 @@ describe('useBoard — loads, then refetches on stream frames', () => {
             clientTime: '2026-08-19T09:59:00.000Z',
             serverTime: '2026-08-19T10:00:00.000Z',
             seq: 2,
+            // The workspace stream position, required since Plan 6 Task 8 widened
+            // `StreamItem`'s event member from `EventEnvelope` to `LedgerEvent`.
+            // `seq` above is the per-entity counter; these are different numbers on
+            // purpose, so nothing here can pass by confusing the two.
+            workspaceSeq: 9,
           },
         });
       });

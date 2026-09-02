@@ -107,7 +107,7 @@ plan	task	status	pr	merge_sha	note
 06	5	in-flight	-	-	no code change: all four guards were already present AND each independently covered — IngestResult (packages/domain/src/ingest-result.ts, pinned by board.test.tsx:335), docToPlainText (doc-text.ts + doc-text.test.ts), blocked (workflow.ts:13 + workflow-schema.test.ts:46), cause (workflow.ts:144 + ticket-events.test.ts:62). exec/11-plan6-remainder
 06	6	done	36	3fb22d3f	
 06	7	todo	-	-	
-06	8	todo	-	-	
+06	8	in-flight	-	-	artefact: packages/app-core/src/online/stream.ts + test/online/stream.test.ts (26 cases); StreamItem widened to five members with the event member carrying LedgerEvent. exec/11-plan6-remainder
 06	9	done	43	c93c910	artefact: packages/app-core/src/views/board.tsx, use-live-query.ts, rollup-text.ts (= PR #43 squash sha)
 06	10	todo	-	-	
 06	11	todo	-	-	

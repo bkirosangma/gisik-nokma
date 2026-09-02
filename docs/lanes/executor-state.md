@@ -82,8 +82,22 @@ commit. Re-ask the ruling; do not re-earn it.
 | Task | What | State |
 |---|---|---|
 | T5 | Domain gap guards — `IngestResult`, `docToPlainText`, `blocked`, `cause` | **DONE — no code.** All four guards were already present AND each has a check that would notice its removal. Cited in the ledger note and the commit. |
-| T8 | Online stream — WS subscribe, reconnect, `afterSeq` | **IN FLIGHT** — implementer + reviewer running. Closes the two `StreamItem` drifts. |
-| T7 | Online DataSource — HTTP client, mappers, ingest | **todo** — owns finding 1 and 3 |
+| T8 | Online stream — WS subscribe, reconnect, `afterSeq` | **IN FLIGHT** — implementer + reviewer running. **Both `StreamItem` drifts CLOSED in the working tree** (`scope-revoked` added; the event member moved to `LedgerEvent`), with `apps/server`'s two client-contract cases rewritten to pin the agreement. `error.code` (bare `string` vs `StreamErrorCode`) is the one stream divergence left open. |
+| T7 | Online DataSource — HTTP client, mappers, ingest | **todo** — owns finding 1 and 3. Two of its four blocked mappers are HELD on P25. |
+
+### RECORDED FOR TASK 16, not fixed — the catalogue lives in §3, and Task 16's own text says §8
+
+Plan 6 Task 16 says *"`Features.md` §8, `test-cases/08-web-client.md` (cases 8.x only — no other
+numbers)"*. **Every Plan 6 client feature already shipped is catalogued under `Features.md` §3 and
+`test-cases/03-foundation-ledger.md`** — the `DataSource` contract (`:31`), the submit factory
+(`:33`), provenance (`:34`), the pre-check cache (`:35`), the live-query hook (`:37`), the board view
+(`:39`). There is **no §8 header in `Features.md` at all** (it runs §7 → §9) and no
+`test-cases/08-web-client.md`. Task 8's two new cases were filed as 3.33/3.34, next to their siblings,
+which is the consistent choice and the one that conflicts with the instruction.
+
+**Owner: Plan 6 Task 16.** It has to decide whether to open §8 and migrate six bullets plus their
+cases, or to record §3 as the real home and amend its own text. Not fixed here, because moving a
+catalogue mid-step would put half of Plan 6 in each place — which is worse than either.
 | T10 | List view | **todo** — bound by ruling P24 |
 | T11, T12, T12a, T13 | My Work / ticket sheet / attachments / reopen flow | **todo** |
 | T14 | `apps/web` Next.js shell | **todo** — the thing Plans 8 and 9 are waiting on |
@@ -264,6 +278,8 @@ and `card.assignee.id`/`.name` (line 94). Neither is in any response. It breaks 
 **6. `StreamItem` has no `scope-revoked` member**, so a revocation arrives as an unrecognised `type`
 and is silently dropped, leaving stale authorization in the client cache. Severest of the stream
 items. Owner Plan 6. Does not change this step's scope — no client consumer exists yet.
+**CLOSED in step 11 (Plan 6 Task 8)**, together with the `workspaceSeq` drift beside it: the union has
+five members and its event member carries `LedgerEvent`. `error.code` remains bare `string`.
 
 ### RULING TAKEN THIS STEP — `UserPreferences` (coordination doc §6b), the one with a deadline
 
@@ -331,7 +347,7 @@ exactly as recorded. The four new ones, each cited:
 
 | # | Contract | The disagreement |
 |---|---|---|
-| c | `StreamItem` vs `ServerStreamFrame` | **Self-documented in `stream-frames.ts:143-162`.** Client's event frame carries `EventEnvelope` and so **lacks `workspaceSeq` — the field the resume protocol needs**; client has **no `scope-revoked` member at all**, so a revocation arrives as an unrecognised `type` and is **silently dropped**; `error.code` is bare `string` vs the server's typed enum |
+| c | `StreamItem` vs `ServerStreamFrame` | **Self-documented in `stream-frames.ts:143-162`. Two of the three CLOSED in step 11 (Plan 6 Task 8):** the event member now carries `LedgerEvent` and so holds `workspaceSeq`, and `scope-revoked` is a fifth member carrying the server's `projectId?: never` verbatim. **Still open: `error.code` is bare `string` vs the server's typed enum**, so a misspelled code is a runtime surprise rather than a compile error. `stream-frames.ts` argues the end state is REPLACEMENT by `ServerStreamFrame`, not re-synchronisation — owner Plan 10 |
 | d | `SearchHit` vs the real search response | Client expects a **flat array**; server returns `{workspaceId, query, hits:[{card: TicketCard, snippet}]}`. **`matchedIn` does not exist server-side at all** — the server headlines title+description+comments into one blob and cannot say which field matched |
 | e | `MyWorkView` vs `MyWorkResponse` | **The most severe: a different grouping MODEL, not a rename.** Client `{assigned, inTransit, contested}` vs server `{open, active, terminal}`. **`contested` does not exist server-side** (`my-work.ts:96` calls it a Plan 10 extension point) |
 | f | `BoardView` vs `BoardResponse` | Client nests columns under `groups: BoardGroup[]`; server returns a **flat** `columns[]`. Card level: client `assignee: Actor \| null` **with `.name`** vs server `assigneeId: string \| null`, never resolved — and **`board.tsx:94` already reads `card.assignee.id`/`.name`**, so this is live, not dead |

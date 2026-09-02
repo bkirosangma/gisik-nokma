@@ -47,14 +47,31 @@ import { fakeSocket } from '../helpers/stream-socket.js';
  * this file at 15 passed, 0 failed. The divergences the file exists to pin were
  * gone and the suite did not notice.
  *
- * So the two divergences whose case TURNS on the client's shape —
- * `RollupToViewer`'s three fields and `StreamItem`'s four members — derive that
- * shape from `packages/app-core/src/*.ts` with `readFileSync` on a relative
- * path (`clientTypeFields`, `clientUnionTags`). That reads the checked-in
- * source text, never `./dist`, so the build-order rationale above survives
- * intact while the pin becomes real. Each is asserted with a whole-array
- * `toEqual`, which is simultaneously the positive control and the line that
- * fires on the reconciliation.
+ * So the two cases that TURN on the client's shape — `RollupToViewer`'s three
+ * fields and `StreamItem`'s union members — derive that shape from
+ * `packages/app-core/src/*.ts` with `readFileSync` on a relative path
+ * (`clientTypeFields`, `clientUnionTags`). That reads the checked-in source
+ * text, never `./dist`, so the build-order rationale above survives intact while
+ * the pin becomes real. Each is asserted with a whole-array `toEqual`, which is
+ * simultaneously the positive control and the line that fires when either side
+ * moves.
+ *
+ * ## `StreamItem`'s two divergences were RECONCILED (Plan 6 Task 8); the case stayed
+ *
+ * The mechanism above did its job: adding `scope-revoked` to `StreamItem` turned
+ * the stream case red, and the client's event member moved from `EventEnvelope`
+ * to `LedgerEvent` in the same change. Both stream cases below were rewritten to
+ * pin the RECONCILED state instead of being deleted — a divergence that closed is
+ * a divergence that can silently re-open, and the derived-from-source machinery
+ * that caught the reconciliation is exactly what catches a regression. What each
+ * asserts is now AGREEMENT between the two unions rather than disagreement, and
+ * each still carries its positive control.
+ *
+ * **`error.code` is the one stream divergence still open**: the client types it
+ * `string` where `ServerStreamFrame` types it `StreamErrorCode`, so a misspelled
+ * code is a runtime surprise on the client rather than a compile error. It is not
+ * pinned here — no case in this file ever asserted it — and it is named rather
+ * than silently carried.
  *
  * The REMAINING client expectations are quoted in comments naming the line they
  * came from (`packages/app-core/src/view-types.ts`, `.../data-source.ts`).
@@ -170,6 +187,25 @@ function clientUnionTags(file: 'view-types.ts' | 'data-source.ts', name: string)
   const decl = new RegExp(`export type ${name} =([\\s\\S]*?);\\s*$`, 'm').exec(clientSource(file));
   if (decl === null) throw new Error(`${file}: no \`export type ${name} = ... ;\` declaration`);
   return [...(decl[1] ?? '').matchAll(/type: '([^']+)'/g)].map(([, tag]) => tag ?? '');
+}
+
+/**
+ * The type name a union member's field is declared with, e.g. `LedgerEvent` for
+ * `StreamItem`'s `{ type: 'event'; envelope: LedgerEvent }`. Same fail-loud
+ * contract as the two above: a rename that this regex cannot find throws, rather
+ * than returning something a `not.toBe` would happily accept.
+ */
+function clientUnionMemberFieldType(
+  file: 'view-types.ts' | 'data-source.ts',
+  name: string,
+  tag: string,
+  field: string,
+): string {
+  const decl = new RegExp(`export type ${name} =([\\s\\S]*?);\\s*$`, 'm').exec(clientSource(file));
+  if (decl === null) throw new Error(`${file}: no \`export type ${name} = ... ;\` declaration`);
+  const member = new RegExp(`type: '${tag}';[^}]*?\\b${field}: (\\w+)`).exec(decl[1] ?? '');
+  if (member === null) throw new Error(`${file}: ${name}'s '${tag}' member declares no \`${field}\``);
+  return member[1] ?? '';
 }
 
 /** Every key anywhere in a body, dotted. What an "absent everywhere" claim is made over. */
@@ -681,19 +717,26 @@ describe('GET/PUT /v1/me/preferences vs UserPreferences', () => {
   });
 });
 
-describe('the stream union — `scope-revoked` reaches a client that has no member for it', () => {
-  it("the server EMITS `scope-revoked`, the published schema accepts it, and the client's union has no such member", async () => {
+describe('the stream union — RECONCILED: the client now has a member for every frame the server emits', () => {
+  it('the server EMITS `scope-revoked`, the published schema accepts it, and the client union now carries it too', async () => {
     // `data-source.ts:22-26` — the client's `StreamItem` union. READ OUT OF THE
     // CLIENT SOURCE as text, so a `dist` built from a different source cannot
     // decide whether this passes AND a reconciliation in `app-core` cannot pass
     // unnoticed. A transcribed literal would have done only the first.
     const CLIENT_STREAM_TYPES = clientUnionTags('data-source.ts', 'StreamItem');
-    // The pin and its own positive control: the union is these four members and
-    // no others. "Exactly four" is therefore measured here rather than asserted
-    // in prose, and **the day somebody adds `scope-revoked` to that union this
-    // case goes red** — which is the whole point of the file.
-    expect(CLIENT_STREAM_TYPES).toEqual(['event', 'purge', 'caught-up', 'error']);
-    expect(CLIENT_STREAM_TYPES).not.toContain('scope-revoked');
+    // The pin and its own positive control: the union is these five members and
+    // no others. "Exactly five" is measured here rather than asserted in prose,
+    // and the day somebody narrows that union back — or lets it drift ahead of
+    // the server — this case goes red, which is the whole point of the file.
+    // It was `['event', 'purge', 'caught-up', 'error']` until Plan 6 Task 8, and
+    // this line going red is what reported the reconciliation.
+    expect(CLIENT_STREAM_TYPES).toEqual([
+      'event',
+      'purge',
+      'scope-revoked',
+      'caught-up',
+      'error',
+    ]);
 
     // Now the server half, through the real path. `visibleEventsFor` is the
     // PRODUCTION generator — the hub's default — and the revocation it reads is
@@ -722,26 +765,52 @@ describe('the stream union — `scope-revoked` reaches a client that has no memb
       workspaceId,
     });
 
-    // So a revocation arrives at a client as an unrecognised `type` and is
-    // silently dropped, leaving stale authorization in the replica's cache.
-    // That is the consequence, and it is the client's omission that has to
-    // change — the server frame is emitted, published and parseable.
-    // `types` widened to `string[]` deliberately: the frame types are a literal
-    // union and `CLIENT_STREAM_TYPES` is now read from a file, so TS refuses
-    // the comparison outright. Refusing it is the wrong answer here — the
-    // question is what the two lists share at RUNTIME, and a client tag the
-    // server union has never heard of is precisely the case worth asking about.
-    expect(CLIENT_STREAM_TYPES.some((type) => (types as string[]).includes(type))).toBe(false);
+    // The reconciliation, asserted as SET EQUALITY between the two unions rather
+    // than as the old "they share nothing". The server half is DERIVED from
+    // `serverStreamFrameSchema`'s own option list, so a sixth frame added to
+    // `ServerStreamFrame` and forgotten on the client lands here as a red case
+    // instead of as a frame a client drops.
+    //
+    // `types` — what this socket actually RECEIVED — is a different question and
+    // stays asserted above: the published union is what the client must be able
+    // to name, and `types` is proof the server really sends one of them.
+    const PUBLISHED_STREAM_TYPES = serverStreamFrameSchema.options.map(
+      (option) => option.shape.type.value as string,
+    );
+    expect([...CLIENT_STREAM_TYPES].sort()).toEqual([...PUBLISHED_STREAM_TYPES].sort());
+    // And the specific frame this case is named for is now in BOTH — the
+    // positive control on the equality above, which a pair of empty arrays would
+    // otherwise satisfy.
+    expect(CLIENT_STREAM_TYPES).toContain('scope-revoked');
+    expect(PUBLISHED_STREAM_TYPES).toContain('scope-revoked');
+    expect(types).toContain('scope-revoked');
   });
 
-  it("the event frame's envelope carries `workspaceSeq`, which the client's `EventEnvelope` has no field for", async () => {
-    // `data-source.ts:23` — the client's `event` frame is
-    // `{type: 'event', envelope: EventEnvelope}`. The server sends a
-    // `LedgerEvent`, which is `EventEnvelope` PLUS `seq` and `workspaceSeq`.
-    // `workspaceSeq` is the field the RESUME protocol needs: `subscribe` takes
-    // `afterSeq` and `caught-up` reports one, both in workspace-cursor terms.
-    // A client typed to `EventEnvelope` cannot name the cursor it must send
-    // back — the divergence is a broken resume, not a cosmetic one.
+  it("the event frame's envelope carries `workspaceSeq`, and the client's event member is now typed to hold it", async () => {
+    // The client half FIRST, derived from the checked-in source and not from a
+    // literal typed here. Until Plan 6 Task 8 this member was
+    // `{type: 'event'; envelope: EventEnvelope}`, which has no `workspaceSeq` —
+    // and `workspaceSeq` is the field the RESUME protocol is defined in terms of:
+    // `subscribe` sends `afterSeq`, `caught-up` reports one, both in workspace-
+    // cursor currency. A client typed to `EventEnvelope` could not name the
+    // cursor it must send back, so that divergence was a broken resume rather
+    // than a cosmetic mismatch.
+    //
+    // This assertion is the reason this case is not server-only. Its body used to
+    // be entirely server-side, so it would have stayed GREEN through the very
+    // reconciliation its own title described — a case that cannot notice the
+    // thing it is named for. `EventEnvelope` is asserted against by name as the
+    // positive control: the pin fails if the member is reverted, not merely if it
+    // is renamed to something unexpected.
+    const CLIENT_EVENT_ENVELOPE = clientUnionMemberFieldType(
+      'data-source.ts',
+      'StreamItem',
+      'event',
+      'envelope',
+    );
+    expect(CLIENT_EVENT_ENVELOPE).toBe('LedgerEvent');
+    expect(CLIENT_EVENT_ENVELOPE).not.toBe('EventEnvelope');
+
     const hub = createStreamHub({ pool: db.pool, onEventCommitted: () => () => {} });
     const socket = fakeSocket();
     try {

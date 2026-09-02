@@ -5658,7 +5658,24 @@ emits it; `packages/app-core/src/data-source.ts`'s `StreamItem` has no such memb
 a client as an unrecognised `type` and is dropped — leaving stale authorization in the client cache
 for exactly the person whose scope was revoked. The client union also carries `EventEnvelope` where
 the server sends `LedgerEvent`, so it lacks `workspaceSeq`, the field the resume protocol needs.
-**Owner: Plan 6.** It does not change step 10's scope — no client consumer exists yet — and
+**Owner: Plan 6.**
+
+**DISCHARGED 2026-09-02 (step 11, Plan 6 Task 8), and the discharge is recorded HERE because a
+ruling whose value lives only in a note is worth exactly what the note is durable.** Both drifts are
+closed in `packages/app-core/src/data-source.ts`: `StreamItem` has a fifth `scope-revoked` member
+carrying the server's `projectId?: never` verbatim, and its event member carries `LedgerEvent`.
+`EventEnvelope` was NOT touched. The widening is an alignment rather than a contract move — this
+document already records `replica.revokeScope` as **Done**, i.e. Plan 10 already consumes
+`ScopeRevokedInstruction`, so the narrow union was stranding the implementer that had already
+shipped. Step 10's two client-contract cases were rewritten to pin the AGREEMENT (set equality
+against `serverStreamFrameSchema`'s derived option list; the event member's declared type) rather
+than deleted, and the second of them had to GAIN a client half — its body was server-side only, so
+it would have stayed green through the very reconciliation its title described. **Still open, and
+the only one of the three: `error.code` is bare `string` where the server types `StreamErrorCode`.**
+`stream-frames.ts` argues the end state is replacement of `StreamItem` by `ServerStreamFrame` rather
+than re-synchronisation; that judgement stands, owner Plan 10.
+
+It does not change step 10's scope — no client consumer exists yet — and
 `serverStreamFrameSchema` already exists as the runtime instrument for pinning it.
 
 *One correction while here:* that file names its mocking readers as **Plans 6, 9 and 10**. The
