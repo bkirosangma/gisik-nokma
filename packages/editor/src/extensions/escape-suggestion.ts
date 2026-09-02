@@ -57,13 +57,35 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
  *
  * 1. Detection that does not depend on the wiped state surviving. This
  *    plugin's OWN `appendTransaction(transactions, oldState, newState)`
- *    receives the FULL set of transactions applied in the current dispatch
- *    group — including the ORIGINAL one that carried the input-rule meta,
- *    which is never mutated or stripped, only superseded in the OTHER
- *    plugin's derived state. Scanning `transactions` directly for that meta
- *    finds it regardless of whether TrailingNode ran first, and regardless
- *    of round (ProseMirror reruns `appendTransaction` for every plugin each
- *    time any plugin appends, so this plugin gets another look either way).
+ *    scans `transactions` directly for the meta — including the ORIGINAL
+ *    one that carried it, which is never mutated or stripped, only
+ *    superseded in the OTHER plugin's derived state.
+ *
+ *    ProseMirror's `appendTransaction` contract is NOT "every plugin is
+ *    rerun each round with the complete set" — it is per-plugin and
+ *    incremental (prosemirror-state@1.4.4 dist:800-822, the body of
+ *    `applyTransaction`'s `for (;;)`): each plugin tracks its own count `n`
+ *    of transactions already shown to it, is called with only the
+ *    transactions added since (`n ? trs.slice(n) : trs`), and is
+ *    SKIPPED — its `appendTransaction` never invoked — on a round where
+ *    `n >= trs.length`, i.e. nothing new arrived for it since its last
+ *    look. A plugin reordered earlier in the extension list can genuinely
+ *    stop seeing a later plugin's append.
+ *
+ *    That contract still leaves this scan safe, and not because of this
+ *    plugin's position: `n` starts at 0 for every plugin's first-ever call
+ *    in a dispatch (dist:805, `seen ? seen[i].n : 0`), and `n = 0` always
+ *    yields the FULL `trs`, never a skip. The transaction carrying the
+ *    input-rule meta is `trs[0]`, set (dist:796, `trs = [rootTr]`) before
+ *    the `for (;;)` loop (dist:800) even starts — so it is inside
+ *    every plugin's first look, this one's included, regardless of
+ *    registration order. Verified, not just read from source: moving a
+ *    throwaway `appendTransaction` plugin in after this one — so this
+ *    plugin is no longer the last such plugin registered — left all 27
+ *    escape-suggestion tests green; reverted immediately after. (Contrast
+ *    part 2 below: the `undoInputRule` COMMAND override genuinely does
+ *    depend on this extension being last — that is a different resolution
+ *    mechanism, Tiptap's command table, not this one.)
  *    Once found, it appends a second, DOC-INERT transaction (no steps, one
  *    `setMeta`, `addToHistory: false`) carrying the captured record — a
  *    transaction this plugin's own `state.apply` DOES read (checked first,
@@ -177,6 +199,19 @@ function findInputRuleRecordIn(transactions: readonly Transaction[], state: Edit
  * `record.transform.before` by construction (core computed it against
  * `view.state` before dispatching that same transform), so resolving it
  * there is always valid.
+ *
+ * For a MARK trigger this returns the whole block-text-before-the-match
+ * plus the trailing character, not just the substring the rule regex
+ * matched — so "x **bold**" derives literal "x **bold**", chip included,
+ * even though only "**bold**" was ever at risk of becoming markup ("x "
+ * was plain text before the rule fired and stays plain text after
+ * accepting). This is a deliberate in-scope tradeoff, not deferred work:
+ * `InputRuleRecord` does not carry the rule's own matched span, only
+ * `from`/`to` (the ONE inserted character) and the pre-image, so narrowing
+ * to the exact match would mean re-running each rule's own regex here,
+ * duplicating logic this file does not own. It does not break the
+ * mechanic — the prefix was literal both before and after either way, so
+ * accepting still produces exactly the doc text the chip promised.
  */
 function deriveLiteral(record: InputRuleRecord): string {
   const before = record.transform.before;
