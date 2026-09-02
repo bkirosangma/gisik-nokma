@@ -25,16 +25,16 @@ Step 11 (Plan 6 remainder) **merged as PR #77 → `7b45099`**. Its twelve ledger
 on `main` after the merge; this branch's first commit promotes them. **Nothing from step 11 is
 outstanding.** If you are a restarted session reading this: do not reopen Plan 6.
 
-## Live anchors — 2026-09-02
+## Live anchors — 2026-09-03, **all eighteen tasks done, pre-PR**
 
 | Anchor | Value | How verified |
 |---|---|---|
 | **Branch** | **`exec/12-plan7-remainder`**, cut from `origin/main` `7b45099`. | `git rev-parse --abbrev-ref HEAD` |
 | **Base** | `origin/main` = `7b45099ef6b6ee23b9266d8ec047bae070322398` | `git rev-parse origin/main`, fetched |
 | **Ahead-count** | **Not written here on purpose. Run `git rev-list --count origin/main..HEAD`.** A count taken while writing the commit that records it is *always* short by one and always looks right to its author — step 11's handoff shipped `18` where the command answered `19`, and it had reached a review brief before anyone ran it. A number that cannot be written correctly from inside the commit carrying it should not be written at all. | measured 2026-09-02 |
-| **Gate at branch HEAD** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2152 tests.** domain 335 · rule-engine 280 · **server 856** · app-core 471 · web 69 · **editor 102** · ui 31 · sync-client 8. `check:env` exit 0. | run by the executor with `--force` after Batch B, Node printed into the same log |
-| Gate at the base `7b45099`, for the delta | exit 0 · 24/24 · 2027 tests; server 761, editor 72. **This branch has added +95 server and +30 editor so far.** | measured separately at the base before any Batch A work |
-| **`check:tasks`** | **exit 0**, 177 rows / 177 plan tasks, **100 done (56.5%)**, 0 claimed, **9 in-flight** (Plan 7 T5–T11a, on this branch), 68 todo. **The `done` count does not move until this branch merges** — `done` requires a merge sha that is an ancestor of `origin/main`, and nine finished tasks are correctly not counted as complete yet. | `node scripts/check-task-ledger.mjs` at branch HEAD |
+| **Gate at branch HEAD** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2232 tests.** domain 335 · rule-engine 280 · **server 857** · **app-core 474** · web 69 · **editor 178** · ui 31 · sync-client 8. `check:env` exit 0, `check:tasks` exit 0. | run by the executor with `--force` after T16 AND the P27 fix; Node printed into the same log |
+| Gate at the base `7b45099`, for the delta | exit 0 · 24/24 · 2027 tests; server 761, editor 72, app-core 471. **This branch adds +205 tests: server +96, editor +106, app-core +3.** | measured separately at the base before any step-12 work |
+| **`check:tasks`** | **exit 0**, 177 rows / 177 plan tasks, **100 done (56.5%)**, 0 claimed, **18 in-flight** (all of Plan 7's remainder, on this branch), 59 todo. **The `done` count does not move until this branch merges** — `done` requires a merge sha that is an ancestor of `origin/main`, so eighteen finished tasks are correctly not yet counted complete. On merge Plan 7 goes to 22/22 and the repo to 118/177. | `node scripts/check-task-ledger.mjs` at branch HEAD |
 | **Gate SHAPE** | **24 tasks over EIGHT packages** since `apps/web` exists. Any inherited "21/21 over 7" figure is spent. | the run above |
 | Orphaned, do not cite | every sha in the narrative sections below. | `git branch --contains` (empty = orphaned) |
 
