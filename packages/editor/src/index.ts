@@ -33,3 +33,20 @@ export {
 } from './extensions/attachment-paste.js';
 export { TicketEditor, type TicketEditorProps } from './components/TicketEditor.js';
 export { ImageWrapMenu } from './components/ImageWrapMenu.js';
+export {
+  createBrowserPickerDeps,
+  openDrivePicker,
+  requestDriveFileToken,
+  toDriveReference,
+  GOOGLE_API_SRC,
+  GOOGLE_GSI_SRC,
+  type DrivePickerConfig,
+  type DrivePickerDeps,
+  type PickedDriveFile,
+} from './drive/google-picker.js';
+export {
+  composeDriveReferenceAdded,
+  composeUploadAttachmentAdded,
+  type DriveReferenceAddedEvent,
+  type UploadAttachmentAddedEvent,
+} from './drive/attachment-claims.js';
