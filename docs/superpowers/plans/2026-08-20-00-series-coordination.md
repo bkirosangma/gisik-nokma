@@ -614,7 +614,7 @@ The tier follows the **failure cost** of the task, not its size. "Optimised" cut
 | Final whole-branch review lenses — the three reading lenses | opus (owner ruling 2026-08-31, below) | max |
 | The mocked-contract lens | ~~top tier (Fable-class)~~ **DEAD — see the 2026-08-31 cost ruling** | — |
 | Adversarial refuters | ~~top tier (Fable-class)~~ **DEAD — see the 2026-08-31 cost ruling** | — |
-| Lane controllers / orchestrators | Opus 5 (owner amendment, below) | — |
+| Lane controllers / orchestrators | ~~Opus 5~~ **SONNET for the loop, OPUS for rulings — owner ruling 2026-09-02; syntactic escalation triggers in `docs/lanes/controller-state.md`** | — |
 
 > **SUPERSEDED IN PART, 2026-08-31.** Every `fable` assignment below is DEAD. The controller-runs-Opus
 > half stands. See *"Owner ruling (2026-08-31, second and stronger): Fable out entirely"*.
