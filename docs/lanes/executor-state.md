@@ -293,10 +293,68 @@ planted `process.env.GN_PROBE_UNDOCUMENTED` is still caught (exit 1, then restor
 `git diff`); D2 still reports the `OBJECT_STORE_*` destructuring and D3 still reports
 `HOST`/`PORT`/`LOG_LEVEL`. **All three detectors demonstrably survive the fix.**
 
+## BATCH D — T13, T13a, T14, T15. All committed.
+
+| Task | Result |
+|---|---|
+| **T13** evidence picker + `transitionRequiresEvidence` *(reviewer opus)* | **DONE**, +8 tests. Three Important — one of them the **F5 recurrence below**, which is not this task's to fix. The other two were false absolutes in docblocks: a claim that a type is *"structurally incapable of describing a Drive reference"* (it is not — a caller can map one in, and `onPick` only needs the id), and a claim that the lookup *"can never diverge from what the server will actually enforce"* (it can: the engine matches the **forward-folded** state id via `resolveCurrentStateId`, this lookup matches whatever the caller passes). |
+| **T13a** Drive references not offerable as evidence *(reviewer opus)* | **DONE**, +2 tests. One Important: a new `Features.md` bullet marked **✅ user-observable when nothing mounts `EvidencePicker`** — no surface passes `driveReferences`, so no user can observe it. `⚙️` is the honest marker. Handed to T16. |
+| **T14** `<EditorSlot>` implementation *(opus/opus)* | **DONE**, +17 tests, **verdict ship.** The `doc` seam was resolved — see below. |
+| **T15** RN webview bundle + message bridge *(reviewer opus)* | **DONE**, +11 tests. Two Important: a **false absolute in the trust-boundary docblock** — it claimed no field of a host message ever reaches anything downstream, but `loadDoc` passes `record.doc` straight through — and eleven new tests with no case ids deferred to an owner whose own text does not cover them. |
+
+### T14 resolved the `doc` seam, and named the limit of its own proof
+
+The seam I measured (TS2322, contravariance) was handed to T14 with the wrong-fix trap spelled out,
+and it did **not** take either tempting escape. **But its own stated uncertainty is the thing to
+carry forward:** the compile-time proof rests on a **TRANSCRIPTION** of app-core's declaration
+inside `packages/editor/test/ticket-editor-slot.test.tsx`, because the real assignment would need a
+dependency edge from `packages/editor` to `packages/app-core` — **which is exactly what the twin
+architecture exists to prevent.** So the seam is proven against a copy, and a copy can drift from
+the original. That is the irreducible cost of a contract written twice, and it should be stated
+wherever the twin arrangement is described rather than discovered again.
+
+## RULING NEEDED — F5 RECURRENCE. Reported to the controller. **PROVEN, not inferred.**
+
+**`packages/app-core` now holds BOTH answers to one question, in two files**, and the wrong one is
+on the surface a user touches.
+
+| Site | Resolves wildcard-vs-exact by | Verdict |
+|---|---|---|
+| `packages/rule-engine/src/transition.ts:91-93` — **the engine, authoritative** | `find(exact) ?? find('*')` — **exact wins, regardless of declaration order** | correct |
+| `packages/app-core/src/precheck.ts:375-378` (`needsMembership`) | `find(exact) ?? find('*')` | **correct, and already documents its own drift caveat** |
+| `packages/app-core/src/views/transition-dialog.tsx:23-29` (`transitionOptions`) | iterates `def.transitions` in order, `if (!targets.has(to)) targets.set(...)` — **first declaration wins** | **WRONG** |
+
+**Executed proof** (temporary probe under `packages/app-core`, run and removed; tree verified clean
+with `git status`, never a shell `diff`). Given a def declaring the wildcard *before* the specific
+edge — which `adviseWorkflowDef` only **warns** about, *"real, but not fatal"*, so it publishes
+clean:
+
+```
+transitions: [ {from:'*',   to:'done', rules:[]},
+               {from:'doing',to:'done', rules:[{kind:'require-evidence'}]} ]
+
+ENGINE  resolves (doing -> done) to  [{kind:'require-evidence'}]     ✓ asserted
+DIALOG  resolves (doing -> done) to  []                              ✓ asserted — no evidence prompt
+POSITIVE CONTROL: reverse the two declarations and the dialog AGREES  ✓ asserted
+```
+
+The control is what makes this a divergence rather than a constant: the dialog's answer **depends on
+declaration order**, and the engine's does not.
+
+**The user-visible consequence** is the exact failure mode named in T13's own dispatch: the ticket
+sheet offers a transition with no evidence prompt, the user submits, and the server refuses. **It
+looks like a bug in the product rather than a rule.**
+
+**Why this is a ruling and not a fix I should make:** it is in **Plan 6's package**, and the fix is a
+behaviour change, not prose. The reviewer recorded the owner as *"the Plan 6/6a lane"* — **and Plan 6
+closed at step 11**, which is the second time on this branch that a recorded owner named something
+that no longer exists. So the honest options are (a) fix it here as a two-line change matching
+`precheck.ts`, (b) assign it to **Plan 8**, which owns workflow-def semantics and has not run, or
+(c) assign it to Plan 11's hardening. **That choice is a scope decision, which is the controller's.**
+
 ## IN FLIGHT
 
-**Nothing.** Batch D — **T13, T13a, T14, T15** — is next, then **T16** closes.
-No open PR for this step.
+**T16 — the closer.** Catalogue plus full verification. No open PR for this step.
 
 ## RULINGS OPEN
 
