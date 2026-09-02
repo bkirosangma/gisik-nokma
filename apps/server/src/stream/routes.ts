@@ -1,7 +1,7 @@
 import websocketPlugin from '@fastify/websocket';
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
 import type { WebSocket } from 'ws';
-import { subscribeFrameSchema, type ServerStreamFrame } from '@gisik-nokma/domain';
+import { STREAM_CLOSE_CODES, subscribeFrameSchema, type ServerStreamFrame } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import type { StreamHub, StreamSocket } from './hub.js';
@@ -103,7 +103,21 @@ export type HeartbeatTimer = { stop(): void };
  */
 export type HeartbeatScheduler = (tick: () => void, everyMs: number) => HeartbeatTimer;
 
-const realScheduler: HeartbeatScheduler = (tick, everyMs) => {
+/**
+ * The scheduler every app that does not inject one runs on — which is every app
+ * that ships.
+ *
+ * EXPORTED for 7.161, and the export is the point rather than a convenience.
+ * Until that case existed this function was CONSTRUCTED by every default app in
+ * the suite and TICKED by none of them: the default heartbeat is 30 s and no
+ * test may wait on a clock, so the one path production actually uses was the
+ * one path nothing exercised, while `schedule` looked thoroughly covered
+ * because 7.151 drives an injected substitute through every branch above it.
+ * 7.161 drives this one on fake timers (the tick, and that `stop()` really
+ * stops it) and asserts the `unref` on real ones, since a fake timer cannot
+ * tell you whether a real handle would hold the event loop open.
+ */
+export const realScheduler: HeartbeatScheduler = (tick, everyMs) => {
   const timer = setInterval(tick, everyMs);
   // A heartbeat must not be the reason a process refuses to exit.
   timer.unref?.();
@@ -255,6 +269,9 @@ export function registerStreamRoute(
         const userId = request.currentUserId;
         socketsPerUser.set(userId, (socketsPerUser.get(userId) ?? 0) + 1);
 
+        // Set by `teardown`, read by `handleMessage` across its one suspension
+        // point. See the guard before `hub.subscribe`.
+        let torn = false;
         let released = false;
         function release(): void {
           if (released) return;
@@ -336,6 +353,37 @@ export function registerStreamRoute(
             sendFrame({ type: 'error', workspaceId, ...NOT_A_MEMBER_ERROR });
             return;
           }
+          // THE SOCKET MAY HAVE GONE while the membership read above was in
+          // flight, and subscribing after that leaks the subscription FOREVER.
+          //
+          // `teardown` is the only thing that ever calls `dropSocket`, and it
+          // runs on `close`. A close delivered during the round trip therefore
+          // finds a hub holding nothing, and the handler that resumes
+          // afterwards registers something no second `close` will ever come
+          // back for. The connection budget does not bound it either — the same
+          // teardown already handed the slot back — so one member can repeat it
+          // as often as they like, and each orphan costs a full ledger scan on
+          // every later commit to that workspace. MEASURED on this branch:
+          // ten subscribe-then-immediately-close cycles left 2–4 orphans.
+          //
+          // BOTH conditions, because they close different halves of the window.
+          // `torn` is this route's own fact — teardown has run, the hub has
+          // been told, nothing here may add to it. `readyState` is the
+          // transport's, and it is the earlier of the two: `ws` moves the
+          // socket to CLOSING when the close FRAME arrives, which is strictly
+          // before `close` is emitted, so there is a sliver in which `torn` is
+          // still false and the peer is already gone. Neither is a substitute
+          // for the other.
+          //
+          // Both are point-in-time reads, and that is sufficient rather than
+          // lucky: there is no suspension point between this check and
+          // `hub.subscribe`'s synchronous insert into its two maps, so nothing
+          // can be delivered in between. A close landing later — inside
+          // `subscribe`'s own `await` on the first drain — is already handled,
+          // because by then the subscription is registered and `dropSocket`
+          // finds it. 7.160 forces the window open deterministically rather
+          // than racing for it.
+          if (torn || socket.readyState !== socket.OPEN) return;
           const outcome = await deps.hub.subscribe(
             userId,
             socket as unknown as StreamSocket,
@@ -355,11 +403,30 @@ export function registerStreamRoute(
         socket.on('message', (data: Buffer) => {
           void handleMessage(data).catch((error: unknown) => {
             request.log.error({ err: error }, 'stream: frame handling failed');
-            badMessage('this frame could not be served');
+            // A SERVER fault, answered as one. This used to send
+            // `bad-message`, which is the code for "you sent something wrong"
+            // — and a client whose only recourse is to stop sending a frame it
+            // sent correctly is being told the opposite of what happened. The
+            // hub answers the same class next door by closing
+            // `internalError`/1011 when a drain throws (`hub.ts`'s `pump`
+            // catch), and there is no reason for the two halves of one protocol
+            // to disagree about whose fault a thrown error was.
+            //
+            // A close rather than a fourth error code: `STREAM_ERROR_CODES` is
+            // the enum Plans 6, 9 and 10 mock, and growing it to describe a
+            // condition that already has a close code would be a protocol
+            // change made to avoid closing. Closing is also the honest answer —
+            // the handler gave up partway through a subscribe, so what the
+            // connection holds is no longer something the server can describe.
+            // 7.162 asserts the 1011 with a genuinely malformed frame beside it
+            // still drawing `bad-message`, so this is not "the route closes on
+            // everything".
+            socket.close(STREAM_CLOSE_CODES.internalError, 'stream-error');
           });
         });
 
         const teardown = (): void => {
+          torn = true;
           heartbeat.stop();
           release();
           // Without this every closed socket leaves its subscriptions standing

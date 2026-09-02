@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -7,10 +7,12 @@ import {
   type IngestResult,
   type ServerStreamFrame,
 } from '@gisik-nokma/domain';
+import type { Queryable } from '../../src/db/queryable.js';
 import type { StreamHub } from '../../src/stream/hub.js';
 import {
   NOT_A_MEMBER_ERROR,
   TOO_MANY_CONNECTIONS_BODY,
+  realScheduler,
   type HeartbeatEvent,
   type HeartbeatScheduler,
 } from '../../src/stream/routes.js';
@@ -278,6 +280,11 @@ describe('WS /v1/stream — the door, the frames and the heartbeat', () => {
     // workspace is a retraction, not an eviction. `scope-revoked` is the other
     // instruction and it is NOT this one.
     expect(stream.socket.readyState).toBe(stream.socket.OPEN);
+    // The positive control this branch requires of every `toEqual([])`: the
+    // SAME filter over the SAME array finds frames when there are frames to
+    // find, so the empty result below is "no scope-revoked" rather than "no
+    // frames at all" or a predicate that matches nothing.
+    expect(purges.length).toBeGreaterThanOrEqual(2);
     expect(stream.frames.filter((frame) => frame.type === 'scope-revoked')).toEqual([]);
 
     // And the narrowing really narrowed: the next event on a ticket they just
@@ -493,7 +500,13 @@ describe('WS /v1/stream — the door, the frames and the heartbeat', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('7.149 malformed frames are answered with bad-message and the socket keeps serving', async () => {
+  it('7.149 malformed frames are answered with bad-message, the socket keeps serving, and the refusals subscribe NOTHING', async () => {
+    // From a QUIESCENT hub, for the same reason 7.153 waits for one: the
+    // client's close and the server's release are a turn apart, so a count read
+    // here without waiting is the previous case's release racing this case's
+    // zero. The absolute numbers below are what make the refusals measurable on
+    // their own.
+    await waitFor(() => hub.stats().sockets === 0);
     const stream = await connect('member');
     const junk: Array<[string, string]> = [
       ['not json at all', 'not json at all'],
@@ -525,13 +538,28 @@ describe('WS /v1/stream — the door, the frames and the heartbeat', () => {
       });
       expect(stream.socket.readyState).toBe(stream.socket.OPEN);
     }
+    // NOTHING was subscribed by any of the seven refusals — measured on the
+    // refusals ALONE, before a single well-formed subscribe has been sent on
+    // this connection. That ordering is the whole assertion. This case used to
+    // read `hub.stats().subscriptions > 0` AFTER subscribing legitimately,
+    // which the case's own good subscribe satisfied: MEASURED by mutating the
+    // `!parsed.success` branch to call `hub.subscribe` with the frame's raw
+    // `workspaceId`, that assertion killed nothing while the mutated path was
+    // plainly running (it printed `subscribed`, `subscribed`,
+    // `already-subscribed` ×3, `subscribed` — six executions, three distinct
+    // Map keys). The property it owes is what keeps an unvalidated
+    // actor-supplied string out of the hub's Map keys, and the hub validates
+    // nothing itself: its header says the second Map is its own second defence
+    // precisely because it trusts no caller.
+    expect(hub.stats()).toEqual({ sockets: 0, subscriptions: 0, workspaces: 0 });
+
     // Still alive AND still serving — a socket that answered bad-message by
-    // going deaf would pass every assertion above.
+    // going deaf would pass every assertion above. This is also the positive
+    // control for the three zeroes: the same hub, the same socket, one legal
+    // frame, and all three move.
     stream.subscribe(read.world.workspaceId, 0);
     await stream.next((frame) => frame.type === 'caught-up');
-    // Nothing was subscribed by any of the refusals: one subscription, the one
-    // that was well-formed.
-    expect(hub.stats().subscriptions).toBeGreaterThan(0);
+    expect(hub.stats()).toEqual({ sockets: 1, subscriptions: 1, workspaces: 1 });
   });
 
   it('7.150 one connection multiplexes two workspaces with independent cursors, and a duplicate subscribe is refused without disturbing the first', async () => {
@@ -719,9 +747,11 @@ async function buildStreamApp(overrides: {
   maxSocketsPerUser?: number;
   schedule?: HeartbeatScheduler;
   onHeartbeat?: (event: HeartbeatEvent) => void;
+  /** `AppDeps.pool` — the handle the route's membership check runs on. See 7.160. */
+  pool?: Queryable;
 }): Promise<StreamApp> {
-  const { now, ...stream } = overrides;
-  const built = buildTestApp(db, { now, stream });
+  const { now, pool, ...stream } = overrides;
+  const built = buildTestApp(db, { now, pool, stream });
   await built.app.listen({ port: 0, host: '127.0.0.1' });
   return {
     app: built.app,
@@ -729,6 +759,84 @@ async function buildStreamApp(overrides: {
     hub: built.app.streamHub,
     token: async (phone) => (await signInWithPhone(built.app, built.otp, phone)).token,
     close: () => built.app.close(),
+  };
+}
+
+/**
+ * One macrotask boundary. NOT a sleep and not a settle: `setImmediate` runs
+ * after the microtask queue has drained, so every `await` continuation already
+ * queued has executed by the time this resolves. It is how 7.160 reads the hub
+ * at a point strictly after a resumed `handleMessage` would have registered its
+ * subscription, without waiting on a clock for it.
+ */
+const turn = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+/**
+ * A `Queryable` that can take ONE membership read hostage.
+ *
+ * `resolveEffectiveRole`'s query is the suspension point the route's
+ * close-during-subscribe race lives inside, and left to itself the race is
+ * decided by whether Postgres answers before a TCP close handshake completes —
+ * a coin the suite must not toss. This wrapper stands in for `AppDeps.pool`
+ * (and nothing else: `db`, auth and ingest keep the real pool), spots the
+ * membership statement by its `FROM proj_memberships`, and lets a case say
+ * exactly when it may proceed, or that it must fail.
+ */
+type MembershipGate = {
+  pool: Queryable;
+  /**
+   * Holds the NEXT membership read until `hook()` resolves, then runs the real
+   * query. The returned promise resolves once that real query has SETTLED —
+   * which is one microtask ahead of the route's own resumption, hence the
+   * `turn()` every caller pairs it with.
+   */
+  once(hook: () => Promise<unknown>): Promise<void>;
+  /** Makes the NEXT membership read throw, which is a SERVER fault. */
+  fail(error: Error): Promise<void>;
+};
+
+function membershipGate(): MembershipGate {
+  let intercept: ((run: () => Promise<unknown>) => Promise<unknown>) | null = null;
+  const real = db.pool;
+  const forward = (args: unknown[]): Promise<unknown> =>
+    (real.query as unknown as (...rest: unknown[]) => Promise<unknown>).apply(real, args);
+  const pool = {
+    query(...args: unknown[]): Promise<unknown> {
+      const first = args[0];
+      const text = typeof first === 'string' ? first : (first as { text?: string } | null)?.text;
+      if (intercept !== null && typeof text === 'string' && text.includes('FROM proj_memberships')) {
+        const taken = intercept;
+        intercept = null;
+        return taken(() => forward(args));
+      }
+      return forward(args);
+    },
+  };
+  return {
+    pool: pool as unknown as Queryable,
+    once(hook) {
+      return new Promise<void>((resolve, reject) => {
+        intercept = async (run) => {
+          try {
+            await hook();
+            const result = await run();
+            resolve();
+            return result;
+          } catch (error) {
+            reject(error instanceof Error ? error : new Error(String(error)));
+            throw error;
+          }
+        };
+      });
+    },
+    fail(error) {
+      return new Promise<void>((resolve) => {
+        intercept = () => {
+          resolve();
+          return Promise.reject(error);
+        };
+      });
+    },
   };
 }
 
@@ -890,6 +998,62 @@ describe('WS /v1/stream — the heartbeat, driven by the injected clock', () => 
     }
   });
 
+  it('7.161 the PRODUCTION scheduler ticks, stops, and does not hold the process open', () => {
+    // The gate's blind spot until this case: `realScheduler` is what every app
+    // that injects nothing runs on — which is every app that ships and most of
+    // the ones in this suite — and NOTHING had ever made it tick. The default
+    // heartbeat is 30 s, no test may wait on a clock, and 7.151 proves the
+    // heartbeat's arithmetic against an INJECTED substitute, so the seam looked
+    // covered while the default behind it was not. Deleting the `setInterval`
+    // and returning a no-op timer reddened nothing before this.
+    //
+    // Fake timers, not a wait: `vi.advanceTimersByTime` moves the timer wheel
+    // by hand. No socket I/O happens inside this window — `TestStream.next`'s
+    // own 5 s guard is a `setTimeout` and would be advanced along with
+    // everything else.
+    const fired: number[] = [];
+    vi.useFakeTimers();
+    try {
+      const timer = realScheduler(() => fired.push(fired.length), 30_000);
+      vi.advanceTimersByTime(29_999);
+      // Not merely "it fired eventually": it fires on the interval it was
+      // given, so a scheduler that ignored `everyMs` fails here.
+      expect(fired).toHaveLength(0);
+      vi.advanceTimersByTime(1);
+      expect(fired).toHaveLength(1);
+      // REPEATING, not one-shot — a `setTimeout` in this position would pass
+      // every assertion above and then stop pinging a live peer forever.
+      vi.advanceTimersByTime(90_000);
+      expect(fired).toHaveLength(4);
+
+      timer.stop();
+      vi.advanceTimersByTime(300_000);
+      // The positive control for that stop is the four ticks above: the same
+      // rig, the same clock, ten intervals of it, and nothing more arrives.
+      expect(fired).toHaveLength(4);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    // And the `unref`, which no fake timer can answer: an unref'd handle is
+    // absent from `process.getActiveResourcesInfo()`, so a heartbeat left
+    // running cannot be the reason a process refuses to exit. A bare
+    // `setInterval` beside it is the control that the probe can see a timer at
+    // all — without it "no new Timeout" is indistinguishable from a probe that
+    // never reports one.
+    const before = process.getActiveResourcesInfo().filter((kind) => kind === 'Timeout').length;
+    const scheduled = realScheduler(() => {}, 30_000);
+    const afterScheduler = process
+      .getActiveResourcesInfo()
+      .filter((kind) => kind === 'Timeout').length;
+    const control = setInterval(() => {}, 30_000);
+    const afterControl = process.getActiveResourcesInfo().filter((kind) => kind === 'Timeout').length;
+    clearInterval(control);
+    scheduled.stop();
+    expect(afterScheduler).toBe(before);
+    expect(afterControl).toBe(before + 1);
+  });
+
   it('7.156 an oversized frame is refused by the payload bound rather than buffered', async () => {
     const server = await buildStreamApp({});
     try {
@@ -903,6 +1067,156 @@ describe('WS /v1/stream — the heartbeat, driven by the injected clock', () => 
       // `maxPayload` the default is 100 MB, and a frame this size is buffered,
       // parsed and answered `bad-message` instead.
       expect(closed.code).toBe(1009);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+/**
+ * What happens on the far side of the ONE suspension point `handleMessage` has,
+ * and on the path where the server itself is what went wrong.
+ *
+ * Both need `AppDeps.pool` to be a thing the case controls, which is what
+ * `membershipGate` is for; neither can be reached from the shared read world,
+ * whose pool is the real one and whose sockets other cases are standing on.
+ */
+describe('WS /v1/stream — the membership round trip the socket can disappear across', () => {
+  it('7.160 a socket that closes DURING the membership check leaves NO orphan subscription — the subscribe that resumes afterwards is refused', async () => {
+    // A LIVE BUG on unmodified source, not a test gap. `handleMessage` suspends
+    // at `resolveEffectiveRole` and calls `hub.subscribe` after it. A `close`
+    // delivered inside that window runs `teardown` — which stops the heartbeat,
+    // hands the connection-budget slot back and calls `dropSocket` on a hub
+    // holding nothing yet — and the suspended handler then subscribes anyway.
+    // Nothing can ever drop what it registered: the socket is gone, so no
+    // second `close` fires. And because the budget slot was already returned,
+    // the per-user cap bounds the leak at ZERO — one member can repeat it
+    // indefinitely, and every orphan costs a full ledger scan on every
+    // subsequent commit to that workspace.
+    //
+    // 7.153 cannot see it, and the reason is exactly what this case had to
+    // invert: 7.153 awaits `caught-up` before closing, and that ordering is
+    // what closes the window. Here the close is sent in the same breath as the
+    // subscribe, with nothing awaited in between.
+    const gate = membershipGate();
+    // A cap far above what this case opens: the budget is 7.152's subject, and
+    // ten sequential sockets whose server-side release lags the client's close
+    // would otherwise make THIS case fail for that unrelated reason.
+    const server = await buildStreamApp({ pool: gate.pool, maxSocketsPerUser: 64 });
+    try {
+      const token = await server.token('+911111111154');
+      const headers = { authorization: `Bearer ${token}` };
+      const founded = await server.app.inject({
+        method: 'POST',
+        url: '/v1/workspaces',
+        headers,
+        payload: { name: 'Race shop' },
+      });
+      expect(founded.statusCode).toBe(201);
+      const workspaceId = (founded.json() as { workspaceId: string }).workspaceId;
+
+      // The POSITIVE CONTROL, on this rig, before anything is claimed empty: a
+      // subscribe allowed to finish registers all three. Every zero below is
+      // therefore a refusal and not a rig that could never have subscribed
+      // anything — the `membershipGate` in front of the pool included.
+      const control = await openStream(server.port, headers);
+      control.subscribe(workspaceId, 0);
+      await control.next((frame) => frame.type === 'caught-up');
+      expect(server.hub.stats()).toEqual({ sockets: 1, subscriptions: 1, workspaces: 1 });
+      await control.close();
+      await waitFor(() => server.hub.stats().sockets === 0);
+
+      // ── The shape the bug takes in the wild: subscribe and close in the SAME
+      // breath, ten times. Whether any given cycle lands inside the window is a
+      // race, so this half is the realistic reproduction rather than the proof;
+      // the forced half below is the proof.
+      for (let cycle = 0; cycle < 10; cycle += 1) {
+        const stream = await openStream(server.port, headers);
+        stream.subscribe(workspaceId, 0);
+        await stream.close();
+      }
+      // Every chance to settle, and then the claim. The `catch` is deliberate:
+      // a hub still holding a socket here is holding it FOREVER, and the
+      // assertion below says so by name and prints the leak, where the bare
+      // wait would only report that a predicate never came true.
+      await waitFor(() => server.hub.stats().sockets === 0).catch(() => undefined);
+      await turn();
+      expect(server.hub.stats()).toEqual({ sockets: 0, subscriptions: 0, workspaces: 0 });
+
+      // ── The same race, DECIDED rather than run. The membership read is held
+      // until the client's close handshake has completed, which is strictly
+      // after the server socket received the close frame and answered it — so
+      // the transport is at least CLOSING when the handler resumes, every time.
+      const forced = await openStream(server.port, headers);
+      const settled = gate.once(() => forced.closed);
+      forced.subscribe(workspaceId, 0);
+      await forced.close();
+      await settled;
+      // `settled` resolves one microtask ahead of the route's own resumption,
+      // and everything between that resumption and a registered subscription is
+      // microtasks — two `await` continuations and then `hub.subscribe`'s
+      // synchronous insert into `bySocket`/`byWorkspace`. One macrotask
+      // boundary is therefore strictly after the orphan would exist. This is
+      // NOT a settle interval and must not be turned into one.
+      await turn();
+      expect(server.hub.stats()).toEqual({ sockets: 0, subscriptions: 0, workspaces: 0 });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('7.162 a SERVER fault closes 1011, the way the hub closes 1011 — it is not answered as if the client sent something wrong', async () => {
+    // `bad-message` says "you sent something wrong" and the client's only
+    // sensible response to it is to stop sending that frame. A throw inside
+    // `handleMessage` is the opposite fault, and the hub next door already
+    // answers that class by closing `STREAM_CLOSE_CODES.internalError`. The two
+    // now agree, and the enum is untouched: `STREAM_ERROR_CODES` is the
+    // protocol Plans 6, 9 and 10 mock, and inventing a fourth code to describe
+    // a condition that already has a close code would be a protocol change made
+    // to avoid a close.
+    const gate = membershipGate();
+    const server = await buildStreamApp({ pool: gate.pool });
+    try {
+      const token = await server.token('+911111111155');
+      const headers = { authorization: `Bearer ${token}` };
+      const founded = await server.app.inject({
+        method: 'POST',
+        url: '/v1/workspaces',
+        headers,
+        payload: { name: 'Fault shop' },
+      });
+      expect(founded.statusCode).toBe(201);
+      const workspaceId = (founded.json() as { workspaceId: string }).workspaceId;
+
+      // The CLIENT fault, on its own socket, as the control that keeps the
+      // close below from being "this route closes on everything": a genuinely
+      // malformed frame is still answered `bad-message` and the socket lives.
+      const clientFault = await openStream(server.port, headers);
+      clientFault.sendRaw('not json at all');
+      const answered = await clientFault.next((frame) => frame.type === 'error');
+      expect(answered).toEqual({
+        type: 'error',
+        workspaceId: null,
+        code: 'bad-message',
+        message: expect.any(String),
+      });
+      expect(clientFault.socket.readyState).toBe(clientFault.socket.OPEN);
+      await clientFault.close();
+
+      // The SERVER fault: the membership read throws, which is nothing the
+      // client did and nothing the client can fix.
+      const serverFault = await openStream(server.port, headers);
+      const thrown = gate.fail(new Error('membership read exploded'));
+      serverFault.subscribe(workspaceId, 0);
+      await thrown;
+      const closed = await serverFault.closed;
+      expect(closed.code).toBe(1011);
+      expect(closed.reason).toBe('stream-error');
+      // And NOT as a client fault: no `bad-message` frame was sent on the way.
+      expect(serverFault.frames).toEqual([]);
+      // Which leaves nothing behind either — the close ran teardown.
+      await waitFor(() => server.hub.stats().sockets === 0).catch(() => undefined);
+      expect(server.hub.stats()).toEqual({ sockets: 0, subscriptions: 0, workspaces: 0 });
     } finally {
       await server.close();
     }

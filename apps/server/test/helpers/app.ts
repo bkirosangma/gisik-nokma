@@ -6,6 +6,7 @@ import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
 import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
+import type { Queryable } from '../../src/db/queryable.js';
 import type { ProjectionRegistry } from '../../src/projections/registry.js';
 import type { TestDatabase } from './db.js';
 
@@ -63,6 +64,20 @@ export type BuildTestAppOverrides = {
    * never expires.
    */
   stream?: AppDeps['stream'];
+  /**
+   * Replaces `AppDeps.pool` — the handle every read, permission and stream
+   * membership check goes through — and NOTHING else. `db`, the auth instance
+   * and the ingest service keep the real pool, so a wrapper passed here can
+   * observe, delay or fail a READ without breaking a commit or a sign-in.
+   *
+   * Written for 7.160 and 7.162, which need the membership round trip inside
+   * `handleMessage` to be a thing the test controls: one needs it still
+   * suspended at a moment the test chooses (the close-during-subscribe race is
+   * otherwise decided by whether Postgres or a TCP close handshake wins, which
+   * is not a fact a suite may rest on), and the other needs it to THROW, which
+   * is the only way the route's server-fault path executes at all.
+   */
+  pool?: Queryable;
 };
 
 /**
@@ -106,7 +121,7 @@ export function buildTestApp(
   const app = buildApp(
     {
       db: db.pool,
-      pool: db.pool,
+      pool: overrides.pool ?? db.pool,
       ingest,
       auth,
       // The internal door as a named capability, exactly as `src/index.ts`
