@@ -9,6 +9,7 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { VersionedDocument } from './versioned-document.js';
 import { TicketImage } from '../extensions/ticket-image.js';
 import { Mention, type MentionCandidate } from '../extensions/mention.js';
+import { EscapeSuggestion } from '../extensions/escape-suggestion.js';
 
 export type EditorSchemaOptions = {
   /**
@@ -160,5 +161,11 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // door stays the cheaper place to enforce a range.
     // A test pins the positive half: 1–6 survive a round trip, so a change
     // that clamps or drops them fails.
+    // Task 5: the escape-suggestion mechanic (spec §2's named requirement).
+    // Every surface gets it; see extensions/escape-suggestion.ts for the
+    // mechanism and for why "Task 5's change is what makes them fail" above
+    // does not extend to the two paste-rule tests in test/schema.test.ts —
+    // this extension owns the typed (input-rule) trigger table only.
+    EscapeSuggestion,
   ];
 }

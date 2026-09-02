@@ -77,3 +77,20 @@
 .editor-mention {
   white-space: nowrap;
 }
+
+/* Escape-suggestion chip: inline widget after the caret. */
+.escape-chip {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: baseline;
+  margin-left: 0.375rem;
+  padding: 0.0625rem 0.375rem;
+  font-size: 0.75rem;
+  vertical-align: baseline;
+  cursor: pointer;
+  user-select: none;
+}
+.escape-chip__hint {
+  font-size: 0.625rem;
+  opacity: 0.7;
+}

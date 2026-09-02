@@ -20,3 +20,8 @@ export {
   type MentionPopupProps,
   type MentionPopupRenderer,
 } from './extensions/mention-popup.js';
+export {
+  EscapeSuggestion,
+  escapeSuggestionKey,
+  getEscapeSuggestion,
+} from './extensions/escape-suggestion.js';
