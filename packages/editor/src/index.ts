@@ -58,3 +58,5 @@ export {
   type AttachmentListEntry,
   type DriveLinkCheck,
 } from './components/AttachmentListItem.js';
+export { transitionRequiresEvidence } from './attachments/require-evidence.js';
+export { EvidencePicker, type AttachmentSummary, type EvidencePickerProps } from './components/EvidencePicker.js';

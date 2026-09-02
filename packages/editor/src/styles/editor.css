@@ -167,3 +167,16 @@
   border-left: 2px dashed;
   padding-left: 0.5rem;
 }
+
+/* The evidence picker (spec §4's require-evidence companion, Task 13):
+   structural layout only, per this file's no-colour rule — it inherits
+   `currentColor` like every other element here. */
+.evidence-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.evidence-picker__option {
+  text-align: left;
+  cursor: pointer;
+}
