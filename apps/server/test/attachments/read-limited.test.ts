@@ -18,6 +18,23 @@ import { readAtMost } from '../../src/attachments/read-limited.js';
  * a thousandfold gap: a check moved after the loop produces all 8 MiB and this
  * file goes red with a number that says exactly what happened.
  *
+ * ## Exactly ONE test here constrains that, and it is not the obvious three
+ *
+ * Moving the comparison below the `for await` reddens
+ * "planted defect: the refusal happens DURING the stream, not after buffering
+ * it" and NOTHING else in this file. "refuses one byte over the limit" still
+ * sees 4097 > 4096; "states the limit in the refusal" still sees 30 MiB >
+ * 25 MiB; "a sub-mebibyte ceiling changes units" still sees 8192 > 4096. All
+ * three get the identical refusal object back and stay green, because WHETHER
+ * is unchanged by the mutation and WHETHER is all they read.
+ *
+ * This is written down because a mutation ledger for this task claimed all four
+ * reddened. Three of those were inferred from the file going red rather than
+ * watched test-by-test, and a reader auditing the branch would otherwise
+ * believe four assertions constrain a property one assertion constrains. The
+ * one is sufficient — nothing can slip through a 2 MiB bound against an 8 MiB
+ * source — but sufficiency and provenance are different claims.
+ *
  * ## The readahead allowance, and why it is not slack
  *
  * `Readable.from` runs in object mode with a 16-object high-water mark, so the

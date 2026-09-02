@@ -30,13 +30,60 @@ const NOT_FOUND_BODY = { error: 'not-found' } as const;
  *
  * Existence must be indistinguishable from invisibility (spec §6 discipline
  * applied to files). Returning the same OBJECT from one place is the cheap
- * half; the half that matters is that no refusal above adds a header, a
- * reason, or a timing difference the other does not have — which is why the
- * visibility check runs before anything that could vary (see the refusal-order
- * note on the handler).
+ * half; the half that matters is that no refusal above adds a header or a
+ * reason the other does not have — which is why the visibility check runs
+ * before anything that could vary (see the refusal-order note on the handler).
+ * `attachments-upload.test.ts` compares status, parsed body, RAW body and every
+ * header but `date` between the two, behind a 201 positive control.
+ *
+ * ## What is NOT claimed here: equal timing
+ *
+ * An earlier draft of this comment said the two refusals differ by no "timing
+ * difference" either. Nothing measured that, and it is false as written. A
+ * nonexistent ticket costs exactly one query — `getResolvedVisibility` returns
+ * null and short-circuits the `||` — while a real-but-invisible ticket costs
+ * that query plus `canSee`, which re-runs `getResolvedVisibility` and then
+ * `resolveEffectiveRole` (`visibility/can-see.ts`). Three round-trips against
+ * one, and the asymmetry runs in the direction an attacker would want: the real
+ * ticket is the slow one.
+ *
+ * The constraint this plan imposes is BYTE-IDENTITY of the answer, and that is
+ * met and tested. The timing channel is real but unmeasured and unclosed here:
+ * closing it means making the two paths do the same number of queries, which is
+ * a change to the shared visibility layer every read route in the product goes
+ * through, not to this route. **RECORDED, not fixed. Owner: whichever task
+ * hardens `visibility/can-see.ts`** — none is scheduled, so it is raised in
+ * this task's report rather than silently inherited by Task 10's download half,
+ * which copies this function.
  */
 function replyNotFound(reply: FastifyReply): FastifyReply {
   return reply.code(404).send(NOT_FOUND_BODY);
+}
+
+/**
+ * The parser refusals `@fastify/multipart` raises before the handler owns the
+ * request, translated into this route's own vocabulary.
+ *
+ * MEASURED against `@fastify/multipart@9.4.0`, not read off the README:
+ * `FST_PARTS_LIMIT` is `createError(code, message, 413)`, so left alone Fastify
+ * answers 413 with the LIBRARY's body (`{statusCode, code, error, message}`)
+ * and the route's published `{error, reason}` shape silently stops applying to
+ * one of its own status codes. Catching it is what makes "413 is this product's
+ * own answer, with its own body" true for every 413 the door can emit rather
+ * than only for the one `readAtMost` produces.
+ *
+ * ONE code, not the three the plugin defines. `FST_FILES_LIMIT` and
+ * `FST_FIELDS_LIMIT` cannot be raised by the limits this route configures, and
+ * a branch no request can reach is the same check-that-cannot-fail the register
+ * call below cites when it deletes `files: 1`. Breadth here would have been
+ * untested breadth. If either limit is ever reintroduced, this set widens in
+ * the same change set as the limit, with the test that reaches it.
+ */
+const MULTIPART_PARTS_LIMIT_CODE = 'FST_PARTS_LIMIT';
+
+function isPartCountRefusal(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null || !('code' in err)) return false;
+  return (err as { code: unknown }).code === MULTIPART_PARTS_LIMIT_CODE;
 }
 
 /**
@@ -68,25 +115,50 @@ function discardUnreadFile(file: Readable): void {
  *
  * The filename survives, sanitized, for display alone.
  *
- * ## The size limit is enforced during the stream
+ * ## The size limit on the FILE is enforced during the stream
  *
  * `readAtMost` refuses at the byte that crosses the ceiling and tears the
- * source down there; nothing beyond `maxBytes` is ever pulled. `@fastify/
- * multipart`'s own `limits.fileSize` is deliberately NOT configured, because
- * two limits at the same threshold means one of them can never fire and a
- * defect planted in it would survive unnoticed. See `read-limited.ts` for the
- * full argument and the test that measures the claim.
+ * source down there; nothing beyond `maxBytes` is ever pulled. It is the only
+ * decision about the file's size, and the parser's competing one is switched
+ * OFF explicitly at the register call below — not left unset, which is a
+ * different thing and used to be a 1 MiB silent truncation. See
+ * `read-limited.ts` for why one decision rather than two, and the register call
+ * for what "unset" actually did.
+ *
+ * "One size decision" is a claim about the FILE BYTES and nothing else. The
+ * parser also caps a field VALUE at 256 bytes, and that is a second size
+ * decision — see the register call below, where it is made loud instead of
+ * silent.
  *
  * ## Refusal ORDER is load-bearing, not incidental
  *
- * Session → ticket named → ticket visible → size → sniff. The visibility 404
- * comes before every refusal that depends on the FILE, and it must stay there:
- * if size or sniff ran first, a guest could learn which ticket ids exist by
- * uploading rubbish to each and reading 415 (ticket real, file bad) against
- * 404 (ticket not theirs). The oracle would be the refusal they got, not the
- * one they were meant to get. A refactor that reorders these lines re-opens
- * that channel, and `attachments-upload.test.ts` compares a guest's answer to
- * a nonexistent ticket's answer field by field to catch it.
+ * In the order they can actually fire:
+ *
+ *   1. no session → 401 (`requireSession`, a preHandler, before this body runs)
+ *   2. too many parts → 413, raised INSIDE `await request.file()` by the parser
+ *      and translated to this route's body
+ *   3. no `file` part → 400
+ *   4. no usable `ticketId` field (absent, or truncated by `fieldSize`) → 400
+ *   5. ticket not visible, or not there → 404
+ *   6. file over `maxBytes` → 413
+ *   7. bytes not an accepted type → 415
+ *
+ * Steps 2–4 are listed because they DO precede the visibility 404 and an
+ * earlier version of this note left them out, which made the order look like a
+ * shorter list than the code has. None of them is an existence oracle: each is
+ * decided on the shape of the request alone, before any ticket id is read from
+ * a field or looked up, so the answer is identical for a ticket that exists,
+ * one that does not, and one the caller may not see.
+ *
+ * Step 5 before steps 6 and 7 is the part that matters and must stay: if size
+ * or sniff ran first, a guest could learn which ticket ids exist by uploading
+ * rubbish to each and reading 415 (ticket real, file bad) against 404 (ticket
+ * not theirs). The oracle would be the refusal they got, not the one they were
+ * meant to get. A refactor that reorders these lines re-opens that channel, and
+ * `attachments-upload.test.ts` compares a guest's answer to a nonexistent
+ * ticket's answer field by field to catch it, and separately sends an invisible
+ * ticket a body that is over-size AND unsniffable so both of steps 6 and 7 are
+ * pinned behind step 5 rather than only the one.
  *
  * ## HTTP-Origin on this route: no, and by decision rather than by omission
  *
@@ -140,18 +212,85 @@ export async function registerAttachmentRoutes(
 ): Promise<void> {
   const maxBytes = deps.maxBytes ?? ATTACHMENT_MAX_BYTES;
 
-  // No `fileSize` here on purpose — see the size-limit note above. The other
-  // limits are hygiene against an unbounded field: busboy buffers field VALUES
-  // whole, so an uncapped `fieldSize` is a memory hole that no file limit
-  // covers.
+  // `fileSize` is switched OFF here, explicitly, and the explicitness is the
+  // whole point.
+  //
+  // This route shipped with no `fileSize` key at all, on the argument that not
+  // configuring the library's limit leaves exactly one size decision — the loop
+  // in `readAtMost`. MEASURED, and the argument was wrong about what omission
+  // means: `@fastify/multipart` reads `options.limits?.fileSize ||
+  // fastify.initialConfig.bodyLimit`, so an absent key inherits Fastify's
+  // bodyLimit, which is 1 MiB. Worse, a route that consumes `data.file` as a
+  // stream (this one) never reaches the `throwFileSizeLimit` check, which lives
+  // in `toBuffer()`. So busboy TRUNCATED every upload at 1_048_576 bytes and
+  // handed the short stream on: `readAtMost` saw a body under its ceiling, the
+  // sniff passed on the real magic bytes, and a 3 MiB image was stored as a
+  // 1 MiB corrupt file with a 201 and a row saying `size: 1048576`. The
+  // published 25 MiB ceiling had never once applied. The boundary pair in
+  // `attachments-upload.test.ts` — accept exactly ATTACHMENT_MAX_BYTES, refuse
+  // one byte more — is what found it; the single one-sided assertion it
+  // replaced could not, because 200_016 bytes fits under 1 MiB too.
+  //
+  // MAX_SAFE_INTEGER rather than `maxBytes`: putting the parser's limit at the
+  // same threshold as ours is the "two guards, one of which can never fire"
+  // shape `read-limited.ts` argues against. Off is a stance; absent was not.
+  //
+  // The other two are hygiene against an unbounded request: busboy buffers
+  // field VALUES whole, so an uncapped `fieldSize` is a memory hole no file
+  // limit covers, and an uncapped part COUNT is the same hole reached by
+  // repetition. Each was MEASURED against @fastify/multipart@9.4.0 rather than
+  // assumed, because the three settings behave completely differently and two
+  // of the four this route originally carried were worse than nothing:
+  //
+  //   `parts: 8`     — when the ninth part arrives BEFORE the file part, the
+  //                    parser rejects `await request.file()` with
+  //                    `FST_PARTS_LIMIT` (statusCode 413). Caught below and
+  //                    answered in this route's own body. `parts` bounds the
+  //                    field count too, since fields are parts.
+  //   `fieldSize`    — does NOT error. `onField` sets `valueTruncated: true`
+  //                    and hands the SHORTENED value through, so a handler that
+  //                    reads `.value` without reading that flag acts on a
+  //                    string the client never sent. Read below, and refused.
+  //   `fields: 4`    — REMOVED. Measured: a fifth field aborts the parse in a
+  //                    way that surfaces as `ERR_STREAM_PREMATURE_CLOSE` while
+  //                    the handler is reading the file, i.e. a 500 with
+  //                    Fastify's own body, indistinguishable from a client that
+  //                    hung up. `parts` already bounds the count, and does it
+  //                    with an error this route can answer for.
+  //   `files: 1`     — REMOVED. Measured: unobservable here. `request.file()`
+  //                    resolves on the first file, so the limit can only fire
+  //                    after this handler already has what it came for; two
+  //                    files were accepted, 201, with the limit set and with it
+  //                    unset alike. A knob no request can move is a check that
+  //                    cannot fail.
+  //
+  // What bounds a SECOND file part, then, now that neither `files` nor a 1 MiB
+  // default is there to truncate it? Not `parts`, which bounds the count and
+  // says nothing about bytes. It is that the plugin never accumulates a file it
+  // is not asked for — `onFile` hands out the stream and only `toBuffer()`
+  // buffers — so an unconsumed trailing part exerts back-pressure instead of
+  // growing. MEASURED over a real socket rather than `inject`, which cannot
+  // show what comes off the wire: a client streaming a 60 MiB second file part
+  // got the 201 for the first one after ~1 MiB and was then torn down, the same
+  // ~1 MiB of kernel buffering seen with `files: 1` set and with the old
+  // truncating default. Removing the limit loosened nothing.
   await app.register(multipart, {
-    limits: { files: 1, fields: 4, fieldSize: 256, parts: 8 },
+    limits: { fileSize: Number.MAX_SAFE_INTEGER, fieldSize: 256, parts: 8 },
   });
 
   const requireSession = makeRequireSession(deps.auth);
 
   app.post('/v1/attachments', { preHandler: requireSession }, async (request, reply) => {
-    const data = await request.file();
+    let data;
+    try {
+      data = await request.file();
+    } catch (err) {
+      if (!isPartCountRefusal(err)) throw err;
+      return reply.code(413).send({
+        error: 'payload-too-large',
+        reason: 'This request has too many parts.',
+      });
+    }
     if (!data) {
       return reply
         .code(400)
@@ -175,8 +314,18 @@ export async function registerAttachmentRoutes(
     // nobody later writes the test that proves it and watches it flake.
     const rawTicketField = data.fields['ticketId'];
     const ticketField = Array.isArray(rawTicketField) ? rawTicketField[0] : rawTicketField;
+    // `valueTruncated` is the flag `fieldSize` sets INSTEAD of erroring. Reading
+    // `.value` without it is how a size decision fails invisibly: a 300-byte
+    // `ticketId` would arrive as its first 256 bytes and be looked up as though
+    // the client had sent that. The effect today is benign — no 256-character
+    // string is a ULID, so it lands on the same 404 — but "benign because of a
+    // fact two files away" is exactly the shape that stops being benign when
+    // one of the two files changes. A truncated field is treated as no field.
     const ticketId =
-      ticketField && ticketField.type === 'field' && typeof ticketField.value === 'string'
+      ticketField &&
+      ticketField.type === 'field' &&
+      typeof ticketField.value === 'string' &&
+      !ticketField.valueTruncated
         ? ticketField.value
         : null;
     if (!ticketId) {
@@ -187,11 +336,20 @@ export async function registerAttachmentRoutes(
       });
     }
 
-    // The ticket's OWN workspace, read from `proj_visibility` — the same row
+    // The ticket's OWN workspace, read from `proj_visibility` — the same table
     // `canSee` decides on. The plan text read `proj_tickets` for this, which
     // would put existence and permission on two different tables: a ticket
-    // present in one and absent from the other would be answerable or
-    // deniable depending on which query ran first. One source, one answer.
+    // present in one and absent from the other would be answerable or deniable
+    // depending on which query ran first.
+    //
+    // One TABLE, and — stated precisely, because the first draft of this
+    // comment said "one source, one answer" and meant something stronger than
+    // it delivered — two READS of it. `canSee` calls `getResolvedVisibility`
+    // itself, so `visibility.workspaceId` below comes from this read while the
+    // permission answer comes from that one. A projection rewriting the row
+    // between them would file the object under the workspace of read #1 having
+    // been permitted by read #2. Not a hole worth a transaction here, but Task
+    // 10 copies this shape and should copy the caveat with it.
     const visibility = await getResolvedVisibility(deps.pool, ticketId);
     if (visibility === null || !(await canSee(deps.pool, request.currentUserId, ticketId))) {
       discardUnreadFile(data.file);

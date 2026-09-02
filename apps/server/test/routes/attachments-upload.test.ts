@@ -64,12 +64,25 @@ import { signInWithPhone } from '../helpers/session.js';
  * for both separators), so no route-level assertion can reach that branch.
  * `test/attachments/filename.test.ts` owns it and can fail on it.
  *
- * ## `maxBytes` is 4096, not 25 MiB
+ * ## `maxBytes` is 4096 here, and 25 MiB in exactly one test
  *
- * The size refusal is proven cheaply here at the HTTP boundary; that the
- * refusal happens DURING the stream rather than after buffering is proven
- * against a counting source in `test/attachments/read-limited.test.ts`, which
- * is the only place it is observable.
+ * The size refusal is proven cheaply at the HTTP boundary by running this
+ * file's app at a 4096 ceiling; that the refusal happens DURING the stream
+ * rather than after buffering is proven against a counting source in
+ * `test/attachments/read-limited.test.ts`, which is the only place it is
+ * observable. The one test that pays for real 25 MiB bodies is the ceiling
+ * test, and it pays because a one-sided assertion there cannot tell
+ * `ATTACHMENT_MAX_BYTES` from any larger number — see its own comment.
+ *
+ * ## The parser's limits are refusals too, and they are tested as such
+ *
+ * `@fastify/multipart` is configured with `fieldSize` and `parts`, and both can
+ * refuse a request before the handler decides anything. They are covered here
+ * rather than left to the library's reputation, because measurement showed the
+ * two behave completely differently — one truncates silently and one raises a
+ * 413 with a body that is not this route's — and because two further limits
+ * this route once carried were removed on the strength of that measurement.
+ * The register call in `src/routes/attachments.ts` records what each does.
  */
 
 const WS = newUlid();
@@ -347,7 +360,7 @@ describe('POST /v1/attachments', () => {
     expect(await listTicketAttachments(db.pool, ticketId)).toEqual([]);
   });
 
-  it('the shipped ceiling is 25 MiB, and it is the one a route with no maxBytes uses', async () => {
+  it('the shipped ceiling is 25 MiB, and a route with no maxBytes uses exactly that number', async () => {
     // Two separate claims, because pinning only the first leaves
     // `deps.maxBytes ?? SOMETHING_ELSE` free to ship. The constant is a Global
     // Constraints number; every other test in this file runs at 4096, so
@@ -355,14 +368,22 @@ describe('POST /v1/attachments', () => {
     expect(ATTACHMENT_MAX_BYTES).toBe(26_214_400);
     expect(ATTACHMENT_MAX_BYTES).toBe(25 * 1024 * 1024);
 
-    // A second app, registered exactly as production registers it: no
-    // `maxBytes`. A body far over this file's 4096 ceiling must be accepted,
-    // which is only true if the fallback is the real constant. Mutating the
-    // fallback to a small number reddens this line.
+    // A BOUNDARY PAIR, and it has to be a pair. This test previously sent one
+    // 200_016-byte body through a `maxBytes`-less app and read 201, which
+    // proves only "the fallback is somewhere above 200_016" — every value in
+    // (200_016, ∞) passes, so `deps.maxBytes ?? 1_048_576` would have shipped
+    // green under a title saying it could not. (The planted defect that was
+    // supposed to check this used 1024, which lands below the gap and therefore
+    // told the implementer the whole claim was constrained.) Accepting exactly
+    // ATTACHMENT_MAX_BYTES and refusing exactly one byte more pins the fallback
+    // to a single value from both sides.
     const defaulted = Fastify();
     await registerAttachmentRoutes(defaulted, { pool: db.pool, store, auth: sharedAuth });
     await defaulted.ready();
-    try {
+
+    const atCeiling = async (
+      totalBytes: number,
+    ): Promise<Awaited<ReturnType<FastifyInstance['inject']>>> => {
       const ticketId = await freshTicket();
       const { payload, headers } = multipartBody([
         { name: 'ticketId', value: ticketId },
@@ -370,21 +391,109 @@ describe('POST /v1/attachments', () => {
           name: 'file',
           filename: 'wide.png',
           contentType: 'image/png',
-          data: Buffer.concat([PNG, Buffer.alloc(200_000)]),
+          // Real png magic bytes so SIZE is the only thing that can decide.
+          data: Buffer.concat([PNG, Buffer.alloc(totalBytes - PNG.length)]),
         },
       ]);
-      const res = await defaulted.inject({
+      return defaulted.inject({
         method: 'POST',
         url: '/v1/attachments',
         payload,
         headers: { ...headers, authorization: `Bearer ${memberToken}` },
       });
+    };
 
-      expect(res.statusCode).toBe(201);
-      expect((res.json() as { size: number }).size).toBe(PNG.length + 200_000);
+    try {
+      const exact = await atCeiling(ATTACHMENT_MAX_BYTES);
+      expect(exact.statusCode).toBe(201);
+      expect((exact.json() as { size: number }).size).toBe(ATTACHMENT_MAX_BYTES);
+
+      const over = await atCeiling(ATTACHMENT_MAX_BYTES + 1);
+      expect(over.statusCode).toBe(413);
+      // The refusal names the shipped ceiling in the shipped units — a fallback
+      // of 1_048_576 would say "1 MB" here even if the pair above were dropped.
+      expect(over.json()).toEqual({
+        error: 'payload-too-large',
+        reason: 'This file is larger than the 25 MB limit.',
+      });
     } finally {
       await defaulted.close();
     }
+  });
+
+  it('planted defect: a ticketId truncated by the field-size cap is refused, not acted on', async () => {
+    // `fieldSize: 256` does not error when a field value is too long — busboy
+    // sets `valueTruncated` and hands the SHORTENED string through. A handler
+    // reading `.value` alone would look up the first 256 bytes of what the
+    // client sent, which is a size decision that fails invisibly, the exact
+    // class the size argument in `read-limited.ts` claims to have removed.
+    const ticketId = await freshTicket();
+    const before = await countStoredObjects(storeRoot);
+
+    const res = await post(
+      [
+        { name: 'ticketId', value: `${ticketId}${'x'.repeat(300)}` },
+        { name: 'file', filename: 'p.png', contentType: 'image/png', data: PNG },
+      ],
+      memberToken,
+    );
+
+    expect(res.statusCode).toBe(400);
+    expect((res.json() as { error: string }).error).toBe('bad-request');
+    expect(await countStoredObjects(storeRoot)).toBe(before);
+    expect(await listTicketAttachments(db.pool, ticketId)).toEqual([]);
+
+    // POSITIVE CONTROL, and the one that makes the refusal about truncation
+    // rather than about the prefix: the untruncated id, same file, is accepted.
+    // Without it a handler that 400'd every upload would pass every line above.
+    const ok = await upload(memberToken, ticketId, {
+      filename: 'p.png',
+      contentType: 'image/png',
+      data: PNG,
+    });
+    expect(ok.statusCode).toBe(201);
+  });
+
+  it('planted defect: too many parts is refused 413 in THIS route’s body, not the parser’s', async () => {
+    // The parser's own `FST_PARTS_LIMIT` is `createError(..., 413)`, so left
+    // uncaught Fastify answers 413 with `{statusCode, code, error, message}` —
+    // a shape no client of this route is told about, on a status code the route
+    // publishes as its own. Nine parts, the ninth arriving before the file, is
+    // where the parser rejects `request.file()`.
+    const ticketId = await freshTicket();
+    const before = await countStoredObjects(storeRoot);
+
+    const filler = Array.from({ length: 8 }, (_, i) => ({ name: `pad${i}`, value: 'v' }));
+    const res = await post(
+      [
+        { name: 'ticketId', value: ticketId },
+        ...filler,
+        { name: 'file', filename: 'p.png', contentType: 'image/png', data: PNG },
+      ],
+      memberToken,
+    );
+
+    expect(res.statusCode).toBe(413);
+    // Asserted on the WHOLE body: `toMatchObject` would pass on the parser's
+    // body too, since that also carries `statusCode: 413`.
+    expect(res.json()).toEqual({
+      error: 'payload-too-large',
+      reason: 'This request has too many parts.',
+    });
+    expect(await countStoredObjects(storeRoot)).toBe(before);
+    expect(await listTicketAttachments(db.pool, ticketId)).toEqual([]);
+
+    // POSITIVE CONTROL: the same shape one part shorter is accepted, so the
+    // 413 is the count and not the padding fields themselves.
+    const ok = await post(
+      [
+        { name: 'ticketId', value: ticketId },
+        ...filler.slice(0, 6),
+        { name: 'file', filename: 'p.png', contentType: 'image/png', data: PNG },
+      ],
+      memberToken,
+    );
+    expect(ok.statusCode).toBe(201);
   });
 
   it('planted defect: a guest gets a 404 indistinguishable from a ticket that never existed', async () => {
@@ -451,6 +560,30 @@ describe('POST /v1/attachments', () => {
 
     expect(res.statusCode).toBe(404);
     expect(res.json()).toEqual({ error: 'not-found' });
+
+    // The docblock names SIZE as well as sniff, and the case above cannot
+    // reach it: 64 bytes is nowhere near the 4096 ceiling, so a
+    // size-before-visibility reordering would leave this test green. The same
+    // guest, the same invisible ticket, a body over the ceiling — and honest
+    // png bytes, so size is the only thing left that could answer 413.
+    const oversize = await upload(guestToken, ticketId, {
+      filename: 'thing.png',
+      contentType: 'image/png',
+      data: Buffer.concat([PNG, Buffer.alloc(8192)]),
+    });
+
+    expect(oversize.statusCode).toBe(404);
+    expect(oversize.json()).toEqual({ error: 'not-found' });
+
+    // POSITIVE CONTROL: the identical oversize body from a viewer who MAY see
+    // the ticket answers 413, so the 404 above is the visibility check winning
+    // the race and not the size check having quietly stopped working.
+    const seen = await upload(memberToken, ticketId, {
+      filename: 'thing.png',
+      contentType: 'image/png',
+      data: Buffer.concat([PNG, Buffer.alloc(8192)]),
+    });
+    expect(seen.statusCode).toBe(413);
   });
 
   it('no session → 401 with the one unauthenticated body', async () => {

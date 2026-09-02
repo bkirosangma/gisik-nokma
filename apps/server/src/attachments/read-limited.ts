@@ -35,13 +35,32 @@ function describeLimit(maxBytes: number): string {
  * can never fire. That is a check that cannot fail — the sixth disguise in
  * this repo's own note on the subject — and a planted defect aimed at it would
  * survive silently, condemning a guard that was fine. So there is exactly ONE
- * size decision in the upload path, it is the loop below, and a mutation that
- * moves the comparison after the loop reddens
- * `test/attachments/read-limited.test.ts` by name.
+ * size decision about the FILE BYTES in the upload path, it is the loop below,
+ * and a mutation that moves the comparison after the loop reddens ONE named
+ * test: `read-limited.test.ts` > "planted defect: the refusal happens DURING
+ * the stream, not after buffering it".
  *
- * The trade is that `413` is now this product's own answer rather than
+ * That test is named singly on purpose. The other size assertions in that file
+ * — one byte over, the 25 MB sentence, the sub-mebibyte units — all survive the
+ * post-loop mutation untouched, because `total` still exceeds `maxBytes` when
+ * the loop ends and the same refusal object still comes back. Only the
+ * producer-side count can tell "refused while reading" from "refused after
+ * reading", so only the test that reads that count constrains the claim. An
+ * earlier ledger for this task credited the mutation with reddening four tests;
+ * it reddens one, and the one is enough only because the gap it measures is
+ * thousandfold.
+ *
+ * The route is NOT free of the parser's own size settings, and this comment
+ * used to imply it was. `routes/attachments.ts` caps a field VALUE at 256 bytes
+ * and the part COUNT at 8. Neither touches the file bytes; both are documented
+ * and refused for at the register call there, `fieldSize` explicitly because
+ * the parser truncates silently rather than erroring.
+ *
+ * The trade is that `413` is this product's own answer rather than
  * `@fastify/multipart`'s propagated `statusCode`, which is what the plan's
- * Produces block promised. Same status, our own body. Recorded in the commit.
+ * Produces block promised. Same status, our own body — for the parser's
+ * part-count 413 as well, which the route catches and re-answers so the claim
+ * holds for every 413 the door emits and not just for this one.
  *
  * ## "During the stream" is a measurable claim, and it is measured
  *
