@@ -14,3 +14,8 @@ __pycache__/
 *.tsbuildinfo
 coverage/
 .superpowers/
+
+# graphify: derived structural graph. Rebuilt from source in ~1 min at zero LLM cost
+# (code-only corpora skip semantic extraction), so it is regenerated, never shared.
+# Each worktree keeps its own, which is correct: they sit on different branches.
+graphify-out/
