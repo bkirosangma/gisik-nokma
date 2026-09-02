@@ -3,6 +3,8 @@ import { docToPlainText } from '@gisik-nokma/domain';
 import { createTestEditor } from './helpers/create-editor.js';
 import { typeText } from './helpers/type-text.js';
 
+const IMG = '01J9GIMA000000000000000000';
+
 /**
  * `packages/domain/src/doc-text.ts` shipped before this package existed and
  * its header names Plan 7's editor as the thing that conforms to it. That
@@ -287,5 +289,75 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
     expect(editor.getText()).toBe('GST filing\n\n');
     expect(docToPlainText(json)).toBe('GST filing');
     editor.destroy();
+  });
+
+  /**
+   * Plan 7 Task 6's gap: this file covered every schema-v1 node the walker
+   * names — the twelve in `BLOCK_NODE_TYPES`, plus `text`, `hardBreak` and
+   * `mention`, each with their own case above — except `image`, added by
+   * Task 3 after this file's first cases were written. `image` is `atom:
+   * true` with no `content` array at all, so it hits neither the block-node
+   * branch (its type is not in the walker's set) nor the children branch
+   * (there is nothing to recurse into): `render` falls through to
+   * `candidate.content` being non-array, `children` is `''`, and the node
+   * contributes nothing.
+   *
+   * Pinned from the same direction as `horizontalRule` above, and for the
+   * same reason it took a moment to see it was pinned at all: DELETING
+   * something cannot break this case — `image`'s type is not in the
+   * walker's block set and it has no content to lose, so removing either
+   * fact changes nothing here. ADDING something can: a later hand deciding
+   * `alt` text is worth indexing — a reasonable-sounding change — would
+   * make this case fail on an exact-string diff, before it ever reached a
+   * search index or a notification. The `alt` text below names nothing
+   * that appears anywhere else in the doc, so that mutation cannot pass by
+   * accident of the surrounding words.
+   */
+  it('renders an image node as no text at all — atom, no content, nothing to walk', () => {
+    const editor = createTestEditor(undefined, {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'the receipt' }] },
+        { type: 'image', attrs: { attachmentId: IMG, wrap: 'block', alt: 'scan of the challan' } },
+        { type: 'paragraph', content: [{ type: 'text', text: 'is attached' }] },
+      ],
+    });
+    expect(docToPlainText(editor.getJSON())).toBe('the receipt\nis attached');
+    editor.destroy();
+  });
+
+  /**
+   * Named by Task 6's plan text, and worth being honest about what it adds:
+   * nothing that the first case in this file ('renders every block node the
+   * schema names as its own line') does not already pin more strongly — that
+   * case already asserts an exact full string across heading, paragraph,
+   * bulletList, blockquote and codeBlock. An `indexOf`-ordering assertion
+   * would be weaker still: `indexOf('AAA') < indexOf('BBB')` passes even if
+   * the walker fused every block into one unbroken line, which is exactly
+   * the failure this file's header says the suite exists to catch. So this
+   * case asserts the exact string too, kept only because the plan names it
+   * by name, not because it closes a gap the first case leaves open.
+   */
+  it('keeps a kitchen-sink document — heading, paragraph, blockquote — in document order', () => {
+    const editor = createTestEditor(undefined, {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'AAA' }] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'BBB' }] },
+        { type: 'blockquote', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'CCC' }] }] },
+      ],
+    });
+    expect(docToPlainText(editor.getJSON())).toBe('AAA\nBBB\nCCC');
+    editor.destroy();
+  });
+
+  it('renders the empty doc as an empty-ish string, never a throw', () => {
+    // Not an editor-produced document — an editor always carries at least one
+    // empty paragraph — but proj_search and notifications call
+    // `docToPlainText` on whatever a client sent, and `{ type: 'doc',
+    // content: [] }` is exactly the malformed-but-well-typed shape the
+    // walker's total-function contract (doc-text.ts's header) exists for.
+    expect(() => docToPlainText({ type: 'doc', content: [] })).not.toThrow();
+    expect(docToPlainText({ type: 'doc', content: [] })).toBe('');
   });
 });
