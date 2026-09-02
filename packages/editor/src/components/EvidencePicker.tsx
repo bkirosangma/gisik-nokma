@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { EVIDENCE_DRIVE_REFERENCE_REASON, type DriveReference } from '@gisik-nokma/domain';
 import type { UploadResult } from '../upload.js';
 
 /**
@@ -16,13 +17,12 @@ import type { UploadResult } from '../upload.js';
  * (`AttachmentListItem.tsx:50-52`) already discriminates uploads from Drive
  * references by `kind`, and this task's callers pass uploads only — but the
  * type itself does not prevent it; only every caller upholding the prop's
- * contract does. Plan 7's own text names Task 13a as the task that extends
- * this component with a *separate* prop (`driveReferences?:
- * DriveReferenceSummary[]`) so a Drive reference can be shown — unofferable,
- * carrying the server's own reason sentence — without ever touching this
- * array or `onPick`. That extension is Task 13a's scope, not this task's;
- * see the predicate note on `EvidencePicker` below for what that leaves this
- * component responsible for today.
+ * contract does. Task 13a extends this component with a *separate* prop
+ * (`driveReferences?: DriveReferenceSummary[]`, below) so a Drive reference
+ * is shown — unofferable, carrying the server's own reason sentence —
+ * without ever touching this array or `onPick`. See the predicate note on
+ * `EvidencePicker` below for what that does and does not change about this
+ * type's own guarantees.
  */
 export type AttachmentSummary = {
   attachmentId: string;
@@ -31,9 +31,20 @@ export type AttachmentSummary = {
   size: number;
 };
 
+/** A Drive reference on this ticket, as the evidence picker lists it — never as something offerable. */
+export type DriveReferenceSummary = { attachmentId: string } & DriveReference;
+
 export type EvidencePickerProps = {
   /** The ticket's existing UPLOADS — any of them can serve as evidence. Never pass a Drive reference here: see `AttachmentSummary`'s docblock. */
   attachments: AttachmentSummary[];
+  /**
+   * Drive references on this ticket. They are listed so the user is not
+   * left wondering where their file went — and they arrive on their own
+   * prop, with no pick handler anywhere near them, because "not offerable"
+   * must be a fact about the code and not a disabled attribute someone can
+   * defeat (spec §2, Drive rule 1).
+   */
+  driveReferences?: DriveReferenceSummary[];
   uploadAttachment(file: File): Promise<UploadResult>;
   /** Emit attachment.added for a fresh upload before it is offered as evidence. */
   onAttachmentAdded(result: UploadResult): Promise<void> | void;
@@ -75,9 +86,12 @@ export type EvidencePickerProps = {
  * client-side mirror can catch; the gate's per-ticket `WHERE ... AND
  * ticket_id = $2` clause is the backstop for that case, not this one.
  * SHOWING a Drive reference to the user (with the named reason, rather than
- * silently discarding it) is Task 13a's scope, layered on top of this file
- * through its own `driveReferences` prop — deliberately not built here, so
- * as not to reach into a task this one was not asked to do.
+ * silently discarding it) is Task 13a's addition, layered on top of this
+ * file through the `driveReferences` prop below: it renders in its own
+ * `.evidence-picker__unavailable` section, mapped from its own array, with
+ * no `onClick` anywhere in that markup — there is no code path from a
+ * `DriveReferenceSummary` to `onPick`, structurally, not merely by omitting
+ * a disabled attribute someone could defeat.
  */
 export function EvidencePicker(props: EvidencePickerProps): React.JSX.Element {
   const [uploading, setUploading] = useState(false);
@@ -115,6 +129,18 @@ export function EvidencePicker(props: EvidencePickerProps): React.JSX.Element {
           </li>
         ))}
       </ul>
+      {(props.driveReferences ?? []).length === 0 ? null : (
+        <div className="evidence-picker__unavailable">
+          <p className="evidence-picker__reason">{EVIDENCE_DRIVE_REFERENCE_REASON}</p>
+          <ul>
+            {(props.driveReferences ?? []).map((reference) => (
+              <li key={reference.attachmentId} className="evidence-picker__unavailable-item">
+                {reference.name} · Google Drive reference, last seen {reference.capturedAt.slice(0, 10)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <label className="evidence-picker__upload">
         {uploading ? 'Uploading…' : 'Upload new evidence'}
         <input type="file" disabled={uploading} onChange={(event) => void handleUpload(event.target.files)} />

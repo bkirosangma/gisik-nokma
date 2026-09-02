@@ -1,6 +1,6 @@
 import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { WorkflowDef } from '@gisik-nokma/domain';
+import { EVIDENCE_DRIVE_REFERENCE_REASON, type WorkflowDef } from '@gisik-nokma/domain';
 import { transitionRequiresEvidence } from '../src/attachments/require-evidence.js';
 import { EvidencePicker } from '../src/components/EvidencePicker.js';
 
@@ -157,6 +157,60 @@ describe('EvidencePicker', () => {
     );
     fireEvent.click(view.container.querySelector('.evidence-picker__cancel') as HTMLButtonElement);
     expect(onCancel).toHaveBeenCalled();
+    view.unmount();
+  });
+
+  const DRIVE_REFERENCES = [
+    {
+      attachmentId: '01J9GATD000000000000000000',
+      driveFileId: '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456',
+      name: 'receipt.pdf', // same name as an upload on purpose: names prove nothing
+      mimeType: 'application/pdf',
+      webViewLink: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456/view',
+      capturedAt: '2026-08-20T10:00:00.000Z',
+    },
+  ];
+
+  it('planted defect: a Drive reference is never among the offerable options', () => {
+    const onPick = vi.fn();
+    const view = render(
+      <EvidencePicker
+        attachments={ATTACHMENTS}
+        driveReferences={DRIVE_REFERENCES}
+        uploadAttachment={vi.fn()}
+        onAttachmentAdded={vi.fn()}
+        onPick={onPick}
+        onCancel={vi.fn()}
+      />,
+    );
+    // Exactly the uploads are offerable — the reference did not sneak in on a matching name.
+    const options = [...view.container.querySelectorAll('.evidence-picker__option')];
+    expect(options).toHaveLength(ATTACHMENTS.length);
+    for (const option of options) {
+      expect(option.textContent).not.toContain('Google Drive');
+    }
+    // Clicking anything in the unavailable section picks nothing.
+    for (const item of view.container.querySelectorAll('.evidence-picker__unavailable-item')) {
+      fireEvent.click(item);
+    }
+    expect(onPick).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("planted defect: the reference is shown with the server's own reason, word for word", () => {
+    const view = render(
+      <EvidencePicker
+        attachments={[]}
+        driveReferences={DRIVE_REFERENCES}
+        uploadAttachment={vi.fn()}
+        onAttachmentAdded={vi.fn()}
+        onPick={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const unavailable = view.container.querySelector('.evidence-picker__unavailable')!;
+    expect(unavailable.textContent).toContain('receipt.pdf');
+    expect(view.container.querySelector('.evidence-picker__reason')!.textContent).toBe(EVIDENCE_DRIVE_REFERENCE_REASON);
     view.unmount();
   });
 });

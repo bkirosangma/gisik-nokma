@@ -823,6 +823,21 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   `DriveReference`, `isDriveReference()`, `DRIVE_FILE_SCOPE`, `RULE_EVIDENCE_DRIVE_REFERENCE` and its
   reason string: two statements of what a Drive reference is, pinned to each other so the second
   cannot quietly stop meaning the first. `packages/domain/src/attachment-kinds.ts`
+- ✅ **Evidence picker refuses a Drive reference structurally, not conditionally** — `EvidencePicker`
+  offers a ticket's uploads as evidence (`attachments`) and, on its own `driveReferences` prop, lists
+  any Drive references the ticket carries in a separate `evidence-picker__unavailable` section naming
+  each one plus the day it was last seen, under the SAME `EVIDENCE_DRIVE_REFERENCE_REASON` sentence
+  the server's evidence gate refuses with (`packages/domain/src/attachment-kinds.ts`) — imported, never
+  retyped, so the two cannot drift. That section maps its own array and puts no click handler
+  anywhere near it: there is no code path from a `DriveReferenceSummary` to `onPick`, which is what
+  makes "not offerable" a fact about the code rather than a `disabled` attribute a later change could
+  quietly drop (spec §2, Drive rule 1). The separation is structural, by PROP, not by an in-component
+  predicate over mime or filename — this component reads no `kind` field at all, and
+  `DriveReferenceSummary` carries none; routing a reference onto `driveReferences` rather than
+  `attachments` is the caller's job (`AttachmentListEntry` already discriminates by `kind` — Plan
+  6/6a), and the server's evidence gate (`apps/server/src/gates/evidence-gate.ts`, Task 11a) is the
+  backstop for an id that reaches `onPick` by any other path. `packages/editor/src/components/EvidencePicker.tsx`,
+  `packages/editor/src/styles/editor.css`
 
 ## 12. Offline sync & the apps
 

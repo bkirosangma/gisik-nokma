@@ -180,3 +180,10 @@
   text-align: left;
   cursor: pointer;
 }
+.evidence-picker__unavailable {
+  border-left: 2px dashed;
+  padding-left: 0.5rem;
+}
+.evidence-picker__unavailable-item {
+  font-size: 0.85rem;
+}

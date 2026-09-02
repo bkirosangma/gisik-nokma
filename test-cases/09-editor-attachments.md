@@ -61,6 +61,11 @@ by reading the named file and not by grep alone.
 - 9.57 ✅ An `attachment.added` claim states which of the two kinds it is or is refused at the door; a Drive reference and an upload are two shapes, not one shape with optional fields. (`packages/domain/test/attachment-kinds.test.ts`)
 - 9.58 ✅ `isDriveReference` and the evidence rule's reason string are pinned to each other, so the second cannot quietly stop meaning the first. (`packages/domain/test/attachment-kinds.test.ts`)
 
+## Evidence picker
+
+- 9.63 ✅ A Drive reference passed on `driveReferences` never appears among the offerable `.evidence-picker__option` buttons, even when its name matches an offerable upload's name exactly — and clicking anything in its `.evidence-picker__unavailable` section picks nothing, because that section carries no `onClick` at all. (`packages/editor/test/evidence-picker.test.tsx`)
+- 9.64 ✅ The Drive reference's unavailable section shows the server's own `EVIDENCE_DRIVE_REFERENCE_REASON`, asserted against the exported constant rather than a retyped copy. (`packages/editor/test/evidence-picker.test.tsx`)
+
 ## Not on this branch
 
 - 9.59 ❌ The attachment upload pipeline end to end (client submit → server sniff → stored `mime`/`size` as the server's truth, per coordination amendment 15). Owner: Plan 7 Task 12.
