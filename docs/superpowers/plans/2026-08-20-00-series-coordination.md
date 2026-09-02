@@ -5884,7 +5884,7 @@ failure this series is named for:**
    | | why it is in clause 1 | shape of the change |
    |---|---|---|
    | `getBoard` | `board.tsx` dereferences `workflowVersion` today | add `def.version` where columns are pushed — a field addition |
-   | `getMyWorkspaces` | the nav (T14) has no other source of `projects` | join `proj_projects` — a field addition |
+   | `getMyWorkspaces` | the nav (T14) has no other source of `projects` | **CORRECTED 2026-09-02, after the table was first written and reported: this is NOT a field addition.** `grep -rn "proj_projects" apps/server/src` returns the projection that writes it, one existence check, and **no route that reads it** (positive control in the same sweep: `proj_memberships` has eight readers). There is no shipped project-list read at all, so adding `projects` here means DESIGNING one, and its first question is what a project-scoped guest sees of a workspace's other projects. **A VISIBILITY DECISION** |
    | `getTicket` | the route answers a `proj_visibility` row where its name promises a ticket | **read `proj_tickets` instead. A VISIBILITY DECISION, not a field addition** |
    | `getTickets` | five fields, four of them not derivable client-side | **`hasRestrictedParent` is itself about restricted visibility; `assignedProvenance` reads the raw `events` table. A VISIBILITY DECISION** |
 
@@ -5892,10 +5892,18 @@ failure this series is named for:**
    `search`'s `matchedIn` is NOT in clause 1 — no view among Plan 6's twelve remaining tasks consumes
    it, so it blocks nothing here and is recorded for whoever builds the search surface.
 
-   **Two of the four carry a visibility decision rather than a field addition**, and they sit under
-   Plan 4's read enforcement — the surface whose own execution notes recorded the cross-workspace
-   forgery hazard. That is the part that decides whether clause 1 is four tasks inside a step or a
-   step of its own, and it is stated here rather than discovered at implementation time.
+   **THREE of the four carry a visibility decision rather than a field addition** — corrected upward
+   from two after `getMyWorkspaces` was checked rather than assumed. They sit under Plan 4's read
+   enforcement, the surface whose own execution notes recorded the cross-workspace forgery hazard.
+   That is what decides whether clause 1 is a few tasks inside a step or a step of its own.
+
+   **Only `getBoard` is a pure field addition, and it is the one being done.** `def.version` comes off
+   the same `PublishedWorkflowDef` the column's `workflowName` already comes from, so it discloses
+   nothing a viewer of that board cannot already see. The other three are HELD pending the ruling.
+
+   The correction is itself the lesson: the first version of this table priced two rows as one-line
+   changes on the strength of "the fact is in a table". A fact being in a table says nothing about
+   whether a door exists to hand it through, or who is allowed to walk up to it.
 2. **Signature gaps are closed in the CLIENT.** `getPreferences`/`putPreferences` cannot form their
    request at all, so there is no server-side reading of the problem. This extends **ruling P24** —
    already taken, that the shipped `.strict()` preferences document wins over Plan 6's — from the
