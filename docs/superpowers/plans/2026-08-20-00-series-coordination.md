@@ -6122,3 +6122,35 @@ a purely local refusal elsewhere.
 
 **Why it is recorded rather than decided.** Both readings are defensible from one sentence, and the
 choice is a product decision about whose refusal a user should be shown, not an implementation detail.
+
+### 5. Plan 8 Task 3: the frozen errand template trips `rule-bypassable`, and no plan has ruled it. **Owner: the owner (ruling request), not resolved here.**
+
+`ERRAND_WITH_WAITS_TEMPLATE` (`packages/domain/src/workflows/errand-with-waits.ts`) is pinned by Plan
+11's `checkErrandTemplate` oracle (verified absent from this branch by search this session — Plan 11
+has not landed here yet) and its own docblock: *"Edit this only with that check green."* Task 3's own
+prose states the opposite invariant twice — *"a shipped template that greets the author with a warning
+is a shipped template that is wrong."*
+
+Both cannot hold. `packages/domain/src/advise-workflow.ts`'s `rule-bypassable` check (an amendment that
+landed after Plan 8's Task 3 text was written; its module docblock does not name an owning plan, and
+Plan 2 — the plan most likely to own the validate/advise tier — executed 2026-08-28 and its own
+execution-consequences section above does not mention this check, so "Plan 2 owns it" is not verified
+and is NOT asserted here) correctly reports two bypasses on the frozen template: `require-comment`
+guards `in-progress -> waiting`, but `later -> waiting` and `next -> waiting` both enter the same state
+carrying no `require-comment` rule — and `later -> waiting` must stay rule-free, because it is one of
+the seed's pinned one-hop paths (Task 3's own guard-step comment).
+
+Task 3 cannot resolve this: fixing the template violates Plan 11's oracle pin (owned there, not here);
+silencing `rule-bypassable` means editing a check this task does not own. `packages/app-core/test/workflow-builder/templates.test.ts`
+records the actual advisory output (2× `rule-bypassable`) rather than asserting the stale "warns about
+nothing" claim for this one template — the other two templates (`simple-kanban`, `approval-chain`) still
+assert clean per Task 3's invariant.
+
+**What needs a ruling:** either (a) the `rule-bypassable` check gains a way to accept the from-any-prior-open-state
+seeding pattern as intentionally uncovered (Plan 8's own guard-wildcard precedent — line ~495 above —
+suggests a rule-free multi-entry seed path is a recognized shape, not an oversight), or (b) Task 3's
+"warns about nothing" invariant is amended to admit a documented exception for templates whose shape is
+pinned by a downstream oracle, or (c) the template itself changes and Plan 11's `checkErrandTemplate`
+changes with it in the same commit, once Plan 11 actually lands and its author can make that call. This
+entry does not pick one — same discipline as ruling-request entries above (autonomous execution
+protocol, ruling 3: conservative default + record, never silently and never blocking).
