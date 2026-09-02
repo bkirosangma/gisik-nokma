@@ -29,6 +29,7 @@ describe('S3ObjectStore', () => {
     expect(input.Bucket).toBe('gisik-attachments');
     expect(input.Key).toBe('w/ws1/a/att1');
     expect(input.ContentType).toBe('application/pdf');
+    expect(input.ContentLength).toBe(bytes.length);
   });
 
   it('getStream returns the body stream', async () => {
@@ -55,6 +56,21 @@ describe('S3ObjectStore', () => {
     s3Mock.on(DeleteObjectCommand).resolves({});
     await makeStore().delete('w/ws1/a/att1');
     expect(s3Mock.commandCalls(DeleteObjectCommand)[0]!.args[0].input.Key).toBe('w/ws1/a/att1');
+  });
+
+  it('defaults path-style addressing to true when the config omits it', () => {
+    // No client override and no forcePathStyle key: the only shape that
+    // reaches the constructor's `config.forcePathStyle ?? true`. The SDK's
+    // own default is false (confirmed by inspecting a bare S3Client's
+    // resolved config), so `toBe(true)` here constrains this class's
+    // explicit choice, not an SDK default riding along for free.
+    const store = new S3ObjectStore({
+      region: 'ap-south-1',
+      bucket: 'gisik-attachments',
+      accessKeyId: 'k',
+      secretAccessKey: 's',
+    });
+    expect((store as unknown as { client: S3Client }).client.config.forcePathStyle).toBe(true);
   });
 
   it('planted defect: malformed keys are refused before any network call', async () => {
