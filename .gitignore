@@ -25,3 +25,7 @@ playwright-report/
 # (code-only corpora skip semantic extraction), so it is regenerated, never shared.
 # Each worktree keeps its own, which is correct: they sit on different branches.
 graphify-out/
+
+# Local-disk ObjectStore root (apps/server/src/attachments/local-disk-store.ts,
+# default var/attachments): dev/test attachment bytes, never committed.
+var/
