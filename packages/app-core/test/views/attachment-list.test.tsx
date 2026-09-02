@@ -82,7 +82,7 @@ describe('3.76 AttachmentList', () => {
  * identically, so app-core never depends on the editor package and structural
  * typing joins the two. This comment used to say that twin did not exist yet,
  * which was true when written; **Plan 7 Task 12b created it at
- * `packages/editor/src/components/AttachmentListItem.tsx:49`.** The two
+ * `packages/editor/src/components/AttachmentListItem.tsx:50`.** The two
  * declarations now move together or not at all.
  *
  * The assertion below is deliberately NOT rewritten to import the editor's

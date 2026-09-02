@@ -21,7 +21,7 @@ import { formatDate } from '../provenance.js';
  * This paragraph used to read *"Measured 2026-09-02: `packages/editor` declares
  * no `AttachmentListEntry`"*, and that measurement was true when it was taken.
  * **Plan 7 Task 12b falsified it: the twin is
- * `packages/editor/src/components/AttachmentListItem.tsx:49`.** The two are now
+ * `packages/editor/src/components/AttachmentListItem.tsx:50`.** The two are now
  * edited together or not at all — that is the whole point of the arrangement,
  * and it only starts binding once the second declaration exists.
  *

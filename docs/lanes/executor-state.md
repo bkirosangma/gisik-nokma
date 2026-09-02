@@ -241,7 +241,7 @@ trusted.
 
 ### The twin-declaration seam: closed here, by the step owner, because its recorded owner did not exist
 
-Task 12b created `AttachmentListEntry` in `packages/editor/src/components/AttachmentListItem.tsx:49`
+Task 12b created `AttachmentListEntry` in `packages/editor/src/components/AttachmentListItem.tsx:50`
 — the twin Plan 6 Open question 13 promised. **That falsified a dated measurement in three places**,
 each true when written. Task 12b, correctly scoped to `packages/editor`, refused to reach into
 another package and instead **wrote an annotation naming all three sites, naming its own blind
