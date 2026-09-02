@@ -115,13 +115,13 @@ by reading the named file and not by grep alone.
 
 ## Escape suggestions (Task 5's coverage, deferred to this task)
 
-- 9.88 ✅ Every reserved autoformat sequence — recounted, not inherited: 13 block triggers (headings 1–6, `-`/`*`/`+`, `1.`, `>`, ``` fence, `---`) and 6 mark triggers (`**`/`__`, `*`/`_`, `~~`, backtick), 19 total, table-driven with `it.each` — triggers its formatting AND surfaces the escape suggestion (a `[data-escape-chip]` in the DOM), and accepting (`undoInputRule`) yields the literal typed text with the chip and the suggestion both gone. One planted-defect-style assertion per trigger inside the shared body. (`packages/editor/test/escape-suggestion.test.ts`)
+- 9.88 ✅ Every reserved autoformat sequence — recounted, not inherited: 13 block triggers (headings 1–6, `-`/`*`/`+`, `1.`, `>`, ``` fence, `---`) and 6 mark triggers (`**`/`__`, `*`/`_`, `~~`, backtick), 19 total, table-driven with `it.each` (one shared body run 19 times, not 19 separate assertions) — each trigger applies its formatting AND surfaces the escape suggestion (a `[data-escape-chip]` in the DOM), and accepting via `undoInputRule` reverses the formatting and leaves the literal typed characters, with the chip and the suggestion both gone. (`packages/editor/test/escape-suggestion.test.ts`)
 - 9.89 ✅ Backspace accepts through a real `keydown` (core's Backspace keymap routes it through `undoInputRule`) — proven with a genuine event rather than the `keyboardShortcut` test helper, whose own replay of a captured transaction is independently shown to mishandle a position-shifting multi-step transaction, isolated from this extension's own code. (`packages/editor/test/escape-suggestion.test.ts`)
 - 9.90 ✅ Clicking the chip accepts: the formatting is gone from the rendered HTML and the typed markup stands as literal text in the document. (`packages/editor/test/escape-suggestion.test.ts`)
 - 9.91 ✅ Escape dismisses: the suggestion and the chip both disappear and the formatting (a heading, here) stays applied — the opposite outcome from accepting. (`packages/editor/test/escape-suggestion.test.ts`)
 - 9.92 ✅ Continuing to type dismisses the suggestion the same way Escape does, and the formatting stays. (`packages/editor/test/escape-suggestion.test.ts`)
 - 9.93 ✅ Escape with no active suggestion is not consumed — `handleKeyDown` returns `false`, leaving the key free for whatever else wants it. (`packages/editor/test/escape-suggestion.test.ts`)
-- 9.94 ✅ Three non-triggers stay literal with no suggestion offered at all: a markdown link `[text](url)`, a table pipe row, and a bare URL (autolink off) — `it.each`, no `<a>` in the rendered HTML for any of them. (`packages/editor/test/escape-suggestion.test.ts`)
+- 9.94 ✅ Three non-triggers stay literal with no suggestion offered at all: a markdown link `[text](url)`, a line containing pipe characters (`a | b | c` — proving pipes trigger nothing, not that this schema has a table input rule), and a bare URL (autolink off) — `it.each`, no `<a>` in the rendered HTML for any of them. (`packages/editor/test/escape-suggestion.test.ts`)
 
 ## Test infrastructure
 
