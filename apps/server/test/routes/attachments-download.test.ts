@@ -108,17 +108,23 @@ const UNSAFE_BYTES = Buffer.from('%PDF-1.7 unsafe-name body');
  * sanitized on the way in.
  *
  * Quote-only, deliberately, not CR/LF: `sanitizeFilename` also strips CR/LF
- * (header-injection prevention), but MEASURED — planting `bad"name\r\n.pdf`
- * here and mutating the call site to `row.filename` — Node's http layer
- * rejects the raw CR/LF in the header value with `ERR_INVALID_CHAR` before
- * the response is ever sent, so the mutation reddens at `res.statusCode`
- * (`500`, not `200`) rather than at the `content-disposition` equality
- * below. That proves "an unsanitized CRLF filename crashes the route," a
- * real property but not this test's, and would leave the composition claim
- * — that the returned header VALUE is the sanitized string — with the same
- * unexecuted-assertion gap this fixture exists to close. A quote-only name
- * transmits fine either way, so the mutation is caught by the header-value
- * assertion itself.
+ * (header-injection prevention), but a `bad"name\r\n.pdf` fixture was tried
+ * here FIRST, with the call site mutated to `row.filename`, and MEASURED to
+ * redden at `res.statusCode` (`500`, not `200`) rather than at the
+ * `content-disposition` equality below. A standalone Fastify 5.12.1 probe
+ * outside this suite (same shape: `reply.header('content-disposition',
+ * unsanitizedValue)`, logger enabled) confirms why: `TypeError
+ * [ERR_INVALID_CHAR]: Invalid character in header content
+ * ["content-disposition"]` thrown from `Response.setHeader` inside
+ * `writeHead`, caught by Fastify's error handler and turned into that 500 —
+ * this suite's own Fastify instance has no logger configured, so the error
+ * itself is invisible in its output even though the status code is not.
+ * Either way, that mutation would prove "an unsanitized CRLF filename
+ * crashes the route," a real property but not this test's, and would leave
+ * the composition claim — that the returned header VALUE is the sanitized
+ * string — with the same unexecuted-assertion gap this fixture exists to
+ * close. A quote-only name transmits fine either way, so the mutation is
+ * caught by the header-value assertion itself.
  */
 const UNSAFE_FILENAME = 'bad"name.pdf';
 
