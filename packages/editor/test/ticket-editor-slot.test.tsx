@@ -104,6 +104,7 @@ void _slotFitsAppCoreContract;
 // path is resolved from vitest's cwd (this package's root) instead.
 const APP_CORE_SLOT_SOURCE = resolve(process.cwd(), '../app-core/src/views/editor-slot.tsx');
 const OWN_SOURCE = resolve(process.cwd(), 'test/ticket-editor-slot.test.tsx');
+const THIS_HALF_SOURCE = resolve(process.cwd(), 'src/components/TicketEditorSlot.tsx');
 
 describe('the <EditorSlot> contract, written twice', () => {
   it("app-core's half still spells `doc` as unknown, which is why this half widened", () => {
@@ -130,15 +131,34 @@ describe('the <EditorSlot> contract, written twice', () => {
       readFileSync(OWN_SOURCE, 'utf8'),
       'type AppCoreEditorSlotProps = {',
     );
-    // CONTROLS: both extractions found a real declaration, so an empty set on
-    // either side fails here rather than passing as a vacuous equality.
+    // THREE sets, not two, because the chain has three links and comparing only
+    // the outer two leaves the middle one unguarded. (a) runtime: app-core's
+    // names == the transcription's names. (b) compile-time: the transcription is
+    // ASSIGNABLE to this package's props — but assignability is contravariant
+    // and never rejects extra properties on a TYPE, so a transcription carrying
+    // a field this package's own `EditorSlotProps` does not declare still
+    // assigns cleanly. Without (c) below, someone who dutifully updates the
+    // transcription after app-core adds a prop turns this case green again
+    // while this package's declaration silently never gains the field.
+    const thisHalfFields = fieldNamesOf(
+      readFileSync(THIS_HALF_SOURCE, 'utf8'),
+      'export type EditorSlotProps = {',
+    );
+    // CONTROLS: all three extractions found a real declaration, so an empty set
+    // anywhere fails here rather than passing as a vacuous equality.
     expect(appCoreFields.length).toBeGreaterThan(10);
     expect(transcribedFields.length).toBeGreaterThan(10);
+    expect(thisHalfFields.length).toBeGreaterThan(10);
     // The type-level assignment above catches a field whose TYPE diverged; it
     // cannot catch one app-core ADDS, because an optional addition still
     // assigns and a required one this file never transcribed is simply unknown
     // to it. Set equality is what closes that.
     expect([...transcribedFields].sort()).toEqual([...appCoreFields].sort());
+    // (c) the middle link: this package's own declaration carries exactly the
+    // same field names as the half it is a copy of. `editorRef` is deliberately
+    // NOT here — it lives on `TicketEditorSlotProps`, a separate type, which is
+    // the whole reason app-core never has to name `@tiptap/core`'s `Editor`.
+    expect([...thisHalfFields].sort()).toEqual([...appCoreFields].sort());
   });
 });
 
@@ -193,6 +213,46 @@ function submitButton(view: { container: HTMLElement }): HTMLButtonElement {
 }
 
 describe('TicketEditorSlot', () => {
+  /**
+   * THE PRODUCTION CONFIGURATION, and the only case in this file that mounts it.
+   *
+   * Every other runtime case here passes `editorRef` — a prop deliberately kept
+   * OUT of `EditorSlotProps` (TicketEditorSlot.tsx) because app-core cannot name
+   * `@tiptap/core`'s `Editor`. So `props.editorRef ?? ownRef` took its LEFT
+   * branch in all of them, and `handleSubmit` returns early on `!editor`: every
+   * behaviour those cases prove rests on a ref app-core will never supply. The
+   * fallback `ownRef` — the branch that actually runs when the sheet mounts this
+   * — had zero executions, and any mutation of it survived the whole battery.
+   *
+   * The readiness signal here has to be DOM-observable, because the ref is the
+   * thing under test. `the words` rendering is the proxy for "the child's effect
+   * (TicketEditor.tsx:96-103) has filled `ownRef`"; clicking before that, the
+   * early return swallows the click and the `submit` waitFor fails loudly.
+   *
+   * This is NOT the end-to-end mount (case 9.61, Plan 6a Task 12): nothing here
+   * passes `TicketEditorSlot` to `TicketSheet`'s `editorSlot` prop.
+   */
+  it('mounted the way app-core mounts it — no editorRef — the slot uses its OWN ref, submits, and clears', async () => {
+    const submit = vi.fn(async (_submission: EditorSubmission) => {});
+    const onDone = vi.fn();
+    const view = render(<TicketEditorSlot {...makeProps({ submit, onDone, doc: DOC })} />);
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor .ProseMirror')).not.toBeNull();
+      expect(proseMirrorText(view)).toContain('the words');
+    });
+    submitButton(view).click();
+    await vi.waitFor(() => {
+      expect(submit).toHaveBeenCalledTimes(1);
+    });
+    expect(submit.mock.lastCall?.[0]?.type).toBe('comment.added');
+    expect(JSON.stringify(submit.mock.lastCall?.[0]?.payload)).toContain('the words');
+    expect(onDone).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(proseMirrorText(view)).toBe('');
+    });
+    view.unmount();
+  });
+
   it('comment mode: submit sends comment.added and clears the composer on success', async () => {
     const submit = vi.fn(async (_submission: EditorSubmission) => {});
     const onDone = vi.fn();
@@ -261,6 +321,12 @@ describe('TicketEditorSlot', () => {
     // and a `submitting` flag read from the render closure is still false for
     // the second one. An append-only ledger has no way to unsay the duplicate.
     submitButton(view).click();
+    // PINS THE DISCRIMINATION. jsdom's `HTMLElement.click()` returns early on a
+    // disabled control, so if React ever committed `disabled` between these two
+    // statements the second click would be swallowed by the ATTRIBUTE and this
+    // case would keep passing while no longer testing `submittingRef` at all.
+    // Asserting the button is still enabled makes that regression red instead.
+    expect(submitButton(view).disabled).toBe(false);
     submitButton(view).click();
     release();
     await vi.waitFor(() => {
