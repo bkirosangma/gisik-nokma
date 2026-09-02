@@ -122,10 +122,10 @@ plan	task	status	pr	merge_sha	note
 07	2	done	47	a3746fb	artefact: packages/domain/src/doc-embeds.ts (PR #47)
 07	3	done	47	a3746fb	artefact: packages/editor/src/extensions/ticket-image.ts (PR #47)
 07	4	done	47	a3746fb	artefact: packages/editor/src/extensions/mention.ts, mention-popup.ts (= PR #47 squash sha)
-07	5	todo	-	-	
-07	6	todo	-	-	
-07	7	todo	-	-	
-07	8	todo	-	-	
+07	5	in-flight	-	-	exec/12-plan7-remainder; 
+07	6	in-flight	-	-	exec/12-plan7-remainder; 
+07	7	in-flight	-	-	exec/12-plan7-remainder; 
+07	8	in-flight	-	-	exec/12-plan7-remainder; 
 07	9	todo	-	-	
 07	9a	todo	-	-	
 07	10	todo	-	-	

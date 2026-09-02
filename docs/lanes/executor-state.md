@@ -9,7 +9,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > verified with `git branch --contains` (empty output = orphaned), never with `git cat-file`, which
 > passes on reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 12 — Plan 7 remainder. Eighteen tasks. STARTING, 0 of 18.**
+## WHERE I AM: **STEP 12 — Plan 7 remainder. Eighteen tasks. FOUR DONE (T5, T6, T7, T8).**
+
+**Next: Batch B — T9, T9a, T10, T11, T11a.** Then T12/12a/12b/12c, T13/13a, T14, T15, and T16 closes.
+Nothing is awaiting a decision; no PR is open yet.
 
 Step 11 (Plan 6 remainder) **merged as PR #77 → `7b45099`**. Its twelve ledger rows said `in-flight`
 on `main` after the merge; this branch's first commit promotes them. **Nothing from step 11 is
@@ -22,8 +25,9 @@ outstanding.** If you are a restarted session reading this: do not reopen Plan 6
 | **Branch** | **`exec/12-plan7-remainder`**, cut from `origin/main` `7b45099`. | `git rev-parse --abbrev-ref HEAD` |
 | **Base** | `origin/main` = `7b45099ef6b6ee23b9266d8ec047bae070322398` | `git rev-parse origin/main`, fetched |
 | **Ahead-count** | **Not written here on purpose. Run `git rev-list --count origin/main..HEAD`.** A count taken while writing the commit that records it is *always* short by one and always looks right to its author — step 11's handoff shipped `18` where the command answered `19`, and it had reached a review brief before anyone ran it. A number that cannot be written correctly from inside the commit carrying it should not be written at all. | measured 2026-09-02 |
-| **Gate at `7b45099`** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2027 tests.** domain 335 · rule-engine 280 · server 761 · app-core 471 · web 69 · editor 72 · ui 31 · sync-client 8. | run by the executor at this sha with `--force`, Node printed into the same log |
-| **`check:tasks`** | **exit 0**, 177 rows / 177 plan tasks, **100 done (56.5%)**, 0 claimed, 0 in-flight, 77 todo. | `node scripts/check-task-ledger.mjs` at this sha, after the promotion below |
+| **Gate at branch HEAD** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2080 tests.** domain 335 · rule-engine 280 · **server 784** · app-core 471 · web 69 · **editor 102** · ui 31 · sync-client 8. `check:env` exit 0. | run by the executor with `--force` after Batch A, Node printed into the same log |
+| Gate at the base `7b45099`, for the delta | exit 0 · 24/24 · 2027 tests; server 761, editor 72. **Batch A added +23 server and +30 editor.** | measured separately at the base before any Batch A work |
+| **`check:tasks`** | **exit 0**, 177 rows / 177 plan tasks, **100 done (56.5%)**, 0 claimed, **4 in-flight** (Plan 7 T5–T8, on this branch), 73 todo. | `node scripts/check-task-ledger.mjs` at branch HEAD |
 | **Gate SHAPE** | **24 tasks over EIGHT packages** since `apps/web` exists. Any inherited "21/21 over 7" figure is spent. | the run above |
 | Orphaned, do not cite | every sha in the narrative sections below. | `git branch --contains` (empty = orphaned) |
 
@@ -74,17 +78,41 @@ scope and left later tasks' declared artefacts on `main`:
 rewrites merged work.** Every dispatch in this step must be told what already exists and, for each
 existing artefact, **the enumerated absences — never the word "partial"**.
 
-**2. Two contract seams are assigned to step 12 BY NAME. Edit both sides or neither.** Recorded by
-the controller's structural scan at step 11's close, and not fixed there on purpose:
+**2. The two contract seams handed to step 12 were BOTH described wrongly. Re-measured 2026-09-02.**
+The controller's structural scan at step 11's close named two "real" seams and one false positive.
+Measurement says one of the two "real" ones is also false, and the other's hazard runs backwards.
 
-| Seam | Plan 6 says | Plan 7 says | Lands in |
-|---|---|---|---|
-| `EditorSlotProps.doc` | `doc: unknown` (`packages/app-core/src/views/editor-slot.tsx:59`) | `doc: DocJson \| null` | **Task 14** |
-| `AttachmentListEntry` | inlines the drive-reference fields (`packages/app-core/src/views/attachment-list.tsx:41`) | `… & DriveReference` | **Task 12b** |
+**`AttachmentListEntry` — NOT a divergence. A THIRD false positive, alongside `EditorSlotUpload`.**
+`packages/app-core/src/views/attachment-list.tsx:15-40` already carries the refutation: a
+conditional-type probe run in **both directions** against `tsconfig.base.json`, with a control that
+dropping a REQUIRED member breaks it and a second control recording that dropping the OPTIONAL
+`iconLink` leaves mutual assignability intact — so the claim is scoped to required members and says
+nothing stronger. Its own verdict: *"step 12 may collapse the two onto the domain type, but **it has
+no difference to reconcile**."* Plan 6 spelling the six members out and Plan 7 writing
+`& DriveReference` are the same type. **T12b's work here is an optional tidy-up, not a
+reconciliation.** Do not let a reviewer re-find it as a divergence.
 
-If Task 14's implementer writes `doc: DocJson | null` in `packages/editor` while `app-core` still
-says `doc: unknown`, **the seam ships and typecheck does not necessarily catch it** — `unknown`
-accepts everything. Put the both-or-neither constraint in those two dispatch prompts explicitly.
+**`EditorSlotProps.doc` — a real divergence, but "typecheck won't catch it" is exactly backwards.**
+Plan 7 Task 14 declares its own `EditorSlotProps` with `doc: DocJson | null`; app-core's says
+`doc: unknown` (`views/editor-slot.tsx:59`). The inherited claim was that the seam ships silently
+because `unknown` accepts everything. **Measured with the repo's own `tsc` under `strict: true`:**
+
+```
+const slot: (p: PropsAppCore) => null = TicketEditorSlot
+  error TS2322: Type 'PropsAppCore' is not assignable to type 'PropsEditor'.
+                Type 'unknown' is not assignable to type 'DocJson | null'.
+CONTROL 1 — a component taking the WIDER prop: COMPILES (the probe is not rejecting everything).
+CONTROL 2 — value-level unknown -> DocJson|null: fails, as expected.
+```
+
+Function parameters are **contravariant** under `strictFunctionTypes`, so the **narrower** declaration
+is the one that breaks, loudly, at the `apps/web` assignment site. **The hazard is therefore the WRONG
+FIX, not silence:** on hitting TS2322 an implementer is tempted to widen `packages/editor`'s `doc` to
+`unknown` — destroying the `null → empty composer` distinction Plan 7 asks for — or to cast, which
+hides it. Note also that **the plan's own Task 14 comment argues the wrong direction**: *"DocJson is
+assignable to unknown"* is true for passing a doc VALUE into a slot typed `unknown`, and is not what
+the component assignment needs. The correct resolution is a decision — narrow app-core's prop, or
+give the slot the doc as a separate narrower prop — and **both declarations move in the same commit.**
 
 **`EditorSlotUpload` is a FALSE POSITIVE** — identical fields, different line breaks. Named here so
 no reviewer re-finds it and no implementer "fixes" it.
@@ -133,9 +161,38 @@ its route serves the field. **Do not weaken one to make a Plan 7 view light up.*
    which is a different question and does not inherit that refusal — but check that §9 exists before
    assuming it does, because §8 did not.
 
+## BATCH A — T5, T6, T7, T8. All committed, gate green at HEAD.
+
+| Task | Result |
+|---|---|
+| **T5** escape-suggestion | **DONE**, +27 tests. Two Important findings, both **against prose, not code** — a docblock generalising ProseMirror's `appendTransaction` contract as "receives the FULL set" when the real contract is per-plugin incremental (`n ? trs.slice(n) : trs`, skipped once a plugin has seen everything). **The fix round ran the discriminating experiment and REFUTED the reviewer's own ordering-dependence theory** — it inserted a second `appendTransaction` plugin after `EscapeSuggestion` so it was no longer last, and all 27 tests stayed green — then corrected the docblock to the real mechanism anyway. Reverted the experiment, verified with `git diff`, rebuilt `dist`. |
+| **T6** docToPlainText conformance | **DONE**, +3 tests. Extended the existing `doc-text-conformance.test.ts` rather than creating the plan's `doc-to-plain-text.test.ts` — the gap was **one node (`image`), not a whole file.** Two Important findings, both false claims in prose. **Then the fix round's own corrected node count was itself wrong, and a further commit (`7985a27`) fixed that** — the recorded pattern holding again. |
+| **T7** attachments table + `ObjectStore` + local-disk | **DONE**, +10 tests, **verdict ship, no findings.** The reviewer's note: *"this task is unusually well-verified"* — all five planted-defect mutations reproduced. Implementer flagged that **the plan's own traversal assertion is vacuous** (`readdir(root).every(e => e === 'w')` is trivially true for keys that resolve *above* root) and replaced it with direct `stat()` checks. |
+| **T8** S3 store + store factory | **DONE**, +10 tests. Two Important findings, and **both were checks that cannot fail** — the exact signature failure of this series. A test *named* "put uploads with bucket, key, content type and length" **never asserted `ContentLength`** (deleting it left all six tests green), and the plan's declared "path-style default true" had **zero coverage** (inverting the condition left both files green). Both fixed. |
+
+**The through-line of Batch A: every finding was either a false claim in prose or a check that could
+not fail. No implementation defect was found in four tasks.** That is the same distribution step 11's
+whole-branch review produced, and it is the argument for keeping the reviewer stage even at the
+lowered floors.
+
+## RECORDED, NOT FIXED — carried out of Batch A with owners
+
+- **`.env.example` carries a stale `S3_*` placeholder block** (`S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`,
+  `S3_ACCESS_KEY`, `S3_SECRET_KEY`, …) predating T8's `OBJECT_STORE_*` variables. Restored verbatim
+  rather than merged. **Owner: Plan 11's deployment hardening.**
+- **`schema.test.ts` carries two "CURRENT BEHAVIOUR pending Task 5" cases about paste-rule
+  autoformatting that Task 5's actual text never covers** — Task 5 is typed-input-rule only.
+  **Owner: plan author / a coordination-doc amendment.**
+- **Shadowing the `undoInputRule` command name is monorepo-wide**, affecting every future
+  `editor.commands.undoInputRule()` caller, and Task 5's Cross-plan Produces list names only
+  `getEscapeSuggestion`. **Owner: plan author.**
+- **`comparableHeaders` is defined locally in at least three server test files**
+  (`tickets-read.test.ts:92`, `my-work.test.ts:415`, `preferences.test.ts`). **Owner: a later
+  test-helper consolidation; explicitly NOT T10, which must only consume the pattern.**
+
 ## IN FLIGHT
 
-**Nothing.** No open PR for this step. No fan-out running.
+**Batch B — T9, T9a, T10, T11, T11a.** No open PR for this step.
 
 ## RULINGS OPEN
 
