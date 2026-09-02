@@ -53,6 +53,19 @@ export function makeEvidenceGate(): ServerGate {
       // Not an upload. A Drive reference has no bytes and therefore no
       // `attachments` row — its whole record is the ledger — so ask the
       // ledger, scoped to THIS ticket, before deciding which truth to tell.
+      // The `kind = 'drive-reference'` filter states what this query means —
+      // "a reference by this id", not merely "an attachment.added by this id"
+      // — rather than leaning on the fact that reaching this line already
+      // means no upload row exists for evidenceId. That fact is true only
+      // because an upload's own attachments row is checked first, above; it
+      // is not a property of this query, and it stops holding the day a
+      // second path can reach this SELECT without that precondition (e.g. a
+      // future caller of this ledger check outside makeEvidenceGate). No
+      // fixture in this suite currently distinguishes the filter's presence
+      // from its absence, since every seeded row here already carries
+      // kind: 'drive-reference' — a killing case needs an attachment.added
+      // row of a different kind at the same id, which is possible only once
+      // Plan 3's registration event exists.
       const reference = await db.query(
         `SELECT 1 FROM events
           WHERE entity_kind = 'ticket'
