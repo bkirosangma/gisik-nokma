@@ -2,7 +2,7 @@ import type { WorkflowDef } from '@gisik-nokma/domain';
 
 export type StatePosition = { x: number; y: number };
 
-/** The distinguished node every from-any ('*') transition draws from. */
+/** The distinguished node from-any ('*') transitions will draw from once Task 5's canvas exists. */
 export const ANY_STATE_NODE_ID = 'any-state';
 
 export const COLUMN_WIDTH = 260;
@@ -12,10 +12,19 @@ const TOP_MARGIN = 80;
 /**
  * Deterministic layered layout: BFS distance from initialStateId decides the
  * column, arrival order decides the row. States the BFS never reaches (and
- * every state when the initial marker dangles) go to one final column — the
- * issues panel names the problem; layout only has to keep drawing.
+ * every state when the initial marker dangles) go to one final column. Layout
+ * only has to keep drawing; whether the def is legal is validateWorkflowDef's
+ * verdict (`unknown-initial-state` when the marker dangles — it then skips
+ * reachability altogether — and `unreachable-state` otherwise), and Task 8's
+ * issues panel, not yet written, is what will put that in front of the author.
+ *
  * '*' transitions are ignored for layering: they point at everything and
- * would flatten the picture into one column.
+ * would flatten the picture into one column. So this walk and the validator's
+ * are deliberately NOT the same set — the validator counts every '*' target as
+ * reachable. Measured: with transitions todo->done and '*'->cancelled,
+ * `cancelled` lands in the final column here while validateWorkflowDef returns
+ * no issues at all. A state in that column is therefore not evidence of a
+ * problem, and this docblock must not be read as promising one.
  */
 export function layoutDraft(def: WorkflowDef): Record<string, StatePosition> {
   const stateIds = new Set(def.states.map((state) => state.id));

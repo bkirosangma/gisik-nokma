@@ -95,7 +95,9 @@ export function selectCanPublish(draft: WorkflowDraft): boolean {
   return selectIssues(draft).length === 0;
 }
 
-/** Distinct state ids that some transition points at — the require-different-user picker's choices. */
+/** Distinct state ids that some transition points at — the choices Task 7's
+ * require-different-user picker will offer. No production code calls this yet;
+ * its own test in draft-store.test.ts does. */
 export function selectInboundTargetIds(def: WorkflowDef): string[] {
   const targets: string[] = [];
   for (const transition of def.transitions) {
