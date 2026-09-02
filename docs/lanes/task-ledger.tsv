@@ -117,7 +117,7 @@ plan	task	status	pr	merge_sha	note
 06	14	done	77	7b45099	artefact: apps/web (new package, Next.js 15 shell, 8th workspace package); gate 21->24 tasks.
 06	15	done	77	7b45099	artefact: packages/app-core/src/online/invites.ts + apps/web/app/invite/[token]/page.tsx + e2e/smoke.spec.ts (run for real, 5 passed, off the gate).
 06	15b	done	77	7b45099	artefact: online/{invites-admin,founding}.ts + views/visibility-editor.tsx + apps/web/app/w/[workspaceId]/members/page.tsx.
-06	16	done	77	7b45099	artefact: Features.md §3 web-client note, test-cases/03-foundation-ledger.md (3.145-3.147 + citations), README.md correction; §8 CONSIDERED AND REFUSED with reasoning in four places.
+06	16	done	77	7b45099	artefact: Features.md §3 web-client note, test-cases/03-foundation-ledger.md (3.145-3.147 + citations), README.md correction; §8 CONSIDERED AND REFUSED with reasoning in four places. | CONTROLLER: declared artefact test-cases/08-web-client.md deliberately NOT created; §8 refused because migrating 112+ live cross-referenced ids breaks the README never-renumber rule. Catalogue landed in §3. Deviation recorded, not hidden.
 07	1	done	47	a3746fb	artefact: packages/editor scaffold + document schema (PR #47, multi-task branch)
 07	2	done	47	a3746fb	artefact: packages/domain/src/doc-embeds.ts (PR #47)
 07	3	done	47	a3746fb	artefact: packages/editor/src/extensions/ticket-image.ts (PR #47)

@@ -11,17 +11,136 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
-## Anchors — re-measured 2026-09-02 ~08:45 IST, at `ac187e8` (step 10 merged)
+## RULING P27 (2026-09-02/03, owner-approved) — F5 recurrence in `packages/app-core`: fix now in step 12
+
+**Escalated by the executor mid-step-12** (`exec/12-plan7-remainder`, T16 running, no PR open yet), via a
+direct cross-session message to this controller — not tmux, a different channel, and it worked. Recorded
+here immediately because a ruling that lives only in a message or a pane does not survive either session's
+restart (P26's own history, twice now).
+
+**THE FINDING, proven by execution, not merely read.** `packages/app-core` held two answers to the
+wildcard-vs-exact transition-rule question, and the wrong one was on the user-facing surface:
+
+- `packages/rule-engine/src/transition.ts:91-93` (the ENGINE, authoritative) and
+  `packages/app-core/src/precheck.ts:375-378` (`needsMembership`) both do `find(exact) ?? find('*')` —
+  **exact wins, declaration order irrelevant.**
+- `packages/app-core/src/views/transition-dialog.tsx:23-29` (`transitionOptions`) iterates
+  `def.transitions` in order and keeps the **first match** — **first DECLARATION wins. Wrong.**
+
+Proven with a temporary probe (removed, tree verified clean via `git status`, not shell `diff`): a workflow
+def declaring the wildcard *before* the specific edge is a shape `adviseWorkflowDef` only warns about
+("real, but not fatal"), so it publishes clean. Under it, the ENGINE resolves `(doing→done)` to
+`[{kind:'require-evidence'}]` while the DIALOG resolves the same transition to `[]` — no evidence prompt
+shown. **Positive control**: reversing the two declarations makes the dialog agree, which is what makes
+this a genuine divergence rather than a constant. **User-visible consequence**: the ticket sheet offers a
+transition with no evidence prompt, the user submits, the server refuses — reads as a product bug, not a
+rule, which is the exact failure mode T13's own dispatch named as the thing to avoid.
+
+**Why it needed a ruling rather than a silent fix**: it is a 2-line change in a package that shipped under
+Plan 6 (closed at step 11), so fixing it is a scope decision, not a task detail. The reviewer's first
+instinct was to record the owner as "the Plan 6/6a lane" — **the second time this branch has found a
+recorded owner naming a plan that no longer exists** (the first was the `AttachmentListEntry` false
+positive, corrected in the same branch). Assigning it to another dead owner would repeat the mistake the
+branch keeps independently finding.
+
+**RULING: Option (a) — fix it now, in step 12.** Match `precheck.ts`'s exact-match-wins resolution exactly
+in `transitionOptions`; promote the removed probe to a **permanent** regression test in `app-core`, both
+directions (wildcard-before-exact and exact-before-wildcard), so the positive control that makes this a
+divergence rather than a constant stays in the suite. Recorded in the step-12 PR body as a ruling-directed
+addition outside T13–T16's original scope, same shape as every other named deviation this branch has
+carried. Rejected: (b) assign to Plan 8 (workflow-def semantics owner, unrun) and (c) assign to Plan 11
+hardening — both park a live, proven, user-visible defect for a plan that has not started, when the fix is
+cheap and the correct pattern already exists twice in the same package.
+
+**General form, worth keeping alongside the `getBoard`/version-field lesson**: `adviseWorkflowDef`'s
+wildcard-before-exact warning is real but non-fatal, which is exactly the gap that let two consumers of the
+same `WorkflowDef` disagree for as long as nobody executed the shape it warns about rather than merely
+reading past the warning.
+
+## OWNER CORRECTION 2026-09-02 — magic-link sender is `contact@artsourced.in`, not `sign-in@artsourced.in`
+
+Plan 11's Open question 13 and the coordination doc's sign-off table (line 86) both recorded
+`sign-in@artsourced.in` as the owner's 2026-08-20 confirmation. **The owner corrected the local-part to
+`contact@artsourced.in` on 2026-09-02** — the apex-address reasoning (sender reputation and deliverability
+stay with the established zone) is unchanged, only the mailbox name. Both plan documents and
+`deploy/do/app.yaml`'s `MAGIC_LINK_FROM` value are corrected in place (this PR); dev/CI's
+`sign-in@gisik-nokma.local` is untouched — it never leaves Mailpit. **No code has executed against the old
+value** — Plan 11 is 0/16 `done`, so this is a plan-text correction, not a rollback.
+
+## Anchors — re-measured 2026-09-02 ~16:00 IST, at `7b45099` (step 11 merged)
 
 | what | value |
 |---|---|
-| `main` | **`ac187e8`** — **STEP 10 (integration checkpoint) MERGED, PR #70.** Behind it: step 9 `563c983` (#67), docs `aa67ee3` (#68), `c9ab31c` (#69), ledger fix `75c3d1e` (#71). Refetch |
-| last forced gate | **`ac187e8`** — `GATE_EXIT=0` **read from `$?` on its own line, no pipe**, `--force` so **0 cached**, 21/21, **1612 tests**, 24.4s, node **v22.22.2**, zero `Unsupported engine` |
-| gate composition | domain 335 · rule-engine 280 · **server 756** · app-core 130 · editor 72 · ui 31 · sync-client 8 = **1612** (server 717 → 756: +21 round-trip, +15 contract) |
-| **corroboration** | the executor gated its own tip **three times** and reported the same 1612 and the same split. Different trees, same numbers |
-| ledger gate | **`CHECK_EXIT=0`** — read the same way. **88/177 (49.7%)**, claimed 0, todo 89 |
-| open PRs | re-measure |
-| executor | **RESTARTED** for **step 11 (Plan 6 remainder)**, fresh session, was 35% |
+| `main` | **`7b45099`** — **STEP 11 (Plan 6 remainder, all 12 tasks) MERGED, PR #77.** `apps/web` exists: an **eighth workspace package** |
+| last forced gate | **`7b45099`** — `GATE_EXIT=0` read from `$?`, `--force` so **0 cached**, **24/24 tasks** (was 21), **2027 tests**, 40.5s, node **v22.22.2**, zero `Unsupported engine` |
+| gate composition | domain 335 · rule-engine 280 · **server 761** · **app-core 471** · **web 69 (new)** · editor 72 · ui 31 · sync-client 8 = **2027** |
+| corroboration | the executor gated its own tip and reported the same **2027** and the same split |
+| ledger | **`CHECK_EXIT=0` · 100/177 (56.5%)** · claimed 0 · in-flight 0 · todo 77 |
+| executor | restarted for **step 12 (Plan 7 remainder)**, 18 of 22 todo, T9/T11 floor-list |
+
+> ### ⚠ THE FORCED-GATE PROCEDURE WAS INCOMPLETE AND IT PRODUCED A FALSE RED
+> **`pnpm install --frozen-lockfile` MUST run before the gate whenever the package set may have
+> changed.** Step 11 added `apps/web`, an eighth workspace package. My worktree had no
+> `node_modules` for it, so the gate came back **`GATE_EXIT=1`, `Tasks: 16 successful, 24 total`,
+> `Failed: @gisik-nokma/web#test`** — with `sh: vitest: command not found`, `sh: next: command not
+> found`, `sh: tsc: command not found` and **`WARN Local package.json exists, but node_modules
+> missing`**. After the install: **24/24, 2027 tests, exit 0.**
+> **Nothing was wrong with `main`.** Same family as the `better-sqlite3` ABI false red already in this
+> file — a stale worktree, not a defect. **The discriminator is the WARN line and
+> `command not found`; a real failure names a test, not a missing binary.**
+> **This is a hole in the written procedure, not a slip.** The loop says "forced gate under node 22"
+> and never mentioned install — **a Sonnet controller following it literally would have reported
+> `main` broken.** Trigger #4 sends a RED gate to Opus, so it would have escalated rather than
+> mis-merged, but it would have escalated a non-event. **The procedure now reads: install, then gate.**
+
+## STEP 11 CLOSED — Plan 6 complete, and the executor solved a boundary I never specified
+
+**`apps/web` is real**: Next.js 15 shell, sign-in, navigation, invite acceptance, and a Playwright
+smoke **run for real (5 passed) but deliberately off the gate**. `app-core` went 130 → **471** tests.
+
+> **THE EXECUTOR INVENTED THE RIGHT ANSWER FOR A CASE THE RULES DID NOT COVER.** It had completed 12
+> tasks it could not itself mark `done` — promotion is the controller's act. Instead of leaving them
+> `todo` (understating) or marking them `done` (overstepping), **it moved them to `in-flight` and wrote
+> the per-task artefact evidence into each note.** So the 12 promotions arrived with their evidence
+> already attached rather than reconstructed. That is the `done`/`claimed` split's logic applied one
+> case further out, by the party the split exists to check. **Keep this shape.**
+
+**T16 was promoted WITH ITS DEVIATION NAMED.** Its declared artefact `test-cases/08-web-client.md` was
+**deliberately not created** — opening §8 means remapping **112+ live cross-referenced ids** against the
+README's own never-renumber rule. The catalogue landed in **§3** instead (3.145–3.147 + citations +
+a README correction). **The artefact rule could not decide this one**; the note carries the deviation so
+the ledger does not read as if the file exists.
+
+## RULING P25 — TAKEN 2026-09-02. Clauses 2 and 3 accepted; clause 1 CAPPED AT `getBoard`
+
+**`getMyWorkspaces`, `getTicket`, `getTickets` do NOT enter step 12 and must not be folded into it.**
+
+1. **They are visibility decisions, not field additions** — corrected upward from two to three by the
+   executor checking rather than assuming. **`getMyWorkspaces` is not even a field addition:** there is
+   **no shipped project-list read at all** (`grep -rn "proj_projects"` finds the projection, one
+   existence check, and **no route that reads it**; positive control `proj_memberships` = eight
+   readers). Adding it means DESIGNING a read whose first question is *what a project-scoped guest sees
+   of a workspace's other projects.* That is Plan 4's read-enforcement surface — which has produced
+   **P19, P22 and P23, every one a disclosure no test caught.**
+2. **The executor's own confidence decided it:** *"neither has been implemented, so the assertion is a
+   prediction from reading the routes, not a measurement."* A step that might be *"bigger than a step"*
+   by its author's own admission is not absorbed silently.
+3. **Deferring is SAFE here, which is unusual — and it was VERIFIED, not taken on the PR's word.**
+   `ServingGapError`: 11 uses in `mappers.ts`, handled in four views, and `client-contract.test.ts`
+   names five of the six **server-side**, so a refusal **goes RED the day its route starts serving**.
+   A self-expiring gap is cheap to hold; a rotting one is not.
+
+**CONDITION, and it is the checkable part:** each of the three must be implemented by **applying an
+existing Plan 4 visibility rule.** **If any requires a NEW rule rather than an application of one,
+ESCALATE BEFORE BUILDING.** Same shape as P23's condition, which fired correctly.
+
+> **TWO LESSONS PROMOTED FROM THE EXECUTOR'S OWN POSTSCRIPT, because they generalise past their cases:**
+> **"A sweep is a fact about the directories it walked."** The register misrouted `getAttention`'s fix
+> because the derivation swept `routes/**` and the route lives in `sync/`. **A register that misroutes a
+> fix is worse than none — it looks checked.**
+> **`getBoard`'s field addition was nearly a check that could not fail.** Every fixture workflow was at
+> v1, so serving the constant `1` left **all 756 server tests green**, whole-body `toEqual` included.
+> **Tidy fixtures make a version field indistinguishable from a constant.**
 
 ## STEP 10 CLOSED — and the executor found the controller's ledger bug, not the other way round
 
@@ -149,6 +268,43 @@ minute's reading; a false negative costs the defect this pass exists to find.
 
 **Do NOT let the post-commit hook satisfy this.** The hook is AST-only whole-repo — it keeps the
 structural graph fresh and produces **zero** inferred edges. Freshness is not the same capability.
+
+### SCHEDULED — code-comment cleanup pass, BEFORE PLAN 11 STARTS (owner request 2026-09-03)
+
+**Goal:** cross-cutting quality pass, not a plan task — apply `CODING_STANDARDS.md`'s own rule
+retroactively across shipped code. **This is a tightening pass, not a stripping pass** — see the caveat
+below before anyone runs it as a blind mechanical sweep.
+
+| | |
+|---|---|
+| **TRIGGER** | after Plan 10 (offline-sync-apps) merges — every application package/app (`packages/*`, `apps/server`, `apps/web`, `apps/desktop`, `apps/mobile`) is complete and stable; before Plan 11 (deployment/dogfooding) starts |
+| **SCOPE** | inline code comments and docblocks across `packages/*` and `apps/*`. **NOT** the plan documents, commit messages, or this file / `executor-state.md` — those serve a different audience and function, and this series already has a separate falsifiability rule for prose. **NOT** `reference/` (frozen) |
+| **NOT a ledger task** | deliberately kept outside the 177-task denominator, same reasoning as the semantic-extraction pass above — inserting it into Plan 11's numbered tasks would mean editing a locked plan document and risks the same renumbering hazard this series repeatedly guards against elsewhere |
+
+**WHY THIS TIMING, not earlier and not at the very end:**
+1. **Not now** — 60+ of the remaining tasks are client-side code that doesn't exist yet (same reason the
+   semantic pass above waits). Cleaning comments now means redoing it after every later plan's new files.
+2. **Not after Plan 11** — Plan 11 is deployment/dogfooding: Dockerfiles, the DO spec, seed scripts. Lower
+   comment-density than the application code, and delays the actual benefit (easier review) for the whole
+   rest of the series for comparatively little gain.
+3. **Right before Plan 11** — every application package is done and stable by then, so one pass covers
+   everything that actually accumulated the verbose-comment style this series is known for, and Plan 11's
+   own new files get written directly in the cleaned convention. No second pass needed for them.
+
+**⚠ CAUTION, because a blind pass here would do real damage.** A large share of this codebase's verbose
+comments are genuinely WHY-explaining — hidden constraints, workarounds, "this test's TZ loop cannot fail
+and here is why" — exactly what `CODING_STANDARDS.md` says to *keep*. Several of this series' real defects
+(the TZ-invariant test, the env-gate scanner's raw-vs-stripped mismatch, the database-timezone triple
+redundancy) were caught by someone reading precisely this kind of comment. **The job is tightening
+legitimate rationale for readability, not deleting it** — stripping WHY-comments in the name of brevity
+would remove the exact signal this series has repeatedly relied on. A blanket "shorter is better" pass is
+explicitly the wrong shape.
+
+**Exact scope left to a dedicated planning pass at trigger time, not decided here:** whether this touches
+test-file comments (planted-defect docblocks are load-bearing, not decorative) and the extensive rationale
+comments in shared low-level utilities (e.g. `ist-day.ts`'s "no dependencies, and that is not an accident
+of style") that this series has used as documentation. Run `superpowers:writing-plans` or equivalent when
+the trigger fires rather than pre-committing task-by-task now.
 
 ### The cheap scan that replaces graphifying the plans
 
