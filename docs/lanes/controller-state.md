@@ -11,6 +11,52 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## RULING P27 (2026-09-02/03, owner-approved) — F5 recurrence in `packages/app-core`: fix now in step 12
+
+**Escalated by the executor mid-step-12** (`exec/12-plan7-remainder`, T16 running, no PR open yet), via a
+direct cross-session message to this controller — not tmux, a different channel, and it worked. Recorded
+here immediately because a ruling that lives only in a message or a pane does not survive either session's
+restart (P26's own history, twice now).
+
+**THE FINDING, proven by execution, not merely read.** `packages/app-core` held two answers to the
+wildcard-vs-exact transition-rule question, and the wrong one was on the user-facing surface:
+
+- `packages/rule-engine/src/transition.ts:91-93` (the ENGINE, authoritative) and
+  `packages/app-core/src/precheck.ts:375-378` (`needsMembership`) both do `find(exact) ?? find('*')` —
+  **exact wins, declaration order irrelevant.**
+- `packages/app-core/src/views/transition-dialog.tsx:23-29` (`transitionOptions`) iterates
+  `def.transitions` in order and keeps the **first match** — **first DECLARATION wins. Wrong.**
+
+Proven with a temporary probe (removed, tree verified clean via `git status`, not shell `diff`): a workflow
+def declaring the wildcard *before* the specific edge is a shape `adviseWorkflowDef` only warns about
+("real, but not fatal"), so it publishes clean. Under it, the ENGINE resolves `(doing→done)` to
+`[{kind:'require-evidence'}]` while the DIALOG resolves the same transition to `[]` — no evidence prompt
+shown. **Positive control**: reversing the two declarations makes the dialog agree, which is what makes
+this a genuine divergence rather than a constant. **User-visible consequence**: the ticket sheet offers a
+transition with no evidence prompt, the user submits, the server refuses — reads as a product bug, not a
+rule, which is the exact failure mode T13's own dispatch named as the thing to avoid.
+
+**Why it needed a ruling rather than a silent fix**: it is a 2-line change in a package that shipped under
+Plan 6 (closed at step 11), so fixing it is a scope decision, not a task detail. The reviewer's first
+instinct was to record the owner as "the Plan 6/6a lane" — **the second time this branch has found a
+recorded owner naming a plan that no longer exists** (the first was the `AttachmentListEntry` false
+positive, corrected in the same branch). Assigning it to another dead owner would repeat the mistake the
+branch keeps independently finding.
+
+**RULING: Option (a) — fix it now, in step 12.** Match `precheck.ts`'s exact-match-wins resolution exactly
+in `transitionOptions`; promote the removed probe to a **permanent** regression test in `app-core`, both
+directions (wildcard-before-exact and exact-before-wildcard), so the positive control that makes this a
+divergence rather than a constant stays in the suite. Recorded in the step-12 PR body as a ruling-directed
+addition outside T13–T16's original scope, same shape as every other named deviation this branch has
+carried. Rejected: (b) assign to Plan 8 (workflow-def semantics owner, unrun) and (c) assign to Plan 11
+hardening — both park a live, proven, user-visible defect for a plan that has not started, when the fix is
+cheap and the correct pattern already exists twice in the same package.
+
+**General form, worth keeping alongside the `getBoard`/version-field lesson**: `adviseWorkflowDef`'s
+wildcard-before-exact warning is real but non-fatal, which is exactly the gap that let two consumers of the
+same `WorkflowDef` disagree for as long as nobody executed the shape it warns about rather than merely
+reading past the warning.
+
 ## OWNER CORRECTION 2026-09-02 — magic-link sender is `contact@artsourced.in`, not `sign-in@artsourced.in`
 
 Plan 11's Open question 13 and the coordination doc's sign-off table (line 86) both recorded
