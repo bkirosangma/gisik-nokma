@@ -13,7 +13,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| **Branch in flight** | **`exec/10-integration-checkpoint`** @ **`44fb736`**, pushed. Step 10, the integration checkpoint. **Task A is COMMITTED; Task B is in flight and UNCOMMITTED in the tree.** | `git rev-parse HEAD`, `git branch --contains 44fb736` non-empty |
+| **Branch in flight** | **`exec/10-integration-checkpoint`** @ **`684839f`**, pushed. **All step-10 work is COMMITTED; the tree is clean.** The FINAL WHOLE-BRANCH REVIEW is running; no PR is open yet. | `git rev-parse HEAD`, `git status --porcelain` empty, `git branch --contains 684839f` non-empty |
 | **`main`** | **`c9ab31c`** — step 9 (`563c983`, PR #67) plus two docs-only merges (`aa67ee3` #68, `c9ab31c` #69). **REFETCH before trusting this.** | `git rev-parse origin/main`, `git log --oneline -5` |
 | **`563c983` reachable?** | **YES**, ancestor of `c9ab31c`. The only diff `563c983..c9ab31c` is three files under `docs/lanes/`. | `git merge-base --is-ancestor 563c983 origin/main` → true; `git diff --stat` |
 | **Gate on merged main** | exit 0 · 21/21 · 0 cached · 1573 tests · Node v22.22.2. Measured by the controller at `563c983`; docs-only merges cannot move it (`turbo.json` declares no `inputs` and `docs/` is outside every package). | controller's forced gate |
@@ -29,8 +29,55 @@ sitting in the tree.
 | Task | What | State |
 |---|---|---|
 | **A** | **Ruling P18** — wire `getEntityState('membership')` to `proj_memberships` | **DONE, committed `44fb736`, gate green** |
-| **B** | Real-door round trip + the client-contract divergence pins (C merged in — they collide on `test-cases/07` and `Features.md` §7) | **IN FLIGHT**, uncommitted in the tree |
-| docs | coordination doc records + this file | not started |
+| **B** | Real-door round trip + the client-contract divergence pins (C merged in) | **DONE, committed `684839f`, gate green** |
+| docs | coordination doc records (P18 discharge, ruling P24, the recounts) | **DONE, committed `2b9876d`** |
+| final review | ONE opus reviewer over the whole branch | **IN FLIGHT** |
+| PR | opened only after the review is clean; **the controller merges, never the executor** | not started |
+
+### Task B — what it added, and the finding that nearly escaped
+
+Two files under `apps/server/test/integration/`, 36 cases.
+
+`real-door-round-trip.test.ts` (21) builds its world ONLY through the shipped doors and reads it
+back through the shipped read routes. No `applyCommitted`, no `insertEvent`, no INSERT into any
+projection table — the five `db.pool.query` calls are SELECTs used as oracles. It also carries **the
+repo's first proof that varies `TZ`**: three zones, the expectation computed without the function
+under test, a first case proving the knob moves before anything leans on it, and the mutation
+captured as a number rather than a colour — `daysInFlight` 30 under `TZ=UTC` where the IST-correct
+answer is 31. That closes the brief's known gap #2 for this surface.
+
+`client-contract.test.ts` (15) pins the divergences, sorted into **signature / serving / data** gaps
+because the sort decides whether each is a client edit, a route change, or a product decision.
+
+**THE FINDING WORTH CARRYING FORWARD.** Its docblock claimed it would redden "the day either side
+moves". The reviewer MEASURED that claim and it was false in the client direction: adding
+`scope-revoked` to `StreamItem` in `packages/app-core` reconciled the divergence and the suite still
+passed. The client half was literals the test file typed about itself, so two assertions could only
+fire on someone editing the line directly above them. **A file whose whole purpose is to notice
+movement, that could not notice movement.** It now derives those facts by `readFileSync` over the
+sibling source text — which preserves the reason the package import was refused, since the text is
+the checked-in `.ts` and never `./dist` — and the extractors THROW rather than returning `[]`,
+because an empty list satisfies every `not.toContain` in the file. **I re-ran the reconciliation
+myself: one death, by name, with the derived array grown to five — which is what proves the
+extractor parsed the mutation instead of failing open.**
+
+### RECORDED FOR THE CONTROLLER, not fixed — `pnpm check:tasks` fails
+
+It is **not a gate**: CI runs `pnpm check:env` and `pnpm turbo run build test typecheck`, and
+`check:tasks` appears in neither. It is not this branch's doing either —
+`git diff origin/main -- docs/lanes/task-ledger.tsv` is **empty**, so it fails identically on `main`.
+It reports rows with `pr "-"` (04/2, 04/3, 06/1–4, 07/1–3, 10/1–3, 10/8). **Owner: the controller**,
+whose file the ledger is.
+
+### Gate at `684839f`, run by the executor at the tree being reported
+
+**exit 0 · 21/21 · 0 cached · 1612 tests · Node v22.22.2 · 0 `Unsupported engine` WARNs.**
+domain 335 · rule-engine 280 · **server 756** · app-core 130 · editor 72 · ui 31 · sync-client 8.
+
+**The delta decomposes twice over.** Main 1573 → 1576 after Task A (+3, all `engine-context.test.ts`,
+15 → 18 `it(`) → 1612 after Task B (+36, all `apps/server`, 720 → 756, split 21 round-trip + 15
+contract). Every other package is unchanged, as it must be: the branch's only `packages/` change is
+none — its single production edit is in `apps/server/src`.
 
 ### Task A — what it cost and what it bought, since a successor should not re-derive it
 
