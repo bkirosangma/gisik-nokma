@@ -15,14 +15,33 @@ const PNG_RESULT: UploadResult = {
 };
 const PDF_RESULT: UploadResult = { ...PNG_RESULT, attachmentId: '01J9GATB000000000000000000', mime: 'application/pdf', filename: 'gst.pdf' };
 
-function makeEditor(overrides: Partial<AttachmentPasteOptions> = {}): { editor: Editor; options: AttachmentPasteOptions; calls: string[] } {
+/**
+ * `hadImageNodeAtEventTime` is the ordering contract's own recorder, filled
+ * in by the default `onAttachmentAdded` below at the moment it runs — every
+ * test that pastes an image through the default inherits the check, not
+ * just the one test that names it. It stays `null` if the callback never
+ * ran, so a vacuous pass (mutation removes the call, `calls` shifts too)
+ * cannot be mistaken for a proven `false`.
+ */
+function makeEditor(overrides: Partial<AttachmentPasteOptions> = {}): {
+  editor: Editor;
+  options: AttachmentPasteOptions;
+  calls: string[];
+  hadImageNodeAtEventTime: { value: boolean | null };
+} {
   const calls: string[] = [];
+  const hadImageNodeAtEventTime: { value: boolean | null } = { value: null };
   const options: AttachmentPasteOptions = {
     uploadAttachment: vi.fn(async () => {
       calls.push('upload');
       return PNG_RESULT;
     }),
     onAttachmentAdded: vi.fn(async () => {
+      // Recorded, never asserted, here: a throw inside this callback is
+      // swallowed by handleFile's catch and reported as an upload error,
+      // which points a future reader at the wrong site. The assertion
+      // belongs in the test, against this recorded value.
+      hadImageNodeAtEventTime.value = hasImageNode(editor);
       calls.push('event');
     }),
     onFileAttached: vi.fn(() => {
@@ -43,7 +62,7 @@ function makeEditor(overrides: Partial<AttachmentPasteOptions> = {}): { editor: 
     element: document.createElement('div'),
     extensions: [...buildEditorExtensions(), createAttachmentPasteExtension(options)],
   });
-  return { editor, options, calls };
+  return { editor, options, calls, hadImageNodeAtEventTime };
 }
 
 /** Invoke the plugin's handlePaste prop directly with a fake clipboard event. */
@@ -73,17 +92,7 @@ function findImageNode(editor: Editor): { attrs: Record<string, unknown> } | nul
 
 describe('attachment paste/drop (layer 2)', () => {
   it('an image file uploads, emits attachment.added, THEN inserts the node with wrap block', async () => {
-    const { editor, calls } = makeEditor({
-      onAttachmentAdded: vi.fn(async () => {
-        // The ordering contract itself: at the moment attachment.added
-        // fires, no node has landed yet — a submit racing this flow can
-        // never observe a doc node for a claim that hasn't gone out.
-        // `calls` alone can't catch a hoisted node insertion (it never
-        // records one), so this is the assertion that actually pins order.
-        expect(hasImageNode(editor)).toBe(false);
-        calls.push('event');
-      }),
-    });
+    const { editor, calls, hadImageNodeAtEventTime } = makeEditor();
     const file = new File([new Uint8Array(12)], 'shelf.png', { type: 'image/png' });
     expect(paste(editor, [file])).toBe(true);
     await vi.waitFor(() => {
@@ -91,6 +100,13 @@ describe('attachment paste/drop (layer 2)', () => {
     });
     // Order is the contract: chip → upload → attachment.added event → node.
     expect(calls).toEqual(['start', 'upload', 'event', 'end']);
+    // The ordering contract itself, named: at the moment attachment.added
+    // fired, no node had landed yet — a submit racing this flow can never
+    // observe a doc node for a claim that hasn't gone out. `calls` alone
+    // can't catch a hoisted node insertion (it never records one); this is
+    // the assertion that actually pins order, and `.value` starting `null`
+    // means a callback that never ran can't pass this vacuously.
+    expect(hadImageNodeAtEventTime.value).toBe(false);
     // The node itself, not just its presence: wrap and alt come from the
     // upload result, and attachmentId is the load-bearing link the server's
     // ingest gate (layer 3) checks against real attachments.
