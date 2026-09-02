@@ -823,7 +823,7 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   `DriveReference`, `isDriveReference()`, `DRIVE_FILE_SCOPE`, `RULE_EVIDENCE_DRIVE_REFERENCE` and its
   reason string: two statements of what a Drive reference is, pinned to each other so the second
   cannot quietly stop meaning the first. `packages/domain/src/attachment-kinds.ts`
-- ✅ **Evidence picker refuses a Drive reference structurally, not conditionally** — `EvidencePicker`
+- ⚙️ **Evidence picker refuses a Drive reference structurally, not conditionally** — `EvidencePicker`
   offers a ticket's uploads as evidence (`attachments`) and, on its own `driveReferences` prop, lists
   any Drive references the ticket carries in a separate `evidence-picker__unavailable` section naming
   each one plus the day it was last seen, under the SAME `EVIDENCE_DRIVE_REFERENCE_REASON` sentence
