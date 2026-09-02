@@ -85,16 +85,102 @@ satisfies the requirement the `json` ban is about, and the instrument was proven
 
 ## Where I am in the serial sequence
 
-**STEPS 7 AND 8 ARE MERGED.** `main` = **`00cb2e0`**. **RULING P23 IS SETTLED — see below.**
+# ★ STEP 9 IS COMPLETE. PLAN 5, ALL 17 TASKS, DONE AND REVIEWED. THE PR IS OPEN. ★
 
-**STEP 9 (Plan 5, the hinge, 17 tasks) IS IN PROGRESS on `exec/05-api-realtime`.**
-**BATCH A ONLY IS DONE: T1 and T2, plus T2's fix round. T3 ONWARD IS NOT STARTED.**
+**Nothing is in flight. The executor's work on this step is finished; the controller merges.**
 
-Gate **re-run at the post-rebase sha `c3b1090`**, not carried over from the pre-rebase run:
-**exit 0 READ (not inferred), 21/21 (0 cached), 1321 tests**, zero `Unsupported engine` WARNs,
-**Node v22.22.2**. domain 314 · rule-engine 280 · **server 486** · app-core 130 · editor 72 · ui 31 ·
-sync-client 8. (Sum checks: 314+280+486+130+72+31+8 = 1321.) The rebase moved only docs, so composition
-could not have shifted — but it was measured rather than argued, because *docs-only* was itself a claim.
+| Task | Review outcome |
+|---|---|
+| T1 `docToPlainText` · T2 FilterSpec + compiler | done pre-restart; T2 had a fix round |
+| T3 `workspace.settings_set` | clean, 1 Minor fixed |
+| T4 `proj_workspace_settings` + shared helpers | clean, 1 Minor fixed |
+| **T5 FLOOR** visibility predicate in SQL | 1 **Important** + 2 Minor, fixed and proven |
+| T6 `proj_search` (tsvector) | **CLEAN — zero findings** |
+| T7 read models / TicketCard | **CLEAN — zero findings** |
+| T8 `GET /board` | **CLEAN — zero findings** |
+| T9 `GET /tickets` list read | clean, 1 Minor fixed |
+| **T9b FLOOR** builder reads | 2 **Important** + 3 Minor + 1 ruling, all closed |
+| T10 `GET /v1/search` | clean, 1 Minor fixed |
+| T11 `/me/work` · T12 `/attention` | **CLEAN — zero findings each** |
+| T13 `/me/preferences` | **CLEAN — zero findings** |
+| **T14 FLOOR** stream frames + hub | 2 **Important** + 4 Minor + 1 Nit, all closed |
+| **T15 FLOOR** WS `/v1/stream` | 1 **Important (a LIVE bug)** + 5 more, all closed |
+| T16 catalogue reconciliation | **CLEAN**, +0 tests as expected |
+| **Final whole-branch review (1 opus)** | **No Critical, no Important. SAFE TO MERGE.** 2 Minor + 2 Nit, all fixed. |
+
+**FINAL GATE, re-run by the executor at the tip, never taken from an agent's report:**
+**exit 0 · 21/21 · 0 cached · 1573 tests** — domain 335 · rule-engine 280 · **server 717** ·
+app-core 130 · editor 72 · ui 31 · sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**.
+`pnpm check:env` (the other CI step) also passes.
+
+**BRANCH POSITION — measured through `rtk proxy`, and that mattered:**
+`origin/main` = `1223c4c`; merge-base = `00cb2e0`; branch is **93 commits ahead**, main 6 ahead.
+**`git log --oneline origin/main..HEAD | wc -l` printed 50 — a PROXIED WRONG COUNT.** The raw
+`rtk proxy git rev-list --count` says 93. That is the "silent wrong COUNT" mode from the rtk notes,
+met live at the last measurement of the step. **Pipe a count through the proxy and you get a
+well-formed lie.**
+
+**NOT REBASED, deliberately.** `git merge-tree --write-tree origin/main HEAD` → **exit 0, zero
+conflicts**, and main's 6 commits touch only `docs/lanes/controller-state.md`,
+`docs/lanes/task-ledger.tsv` and `scripts/check-task-ledger.mjs` — **no file this branch touches.**
+Rebasing 93 commits would orphan every sha this file and 50 commit messages cite, for no gain.
+
+**CI will not fail on the new ledger script:** `check:tasks` exists in `package.json` but
+`.github/workflows/ci.yml` runs only `pnpm check:env` and `pnpm turbo run build test typecheck`.
+**But the merger should know:** main's `992c459`/`1223c4c` rewrote the `done` evidence rule after this
+branch diverged, so Plan 5's ledger rows must satisfy the NEW artefact-evidence rule. **The ledger is
+the controller's file and this branch deliberately does not touch it.**
+
+## WHAT THIS STEP FOUND — the through-line, because it repeated six times
+
+**A negative assertion is only as good as your ability to make it fire.** Six instances, each caught
+by a different party, none by a rule:
+
+1. **T2** — `expect(sql).not.toContain(hostile)` **fired on CORRECT code**. It measures whether a
+   value LOOKS like SQL, not whether it was concatenated.
+2. **T9b** — a `__proto__` state id, and every live ticket in it, vanished from a response. The
+   earlier fix used `toString` as its proof value, and `toString` is exactly the value that makes such
+   a fix look complete: plain assignment shadows the prototype method, while `__proto__` assigns
+   through an accessor that creates **no own key**. **A proof run with one value proves that value.**
+3. **T9b's fix** — a *literal* `{ __proto__: 1 }` in the expected object collapses identically, so the
+   new assertion would have passed against the defect. **The test for a `__proto__` bug can have the
+   `__proto__` bug.** It uses a computed key.
+4. **T10** — `not.toContain(secret)` on a snippet **survived a real leak**, because `ts_headline`
+   windows onto a match and never renders unmatched text. Replaced by a substring-of-its-own-row form.
+5. **T14** — the assertion carrying the task's central disclosure decision inspected only
+   `frames.slice(-1)`, which is structurally incapable of holding the id it forbade.
+6. **T15** — `expect(hub.stats().subscriptions).toBeGreaterThan(0)` was satisfied by the case's own
+   well-formed subscribe, so a malformed frame opening a real subscription passed it.
+
+**Two more rules earned here, both now in the catalogue's header or a docblock:**
+- **NAME THE CASES A MUTATION KILLS, NEVER THE COUNT** — unless deterministic AND reproduced by a
+  second party. "Reddens seven cases" re-ran as 15, 18, 4, 15; a "dies 6" measured 7.
+- **A MUTATION CAN BE INERT IN ITS FIXTURE.** T14's reviewer proposed one that emitted nothing at that
+  cursor, so its "all tests passed" was evidence of nothing. **Confirm the mutated path EXECUTED
+  before concluding anything from a survivor** — and a survivor is a MISSING FIXTURE until proven
+  otherwise (T12 had four survive on first run and closed all four with fixtures).
+
+## OPEN ITEMS FOR THE CONTROLLER — none block the merge
+
+1. **§6b, coordination doc: Plan 6 declares an INCOMPATIBLE `UserPreferences`.** Informationally
+   equivalent to the server's, so it is a naming conflict — **but it needs a ruling before Plan 6
+   Task 10.** This is the one item with a deadline.
+2. **One EXECUTOR RULING was made and recorded (coordination doc §5): a guest may NOT call
+   `GET /v1/workspaces/:id/members`.** The plan settles who is hidden from the listing and never says
+   who may call it, so a guest invited to one shared ticket was receiving the workspace's entire staff
+   directory. Conservative default, cheap to reverse, owner Plan 8.
+3. **An OWNER QUESTION, shipped per the spec's plain reading:** `terminalChildren` counts children the
+   viewer cannot see. Supported by one illustrative sentence in the product design doc, not a ruling.
+   Reversible in one JOIN predicate.
+4. **The integration checkpoint (sequence step 10) is now due and it has a specific target.**
+   `applyCommitted` enumerates six things real ingest does that it does not — no locks, seqs from a
+   process map rather than the DB, no permission gate, no rule engine, no `bootstrapWorkspace`, no
+   stream notify — and nearly every read test on this branch is built on it. **A read model green
+   against it is proven correct about ROWS and proven nothing about whether those rows are reachable
+   through the shipped door.**
+5. Recorded with named owners, not fixed: the stream suite's tenancy coverage is an artifact of test
+   order (Plan 4); `foldStateIdForward`'s prototype hazard (Plan 3); `assigneeId` cannot distinguish
+   never-assigned from unassigned (Plan 3); `rollupFor` N+1 at 50 hits (Plan 5 T7's own note).
 
 ### THE SEAM — exactly where a successor picks up
 
