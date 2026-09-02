@@ -131,6 +131,75 @@ describe('anchorIssues', () => {
     expect(advisoryAnchorOf(uncovered, 'rule-bypassable')).toEqual({ kind: 'transition', index: 2 });
   });
 
+  it('two distinct duplicated state ids pair in second-sighting order, not first-occurrence order', () => {
+    // validateWorkflowDef fills its duplicateIds Set at the SECOND sighting of
+    // each id, so with x,y,y,x the issues come out [y, x] — not the [x, y]
+    // definition-order a naive first-occurrence walk would produce.
+    const def: WorkflowDef = {
+      id: 'wf',
+      version: 1,
+      name: 'dup ids',
+      initialStateId: 'x',
+      states: [
+        { id: 'x', name: 'X', category: 'open' },
+        { id: 'y', name: 'Y', category: 'terminal' },
+        { id: 'y', name: 'Y2', category: 'terminal' },
+        { id: 'x', name: 'X2', category: 'terminal' },
+      ],
+      transitions: [],
+    };
+    const issues = validateWorkflowDef(def).filter((issue) => issue.code === 'duplicate-state-id');
+    expect(issues.map((issue) => issue.message)).toEqual([
+      expect.stringContaining('"y"'),
+      expect.stringContaining('"x"'),
+    ]);
+    expect(anchorIssues(def, issues).map((issue) => issue.anchor)).toEqual([
+      { kind: 'state', stateId: 'y' },
+      { kind: 'state', stateId: 'x' },
+    ]);
+  });
+
+  it('a to:"*" transition never anchors as unknown-transition-state', () => {
+    const def: WorkflowDef = {
+      id: 'wf',
+      version: 1,
+      name: 'wildcard to',
+      initialStateId: 'a',
+      states: [
+        { id: 'a', name: 'A', category: 'open' },
+        { id: 'b', name: 'B', category: 'terminal' },
+      ],
+      transitions: [
+        { from: 'a', to: '*', rules: [] },
+        { from: 'ghost', to: 'b', rules: [] },
+      ],
+    };
+    const issues = validateWorkflowDef(def).filter((issue) => issue.code === 'unknown-transition-state');
+    expect(issues).toHaveLength(1);
+    expect(anchorIssues(def, issues).map((issue) => issue.anchor)).toEqual([{ kind: 'transition', index: 1 }]);
+  });
+
+  it('a triplicated edge produces exactly one duplicate-transition issue and one anchor', () => {
+    const def: WorkflowDef = {
+      id: 'wf',
+      version: 1,
+      name: 'triple dup',
+      initialStateId: 'a',
+      states: [
+        { id: 'a', name: 'A', category: 'open' },
+        { id: 'b', name: 'B', category: 'terminal' },
+      ],
+      transitions: [
+        { from: 'a', to: 'b', rules: [] },
+        { from: 'a', to: 'b', rules: [] },
+        { from: 'a', to: 'b', rules: [] },
+      ],
+    };
+    const issues = validateWorkflowDef(def).filter((issue) => issue.code === 'duplicate-transition');
+    expect(issues).toHaveLength(1);
+    expect(anchorIssues(def, issues).map((issue) => issue.anchor)).toEqual([{ kind: 'transition', index: 1 }]);
+  });
+
   it('two issues of one code pair with offenders in definition order', () => {
     const def = base();
     def.states = [
