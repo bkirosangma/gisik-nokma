@@ -635,6 +635,61 @@ depended on an unchecked assumption, shipped one hour after that rule was writte
 
 ## Standing owner rulings currently in force
 
+- **RULING P26 (2026-09-02) — `SavedFilter`'s field is `filterSpec`. Plan 9 Task 13's `spec` is
+  SUPERSEDED before it is written.** *(Written here because the executor received P26 as a message and
+  correctly reported it had "a number, a subject, and no text" — a ruling that lives only in a pane does
+  not survive either session's restart. That is the second time in one day.)*
+  - **Three spellings of one field exist.** `packages/domain/src/preferences.ts:28` → **`filterSpec`**,
+    shipped, schema is `.strict()`. `packages/app-core/src/view-types.ts:183` → `filter`, shipped.
+    **Plan 9 Task 13 → `spec`, not yet built, 48 mentions.**
+  - **SCOPE, stated precisely because the first version of this was too wide.** The first two are **NOT
+    new**: they are one of P24's "three renames", and `client-contract.test.ts:605` already pins them —
+    *"the client's document is REFUSED whole — `.strict()` turns three renames into one 400."* **That
+    half is closed and is not reopened here.** What is new is only Plan 9's third spelling.
+  - **Plan 9 T13 is not disagreeing — it does not know.** Measured against its own text: **zero**
+    mentions of `filterSpec`, **zero** of `preferencesDocSchema`, **zero** of `Plan 5`.
+  - **The ruling needs no new argument:** a `.strict()` schema REFUSES a third spelling rather than
+    renaming it. `filterSpec` wins; Plan 9 T13 adopts it. P24's logic, a plan P24 never looked at.
+  - **Also recorded, owner step 12 (Plan 7):** `EditorSlotProps` differs (Plan 6 `doc: unknown` vs
+    Plan 7 `doc: DocJson | null`) and `AttachmentListEntry` differs structurally (Plan 6 inlines the
+    drive-reference fields, Plan 7 uses `& DriveReference`). **`EditorSlotUpload` was a FALSE POSITIVE**
+    — identical fields, different line breaks — named so nobody re-finds it.
+
+## QUOTA IS THE BINDING CONSTRAINT, NOT TIME — measured 2026-09-02
+
+**Measured, not estimated:** weekly went 1% → 33% between 03:27 and 14:20, i.e. **2.94 percentage points
+per hour across BOTH sessions**. 67% remaining ≈ **23 hours of work**, against **112 hours** until the
+stated reset. **We exhaust the week's allowance in about a day and then idle for ~3.7 days.**
+
+- **Step 11's pace is 48 min/task** (7 tasks in 5.6h), against Plan 5's 31. **UI work is genuinely
+  slower and 60 of the 89 remaining tasks are client-side — plan against 48.**
+- This weekly buys roughly **28 more tasks**. All 89 need ~3 weekly cycles; 73 (excluding Plan 11) ~2.6.
+- **A CONTROLLER ESTIMATE OF "4–6 DAYS" WAS GIVEN EARLIER AND WAS WRONG.** It measured throughput and
+  **ignored quota entirely.** Time was never the constraint. Correct form: 4–6 days *of permitted
+  execution*, spread across ~3 weekly windows.
+- **⚠ The reset semantics do not match the label.** The status line says *"resets mon 6:30am"*, but
+  weekly was observed dropping **62% → 1% overnight Tue→Wed**, which no Monday reset explains. That is
+  consistent with a ROLLING window. If it rolls, capacity replenishes continuously and the outlook is
+  materially better than the figures above, which assume hard cliffs. **Unresolved — do not present
+  either reading as settled.**
+
+## THE CONTROLLER RESTARTS ITSELF AT THE NEXT STEP BOUNDARY — owner-instructed 2026-09-02
+
+**The owner instructed this directly.** This role has imposed a restart on the executor at every step
+boundary all day and **has never once applied it to itself** — while the spend record has it at **39% of
+$1,072, 1.4× the executor it supervises**, and context growth costs money *directly* because cache reads
+are 68% of the bill.
+
+**A controller cannot restart itself** — the restart is owner-issued (`/clear`) or owner-relaunched.
+**So the obligation is to make it free, and that is what this file is for.** Before the next step PR
+merges, confirm: anchors re-measured at the reported sha, every ruling written HERE and not only sent,
+the ledger figure quoted from `check:tasks` with the exit code read from a redirect, and the executor's
+position named by BRANCH rather than by sha. All four hold as of this commit.
+
+    claude --model opus --permission-mode bypassPermissions \
+      "$(cat /Users/kiro/my_projects/gisik-nokma-lanes/dispatch-controller-serial.md)"
+
+
 - **RULING P23 (2026-09-01) — the `ScopeRevokedInstruction` blessing is SCOPE-WIDE ONLY; 6.101's
   per-event extension is settled by PROBE, not by the docblock.** Raised by the executor when the
   escalation condition set for it actually fired — the fix agent derived that the docblock *does* bless
