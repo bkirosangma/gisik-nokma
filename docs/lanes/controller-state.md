@@ -665,6 +665,21 @@ Every one below was violated by a controller that had just written it. **Assume 
   **"exit code 0"** for a gate whose summary said `Tasks: 11 successful, 18 total / Failed:
   sync-client#test`. **Read the `Tasks:` line. It is the only honest signal.** Write the exit code INTO
   the log (`echo "TURBO_EXIT=$?" >> log`), never after a pipe.
+- **I PIPED THE LEDGER GATE AND READ `grep`'s EXIT CODE, FOR FOUR CONSECUTIVE MERGES.** Found 2026-09-02
+  by the **executor**, in PR #70, which correctly said *"`check:tasks` fails and is not this branch's —
+  owner: the controller."* Every check I ran was `pnpm check:tasks 2>&1 | grep -E 'VERIFIED|todo'`.
+  **The summary printed `88/177 (49.7%)` while the command was exiting 1.** I even wrote
+  `; echo "CHECK_EXIT=$?"` once and it printed `0` — **`grep`'s status, because the pipe was still
+  there.** The tell was available and I filtered it out: the report carries a
+  `ROWS CLAIMING done WITH NO EVIDENCE` section, and my grep pattern could not match it.
+  **The defect it hid was also mine.** The audit's applier set status, sha and note on the 14
+  `todo → done` rows and **never set the `pr` column**. `claimed → done` rows already carried one —
+  which is exactly why the bug was invisible in the 32 and present in the 14.
+  **Third costume of the entry directly above** (`| tail`, then a trailing `echo`, now **a `grep` whose
+  pattern cannot match the failure section**, so the output reads as a clean report). Committed inside
+  the instrument built to catch drift, while writing about falsifiability.
+  **Redirect to a file, read `$?` on the NEXT line, grep the file afterwards — and grep the FAILURE
+  vocabulary, not only the success vocabulary. A filter that can only show you good news is not a check.**
 - A rule does not reliably fire on its author. **The executor caught three controller errors on its first
   day**, each in an artifact the controller had just written *and verified*.
 - Over-caution has a price here. Blocking a restart on a documentation merge spends session carriage —

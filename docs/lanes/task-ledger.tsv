@@ -69,9 +69,9 @@ plan	task	status	pr	merge_sha	note
 03	12	done	59	6cb631d0	
 03	13	done	59	6cb631d0	
 03	14	done	59	6cb631d0	
-04	1	done	-	06e5061	artefact: apps/server/src/auth/auth.ts + senders + db/queryable.ts (PR #20)
-04	2	done	-	31df85b	artefact: apps/server/src/auth/routes.ts, require-session.ts (PR #30)
-04	3	done	-	ef410ea	artefact: packages/domain/src/events/membership.ts, visibility.ts (PR #22)
+04	1	done	20	06e5061	artefact: apps/server/src/auth/auth.ts + senders + db/queryable.ts (PR #20)
+04	2	done	30	31df85b	artefact: apps/server/src/auth/routes.ts, require-session.ts (PR #30)
+04	3	done	22	ef410ea	artefact: packages/domain/src/events/membership.ts, visibility.ts (PR #22)
 04	4	done	51	45c83eb4	
 04	5	done	51	45c83eb4	
 04	6	done	52	40c52191	
@@ -100,10 +100,10 @@ plan	task	status	pr	merge_sha	note
 05	14	done	67	563c983	artefact: packages/domain/src/stream-frames.ts
 05	15	done	67	563c983	artefact: apps/server/src/stream/routes.ts
 05	16	done	67	563c983	catalogue task: precondition MET — all 16 sibling tasks merged in this same commit; test-cases/07 carries 153 entries reaching 7.162 (late-task ids) and Features.md §7 exists. NOT promoted on artefact presence alone (the file was opened by T2)
-06	1	done	-	2e9f405	artefact: packages/ui scaffold + tokens (PR #16)
-06	2	done	-	2e9f405	artefact: packages/ui/test/helpers/colour-scan.ts, token-discipline.test.ts (PR #16)
-06	3	done	-	2e9f405	artefact: all 8 declared components + ui.css, each verified present (PR #16)
-06	4	done	-	2e9f405	artefact: packages/app-core scaffold, DataSource interface (PR #16)
+06	1	done	16	2e9f405	artefact: packages/ui scaffold + tokens (PR #16)
+06	2	done	16	2e9f405	artefact: packages/ui/test/helpers/colour-scan.ts, token-discipline.test.ts (PR #16)
+06	3	done	16	2e9f405	artefact: all 8 declared components + ui.css, each verified present (PR #16)
+06	4	done	16	2e9f405	artefact: packages/app-core scaffold, DataSource interface (PR #16)
 06	5	todo	-	-	
 06	6	done	36	3fb22d3f	
 06	7	todo	-	-	
@@ -118,9 +118,9 @@ plan	task	status	pr	merge_sha	note
 06	15	todo	-	-	
 06	15b	todo	-	-	
 06	16	todo	-	-	
-07	1	done	-	a3746fb	artefact: packages/editor scaffold + document schema (PR #47, multi-task branch)
-07	2	done	-	a3746fb	artefact: packages/domain/src/doc-embeds.ts (PR #47)
-07	3	done	-	a3746fb	artefact: packages/editor/src/extensions/ticket-image.ts (PR #47)
+07	1	done	47	a3746fb	artefact: packages/editor scaffold + document schema (PR #47, multi-task branch)
+07	2	done	47	a3746fb	artefact: packages/domain/src/doc-embeds.ts (PR #47)
+07	3	done	47	a3746fb	artefact: packages/editor/src/extensions/ticket-image.ts (PR #47)
 07	4	done	47	a3746fb	artefact: packages/editor/src/extensions/mention.ts, mention-popup.ts (= PR #47 squash sha)
 07	5	todo	-	-	
 07	6	todo	-	-	
@@ -170,14 +170,14 @@ plan	task	status	pr	merge_sha	note
 09	13	todo	-	-	
 09	14	todo	-	-	
 09	15	todo	-	-	
-10	1	done	-	b62be74	artefact: packages/domain/src/events/contest-events.ts (PR #23, subject names it)
-10	2	done	-	b62be74	artefact: packages/rule-engine/src/contests.ts (PR #23, subject names it)
-10	3	done	-	b62be74	artefact: apps/server/src/sync/stream-seq.ts (PR #23, subject names it)
+10	1	done	23	b62be74	artefact: packages/domain/src/events/contest-events.ts (PR #23, subject names it)
+10	2	done	23	b62be74	artefact: packages/rule-engine/src/contests.ts (PR #23, subject names it)
+10	3	done	23	b62be74	artefact: apps/server/src/sync/stream-seq.ts (PR #23, subject names it)
 10	4	done	53	33538bee	lifted to Phase 1; closes the §11 envelope-origin window
 10	5	todo	-	-	
 10	6	todo	-	-	
 10	7	todo	-	-	
-10	8	done	-	b62be74	artefact: packages/sync-client scaffold (PR #23, subject names it)
+10	8	done	23	b62be74	artefact: packages/sync-client scaffold (PR #23, subject names it)
 10	9	todo	-	-	
 10	10	todo	-	-	
 10	11	todo	-	-	
