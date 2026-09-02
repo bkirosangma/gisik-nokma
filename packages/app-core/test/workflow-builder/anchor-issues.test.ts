@@ -200,6 +200,33 @@ describe('anchorIssues', () => {
     expect(anchorIssues(def, issues).map((issue) => issue.anchor)).toEqual([{ kind: 'transition', index: 1 }]);
   });
 
+  it('two distinct duplicate-edge groups, one tripled and one doubled, each anchor at their own second sighting', () => {
+    const def: WorkflowDef = {
+      id: 'wf',
+      version: 1,
+      name: 'two dup groups',
+      initialStateId: 'a',
+      states: [
+        { id: 'a', name: 'A', category: 'open' },
+        { id: 'b', name: 'B', category: 'open' },
+        { id: 'c', name: 'C', category: 'terminal' },
+      ],
+      transitions: [
+        { from: 'a', to: 'b', rules: [] },
+        { from: 'a', to: 'b', rules: [] },
+        { from: 'a', to: 'b', rules: [] },
+        { from: 'b', to: 'c', rules: [] },
+        { from: 'b', to: 'c', rules: [] },
+      ],
+    };
+    const issues = validateWorkflowDef(def).filter((issue) => issue.code === 'duplicate-transition');
+    expect(issues).toHaveLength(2);
+    expect(anchorIssues(def, issues).map((issue) => issue.anchor)).toEqual([
+      { kind: 'transition', index: 1 },
+      { kind: 'transition', index: 4 },
+    ]);
+  });
+
   it('two issues of one code pair with offenders in definition order', () => {
     const def = base();
     def.states = [

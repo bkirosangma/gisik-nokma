@@ -7,6 +7,7 @@ export const BUILTIN_FIELD_CHOICES: readonly FieldChoice[] = [
   { id: 'title', name: 'Title', source: 'Built-in' },
   { id: 'description', name: 'Description', source: 'Built-in' },
   { id: 'dueDate', name: 'Due date', source: 'Built-in' },
+  { id: 'startDate', name: 'Start date', source: 'Built-in' },
 ];
 
 /**
