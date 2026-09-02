@@ -1,6 +1,10 @@
 .DS_Store
 node_modules/
 dist/
+# packages/editor's RN webview bundle (vite.webview.config.ts outDir): a
+# single self-contained index.html, not the package's tsc `dist/` above but
+# still a regenerated build artefact, never committed.
+dist-webview/
 build/
 __pycache__/
 *.pyc

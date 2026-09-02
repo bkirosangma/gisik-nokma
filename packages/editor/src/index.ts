@@ -70,3 +70,11 @@ export {
   type EditorSlotUpload,
   type TicketEditorSlotProps,
 } from './components/TicketEditorSlot.js';
+export {
+  EDITOR_BRIDGE_VERSION,
+  parseHostMessage,
+  serializeEditorMessage,
+  type EditorToHostMessage,
+  type HostToEditorMessage,
+} from './webview/bridge.js';
+export { createEditorBridge, type EditorBridge, type EditorBridgeDeps } from './webview/create-editor-bridge.js';
