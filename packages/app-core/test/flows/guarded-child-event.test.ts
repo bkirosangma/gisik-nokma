@@ -41,8 +41,8 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   return { promise, resolve };
 }
 
-describe('3.77 · 13.1 reopenStateOptions — structurally reachable, non-terminal only', () => {
-  it('13.1a offers only non-terminal states with a declared transition from the current terminal state', () => {
+describe('3.77 · T13.1 reopenStateOptions — structurally reachable, non-terminal only', () => {
+  it('T13.1a offers only non-terminal states with a declared transition from the current terminal state', () => {
     // From 'done', WF_ERRAND declares done→doing and the wildcard *→todo.
     expect(reopenStateOptions(WF_ERRAND, 'done').map((state) => state.id).sort()).toEqual([
       'doing',
@@ -50,7 +50,7 @@ describe('3.77 · 13.1 reopenStateOptions — structurally reachable, non-termin
     ]);
   });
 
-  it('13.1b carries each state name, so no option renders as a bare id', () => {
+  it('T13.1b carries each state name, so no option renders as a bare id', () => {
     expect(reopenStateOptions(WF_ERRAND, 'done')).toEqual(
       expect.arrayContaining([
         { id: 'doing', name: 'Doing' },
@@ -59,7 +59,7 @@ describe('3.77 · 13.1 reopenStateOptions — structurally reachable, non-termin
     );
   });
 
-  it('13.1c never offers a terminal state, even when one is structurally reachable', () => {
+  it('T13.1c never offers a terminal state, even when one is structurally reachable', () => {
     const twoTerminals: WorkflowDef = {
       ...WF_ERRAND,
       states: [...WF_ERRAND.states, { id: 'cancelled', name: 'Cancelled', category: 'terminal' }],
@@ -72,12 +72,12 @@ describe('3.77 · 13.1 reopenStateOptions — structurally reachable, non-termin
     expect(offered.sort()).toEqual(['doing', 'todo']);
   });
 
-  it('13.1d does not offer a state the definition never declares an edge to', () => {
+  it('T13.1d does not offer a state the definition never declares an edge to', () => {
     // WF_ERRAND declares no edge done→waiting, and 'waiting' is non-terminal.
     expect(reopenStateOptions(WF_ERRAND, 'done').map((state) => state.id)).not.toContain('waiting');
   });
 
-  it('13.1e a wildcard edge back into the current state is not an option (it moves nothing)', () => {
+  it('T13.1e a wildcard edge back into the current state is not an option (it moves nothing)', () => {
     const selfWildcard: WorkflowDef = {
       ...WF_ERRAND,
       transitions: [{ from: '*', to: 'doing', rules: [] }, { from: 'doing', to: 'todo', rules: [] }],
@@ -85,7 +85,7 @@ describe('3.77 · 13.1 reopenStateOptions — structurally reachable, non-termin
     expect(reopenStateOptions(selfWildcard, 'doing').map((state) => state.id)).toEqual(['todo']);
   });
 
-  it('13.1f keeps a rule-bearing target on the list — the server, not this client, refuses it', () => {
+  it('T13.1f keeps a rule-bearing target on the list — the server, not this client, refuses it', () => {
     // done→doing in WF_ERRAND carries no rules, so build one that does: the
     // owner decision says the parent's own rules apply ON ATTEMPT.
     const guarded: WorkflowDef = {
@@ -96,14 +96,14 @@ describe('3.77 · 13.1 reopenStateOptions — structurally reachable, non-termin
   });
 });
 
-describe('3.77 · 13.2 submitChildEvent — one refusal is a remedy, the rest are refusals', () => {
-  it('13.2a passes a committed child straight through', async () => {
+describe('3.77 · T13.2 submitChildEvent — one refusal is a remedy, the rest are refusals', () => {
+  it('T13.2a passes a committed child straight through', async () => {
     const source = createFakeDataSource();
     const outcome = await submitChildEvent(source, submittedTicketCreated());
     expect(outcome.kind).toBe('committed');
   });
 
-  it('13.2b surfaces hierarchy.parent-terminal as needs-reopen, rule and reason intact', async () => {
+  it('T13.2b surfaces hierarchy.parent-terminal as needs-reopen, rule and reason intact', async () => {
     const source = createFakeDataSource({}, (events) =>
       events.map((event) => parentTerminalRefusal(event.id)),
     );
@@ -114,7 +114,7 @@ describe('3.77 · 13.2 submitChildEvent — one refusal is a remedy, the rest ar
     });
   });
 
-  it('13.2c reparent refusals take the same path — the rule is shared', async () => {
+  it('T13.2c reparent refusals take the same path — the rule is shared', async () => {
     const source = createFakeDataSource({}, (events) =>
       events.map((event) => parentTerminalRefusal(event.id)),
     );
@@ -127,7 +127,7 @@ describe('3.77 · 13.2 submitChildEvent — one refusal is a remedy, the rest ar
     expect((await submitChildEvent(source, reparent)).kind).toBe('needs-reopen');
   });
 
-  it('13.2d any other refusal stays an ordinary refusal, reason verbatim', async () => {
+  it('T13.2d any other refusal stays an ordinary refusal, reason verbatim', async () => {
     const source = createFakeDataSource({}, (events) =>
       events.map((event) =>
         refusedWith(event.id, 'hierarchy.rank', 'A task cannot sit under a sub-task.'),
@@ -139,7 +139,7 @@ describe('3.77 · 13.2 submitChildEvent — one refusal is a remedy, the rest ar
     });
   });
 
-  it('13.2e an invalid answer is neither committed nor a refusal, and keeps the door code', async () => {
+  it('T13.2e an invalid answer is neither committed nor a refusal, and keeps the door code', async () => {
     const source = createFakeDataSource({}, (events) =>
       events.map((event) => ({
         status: 'invalid' as const,
@@ -158,7 +158,7 @@ describe('3.77 · 13.2 submitChildEvent — one refusal is a remedy, the rest ar
     }
   });
 
-  it('13.2f a one-claim batch answered with nothing is UNKNOWN, never a silent commit', async () => {
+  it('T13.2f a one-claim batch answered with nothing is UNKNOWN, never a silent commit', async () => {
     const source = createFakeDataSource({}, () => []);
     await expect(submitChildEvent(source, submittedTicketCreated())).rejects.toThrow(
       UnansweredClaimError,
@@ -166,7 +166,7 @@ describe('3.77 · 13.2 submitChildEvent — one refusal is a remedy, the rest ar
   });
 });
 
-describe('3.78 · 13.3 reopenAndProceed — parent first, cause attached, refusals surfaced', () => {
+describe('3.78 · T13.3 reopenAndProceed — parent first, cause attached, refusals surfaced', () => {
   const childEvent = submittedTicketCreated();
   const childTicketId = childEvent.entity.id;
   const plan = {
@@ -176,7 +176,7 @@ describe('3.78 · 13.3 reopenAndProceed — parent first, cause attached, refusa
     childEvent,
   };
 
-  it('13.3a ingests the parent transition (with cause, wire spelling) before the child, then commits both', async () => {
+  it('T13.3a ingests the parent transition (with cause, wire spelling) before the child, then commits both', async () => {
     const source = createFakeDataSource();
     const outcome = await reopenAndProceed(source, plan, make);
     expect(outcome.kind).toBe('committed');
@@ -195,7 +195,7 @@ describe('3.78 · 13.3 reopenAndProceed — parent first, cause attached, refusa
     expect(secondBatch?.[0]).toBe(childEvent); // the SAME claim, retried after the remedy
   });
 
-  it('13.3b the parent claim is a real envelope: this actor, this workspace, no server fields', async () => {
+  it('T13.3b the parent claim is a real envelope: this actor, this workspace, no server fields', async () => {
     const source = createFakeDataSource();
     await reopenAndProceed(source, plan, make);
     const parent = source.ingested[0]?.[0] as SubmittedEvent;
@@ -206,7 +206,7 @@ describe('3.78 · 13.3 reopenAndProceed — parent first, cause attached, refusa
     expect(parent).not.toHaveProperty('serverTime');
   });
 
-  it('13.3c SEQUENCING: the child is not sent while the parent answer is still outstanding', async () => {
+  it('T13.3c SEQUENCING: the child is not sent while the parent answer is still outstanding', async () => {
     const gate = deferred<IngestResult[]>();
     const source = createFakeDataSource({}, (events) =>
       events[0]?.type === 'ticket.transitioned'
@@ -227,7 +227,7 @@ describe('3.78 · 13.3 reopenAndProceed — parent first, cause attached, refusa
     expect(source.ingested[1]?.[0]).toBe(childEvent);
   });
 
-  it("13.3d the parent's own transition rules still apply — its refusal surfaces and the child is never sent", async () => {
+  it("T13.3d the parent's own transition rules still apply — its refusal surfaces and the child is never sent", async () => {
     const source = createFakeDataSource({}, (events) =>
       events.map((event) =>
         refusedWith(event.id, 'restrict-to', 'Only Anselma Marak may move this out of Done.'),
@@ -242,7 +242,7 @@ describe('3.78 · 13.3 reopenAndProceed — parent first, cause attached, refusa
     expect(source.ingested[0]?.[0]?.type).toBe('ticket.transitioned');
   });
 
-  it('13.3e a require-comment refusal on the reopen is honoured the same way — no rule is privileged', async () => {
+  it('T13.3e a require-comment refusal on the reopen is honoured the same way — no rule is privileged', async () => {
     const source = createFakeDataSource({}, (events) =>
       events.map((event) =>
         refusedWith(event.id, 'require-comment', 'This move needs a comment saying why.'),
@@ -253,7 +253,7 @@ describe('3.78 · 13.3 reopenAndProceed — parent first, cause attached, refusa
     expect(source.ingested).toHaveLength(1);
   });
 
-  it('13.3f an INVALID parent answer also stops the child — invalid is not acceptance', async () => {
+  it('T13.3f an INVALID parent answer also stops the child — invalid is not acceptance', async () => {
     const source = createFakeDataSource({}, (events) =>
       events.map((event) => ({
         status: 'invalid' as const,
@@ -266,7 +266,7 @@ describe('3.78 · 13.3 reopenAndProceed — parent first, cause attached, refusa
     expect(source.ingested).toHaveLength(1);
   });
 
-  it('13.3g a child refusal after the reopen keeps the reopen standing and reports both truths', async () => {
+  it('T13.3g a child refusal after the reopen keeps the reopen standing and reports both truths', async () => {
     let call = 0;
     const source = createFakeDataSource({}, (events) => {
       call += 1;

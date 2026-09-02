@@ -13,7 +13,8 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| **Branch** | **`exec/11-plan6-remainder`**, rebased onto `origin/main` `bf0ed47`, **18 commits ahead**, pushed. | `git rev-list --count origin/main..HEAD` |
+| **Branch** | **`exec/11-plan6-remainder`**, rebased onto `origin/main` `bf0ed47`, pushed. **Do not trust a number written here for the ahead-count — run the command.** | `git rev-list --count origin/main..HEAD` |
+| **Why no number in that row** | This row said **18**; the command it cites answers **19**. Not a slip: the count was taken while writing the commit that records it, so a self-referential ahead-count is **always short by one** and always looks right to its author. It had already propagated into a review brief before anyone ran the command. A count that cannot be written correctly from inside the commit that carries it should not be written at all. | measured, 2026-09-02 |
 | **Position** | **All twelve Plan 6 tasks complete.** Final whole-branch review running; **PR not yet opened.** | ledger + `git log` |
 | **Gate at HEAD** | **exit 0 · 24/24 · 0 cached · 2026 tests · Node v22.22.2 · 0 engine warnings.** domain 335 · rule-engine 280 · **server 761** · **app-core 470** · **web 69** · editor 72 · ui 31 · sync-client 8. | run by the executor at this sha, `--force` |
 | **`check:tasks` / `check:env`** | both **exit 0**. | run at this sha |

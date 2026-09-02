@@ -28,7 +28,16 @@ export const MAX_INGEST_BATCH = 100;
 export type OnlineDataSourceDeps = {
   /** HTTP origin — '' when a shell proxies same-origin (Next rewrites). */
   baseUrl: string;
-  /** WS origin; defaults to baseUrl. Next dev cannot proxy WS, so a web shell would pass the server origin here — no such shell exists yet. */
+  /**
+   * WS origin; defaults to `baseUrl`. Next dev does not proxy protocol upgrades,
+   * so a shell must dial the server's own origin here rather than its own.
+   *
+   * **`apps/web` does exactly that** — `apps/web/src/providers.tsx:83` passes
+   * `NEXT_PUBLIC_SERVER_URL`. This sentence read "no such shell exists yet" until
+   * 2026-09-02; it was true when written and `apps/web` landed four commits later
+   * on the same branch without it being revisited. A docblock naming an absence is
+   * a claim with a shelf life.
+   */
   streamBaseUrl?: string;
   fetchImpl?: FetchLike;
   webSocketFactory?: (url: string) => WebSocketLike;

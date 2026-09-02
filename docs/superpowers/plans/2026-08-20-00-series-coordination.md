@@ -6090,7 +6090,7 @@ server-side, because until then there is no run in which the client can observe 
 `packages/app-core/src/views/create-ticket-flow.tsx:189-201`: when a `ClientStateCache` is present and
 the draft names a parent, `create` runs `precheckEvent` locally, and on a `hierarchy.parent-terminal`
 refusal it opens the reopen prompt and **returns at `:200`** — `dataSource.ingest` is never called. The
-test that pins this is `packages/app-core/test/views/reopen-flow.test.tsx:254` (case 13.4g, *"a local
+test that pins this is `packages/app-core/test/views/reopen-flow.test.tsx:254` (case T13.4g, *"a local
 refusal is not presented as though the server had spoken — nothing is even submitted"*), which asserts
 `source.ingested` is EMPTY on that path.
 
@@ -6114,7 +6114,7 @@ says a pre-check is advisory and never a promise about acceptance.
 **The exact fix if the owner takes the second reading.** Small and local: delete the early `return` at
 `create-ticket-flow.tsx:200` so the flow falls through to `submitChildEvent`, and pass `'server'` rather
 than `'instant'` as `openReopenPrompt`'s origin — at which point the pre-check branch's only remaining
-job is that it has already computed the prompt. **Case 13.4g would need REWRITING, not deleting:** its
+job is that it has already computed the prompt. **Case T13.4g would need REWRITING, not deleting:** its
 subject (a refusal wears the name of whoever made it) survives the change; what changes is that
 `source.ingested` is no longer empty on that path and the label under the preview class becomes the
 server's. The `refusalOrigin` prop itself stays either way — the reopen prompt can still be reached from

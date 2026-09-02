@@ -197,6 +197,62 @@ describe('3.97 listPending — the roster of outstanding invitations', () => {
   });
 
   /**
+   * 3.148 — every absent cell in this row says it is absent, and that had to be
+   * made true rather than asserted. `invitedBy` and `invitedAt` substituted `''`
+   * while their three siblings carried explicit markers, and on a non-nullable
+   * `string` an empty cell is indistinguishable from a served one — so the two
+   * fields whose whole job is to ATTRIBUTE an invitation were the two that would
+   * have masked a malformed body. Neither can fire against the shipped door
+   * (`apps/server/src/routes/invites.ts:579-580` always serves both), which is
+   * exactly why the substitute had never been seen by anything.
+   *
+   * The control matters as much as the case: the SAME wire row with every field
+   * present must carry no marker at all, or a mapper that stamped markers
+   * unconditionally would pass the assertion above.
+   */
+  it('3.148 names every absent cell rather than emptying it, and marks nothing when the wire is whole', async () => {
+    const gappy = createHttpInviteAdminGateway(
+      fakeHttp({
+        'GET /v1/workspaces/ws_1/invites': {
+          invites: [{ inviteId: 'i_1', projectIds: [], expiresAt: null }],
+        },
+      }),
+    );
+    const [gap] = await gappy.listPending('ws_1');
+    expect(gap).toEqual({
+      inviteId: 'i_1',
+      address: '(no address recorded — row 1)',
+      channel: '(no channel recorded)',
+      role: '(no role recorded)',
+      projectIds: [],
+      invitedBy: '(no inviter recorded)',
+      invitedAt: '(no invite date recorded)',
+      expiresAt: null,
+    });
+
+    const whole = createHttpInviteAdminGateway(
+      fakeHttp({
+        'GET /v1/workspaces/ws_1/invites': {
+          invites: [
+            {
+              inviteId: 'i_1',
+              address: 'a@b.test',
+              channel: 'email',
+              role: 'member',
+              projectIds: [],
+              invitedBy: 'u_1',
+              invitedAt: '2026-09-01T10:00:00.000Z',
+              expiresAt: null,
+            },
+          ],
+        },
+      }),
+    );
+    const [served] = await whole.listPending('ws_1');
+    expect(JSON.stringify(served)).not.toContain('no ');
+  });
+
+  /**
    * 3.99 — the 403 that the members page uses as its role gate.
    *
    * `INVITE_ADMIN_ONLY_BODY` (`routes/invites.ts:118`) is what a plain member

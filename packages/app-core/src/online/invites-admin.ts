@@ -178,8 +178,14 @@ export function createHttpInviteAdminGateway(http: HttpClient): InviteAdminGatew
           projectIds: Array.isArray(row['projectIds'])
             ? row['projectIds'].filter((id): id is string => typeof id === 'string')
             : [],
-          invitedBy: asString(row['invitedBy']) ?? '',
-          invitedAt: asString(row['invitedAt']) ?? '',
+          // Same rule as `address`/`channel`/`role` above, and it was NOT applied
+          // here until 2026-09-02: an empty string is indistinguishable from a
+          // served one on a non-nullable `string`, so a malformed body would be
+          // MASKED by the very field meant to attribute the invitation. Neither
+          // can fire against the shipped door — `routes/invites.ts:579-580` always
+          // serves both — which is exactly why the substitute had never been seen.
+          invitedBy: asString(row['invitedBy']) ?? '(no inviter recorded)',
+          invitedAt: asString(row['invitedAt']) ?? '(no invite date recorded)',
           expiresAt: typeof expiresAt === 'string' ? expiresAt : null,
         };
       });

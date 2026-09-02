@@ -111,8 +111,8 @@ function renderFlow(
   return onCreated;
 }
 
-describe('3.79 · 13.4 the reopen option (owner decision) — the whole flow', () => {
-  it('13.4a offers the reopen at the moment of refusal, then emits parent-with-cause BEFORE the child, and both commit', async () => {
+describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', () => {
+  it('T13.4a offers the reopen at the moment of refusal, then emits parent-with-cause BEFORE the child, and both commit', async () => {
     const user = userEvent.setup();
     const source = flowSource((call, events) =>
       call === 1
@@ -152,7 +152,7 @@ describe('3.79 · 13.4 the reopen option (owner decision) — the whole flow', (
     expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).not.toBeInTheDocument();
   });
 
-  it("13.4b the parent's own rules are honoured, not bypassed — its refusal renders verbatim and the child is never sent", async () => {
+  it("T13.4b the parent's own rules are honoured, not bypassed — its refusal renders verbatim and the child is never sent", async () => {
     const user = userEvent.setup();
     const source = flowSource((call, events) =>
       call === 1
@@ -178,7 +178,7 @@ describe('3.79 · 13.4 the reopen option (owner decision) — the whole flow', (
     expect(screen.getByRole('dialog', { name: 'Reopen parent?' })).toBeInTheDocument();
   });
 
-  it('13.4c a child refusal after a committed reopen reports both truths — the reopen is recorded history', async () => {
+  it('T13.4c a child refusal after a committed reopen reports both truths — the reopen is recorded history', async () => {
     const user = userEvent.setup();
     const source = flowSource((call, events) => {
       if (call === 1) return events.map((event) => parentTerminal(event.id));
@@ -203,7 +203,7 @@ describe('3.79 · 13.4 the reopen option (owner decision) — the whole flow', (
     expect(source.ingested).toHaveLength(3);
   });
 
-  it('13.4d an ordinary successful create never shows the dialog', async () => {
+  it('T13.4d an ordinary successful create never shows the dialog', async () => {
     const user = userEvent.setup();
     const source = flowSource((_call, events) => events.map((event) => committed(event.id)));
     const onCreated = renderFlow(source);
@@ -213,7 +213,7 @@ describe('3.79 · 13.4 the reopen option (owner decision) — the whole flow', (
     expect(source.ingested).toHaveLength(1);
   });
 
-  it("13.4e the parent's workflow is read at the version the parent PINS, never latest", async () => {
+  it("T13.4e the parent's workflow is read at the version the parent PINS, never latest", async () => {
     const user = userEvent.setup();
     const workflowAsks: WorkflowAsk[] = [];
     const source = flowSource(
@@ -229,7 +229,7 @@ describe('3.79 · 13.4 the reopen option (owner decision) — the whole flow', (
     expect(workflowAsks).toEqual([{ workflowId: 'wf-errand', version: 1 }]);
   });
 
-  it('13.4f a local check that did not refuse settles nothing — the SERVER refuses and its reason is what shows', async () => {
+  it('T13.4f a local check that did not refuse settles nothing — the SERVER refuses and its reason is what shows', async () => {
     const user = userEvent.setup();
     const cache = createClientStateCache();
     // A non-terminal parent: the pre-check reads it and declines to refuse.
@@ -251,7 +251,7 @@ describe('3.79 · 13.4 the reopen option (owner decision) — the whole flow', (
     expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).not.toBeInTheDocument();
   });
 
-  it('13.4g a local refusal is not presented as though the server had spoken — nothing is even submitted', async () => {
+  it('T13.4g a local refusal is not presented as though the server had spoken — nothing is even submitted', async () => {
     const user = userEvent.setup();
     const cache = createClientStateCache();
     cache.upsertTicket(parentState({ stateId: 'done', stateCategory: 'terminal' }));
@@ -277,7 +277,7 @@ describe('3.79 · 13.4 the reopen option (owner decision) — the whole flow', (
     expect(source.ingested[1]?.[0]?.type).toBe('ticket.created');
   });
 
-  it('3.80 · 13.4h when the parent read REFUSES, the offer is not built and the refusal still renders verbatim', async () => {
+  it('3.80 · T13.4h when the parent read REFUSES, the offer is not built and the refusal still renders verbatim', async () => {
     const user = userEvent.setup();
     // The REAL `ServingGapError` carrying the REAL register entries, the shape
     // 3.75 established: a hand-written Error would keep passing on the day the
@@ -303,12 +303,12 @@ describe('3.79 · 13.4 the reopen option (owner decision) — the whole flow', (
     expect(onCreated).not.toHaveBeenCalled();
   });
 
-  it('3.80 · 13.4h-control the register really does carry getTicket absences, so 13.4h is a measurement', () => {
+  it('3.80 · T13.4h-control the register really does carry getTicket absences, so T13.4h is a measurement', () => {
     expect((SERVING_GAPS['getTicket'] ?? []).length).toBeGreaterThan(0);
     expect(SERVING_GAPS['getTicket']?.[0]?.field).toBeTruthy();
   });
 
-  it('13.4k a workflow with no non-terminal move out of its terminal state offers no reopen, and says so', async () => {
+  it('T13.4k a workflow with no non-terminal move out of its terminal state offers no reopen, and says so', async () => {
     const user = userEvent.setup();
     // 'done' is terminal and its only declared edge leaves to another terminal
     // state, so there is nothing to offer. A disabled button with no sentence
@@ -337,7 +337,7 @@ describe('3.79 · 13.4 the reopen option (owner decision) — the whole flow', (
     expect(within(dialog).getByRole('button', { name: 'Reopen and proceed' })).toBeDisabled();
   });
 
-  it('13.4l a claim the server answers with NOTHING is reported as unknown, never as a quiet success', async () => {
+  it('T13.4l a claim the server answers with NOTHING is reported as unknown, never as a quiet success', async () => {
     const user = userEvent.setup();
     const source = flowSource(() => []);
     const onCreated = renderFlow(source);
@@ -350,7 +350,7 @@ describe('3.79 · 13.4 the reopen option (owner decision) — the whole flow', (
     expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).not.toBeInTheDocument();
   });
 
-  it('13.4i cancelling the offer submits nothing further', async () => {
+  it('T13.4i cancelling the offer submits nothing further', async () => {
     const user = userEvent.setup();
     const source = flowSource((_call, events) => events.map((event) => parentTerminal(event.id)));
     const onCreated = renderFlow(source);
@@ -365,7 +365,7 @@ describe('3.79 · 13.4 the reopen option (owner decision) — the whole flow', (
     expect(onCreated).not.toHaveBeenCalled();
   });
 
-  it('13.4j a claim the server calls INVALID reports the door’s own code and message, not a stand-in', async () => {
+  it('T13.4j a claim the server calls INVALID reports the door’s own code and message, not a stand-in', async () => {
     const user = userEvent.setup();
     const source = flowSource((_call, events) =>
       events.map((event) => ({
