@@ -949,15 +949,30 @@ describe('GET /v1/workspaces/:ws/tickets/:id vs TicketRead', () => {
 
 describe('GET/PUT /v1/me/preferences vs UserPreferences', () => {
   it("the client's document is REFUSED whole — `.strict()` turns three renames into one 400", async () => {
-    // `view-types.ts:191` — `UserPreferences = {version: 1, projects:
-    // Record<id, {columns, grouping}>, savedFilters}`, with
+    // `view-types.ts:220` — `UserPreferences = {version: 1, projects:
+    // Record<id, ProjectViewPrefs>, savedFilters}`, with
     // `SavedFilter = {id, name, filter}`. The server's `preferencesDocSchema`
     // is `.strict()` and its keys are `{savedFilters, listColumns, grouping}`
     // with `SavedFilter.filterSpec`. So this is not an adapter's rename job:
     // the client's document does not reach storage at all.
+    //
+    // `ProjectViewPrefs` (`view-types.ts:214`) is no longer a plain
+    // `{columns, grouping}` pair: ruling P24 says the server's two parallel
+    // records can hold a project in `listColumns` and not in `grouping`, and
+    // that the missing half must surface as NOT SET rather than as a default
+    // wearing the user's authority — so each half is a `Chosen<T>` whose
+    // `default` arm carries no value. That is what this payload spells out, and
+    // spelling it out is the point of the pin: the shape below is what a client
+    // would actually send today, so the 400 is measured against the real type
+    // rather than against a shape nothing constructs any more.
     const clientDoc = {
       version: 1,
-      projects: { [projectId]: { columns: ['status'], grouping: 'epic' } },
+      projects: {
+        [projectId]: {
+          columns: { origin: 'stored', value: ['status'] },
+          grouping: { origin: 'stored', value: 'epic' },
+        },
+      },
       savedFilters: [{ id: 'mine', name: 'Mine', filter: {} }],
     };
     const refused = await app.inject({

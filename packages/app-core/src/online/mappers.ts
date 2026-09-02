@@ -16,7 +16,6 @@ import type {
   TransitionCause,
   UserPreferences,
 } from '../view-types.js';
-import { DEFAULT_VIEW_PREFS } from '../view-types.js';
 
 /**
  * The ONE adaptation layer between the shipped `/v1` JSON and the client
@@ -716,10 +715,24 @@ export function toServerFilterSpec(filter: FilterSpec): Record<string, unknown> 
  * Ruling P24 settled that the SHIPPED `.strict()` document wins over Plan 6's,
  * so this translates rather than asking the server to change: the server's
  * `listColumns` and `grouping` are two records keyed by project id, and the
- * client's `projects` is one record of pairs. A project named by only one of the
- * two takes `DEFAULT_VIEW_PREFS` for the other half — the server's absence of a
- * key means "this person never arranged that", which is exactly what the
- * client's default says.
+ * client's `projects` is one record of pairs.
+ *
+ * ## The half that is absent is reported NOT SET, and this is where that changed
+ *
+ * This function used to fill a missing half with `DEFAULT_VIEW_PREFS.columns` /
+ * `.grouping`, and its docblock defended that as saying the same thing the
+ * server's absent key says. **It does not, and ruling P24 forbids it in as many
+ * words:** *"a project present in `listColumns` and absent from `grouping` has no
+ * faithful client representation, and reaching for `DEFAULT_VIEW_PREFS` there
+ * invents a preference the user never set … a project missing from `grouping`
+ * surfaces as **not set**, never as a default wearing a user's authority."*
+ *
+ * The server's absence and the client's default are the same PIXELS and not the
+ * same fact: one is "nobody arranged this", the other is "this arrangement is
+ * yours". `ProjectViewPrefs` now admits the difference — each half is a `Chosen`
+ * whose `default` arm carries no value — so the half that is absent arrives here
+ * as `{ origin: 'default' }` and every consumer must narrow before it can render
+ * anything. Nothing in this file picks a stock value any more.
  *
  * ## There is no 404 branch here, and its removal is the point
  *
@@ -758,12 +771,12 @@ export function mapPreferences(raw: unknown): UserPreferences {
     projects[projectId] = {
       columns:
         columns === undefined
-          ? DEFAULT_VIEW_PREFS.columns
-          : asListColumnIds(columns, `preferences.listColumns.${projectId}`),
+          ? { origin: 'default' }
+          : { origin: 'stored', value: asListColumnIds(columns, `preferences.listColumns.${projectId}`) },
       grouping:
         group === undefined
-          ? DEFAULT_VIEW_PREFS.grouping
-          : asGrouping(group, `preferences.grouping.${projectId}`),
+          ? { origin: 'default' }
+          : { origin: 'stored', value: asGrouping(group, `preferences.grouping.${projectId}`) },
     };
   }
   const savedFilters: SavedFilter[] = asArray(
@@ -781,13 +794,33 @@ export function mapPreferences(raw: unknown): UserPreferences {
   return { version: 1, projects, savedFilters };
 }
 
-/** `UserPreferences` → the server's `.strict()` document. P24, the other way. */
+/**
+ * `UserPreferences` → the server's `.strict()` document. P24, the other way.
+ *
+ * ## A half nobody chose is NOT WRITTEN, which is what makes the round trip total
+ *
+ * The two records are keyed independently, so the server can hold a project in
+ * `listColumns` and not in `grouping` — that is the asymmetry P24 names, and it
+ * is also the only shape in which this client can store "one half chosen". A
+ * version of this function that wrote both halves unconditionally would take a
+ * `{ origin: 'default' }` half, spend a stock value on it, and PUT that value
+ * under the user's name: the same substitution `mapPreferences` just stopped
+ * making, one layer over and permanent, because storage is where a default stops
+ * being recoverable as a default.
+ *
+ * So a `default` half contributes no key, and the fixed point is faithful: a
+ * user who chose a grouping and never chose columns round-trips as a grouping
+ * key with no matching `listColumns` key, and reads back as
+ * `{ columns: { origin: 'default' }, grouping: { origin: 'stored', … } }`. A
+ * project whose halves are both `default` disappears from the document, which is
+ * the truth about a project nobody has arranged.
+ */
 export function toServerPreferences(preferences: UserPreferences): Record<string, unknown> {
   const listColumns: Record<string, unknown> = {};
   const groupings: Record<string, unknown> = {};
   for (const [projectId, prefs] of Object.entries(preferences.projects)) {
-    listColumns[projectId] = prefs.columns;
-    groupings[projectId] = prefs.grouping;
+    if (prefs.columns.origin === 'stored') listColumns[projectId] = prefs.columns.value;
+    if (prefs.grouping.origin === 'stored') groupings[projectId] = prefs.grouping.value;
   }
   return {
     savedFilters: preferences.savedFilters.map((saved) => ({
@@ -977,8 +1010,9 @@ const MAP_MY_WORK_ABSENCES: readonly Absence[] = [
  *
  * ## `inTransit` is NOT one of the absences, and the difference is the point
  *
- * `inTransit` is the replica's outbox. The web client is online-only (Plan 6
- * §5), so it HAS no outbox and `inTransit: []` would be the true answer, not a
+ * `inTransit` is the replica's outbox. The web client is online-only (spec §5,
+ * line 104 — Plan 6 carries the constraint at its own line 23, and cites it as
+ * "spec §5" there too), so it HAS no outbox and `inTransit: []` would be the true answer, not a
  * degradation — a structural emptiness. `contested` is the opposite: the rows
  * exist in `proj_contested`, so `[]` there would be a claim about the world
  * rather than a fact about this client. That distinction is why the two are

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SubmittedEvent } from '@gisik-nokma/domain';
 import type { DataSource, StreamItem } from '../src/data-source.js';
-import { DEFAULT_VIEW_PREFS } from '../src/view-types.js';
+import { DEFAULT_GROUPING, DEFAULT_LIST_COLUMNS, DEFAULT_VIEW_PREFS } from '../src/view-types.js';
 import { createFakeDataSource } from './helpers/fake-data-source.js';
 import { submittedTicketCreated } from './helpers/seed.js';
 
@@ -51,6 +51,17 @@ describe('the fake DataSource (the harness every view test rides on)', () => {
     // `getPreferences` takes a workspaceId as of ruling P25 clause 2 — the route
     // 400s without one — so a call that compiles is itself part of the pin.
     expect(await source.query.getPreferences('ws_1')).toEqual({ version: 1, projects: {}, savedFilters: [] });
-    expect(DEFAULT_VIEW_PREFS.grouping).toBe('epic');
+    // The stock VALUES and "nothing is set" are now two different constants,
+    // and pinning both is the point: `DEFAULT_VIEW_PREFS` says the user has
+    // chosen neither half — its `default` arms carry no value at all — while
+    // `DEFAULT_GROUPING` is the value a view renders in that case. Fusing them
+    // is what let a default be read as a choice (ruling P24).
+    expect(DEFAULT_GROUPING).toBe('epic');
+    expect(DEFAULT_LIST_COLUMNS).toEqual(['status', 'assignee', 'dueDate', 'progress']);
+    expect(DEFAULT_VIEW_PREFS).toEqual({
+      columns: { origin: 'default' },
+      grouping: { origin: 'default' },
+    });
+    expect(DEFAULT_VIEW_PREFS.grouping).not.toHaveProperty('value');
   });
 });

@@ -5842,7 +5842,7 @@ Three things read as gaps and are not, and each would have cost a wrong route ch
    flat shape is what it settled ON.
 3. **`inTransit`.** `routes/my-work.ts:91-101` states that claims in transit live in the replica's
    outbox and are "never served from a server that by definition has not received them." **The web
-   client is online-only (Plan 6 §5): it has no outbox, so `inTransit: []` is not a degradation, it
+   client is online-only (spec §5, line 104): it has no outbox, so `inTransit: []` is not a degradation, it
    is the true answer**, and the test that pins it must say *because there is no outbox*, never
    *because the read returned nothing*.
 
@@ -5989,3 +5989,81 @@ than the citation.
 worse than reporting it missing. The ask is one sentence: *does P24's reasoning extend to Plan 9's
 `spec`?* If it does — and the same `.strict()` argument applies unchanged — then P26 is that sentence
 and Plan 9's Open questions should carry it before step 14 dispatches.
+
+---
+
+## Step 11 (Plan 6 remainder) — three findings RECORDED, each with a named owner
+
+Found while closing ruling P24's per-project asymmetry in `ProjectViewPrefs` (step 11). None is owned
+by that task; each is recorded here rather than fixed, per the standing rule, and each names an owner
+that still has work. **None of the three was implemented.**
+
+### 1. Two date spellings will sit side by side on one screen. Owner: whoever next touches the attention route.
+
+`apps/server/src/routes/attention.ts:245` composes its `due-soon` reason from the **raw `YYYY-MM-DD`
+day claim**:
+
+```ts
+reason: `Needed by ${due.date} — due within ${settings.dueSoonDays} days.`,
+```
+
+My Work's due line, in the same client, renders the same kind of fact through the domain's one
+renderer — `packages/app-core/src/views/my-work.tsx:167`, `formatDate(item.dueDate.date)` → `30 Aug
+2026`. Both surfaces can be on screen together, so a user sees `2026-08-30` in the strip and
+`30 Aug 2026` in My Work, for the same claim.
+
+**The client is not the site to fix.** The owner decision is that attention reasons are the SERVER's,
+rendered verbatim (spec §7's "user's language" means named reasons, not localisation), and
+`attention-strip.test.tsx:25` pins that the strip renders the server's spelling as sent. Re-deriving
+the date in the browser would compute it without the workspace's thresholds — the thing the verbatim
+rule exists to prevent. **The spelling to change is the route's**, so that what it emits is already the
+domain's spelling. Nothing here should be changed until that route is touched, because changing the
+route's text moves a string the client tests quote.
+
+### 2. No test under `packages/app-core/test/views/` carries a test-case ID. Owner: Plan 6 Task 16.
+
+The workspace convention (`/Users/kiro/my_projects/CLAUDE.md`, `test-cases/`) is that tests
+cross-reference cases by id so grep finds both directions. **The claim as first written was "no test in
+`packages/app-core`", and a sweep falsified that** — recorded here in its corrected form, because a
+recorded finding that overstates its scope sends its owner to the wrong files.
+
+Measured 2026-09-02, `grep -rnE "(it|describe|test)\(\s*['\"\`][^'\"\`]*[0-9]+\.[0-9]+"` with quoted
+globs over each test file:
+
+| id-carrying test names | file |
+|---|---|
+| 27 | `test/online/mappers.test.ts` |
+| 14 | `test/online/online-data-source.test.ts` |
+| 7 | `test/online/http.test.ts` |
+| 3 | `test/no-http-in-views.test.ts` |
+| **0** | `test/views/board.test.tsx` |
+| **0** | `test/views/ticket-list.test.tsx` |
+| **0** | `test/views/list-model.test.ts` |
+| **0** | `test/views/my-work.test.tsx` |
+| **0** | `test/views/attention-strip.test.tsx` |
+| **0** | `test/views/rollup-text.test.ts` |
+| 0 | `cache` / `data-source` / `precheck` / `provenance` / `submit` / `stream` |
+
+Positive control, same command shape and same run: `apps/server/test/` returns **206** hits (e.g.
+`visible-events-for.test.ts:121` — `it('6.16 never yields an event about a ticket …')`), so the regex
+finds ids where ids exist. Second control: the ids are not absent from `app-core` as *text* —
+`no-http-in-views.test.ts:30` carries `3.47` and `online/http.test.ts:57` carries `3.45` — they are
+absent from the **views** suite specifically. The 51-vs-0 split inside one package is the finding.
+
+`rollup-text.test.ts` is added to the list the finding was reported with; it has the same gap and was
+not named. **Owner: Plan 6 Task 16**, which owns the catalogue and is where the ids and the tests get
+reconciled in one pass.
+
+### 3. `SHIPPED_KINDS` in the attention tests is a reconstruction, not a measurement. Owner: whoever closes the attention serving gap.
+
+`packages/app-core/test/views/attention-strip.test.tsx:69` declares
+`const SHIPPED_KINDS: AttentionItem[] = [ITEMS[0]!, ITEMS[1]!, ITEMS[3]!]` — "the three the server
+emits today" — and two tests rest on it (`:129`, `:145`). **That three-kind array is inferred from
+reading `routes/attention.ts`, not observed.** `mapAttention` refuses over the contested kind's missing
+`title` (`ServingGapError`), so no fixture reaching this file can be the server's real answer; the day
+the route emits a fourth kind, or stops emitting one of the three, nothing in `app-core` goes red.
+
+The place that WOULD go red is `apps/server/test/integration/client-contract.test.ts`, which injects
+the real route and reads the real body. **Owner: whoever closes the attention serving gap** — the same
+change that makes `contested` servable is the change that must move this constant and pin it
+server-side, because until then there is no run in which the client can observe the true kind set.

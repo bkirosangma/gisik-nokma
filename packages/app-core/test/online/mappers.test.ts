@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_VIEW_PREFS } from '../../src/view-types.js';
 import type {
   AttentionResponse,
   BoardResponse,
@@ -477,7 +478,25 @@ describe('3.37 mapIngestResults — index alignment and the arm, both checked', 
 });
 
 describe('3.38 preferences — ruling P24 both ways', () => {
-  it('folds listColumns and grouping into projects and defaults the half that is absent', () => {
+  /**
+   * RULING P24, the half that is ABSENT — and this test replaced one that
+   * asserted the opposite.
+   *
+   * The superseded assertion was *"defaults the half that is absent"*: a project
+   * in `listColumns` and not in `grouping` came back carrying
+   * `DEFAULT_VIEW_PREFS.grouping`, indistinguishable from a person who had
+   * chosen `'epic'`. P24 forbids exactly that — *"reaching for
+   * `DEFAULT_VIEW_PREFS` there invents a preference the user never set … a
+   * project missing from `grouping` surfaces as **not set**, never as a default
+   * wearing a user's authority."*
+   *
+   * Both projects here are half-set, MIRRORED, so a mapper that hard-wired one
+   * side would fail on the other; and the assertion is on `origin`, which is the
+   * only thing that distinguishes the two situations, since the VALUE a view
+   * ends up rendering is the same `'epic'` either way. That is the whole finding
+   * in one line: the old shape could not tell them apart.
+   */
+  it('reports the half that is ABSENT as not set, rather than defaulting it under the user’s name', () => {
     const prefs = mapPreferences({
       savedFilters: [],
       listColumns: { '01J9GPRJ000000000000000000': ['status', 'assignee'] },
@@ -486,13 +505,32 @@ describe('3.38 preferences — ruling P24 both ways', () => {
     expect(prefs).toEqual({
       version: 1,
       projects: {
-        '01J9GPRJ000000000000000000': { columns: ['status', 'assignee'], grouping: 'epic' },
+        '01J9GPRJ000000000000000000': {
+          columns: { origin: 'stored', value: ['status', 'assignee'] },
+          grouping: { origin: 'default' },
+        },
         '01J9GPRJ111111111111111111': {
-          columns: ['status', 'assignee', 'dueDate', 'progress'],
-          grouping: 'flat',
+          columns: { origin: 'default' },
+          grouping: { origin: 'stored', value: 'flat' },
         },
       },
       savedFilters: [],
+    });
+    // Stated as the refusal it is: no half the server did not send carries a
+    // value at all, so no consumer can read one as a choice. `toEqual` alone
+    // would pass against a `{origin:'default', value:…}` shape.
+    expect(prefs.projects['01J9GPRJ000000000000000000']?.grouping).not.toHaveProperty('value');
+    expect(prefs.projects['01J9GPRJ111111111111111111']?.columns).not.toHaveProperty('value');
+    // CONTROL, same run: a project the server names in BOTH records is `stored`
+    // on both halves — so "everything is default now" is not what this measures.
+    const both = mapPreferences({
+      savedFilters: [],
+      listColumns: { '01J9GPRJ222222222222222222': ['status'] },
+      grouping: { '01J9GPRJ222222222222222222': 'type' },
+    });
+    expect(both.projects['01J9GPRJ222222222222222222']).toEqual({
+      columns: { origin: 'stored', value: ['status'] },
+      grouping: { origin: 'stored', value: 'type' },
     });
   });
 
@@ -510,7 +548,10 @@ describe('3.38 preferences — ruling P24 both ways', () => {
         listColumns: { p: ['status', 'field:amount'] },
         grouping: { p: 'flat' },
       }).projects['p'],
-    ).toEqual({ columns: ['status', 'field:amount'], grouping: 'flat' });
+    ).toEqual({
+      columns: { origin: 'stored', value: ['status', 'field:amount'] },
+      grouping: { origin: 'stored', value: 'flat' },
+    });
   });
 
   /**
@@ -605,7 +646,12 @@ describe('3.38 preferences — ruling P24 both ways', () => {
     expect(
       toServerPreferences({
         version: 1,
-        projects: { '01J9GPRJ000000000000000000': { columns: ['status'], grouping: 'epic' } },
+        projects: {
+          '01J9GPRJ000000000000000000': {
+            columns: { origin: 'stored', value: ['status'] },
+            grouping: { origin: 'stored', value: 'epic' },
+          },
+        },
         savedFilters: [{ id: 'f', name: 'Mine', filter: { assigneeIds: [ANSELMA] } }],
       }),
     ).toEqual({
@@ -613,6 +659,67 @@ describe('3.38 preferences — ruling P24 both ways', () => {
       listColumns: { '01J9GPRJ000000000000000000': ['status'] },
       grouping: { '01J9GPRJ000000000000000000': 'epic' },
     });
+  });
+
+  /**
+   * The WRITE side of P24, which is where a default becomes permanent.
+   *
+   * A half nobody chose contributes NO KEY. Writing one would spend a stock
+   * value on it and PUT that value under the user's name — the substitution
+   * `mapPreferences` stopped making, one layer over and unrecoverable, because
+   * once it is in storage nothing downstream can tell it from a choice.
+   *
+   * The round trip is asserted whole rather than the write alone: a `default`
+   * half that survives `toServerPreferences` → `mapPreferences` as `default` is
+   * the fixed point that makes the pair of functions total, which is the thing
+   * P24 said the client type could not express.
+   */
+  it('declines to STORE a half nobody chose, and the half-set project round-trips as half-set', () => {
+    const halfSet = {
+      version: 1 as const,
+      projects: {
+        '01J9GPRJ000000000000000000': {
+          columns: { origin: 'default' as const },
+          grouping: { origin: 'stored' as const, value: 'type' as const },
+        },
+      },
+      savedFilters: [],
+    };
+    const document = toServerPreferences(halfSet);
+    expect(document).toEqual({
+      savedFilters: [],
+      listColumns: {},
+      grouping: { '01J9GPRJ000000000000000000': 'type' },
+    });
+    // Round trip: what the server would hand back reads as the same half-set
+    // project, NOT as a user who chose the stock columns.
+    expect(mapPreferences(document)).toEqual(halfSet);
+
+    // CONTROL, same run, one origin apart: the identical columns marked
+    // `stored` DO reach storage. Without this, a `toServerPreferences` that
+    // dropped `listColumns` entirely passes the assertion above.
+    const chosen = toServerPreferences({
+      ...halfSet,
+      projects: {
+        '01J9GPRJ000000000000000000': {
+          columns: { origin: 'stored', value: ['status', 'assignee', 'dueDate', 'progress'] },
+          grouping: { origin: 'stored', value: 'type' },
+        },
+      },
+    });
+    expect(chosen['listColumns']).toEqual({
+      '01J9GPRJ000000000000000000': ['status', 'assignee', 'dueDate', 'progress'],
+    });
+
+    // And a project whose halves are BOTH unchosen disappears from the
+    // document — the truth about a project nobody has arranged.
+    expect(
+      toServerPreferences({
+        version: 1,
+        projects: { '01J9GPRJ111111111111111111': DEFAULT_VIEW_PREFS },
+        savedFilters: [],
+      }),
+    ).toEqual({ savedFilters: [], listColumns: {}, grouping: {} });
   });
 });
 

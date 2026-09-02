@@ -268,7 +268,12 @@ describe('3.40 the three signatures that grew a workspaceId (P25 clause 2)', () 
     });
     await source.query.putPreferences(WORKSPACE, {
       version: 1,
-      projects: { [PROJECT]: { columns: ['status'], grouping: 'epic' } },
+      projects: {
+        [PROJECT]: {
+          columns: { origin: 'stored', value: ['status'] },
+          grouping: { origin: 'stored', value: 'epic' },
+        },
+      },
       savedFilters: [],
     });
     await source.query.getMyWork(WORKSPACE).catch(() => undefined);
@@ -283,6 +288,60 @@ describe('3.40 the three signatures that grew a workspaceId (P25 clause 2)', () 
       listColumns: { [PROJECT]: ['status'] },
       grouping: { [PROJECT]: 'epic' },
     });
+  });
+
+  /**
+   * 3.67 — the HALF-SET project, measured ON THE WIRE rather than reasoned.
+   *
+   * `toServerPreferences` declining to store a half nobody chose is proven as a
+   * pure function in `mappers.test.ts`. That is not the same claim as *what this
+   * client actually sends*: between the two sits `putPreferences`, and a
+   * composition can lose a property both of its halves have. So this asserts the
+   * REQUEST BODY — the bytes the server would receive — for a project the user
+   * has arranged only half of.
+   *
+   * The wrong answer this refuses is specific and it is the one a reasonable
+   * implementation gives: `listColumns: { [PROJECT]: [...stock columns] }`,
+   * which stores this client's default under the user's name, permanently and
+   * unrecoverably, because storage cannot tell a default from a choice.
+   */
+  it('3.67 sends NO listColumns key for a project whose columns nobody chose', async () => {
+    const { fetchImpl, calls } = recordingFetch({
+      '/v1/me/preferences': { savedFilters: [], listColumns: {}, grouping: {} },
+    });
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    await source.query.putPreferences(WORKSPACE, {
+      version: 1,
+      projects: {
+        [PROJECT]: { columns: { origin: 'default' }, grouping: { origin: 'stored', value: 'flat' } },
+      },
+      savedFilters: [],
+    });
+    const body = JSON.parse(String(calls[0]?.init?.body));
+    expect(body).toEqual({
+      savedFilters: [],
+      listColumns: {},
+      grouping: { [PROJECT]: 'flat' },
+    });
+    // Said as the refusal it is: the key is ABSENT, not present-and-empty. A
+    // `listColumns: { [PROJECT]: [] }` would be the user choosing NO columns,
+    // which is a different statement from never having chosen.
+    expect(Object.keys(body.listColumns)).toEqual([]);
+
+    // CONTROL, one origin apart, same run: the identical columns marked
+    // `stored` DO reach the wire. Without it, a transport that dropped
+    // `listColumns` entirely passes the assertions above.
+    await source.query.putPreferences(WORKSPACE, {
+      version: 1,
+      projects: {
+        [PROJECT]: {
+          columns: { origin: 'stored', value: ['status'] },
+          grouping: { origin: 'stored', value: 'flat' },
+        },
+      },
+      savedFilters: [],
+    });
+    expect(JSON.parse(String(calls[1]?.init?.body)).listColumns).toEqual({ [PROJECT]: ['status'] });
   });
 });
 
