@@ -36,6 +36,62 @@ names live in `Features.md` §7 and `test-cases/07-api-realtime-search.md`, whic
 **The status table further down is kept for its REVIEW OUTCOMES, which are still true. Its shas are
 not.**
 
+### STEP 10 IS ALREADY SCOPED — read-only recon, run 2026-09-02, before you re-derive any of it
+
+**The brief's framing of step 10 is wrong in one way and understated in another.** Both corrections
+are measured, with a positive control (`rtk proxy grep -rn "FakeDataSource"` returned the 3 files it
+should, run before any null result below was trusted).
+
+**WRONG: there is only ONE fake, and Plans 8 and 9 have no client code in this repo at all.**
+`packages/app-core/test/helpers/fake-data-source.ts` (`createFakeDataSource`) is the whole of it, and
+it is total — it implements every one of `DataSource`'s 11 query methods plus `ingest` and
+`subscribe`. Its own docblock already calls itself a *"SANCTIONED MOCKED-CONTRACT SEAM"*. **No
+`http-data-source.ts` or online `DataSource` exists anywhere**, so the fake is the only implementation
+there is. It is consumed by `cache.test.ts`, `data-source.test.ts` and `board.test.tsx` — and
+`board.tsx` is the one real view component in the repo, so it is load-bearing. Nothing server-facing
+was found in `packages/editor`, `packages/ui` or `packages/sync-client`.
+*(`stream-frames.ts:161` names the stream fake's readers as Plans 6, 9 and 10 — reconcile that against
+the brief's "6a, 8 and 9" before scoping.)*
+
+**UNDERSTATED: SIX confirmed shape disagreements, not the two already known.** The two known ones hold
+exactly as recorded. The four new ones, each cited:
+
+| # | Contract | The disagreement |
+|---|---|---|
+| c | `StreamItem` vs `ServerStreamFrame` | **Self-documented in `stream-frames.ts:143-162`.** Client's event frame carries `EventEnvelope` and so **lacks `workspaceSeq` — the field the resume protocol needs**; client has **no `scope-revoked` member at all**, so a revocation arrives as an unrecognised `type` and is **silently dropped**; `error.code` is bare `string` vs the server's typed enum |
+| d | `SearchHit` vs the real search response | Client expects a **flat array**; server returns `{workspaceId, query, hits:[{card: TicketCard, snippet}]}`. **`matchedIn` does not exist server-side at all** — the server headlines title+description+comments into one blob and cannot say which field matched |
+| e | `MyWorkView` vs `MyWorkResponse` | **The most severe: a different grouping MODEL, not a rename.** Client `{assigned, inTransit, contested}` vs server `{open, active, terminal}`. **`contested` does not exist server-side** (`my-work.ts:96` calls it a Plan 10 extension point) |
+| f | `BoardView` vs `BoardResponse` | Client nests columns under `groups: BoardGroup[]`; server returns a **flat** `columns[]`. Card level: client `assignee: Actor \| null` **with `.name`** vs server `assigneeId: string \| null`, never resolved — and **`board.tsx:94` already reads `card.assignee.id`/`.name`**, so this is live, not dead |
+| + | `getPreferences` / `getMyWork` signatures | Take **no `workspaceId`**, but both routes 400 `invalid_query` without `?workspaceId=`. `putPreferences` is typed `Promise<void>`; the real PUT returns the stored document |
+| + | `WorkspaceRef` vs `GET /v1/me/workspaces` | Wrapped not bare, `id`→`workspaceId`, `role` added, **`projects` absent entirely** |
+
+**That last row is the one to think about.** `GET /v1/me/workspaces` has the repo's ONLY real
+POST→GET round-trip test (`workspaces.test.ts:375-392`), it is green — **and it still disagrees with
+the client contract.** So a passing end-to-end test does not close this gap unless it is asserted
+against the CLIENT's shape.
+
+**NO end-to-end test exists for the new read surface.** Every read-route test builds its world through
+`read-app.ts` → `applyCommitted`, i.e. through the six-absence seeder. Two near-misses, both
+incomplete: `security.test.ts:96` does a real `POST /v1/events` but never reads it back through a
+route; `security.test.ts:156` reads through a real route but seeds via raw `insertEvent`, bypassing
+ingest entirely. **The real building blocks already exist** — `buildTestApp()` (real Fastify, real
+auth, the real gated `IngestService`, real projection registry, no stubs) and `createTestDatabase()`
+(real Postgres, real migrations).
+
+**THE FIRST TEST TO WRITE, and why this one:** a real founding-through-board round trip —
+`POST /v1/workspaces` → `POST /v1/events` with `project.created` + `ticket.created` under a real
+signed-in session → `GET /v1/projects/:projectId/board`, asserting the raw body. It is **the only
+scenario that can exercise `bootstrapWorkspace` at all**, since its side effects fire only from a real
+`workspace.created` through real ingest; in the same flow it proves the seqs come from the database
+rather than the process map, and that the permission gate and rule engine admit an ordinary creation —
+**three of the six absences closed by one scenario.** And because `board.tsx` is the one view built
+against the fake, it surfaces disagreements (b) and (f) in the place the client already depends on
+them.
+
+**Not established, time-boxed:** `getMembers`/`Actor`, `getTicket`/`ParentRef`,
+`getTicketHistory`/`TicketHistoryEvent`, `getWorkflowDef`/`WorkflowDef` were not compared in depth —
+plausible homes for a seventh and eighth disagreement.
+
 ### WHAT THE NEXT SESSION SHOULD DO
 
 **Step 9 is closed. The next item in the serial sequence is STEP 10 — the integration checkpoint.**
