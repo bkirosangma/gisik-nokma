@@ -102,9 +102,9 @@ commit. Re-ask the ruling; do not re-earn it.
 | T7 | Online DataSource + P25's one approved route change | **DONE.** `online/{http,mappers,online-data-source,index}.ts`. **6/12 methods answer, 6 refuse by name.** |
 | T10 | List view | **DONE.** `list-model.ts`, `ticket-list.tsx`, `use-preferences.ts`, 47 cases. Ruling P24 now honoured PER HALF via `Chosen<T>`. |
 | T11 | My Work + attention strip | **DONE.** `my-work.tsx`, `attention-strip.tsx`, 35 cases. Review shipped clean. |
-| T12, T12a, T13 | ticket sheet / attachments / reopen flow | **NEXT.** T12's `getTicket` refuses — build against the fake, as T9/T10/T11 did. |
-| T14 | `apps/web` Next.js shell | **todo** — the thing Plans 8 and 9 wait on. Its pages need T10–T12; its shell does not. |
-| T15, T15b, T16 | invite + doors + catalogue | **todo** |
+| T12, T12a, T13 | ticket sheet / attachments / reopen flow | **DONE.** 9 view modules + flows/guarded-child-event.ts, 104 cases. Both reviews shipped clean. |
+| T14 | `apps/web` Next.js shell | **NEXT — and it is what Plans 8 and 9 are blocked on.** Greenfield: `apps/web/` does not exist. |
+| T15, T15b, T16 | invite + doors + catalogue | **todo.** T15's Playwright smoke goes behind `test:e2e`, NOT `test` — the gate runs `test` only and CI installs no browsers. |
 
 ### WHAT "REFUSES" MEANS FOR T10–T13, so a restart does not read it as blocked
 
@@ -115,13 +115,13 @@ the ONLINE source, and each one is pinned by a server-side cross-check in
 `apps/server/test/integration/client-contract.test.ts` that goes RED the day the route starts serving
 the field. Build the views. Do not weaken the refusals to make a view light up.
 
-### Gate at the T10/T11 commit, measured at the tree reported
+### Gate at the T12/T12a/T13 commit, measured at the tree reported
 
-**exit 0 · 21/21 · 0 cached · 1798 tests · Node v22.22.2 · 0 engine warnings.**
-domain 335 · rule-engine 280 · **server 761** · **app-core 311** · editor 72 · ui 31 · sync-client 8.
+**exit 0 · 21/21 · 0 cached · 1902 tests · Node v22.22.2 · 0 engine warnings.**
+domain 335 · rule-engine 280 · **server 761** · **app-core 415** · editor 72 · ui 31 · sync-client 8.
 
-Decomposes from main's 1612 in three steps: app-core 130 → 224 (T7+T8) → 311 (T10+T11+fix); server
-756 → 761 (the client-contract cross-checks). **Every other package byte-identical throughout**, which
+Decomposes from main's 1612 in four steps: app-core 130 → 224 (T7+T8) → 311 (T10+T11) → 415
+(T12+T12a+T13); server 756 → 761 (the client-contract cross-checks). **Every other package byte-identical throughout**, which
 is the check that this branch has not touched what it does not claim to touch.
 
 ### RULING P24 WAS BEING VIOLATED BY THIS BRANCH'S OWN CODE, and the fix is a type
