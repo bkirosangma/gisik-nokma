@@ -5,6 +5,7 @@ import { LogMagicLinkSender } from './auth/magic-link-sender.js';
 import { LogOtpSender } from './auth/otp-sender.js';
 import { loadConfig } from './config.js';
 import { createPool } from './db.js';
+import { buildServerGates } from './gates/index.js';
 import { createIngestService } from './ingest/ingest-service.js';
 import { buildProjectionRegistry } from './projections/index.js';
 
@@ -12,7 +13,19 @@ async function main(): Promise<void> {
   const config = loadConfig(process.env);
   const pool = createPool(config.databaseUrl);
   const projections = buildProjectionRegistry();
-  const ingest = createIngestService({ pool, evaluate: evaluateEvent, projections });
+  // `gates` is what makes the server-owned refusals real in production rather
+  // than only in their tests: an embedded attachment must be this ticket's own
+  // image, and named evidence must exist on this ticket. Everything else that
+  // builds an ingest service — every test suite — leaves it out and gets the
+  // ungated default, so THIS line is the only place the product's gates are
+  // switched on. `test/gates/gate-seam.test.ts` pins what `buildServerGates()`
+  // covers; nothing boots this composition root, which is recorded as a gap.
+  const ingest = createIngestService({
+    pool,
+    evaluate: evaluateEvent,
+    projections,
+    gates: buildServerGates(),
+  });
   const auth = createAuth({
     pool,
     // The senders that exist, and neither is deployable.

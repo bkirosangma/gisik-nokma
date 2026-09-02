@@ -11,6 +11,7 @@ import {
 } from '@gisik-nokma/domain';
 import type { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { createEngineContext } from '../engine-context.js';
+import type { ServerGate } from '../gates/server-gate.js';
 import {
   insertEvent,
   isUniqueViolation,
@@ -31,6 +32,18 @@ export type IngestDeps = {
   projections: ProjectionRegistry;
   registry?: EventTypeRegistry; // defaults to domainRegistry
   now?: () => Date;             // injectable clock for tests
+  /**
+   * Server-side refusals that need server-owned state the pure rule engine
+   * cannot see — the `attachments` table (Plan 7 Task 11). Optional and
+   * defaulting to `[]`, so the seam is invisible to every caller that does not
+   * use it: Plan 1's ingest suite, the permission suites and the route suites
+   * all construct this service without gates and are unchanged by their
+   * existence.
+   *
+   * Construction-time and unconditional — see `../gates/server-gate.ts` for
+   * why gates, unlike the permission gate, do not distinguish the doors.
+   */
+  gates?: ServerGate[];
 };
 
 export type CommittedEventListener = (event: LedgerEvent) => void;
@@ -133,6 +146,7 @@ type CommitOutcome = { result: IngestResult; committed: LedgerEvent | null };
 export function createIngestService(deps: IngestDeps): IngestService {
   const registry = deps.registry ?? domainRegistry;
   const now = deps.now ?? (() => new Date());
+  const gates = deps.gates ?? [];
   const listeners = new Set<CommittedEventListener>();
 
   function notifyCommitted(event: LedgerEvent): void {
@@ -279,6 +293,45 @@ export function createIngestService(deps: IngestDeps): IngestService {
           result: { status: 'refused', eventId: envelope.id, rule: verdict.rule, reason: verdict.reason },
           committed: null,
         };
+      }
+
+      // The server gates (Plan 7 Task 11). They run HERE — after the engine has
+      // accepted and before anything is appended — and the position is the
+      // whole point of the seam.
+      //
+      // Inside the transaction, reading through `client` and never
+      // `deps.pool`. A gate handed the pool would compile, pass every
+      // single-event test, and judge a world one connection away from the one
+      // this event is about to join. `test/gates/gate-seam.test.ts` pins the
+      // handle by writing a marker row from inside a gate and proving the
+      // ROLLBACK took it back — a write through the pool would autocommit and
+      // survive.
+      //
+      // A refusal here is the SAME path as an engine refusal: ROLLBACK, no
+      // append, no projection, no listener, the standard refused shape. It
+      // rolls back THIS event's transaction and no other — `commitOne` takes a
+      // connection per event, so a gate refusal in the middle of a batch leaves
+      // its committed neighbours committed and lets the events after it be
+      // judged on their own. That is deliberate and is pinned in
+      // `test/gates/gate-seam.test.ts`; the alternative — one gate refusal
+      // discarding a whole sync push — would make an offline client's
+      // legitimate work vanish because one of its documents named a stale
+      // attachment.
+      for (const gate of gates) {
+        if (gate.eventType !== submitted.type) continue;
+        const gateRefusal = await gate.check(submitted, client);
+        if (gateRefusal !== null) {
+          await client.query('ROLLBACK');
+          return {
+            result: {
+              status: 'refused',
+              eventId: envelope.id,
+              rule: gateRefusal.rule,
+              reason: gateRefusal.reason,
+            },
+            committed: null,
+          };
+        }
       }
 
       await insertEvent(client, envelope);
