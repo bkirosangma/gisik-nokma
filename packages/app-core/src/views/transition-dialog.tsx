@@ -13,24 +13,48 @@ export type TransitionOption = { toStateId: string; name: string; rules: Transit
  * `from: '*'` means "from any state", so a wildcard edge is offered from
  * everywhere except the state it points at: offering `doing → doing` would put
  * a move on screen that changes nothing and that the engine has no edge for.
- * A target reachable by more than one edge keeps the FIRST edge's rules, in
+ *
+ * ## A target reachable by BOTH a wildcard and an exact edge (ruling P27)
+ *
+ * **The exact edge supplies the rules, and declaration order does not matter.**
+ * That is not a preference — it is what the engine does, and this function's
+ * whole purpose is to predict the engine. `packages/rule-engine/src/transition.ts:91-93`
+ * resolves `find(exact) ?? find('*')`, and `precheck.ts`'s `needsMembership`
+ * already mirrors it at :375-378. This is the third copy of one rule.
+ *
+ * This paragraph used to say the target *"keeps the FIRST edge's rules, in
  * declaration order, rather than merging two rule sets into one that no
- * transition declares.
+ * transition declares"*. **The reasoning was sound and aimed at the wrong
+ * alternative.** Merging was never what the engine does either, so rejecting it
+ * settled nothing; the live question was exact-versus-wildcard, and answering
+ * it by declaration order made this function disagree with the engine whenever
+ * a definition happened to declare its wildcard first — a shape
+ * `adviseWorkflowDef` only WARNS about, so it publishes clean. The visible
+ * result was a transition offered with no evidence prompt on a move the server
+ * then refuses, which reads to a user as a bug in the product rather than a
+ * rule. A decision argued against a straw alternative reads as considered,
+ * which is why this survived review.
  *
  * A target the definition names but has no state for is dropped rather than
  * rendered as a bare id: a select option a user cannot read is not an option.
  */
 export function transitionOptions(def: WorkflowDef, fromStateId: string): TransitionOption[] {
-  const targets = new Map<string, TransitionRules>();
+  // Which targets are reachable at all, in declaration order of first mention.
+  const targets: string[] = [];
   for (const transition of def.transitions) {
     if (transition.from !== fromStateId && transition.from !== '*') continue;
     if (transition.to === fromStateId) continue;
-    if (!targets.has(transition.to)) targets.set(transition.to, transition.rules);
+    if (!targets.includes(transition.to)) targets.push(transition.to);
   }
-  return [...targets.entries()]
-    .map(([toStateId, rules]) => {
+  return targets
+    .map((toStateId) => {
+      // The engine's resolution, in the engine's order.
+      const edge =
+        def.transitions.find((t) => t.from === fromStateId && t.to === toStateId) ??
+        def.transitions.find((t) => t.from === '*' && t.to === toStateId);
       const state = def.states.find((candidate) => candidate.id === toStateId);
-      return state === undefined ? null : { toStateId, name: state.name, rules };
+      if (edge === undefined || state === undefined) return null;
+      return { toStateId, name: state.name, rules: edge.rules };
     })
     .filter((option): option is TransitionOption => option !== null);
 }
