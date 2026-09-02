@@ -6123,7 +6123,7 @@ a purely local refusal elsewhere.
 **Why it is recorded rather than decided.** Both readings are defensible from one sentence, and the
 choice is a product decision about whose refusal a user should be shown, not an implementation detail.
 
-## RULING REQUEST — Plan 8 Task 3's frozen errand template trips `rule-bypassable`, unowned by any open plan (2026-09-03, exec/13 executor)
+## RULING REQUEST — Plan 8 Task 3's frozen errand template trips `rule-bypassable`; Plan 2's own ruling designed the check but did not settle this shape (2026-09-03, exec/13 executor; corrected 2026-09-03, T3 fix round)
 
 `ERRAND_WITH_WAITS_TEMPLATE` (`packages/domain/src/workflows/errand-with-waits.ts`) is pinned by Plan
 11's `checkErrandTemplate` oracle (verified absent from this branch by search this session — Plan 11
@@ -6131,26 +6131,39 @@ has not landed here yet) and its own docblock: *"Edit this only with that check 
 prose states the opposite invariant twice — *"a shipped template that greets the author with a warning
 is a shipped template that is wrong."*
 
-Both cannot hold. `packages/domain/src/advise-workflow.ts`'s `rule-bypassable` check (an amendment that
-landed after Plan 8's Task 3 text was written; its module docblock does not name an owning plan, and
-Plan 2 — the plan most likely to own the validate/advise tier — executed 2026-08-28 and its own
-execution-consequences section above does not mention this check, so "Plan 2 owns it" is not verified
-and is NOT asserted here) correctly reports two bypasses on the frozen template: `require-comment`
-guards `in-progress -> waiting`, but `later -> waiting` and `next -> waiting` both enter the same state
-carrying no `require-comment` rule — and `later -> waiting` must stay rule-free, because it is one of
-the seed's pinned one-hop paths (Task 3's own guard-step comment).
+Both cannot hold. **Correction (this fix round): the prior text here claimed to have "verified Plan 2
+... doesn't claim this check in its own execution-consequences section" and titled the entry "unowned by
+any open plan." Both claims were false and are withdrawn.** `packages/domain/src/advise-workflow.ts`'s
+`rule-bypassable` check is exactly the check Plan 2's own execution-consequences §8 above (lines
+491-530) owns: §8 is the owner-ruling request for it, the owner's 2026-08-28 ruling ("option 1 —
+generalise the advisory tier," line 517) that created it, and the amendment landing note (line 526)
+that names the cover semantics — "same-kind-present, not rule-set equivalence" (line 529) — which
+`advise-workflow.ts`'s own docblock carries verbatim. So the check is owned, and its design is Plan 2's;
+what is NOT settled is the shape below. The check correctly reports two bypasses on the frozen
+template: `require-comment` guards `in-progress -> waiting`, but `later -> waiting` and `next ->
+waiting` both enter the same state carrying no `require-comment` rule — and `later -> waiting` must
+stay rule-free, because it is one of the seed's pinned one-hop paths (Task 3's own guard-step comment).
 
 Task 3 cannot resolve this: fixing the template violates Plan 11's oracle pin (owned there, not here);
-silencing `rule-bypassable` means editing a check this task does not own. `packages/app-core/test/workflow-builder/templates.test.ts`
-records the actual advisory output (2× `rule-bypassable`) rather than asserting the stale "warns about
-nothing" claim for this one template — the other two templates (`simple-kanban`, `approval-chain`) still
-assert clean per Task 3's invariant.
+silencing `rule-bypassable` means editing a check Plan 2 designed and Task 3 does not own.
+`packages/app-core/test/workflow-builder/templates.test.ts` records the actual advisory output (2×
+`rule-bypassable`) rather than asserting the stale "warns about nothing" claim for this one template —
+the other two templates (`simple-kanban`, `approval-chain`) still assert clean per Task 3's invariant.
 
-**What needs a ruling:** either (a) the `rule-bypassable` check gains a way to accept the from-any-prior-open-state
-seeding pattern as intentionally uncovered (Plan 8's own guard-wildcard precedent — line ~495 above —
-suggests a rule-free multi-entry seed path is a recognized shape, not an oversight), or (b) Task 3's
-"warns about nothing" invariant is amended to admit a documented exception for templates whose shape is
-pinned by a downstream oracle, or (c) the template itself changes and Plan 11's `checkErrandTemplate`
-changes with it in the same commit, once Plan 11 actually lands and its author can make that call. This
-entry does not pick one — same discipline as ruling-request entries above (autonomous execution
-protocol, ruling 3: conservative default + record, never silently and never blocking).
+**What actually needs a ruling.** The owner's 2026-08-28 ruling (§8 above) designed COVER as
+"same-kind-present on another edge into the same target" and explicitly made the *guarded wildcard*
+the sanctioned way to close a bypass (§8's codicil, line 517: "we should be able to have the anywhere
+arrow carry its own guard"). It did not design a way to mark an edge as *deliberately* left uncovered —
+which is what `later -> waiting` and `next -> waiting` are here: adding `require-comment` to satisfy
+COVER would break the pinned one-hop seed invariant, so this is not a case the landed design missed by
+oversight, it is a shape the design never had to address, because §8's own worked examples all involve
+closing the bypass, not preserving it as read. Either (a) the advisory tier gains an explicit
+exemption/annotation path for a deliberately-uncovered edge — the `wf_rules` fixture's own `notes`
+field (amendment requirement 4, line 530 above) is already exactly this shape, though scoped there to
+annotating the wildcard archetype rather than to any def, so extending it is a design act, not a copy —
+or (b) Task 3's "warns about nothing" invariant is amended to admit a documented exception for
+templates whose shape is pinned by a downstream oracle, or (c) the template itself changes and Plan
+11's `checkErrandTemplate` changes with it in the same commit, once Plan 11 actually lands and its
+author can make that call. This entry does not pick one — same discipline as ruling-request entries
+above (autonomous execution protocol, ruling 3: conservative default + record, never silently and
+never blocking).
