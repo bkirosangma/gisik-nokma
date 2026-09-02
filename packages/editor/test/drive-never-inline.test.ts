@@ -69,8 +69,25 @@ describe('a Drive reference never becomes an inline image (rule 3)', () => {
    * TypeScript refuses the call at compile time (`@ts-expect-error`, enforced
    * by this package's `typecheck` gate: an unused directive is itself a type
    * error), and even forced through at runtime, `isEmbeddableImageMime(undefined)`
-   * is false, so layer 1's own guard refuses it too. Two independent floors,
-   * proven at once.
+   * is false, so layer 1's own guard refuses it too.
+   *
+   * These are NOT two independent proofs of the rule. `line 82`'s
+   * `expect(inserted).toBe(false)` is only the mime-check floor — it holds
+   * because `attrs.mime` is `undefined`, the same outcome a plain mime check
+   * (`isEmbeddableImageMime`, ticket-image.ts:184) would produce for ANY
+   * payload lacking a `mime` field, Drive or not. It does not by itself
+   * distinguish "refused because this is a Drive claim" from "refused
+   * because this call forgot to set mime". Each floor does survive removal
+   * of the OTHER (drop the runtime guard and TypeScript still errors on the
+   * `@ts-expect-error` line above; loosen the command's param to `mime?:
+   * string` and the runtime guard still returns false) — but both trace
+   * back to one upstream fact, not two: `DriveReference` (domain
+   * attachment-kinds.ts:43) spells its field `mimeType`, never `mime`. A
+   * rename of that field to `mime` would collapse the type floor (the call
+   * becomes assignable, no `@ts-expect-error` needed) and hand
+   * `isEmbeddableImageMime` a real `image/png` string, collapsing the
+   * runtime floor in the same edit. So this case is real evidence, but its
+   * shared root should not be read as two floors that fail independently.
    */
   it('planted defect: a Drive claim is not assignable to insertTicketImage — refused by TYPE, and if forced, refused at RUNTIME too', () => {
     const { editor } = makeEditor();
@@ -79,6 +96,11 @@ describe('a Drive reference never becomes an inline image (rule 3)', () => {
     // the `mime` insertTicketImage requires, and TypeScript refuses this call
     // on that missing property — not on any runtime check.
     const inserted = editor.commands.insertTicketImage(event.payload);
+    // This assertion alone is the mime-check floor, not a Drive-specific one:
+    // it holds because attrs.mime is undefined here, which is exactly what
+    // isEmbeddableImageMime(undefined) also rejects for a non-Drive payload
+    // missing `mime`. See the docblock above for why that upstream sharing
+    // means the two floors are not independent of each other.
     expect(inserted).toBe(false); // forced through anyway: layer 1's mime guard still refuses it
     expect(imageNodeCount(editor)).toBe(0);
     editor.destroy();
