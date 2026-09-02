@@ -50,11 +50,40 @@ DO re-verify before building on them:**
 `apps/server/test/integration/client-contract.test.ts` is the machine-checked register of what an HTTP
 `DataSource` can and cannot be built from. **Read it before writing one.**
 
+### THE ONE THING A RESTART MUST NOT MISS: **RULING REQUEST P25 IS OPEN AND UNANSWERED**
+
+Written in full at the END of `docs/superpowers/plans/2026-08-20-00-series-coordination.md`, section
+*"Step 11 (Plan 6 remainder) — the `DataSource` register, re-derived, and RULING REQUEST P25"*. Read
+that section, not this summary, before acting on it.
+
+**The finding.** Step 10's "9 of 12 blocked" reproduces exactly, from the interface body at
+`data-source.ts:36-47`. The SORT moves: **6 serving · 1 data · 2 signature**, not 3 signature. Six of
+the nine blocked methods are gaps where **the server holds the fact and does not put it on the wire**.
+
+**Why it is a ruling and not a note.** The standing rule sends an out-of-scope finding to a named
+owner. That owner is Plan 5. **Plan 5 is 17/17 and merged — it has no task left to carry them.** A gap
+recorded against an owner with no remaining tasks is dropped, by the rule meant to prevent dropping it.
+
+**Proposed default, being proceeded on until the owner rules.** Four serving gaps close in the SERVER
+inside this step — `getBoard` (`workflowVersion`), `getMyWorkspaces` (`projects`), `getTicket`,
+`getTickets`. Two signature gaps close in the CLIENT (`getPreferences`/`putPreferences`, extending
+ruling P24 from the document to the signature). One data gap is answered honestly (`inTransit: []`,
+true because the web client has no outbox) and `contested` defers to **Plan 10**, which owns it in two
+server docblocks headed `EXTENSION POINT (Plan 10)` and has 13 tasks outstanding.
+
+**The part that decides how big this is.** Two of the four — `getTicket` and `getTickets` — carry a
+VISIBILITY decision, not a field addition, and sit under Plan 4's read enforcement. **Those two are
+being HELD** until the controller answers. The other two are field additions and proceed.
+
+**If a restart finds this unanswered: do not re-derive the register.** It is measured, cited
+line-by-line, and one cell that shipped contested was resolved against its own deriver in a follow-up
+commit. Re-ask the ruling; do not re-earn it.
+
 | Task | What | State |
 |---|---|---|
-| T5 | Domain gap guards — `IngestResult`, `docToPlainText`, `blocked` | **todo** |
+| T5 | Domain gap guards — `IngestResult`, `docToPlainText`, `blocked`, `cause` | **DONE — no code.** All four guards were already present AND each has a check that would notice its removal. Cited in the ledger note and the commit. |
+| T8 | Online stream — WS subscribe, reconnect, `afterSeq` | **IN FLIGHT** — implementer + reviewer running. Closes the two `StreamItem` drifts. |
 | T7 | Online DataSource — HTTP client, mappers, ingest | **todo** — owns finding 1 and 3 |
-| T8 | Online stream — WS subscribe, reconnect, `afterSeq` | **todo** — owns the missing `scope-revoked` member |
 | T10 | List view | **todo** — bound by ruling P24 |
 | T11, T12, T12a, T13 | My Work / ticket sheet / attachments / reopen flow | **todo** |
 | T14 | `apps/web` Next.js shell | **todo** — the thing Plans 8 and 9 are waiting on |
