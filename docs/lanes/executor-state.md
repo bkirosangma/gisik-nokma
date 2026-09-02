@@ -100,8 +100,9 @@ commit. Re-ask the ruling; do not re-earn it.
 | T5 | Domain gap guards | **DONE, no code.** All four guards present, each with a check that notices removal. |
 | T8 | Online stream | **DONE.** `online/stream.ts`, 26 cases. `StreamItem` widened to five members, event member carries `LedgerEvent`. |
 | T7 | Online DataSource + P25's one approved route change | **DONE.** `online/{http,mappers,online-data-source,index}.ts`. **6/12 methods answer, 6 refuse by name.** |
-| T10 | List view | **NEXT.** Bound by ruling P24. Its `getTickets` REFUSES — build the view against the fake, as T9 did. |
-| T11, T12, T12a, T13 | My Work / ticket sheet / attachments / reopen flow | **todo.** T11's `getMyWork`+`getAttention` and T12's `getTicket` also refuse. |
+| T10 | List view | **DONE.** `list-model.ts`, `ticket-list.tsx`, `use-preferences.ts`, 47 cases. Ruling P24 now honoured PER HALF via `Chosen<T>`. |
+| T11 | My Work + attention strip | **DONE.** `my-work.tsx`, `attention-strip.tsx`, 35 cases. Review shipped clean. |
+| T12, T12a, T13 | ticket sheet / attachments / reopen flow | **NEXT.** T12's `getTicket` refuses — build against the fake, as T9/T10/T11 did. |
 | T14 | `apps/web` Next.js shell | **todo** — the thing Plans 8 and 9 wait on. Its pages need T10–T12; its shell does not. |
 | T15, T15b, T16 | invite + doors + catalogue | **todo** |
 
@@ -114,12 +115,22 @@ the ONLINE source, and each one is pinned by a server-side cross-check in
 `apps/server/test/integration/client-contract.test.ts` that goes RED the day the route starts serving
 the field. Build the views. Do not weaken the refusals to make a view light up.
 
-### Gate at the T7 commit, measured at the tree reported
+### Gate at the T10/T11 commit, measured at the tree reported
 
-**exit 0 · 21/21 · 0 cached · 1711 tests · Node v22.22.2 · 0 engine warnings.**
-domain 335 · rule-engine 280 · **server 761** · **app-core 224** · editor 72 · ui 31 · sync-client 8.
-Decomposes from main's 1612: app-core 130 → 224 (+94, of which 26 are T8's stream), server 756 → 761
-(+5, the client-contract cross-checks). Every other package byte-identical.
+**exit 0 · 21/21 · 0 cached · 1798 tests · Node v22.22.2 · 0 engine warnings.**
+domain 335 · rule-engine 280 · **server 761** · **app-core 311** · editor 72 · ui 31 · sync-client 8.
+
+Decomposes from main's 1612 in three steps: app-core 130 → 224 (T7+T8) → 311 (T10+T11+fix); server
+756 → 761 (the client-contract cross-checks). **Every other package byte-identical throughout**, which
+is the check that this branch has not touched what it does not claim to touch.
+
+### RULING P24 WAS BEING VIOLATED BY THIS BRANCH'S OWN CODE, and the fix is a type
+
+`mapPreferences` filled a half-set project's missing half with `DEFAULT_VIEW_PREFS` — exactly what P24
+forbids. Closed with `Chosen<T> = {origin:'stored'; value:T} | {origin:'default'}`. **The default arm
+carries no `value` deliberately**: a record with both fields expresses the distinction but lets a
+consumer read `.value` and ignore `.origin`, leaving the ruling on convention. With no value to read,
+the offending line will not compile. Do not "simplify" this back into a pair.
 
 ### RECORDED FOR STEP 12 (Plan 7), from the controller's structural scan — not mine to fix
 
