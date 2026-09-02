@@ -176,18 +176,40 @@ describe('AttentionStrip — an absent kind is absent, never an empty section as
  * Three things it takes from the stronger one:
  *   1. A CONTROL FIRST proving `process.env.TZ` moves this process's idea of
  *      local time. Under vitest's `threads` pool it does NOT — a worker thread
- *      gets no process-level reconfiguration — and without the control every
- *      zone assertion below passes while proving nothing. `board.test.tsx`
- *      records the measurement: under `--pool=threads` it was 32/32 green
- *      before its own probe existed. This repo's config sets no `pool`, so the
- *      knob does work here — which is a fact this control ESTABLISHES per run
- *      rather than one the suite may assume.
+ *      gets no process-level reconfiguration — and without the control the
+ *      harness would be inert and nobody would know. `board.test.tsx` records
+ *      the measurement: under `--pool=threads` it was 32/32 green before its own
+ *      probe existed. This repo's config sets no `pool`, so the knob does work
+ *      here — which is a fact this control ESTABLISHES per run rather than one
+ *      the suite may assume. **It establishes the knob and nothing more:** a
+ *      working knob does not make the zone assertions below discriminate, and
+ *      an earlier version of this sentence implied that it did.
  *   2. A FIXTURE-INTERESTINGNESS check. Three zones agreeing is worthless if
  *      the instant falls on the same calendar page in all three, so the
  *      straddle is asserted with plain arithmetic before anything leans on it.
  *   3. Each zone asserted against an INDEPENDENT expectation rather than
  *      against the other zones. Three agreeing WRONG answers pass a mutual
  *      comparison; they do not pass this.
+ *
+ * ## WHAT THE ZONE AXIS CANNOT CATCH TODAY, and what this block IS
+ *
+ * Against the CURRENT implementation the three zones discriminate nothing.
+ * `formatDate` runs through `istDayBounds` and `formatIstInstant`, both constant
+ * +05:30 arithmetic over the UTC getters (`packages/domain/src/ist-day.ts`,
+ * `packages/domain/src/clock-skew.ts:51`) with no local-zone reader anywhere on
+ * the path, so all three render one string. Measured 2026-09-02:
+ * `formatDate('2026-08-19T10:00:00.000Z')` answered `19 Aug 2026` under
+ * `Pacific/Kiritimati`, `Asia/Kolkata` and `Pacific/Niue` alike, against a
+ * `toLocaleDateString` control in the same run that answered a different day in
+ * one of them.
+ *
+ * So this is a REGRESSION GUARD, and that is where its teeth are: replacing
+ * `formatDate`'s body with `new Date(value).toLocaleDateString()`
+ * (`packages/app-core/src/provenance.ts:27`) kills TWO cases in this block —
+ * `zone Pacific/Kiritimati: expected 'claimed by Anselma Marak on 20/8/2026' to
+ * be 'claimed by Anselma Marak on 19 Aug 20…'` (vitest elides the tail), and its
+ * day-anchored twin, `zone Pacific/Kiritimati: expected 'claimed by Anselma
+ * Marak on 20/8/2026' to match / on 19 Aug 2026$/`.
  */
 describe('AttentionStrip — one clock, and it is not the viewer’s laptop', () => {
   /** Straddling the product's own zone in both directions. Neither observes DST. */

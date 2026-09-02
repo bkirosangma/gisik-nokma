@@ -372,6 +372,30 @@ describe('TicketList — a default arrangement never wears the user’s authorit
  * no zone maths may invent a time of day for it and then round it to the wrong
  * date. Rendered from two absurd zones the words must not move, AND they must
  * be the IST words, so a formatter that is merely consistently wrong fails too.
+ *
+ * ## WHAT THE ZONE AXIS CANNOT CATCH TODAY
+ *
+ * Against the CURRENT implementation the two zones discriminate nothing.
+ * `formatDate` sends a day claim through `istDayBounds` and `formatIstInstant`,
+ * both of which are constant +05:30 arithmetic over the UTC getters
+ * (`packages/domain/src/ist-day.ts`, `packages/domain/src/clock-skew.ts:51`)
+ * with no local-zone reader on the path, so every zone renders the same string.
+ * Measured 2026-09-02: `formatDate('2026-08-30')` answered `30 Aug 2026` under
+ * `Pacific/Kiritimati`, `Asia/Kolkata` and `Pacific/Niue` alike, while a
+ * `new Date('2026-08-30').toLocaleDateString()` control in the same run answered
+ * `30/8/2026`, `30/8/2026` and `29/8/2026` — the wrong DAY in the third.
+ *
+ * ## WHAT IT DOES CATCH, and the mutation that proves it
+ *
+ * These are REGRESSION GUARDS. Replacing `formatDate`'s body with
+ * `new Date(value).toLocaleDateString()` (`packages/app-core/src/provenance.ts:27`)
+ * kills THREE cases in this block — the +14 case, the −11 case and the
+ * day-anchored one. Measured 2026-09-02: `expected '30/8/2026 — Kiro's claim'
+ * to be '30 Aug 2026 — Kiro's claim'` from Kiritimati and
+ * `expected '29/8/2026 — Kiro's claim' to be '30 Aug 2026 — Kiro's claim'` from
+ * Niue — note that the +14 case dies on the SPELLING while only the −11 case
+ * dies on the wrong DAY, which is why both zones are kept. That is what they
+ * are for.
  */
 describe('TicketList — one clock, named, and not the device’s', () => {
   const DUE_ONLY: ListRow[] = [
@@ -427,10 +451,18 @@ describe('TicketList — one clock, named, and not the device’s', () => {
   });
 
   /**
-   * THE PROBE THAT KEEPS THE THREE ABOVE FROM BEING VACUOUS. Under vitest's
-   * `threads` pool a worker does not get `process.env.TZ` reconfiguration at
-   * all, so every zone renders identically and all three pass while proving
-   * nothing — measured on this repo in `board.test.tsx`, 32/32 green.
+   * THE PROBE, AND EXACTLY WHAT IT ESTABLISHES. It proves the KNOB moves: under
+   * vitest's `threads` pool a worker gets no `process.env.TZ` reconfiguration at
+   * all — measured on this repo in `board.test.tsx`, 32/32 green — and this
+   * config sets no pool, so the harness above really can change the ambient zone.
+   *
+   * It does NOT make the three cases above non-vacuous, and an earlier version
+   * of this comment said it did. Against today's `formatDate` the zones cannot
+   * discriminate at all (see the block docblock): a working knob turned on a
+   * formatter that reads no zone still yields three identical strings. What the
+   * probe buys is that the day a device-reading formatter IS written back in,
+   * the harness will detect it rather than sitting inert. Knob and discrimination
+   * are two different claims; only the first is proven here.
    */
   it('the harness above really can move the ambient zone — otherwise it proves nothing', () => {
     const original = process.env.TZ;

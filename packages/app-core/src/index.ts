@@ -39,3 +39,42 @@ export {
 } from './views/ticket-list.js';
 export { AttentionStrip, useAttention, type AttentionStripProps } from './views/attention-strip.js';
 export { MyWork, useMyWork, type MyWorkProps } from './views/my-work.js';
+export {
+  PlainTextEditorSlot,
+  type EditorSlotComponent,
+  type EditorSlotProps,
+  type EditorSlotSubmission,
+  type EditorSlotUpload,
+} from './views/editor-slot.js';
+export { HistoryList } from './views/history-list.js';
+export {
+  AttachmentList,
+  type AttachmentListEntry,
+  type AttachmentListProps,
+} from './views/attachment-list.js';
+export {
+  TransitionDialog,
+  transitionOptions,
+  type TransitionDialogProps,
+  type TransitionOption,
+  type TransitionSubmission,
+} from './views/transition-dialog.js';
+export { TicketSheet, HISTORY_PAGE_LIMIT, type TicketSheetProps } from './views/ticket-sheet.js';
+export {
+  UnansweredClaimError,
+  reopenAndProceed,
+  reopenStateOptions,
+  submitChildEvent,
+  type GuardedOutcome,
+  type InvalidResult,
+  type Refusal,
+  type ReopenOutcome,
+  type ReopenPlan,
+} from './flows/guarded-child-event.js';
+export { ReopenDialog, type ReopenDialogProps, type RefusalOrigin } from './views/reopen-dialog.js';
+export {
+  NewTicketDialog,
+  type NewTicketDialogProps,
+  type NewTicketDraft,
+} from './views/new-ticket-dialog.js';
+export { CreateTicketFlow, type CreateTicketFlowProps } from './views/create-ticket-flow.js';

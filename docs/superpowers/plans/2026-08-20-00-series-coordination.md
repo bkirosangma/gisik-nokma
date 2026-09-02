@@ -5992,7 +5992,7 @@ and Plan 9's Open questions should carry it before step 14 dispatches.
 
 ---
 
-## Step 11 (Plan 6 remainder) — three findings RECORDED, each with a named owner
+## Step 11 (Plan 6 remainder) — four findings RECORDED, each with a named owner
 
 Found while closing ruling P24's per-project asymmetry in `ProjectViewPrefs` (step 11). None is owned
 by that task; each is recorded here rather than fixed, per the standing rule, and each names an owner
@@ -6067,3 +6067,41 @@ The place that WOULD go red is `apps/server/test/integration/client-contract.tes
 the real route and reads the real body. **Owner: whoever closes the attention serving gap** — the same
 change that makes `contested` servable is the change that must move this constant and pin it
 server-side, because until then there is no run in which the client can observe the true kind set.
+
+### 4. Task 13's instant pre-check opens the reopen offer without submitting anything — a SPEC-READING ambiguity. **Owner: the owner. Not resolved here.**
+
+`packages/app-core/src/views/create-ticket-flow.tsx:189-201`: when a `ClientStateCache` is present and
+the draft names a parent, `create` runs `precheckEvent` locally, and on a `hierarchy.parent-terminal`
+refusal it opens the reopen prompt and **returns at `:200`** — `dataSource.ingest` is never called. The
+test that pins this is `packages/app-core/test/views/reopen-flow.test.tsx:254` (case 13.4g, *"a local
+refusal is not presented as though the server had spoken — nothing is even submitted"*), which asserts
+`source.ingested` is EMPTY on that path.
+
+**The spec line in tension.** `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md:104` —
+*"**The web client** is online-only — the same rule engine runs for instant feedback, but every action
+round-trips."*
+
+**The implementer's reading (what is shipped).** "Round-trips" attaches to the CLAIM. On the instant
+path no claim is made at all: the user is offered a remedy instead, and accepting it sends
+parent-then-child exactly as the server-refused path does — the shortcut is to the OFFER and never past
+the two claims. Under this reading the sentence is satisfied because every action that is *taken* still
+round-trips; declining the offer takes no action.
+
+**The equally defensible reading.** "Every action round-trips" means the create is SUBMITTED regardless,
+so the refusal the actor sees is always the authority's, and the local engine only shortens the wait
+rather than standing in for the server. This reading has real weight: the local cache can be stale in
+ways the server is not, so a locally-refused create that the server would have ACCEPTED is silently
+converted into a reopen offer the user did not need — and the sheet's own `precheck` docblock already
+says a pre-check is advisory and never a promise about acceptance.
+
+**The exact fix if the owner takes the second reading.** Small and local: delete the early `return` at
+`create-ticket-flow.tsx:200` so the flow falls through to `submitChildEvent`, and pass `'server'` rather
+than `'instant'` as `openReopenPrompt`'s origin — at which point the pre-check branch's only remaining
+job is that it has already computed the prompt. **Case 13.4g would need REWRITING, not deleting:** its
+subject (a refusal wears the name of whoever made it) survives the change; what changes is that
+`source.ingested` is no longer empty on that path and the label under the preview class becomes the
+server's. The `refusalOrigin` prop itself stays either way — the reopen prompt can still be reached from
+a purely local refusal elsewhere.
+
+**Why it is recorded rather than decided.** Both readings are defensible from one sentence, and the
+choice is a product decision about whose refusal a user should be shown, not an implementation detail.

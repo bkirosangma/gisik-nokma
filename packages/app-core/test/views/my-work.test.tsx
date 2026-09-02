@@ -211,6 +211,21 @@ describe('MyWork — the in-transit section is empty because there is no outbox,
  * Same three ingredients as the strip's block, and for the same reasons: a
  * control that the knob moves, a control that the fixture straddles, and each
  * zone checked against an expectation computed WITHOUT the code under test.
+ *
+ * ## AND THE ZONES DISCRIMINATE NOTHING TODAY — which is why the mutation above
+ * is named rather than the zone list
+ *
+ * `formatDate` reaches `istDayBounds` and `formatIstInstant`, both constant
+ * +05:30 arithmetic over the UTC getters, with no local-zone reader on the path,
+ * so all three zones render one string against the CURRENT implementation:
+ * measured 2026-09-02, `formatDate('2026-08-30')` answered `30 Aug 2026` under
+ * `Pacific/Kiritimati`, `Asia/Kolkata` and `Pacific/Niue` alike, while a
+ * `new Date('2026-08-30').toLocaleDateString()` control in the same run answered
+ * `29/8/2026` from Niue. The `TZ` control proves the KNOB moves; it does not
+ * make these assertions discriminate. What they are is a REGRESSION GUARD, and
+ * the one-line defect named above is what they kill — TWO cases here, `zone
+ * Pacific/Kiritimati: expected 'needed by 30/8/2026 — Kiro's claim' to be
+ * 'needed by 30 Aug 2026 — Kiro's claim'` and its day-anchored twin.
  */
 describe('MyWork — the due DAY CLAIM does not move with the viewer’s laptop', () => {
   const ZONES = ['Pacific/Kiritimati', 'Asia/Kolkata', 'Pacific/Niue'] as const;

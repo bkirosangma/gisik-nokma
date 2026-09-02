@@ -111,9 +111,9 @@ plan	task	status	pr	merge_sha	note
 06	9	done	43	c93c910	artefact: packages/app-core/src/views/board.tsx, use-live-query.ts, rollup-text.ts (= PR #43 squash sha)
 06	10	in-flight	-	-	artefact: packages/app-core/src/views/{list-model.ts,ticket-list.tsx,use-preferences.ts} + 2 test files (47 cases); ruling P24 honoured per-half via Chosen<T>. exec/11-plan6-remainder
 06	11	in-flight	-	-	artefact: packages/app-core/src/views/{my-work.tsx,attention-strip.tsx} + 2 test files (35 cases); inTransit empty BECAUSE no outbox, asserted with that reason. exec/11-plan6-remainder
-06	12	todo	-	-	
-06	12a	todo	-	-	
-06	13	todo	-	-	
+06	12	in-flight	-	-	artefact: packages/app-core/src/views/{ticket-sheet,history-list,transition-dialog,editor-slot}.tsx + tests; both clocks labelled, history tab distinguishes loading/error/empty. exec/11-plan6-remainder
+06	12a	in-flight	-	-	artefact: packages/app-core/src/views/attachment-list.tsx + test; held file vs Drive pointer never merged. exec/11-plan6-remainder
+06	13	in-flight	-	-	artefact: packages/app-core/src/flows/guarded-child-event.ts + views/{reopen-dialog,new-ticket-dialog,create-ticket-flow}.tsx + tests; parent event before child, parent rules still apply. exec/11-plan6-remainder
 06	14	todo	-	-	
 06	15	todo	-	-	
 06	15b	todo	-	-	
