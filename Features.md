@@ -630,6 +630,74 @@ reason on record, not an oversight:*
   - **A registration hazard worth knowing**: `app.register(websocket)` followed by a top-level `app.get(…, {websocket:true})` SILENTLY degrades to a plain HTTP route — the plugin's `onRoute` hook does not exist yet, `websocket: true` is never read, the handler is called with `(request, reply)`, and the upgrade dies in a 500 with no warning. The route is therefore declared inside its own `app.register(...)`.
   `apps/server/src/stream/routes.ts`, `apps/server/src/app.ts`, `apps/server/test/helpers/stream.ts`, `apps/server/test/stream/stream-route.test.ts`
 
+- ⚙️ **The integration checkpoint — one world built through the shipped doors, read back through the
+  shipped read routes.** A world founded by real `signInWithPhone` → `POST /v1/workspaces` →
+  `POST /v1/events` (project, roster, a parent and a child ticket, an assignment, a transition), then
+  read through `GET /v1/me/workspaces`, `/v1/projects/:id/board`, `/v1/projects/:id/tickets`,
+  `/v1/workspaces/:ws/tickets/:id`, `/v1/tickets/:id/history`, `/v1/search`, `/v1/me/work`,
+  `/v1/me/preferences` and `/v1/workspaces/:ws/attention` — every body asserted whole with `toEqual`,
+  and every route carrying a second signed-in non-member who gets that route's refusal in the same
+  run. **It contains no `applyCommitted`, no `insertEvent` and no `INSERT` into any `proj_*` table**,
+  which is the whole point: it closes the one gap the six absences in `test/helpers/apply.ts` do not
+  cover. Recounted, five of those six are already exercised through the real door elsewhere and only
+  the locks are not; what was missing was that every Plan 5 read-route test seeds its world with
+  `applyCommitted` and none writes through `POST /v1/events`, so the absences were closed for the
+  WRITE path and open for the READ path. What the round trip therefore proves and a seeded read cannot:
+  the `workflowId`/`stateId`/`stateCategory` on every card were chosen by the founding sequence and
+  the rule engine rather than typed by the fixture; every `seq` was minted by `nextSeq` inside the
+  ingest transaction; and `rollup.uncategorizedChildren === 0` is a fact about that transaction having
+  advanced `proj_visibility` and `proj_tickets` together, which `read-models.ts` names a subset-applying
+  fixture as the way to break. `apps/server/test/integration/real-door-round-trip.test.ts`
+- ⚙️ **The attention strip proved with `TZ` varied — the first such proof in this repository.** The
+  strip is asked from `UTC`, `Asia/Kolkata` and `America/Los_Angeles` against a frozen clock thirty
+  days after the ticket entered its state **and pinned to 20:00Z**, and the whole body must be
+  identical in each. The pinned time of day is the load-bearing part: at 20:00Z the three zones
+  disagree about which calendar page it is — 01:30 the next day in IST — which is the window
+  `read-models.ts` names as "the whole Indian evening", and an instant inherited from the wall clock
+  spends most of the day outside it. **Measured, not merely asserted:** making the strip's "today"
+  process-timezone-dependent (`now.toLocaleDateString('en-CA')` for `istDayOf`) reddens this and
+  nothing else, answering `daysInFlight: 30` under `TZ=UTC` where the IST-correct answer is 31.
+  Measured
+  across all 48 test files on an earlier `main`: zero vary `TZ`, seven are clock-sensitive, all seven
+  omit it — and both this machine and the product are `Asia/Kolkata`, so every day-boundary proof in
+  the repo was consistent with the property being false. The zone switch carries its own control
+  (`new Date(0).getHours()` is 0 under UTC and 5 under IST) so the three-way equality cannot pass on an
+  inert knob, and the expected IST day is computed independently of `istDayOf` rather than imported
+  from the code under test. `apps/server/test/integration/real-door-round-trip.test.ts`
+- ⚙️ **The client-contract pins — every `DataSource` divergence asserted, so a reconciliation cannot be
+  silent.** Fifteen cases pinning the shipped `/v1` bodies against Plan 6's `DataSourceQuery` and
+  `view-types.ts`, each as a named negative with a positive control on the same field in the same run:
+  the three **signature gaps** (`getMyWork`, `getPreferences`, `putPreferences` take no `workspaceId`,
+  and all three routes answer **400 `invalid_query`** without one — the sharpest possible pin, since it
+  is the request an adapter written to the client's signature would actually send); the **serving gap**
+  `BoardGroup.workflowVersion` (absent at every depth of the board body, and `proj_tickets` holds it —
+  which is what makes it one route change rather than a product decision); and the **data gaps**
+  `BoardCard.assignee` vs `assigneeId`, `SearchHit.matchedIn`, `WorkspaceRef.projects`,
+  `MyWorkView`'s `{assigned,inTransit,contested}` vs the server's `{open,active,terminal}`, the board's
+  flat `columns` vs the client's `groups`, `TicketRead`'s wrapper and its snake_case inner row, the
+  whole-document refusal of the client's `UserPreferences`, and `FilterSpec`'s singular/plural
+  disagreement. It IMPORTS nothing from `@gisik-nokma/app-core` — a by-package-name import resolves
+  through `./dist` and would make these failures depend on build order — but the two divergences whose
+  case turns on the client's shape (`RollupToViewer`'s three fields, `StreamItem`'s four members)
+  READ that shape out of `packages/app-core/src/*.ts` by relative path with `readFileSync`, which is
+  source text and never `./dist`, and pin it with a whole-array `toEqual`. A client half encoded only
+  as a literal the test file types can change only when somebody edits that file, so it pins nothing:
+  measured, before the fix, adding `scope-revoked` to the client union left the file 15/0 green. The
+  remaining client expectations are quoted beside the line they came from as documentation, and what
+  runs beneath each is an assertion on the real server body. Green today; RED the day the server
+  moves, and red on those two the day the client moves.
+  `apps/server/test/integration/client-contract.test.ts`
+- ⚙️ **The stream union's missing member, pinned end to end.** The client's `StreamItem` union has no
+  `scope-revoked` at all, so a revocation reaches a client as an unrecognised `type` and is silently
+  dropped, leaving stale authorization in the replica's cache. The server half is proved through the
+  real path — a `membership.granted` then `membership.revoked` appended by the owner through
+  `POST /v1/events`, then the ex-member subscribing to a hub running the PRODUCTION `visibleEventsFor`
+  — and both halves of the recording are asserted: `frames` is the parse, proving
+  `serverStreamFrameSchema` accepts the frame, and `raw` is the bytes a client actually receives and
+  drops. That socket gets no frame of any client-known type at all. Beside it, `envelope.workspaceSeq`
+  is pinned present on every event frame, because it is the field the RESUME protocol needs and the
+  client's `EventEnvelope` has no slot for it. `apps/server/test/integration/client-contract.test.ts`
+
 
 ## 9. Editor, documents & attachments
 
