@@ -787,7 +787,7 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   `false` rather than left to a default — `document` because it is replaced, `link` because it is
   reconfigured, `underline` because it is not this product's vocabulary.
   `packages/editor/src/schema/extensions.ts`
-- ✅ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
+- ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink`, `linkOnPaste` and
   `markdownLinks` are all `false`, and they are not sufficient: **seven paste rules across five
   extensions** and **eighteen input rules across ten** remain live, counted against the built
@@ -810,7 +810,7 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   before the merge. A present id with a missing NAME is still admitted, deliberately: refusing that
   discards the only fact the markup carried, while refusing a blank id discards nothing.
   `packages/editor/src/extensions/mention.ts`
-- ✅ **Mention picker** — `createMentionPopup`, `mentionResultAnnouncement`, `MentionPopupProps`,
+- ⚙️ **Mention picker** — `createMentionPopup`, `mentionResultAnnouncement`, `MentionPopupProps`,
   `MentionPopupRenderer`. Arrow-key navigation with a selected item, Enter to insert, Escape to
   dismiss leaving the typed text literal, mouse selection, and a candidate with a blank userId or a
   blank name never offered. Announces its result count politely to a screen reader and hands the
@@ -899,13 +899,21 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   no client can reach either endpoint on a running server. Recorded here rather than fixed: wiring the
   composition root is outside this task's scope, and no task in this plan's text claims it (`test-cases/09-editor-attachments.md`'s case 9.59 carries the same finding, with the sweep that established it).
   `apps/server/src/routes/attachments.ts`
-- ⚙️ **The server-gate seam is wired into the real server** — `apps/server/src/index.ts` is the ONE
-  composition root that calls `buildServerGates()` and hands the result into `createIngestService`, so
-  the image-embed and evidence refusals are live in production and not only inside their own tests (every
-  OTHER thing that builds an ingest service — every test suite — gets the seam's default `[]` and no
-  gating at all, which is why the two attachment routes above being unreachable does not also mean these
-  gates are unreachable: `comment.added`/`ticket.field_set`/`ticket.transitioned` all still ingest through
-  this same composition root via the routes that ARE wired). The seam runs inside the ingest TRANSACTION,
+- ⚙️ **The server-gate seam is wired into the one composition root** — `apps/server/src/index.ts` is the
+  ONE composition root that calls `buildServerGates()` and hands the result into `createIngestService`,
+  which is the narrower and true claim this bullet exists to draw: unlike the two attachment routes above
+  — which are NOT registered on `apps/server/src/app.ts`'s composition root and so unreachable on the
+  server this repo boots — the gate seam IS wired at the one composition root this repo has, even though
+  that composition root itself is never started (`apps/server/src/index.ts`'s own comment records that
+  nothing boots it, and there is no `start` script, Dockerfile, or deployment target anywhere in the
+  repo, so "wired" here does not mean "live in production"; no production exists to be live in). Most
+  other call sites that build an ingest service leave `gates` out entirely and get the seam's default
+  `[]` and no gating at all — but three of this task's own test suites deliberately pass
+  `gates: buildServerGates()` to exercise the seam directly (`test/gates/gate-seam.test.ts`,
+  `test/gates/evidence-gate.test.ts`, `test/gates/image-embed-gate.test.ts`), so "every test suite" is not
+  literally true; those three are the ones proving the refusals below. `comment.added`/`ticket.field_set`/
+  `ticket.transitioned` all still ingest through this same composition root via the routes that ARE wired.
+  The seam runs inside the ingest TRANSACTION,
   so a refusal rolls back only its own event and its writes, leaving batch neighbours committed; it runs
   AFTER the rule engine and AFTER the permission gate at the client door, so a stranger embedding a pdf on
   a ticket they cannot see is told about permission and never learns which attachment that ticket holds.
