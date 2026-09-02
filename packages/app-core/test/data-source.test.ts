@@ -48,7 +48,9 @@ describe('the fake DataSource (the harness every view test rides on)', () => {
 
   it('serves overridable queries with honest empty defaults', async () => {
     const source = createFakeDataSource({ getMyWork: async () => ({ assigned: [], inTransit: [], contested: [] }) });
-    expect(await source.query.getPreferences()).toEqual({ version: 1, projects: {}, savedFilters: [] });
+    // `getPreferences` takes a workspaceId as of ruling P25 clause 2 — the route
+    // 400s without one — so a call that compiles is itself part of the pin.
+    expect(await source.query.getPreferences('ws_1')).toEqual({ version: 1, projects: {}, savedFilters: [] });
     expect(DEFAULT_VIEW_PREFS.grouping).toBe('epic');
   });
 });

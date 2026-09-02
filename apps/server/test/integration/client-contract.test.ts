@@ -4,6 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid, serverStreamFrameSchema, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { FastifyInstance } from 'fastify';
 import type { LogOtpSender } from '../../src/auth/otp-sender.js';
+import type { IngestService } from '../../src/ingest/ingest-service.js';
+import { buildContestedClaim } from '../../src/sync/contest-coherence.js';
 import { createStreamHub } from '../../src/stream/hub.js';
 import { buildTestApp } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -89,23 +91,43 @@ import { fakeSocket } from '../helpers/stream-socket.js';
  *
  * Three kinds of gap, and they have different owners:
  *
- * - **Signature gap** — the client method cannot even FORM the request
- *   (`getMyWork()`, `getPreferences()`, `putPreferences()` take no
- *   `workspaceId`; all three routes answer 400 `invalid_query` without one).
- *   Fixed by changing the client's signature.
+ * - **Signature gap** — the client method cannot even FORM the request. All
+ *   three of them (`getMyWork`, `getPreferences`, `putPreferences`) are now
+ *   RECONCILED (Plan 6 Task 7, ruling P25 clause 2): the client's signatures
+ *   grew the `workspaceId` its routes read before the door, and the first
+ *   describe below pins the agreement — the parameter list read out of
+ *   `data-source.ts`, beside the 400/200 pair that is the reason it had to move.
  * - **Serving gap** — the server HOLDS the fact and does not put it on the
- *   wire (`workflowVersion` lives in `proj_tickets` and appears in no board
- *   body). Fixed by one route change.
+ *   wire. Fixed by one route change. `workflowVersion` was the worked example
+ *   and is RECONCILED (Plan 6 Task 11); the others — `ListRow`'s five,
+ *   `TicketRead`'s three, `WorkspaceRef.projects`, `WorkItem.projectName` and
+ *   `stateName` — are HELD, three of them because serving the fact is a
+ *   VISIBILITY decision under Plan 4 rather than a field addition.
  * - **Data gap** — the server does not have the fact at all
- *   (`SearchHit.matchedIn`, `BoardCard.assignee.name`, `WorkspaceRef.projects`,
- *   `MyWorkView.contested`). Fixed by a product decision.
+ *   (`SearchHit.matchedIn`: `routes/search.ts` destroys which column matched
+ *   inside the query; `BoardCard.assignee.name`, which is why Task 7 joins the
+ *   members route client-side instead).
  *
  * Sorting them is the difference between a morning's work and a design round.
+ *
+ * ## The refusals are cross-checked HERE, and that is new (Plan 6 Task 7)
+ *
+ * The online `DataSource` refuses six `DataSourceQuery` methods rather than
+ * returning a view built from facts the server did not send, and each refusal
+ * ENUMERATES its absences as data in `packages/app-core/src/online/mappers.ts`.
+ * A test in `app-core` can only prove the refusal fires. `expectStillUnserved`
+ * below proves the refusal is still TRUE: every `wireKey` a refusal names is
+ * checked against the real `/v1` body in the same run. That is what makes a
+ * recorded gap go red when its route finally closes it, instead of outliving
+ * the thing it described.
  */
 
 let db: TestDatabase;
 let app: FastifyInstance;
 let otp: LogOtpSender;
+let ingest: IngestService;
+/** The `claim.contested` row 7.208 reads back out of `GET /v1/contests`. */
+let contestedOriginalId = '';
 
 let owner: { userId: string; headers: { authorization: string } };
 let workspaceId: string;
@@ -208,6 +230,141 @@ function clientUnionMemberFieldType(
   return member[1] ?? '';
 }
 
+/**
+ * The PARAMETER NAMES a `DataSourceQuery` method declares, in source order.
+ *
+ * Same fail-loud contract as the three helpers above, and the same reason for
+ * existing: ruling P25 clause 2 moved three signatures, and a literal typed in
+ * this file would have stayed green through the move it describes.
+ */
+function clientMethodParameters(
+  file: 'view-types.ts' | 'data-source.ts',
+  name: string,
+  method: string,
+): string[] {
+  const block = new RegExp(`export type ${name} = \\{([^{}]*)\\}`).exec(clientSource(file));
+  if (block === null) throw new Error(`${file}: no \`export type ${name} = { ... }\` block`);
+  const signature = new RegExp(`\\b${method}\\(([^)]*)\\)`).exec(block[1] ?? '');
+  if (signature === null) throw new Error(`${file}: ${name} declares no \`${method}(...)\``);
+  return (signature[1] ?? '')
+    .split(',')
+    .map((parameter) => (parameter.split(':')[0] ?? '').trim())
+    .filter((parameter) => parameter.length > 0);
+}
+
+/**
+ * `packages/app-core/src/online/mappers.ts`, read as TEXT, exactly as the two
+ * pins above read `view-types.ts` and `data-source.ts`.
+ *
+ * ## What this is for, and why it is the only place it can live
+ *
+ * Six `DataSourceQuery` methods cannot be answered over the shipped routes, and
+ * the online source REFUSES them rather than returning a plausible-looking view
+ * (Plan 6 Task 7). Each refusal enumerates the facts that are absent, as data:
+ * `{ field, wireKey, because, owner }`. A test in `app-core` can assert that the
+ * refusal fires and names what it names — but it can only go red when somebody
+ * edits `mappers.ts`, because nothing in that package has ever seen a server.
+ *
+ * THIS file has the real bodies. So the enumeration is checked here against
+ * them: every `wireKey` a refusal still names must be genuinely absent from the
+ * live `/v1` answer. The day a route starts serving one, the case reddens and
+ * somebody has to delete a refusal that is no longer true — which is exactly the
+ * outcome "recorded with a named owner" is supposed to produce and usually does
+ * not.
+ *
+ * It throws rather than returning `[]` for the same reason `clientTypeFields`
+ * does: an empty list satisfies every absence assertion below, which is the one
+ * way this pin could pass by being broken.
+ */
+const APP_CORE_MAPPERS = fileURLToPath(
+  new URL('../../../../packages/app-core/src/online/mappers.ts', import.meta.url),
+);
+
+type MapperAbsence = { field: string; wireKey: string | null; wireRoute: string | null };
+
+/**
+ * `wireRoute` is parsed as a THIRD aligned column, not as an optional extra.
+ *
+ * It was added because an absence is not always missing from the route the
+ * client method calls: `MyWorkView.contested` is closed by `GET /v1/contests`,
+ * which shipped, and a cross-check that looked for `title` in the `/v1/me/work`
+ * body would have found it (on a `TicketCard`) and reddened for a reason that
+ * has nothing to do with contests. Every entry therefore states which body its
+ * `wireKey` is a claim about, and the three-way count check below is what stops
+ * a half-edited list from silently pairing one entry's field with another's
+ * route.
+ */
+function mapperAbsences(constName: string): MapperAbsence[] {
+  const source = readFileSync(APP_CORE_MAPPERS, 'utf8');
+  expect(source, 'online/mappers.ts').toContain('export class ServingGapError');
+  const block = new RegExp(
+    `const ${constName}: readonly Absence\\[\\] = \\[([\\s\\S]*?)\\n\\];`,
+  ).exec(source);
+  if (block === null) {
+    throw new Error(
+      `online/mappers.ts: no \`const ${constName}: readonly Absence[] = [ ... ];\` block`,
+    );
+  }
+  const body = block[1] ?? '';
+  const fields = [...body.matchAll(/\n {4}field: (['"])([\s\S]*?)\1,/g)].map(([, , field]) => field ?? '');
+  const wireKeys = [...body.matchAll(/\n {4}wireKey: (?:(['"])([\s\S]*?)\1|null),/g)].map(
+    ([, , key]) => key ?? null,
+  );
+  const wireRoutes = [...body.matchAll(/\n {4}wireRoute: (?:(['"])([\s\S]*?)\1|null),/g)].map(
+    ([, , route]) => route ?? null,
+  );
+  if (fields.length === 0) throw new Error(`${constName}: parsed no \`field:\` entries`);
+  if (fields.length !== wireKeys.length || fields.length !== wireRoutes.length) {
+    throw new Error(
+      `${constName}: ${fields.length} field entries against ${wireKeys.length} wireKey and ${wireRoutes.length} wireRoute entries`,
+    );
+  }
+  return fields.map((field, index) => ({
+    field,
+    wireKey: wireKeys[index] ?? null,
+    wireRoute: wireRoutes[index] ?? null,
+  }));
+}
+
+/**
+ * The assertion every refusal cross-check makes: each `wireKey` the refusal
+ * still names is absent from this real body, at every depth — and the walker
+ * could have found keys on it, which is what keeps "absent" from meaning
+ * "nothing was looked at".
+ *
+ * `route` selects the absences this body can speak to, and the SELECTION is
+ * itself asserted: a call that matches nothing throws rather than passing
+ * vacuously. Without that, pointing a `wireRoute` at a route no case exercises
+ * would silently retire the pin — the check would keep passing over an empty
+ * list, which is the exact "cannot fail" shape this file exists to avoid. The
+ * complementary guard is the route-coverage case below, which asserts every
+ * `wireRoute` in `mappers.ts` is a route some case here really fetches.
+ */
+function expectStillUnserved(
+  constName: string,
+  body: unknown,
+  presentControl: string,
+  route: string,
+): void {
+  const all = mapperAbsences(constName);
+  const absences = all.filter((absence) => absence.wireRoute === route);
+  expect(
+    absences.length,
+    `${constName}: no absence names ${route} — either this call names the wrong route or the list moved`,
+  ).toBeGreaterThan(0);
+  const keys = allKeys(body);
+  expect(keys.length, `${constName}: the body has keys to search`).toBeGreaterThan(0);
+  expect(keys, `${constName}: positive control`).toContain(presentControl);
+  for (const { field, wireKey } of absences) {
+    if (wireKey === null) continue;
+    const served = keys.filter((key) => key === wireKey || key.endsWith(`.${wireKey}`));
+    expect(
+      served,
+      `${field}: the online DataSource still refuses because \`${wireKey}\` is unserved on ${route}, and this body now carries it — delete the refusal in packages/app-core/src/online/mappers.ts`,
+    ).toEqual([]);
+  }
+}
+
 /** Every key anywhere in a body, dotted. What an "absent everywhere" claim is made over. */
 function allKeys(value: unknown, path = ''): string[] {
   if (Array.isArray(value)) return value.flatMap((item, i) => allKeys(item, `${path}[${i}]`));
@@ -223,6 +380,7 @@ beforeAll(async () => {
   const built = buildTestApp(db);
   app = built.app;
   otp = built.otp;
+  ingest = built.ingest;
   await app.ready();
 
   owner = await signedIn();
@@ -303,6 +461,35 @@ beforeAll(async () => {
     payload: { userId: exMember.userId },
     actorId: owner.userId,
   });
+
+  // A REAL contested claim, so 7.208's "these keys are absent" is a statement
+  // about a populated row rather than about `{contests: []}` — an empty array
+  // satisfies every absence assertion ever written, which is the one way that
+  // case could pass by being broken. Built by the server-side constructor and
+  // appended through the INTERNAL door, because the client door refuses
+  // server-origin events (the envelope-origin gate) and `claim.contested` is
+  // one: the server files contests, never a client.
+  const refusedClaim: SubmittedEvent = {
+    id: newUlid(),
+    workspaceId,
+    entity: { kind: 'ticket', id: ticketId },
+    type: 'ticket.transitioned',
+    version: 1,
+    payload: { toStateId: 'done' },
+    actorId: owner.userId,
+    origin: 'web',
+    clientTime: '2026-08-20T09:00:00.000Z',
+  };
+  contestedOriginalId = refusedClaim.id;
+  const [contested] = await ingest.ingestBatch([
+    buildContestedClaim({
+      originalEvent: refusedClaim,
+      rule: 'require-field',
+      reason: 'A due date is required before this move.',
+      actorId: owner.userId,
+    }),
+  ]);
+  expect(contested).toMatchObject({ status: 'committed' });
 });
 
 afterAll(async () => {
@@ -310,28 +497,67 @@ afterAll(async () => {
   await db.drop();
 });
 
-describe('SIGNATURE GAP — three client methods cannot form their request at all', () => {
+describe('SIGNATURE GAP RECONCILED — the three client methods now name their workspace', () => {
   /**
-   * `data-source.ts` declares `getMyWork(): Promise<MyWorkView>`,
-   * `getPreferences(): Promise<UserPreferences>` and
-   * `putPreferences(preferences: UserPreferences): Promise<void>` — **no
-   * `workspaceId` on any of the three.** Every one of those routes reads
-   * `?workspaceId=` before the door and refuses without it.
+   * **RECONCILED 2026-09-02 (Plan 6 Task 7, ruling P25 clause 2). The cases
+   * stayed and their claim inverted** — the same treatment 7.189 and the two
+   * stream cases got, for the same reason: a divergence that closed can
+   * silently re-open, and nothing else in this file would notice.
    *
-   * The 400 is the sharpest possible pin. A missing-field assertion on a body
-   * says the shape is wrong; this says the request an adapter written to the
-   * client's signature would SEND is refused at the door, whole, before
-   * membership is even resolved — which is a fact about the method signature
-   * and not about the view model.
+   * What they used to say: `data-source.ts` declared `getMyWork()`,
+   * `getPreferences()` and `putPreferences(preferences)` — **no `workspaceId`
+   * on any of the three** — while every one of those routes reads
+   * `?workspaceId=` before the door and refuses without it. The 400 was the
+   * sharpest possible pin, because it says the request an adapter written to the
+   * client's signature would SEND is refused whole, before membership is even
+   * resolved: a fact about the method signature, not about the view model, and
+   * therefore not something `online/mappers.ts` could adapt.
+   *
+   * The signatures moved. The 400/200 pair is KEPT below, because it is the
+   * reason they had to — it is what makes "the client must name a workspace" a
+   * measurement rather than a preference — and the client half is read OUT OF
+   * SOURCE, so this file notices if the parameters are ever taken back off.
    */
   const NO_WORKSPACE = [
-    { method: 'GET' as const, url: '/v1/me/work' },
-    { method: 'GET' as const, url: '/v1/me/preferences' },
-    { method: 'PUT' as const, url: '/v1/me/preferences' },
+    { method: 'GET' as const, url: '/v1/me/work', client: 'getMyWork', parameters: ['workspaceId'] },
+    {
+      method: 'GET' as const,
+      url: '/v1/me/preferences',
+      client: 'getPreferences',
+      parameters: ['workspaceId'],
+    },
+    {
+      method: 'PUT' as const,
+      url: '/v1/me/preferences',
+      client: 'putPreferences',
+      parameters: ['workspaceId', 'preferences'],
+    },
   ];
 
+  it('7.201 all three client signatures now declare a workspaceId, and it comes FIRST', () => {
+    for (const { client, parameters } of NO_WORKSPACE) {
+      // Whole-array `toEqual`, which is simultaneously the pin and its own
+      // positive control: these parameters, in this order, and no others. A
+      // `toContain` would stay green if `workspaceId` were added as a trailing
+      // optional nobody passed.
+      expect(clientMethodParameters('data-source.ts', 'DataSourceQuery', client)).toEqual(
+        parameters,
+      );
+    }
+    // Control on the extractor itself, same run: a method that never had the
+    // problem still reads the way it reads, so an extractor returning
+    // `['workspaceId']` for everything would be caught here.
+    expect(clientMethodParameters('data-source.ts', 'DataSourceQuery', 'getTicket')).toEqual([
+      'workspaceId',
+      'ticketId',
+    ]);
+    expect(clientMethodParameters('data-source.ts', 'DataSourceQuery', 'getBoard')).toEqual([
+      'projectId',
+    ]);
+  });
+
   for (const { method, url } of NO_WORKSPACE) {
-    it(`${method} ${url} with no workspaceId — the request the client's signature can build — is 400 invalid_query`, async () => {
+    it(`${method} ${url} with no workspaceId — the request the OLD signature could build — is 400 invalid_query`, async () => {
       const refused = await app.inject({
         method,
         url,
@@ -345,7 +571,8 @@ describe('SIGNATURE GAP — three client methods cannot form their request at al
 
       // POSITIVE CONTROL, same run, one query parameter apart: the identical
       // request from the identical session, naming the workspace, is answered.
-      // Without it "this route refuses everything" passes.
+      // Without it "this route refuses everything" passes. It is also the
+      // request the NEW client signature builds.
       const answered = await app.inject({
         method,
         url: `${url}?workspaceId=${workspaceId}`,
@@ -414,30 +641,80 @@ describe('GET /v1/projects/:projectId/board vs BoardView', () => {
     expect(body['workspaceId']).toBe(workspaceId);
   });
 
-  it('SERVING GAP — `workflowVersion` appears NOWHERE in the board body, and `proj_tickets` holds it', async () => {
-    // `BoardGroup.workflowVersion` (`view-types.ts:62`) is dereferenced at
-    // `views/board.tsx:28` as part of a React `key`. The negative is scoped to
-    // the WHOLE body — every key at every depth — because a null scoped to one
-    // object is a fact about that object only.
-    expect(allKeys(body)).not.toContain('workflowVersion');
-    expect(allKeys(body).filter((key) => key.endsWith('.workflowVersion'))).toEqual([]);
+  it('SERVING GAP CLOSED — every board column carries `workflowVersion`, and it is the DEFINITION’s version', async () => {
+    // **RECONCILED 2026-09-02 (Plan 6 Task 11, P25 clause 1). The case stayed
+    // and its claim inverted.** It formerly read: `workflowVersion` appears at
+    // no depth of the board body while `proj_tickets` holds it — a serving gap
+    // owned by one route change. That route change landed
+    // (`routes/board.ts` populates it at both `columns.push` sites), and the
+    // case was rewritten rather than deleted for the same reason the two stream
+    // cases were: a divergence that closed can silently re-open, and nothing
+    // else in this file would notice.
+    //
+    // The CLIENT half is read out of source, not transcribed — the mechanism
+    // this file's docblock exists to explain. A literal list typed here could
+    // change only when somebody edits this file, so it would pin nothing on
+    // `app-core`: the day `BoardGroup` dropped or renamed the field, a
+    // transcribed pin would have stayed green.
+    const CLIENT_GROUP_FIELDS = clientTypeFields('view-types.ts', 'BoardGroup');
+    expect(CLIENT_GROUP_FIELDS).toEqual([
+      'workflowId',
+      'workflowVersion',
+      'workflowName',
+      'columns',
+    ]);
 
-    // POSITIVE CONTROL, and the one that makes this a SERVING gap rather than a
-    // data gap: the server holds the number. `projections/tickets.ts` writes
-    // `workflow_version` on every ticket row, so the fix is one route change
-    // and not a product decision — which is the distinction that decides who
-    // owns it.
+    // The SERVER half, over the whole body at every depth — the same scope the
+    // negative used to be taken over, so the two claims are commensurable.
+    const versionKeys = allKeys(body).filter((key) => key.endsWith('.workflowVersion'));
+    const columns = body['columns'] as Array<Record<string, unknown>>;
+    // EVERY column, not merely some: a route that populated one push site and
+    // forgot the other would satisfy a `toContain`.
+    expect(versionKeys).toHaveLength(columns.length);
+    expect(columns.length).toBeGreaterThan(0); // control: there are columns to have missed
+
+    // AGREEMENT, which is the thing the field means. `workflowVersion` names the
+    // published definition this column's `name`/`category`/`blocked` were read
+    // out of, so it is asserted against `proj_workflows` — the table the route
+    // resolved the definition from — rather than against a literal `1`.
+    const { rows: published } = await db.pool.query<{ version: number }>(
+      'SELECT version FROM proj_workflows WHERE workspace_id = $1 AND workflow_id = $2 ORDER BY version DESC',
+      [workspaceId, column['workflowId']],
+    );
+    // `ORDER BY version DESC` is what makes `[0]` the LATEST, and that is the
+    // whole requirement. Deliberately NOT `toHaveLength(1)`: that would encode
+    // "this workflow has exactly one version ever" as a contract of this test,
+    // and the day somebody publishes a v2 into this world — the same fixture
+    // change `routes/board.test.ts` already makes, for falsifiability — this
+    // case would redden for a reason unrelated to the property it names.
+    expect(published.length).toBeGreaterThan(0);
+    const latestVersion = published[0]?.version;
+    expect(typeof latestVersion).toBe('number');
+    for (const c of columns) {
+      expect(c['workflowVersion']).toBe(latestVersion);
+    }
+
+    // The ticket row's own `workflow_version` still exists and still agrees —
+    // it was the old case's positive control and it is kept, because it is what
+    // says the number served is not merely internally consistent. The two are
+    // DIFFERENT facts (the ticket's folded-under version, the column's
+    // definition version) that this world happens to hold equal, and saying so
+    // is what stops a later reader treating the equality as a contract.
     const { rows } = await db.pool.query<{ workflow_version: number }>(
       'SELECT workflow_version FROM proj_tickets WHERE ticket_id = $1',
       [ticketId],
     );
     expect(rows).toHaveLength(1);
-    expect(typeof rows[0]?.workflow_version).toBe('number');
-    expect(rows[0]?.workflow_version).toBe(1);
+    expect(rows[0]?.workflow_version).toBe(latestVersion);
 
-    // The control's own control: the walker CAN find a key on this body, so
-    // "not in `allKeys`" is a fact about the key and not about the walker.
+    // The walker control, unchanged: it CAN find a key on this body, so what it
+    // reports about `.workflowVersion` is a fact about the key.
     expect(allKeys(body)).toContain('columns');
+
+    // NOT PINNED, and named rather than left to look covered: the STRAGGLER
+    // column's `workflowVersion: 0`. `appendStragglerColumns`' own docblock
+    // records that no seed at any layer can reach that pass — the reducer throws
+    // on both roads into it — so a case here would be a check that cannot fail.
   });
 
   it('the rollup carries a FOURTH field `RollupToViewer` has no room for', () => {
@@ -519,6 +796,12 @@ describe('GET /v1/search vs SearchHit', () => {
 
     // And the response WRAPS the hits, where `search()` returns `SearchHit[]`.
     expect(Object.keys(body).sort()).toEqual(['hits', 'query', 'workspaceId']);
+
+    // 7.204 — the refusal, cross-checked. `matchedIn` is the ONLY thing
+    // blocking `search`: `ticketId`, `projectId` and `title` are all on
+    // `hit.card` and are adaptable, which is why the refusal names one field
+    // and not four.
+    expectStillUnserved('MAP_SEARCH_HITS_ABSENCES', body, 'hits', '/v1/search');
   });
 });
 
@@ -535,9 +818,10 @@ describe('GET /v1/me/work vs MyWorkView', () => {
     // `view-types.ts:157` — `MyWorkView = {assigned, inTransit, contested}`.
     // This is not a rename: the server groups by STATE CATEGORY and the client
     // groups by CLAIM STATUS. `inTransit` is the replica's outbox, which a
-    // server by definition has not received; `contested` is Plan 10's
-    // `claim.contested` extension point (`routes/my-work.ts` says so in as many
-    // words). So one axis cannot be computed from the other at all.
+    // server by definition has not received; `contested` comes from a DIFFERENT
+    // shipped route — `GET /v1/contests` — which is why the two absences about
+    // it are cross-checked against that body in 7.208 and not against this one.
+    // So one axis cannot be computed from the other at all.
     expect(Object.keys(body.groups).sort()).toEqual(['active', 'open', 'terminal']);
     for (const clientKey of ['assigned', 'inTransit', 'contested']) {
       expect(body.groups).not.toHaveProperty(clientKey);
@@ -559,6 +843,15 @@ describe('GET /v1/me/work vs MyWorkView', () => {
     expect(card).not.toHaveProperty('stateName');
     expect(card).toHaveProperty('projectId'); // control
     expect(card).toHaveProperty('stateId'); // control
+
+    // 7.205 — the refusal, cross-checked, for the two absences this body can
+    // speak to: `projectName` and `stateName`. `getMyWork`'s other two —
+    // `ContestedClaim.title` and `ContestedClaim.claim.serverTime` — name
+    // `/v1/contests` and are measured there, in 7.208. `inTransit` is
+    // deliberately in neither list: the web client is online-only and has no
+    // outbox, so an empty `inTransit` is the true answer rather than a degraded
+    // one, and the absence list says so by leaving it out.
+    expectStillUnserved('MAP_MY_WORK_ABSENCES', body, 'groups', '/v1/me/work');
   });
 });
 
@@ -587,6 +880,13 @@ describe('GET /v1/me/workspaces vs WorkspaceRef', () => {
     expect(Object.keys(ref).sort()).toEqual(['name', 'role', 'workspaceId']);
     // And the client type has no `role` at all — the server discloses MORE
     // here, which is the one direction that is safe.
+
+    // 7.202 — THE REFUSAL, cross-checked against this very body. The online
+    // `DataSource` answers `getMyWorkspaces` with a `ServingGapError` naming
+    // `WorkspaceRef.projects`; this asserts the fact it names is still absent
+    // here. The day this route joins `proj_projects`, the case reddens and the
+    // refusal has to go.
+    expectStillUnserved('MAP_WORKSPACE_REFS_ABSENCES', body, 'workspaces', '/v1/me/workspaces');
   });
 });
 
@@ -634,6 +934,16 @@ describe('GET /v1/workspaces/:ws/tickets/:id vs TicketRead', () => {
       headers: owner.headers,
     });
     expect(JSON.stringify(board.json())).toContain('Sweep the aisle');
+
+    // 7.203 — the refusal, cross-checked. `getTicket` throws a
+    // `ServingGapError` naming `title`, `stateProvenance` and the absent
+    // `TicketState` (whose `transitions` is the key that would appear first).
+    expectStillUnserved(
+      'MAP_TICKET_READ_ABSENCES',
+      body,
+      'ticket',
+      '/v1/workspaces/:workspaceId/tickets/:ticketId',
+    );
   });
 });
 
@@ -714,6 +1024,178 @@ describe('GET/PUT /v1/me/preferences vs UserPreferences', () => {
       },
     });
     expect(singular.statusCode).toBe(200);
+  });
+});
+
+describe('GET /v1/projects/:projectId/tickets vs TicketListView', () => {
+  it('7.206 SERVING GAPS — five fields `ListRow` needs and no card carries', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/projects/${projectId}/tickets?groupBy=flat`,
+      headers: owner.headers,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      groups: Array<{ cards: Array<Record<string, unknown>> }>;
+    };
+
+    // The cards have to BE there, or "these five fields are absent" is a claim
+    // about an empty array. Both tickets from `beforeAll` are in this project.
+    const cards = body.groups.flatMap((group) => group.cards);
+    expect(cards.length).toBeGreaterThan(0);
+
+    // `view-types.ts` — `ListRow` needs `typeRank`, `epicId`, `stateName`,
+    // `hasRestrictedParent` and `assignedProvenance`. The route serves
+    // `TicketCard`s, which carry none of them, and four of the five cannot be
+    // derived client-side at all. The online `DataSource` therefore refuses
+    // `getTickets` outright; this is the server half of that refusal.
+    expectStillUnserved(
+      'MAP_LIST_VIEW_ABSENCES',
+      body,
+      'groups',
+      '/v1/projects/:projectId/tickets',
+    );
+
+    // Controls, same cards, same run: what IS there, so "five keys absent" is
+    // not "the cards are empty". `stateId` is the one `stateName` would be read
+    // from and `typeId` the one `typeRank` would be ranked by, which is what
+    // makes each of those a SERVING gap rather than a data gap.
+    const card = cards[0] as Record<string, unknown>;
+    expect(card).toHaveProperty('stateId');
+    expect(card).toHaveProperty('typeId');
+    expect(card).toHaveProperty('parentId');
+    expect(card).toHaveProperty('assigneeId');
+  });
+});
+
+describe('GET /v1/workspaces/:ws/attention vs AttentionItem', () => {
+  it('7.207 the strip emits three kinds where `AttentionKind` has four, and the fourth’s owner is /v1/contests', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/attention`,
+      headers: owner.headers,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { items: Array<{ kind: string }> };
+
+    // `AttentionKind` (`view-types.ts`) has FOUR members and this strip can
+    // emit three. That is not a shape a mapper can adapt: it is the difference
+    // between "nothing is contested" and "nobody looked".
+    expect(body.items.every((item) => item.kind !== 'contested')).toBe(true);
+
+    // **CORRECTED 2026-09-02.** This case used to pin `routes/attention.ts`'s
+    // SOURCE — "it never mentions proj_contested" — with the refusal's `wireKey`
+    // at `null`. Both were true and both aimed at the wrong file: `GET
+    // /v1/contests` shipped (`src/sync/contests-route.ts`, registered in
+    // `app.ts`), gated per row by `canSee` and queryable by workspace, so the
+    // fourth kind is a client-side JOIN away and this route owes nothing. The
+    // strip staying three-kinded is a fact about THIS route and is still pinned
+    // above; what the refusal is about now lives in 7.208, against the body that
+    // would close it.
+    const absences = mapperAbsences('MAP_ATTENTION_ABSENCES');
+    expect(absences.map((absence) => absence.wireRoute)).toEqual(['/v1/contests']);
+    expect(absences.map((absence) => absence.wireKey)).toEqual(['title']);
+    expect(absences[0]?.field).toContain('contested');
+  });
+});
+
+describe('GET /v1/contests vs the two contested refusals', () => {
+  /**
+   * 7.208 — the SHIPPED contested read, measured against what the client would
+   * need to join it.
+   *
+   * `GET /v1/contests` is what `MyWorkView.contested` and `AttentionItem`'s
+   * fourth kind would be built from, so it is the route those refusals name and
+   * the only body this claim can be made over. The row here is a REAL
+   * `claim.contested`, appended in `beforeAll` through the internal ingest door
+   * and out through the whole projection registry — `{contests: []}` would make
+   * every "absent" assertion below trivially true.
+   *
+   * Two absences, two different kinds:
+   *
+   * - `title` is a key the route COULD grow: `proj_contested` stores
+   *   `ticket_id`, so one join names the ticket. Whoever does that closes both
+   *   the My Work banner and the attention strip's fourth kind, and this case
+   *   goes red so they notice.
+   * - `serverTime` is not. `originalEvent` is a `SubmittedEvent` — the envelope
+   *   MINUS `serverTime` and `seq` — because the claim was refused at the door
+   *   and never committed, so the instant `ClaimProvenance` requires was never
+   *   recorded by anything. Pinned here anyway: the day a body under this route
+   *   carries one, somebody has changed what a contest is and the client's
+   *   refusal has to be re-argued rather than quietly kept.
+   */
+  it('7.208 carries the contest whole and still carries neither a title nor the claim’s serverTime', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/contests?workspaceId=${workspaceId}&ticketId=${ticketId}`,
+      headers: owner.headers,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { contests: Array<Record<string, unknown>> };
+    // The row is THERE. Everything below is a claim about a populated contest.
+    expect(body.contests).toHaveLength(1);
+    const contest = body.contests[0] as Record<string, unknown>;
+    expect(contest['originalEventId']).toBe(contestedOriginalId);
+
+    // Controls, same body, same run: the three `ContestedClaim` fields the join
+    // DOES produce, and the ticket the join would be made on.
+    expect(contest).toHaveProperty('ticketId');
+    expect(contest).toHaveProperty('rule');
+    expect(contest).toHaveProperty('reason');
+    expect(contest).toHaveProperty('claimantId');
+    // And the embedded claim really is there and really does carry the OTHER
+    // half of a provenance — so "no serverTime" is not "no original event".
+    const original = contest['originalEvent'] as Record<string, unknown>;
+    expect(original['actorId']).toBe(owner.userId);
+    expect(original['clientTime']).toBe('2026-08-20T09:00:00.000Z');
+
+    // `contestedAt` IS present and is deliberately not spent as the claim's
+    // `serverTime`: it is when the server FILED the refusal, not when it
+    // received the claim.
+    expect(contest['contestedAt']).toEqual(expect.any(String));
+
+    expectStillUnserved('MAP_MY_WORK_ABSENCES', body, 'contests', '/v1/contests');
+    expectStillUnserved('MAP_ATTENTION_ABSENCES', body, 'contests', '/v1/contests');
+  });
+
+  /**
+   * 7.209 — the guard on the guard.
+   *
+   * `expectStillUnserved` now SELECTS absences by route, and a selection is a
+   * place a pin can be retired without anything going red: point a `wireRoute`
+   * at a route no case fetches and its `wireKey` is never measured against
+   * anything again. So the set of routes the refusals name is asserted against
+   * the set of routes this file actually exercises — one list derived from
+   * `mappers.ts`, the other written here, and neither able to shrink quietly.
+   */
+  it('7.209 every route the refusals name is a route this file really fetches', () => {
+    const EXERCISED = [
+      '/v1/contests',
+      '/v1/me/work',
+      '/v1/me/workspaces',
+      '/v1/projects/:projectId/tickets',
+      '/v1/search',
+      '/v1/workspaces/:workspaceId/tickets/:ticketId',
+    ];
+    const named = new Set<string>();
+    for (const constName of [
+      'MAP_WORKSPACE_REFS_ABSENCES',
+      'MAP_LIST_VIEW_ABSENCES',
+      'MAP_TICKET_READ_ABSENCES',
+      'MAP_SEARCH_HITS_ABSENCES',
+      'MAP_MY_WORK_ABSENCES',
+      'MAP_ATTENTION_ABSENCES',
+    ]) {
+      for (const absence of mapperAbsences(constName)) {
+        // A `wireKey` with no `wireRoute` is a key nothing can ever measure.
+        expect(
+          absence.wireKey === null || absence.wireRoute !== null,
+          `${absence.field}: names a wireKey with no wireRoute`,
+        ).toBe(true);
+        if (absence.wireRoute !== null) named.add(absence.wireRoute);
+      }
+    }
+    expect([...named].sort()).toEqual(EXERCISED);
   });
 });
 

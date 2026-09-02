@@ -69,6 +69,26 @@ export type Unsubscribe = () => void;
  * Typed read functions mirroring the server read surface (Plan 5 + earlier).
  * Implemented twice: online (this plan — HTTP) and replica (Plan 10 — local
  * store + outbox). Views call these and never speak HTTP (amendment 10).
+ *
+ * ## THREE signatures grew a `workspaceId` (Plan 6 Task 7, ruling P25 clause 2)
+ *
+ * `getMyWork`, `getPreferences` and `putPreferences` took no argument at all
+ * when this file was written, and no server existed to contradict them. Three
+ * shipped routes now do: `GET /v1/me/work`, `GET /v1/me/preferences` and
+ * `PUT /v1/me/preferences` each read `?workspaceId=` BEFORE the door and answer
+ * **400 `invalid_query`** without one — so the request the old signatures could
+ * build was refused whole, before membership was even resolved. That is a fact
+ * about the method signature rather than about the view model, which is why it
+ * could not be adapted inside `online/mappers.ts` the way a renamed field can.
+ *
+ * It extends ruling **P24** — already taken, that the shipped `.strict()`
+ * preferences document wins over Plan 6's — from the document's shape to the
+ * method's signature: the same argument one layer out.
+ * `apps/server/test/integration/client-contract.test.ts` pins both halves, the
+ * client's declared parameters read out of THIS file's source and the routes'
+ * 400/200 pair measured through the real door.
+ *
+ * `getAttention` and `getMembers` already carried one and are untouched.
  */
 export type DataSourceQuery = {
   getMyWorkspaces(): Promise<WorkspaceRef[]>;
@@ -79,10 +99,10 @@ export type DataSourceQuery = {
   getTicketHistory(ticketId: string, afterSeq?: number, limit?: number): Promise<TicketHistoryEvent[]>;
   getWorkflowDef(workspaceId: string, workflowId: string, version?: number): Promise<WorkflowDef | null>;
   search(workspaceId: string, text: string, filter?: FilterSpec): Promise<SearchHit[]>;
-  getMyWork(): Promise<MyWorkView>;
+  getMyWork(workspaceId: string): Promise<MyWorkView>;
   getAttention(workspaceId: string): Promise<AttentionItem[]>;
-  getPreferences(): Promise<UserPreferences>;
-  putPreferences(preferences: UserPreferences): Promise<void>;
+  getPreferences(workspaceId: string): Promise<UserPreferences>;
+  putPreferences(workspaceId: string, preferences: UserPreferences): Promise<void>;
 };
 
 /** Coordination amendment 10 — the one seam between views and the world. */
