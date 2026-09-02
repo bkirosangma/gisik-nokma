@@ -9,146 +9,57 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > verified with `git branch --contains` (empty output = orphaned), never with `git cat-file`, which
 > passes on reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## Live anchors — 2026-09-02, **STEP 11 IN FLIGHT (Plan 6 remainder)**
-
-**Step 10 is CLOSED — PR #70 merged as `ac187e8`.** Everything below the "STEP 10 RECORD" line is
-history. Read it for its *reasoning*, never for its position.
+## Live anchors — 2026-09-02, **STEP 11 COMPLETE. ALL TWELVE TASKS DONE.**
 
 | Anchor | Value | How verified |
 |---|---|---|
-| **Branch in flight** | **`exec/11-plan6-remainder`**, cut from `ac187e8`. | `git branch --show-current` |
-| **`main`** | **`ac187e8`** — step 10 (PR #70) on top of `75c3d1e` (the ledger PR-column fix, #71) and `c9ab31c` (#69). **REFETCH before trusting this.** | `git rev-parse origin/main` |
-| **`ac187e8` reachable?** | **YES** — `git branch -r --contains ac187e8` names `origin/main`. | `git branch -r --contains` (empty output = orphaned; `cat-file` would lie) |
-| **Ledger** | **177 data rows, 88 done, 89 todo (49.7%)**, counted from the file at this sha with `awk -F'\t' '$1 ~ /^[0-9]+$/'`. Do **not** count it with `wc -l` (206) or `head -1` — the rtk proxy rewrites both and returned `[206 more lines]` for `head -1` in this very session. | `awk` tally over data rows |
-| **Plan 6 remaining** | **12 todo**: T5, T7, T8, T10, T11, T12, T12a, T13, T14, T15, T15b, T16. Done: T1–T4 (#16), T6 (#36), T9 (#43). | `grep -E "^06" docs/lanes/task-ledger.tsv` |
-| Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing. | `node -v` |
-| Orphaned, do not cite | every sha in the narrative below the "STEP 10 RECORD" line, and every sha in the step-10 section above it (`44fb736`, `684839f`, `2b9876d`, `eeea9a6`) — **#70 was SQUASHED into `ac187e8`.** | `git branch --contains` |
+| **Branch** | **`exec/11-plan6-remainder`**, rebased onto `origin/main` `bf0ed47`, **18 commits ahead**, pushed. | `git rev-list --count origin/main..HEAD` |
+| **Position** | **All twelve Plan 6 tasks complete.** Final whole-branch review running; **PR not yet opened.** | ledger + `git log` |
+| **Gate at HEAD** | **exit 0 · 24/24 · 0 cached · 2026 tests · Node v22.22.2 · 0 engine warnings.** domain 335 · rule-engine 280 · **server 761** · **app-core 470** · **web 69** · editor 72 · ui 31 · sync-client 8. | run by the executor at this sha, `--force` |
+| **`check:tasks` / `check:env`** | both **exit 0**. | run at this sha |
+| **The gate changed SHAPE** | **24 tasks over EIGHT packages**, because `apps/web` now exists. Any inherited "21/21 over 7" figure is spent. | `pnpm turbo run …` |
+| Orphaned, do not cite | every sha in the narrative below — this branch was rebased, and step 10's were squashed before that. | `git branch --contains` (empty = orphaned) |
 
-## WHERE I AM: **STEP 11 — PLAN 6 REMAINDER.** 12 tasks, nothing yet complete.
+## WHERE I AM: **STEP 11 IS COMPLETE.** Twelve of twelve. PR not yet open.
 
-**This is the first step of Phase 3**, and it goes first because Plan 8's T13–14 and Plan 9's T14 both
-need `apps/web`, which is Plan 6 T14.
+| Task | State |
+|---|---|
+| T5 | **DONE, no code** — all four guards already present, each with a check that notices removal. |
+| T7 | **DONE** — the online `DataSource`. **6 of 12 methods answer; 6 refuse by name.** |
+| T8 | **DONE** — the stream. `StreamItem` widened to five members, event member carries `LedgerEvent`. |
+| T10 | **DONE** — List view. Ruling P24 honoured PER HALF via `Chosen<T>`. |
+| T11 | **DONE** — My Work + attention strip. |
+| T12 / T12a / T13 | **DONE** — ticket sheet (both clocks), attachments, reopen flow. |
+| T14 | **DONE** — `apps/web`. **Plans 8 and 9 are unblocked.** |
+| T15 / T15b | **DONE** — invite acceptance, the doors, and a Playwright smoke RUN for real (5 passed), off the gate. |
+| T16 | **DONE** — catalogue. **§8 was CONSIDERED AND REFUSED**, recorded in four places. |
 
-**Four things step 10 handed this step, all already measured — do not re-derive them from scratch, but
-DO re-verify before building on them:**
+### FOUR THINGS A SUCCESSOR MUST NOT UNDO
 
-1. ~~**`board.tsx` is a LIVE DEFECT**~~ — **CLOSED in step 11.** The claim as inherited was *"none of
-   those three fields exists in any server response"*, and it is now false on all three, by two
-   different routes. `workflowVersion` is **SERVED**: `routes/board.ts` puts `def.version` on every
-   column (P25 clause 1's one pure field addition). `assignee.id`/`.name` are **JOINED client-side**
-   from `GET /v1/workspaces/:workspaceId/members`, off the `workspaceId` the board body already carries
-   — a second shipped route, no invented fact. `getBoard` is one of the six methods the online
-   `DataSource` now answers.
+1. **The six `ServingGapError` refusals are the point, not a shortfall.** `getMyWorkspaces`,
+   `getTickets`, `getTicket`, `search`, `getMyWork`, `getAttention` THROW rather than invent a fact the
+   server does not send. Each is cross-checked server-side in
+   `apps/server/test/integration/client-contract.test.ts` and goes RED the day its route serves the
+   field. **Do not weaken one to make a view light up.**
+2. **`Chosen<T>`'s default arm carries no `value`, deliberately** (`view-types.ts`). A pair would let a
+   consumer read `.value` and ignore `.origin`, which is how ruling P24 was being violated in the first
+   place. The obvious tidy-up restores the defect.
+3. **`apps/web/tsconfig.json` excludes `.next`.** Next's default `include` globs a directory
+   `next build` deletes while turbo runs typecheck concurrently — measured **2 red of 3** without the
+   exclude. It cannot be a narrower include: `next build` rewrites that file's include every run and
+   never touches its exclude. **If the gate reddens on `@gisik-nokma/web:typecheck` with TS6053, this
+   is why** — and run it three times before believing either answer.
+4. **`Features.md` §3, not §8.** §8 was considered and refused because migrating means mapping 112+
+   live cross-referenced ids against the README's own never-renumber rule. The §3 note leads with the
+   refusal because this session's own retrieval kept injecting a stale "create §8" note.
 
-   **The correction is the point.** Two of the three were never serving gaps at all; the third was the
-   cheapest one on the list. An inherited "exists nowhere" is a reading of a moment, and this one was
-   already wrong about a route that a client is allowed to call.
-2. **Ruling P24 is TAKEN and binds Task 10** — the SERVER's `UserPreferences` shape wins. Plan 6's
-   document is refused three ways by the shipped `.strict()` schema, so this is adoption, not a rename.
-   Reversible in one direction only while T10 is unexecuted.
-3. **9 of 12 `DataSourceQuery` methods cannot be implemented over the shipped routes**; three of those
-   cannot even form their request (`getMyWork`, `getPreferences`, `putPreferences` take no
-   `workspaceId`, and those routes 400 `invalid_query` without it). The blocked rows were sorted into
-   **serving** gaps (one route change) and **data** gaps (a product decision); step 10 named that sort
-   as the thing it was least sure of. **Re-derive the sort before building on it.**
-4. **There is ONE fake and NO real `DataSource` anywhere** — `packages/app-core/test/helpers/fake-data-source.ts`.
-   It is load-bearing: the only real view component is built against it.
+### RULING P25 IS STILL OPEN — three route changes are HELD on it
 
-`apps/server/test/integration/client-contract.test.ts` is the machine-checked register of what an HTTP
-`DataSource` can and cannot be built from. **Read it before writing one.**
-
-### THE ONE THING A RESTART MUST NOT MISS: **RULING REQUEST P25 IS OPEN AND UNANSWERED**
-
-Written in full at the END of `docs/superpowers/plans/2026-08-20-00-series-coordination.md`, section
-*"Step 11 (Plan 6 remainder) — the `DataSource` register, re-derived, and RULING REQUEST P25"*. Read
-that section, not this summary, before acting on it.
-
-**The finding.** Step 10's "9 of 12 blocked" reproduces exactly, from the interface body at
-`data-source.ts:36-47`. The SORT moves: **6 serving · 1 data · 2 signature**, not 3 signature. Six of
-the nine blocked methods are gaps where **the server holds the fact and does not put it on the wire**.
-
-**Why it is a ruling and not a note.** The standing rule sends an out-of-scope finding to a named
-owner. That owner is Plan 5. **Plan 5 is 17/17 and merged — it has no task left to carry them.** A gap
-recorded against an owner with no remaining tasks is dropped, by the rule meant to prevent dropping it.
-
-**Proposed default, and what has actually been DONE under it.**
-
-- **`getBoard` — DONE.** The one pure field addition; `routes/board.ts` now serves `def.version`.
-- **`getMyWorkspaces`, `getTicket`, `getTickets` — HELD.** All three carry a visibility decision under
-  Plan 4's read enforcement. `getMyWorkspaces` was mis-priced as a field addition and corrected: no
-  route reads `proj_projects` at all, so serving `projects` means designing a read.
-- **Signature gaps — DONE in the CLIENT.** `getPreferences`/`putPreferences`/`getMyWork` take a
-  `workspaceId`, extending ruling P24 from the document to the signature.
-- **`inTransit: []` — answered honestly**, because an online client has no outbox. Not an absence.
-- **`contested` — REFUSED, and the REASON was corrected.** The inherited reason ("the attention route
-  never reads `proj_contested`") points at the wrong file. **`GET /v1/contests` is shipped**
-  (`sync/contests-route.ts:107`, wired at `app.ts:208`, gated per-row by `canSee`) and its own docblock
-  says *"The ticket banner, My Work and the attention strip all read this."* The real gap is that
-  `ContestView` carries **no `projectId` and no `title`**, both of which `AttentionItem` requires. So
-  the fix is one field pair on `/v1/contests`, not a new read in `attention.ts`.
-
-**The part that decides how big this is.** Two of the four — `getTicket` and `getTickets` — carry a
-VISIBILITY decision, not a field addition, and sit under Plan 4's read enforcement. **Those two are
-being HELD** until the controller answers. The other two are field additions and proceed.
-
-**If a restart finds this unanswered: do not re-derive the register.** It is measured, cited
-line-by-line, and one cell that shipped contested was resolved against its own deriver in a follow-up
-commit. Re-ask the ruling; do not re-earn it.
-
-| Task | What | State |
-|---|---|---|
-| T5 | Domain gap guards | **DONE, no code.** All four guards present, each with a check that notices removal. |
-| T8 | Online stream | **DONE.** `online/stream.ts`, 26 cases. `StreamItem` widened to five members, event member carries `LedgerEvent`. |
-| T7 | Online DataSource + P25's one approved route change | **DONE.** `online/{http,mappers,online-data-source,index}.ts`. **6/12 methods answer, 6 refuse by name.** |
-| T10 | List view | **DONE.** `list-model.ts`, `ticket-list.tsx`, `use-preferences.ts`, 47 cases. Ruling P24 now honoured PER HALF via `Chosen<T>`. |
-| T11 | My Work + attention strip | **DONE.** `my-work.tsx`, `attention-strip.tsx`, 35 cases. Review shipped clean. |
-| T12, T12a, T13 | ticket sheet / attachments / reopen flow | **DONE.** 9 view modules + flows/guarded-child-event.ts, 104 cases. Both reviews shipped clean. |
-| T14 | `apps/web` Next.js shell | **DONE.** New 8th workspace package; the gate went 21 → 24 tasks. **Plans 8 and 9 are unblocked.** |
-| T15, T15b | invite acceptance, Playwright smoke, the doors | **DONE.** Smoke RUN for real (chromium, `next dev`, 5 passed) and behind `test:e2e`, off the gate. |
-| T16 | catalogue + full verification | **IN FLIGHT.** It owns the §3-vs-§8 decision. |
-
-### WHAT "REFUSES" MEANS FOR T10–T13, so a restart does not read it as blocked
-
-Six `DataSourceQuery` methods throw a `ServingGapError` rather than invent a fact. **The views are still
-buildable and testable** — they take view types as props and are proven against
-`test/helpers/fake-data-source.ts`, exactly as T9's board was. The refusal bites only at runtime with
-the ONLINE source, and each one is pinned by a server-side cross-check in
-`apps/server/test/integration/client-contract.test.ts` that goes RED the day the route starts serving
-the field. Build the views. Do not weaken the refusals to make a view light up.
-
-### Gate at the T14/T15/T15b commit, measured at the tree reported
-
-**exit 0 · 24/24 · 0 cached · 2026 tests · Node v22.22.2 · 0 engine warnings.** RUN TWICE, identical.
-domain 335 · rule-engine 280 · **server 761** · **app-core 470** · **web 69** · editor 72 · ui 31 ·
-sync-client 8.
-
-**The gate is 24 tasks over EIGHT packages now**, because `apps/web` exists. That is the change landing,
-not a regression — but it means any inherited "21/21 over 7 packages" figure is spent.
-
-### THE FLAKE `apps/web` ALMOST SHIPPED — do not undo the fix
-
-`apps/web/tsconfig.json` carries `exclude: ['.next']`. Next's own default `include` globs
-`.next/types/**/*.ts`, a directory `next build` DELETES and regenerates, and turbo runs `typecheck`
-concurrently with it because `typecheck.dependsOn` is `^build` (upstream), not this package's own build.
-**Measured: 2 red of 3 without the exclude, 4 green of 4 with it.** It must be the exclude and not a
-narrower include, because `next build` rewrites `tsconfig.json`'s include on every run and never touches
-its exclude. Cost, stated in `apps/web/README.md`: the generated route-signature types leave `tsc`'s
-program and are checked by `next build`'s own pass, which is on the same gate.
-
-**If the gate ever comes back red on `@gisik-nokma/web:typecheck` with TS6053, look here first**, and run
-it three times before believing either answer.
-
-Decomposes from main's 1612: app-core 130 → 224 (T7+T8) → 311 (T10+T11) → 415 (T12+T12a+T13) →
-470 (the T14 seam and T15's gateways); web 0 → 69 (new); server 756 → 761 (the cross-checks). **Every other package byte-identical throughout**, which
-is the check that this branch has not touched what it does not claim to touch.
-
-### RULING P24 WAS BEING VIOLATED BY THIS BRANCH'S OWN CODE, and the fix is a type
-
-`mapPreferences` filled a half-set project's missing half with `DEFAULT_VIEW_PREFS` — exactly what P24
-forbids. Closed with `Chosen<T> = {origin:'stored'; value:T} | {origin:'default'}`. **The default arm
-carries no `value` deliberately**: a record with both fields expresses the distinction but lets a
-consumer read `.value` and ignore `.origin`, leaving the ruling on convention. With no value to read,
-the offending line will not compile. Do not "simplify" this back into a pair.
+`getMyWorkspaces`, `getTicket`, `getTickets` each carry a **visibility decision** under Plan 4's read
+enforcement, and are not built. `getBoard`'s `workflowVersion` was the one pure field addition and IS
+served. The register is at the end of the coordination doc; **do not re-derive it**, and note two of its
+rows were already corrected once — `getAttention`'s fix belongs in `sync/contests-route.ts`, not
+`routes/attention.ts`, and `getMyWorkspaces` is not the field addition it was first priced as.
 
 ### RECORDED FOR STEP 12 (Plan 7), from the controller's structural scan — not mine to fix
 
