@@ -20,3 +20,61 @@ export {
   type MentionPopupProps,
   type MentionPopupRenderer,
 } from './extensions/mention-popup.js';
+export {
+  EscapeSuggestion,
+  escapeSuggestionKey,
+  getEscapeSuggestion,
+} from './extensions/escape-suggestion.js';
+export { UploadRefusedError, uploadAttachmentHttp, type UploadResult } from './upload.js';
+export {
+  attachmentPasteKey,
+  createAttachmentPasteExtension,
+  type AttachmentPasteOptions,
+} from './extensions/attachment-paste.js';
+export { TicketEditor, type TicketEditorProps } from './components/TicketEditor.js';
+export { ImageWrapMenu } from './components/ImageWrapMenu.js';
+export {
+  createBrowserPickerDeps,
+  openDrivePicker,
+  requestDriveFileToken,
+  toDriveReference,
+  GOOGLE_API_SRC,
+  GOOGLE_GSI_SRC,
+  type DrivePickerConfig,
+  type DrivePickerDeps,
+  type PickedDriveFile,
+} from './drive/google-picker.js';
+export {
+  composeDriveReferenceAdded,
+  composeUploadAttachmentAdded,
+  type DriveReferenceAddedEvent,
+  type UploadAttachmentAddedEvent,
+} from './drive/attachment-claims.js';
+export {
+  AttachmentListItem,
+  DriveReferenceItem,
+  UploadedAttachmentItem,
+  describeDriveReachability,
+  type AttachmentListEntry,
+  type DriveLinkCheck,
+} from './components/AttachmentListItem.js';
+export { transitionRequiresEvidence } from './attachments/require-evidence.js';
+export { EvidencePicker, type AttachmentSummary, type EvidencePickerProps } from './components/EvidencePicker.js';
+export {
+  composeEditorSubmission,
+  type EditorSubmission,
+} from './attachments/compose-editor-submission.js';
+export {
+  TicketEditorSlot,
+  type EditorSlotProps,
+  type EditorSlotUpload,
+  type TicketEditorSlotProps,
+} from './components/TicketEditorSlot.js';
+export {
+  EDITOR_BRIDGE_VERSION,
+  parseHostMessage,
+  serializeEditorMessage,
+  type EditorToHostMessage,
+  type HostToEditorMessage,
+} from './webview/bridge.js';
+export { createEditorBridge, type EditorBridge, type EditorBridgeDeps } from './webview/create-editor-bridge.js';

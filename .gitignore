@@ -1,6 +1,10 @@
 .DS_Store
 node_modules/
 dist/
+# packages/editor's RN webview bundle (vite.webview.config.ts outDir): a
+# single self-contained index.html, not the package's tsc `dist/` above but
+# still a regenerated build artefact, never committed.
+dist-webview/
 build/
 __pycache__/
 *.pyc
@@ -25,3 +29,7 @@ playwright-report/
 # (code-only corpora skip semantic extraction), so it is regenerated, never shared.
 # Each worktree keeps its own, which is correct: they sit on different branches.
 graphify-out/
+
+# Local-disk ObjectStore root (apps/server/src/attachments/local-disk-store.ts,
+# default var/attachments): dev/test attachment bytes, never committed.
+var/

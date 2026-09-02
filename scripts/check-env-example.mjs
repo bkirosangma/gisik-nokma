@@ -107,8 +107,22 @@ for (const root of ROOTS) {
       record(m[1], shown, 'process.env access');
     }
 
-    if (!/process\.env|ProcessEnv/.test(source)) continue;
+    // D2 and D3 both scan `code`, so the gate that admits a file to them must
+    // scan `code` too. It used to test `source`, and the inconsistency was not
+    // theoretical: `packages/editor/src/drive/google-picker.ts` was admitted on
+    // the strength of a docblock sentence reading "never read from process.env
+    // in here" — a sentence asserting the file does NOT touch the environment —
+    // whereupon D3 read the `Action: { PICKED: string; CANCEL: string }` type
+    // members as undocumented config keys and failed the contract. A file was
+    // flagged for saying it reads no environment.
+    //
+    // D1 above is deliberately left on raw `source`: a commented-out
+    // `process.env.FOO` still names a variable someone meant to read, and that
+    // is worth reporting. The difference is that D1 matches the variable
+    // itself, while D2/D3 match SHAPES that are only evidence in a file which
+    // genuinely reads the environment.
     const code = withoutCommentLines(source);
+    if (!/process\.env|ProcessEnv/.test(code)) continue;
 
     // D2 -- destructuring off the environment.
     for (const m of code.matchAll(/(?:const|let|var)\s*\{([^}]*)\}\s*=\s*(?:process\.env|env)\b/g)) {

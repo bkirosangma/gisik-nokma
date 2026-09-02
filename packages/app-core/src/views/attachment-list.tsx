@@ -14,13 +14,29 @@ import { formatDate } from '../provenance.js';
  * date, which say that the two facts on screen are observations rather than
  * standing truths.
  *
- * ## The twin declaration Plan 6 Open question 13 promises does not exist yet
+ * ## The twin declaration Plan 6 Open question 13 promises NOW EXISTS
  *
  * The plan says `packages/editor` declares this union identically so that
  * package never depends on app-core, and that the two are edited together.
- * **Measured 2026-09-02: `packages/editor` declares no `AttachmentListEntry`.**
- * Nothing here has a twin to move beside it, and nothing under
- * `packages/editor` is touched from here.
+ * This paragraph used to read *"Measured 2026-09-02: `packages/editor` declares
+ * no `AttachmentListEntry`"*, and that measurement was true when it was taken.
+ * **Plan 7 Task 12b falsified it: the twin is
+ * `packages/editor/src/components/AttachmentListItem.tsx:50`.** The two are now
+ * edited together or not at all — that is the whole point of the arrangement,
+ * and it only starts binding once the second declaration exists.
+ *
+ * The stale sentence is corrected here rather than annotated because an
+ * annotation on the editor side cannot reach the reader who arrives cold at
+ * app-core, edits app-core alone, and never learns a twin was waiting. Task 12b
+ * recorded that limitation in its own docblock explicitly and could not act on
+ * it, being scoped to `packages/editor`.
+ *
+ * **`packages/app-core/src/views/editor-slot.tsx:17` carries a
+ * sentence of the same shape about a DIFFERENT type, `EditorSlotUpload`, and
+ * that one is STILL TRUE** — swept at this commit, `packages/editor` contains no
+ * `type`, `interface` or `const` of that name, only two prose mentions. Naming
+ * the survivor is half the point: a reader who sees this correction and writes
+ * off every sentence of its shape would break a claim that holds.
  *
  * The union below is Plan 6's own text, spelled out member by member. Plan 7's
  * text writes the reference arm as `{kind, attachmentId} & DriveReference`, and

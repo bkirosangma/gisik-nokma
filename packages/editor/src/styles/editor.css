@@ -77,3 +77,113 @@
 .editor-mention {
   white-space: nowrap;
 }
+
+/* Escape-suggestion chip: inline widget after the caret. */
+.escape-chip {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: baseline;
+  margin-left: 0.375rem;
+  padding: 0.0625rem 0.375rem;
+  font-size: 0.75rem;
+  vertical-align: baseline;
+  cursor: pointer;
+  user-select: none;
+}
+.escape-chip__hint {
+  font-size: 0.625rem;
+  opacity: 0.7;
+}
+
+/* Editor shell + chrome: the upload chips (UI-only optimistic placeholder,
+   never a doc node) and the wrap menu shown on image selection. Structural
+   only, same rule as the rest of this file. */
+.ticket-editor {
+  position: relative;
+}
+.ticket-editor__content {
+  min-height: 4rem;
+}
+.upload-chips {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  pointer-events: none;
+}
+.upload-chips__chip {
+  font-size: 0.6875rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid currentColor;
+}
+.image-wrap-menu {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+.image-wrap-menu__option {
+  border: 1px solid currentColor;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.125rem 0.5rem;
+}
+.image-wrap-menu__option--active {
+  outline: 1px solid currentColor;
+  outline-offset: -1px;
+}
+.image-wrap-menu__alt {
+  min-width: 10rem;
+  border: 1px solid currentColor;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+/* The two kinds of attachment, told apart on the surface (spec §2, Drive rule
+   2). The dashed edge that marks a reference is the one visual difference a
+   stylesheet can carry under this file's no-colour rule; it inherits
+   `currentColor` like every other edge here. The two classes that carry no
+   rule — `attachment-item--upload` and `attachment-item__name` — are emitted
+   deliberately and styled by nobody yet: an upload is the unmarked case, and
+   the name is a plain link. `test/attachment-list-item.test.tsx` asserts that
+   split in both directions, so a rule appearing for either without the
+   contract moving fails there rather than drifting. */
+.attachment-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.35rem 0;
+}
+.attachment-item__kind,
+.attachment-item__last-seen,
+.attachment-item__reachability {
+  font-size: 0.85rem;
+}
+.attachment-item--drive-reference {
+  border-left: 2px dashed;
+  padding-left: 0.5rem;
+}
+
+/* The evidence picker (spec §4's require-evidence companion, Task 13):
+   structural layout only, per this file's no-colour rule — it inherits
+   `currentColor` like every other element here. */
+.evidence-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.evidence-picker__option {
+  text-align: left;
+  cursor: pointer;
+}
+.evidence-picker__unavailable {
+  border-left: 2px dashed;
+  padding-left: 0.5rem;
+}
+.evidence-picker__unavailable-item {
+  font-size: 0.85rem;
+}

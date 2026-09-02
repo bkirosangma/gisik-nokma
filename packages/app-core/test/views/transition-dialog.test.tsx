@@ -50,9 +50,18 @@ describe('3.71 transitionOptions — only transitions the definition declares', 
     ]);
   });
 
-  it('PLANTED DEFECT: a target reachable twice keeps the FIRST edge’s rules, never a merged set', () => {
+  it('PLANTED DEFECT: a target reachable twice is never a MERGED rule set', () => {
     // Merging two edges' rules would prompt for something no single declared
     // transition asks for.
+    //
+    // NOTE ON WHAT THIS CASE DOES *NOT* PROVE. It declares the EXACT edge
+    // first, so it answers `require-comment` under first-declaration-wins AND
+    // under exact-wins alike — it cannot tell those two implementations apart,
+    // and it used to be titled as though it could ("keeps the FIRST edge's
+    // rules"). The divergence between them is pinned by 3.149 below, which
+    // declares the wildcard first. This case is kept because "never merged" is
+    // a real property and still true; it is simply a weaker one than its old
+    // name claimed.
     const twice: WorkflowDef = {
       ...WF_ERRAND,
       transitions: [
@@ -63,6 +72,75 @@ describe('3.71 transitionOptions — only transitions the definition declares', 
     const options = transitionOptions(twice, 'doing');
     expect(options).toHaveLength(1);
     expect(options[0]?.rules).toEqual([{ kind: 'require-comment' }]);
+  });
+});
+
+/**
+ * Ruling P27. `transitionOptions` exists to predict the engine, so where a
+ * wildcard and an exact edge both reach one target it must resolve them the way
+ * the engine does: `find(exact) ?? find('*')`
+ * (`packages/rule-engine/src/transition.ts:91-93`), which `precheck.ts`'s
+ * `needsMembership` already mirrors at :375-378.
+ *
+ * It did not. It kept the first matching edge in DECLARATION ORDER, so a
+ * definition that happened to declare its wildcard first made the dialog
+ * disagree with the engine — and `adviseWorkflowDef` only WARNS about that
+ * shape ("real, but not fatal"), so such a definition publishes clean. The
+ * user-visible result was a transition offered with no evidence prompt on a
+ * move the server then refuses.
+ *
+ * THE REDDENING MUTATION, and it is site-identifying: restore
+ * `if (!targets.has(to)) targets.set(to, transition.rules)` in place of the
+ * edge resolution. Case 3.149 answers `[]` and fails; 3.150 and 3.151 stay
+ * green. Only the wildcard-first ordering can see the defect, which is exactly
+ * why 3.150 has to be here — a single-ordering test would prove the answer is
+ * right once, not that it is independent of ordering.
+ */
+describe('3.149-3.151 wildcard and exact edges resolve the way the ENGINE resolves them (P27)', () => {
+  const REQUIRE_EVIDENCE = [{ kind: 'require-evidence' }] as WorkflowDef['transitions'][number]['rules'];
+
+  const defWith = (transitions: WorkflowDef['transitions']): WorkflowDef => ({
+    ...WF_ERRAND,
+    transitions,
+  });
+
+  it('3.149 wildcard declared FIRST: the EXACT edge still supplies the rules', () => {
+    const options = transitionOptions(
+      defWith([
+        { from: '*', to: 'done', rules: [] },
+        { from: 'doing', to: 'done', rules: REQUIRE_EVIDENCE },
+      ]),
+      'doing',
+    );
+    expect(options).toHaveLength(1);
+    expect(options[0]?.rules).toEqual(REQUIRE_EVIDENCE);
+  });
+
+  it('3.150 exact declared FIRST: the same answer — the control that makes 3.149 a divergence test', () => {
+    // Without this case, 3.149 shows only that one ordering yields the right
+    // answer. The pair is what shows the answer does not depend on ordering,
+    // which is the actual property the engine has.
+    const options = transitionOptions(
+      defWith([
+        { from: 'doing', to: 'done', rules: REQUIRE_EVIDENCE },
+        { from: '*', to: 'done', rules: [] },
+      ]),
+      'doing',
+    );
+    expect(options).toHaveLength(1);
+    expect(options[0]?.rules).toEqual(REQUIRE_EVIDENCE);
+  });
+
+  it('3.151 a target reachable ONLY by a wildcard still resolves to the wildcard edge', () => {
+    // The regression the fix itself could introduce: preferring the exact edge
+    // must not drop targets that have no exact edge to prefer.
+    const options = transitionOptions(
+      defWith([{ from: '*', to: 'done', rules: REQUIRE_EVIDENCE }]),
+      'doing',
+    );
+    expect(options).toHaveLength(1);
+    expect(options[0]?.toStateId).toBe('done');
+    expect(options[0]?.rules).toEqual(REQUIRE_EVIDENCE);
   });
 });
 
