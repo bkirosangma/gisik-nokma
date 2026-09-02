@@ -640,7 +640,10 @@ reason on record, not an oversight:*
   run. **It contains no `applyCommitted`, no `insertEvent` and no `INSERT` into any `proj_*` table**,
   which is the whole point: it closes the one gap the six absences in `test/helpers/apply.ts` do not
   cover. Recounted, five of those six are already exercised through the real door elsewhere and only
-  the locks are not; what was missing was that every Plan 5 read-route test seeds its world with
+  the locks are not — *through the real door*, which is the whole claim: `lockEntity` and
+  `lockWorkspace` are both covered directly by `apps/server/test/event-store.test.ts` (`:83`, the
+  falsifiable hold-off; `:242`, `appendUnderBothLocks`), and what no test does is reach either one
+  through `POST /v1/events`. What was missing was that every Plan 5 read-route test seeds its world with
   `applyCommitted` and none writes through `POST /v1/events`, so the absences were closed for the
   WRITE path and open for the READ path. What the round trip therefore proves and a seeded read cannot:
   the `workflowId`/`stateId`/`stateCategory` on every card were chosen by the founding sequence and
@@ -655,8 +658,12 @@ reason on record, not an oversight:*
   disagree about which calendar page it is — 01:30 the next day in IST — which is the window
   `read-models.ts` names as "the whole Indian evening", and an instant inherited from the wall clock
   spends most of the day outside it. **Measured, not merely asserted:** making the strip's "today"
-  process-timezone-dependent (`now.toLocaleDateString('en-CA')` for `istDayOf`) reddens this and
-  nothing else, answering `daysInFlight: 30` under `TZ=UTC` where the IST-correct answer is 31.
+  process-timezone-dependent — `formatUtcDay` (`packages/domain/src/ist-day.ts`) reading
+  `getDate()`/`getMonth()`/`getFullYear()` instead of their UTC forms — reddens this and nothing
+  else, because the three zones then answer different `daysInFlight`. The expected count is
+  **computed at run time rather than hard-coded**: pinning the frozen instant to 20:00Z makes the
+  IST-correct answer 30 or 31 depending on where in the Indian evening the entry instant fell, so
+  naming either as *the* answer would be a fixture that is right on some runs and wrong on others.
   Measured
   across all 48 test files on an earlier `main`: zero vary `TZ`, seven are clock-sensitive, all seven
   omit it — and both this machine and the product are `Asia/Kolkata`, so every day-boundary proof in

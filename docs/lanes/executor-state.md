@@ -13,26 +13,69 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| **Branch in flight** | **`exec/10-integration-checkpoint`** @ **`684839f`**, pushed. **All step-10 work is COMMITTED; the tree is clean.** The FINAL WHOLE-BRANCH REVIEW is running; no PR is open yet. | `git rev-parse HEAD`, `git status --porcelain` empty, `git branch --contains 684839f` non-empty |
+| **Branch in flight** | **`exec/10-integration-checkpoint`**, pushed, **PR OPEN, awaiting the controller's merge.** All step-10 work is committed; the tree is clean; the final whole-branch review has run and its fix round has landed. | `git status --porcelain` empty, `git branch --contains <tip>` non-empty, `gh pr view` |
 | **`main`** | **`c9ab31c`** — step 9 (`563c983`, PR #67) plus two docs-only merges (`aa67ee3` #68, `c9ab31c` #69). **REFETCH before trusting this.** | `git rev-parse origin/main`, `git log --oneline -5` |
 | **`563c983` reachable?** | **YES**, ancestor of `c9ab31c`. The only diff `563c983..c9ab31c` is three files under `docs/lanes/`. | `git merge-base --is-ancestor 563c983 origin/main` → true; `git diff --stat` |
 | **Gate on merged main** | exit 0 · 21/21 · 0 cached · 1573 tests · Node v22.22.2. Measured by the controller at `563c983`; docs-only merges cannot move it (`turbo.json` declares no `inputs` and `docs/` is outside every package). | controller's forced gate |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing. | `node -v` |
 | Orphaned, do not cite | every sha in the narrative below the anchors, including all of Plan 5's task shas — **#67 was SQUASHED**. `git cat-file` passes on all of them and returns pre-merge content. | `git merge-base --is-ancestor` |
 
-## WHERE I AM: STEP 10, the integration checkpoint. Task A of three, in flight.
+## WHERE I AM: STEP 10 IS COMPLETE. PR OPEN, AWAITING THE CONTROLLER'S MERGE.
 
-**Nothing is committed on the branch yet.** If you are a restarted session, the working tree may hold
-an uncommitted Task A. Check `git status` before doing anything; do not re-dispatch work that is
-sitting in the tree.
+**Everything is committed and pushed, and the tree is clean.** The executor's work on this step is
+finished. **The executor opens PRs and NEVER merges** — that is the whole reason a second session
+exists, and it is the one authority this role does not have.
 
 | Task | What | State |
 |---|---|---|
 | **A** | **Ruling P18** — wire `getEntityState('membership')` to `proj_memberships` | **DONE, committed `44fb736`, gate green** |
 | **B** | Real-door round trip + the client-contract divergence pins (C merged in) | **DONE, committed `684839f`, gate green** |
 | docs | coordination doc records (P18 discharge, ruling P24, the recounts) | **DONE, committed `2b9876d`** |
-| final review | ONE opus reviewer over the whole branch | **IN FLIGHT** |
-| PR | opened only after the review is clean; **the controller merges, never the executor** | not started |
+| final review | ONE opus reviewer over the whole branch | **DONE** — 3 Important + 2 Minor + 1 Nit, **all against the DOCUMENTS, none against the code**; all fixed |
+| review fix round | prose and comments only, no behaviour touched | **DONE**, committed |
+| PR | **OPEN. The controller merges; the executor never does.** | see the anchors row |
+
+### THE FINAL REVIEW'S RESULT IS THE MOST USEFUL THING ON THIS BRANCH — read it before the code
+
+**Every one of its six findings was against a DOCUMENT, and every one was the executor's own prose.**
+The code, the tests and the catalogues came through clean. Three were Important, and all three are
+the failure classes this very branch documents, committed by the party writing the documentation
+about them:
+
+1. **The restart surface contradicted itself.** This file's heading still read *"Task A of three, in
+   flight"* and *"Nothing is committed on the branch yet"*, three lines under an anchors row saying
+   the opposite. That is `a63b326`'s lesson — *a pointer from a correct document to a stale one
+   reverses* — recurring **in the same file, on the same branch that cites it.** A patched table does
+   not repair a heading, and a restarted session reads the heading first.
+2. **The signature-failure lesson named the WRONG MODULE, in four places** including the production
+   docblock. It said the rule engine's `restrict-to` suite is green because `memory-context.ts`
+   carries memberships. **It does not** — `memory-context.ts:151-159` answers null for
+   `'membership'`, and `test/memory-context.test.ts:214` is a case named *"does not serve memberships
+   — this context is a SECOND context, not a replacement"*. **`fixtures/harness.ts:294` alone
+   answers.** The root cause is a misread antecedent at `memory-context.ts:18-24`, and **the branch
+   already carried the correct version** at case 6.136 and in `docs/plan-3-chain-b-handoff.md`. The
+   executor introduced the error in its own dispatch prompt and it propagated outward from there.
+3. **"Only `lockWorkspace`/`lockEntity` has no coverage anywhere" was false**, in four places.
+   `test/event-store.test.ts:83` is `lockEntity holds off a second transaction until the first
+   commits (falsifiable)` — it asserts non-acquisition after 100 ms, asserts `pg_locks` holds exactly
+   one ungranted advisory lock, then asserts acquisition on commit; `:242` drives `lockWorkspace`.
+   The true claim is **"uncovered through the real door"**. An absence claim was published without
+   the sweep this repo's own rule demands.
+
+The Minors were the same shape: a positive control quoted as `4/5/3/1` where the grep returns
+`4/5/3/2` (the test file had it right and the two documents did not), and **"9 of 11" where
+`DataSourceQuery` declares 12 methods** — the table has 11 rows only because `getPreferences` and
+`putPreferences` share one, so the fraction mixed rows into a denominator of methods. **9 of 12.**
+
+**The fix round found MORE copies than the review cited in every single case** — four where three
+were named, twice — and corrected two copies that predate this branch, on the ground that leaving
+them would make one document assert both readings of the same fact. It also caught two errors its own
+edits introduced. Nothing was refuted, because nothing was refutable.
+
+**The lesson, since it is the one this step actually earned:** the branch's tests were mutation-proved
+and its prose was not. Six false claims in documents that later plans navigate by, on a branch whose
+own thesis is that a claim without an executed check behind it is not evidence. **Prose is not exempt
+from the falsifiability law, and it is the part no gate runs.**
 
 ### Task B — what it added, and the finding that nearly escaped
 
@@ -40,11 +83,16 @@ Two files under `apps/server/test/integration/`, 36 cases.
 
 `real-door-round-trip.test.ts` (21) builds its world ONLY through the shipped doors and reads it
 back through the shipped read routes. No `applyCommitted`, no `insertEvent`, no INSERT into any
-projection table — the five `db.pool.query` calls are SELECTs used as oracles. It also carries **the
-repo's first proof that varies `TZ`**: three zones, the expectation computed without the function
-under test, a first case proving the knob moves before anything leans on it, and the mutation
-captured as a number rather than a colour — `daysInFlight` 30 under `TZ=UTC` where the IST-correct
-answer is 31. That closes the brief's known gap #2 for this surface.
+projection table — the four `db.pool.query` calls (`:222`, `:838`, `:870`, `:964`) are SELECTs used
+as oracles. It also carries **the repo's first proof that varies `TZ`**: three zones, the expectation
+computed without the function under test, a first case proving the knob moves before anything leans
+on it, and the mutation captured as a number rather than a colour — under
+`formatUtcDay` reading `getDate()`/`getMonth()`/`getFullYear()` instead of their UTC forms, the three
+zones answer different `daysInFlight` and the run reddens. The expected count is **computed at run
+time, not hard-coded**: pinning the frozen instant to 20:00Z makes the IST-correct answer 30 or 31
+depending on where in the Indian evening the entry instant fell, so naming either number as *the*
+answer would be a fixture that is right on some runs and wrong on others. That closes the brief's
+known gap #2 for this surface.
 
 `client-contract.test.ts` (15) pins the divergences, sorted into **signature / serving / data** gaps
 because the sort decides whether each is a client edit, a route change, or a product decision.
@@ -69,15 +117,20 @@ It is **not a gate**: CI runs `pnpm check:env` and `pnpm turbo run build test ty
 It reports rows with `pr "-"` (04/2, 04/3, 06/1–4, 07/1–3, 10/1–3, 10/8). **Owner: the controller**,
 whose file the ledger is.
 
-### Gate at `684839f`, run by the executor at the tree being reported
+### Gate, run by the executor at the tree being reported — THREE TIMES, and the third is the one that matters
 
 **exit 0 · 21/21 · 0 cached · 1612 tests · Node v22.22.2 · 0 `Unsupported engine` WARNs.**
 domain 335 · rule-engine 280 · **server 756** · app-core 130 · editor 72 · ui 31 · sync-client 8.
 
 **The delta decomposes twice over.** Main 1573 → 1576 after Task A (+3, all `engine-context.test.ts`,
 15 → 18 `it(`) → 1612 after Task B (+36, all `apps/server`, 720 → 756, split 21 round-trip + 15
-contract). Every other package is unchanged, as it must be: the branch's only `packages/` change is
-none — its single production edit is in `apps/server/src`.
+contract). Every other package is unchanged, as it must be: **the branch changes nothing under
+`packages/`** — its single production edit is `apps/server/src/engine-context.ts`.
+
+**The post-review fix round was gated again and came back byte-identical: 1612, same composition,
+Node v22.22.2, 0 cached, 0 engine warnings.** For a round that changed only comments and prose that
+is the expected result, and it is the evidence that no behaviour moved — a prose round whose totals
+shifted would mean something was edited that was not prose.
 
 ### Task A — what it cost and what it bought, since a successor should not re-derive it
 
@@ -113,7 +166,12 @@ Do not work from the dispatch brief's description of step 10, and do not work fr
 the two type files. Findings, each with a positive control run in the same command:
 
 **1. The six `applyCommitted` absences are NOT the target — five are already closed.**
-`lockWorkspace`/`lockEntity` is the only one with no coverage anywhere. Seqs-from-the-DB,
+`lockWorkspace`/`lockEntity` is the only one uncovered **through the real door**. Both are covered
+directly, so "no coverage anywhere" would be false: `test/event-store.test.ts:83` is
+*`lockEntity` holds off a second transaction until the first commits (falsifiable)* — it asserts B
+has not acquired after 100 ms, that `pg_locks` reports exactly one ungranted advisory lock in this
+database, and that B acquires the moment A commits — and `lockWorkspace` is driven at
+`event-store.test.ts:242` by `appendUnderBothLocks`. Seqs-from-the-DB,
 `checkPermission`, the rule engine, `bootstrapWorkspace` and `notifyCommitted` are each already
 exercised through the real door — the last by `stream-route.test.ts`'s `submit()`, whose docblock
 says exactly why a row-writing helper cannot drive the hub.
@@ -121,7 +179,10 @@ says exactly why a row-writing helper cannot drive the hub.
 **2. The real gap is one sentence.** *Every Plan 5 read-route test seeds through `applyCommitted`
 and none of them writes through `POST /v1/events`.* Measured: `grep -l "v1/events"` over
 `board|list|search|my-work|attention|preferences`.test.ts returns **nothing**; the same grep returns
-4 · 5 · 3 · 1 for `workspaces` · `invites` · `security` · `stream-route`. The grep can hit.
+4 · 5 · 3 · 2 for `workspaces` · `invites` · `security` · `stream-route`. The grep can hit. (The
+first three are in `test/routes/`; `stream-route.test.ts` is in `test/stream/`, so it is the same
+grep and not the same directory. `grep -c v1/events test/stream/stream-route.test.ts` is **2** — a
+docblock mention at `:114` and the real `url: '/v1/events'` at `:126`.)
 
 **3. The write half is already proven end to end** — `workspaces.test.ts` does real sign-in →
 `POST /v1/workspaces` → `project.created` → `project.member_added` → `ticket.created`, all
@@ -129,10 +190,13 @@ committing, then asserts **`proj_tickets` by querying the table directly**. So t
 small and precise: *nothing on `main` reads back through a shipped READ route what a real POST
 wrote.*
 
-**4. The client contract is worse than "six disagreements": 9 of 11 `DataSourceQuery` methods cannot
+**4. The client contract is worse than "six disagreements": 9 of 12 `DataSourceQuery` methods cannot
 be implemented over the shipped routes**, and 3 of those cannot even form their request
 (`getMyWork`, `getPreferences`, `putPreferences` take no `workspaceId`; all three routes 400
-`invalid_query` without it). The full register — per method, with the serving-gap vs data-gap
+`invalid_query` without it). **The denominator is 12** — `packages/app-core/src/data-source.ts`
+declares twelve methods on `DataSourceQuery`, and 9 blocked + 3 adaptable = 12; the register's table
+shows only 11 rows because `getPreferences` and `putPreferences` share one, so do not recount it from
+rows. The full register — per method, with the serving-gap vs data-gap
 distinction that decides who fixes each — is in the coordination doc section this step adds. The
 distinction matters: a **serving** gap is a fact the server holds and does not put on the wire (one
 route change); a **data** gap is a fact it does not have (a product decision).
@@ -171,8 +235,12 @@ It is a **functionality gap, not a security defect**, and saying so is load-bear
 fails CLOSED, so every role-gated transition rule is refused for everyone on the server path. Anyone
 reporting it as an authorisation bypass will provoke a mis-sequencing ruling. The reason nothing
 noticed is this series' signature failure in its purest form: the rule engine's own `restrict-to`
-tests pass against `memory-context.ts`, which carries `fx.memberships` and answers — green on the
-side with the fake, untested on the side with the truth.
+tests pass against **`packages/rule-engine/src/fixtures/harness.ts` alone** — it is the only
+in-memory context that carries `fx.memberships` and answers (`harness.ts:294`), and the eleven
+`rule-restrict-to-*` fixtures run through it via `test/fixtures.test.ts`. The SECOND in-memory context, `memory-context.ts`, answered
+`null` for `'membership'` exactly as the server did, and its own suite pins that
+(`test/memory-context.test.ts:214`, *"does not serve memberships — this context is a SECOND context,
+not a replacement"*). So: green on the one side with the fake, untested everywhere else.
 
 ---
 
@@ -194,7 +262,7 @@ should, run before any null result below was trusted).
 
 **WRONG: there is only ONE fake, and Plans 8 and 9 have no client code in this repo at all.**
 `packages/app-core/test/helpers/fake-data-source.ts` (`createFakeDataSource`) is the whole of it, and
-it is total — it implements every one of `DataSource`'s 11 query methods plus `ingest` and
+it is total — it implements every one of `DataSource`'s 12 query methods plus `ingest` and
 `subscribe`. Its own docblock already calls itself a *"SANCTIONED MOCKED-CONTRACT SEAM"*. **No
 `http-data-source.ts` or online `DataSource` exists anywhere**, so the fake is the only implementation
 there is. It is consumed by `cache.test.ts`, `data-source.test.ts` and `board.test.tsx` — and

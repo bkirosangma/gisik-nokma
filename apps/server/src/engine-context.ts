@@ -49,10 +49,17 @@ function isIdentityOnlyKind(kind: EntityKind): kind is OtherEntityState['kind'] 
  * cost was every workflow whose approval step is spelled as a role.
  *
  * It survived because the contract was half witnessed. The rule engine's own
- * suite drives `restrict-to` against `memory-context.ts` and `fixtures/harness.ts`,
- * both of which carry memberships, so the criterion was green on the side with
- * the fake and untested on the side with the truth. `proj_memberships` landed in
- * Plan 4 Task 4 and nothing read it through the engine.
+ * suite drives `restrict-to` against `packages/rule-engine/src/fixtures/harness.ts`
+ * ALONE — it is the only in-memory context that carries memberships and answers
+ * (`harness.ts:294`), and the eleven `rule-restrict-to-*` fixtures run through
+ * it via `packages/rule-engine/test/fixtures.test.ts`. The
+ * SECOND in-memory context, `packages/rule-engine/src/memory-context.ts`,
+ * answered `null` for `'membership'` exactly as this file did, and its own suite
+ * pins that: `packages/rule-engine/test/memory-context.test.ts:214` is a case
+ * named "does not serve memberships — this context is a SECOND context, not a
+ * replacement". So the criterion was green on the one side with the fake and
+ * untested everywhere else. `proj_memberships` landed in Plan 4 Task 4 and
+ * nothing read it through the engine.
  *
  * ## Why `resolveEffectiveRole` and not a SELECT of our own
  *

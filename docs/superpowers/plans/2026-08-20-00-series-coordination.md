@@ -4297,7 +4297,9 @@ rule with `roles` reaches it. Recorded because a "no caller" claim is exactly th
 hazard by accident.
 
 **And the suite cannot see it.** The rule engine's own `restrict-to` tests run against
-`memory-context.ts`, which carries `fx.memberships` and *does* answer — so they pass. The server path is
+`fixtures/harness.ts`, which carries `fx.memberships` and *does* answer (`harness.ts:294`) — so they
+pass. (Corrected by the step-10 checkpoint's fix round: this used to name `memory-context.ts`, whose
+`getEntityState` answers `null` for `'membership'` exactly as the server did.) The server path is
 the only place the null appears, and no server test exercises a role-gated transition. **A
 half-witnessed contract: green on the side that has the fake, untested on the side that has the truth.**
 
@@ -5561,7 +5563,15 @@ command, and both are recorded here rather than in the executor's handoff becaus
 
 The dispatch brief and the preceding recon both frame step 10 as closing the six things
 `test/helpers/apply.ts` enumerates that real ingest does and `applyCommitted` does not. Counted
-against the tree at `c9ab31c`, **only `lockWorkspace`/`lockEntity` has no coverage anywhere.**
+against the tree at `c9ab31c`, **only `lockWorkspace`/`lockEntity` is uncovered through the real
+door.** Say it that way and not "anywhere", because "anywhere" is false and this section's own lesson
+is the one that catches it: both locks are covered directly, in `apps/server/test/event-store.test.ts`.
+`:83` is *`lockEntity` holds off a second transaction until the first commits (falsifiable)* — A takes
+the lock, B is asserted not to have acquired after 100 ms, `pg_locks` is asserted to report exactly
+one ungranted advisory lock in this database, and B is asserted to acquire the moment A commits; its
+docblock records that the neighbouring race test passed 5/5 with `lockEntity` no-opped, which is why
+that one exists. `lockWorkspace` is driven at `:242` by `appendUnderBothLocks`. What no test does is
+reach either lock **through `POST /v1/events`**, and concurrency was not step 10's subject.
 Seqs-from-the-database, `checkPermission`, the rule engine and `bootstrapWorkspace` are all exercised
 by `test/routes/workspaces.test.ts`, and `notifyCommitted` — the one the recon explicitly called
 still-open — is exercised by `test/stream/stream-route.test.ts`'s `submit()` helper, whose own
@@ -5572,8 +5582,11 @@ writes rows straight into `events` fires nothing."*
 **The real gap is one sentence:** *every Plan 5 read-route test seeds its world with `applyCommitted`
 and none of them writes through `POST /v1/events`.* The absences are closed for the WRITE path and
 open for the READ path. Measured: `grep -l "v1/events"` over `board`, `list`, `search`, `my-work`,
-`attention` and `preferences`.test.ts returns **nothing**, while the same grep in the same directory
-returns 4, 5, 3 and 1 for `workspaces`, `invites`, `security` and `stream-route`. The grep can hit.
+`attention` and `preferences`.test.ts returns **nothing**, while the same grep returns 4, 5, 3 and 2
+for `workspaces`, `invites`, `security` and `stream-route`. The grep can hit. Two corrections to how
+that used to be written: `stream-route.test.ts` returns **2**, not 1 (`grep -c v1/events` on it — a
+docblock mention at `:114` and the real `url: '/v1/events'` at `:126`), and it is **not the same
+directory** — the first three live in `test/routes/` and it lives in `test/stream/`.
 
 And the write half is already proven end to end — `workspaces.test.ts` walks real sign-in →
 `POST /v1/workspaces` → `project.created` → `project.member_added` → `ticket.created`, every one
@@ -5587,7 +5600,7 @@ true about `applyCommitted` and says nothing about whether some other test close
 elsewhere. **An absence enumerated in one file is a fact about that file.** Re-measure before
 scoping work off it.
 
-### The client `DataSource` contract cannot be implemented over the shipped routes — 9 of 11 methods
+### The client `DataSource` contract cannot be implemented over the shipped routes — 9 of 12 methods
 
 The recon reported "six shape disagreements". Recounted from each handler's own `return` statement
 plus `packages/app-core/src/data-source.ts`, `view-types.ts` and `packages/domain/src/read-models.ts`,
@@ -5608,6 +5621,14 @@ the client shape from what the route answers.** By that test:
 | `getMyWork` | **blocked ×2** | a different grouping MODEL, and it takes no `workspaceId` |
 | `getAttention` | **blocked** | client `AttentionKind` includes `'contested'`; the server union has three arms and not that one |
 | `getPreferences` / `putPreferences` | **blocked (signature)** | neither takes a `workspaceId`; both routes answer **400 `invalid_query`** without one |
+
+**The denominator is 12 and the table has 11 rows — do not recount it from rows.**
+`packages/app-core/src/data-source.ts` declares **twelve** methods on `DataSourceQuery`, and the
+table's own verdicts sum to twelve: blocked = `getMyWorkspaces`, `getBoard`, `getTickets`,
+`getTicket`, `search`, `getMyWork`, `getAttention`, `getPreferences`, `putPreferences` (9);
+adaptable = `getMembers`, `getTicketHistory`, `getWorkflowDef` (3). The last row pairs
+`getPreferences` with `putPreferences` because they share a verdict and a reason, so a row count is
+11 and a method count is 12. This heading previously read *9 of 11*, which mixed the two.
 
 **Sort the blocked rows into two kinds, because the sort decides who fixes each.** A **serving gap**
 is a fact the server holds and does not put on the wire — one route change. A **data gap** is a fact
@@ -5677,9 +5698,22 @@ cost was every workflow whose approval step is spelled as a role, for everyone, 
 included. Reported as an authorisation defect it would have provoked a mis-sequencing ruling.
 
 Why nothing noticed is this series' signature failure in its purest form: the rule engine's own
-`restrict-to` suite drives `memory-context.ts` and `fixtures/harness.ts`, both of which carry
-`fx.memberships` and answer. **Sixty-one fixtures green on the side with the fake; the side with the
-truth never exercised.**
+`restrict-to` suite drives **`fixtures/harness.ts` ALONE** — it is the only in-memory context that
+carries `fx.memberships` and answers (`harness.ts:294`), and the eleven `rule-restrict-to-*` fixtures
+run through it via `test/fixtures.test.ts`. The SECOND in-memory context, `memory-context.ts`,
+answered `null` for `'membership'` **exactly as the server did**, and its own suite pins that:
+`test/memory-context.test.ts:214` is a
+case named *"does not serve memberships — this context is a SECOND context, not a replacement"*.
+**Sixty-one fixtures green on the one side with the fake; every other side never exercised.**
+
+**Name the right module, because three documents on this branch first named the wrong one, and the
+misread is instructive.** `memory-context.ts:18-24` reads *"It does NOT replace `buildInMemoryContext`
+in `./fixtures/harness.js` … and **it** carries `fx.memberships`"* — the `it` is the harness, not the
+file the sentence is in. A signature-failure lesson that points at a module which answers null is
+worse than no lesson: the next reader concludes the fake side is broader than it is. The corrected
+version of this same claim already existed on the branch, at `test-cases/06-auth-visibility.md` case
+6.136 and in `docs/plan-3-chain-b-handoff.md` — so this was a disagreement inside one branch, not a
+missing measurement.
 
 ---
 

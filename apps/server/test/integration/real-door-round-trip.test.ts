@@ -20,7 +20,11 @@ import { signInWithPhone } from '../helpers/session.js';
  * `notifyCommitted` by `test/stream/stream-route.test.ts`'s `submit()`, and
  * `bootstrapWorkspace`, the permission gate, the rule engine and DB-minted
  * seqs by `test/routes/workspaces.test.ts`. Only `lockWorkspace`/`lockEntity`
- * is uncovered anywhere, and concurrency is not this file's subject.
+ * is uncovered **through the real door** — not "anywhere": both are covered
+ * directly in `test/event-store.test.ts`, `lockEntity` at `:83` ("holds off a
+ * second transaction until the first commits (falsifiable)") and `lockWorkspace`
+ * at `:242` via `appendUnderBothLocks`. What no test does is reach either lock
+ * through `POST /v1/events`, and concurrency is not this file's subject.
  *
  * The real gap is one sentence and it was measured:
  *
