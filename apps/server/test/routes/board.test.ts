@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { newUlid, type BoardResponse } from '@gisik-nokma/domain';
 import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
+import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
 
@@ -46,6 +47,36 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * neighbour workspace). Nothing here writes to the ledger after that, so no
  * case depends on declaration order.
  *
+ * ## The one thing this file appends to the shared world: `wf-second` v2
+ *
+ * Still inside `beforeAll`, before any case runs, so the paragraph above holds.
+ * Its reason is falsifiability and it is worth stating, because without it a
+ * field this file asserts could not be wrong. Every workflow any BOARD sees in
+ * this suite was at version 1 — `test/routes/attention.test.ts` publishes a
+ * `wf-second` v2 of its own, but that file exercises the attention strip and
+ * produces no columns — so a board column's `workflowVersion` could not be told
+ * apart from the literal `1`, from the ticket row's `workflow_version`, or from
+ * any other workflow's version. **MEASURED, as the counterfactual and not as a
+ * prediction:** with this publish removed and the `wf-second` expectations below
+ * put back to `1`, replacing `workflowVersion: def.version` in `routes/board.ts`
+ * with `workflowVersion: 1` left all 756 server tests green — the whole-body
+ * `toEqual` in `test/integration/real-door-round-trip.test.ts` and the agreement
+ * case in `test/integration/client-contract.test.ts` included. The second
+ * publish gives the sibling board TWO workflows at TWO versions, and the
+ * candidates come apart: the same mutation then kills the second case below.
+ *
+ * It is appended HERE and not in `seedSiblingProject` because
+ * `test/routes/attention.test.ts` already publishes its OWN `wf-second` v2 (with
+ * `todo` flagged blocked) into the same shared sibling project, and
+ * `proj_workflows` is `ON CONFLICT (workflow_id, version) DO NOTHING` — a shared
+ * v2 would silently swallow that file's definition and take four of its cases
+ * with it. Measured, not predicted: it did, before this moved.
+ *
+ * The states are byte-identical to v1, so no `stateMapping` is owed and no
+ * column set, name, category or blocked flag any case here asserts moves. The
+ * chore ticket, created under v1, is folded forward to v2 by Plan 3's
+ * refresh-on-publish.
+ *
  * ## Nothing on this response moves with `TZ`
  *
  * Stated rather than skipped. The only times a board carries are
@@ -64,6 +95,33 @@ let read: ReadWorld;
 beforeAll(async () => {
   db = await createTestDatabase();
   read = await buildReadTestApp(db);
+
+  // See the docblock — `wf-second`'s SECOND version, identical states, so that
+  // one board carries two workflows at two different versions.
+  await applyCommitted(db.pool, [
+    makeCommitted({
+      workspaceId: read.world.workspaceId,
+      actorId: read.world.owner,
+      entity: { kind: 'workflow', id: read.sibling.secondWorkflowId },
+      type: 'workflow.defined',
+      payload: {
+        id: read.sibling.secondWorkflowId,
+        version: 2,
+        name: 'Second flow',
+        initialStateId: 'todo',
+        states: [
+          { id: 'todo', name: 'Queued', category: 'open' },
+          { id: 'waiting', name: 'Parked', category: 'active' },
+          { id: 'done', name: 'Filed', category: 'terminal' },
+        ],
+        transitions: [
+          { from: '*', to: 'todo', rules: [] },
+          { from: '*', to: 'waiting', rules: [] },
+          { from: '*', to: 'done', rules: [] },
+        ],
+      },
+    }),
+  ]);
 }, 60_000);
 
 afterAll(async () => {
@@ -110,16 +168,17 @@ describe('GET /v1/projects/:projectId/board — the columns', () => {
       board.columns.map((c) => ({
         workflowId: c.workflowId,
         workflowName: c.workflowName,
+        workflowVersion: c.workflowVersion,
         stateId: c.stateId,
         name: c.name,
         category: c.category,
         blocked: c.blocked,
       })),
     ).toEqual([
-      { workflowId: 'wf-errands', workflowName: 'Errands', stateId: 'todo', name: 'To do', category: 'open', blocked: false },
-      { workflowId: 'wf-errands', workflowName: 'Errands', stateId: 'doing', name: 'Doing', category: 'active', blocked: false },
-      { workflowId: 'wf-errands', workflowName: 'Errands', stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true },
-      { workflowId: 'wf-errands', workflowName: 'Errands', stateId: 'done', name: 'Done', category: 'terminal', blocked: false },
+      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'todo', name: 'To do', category: 'open', blocked: false },
+      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'doing', name: 'Doing', category: 'active', blocked: false },
+      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true },
+      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'done', name: 'Done', category: 'terminal', blocked: false },
     ]);
   });
 
@@ -142,19 +201,34 @@ describe('GET /v1/projects/:projectId/board — the columns', () => {
     const board = await boardOf('member', read.sibling.projectId);
 
     expect(
-      board.columns.map((c) => ({ workflowId: c.workflowId, stateId: c.stateId, name: c.name, blocked: c.blocked })),
+      board.columns.map((c) => ({
+        workflowId: c.workflowId,
+        workflowVersion: c.workflowVersion,
+        stateId: c.stateId,
+        name: c.name,
+        blocked: c.blocked,
+      })),
     ).toEqual([
       // Ordered by workflow id, then by the order each publisher authored their
       // states. `todo` and `waiting` each appear TWICE — once per workflow —
       // and `waiting` is blocked under one and not the other, which is what a
       // flag keyed on a bare state id would get wrong.
-      { workflowId: 'wf-errands', stateId: 'todo', name: 'To do', blocked: false },
-      { workflowId: 'wf-errands', stateId: 'doing', name: 'Doing', blocked: false },
-      { workflowId: 'wf-errands', stateId: 'waiting', name: 'Waiting on counterparty', blocked: true },
-      { workflowId: 'wf-errands', stateId: 'done', name: 'Done', blocked: false },
-      { workflowId: 'wf-second', stateId: 'todo', name: 'Queued', blocked: false },
-      { workflowId: 'wf-second', stateId: 'waiting', name: 'Parked', blocked: false },
-      { workflowId: 'wf-second', stateId: 'done', name: 'Filed', blocked: false },
+      //
+      // `workflowVersion` is the second thing this board is uniquely able to
+      // say. `wf-second` is published TWICE (see this file's docblock), so the two
+      // workflows here sit at DIFFERENT versions — and that is the only place
+      // in the suite where the column's version can be told apart from the
+      // literal `1`, from the ticket row's `workflow_version`, or from the
+      // other workflow's version. Every state of one workflow carries that
+      // workflow's own number, which is what a version read off the first def
+      // in the map, or off the card, would get wrong.
+      { workflowId: 'wf-errands', workflowVersion: 1, stateId: 'todo', name: 'To do', blocked: false },
+      { workflowId: 'wf-errands', workflowVersion: 1, stateId: 'doing', name: 'Doing', blocked: false },
+      { workflowId: 'wf-errands', workflowVersion: 1, stateId: 'waiting', name: 'Waiting on counterparty', blocked: true },
+      { workflowId: 'wf-errands', workflowVersion: 1, stateId: 'done', name: 'Done', blocked: false },
+      { workflowId: 'wf-second', workflowVersion: 2, stateId: 'todo', name: 'Queued', blocked: false },
+      { workflowId: 'wf-second', workflowVersion: 2, stateId: 'waiting', name: 'Parked', blocked: false },
+      { workflowId: 'wf-second', workflowVersion: 2, stateId: 'done', name: 'Filed', blocked: false },
     ]);
 
     // Each card under its OWN workflow's column and nowhere else. A board that

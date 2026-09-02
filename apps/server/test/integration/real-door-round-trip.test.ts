@@ -95,6 +95,14 @@ let childId: string;
 let workflowId: string;
 /** `SIMPLE_KANBAN_TEMPLATE.initialStateId`, read back off the ledger rather than assumed. */
 let initialStateId: string;
+/**
+ * The VERSION the founding sequence published, read off the same
+ * `workflow.defined` payload. Typed `number` and asserted `1` below rather than
+ * hard-coded into the board expectation: `toEqual` ignores an `undefined`
+ * property, so a `payload['version']` that came back missing would make the
+ * board's `workflowVersion` line pass against a body that never carried the key.
+ */
+let workflowVersion: number;
 
 let phoneCounter = 0;
 
@@ -227,6 +235,7 @@ beforeAll(async () => {
   expect(defined).toBeDefined();
   workflowId = defined?.payload['id'] as string;
   initialStateId = defined?.payload['initialStateId'] as string;
+  workflowVersion = defined?.payload['version'] as number;
 
   projectId = newUlid();
   await post(member.headers, {
@@ -348,6 +357,12 @@ describe('the world was built through the doors, and the server chose these valu
     // put in this workspace's ledger and the `workflow.defined` beside them.
     expect(workflowId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(initialStateId).toBe('todo');
+    // The founding sequence publishes ONE version, and it is the first one.
+    // This is the positive control for the `workflowVersion` the board
+    // expectation below is built from: a `number` that really is a number, so
+    // that line cannot pass by both sides being `undefined`.
+    expect(typeof workflowVersion).toBe('number');
+    expect(workflowVersion).toBe(1);
   });
 });
 
@@ -435,6 +450,7 @@ describe('GET /v1/projects/:projectId/board', () => {
         {
           workflowId,
           workflowName: 'Simple kanban',
+          workflowVersion,
           stateId: 'todo',
           name: 'To do',
           category: 'open',
@@ -444,6 +460,7 @@ describe('GET /v1/projects/:projectId/board', () => {
         {
           workflowId,
           workflowName: 'Simple kanban',
+          workflowVersion,
           stateId: 'doing',
           name: 'Doing',
           category: 'active',
@@ -453,6 +470,7 @@ describe('GET /v1/projects/:projectId/board', () => {
         {
           workflowId,
           workflowName: 'Simple kanban',
+          workflowVersion,
           stateId: 'done',
           name: 'Done',
           category: 'terminal',

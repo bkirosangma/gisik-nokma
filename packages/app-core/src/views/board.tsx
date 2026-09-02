@@ -9,7 +9,30 @@ import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
 export type BoardProps = {
   board: BoardViewData;
   onOpenTicket: (ticketId: string) => void;
+  /**
+   * The create affordance the empty board offers, and the reason it is
+   * OPTIONAL rather than required.
+   *
+   * The words come first: an empty board must say something even where the
+   * shell above it has no create flow to hand down. A required prop would force
+   * every mount to pass one, and the mount with nothing to pass would pass a
+   * no-op — a button that looks like a way out of an empty project and is not.
+   * So the copy is unconditional and the button is not, and both arms are
+   * tested (`board.test.tsx`): with a handler the button is there and clicking
+   * it calls the handler; without one there is no button and the sentence is
+   * still on screen.
+   */
+  onCreateTicket?: () => void;
 };
+
+/**
+ * The words an empty board says instead of drawing nothing.
+ *
+ * Pinned copy (Plan 6 Task 15b, item 4). Exported so the shell's own tests can
+ * assert the same string this renders rather than a re-typed copy of it — two
+ * spellings of one sentence is how a copy change passes a test it broke.
+ */
+export const EMPTY_BOARD_COPY = 'No tickets here yet — create one.';
 
 /**
  * Columns are exactly the attached workflow's states — empty ones render too,
@@ -21,7 +44,41 @@ export type BoardProps = {
  * workflow or several. A grouping that drops a card is a filter wearing a
  * grouping's name, and the ticket it dropped is gone with nothing saying so.
  */
-export function Board({ board, onOpenTicket }: BoardProps) {
+export function Board({ board, onOpenTicket, onCreateTicket }: BoardProps) {
+  /**
+   * ZERO GROUPS IS A SENTENCE, NOT AN EMPTY DIV (Plan 6 Task 15b, item 4).
+   *
+   * `mapBoardView` builds groups by folding the server's flat `columns` array,
+   * so a response with `columns: []` yields `groups: []` — and that response is
+   * ORDINARY rather than exceptional. `GET /v1/projects/:projectId/board`
+   * answers 200 with an empty board to a workspace member who is not on a
+   * project-mode project (`routes/board.ts`, the gate's docblock says so at
+   * length), and to any project whose tickets this viewer cannot see. Before
+   * this branch, `board.groups.map` over `[]` rendered an empty `<div
+   * class="gn-board">`: a page that had loaded, had refused nothing, and said
+   * nothing — indistinguishable from a board still painting.
+   *
+   * The copy says "no tickets", NOT "no columns" and not "no workflow". The
+   * board's columns come from the attached workflow, and Plan 5's Open question
+   * 7 settled that the server will not invent default columns for a project
+   * whose workflows this viewer may not read — inventing them would leak a
+   * restricted project's structure. So the client cannot tell "this project has
+   * no work in it" from "this viewer sees none of it", and the sentence is
+   * written to be true of both: it reports what is on this screen and makes no
+   * claim about the project.
+   */
+  if (board.groups.length === 0) {
+    return (
+      <div className="gn-board gn-board--empty">
+        <p className="gn-board__empty-copy">{EMPTY_BOARD_COPY}</p>
+        {onCreateTicket !== undefined ? (
+          <button type="button" className="gn-board__empty-create" onClick={onCreateTicket}>
+            Create a ticket
+          </button>
+        ) : null}
+      </div>
+    );
+  }
   return (
     <div className="gn-board">
       {board.groups.map((group) => (

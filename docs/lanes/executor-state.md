@@ -9,39 +9,91 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > verified with `git branch --contains` (empty output = orphaned), never with `git cat-file`, which
 > passes on reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## Live anchors — 2026-09-02, STEP 10 IN FLIGHT
+## Live anchors — 2026-09-02, **STEP 11 COMPLETE. ALL TWELVE TASKS DONE.**
 
 | Anchor | Value | How verified |
 |---|---|---|
-| **Branch in flight** | **`exec/10-integration-checkpoint`**, pushed, **PR #70 OPEN, awaiting the controller's merge.** All step-10 work is committed; the tree is clean; the final whole-branch review has run and its fix round has landed. | `git status --porcelain` empty, `git branch --contains <tip>` non-empty, `gh pr view 70` |
-| **`main`** | **`c9ab31c`** — step 9 (`563c983`, PR #67) plus two docs-only merges (`aa67ee3` #68, `c9ab31c` #69). **REFETCH before trusting this.** | `git rev-parse origin/main`, `git log --oneline -5` |
-| **`563c983` reachable?** | **YES**, ancestor of `c9ab31c`. The only diff `563c983..c9ab31c` is three files under `docs/lanes/`. | `git merge-base --is-ancestor 563c983 origin/main` → true; `git diff --stat` |
-| **Gate on merged main** | exit 0 · 21/21 · 0 cached · 1573 tests · Node v22.22.2. Measured by the controller at `563c983`; docs-only merges cannot move it (`turbo.json` declares no `inputs` and `docs/` is outside every package). | controller's forced gate |
-| Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing. | `node -v` |
-| Orphaned, do not cite | every sha in the narrative below the anchors, including all of Plan 5's task shas — **#67 was SQUASHED**. `git cat-file` passes on all of them and returns pre-merge content. | `git merge-base --is-ancestor` |
+| **Branch** | **`exec/11-plan6-remainder`**, rebased onto `origin/main` `bf0ed47`, pushed. **Do not trust a number written here for the ahead-count — run the command.** | `git rev-list --count origin/main..HEAD` |
+| **Why no number in that row** | This row said **18**; the command it cites answers **19**. Not a slip: the count was taken while writing the commit that records it, so a self-referential ahead-count is **always short by one** and always looks right to its author. It had already propagated into a review brief before anyone ran the command. A count that cannot be written correctly from inside the commit that carries it should not be written at all. | measured, 2026-09-02 |
+| **Position** | **All twelve Plan 6 tasks complete. Final review DONE (verdict ship, all five findings against documents, all fixed). PR #77 IS OPEN, awaiting the controller's merge.** | `gh pr view 77` |
+| **Gate at HEAD** | **exit 0 · 24/24 · 0 cached · 2027 tests · Node v22.22.2 · 0 engine warnings.** domain 335 · rule-engine 280 · **server 761** · **app-core 471** · **web 69** · editor 72 · ui 31 · sync-client 8. | run by the executor at this sha, `--force` |
+| **`check:tasks` / `check:env`** | both **exit 0**. | run at this sha |
+| **The gate changed SHAPE** | **24 tasks over EIGHT packages**, because `apps/web` now exists. Any inherited "21/21 over 7" figure is spent. | `pnpm turbo run …` |
+| Orphaned, do not cite | every sha in the narrative below — this branch was rebased, and step 10's were squashed before that. | `git branch --contains` (empty = orphaned) |
 
-## WHERE I AM: STEP 10 IS COMPLETE. **PR #70 IS OPEN**, AWAITING THE CONTROLLER'S MERGE.
+## WHERE I AM: **STEP 11 IS COMPLETE. PR #77 IS OPEN.** Twelve of twelve.
 
-**NEXT IN THE SERIAL SEQUENCE once #70 merges: step 11, Plan 6 remainder** — first in Phase 3,
-because Plan 8's T13-14 and Plan 9's T14 both need `apps/web`. **Three things this step hands it,
-all with Plan 6 as the named owner:** the `board.tsx` live defect (it dereferences two fields no
-response carries), the `StreamItem` union's missing `scope-revoked` member, and **ruling P24** —
-Plan 6 Task 10 adopts the SERVER's `UserPreferences` shape. `apps/server/test/integration/client-contract.test.ts`
-is the machine-checked register of what an HTTP `DataSource` can and cannot be built from; read it
-before writing one.
+**The executor opens PRs and NEVER merges** — that is the whole reason a second session exists, and it is
+the one authority this role does not have. **The next item in the serial sequence is STEP 12, Plan 7
+(editor + attachments)**, which inherits two boundary items recorded below.
 
-**Everything is committed and pushed, and the tree is clean.** The executor's work on this step is
-finished. **The executor opens PRs and NEVER merges** — that is the whole reason a second session
-exists, and it is the one authority this role does not have.
+| Task | State |
+|---|---|
+| T5 | **DONE, no code** — all four guards already present, each with a check that notices removal. |
+| T7 | **DONE** — the online `DataSource`. **6 of 12 methods answer; 6 refuse by name.** |
+| T8 | **DONE** — the stream. `StreamItem` widened to five members, event member carries `LedgerEvent`. |
+| T10 | **DONE** — List view. Ruling P24 honoured PER HALF via `Chosen<T>`. |
+| T11 | **DONE** — My Work + attention strip. |
+| T12 / T12a / T13 | **DONE** — ticket sheet (both clocks), attachments, reopen flow. |
+| T14 | **DONE** — `apps/web`. **Plans 8 and 9 are unblocked.** |
+| T15 / T15b | **DONE** — invite acceptance, the doors, and a Playwright smoke RUN for real (5 passed), off the gate. |
+| T16 | **DONE** — catalogue. **§8 was CONSIDERED AND REFUSED**, recorded in four places. |
 
-| Task | What | State |
-|---|---|---|
-| **A** | **Ruling P18** — wire `getEntityState('membership')` to `proj_memberships` | **DONE, committed `44fb736`, gate green** |
-| **B** | Real-door round trip + the client-contract divergence pins (C merged in) | **DONE, committed `684839f`, gate green** |
-| docs | coordination doc records (P18 discharge, ruling P24, the recounts) | **DONE, committed `2b9876d`** |
-| final review | ONE opus reviewer over the whole branch | **DONE** — 3 Important + 2 Minor + 1 Nit, **all against the DOCUMENTS, none against the code**; all fixed |
-| review fix round | prose and comments only, no behaviour touched | **DONE**, committed |
-| PR | **#70 OPEN. The controller merges; the executor never does.** | `gh pr view 70` |
+### FOUR THINGS A SUCCESSOR MUST NOT UNDO
+
+1. **The six `ServingGapError` refusals are the point, not a shortfall.** `getMyWorkspaces`,
+   `getTickets`, `getTicket`, `search`, `getMyWork`, `getAttention` THROW rather than invent a fact the
+   server does not send. Each is cross-checked server-side in
+   `apps/server/test/integration/client-contract.test.ts` and goes RED the day its route serves the
+   field. **Do not weaken one to make a view light up.**
+2. **`Chosen<T>`'s default arm carries no `value`, deliberately** (`view-types.ts`). A pair would let a
+   consumer read `.value` and ignore `.origin`, which is how ruling P24 was being violated in the first
+   place. The obvious tidy-up restores the defect.
+3. **`apps/web/tsconfig.json` excludes `.next`.** Next's default `include` globs a directory
+   `next build` deletes while turbo runs typecheck concurrently — measured **2 red of 3** without the
+   exclude. It cannot be a narrower include: `next build` rewrites that file's include every run and
+   never touches its exclude. **If the gate reddens on `@gisik-nokma/web:typecheck` with TS6053, this
+   is why** — and run it three times before believing either answer.
+4. **`Features.md` §3, not §8.** §8 was considered and refused because migrating means mapping 112+
+   live cross-referenced ids against the README's own never-renumber rule. The §3 note leads with the
+   refusal because this session's own retrieval kept injecting a stale "create §8" note.
+
+### RULING P25 IS STILL OPEN — three route changes are HELD on it
+
+`getMyWorkspaces`, `getTicket`, `getTickets` each carry a **visibility decision** under Plan 4's read
+enforcement, and are not built. `getBoard`'s `workflowVersion` was the one pure field addition and IS
+served. The register is at the end of the coordination doc; **do not re-derive it**, and note two of its
+rows were already corrected once — `getAttention`'s fix belongs in `sync/contests-route.ts`, not
+`routes/attention.ts`, and `getMyWorkspaces` is not the field addition it was first priced as.
+
+### RECORDED FOR STEP 12 (Plan 7), from the controller's structural scan — not mine to fix
+
+- **`EditorSlotProps`**: Plan 6 declares `doc: unknown`, Plan 7 `doc: DocJson | null`.
+- **`AttachmentListEntry`**: Plan 6 inlines the drive-reference fields, Plan 7 uses `& DriveReference`.
+- **`EditorSlotUpload` was a FALSE POSITIVE** — identical fields, different line breaks. Named here so
+  nobody re-finds it.
+
+Both real ones are the "one contract written twice" seam Plan 6's Open questions 13 and 15 describe:
+edit both or neither. **Owner: step 12.**
+
+### RECORDED FOR TASK 16, not fixed — the catalogue lives in §3, and Task 16's own text says §8
+
+Plan 6 Task 16 says *"`Features.md` §8, `test-cases/08-web-client.md` (cases 8.x only — no other
+numbers)"*. **Every Plan 6 client feature already shipped is catalogued under `Features.md` §3 and
+`test-cases/03-foundation-ledger.md`** — the `DataSource` contract (`:31`), the submit factory
+(`:33`), provenance (`:34`), the pre-check cache (`:35`), the live-query hook (`:37`), the board view
+(`:39`). There is **no §8 header in `Features.md` at all** (it runs §7 → §9) and no
+`test-cases/08-web-client.md`. Task 8's two new cases were filed as 3.33/3.34, next to their siblings,
+which is the consistent choice and the one that conflicts with the instruction.
+
+**Owner: Plan 6 Task 16.** It has to decide whether to open §8 and migrate six bullets plus their
+cases, or to record §3 as the real home and amend its own text. Not fixed here, because moving a
+catalogue mid-step would put half of Plan 6 in each place — which is worse than either.
+| T10 | List view | **todo** — bound by ruling P24 |
+| T11, T12, T12a, T13 | My Work / ticket sheet / attachments / reopen flow | **todo** |
+| T14 | `apps/web` Next.js shell | **todo** — the thing Plans 8 and 9 are waiting on |
+| T15, T15b | Invite acceptance + Playwright smoke; the doors | **todo** |
+| T16 | `Features.md` §8, `test-cases/08-web-client.md`, full verification | **todo** |
 
 ### THE FINAL REVIEW'S RESULT IS THE MOST USEFUL THING ON THIS BRANCH — read it before the code
 
@@ -209,14 +261,19 @@ distinction that decides who fixes each — is in the coordination doc section t
 distinction matters: a **serving** gap is a fact the server holds and does not put on the wire (one
 route change); a **data** gap is a fact it does not have (a product decision).
 
-**5. A live defect, not a disagreement.** `packages/app-core/src/views/board.tsx` — the one real view
-component on `main`, fed by `source.query.getBoard()` — dereferences `group.workflowVersion` (line 28)
-and `card.assignee.id`/`.name` (line 94). Neither is in any response. It breaks the moment an HTTP
-`DataSource` exists. **Owner: Plan 6, which is step 11.**
+**5. A live defect, not a disagreement.** *(CLOSED in step 11 — see the correction at the top of this
+file. `workflowVersion` is served; `assignee` is joined from the members route. The sentence below was
+true of `main` when written and is false now, and it is kept only because the correction above cites
+it.)* `packages/app-core/src/views/board.tsx` — the one real view component on `main`, fed by
+`source.query.getBoard()` — dereferences `group.workflowVersion` (line 28) and `card.assignee.id`/`.name`
+(line 94). Neither is in any response. It breaks the moment an HTTP `DataSource` exists.
+**Owner: Plan 6, which is step 11.**
 
 **6. `StreamItem` has no `scope-revoked` member**, so a revocation arrives as an unrecognised `type`
 and is silently dropped, leaving stale authorization in the client cache. Severest of the stream
 items. Owner Plan 6. Does not change this step's scope — no client consumer exists yet.
+**CLOSED in step 11 (Plan 6 Task 8)**, together with the `workspaceSeq` drift beside it: the union has
+five members and its event member carries `LedgerEvent`. `error.code` remains bare `string`.
 
 ### RULING TAKEN THIS STEP — `UserPreferences` (coordination doc §6b), the one with a deadline
 
@@ -252,7 +309,7 @@ not a replacement"*). So: green on the one side with the fake, untested everywhe
 
 ---
 
-## BELOW THIS LINE IS THE STEP 9 RECORD — history, not position. Every sha in it is orphaned.
+## BELOW THIS LINE IS THE STEP 9 / STEP 10 RECORD — history, not position. Every sha in it is orphaned.
 
 ### How to find Plan 5's work now that its shas are dead
 
@@ -284,7 +341,7 @@ exactly as recorded. The four new ones, each cited:
 
 | # | Contract | The disagreement |
 |---|---|---|
-| c | `StreamItem` vs `ServerStreamFrame` | **Self-documented in `stream-frames.ts:143-162`.** Client's event frame carries `EventEnvelope` and so **lacks `workspaceSeq` — the field the resume protocol needs**; client has **no `scope-revoked` member at all**, so a revocation arrives as an unrecognised `type` and is **silently dropped**; `error.code` is bare `string` vs the server's typed enum |
+| c | `StreamItem` vs `ServerStreamFrame` | **Self-documented in `stream-frames.ts:143-162`. Two of the three CLOSED in step 11 (Plan 6 Task 8):** the event member now carries `LedgerEvent` and so holds `workspaceSeq`, and `scope-revoked` is a fifth member carrying the server's `projectId?: never` verbatim. **Still open: `error.code` is bare `string` vs the server's typed enum**, so a misspelled code is a runtime surprise rather than a compile error. `stream-frames.ts` argues the end state is REPLACEMENT by `ServerStreamFrame`, not re-synchronisation — owner Plan 10 |
 | d | `SearchHit` vs the real search response | Client expects a **flat array**; server returns `{workspaceId, query, hits:[{card: TicketCard, snippet}]}`. **`matchedIn` does not exist server-side at all** — the server headlines title+description+comments into one blob and cannot say which field matched |
 | e | `MyWorkView` vs `MyWorkResponse` | **The most severe: a different grouping MODEL, not a rename.** Client `{assigned, inTransit, contested}` vs server `{open, active, terminal}`. **`contested` does not exist server-side** (`my-work.ts:96` calls it a Plan 10 extension point) |
 | f | `BoardView` vs `BoardResponse` | Client nests columns under `groups: BoardGroup[]`; server returns a **flat** `columns[]`. Card level: client `assignee: Actor \| null` **with `.name`** vs server `assigneeId: string \| null`, never resolved — and **`board.tsx:94` already reads `card.assignee.id`/`.name`**, so this is live, not dead |
@@ -320,10 +377,10 @@ plausible homes for a seventh and eighth disagreement.
 
 ### WHAT THE NEXT SESSION SHOULD DO
 
-**Step 9 is closed. The next item in the serial sequence is STEP 10 — the integration checkpoint.**
-It is described in the brief and its target is already concrete; see *"Open items for the controller"*
-below, item 4. Nothing in this document assigns the executor any step-9 work, and re-running any of it
-would be redoing merged work against orphaned shas.
+**STALE WHEN WRITTEN — kept only so the paragraph below it stays readable.** This said the next item
+was step 10. **Step 10 merged as `ac187e8`.** The live position is the "WHERE I AM" section at the top
+of this file, and it is step 11. Nothing in this document assigns the executor any step-9 or step-10
+work, and re-running any of it would be redoing merged work against orphaned shas.
 
 ## THE RULE THIS COST US — kept because it generalises, though its example is now history
 

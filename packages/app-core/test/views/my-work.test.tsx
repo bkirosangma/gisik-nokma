@@ -1,0 +1,386 @@
+import { render, screen, within } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
+import { act } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { ServingGapError, SERVING_GAPS } from '../../src/online/mappers.js';
+import type { MyWorkView, WorkItem } from '../../src/view-types.js';
+import { MyWork, useMyWork } from '../../src/views/my-work.js';
+import { createFakeDataSource } from '../helpers/fake-data-source.js';
+import { WS, claim } from '../helpers/seed.js';
+
+const GST: WorkItem = {
+  ticketId: 't1',
+  workspaceId: WS,
+  projectId: 'prj_1',
+  projectName: 'Registrations',
+  title: 'File the GST return',
+  stateId: 'doing',
+  stateName: 'Doing',
+  stateCategory: 'active',
+  stateProvenance: claim(),
+  dueDate: { date: '2026-08-30', claim: claim({ actorId: 'user_kiro', actorName: 'Kiro' }) },
+};
+
+const VIEW: MyWorkView = {
+  assigned: [GST],
+  inTransit: [],
+  contested: [
+    {
+      ticketId: 't9',
+      title: 'Bank mandate',
+      rule: 'restrict-to',
+      reason: 'Only the assignee may perform this transition.',
+      claim: claim(),
+    },
+  ],
+};
+
+describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
+  it('renders the three sections', () => {
+    render(<MyWork view={VIEW} onOpenTicket={vi.fn()} />);
+    expect(screen.getByRole('region', { name: 'Assigned to me' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'My claims in transit' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'My contested claims' })).toBeInTheDocument();
+  });
+
+  it('renders assigned items with project, state provenance title and the attributed due claim', () => {
+    render(<MyWork view={VIEW} onOpenTicket={vi.fn()} />);
+    const assigned = screen.getByRole('region', { name: 'Assigned to me' });
+    expect(within(assigned).getByText('File the GST return')).toBeInTheDocument();
+    expect(within(assigned).getByText('Registrations')).toBeInTheDocument();
+    expect(within(assigned).getByText("needed by 30 Aug 2026 — Kiro's claim")).toBeInTheDocument();
+    expect(
+      within(assigned).getByTitle('marked Doing by Anselma Marak on 19 Aug 2026'),
+    ).toBeInTheDocument();
+  });
+
+  it('PLANTED DEFECT: a nameless due claim is attributed by id — a deadline is never an unowned property', () => {
+    const nameless: MyWorkView = {
+      ...VIEW,
+      assigned: [
+        { ...GST, dueDate: { date: '2026-08-30', claim: claim({ actorId: 'user_kiro', actorName: null }) } },
+      ],
+    };
+    render(<MyWork view={nameless} onOpenTicket={vi.fn()} />);
+    expect(screen.getByText("needed by 30 Aug 2026 — user_kiro's claim")).toBeInTheDocument();
+  });
+
+  it('PLANTED DEFECT: an item with no due date renders no due line — no invented deadline', () => {
+    const undated: MyWorkView = { ...VIEW, assigned: [{ ...GST, dueDate: null }] };
+    const { container } = render(<MyWork view={undated} onOpenTicket={vi.fn()} />);
+    expect(container.querySelector('.gn-my-work__due')).toBeNull();
+    expect(container.textContent).not.toContain('needed by');
+  });
+
+  it('renders a contested claim with the rule named, the reason verbatim and the claim provenance', () => {
+    render(<MyWork view={VIEW} onOpenTicket={vi.fn()} />);
+    const contested = screen.getByRole('region', { name: 'My contested claims' });
+    expect(within(contested).getByText('Bank mandate')).toBeInTheDocument();
+    expect(within(contested).getByText(/restrict-to/)).toBeInTheDocument();
+    expect(
+      within(contested).getByText('Only the assignee may perform this transition.'),
+    ).toBeInTheDocument();
+    expect(within(contested).getByText('claimed by Anselma Marak on 19 Aug 2026')).toBeInTheDocument();
+  });
+
+  it('PLANTED DEFECT: the contested reason is the engine’s, not a paraphrase — and the rule is named beside it', () => {
+    // The reason and the rule are two different facts and both come off the
+    // `claim.contested` ledger event. A card that showed only the rule leaves
+    // the user reading a slug; one that showed only the reason leaves them
+    // unable to say which rule turned the claim away.
+    const contested: MyWorkView = {
+      assigned: [],
+      inTransit: [],
+      contested: [
+        {
+          ticketId: 't9',
+          title: 'Bank mandate',
+          rule: 'four-eyes',
+          reason: 'The person who requested this may not also approve it.',
+          claim: claim(),
+        },
+      ],
+    };
+    const { container } = render(<MyWork view={contested} onOpenTicket={vi.fn()} />);
+    expect(screen.getByText('four-eyes')).toBeInTheDocument();
+    expect(
+      screen.getByText('The person who requested this may not also approve it.'),
+    ).toBeInTheDocument();
+    expect(container.querySelector('.gn-my-work__reason')?.textContent).toBe(
+      'The person who requested this may not also approve it.',
+    );
+  });
+
+  it('opens the ticket from either an assigned card or a contested one', async () => {
+    const user = userEvent.setup();
+    const onOpenTicket = vi.fn();
+    render(<MyWork view={VIEW} onOpenTicket={onOpenTicket} />);
+    await user.click(screen.getByRole('button', { name: 'File the GST return' }));
+    await user.click(screen.getByRole('button', { name: 'Bank mandate' }));
+    expect(onOpenTicket.mock.calls).toEqual([['t1'], ['t9']]);
+  });
+});
+
+/**
+ * `inTransit` EMPTY IS THE TRUTH FOR THIS CLIENT, and the reason matters more
+ * than the emptiness.
+ *
+ * `inTransit` is the REPLICA'S OUTBOX (Plan 10). The web client is online-only
+ * — SPEC §5 line 104, whose same section places the outbox in the mobile and
+ * desktop replicas and nowhere else; Plan 6 carries it at line 23 and cites it
+ * as "spec §5" there. ("Plan 6 §5" was a MISCITATION, not a shorthand, and was
+ * corrected 2026-09-02 at `online/mappers.ts` and the coordination doc — Plan 6
+ * has no §5.) So this client has no outbox — there is no place a claim in transit could be
+ * held — so `[]` here is a fact about this client's CONSTRUCTION, not a read
+ * that came back with nothing. Those are different facts and only one of them
+ * is true here: an assertion resting on "the read returned nothing" would still
+ * pass the day the read broke.
+ *
+ * The register agrees, and that is the falsifiable half of the claim rather
+ * than a comment restating it: `mapMyWork` refuses over `contested` and
+ * deliberately does NOT list `inTransit` as a serving gap.
+ */
+describe('3.58 MyWork — the in-transit section is empty because there is no outbox, not because a read was empty', () => {
+  it('renders the empty state, and the reason is structural', () => {
+    render(<MyWork view={VIEW} onOpenTicket={vi.fn()} />);
+    const transit = screen.getByRole('region', { name: 'My claims in transit' });
+    expect(
+      within(transit).getByText('No claims in transit.'),
+      'empty because this online-only client has no outbox to hold a claim in transit — NOT because a read came back empty',
+    ).toBeInTheDocument();
+  });
+
+  it('PLANTED DEFECT: and the serving-gap register says the same — `contested` is a gap, `inTransit` is not', () => {
+    const absences = SERVING_GAPS['getMyWork'] ?? [];
+    const register = absences.map((absence) => `${absence.field} :: ${absence.because}`).join('\n');
+    expect(absences.length).toBeGreaterThan(0);
+    expect(register).toContain('ContestedClaim.title');
+    expect(register).toContain('ContestedClaim.claim.serverTime');
+    // The whole point: no absence in the register is about `inTransit`. If one
+    // ever appears, the empty state above stops being structural truth and this
+    // fails, naming the register.
+    expect(
+      absences.map((absence) => absence.field).join(' | '),
+      `no getMyWork absence may be about inTransit — it is structurally empty for an online-only client:\n${register}`,
+    ).not.toContain('inTransit');
+  });
+
+  it('PLANTED DEFECT: a claim in transit, when one exists, is badged distinctly from an assigned one', () => {
+    // The section is not decorative. Plan 10's replica fills it, and when it
+    // does the card must be visibly different from the same ticket sitting in
+    // "Assigned to me" — otherwise a claim the server has never seen reads as
+    // a claim it accepted.
+    const withTransit: MyWorkView = { ...VIEW, inTransit: [GST] };
+    render(<MyWork view={withTransit} onOpenTicket={vi.fn()} />);
+    const transit = screen.getByRole('region', { name: 'My claims in transit' });
+    const assigned = screen.getByRole('region', { name: 'Assigned to me' });
+    expect(within(transit).getByText('claim in transit')).toBeInTheDocument();
+    expect(within(transit).queryByText('No claims in transit.')).not.toBeInTheDocument();
+    expect(within(assigned).queryByText('claim in transit')).not.toBeInTheDocument();
+  });
+
+  it('the assigned section has its own honest empty state', () => {
+    render(
+      <MyWork view={{ assigned: [], inTransit: [], contested: [] }} onOpenTicket={vi.fn()} />,
+    );
+    expect(screen.getByText('Nothing assigned to you.')).toBeInTheDocument();
+    expect(screen.getByText('No contested claims.')).toBeInTheDocument();
+  });
+});
+
+/**
+ * BINDING SEMANTIC, and the reach of the claim is stated where it was MEASURED
+ * rather than assumed.
+ *
+ * `board.test.tsx` proves only the INSTANT path — board cards carry no
+ * `dueDate`. But Task 10's `ticket-list.test.tsx` DOES already vary `TZ` over a
+ * day claim in its due-date column (case 3.52), so this is the second surface
+ * on that path and not the first: an earlier draft of this comment claimed the
+ * day-claim path was untested and that was simply false. What this block adds
+ * is a third zone, a control that the fixture straddles, and expectations
+ * reached without the code under test.
+ *
+ * The defect is not academic. `formatDate` sends a day claim through
+ * `istDayBounds`' opening instant precisely so no zone arithmetic can invent a
+ * time of day for it. The defect this closes is one line: a bare
+ * `new Date('2026-08-30').toLocaleDateString()`, which parses the claim as UTC
+ * midnight and prints the TWENTY-NINTH anywhere west of Greenwich — a deadline
+ * moved off the day somebody claimed it for, on the machine of whoever is
+ * travelling.
+ *
+ * Same three ingredients as the strip's block, and for the same reasons: a
+ * control that the knob moves, a control that the fixture straddles, and each
+ * zone checked against an expectation computed WITHOUT the code under test.
+ *
+ * ## AND THE ZONES DISCRIMINATE NOTHING TODAY — which is why the mutation above
+ * is named rather than the zone list
+ *
+ * `formatDate` reaches `istDayBounds` and `formatIstInstant`, both constant
+ * +05:30 arithmetic over the UTC getters, with no local-zone reader on the path,
+ * so all three zones render one string against the CURRENT implementation:
+ * measured 2026-09-02, `formatDate('2026-08-30')` answered `30 Aug 2026` under
+ * `Pacific/Kiritimati`, `Asia/Kolkata` and `Pacific/Niue` alike, while a
+ * `new Date('2026-08-30').toLocaleDateString()` control in the same run answered
+ * `29/8/2026` from Niue. The `TZ` control proves the KNOB moves; it does not
+ * make these assertions discriminate. What they are is a REGRESSION GUARD, and
+ * the one-line defect named above is what they kill — TWO cases here, `zone
+ * Pacific/Kiritimati: expected 'needed by 30/8/2026 — Kiro's claim' to be
+ * 'needed by 30 Aug 2026 — Kiro's claim'` and its day-anchored twin.
+ */
+describe('3.61 MyWork — the due DAY CLAIM does not move with the viewer’s laptop', () => {
+  const ZONES = ['Pacific/Kiritimati', 'Asia/Kolkata', 'Pacific/Niue'] as const;
+  const DUE_DAY = '2026-08-30';
+
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  /**
+   * '2026-08-30' → '30 Aug 2026', by string surgery and a lookup table. No
+   * `Date`, no zone, no `formatIstInstant` — a day claim IS its own day, and
+   * the expectation has to be reached without the machinery being tested or it
+   * agrees by construction.
+   */
+  function spellDay(isoDay: string): string {
+    const [year, month, day] = isoDay.split('-');
+    return `${Number(day)} ${MONTHS[Number(month) - 1]} ${year}`;
+  }
+
+  function dueLineUnder(zone: string): string {
+    const original = process.env['TZ'];
+    process.env['TZ'] = zone;
+    try {
+      const view = render(<MyWork view={VIEW} onOpenTicket={vi.fn()} />);
+      const text = view.container.querySelector('.gn-my-work__due')?.textContent ?? '';
+      view.unmount();
+      return text;
+    } finally {
+      // The delete-when-unset restore: `= undefined` assigns the string
+      // "undefined", which ICU resolves to GMT, silently switching every later
+      // file in this worker to UTC — and only when TZ was unset, which is the
+      // default here and in CI.
+      if (original === undefined) delete process.env['TZ'];
+      else process.env['TZ'] = original;
+    }
+  }
+
+  it('CONTROL — setting process.env.TZ really does change what this process thinks local time is', () => {
+    const original = process.env['TZ'];
+    try {
+      process.env['TZ'] = 'UTC';
+      const utcHour = new Date(0).getHours();
+      process.env['TZ'] = 'Asia/Kolkata';
+      const istHour = new Date(0).getHours();
+      expect(utcHour).toBe(0);
+      expect(istHour).toBe(5);
+    } finally {
+      if (original === undefined) delete process.env['TZ'];
+      else process.env['TZ'] = original;
+    }
+  });
+
+  it('CONTROL — a naive reading of this day claim really would land on a different day', () => {
+    // Kiritimati is a fixed +14 and Niue a fixed −11. `new Date('2026-08-30')`
+    // is UTC midnight, so the naive local page is the 30th in Kiritimati and
+    // the TWENTY-NINTH in Niue. Computed by arithmetic, not by the TZ database
+    // and not by anything under test — this is what makes the three-zone
+    // comparison below a test rather than a coin flip.
+    const naivePageAt = (offsetHours: number) =>
+      new Date(Date.parse(`${DUE_DAY}T00:00:00Z`) + offsetHours * 3600 * 1000)
+        .toISOString()
+        .slice(0, 10);
+    expect(naivePageAt(14)).toBe('2026-08-30');
+    expect(naivePageAt(-11)).toBe('2026-08-29');
+    expect(naivePageAt(-11)).not.toBe(DUE_DAY);
+  });
+
+  it('PLANTED DEFECT: the due day renders as claimed from every zone, each checked alone', () => {
+    const expected = `needed by ${spellDay(DUE_DAY)} — Kiro's claim`;
+    for (const zone of ZONES) {
+      expect(dueLineUnder(zone), `zone ${zone}`).toBe(expected);
+    }
+  });
+
+  /**
+   * ANCHORED ON WHAT THE DAY MUST BE, not on the two spellings it must not be —
+   * the correction `ticket-list.test.tsx` had to make to its own version of this
+   * assertion, inherited here rather than re-learned. Written purely as
+   * `not.toContain('29 Aug')` this survives a bare `toLocaleDateString()`, which
+   * renders the shifted day as `8/29/2026`: a string containing neither "29 Aug"
+   * nor "31 Aug". The absence assertion was checking a spelling the defect does
+   * not use. The `toMatch` catches every spelling of the wrong day; the two
+   * absences are kept beside it because they name the failure a reader will
+   * recognise.
+   */
+  it('PLANTED DEFECT: and no zone can slide the deadline off the day it claims', () => {
+    for (const zone of ZONES) {
+      expect(dueLineUnder(zone), `zone ${zone}`).toMatch(/^needed by 30 Aug 2026 — /);
+      expect(dueLineUnder(zone), `zone ${zone}`).not.toContain('29 Aug');
+      expect(dueLineUnder(zone), `zone ${zone}`).not.toContain('31 Aug');
+    }
+  });
+
+  it('PLANTED DEFECT: the zone swap hands the worker back exactly the TZ it borrowed', () => {
+    const outer = process.env['TZ'];
+    try {
+      delete process.env['TZ'];
+      dueLineUnder('Pacific/Niue');
+      expect(Object.hasOwn(process.env, 'TZ')).toBe(false);
+      expect(process.env['TZ']).toBeUndefined();
+
+      process.env['TZ'] = 'Pacific/Kiritimati';
+      dueLineUnder('Pacific/Niue');
+      expect(process.env['TZ']).toBe('Pacific/Kiritimati');
+    } finally {
+      if (outer === undefined) delete process.env['TZ'];
+      else process.env['TZ'] = outer;
+    }
+  });
+});
+
+/**
+ * `getMyWork` REFUSES today, over `contested`. The refusal must reach the
+ * surface as an error — a `MyWorkView` with three empty sections is
+ * indistinguishable from a person who has nothing to do.
+ */
+describe('3.60 useMyWork — a refusal is an error, never three empty sections', () => {
+  function Harness({ source }: { source: ReturnType<typeof createFakeDataSource> }) {
+    const { data, error } = useMyWork(source, WS);
+    return (
+      <div>
+        <span data-testid="error">{error ?? 'none'}</span>
+        <span data-testid="view">{data === null ? 'loading' : `assigned:${data.assigned.length}`}</span>
+      </div>
+    );
+  }
+
+  it('PLANTED DEFECT: the serving gap surfaces and the view never renders "assigned:0"', async () => {
+    const source = createFakeDataSource({
+      getMyWork: async () => {
+        throw new ServingGapError('getMyWork', SERVING_GAPS['getMyWork'] ?? []);
+      },
+    });
+    render(<Harness source={source} />);
+    await act(async () => {});
+    expect(screen.getByTestId('error')).toHaveTextContent('facts the shipped route does not serve');
+    expect(screen.getByTestId('error')).toHaveTextContent('ContestedClaim.title');
+    expect(screen.getByTestId('view')).toHaveTextContent('loading');
+    expect(screen.getByTestId('view')).not.toHaveTextContent('assigned:0');
+  });
+
+  it('PLANTED DEFECT: the hook passes the workspace the caller named — the route 400s without one', async () => {
+    // Ruling P25 clause 2: `GET /v1/me/work` reads `?workspaceId=` BEFORE the
+    // door and answers 400 `invalid_query` without it, so a hook that dropped
+    // the argument would build a request refused whole. The plan's snippet
+    // calls `getMyWork()`.
+    const asked: string[] = [];
+    const source = createFakeDataSource({
+      getMyWork: async (workspaceId) => {
+        asked.push(workspaceId);
+        return { assigned: [GST], inTransit: [], contested: [] };
+      },
+    });
+    render(<Harness source={source} />);
+    await act(async () => {});
+    expect(asked).toEqual([WS]);
+    expect(screen.getByTestId('view')).toHaveTextContent('assigned:1');
+    expect(source.subscriptions).toEqual([{ workspaceId: WS, afterSeq: 0 }]);
+  });
+});

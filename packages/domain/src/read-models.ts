@@ -180,9 +180,34 @@ export type TicketCard = {
   rollup: TicketRollup | null;
 };
 
+/**
+ * One column of a board: one state of one workflow, holding the cards this
+ * viewer may see.
+ *
+ * `workflowVersion` names the published definition this column's `name`,
+ * `category` and `blocked` were read out of. It is the field the client's
+ * `BoardGroup` keys its groups on (`packages/app-core/src/views/board.tsx:28`
+ * builds `` `${workflowId}@${workflowVersion}` ``), which is why it must name a
+ * definition and not merely a workflow: two columns sharing a key are asserted
+ * by that key to have come from the same published definition.
+ *
+ * **`0` is the one value that is not a version**, and it means "no published
+ * definition names this column" — the straggler case in
+ * `apps/server/src/routes/board.ts`. It collapses nothing, because no publisher
+ * can mint it: `workflowDefSchema.version` is `z.number().int().min(1)`, and the
+ * only writer of `proj_workflows` ON THE PRODUCT PATH
+ * (`apps/server/src/projections/workflows.ts`) parses every payload through that
+ * schema before inserting. (Enumerated, not assumed: one TEST file also inserts
+ * directly — `apps/server/test/read/compile-filter.test.ts` — which is a fixture
+ * and not a road a request can take.) So `0` and "a real version" stay
+ * tellable apart at the client, exactly as this file's rule requires — and the
+ * alternative, carrying the workflow's LATEST version on a column no definition
+ * names, would file that column under a definition it was never folded into.
+ */
 export type BoardColumn = {
   workflowId: string;
   workflowName: string;
+  workflowVersion: number;
   stateId: string;
   name: string;
   category: StateCategory;

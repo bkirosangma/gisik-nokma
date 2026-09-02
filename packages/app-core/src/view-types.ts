@@ -182,7 +182,36 @@ export type SearchHit = {
 
 export type SavedFilter = { id: string; name: string; filter: FilterSpec };
 
-export type ProjectViewPrefs = { columns: ListColumnId[]; grouping: Grouping };
+/**
+ * Whether what is on screen is the user's own choice or this client's stock
+ * value. One vocabulary for the whole surface: `TicketList` re-exports this
+ * name rather than declaring a second spelling of it.
+ */
+export type PrefsOrigin = 'stored' | 'default';
+
+/**
+ * One half of an arrangement, carrying WHO chose it — and the `default` arm
+ * carries NO VALUE, on purpose.
+ *
+ * Ruling P24 (coordination doc): server → client is not total. The client pairs
+ * `{columns, grouping}` under one project key and the server keeps two parallel
+ * records, so a project present in `listColumns` and absent from `grouping` has
+ * no faithful representation as a plain pair — and *"reaching for
+ * `DEFAULT_VIEW_PREFS` there invents a preference the user never set … a project
+ * missing from `grouping` surfaces as **not set**, never as a default wearing a
+ * user's authority."*
+ *
+ * A `{ value, origin }` record would express that and still let a consumer read
+ * `.value` while ignoring `.origin` — the ruling would hold by convention, which
+ * is the same standing the substitution had before it was caught. Here the
+ * `default` arm has no `value` member at all, so reading a value without first
+ * narrowing on `origin` is a COMPILE ERROR, and the only way to put a stock
+ * value on screen is to reach for `DEFAULT_LIST_COLUMNS` / `DEFAULT_GROUPING`
+ * by name, with the origin in hand to say so.
+ */
+export type Chosen<T> = { origin: 'stored'; value: T } | { origin: 'default' };
+
+export type ProjectViewPrefs = { columns: Chosen<ListColumnId[]>; grouping: Chosen<Grouping> };
 
 /**
  * Server-owned per-user rows, NOT ledger events (amendment 14). View
@@ -194,7 +223,33 @@ export type UserPreferences = {
   savedFilters: SavedFilter[];
 };
 
+/**
+ * The stock arrangement's VALUES — what a view renders when the user has chosen
+ * nothing. Split out from `DEFAULT_VIEW_PREFS` because the two are different
+ * facts and fusing them is what let a default wear a user's authority: these
+ * constants are a client's stock answer, `DEFAULT_VIEW_PREFS` is the statement
+ * that NOTHING IS SET. A consumer that wants the former must name it.
+ */
+export const DEFAULT_LIST_COLUMNS: ListColumnId[] = ['status', 'assignee', 'dueDate', 'progress'];
+export const DEFAULT_GROUPING: Grouping = 'epic';
+
+/** Neither half chosen — the arrangement of a project nobody has arranged. */
 export const DEFAULT_VIEW_PREFS: ProjectViewPrefs = {
-  columns: ['status', 'assignee', 'dueDate', 'progress'],
-  grouping: 'epic',
+  columns: { origin: 'default' },
+  grouping: { origin: 'default' },
 };
+
+/**
+ * The PROJECT-level origin, derived from the halves and stored nowhere.
+ *
+ * `'default'` means the user has arranged NEITHER half — which, coming out of
+ * `mapPreferences`, is exactly the project that appears in neither of the
+ * server's two records, i.e. the project absent from the document. Kept as one
+ * exported function because both `useTicketList` and `TicketList` need the rule
+ * and a second copy of it is how the two would come to disagree.
+ */
+export function prefsOriginOf(prefs: ProjectViewPrefs): PrefsOrigin {
+  return prefs.columns.origin === 'stored' || prefs.grouping.origin === 'stored'
+    ? 'stored'
+    : 'default';
+}

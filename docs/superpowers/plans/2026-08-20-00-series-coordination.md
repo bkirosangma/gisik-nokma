@@ -22,6 +22,8 @@
 
 Execution order: 1 → 2 → 3 → 4 → 5, then 6/7/8/9 in parallel, then 10, then 11 — **superseded for Plans 3–11 by the owner decision of 2026-08-28 (parallel waves), at the end of this document.** Each plan's Interfaces blocks are the contract for its successors. Features.md/test-cases numbering: Plan 5 → §7/`07-api-realtime-search` · 6 → §8/`08-web-client` · 7 → §9/`09-editor-attachments` · 8 → §10/`10-workflow-builder` · 9 → §11/`11-calendar-notifications` · 10 → §12/`12-offline-sync-apps` · 11 → §13/`13-deployment-dogfooding`.
 
+**Correction to the row above, made while applying it (Plan 6 Task 16, 2026-09-02): Plan 6's row does not hold.** Every Plan 6 web-client feature landed in `Features.md` §3 and was catalogued there, in `test-cases/03-foundation-ledger.md`, with 144 live cases (3.1–3.144, plus 3.145–3.146 added by Task 16's own sweep) — none of them ever minted under an 8.x id, because the §8/`08-web-client` destination this table names was never opened before the work outran it. Task 16 measured this rather than migrating: renumbering 112+ already-cross-referenced ids to match this row would violate `test-cases/README.md`'s own never-renumber rule for a purely cosmetic relocation, so §3 stays Plan 6's permanent home and §8/`08-web-client.md` are not created. This row is not corrected in place because the table above is this document's numbering authority for every other plan in it — Plans 7–11 still read `7 → §9`, `8 → §10`, `9 → §11`, `10 → §12`, `11 → §13` verbatim — and only Plan 6's cell is superseded. Full reasoning: `Features.md`'s §3 web-client note and `test-cases/README.md`'s matching correction.
+
 ## Reconciliation decisions
 
 1. **Package scope is `@gisik-nokma/*`** — `@gisik-nokma/domain`, `@gisik-nokma/rule-engine`, `@gisik-nokma/server`. Plan 1 owns the scaffold; `@gisik/*` specifiers elsewhere were drift.
@@ -5658,7 +5660,24 @@ emits it; `packages/app-core/src/data-source.ts`'s `StreamItem` has no such memb
 a client as an unrecognised `type` and is dropped — leaving stale authorization in the client cache
 for exactly the person whose scope was revoked. The client union also carries `EventEnvelope` where
 the server sends `LedgerEvent`, so it lacks `workspaceSeq`, the field the resume protocol needs.
-**Owner: Plan 6.** It does not change step 10's scope — no client consumer exists yet — and
+**Owner: Plan 6.**
+
+**DISCHARGED 2026-09-02 (step 11, Plan 6 Task 8), and the discharge is recorded HERE because a
+ruling whose value lives only in a note is worth exactly what the note is durable.** Both drifts are
+closed in `packages/app-core/src/data-source.ts`: `StreamItem` has a fifth `scope-revoked` member
+carrying the server's `projectId?: never` verbatim, and its event member carries `LedgerEvent`.
+`EventEnvelope` was NOT touched. The widening is an alignment rather than a contract move — this
+document already records `replica.revokeScope` as **Done**, i.e. Plan 10 already consumes
+`ScopeRevokedInstruction`, so the narrow union was stranding the implementer that had already
+shipped. Step 10's two client-contract cases were rewritten to pin the AGREEMENT (set equality
+against `serverStreamFrameSchema`'s derived option list; the event member's declared type) rather
+than deleted, and the second of them had to GAIN a client half — its body was server-side only, so
+it would have stayed green through the very reconciliation its title described. **Still open, and
+the only one of the three: `error.code` is bare `string` where the server types `StreamErrorCode`.**
+`stream-frames.ts` argues the end state is replacement of `StreamItem` by `ServerStreamFrame` rather
+than re-synchronisation; that judgement stands, owner Plan 10.
+
+It does not change step 10's scope — no client consumer exists yet — and
 `serverStreamFrameSchema` already exists as the runtime instrument for pinning it.
 
 *One correction while here:* that file names its mocking readers as **Plans 6, 9 and 10**. The
@@ -5750,3 +5769,356 @@ Client-side, `version` is not lost: it belongs on the client's cache envelope, n
 server-owned document whose shape the server already versions by refusing unknown keys. The
 per-project asymmetry is the one thing an adapter must handle explicitly — a project missing from
 `grouping` surfaces as *not set*, never as a default wearing a user's authority.
+
+## Step 11 (Plan 6 remainder) — the `DataSource` register, re-derived, and RULING REQUEST P25
+
+**Status: RULING REQUESTED, not taken.** The executor proceeds on the conservative default stated at
+the end of this section and will reverse if the owner rules otherwise. Everything above the ruling is
+measurement; the ruling is the only judgement.
+
+### Why this was re-derived rather than inherited
+
+Step 10 measured "9 of 12 `DataSourceQuery` methods cannot be implemented over the shipped routes"
+and **named that sort as the claim it was least sure of.** It was re-derived from the files by an
+agent given the count as a claim to check rather than as input. The count reproduces exactly — **3
+adaptable, 9 blocked, denominator 12 counted from the `DataSourceQuery` interface body at
+`packages/app-core/src/data-source.ts:36-47`** — and the sort moves:
+
+| | step 10 | re-derived |
+|---|---|---|
+| adaptable | 3 | 3 — `getMembers`, `getTicketHistory`, `getWorkflowDef` |
+| **signature** | 3 (`getMyWork`, `getPreferences`, `putPreferences`) | **2** — `getPreferences`, `putPreferences` |
+| **serving** | not separated | **6** — `getMyWorkspaces`, `getBoard`, `getTickets`, `getTicket`, `search`, `getAttention` |
+| **data** | not separated | **1** — `getMyWork` |
+
+The disagreement is not about facts. `getMyWork` is blocked BOTH ways — it cannot form its request
+(no `workspaceId`) **and** its `inTransit` member is structurally unservable. Step 10 reported the
+signature half; the re-derivation reports the severest half. **Both readings are true of the same
+method**, which is why a register that reports one label per method must say which ordering it used.
+This one uses data > serving > signature.
+
+### The six serving gaps, each with the thing the server already holds
+
+A **serving** gap is a fact the server has and does not put on the wire. Every row below cites where
+the fact lives, because a serving claim with no such citation is a data gap wearing a cheaper label.
+
+| Method | Missing | Where the server already holds it |
+|---|---|---|
+| `getMyWorkspaces` | `WorkspaceRef.projects` | `proj_projects` (`migrations/1787961500000_proj-projects.sql`), queryable per workspace, never joined at `routes/workspaces.ts:149-165` |
+| `getBoard` | `BoardGroup.workflowVersion` | `PublishedWorkflowDef.version`, already in the `defs` Map built at `routes/board.ts:102-106` and dropped when columns are pushed at `:123-135` |
+| `getTickets` | `typeRank`, `epicId`, `stateName`, `hasRestrictedParent`, `assignedProvenance` | `proj_ticket_types.rank`; `epicAncestors` (`routes/list.ts:369-428`, docblock from `:305`) already computes the epic and uses it only as a group key; workflow defs already fetched at `:233-247` carry state names |
+| `getTicket` | `title`, `stateProvenance`, a real `TicketState` | the route answers a raw `proj_visibility` row (`routes/tickets.ts:56-64`); `proj_tickets` exists and its siblings `board.ts`/`list.ts` already read it through `read/ticket-cards.ts` |
+| `search` | `SearchHit.matchedIn` | `proj_search` stores `title`/`description`/`comments` as three independently weighted columns; `routes/search.ts:142-146` concatenates them before one `ts_headline`, so which matched is destroyed in the query, not absent from the store |
+| `getAttention` | the `contested` item kind | **THIS ROW WAS WRONG AND IS CORRECTED.** It said the fix was joining `proj_contested` into `routes/attention.ts`. **`GET /v1/contests` is already shipped** — `sync/contests-route.ts:107`, wired at `app.ts:208`, filtered per row through `canSee`, taking `?workspaceId=&ticketId=&claimantId=&open=true` — and its own docblock says *"The ticket banner, My Work and the attention strip all read this."* A client may join it, exactly as `getBoard` joins the members route. The real gap is one field pair: **`ContestView` carries no `projectId` and no `title`**, both required by `AttentionItem`. Fix belongs in `contests-route.ts` |
+
+**One row was shipped contested by its deriver and is RESOLVED here, against the deriver.**
+`getTickets`' `assignedProvenance` was called *serving* by analogy to `read/state-provenance.ts`,
+which reconstructs state provenance with a `DISTINCT ON` over the raw `events` table — and the
+deriver then flagged that `packages/domain/src/read-models.ts` says `proj_tickets.assignee_id` is a
+bare column with no provenance beside it and "the projection does not hold the difference either",
+which if read as a position rather than a not-yet would flip the label to *data*.
+
+**Read at the site, the note does not say that.** `read-models.ts:141-147` is scoped to one thing:
+what `TicketCard.assigneeId: null` can and cannot mean. It says null cannot distinguish *never
+assigned* from *unassigned by somebody*, because the column holds no provenance — and that inventing
+"a union whose second arm could never be populated would be worse than the honest gap." That is an
+argument about the **absence** case, and it is the *reason* one would go to the ledger rather than a
+reason not to. `ticket.assigned` is a real event type (`vocabulary.ts:112`), and
+`read/state-provenance.ts:42-84` (`stateProvenanceFor`) is the same query shape already shipped for state.
+
+The client type settles it from the other side: **`ListRow.assignedProvenance` is already
+`ClaimProvenance | null`** (`view-types.ts:100`), paired with `assignee: Actor | null`. So the client
+contract encodes precisely the honest gap the note protects — no assignee, no provenance — and asks
+for provenance only in the case the ledger can answer. **Serving.** The label stands and the cell is
+no longer the least-safe one in the table.
+
+### What is NOT a gap, and would have become one
+
+Three things read as gaps and are not, and each would have cost a wrong route change:
+
+1. **`BoardCard.assignee`.** The server sends `assigneeId` and no name; `Actor` requires one. But
+   `getMembers` is *adaptable* and answers `{id, name}` for the whole workspace, and the board body
+   carries `workspaceId`. The name is a **client-side join over a shipped route** — no server change.
+2. **`BoardView.groups`.** The server returns flat `columns[]`, each already carrying `workflowId`.
+   Grouping is a pure client mapping; Plan 6's Open question 10 settled this in 2026-08-27 and the
+   flat shape is what it settled ON.
+3. **`inTransit`.** `routes/my-work.ts:91-101` states that claims in transit live in the replica's
+   outbox and are "never served from a server that by definition has not received them." **The web
+   client is online-only (spec §5, line 104): it has no outbox, so `inTransit: []` is not a degradation, it
+   is the true answer**, and the test that pins it must say *because there is no outbox*, never
+   *because the read returned nothing*.
+
+### What legitimately DEFERS, with an owner that still has tasks
+
+`contested`, in both `getAttention` and `getMyWork`. `routes/attention.ts:150` and
+`routes/my-work.ts:91` each open a docblock section naming **Plan 10** as its owner in a docblock headed `EXTENSION POINT
+(Plan 10)`, and both were written that way deliberately — `AttentionItem` is a discriminated union
+and `MyWorkResponse` nests under `groups` precisely so the fourth arm arrives additively. **Plan 10
+has 13 tasks outstanding, so this deferral has a live owner.** It is the only one here that does.
+
+### THE RULING REQUEST — and why "record it with a named owner" does not work this time
+
+The standing rule is that a finding outside the current scope is **recorded with a named owner, not
+fixed.** Applied here it names Plan 5 for all six serving gaps. **Plan 5 is 17/17 done and merged. It
+has no task left to carry them.** A gap recorded against an owner with no remaining tasks is not
+deferred; it is dropped, quietly, by a rule whose whole purpose is to prevent exactly that.
+
+And the alternative to fixing them is worse than it looks. Plan 6's adaptation rule confines all
+adaptation to `packages/app-core/src/online/` and forbids moving view types or `DataSource`
+signatures. Under that rule a mapper facing a serving gap has exactly two moves, and **both are the
+failure this series is named for:**
+
+- **invent the fact.** `workflowVersion` is the sharp case. A mapper could fetch the workflow def and
+  read its version — but `getWorkflowDef` is latest-by-default, and `workflowVersion` exists, in
+  Plan 6's own words, so that "a v2 state remap shows rather than hides." Filling it with *latest*
+  hides precisely what the field was added to show. A plausible number in the honest field is worse
+  than an absent one.
+- **widen the view type to admit absence.** That degrades a guarantee the plan names as load-bearing,
+  in the client, permanently, to accommodate a route that could serve it in one line.
+
+**Proposed ruling P25, three clauses, conservative in the direction of the server holding the fact:**
+
+1. **FOUR serving gaps are closed in the SERVER, inside step 11**, each with a test through the real
+   door. Not because Plan 6 owns `apps/server`, but because the fact is already in the database, the
+   client cannot honestly synthesise it, and no other plan has a task that will. Named, because a
+   clause that says "the serving gaps" reads as six and two of the six are not in it:
+
+   | | why it is in clause 1 | shape of the change |
+   |---|---|---|
+   | `getBoard` | `board.tsx` dereferences `workflowVersion` today | **DONE.** `def.version` added at both push sites in `routes/board.ts`; a straggler column answers `0`, which `workflowDefSchema.version`'s `min(1)` makes uncollidable with any published version |
+   | `getMyWorkspaces` | the nav (T14) has no other source of `projects` | **CORRECTED 2026-09-02, after the table was first written and reported: this is NOT a field addition.** `grep -rn "proj_projects" apps/server/src` returns the projection that writes it, one existence check, and **no route that reads it** (positive control in the same sweep: `proj_memberships` has eight readers). There is no shipped project-list read at all, so adding `projects` here means DESIGNING one, and its first question is what a project-scoped guest sees of a workspace's other projects. **A VISIBILITY DECISION** |
+   | `getTicket` | the route answers a `proj_visibility` row where its name promises a ticket | **read `proj_tickets` instead. A VISIBILITY DECISION, not a field addition** |
+   | `getTickets` | five fields, four of them not derivable client-side | **`hasRestrictedParent` is itself about restricted visibility; `assignedProvenance` reads the raw `events` table. A VISIBILITY DECISION** |
+
+   `getAttention` is NOT in clause 1 — its only gap is `contested`, which clause 3 defers to Plan 10.
+   `search`'s `matchedIn` is NOT in clause 1 — no view among Plan 6's twelve remaining tasks consumes
+   it, so it blocks nothing here and is recorded for whoever builds the search surface.
+
+   **THREE of the four carry a visibility decision rather than a field addition** — corrected upward
+   from two after `getMyWorkspaces` was checked rather than assumed. They sit under Plan 4's read
+   enforcement, the surface whose own execution notes recorded the cross-workspace forgery hazard.
+   That is what decides whether clause 1 is a few tasks inside a step or a step of its own.
+
+   **Only `getBoard` is a pure field addition, and it is the one being done.** `def.version` comes off
+   the same `PublishedWorkflowDef` the column's `workflowName` already comes from, so it discloses
+   nothing a viewer of that board cannot already see. The other three are HELD pending the ruling.
+
+   The correction is itself the lesson: the first version of this table priced two rows as one-line
+   changes on the strength of "the fact is in a table". A fact being in a table says nothing about
+   whether a door exists to hand it through, or who is allowed to walk up to it.
+2. **Signature gaps are closed in the CLIENT.** `getPreferences`/`putPreferences` cannot form their
+   request at all, so there is no server-side reading of the problem. This extends **ruling P24** —
+   already taken, that the shipped `.strict()` preferences document wins over Plan 6's — from the
+   document's shape to the method's signature, which is the same argument one layer out.
+   `getMyWork` takes a `workspaceId` for the same reason.
+3. **The one data gap is answered honestly, not filled.** `inTransit: []` for the online source, with
+   the reason in the assertion. `contested` defers to Plan 10, named above.
+
+**The executor proceeds on this default** and does the unblocked work first — Plan 6 T8's stream
+widening, which needs no ruling because the server already sends both missing things, and T7's
+transport and the three adaptable mappers. If the owner rules that `apps/server` is out of step 11's
+scope, clause 1 becomes a new step and Plan 6's view tasks wait for it; nothing done under clauses 2
+and 3 is wasted either way.
+
+**Least sure, stated so a reader with limited budget knows where to aim it:** whether `getTicket` and
+`getTickets` can be changed without reopening a Plan 4 visibility decision. Both are asserted above to
+carry one; neither has been implemented, so the assertion is a prediction from reading the routes, not
+a measurement. If it is wrong in the safe direction they are field additions like the other two; if it
+is wrong in the unsafe direction, clause 1 is bigger than a step.
+
+
+### P25 postscript, written after clause 1's one approved row was executed
+
+**Two corrections the execution produced, both against this document.**
+
+**1. The `getAttention` row above was wrong about which file closes it**, and it was wrong in the
+direction that costs most: it named a route change in `attention.ts` when a route serving exactly those
+rows was already shipped and already names the attention strip as its consumer. A register exists so a
+recorded gap does not outlive the thing it described; a register that misroutes the fix is worse than
+none, because it looks like it was checked. Found by reading `sync/contests-route.ts`, which nothing in
+the original derivation had opened — the derivation swept `apps/server/src/routes/**`, and this route
+lives in `apps/server/src/sync/`. **A sweep is a fact about the directories it walked.**
+
+**2. `getBoard`'s field addition was nearly a check that could not fail.** Every workflow a board could
+see in the test fixtures was at v1, so serving the constant `1` instead of `def.version` left all 756
+server tests green — the whole-body round-trip `toEqual` and the client-contract agreement case
+included. The fixtures were tidy, and tidy fixtures make a version field indistinguishable from a
+constant. A second workflow is now published at v2 for the sole purpose of making the two
+distinguishable. This is the brief's *"a count equal to a max because the fixtures were tidy"*, in a
+new costume.
+
+**And one measurement corrected:** step 10 recorded that adding `workflowVersion` "kills 6 tests
+including the serving gap case". Measured at execution it kills **2**. Not a mistake at the time
+necessarily — but a kill count is a fact about a suite at a moment, and this one was cited three steps
+later as though it were a property of the change.
+
+## RULING P26 EXISTS AS A NUMBER WITH NO TEXT — recorded by the executor, 2026-09-02
+
+`docs/lanes/controller-state.md:159` says the cross-plan shape scan found *"1 live (`SavedFilter`, now
+Ruling P26)"*. **Searched at `origin/main`: the string `P26` appears in that one line and nowhere else
+in `docs/`** (`git grep -n "P26" origin/main -- docs/` → a single hit; positive control in the same
+sweep — `SavedFilter` returns five files). So the ruling has a number, a subject and a claim that it was
+taken, and no statement of what it decided.
+
+This is the failure the coordination doc already names in its own words — *a correct ruling whose entire
+value lives in a note is worth exactly as much as the note is durable* — one turn further along: here
+not even the note survived, only the citation.
+
+**What the collision actually is, measured, so the ruling can be written from evidence rather than
+recalled.** Three spellings of one field:
+
+| Where | Declaration |
+|---|---|
+| Plan 6 (`…-06-web-client.md:1663`) | `{ id; name; filter: FilterSpec }` |
+| Plan 9 (`…-09-calendar-notifications.md:5795`) | `{ id; name; spec: FilterSpec }` |
+| **SHIPPED** (`packages/domain/src/preferences.ts:24-31`) | `{ id; name; filterSpec }`, and the schema is **`.strict()`** |
+
+`.strict()` is what makes this live rather than cosmetic: the shipped door **refuses both plan
+spellings**, so neither plan's document can round-trip through storage as written. And
+`preferences.ts:22` already names the owner — *"Recorded rather than fixed; the owner is Plan 6, which
+renders the list."*
+
+**For Plan 6 the substance is already settled and needs no new ruling: RULING P24 covers it.** P24 took
+the shipped `UserPreferences` shape over Plan 6's, naming `SavedFilter.filter` vs the shipped
+`filterSpec` as one of the three ways `.strict()` refuses Plan 6's document. Task 10 is executing under
+P24 now, and Task 7's `mapPreferences` already implements the translation.
+
+**The part P24 does NOT cover is Plan 9**, whose `spec` spelling nobody has been told about. That is
+step 14's, and it is written here rather than left in a number so step 14 inherits the evidence rather
+than the citation.
+
+**Not resolved by the executor**, because P26 is the controller's ruling and inventing its text would be
+worse than reporting it missing. The ask is one sentence: *does P24's reasoning extend to Plan 9's
+`spec`?* If it does — and the same `.strict()` argument applies unchanged — then P26 is that sentence
+and Plan 9's Open questions should carry it before step 14 dispatches.
+
+---
+
+## Step 11 (Plan 6 remainder) — four findings RECORDED, each with a named owner
+
+Found while closing ruling P24's per-project asymmetry in `ProjectViewPrefs` (step 11). None is owned
+by that task; each is recorded here rather than fixed, per the standing rule, and each names an owner
+that still has work. **None of the three was implemented.**
+
+### 1. Two date spellings will sit side by side on one screen. Owner: whoever next touches the attention route.
+
+`apps/server/src/routes/attention.ts:245` composes its `due-soon` reason from the **raw `YYYY-MM-DD`
+day claim**:
+
+```ts
+reason: `Needed by ${due.date} — due within ${settings.dueSoonDays} days.`,
+```
+
+My Work's due line, in the same client, renders the same kind of fact through the domain's one
+renderer — `packages/app-core/src/views/my-work.tsx:167`, `formatDate(item.dueDate.date)` → `30 Aug
+2026`. Both surfaces can be on screen together, so a user sees `2026-08-30` in the strip and
+`30 Aug 2026` in My Work, for the same claim.
+
+**The client is not the site to fix.** The owner decision is that attention reasons are the SERVER's,
+rendered verbatim (spec §7's "user's language" means named reasons, not localisation), and
+`attention-strip.test.tsx:25` pins that the strip renders the server's spelling as sent. Re-deriving
+the date in the browser would compute it without the workspace's thresholds — the thing the verbatim
+rule exists to prevent. **The spelling to change is the route's**, so that what it emits is already the
+domain's spelling. Nothing here should be changed until that route is touched, because changing the
+route's text moves a string the client tests quote.
+
+### 2. No test under `packages/app-core/test/views/` carries a test-case ID. Owner: Plan 6 Task 16.
+
+The workspace convention (`/Users/kiro/my_projects/CLAUDE.md`, `test-cases/`) is that tests
+cross-reference cases by id so grep finds both directions. **The claim as first written was "no test in
+`packages/app-core`", and a sweep falsified that** — recorded here in its corrected form, because a
+recorded finding that overstates its scope sends its owner to the wrong files.
+
+Measured 2026-09-02, `grep -rnE "(it|describe|test)\(\s*['\"\`][^'\"\`]*[0-9]+\.[0-9]+"` with quoted
+globs over each test file:
+
+| id-carrying test names | file |
+|---|---|
+| 27 | `test/online/mappers.test.ts` |
+| 14 | `test/online/online-data-source.test.ts` |
+| 7 | `test/online/http.test.ts` |
+| 3 | `test/no-http-in-views.test.ts` |
+| **0** | `test/views/board.test.tsx` |
+| **0** | `test/views/ticket-list.test.tsx` |
+| **0** | `test/views/list-model.test.ts` |
+| **0** | `test/views/my-work.test.tsx` |
+| **0** | `test/views/attention-strip.test.tsx` |
+| **0** | `test/views/rollup-text.test.ts` |
+| 0 | `cache` / `data-source` / `precheck` / `provenance` / `submit` / `stream` |
+
+Positive control, same command shape and same run: `apps/server/test/` returns **206** hits (e.g.
+`visible-events-for.test.ts:121` — `it('6.16 never yields an event about a ticket …')`), so the regex
+finds ids where ids exist. Second control: the ids are not absent from `app-core` as *text* —
+`no-http-in-views.test.ts:30` carries `3.47` and `online/http.test.ts:57` carries `3.45` — they are
+absent from the **views** suite specifically. The 51-vs-0 split inside one package is the finding.
+
+`rollup-text.test.ts` is added to the list the finding was reported with; it has the same gap and was
+not named. **Owner: Plan 6 Task 16**, which owns the catalogue and is where the ids and the tests get
+reconciled in one pass.
+
+**PARTIALLY RESOLVED (Plan 6 Task 16's fix round, 2026-09-02).** `rollup-text.test.ts`, the one file
+this table names by name and Task 16's original sweep left out, now carries a case-id prefix on its
+`describe(...)` block (`3.145`, matching the case that already cited the file). Measured across the
+whole `packages/app-core/test/views/` directory (`grep -cE "^describe\('[0-9]" <file>` against
+`grep -cE "^describe\(" <file>` per file): `ticket-list.test.tsx`, `list-model.test.ts`,
+`my-work.test.tsx`, `attention-strip.test.tsx`, `attachment-list.test.tsx`, `history-list.test.tsx`,
+`editor-slot.test.tsx`, `transition-dialog.test.tsx` and `rollup-text.test.ts` — nine files — now carry
+an id on every `describe` block, twenty-seven blocks in total (`git diff -- <file> | grep -cE
+'^\+describe\('` per file), each resolving to a live entry in `test-cases/03-foundation-ledger.md`
+(swept and confirmed with a `3.9999` negative control). **`board.test.tsx` is still 1 of 10 and
+`ticket-sheet.test.tsx` still 1 of 8** — neither was in this round's four assigned fixes, and this
+table's own "no test under `packages/app-core/test/views/` carries a test-case ID" framing named the
+directory, not only the six files its table rows list by name, so both remain open against that
+framing. Recorded here so the next reader does not read "27 blocks fixed" as "the directory is done."
+
+### 3. `SHIPPED_KINDS` in the attention tests is a reconstruction, not a measurement. Owner: whoever closes the attention serving gap.
+
+`packages/app-core/test/views/attention-strip.test.tsx:69` declares
+`const SHIPPED_KINDS: AttentionItem[] = [ITEMS[0]!, ITEMS[1]!, ITEMS[3]!]` — "the three the server
+emits today" — and two tests rest on it (`:129`, `:145`). **That three-kind array is inferred from
+reading `routes/attention.ts`, not observed.** `mapAttention` refuses over the contested kind's missing
+`title` (`ServingGapError`), so no fixture reaching this file can be the server's real answer; the day
+the route emits a fourth kind, or stops emitting one of the three, nothing in `app-core` goes red.
+
+The place that WOULD go red is `apps/server/test/integration/client-contract.test.ts`, which injects
+the real route and reads the real body. **Owner: whoever closes the attention serving gap** — the same
+change that makes `contested` servable is the change that must move this constant and pin it
+server-side, because until then there is no run in which the client can observe the true kind set.
+
+### 4. Task 13's instant pre-check opens the reopen offer without submitting anything — a SPEC-READING ambiguity. **Owner: the owner. Not resolved here.**
+
+`packages/app-core/src/views/create-ticket-flow.tsx:189-201`: when a `ClientStateCache` is present and
+the draft names a parent, `create` runs `precheckEvent` locally, and on a `hierarchy.parent-terminal`
+refusal it opens the reopen prompt and **returns at `:200`** — `dataSource.ingest` is never called. The
+test that pins this is `packages/app-core/test/views/reopen-flow.test.tsx:254` (case T13.4g, *"a local
+refusal is not presented as though the server had spoken — nothing is even submitted"*), which asserts
+`source.ingested` is EMPTY on that path.
+
+**The spec line in tension.** `docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md:104` —
+*"**The web client** is online-only — the same rule engine runs for instant feedback, but every action
+round-trips."*
+
+**The implementer's reading (what is shipped).** "Round-trips" attaches to the CLAIM. On the instant
+path no claim is made at all: the user is offered a remedy instead, and accepting it sends
+parent-then-child exactly as the server-refused path does — the shortcut is to the OFFER and never past
+the two claims. Under this reading the sentence is satisfied because every action that is *taken* still
+round-trips; declining the offer takes no action.
+
+**The equally defensible reading.** "Every action round-trips" means the create is SUBMITTED regardless,
+so the refusal the actor sees is always the authority's, and the local engine only shortens the wait
+rather than standing in for the server. This reading has real weight: the local cache can be stale in
+ways the server is not, so a locally-refused create that the server would have ACCEPTED is silently
+converted into a reopen offer the user did not need — and the sheet's own `precheck` docblock already
+says a pre-check is advisory and never a promise about acceptance.
+
+**The exact fix if the owner takes the second reading.** Small and local: delete the early `return` at
+`create-ticket-flow.tsx:200` so the flow falls through to `submitChildEvent`, and pass `'server'` rather
+than `'instant'` as `openReopenPrompt`'s origin — at which point the pre-check branch's only remaining
+job is that it has already computed the prompt. **Case T13.4g would need REWRITING, not deleting:** its
+subject (a refusal wears the name of whoever made it) survives the change; what changes is that
+`source.ingested` is no longer empty on that path and the label under the preview class becomes the
+server's. The `refusalOrigin` prop itself stays either way — the reopen prompt can still be reached from
+a purely local refusal elsewhere.
+
+**Why it is recorded rather than decided.** Both readings are defensible from one sentence, and the
+choice is a product decision about whose refusal a user should be shown, not an implementation detail.

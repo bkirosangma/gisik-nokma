@@ -11,8 +11,14 @@ __pycache__/
 # above would otherwise silently keep it out of the repo.
 !.env.example
 .turbo/
+.next/
 *.tsbuildinfo
 coverage/
+# Playwright's own output: a run's HTML report and its per-failure traces and
+# screenshots. Both are artefacts of `test:e2e`, which is not on the gate; the
+# report directory in particular is regenerated whole on every run.
+test-results/
+playwright-report/
 .superpowers/
 
 # graphify: derived structural graph. Rebuilt from source in ~1 min at zero LLM cost

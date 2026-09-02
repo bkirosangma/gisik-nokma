@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isUlid, type EventEnvelope, type WorkflowDef } from '@gisik-nokma/domain';
+import { isUlid, type LedgerEvent, type WorkflowDef } from '@gisik-nokma/domain';
 import { createClientStateCache } from '../src/cache.js';
 import { withCacheFeed } from '../src/cache-feed.js';
 import { createFakeDataSource } from './helpers/fake-data-source.js';
@@ -15,7 +15,13 @@ import { PARENT, TICKET, WF_ERRAND, WS, claim, ticketStateSeed } from './helpers
 const WF_ULID = '01J9GWFA000000000000000000';
 const WF_REAL: WorkflowDef = { ...WF_ERRAND, id: WF_ULID };
 
-function ticketEnvelope(overrides: Partial<EventEnvelope> = {}): EventEnvelope {
+/**
+ * A `LedgerEvent`, not a bare `EventEnvelope`: Plan 6 Task 8 widened `StreamItem`'s
+ * event member to carry the workspace stream position the resume protocol is
+ * defined in terms of. `noteEvent` still takes an `EventEnvelope`, and a
+ * `LedgerEvent` is one — the widening costs those call sites nothing.
+ */
+function ticketEnvelope(overrides: Partial<LedgerEvent> = {}): LedgerEvent {
   return {
     id: '01J9GEVT000000000000000000',
     workspaceId: WS,
@@ -28,6 +34,8 @@ function ticketEnvelope(overrides: Partial<EventEnvelope> = {}): EventEnvelope {
     clientTime: '2026-08-20T09:00:00.000Z',
     serverTime: '2026-08-20T09:00:01.000Z',
     seq: 4,
+    // Deliberately different from `seq`: per-entity counter vs workspace position.
+    workspaceSeq: 17,
     ...overrides,
   };
 }

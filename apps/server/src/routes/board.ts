@@ -123,6 +123,11 @@ export async function readBoard(
       columns.push({
         workflowId,
         workflowName: def.name,
+        // The version of the definition the next four fields are read out of,
+        // off the same `def` `workflowName` already comes from. It discloses
+        // nothing `workflowName` does not: a viewer who can see this column can
+        // already see that this def exists.
+        workflowVersion: def.version,
         stateId: state.id,
         name: state.name,
         category: state.category,
@@ -174,6 +179,29 @@ export async function readBoard(
  * denormalized at the time the state was entered, so it is a recorded fact
  * rather than a guess. `blocked` is `false` for the same reason the name is the
  * id: the flag lives on the definition, and there is none.
+ *
+ * `workflowVersion` is `0`, and it is the one field here where the obvious
+ * fallback is the harmful answer. `workflowName` may be read off the latest def
+ * (`defs.get(workflowId)?.name`) because a workflow's name is a fact about the
+ * WORKFLOW; a version is a fact about one DEFINITION, and this column's state is
+ * in none. Carrying `def.version` here would be the specific lie the field
+ * exists to prevent, and it has a mechanism rather than only a principle:
+ * `packages/app-core/src/views/board.tsx:28` renders each group under the key
+ * `` `${workflowId}@${workflowVersion}` ``, so a straggler stamped with the
+ * latest version lands in the SAME group as that definition's real columns and
+ * is drawn as one of its states. Stated at the right strength: the server
+ * serves flat `columns` and NO adapter from `BoardResponse` to `BoardView`
+ * exists yet (the shape gap pinned as case 7.188), so this is what the obvious
+ * regrouping would do rather than what any shipped code does today — which is
+ * the reason to get the value right BEFORE that adapter is written. `0` cannot collide with a published version: `workflowDefSchema` is
+ * `version: z.number().int().min(1)`, and `projections/workflows.ts` — the only
+ * writer of `proj_workflows` on the product path — parses every payload through
+ * it before inserting, so no request can put a row there with a version below 1.
+ * (Enumerated rather than assumed. `test/read/compile-filter.test.ts` also
+ * INSERTs into that table directly, with a version of its own choosing; it is a
+ * fixture, it never reaches this route, and it is named here so the claim above
+ * is the narrow one it can carry.) So the straggler lands in a group of its own,
+ * which is what it is.
  */
 function appendStragglerColumns(
   columns: BoardColumn[],
@@ -201,6 +229,8 @@ function appendStragglerColumns(
     columns.push({
       workflowId,
       workflowName: defs.get(workflowId)?.name ?? workflowId,
+      // Not `defs.get(workflowId)?.version` — see this function's docblock.
+      workflowVersion: 0,
       stateId,
       name: stateId,
       category: stateCategory,
