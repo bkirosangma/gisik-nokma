@@ -4,3 +4,6 @@ export * from './summaries.js';
 export * from './fields.js';
 export * from './anchor-issues.js';
 export * from './templates.js';
+export * from './gateway.js';
+export * from './fake-gateway.js';
+export * from './events.js';
