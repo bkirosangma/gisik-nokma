@@ -153,6 +153,36 @@ surfaces `ServingGapError` — **never to weaken one to make a view light up**, 
 explicitly forbids. Step 12's final review found `registerAttachmentRoutes` is defined and **never
 called**, so "the module exists" is not evidence the route serves.
 
+**3b. PLAN 8 COVERS ONE OF THE TWO ADVISORY CODES THAT SHIP, AND ITS OWN CATALOGUE TEXT SAYS SO.**
+
+Measured with a positive control in the same run: **`rule-bypassable` appears 0 times in Plan 8**,
+while **`rdu-bypassable` appears 17 times in the same file**, and
+`packages/domain/src/advise-workflow.ts` demonstrably emits **both** codes. Plan 8's text predates
+the F5 amendment commit `c7fef4b` (*"Every guard now says when an arrow goes around it, and the
+arrow that carries its own guard says nothing"*), which is the commit that added `rule-bypassable`.
+The amendment was pulled forward as its own PR precisely because no task absorbed it — and the
+consequence nobody wrote down is that **the plan that consumes the advisory tier still describes the
+one-code version of it.**
+
+The code half is harmless: the advisory section is fed by `adviseWorkflowDef` and anchored through
+the same widened `anchorIssues`, so a `rule-bypassable` advisory **renders correctly today with no
+change**. Two things are not harmless:
+
+- **Task 8's advisory coverage table has one row (A1, `rdu-bypassable`).** Nothing exercises the
+  second code, so the claim "the advisory tier is covered" would hold for half the tier. Given the
+  plan's own standard — *"Without the pair, 'advisories do not gate publish' is a convention rather
+  than a guarantee"* — the same argument applies to the second code.
+- **Task 15's `Features.md` text is dictated verbatim by the plan and says the advisory section
+  "carries `rdu-bypassable`"**, naming one code where two ship. Transcribed faithfully, that ships a
+  false catalogue claim, in the document whose whole purpose is describing reality.
+
+**Conservative default taken, per the coordination doc's ruling protocol** (take the conservative
+option, record it in the same change set, notify, continue — never block): **cover both codes and
+correct the one catalogue sentence.** This widens Task 8 by one test and edits one dictated
+sentence in Task 15; it does not touch `packages/domain`, whose COVER semantics are settled and must
+not be reopened. Recorded here rather than fixed on the spot because the tasks that own it have not
+run yet — **this is a note to T8 and T15, not a licence for any other task to touch the tier.**
+
 **4. The `apps/web` TS6053 hazard returns at T13, which adds six pages.** `apps/web/tsconfig.json`
 excludes `.next` because Next's default `include` globs a directory `next build` deletes while turbo
 runs typecheck concurrently — measured **2 red of 3** without the exclude. It cannot be a narrower
