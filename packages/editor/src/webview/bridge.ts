@@ -41,9 +41,14 @@ export type EditorToHostMessage =
  *   - a recognised `kind` missing a required field, or a field of the wrong
  *     type (e.g. `insertImage` with no `mime`, `mentionResults` whose
  *     `users` is not an array) — refused per-branch.
- *   - a `loadDoc.doc` that is present but not doc-shaped — refused via
- *     `isDocJson`, so a hostile or corrupt payload cannot smuggle an
- *     arbitrary object into `editor.commands.setContent`.
+ *   - a `loadDoc.doc` that is not doc-shaped AT THE TOP LEVEL — refused via
+ *     `isDocJson`, which checks only `typeof value === 'object' &&
+ *     value.type === 'doc'`. That stops a payload that isn't a document at
+ *     all (a bare string, `{ type: 'paragraph' }` standing in for a doc,
+ *     `null` when a doc is required) — it is NOT a deep check, and a value
+ *     that passes it can still carry unvalidated content underneath. See
+ *     the `loadDoc` bullet below: it is this file's one exception to
+ *     "nothing unvalidated reaches downstream".
  *
  * WHAT IS DELIBERATELY TOLERATED, not refused:
  *   - an `insertImage` whose `mime` names something other than an image.
@@ -54,13 +59,26 @@ export type EditorToHostMessage =
  *   - a message carrying EXTRA fields beyond the ones a given `kind`
  *     defines. Every branch below returns a freshly constructed object
  *     literal built field-by-field from `record`, never `record` itself
- *     (and never a spread of it) — so an unrecognised extra field is read
- *     by nothing and reaches nothing downstream. Tolerating it is not a gap
- *     in validation; it is the same discipline as refusing a wrong `kind`,
- *     applied one level down: forward-compatible against a host that later
- *     adds a field this bundle does not know about yet, with no way for
- *     that field to smuggle anything past the parser because it is never
- *     copied through.
+ *     (and never a spread of it) — so for every kind EXCEPT `loadDoc`, an
+ *     unrecognised extra field is read by nothing and reaches nothing
+ *     downstream.
+ *
+ *     `loadDoc` is the deliberate exception, and it is a real one, not a
+ *     hypothetical: `record.doc` is assigned straight into the returned
+ *     message BY REFERENCE — the attacker's own object, not a copy — and
+ *     `create-editor-bridge.ts` passes that same reference straight into
+ *     `editor.commands.setContent`. Because `isDocJson` validates only the
+ *     top level, a `doc` that satisfies `{ type: 'doc' }` can still carry
+ *     anything in its nested `content`: an `attachmentId` that is an
+ *     object instead of a string, a `wrap` outside `IMAGE_WRAP_MODES`, a
+ *     numeric `alt`. All of it reaches the live document unfiltered and is
+ *     echoed straight back to the host on the next `change` message.
+ *     Nothing in this package validates that interior today — the
+ *     per-attribute coercion TicketImage applies (an unknown `wrap` becomes
+ *     `block`, for instance) lives in its HTML `parseHTML`, a door this
+ *     JSON-in path never opens. This is a tracked gap, not a covered case:
+ *     owned by Task 3 (ticket-image attribute validation) or Task 16's
+ *     verification pass, not solved by this function.
  *   - `mentionResults.users` similarly parses if merely an array; a
  *     malformed entry inside it is filtered out below rather than voiding
  *     the whole message, since a partial batch of results is still useful
@@ -70,10 +88,11 @@ export type EditorToHostMessage =
  * ONE CATEGORY THIS FUNCTION DOES NOT SEE: "not JSON at all" — a raw string
  * that fails `JSON.parse`. That is handled one layer up, in `entry.tsx`'s
  * `message` event listener, which try/catches the parse and drops anything
- * that throws before this function is ever called. `entry.tsx` is the
- * untested DOM shim by design (see its own file for why), so that half of
- * "malformed" has no unit test here — the coverage for it is the shape of
- * the listener itself, not a red/green check.
+ * that throws before this function is ever called. That listener carries
+ * no unit test of its own: it is a three-line DOM shim (`window` /
+ * `document` message listeners) that only runs inside a real WebView or a
+ * browser tab, so its coverage is the shape of the listener itself, not a
+ * red/green check.
  */
 export function parseHostMessage(raw: unknown): HostToEditorMessage | null {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
