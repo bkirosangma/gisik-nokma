@@ -5949,3 +5949,43 @@ new costume.
 including the serving gap case". Measured at execution it kills **2**. Not a mistake at the time
 necessarily — but a kill count is a fact about a suite at a moment, and this one was cited three steps
 later as though it were a property of the change.
+
+## RULING P26 EXISTS AS A NUMBER WITH NO TEXT — recorded by the executor, 2026-09-02
+
+`docs/lanes/controller-state.md:159` says the cross-plan shape scan found *"1 live (`SavedFilter`, now
+Ruling P26)"*. **Searched at `origin/main`: the string `P26` appears in that one line and nowhere else
+in `docs/`** (`git grep -n "P26" origin/main -- docs/` → a single hit; positive control in the same
+sweep — `SavedFilter` returns five files). So the ruling has a number, a subject and a claim that it was
+taken, and no statement of what it decided.
+
+This is the failure the coordination doc already names in its own words — *a correct ruling whose entire
+value lives in a note is worth exactly as much as the note is durable* — one turn further along: here
+not even the note survived, only the citation.
+
+**What the collision actually is, measured, so the ruling can be written from evidence rather than
+recalled.** Three spellings of one field:
+
+| Where | Declaration |
+|---|---|
+| Plan 6 (`…-06-web-client.md:1663`) | `{ id; name; filter: FilterSpec }` |
+| Plan 9 (`…-09-calendar-notifications.md:5795`) | `{ id; name; spec: FilterSpec }` |
+| **SHIPPED** (`packages/domain/src/preferences.ts:24-31`) | `{ id; name; filterSpec }`, and the schema is **`.strict()`** |
+
+`.strict()` is what makes this live rather than cosmetic: the shipped door **refuses both plan
+spellings**, so neither plan's document can round-trip through storage as written. And
+`preferences.ts:22` already names the owner — *"Recorded rather than fixed; the owner is Plan 6, which
+renders the list."*
+
+**For Plan 6 the substance is already settled and needs no new ruling: RULING P24 covers it.** P24 took
+the shipped `UserPreferences` shape over Plan 6's, naming `SavedFilter.filter` vs the shipped
+`filterSpec` as one of the three ways `.strict()` refuses Plan 6's document. Task 10 is executing under
+P24 now, and Task 7's `mapPreferences` already implements the translation.
+
+**The part P24 does NOT cover is Plan 9**, whose `spec` spelling nobody has been told about. That is
+step 14's, and it is written here rather than left in a number so step 14 inherits the evidence rather
+than the citation.
+
+**Not resolved by the executor**, because P26 is the controller's ruling and inventing its text would be
+worse than reporting it missing. The ask is one sentence: *does P24's reasoning extend to Plan 9's
+`spec`?* If it does — and the same `.strict()` argument applies unchanged — then P26 is that sentence
+and Plan 9's Open questions should carry it before step 14 dispatches.
