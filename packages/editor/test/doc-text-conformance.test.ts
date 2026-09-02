@@ -292,15 +292,27 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
   });
 
   /**
-   * Plan 7 Task 6's gap: this file covered every schema-v1 node the walker
-   * names — the twelve in `BLOCK_NODE_TYPES`, plus `text`, `hardBreak` and
-   * `mention`, each with their own case above — except `image`, added by
-   * Task 3 after this file's first cases were written. `image` is `atom:
-   * true` with no `content` array at all, so it hits neither the block-node
-   * branch (its type is not in the walker's set) nor the children branch
-   * (there is nothing to recurse into): `render` falls through to
-   * `candidate.content` being non-array, `children` is `''`, and the node
-   * contributes nothing.
+   * Plan 7 Task 6's gap, stated precisely rather than as "every node has its
+   * own case": of the walker's fifteen named types (the twelve in
+   * `BLOCK_NODE_TYPES`, plus `text`, `hardBreak` and `mention`), seven have a
+   * case above that puts them in a fixture — `paragraph`, `heading` and
+   * `codeBlock` (the header's three load-bearing ones), plus `blockquote`,
+   * `bulletList`, `orderedList` and `listItem` (present in fixtures, inert
+   * if deleted per the header, but present). Five do not: `doc`, which is
+   * only ever the implicit wrapper every fixture shares and is never itself
+   * what a case is built to exercise, and the four snake_case aliases
+   * (`code_block`, `bullet_list`, `ordered_list`, `list_item`), which no
+   * fixture here uses at all because schema v1 never emits that spelling.
+   * `text`, `hardBreak` and `mention` each have a case of their own too. That
+   * five-node gap is the header's own claim, immediately above, and this
+   * file was already honest about it before this commit. `image` was the
+   * one node — named by neither the twelve nor the three non-block names —
+   * that this file had never put in a fixture at all, dedicated or
+   * incidental, until now. `image` is `atom: true` with no `content` array
+   * at all, so it hits neither the block-node branch (its type is not in the
+   * walker's set) nor the children branch (there is nothing to recurse
+   * into): `render` falls through to `candidate.content` being non-array,
+   * `children` is `''`, and the node contributes nothing.
    *
    * Pinned from the same direction as `horizontalRule` above, and for the
    * same reason it took a moment to see it was pinned at all: DELETING
@@ -357,6 +369,21 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
     // `docToPlainText` on whatever a client sent, and `{ type: 'doc',
     // content: [] }` is exactly the malformed-but-well-typed shape the
     // walker's total-function contract (doc-text.ts's header) exists for.
+    //
+    // Correction to this repo's history: an earlier commit message justified
+    // the bare `.toBe('')` below by claiming it guards docToPlainText's
+    // internal `.trim()` call. That is false for this specific input. An
+    // empty `content` array makes `render` return `''` on its own — the
+    // block-node branch's `children.length > 0` guard is false, so the doc
+    // node contributes nothing — before `docToPlainText`'s
+    // `.replace().replace().trim()` pipeline ever runs; trimming `''` is a
+    // no-op whether or not `.trim()` is even called. Deleting the internal
+    // `.trim()` leaves this assertion green. The case in this file that
+    // actually reddens on that regression is 'is unbothered by the doc
+    // attrs this schema stamps and the paragraph typing appends' above,
+    // whose trailing empty paragraph produces a trailing `\n` that only
+    // `.trim()` strips. This case exists for the throw-safety and
+    // malformed-input contract described above, not for trim coverage.
     expect(() => docToPlainText({ type: 'doc', content: [] })).not.toThrow();
     expect(docToPlainText({ type: 'doc', content: [] })).toBe('');
   });
