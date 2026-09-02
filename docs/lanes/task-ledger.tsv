@@ -84,22 +84,22 @@ plan	task	status	pr	merge_sha	note
 04	13	done	57	dd7bfcfd	
 04	14	done	57	dd7bfcfd	
 05	1	done	8	23361496	
-05	2	todo	-	-	
-05	3	todo	-	-	
-05	4	todo	-	-	
-05	5	todo	-	-	
-05	6	todo	-	-	
-05	7	todo	-	-	
-05	8	todo	-	-	
-05	9	todo	-	-	
-05	9b	todo	-	-	
-05	10	todo	-	-	
-05	11	todo	-	-	
-05	12	todo	-	-	
-05	13	todo	-	-	
-05	14	todo	-	-	
-05	15	todo	-	-	
-05	16	todo	-	-	
+05	2	done	67	563c983	artefact: packages/domain/src/filter-spec.ts
+05	3	done	67	563c983	artefact: packages/domain/src/events/workspace-settings.ts
+05	4	done	67	563c983	artefact: apps/server/src/projections/workspace-settings.ts
+05	5	done	67	563c983	artefact: apps/server/src/read/visible-where.ts
+05	6	done	67	563c983	artefact: apps/server/src/projections/search.ts
+05	7	done	67	563c983	artefact: packages/domain/src/read-models.ts
+05	8	done	67	563c983	artefact: apps/server/src/routes/board.ts
+05	9	done	67	563c983	artefact: apps/server/src/routes/list.ts
+05	9b	done	67	563c983	artefact: apps/server/src/routes/builder-reads.ts
+05	10	done	67	563c983	artefact: apps/server/src/routes/search.ts
+05	11	done	67	563c983	artefact: apps/server/src/routes/my-work.ts
+05	12	done	67	563c983	artefact: apps/server/src/routes/attention.ts
+05	13	done	67	563c983	artefact: packages/domain/src/preferences.ts
+05	14	done	67	563c983	artefact: packages/domain/src/stream-frames.ts
+05	15	done	67	563c983	artefact: apps/server/src/stream/routes.ts
+05	16	done	67	563c983	catalogue task: precondition MET — all 16 sibling tasks merged in this same commit; test-cases/07 carries 153 entries reaching 7.162 (late-task ids) and Features.md §7 exists. NOT promoted on artefact presence alone (the file was opened by T2)
 06	1	done	-	2e9f405	artefact: packages/ui scaffold + tokens (PR #16)
 06	2	done	-	2e9f405	artefact: packages/ui/test/helpers/colour-scan.ts, token-discipline.test.ts (PR #16)
 06	3	done	-	2e9f405	artefact: all 8 declared components + ui.css, each verified present (PR #16)
