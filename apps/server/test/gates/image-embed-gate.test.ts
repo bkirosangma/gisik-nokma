@@ -6,6 +6,7 @@ import { buildServerGates } from '../../src/gates/index.js';
 import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
 import { createProjectionRegistry } from '../../src/projections/registry.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { seedDriveReference } from '../helpers/drive-reference.js';
 
 const WS = '01J9GWKS000000000000000000';
 const TICKET = '01J9GTKA000000000000000000';
@@ -175,5 +176,31 @@ describe('image-embed gate (layer 3)', () => {
       submitted('comment.added', { body: { type: 'doc', content: [{ type: 'paragraph' }] } }),
     ]);
     expect(result).toMatchObject({ status: 'committed' });
+  });
+
+  it('planted defect: a document embedding a Drive image reference is refused — a reference has no bytes to show, whatever it claims to be', async () => {
+    // mimeType: 'image/png' is deliberate and DEVIATES from the plan's
+    // literal `seedDriveReference(db.pool, { workspaceId, ticketId,
+    // attachmentId, actorId })` call, which relies on the helper's
+    // application/pdf default. A PDF-mime reference would pass this
+    // assertion under EITHER a correct implementation (checks `attachments`
+    // existence) or a wrong one (checks the claimed mime) — a PDF fails a
+    // mime check too, so the two implementations are indistinguishable from
+    // that seed. An image-mime reference is the only seed a wrong,
+    // mime-based implementation would accept; refusing it anyway is the
+    // proof this task exists to demand. See the `mimeType` extension note on
+    // seedDriveReference.
+    const referenceId = newUlid();
+    await seedDriveReference(db.pool, {
+      workspaceId: WS,
+      ticketId: TICKET,
+      attachmentId: referenceId,
+      actorId: ACTOR,
+      mimeType: 'image/png',
+    });
+    const event = submitted('comment.added', { body: docEmbedding(referenceId) });
+    const [result] = await ingest.ingestBatch([event]);
+    expect(result).toMatchObject({ status: 'refused', rule: RULE_EMBED_UNKNOWN });
+    expect(await ledgerCount(event.id)).toBe(0);
   });
 });
