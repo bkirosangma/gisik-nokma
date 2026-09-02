@@ -383,9 +383,68 @@ question was exact-versus-wildcard and it was never asked. **A decision argued a
 option reads as considered**, which is why it survived review and why the replacement docblock says
 so explicitly instead of presenting the new rule as though it had always been obvious.
 
+## FINAL WHOLE-BRANCH REVIEW — verdict **SHIP**, no Critical. One opus reviewer, per the cost ruling.
+
+It executed its claims rather than reasoning to them, and **the branch held on every one it ran**:
+P27's mutation kills exactly 1 of 20 and the failure is 3.149; the three enforcement layers are
+genuinely independent (mutating layer 2's mime check reddens only the named layer-2 test, and the
+layer-3 suite imports nothing from `packages/editor`); the eleven-`comparableHeaders` sweep is
+exactly right; the 25 MiB boundary is pinned from both sides at 26,214,400 and one more; object keys
+are traversal-proof by construction. Two Important findings, both now closed:
+
+### 1. The branch's own premise was stale — and the review's correction was stale too
+
+The dispatch said `origin/main` was `7b45099`. It was `941fda8` when the review measured, and
+**`5c5407d` — four commits ahead, not three — by the time I did.** *A delta is a fact about a
+commit; an absolute is a fact about a moment, and nobody holds the moment.* Merged, one conflict.
+
+**`diff` said the two versions of the Plan 6 block were identical. They are not** — row `06/16`
+differs and main's is 241 characters longer, carrying a controller note recording that
+`test-cases/08-web-client.md` was deliberately NOT created and why. That is **the recorded
+false-identical `diff` failure, caught in the one place where believing it would have destroyed the
+note the merge existed to preserve.** Established instead by a Python line-compare and by `cmp`
+(exit 1). Resolved **row-wise**: plan 07 rows from the branch, all others from main — measured
+after, 22 rows from the branch and 185 from main, **of which exactly one differed**, which is the
+conflicting row and no other.
+
+Main's own P27 commit is **record-only** (46 lines into `controller-state.md`, no code since the
+merge base), so this branch's fix is not a duplicate.
+
+### 2. `registerAttachmentRoutes` is never called, and layer 3 would refuse every inline image
+
+**Verified independently with a positive control**: `registerEventRoutes` resolves to its real call
+site at `app.ts:204`; `registerAttachmentRoutes` appears in `src/` **only at its own definition**
+(`routes/attachments.ts:211`). `buildServerGates()` IS wired, at `index.ts:27`. So on the server
+this repo starts, the `attachments` table can never gain a row — its only writer is the POST handler
+in that unregistered module — and `image-embed-gate`'s `attachment.embed-unknown` branch therefore
+**refuses every embedded image**: correct about the rule, useless as a product.
+
+The gap itself was already disclosed (`Features.md` and cases 9.59/9.61). **The consequence was
+not**, and that is the finding. **Recorded, not fixed — owner: Plan 11's deployment work**, which
+owns the boot path, the `start` script and the deployment target. Registering routes is not in Plan
+7's task text and turning an editor plan into a deployment change is not this step's call.
+
+### The same review found TWO more false claims in the source comment that started one of them
+
+`index.ts`'s docblock claimed **"every test suite"** leaves `gates` out — **three do not**
+(`gate-seam`, `evidence-gate`, `image-embed-gate`; measured 3 of the 13 files that build an ingest
+service). T16's reviewer had found that sentence copied into `Features.md` and T16 fixed the copy;
+**the source survived**, which is the eighth instance on this branch of a fix landing downstream of
+its origin. It also claimed **"nothing boots this composition root"** — `pnpm dev` boots it. The
+true, narrower claim is that there is no `start` script, Dockerfile or deployment target, so there
+is no production for the gates to be real *in*. Both corrected at source.
+
+### Where the reviewer did NOT look, in its own words
+
+`gate-seam.test.ts` (404 lines), `ticket-editor-slot.test.tsx` (458), the webview bridge and its
+test, `escape-suggestion.ts` beyond one docblock, `s3-store.ts`, `attachment-repo.ts`,
+`google-picker.ts` and its 295-line test, the plan file except by grep, this handoff, and the
+base-vs-head per-package deltas. **A single reviewer cannot cover 51 commits, and the cost ruling
+priced that knowingly.** Anyone re-reviewing should start from this list.
+
 ## IN FLIGHT
 
-**T16 — the closer.** Catalogue plus full verification. No open PR for this step.
+**The step-12 PR.** All eighteen tasks done, P27 applied, merged up to `origin/main`, gate green.
 
 ## RULINGS OPEN
 
