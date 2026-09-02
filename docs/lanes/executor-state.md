@@ -9,23 +9,97 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > verified with `git branch --contains` (empty output = orphaned), never with `git cat-file`, which
 > passes on reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## Live anchors — 2026-08-31, rewritten after the step-4 recon was found WRONG
+## Live anchors — 2026-09-02, rewritten AFTER STEP 9 MERGED
 
-**The previous version of this file told a restarted executor to rebase `exec/04-auth-visibility` and
-called it "the largest rebase left in the series." That instruction was live and wrong. Do not do it.**
-The branch is **fully redundant**: all four of its commits are already on `main` under different shas,
-and `git cherry -v origin/main origin/exec/04-auth-visibility` prints `-` (already upstream) for every
-one of them. There is no rebase in step 4.
+> **The version of this table that stood here until now was STALE AND LIVE.** It said
+> `Branch in flight: exec/05-api-realtime @ c3b1090` and `main: 00cb2e0`. Both were false by the time
+> anyone could read them: step 9 had merged. **The document's own banner further down was correct, and
+> this table was not — and this table is what a restarted session reads first, because this document
+> tells it to.** That is the failure worth naming: *a pointer from a correct document to a stale one
+> reverses*, and here both documents were the same file. **A banner does not repair an anchor.**
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/05-api-realtime` @ `c3b1090`** — **REBASED ONTO `origin/main` 2026-09-01.** **STEP 9 (Plan 5) IN PROGRESS.** | `git log`, `git branch -r --contains` |
-| `main` | **`00cb2e0`** — steps 7 and 8 BOTH MERGED (#57 → `dd7bfcf`, Chain B → `6cb631d` via **#59**, not #58), then the controller's docs-only **#60 → `00cb2e0`**. **REFETCH before trusting this** | `git log origin/main` |
-| `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
+| **Branch in flight** | **NONE. Nothing is in flight.** Step 9 is merged; the executor holds no open work. | `gh pr view 67` |
+| **`main`** | **`563c983`** — **STEP 9 (Plan 5, all 17 tasks) IS MERGED**, as PR #67, at 2026-09-02T00:47:41Z. **REFETCH before trusting this.** | `git rev-parse origin/main`, `gh pr view 67 --json state,mergeCommit` |
+| **`exec/05-api-realtime`** | **MERGED and SQUASHED. Its worktree still holds it; it is safe to delete.** | `gh pr view 67` |
+| **EVERY sha this document cites below is ORPHANED** | **#67 was SQUASHED**, so `da522b6` — the branch tip — is **NOT an ancestor of main**, and neither is any of the other 94. `git cat-file` passes on all of them and returns pre-merge content while looking like it worked. **The `(#67)` suffix on main's subject is the marker.** | `git merge-base --is-ancestor da522b6 origin/main` → **false** |
+| **Gate ON MERGED MAIN** | **exit 0 · 21/21 · 0 cached · 1573 tests · 0 `Unsupported engine` WARNs · Node v22.22.2.** domain 335 · rule-engine 280 · **server 717** · app-core 130 · editor 72 · ui 31 · sync-client 8. **Measured at `563c983` AFTER the merge, not carried over from the branch** — identical to the branch's, so the squash preserved everything | `rtk proxy pnpm turbo run build test typecheck --force`, summary line read |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
-| Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, every pre-squash sha of the Phase 0 branches, and **NEW 2026-09-01: `6d15e50`, `96a6ff3`, `400fbfc`, `95004e1`** — Plan 5 batch A's PRE-REBASE shas, killed by the rebase below. An earlier version of this very file cited all four as live. | `git branch --contains`, empty = orphaned |
+| Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, `6d15e50`, `96a6ff3`, `400fbfc`, `95004e1`, `c3b1090`, `da522b6`, **and every task sha in the status table below** | `git merge-base --is-ancestor`, `git branch --contains` |
 
-## THE RULE THIS COST US, and it generalises to every remaining rebase
+### How to find Plan 5's work now that its shas are dead
+
+Do not chase the shas. **The work is one squashed commit, `563c983`.** For a task's actual content use
+`git log --oneline 1223c4c..563c983` (empty — it is one commit) or read the files directly; the task
+names live in `Features.md` §7 and `test-cases/07-api-realtime-search.md`, which are the durable index.
+**The status table further down is kept for its REVIEW OUTCOMES, which are still true. Its shas are
+not.**
+
+### STEP 10 IS ALREADY SCOPED — read-only recon, run 2026-09-02, before you re-derive any of it
+
+**The brief's framing of step 10 is wrong in one way and understated in another.** Both corrections
+are measured, with a positive control (`rtk proxy grep -rn "FakeDataSource"` returned the 3 files it
+should, run before any null result below was trusted).
+
+**WRONG: there is only ONE fake, and Plans 8 and 9 have no client code in this repo at all.**
+`packages/app-core/test/helpers/fake-data-source.ts` (`createFakeDataSource`) is the whole of it, and
+it is total — it implements every one of `DataSource`'s 11 query methods plus `ingest` and
+`subscribe`. Its own docblock already calls itself a *"SANCTIONED MOCKED-CONTRACT SEAM"*. **No
+`http-data-source.ts` or online `DataSource` exists anywhere**, so the fake is the only implementation
+there is. It is consumed by `cache.test.ts`, `data-source.test.ts` and `board.test.tsx` — and
+`board.tsx` is the one real view component in the repo, so it is load-bearing. Nothing server-facing
+was found in `packages/editor`, `packages/ui` or `packages/sync-client`.
+*(`stream-frames.ts:161` names the stream fake's readers as Plans 6, 9 and 10 — reconcile that against
+the brief's "6a, 8 and 9" before scoping.)*
+
+**UNDERSTATED: SIX confirmed shape disagreements, not the two already known.** The two known ones hold
+exactly as recorded. The four new ones, each cited:
+
+| # | Contract | The disagreement |
+|---|---|---|
+| c | `StreamItem` vs `ServerStreamFrame` | **Self-documented in `stream-frames.ts:143-162`.** Client's event frame carries `EventEnvelope` and so **lacks `workspaceSeq` — the field the resume protocol needs**; client has **no `scope-revoked` member at all**, so a revocation arrives as an unrecognised `type` and is **silently dropped**; `error.code` is bare `string` vs the server's typed enum |
+| d | `SearchHit` vs the real search response | Client expects a **flat array**; server returns `{workspaceId, query, hits:[{card: TicketCard, snippet}]}`. **`matchedIn` does not exist server-side at all** — the server headlines title+description+comments into one blob and cannot say which field matched |
+| e | `MyWorkView` vs `MyWorkResponse` | **The most severe: a different grouping MODEL, not a rename.** Client `{assigned, inTransit, contested}` vs server `{open, active, terminal}`. **`contested` does not exist server-side** (`my-work.ts:96` calls it a Plan 10 extension point) |
+| f | `BoardView` vs `BoardResponse` | Client nests columns under `groups: BoardGroup[]`; server returns a **flat** `columns[]`. Card level: client `assignee: Actor \| null` **with `.name`** vs server `assigneeId: string \| null`, never resolved — and **`board.tsx:94` already reads `card.assignee.id`/`.name`**, so this is live, not dead |
+| + | `getPreferences` / `getMyWork` signatures | Take **no `workspaceId`**, but both routes 400 `invalid_query` without `?workspaceId=`. `putPreferences` is typed `Promise<void>`; the real PUT returns the stored document |
+| + | `WorkspaceRef` vs `GET /v1/me/workspaces` | Wrapped not bare, `id`→`workspaceId`, `role` added, **`projects` absent entirely** |
+
+**That last row is the one to think about.** `GET /v1/me/workspaces` has the repo's ONLY real
+POST→GET round-trip test (`workspaces.test.ts:375-392`), it is green — **and it still disagrees with
+the client contract.** So a passing end-to-end test does not close this gap unless it is asserted
+against the CLIENT's shape.
+
+**NO end-to-end test exists for the new read surface.** Every read-route test builds its world through
+`read-app.ts` → `applyCommitted`, i.e. through the six-absence seeder. Two near-misses, both
+incomplete: `security.test.ts:96` does a real `POST /v1/events` but never reads it back through a
+route; `security.test.ts:156` reads through a real route but seeds via raw `insertEvent`, bypassing
+ingest entirely. **The real building blocks already exist** — `buildTestApp()` (real Fastify, real
+auth, the real gated `IngestService`, real projection registry, no stubs) and `createTestDatabase()`
+(real Postgres, real migrations).
+
+**THE FIRST TEST TO WRITE, and why this one:** a real founding-through-board round trip —
+`POST /v1/workspaces` → `POST /v1/events` with `project.created` + `ticket.created` under a real
+signed-in session → `GET /v1/projects/:projectId/board`, asserting the raw body. It is **the only
+scenario that can exercise `bootstrapWorkspace` at all**, since its side effects fire only from a real
+`workspace.created` through real ingest; in the same flow it proves the seqs come from the database
+rather than the process map, and that the permission gate and rule engine admit an ordinary creation —
+**three of the six absences closed by one scenario.** And because `board.tsx` is the one view built
+against the fake, it surfaces disagreements (b) and (f) in the place the client already depends on
+them.
+
+**Not established, time-boxed:** `getMembers`/`Actor`, `getTicket`/`ParentRef`,
+`getTicketHistory`/`TicketHistoryEvent`, `getWorkflowDef`/`WorkflowDef` were not compared in depth —
+plausible homes for a seventh and eighth disagreement.
+
+### WHAT THE NEXT SESSION SHOULD DO
+
+**Step 9 is closed. The next item in the serial sequence is STEP 10 — the integration checkpoint.**
+It is described in the brief and its target is already concrete; see *"Open items for the controller"*
+below, item 4. Nothing in this document assigns the executor any step-9 work, and re-running any of it
+would be redoing merged work against orphaned shas.
+
+## THE RULE THIS COST US — kept because it generalises, though its example is now history
 
 **`git cherry` belongs BEFORE the pre-rebase gate rule fires. An ahead-count is not a work-count.**
 
@@ -85,7 +159,11 @@ satisfies the requirement the `json` ban is about, and the instrument was proven
 
 ## Where I am in the serial sequence
 
-# ★ STEP 9 IS COMPLETE. PLAN 5, ALL 17 TASKS, DONE AND REVIEWED. THE PR IS OPEN. ★
+# ★ STEP 9 IS COMPLETE AND **MERGED** — PR #67 → `563c983`, 2026-09-02. ★
+
+**This whole section is now a RECORD of a finished step, not a status.** It was written while the PR
+was open and it still says so in places; every sha in it is orphaned by the squash. Read it for the
+review outcomes and the lessons, not for position — position is the anchors table at the top.
 
 **Nothing is in flight. The executor's work on this step is finished; the controller merges.**
 
@@ -108,20 +186,23 @@ satisfies the requirement the `json` ban is about, and the instrument was proven
 | T16 catalogue reconciliation | **CLEAN**, +0 tests as expected |
 | **Final whole-branch review (1 opus)** | **No Critical, no Important. SAFE TO MERGE.** 2 Minor + 2 Nit, all fixed. |
 
-**FINAL GATE, re-run by the executor at the tip, never taken from an agent's report:**
+**FINAL GATE ON THE BRANCH, re-run by the executor at the tip, never taken from an agent's report:**
 **exit 0 · 21/21 · 0 cached · 1573 tests** — domain 335 · rule-engine 280 · **server 717** ·
 app-core 130 · editor 72 · ui 31 · sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**.
 `pnpm check:env` (the other CI step) also passes.
 
-**BRANCH POSITION — measured through `rtk proxy`, and that mattered:**
-`origin/main` = `1223c4c`; merge-base = `00cb2e0`; branch is **93 commits ahead**, main 6 ahead.
+**BRANCH POSITION AS MEASURED ON 2026-09-01, BEFORE THE MERGE — historical, and every value here is
+now superseded by the anchors table at the top of this file:**
+`origin/main` was `1223c4c`; merge-base `00cb2e0`; branch **93 commits ahead**, main 6 ahead.
+**All of that is spent — #67 squashed those 93 commits into `563c983`.** The paragraph is kept for the
+measurement lesson below, which is the part that generalises.
 **`git log --oneline origin/main..HEAD | wc -l` printed 50 — a PROXIED WRONG COUNT.** The raw
 `rtk proxy git rev-list --count` says 93. That is the "silent wrong COUNT" mode from the rtk notes,
 met live at the last measurement of the step. **Pipe a count through the proxy and you get a
 well-formed lie.**
 
-**NOT REBASED, deliberately.** `git merge-tree --write-tree origin/main HEAD` → **exit 0, zero
-conflicts**, and main's 6 commits touch only `docs/lanes/controller-state.md`,
+**NOT REBASED, deliberately — and it merged clean, so the call held.** `git merge-tree --write-tree
+origin/main HEAD` → **exit 0, zero conflicts**, and main's 6 commits touched only `docs/lanes/controller-state.md`,
 `docs/lanes/task-ledger.tsv` and `scripts/check-task-ledger.mjs` — **no file this branch touches.**
 Rebasing 93 commits would orphan every sha this file and 50 commit messages cite, for no gain.
 
