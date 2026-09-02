@@ -23,7 +23,8 @@
   "dependencies": {
     "@gisik-nokma/domain": "workspace:*",
     "@gisik-nokma/rule-engine": "workspace:*",
-    "@gisik-nokma/ui": "workspace:*"
+    "@gisik-nokma/ui": "workspace:*",
+    "@xyflow/react": "^12.8.2"
   },
   "peerDependencies": {
     "react": "^19.0.0",

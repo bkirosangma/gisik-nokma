@@ -20,3 +20,54 @@ afterEach(cleanup);
  * point, React declines to flush the update they were written to flush.
  */
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+/**
+ * React Flow jsdom shims (Plan 8) — the official recipe from
+ * reactflow.dev/learn/advanced-use/testing, adapted. Harmless for suites that
+ * never render the canvas; needed once the workflow builder's React Flow
+ * canvas (Task 6+) renders under jsdom, which has no layout engine.
+ *
+ * Guarded on `typeof HTMLElement`: this setup file runs for every test file
+ * in the package, including ones that opt into `@vitest-environment node`
+ * (no DOM globals at all) via a file-level pragma — those must not crash here.
+ */
+if (typeof HTMLElement !== 'undefined') {
+  class ResizeObserverShim {
+    private readonly callback: ResizeObserverCallback;
+    constructor(callback: ResizeObserverCallback) {
+      this.callback = callback;
+    }
+    observe(target: Element): void {
+      this.callback([{ target } as ResizeObserverEntry], this as unknown as ResizeObserver);
+    }
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+
+  class DOMMatrixReadOnlyShim {
+    readonly m22: number;
+    constructor(transform?: string) {
+      const scale = transform?.match(/scale\(([\d.]+)\)/)?.[1];
+      this.m22 = scale === undefined ? 1 : Number.parseFloat(scale);
+    }
+  }
+
+  globalThis.ResizeObserver = ResizeObserverShim as unknown as typeof ResizeObserver;
+  (globalThis as Record<string, unknown>).DOMMatrixReadOnly = DOMMatrixReadOnlyShim;
+
+  Object.defineProperties(HTMLElement.prototype, {
+    offsetHeight: {
+      get(this: HTMLElement) {
+        return Number.parseFloat(this.style.height) || 40;
+      },
+    },
+    offsetWidth: {
+      get(this: HTMLElement) {
+        return Number.parseFloat(this.style.width) || 180;
+      },
+    },
+  });
+
+  (SVGElement.prototype as unknown as { getBBox: () => DOMRect }).getBBox = () =>
+    ({ x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, toJSON: () => ({}) }) as DOMRect;
+}
