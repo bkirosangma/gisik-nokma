@@ -142,3 +142,28 @@
   color: inherit;
   font: inherit;
 }
+
+/* The two kinds of attachment, told apart on the surface (spec §2, Drive rule
+   2). The dashed edge that marks a reference is the one visual difference a
+   stylesheet can carry under this file's no-colour rule; it inherits
+   `currentColor` like every other edge here. The two classes that carry no
+   rule — `attachment-item--upload` and `attachment-item__name` — are emitted
+   deliberately and styled by nobody yet: an upload is the unmarked case, and
+   the name is a plain link. `test/attachment-list-item.test.tsx` asserts that
+   split in both directions, so a rule appearing for either without the
+   contract moving fails there rather than drifting. */
+.attachment-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.35rem 0;
+}
+.attachment-item__kind,
+.attachment-item__last-seen,
+.attachment-item__reachability {
+  font-size: 0.85rem;
+}
+.attachment-item--drive-reference {
+  border-left: 2px dashed;
+  padding-left: 0.5rem;
+}

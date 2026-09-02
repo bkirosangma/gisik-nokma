@@ -50,3 +50,11 @@ export {
   type DriveReferenceAddedEvent,
   type UploadAttachmentAddedEvent,
 } from './drive/attachment-claims.js';
+export {
+  AttachmentListItem,
+  DriveReferenceItem,
+  UploadedAttachmentItem,
+  describeDriveReachability,
+  type AttachmentListEntry,
+  type DriveLinkCheck,
+} from './components/AttachmentListItem.js';
