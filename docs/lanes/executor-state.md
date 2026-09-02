@@ -9,9 +9,13 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > verified with `git branch --contains` (empty output = orphaned), never with `git cat-file`, which
 > passes on reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 12 — Plan 7 remainder. Eighteen tasks. FOUR DONE (T5, T6, T7, T8).**
+## WHERE I AM: **STEP 12 — Plan 7 remainder. Eighteen tasks. TEN DONE.**
 
-**Next: Batch B — T9, T9a, T10, T11, T11a.** Then T12/12a/12b/12c, T13/13a, T14, T15, and T16 closes.
+Done: **T5, T6, T7, T8** (Batch A) and **T9, T9a, T10, T11, T11a** (Batch B).
+**Both of the plan's independent tracks are now complete** — the editor track (T5–T6) and the whole
+server track (T7–T11a). That is the gate Tasks 12–15 were waiting on: they need both, and both exist.
+
+**Next: Batch C — T12, T12a, T12b, T12c.** Then T13/T13a, T14, T15, and T16 closes.
 Nothing is awaiting a decision; no PR is open yet.
 
 Step 11 (Plan 6 remainder) **merged as PR #77 → `7b45099`**. Its twelve ledger rows said `in-flight`
@@ -25,9 +29,9 @@ outstanding.** If you are a restarted session reading this: do not reopen Plan 6
 | **Branch** | **`exec/12-plan7-remainder`**, cut from `origin/main` `7b45099`. | `git rev-parse --abbrev-ref HEAD` |
 | **Base** | `origin/main` = `7b45099ef6b6ee23b9266d8ec047bae070322398` | `git rev-parse origin/main`, fetched |
 | **Ahead-count** | **Not written here on purpose. Run `git rev-list --count origin/main..HEAD`.** A count taken while writing the commit that records it is *always* short by one and always looks right to its author — step 11's handoff shipped `18` where the command answered `19`, and it had reached a review brief before anyone ran it. A number that cannot be written correctly from inside the commit carrying it should not be written at all. | measured 2026-09-02 |
-| **Gate at branch HEAD** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2080 tests.** domain 335 · rule-engine 280 · **server 784** · app-core 471 · web 69 · **editor 102** · ui 31 · sync-client 8. `check:env` exit 0. | run by the executor with `--force` after Batch A, Node printed into the same log |
-| Gate at the base `7b45099`, for the delta | exit 0 · 24/24 · 2027 tests; server 761, editor 72. **Batch A added +23 server and +30 editor.** | measured separately at the base before any Batch A work |
-| **`check:tasks`** | **exit 0**, 177 rows / 177 plan tasks, **100 done (56.5%)**, 0 claimed, **4 in-flight** (Plan 7 T5–T8, on this branch), 73 todo. | `node scripts/check-task-ledger.mjs` at branch HEAD |
+| **Gate at branch HEAD** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2152 tests.** domain 335 · rule-engine 280 · **server 856** · app-core 471 · web 69 · **editor 102** · ui 31 · sync-client 8. `check:env` exit 0. | run by the executor with `--force` after Batch B, Node printed into the same log |
+| Gate at the base `7b45099`, for the delta | exit 0 · 24/24 · 2027 tests; server 761, editor 72. **This branch has added +95 server and +30 editor so far.** | measured separately at the base before any Batch A work |
+| **`check:tasks`** | **exit 0**, 177 rows / 177 plan tasks, **100 done (56.5%)**, 0 claimed, **9 in-flight** (Plan 7 T5–T11a, on this branch), 68 todo. **The `done` count does not move until this branch merges** — `done` requires a merge sha that is an ancestor of `origin/main`, and nine finished tasks are correctly not counted as complete yet. | `node scripts/check-task-ledger.mjs` at branch HEAD |
 | **Gate SHAPE** | **24 tasks over EIGHT packages** since `apps/web` exists. Any inherited "21/21 over 7" figure is spent. | the run above |
 | Orphaned, do not cite | every sha in the narrative sections below. | `git branch --contains` (empty = orphaned) |
 
@@ -189,13 +193,38 @@ lowered floors.
 - **Shadowing the `undoInputRule` command name is monorepo-wide**, affecting every future
   `editor.commands.undoInputRule()` caller, and Task 5's Cross-plan Produces list names only
   `getEscapeSuggestion`. **Owner: plan author.**
-- **`comparableHeaders` is defined locally in at least three server test files**
-  (`tickets-read.test.ts:92`, `my-work.test.ts:415`, `preferences.test.ts`). **Owner: a later
-  test-helper consolidation; explicitly NOT T10, which must only consume the pattern.**
+- **`comparableHeaders` is defined locally in ELEVEN server test files**, all byte-identical.
+  This entry first said "at least three" — that was the three I happened to grep, published as
+  though it were a sweep. T10's reviewer ran the file-by-file enumeration and found **eleven**;
+  re-verified here at branch HEAD with a positive control in the same run (16 files mention
+  `canSee`). **The understatement is the finding**: an absence-shaped claim written from a partial
+  grep reads exactly like one written from a sweep. **Owner: a later test-helper consolidation;
+  explicitly NOT T10, which was told to consume the pattern and not hoist it.**
+
+## BATCH B — T9, T9a, T10, T11, T11a. All committed.
+
+| Task | Result |
+|---|---|
+| **T9** sniffing + `POST /v1/attachments` *(floor-list, opus/opus)* | **DONE**, +30 tests. Four Important. The sharpest: **the size-refusal planted-defect ledger claimed four tests reddened when only one would** — under "move the size check below the streaming loop", three of the four still compare `total > limit` after the loop and stay green. The guard itself is sound; the ledger's provenance was not. Also: `fieldSize: 256` **truncates silently** rather than refusing (multipart sets `valueTruncated` and passes the value through), so a docblock claiming "exactly ONE size decision in the upload path" was false. |
+| **T9a** SHA-256 at the door | **DONE**, +9 tests, **verdict ship, no findings.** |
+| **T10** `GET /v1/attachments/:id` *(reviewer escalated to opus)* | **DONE**, +5 tests. Four Important — **and the escalation earned itself on the first one.** The step's headline property, byte-identity across the three 404s, **carried no executed mutation**: all three planted defects reddened a status or `content-disposition` assertion and aborted the test *before* reaching the identity comparison. That is the "mutation that never ran" costume sitting on exactly the property this task exists for. Also: `(sanitized)` filename behaviour asserted by a check that cannot fail — the fixture filename was already sanitary, so deleting `sanitizeFilename` left it green. |
+| **T11** server gates *(floor-list, opus/opus)* | **DONE**, +21 tests. One Important: **the gate loop's POSITION inside `commitOne` — the property that stops the refusals being an existence oracle — was pinned by nothing.** Every service constructed with `gates` in this repo also had the other ordering, so no test could tell the two apart. |
+| **T11a** attachment kinds + evidence refusal | **DONE**, +2 tests, **verdict ship, no findings.** Domain half was already merged; only the server half was built. |
+
+**Two fix-round commits corrected claims inside their own immediately-preceding commit**
+(`81efdd8`, `75abf70`). That is the third and fourth instance this step of the recorded pattern: a
+fix round finds more than the review cited, including its own new errors.
+
+**Batch B's through-line differs from Batch A's and is worth the contrast.** Batch A found no
+implementation defect at all — everything was prose or an unfalsifiable check. Batch B found the
+same two classes again, but on the *load-bearing* properties: the byte-identity of a disclosure
+refusal, the position of a gate loop, and the one ceiling named in Global Constraints. **The
+escalation policy is doing real work** — T10 was not on the brief's floor list, and its reviewer
+found the step's most dangerous unfalsifiable check.
 
 ## IN FLIGHT
 
-**Batch B — T9, T9a, T10, T11, T11a.** No open PR for this step.
+**Nothing.** Batch C (T12, T12a, T12b, T12c) is next. No open PR for this step.
 
 ## RULINGS OPEN
 
