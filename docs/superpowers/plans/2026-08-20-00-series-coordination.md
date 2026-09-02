@@ -5792,14 +5792,26 @@ the fact lives, because a serving claim with no such citation is a data gap wear
 | `search` | `SearchHit.matchedIn` | `proj_search` stores `title`/`description`/`comments` as three independently weighted columns; `routes/search.ts:142-146` concatenates them before one `ts_headline`, so which matched is destroyed in the query, not absent from the store |
 | `getAttention` | the `contested` item kind | `proj_contested` (`migrations/1787961400000_proj-contested.sql`) holds ticket, claimant, rule, reason, timestamp |
 
-**One row is contested by its own deriver and is recorded as contested rather than resolved.**
+**One row was shipped contested by its deriver and is RESOLVED here, against the deriver.**
 `getTickets`' `assignedProvenance` was called *serving* by analogy to `read/state-provenance.ts`,
-which reconstructs state provenance with a `DISTINCT ON` over the raw `events` table. But
-`packages/domain/src/read-models.ts` says in as many words that `proj_tickets.assignee_id` is a bare
-column with no provenance beside it and **the projection does not hold the difference either** — a
-deliberate note, not silence. If that note is the codebase's position rather than a not-yet, the
-honest label is *data* and `getTickets` rises a rank. **Unresolved, and it is the single least-safe
-cell in the table.**
+which reconstructs state provenance with a `DISTINCT ON` over the raw `events` table — and the
+deriver then flagged that `packages/domain/src/read-models.ts` says `proj_tickets.assignee_id` is a
+bare column with no provenance beside it and "the projection does not hold the difference either",
+which if read as a position rather than a not-yet would flip the label to *data*.
+
+**Read at the site, the note does not say that.** `read-models.ts:141-147` is scoped to one thing:
+what `TicketCard.assigneeId: null` can and cannot mean. It says null cannot distinguish *never
+assigned* from *unassigned by somebody*, because the column holds no provenance — and that inventing
+"a union whose second arm could never be populated would be worse than the honest gap." That is an
+argument about the **absence** case, and it is the *reason* one would go to the ledger rather than a
+reason not to. `ticket.assigned` is a real event type (`vocabulary.ts:112`), and
+`read/state-provenance.ts:42-84` (`stateProvenanceFor`) is the same query shape already shipped for state.
+
+The client type settles it from the other side: **`ListRow.assignedProvenance` is already
+`ClaimProvenance | null`** (`view-types.ts:100`), paired with `assignee: Actor | null`. So the client
+contract encodes precisely the honest gap the note protects — no assignee, no provenance — and asks
+for provenance only in the case the ledger can answer. **Serving.** The label stands and the cell is
+no longer the least-safe one in the table.
 
 ### What is NOT a gap, and would have become one
 
@@ -5847,9 +5859,26 @@ failure this series is named for:**
 
 **Proposed ruling P25, three clauses, conservative in the direction of the server holding the fact:**
 
-1. **Serving gaps are closed in the SERVER, inside step 11**, one route change each, each with a test
-   through the real door. Not because Plan 6 owns `apps/server`, but because the fact is already in
-   the database, the client cannot honestly synthesise it, and no other plan has a task that will.
+1. **FOUR serving gaps are closed in the SERVER, inside step 11**, each with a test through the real
+   door. Not because Plan 6 owns `apps/server`, but because the fact is already in the database, the
+   client cannot honestly synthesise it, and no other plan has a task that will. Named, because a
+   clause that says "the serving gaps" reads as six and two of the six are not in it:
+
+   | | why it is in clause 1 | shape of the change |
+   |---|---|---|
+   | `getBoard` | `board.tsx` dereferences `workflowVersion` today | add `def.version` where columns are pushed — a field addition |
+   | `getMyWorkspaces` | the nav (T14) has no other source of `projects` | join `proj_projects` — a field addition |
+   | `getTicket` | the route answers a `proj_visibility` row where its name promises a ticket | **read `proj_tickets` instead. A VISIBILITY DECISION, not a field addition** |
+   | `getTickets` | five fields, four of them not derivable client-side | **`hasRestrictedParent` is itself about restricted visibility; `assignedProvenance` reads the raw `events` table. A VISIBILITY DECISION** |
+
+   `getAttention` is NOT in clause 1 — its only gap is `contested`, which clause 3 defers to Plan 10.
+   `search`'s `matchedIn` is NOT in clause 1 — no view among Plan 6's twelve remaining tasks consumes
+   it, so it blocks nothing here and is recorded for whoever builds the search surface.
+
+   **Two of the four carry a visibility decision rather than a field addition**, and they sit under
+   Plan 4's read enforcement — the surface whose own execution notes recorded the cross-workspace
+   forgery hazard. That is the part that decides whether clause 1 is four tasks inside a step or a
+   step of its own, and it is stated here rather than discovered at implementation time.
 2. **Signature gaps are closed in the CLIENT.** `getPreferences`/`putPreferences` cannot form their
    request at all, so there is no server-side reading of the problem. This extends **ruling P24** —
    already taken, that the shipped `.strict()` preferences document wins over Plan 6's — from the
@@ -5864,6 +5893,8 @@ transport and the three adaptable mappers. If the owner rules that `apps/server`
 scope, clause 1 becomes a new step and Plan 6's view tasks wait for it; nothing done under clauses 2
 and 3 is wasted either way.
 
-**Least sure, stated so a reader with limited budget knows where to aim it:** the `assignedProvenance`
-cell above, and after it, whether `search`'s `matchedIn` is worth a query change at all — it is the
-only serving gap whose consuming view is not among Plan 6's twelve remaining tasks.
+**Least sure, stated so a reader with limited budget knows where to aim it:** whether `getTicket` and
+`getTickets` can be changed without reopening a Plan 4 visibility decision. Both are asserted above to
+carry one; neither has been implemented, so the assertion is a prediction from reading the routes, not
+a measurement. If it is wrong in the safe direction they are field additions like the other two; if it
+is wrong in the unsafe direction, clause 1 is bigger than a step.
