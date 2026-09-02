@@ -216,7 +216,7 @@ reason on record, not an oversight:*
   and never on falsiness, since `dueSoonDays: 0` is a legal claim. Blind last-writer-wins is safe here
   for a stated reason rather than by luck: the table's key IS the workspace the events are filed
   against, so each key has exactly one totally-ordered writer and canonical replay order is that
-  writer's own claim order. **Registered LAST, and the append is a dependency decision rather than a
+  writer's own claim order. **Appended at registration — LAST until Task 6 put `proj_search` after it — and the append is a dependency decision rather than a
   §8 position** — coordination §8's canonical order stops at `proj_visibility` and `proj_contested` is
   already past its end, so "after `proj_visibility`" no longer picks a unique slot; this projection
   reads no other projection's table and none reads its table inside an ingest transaction
@@ -571,7 +571,11 @@ reason on record, not an oversight:*
   for a member who may see nothing. Contested claims join as a fourth, additive item kind in Plan 10.
   `apps/server/src/routes/attention.ts`
 - ⚙️ **`AppDeps.now`** — the clock the attention strip computes against, threaded through `buildApp`
-  UNDEFAULTED so the one definition of "the real clock" lives in `registerAttentionRoutes`. It exists
+  UNDEFAULTED. It was introduced so "the real clock" was defined once, in `registerAttentionRoutes`;
+  **Task 15's stream route then added a second default of its own** for the heartbeat deadline.
+  `buildApp` hands both routes the SAME optional field, so pinning it pins both and leaving it unset
+  gives both the wall clock — there is no drift today, but there is **no single place to change it**,
+  and anyone replacing the real clock must change both routes in one breath. It exists
   because the strip is the only read on this surface whose answer changes while the database does not:
   a test that could not pin `now` would be asserting against the day it happened to run.
   `buildReadTestApp` freezes it at `SCENARIO_NOW`, the instant the shared world's fixtures were always

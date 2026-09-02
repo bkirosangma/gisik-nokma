@@ -309,8 +309,14 @@ function stateNameOf(defs: Map<string, PublishedWorkflowDef>, card: TicketCard):
  * forgets the session check and still compiles.
  *
  * `now` is the one dependency this route has that its neighbours do not, and it
- * defaults HERE and nowhere else — `buildApp` passes `deps.now` straight through
- * so there is exactly one definition of "the real clock" to drift from.
+ * defaults here, and **this is no longer the only place it defaults.** Task 15's
+ * `registerStreamRoute` has its own `deps.now ?? (() => new Date())` for the
+ * heartbeat deadline, and `ingest-service.ts` has had one since before this
+ * branch. `buildApp` threads the SAME optional `deps.now` to both routes, so
+ * pinning it pins both and leaving it unset gives both the wall clock — there is
+ * no drift today. **But there is no single definition to change**, so anyone
+ * replacing "the real clock" here must change the stream route in the same
+ * breath or the server keeps two of them.
  */
 export function registerAttentionRoutes(
   app: FastifyInstance,

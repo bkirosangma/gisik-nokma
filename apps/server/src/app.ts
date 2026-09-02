@@ -271,7 +271,9 @@ export function buildApp(
   // staleness window and an IST due window, with the two thresholds read from
   // the workspace's own `workspace.settings_set` claim rather than from
   // constants. `deps.now` is threaded through UNDEFAULTED on purpose — the
-  // default lives in `registerAttentionRoutes`, so there is one definition of
+  // default lives in `registerAttentionRoutes` — but NOT only there: Task 15's
+  // `registerStreamRoute` defaults it too, for the heartbeat deadline. Both get
+  // this same optional field, so pinning it pins both. There is not one definition of
   // the real clock. Same preHandler by parameter, same reason as every route
   // above it: the handler reads `request.currentUserId` and resolves its whole
   // tenancy gate from it.

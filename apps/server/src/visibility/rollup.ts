@@ -164,9 +164,22 @@ type ChildRow = {
  *
  * It answers about `ticketId`'s children whoever asks. That is correct for what
  * it is — a counter, not a door — but it means **calling it without a guard
- * discloses a parent's child count to someone who may not see the parent**. Its
- * one caller is the single-ticket read, which asks it only after both of that
- * route's guards have passed. Hoisting the call above them is a real leak and
+ * discloses a parent's child count to someone who may not see the parent**.
+ *
+ * **It has TWO call sites and they govern SIX read paths, not one.** This
+ * sentence used to say "its one caller is the single-ticket read", and Plan 5
+ * Task 7 falsified it without touching it: `routes/tickets.ts` still asks after
+ * both of that route's guards, but `read/ticket-cards.ts`'s `assembleTicketCards`
+ * now asks once per card, and board, list, search, My Work and the attention
+ * strip all call that. **Every one of the five passes a bound
+ * `t.workspace_id` clause AND `visibleTicketsWhere` before a row reaches the
+ * assembler**, so no parent is counted that its viewer may not see — checked at
+ * all five sites, not assumed. The constraint below is therefore a constraint on
+ * SIX paths, and the danger is a seventh: `fetchTicketRows` is exported, has no
+ * production caller, and warns in its own docblock that it applies neither
+ * predicate. A by-id endpoint reaching for that pair and gating only the
+ * requested ids would call an unguarded counter. Hoisting a call above its
+ * guards is a real leak and
  * is **not observable through the route's responses** (the 404 body is fixed and
  * identical either way), so no test here claims to pin that ordering — a test
  * that did would be passing for a reason unrelated to the property it names.
