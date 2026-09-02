@@ -118,6 +118,38 @@ success. Same family as a `grep` filter that can only match good news. The `HIST
 results are **claude-mem** and the `SEMANTIC:` blocks are **semble**; both work, which is exactly why the
 third missing leg looked normal.
 
+### SCHEDULED — one semantic pass over the client packages, AFTER STEP 14
+
+**Owner-approved 2026-09-02. This is the ONLY semantic extraction planned; everything else stays AST.**
+
+| | |
+|---|---|
+| **TRIGGER** | **after step 14 (Plan 9) merges** — Plans 6, 7, 8, 9 all landed, before step 15 |
+| **SCOPE** | `packages/app-core` + `packages/ui` + `packages/editor` + `packages/sync-client` only |
+| **COST** | ~74 files → **~4 subagents**. A full-code pass would be ~20; the plans would be ~18 |
+| **NOT IN SCOPE** | the 13 plan documents (3.8 MB), `apps/server`, `reference/` |
+
+**What it buys that AST cannot give, stated as the one thing to look for:**
+`semantically_similar_to` edges — *"two functions that solve the same problem and never call each
+other."* **That is this series' signature failure with a different name.** The visibility decision table
+lives **once in `canSeeResolved` and once in SQL**, its own docblock names the hazard, and **Plan 5 T5
+nearly wrote a third copy** — caught by an executor reading carefully, not by any instrument. AST cannot
+see this class at all: there is no import, no call, no citation to extract, which is precisely why it
+survives review.
+
+**WHY AFTER STEP 14 AND NOT NOW — two reasons, both measured:**
+1. **60 of the 80 remaining tasks are client-side and unwritten.** Extracting now maps a codebase about
+   to double, and the duplication it hunts cannot exist before the components do.
+2. **Cost lands where the bill already hurts.** The spend record has this controller at 39% of
+   $1,072. One 4-agent pass at the right moment beats a 20-agent pass at the wrong one.
+
+**Run it with `--mode deep`** — the flag exists to be aggressive with INFERRED edges and to mark
+uncertain ones AMBIGUOUS rather than omitting them. For a duplicate-logic hunt a false positive costs a
+minute's reading; a false negative costs the defect this pass exists to find.
+
+**Do NOT let the post-commit hook satisfy this.** The hook is AST-only whole-repo — it keeps the
+structural graph fresh and produces **zero** inferred edges. Freshness is not the same capability.
+
 ### The cheap scan that replaces graphifying the plans
 
 **Do NOT graphify the 13 plan documents to hunt cross-plan contract collisions.** A targeted scan does it
