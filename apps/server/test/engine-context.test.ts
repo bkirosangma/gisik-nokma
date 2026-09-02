@@ -25,9 +25,17 @@ import { createTestDatabase, type TestDatabase } from './helpers/db.js';
  * comes back for every kind, so a ticket looks like a TicketState with no
  * `workflowId` and a membership looks like a MembershipState with no `role`.
  *
- * `'membership'` stays null — Plan 4's proj_memberships owns it — which is why
- * the role-gated transition at the foot of this file is refused by `restrict-to`
- * naming a role the actor cannot be shown to hold.
+ * `'membership'` was the last kind still answering null, and the step-10
+ * integration checkpoint closes it — controller ruling P18, a wiring no task in
+ * Plan 4 owned. `getEntityState('membership')` now reads `proj_memberships`
+ * through `resolveEffectiveRole`, so `restrict-to`'s role criterion decides
+ * something on the server path for the first time; before it, every role-gated
+ * edge in the product was refused for everyone, always, because the context
+ * could not say that anybody held any role. The membership assertion below is
+ * INVERTED, following this file's own rule, and the role-gated transition at
+ * the foot grows from one refusal into the refuse/refuse/commit triple that is
+ * the only thing which distinguishes a wired role gate from a broken one:
+ * a stranger refused, a `member` refused, an `admin` through.
  */
 let db: TestDatabase;
 
@@ -43,7 +51,42 @@ const WORKSPACE = newUlid();
 const WORKFLOW = newUlid();
 const TICKET = newUlid();
 const PROJECT = newUlid();
+/**
+ * The actor every envelope in this file is filed by, and the one person who is
+ * deliberately NEVER granted a membership. Two things rest on that absence: the
+ * negative control in the membership case below, and the `restrict-to` refusal
+ * at the foot of the file, which is unchanged by ruling P18's wiring precisely
+ * because this actor holds no row for the new reader to find. Grant ACTOR a
+ * role and both stop measuring anything.
+ */
 const ACTOR = newUlid();
+/** Granted `admin` at the ledger — the role `roleGatedWorkflow`'s only edge names. */
+const ADMIN_USER = newUlid();
+/** Granted `member` at the ledger — a real membership that the same edge must still refuse. */
+const MEMBER_USER = newUlid();
+/**
+ * Granted `member`, put on a project's roster, then REVOKED — the one person in
+ * this file who is not a member and has a `proj_memberships` row standing behind
+ * them anyway.
+ *
+ * That pair is not a curiosity, it is the reason `readMembershipState` goes
+ * through `resolveEffectiveRole` instead of selecting the table itself:
+ * `membership.revoked` deletes the workspace-scope row ALONE, on purpose, because
+ * the roster rows belong to the project entity's stream and a cross-entity delete
+ * would make the table depend on arrival interleaving (`projections/proj-memberships.ts`).
+ * The guarantee that delete was meant to give lives in `resolveEffectiveRole`'s
+ * early return. So this user is the input under which the audited reader and a
+ * bare `WHERE workspace_id = $1 AND user_id = $2` disagree — and the disagreement
+ * is a revoked person walking a role gate.
+ */
+const REVOKED_USER = newUlid();
+/**
+ * The project REVOKED_USER's surviving roster row names. Deliberately NOT
+ * `PROJECT`: a `project.member_added` writes that entity a head row, and the
+ * identity-only case below asserts `getEntityState('project', PROJECT)` is null
+ * on the strength of PROJECT having none.
+ */
+const ROSTER_PROJECT = newUlid();
 
 function service() {
   return createIngestService({
@@ -75,6 +118,52 @@ function submittedIn(
     clientTime: '2026-08-20T09:00:00.000Z',
     ...partial,
   };
+}
+
+/**
+ * A workspace-scope membership, made the way the product makes one: a real
+ * `membership.granted` through the ingest service, which writes
+ * `proj_memberships` through its own projection and the membership entity's head
+ * row alongside it.
+ *
+ * Never an `INSERT INTO proj_memberships`. The table is written by two entity
+ * streams under disjoint key ownership (`projections/proj-memberships.ts`), the
+ * payload is parsed by the door's own schema, and `granted_at`/`workspace_seq`
+ * come off the stored event — a hand-written row can satisfy the reader while
+ * describing a grant the ledger never carried, which is the shape that lets a
+ * test pass against a projection that does not work.
+ */
+function granted(userId: string, role: 'owner' | 'admin' | 'member' | 'guest'): SubmittedEvent {
+  return submitted({
+    entity: { kind: 'membership', id: membershipId(WORKSPACE, userId) },
+    type: 'membership.granted',
+    payload: { userId, role },
+  });
+}
+
+/**
+ * The other half of the revocation fixture, and it is filed against the PROJECT
+ * entity rather than the membership — which is the whole reason the surviving
+ * row survives. Two streams write `proj_memberships` under disjoint key
+ * ownership, and this is the one that writes `scope_kind='project'` with role
+ * `'member'` hardcoded (`projections/proj-memberships.ts`); nothing a membership
+ * event does will remove it.
+ */
+function addedToProject(projectId: string, userId: string, projectAdmin: boolean): SubmittedEvent {
+  return submitted({
+    entity: { kind: 'project', id: projectId },
+    type: 'project.member_added',
+    payload: { userId, projectAdmin },
+  });
+}
+
+/** A workspace-scope revocation, through the ledger like everything else here. */
+function revoked(userId: string): SubmittedEvent {
+  return submitted({
+    entity: { kind: 'membership', id: membershipId(WORKSPACE, userId) },
+    type: 'membership.revoked',
+    payload: { userId },
+  });
 }
 
 /** A two-state workflow with no rules on any edge, so a transition tests the invariant and not a gate. */
@@ -188,16 +277,64 @@ beforeAll(async () => {
   // until this task.
   expect(results.map((result) => result.status)).toEqual(['committed', 'committed', 'committed']);
 
-  // The membership row Plan 4 will write for real. Planted directly because no
-  // event type is bound to the `membership` kind yet, and §9's hazard needs a
-  // membership entity that HAS a head — "if the membership entity has any
-  // committed event the guard passes `!== null`" is the whole sentence.
+  // §9's hazard needs a membership entity that HAS a head and no membership
+  // state behind it — "if the membership entity has any committed event the
+  // guard passes `!== null`" is the whole sentence. The head is still PLANTED
+  // rather than granted, and after ruling P18 that is the point rather than a
+  // leftover: a real grant for ACTOR would write a `proj_memberships` row too,
+  // and the hazard is exactly the pair "head yes, membership no". This is the
+  // one row in this file written by hand, and it is written into
+  // proj_entity_heads — never into proj_memberships, which is seeded through
+  // the ledger below.
   await db.pool.query(
     `INSERT INTO proj_entity_heads
        (entity_kind, entity_id, workspace_id, head_seq, head_event_id, head_event_type, head_server_time)
      VALUES ('membership', $1, $2, 1, $3, 'membership.granted', '2026-08-20T09:00:01.000Z')`,
     [membershipId(WORKSPACE, ACTOR), WORKSPACE, newUlid()],
   );
+
+  // Ruling P18's fixtures, in their own batch rather than appended to the three
+  // above: that array and the essay over it enumerate Task 12's four-step
+  // revert, and a fourth and fifth element would falsify the enumeration.
+  //
+  // Two roles, granted at the ledger, so the role-gated cases below can differ
+  // in the ROLE and in nothing else. Asserting the commits is not ceremony — a
+  // grant that failed to land would leave the admin transition refused, which is
+  // the pre-P18 answer, and the file would read as if it had proved the gap was
+  // still open.
+  const grants = await service().ingestBatch([
+    granted(ADMIN_USER, 'admin'),
+    granted(MEMBER_USER, 'member'),
+  ]);
+  expect(grants.map((result) => result.status)).toEqual(['committed', 'committed']);
+
+  // The revocation fixture, in a batch of its own again, for the same reason:
+  // the essay over the two grants says "Two roles", and a third element would
+  // make that sentence false.
+  //
+  // Three events, in this order, because the state they build cannot be reached
+  // any other way — grant, put on a project's roster, revoke. What is left
+  // behind is a person who belongs to no workspace and still has a
+  // `proj_memberships` row, which is the ONE input under which
+  // `resolveEffectiveRole` and a bare SELECT of that table give different
+  // answers. The order is not decoration: `project.member_added` before the
+  // grant would still write the roster row, but the fixture would then be
+  // asserting something the product never does, and the revoke must come last
+  // or there is nothing to survive it.
+  //
+  // Every status is asserted, not just the last. A `project.member_added` that
+  // was refused would leave REVOKED_USER a plain non-member, and the null below
+  // would pass for the ordinary reason instead of the one it is named for.
+  const revocation = await service().ingestBatch([
+    granted(REVOKED_USER, 'member'),
+    addedToProject(ROSTER_PROJECT, REVOKED_USER, true),
+    revoked(REVOKED_USER),
+  ]);
+  expect(revocation.map((result) => result.status)).toEqual([
+    'committed',
+    'committed',
+    'committed',
+  ]);
 });
 
 describe('createEngineContext.getEntityState — what the server can honestly serve', () => {
@@ -241,19 +378,193 @@ describe('createEngineContext.getEntityState — what the server can honestly se
     }
   });
 
-  it('answers null for a membership that HAS a head row — the §9 hazard, planted', async () => {
-    // The head pointer carries `kind: 'membership'`, so the cast this replaces
-    // satisfied restrict-to's `membership.kind === 'membership'` narrowing and
-    // then read `undefined` off `.role`. Null is the honest answer: the server
-    // has no membership state to serve, and Plan 4's proj_memberships is what
-    // will change that.
+  it('serves the WHOLE MembershipState for each granted role, and null for a head with no grant and for a revoked person whose roster row survives — inverted by ruling P18', async () => {
+    // THE ASSERTION RULING P18 INVERTS. It read `.toBeNull()` under the name
+    // "answers null for a membership that HAS a head row — the §9 hazard,
+    // planted", and the null was honest at the time: proj_memberships existed
+    // and nothing read it through the engine.
+    //
+    // The answers are asserted in ONE case because none of them is worth
+    // anything alone. The two grants prove the reader resolves a role and
+    // resolves the RIGHT one; the planted head with no grant behind it is the
+    // control that keeps those answers about proj_memberships rather than about
+    // a reader that says yes to anything — and it is the SAME shape the §9
+    // hazard always was, which is why the head row survives the inversion
+    // instead of being deleted with it. The revoked user at the foot is the only
+    // input that distinguishes the audited reader from a bare SELECT of the
+    // table, and it needs the grants above it in the same run to mean anything.
+    //
+    // `toEqual` on the whole object, not `toMatchObject`: the defect this file
+    // was written against returned a head POINTER that satisfied every partial
+    // matcher anyone would have written, and `role` is precisely the field it
+    // lacked.
     const client = await db.pool.connect();
     try {
-      const membership = await createEngineContext(client).getEntityState(
-        'membership',
-        membershipId(WORKSPACE, ACTOR),
+      const ctx = createEngineContext(client);
+
+      expect(await ctx.getEntityState('membership', membershipId(WORKSPACE, ADMIN_USER))).toEqual({
+        kind: 'membership',
+        id: membershipId(WORKSPACE, ADMIN_USER),
+        workspaceId: WORKSPACE,
+        userId: ADMIN_USER,
+        role: 'admin',
+      });
+
+      // BOTH granted roles are read directly, and the second is not a
+      // duplicate of the first. `role` is the only field of a MembershipState
+      // the engine consults, and until this line `'admin'` was the only role
+      // ever DIRECTLY witnessed anywhere in the repo — so a reader that
+      // collapsed every other role onto one wrong value passed the whole suite.
+      //
+      // The direction the earlier sweep's M4 does NOT cover, stated exactly
+      // rather than assumed to be covered: a constant `'admin'` IS caught,
+      // because the `member` case at the foot of this file then commits a move
+      // the edge should have refused. The reverse is invisible there. That case
+      // reaches `role` only through a refusal, and a refusal passes for every
+      // role the edge does not name, so `'member' → 'guest'` reddens nothing —
+      // and what such a collapse WOULD be is ruling P18's own defect wearing a
+      // different hat: an OWNER hitting a `restrict-to {roles:['owner']}` edge,
+      // refused naming a role they hold.
+      //
+      // Mutation that reddens this line, naming its own site: return
+      // `role: eff.workspaceRole === 'admin' ? 'admin' : 'guest'` from
+      // `readMembershipState`.
+      expect(await ctx.getEntityState('membership', membershipId(WORKSPACE, MEMBER_USER))).toEqual({
+        kind: 'membership',
+        id: membershipId(WORKSPACE, MEMBER_USER),
+        workspaceId: WORKSPACE,
+        userId: MEMBER_USER,
+        role: 'member',
+      });
+
+      // ACTOR has the planted head row and no `membership.granted` anywhere in
+      // the ledger. Mutation that reddens this line, naming its own site: drop
+      // the `eff.workspaceRole === null` early return in `readMembershipState`
+      // and return the state regardless — the answer becomes a membership with
+      // `role: null` for somebody who is not a member of anything.
+      expect(await ctx.getEntityState('membership', membershipId(WORKSPACE, ACTOR))).toBeNull();
+
+      // Nobody at all: no head row, no grant. Under the SHIPPED body this is the
+      // SAME traversal as the line above — the membership branch answers before
+      // `readEntityHead`, so no head is read on this path — and calling the two
+      // "different absences" would be exactly the drift this file exists to
+      // catch. They are kept for two different reasons instead. This one stops
+      // the null above being a reader that says null the second time it is
+      // asked; the ACTOR line is a REGRESSION PIN — an input under which the
+      // `as unknown as EntityState` cast this file was written against answers
+      // something rather than null, because the head row is there for the cast
+      // to return. It was the ONLY such input until this round; the revoked user
+      // below is now a second, reached through the ledger rather than planted.
+      // ACTOR is kept anyway, because the §9 hazard is its own shape and this
+      // file records what could be answered and when.
+      //
+      // NAMING WHAT THAT PIN DOES NOT COVER, since an earlier draft of this
+      // comment claimed it and the claim was false: it does not distinguish a
+      // head-GATED body — one that read `readEntityHead` first and answered null
+      // when there was none — from the shipped one that answers above the head
+      // read. Nothing in this suite does. ACTOR has a head and no grant, so a
+      // head-gated body reaches the same null by a longer route; and every other
+      // membership here was granted through the ledger, which writes the head row
+      // in the same transaction as the `proj_memberships` row, so the gate would
+      // never be the thing that decided. The pair "membership row, no head row"
+      // is what would tell them apart and it is not reachable through the ledger
+      // at all — it would have to be manufactured by deleting a head row by hand,
+      // which is a fixture describing a database no ingest can produce. The
+      // ordering therefore rests on the argument in `engine-context.ts`, which is
+      // where it is written down, and not on a case here.
+      expect(await ctx.getEntityState('membership', membershipId(WORKSPACE, newUlid()))).toBeNull();
+
+      // THE REVOCATION, and the only assertion in the suite that can tell
+      // `resolveEffectiveRole` apart from the `SELECT role FROM proj_memberships
+      // WHERE workspace_id = $1 AND user_id = $2` that `readMembershipState`'s
+      // docblock warns the next person off writing. Until this line the warning
+      // was prose with nothing behind it: that SELECT passes every other case in
+      // this file, because everyone else's workspace-scope row either exists or
+      // does not.
+      //
+      // REVOKED_USER's does not, and their project-scope roster row does — by
+      // design, not by accident (`membership.revoked` deletes the workspace row
+      // alone; see the fixture above). The row is asserted to be there first,
+      // because a null that came back from an empty table would be this house's
+      // favourite kind of lie.
+      const surviving = await db.pool.query(
+        `SELECT scope_kind, project_id, role FROM proj_memberships
+         WHERE workspace_id = $1 AND user_id = $2`,
+        [WORKSPACE, REVOKED_USER],
       );
-      expect(membership).toBeNull();
+      expect(surviving.rows).toEqual([
+        { scope_kind: 'project', project_id: ROSTER_PROJECT, role: 'member' },
+      ]);
+
+      // So: a row exists, and the honest answer is still null, because the row
+      // is not evidence of membership. Under the bare SELECT it comes back as
+      // `role: 'member'` and a revoked person walks a `restrict-to
+      // {roles:['member']}` edge. The ADMIN_USER `toEqual` at the top of this
+      // case is the same-run positive control that keeps this null about the
+      // reader rather than about a table nothing wrote.
+      expect(
+        await ctx.getEntityState('membership', membershipId(WORKSPACE, REVOKED_USER)),
+      ).toBeNull();
+    } finally {
+      client.release();
+    }
+  });
+
+  it('serves a membership only for an id that re-encodes to itself — the fail-closed decode', async () => {
+    // `membershipId` is `${workspaceId}:${userId}`, and this method is handed
+    // the id as a string, so the pair has to be recovered from it. The decode is
+    // checked by re-encoding the halves and comparing to the input rather than
+    // by reasoning about what can appear inside a ULID.
+    //
+    // BOTH malformed ids are built from ADMIN_USER, who genuinely resolves —
+    // that is the whole design of this case. Built from ACTOR they would answer
+    // null with the guard deleted too, and the mutation would survive against a
+    // fixture that had nothing to find.
+    //
+    // Mutation that reddens it, naming its own site: delete the
+    // `membershipId(workspaceId, userId) !== id` comparison in
+    // `readMembershipState` and the extra-segment id resolves ADMIN_USER's whole
+    // state for an id nothing ever minted.
+    //
+    // The colon-free line is a different branch and is retained on a weaker
+    // claim, said plainly rather than dressed up: NO single-clause deletion
+    // reddens it. Dropping the `userId === undefined` guard does not compile,
+    // and every decode that does compile — `indexOf` and slice, `split` with
+    // defaults — hands the round-trip a pair that fails to re-encode, so the
+    // answer stays null through all of them. What it can still catch is a decode
+    // that THROWS on an id with no separator rather than answering, which is the
+    // ordinary way this kind of parser goes wrong, and a throw here would reach
+    // the engine as a 500 on an ingest rather than a refusal.
+    const client = await db.pool.connect();
+    try {
+      const ctx = createEngineContext(client);
+      const wellFormed = membershipId(WORKSPACE, ADMIN_USER);
+
+      // The positive control, in the same run, so "null" below is the guard and
+      // not an empty table.
+      expect(await ctx.getEntityState('membership', wellFormed)).toEqual({
+        kind: 'membership',
+        id: wellFormed,
+        workspaceId: WORKSPACE,
+        userId: ADMIN_USER,
+        role: 'admin',
+      });
+
+      expect(await ctx.getEntityState('membership', `${wellFormed}:extra`)).toBeNull();
+      expect(await ctx.getEntityState('membership', WORKSPACE)).toBeNull();
+
+      // WHAT THE ROUND TRIP DOES NOT CHECK, named here so nobody reads it as
+      // validation: it is a SHAPE test, not a validity test. `':'`, `'<ws>:'` and
+      // `':<user>'` all re-encode to themselves, so they pass the guard and reach
+      // `resolveEffectiveRole` with an empty string for one half or both. That is
+      // harmless and was driven rather than assumed — the query is parameterised,
+      // no row matches an empty id, all three answer null and none throws — and
+      // no assertion is written for them on purpose: they answer null under the
+      // shipped body and under every mutation of it, so a case would be one of
+      // the checks that cannot fail. The reason the guard is enough anyway is
+      // that these ids are unreachable: the door admits only `^<ULID>:<ULID>$`
+      // for a membership entity (`packages/domain/src/events/membership.ts`), and
+      // `restrict-to` builds the id from `env.workspaceId` and `env.actorId`.
     } finally {
       client.release();
     }
@@ -372,10 +683,16 @@ describe('a role-gated transition through the shipped server context', () => {
     // meant the role gate at the end of this transition was never reached. The
     // ticket resolves now, its workflow resolves, the `todo -> done` edge is
     // found, and `restrict-to` asks the question §9 was always about: is the
-    // actor an admin here? The server cannot say they are — `'membership'` is
-    // Plan 4's proj_memberships and still answers null — so the move is refused
-    // naming the role it wanted. The refusal is honest about its own subject,
-    // which is the whole property this file exists to hold.
+    // actor an admin here? ACTOR is a member of nothing, so the answer is no and
+    // the move is refused naming the role it wanted.
+    //
+    // RULING P18 LEAVES THIS CASE WORD FOR WORD UNCHANGED, and that is the
+    // reason it cannot stand alone. It passed against a context that answered
+    // null for every membership in the world, and it passes against one that
+    // reads proj_memberships, because ACTOR holds no row either way — so on its
+    // own it is evidence about the refusal and none at all about the wiring. The
+    // two cases below are what make it a discriminator: the same edge, the same
+    // ticket, differing in the actor's ROLE and in nothing else.
     //
     // Against the `as unknown as EntityState` cast two commits ago, the same
     // batch was refused `unknown-workflow`, reasoning "Ticket <id> uses workflow
@@ -387,6 +704,79 @@ describe('a role-gated transition through the shipped server context', () => {
       eventId: expect.any(String),
       rule: 'restrict-to',
       reason: `Only anyone with the role admin may make this move, and ${ACTOR} is not among them.`,
+    });
+  });
+
+  it('refuses the SAME move to a real member — the gate discriminates on the role, not on having one', async () => {
+    // The case that separates a working role gate from a reader that says yes to
+    // anyone it finds a row for, which is the likeliest silent defect in this
+    // wiring. MEMBER_USER holds a genuine workspace-scope `proj_memberships` row
+    // granted at the ledger; the edge names `admin`; the answer must still be a
+    // refusal, and the refusal must name MEMBER_USER rather than ACTOR, so it is
+    // this actor's question that was asked.
+    //
+    // Mutation that reddens it, naming its own site: return
+    // `{ ...state, role: 'admin' }` from `readMembershipState`, or drop
+    // `eff.workspaceRole` in favour of a constant — this commits and the product
+    // has a role gate that only checks attendance.
+    const results = await service().ingestBatch([
+      {
+        ...submitted({
+          entity: { kind: 'ticket', id: TICKET },
+          type: 'ticket.transitioned',
+          payload: { to: 'done' },
+        }),
+        actorId: MEMBER_USER,
+      },
+    ]);
+
+    expect(results[0]).toEqual({
+      status: 'refused',
+      eventId: expect.any(String),
+      rule: 'restrict-to',
+      reason: `Only anyone with the role admin may make this move, and ${MEMBER_USER} is not among them.`,
+    });
+  });
+
+  it('COMMITS the same move for an actor who genuinely holds admin — ruling P18, end to end', async () => {
+    // THE INVERSION, and the half the two refusals above are worthless without.
+    // Nothing differs from them but the actor's role: same ticket, same edge,
+    // same envelope shape, same `restrict-to` rule naming `admin`. Against the
+    // shipped server before this task it was refused, exactly like the other
+    // two, and so was every role-gated move any workspace could ever define.
+    //
+    // Mutation that reddens it, naming its own site: restore the old body —
+    // `return null` for `kind === 'membership'` in `createEngineContext.getEntityState`
+    // — and this commit becomes the refusal above with ADMIN_USER's id in it.
+    //
+    // THE ORDER OF THE THREE CASES IS LOAD-BEARING and this is the place it
+    // matters: `roleGatedWorkflow` has exactly one edge, `todo -> done`, so the
+    // commit here puts TICKET in a terminal state with no way out. Run before
+    // either refusal, the two refusals would come back `illegal-transition` —
+    // passing as refusals, naming a different rule, proving nothing about roles.
+    // Refuse, refuse, then commit.
+    //
+    // That is OBSERVED and not reasoned: the mutation sweep's M4 (a constant
+    // `role: 'admin'`) lets the `member` case commit, and this case then fails
+    // with `illegal-transition` — "The workflow "Approvals" does not allow moving
+    // from "Done" to "Done"." — which is the hazard sentence itself, printed by
+    // the suite.
+    const results = await service().ingestBatch([
+      {
+        ...submitted({
+          entity: { kind: 'ticket', id: TICKET },
+          type: 'ticket.transitioned',
+          payload: { to: 'done' },
+        }),
+        actorId: ADMIN_USER,
+      },
+    ]);
+
+    expect(results[0]).toEqual({
+      status: 'committed',
+      eventId: expect.any(String),
+      seq: expect.any(Number),
+      serverTime: expect.any(String),
     });
   });
 });

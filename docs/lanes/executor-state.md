@@ -9,24 +9,250 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > verified with `git branch --contains` (empty output = orphaned), never with `git cat-file`, which
 > passes on reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## Live anchors — 2026-09-02, rewritten AFTER STEP 9 MERGED
-
-> **The version of this table that stood here until now was STALE AND LIVE.** It said
-> `Branch in flight: exec/05-api-realtime @ c3b1090` and `main: 00cb2e0`. Both were false by the time
-> anyone could read them: step 9 had merged. **The document's own banner further down was correct, and
-> this table was not — and this table is what a restarted session reads first, because this document
-> tells it to.** That is the failure worth naming: *a pointer from a correct document to a stale one
-> reverses*, and here both documents were the same file. **A banner does not repair an anchor.**
+## Live anchors — 2026-09-02, STEP 10 IN FLIGHT
 
 | Anchor | Value | How verified |
 |---|---|---|
-| **Branch in flight** | **NONE. Nothing is in flight.** Step 9 is merged; the executor holds no open work. | `gh pr view 67` |
-| **`main`** | **`563c983`** — **STEP 9 (Plan 5, all 17 tasks) IS MERGED**, as PR #67, at 2026-09-02T00:47:41Z. **REFETCH before trusting this.** | `git rev-parse origin/main`, `gh pr view 67 --json state,mergeCommit` |
-| **`exec/05-api-realtime`** | **MERGED and SQUASHED. Its worktree still holds it; it is safe to delete.** | `gh pr view 67` |
-| **EVERY sha this document cites below is ORPHANED** | **#67 was SQUASHED**, so `da522b6` — the branch tip — is **NOT an ancestor of main**, and neither is any of the other 94. `git cat-file` passes on all of them and returns pre-merge content while looking like it worked. **The `(#67)` suffix on main's subject is the marker.** | `git merge-base --is-ancestor da522b6 origin/main` → **false** |
-| **Gate ON MERGED MAIN** | **exit 0 · 21/21 · 0 cached · 1573 tests · 0 `Unsupported engine` WARNs · Node v22.22.2.** domain 335 · rule-engine 280 · **server 717** · app-core 130 · editor 72 · ui 31 · sync-client 8. **Measured at `563c983` AFTER the merge, not carried over from the branch** — identical to the branch's, so the squash preserved everything | `rtk proxy pnpm turbo run build test typecheck --force`, summary line read |
-| Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
-| Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, `6d15e50`, `96a6ff3`, `400fbfc`, `95004e1`, `c3b1090`, `da522b6`, **and every task sha in the status table below** | `git merge-base --is-ancestor`, `git branch --contains` |
+| **Branch in flight** | **`exec/10-integration-checkpoint`**, pushed, **PR #70 OPEN, awaiting the controller's merge.** All step-10 work is committed; the tree is clean; the final whole-branch review has run and its fix round has landed. | `git status --porcelain` empty, `git branch --contains <tip>` non-empty, `gh pr view 70` |
+| **`main`** | **`c9ab31c`** — step 9 (`563c983`, PR #67) plus two docs-only merges (`aa67ee3` #68, `c9ab31c` #69). **REFETCH before trusting this.** | `git rev-parse origin/main`, `git log --oneline -5` |
+| **`563c983` reachable?** | **YES**, ancestor of `c9ab31c`. The only diff `563c983..c9ab31c` is three files under `docs/lanes/`. | `git merge-base --is-ancestor 563c983 origin/main` → true; `git diff --stat` |
+| **Gate on merged main** | exit 0 · 21/21 · 0 cached · 1573 tests · Node v22.22.2. Measured by the controller at `563c983`; docs-only merges cannot move it (`turbo.json` declares no `inputs` and `docs/` is outside every package). | controller's forced gate |
+| Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing. | `node -v` |
+| Orphaned, do not cite | every sha in the narrative below the anchors, including all of Plan 5's task shas — **#67 was SQUASHED**. `git cat-file` passes on all of them and returns pre-merge content. | `git merge-base --is-ancestor` |
+
+## WHERE I AM: STEP 10 IS COMPLETE. **PR #70 IS OPEN**, AWAITING THE CONTROLLER'S MERGE.
+
+**NEXT IN THE SERIAL SEQUENCE once #70 merges: step 11, Plan 6 remainder** — first in Phase 3,
+because Plan 8's T13-14 and Plan 9's T14 both need `apps/web`. **Three things this step hands it,
+all with Plan 6 as the named owner:** the `board.tsx` live defect (it dereferences two fields no
+response carries), the `StreamItem` union's missing `scope-revoked` member, and **ruling P24** —
+Plan 6 Task 10 adopts the SERVER's `UserPreferences` shape. `apps/server/test/integration/client-contract.test.ts`
+is the machine-checked register of what an HTTP `DataSource` can and cannot be built from; read it
+before writing one.
+
+**Everything is committed and pushed, and the tree is clean.** The executor's work on this step is
+finished. **The executor opens PRs and NEVER merges** — that is the whole reason a second session
+exists, and it is the one authority this role does not have.
+
+| Task | What | State |
+|---|---|---|
+| **A** | **Ruling P18** — wire `getEntityState('membership')` to `proj_memberships` | **DONE, committed `44fb736`, gate green** |
+| **B** | Real-door round trip + the client-contract divergence pins (C merged in) | **DONE, committed `684839f`, gate green** |
+| docs | coordination doc records (P18 discharge, ruling P24, the recounts) | **DONE, committed `2b9876d`** |
+| final review | ONE opus reviewer over the whole branch | **DONE** — 3 Important + 2 Minor + 1 Nit, **all against the DOCUMENTS, none against the code**; all fixed |
+| review fix round | prose and comments only, no behaviour touched | **DONE**, committed |
+| PR | **#70 OPEN. The controller merges; the executor never does.** | `gh pr view 70` |
+
+### THE FINAL REVIEW'S RESULT IS THE MOST USEFUL THING ON THIS BRANCH — read it before the code
+
+**Every one of its six findings was against a DOCUMENT, and every one was the executor's own prose.**
+The code, the tests and the catalogues came through clean. Three were Important, and all three are
+the failure classes this very branch documents, committed by the party writing the documentation
+about them:
+
+1. **The restart surface contradicted itself.** This file's heading still read *"Task A of three, in
+   flight"* and *"Nothing is committed on the branch yet"*, three lines under an anchors row saying
+   the opposite. That is `a63b326`'s lesson — *a pointer from a correct document to a stale one
+   reverses* — recurring **in the same file, on the same branch that cites it.** A patched table does
+   not repair a heading, and a restarted session reads the heading first.
+2. **The signature-failure lesson named the WRONG MODULE, in four places** including the production
+   docblock. It said the rule engine's `restrict-to` suite is green because `memory-context.ts`
+   carries memberships. **It does not** — `memory-context.ts:151-159` answers null for
+   `'membership'`, and `test/memory-context.test.ts:214` is a case named *"does not serve memberships
+   — this context is a SECOND context, not a replacement"*. **`fixtures/harness.ts:294` alone
+   answers.** The root cause is a misread antecedent at `memory-context.ts:18-24`, and **the branch
+   already carried the correct version** at case 6.136 and in `docs/plan-3-chain-b-handoff.md`. The
+   executor introduced the error in its own dispatch prompt and it propagated outward from there.
+3. **"Only `lockWorkspace`/`lockEntity` has no coverage anywhere" was false**, in four places.
+   `test/event-store.test.ts:83` is `lockEntity holds off a second transaction until the first
+   commits (falsifiable)` — it asserts non-acquisition after 100 ms, asserts `pg_locks` holds exactly
+   one ungranted advisory lock, then asserts acquisition on commit; `:242` drives `lockWorkspace`.
+   The true claim is **"uncovered through the real door"**. An absence claim was published without
+   the sweep this repo's own rule demands.
+
+The Minors were the same shape: a positive control quoted as `4/5/3/1` where the grep returns
+`4/5/3/2` (the test file had it right and the two documents did not), and **"9 of 11" where
+`DataSourceQuery` declares 12 methods** — the table has 11 rows only because `getPreferences` and
+`putPreferences` share one, so the fraction mixed rows into a denominator of methods. **9 of 12.**
+
+**The fix round found MORE copies than the review cited in every single case** — four where three
+were named, twice — and corrected two copies that predate this branch, on the ground that leaving
+them would make one document assert both readings of the same fact. It also caught two errors its own
+edits introduced. Nothing was refuted, because nothing was refutable.
+
+**The lesson, since it is the one this step actually earned:** the branch's tests were mutation-proved
+and its prose was not. Six false claims in documents that later plans navigate by, on a branch whose
+own thesis is that a claim without an executed check behind it is not evidence. **Prose is not exempt
+from the falsifiability law, and it is the part no gate runs.**
+
+### Task B — what it added, and the finding that nearly escaped
+
+Two files under `apps/server/test/integration/`, 36 cases.
+
+`real-door-round-trip.test.ts` (21) builds its world ONLY through the shipped doors and reads it
+back through the shipped read routes. No `applyCommitted`, no `insertEvent`, no INSERT into any
+projection table — the four `db.pool.query` calls (`:222`, `:838`, `:870`, `:964`) are SELECTs used
+as oracles. It also carries **the repo's first proof that varies `TZ`**: three zones, the expectation
+computed without the function under test, a first case proving the knob moves before anything leans
+on it, and the mutation captured as a number rather than a colour — under
+`formatUtcDay` reading `getDate()`/`getMonth()`/`getFullYear()` instead of their UTC forms, the three
+zones answer different `daysInFlight` and the run reddens. The expected count is **computed at run
+time, not hard-coded**: pinning the frozen instant to 20:00Z makes the IST-correct answer 30 or 31
+depending on where in the Indian evening the entry instant fell, so naming either number as *the*
+answer would be a fixture that is right on some runs and wrong on others. That closes the brief's
+known gap #2 for this surface.
+
+`client-contract.test.ts` (15) pins the divergences, sorted into **signature / serving / data** gaps
+because the sort decides whether each is a client edit, a route change, or a product decision.
+
+**THE FINDING WORTH CARRYING FORWARD.** Its docblock claimed it would redden "the day either side
+moves". The reviewer MEASURED that claim and it was false in the client direction: adding
+`scope-revoked` to `StreamItem` in `packages/app-core` reconciled the divergence and the suite still
+passed. The client half was literals the test file typed about itself, so two assertions could only
+fire on someone editing the line directly above them. **A file whose whole purpose is to notice
+movement, that could not notice movement.** It now derives those facts by `readFileSync` over the
+sibling source text — which preserves the reason the package import was refused, since the text is
+the checked-in `.ts` and never `./dist` — and the extractors THROW rather than returning `[]`,
+because an empty list satisfies every `not.toContain` in the file. **I re-ran the reconciliation
+myself: one death, by name, with the derived array grown to five — which is what proves the
+extractor parsed the mutation instead of failing open.**
+
+### RECORDED FOR THE CONTROLLER, not fixed — `pnpm check:tasks` fails
+
+It is **not a gate**: CI runs `pnpm check:env` and `pnpm turbo run build test typecheck`, and
+`check:tasks` appears in neither. It is not this branch's doing either —
+`git diff origin/main -- docs/lanes/task-ledger.tsv` is **empty**, so it fails identically on `main`.
+It reports rows with `pr "-"` (04/2, 04/3, 06/1–4, 07/1–3, 10/1–3, 10/8). **Owner: the controller**,
+whose file the ledger is.
+
+### Gate, run by the executor at the tree being reported — THREE TIMES, and the third is the one that matters
+
+**exit 0 · 21/21 · 0 cached · 1612 tests · Node v22.22.2 · 0 `Unsupported engine` WARNs.**
+domain 335 · rule-engine 280 · **server 756** · app-core 130 · editor 72 · ui 31 · sync-client 8.
+
+**The delta decomposes twice over.** Main 1573 → 1576 after Task A (+3, all `engine-context.test.ts`,
+15 → 18 `it(`) → 1612 after Task B (+36, all `apps/server`, 720 → 756, split 21 round-trip + 15
+contract). Every other package is unchanged, as it must be: **the branch changes nothing under
+`packages/`** — its single production edit is `apps/server/src/engine-context.ts`.
+
+**The post-review fix round was gated again and came back byte-identical: 1612, same composition,
+Node v22.22.2, 0 cached, 0 engine warnings.** For a round that changed only comments and prose that
+is the expected result, and it is the evidence that no behaviour moved — a prose round whose totals
+shifted would mean something was edited that was not prose.
+
+### Task A — what it cost and what it bought, since a successor should not re-derive it
+
+`getEntityState('membership')` now reads `proj_memberships` through **`resolveEffectiveRole`**, never
+a SELECT of its own, and the id is decoded **fail-closed by re-encoding it and comparing to the
+input**. It is answered BEFORE the head read, because a membership head row is the §9 hazard's own
+instrument and a head gate would be true for every membership the ledger can produce — a check that
+cannot fail, in an authorisation path.
+
+**Two mutations survived a green 720-test suite and are why the task has three tests rather than
+one.** The reviewer found both; the fix round confirmed and closed both, and pushed back on the
+reviewer's METHOD (it proposed a hand-written `proj_memberships` row; the fixture is built through
+the ledger instead, which the file's own `granted()` docblock demands).
+
+1. Replacing `resolveEffectiveRole` with a bare `WHERE workspace_id = $1 AND user_id = $2` passed
+   **all 720**. It hands back a revoked person's surviving project-roster row as a role — because
+   `membership.revoked` deletes the workspace-scope row ALONE and the guarantee lives in
+   `resolveEffectiveRole`'s early return. **I re-ran this mutation myself: exactly one death, the
+   named case, `expected { kind: 'membership', …(4) } to be null`, with the ADMIN_USER `toEqual`
+   above it passing in the same run — so the mutated path is confirmed executed.**
+2. `role: eff.workspaceRole === 'admin' ? 'admin' : 'guest'` passed all 720, because `role` was only
+   ever witnessed as `'admin'`. The `member` REFUSAL cannot see it — `'guest'` is no more in
+   `['admin']` than `'member'` is — so only a direct read of the whole state catches it.
+
+Gate at `44fb736`: **exit 0 · 21/21 · 0 cached · 1576 tests · Node v22.22.2 · 0 engine warnings.**
+Decomposes: **+3 from main's 1573, entirely in `apps/server` (717 → 720), entirely in
+`engine-context.test.ts` (15 → 18 `it(`)**, the only server test file the change touches.
+
+### The scope was RE-MEASURED at `c9ab31c`, and the brief and the previous recon are both wrong
+
+Do not work from the dispatch brief's description of step 10, and do not work from the predecessor's
+"six shape disagreements" either. Both were recounted from the routes' own `return` statements and
+the two type files. Findings, each with a positive control run in the same command:
+
+**1. The six `applyCommitted` absences are NOT the target — five are already closed.**
+`lockWorkspace`/`lockEntity` is the only one uncovered **through the real door**. Both are covered
+directly, so "no coverage anywhere" would be false: `test/event-store.test.ts:83` is
+*`lockEntity` holds off a second transaction until the first commits (falsifiable)* — it asserts B
+has not acquired after 100 ms, that `pg_locks` reports exactly one ungranted advisory lock in this
+database, and that B acquires the moment A commits — and `lockWorkspace` is driven at
+`event-store.test.ts:242` by `appendUnderBothLocks`. Seqs-from-the-DB,
+`checkPermission`, the rule engine, `bootstrapWorkspace` and `notifyCommitted` are each already
+exercised through the real door — the last by `stream-route.test.ts`'s `submit()`, whose docblock
+says exactly why a row-writing helper cannot drive the hub.
+
+**2. The real gap is one sentence.** *Every Plan 5 read-route test seeds through `applyCommitted`
+and none of them writes through `POST /v1/events`.* Measured: `grep -l "v1/events"` over
+`board|list|search|my-work|attention|preferences`.test.ts returns **nothing**; the same grep returns
+4 · 5 · 3 · 2 for `workspaces` · `invites` · `security` · `stream-route`. The grep can hit. (The
+first three are in `test/routes/`; `stream-route.test.ts` is in `test/stream/`, so it is the same
+grep and not the same directory. `grep -c v1/events test/stream/stream-route.test.ts` is **2** — a
+docblock mention at `:114` and the real `url: '/v1/events'` at `:126`.)
+
+**3. The write half is already proven end to end** — `workspaces.test.ts` does real sign-in →
+`POST /v1/workspaces` → `project.created` → `project.member_added` → `ticket.created`, all
+committing, then asserts **`proj_tickets` by querying the table directly**. So the missing link is
+small and precise: *nothing on `main` reads back through a shipped READ route what a real POST
+wrote.*
+
+**4. The client contract is worse than "six disagreements": 9 of 12 `DataSourceQuery` methods cannot
+be implemented over the shipped routes**, and 3 of those cannot even form their request
+(`getMyWork`, `getPreferences`, `putPreferences` take no `workspaceId`; all three routes 400
+`invalid_query` without it). **The denominator is 12** — `packages/app-core/src/data-source.ts`
+declares twelve methods on `DataSourceQuery`, and 9 blocked + 3 adaptable = 12; the register's table
+shows only 11 rows because `getPreferences` and `putPreferences` share one, so do not recount it from
+rows. The full register — per method, with the serving-gap vs data-gap
+distinction that decides who fixes each — is in the coordination doc section this step adds. The
+distinction matters: a **serving** gap is a fact the server holds and does not put on the wire (one
+route change); a **data** gap is a fact it does not have (a product decision).
+
+**5. A live defect, not a disagreement.** `packages/app-core/src/views/board.tsx` — the one real view
+component on `main`, fed by `source.query.getBoard()` — dereferences `group.workflowVersion` (line 28)
+and `card.assignee.id`/`.name` (line 94). Neither is in any response. It breaks the moment an HTTP
+`DataSource` exists. **Owner: Plan 6, which is step 11.**
+
+**6. `StreamItem` has no `scope-revoked` member**, so a revocation arrives as an unrecognised `type`
+and is silently dropped, leaving stale authorization in the client cache. Severest of the stream
+items. Owner Plan 6. Does not change this step's scope — no client consumer exists yet.
+
+### RULING TAKEN THIS STEP — `UserPreferences` (coordination doc §6b), the one with a deadline
+
+**The SERVER's shape wins; Plan 6 Task 10 adopts it.** The doc called the two "informationally
+equivalent … the cost is a decision, not a migration." True in the abstract, misleading in practice:
+the shipped schema is `.strict()`, so Plan 6's document is **refused at the door three times over** —
+unknown key `version`, `SavedFilter.filter` vs the shipped `filterSpec`, and project keys narrowed to
+`ulidString` while Plan 6's fixtures key by `prj_1`. One asymmetry the doc does not name: server →
+client is **not total**, because the client pairs `{columns, grouping}` under one project key and the
+server keeps two parallel records; a project in `listColumns` and absent from `grouping` has no
+faithful client representation, and reaching for `DEFAULT_VIEW_PREFS` there invents a preference the
+user never set. Conservative default, and reversible in one direction only while Plan 6 T10 is
+unexecuted — which is why it is ruled now.
+
+### Ruling P18 is DISCHARGED BY THIS STEP, and it was genuinely unclaimed
+
+The coordination doc hands it to *"whoever dispatches Plan 4 Task 6 or the step-10 integration
+checkpoint, whichever comes first."* Plan 4 T6 ran and did not take it: `engine-context.ts` still
+answered `null` for `'membership'` at `c9ab31c`, and the only section the doc gained from T6 is about
+determinism tests. So it falls here, and the conservative default the doc names binds — **it lands as
+its own reviewed change**, which is Task A.
+
+It is a **functionality gap, not a security defect**, and saying so is load-bearing: `restrict-to`
+fails CLOSED, so every role-gated transition rule is refused for everyone on the server path. Anyone
+reporting it as an authorisation bypass will provoke a mis-sequencing ruling. The reason nothing
+noticed is this series' signature failure in its purest form: the rule engine's own `restrict-to`
+tests pass against **`packages/rule-engine/src/fixtures/harness.ts` alone** — it is the only
+in-memory context that carries `fx.memberships` and answers (`harness.ts:294`), and the eleven
+`rule-restrict-to-*` fixtures run through it via `test/fixtures.test.ts`. The SECOND in-memory context, `memory-context.ts`, answered
+`null` for `'membership'` exactly as the server did, and its own suite pins that
+(`test/memory-context.test.ts:214`, *"does not serve memberships — this context is a SECOND context,
+not a replacement"*). So: green on the one side with the fake, untested everywhere else.
+
+---
+
+## BELOW THIS LINE IS THE STEP 9 RECORD — history, not position. Every sha in it is orphaned.
 
 ### How to find Plan 5's work now that its shas are dead
 
@@ -44,7 +270,7 @@ should, run before any null result below was trusted).
 
 **WRONG: there is only ONE fake, and Plans 8 and 9 have no client code in this repo at all.**
 `packages/app-core/test/helpers/fake-data-source.ts` (`createFakeDataSource`) is the whole of it, and
-it is total — it implements every one of `DataSource`'s 11 query methods plus `ingest` and
+it is total — it implements every one of `DataSource`'s 12 query methods plus `ingest` and
 `subscribe`. Its own docblock already calls itself a *"SANCTIONED MOCKED-CONTRACT SEAM"*. **No
 `http-data-source.ts` or online `DataSource` exists anywhere**, so the fake is the only implementation
 there is. It is consumed by `cache.test.ts`, `data-source.test.ts` and `board.test.tsx` — and
