@@ -497,7 +497,7 @@ describe('TicketList — one clock, named, and not the device’s', () => {
 /**
  * A SANCTIONED MOCKED-CONTRACT SEAM. `createFakeDataSource` stands in for the
  * `DataSource` this hook consumes; it is NOT the contract. The online source is
- * `src/online/`, where SIX of the twelve query methods — `getTickets` among
+ * `src/online/`, where SIX of the thirteen query methods — `getTickets` among
  * them — deliberately THROW a `ServingGapError` because the shipped routes do
  * not carry `typeRank`, `epicId`, `stateName`, `assignedProvenance` or
  * `hasRestrictedParent`. Everything below is proven about the hook; the rows it

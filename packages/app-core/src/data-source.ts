@@ -1,4 +1,10 @@
-import type { IngestResult, LedgerEvent, SubmittedEvent, WorkflowDef } from '@gisik-nokma/domain';
+import type {
+  IngestResult,
+  LedgerEvent,
+  SubmittedEvent,
+  TicketTypeDef,
+  WorkflowDef,
+} from '@gisik-nokma/domain';
 import type {
   Actor,
   AttentionItem,
@@ -89,6 +95,32 @@ export type Unsubscribe = () => void;
  * 400/200 pair measured through the real door.
  *
  * `getAttention` and `getMembers` already carried one and are untouched.
+ *
+ * ## A THIRTEENTH method: `getTicketTypes` (Plan 6 Task 14 fix round)
+ *
+ * The web shell's New-ticket dialog HARDCODED `epic`/`story`/`task`/`sub-task`
+ * and presented them as the workspace's own types. A workspace whose types
+ * differ — `readTicketTypes` orders by rank then id and the server's own fixture
+ * answers `epic`, `chore`, `task` — got a picker offering four it does not have,
+ * and `ticketTypeExists` (`apps/server/src/routes/builder-reads.ts:363`) then
+ * refused the create. The failure surfaced as a rejected WRITE rather than as
+ * "this build cannot read your ticket types", which is the wrong sentence about
+ * the wrong thing.
+ *
+ * The server serves them — `GET /v1/workspaces/:workspaceId/ticket-types`,
+ * registered at `builder-reads.ts:531`. What was missing was the SEAM: amendment
+ * 10 says views never speak HTTP, so with no method here the shell could not
+ * reach a route that had shipped. Plan 6's own Open question 7 settles the
+ * intent — "the `typeOptions` prop is fed from it; the built-in ladder remains
+ * only the LOADING FALLBACK" — and this is that method.
+ *
+ * It returns the DOMAIN's `TicketTypeDef`, not a client view model, exactly as
+ * `getWorkflowDef` returns `WorkflowDef`: the wire body is
+ * `TicketTypeListResponse` (`packages/domain/src/read-models.ts:301`), whose
+ * `ticketTypes` are `TicketTypeDef` already. There is no rename to adapt and
+ * therefore no view model to invent. It is NOT one of the six refusals: every
+ * field the client needs is on the wire, pinned by case 7.38
+ * (`apps/server/test/routes/builder-reads.test.ts:250`).
  */
 export type DataSourceQuery = {
   getMyWorkspaces(): Promise<WorkspaceRef[]>;
@@ -98,6 +130,7 @@ export type DataSourceQuery = {
   getTicket(workspaceId: string, ticketId: string): Promise<TicketRead | null>;
   getTicketHistory(ticketId: string, afterSeq?: number, limit?: number): Promise<TicketHistoryEvent[]>;
   getWorkflowDef(workspaceId: string, workflowId: string, version?: number): Promise<WorkflowDef | null>;
+  getTicketTypes(workspaceId: string): Promise<TicketTypeDef[]>;
   search(workspaceId: string, text: string, filter?: FilterSpec): Promise<SearchHit[]>;
   getMyWork(workspaceId: string): Promise<MyWorkView>;
   getAttention(workspaceId: string): Promise<AttentionItem[]>;

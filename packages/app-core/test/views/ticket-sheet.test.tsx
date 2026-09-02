@@ -702,3 +702,43 @@ describe('TicketSheet — a truncated ledger says it is truncated', () => {
     expect(document.body.textContent).not.toContain('may go on past them');
   });
 });
+
+/**
+ * The MOUNT, and only the mount (Plan 6 Task 15b, item 3). Cases 3.116–3.117.
+ *
+ * The editor's own behaviour — the two pinned sentences, the lockout warning
+ * that changes nothing, the payload spellings, the refusal rendering — is
+ * proven in `visibility-editor.test.tsx`, driving the component directly. It is
+ * NOT proven here, and the reason is worth stating rather than assumed: every
+ * case in this file feeds a fabricated successful `getTicket`, and `getTicket`
+ * refuses against the shipped server (`mapTicketRead`), so this whole details
+ * body is DARK in production today. Asserting the editor's behaviour through
+ * this harness would be reporting coverage of a line nobody can reach.
+ */
+describe('3.116 TicketSheet — the "Who can see this" section is mounted', () => {
+  it('renders the section, and the owner-disclosure sentence inside it', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    const section = screen.getByRole('region', { name: 'Who can see this' });
+    expect(
+      within(section).getByText('Visible to: these people — and the workspace owner, always.'),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * 3.117 PLANTED DEFECT — nothing serves the standing audience.
+   *
+   * `TicketRead` has five fields and none is visibility; the shipped ticket
+   * route answers a `proj_visibility` row wrapped in `{ticket, parent, rollup}`
+   * with no provenance block at all. So the sheet passes `undefined` and the
+   * section must render the ABSENCE. A default of "Whatever the parent decided"
+   * would be plausible — `inherit` is what a ticket is born with — and that is
+   * exactly why it must not be drawn.
+   */
+  it('3.117 shows the audience as UNSERVED rather than defaulting to a mode', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    const section = screen.getByRole('region', { name: 'Who can see this' });
+    expect(within(section).getByRole('status')).toHaveTextContent('not being served yet');
+  });
+});

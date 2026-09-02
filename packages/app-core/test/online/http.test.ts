@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HttpError, createHttpClient } from '../../src/online/http.js';
+import { HttpError, createHttpClient, refusalText } from '../../src/online/http.js';
 
 function fakeFetch(status: number, body: unknown) {
   const calls: Array<{ input: string; init?: RequestInit }> = [];
@@ -97,6 +97,76 @@ describe('3.36 createHttpClient', () => {
       // is the reason the class exists.
       await expect(http.get('/v1/me/work')).rejects.toBeInstanceOf(HttpError);
     }
+  });
+
+  /**
+   * 3.115 PLANTED DEFECT — the refusal BODY, without which every write refusal
+   * on this branch reached the screen as `HTTP 422 for /v1/workspaces`.
+   *
+   * Every write door answers a refusal as a body and uses the status only to
+   * classify it: `POST /v1/workspaces` sends `INVALID_NAME_BODY` at 400 and an
+   * `IngestResult` at 422, `POST /v1/workspaces/:id/invites` sends that same
+   * `IngestResult`, `GET /v1/workspaces/:id/invites` sends
+   * `INVITE_ADMIN_ONLY_BODY` at 403. Until this field existed the shell could
+   * only paraphrase a refusal it had never read.
+   */
+  it('3.115 carries the parsed refusal body out on the error, alongside the status', async () => {
+    const body = { error: 'forbidden', rule: 'permission.role', message: 'Only an admin can.' };
+    const { fetchImpl } = fakeFetch(403, body);
+    await expect(createHttpClient('', fetchImpl).get('/v1/workspaces/ws/invites')).rejects.toMatchObject(
+      { name: 'HttpError', status: 403, body },
+    );
+  });
+
+  /**
+   * 3.115 — `undefined` is distinct from a body that parsed, and the
+   * distinction is load-bearing: a proxy's HTML 502 page must not surface as
+   * `SyntaxError: Unexpected token '<'`, which names neither the status nor the
+   * door.
+   */
+  it('3.115 leaves the body undefined when nothing readable came back, and still raises the STATUS', async () => {
+    const fetchImpl = async () =>
+      ({
+        ok: false,
+        status: 502,
+        json: async () => {
+          throw new SyntaxError("Unexpected token '<', \"<html>\"... is not valid JSON");
+        },
+      }) as unknown as Response;
+    const error = await createHttpClient('', fetchImpl)
+      .post('/v1/events', {})
+      .then(() => null, (cause: unknown) => cause);
+    expect(error).toBeInstanceOf(HttpError);
+    expect((error as HttpError).status).toBe(502);
+    expect((error as HttpError).body).toBeUndefined();
+    // CONTROL, same run: a readable body IS read, so the case above is the
+    // catch discriminating rather than the field never being set.
+    const { fetchImpl: readable } = fakeFetch(502, { message: 'upstream said no' });
+    await expect(createHttpClient('', readable).post('/v1/events', {})).rejects.toMatchObject({
+      body: { message: 'upstream said no' },
+    });
+  });
+
+  describe('3.115 refusalText — the server’s own words, or null', () => {
+    it('reads `message` from a frozen refusal body and `reason` from an IngestResult', () => {
+      expect(refusalText({ error: 'forbidden', message: 'Only an admin can.' })).toBe(
+        'Only an admin can.',
+      );
+      expect(refusalText({ status: 'refused', rule: 'permission.role', reason: 'Not yours.' })).toBe(
+        'Not yours.',
+      );
+    });
+
+    /**
+     * PLANTED DEFECT: a fallback sentence minted here — "something went wrong"
+     * — would be this module inventing words no server said, which every
+     * caller would then render as though the server had said them.
+     */
+    it('answers null rather than a manufactured sentence, for every unreadable shape', () => {
+      for (const body of [undefined, null, 'a string', 42, {}, { error: 'forbidden' }, []]) {
+        expect(refusalText(body), JSON.stringify(body ?? null)).toBeNull();
+      }
+    });
   });
 
   it('3.36 answers undefined for 204 without asking for a body', async () => {

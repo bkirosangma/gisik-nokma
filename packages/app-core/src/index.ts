@@ -14,7 +14,7 @@ export {
 } from './precheck.js';
 export { formatRollup } from './views/rollup-text.js';
 export { useLiveQuery, type LiveQueryResult } from './views/use-live-query.js';
-export { Board, useBoard, type BoardProps } from './views/board.js';
+export { Board, EMPTY_BOARD_COPY, useBoard, type BoardProps } from './views/board.js';
 export {
   columnLabel,
   countRows,
@@ -78,3 +78,10 @@ export {
   type NewTicketDraft,
 } from './views/new-ticket-dialog.js';
 export { CreateTicketFlow, type CreateTicketFlowProps } from './views/create-ticket-flow.js';
+export {
+  LOCKOUT_WARNING_COPY,
+  OWNER_ALWAYS_SEES_COPY,
+  VisibilityEditor,
+  type VisibilityClaim,
+  type VisibilityEditorProps,
+} from './views/visibility-editor.js';

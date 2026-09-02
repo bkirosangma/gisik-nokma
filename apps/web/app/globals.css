@@ -1,0 +1,37 @@
+/* Colours arrive as tokens only (coordination amendment 11). This file is
+   inside `packages/ui`'s token-discipline scan — `apps/web/app` is one of its
+   declared roots — so a literal here reddens that suite, not this one. */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--gn-surface);
+  color: var(--gn-text);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  line-height: 1.45;
+}
+a { color: var(--gn-accent); }
+
+.gn-shell { max-width: 80rem; margin: 0 auto; padding: 0 1.25rem 3rem; }
+.gn-shell__main { margin-top: 1.25rem; display: flex; flex-direction: column; gap: 1.1rem; }
+@media (max-width: 60rem) {
+  .gn-shell { padding: 0 0.75rem 2rem; }
+}
+.gn-page-title { margin: 1.2rem 0 0.4rem; }
+.gn-workspace-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 0.9rem; padding: 0; list-style: none; }
+.gn-view-tabs { display: flex; gap: 0.4rem; align-items: center; }
+
+.gn-nav { display: flex; align-items: center; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid var(--gn-border); }
+.gn-nav__spacer { flex: 1; }
+
+.gn-sign-in { max-width: 26rem; margin: 3rem auto; display: flex; flex-direction: column; gap: 0.9rem; }
+.gn-sign-in__method { display: flex; flex-direction: column; gap: 0.6rem; }
+.gn-sign-in__method label { display: flex; flex-direction: column; gap: 0.3rem; }
+.gn-sign-in__alternatives { display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid var(--gn-border); padding-top: 0.9rem; }
+
+/* A refusal is a first-class rendering, not an error state: six of the twelve
+   `DataSourceQuery` methods answer with a `ServingGapError` naming the facts the
+   shipped routes do not serve, and this is where the shell shows those words
+   rather than a spinner that never stops. */
+.gn-shell__refusal { margin: 0; padding: 0.75rem 0.9rem; border: 1px solid var(--gn-border); border-radius: 0.4rem; color: var(--gn-text-muted); }
+.gn-shell__refusal-what { display: block; font-weight: 600; color: var(--gn-text); }

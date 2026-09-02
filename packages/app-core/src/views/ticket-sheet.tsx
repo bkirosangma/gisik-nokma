@@ -12,6 +12,7 @@ import { PlainTextEditorSlot, type EditorSlotComponent } from './editor-slot.js'
 import { HistoryList } from './history-list.js';
 import { formatRollup } from './rollup-text.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
+import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
 
 /**
@@ -68,6 +69,36 @@ export type TicketSheetProps = {
   uploadEvidence?: (file: File) => Promise<{ attachmentId: string }>;
   /** Uploads and Drive references, from the ticket's `attachment.added` history. */
   attachments?: AttachmentListEntry[];
+  /**
+   * The ticket's standing audience, for the "Who can see this" section.
+   *
+   * Defaults to `undefined`, which the section renders as the ABSENCE it is —
+   * and `undefined` is what every caller passes today, because nothing serves
+   * it: `TicketRead` has no visibility field and the shipped ticket route's
+   * wrapper carries no provenance block. See `visibility-editor.tsx`.
+   */
+  visibility?: VisibilityClaim | null;
+  /**
+   * Whether this viewer may change who sees the ticket. **Defaults to `true`,
+   * and the default is the honest one rather than the permissive one.**
+   *
+   * Spec §6 gives the power to project admins and the ticket's creator. Neither
+   * fact is readable from this client: `Actor` is `{id, name}` with no role, and
+   * `TicketRead` does not name a creator. The authority that DOES know is the
+   * ingest door — `checkVisibilityPermission`
+   * (`apps/server/src/permissions/check-permission.ts:743`) refuses a
+   * `visibility.set` from anyone lacking project-admin rights or creatorship,
+   * reporting `permission.role`, and the editor renders that refusal verbatim.
+   *
+   * Defaulting to `false` would hide the controls from exactly the people
+   * entitled to use them, on a guess, with no way for them to discover the
+   * power exists. Defaulting to `true` shows the control and lets the one place
+   * that knows answer — which is the same argument `routes/invites.ts` makes
+   * for gating `invite.sent` at the ingest door rather than in the handler: a
+   * second answer to one question is free to drift from the first. A caller
+   * that acquires a real read passes `false` and the controls go.
+   */
+  canSetVisibility?: boolean;
 };
 
 /**
@@ -108,7 +139,7 @@ export type TicketSheetProps = {
  * ## What this sheet does when the read REFUSES
  *
  * `getTicket` refuses today against the real server (`ServingGapError`, six of
- * twelve query methods): the shipped route answers a `proj_visibility` row
+ * thirteen query methods): the shipped route answers a `proj_visibility` row
  * wrapped in `{ticket, parent, rollup}`, which carries no `title`, no
  * provenance block and no `TicketState`. `useLiveQuery` surfaces that rejection
  * as `error` with `data` left null, and this component then renders the REFUSAL
@@ -132,6 +163,8 @@ export function TicketSheet({
   editorSlot,
   uploadEvidence,
   attachments,
+  visibility,
+  canSetVisibility = true,
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
   const [tab, setTab] = useState<'details' | 'history'>('details');
@@ -344,6 +377,30 @@ export function TicketSheet({
           </dl>
 
           <AttachmentList entries={attachments ?? []} />
+
+          {/*
+            Spec §6's audience section. It is mounted here and it is DARK
+            against the shipped server: this component returns its refusal
+            branch above whenever `getTicket` rejects, and `getTicket` refuses
+            today (`mapTicketRead`, one of the six serving gaps). So nobody
+            reaches this line in production until that read is served — which is
+            why the editor's own behaviour is proven in
+            `test/views/visibility-editor.test.tsx`, driving the component
+            directly, rather than through a fabricated successful read here.
+          */}
+          <VisibilityEditor
+            dataSource={dataSource}
+            workspaceId={workspaceId}
+            ticketId={ticketId}
+            currentUserId={currentUserId}
+            members={members.data ?? []}
+            current={visibility ?? null}
+            canEdit={canSetVisibility}
+            onChanged={() => {
+              read.reload();
+              history.reload();
+            }}
+          />
         </div>
       ) : (
         <HistoryTab result={history} nameOf={nameOf} />

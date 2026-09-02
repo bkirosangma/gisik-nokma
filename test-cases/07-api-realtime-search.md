@@ -291,7 +291,7 @@ gap** (the server does not have the fact — a product decision).
 ### 7.201–7.209 — the client `DataSource` reconciliations and the REFUSAL cross-checks (Plan 6 Task 7; 7.208–7.209 added Step 11)
 
 **What is new in this block, and why it could not live in `app-core`.** Plan 6 Task 7 shipped the
-online `DataSource`, and six of its twelve query methods REFUSE rather than returning a view built
+online `DataSource`, and six of its thirteen query methods REFUSE rather than returning a view built
 from facts the server did not send. Each refusal enumerates its absences as data —
 `{field, wireKey, wireRoute, because, owner}` — in `packages/app-core/src/online/mappers.ts`. A test in
 `app-core` can prove the refusal fires (3.39) but can only go red when somebody edits that file,

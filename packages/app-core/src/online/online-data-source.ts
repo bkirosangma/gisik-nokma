@@ -13,6 +13,7 @@ import {
   mapPreferences,
   mapSearchHits,
   mapTicketRead,
+  mapTicketTypes,
   mapWorkflowDef,
   mapWorkspaceRefs,
   rosterByActorId,
@@ -61,7 +62,7 @@ export function listQueryString(filter: FilterSpec, grouping: Grouping): string 
 /**
  * The online implementation of amendment 10's `DataSource`: HTTP + WS.
  *
- * ## Six of the twelve query methods REFUSE, and that is the design
+ * ## Six of the THIRTEEN query methods REFUSE, and that is the design
  *
  * They refuse in `mappers.ts`, with a `ServingGapError` that ENUMERATES the
  * facts the shipped routes do not serve and names who closes each. The
@@ -161,6 +162,29 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       const suffix = version === undefined ? '' : `?version=${version}`;
       const raw = await http.get(`/v1/workspaces/${workspaceId}/workflows/${workflowId}${suffix}`);
       return raw === null ? null : mapWorkflowDef(raw);
+    },
+
+    /**
+     * The route that shipped and had no seam (Plan 6 Task 14 fix round).
+     *
+     * **404 is re-raised, and the alternative is the bug this method exists to
+     * remove.** `Promise<TicketTypeDef[]>` has an absence value — `[]` — and it
+     * would be a lie: this route answers the frozen `READ_NOT_FOUND_BODY` for
+     * "not a member of this workspace" (`door(..., 'members-only')`,
+     * `builder-reads.ts:534`), and `[]` reads as "this workspace defines no
+     * ticket types". That is not merely wrong, it is impossible — Plan 4's
+     * bootstrap materialises the four built-ins as real `ticket-type.defined`
+     * events in every workspace from its first moment — so an empty answer would
+     * be a claim no real workspace could ever produce, handed to a New-ticket
+     * dialog which would then offer NO types at all. Same argument as
+     * `getBoard`'s and `getPreferences`', and it is `HttpError` for the same
+     * reason: the server really did answer 404 and nothing was malformed.
+     */
+    getTicketTypes: async (workspaceId) => {
+      const path = `/v1/workspaces/${workspaceId}/ticket-types`;
+      const raw = await http.get(path);
+      if (raw === null) throw new HttpError(404, path);
+      return mapTicketTypes(raw);
     },
 
     search: async (workspaceId, text, filter) => {

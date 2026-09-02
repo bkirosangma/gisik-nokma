@@ -44,7 +44,14 @@ import { fileURLToPath } from 'node:url';
 // the same from anywhere it is invoked.
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-const ROOTS = ['apps/server/src', 'apps/web/src', 'packages'];
+// 'apps/web' rather than 'apps/web/src': the shell reads configuration from
+// two places outside src/ -- next.config.ts at the package root (SERVER_ORIGIN,
+// for the dev rewrites) and, in principle, any page under app/. Scanning only
+// src/ left both invisible, so a NEXT_PUBLIC_ variable baked into the browser
+// bundle from a page could ship undocumented. The walker already skips
+// node_modules, dist, .next and *.test.* files, so widening this costs one
+// config file and covers the whole app.
+const ROOTS = ['apps/server/src', 'apps/web', 'packages'];
 const IGNORE = new Set(['NODE_ENV', 'CI', 'PATH', 'HOME', 'TEST_DATABASE_ADMIN_URL']);
 // Where the server's configuration contract is declared. A tripwire, not a
 // detector: if this file stops contributing variables, the gate is no longer

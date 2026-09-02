@@ -11,7 +11,7 @@ import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { isUlid, type IngestResult } from '@gisik-nokma/domain';
 import type { BoardCard, BoardGroup, BoardView } from '../../src/view-types.js';
-import { Board, useBoard } from '../../src/views/board.js';
+import { Board, EMPTY_BOARD_COPY, useBoard } from '../../src/views/board.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
 import { TICKET, WS, boardCardSeed, claim } from '../helpers/seed.js';
 
@@ -742,5 +742,86 @@ describe('useBoard — a project switch is a different question, and it gets ask
     });
     expect(screen.getByText('board:prj_B')).toBeInTheDocument();
     expect(screen.queryByText('board:prj_A')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Plan 6 Task 15b, item 4. Cases 3.112–3.114
+ * (`test-cases/03-foundation-ledger.md`).
+ */
+describe('3.112 an empty board says words, not nothing', () => {
+  const emptyBoard: BoardView = { projectId: 'prj_1', groups: [] };
+
+  /**
+   * PLANTED DEFECT — the whole reason this branch exists.
+   *
+   * `mapBoardView` folds the server's flat `columns` array into groups, so a
+   * `columns: []` response yields `groups: []`. That response is ORDINARY:
+   * `routes/board.ts`'s gate docblock records that a workspace member who is
+   * not on a project-mode project passes the door and gets 200 with an empty
+   * board. Before this branch, `board.groups.map` over `[]` rendered an empty
+   * `<div class="gn-board">` — loaded, refused nothing, said nothing, and
+   * indistinguishable from a board still painting.
+   */
+  it('renders the pinned copy where it used to render an empty div', () => {
+    render(<Board board={emptyBoard} onOpenTicket={() => {}} />);
+    expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
+    expect(EMPTY_BOARD_COPY).toBe('No tickets here yet — create one.');
+    // No scaffolding: not one column region is drawn for a board with no groups.
+    expect(screen.queryAllByRole('region')).toEqual([]);
+  });
+
+  /**
+   * 3.113 BOTH ARMS of the optional affordance, because a wrapper that always
+   * passed `onCreateTicket` would make the no-handler arm a HARNESS vacuity —
+   * the default under test supplied by the harness testing it.
+   */
+  it('3.113 offers the create affordance when the shell handed one down', async () => {
+    const clicks: number[] = [];
+    render(
+      <Board board={emptyBoard} onOpenTicket={() => {}} onCreateTicket={() => clicks.push(1)} />,
+    );
+    const button = screen.getByRole('button', { name: 'Create a ticket' });
+    await userEvent.setup().click(button);
+    expect(clicks).toEqual([1]);
+  });
+
+  it('3.113 says the words and offers NO button when the shell handed none', () => {
+    render(<Board board={emptyBoard} onOpenTicket={() => {}} />);
+    expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
+    // A no-op button here would look like a way out of an empty project and
+    // would not be one.
+    expect(screen.queryByRole('button', { name: 'Create a ticket' })).toBeNull();
+  });
+
+  /**
+   * 3.114 — the branch discriminates. A `return` placed above the group loop
+   * unconditionally, or a condition on `columns` rather than `groups`, would
+   * make every board empty; this is the control that catches it.
+   */
+  it('3.114 CONTROL — a board WITH groups renders columns and never the empty copy', () => {
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} />);
+    expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
+    expect(screen.getAllByRole('region')).toHaveLength(4);
+  });
+
+  it('3.114 a group whose columns are all empty is NOT an empty board — it is a board', () => {
+    const noCards: BoardView = {
+      projectId: 'prj_1',
+      groups: [
+        {
+          workflowId: 'wf-errand',
+          workflowVersion: 1,
+          workflowName: 'Errand',
+          columns: [{ stateId: 'todo', name: 'To do', category: 'open', blocked: false, cards: [] }],
+        },
+      ],
+    };
+    render(<Board board={noCards} onOpenTicket={() => {}} />);
+    // The columns ARE the workflow's states and rendering them is the promise
+    // this file's first describe makes. Saying "no tickets here yet" over a
+    // real column set would delete the one thing the board is for.
+    expect(screen.getByRole('region', { name: 'To do' })).toBeInTheDocument();
+    expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
   });
 });

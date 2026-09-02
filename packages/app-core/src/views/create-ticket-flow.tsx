@@ -77,7 +77,7 @@ type Failure = { headline: string | null; refusal: Refusal; origin: RefusalOrigi
  * state it is sitting in, and the workflow whose non-terminal states are the
  * options. `parentCandidates` supplies the title; the rest comes from
  * `DataSource.query.getTicket`, and against the shipped server that method
- * REFUSES today (`ServingGapError`, six of twelve query methods — the route
+ * REFUSES today (`ServingGapError`, six of thirteen query methods — the route
  * answers a `proj_visibility` row with no `TicketState`, no title and no
  * provenance). So online, this flow reaches the refusal and then cannot build
  * the offer.

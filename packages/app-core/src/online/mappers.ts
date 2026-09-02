@@ -1,4 +1,4 @@
-import type { IngestResult, StateCategory, WorkflowDef } from '@gisik-nokma/domain';
+import type { IngestResult, StateCategory, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
 import type {
   Actor,
   BoardCard,
@@ -37,7 +37,7 @@ import type {
  *
  * ## Why several mappers below are nothing but a refusal
  *
- * Six of the twelve `DataSourceQuery` methods cannot be answered over the routes
+ * Six of the thirteen `DataSourceQuery` methods cannot be answered over the routes
  * that shipped. The register — coordination doc, "Step 11 (Plan 6 remainder) —
  * the `DataSource` register, re-derived, and RULING REQUEST P25" — holds the
  * measurement; each refusal below repeats only its own half. A mapper that
@@ -532,6 +532,52 @@ export function mapWorkflowDef(raw: unknown): WorkflowDef {
     });
   });
   return definition as unknown as WorkflowDef;
+}
+
+/**
+ * `GET /v1/workspaces/:workspaceId/ticket-types` → `TicketTypeDef[]`.
+ *
+ * ## This is an ADAPTATION, not a serving gap, and that was measured
+ *
+ * Every field the client needs is on the wire, under the client's own spelling:
+ * the route's body is typed `TicketTypeListResponse`
+ * (`packages/domain/src/read-models.ts:301`) whose `ticketTypes` are the very
+ * `TicketTypeDef` this returns, and `readTicketTypes`
+ * (`apps/server/src/routes/builder-reads.ts:172`) builds each entry as
+ * `{id, name, icon, rank, workflowId, fields}`. Case 7.38
+ * (`apps/server/test/routes/builder-reads.test.ts:250`) pins that body against a
+ * real database and real doors — `[['epic',1,'wf-errands'], ['chore',3,
+ * 'wf-second'], ['task',3,'wf-errands']]`, names, icons and `fields` included.
+ * So there is nothing to rename and nothing absent to refuse over; this mapper
+ * VALIDATES and hands the definitions on.
+ *
+ * The validation is not ceremony. `ticket-types` is the one read whose answer
+ * this shell turns into a WRITE — the id chosen in the picker is the `typeId` in
+ * `ticket.created` — so a malformed entry that survived to the dialog would be
+ * submitted and refused by `ticketTypeExists` under the actor's name. Failing
+ * here names the response; failing there names the person.
+ *
+ * `fields` is validated only as far as ARRAY. The custom-field shapes are
+ * `customFieldDefSchema`'s (`packages/domain/src/ticket-types.ts:10`) and
+ * re-stating them here would be a second declaration of one shape, free to
+ * disagree with the first; nothing in this shell reads a field definition yet.
+ * Stated rather than left implicit: a garbled `fields[0].type` reaches a future
+ * consumer unchecked, and that consumer is where it must be caught.
+ */
+export function mapTicketTypes(raw: unknown): TicketTypeDef[] {
+  const record = asRecord(raw, 'ticketTypes');
+  return asArray(record['ticketTypes'], 'ticketTypes.ticketTypes').map((entry, index) => {
+    const path = `ticketTypes.ticketTypes[${index}]`;
+    const type = asRecord(entry, path);
+    return {
+      id: asString(type['id'], `${path}.id`),
+      name: asString(type['name'], `${path}.name`),
+      icon: asString(type['icon'], `${path}.icon`),
+      rank: asNumber(type['rank'], `${path}.rank`),
+      workflowId: asString(type['workflowId'], `${path}.workflowId`),
+      fields: asArray(type['fields'], `${path}.fields`) as TicketTypeDef['fields'],
+    };
+  });
 }
 
 const INGEST_ARMS: Record<string, readonly string[]> = {

@@ -1,4 +1,4 @@
-import type { IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
+import { builtinTicketTypeDefs, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { DataSource, DataSourceQuery, StreamItem, Unsubscribe } from '../../src/data-source.js';
 
 export type IngestScript = (events: SubmittedEvent[]) => IngestResult[] | Promise<IngestResult[]>;
@@ -37,6 +37,14 @@ export function createFakeDataSource(
     getTicket: async () => null,
     getTicketHistory: async () => [],
     getWorkflowDef: async () => null,
+    // NOT `[]`, and this default is the one that is deliberately non-empty. Plan
+    // 4's bootstrap materialises the four built-ins as real
+    // `ticket-type.defined` events in every workspace at creation, so a
+    // workspace with no ticket types cannot exist and a fake answering one would
+    // put every view under test in a world the product cannot produce. It is
+    // built by the DOMAIN's own `builtinTicketTypeDefs` rather than retyped, so
+    // a change to the ladder cannot leave this fixture behind.
+    getTicketTypes: async () => builtinTicketTypeDefs('wf_default'),
     search: async () => [],
     // Three of these take a `workspaceId` (ruling P25 clause 2) and none of the
     // defaults reads it: the fake answers the same empty view for every

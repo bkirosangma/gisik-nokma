@@ -442,3 +442,89 @@ describe('3.40 subscribe is Task 8’s stream subscriber, wired not rewritten', 
     unsubscribe();
   });
 });
+
+/**
+ * 3.140 — `getTicketTypes`, the seam that was missing while the route shipped.
+ *
+ * The route has existed since Plan 5 (`GET /v1/workspaces/:workspaceId/ticket-types`,
+ * `apps/server/src/routes/builder-reads.ts:531`) and `DataSourceQuery` had no
+ * method for it, so the web shell could not reach it through amendment 10's
+ * boundary and hardcoded `epic`/`story`/`task`/`sub-task` instead.
+ *
+ * The fixture below is the SERVER'S OWN, not an invention: case 7.38
+ * (`apps/server/test/routes/builder-reads.test.ts:250`) measures that body
+ * against a real database and real doors — `epic` rank 1, `chore` rank 3 on a
+ * second workflow, `task` rank 3, ordered by rank then id. It is deliberately
+ * NOT the built-in ladder, because the whole point of this method is that a
+ * workspace's types are its own.
+ */
+const TICKET_TYPES = {
+  workspaceId: WORKSPACE,
+  ticketTypes: [
+    { id: 'epic', name: 'Epic', icon: 'flag', rank: 1, workflowId: 'wf-errands', fields: [] },
+    { id: 'chore', name: 'Chore', icon: 'broom', rank: 3, workflowId: 'wf-second', fields: [] },
+    { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-errands', fields: [] },
+  ],
+};
+
+describe('3.140 getTicketTypes reads the route that shipped', () => {
+  it('names the workspace in the path and hands back the definitions in the server’s order', async () => {
+    const { fetchImpl, calls } = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/ticket-types`]: TICKET_TYPES,
+    });
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    const types = await source.query.getTicketTypes(WORKSPACE);
+    // The ROWS, printed, not a count: a length assertion passes for a mapper
+    // that returned three of anything.
+    expect(types.map((type) => [type.id, type.name, type.icon, type.rank, type.workflowId])).toEqual(
+      [
+        ['epic', 'Epic', 'flag', 1, 'wf-errands'],
+        ['chore', 'Chore', 'broom', 3, 'wf-second'],
+        ['task', 'Task', 'check', 3, 'wf-errands'],
+      ],
+    );
+    expect(calls.map((call) => call.input)).toEqual([
+      `/v1/workspaces/${WORKSPACE}/ticket-types`,
+    ]);
+  });
+
+  it('re-raises a 404 rather than answering [], because [] would be a claim no workspace can make', async () => {
+    // A 404 here is `door(..., 'members-only')` — "you are not in this
+    // workspace". `[]` would say "this workspace defines no ticket types", which
+    // Plan 4's bootstrap makes impossible: the four built-ins land as real
+    // `ticket-type.defined` events at creation. The dialog fed that `[]` would
+    // offer no type at all.
+    const { fetchImpl } = recordingFetch({});
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    await expect(source.query.getTicketTypes(WORKSPACE)).rejects.toBeInstanceOf(HttpError);
+    await expect(source.query.getTicketTypes(WORKSPACE)).rejects.toMatchObject({ status: 404 });
+    // Control, same run: the workspace that IS readable answers definitions, so
+    // "this method rejects everything" cannot pass the case above.
+    const { fetchImpl: ok } = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/ticket-types`]: TICKET_TYPES,
+    });
+    const readable = createOnlineDataSource({ baseUrl: '', fetchImpl: ok });
+    expect((await readable.query.getTicketTypes(WORKSPACE)).map((type) => type.id)).toEqual([
+      'epic',
+      'chore',
+      'task',
+    ]);
+  });
+
+  it('a garbled definition fails HERE, named, rather than becoming a typeId in a write', async () => {
+    // `ticket-types` is the one read this shell turns into a WRITE: the id
+    // chosen in the picker is the `typeId` in `ticket.created`. A malformed
+    // entry that survived to the dialog would be submitted under the actor's
+    // name and refused by `ticketTypeExists`.
+    const { fetchImpl } = recordingFetch({
+      [`/v1/workspaces/${WORKSPACE}/ticket-types`]: {
+        workspaceId: WORKSPACE,
+        ticketTypes: [{ id: 'epic', name: 'Epic', icon: 'flag', rank: '1', workflowId: 'wf', fields: [] }],
+      },
+    });
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    await expect(source.query.getTicketTypes(WORKSPACE)).rejects.toThrowError(
+      'response mapping failed at ticketTypes.ticketTypes[0].rank: expected a number',
+    );
+  });
+});
