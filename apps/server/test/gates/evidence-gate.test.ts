@@ -1,11 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import {
+  EVIDENCE_DRIVE_REFERENCE_REASON,
+  RULE_EVIDENCE_DRIVE_REFERENCE,
+  newUlid,
+  type SubmittedEvent,
+} from '@gisik-nokma/domain';
 import { insertAttachment } from '../../src/attachments/attachment-repo.js';
 import { RULE_EVIDENCE_UNKNOWN } from '../../src/gates/evidence-gate.js';
 import { buildServerGates } from '../../src/gates/index.js';
 import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
 import { createProjectionRegistry } from '../../src/projections/registry.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { seedDriveReference } from '../helpers/drive-reference.js';
 
 const WS = '01J9GWKS000000000000000000';
 const TICKET = '01J9GTKA000000000000000000';
@@ -114,5 +120,31 @@ describe('evidence gate', () => {
       expect(foreign.reason.replace(FOREIGN_ID, 'ID')).toBe(fabricated.reason.replace(fake, 'ID'));
     }
     expect(await ledgerCount(foreignEvent.id)).toBe(0);
+  });
+
+  it('planted defect: a Drive reference on THIS ticket is refused as evidence, with the remedy named', async () => {
+    const referenceId = newUlid();
+    await seedDriveReference(db.pool, { workspaceId: WS, ticketId: TICKET, attachmentId: referenceId, actorId: ACTOR });
+    const event = transition({ to: 'done', evidenceAttachmentId: referenceId });
+    const [result] = await ingest.ingestBatch([event]);
+    expect(result).toMatchObject({ status: 'refused', rule: RULE_EVIDENCE_DRIVE_REFERENCE });
+    if (result?.status === 'refused') {
+      // Byte-identical to the single origin — the user and the test read the same sentence.
+      expect(result.reason).toBe(EVIDENCE_DRIVE_REFERENCE_REASON);
+      expect(result.reason).not.toContain(referenceId);
+    }
+    expect(await ledgerCount(event.id)).toBe(0);
+  });
+
+  it('planted defect: a Drive reference on ANOTHER ticket refuses as unknown — the drive refusal never leaks existence elsewhere', async () => {
+    const elsewhere = newUlid();
+    await seedDriveReference(db.pool, { workspaceId: WS, ticketId: OTHER_TICKET, attachmentId: elsewhere, actorId: ACTOR });
+    const [foreign] = await ingest.ingestBatch([transition({ to: 'done', evidenceAttachmentId: elsewhere })]);
+    const fake = newUlid();
+    const [fabricated] = await ingest.ingestBatch([transition({ to: 'done', evidenceAttachmentId: fake })]);
+    expect(foreign).toMatchObject({ status: 'refused', rule: RULE_EVIDENCE_UNKNOWN });
+    if (foreign?.status === 'refused' && fabricated?.status === 'refused') {
+      expect(foreign.reason.replace(elsewhere, 'ID')).toBe(fabricated.reason.replace(fake, 'ID'));
+    }
   });
 });
