@@ -293,26 +293,35 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
 
   /**
    * Plan 7 Task 6's gap, stated precisely rather than as "every node has its
-   * own case": of the walker's fifteen named types (the twelve in
-   * `BLOCK_NODE_TYPES`, plus `text`, `hardBreak` and `mention`), seven have a
-   * case above that puts them in a fixture — `paragraph`, `heading` and
-   * `codeBlock` (the header's three load-bearing ones), plus `blockquote`,
-   * `bulletList`, `orderedList` and `listItem` (present in fixtures, inert
-   * if deleted per the header, but present). Five do not: `doc`, which is
-   * only ever the implicit wrapper every fixture shares and is never itself
-   * what a case is built to exercise, and the four snake_case aliases
-   * (`code_block`, `bullet_list`, `ordered_list`, `list_item`), which no
-   * fixture here uses at all because schema v1 never emits that spelling.
-   * `text`, `hardBreak` and `mention` each have a case of their own too. That
-   * five-node gap is the header's own claim, immediately above, and this
-   * file was already honest about it before this commit. `image` was the
-   * one node — named by neither the twelve nor the three non-block names —
-   * that this file had never put in a fixture at all, dedicated or
-   * incidental, until now. `image` is `atom: true` with no `content` array
-   * at all, so it hits neither the block-node branch (its type is not in the
-   * walker's set) nor the children branch (there is nothing to recurse
-   * into): `render` falls through to `candidate.content` being non-array,
-   * `children` is `''`, and the node contributes nothing.
+   * own case" — and counted by grepping this file for `type: '<name>'`
+   * against each of the walker's SIXTEEN named types (`grep -c "type:
+   * '<name>'" doc-text-conformance.test.ts` for each of the twelve in
+   * `BLOCK_NODE_TYPES` plus `text`, `hardBreak`, `hard_break` and `mention`),
+   * not assembled from the header's prose. Ten have a case above built to
+   * exercise them: `paragraph`, `heading` and `codeBlock` (the header's
+   * three load-bearing ones), `blockquote`, `bulletList`, `orderedList` and
+   * `listItem` (present in fixtures, inert if deleted per the header, but
+   * present), plus `text`, `hardBreak` and `mention`. Six do not: `doc`,
+   * which appears in every fixture but only as the implicit top-level
+   * wrapper — never itself what a case is built to exercise — and five
+   * spellings no fixture here uses at all because schema v1 never emits
+   * them: the four snake_case block aliases (`code_block`, `bullet_list`,
+   * `ordered_list`, `list_item`) and `hard_break`, `hardBreak`'s own
+   * snake_case twin on the same line of the walker (doc-text.ts:70) that
+   * this file's header does not mention by name. This six-node count is a
+   * different partition than the header's inertness-if-deleted count two
+   * groups up — `doc` sits in the header's "inert but present" group while
+   * being absent-from-a-dedicated-case here — but the two are consistent:
+   * nothing this paragraph calls uncovered is claimed as covered anywhere
+   * else in this file. Of those sixteen walker-named types plus `image`
+   * (which the walker does not name at all — it reaches `render`'s generic
+   * fallthrough, not a named branch), `image` was the one this file had
+   * never put in any fixture, dedicated or incidental, until now. `image` is
+   * `atom: true` with no `content` array at all, so it hits neither the
+   * block-node branch (its type is not in the walker's set) nor the
+   * children branch (there is nothing to recurse into): `render` falls
+   * through to `candidate.content` being non-array, `children` is `''`, and
+   * the node contributes nothing.
    *
    * Pinned from the same direction as `horizontalRule` above, and for the
    * same reason it took a moment to see it was pinned at all: DELETING
@@ -378,12 +387,14 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
     // node contributes nothing — before `docToPlainText`'s
     // `.replace().replace().trim()` pipeline ever runs; trimming `''` is a
     // no-op whether or not `.trim()` is even called. Deleting the internal
-    // `.trim()` leaves this assertion green. The case in this file that
-    // actually reddens on that regression is 'is unbothered by the doc
-    // attrs this schema stamps and the paragraph typing appends' above,
-    // whose trailing empty paragraph produces a trailing `\n` that only
-    // `.trim()` strips. This case exists for the throw-safety and
-    // malformed-input contract described above, not for trim coverage.
+    // `.trim()` leaves this assertion green. Planting exactly that mutation
+    // (removing `.trim()` from doc-text.ts) and running this file through
+    // `pnpm turbo run build test` (so the rebuild picks up the source
+    // change) reddened ten of this file's eleven cases — every case whose
+    // expected string spans the whole document, each on a trailing-`\n`
+    // diff (e.g. `'the portal\n'`, `'AAA\nBBB\nCCC\n'`) — and left only this
+    // one green. This case exists for the throw-safety and malformed-input
+    // contract described above, not for trim coverage.
     expect(() => docToPlainText({ type: 'doc', content: [] })).not.toThrow();
     expect(docToPlainText({ type: 'doc', content: [] })).toBe('');
   });
