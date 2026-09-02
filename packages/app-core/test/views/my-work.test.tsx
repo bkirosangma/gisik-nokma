@@ -35,7 +35,7 @@ const VIEW: MyWorkView = {
   ],
 };
 
-describe('MyWork — assigned, in transit, contested (spec §7)', () => {
+describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
   it('renders the three sections', () => {
     render(<MyWork view={VIEW} onOpenTicket={vi.fn()} />);
     expect(screen.getByRole('region', { name: 'Assigned to me' })).toBeInTheDocument();
@@ -140,7 +140,7 @@ describe('MyWork — assigned, in transit, contested (spec §7)', () => {
  * than a comment restating it: `mapMyWork` refuses over `contested` and
  * deliberately does NOT list `inTransit` as a serving gap.
  */
-describe('MyWork — the in-transit section is empty because there is no outbox, not because a read was empty', () => {
+describe('3.58 MyWork — the in-transit section is empty because there is no outbox, not because a read was empty', () => {
   it('renders the empty state, and the reason is structural', () => {
     render(<MyWork view={VIEW} onOpenTicket={vi.fn()} />);
     const transit = screen.getByRole('region', { name: 'My claims in transit' });
@@ -227,7 +227,7 @@ describe('MyWork — the in-transit section is empty because there is no outbox,
  * Pacific/Kiritimati: expected 'needed by 30/8/2026 — Kiro's claim' to be
  * 'needed by 30 Aug 2026 — Kiro's claim'` and its day-anchored twin.
  */
-describe('MyWork — the due DAY CLAIM does not move with the viewer’s laptop', () => {
+describe('3.61 MyWork — the due DAY CLAIM does not move with the viewer’s laptop', () => {
   const ZONES = ['Pacific/Kiritimati', 'Asia/Kolkata', 'Pacific/Niue'] as const;
   const DUE_DAY = '2026-08-30';
 
@@ -340,7 +340,7 @@ describe('MyWork — the due DAY CLAIM does not move with the viewer’s laptop'
  * surface as an error — a `MyWorkView` with three empty sections is
  * indistinguishable from a person who has nothing to do.
  */
-describe('useMyWork — a refusal is an error, never three empty sections', () => {
+describe('3.60 useMyWork — a refusal is an error, never three empty sections', () => {
   function Harness({ source }: { source: ReturnType<typeof createFakeDataSource> }) {
     const { data, error } = useMyWork(source, WS);
     return (

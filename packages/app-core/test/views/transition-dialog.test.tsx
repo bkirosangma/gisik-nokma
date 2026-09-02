@@ -9,7 +9,7 @@ import {
 } from '../../src/views/transition-dialog.js';
 import { WF_ERRAND } from '../helpers/seed.js';
 
-describe('transitionOptions — only transitions the definition declares', () => {
+describe('3.71 transitionOptions — only transitions the definition declares', () => {
   it('offers declared targets from the current state (from-state or *), excluding self', () => {
     expect(transitionOptions(WF_ERRAND, 'doing').map((option) => option.toStateId)).toEqual([
       'todo',
@@ -84,7 +84,7 @@ function renderDialog(overrides: Partial<TransitionDialogProps> = {}) {
   return onSubmit;
 }
 
-describe('TransitionDialog — prompts driven by the workflow definition', () => {
+describe('3.72 TransitionDialog — prompts driven by the workflow definition', () => {
   it('requires a comment when the chosen transition declares require-comment', async () => {
     const user = userEvent.setup();
     const onSubmit = renderDialog();

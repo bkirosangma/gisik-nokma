@@ -22,6 +22,8 @@
 
 Execution order: 1 → 2 → 3 → 4 → 5, then 6/7/8/9 in parallel, then 10, then 11 — **superseded for Plans 3–11 by the owner decision of 2026-08-28 (parallel waves), at the end of this document.** Each plan's Interfaces blocks are the contract for its successors. Features.md/test-cases numbering: Plan 5 → §7/`07-api-realtime-search` · 6 → §8/`08-web-client` · 7 → §9/`09-editor-attachments` · 8 → §10/`10-workflow-builder` · 9 → §11/`11-calendar-notifications` · 10 → §12/`12-offline-sync-apps` · 11 → §13/`13-deployment-dogfooding`.
 
+**Correction to the row above, made while applying it (Plan 6 Task 16, 2026-09-02): Plan 6's row does not hold.** Every Plan 6 web-client feature landed in `Features.md` §3 and was catalogued there, in `test-cases/03-foundation-ledger.md`, with 144 live cases (3.1–3.144, plus 3.145–3.146 added by Task 16's own sweep) — none of them ever minted under an 8.x id, because the §8/`08-web-client` destination this table names was never opened before the work outran it. Task 16 measured this rather than migrating: renumbering 112+ already-cross-referenced ids to match this row would violate `test-cases/README.md`'s own never-renumber rule for a purely cosmetic relocation, so §3 stays Plan 6's permanent home and §8/`08-web-client.md` are not created. This row is not corrected in place because the table above is this document's numbering authority for every other plan in it — Plans 7–11 still read `7 → §9`, `8 → §10`, `9 → §11`, `10 → §12`, `11 → §13` verbatim — and only Plan 6's cell is superseded. Full reasoning: `Features.md`'s §3 web-client note and `test-cases/README.md`'s matching correction.
+
 ## Reconciliation decisions
 
 1. **Package scope is `@gisik-nokma/*`** — `@gisik-nokma/domain`, `@gisik-nokma/rule-engine`, `@gisik-nokma/server`. Plan 1 owns the scaffold; `@gisik/*` specifiers elsewhere were drift.
@@ -6053,6 +6055,21 @@ absent from the **views** suite specifically. The 51-vs-0 split inside one packa
 `rollup-text.test.ts` is added to the list the finding was reported with; it has the same gap and was
 not named. **Owner: Plan 6 Task 16**, which owns the catalogue and is where the ids and the tests get
 reconciled in one pass.
+
+**PARTIALLY RESOLVED (Plan 6 Task 16's fix round, 2026-09-02).** `rollup-text.test.ts`, the one file
+this table names by name and Task 16's original sweep left out, now carries a case-id prefix on its
+`describe(...)` block (`3.145`, matching the case that already cited the file). Measured across the
+whole `packages/app-core/test/views/` directory (`grep -cE "^describe\('[0-9]" <file>` against
+`grep -cE "^describe\(" <file>` per file): `ticket-list.test.tsx`, `list-model.test.ts`,
+`my-work.test.tsx`, `attention-strip.test.tsx`, `attachment-list.test.tsx`, `history-list.test.tsx`,
+`editor-slot.test.tsx`, `transition-dialog.test.tsx` and `rollup-text.test.ts` — nine files — now carry
+an id on every `describe` block, twenty-seven blocks in total (`git diff -- <file> | grep -cE
+'^\+describe\('` per file), each resolving to a live entry in `test-cases/03-foundation-ledger.md`
+(swept and confirmed with a `3.9999` negative control). **`board.test.tsx` is still 1 of 10 and
+`ticket-sheet.test.tsx` still 1 of 8** — neither was in this round's four assigned fixes, and this
+table's own "no test under `packages/app-core/test/views/` carries a test-case ID" framing named the
+directory, not only the six files its table rows list by name, so both remain open against that
+framing. Recorded here so the next reader does not read "27 blocks fixed" as "the directory is done."
 
 ### 3. `SHIPPED_KINDS` in the attention tests is a reconstruction, not a measurement. Owner: whoever closes the attention serving gap.
 

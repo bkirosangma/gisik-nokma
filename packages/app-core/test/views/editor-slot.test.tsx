@@ -4,7 +4,7 @@ import { PlainTextEditorSlot } from '../../src/views/editor-slot.js';
 
 const TICKET_ID = '01J9GTKA000000000000000000';
 
-describe('PlainTextEditorSlot — the honest read-only default until Plan 7', () => {
+describe('3.68 PlainTextEditorSlot — the honest read-only default until Plan 7', () => {
   it('renders the plain-text projection of a document', () => {
     render(
       <PlainTextEditorSlot

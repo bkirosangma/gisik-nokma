@@ -106,7 +106,7 @@ function ControlledList({
 
 const ALL_GROUPINGS: Grouping[] = ['epic', 'status', 'assignee', 'type', 'flat'];
 
-describe('TicketList — Asana-shaped, honest to the row set', () => {
+describe('3.51 TicketList — Asana-shaped, honest to the row set', () => {
   it('pins Recently assigned at the top with my newest assignment', () => {
     render(<ControlledList />);
     const pinned = screen.getByRole('region', { name: 'Recently assigned' });
@@ -223,7 +223,7 @@ describe('TicketList — Asana-shaped, honest to the row set', () => {
   });
 });
 
-describe('TicketList — restriction is named, never a vanish (invariant 5)', () => {
+describe('3.51 TicketList — restriction is named, never a vanish (invariant 5)', () => {
   const RESTRICTED_CHILD = listRowSeed({
     ticketId: 'child',
     title: 'Under something I cannot see',
@@ -271,7 +271,7 @@ describe('TicketList — restriction is named, never a vanish (invariant 5)', ()
   });
 });
 
-describe('TicketList — a default arrangement never wears the user’s authority (ruling P24)', () => {
+describe('3.53 TicketList — a default arrangement never wears the user’s authority (ruling P24)', () => {
   it('PLANTED DEFECT: says so on screen when the arrangement is this client’s default', () => {
     render(<ControlledList initial={DEFAULT_VIEW_PREFS} />);
     expect(screen.getByTestId('list-prefs-origin')).toHaveTextContent(
@@ -397,7 +397,7 @@ describe('TicketList — a default arrangement never wears the user’s authorit
  * dies on the wrong DAY, which is why both zones are kept. That is what they
  * are for.
  */
-describe('TicketList — one clock, named, and not the device’s', () => {
+describe('3.52 TicketList — one clock, named, and not the device’s', () => {
   const DUE_ONLY: ListRow[] = [
     listRowSeed({
       ticketId: 'due',
@@ -561,7 +561,7 @@ function eventFrame(source: FakeDataSource): void {
   });
 }
 
-describe('useTicketList — preferences round-trip through the DataSource (amendment 14)', () => {
+describe('3.53 useTicketList — preferences round-trip through the DataSource (amendment 14)', () => {
   it('loads stored prefs and writes changes back via putPreferences, workspace and all', async () => {
     const putPreferences = vi.fn(async () => {});
     const source = createFakeDataSource({
@@ -619,7 +619,7 @@ describe('useTicketList — preferences round-trip through the DataSource (amend
   });
 });
 
-describe('useTicketList — preferences are not ledger events, so the stream does not feed them', () => {
+describe('3.54 useTicketList — preferences are not ledger events, so the stream does not feed them', () => {
   /**
    * Amendment 14: preferences are server-owned per-user rows. No frame on the
    * stream can carry one, so a preferences read subscribed to the stream is
@@ -691,7 +691,7 @@ describe('useTicketList — preferences are not ledger events, so the stream doe
   });
 });
 
-describe('useTicketList — a refusal is an error, never an empty list', () => {
+describe('3.146 useTicketList — a refusal is an error, never an empty list', () => {
   /**
    * `getTickets` REFUSES today — the shipped route serves none of `typeRank`,
    * `epicId`, `stateName`, `assignedProvenance` or `hasRestrictedParent`. The

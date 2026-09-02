@@ -68,7 +68,7 @@ const ITEMS: AttentionItem[] = [
 /** The three the server emits today. Plan 10's `contested` is deliberately absent. */
 const SHIPPED_KINDS: AttentionItem[] = [ITEMS[0]!, ITEMS[1]!, ITEMS[3]!];
 
-describe('AttentionStrip — computed, never authored (spec §7)', () => {
+describe('3.56–3.57 AttentionStrip — computed, never authored (spec §7)', () => {
   it('renders every item with its kind and its computed reason', () => {
     render(<AttentionStrip items={ITEMS} onOpenTicket={vi.fn()} />);
     expect(screen.getByText(BLOCKED_REASON)).toBeInTheDocument();
@@ -123,7 +123,7 @@ describe('AttentionStrip — computed, never authored (spec §7)', () => {
  * "Contested (0)" heading, or an empty fourth section, either of which tells a
  * user that nothing is contested — the one thing this client cannot know.
  */
-describe('AttentionStrip — an absent kind is absent, never an empty section asserting nothing', () => {
+describe('3.55 AttentionStrip — an absent kind is absent, never an empty section asserting nothing', () => {
   it('PLANTED DEFECT: with only the three shipped kinds, the word "Contested" appears nowhere', () => {
     const { container } = render(
       <AttentionStrip items={SHIPPED_KINDS} onOpenTicket={vi.fn()} />,
@@ -211,7 +211,7 @@ describe('AttentionStrip — an absent kind is absent, never an empty section as
  * day-anchored twin, `zone Pacific/Kiritimati: expected 'claimed by Anselma
  * Marak on 20/8/2026' to match / on 19 Aug 2026$/`.
  */
-describe('AttentionStrip — one clock, and it is not the viewer’s laptop', () => {
+describe('3.61 AttentionStrip — one clock, and it is not the viewer’s laptop', () => {
   /** Straddling the product's own zone in both directions. Neither observes DST. */
   const ZONES = ['Pacific/Kiritimati', 'Asia/Kolkata', 'Pacific/Niue'] as const;
   const SERVER_TIME = claim().serverTime;
@@ -334,7 +334,7 @@ describe('AttentionStrip — one clock, and it is not the viewer’s laptop', ()
  * `online/mappers.ts` rather than a stand-in `Error`, so the assertion pins the
  * refusal that actually ships and goes stale the day the register changes.
  */
-describe('useAttention — a refusal is an error, never an empty strip', () => {
+describe('3.60 useAttention — a refusal is an error, never an empty strip', () => {
   function Harness({ source }: { source: ReturnType<typeof createFakeDataSource> }) {
     const { data, error } = useAttention(source, WS);
     return (

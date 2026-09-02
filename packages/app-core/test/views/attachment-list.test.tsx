@@ -25,7 +25,7 @@ const REFERENCE: AttachmentListEntry = {
 /** Words that would claim knowledge about a file this board does not hold. */
 const FORBIDDEN = ['deleted', 'missing', 'no longer', 'available', 'verified'];
 
-describe('AttachmentList', () => {
+describe('3.76 AttachmentList', () => {
   it('PLANTED DEFECT — the two kinds are told apart: a Drive reference is never rendered as a held file', () => {
     const view = render(<AttachmentList entries={[UPLOAD, REFERENCE]} />);
     const [uploaded, referenced] = [...view.container.querySelectorAll('.gn-attachment')];
@@ -91,7 +91,7 @@ describe('AttachmentList', () => {
  * and a step-12 reconciliation has nothing to reconcile. This asserts it against
  * the domain's own shape guard rather than against a comment.
  */
-describe('AttachmentListEntry — the drive arm is the domain’s DriveReference, inlined', () => {
+describe('3.76 AttachmentListEntry — the drive arm is the domain’s DriveReference, inlined', () => {
   it('PLANTED DEFECT: the reference arm satisfies the domain’s DriveReference guard, member for member', () => {
     expect(REFERENCE.kind).toBe('drive-reference');
     if (REFERENCE.kind !== 'drive-reference') throw new Error('unreachable');

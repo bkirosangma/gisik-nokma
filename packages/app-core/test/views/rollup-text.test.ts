@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formatRollup } from '../../src/views/rollup-text.js';
 
-describe('formatRollup — derived progress to the viewer (spec §6)', () => {
+describe('3.145 formatRollup — derived progress to the viewer (spec §6)', () => {
   it('reads "n of m done" over ALL children', () => {
     expect(formatRollup({ totalChildren: 8, terminalChildren: 5, restrictedCount: 0 })).toBe('5 of 8 done');
   });

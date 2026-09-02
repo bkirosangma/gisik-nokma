@@ -34,7 +34,7 @@ function spellIst(iso: string): string {
   return `${Number(day)} ${MONTHS[Number(month) - 1]} ${year}, ${(time ?? '').slice(0, 5)} IST`;
 }
 
-describe('HistoryList — the ledger filtered, never summarised (spec §3)', () => {
+describe('3.69 HistoryList — the ledger filtered, never summarised (spec §3)', () => {
   /**
    * THE FIXTURE IS WHAT MAKES THIS FALSIFIABLE, so it is asserted rather than
    * assumed. `SKEWED`'s two clocks are three days apart: a surface that showed
@@ -156,7 +156,7 @@ describe('HistoryList — the ledger filtered, never summarised (spec §3)', () 
  * written back in,
  * the zones start discriminating and these cases are the ones that say so.
  */
-describe('HistoryList — neither clock moves with the viewer’s laptop', () => {
+describe('3.70 HistoryList — neither clock moves with the viewer’s laptop', () => {
   const ZONES = ['Pacific/Kiritimati', 'Asia/Kolkata', 'Pacific/Niue'] as const;
 
   function clocksUnder(zone: string): string[] {

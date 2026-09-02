@@ -69,7 +69,7 @@ function paginationTripwire(key: keyof TicketListView): CompleteRowSetOnly {
   return key;
 }
 
-describe('grouping arranges truth; it never changes it (spec §7 List)', () => {
+describe('3.48 grouping arranges truth; it never changes it (spec §7 List)', () => {
   it('TYPE TRIPWIRE: TicketListView is the COMPLETE row set, which is what licenses grouping here', () => {
     expect(paginationTripwire('rows')).toBe('rows');
     expect(paginationTripwire('projectId')).toBe('projectId');
@@ -136,7 +136,7 @@ describe('grouping arranges truth; it never changes it (spec §7 List)', () => {
   });
 });
 
-describe('nestRows — hierarchy as indentation', () => {
+describe('3.49 nestRows — hierarchy as indentation', () => {
   it('orders parent-before-children with depths, orphans at the root', () => {
     const nodes = nestRows(ROWS);
     const byId = Object.fromEntries(nodes.map((node) => [node.row.ticketId, node]));
@@ -194,7 +194,7 @@ describe('nestRows — hierarchy as indentation', () => {
   });
 });
 
-describe('recentlyAssignedRows — pinned section source', () => {
+describe('3.50 recentlyAssignedRows — pinned section source', () => {
   it('holds only my assignments, newest claim first', () => {
     const rows = recentlyAssignedRows(ROWS, 'me');
     expect(rows.map((row) => row.ticketId)).toEqual(['t4', 't2']);
@@ -259,7 +259,7 @@ describe('recentlyAssignedRows — pinned section source', () => {
   });
 });
 
-describe('columnLabel', () => {
+describe('3.147 columnLabel', () => {
   it('names the built-in columns', () => {
     expect(columnLabel('dueDate')).toBe('Due date');
     expect(columnLabel('progress')).toBe('Progress');

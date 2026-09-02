@@ -303,6 +303,12 @@ serving one of those facts, the case reddens and somebody has to delete a refusa
 true** — which is the outcome "recorded with a named owner" is supposed to produce and, as ruling P25
 observed of Plan 5, usually does not.
 
+**Six refusing methods, seven `expectStillUnserved` calls below (one each at 7.202–7.206, two inside
+7.208) — the count is not a typo.** `/v1/contests` closes two of the six methods' absences at once
+(`getMyWork`'s `contested` share and `getAttention`'s fourth item kind), so 7.208 cross-checks it
+twice against the same body, once per absence register (`MAP_MY_WORK_ABSENCES`, then
+`MAP_ATTENTION_ABSENCES`) — one route, two registers, seven calls over six refusing methods.
+
 The extractor throws rather than returning `[]`, for the same reason `clientTypeFields` does: an empty
 list satisfies every absence assertion here. That fail-loud path was probed by renaming
 `MAP_LIST_VIEW_ABSENCES`, which reddens 7.206 with ``no `const MAP_LIST_VIEW_ABSENCES: readonly
