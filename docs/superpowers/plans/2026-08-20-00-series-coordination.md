@@ -6123,7 +6123,7 @@ a purely local refusal elsewhere.
 **Why it is recorded rather than decided.** Both readings are defensible from one sentence, and the
 choice is a product decision about whose refusal a user should be shown, not an implementation detail.
 
-### 5. Plan 8 Task 3: the frozen errand template trips `rule-bypassable`, and no plan has ruled it. **Owner: the owner (ruling request), not resolved here.**
+## RULING REQUEST — Plan 8 Task 3's frozen errand template trips `rule-bypassable`, unowned by any open plan (2026-09-03, exec/13 executor)
 
 `ERRAND_WITH_WAITS_TEMPLATE` (`packages/domain/src/workflows/errand-with-waits.ts`) is pinned by Plan
 11's `checkErrandTemplate` oracle (verified absent from this branch by search this session — Plan 11
