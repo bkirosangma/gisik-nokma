@@ -102,7 +102,46 @@ or **a green suite asserting over an empty canvas**. The discriminating check is
 that *removes a node* and must redden. If it does not, the harness is not rendering and every
 canvas assertion in the plan is vacuous.
 
-**3. T4's gateway is where "a mocked contract excuses the server from existing" would land.** T4
+**3. T4's gateway — MEASURED, and the answer is the opposite of the feared one. ALL SEVEN
+OPERATIONS ARE ALREADY SERVED BY A REGISTERED ROUTE.**
+
+`apps/server/src/routes/builder-reads.ts` exists, and `registerBuilderReadRoutes` is **called** at
+`apps/server/src/app.ts:253` — not merely defined. It registers exactly Plan 8's gateway surface:
+
+| Gateway operation | Route | builder-reads.ts |
+|---|---|---|
+| `listWorkflows` | `/v1/workspaces/:workspaceId/workflows` | 482 |
+| `getWorkflow` | `/v1/workspaces/:workspaceId/workflows/:workflowId` | 500 |
+| `listTicketTypes` | `/v1/workspaces/:workspaceId/ticket-types` | 531 |
+| `listMembers` | `/v1/workspaces/:workspaceId/members` | 547 |
+| `getStateOccupancy` | `/v1/workspaces/:workspaceId/workflows/:workflowId/state-occupancy` | 580 |
+| `getTypeWorkflowPopulation` | `/v1/workspaces/:workspaceId/ticket-types/:typeId/population` | 602 |
+| `migrateTypeToWorkflow` | `/v1/workspaces/:workspaceId/ticket-types/:typeId/migrate` | 693 |
+
+`submit` rides `registerEventRoutes`, called at `app.ts:204`. **So Plan 8's gateway is NOT a mocked
+contract excusing a server that does not exist** — the read surface landed ahead of it.
+
+**Two consequences, and the second is a live correction to the plan.**
+
+- **The plan's own assumption 3 is now stale.** It calls the migrate endpoint *"unowned server
+  work — see Open question 13"* and assumes the path
+  `POST /v1/workspaces/:workspaceId/ticket-types/:typeId/migrate-workflow`. **The real path is
+  `…/:typeId/migrate`** and the endpoint is built. T4 and T13 must consume the real path; an
+  implementer transcribing the plan's assumed path would write an adapter that 404s, and no
+  app-core test would notice because the fake answers instead.
+- The fake stays justified for tasks 5–12 — but T13's adapter is now checkable against a real route
+  rather than a promise, and **T4's docblocks must not claim any of these is unserved.**
+
+**The sweep that found this failed its own control first, and the correction is the transferable
+part.** The pattern `export function register[A-Za-z]*Routes` returned 12 registrars and **omitted
+`registerAttachmentRoutes`, which is known to exist** — because that one is declared
+`export **async** function`. Twelve results looked like a complete enumeration. Re-run as
+`export (async )?function …` it returns **13**, and the one registrar with no call site is
+`registerAttachmentRoutes` — which independently re-confirms step 12's finding. **An over-specific
+sweep returns a well-formed wrong answer, and the only thing that exposed it was knowing one row
+that had to be in the output.**
+
+**The original hazard, kept because it still binds the shape of T4:** T4
 defines `WorkflowAuthoringGateway` and its in-memory fake, and **twelve tasks then build against
 that fake** before T13 ever touches a real `DataSource`. The wave-boundary integration checkpoint no
 longer fires and step 10's replacement is spent. **Do a server-read inventory BEFORE T4**, not at
