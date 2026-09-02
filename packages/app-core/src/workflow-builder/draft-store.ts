@@ -82,9 +82,14 @@ export function selectIssues(draft: WorkflowDraft): Issue[] {
  * Publish legality is validateWorkflowDef emptiness — advisories excluded.
  * adviseWorkflowDef is NOT called here and its Advisory[] is never unioned in:
  * an advisory is an authoring warning, and folding one into this predicate
- * would turn every warning into a publish blocker (design decision 9). The
- * issues panel renders advisories in their own section; this selector ignores
- * them, and a planted defect in validation.test.tsx keeps it honest.
+ * would turn every warning into a publish blocker (design decision 9).
+ *
+ * What keeps that honest TODAY is draft-store.test.ts's `an advisory does not
+ * gate publish` — a draft that trips rdu-bypassable and nothing else, asserted
+ * to leave this selector true. The issues panel that will render advisories in
+ * their own visually distinct section does not exist yet: Task 8 builds it
+ * (validation.test.tsx, the planted-defect table), and Task 9 adds the proof
+ * that the Publish button stays enabled and the publish commits.
  */
 export function selectCanPublish(draft: WorkflowDraft): boolean {
   return selectIssues(draft).length === 0;
@@ -195,6 +200,14 @@ export function createDraftStore(initial: WorkflowDraft): DraftStore {
       setDef({ ...state.def, transitions: [...state.def.transitions, { from, to, rules: [] }] });
     },
     removeTransition(index) {
+      // BuilderSelection addresses a transition by index (the plan's Produces
+      // contract), so this clears only a selection pointing AT the removed one.
+      // A selection with a HIGHER index keeps its number while the transitions
+      // shift down under it: measured on a 3-transition def, selection index 2
+      // survived removeTransition(0) and then addressed nothing — 2 is past the
+      // new end. Nearer the front it would instead address a different
+      // transition. Reconciling that is a selection-semantics decision (clear,
+      // or decrement) that belongs to the task owning the inspector.
       const keepSelection =
         state.selection.kind === 'transition' && state.selection.index === index
           ? ({ kind: 'none' } as const)

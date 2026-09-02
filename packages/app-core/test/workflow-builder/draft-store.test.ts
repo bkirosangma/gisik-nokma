@@ -197,3 +197,73 @@ describe('subscribe and selectors', () => {
     expect(selectInboundTargetIds(store.getState().def)).toEqual(['doing', 'done']);
   });
 });
+
+describe('copy-on-write', () => {
+  // The plan's Task 1 header sells this store as an immutable WorkflowDraft,
+  // useSyncExternalStore-compatible. Nothing else pins that: WorkflowDef comes
+  // from z.infer over z.array(...), so its arrays are mutable and tsc accepts
+  // `found.name = name` in place of a map-and-spread, while every other test in
+  // this file reads getState() only AFTER its action. These two tests are the pin.
+  //
+  // What they do NOT claim: that a returned draft is frozen. It is structurally
+  // shared, so a caller who mutates what getState() handed back does reach the
+  // store's own object. The guarantee is one-directional — the store's own
+  // actions never write through a snapshot already handed out.
+  it('no action writes through a snapshot taken before it', () => {
+    const store = storeWith(kanbanDef());
+
+    // All fifteen DraftActions, not a sample of the three internal write helpers.
+    // Measured, not assumed: a first draft of this test drove renameState/addRule/
+    // moveState/addTransition and a planted in-place `setStateCategory` — which
+    // shares mapState with renameState — still shipped green, because nothing
+    // called it. The property is claimed per action, so it is pinned per action.
+    //
+    // Each action also gets its OWN pre-snapshot. One snapshot taken at the top
+    // does not work: a sub-object stops being shared the moment an earlier action
+    // replaces it (addState builds a fresh `positions`), so a later in-place write
+    // to `positions` lands where that snapshot no longer points and the assertion
+    // passes on mutating code. That form was written first, and let a planted
+    // `state.positions[nodeId] = position` through green too.
+    const edits: [string, () => void][] = [
+      ['setWorkflowName', () => store.actions.setWorkflowName('Renamed')],
+      ['addState', () => store.actions.addState({ name: 'Review', category: 'active' })],
+      ['renameState', () => store.actions.renameState('doing', 'In progress')],
+      ['setStateCategory', () => store.actions.setStateCategory('doing', 'open')],
+      ['setStateBlocked', () => store.actions.setStateBlocked('doing', true)],
+      ['setInitialState', () => store.actions.setInitialState('doing')],
+      ['moveState', () => store.actions.moveState('todo', { x: 999, y: 999 })],
+      ['addTransition', () => store.actions.addTransition('done', 'todo')],
+      ['addRule', () => store.actions.addRule(0, { kind: 'require-comment' })],
+      ['updateRule', () => store.actions.updateRule(0, 0, { kind: 'require-field', field: 'title' })],
+      ['removeRule', () => store.actions.removeRule(0, 0)],
+      ['removeTransition', () => store.actions.removeTransition(2)],
+      ['select', () => store.actions.select({ kind: 'state', stateId: 'todo' })],
+      ['removeState', () => store.actions.removeState('done')],
+      ['loadDraft', () => store.actions.loadDraft(newDraft('Fresh'))],
+    ];
+
+    for (const [label, edit] of edits) {
+      const before = store.getState();
+      const beforeJson = JSON.stringify(before);
+      edit();
+      expect(JSON.stringify(before), label).toBe(beforeJson);
+      // ...and the edit changed something, so the assertion above can actually fail
+      expect(JSON.stringify(store.getState()), label).not.toBe(beforeJson);
+    }
+  });
+
+  it('untouched state objects keep reference identity, so memoized children can skip them', () => {
+    const store = storeWith(kanbanDef());
+    const before = store.getState();
+    store.actions.renameState('doing', 'In progress');
+    const after = store.getState();
+
+    expect(after).not.toBe(before);
+    expect(after.def).not.toBe(before.def);
+    expect(after.def.states[1]).not.toBe(before.def.states[1]); // 'doing' — the edited one
+    expect(after.def.states[0]).toBe(before.def.states[0]); // 'todo' — untouched, same object
+    expect(after.def.states[2]).toBe(before.def.states[2]); // 'done' — untouched, same object
+    expect(after.def.transitions).toBe(before.def.transitions); // no transition was addressed
+    expect(after.positions).toBe(before.positions);
+  });
+});
