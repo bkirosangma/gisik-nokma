@@ -232,7 +232,7 @@ function isRduBypassable(def: WorkflowDef, rule: DefRule, transition: DefTransit
   return reachableStateIds(def, watched).has(transition.from);
 }
 
-/** A self-loop is not a way in — the same reading terminal-no-inbound takes. */
+/** The cover test, in one line so the floor semantics have exactly one home. */
 function carriesKind(transition: DefTransition, kind: DefRule['kind']): boolean {
   return transition.rules.some((rule) => rule.kind === kind);
 }
@@ -264,7 +264,7 @@ function ruleBypassableAnchors(def: WorkflowDef): IssueAnchor[] {
       def.transitions.forEach((other, otherIndex) => {
         if (otherIndex === guardedIndex) return;
         if (other.to !== guarded.to) return;
-        if (other.from === other.to) return;
+        if (other.from === other.to) return; // a self-loop is not a way in
         if (carriesKind(other, rule.kind)) return;
         anchors.push({ kind: 'transition', index: guardedIndex });
       });
