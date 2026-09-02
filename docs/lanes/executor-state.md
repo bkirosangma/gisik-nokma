@@ -9,39 +9,57 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > verified with `git branch --contains` (empty output = orphaned), never with `git cat-file`, which
 > passes on reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## Live anchors — 2026-09-02, STEP 10 IN FLIGHT
+## Live anchors — 2026-09-02, **STEP 11 IN FLIGHT (Plan 6 remainder)**
+
+**Step 10 is CLOSED — PR #70 merged as `ac187e8`.** Everything below the "STEP 10 RECORD" line is
+history. Read it for its *reasoning*, never for its position.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| **Branch in flight** | **`exec/10-integration-checkpoint`**, pushed, **PR #70 OPEN, awaiting the controller's merge.** All step-10 work is committed; the tree is clean; the final whole-branch review has run and its fix round has landed. | `git status --porcelain` empty, `git branch --contains <tip>` non-empty, `gh pr view 70` |
-| **`main`** | **`c9ab31c`** — step 9 (`563c983`, PR #67) plus two docs-only merges (`aa67ee3` #68, `c9ab31c` #69). **REFETCH before trusting this.** | `git rev-parse origin/main`, `git log --oneline -5` |
-| **`563c983` reachable?** | **YES**, ancestor of `c9ab31c`. The only diff `563c983..c9ab31c` is three files under `docs/lanes/`. | `git merge-base --is-ancestor 563c983 origin/main` → true; `git diff --stat` |
-| **Gate on merged main** | exit 0 · 21/21 · 0 cached · 1573 tests · Node v22.22.2. Measured by the controller at `563c983`; docs-only merges cannot move it (`turbo.json` declares no `inputs` and `docs/` is outside every package). | controller's forced gate |
+| **Branch in flight** | **`exec/11-plan6-remainder`**, cut from `ac187e8`. | `git branch --show-current` |
+| **`main`** | **`ac187e8`** — step 10 (PR #70) on top of `75c3d1e` (the ledger PR-column fix, #71) and `c9ab31c` (#69). **REFETCH before trusting this.** | `git rev-parse origin/main` |
+| **`ac187e8` reachable?** | **YES** — `git branch -r --contains ac187e8` names `origin/main`. | `git branch -r --contains` (empty output = orphaned; `cat-file` would lie) |
+| **Ledger** | **177 data rows, 88 done, 89 todo (49.7%)**, counted from the file at this sha with `awk -F'\t' '$1 ~ /^[0-9]+$/'`. Do **not** count it with `wc -l` (206) or `head -1` — the rtk proxy rewrites both and returned `[206 more lines]` for `head -1` in this very session. | `awk` tally over data rows |
+| **Plan 6 remaining** | **12 todo**: T5, T7, T8, T10, T11, T12, T12a, T13, T14, T15, T15b, T16. Done: T1–T4 (#16), T6 (#36), T9 (#43). | `grep -E "^06" docs/lanes/task-ledger.tsv` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing. | `node -v` |
-| Orphaned, do not cite | every sha in the narrative below the anchors, including all of Plan 5's task shas — **#67 was SQUASHED**. `git cat-file` passes on all of them and returns pre-merge content. | `git merge-base --is-ancestor` |
+| Orphaned, do not cite | every sha in the narrative below the "STEP 10 RECORD" line, and every sha in the step-10 section above it (`44fb736`, `684839f`, `2b9876d`, `eeea9a6`) — **#70 was SQUASHED into `ac187e8`.** | `git branch --contains` |
 
-## WHERE I AM: STEP 10 IS COMPLETE. **PR #70 IS OPEN**, AWAITING THE CONTROLLER'S MERGE.
+## WHERE I AM: **STEP 11 — PLAN 6 REMAINDER.** 12 tasks, nothing yet complete.
 
-**NEXT IN THE SERIAL SEQUENCE once #70 merges: step 11, Plan 6 remainder** — first in Phase 3,
-because Plan 8's T13-14 and Plan 9's T14 both need `apps/web`. **Three things this step hands it,
-all with Plan 6 as the named owner:** the `board.tsx` live defect (it dereferences two fields no
-response carries), the `StreamItem` union's missing `scope-revoked` member, and **ruling P24** —
-Plan 6 Task 10 adopts the SERVER's `UserPreferences` shape. `apps/server/test/integration/client-contract.test.ts`
-is the machine-checked register of what an HTTP `DataSource` can and cannot be built from; read it
-before writing one.
+**This is the first step of Phase 3**, and it goes first because Plan 8's T13–14 and Plan 9's T14 both
+need `apps/web`, which is Plan 6 T14.
 
-**Everything is committed and pushed, and the tree is clean.** The executor's work on this step is
-finished. **The executor opens PRs and NEVER merges** — that is the whole reason a second session
-exists, and it is the one authority this role does not have.
+**Four things step 10 handed this step, all already measured — do not re-derive them from scratch, but
+DO re-verify before building on them:**
+
+1. **`packages/app-core/src/views/board.tsx` is a LIVE DEFECT, not a pending reconciliation.** The one
+   real view component dereferences `group.workflowVersion` (`:28`) and `card.assignee.id`/`.name`
+   (`:94`). **None of those three fields exists in any server response.** It works today only because
+   the sole `DataSource` implementation is a fake.
+2. **Ruling P24 is TAKEN and binds Task 10** — the SERVER's `UserPreferences` shape wins. Plan 6's
+   document is refused three ways by the shipped `.strict()` schema, so this is adoption, not a rename.
+   Reversible in one direction only while T10 is unexecuted.
+3. **9 of 12 `DataSourceQuery` methods cannot be implemented over the shipped routes**; three of those
+   cannot even form their request (`getMyWork`, `getPreferences`, `putPreferences` take no
+   `workspaceId`, and those routes 400 `invalid_query` without it). The blocked rows were sorted into
+   **serving** gaps (one route change) and **data** gaps (a product decision); step 10 named that sort
+   as the thing it was least sure of. **Re-derive the sort before building on it.**
+4. **There is ONE fake and NO real `DataSource` anywhere** — `packages/app-core/test/helpers/fake-data-source.ts`.
+   It is load-bearing: the only real view component is built against it.
+
+`apps/server/test/integration/client-contract.test.ts` is the machine-checked register of what an HTTP
+`DataSource` can and cannot be built from. **Read it before writing one.**
 
 | Task | What | State |
 |---|---|---|
-| **A** | **Ruling P18** — wire `getEntityState('membership')` to `proj_memberships` | **DONE, committed `44fb736`, gate green** |
-| **B** | Real-door round trip + the client-contract divergence pins (C merged in) | **DONE, committed `684839f`, gate green** |
-| docs | coordination doc records (P18 discharge, ruling P24, the recounts) | **DONE, committed `2b9876d`** |
-| final review | ONE opus reviewer over the whole branch | **DONE** — 3 Important + 2 Minor + 1 Nit, **all against the DOCUMENTS, none against the code**; all fixed |
-| review fix round | prose and comments only, no behaviour touched | **DONE**, committed |
-| PR | **#70 OPEN. The controller merges; the executor never does.** | `gh pr view 70` |
+| T5 | Domain gap guards — `IngestResult`, `docToPlainText`, `blocked` | **todo** |
+| T7 | Online DataSource — HTTP client, mappers, ingest | **todo** — owns finding 1 and 3 |
+| T8 | Online stream — WS subscribe, reconnect, `afterSeq` | **todo** — owns the missing `scope-revoked` member |
+| T10 | List view | **todo** — bound by ruling P24 |
+| T11, T12, T12a, T13 | My Work / ticket sheet / attachments / reopen flow | **todo** |
+| T14 | `apps/web` Next.js shell | **todo** — the thing Plans 8 and 9 are waiting on |
+| T15, T15b | Invite acceptance + Playwright smoke; the doors | **todo** |
+| T16 | `Features.md` §8, `test-cases/08-web-client.md`, full verification | **todo** |
 
 ### THE FINAL REVIEW'S RESULT IS THE MOST USEFUL THING ON THIS BRANCH — read it before the code
 
@@ -252,7 +270,7 @@ not a replacement"*). So: green on the one side with the fake, untested everywhe
 
 ---
 
-## BELOW THIS LINE IS THE STEP 9 RECORD — history, not position. Every sha in it is orphaned.
+## BELOW THIS LINE IS THE STEP 9 / STEP 10 RECORD — history, not position. Every sha in it is orphaned.
 
 ### How to find Plan 5's work now that its shas are dead
 
@@ -320,10 +338,10 @@ plausible homes for a seventh and eighth disagreement.
 
 ### WHAT THE NEXT SESSION SHOULD DO
 
-**Step 9 is closed. The next item in the serial sequence is STEP 10 — the integration checkpoint.**
-It is described in the brief and its target is already concrete; see *"Open items for the controller"*
-below, item 4. Nothing in this document assigns the executor any step-9 work, and re-running any of it
-would be redoing merged work against orphaned shas.
+**STALE WHEN WRITTEN — kept only so the paragraph below it stays readable.** This said the next item
+was step 10. **Step 10 merged as `ac187e8`.** The live position is the "WHERE I AM" section at the top
+of this file, and it is step 11. Nothing in this document assigns the executor any step-9 or step-10
+work, and re-running any of it would be redoing merged work against orphaned shas.
 
 ## THE RULE THIS COST US — kept because it generalises, though its example is now history
 
