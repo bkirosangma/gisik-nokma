@@ -1,0 +1,331 @@
+import type { FieldClaim, WorkspaceRole } from './entity-state.js';
+import type { PublishedWorkflowDef, StateCategory } from './workflow.js';
+import type { Grouping } from './filter-spec.js';
+import type { TicketTypeDef } from './ticket-types.js';
+import type { WorkspaceSettings } from './events/workspace-settings.js';
+
+/**
+ * The read models every `/v1` read route serves and every client renders
+ * (Plan 5 Task 7). These are VIEW MODELS, and the standard they are held to is
+ * that **no field of one may collapse two different facts into one value.**
+ *
+ * ## The rule, stated once for the whole file
+ *
+ * For every field here, three situations must stay tellable apart:
+ *
+ * - **never claimed** — nobody ever said anything. `dueDate` on a fresh ticket.
+ * - **claimed, then withdrawn** — somebody said something and then took it
+ *   back. The ledger keeps the withdrawal AS A CLAIM, with its actor and both
+ *   clocks (`ticket.field_set` with `value: null`; see the reducer's own note
+ *   in `./ticket-state.ts`, which exists so "who emptied this, and when"
+ *   survives). A view model that renders it as the same blank as
+ *   "never claimed" throws away provenance the ledger deliberately kept.
+ * - **withheld** — the fact exists and this viewer may not have it. Rollups are
+ *   the one place this happens here, and it is NAMED rather than subtracted
+ *   (`TicketRollup.restrictedCount`).
+ *
+ * Where a type below cannot tell two of those apart, it says so IN THE TYPE —
+ * a discriminated union or an extra counted field — rather than in a comment.
+ * `TicketDueDate` and `TicketRollup.uncategorizedChildren` are both that rule
+ * applied, and both replace a `null`/`0` the plan text carried.
+ */
+
+/** Owner decision (coordination doc): a reopen names the child that caused it. */
+export type TransitionCause = { kind: 'reopened-for-child'; childTicketId: string };
+
+/**
+ * Who claimed the current state, and when — by both clocks. The provenance
+ * floor made queryable: every card carries this, so "Done" can always
+ * unfold to "marked done by X on date".
+ *
+ * `cause: null` is NOT a collapse. Every state a ticket can be in was claimed
+ * by exactly one event, so there is always an actor and always both clocks;
+ * `cause` is a field that event either carried or did not, and "the transition
+ * named no cause" is a complete statement about a claim that exists. That is
+ * why this type has no `never-claimed` arm and `TicketDueDate` does.
+ */
+export type StateProvenance = {
+  actorId: string;
+  clientTime: string;
+  serverTime: string;
+  cause: TransitionCause | null;
+};
+
+/**
+ * A parent's child counts as a viewer is honestly told them — spec §6's
+ * "5 of 8 done · 2 restricted", field by field.
+ *
+ * `totalChildren` and `terminalChildren` are TRUE counts over **all** direct
+ * children, including the ones this viewer may not see. That is a deliberate,
+ * spec-level disclosure (`docs/superpowers/specs/2026-08-20-gisik-nokma-product-design.md`
+ * line 116: "Derived parent progress is computed server-side over *all*
+ * children … true counts, restriction named, nothing pretended absent"), and
+ * `terminalChildren` discloses strictly MORE than `totalChildren` does — the
+ * first leaks the existence of children the viewer cannot reach, the second
+ * leaks something about their state. That is the "5 of 8 **done**" half and it
+ * is sanctioned by the same line; it is written out here rather than left to
+ * ride on `totalChildren`'s precedent.
+ *
+ * `restrictedCount` is the per-VIEWER half and the thing that keeps the
+ * disclosure honest: it names how much of the total the viewer cannot reach
+ * instead of quietly subtracting it out.
+ *
+ * `uncategorizedChildren` exists because the two halves come from two
+ * projections. The child SET comes from `proj_visibility`; each child's state
+ * category comes from `proj_tickets`. A child the first knows and the second
+ * has no row for has an UNKNOWN category, and counting it as non-terminal
+ * would understate "done" while looking exactly like a true count. So it is
+ * counted on its own line: `terminalChildren + uncategorizedChildren <=
+ * totalChildren`, and a client rendering "5 of 8 done" while
+ * `uncategorizedChildren > 0` is rendering a number it was told is incomplete.
+ *
+ * It is 0 whenever BOTH projections are current with the ledger — the condition,
+ * stated instead of the shorter and slightly false "always 0 in the product".
+ * One ingest transaction writes both or rolls back, and `rebuildProjection`
+ * replays the WHOLE ledger into one projection inside one transaction, so
+ * neither path can leave a partial set. What CAN is a caller that advances one
+ * and not the other: a fixture applying a subset of the registry
+ * (`test/helpers/seed.ts`'s `applyAll`), or a truncation of one table alone.
+ * So a nonzero value means one projection is behind, made countable rather than
+ * either invented away or thrown on. See `apps/server/src/visibility/rollup.ts`
+ * (case 6.83).
+ */
+export type TicketRollup = {
+  totalChildren: number;
+  terminalChildren: number;
+  uncategorizedChildren: number;
+  restrictedCount: number;
+};
+
+/** A due date is a claim: the date plus who claimed it and when. */
+export type DueDateClaim = {
+  date: string;
+  note?: string;
+  actorId: string;
+  clientTime: string;
+  serverTime: string;
+};
+
+/**
+ * A ticket's due date in the three states the ledger can actually be in.
+ *
+ * The plan text typed this `DueDateClaim | null`, and that `null` is the defect
+ * this task is named for: it is the same value for a ticket nobody ever gave a
+ * due date and for a ticket whose due date somebody DELETED. The second is an
+ * attributed act — `ticket.field_set` with `value: null` keeps the clearer's id
+ * and both clocks precisely so it can be shown — and flattening it to `null`
+ * discards provenance one layer below the layer that fought to keep it.
+ *
+ * There is no `null` arm at all, deliberately: a discriminated union with no
+ * empty case makes the compiler ask every renderer which of the three it means,
+ * which is the same device `EffectiveRole`'s brand and this codebase's bare
+ * exhaustive switches use.
+ */
+export type TicketDueDate =
+  | { state: 'claimed'; claim: DueDateClaim }
+  /** Somebody removed it. Who, and by both clocks — the claim is the clearing. */
+  | { state: 'cleared'; actorId: string; clientTime: string; serverTime: string }
+  /** No claim has ever been made about this ticket's due date. */
+  | { state: 'never-claimed' };
+
+/**
+ * One ticket as a board, list, search or My Work response carries it.
+ *
+ * Field-by-field, what each value means when the underlying fact was withheld,
+ * absent, or never claimed:
+ *
+ * - `parentId: null` — this ticket is a ROOT. It is never "a parent you may not
+ *   see": a viewer who cannot see the parent still gets its id here, which is
+ *   the disclosed trade the single-ticket route already makes (spec line 117,
+ *   "existence, no title"). So null is unambiguous.
+ * - `assigneeId: null` — nobody is assigned RIGHT NOW. It does not distinguish
+ *   "never assigned" from "unassigned by somebody", and it cannot:
+ *   `proj_tickets.assignee_id` is a bare column with no provenance beside it,
+ *   so the projection does not hold the difference either. Recorded rather than
+ *   invented — this view model does not claim to carry unassignment provenance,
+ *   and inventing a union whose second arm could never be populated would be
+ *   worse than the honest gap.
+ * - `collaboratorIds: []` — nobody is a collaborator. Never "withheld": the
+ *   list is not filtered per viewer anywhere on the read path.
+ * - `title` — always a claimed string. `ticket.created` writes `fields.title`
+ *   unconditionally, so a card with no title claim means the projection and the
+ *   ledger disagree, and the assembler throws rather than emitting `''` — the
+ *   empty string would be a title nobody typed sitting where a real one goes.
+ * - `dueDate` — the three-state union above; never a bare null.
+ * - `fields` — every claim verbatim, each carrying its own actor and clocks. An
+ *   ABSENT key means never claimed; a present key whose `value` is `null` means
+ *   cleared by that claim's actor. The map preserves the distinction the
+ *   reducer stores, so no field-specific flattening happens here.
+ * - `stateProvenance` — always present; see its own note.
+ * - `rollup: null` — this ticket has NO CHILDREN. Not "children you may not
+ *   see": restricted children are counted in `restrictedCount` and the rollup
+ *   is non-null. Matches `rollupFor`, which answers null for a leaf on the same
+ *   reasoning.
+ */
+export type TicketCard = {
+  ticketId: string;
+  workspaceId: string;
+  projectId: string;
+  typeId: string;
+  parentId: string | null;
+  workflowId: string;
+  stateId: string;
+  stateCategory: StateCategory;
+  assigneeId: string | null;
+  collaboratorIds: string[];
+  title: string;
+  dueDate: TicketDueDate;
+  fields: Record<string, FieldClaim>;
+  stateProvenance: StateProvenance;
+  rollup: TicketRollup | null;
+};
+
+export type BoardColumn = {
+  workflowId: string;
+  workflowName: string;
+  stateId: string;
+  name: string;
+  category: StateCategory;
+  blocked: boolean;
+  cards: TicketCard[];
+};
+
+export type BoardResponse = { projectId: string; workspaceId: string; columns: BoardColumn[] };
+
+export type ListGroup = { key: string; label: string; cards: TicketCard[] };
+
+export type ListResponse = {
+  projectId: string;
+  groupBy: Grouping;
+  groups: ListGroup[];
+  nextCursor: string | null;
+};
+
+export type SearchHit = { card: TicketCard; snippet: string };
+
+export type SearchResponse = { workspaceId: string; query: string; hits: SearchHit[] };
+
+export type MyWorkResponse = {
+  workspaceId: string;
+  groups: { open: TicketCard[]; active: TicketCard[]; terminal: TicketCard[] };
+};
+
+export type AttentionItem =
+  | { kind: 'blocked'; card: TicketCard; stateName: string; reason: string }
+  /**
+   * `enteredStateAt` is the absolute instant the ticket entered its current
+   * state. `daysInFlight` is how many INDIAN days ago that was — computed by
+   * subtracting IST days, not by dividing a millisecond difference (owner
+   * decision 2026-08-20, "time is Asia/Kolkata"). The two disagree for every
+   * instant between 18:30Z and 00:00Z, which is the whole Indian evening.
+   */
+  | {
+      kind: 'stale';
+      card: TicketCard;
+      enteredStateAt: string;
+      daysInFlight: number;
+      thresholdDays: number;
+      reason: string;
+    }
+  | { kind: 'due-soon'; card: TicketCard; due: DueDateClaim; windowDays: number; reason: string };
+
+/**
+ * The attention strip, as the server computes it at `generatedAt` and never
+ * stores it.
+ *
+ * `settings` is the WHOLE `WorkspaceSettings`, provenance included, rather than
+ * the plan text's bare `{ staleDays, dueSoonDays }` pair. That pair is this
+ * file's own rule broken: it gives "the defaults are in force because nobody has
+ * configured this workspace" and "somebody claimed 7 and 7" the same value, and
+ * a client rendering "stale after 7 days" then cannot say whether anyone chose
+ * it. `getWorkspaceSettings` already keeps the two apart — `provenance: null`
+ * means never claimed, and the defaults live in the reader rather than in the
+ * table for exactly that reason — so carrying its answer whole is the change
+ * that stops discarding a distinction one layer below the layer that made it.
+ * The same call `TicketDueDate` makes about a due date somebody deleted.
+ *
+ * `generatedAt` names the moment the judgment was made, and is the only honest
+ * thing a computed strip can return: everything below it expires.
+ */
+export type AttentionResponse = {
+  workspaceId: string;
+  generatedAt: string;
+  settings: WorkspaceSettings;
+  items: AttentionItem[];
+};
+
+/**
+ * ## The builder's read surface (Plan 5 Task 9b)
+ *
+ * Plan 8's workflow builder consumes these through Plan 6's `DataSource.query`.
+ * They are the SHAPE of a workspace — its workflows, its ticket types, its
+ * roster, and how much live work sits in each state — rather than the work
+ * itself, so none of them passes through the ticket visibility predicate. The
+ * access decision therefore lives entirely at the door, and it differs per
+ * route; `apps/server/src/routes/builder-reads.ts` is where it is written down.
+ *
+ * The definition and type payloads travel VERBATIM (`PublishedWorkflowDef`,
+ * `TicketTypeDef`) rather than as flattened view models: the builder loads one
+ * onto a canvas and republishes it, so any field this surface dropped would be
+ * a field the next publish silently deleted.
+ */
+export type WorkflowListResponse = { workspaceId: string; workflows: PublishedWorkflowDef[] };
+
+export type WorkflowResponse = { workspaceId: string; workflow: PublishedWorkflowDef };
+
+export type TicketTypeListResponse = { workspaceId: string; ticketTypes: TicketTypeDef[] };
+
+/**
+ * `displayName` is whatever better-auth's `"user"."name"` holds — the vendor
+ * owns identity (Plan 4), and this surface neither invents a fallback nor
+ * formats a phone number into a name. It is not nullable because a roster row
+ * with no name is not something this read may produce: see `readMembers`, which
+ * states what it does when the join finds nothing.
+ */
+export type WorkspaceMember = { userId: string; displayName: string; role: WorkspaceRole };
+
+export type MemberListResponse = { workspaceId: string; members: WorkspaceMember[] };
+
+/**
+ * Tickets currently sitting in each state of one workflow. Counts cover the
+ * WHOLE workspace, not the caller's view — the route is admin-only for exactly
+ * that reason, so there is no per-viewer variant to drift out of step. Every
+ * state of the resolved definition appears, zeroes included: a mapping dialog
+ * that silently omitted an empty state would invite an author to delete a state
+ * that turns out to hold work tomorrow.
+ */
+export type StateOccupancyResponse = {
+  workspaceId: string;
+  workflowId: string;
+  counts: Record<string, number>;
+};
+
+/**
+ * How many tickets of one type are PINNED to one workflow — `proj_tickets`
+ * filtered on both, because a ticket pins its workflow at creation (owner
+ * decision 2026-08-27) and re-pointing the type's binding changes only what new
+ * tickets get. Admin-only on `StateOccupancyResponse`'s exact terms.
+ *
+ * `count: 0` is a real answer here and not a collapse of "no such type": the
+ * route resolves the type and the workflow first and answers 404 if either is
+ * unknown in this workspace, so a zero always means "this pairing exists and
+ * holds nothing".
+ */
+export type TypePopulationResponse = {
+  workspaceId: string;
+  typeId: string;
+  workflowId: string;
+  count: number;
+};
+
+/**
+ * The bulk rebind's answer — the shape Plan 8's gateway already pinned, served
+ * verbatim rather than renegotiated.
+ *
+ * A union rather than a `count` that goes to 0 on refusal: "nothing moved
+ * because nothing needed to" and "nothing moved because the batch was refused"
+ * are different facts, and a caller must not have to guess which happened.
+ */
+export type MigrationOutcome =
+  | { status: 'migrated'; count: number }
+  | { status: 'refused'; rule: string; reason: string };

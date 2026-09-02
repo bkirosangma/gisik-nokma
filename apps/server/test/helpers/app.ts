@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
-import { buildApp } from '../../src/app.js';
+import { buildApp, type AppDeps } from '../../src/app.js';
 import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
 import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
+import type { Queryable } from '../../src/db/queryable.js';
 import type { ProjectionRegistry } from '../../src/projections/registry.js';
 import type { TestDatabase } from './db.js';
 
@@ -46,6 +47,37 @@ export type BuildTestAppOverrides = {
    * registry that ships" differ in a way no test could name.
    */
   projections?: ProjectionRegistry;
+  /**
+   * Freezes the clock the ATTENTION strip computes against (`AppDeps.now`).
+   * Off by default, so an app built here reads the real clock exactly as the
+   * shipped one does; `read-app.ts` pins it to `SCENARIO_NOW` because that world
+   * is seeded with instants measured from it.
+   */
+  now?: () => Date;
+  /**
+   * `AppDeps.stream` — the heartbeat interval, the per-user connection budget,
+   * and the two seams (`schedule`, `onHeartbeat`) that let a test drive the
+   * heartbeat instead of waiting on one. Off by default, so an app built here
+   * heartbeats on a real `setInterval` exactly as the shipped one does;
+   * `stream-route.test.ts` builds its own app with all four, because the shared
+   * read world's clock is FROZEN and a deadline measured against a constant
+   * never expires.
+   */
+  stream?: AppDeps['stream'];
+  /**
+   * Replaces `AppDeps.pool` — the handle every read, permission and stream
+   * membership check goes through — and NOTHING else. `db`, the auth instance
+   * and the ingest service keep the real pool, so a wrapper passed here can
+   * observe, delay or fail a READ without breaking a commit or a sign-in.
+   *
+   * Written for 7.160 and 7.162, which need the membership round trip inside
+   * `handleMessage` to be a thing the test controls: one needs it still
+   * suspended at a moment the test chooses (the close-during-subscribe race is
+   * otherwise decided by whether Postgres or a TCP close handshake wins, which
+   * is not a fact a suite may rest on), and the other needs it to THROW, which
+   * is the only way the route's server-fault path executes at all.
+   */
+  pool?: Queryable;
 };
 
 /**
@@ -89,7 +121,7 @@ export function buildTestApp(
   const app = buildApp(
     {
       db: db.pool,
-      pool: db.pool,
+      pool: overrides.pool ?? db.pool,
       ingest,
       auth,
       // The internal door as a named capability, exactly as `src/index.ts`
@@ -97,6 +129,10 @@ export function buildTestApp(
       // is the only route into `ingestBatch` any handler has.
       serverAppend: (events) => ingest.ingestBatch(events),
       webOrigin: TEST_WEB_ORIGIN,
+      // Undefaulted: `registerAttentionRoutes` owns the real-clock default, and
+      // passing `undefined` here is what lets it.
+      now: overrides.now,
+      stream: overrides.stream,
     },
     overrides.logStream === undefined ? {} : { logLevel: 'info', logStream: overrides.logStream },
   );

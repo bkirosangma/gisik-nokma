@@ -4,12 +4,21 @@ import type { Auth } from './auth/auth.js';
 import { registerAuthRoutes } from './auth/routes.js';
 import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
+import { registerAttentionRoutes } from './routes/attention.js';
+import { registerBoardRoutes } from './routes/board.js';
+import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
+import { registerListRoutes } from './routes/list.js';
+import { registerMyWorkRoutes } from './routes/my-work.js';
+import { registerPreferencesRoutes } from './routes/preferences.js';
+import { registerSearchRoutes } from './routes/search.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
 import { registerContestsRoute } from './sync/contests-route.js';
+import { createStreamHub } from './stream/hub.js';
+import { registerStreamRoute, type StreamRouteDeps } from './stream/routes.js';
 import type { Queryable } from './db/queryable.js';
 
 export type HealthDb = { query(sql: string): Promise<unknown> };
@@ -79,6 +88,35 @@ export type AppDeps = {
    * them silently.
    */
   webOrigin: string;
+  /**
+   * The clock the ATTENTION strip computes against. Optional, and the only
+   * dependency here that a test would ever want to freeze: the strip is the one
+   * read whose answer changes while the database does not, so a test that could
+   * not pin `now` would be asserting against the day it happened to run.
+   *
+   * There is deliberately no default here. `registerAttentionRoutes` owns it, so
+   * "the real clock" is defined once; a second default in this file would be a
+   * second thing to keep in step. Every other route on this branch reads no
+   * clock at all, which is why this is one optional field rather than a `Clock`
+   * threaded through `AppDeps`.
+   */
+  now?: () => Date;
+  /**
+   * The knobs `WS /v1/stream` exposes — heartbeat interval, per-user connection
+   * budget, and the two seams that make the heartbeat testable without a
+   * sleep (`schedule`, `onHeartbeat`).
+   *
+   * One optional field rather than four, because they are one subject and a
+   * caller either cares about the stream's timing or does not. Every default
+   * lives in `registerStreamRoute`, so this stays UNDEFAULTED here for the same
+   * reason `now` does: one definition of each real value, in the module that
+   * owns it.
+   *
+   * `now` is deliberately NOT in here. The stream's deadline and the attention
+   * strip's Indian day are the same clock — a server does not get to be at two
+   * times at once — and giving the stream its own would make that expressible.
+   */
+  stream?: Omit<StreamRouteDeps, 'pool' | 'hub' | 'now'>;
 };
 
 export function buildApp(
@@ -197,6 +235,79 @@ export function buildApp(
     { pool: deps.pool, ingest: deps.ingest, serverAppend: deps.serverAppend, webOrigin: deps.webOrigin },
     requireSession,
   );
+  // The project board (Plan 5 Task 8) — one column per state of every workflow
+  // in use, cards filtered to what the caller may see. Same preHandler by
+  // parameter, same reason as its neighbours: the handler reads
+  // `request.currentUserId`, and its whole tenancy gate is resolved from it.
+  registerBoardRoutes(app, { pool: deps.pool }, requireSession);
+  // The project list (Plan 5 Task 9) — the same project's tickets as a filtered,
+  // grouped, keyset-paged flat list. Registered beside the board rather than
+  // inside it: same door, same visibility predicate, different arrangement.
+  registerListRoutes(app, { pool: deps.pool }, requireSession);
+  // The builder read surface (Plan 5 Task 9b) — the workflow roster, one
+  // definition by version, the ticket types bound to them, the workspace roster
+  // with guests withheld from non-admins, and the admin-only state occupancy and
+  // type population a publish mapping is built from. Same preHandler by
+  // parameter, same reason as every route above it: each handler reads
+  // `request.currentUserId` and resolves its whole tenancy gate from it.
+  registerBuilderReadRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);
+  // Workspace-wide full text (Plan 5 Task 10) — the FIRST cross-project read
+  // here. Board, list and the builder surface all take their scope from a path
+  // parameter the door resolves; this one spans a whole workspace, so
+  // `visibleTicketsWhere` and the tenancy clause beside it are the entire
+  // boundary. Same preHandler by parameter, same reason as every route above:
+  // the handler reads `request.currentUserId` and resolves its gate from it.
+  registerSearchRoutes(app, { pool: deps.pool }, requireSession);
+  // My Work (Plan 5 Task 11) — the first PER-VIEWER read: not "what is in this
+  // container" but "what is mine", so the session's user id is the filter as
+  // well as the security boundary. Registered with the same preHandler by
+  // parameter as every route above it, and here that matters most: the handler
+  // does not merely read `request.currentUserId`, that id IS the subject of the
+  // answer, and there is deliberately no parameter by which a caller could name
+  // somebody else's.
+  registerMyWorkRoutes(app, { pool: deps.pool }, requireSession);
+  // The attention strip (Plan 5 Task 12) — the first read that is COMPUTED from
+  // the stored claims AND THE CLOCK, and stored nowhere: blocked flags, an IST
+  // staleness window and an IST due window, with the two thresholds read from
+  // the workspace's own `workspace.settings_set` claim rather than from
+  // constants. `deps.now` is threaded through UNDEFAULTED on purpose — the
+  // default lives in `registerAttentionRoutes` — but NOT only there: Task 15's
+  // `registerStreamRoute` defaults it too, for the heartbeat deadline. Both get
+  // this same optional field, so pinning it pins both. There is not one definition of
+  // the real clock. Same preHandler by parameter, same reason as every route
+  // above it: the handler reads `request.currentUserId` and resolves its whole
+  // tenancy gate from it.
+  registerAttentionRoutes(app, { pool: deps.pool, now: deps.now }, requireSession);
+  // View preferences (Plan 5 Task 13) — the FIRST WRITE surface among these
+  // routes, and the one thing this server stores that is NOT an attributed
+  // claim: preferences arrange the record rather than say anything about it
+  // (coordination amendment 14), so they are per-user rows and a PUT appends no
+  // events. It takes `deps.pool` and the same preHandler by parameter as every
+  // route above it, and here that is load-bearing twice over: the handler does
+  // not merely read `request.currentUserId`, that id is the KEY it writes
+  // under, and there is deliberately no parameter by which a caller could name
+  // somebody else's.
+  registerPreferencesRoutes(app, { pool: deps.pool }, requireSession);
+  // The realtime fan-out (Plan 5 Tasks 14–15) — the FIRST thing here that is
+  // not a request/response at all, and the first that decides who ELSE hears
+  // about a change. The hub is created HERE, beside the ingest service whose
+  // commits it listens to: `onEventCommitted` is on `ClientIngest`, so the
+  // narrowed door is enough and the route still cannot reach the internal
+  // append path. Same preHandler by parameter as every route above it, and here
+  // it is the whole door — `stream/hub.ts` authorizes nobody by design.
+  const hub = createStreamHub({
+    pool: deps.pool,
+    onEventCommitted: (listener) => deps.ingest.onEventCommitted(listener),
+  });
+  // A hub outlives a request, so it has to be let go of explicitly: `close()`
+  // drops the commit-feed subscription and every socket's subscriptions. Without
+  // this, a test file that builds several apps over one database leaves a live
+  // listener on each ingest service it ever made.
+  app.addHook('onClose', () => {
+    hub.close();
+  });
+  app.decorate('streamHub', hub);
+  registerStreamRoute(app, { ...deps.stream, pool: deps.pool, hub, now: deps.now }, requireSession);
   registerAuthRoutes(app, deps.auth);
 
   return app;

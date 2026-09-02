@@ -24,7 +24,7 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 - ⚙️ **Client envelope builder** — `newSubmittedEvent(...)`, the one place a client mints an event: it fills `id` (ULID), `version` and `clientTime` and copies the rest of the caller's claim. `serverTime` and `seq` are absent by construction, because they are the server's to assign at ingest and a client that invented them would be asserting facts it does not own. `packages/domain/src/submit.ts`
 - ⚙️ **IST day boundaries** — `istDayOf(instant)` and `istDayBounds(day)` against the fixed +05:30 offset (India has no DST), plus `IST_TIME_ZONE`: the single origin for where a day starts. "Due today", "overdue", calendar-cell assignment and day counts across the whole product resolve here, never from the server's locale or the viewer's device. `packages/domain/src/ist-day.ts`
 - ⚙️ **IST instant rendering & clock skew** — `formatIstInstant(instant)` is the ONE way the product prints an absolute instant to a person (`'21 Aug 2026, 00:00 IST'`). Its day comes from `istDayOf`, so a printed timestamp can never disagree with the calendar cell the same instant lands in; it does constant-offset arithmetic with no `Intl` and no date library, because Hermes on mobile does not reliably ship a timezone database and a silent fallback to the device's zone would be the offline copy disagreeing about when things happened. Anything that is not a well-formed, real ISO instant travels back verbatim rather than as an invented time: unparseable, year-extended, calendar-impossible (`2026-02-30`), a day claim like `2026-08-20` that `Date.parse` would call midnight UTC, or a string with no stated offset that would otherwise be read in the device timezone. `IST_CLOCK_NOTE` is the line a surface puts beside a time so a collaborator in another timezone knows which clock they are reading. Beside them, `clockSkewMs` / `GROSS_CLOCK_SKEW_MS` (10 min) / `hasGrossClockSkew` compute skew from the two clocks the envelope already keeps: DERIVED, never stored and never projected, so the flag is identical wherever it is computed and an unparseable client claim counts as gross rather than as zero. `packages/domain/src/clock-skew.ts`
-- ⚙️ **Plain-text document rendering** — `docToPlainText(doc: unknown): string`, a dependency-free ProseMirror/Tiptap JSON walker (coordination amendment 12): total on junk input, mention nodes `{type:'mention', attrs:{userId, label?}}` render as `@label` falling back to `@userId`, image/attachment nodes render as nothing. Pulled forward as pre-work (Plan 5 Task 1) because `proj_search` (Plan 5), Plan 7's editor, and Plan 9's notifications all consume it; landed here in §3 pending Plan 5's own catalogue task, which may relocate this bullet to §7. `packages/domain/src/doc-text.ts`
+- ⚙️ **Plain-text document rendering** — `docToPlainText(doc: unknown): string`, a dependency-free ProseMirror/Tiptap JSON walker (coordination amendment 12): total on junk input, mention nodes `{type:'mention', attrs:{userId, label?}}` render as `@label` falling back to `@userId`, image/attachment nodes render as nothing. Pulled forward as pre-work (Plan 5 Task 1) because `proj_search` (Plan 5), Plan 7's editor, and Plan 9's notifications all consume it; landed here in §3, and Plan 5's own catalogue task (Task 16) has since run — 2026-09-02 — and deliberately LEFT it here rather than relocating it to §7, because the bullet belongs beside the ledger material it renders. Its TEST CASES are 7.1, 7.2 and 7.159 in `test-cases/07-api-realtime-search.md`, where §7's reservation held: `doc-text.test.ts` had been cited by no `test-cases/` file at all until that task ran. `packages/domain/src/doc-text.ts`
 - ⚙️ **Design tokens — the one colour origin** — `primitives` (hex palette) resolved into 26 semantic `TOKEN_ROLES` for light AND dark, emitted as `--gn-*` CSS custom properties (`themeStylesheet()`: light default, dark by explicit `data-theme="dark"` or by OS preference when unchosen). The origin declares its own `CONTRAST_PAIRS` and the suite verifies all 7 pairs in both themes — a palette edit that breaks readability fails the build. Coordination amendment 11; no colour literal is legal anywhere else in any client package. `packages/ui/src/tokens.ts`
 - ⚙️ **Token-discipline scanner** — walks every client source tree (present and future — trees that do not exist yet are skipped, so a new client package is covered with no edit) for hex, `rgb()`/`rgba()`, `hsl()`/`hsla()`, `oklch()`/`oklab()` and `color-mix()` literals, exempting only `tokens.ts`. Proven against planted defects before the clean-tree assertion is trusted; it does NOT detect bare CSS colour keywords (`red`, `tomato`). `packages/ui/test/helpers/colour-scan.ts`
 - ⚙️ **Base UI components** — Button, Chip, Card, Avatar, Dialog, Sheet, Table: BEM class names, colour only via `var(--gn-*)`, `type="button"` by default so forms are never submitted by accident, Escape-and-scrim close on the modal pair, and horizontal scroll contained inside the table wrapper rather than the page. `packages/ui/src/components/`, `packages/ui/src/ui.css`
@@ -140,11 +140,503 @@ Legend: ✅ user-observable · ⚙️ internal subsystem · ? inferred/unverifie
 - ⚙️ **The gate names the Node it ran under** — `engines` is declared in the root manifest alone, so pnpm's `WARN Unsupported engine` never fires for a per-package script and an absent warning proved nothing (measured under Node v24: silent). A test inside the run asserts `process.version` against the root manifest's own range, parsed rather than restated, and its failure message names the Node. `apps/server/test/node-version.test.ts`
 - ✅ **The invitation token does not reach the process log** — the token travels in the URL path, because `GET /v1/invites/:token` is the pinned client contract, and Fastify's default `info` request line carries `req.url` verbatim (measured). A `req` serializer redacts that one segment and leaves every other path alone, so log access does not become workspace access. `apps/server/src/app.ts`, `apps/server/src/routes/invites.ts`
 
+## 7. API, realtime & search
+
+*(**Plan 5, complete: Tasks 1–16.** Task 16 is this plan's catalogue task and has now run, so this
+note is the replacement it owed rather than the placeholder that stood here. Every `/v1` surface Plan
+5 promised is present: the board, the project list, the builder read surface and the one write that
+belongs with it (the bulk workflow rebind), search, My Work, the attention strip, view preferences,
+and the WebSocket route that mounts the hub. Plan 5 Task 1 (`docToPlainText`) keeps its bullet in §3,
+beside the ledger material it belongs to, on the precedent §3 already records for Plan 6's and Plan
+10's pulled-forward bullets; its test cases are **7.1, 7.2 and 7.159** in
+`test-cases/07-api-realtime-search.md`. §8, §10 and §11 stay absent because the coordination doc
+assigns `Features.md` sections one per implementation plan, so numbering is claimed from that table
+rather than taken next-free.)*
+
+*What this surface does **not** do — enumerated, because a partial surface that only calls itself
+partial tells a reader nothing about which half they have. Every item below is a decision with a
+reason on record, not an oversight:*
+
+- *Search answers the **top 50, unpaginated**, ordered by `ts_rank_cd` then ticket id, and its
+  configuration is `FTS_CONFIG = 'simple'` — **nothing is stemmed, in any language**. Both were
+  settled deliberately rather than deferred: stemming one language while not stemming the others
+  would rank dishonestly for an audience that writes in more than one. Pagination stays additive
+  (`hits` is already an array) and a language-aware configuration is a reindex, not a shape change.*
+- *My Work is **per workspace** (`?workspaceId=`). There is no cross-workspace aggregation on the
+  server; a client that wants one loops. A server-side join would need cross-workspace session
+  scoping this series has not defined, and inventing it inside a view endpoint is how scoping rules
+  end up owned by nobody.*
+- *View preferences are **full-replace `PUT`** per (user, workspace). There is no per-key `PATCH` and
+  no merge: last-write-wins on one person's own view arrangement can lose an arrangement, never
+  truth.*
+- *The board answers **`columns: []`** for a project with no visible tickets. Columns are derived from
+  the workflows in use by tickets THIS CALLER may see, so inventing them from a default would show a
+  viewer columns derived from tickets they cannot see. The first-run empty state is Plan 6's, as copy
+  rather than as scaffolding.*
+- *Attention reasons are **English template strings**, and there is no localisation. The structured
+  fields (`stateName`, `thresholdDays`, `windowDays`, `due`) carry everything a later localisation
+  needs to re-render without a server change; the standing rule is that no surface parses the English.*
+- *The stream has **no load or soak coverage** — throughput, memory ceilings and reconnect storms are
+  Plan 11's deployment concern (case 7.35, 🚫). The bounds this plan owns are proven as correctness
+  instead: the per-user connection budget, the slow-consumer `1013` close, the payload bound on an
+  oversized frame, and the heartbeat that terminates a silent peer.*
+- *Two stream gaps are **recorded and unfixed**, each with a named owner, rather than quietly absent.
+  A per-TICKET narrowing mid-stream sends **no purge frame at all** — the events simply stop and a
+  replica keeps a subtree it may no longer see (case 7.158; owner Plan 4,
+  `apps/server/src/visibility/visible-events-for.ts`, which records it as case 6.104). And the shared read world
+  seeds fixed entity ids (`wf-errands`, `epic`, `task`) that reach the ledger past the door's ULID
+  rule, so those envelopes fail the published frame schema (case 7.157; owner
+  `apps/server/test/helpers/read-scenario.ts`).*
+- *The **envelope** inside a stream frame is not `.strict()` — the outer frame object is, but an
+  unknown ENVELOPE key is silently stripped by the published schema, and it is the test recorder
+  rather than the schema that catches a hub leaking one. A Plan 6/9/10 mock importing only the schema
+  must `.strict()` the envelope on its own side (case 7.142).*
+
+- ⚙️ **FilterSpec compiler** — one strict zod shape (`@gisik-nokma/domain`) compiled to parameterized SQL; user bytes travel only as parameters, injection-proven against thirteen planted hostile inputs executed against a live database. The proof is that the emitted SQL is a CONSTANT, pinned clause by clause, rather than that a value fails to appear in it — a substring check reddens on a correct compiler the moment the value is `$1`, `t.`, `SELECT`, `->>` or `ESCAPE`, and a guard that fires on correct code gets deleted. A concatenating reference compiler stands beside it in the test, only to show what the bound one prevents: the same `fieldId` payload widens its answer past the caller's workspace scope to another tenant's ticket, which is a widened result set rather than the weaker kill a syntax error would be. **The door refuses exactly one byte on sight: U+0000**, in all seven free-form string slots, because Postgres `text` cannot carry it — every other control character, DEL and a lone surrogate included, round-trips and is admitted, so the rule is "what the store can hold" and not a taste for tidy input; the executed test shows each slot raising SQLSTATE 22021 past the door, which is what makes the refusal a 400 instead of a 500. A due bound is the shared `IST_DAY_REGEX`, imported rather than restated, and constrains day SHAPE, not calendar existence — fixed-width padding is what makes the compiled text comparison chronological. `fields[].value` deliberately carries no `.min(1)`: `eq: ''` is a real claim, so `contains: ''` is a declared field-PRESENCE predicate that still cannot widen a read. The two clauses that reach another table (`proj_search`, the blocked-states CTE) carry their own `workspace_id = t.workspace_id` correlation, so a filter term cannot answer out of a neighbouring tenant — executable because `proj_tickets.ticket_id` is globally unique, which makes a correctly-filed neighbouring row harmless and projection DRIFT (a search row filed under the wrong workspace) the thing the correlation actually refuses. `packages/domain/src/filter-spec.ts`, `apps/server/src/read/sql-params.ts`, `apps/server/src/read/compile-filter.ts`
+- ⚙️ **`workspace.settings_set` v1** — the attention strip's two thresholds (`staleDays`,
+  `dueSoonDays`, `DEFAULT_STALE_DAYS = 7`, `DEFAULT_DUE_SOON_DAYS = 7`), claimed as an attributed
+  event against the workspace itself rather than assumed or hardcoded — a threshold is a claim about
+  what deserves attention, so it gets provenance like everything else. Partial-update semantics:
+  either knob alone or both together, at least one required, `.strict()` against unknown keys,
+  integers only in `[1, 365]` for `staleDays` and `[0, 365]` for `dueSoonDays`. Registered with
+  `entityKind: 'workspace'`, so `parseEvent`'s kind guard refuses a settings claim filed against
+  anything else. Who may make the claim: workspace `owner` or `admin` only. A
+  member or guest is refused `permission.role` naming the setting by name; a **non-member is
+  refused earlier**, by the `role === null` branch that precedes every per-type case, so it carries
+  the same rule id and a different reason — which is the better answer, since naming the setting
+  would disclose it to someone holding nothing in this workspace. `packages/domain/src/events/workspace-settings.ts`,
+  `apps/server/src/permissions/check-permission.ts`
+- ⚙️ **`proj_workspace_settings` and `getWorkspaceSettings`** — the thresholds as a rebuildable
+  projection with the last claim's provenance kept. A row exists only once somebody has CLAIMED
+  something: the defaults are supplied at READ time and the answer carries `provenance: null`, because
+  a default is not a claim and there is nobody to attribute it to. Both threshold columns are NULLable
+  so a partial claim can say nothing about the other knob — the upsert's
+  `COALESCE(EXCLUDED.x, existing.x)` is the partial-update semantics itself, not defensiveness, and a
+  stored default would be indistinguishable from a deliberate claim of 7. The reader coalesces on NULL
+  and never on falsiness, since `dueSoonDays: 0` is a legal claim. Blind last-writer-wins is safe here
+  for a stated reason rather than by luck: the table's key IS the workspace the events are filed
+  against, so each key has exactly one totally-ordered writer and canonical replay order is that
+  writer's own claim order. **Appended at registration — LAST until Task 6 put `proj_search` after it — and the append is a dependency decision rather than a
+  §8 position** — coordination §8's canonical order stops at `proj_visibility` and `proj_contested` is
+  already past its end, so "after `proj_visibility`" no longer picks a unique slot; this projection
+  reads no other projection's table and none reads its table inside an ingest transaction
+  (`getWorkspaceSettings` is a read-time function), so neither adjacency is load-bearing.
+  `apps/server/src/projections/workspace-settings.ts`,
+  `apps/server/migrations/1788272876259_proj-workspace-settings.sql`,
+  `apps/server/src/projections/index.ts`
+- ⚙️ **`proj_search` — the full-text projection** — one row per ticket holding its title,
+  description and comments as PLAIN TEXT, plus a `tsvector` GENERATED from all three and weighted
+  A/B/C so ranking can prefer a title hit. Fed by `ticket.created` (title), `ticket.field_set`
+  (`title`, and `description` through `docToPlainText`) and `comment.added` (appended,
+  newline-separated, in the ticket's own `seq` order, each rendered by `docToPlainText` so a mention
+  indexes as `@label` and is findable by the name that was shown). A comment that renders to no text
+  adds nothing — not even the separator, which would otherwise leave a trailing newline no comment
+  accounts for; a title claim whose value is not a string is ignored rather than coerced, since the
+  door admits any value and `SET title = $2` would otherwise write a number nobody typed. The text
+  columns are kept beside the index because a `tsvector` cannot be read back into its words and the
+  search response carries a snippet. **It stores EVERY ticket** — visibility is a read-time decision
+  (`visibleTicketsWhere` against `proj_visibility`), because filtering at index time would put a
+  permission decision inside a rebuildable table and go stale the moment an audience changed without
+  a new ticket event. The configuration is `'simple'`, deliberately and at a stated cost: the
+  audience writes in more than one language, so no English stemming, and `return` therefore does not
+  match `returns` (flagged in the plan's Open questions; the query side names the same configuration
+  and both must move together). Deterministic without a position guard: `apply` reads no table at all
+  — not another projection's, not its own — and touches only the event's own ticket row, so
+  per-entity `seq` order fully determines it, and the `tsv` column is generated by Postgres rather
+  than written here. **`tsvector` is a new projection column-type class in this repo and was proven
+  against the verifier by EXECUTION rather than argued from the type name**: `verifyProjections`
+  diffs live against a shadow rebuild with `EXCEPT`, which needs an equality operator on every column
+  — the whole reason `json` is banned as a projection column here. **Registered LAST, and the append
+  is a dependency decision rather than a coordination §8 position**, on the same grounds as
+  `proj_workspace_settings`: §8's order ends at `proj_visibility`. This projection does already have
+  a reader — `compileFilterSpec`'s text clause — but it is a READ-TIME caller on a request path
+  rather than a handler inside an ingest transaction, so it creates no adjacency.
+  `apps/server/src/projections/search.ts`,
+  `apps/server/migrations/1788278094725_proj-search.sql`,
+  `apps/server/src/projections/index.ts`
+- ⚙️ **Shared ledger-seeding test helpers** — `makeCommitted` / `applyCommitted` / `resetEntitySeqs`,
+  the fixture every Plan 5 read-model task seeds through. `makeCommitted`'s per-entity `seq` restarts
+  at 1 for each entity, exactly as `nextSeq` assigns it, with the per-workspace `workspaceSeq` cursor
+  climbing beside it, exactly as `nextWorkspaceSeq` does — a process-monotonic counter in either place
+  would still be unique, still satisfy both of the ledger's unique constraints, and still hide a
+  handler that confused an entity's history with its workspace's stream. Both clocks default to a
+  fresh instant per call so a test can tell WHICH claim last wrote a row. `applyCommitted` commits one
+  transaction per event through the live registry, which is the unit ingest commits in.
+  `apps/server/test/helpers/apply.ts`
+- ⚙️ **`visibleTicketsWhere` — the read visibility table as one SQL predicate** — the clause every
+  set-based read filters through (list, board, search, attention, My Work), against `proj_visibility`
+  joined as `v`. It is an EXTRACTION, not a new expression: the SQL half of this table already sat
+  inline inside `listVisibleTickets`, so the clause moved out and that function became a caller —
+  there is no parallel SQL copy left beside it. Stated exactly, because the honest version is smaller
+  than the tidy one: this removed a THIRD copy and did not produce a single source of truth. Two
+  expressions of one rule remain — `canSeeResolved` in TypeScript, this one in SQL, kept because the
+  SQL is what makes a list one round trip rather than a workspace-sized read filtered in memory — and
+  what stops them drifting is an agreement test that compares an exact id set per viewer AND
+  cross-checks `canSee` ticket by ticket. With one limit now stated rather than left implied: the
+  cross-check is STRUCTURALLY BLIND wherever both implementations ignore the same input — for a
+  guest, neither consults `eff.projects`, so they agree whatever the fixture holds — and there the
+  only thing that discriminates is a fixture putting the viewer in the state the branch could get
+  wrong. A guest on a project roster is that fixture, and it is what makes an over-permissive guest
+  branch (one that gained the member clause's project disjunct) fail rather than pass the suite. A non-member compiles to `FALSE` and an owner to `TRUE`, so
+  the predicate carries NO tenancy of its own and every caller must supply its own
+  `workspace_id = $n`; the parameters are built inside the branches, since a value bound for a branch
+  that returns a constant would have no `$n` to reference it. The role is walked by a bare `switch`
+  with no `default`, which is measured rather than described: adding a fifth `WorkspaceRole` raises
+  TS2366 here and in `can-see.ts`, while the if-chain it replaced reddened only `can-see.ts` and
+  silently handed the new role the member branch. The mode side cannot have that guard — the modes are
+  string literals inside SQL, invisible to tsc — so a fourth mode fails CLOSED and the agreement test
+  is what would catch it. `apps/server/src/read/visible-where.ts`,
+  `apps/server/src/visibility/visible-tickets.ts`
+- ⚙️ **Read-route membership gate** — `requireMember` answers the caller's `EffectiveRole` in a
+  workspace or `null` meaning 404 (never 403: a 403 confirms the workspace exists to somebody with no
+  business knowing it does), and `workspaceOfProject` resolves a URL's project id to the workspace the
+  role must be resolved in — so a route never trusts a workspace id the caller also supplied, which is
+  the mistake `canSee` avoids by taking no `workspaceId` parameter at all. Membership comes through
+  `resolveEffectiveRole` and never a direct roster SELECT, because a project-scope row survives a
+  revocation by design. `apps/server/src/read/membership.ts`
+- ⚙️ **`seedReadScenario` — the seeded world Plan 5's read tasks share** — one workspace, one project,
+  a workflow carrying a blocked-flagged state, an epic with a child, an explicitly shared ticket, a
+  planted hidden ticket the owner alone is named in (with a confidential comment and a due date), and
+  a guest-shared ticket. Like `applyCommitted`, it ENUMERATES what it does not contain rather than
+  calling itself simplified — no workspace-mode ticket, no admin, no second project, no revoked
+  membership, no attachments or workspace settings, one workspace only — because those absences are
+  the exact shape of what the tests built on it cannot catch, and each read task must seed for itself
+  whatever its own decision table needs. It seeds memberships explicitly, since a `workspace.created`
+  applied this way gets none of the founding side effects a real one gets. It refuses a second seed
+  into the same database with the sentence that names the fix, rather than surfacing a raw
+  `events_entity_seq_unique` violation. `SCENARIO_NOW` is Z-suffixed on purpose and its own test
+  proves the suffix load-bearing under three zones, probe first.
+  `apps/server/test/helpers/read-scenario.ts`
+- ⚙️ **Read-model view types** — the shapes every `/v1` read route serves and Plans 6/9/10 render
+  through the `DataSource`: `TicketCard`, `StateProvenance`, `TransitionCause`, `TicketRollup`,
+  `TicketDueDate`/`DueDateClaim`, and the response envelopes (`BoardResponse`, `ListResponse`,
+  `SearchResponse`, `MyWorkResponse`, `AttentionResponse` and their parts). The standard they are held
+  to is that **no field may collapse two different facts into one value** — never-claimed, claimed
+  then withdrawn, and withheld-from-this-viewer all stay tellable apart, and where a type cannot tell
+  two of them apart it SAYS so in the type rather than in a docblock. Two fields are that rule applied
+  rather than described: `TicketDueDate` is a three-arm union (claimed / cleared / never-claimed) with
+  **no null arm**, because `ticket.field_set` with `value: null` is an attributed clearing whose actor
+  and clocks the reducer keeps on purpose, and a `DueDateClaim | null` would give that act the same
+  value as a ticket nobody ever dated; and `TicketRollup.uncategorizedChildren` counts children whose
+  state category nothing knows, so a "5 of 8 done" is never rendered off evidence for only six of
+  them. `StateProvenance.cause` is `null` without such an arm, and the type says why: every state was
+  claimed by exactly one event, so "the claim named no cause" is a complete statement about a claim
+  that exists. `AttentionResponse.settings` is the third: it carries the whole `WorkspaceSettings`,
+  provenance included, rather than a bare `{staleDays, dueSoonDays}` pair, because that pair gives
+  "nobody has configured this workspace, so 7 is the default" and "somebody claimed 7" the same value
+  — and `getWorkspaceSettings` had already kept them apart one layer down.
+  `packages/domain/src/read-models.ts`
+- ⚙️ **`stateProvenanceFor` / `latestWorkflowDefs` / `blockedStateKeys` / `assembleTicketCards`** — the
+  server-side readers that turn `proj_tickets` rows into cards. Provenance is the claim that produced
+  each ticket's CURRENT state — the latest `ticket.transitioned`, or `ticket.created` if never
+  transitioned — batched as one `DISTINCT ON … ORDER BY entity_id, seq DESC` over the ledger, carrying
+  the actor, BOTH clocks and the reopen `cause`. An id with no claim is ABSENT from the map, never
+  mapped to an anonymous one, and the assembler THROWS on the absence: a projected ticket whose state
+  nobody claimed means `proj_tickets` and the ledger disagree. It throws on a missing or non-string
+  title claim for the same reason — `''` would be a title nobody typed sitting exactly where a real
+  one goes. `latestWorkflowDefs` is **workspace-scoped** (the shipped reader requires it, ruling P14)
+  and `blockedStateKeys` keys on `` `${workflowId}:${stateId}` `` because a state id is unique only
+  within its workflow. `apps/server/src/read/state-provenance.ts`,
+  `apps/server/src/read/workflow-defs.ts`, `apps/server/src/read/ticket-cards.ts`
+- ⚙️ **`RollupView.terminal` and `RollupView.uncategorized`** — the "5 of 8 **done**" half of the
+  rollup, closing case 6.82 at the moment its own note said it would close ("the day Plan 3 Task 11
+  lands"). `terminal` counts children **the viewer cannot see**, which discloses more than `total`
+  does — existence versus state — and that is the spec's own decision (product design line 116, "true
+  counts, restriction named, nothing pretended absent"), stated rather than inherited from `total`'s
+  precedent. `open`/`active` stay absent for 6.82's original reason: nothing reads them. The category
+  is JOINED onto the rows `rollupFor` already walks (`LEFT JOIN proj_tickets`), never read from
+  `proj_rollups`, because case 6.83 has now been MEASURED: `rollupFor` carries no workspace clause and
+  `getRollup` does, so a cross-workspace child (case 6.84) is in one enumeration and not the other, and
+  mixing them can emit `restrictedCount > totalChildren`. The join's miss is COUNTED as `uncategorized`
+  rather than folded into the not-done side; it is always 0 for a ledger written through the shipped
+  door, and nonzero only where a fixture seeds some projections and not others. The single-ticket read
+  returns the view verbatim, so both fields appear in its response body.
+  `apps/server/src/visibility/rollup.ts`
+- ✅ **`GET /v1/projects/:projectId/board`** — one project's board. Columns are the states of the
+  workflows **in use by the tickets this caller may see** — not every workflow the workspace has
+  defined — with every state of a used workflow present whether or not anybody is in it, ordered by
+  workflow id then by the order the publisher authored the states, cards by ticket id. Two workflows
+  on one board sit side by side, so a state id they both use is two distinct columns and a card never
+  appears under the other workflow's copy of its own state. The `blocked`
+  flag is read off the definition, never derived from a category: the seeded `waiting` state is
+  `active` AND blocked while a second workflow's `waiting` is `active` and not. Cards are `TicketCard`s, so each unfolds to
+  who claimed its state and when by both clocks, and a parent carries its four-field rollup. The
+  visibility filter is `visibleTicketsWhere` — the one SQL expression of the decision table, consumed
+  and not restated. `apps/server/src/routes/board.ts`
+- ✅ **The board's door: 401, 404, 404, 200** — no session is `401 {error:'unauthenticated'}`; an
+  unknown project id and a caller who is not a member of the project's workspace are both
+  `404 {error:'not_found'}`, indistinguishable down to `content-length`, because a 403 would confirm
+  the project exists to somebody with no business knowing it does. A member of that workspace who is
+  NOT on the project passes the gate and gets **200 with an empty board** — the gate asks about the
+  workspace, so a project's existence is not a secret from somebody already inside the tenancy, and
+  the emptiness is the visibility predicate answering rather than the door.
+  `apps/server/src/routes/board.ts`
+- ⚙️ **The shared read world for route tests** — `buildReadTestApp(db)` stands the real app up through
+  `buildTestApp`, signs six users in over the wire, seeds the shared scenario under the ids those
+  sessions answered, and adds two fixtures the scenario deliberately lacks: a SIBLING project in the
+  same workspace (without which a workspace board and a project board are the same bytes — measured)
+  and a NEIGHBOUR workspace with its own owner (without which a "member of any workspace" gate would
+  pass every tenancy test). `apps/server/test/helpers/read-app.ts`
+- ✅ **`GET /v1/projects/:projectId/tickets` — the project list read** — one project's tickets as a
+  filtered, grouped, keyset-paged flat list, behind the board's door and the same visibility
+  predicate. It CONSUMES rather than re-expresses: `visibleTicketsWhere` for Plan 4's decision table,
+  `compileFilterSpec` for every actor-supplied byte, `latestWorkflowDefs` (workspace-scoped, ruling
+  P14) for state names. `filter` is URL-encoded JSON validated by `filterSpecSchema`; `groupBy`
+  defaults to `flat`; `limit` defaults to 50 and caps at 200; pagination is keyset by `ticket_id`
+  with `cursor` = the last id of the previous page. Hierarchy is children-by-parent-query:
+  `parentId=<id>` answers direct children, `parentId=root` answers roots, absent answers the project;
+  children are not inlined. Grouping is applied PER PAGE, so a key may recur on a later page and
+  clients merge by `key` — the alternative would make a page boundary depend on the grouping, so one
+  cursor would mean different things under different `groupBy` values. **Grouping by `epic` resolves
+  on the epic RANK read from `BUILTIN_TICKET_TYPE_SEEDS`, never on the id `'epic'`**, so a workspace
+  that renamed its top rung ("Initiative") gets its own headings (owner sign-off 2026-08-20).
+  **The epic walk carries the visibility predicate and the tenancy clause**, which the plan's version
+  did not: a group's key is a ticket id and its LABEL IS THAT TICKET'S TITLE, so a walk that climbed
+  the parent chain without asking Plan 4's question would hand a caller who may see a child the title
+  of an ancestor they may not — reachable rather than theoretical, because a child authors its own
+  audience and stops inheriting. An invisible link STOPS the walk (the caller gets `no-epic`) rather
+  than being climbed over, which would report a grouping whose reason the caller cannot see; the
+  title is read inside the same walk rather than by a second unscoped query. Spec line 117's
+  "existence, no title" is the line held: the ancestor's ID is still disclosed on the child's own
+  `parentId`, which `TicketCard` declares a decided trade. An empty answer is `groups: []` — a group
+  is a bucket of cards, so a bucket with no cards would assert that something is there to look in,
+  and it is what an off-project member gets. Refusals are named `400`s (`invalid_filter`,
+  `invalid_grouping`, `invalid_limit`) that echo no zod issue list, since a refusal quoting what it
+  refused is a mirror an attacker can aim — **and they are answered AFTER the door**, reversing the
+  plan's order so an unauthorised caller cannot exercise the parser at all. The 404 body is now the
+  shared `READ_NOT_FOUND_BODY` beside `requireMember`, so the board's and the list's refusals are one
+  object rather than two literals identical by coincidence.
+  `apps/server/src/routes/list.ts`, `apps/server/src/read/membership.ts`, `apps/server/src/app.ts`
+- ✅ **The builder read surface — `GET /v1/workspaces/:id/workflows`, `/workflows/:id`,
+  `/ticket-types`, `/members`, `/workflows/:id/state-occupancy`, `/ticket-types/:id/population`** —
+  what a workspace IS, as opposed to what work is in it, so Plan 8's builder can author against
+  definitions it can read. What makes this surface different from the board and the list is that
+  **none of it passes through `visibleTicketsWhere`**: a definition has no audience, a roster row is
+  not a ticket, and an occupancy count is deliberately the whole workspace's — so the door is not
+  the first of two defences here, it is the only one, and each route names which of three access
+  levels it sits at. **Any member, guests included**, reads the workflow roster, one definition, and
+  the ticket types: a guest already receives definition events on the stream and their shared
+  ticket cannot render its status, name or icon without them. **The roster withholds guests from
+  non-admin callers, and refuses a guest CALLER outright** — a guest is a person invited to one
+  shared ticket, not a member of the workspace's directory, and handing that person the full
+  non-guest staff directory is the mirror of the leak the withholding rule exists to prevent. The
+  plan settles who is hidden and never says who may call, so the caller half is an **executor
+  ruling: a conservative default, cheap to reverse**, and a refused guest gets the surface's
+  ordinary 404. **Occupancy and population are owner/admin only**, because the honest
+  number counts tickets the caller may not see and there is no per-viewer variant to serve instead.
+  The admin refusal is **404 and never 403**, on `requireMember`'s own grounds: a 403 would confirm
+  a workflow exists to somebody with no business knowing it, so a plain member, a guest, an
+  off-project member and a stranger all get the shared frozen `READ_NOT_FOUND_BODY`. **The door
+  answers before the query string is parsed** on both routes that take one (Task 9's order, not the
+  plan's). Occupancy reports every state of the definition, zeroes included, because a mapping
+  dialog that omitted an empty state would invite an author to delete a state that holds work
+  tomorrow — and **every state means every state, `__proto__` included**: the counts are accumulated
+  in a `Map` and converted with `Object.fromEntries`, because `counts['__proto__'] = 0` on a plain
+  object reaches `Object.prototype`'s ACCESSOR, whose setter ignores a number, so the state and
+  every live ticket in it vanished from the response with nothing thrown. `toString` was safe there
+  (plain assignment shadows a method with an own property) and that is exactly why it read as
+  covered. Recorded rather than closed beside it: such a state cannot be migrated away either, since
+  Fastify's `secure-json-parse` refuses a `__proto__` key in the body before the handler runs.
+  Population takes an explicit `?workflowId=` and refuses to fall back to the type's own
+  binding — a ticket pins its workflow at creation, so the binding is what NEW tickets get and
+  answering with it would be a different number wearing this one's name. `displayName` is
+  better-auth's `"user"."name"` verbatim; the route invents no fallback and formats no phone number
+  into a name, and a membership with no user row is dropped rather than listed nameless. The roster
+  reads **workspace-scope rows only**: `membership.revoked` deletes the workspace row and leaves the
+  project roster rows standing by design, so the plan text's fold across both scopes would hand a
+  revoked person back as a current member. Every actor-supplied id — a workflow id, a type id — is
+  resolved against the workspace the door approved, never one the caller sent (ruling P14:
+  `proj_workflows` is keyed `(workflow_id, version)` globally).
+  `apps/server/src/routes/builder-reads.ts`, `packages/domain/src/read-models.ts`,
+  `apps/server/src/app.ts`
+- ✅ **The bulk workflow rebind — `POST /v1/workspaces/:id/ticket-types/:typeId/migrate`** — the
+  admin action a publish mapping dialog ends in: every ticket of one type on one workflow moved to
+  another, each mapped by `stateMap[ticket.state_id]`. It **orchestrates and never bypasses** — one
+  `ticket.workflow_rebound` per ticket through the ordinary client ingest door, where the honesty
+  already lives (the event is in Plan 4's `ADMIN_ONLY_TYPES` and Plan 3's checks refuse an unknown
+  target per event). It carries **its own admin gate ahead of building anything**, because deferring
+  to ingest would refuse a member only after a batch of envelopes had been built; it answers 404,
+  matching the two sibling admin-only routes on this path prefix. Its body is parsed by zod inside
+  the handler rather than declared as a Fastify schema, because Fastify validates before
+  `preHandler` and a declared schema would answer a stranger's malformed body before the session was
+  resolved. **It is NOT all-or-nothing inside one transaction, as the plan text asks**:
+  `ingestClientBatch` commits one transaction per event by published contract, and a route cannot
+  reach the internal append path (`AppDeps.ingest` is narrowed to `ClientIngest` for exactly that
+  reason). What ships is the achievable half — every question that could refuse the batch is asked
+  UP FRONT over the whole ticket set, so a refusal appends nothing and the answered count equals the
+  events appended. Three such refusals, each `422 {status:'refused', rule, reason}`:
+  `migration.same-workflow`, `migration.unknown-target-state`, and `migration.unmapped-state`
+  naming the states that have no target. **The `stateMap` is read by its OWN keys** — a state id may
+  legally be `toString`, and plain-object indexing would read `Object.prototype.toString` as a
+  mapping, call the state covered, and commit the batch's other tickets while that one was refused
+  at ingest. Two windows are named rather than closed: an infrastructure failure part way through a
+  batch that passed pre-flight, and a TOCTOU — the pre-flight covers every refusal the engine can
+  produce only as of the instant it read the ticket rows, so a concurrent rebind of one of them
+  lands `ticket.rebound-same-workflow` mid-batch. One batch-scoped ingest transaction closes both,
+  and it belongs to the ingest service rather than here.
+  `apps/server/src/routes/builder-reads.ts`, `packages/domain/src/read-models.ts`
+- ✅ **`GET /v1/search` — workspace-wide, visibility-filtered full text** — one ranked answer over
+  `proj_search`'s title, description and comments, each hit a `TicketCard` and a `ts_headline`
+  snippet with the match marked `**…**`. **The first CROSS-PROJECT read in the product**, and its
+  boundary is exactly two conjuncts rather than the three the board and the list stand behind: there
+  is no project clause to hide behind, so `t.workspace_id` and Plan 4's `visibleTicketsWhere` are the
+  whole of it. That makes the tenancy clause falsifiable here for the first time — for a plain member
+  the visibility predicate's first arm is `resolved_mode = 'workspace'`, which a NEIGHBOURING
+  workspace's ticket satisfies, so widening the clause hands one tenant's member another tenant's
+  row. The workspace is named in the query string but is never the actor's word for it: `requireMember`
+  answering with a role in it is what makes it usable, and a caller who names a workspace they do not
+  belong to draws the same frozen `not_found` body as one naming a workspace that does not exist.
+  Ranked by `ts_rank_cd` (title beats description beats comment, through the projection's A/B/C
+  weights) with ties broken by ticket id, and cut to **fifty with no pagination** — a cut, not a
+  page, so the fifty-first match is reached by narrowing the query and not by asking again. The cut
+  is applied to (workspace ∩ visible ∩ match ∩ filter) and to nothing else. **No aggregate is emitted
+  at all** — no total, no result count, and no rank number, which would put a measurement of
+  relevance on the page that nobody claimed. `q` (1–500 characters, no U+0000) is THE text term and a
+  `filter` carrying its own `text` key is refused `invalid_filter` rather than merged: two text terms
+  make a result set the caller can only half explain. Every query value is type-checked before it is
+  used, because `?q=a&q=b` arrives as an array and would otherwise be a 500 for a request the door
+  owes a 400. `apps/server/src/routes/search.ts`, `apps/server/src/app.ts`
+- ⚙️ **`FTS_CONFIG` and `searchTermSchema` — one name each for a matching rule and a search term** —
+  the text-search configuration is a matching rule, so it has to be the same on both sides or it is
+  not a rule: `to_tsvector` decides what lexemes are stored and `websearch_to_tsquery` decides what
+  is looked for, and two sides that disagree produce a search that quietly finds nothing rather than
+  an error anybody notices. `FTS_CONFIG` gives the query sites (the FilterSpec compiler's text
+  clause, and the search route's match, ranking and headline) one name for `'simple'` instead of a
+  fourth literal. It does NOT reach the migration's GENERATED column — that is SQL which runs before
+  any TypeScript exists — so that side stays linked by an executed test rather than by the compiler,
+  which the constant's own docblock states rather than implies. `searchTermSchema` is the same
+  arrangement for the two doors into that query: `q` and a FilterSpec's `text` share one statement of
+  length and of the NUL refusal, the second being load-bearing — a `q` carrying U+0000 is not a bad
+  search, it is SQLSTATE 22021 raised inside the route, a 500 reached through a value that parsed and
+  bound correctly the whole way. `apps/server/src/read/fts.ts`, `packages/domain/src/filter-spec.ts`
+
+- ✅ **`GET /v1/me/work` — assigned-to-me, across every project in one workspace** — the three state
+  categories as `groups.open` / `groups.active` / `groups.terminal`, each holding `TicketCard`s in
+  ticket-id order. **The first PER-VIEWER read in the product**, and that changes what its viewer id
+  is: the board, the list, the builder surface and search all answer "what is in this container" and
+  let the caller's identity only NARROW the answer, while this one answers "what is MINE", so the
+  session's user is the FILTER (`t.assignee_id`) and the SECURITY BOUNDARY (the explicit-list arm of
+  `visibleTicketsWhere`, and the role `requireMember` resolved) at once. It therefore has exactly one
+  source — `request.currentUserId` — and the route offers no parameter by which a caller could name
+  somebody else's queue. That is proven by execution rather than by the signature, because Fastify
+  hands a handler every query key that arrives whether the route declared it or not: a member sending
+  `userId`, `user_id`, `assigneeId`, `viewerId` and `as`, all naming the owner, gets a response
+  byte-identical to the one that names nobody, headers and `content-length` included. **Being
+  ASSIGNED a ticket is not being allowed to SEE it**, and the two come apart in five reachable ways
+  the route is measured against rather than one: a ticket explicitly shared with somebody else and
+  assigned to you anyway; a project-mode ticket assigned to a workspace member who was NEVER on that
+  project; a DIFFERENT person taken off a project they were on by `project.member_removed`, which
+  drops their own assigned ticket out of an answer that held it a moment earlier (those two are not
+  one case — a project roster row survives a revocation by design, so only a viewer who once had one
+  exercises that path); an audience NARROWED by a later `visibility.set` while the assignee stays the
+  assignee; and a workspace ADMIN, who shares the member branch and gets no read bypass, assigned a
+  row they may not read. Each is asserted beside the row that DID come back, so an absence is the
+  predicate answering and not an empty route. The last of them is also **the door's third answer**:
+  that admin gets **200 with three empty groups** rather than a 404, beside a stranger's 404 in the
+  same case — the door asks about the WORKSPACE, and what is inside it is the predicate's business.
+  Scope is ONE workspace,
+  pinned: cross-workspace aggregation is a client concern (one call per workspace), and since
+  `visibleTicketsWhere` compiles to `TRUE` for an owner, `t.workspace_id` is that caller's entire
+  boundary — a ticket in a neighbouring tenancy assigned to this workspace's owner is read back from
+  `proj_tickets` to prove it exists before being asserted absent. Nothing here reads a clock: the
+  grouping key is a column, not a date. The response nests under `groups` so Plan 10's additive
+  `contested` key arrives beside it without reshaping anything; claims in transit are client-local
+  outbox state merged in by Plan 6's `DataSource` and are deliberately never served here. Grouping
+  chooses its bucket through a bare `switch` rather than by indexing an object with the column value
+  — `__proto__` resolves through an accessor onto `Object.prototype` — though the honest statement is
+  that `proj_tickets`' `CHECK (state_category IN ('open','active','terminal'))` is what is
+  load-bearing there and the switch is depth. `apps/server/src/routes/my-work.ts`,
+  `apps/server/src/app.ts`
+- ✅ **`GET /v1/workspaces/:workspaceId/attention`** — the attention strip, **computed at read time and
+  stored nowhere**. Three buckets in a fixed order: `blocked` (visible tickets in a state their OWN
+  workflow flagged, whatever the category — the flag is looked up by the composite
+  `` `${workflowId}:${stateId}` `` key, because a state id is unique only within its workflow, and a
+  blocked `open` state is on the strip exactly as a blocked `active` one is), `stale` (visible tickets
+  in an `active` state entered on or before the IST day `staleDays` back, carrying `enteredStateAt`,
+  `daysInFlight` and `thresholdDays`), and `due-soon` (visible NON-TERMINAL tickets whose due-date
+  CLAIM falls on or before the IST day `dueSoonDays` ahead, overdue included, carrying the whole
+  `DueDateClaim`). Every item carries a plain-language `reason`. Nothing is materialised because a
+  stored strip would freeze a judgment that expires the moment it is written; `generatedAt` names the
+  computation moment, and the clock arrives as `AppDeps.now` so a test can pin it. **Both windows are
+  INDIAN days** (owner decision 2026-08-20): boundaries come from `istDayBounds` compared half-open,
+  day counts subtract `istDayOf` results, and nothing divides a millisecond difference by 86 400 000
+  or slices ten characters off an ISO string — both answer the UTC question, which this product does
+  not ask. The two thresholds are read from the workspace's own `workspace.settings_set` claim, never
+  from the constants, and the response carries the WHOLE `WorkspaceSettings` including its provenance,
+  so "the defaults are in force because nobody configured this" stays tellable from "somebody claimed
+  7". The strip emits no count fields; what a client renders as a count is a bucket length, and every
+  row in every bucket came through `visibleTicketsWhere`, so no count can include a ticket the viewer
+  cannot see. The door is the shared one: 401 for no session and for a forged bearer, an
+  indistinguishable 404 for a non-member and for an unknown workspace, and 200-with-an-empty-`items`
+  for a member who may see nothing. Contested claims join as a fourth, additive item kind in Plan 10.
+  `apps/server/src/routes/attention.ts`
+- ⚙️ **`AppDeps.now`** — the clock the attention strip computes against, threaded through `buildApp`
+  UNDEFAULTED. It was introduced so "the real clock" was defined once, in `registerAttentionRoutes`;
+  **Task 15's stream route then added a second default of its own** for the heartbeat deadline.
+  `buildApp` hands both routes the SAME optional field, so pinning it pins both and leaving it unset
+  gives both the wall clock — there is no drift today, but there is **no single place to change it**,
+  and anyone replacing the real clock must change both routes in one breath. It exists
+  because the strip is the only read on this surface whose answer changes while the database does not:
+  a test that could not pin `now` would be asserting against the day it happened to run.
+  `buildReadTestApp` freezes it at `SCENARIO_NOW`, the instant the shared world's fixtures were always
+  measured from. `apps/server/src/app.ts`, `apps/server/test/helpers/read-app.ts`
+- ✅ **View preferences — `GET`/`PUT /v1/me/preferences?workspaceId=`** — saved filters, per-project
+  list columns and per-project grouping, as **server-owned per-user rows and NOT ledger events**
+  (coordination amendment 14). The exception to everything-is-an-attributed-claim is STATED in three
+  places and made falsifiable in one: preferences arrange the record rather than say anything about
+  it, so there is nothing to attribute and nothing to replay, and the test asserts a PUT appends ZERO
+  events — with two controls in the same case, because "no events were written" and "the request did
+  nothing" are otherwise the same two numbers (the ledger count is non-zero before, an appended event
+  moves it, and the preferences row is there afterwards). The subject is the SESSION and no parameter
+  can name another: five spellings of "act as the owner" on both verbs answer byte-for-byte what the
+  request naming nobody answers, and the owner's row is read back out of the table to prove the
+  impersonating WRITE moved the caller's own document instead. A PUT is a FULL REPLACE, pinned,
+  because a merge cannot express a deletion. **The record keys are `ulidString`, not `z.string()`,
+  and that is a guard rather than tidiness** — MEASURED on zod 3.25.76, a permissive record parses
+  `{"__proto__": [...]}` SUCCESSFULLY and answers `{}`, so a full-replace PUT would store and return
+  a document the caller never sent; over HTTP Fastify's secure JSON parser refuses that one key
+  first, which is why the test also exercises the path no parser guards (a row written as raw jsonb
+  with a `__proto__` key is refused on the way OUT rather than answered). Every string slot refuses
+  U+0000 through `filter-spec.ts`'s own exported guard, imported rather than respelled, because jsonb
+  raises SQLSTATE 22P05 for it in a key or a value — so the refusal is a 400 a caller can
+  read instead of a 500, and that is EXECUTED rather than asserted: each refusal stands beside the
+  same bytes sent at the same store, rejected there with 22P05, with BEL and a newline admitted and
+  round-tripped in the same case to hold the rule at "what the store can hold". An unset preference reads as `EMPTY_PREFERENCES` and the collapse is
+  deliberate and typed: unlike `proj_workspace_settings`, "never saved" and "saved empty" are one
+  answer, because there is nobody to attribute and no screen that could show the difference. The door
+  is the shared one — 401 for no session and for a forged bearer, 400 `invalid_query` for a missing,
+  empty or repeated `workspaceId`, the frozen `READ_NOT_FOUND_BODY` 404 for a non-member, and
+  membership resolved BEFORE the body is parsed, so an unauthorised caller's payload is never read
+  and their 404 does not depend on what they sent. There is no role gate above membership: a guest
+  writes their own preferences like anyone else. Four malformed requests stay distinguishable — bad
+  bytes are Fastify's `FST_ERR_CTP_INVALID_JSON_BODY`, no content type is 415, a body past the 1 MiB
+  limit is 413 (measured, and the ONLY bound on how much a caller may store — no second cap was
+  invented), and a parsed-but-wrong document is this route's own `invalid_preferences`.
+  `packages/domain/src/preferences.ts`, `apps/server/src/preferences/store.ts`,
+  `apps/server/src/routes/preferences.ts`,
+  `apps/server/migrations/1788295700000_user-preferences.sql`, `apps/server/src/app.ts`
+
+- ⚙️ **The `WS /v1/stream` protocol** — `subscribeFrameSchema` (the only client frame: `{type:'subscribe', workspaceId, afterSeq}`, strict, the workspace a ULID rather than the plan's `min(1)` string because it is actor-supplied and becomes a lookup key), `ServerStreamFrame` (`event` / `purge` / `scope-revoked` / `caught-up` / `error`), `STREAM_ERROR_CODES`, `STREAM_CLOSE_CODES` (1008 / 1013 / 1011) and `ledgerEventSchema`. **The event frame carries a `LedgerEvent`, not the plan's `EventEnvelope`**: `EventEnvelope.seq` is the per-entity counter and restarts at 1 for every new entity, so a client resuming by it skips each new entity's early events, and `visibleEventsFor` selects on `workspace_seq` — the resume cursor is `workspaceSeq`, and a frame without it is one no client can resume from. It is a widening, so a consumer typed to `EventEnvelope` still compiles. `scope-revoked.projectId` is typed `?: never` because neither emitter produces one; the day one does, the hub's mapping stops compiling rather than silently widening a project's loss into a workspace's. `serverStreamFrameSchema` is published for the plans that will MOCK this protocol (6, 9, 10) rather than for safety — nothing here parses a server frame — so a fake that omits `workspaceSeq` or invents a `projectId` fails against the same shape the server is held to. **Where the strictness stops:** the outer frame object of every member is `.strict()`, but the ENVELOPE inside the event frame is not — `ledgerEventSchema` is `eventEnvelopeSchema.and(…)` over a non-strict `z.object` — so an unknown envelope key is silently STRIPPED rather than refused, and `payload` is `z.unknown()` by design. A consumer that needs the envelope closed must `.strict()` it on its own side; the server's own frames are held tighter than the schema by the recording socket in the stream tests, which compares the parse against the bytes. `packages/domain/src/stream-frames.ts`, `packages/domain/src/ledger-event.ts`
+- ⚙️ **The subscription hub — the first fan-out, and therefore the first disclosure surface** — `createStreamHub`, one subscription per `(socket, workspace)`, several workspaces multiplexed on one socket. **Catch-up and the live tail are the SAME drain** of `visibleEventsFor(pool, sub.userId, …)`: nothing is broadcast to a workspace, every frame exists because Plan 4's filter yielded an item for that subscriber on that drain, and the hub holds no second opinion about who may see what — the two paths cannot disagree because they are one path. `onEventCommitted` reads and sends nothing; it marks the committed workspace's subscriptions dirty and wakes their pumps, and a subscription is registered BEFORE its first drain so a commit landing mid-catch-up is re-drained rather than lost — while a subscription its OWN drain ended is not re-drained, `dirty` or not, so a commit landing during the drain that revokes a scope costs no second full ledger scan. Narrowing is honoured by construction (every drain re-resolves the reader's role), and `scope-revoked` ENDS its subscription — the instruction means "empty this scope", there is no coherent resume cursor after it, and it is the only thing bounding the instruction for an ex-member whose cursor can never advance. A `scope-revoked` naming a project is refused rather than widened. A consumer past `maxBufferedBytes` is closed 1013 because the ledger, not the socket queue, is the durable buffer. `settled()` makes the fan-out awaitable without a clock (a heartbeat is Task 15's); `stats()` is the operational read and the leak detector — `dropSocket` empties the per-workspace index too, not only the per-socket one. The hub authorizes NOBODY: a stranger drains nothing and is handed back their own cursor, and the `not-a-member` error frame belongs to the route. `apps/server/src/stream/hub.ts`
+
+- ✅ **`WS /v1/stream` — the route, and the only door the stream has** — `registerStreamRoute`, registered in `app.ts` beside the hub it fans out through (created there, next to the ingest service whose `onEventCommitted` it listens to, and released on the app's `onClose`). The hub authorizes nobody by design, so everything that keeps the wrong person off the stream is here.
+  - **The session is resolved at the UPGRADE, and a refusal happens before a socket exists.** MEASURED, not assumed (2026-09-02, `@fastify/websocket` 11.3.0): `preHandler` DOES run on a `websocket: true` route, and a reply from it refuses the handshake with an ordinary HTTP response — no socket is created at all. An anonymous caller and a forged bearer both draw the same `401 {"error":"unauthenticated"}`, byte-identical to each other down to `content-length`. That is the strong form of the refusal, so the plan's `close(1008)` fallback is deliberately NOT shipped: it is unreachable, and an unreachable guard is one no test can tell from its own deletion. A route registered without the preHandler still fails CLOSED — an undefined user resolves no membership and every subscribe is answered `not-a-member`.
+  - **Membership is checked per SUBSCRIBE, not per connection**, because one socket multiplexes several workspaces. A null effective role draws one frozen `not-a-member` frame, and a workspace that does not exist draws the SAME one — the frames differ only in the workspace id the caller themselves sent, so there is no existence oracle, and the socket is not closed either way. A member with nothing visible gets a subscription and an empty catch-up, which is the stream's form of the read routes' *200 with an empty result*.
+  - **A per-user connection budget** (`maxSocketsPerUser`, default 8), enforced as a second preHandler AFTER `requireSession` — the order is load-bearing, since a budget keyed before the session keys every caller on `undefined` and becomes one shared global bucket. Over budget is `429 {"error":"too_many_connections"}` at the handshake, and the budget is returned when the socket closes. **What the bound does not do is stated where it is written**: the count is read in the hook and incremented in the handler, so a burst of simultaneous handshakes can land a few over the cap — deliberately, because a preHandler-held reservation trades a coarse bound for a leak whose failure mode is a user locked out of their own stream. The other half of the same question: a connection's SUBSCRIPTION count is bounded by how many workspaces the caller actually belongs to, since the hub refuses a duplicate per workspace and this route refuses one for a workspace they are not in. **A 16 KiB `maxPayload`** bounds the client frame: the only legal frame is under a hundred bytes, `ws` defaults to 100 MB, and a frame is fully buffered before anything can call it malformed.
+  - **A heartbeat driven by the INJECTED clock**, not by counting ticks: a peer is terminated after strictly more than two heartbeat intervals of measured silence, so two pings genuinely go unanswered first. Coalesced `setInterval` callbacks after an event-loop stall would otherwise kill a healthy peer whose pongs were queued behind them. This is the one and only caller of `StreamSocket.terminate()` — Task 14 declared it and named this task as its owner — and it is deliberately a terminate rather than a close: a peer that has answered nothing for three intervals is not going to read a close code. Both the tick (`schedule`) and the clock (`now`) are seams, so the two directions are tested without a sleep — and the PRODUCTION scheduler behind the seam (`realScheduler`, what every app that injects nothing runs on) is covered in its own right, on fake timers for the interval and the stop and on real ones for the `unref` that keeps a heartbeat from being the reason a process will not exit.
+  - **`bad-message` and `not-a-member` are the route's frames**, produced by nothing in Task 14. Junk, a non-ULID workspace id, an unknown key, a negative cursor and a prototype-polluting body all draw `bad-message` and the socket keeps serving; a duplicate subscribe draws the hub's `already-subscribed` framed here. A refused frame subscribes **nothing** — the hub validates no workspace id of its own, so keeping an unvalidated actor-supplied string out of its Map keys is this route's job alone.
+  - **A CLIENT fault and a SERVER fault get different answers, and the server fault gets the hub's.** A frame the route could not parse or validate is the client's, and is answered `bad-message` on an open socket. A THROW inside frame handling is not — it says nothing about what the client sent, and telling them otherwise leaves them with no recourse but to stop sending a frame they sent correctly — so it closes `1011 stream-error`, exactly as `hub.ts` closes a drain that threw. `STREAM_ERROR_CODES` is deliberately not extended for it: that enum is the protocol Plans 6, 9 and 10 mock, and a fourth code invented to avoid a close would be a protocol change.
+  - **Resource lifecycle**: on close or error the heartbeat is stopped, the budget returned, and the socket dropped from the hub, so no subscription outlives its connection. `app.streamHub` is decorated onto the instance, which is both the operational read and the leak detector. **A subscribe whose socket left during the membership check is refused rather than registered**: frame handling suspends at exactly one point — the membership round trip — and a close delivered inside that window runs the teardown before the subscribe, so the subscription that followed could never be dropped by anything and the returned budget slot meant the leak was bounded at zero. Both a `torn` flag set by the teardown and the transport's own `readyState` are checked immediately before subscribing, because the socket reaches CLOSING when the close frame arrives and only reaches teardown later.
+  - **A registration hazard worth knowing**: `app.register(websocket)` followed by a top-level `app.get(…, {websocket:true})` SILENTLY degrades to a plain HTTP route — the plugin's `onRoute` hook does not exist yet, `websocket: true` is never read, the handler is called with `(request, reply)`, and the upgrade dies in a 500 with no warning. The route is therefore declared inside its own `app.register(...)`.
+  `apps/server/src/stream/routes.ts`, `apps/server/src/app.ts`, `apps/server/test/helpers/stream.ts`, `apps/server/test/stream/stream-route.test.ts`
+
+
 ## 9. Editor, documents & attachments
 
-*Plan 7's client half. §6/§7/§8 are reserved for Plans 4/5/6 and are deliberately absent — the
-coordination doc assigns `Features.md` sections one per implementation plan, so numbering is claimed
-from that table rather than taken next-free.*
+*Plan 7's client half. §8 is reserved for Plan 6 and is deliberately absent — the coordination doc
+assigns `Features.md` sections one per implementation plan, so numbering is claimed from that table
+rather than taken next-free. (§6 and §7 were named here as absent too; both have since been opened,
+by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is unchanged.)*
 
 - ⚙️ **Document schema v1** — `DOC_SCHEMA_VERSION = 1`, `emptyDoc()`, `isDocJson()`, and
   `VersionedDocument`, a replacement for Tiptap's `Document` that carries `schemaVersion` on the doc
@@ -199,7 +691,7 @@ from that table rather than taken next-free.*
 
 *(Plan 10, Task 4 only — the LIFTED §11 closer and the contested-claims read path. Plan 10's own
 catalogue task (Task 18) owns §12's full body and will replace this scope note; what follows is what
-Task 4 added, and nothing else. §7/§8/§10/§11 stay absent because the coordination doc assigns
+Task 4 added, and nothing else. §8/§10/§11 stay absent because the coordination doc assigns
 `Features.md` sections one per implementation plan and numbering is claimed from that table, never
 taken next-free. Still absent rather than missing from this section: the snapshot writer, the replica
 bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Tasks 5–17.)*

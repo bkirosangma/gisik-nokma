@@ -19,11 +19,11 @@ one of them. There is no rebase in step 4.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| Branch in flight | **`exec/03-chain-b`**, cut from step 7's tip. **STEP 8 COMPLETE — Chain B T9–T14 all done.** Step 7 is **PR #57, unmerged** | `git log` |
-| `main` | **`1003d8d`** per the controller (#55 merged). **REFETCH AND RE-VERIFY BY PRESENCE** before trusting it — main has moved under this file three times today | `git fetch`, `git cat-file -e` |
+| Branch in flight | **`exec/05-api-realtime` @ `c3b1090`** — **REBASED ONTO `origin/main` 2026-09-01.** **STEP 9 (Plan 5) IN PROGRESS.** | `git log`, `git branch -r --contains` |
+| `main` | **`00cb2e0`** — steps 7 and 8 BOTH MERGED (#57 → `dd7bfcf`, Chain B → `6cb631d` via **#59**, not #58), then the controller's docs-only **#60 → `00cb2e0`**. **REFETCH before trusting this** | `git log origin/main` |
 | `exec/04-auth-visibility`, `exec/04-t4-t5-permissions` | **Both merged/redundant — safe to delete.** NOTE: `cherry` returns `+` for all 10 of `t4-t5`'s commits **even though #51 merged them**, because #51 was SQUASHED. Main's subject ends `(#51)` — that suffix is the marker | `git cherry -v`, `git log -1 --format=%s` |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
-| Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, and every pre-squash sha of the Phase 0 branches | `git branch --contains`, empty = orphaned |
+| Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, every pre-squash sha of the Phase 0 branches, and **NEW 2026-09-01: `6d15e50`, `96a6ff3`, `400fbfc`, `95004e1`** — Plan 5 batch A's PRE-REBASE shas, killed by the rebase below. An earlier version of this very file cited all four as live. | `git branch --contains`, empty = orphaned |
 
 ## THE RULE THIS COST US, and it generalises to every remaining rebase
 
@@ -83,118 +83,634 @@ satisfies the requirement the `json` ban is about, and the instrument was proven
 | CSRF anchor line | **`sign-in-flows.test.ts:148` on `main @ 91df593`**, content confirmed: `expect(attributes).toEqual(['Max-Age=604800', 'Path=/', 'HttpOnly', 'SameSite=Lax']);` — re-verified on main, not merely on the stale branch, because T5 item 3 anchors a sentence to a line and line numbers drift across a rebase-merge | `awk` over the blob at `origin/main` |
 | `docs/` affects the gate | **NO.** `turbo.json` declares no `inputs`, and `docs/` sits outside every package, so a docs-only merge cannot move gate composition. **PRs #48 and #49 were both docs-only** — do not re-run a gate to "check" them | read `turbo.json` |
 
-## OPEN ESCALATION — the controller session ENDED before this could be delivered
-
-**`gisik-nokma-8d` became unreachable mid-step-7.** This was written as a message, could not be sent,
-and is recorded here instead. **A successor controller must read this before merging step 7's PR.**
-
-### Ruling P23 was applied as DELETE, not as NARROW, and its footprint is wider than the ruling named
-
-The ruling said the member-side per-event purge **must be gated**, naming case **6.101**. The
-implementing agent **deleted the per-event subtree walk entirely**, and flagged the interpretation
-against its own work as its least-sure claim.
-
-**Its derivation, which I judge sound:** a purge may only name an entity the recipient could previously
-see; the module **cannot ask** that question (`proj_visibility` keeps no prior audience, no payload
-carries a before-image); and it **may not reconstruct** the answer (cases 6.82/6.94, the
-second-definition ban). Those three together leave **no conforming per-event emission at all**, so
-nothing survives to gate.
-
-**What it cost beyond 6.101, which is the part needing a controller's eye:**
-* four test blocks deleted; cases **6.90** and **6.99** flipped ✅ → 🚫;
-* **per-event tombstones removed for MEMBERS AS WELL AS GUESTS** — recorded as **6.104**, sibling of
-  6.102, **owner Plan 10**, phrased as an absence.
-
-So the under-purge residual accepted for one case now applies to **all** per-event triggers, and the
-retention half of a gap Plan 10 must close got **harder**, not easier.
-
-**A narrower gate was considered and declined, and this is the load-bearing judgement:** gating the purge
-on the viewer being **on the ticket's project** has a far smaller blast radius, and was refused because
-*being on a container is not holding the entity* — it fails the ruling's own **relationship** axis and
-leaves the same disclosure at a smaller radius, which is exactly what the ruling rejected for guests.
-**I agree with that refusal.**
-
-**REVERSAL IS CHEAP AND EXACT IF A CONTROLLER DISAGREES:** the agent's mutation 1 — re-adding the deleted
-walk — is the precise restoration diff, and it reddens both 6.101 cases and nothing else.
-
-### And the signature defect appeared inside the fix for it
-
-The agent's own mutation sweep **falsified two sentences it had already committed**, and it corrected
-them in place rather than dropping them. The surviving consequence: **case 6.100 now passes for a reason
-its own name does not describe** — it is held by the `canSee` guard that case 6.16 already pins, not by
-anything purge-shaped. Stated on the case and in the test comment, with a warning **not to cite 6.100 as
-evidence that a purge gate exists.**
-
-### A rule of this project was misapplied, and the correction belongs with it
-
-*"Nothing may be chained after the gate"* was read as forbidding `$?` capture, so that agent **inferred**
-exit 0 from four secondary facts. **The rule is about a trailing command in the same pipeline stealing
-the status.** Reading `$?` on the next line is the correct practice:
-
-```
-pnpm turbo run build test typecheck --force > gate.log 2>&1
-GATE_EXIT=$?
-```
-
-**An inferred exit code is a self-inflicted downgrade from a read one.** Re-run here with a captured
-exit: **TURBO_EXIT=0, 21/21, 1161 tests, zero `Unsupported engine` WARNs, durations in seconds.**
-
 ## Where I am in the serial sequence
 
-**PHASE 0 + STEPS 4, 5, 6 MERGED. STEPS 7 AND 8 ARE COMPLETE AND UNMERGED**, because the controller
-session ended mid-step-7 and no successor has appeared. **I do not merge; that is the whole reason a
-second session exists.**
+# ★ STEP 9 IS COMPLETE. PLAN 5, ALL 17 TASKS, DONE AND REVIEWED. THE PR IS OPEN. ★
 
-| | branch | state |
-|---|---|---|
-| **Step 7** Plan 4 T8–T14 | `exec/04-t8-t14-enforcement` | **PR #57 OPEN**, 1225 tests |
-| **Step 8** Plan 3 Chain B T9–T14 | `exec/03-chain-b` | **complete, 19 commits on top of step 7**, needs a PR |
+**Nothing is in flight. The executor's work on this step is finished; the controller merges.**
 
-**Step 8 is branched FROM step 7, not from `main`** — deliberately: `proj_tickets` collides with step 7
-on the projection registry, and step 7's cases 6.57/6.61 reference it. **Merge #57 first, then Chain B.**
-
-Gate at Chain B's HEAD: **exit 0 READ, 21/21, 1277 tests**, zero `Unsupported engine` WARNs.
-domain 295 · rule-engine 280 · **server 461** · app-core 130 · editor 72 · ui 31 · sync-client 8.
-**TEN projections**, counted by printing the `registry.register(` rows — **do not quote that number
-without recounting**; an earlier dispatch of mine said six when there were seven.
-
-### Chain B — what each task found
-
-| task | outcome |
+| Task | Review outcome |
 |---|---|
-| **T9** `proj_ticket_types` | 0 findings. Found **the plan's own upsert was non-deterministic**: a type's key is its PAYLOAD's id filed at fresh entity ULIDs, so **many entity streams write one projection key** |
-| **T10** `proj_tickets` (floor-list) | **Critical** — a `✅` citing a test **nobody had written**, over a branch nothing constrained. Fix found a **second** stale citation the same commit had created |
-| **T11** `proj_rollups` | 0 findings. Found **two plan-text defects**, and reported a survivor **with its reason** rather than papering over it |
-| **T12** `EngineContext` (floor-list) | **First attempt DIED mid-edit** — 3 Criticals incl. never opening its own main file. Retry closed all 11. **P14 is CLOSED** |
-| **T13** history route | 1 Important — **my dispatch's fault** (see below). Converted **two survivors into killers** rather than excusing them |
-| **T14** catalogue | Reconciled 31 reserved ids against what shipped; corrected two to match the test rather than the plan |
+| T1 `docToPlainText` · T2 FilterSpec + compiler | done pre-restart; T2 had a fix round |
+| T3 `workspace.settings_set` | clean, 1 Minor fixed |
+| T4 `proj_workspace_settings` + shared helpers | clean, 1 Minor fixed |
+| **T5 FLOOR** visibility predicate in SQL | 1 **Important** + 2 Minor, fixed and proven |
+| T6 `proj_search` (tsvector) | **CLEAN — zero findings** |
+| T7 read models / TicketCard | **CLEAN — zero findings** |
+| T8 `GET /board` | **CLEAN — zero findings** |
+| T9 `GET /tickets` list read | clean, 1 Minor fixed |
+| **T9b FLOOR** builder reads | 2 **Important** + 3 Minor + 1 ruling, all closed |
+| T10 `GET /v1/search` | clean, 1 Minor fixed |
+| T11 `/me/work` · T12 `/attention` | **CLEAN — zero findings each** |
+| T13 `/me/preferences` | **CLEAN — zero findings** |
+| **T14 FLOOR** stream frames + hub | 2 **Important** + 4 Minor + 1 Nit, all closed |
+| **T15 FLOOR** WS `/v1/stream` | 1 **Important (a LIVE bug)** + 5 more, all closed |
+| T16 catalogue reconciliation | **CLEAN**, +0 tests as expected |
+| **Final whole-branch review (1 opus)** | **No Critical, no Important. SAFE TO MERGE.** 2 Minor + 2 Nit, all fixed. |
 
-### P14 IS CLOSED — verified in source, not taken from a report
+**FINAL GATE, re-run by the executor at the tip, never taken from an agent's report:**
+**exit 0 · 21/21 · 0 cached · 1573 tests** — domain 335 · rule-engine 280 · **server 717** ·
+app-core 130 · editor 72 · ui 31 · sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**.
+`pnpm check:env` (the other CI step) also passes.
 
-All three `proj_workflows` selector branches now read `WHERE workspace_id = $1 AND workflow_id = $2`.
-Tenancy arrives as a **`TenantScope` parameter on the method**, leaving `createEngineContext(client)`
-untouched as the handoff required. The obvious alternative was checked and **reproduces P14 exactly** —
-deriving a type's tenancy from its own head row fails because `proj_entity_heads`' key is global.
-**Ruling P3 held**: `getEntityState('ticket-type')` stayed identity-only despite the plan text
-instructing the rejected alternative at three lines.
+**BRANCH POSITION — measured through `rtk proxy`, and that mattered:**
+`origin/main` = `1223c4c`; merge-base = `00cb2e0`; branch is **93 commits ahead**, main 6 ahead.
+**`git log --oneline origin/main..HEAD | wc -l` printed 50 — a PROXIED WRONG COUNT.** The raw
+`rtk proxy git rev-list --count` says 93. That is the "silent wrong COUNT" mode from the rtk notes,
+met live at the last measurement of the step. **Pipe a count through the proxy and you get a
+well-formed lie.**
 
-### A DISPATCH ERROR OF MINE, recorded because the rule is the point
+**NOT REBASED, deliberately.** `git merge-tree --write-tree origin/main HEAD` → **exit 0, zero
+conflicts**, and main's 6 commits touch only `docs/lanes/controller-state.md`,
+`docs/lanes/task-ledger.tsv` and `scripts/check-task-ledger.mjs` — **no file this branch touches.**
+Rebasing 93 commits would orphan every sha this file and 50 commit messages cite, for no gain.
 
-**I told T13 not to touch the catalogue because T14 would reconcile it.** Its reviewer correctly called
-that an Important: T13 shipped a route while §5 still said the route did not exist. **"The next task
-will fix it" is precisely the follow-up the same-change-set rule forbids.** T14 did close it minutes
-later — which is why it is recorded rather than re-run — but the drift window was real and I created it.
+**CI will not fail on the new ledger script:** `check:tasks` exists in `package.json` but
+`.github/workflows/ci.yml` runs only `pnpm check:env` and `pnpm turbo run build test typecheck`.
+**But the merger should know:** main's `992c459`/`1223c4c` rewrote the `done` evidence rule after this
+branch diverged, so Plan 5's ledger rows must satisfy the NEW artefact-evidence rule. **The ledger is
+the controller's file and this branch deliberately does not touch it.**
 
-### Carried, unfixed, with owners
+## WHAT THIS STEP FOUND — the through-line, because it repeated six times
 
-**`getContest` reads `proj_contested` unscoped** — a fourth instance of P14's class, **executed** by the
-reviewer; narrower than P14 because two other guards bite. *Owner: Plan 10 T7.* ·
-**The ticket-type ladder is not as-of** (Plan 3's own Open question 11) — UNASSIGNED ·
-**P9 `'ticket-type'` parity** diverges between harness and memory-context · **`getEntityState('ticket')`'s
-fail-closed branch is unreachable by any input**, so its tenancy argument is untested — kept and recorded
-so it is not mistaken for a tested predicate · **`routes/tickets.ts:347`'s `ORDER BY seq` has the same
-unfalsifiability T13 fixed in its own route, and `tickets-read.test.ts` carries no `seq` assertion at
-all.** *Owner: Plan 4.*
+**A negative assertion is only as good as your ability to make it fire.** Six instances, each caught
+by a different party, none by a rule:
+
+1. **T2** — `expect(sql).not.toContain(hostile)` **fired on CORRECT code**. It measures whether a
+   value LOOKS like SQL, not whether it was concatenated.
+2. **T9b** — a `__proto__` state id, and every live ticket in it, vanished from a response. The
+   earlier fix used `toString` as its proof value, and `toString` is exactly the value that makes such
+   a fix look complete: plain assignment shadows the prototype method, while `__proto__` assigns
+   through an accessor that creates **no own key**. **A proof run with one value proves that value.**
+3. **T9b's fix** — a *literal* `{ __proto__: 1 }` in the expected object collapses identically, so the
+   new assertion would have passed against the defect. **The test for a `__proto__` bug can have the
+   `__proto__` bug.** It uses a computed key.
+4. **T10** — `not.toContain(secret)` on a snippet **survived a real leak**, because `ts_headline`
+   windows onto a match and never renders unmatched text. Replaced by a substring-of-its-own-row form.
+5. **T14** — the assertion carrying the task's central disclosure decision inspected only
+   `frames.slice(-1)`, which is structurally incapable of holding the id it forbade.
+6. **T15** — `expect(hub.stats().subscriptions).toBeGreaterThan(0)` was satisfied by the case's own
+   well-formed subscribe, so a malformed frame opening a real subscription passed it.
+
+**Two more rules earned here, both now in the catalogue's header or a docblock:**
+- **NAME THE CASES A MUTATION KILLS, NEVER THE COUNT** — unless deterministic AND reproduced by a
+  second party. "Reddens seven cases" re-ran as 15, 18, 4, 15; a "dies 6" measured 7.
+- **A MUTATION CAN BE INERT IN ITS FIXTURE.** T14's reviewer proposed one that emitted nothing at that
+  cursor, so its "all tests passed" was evidence of nothing. **Confirm the mutated path EXECUTED
+  before concluding anything from a survivor** — and a survivor is a MISSING FIXTURE until proven
+  otherwise (T12 had four survive on first run and closed all four with fixtures).
+
+## OPEN ITEMS FOR THE CONTROLLER — none block the merge
+
+1. **§6b, coordination doc: Plan 6 declares an INCOMPATIBLE `UserPreferences`.** Informationally
+   equivalent to the server's, so it is a naming conflict — **but it needs a ruling before Plan 6
+   Task 10.** This is the one item with a deadline.
+2. **One EXECUTOR RULING was made and recorded (coordination doc §5): a guest may NOT call
+   `GET /v1/workspaces/:id/members`.** The plan settles who is hidden from the listing and never says
+   who may call it, so a guest invited to one shared ticket was receiving the workspace's entire staff
+   directory. Conservative default, cheap to reverse, owner Plan 8.
+3. **An OWNER QUESTION, shipped per the spec's plain reading:** `terminalChildren` counts children the
+   viewer cannot see. Supported by one illustrative sentence in the product design doc, not a ruling.
+   Reversible in one JOIN predicate.
+4. **The integration checkpoint (sequence step 10) is now due and it has a specific target.**
+   `applyCommitted` enumerates six things real ingest does that it does not — no locks, seqs from a
+   process map rather than the DB, no permission gate, no rule engine, no `bootstrapWorkspace`, no
+   stream notify — and nearly every read test on this branch is built on it. **A read model green
+   against it is proven correct about ROWS and proven nothing about whether those rows are reachable
+   through the shipped door.**
+5. Recorded with named owners, not fixed: the stream suite's tenancy coverage is an artifact of test
+   order (Plan 4); `foldStateIdForward`'s prototype hazard (Plan 3); `assigneeId` cannot distinguish
+   never-assigned from unassigned (Plan 3); `rollupFor` N+1 at 50 hits (Plan 5 T7's own note).
+
+### THE SEAM — exactly where a successor picks up
+
+**Plan 5 has THREE commits of its own**, now sitting directly on `origin/main` (`00cb2e0`) after the
+rebase. **These are the POST-rebase shas; the pre-rebase ones are orphaned and listed in the anchors
+table above:**
+
+| sha | task |
+|---|---|
+| `b5a776c` | **T1** `docToPlainText` — closed a termination gap the pulled-forward walker shipped with |
+| `3c107c4` | **T2** FilterSpec + the injection-proof compiler |
+| `9286404` | **T2's fix round** — the NUL byte, and a guard that fired on correct code |
+
+**Four files are Plan 5's whole surface so far:** `packages/domain/src/doc-text.ts` (+31),
+`packages/domain/src/filter-spec.ts` (+63), `apps/server/src/read/compile-filter.ts` (+116),
+`apps/server/src/read/sql-params.ts` (+27). `Features.md` **§7** and
+`test-cases/07-api-realtime-search.md` were **opened by T2 in its own change set.**
+
+**T3 AND T4 ARE DONE AND REVIEWED.** Commits: T3 `f57f084`, its doc correction `597b8be`, T4 `2e4c54e`,
+T4's doc correction + honest-helper docblock in the commit after it.
+
+**NEXT: Plan 5 Task 5** (the SQL visibility predicate, plan line 1213) — **FLOOR-LIST**: opus
+implementer AND opus reviewer. **Remaining floor-list in this plan: T5 (1213), T9b (3183), T14 (4918),
+T15 (5452).** Then T6 (1579), T7 (1821), T8 (2315), T9 (2657), T10 (3638), T11 (3874), T12 (4079),
+T13 (4551), T16 (6047).
+
+### NOTHING IS IN FLIGHT. T3, T4 AND T5 ARE ALL DONE, REVIEWED, AND PUSHED.
+
+| Task | Commits | Review outcome |
+|---|---|---|
+| T3 `workspace.settings_set` | `f57f084`, doc fix `597b8be` | clean, 1 Minor (fixed) |
+| T4 `proj_workspace_settings` | `2e4c54e`, doc fix `0a140fa` | clean, 1 Minor (fixed) |
+| T5 **FLOOR-LIST** visibility predicate | `34c62fd`, `e582909`, `6a19638`, fix round `2f24959` | 1 **Important** + 2 Minor, all fixed and PROVEN |
+| T6 `proj_search` (tsvector) | `a21448d`, `91ea648` | **CLEAN — zero findings** |
+| T7 read models / TicketCard | `36c3d85`, `0422b20`, `41bb405` | **CLEAN — zero findings**; 18 mutations, 17 killed, 1 survivor correctly diagnosed as an unconstrained path |
+| T8 `GET /board` (first route) | `d6245e1`, `5a51097`, `6264776`, `dd58777`, `ccfc625`, `0c74fde` | **CLEAN — zero findings**; both door mutations die |
+| T9 `GET /tickets` (list read) | `7bab0b0`, `699aa18`, `c1f577f`, `ca6c39b`, `cc4536c`, `27f64b2`, + doc fix | CLEAN; 1 Minor (an unreproducible count) fixed. **Found and closed a real title-disclosure hole.** |
+| T9b **FLOOR-LIST** builder reads | `98a761a`, `e47bb59`, `4189247`, `8a8444d` (+3), fix round `6406048` | **2 Important + 3 Minor + 1 ruling**, all closed and PROVEN. The most productive review of the plan. |
+| T10 `GET /v1/search` (cross-project) | `1eb3f32`, `66e3549`, `9d642c0`, `82db02b`, `fa2ff11`, `6ae49e7` | CLEAN; 1 Minor (an unstable count) fixed. **Its own leak assertion could not see a leak.** |
+| T11 `GET /v1/me/work` | `4de353f`, `6ec5084`, `32d9df7`, `9afa6ca` | **CLEAN — zero findings.** Reviewer re-ran 8 mutations; all matched. |
+| T12 `GET /attention` (computed) | `347ded7`, `59cd86b`, `fdf7875`, `2d61b13`, `4f97a43`, `d14cf76` | **CLEAN — zero findings.** Reviewer re-ran 10 mutations; all matched. |
+| T13 `/v1/me/preferences` (first WRITE) | `f136086`…`820b575` (7) | **CLEAN — zero findings.** Five items recorded to the coordination doc (§6a-6e). |
+| T14 **FLOOR-LIST** stream frames + hub | `11877e2`…`449a979` (5), fix round `d6a9a2c`, `619a9a7`, `b9b4184`, `7361fbc` | **2 Important + 4 Minor + 1 Nit**, all closed. Hub itself sound; both Importants were in the TESTS. |
+
+**Gate re-run by the executor rather than taken from any agent's report:** exit 0, 21/21, **0 cached**,
+**1555 tests** — domain 335 · rule-engine 280 · **server 699** · app-core 130 · editor 72 · ui 31 ·
+sync-client 8. Zero `Unsupported engine` WARNs, **Node v22.22.2**. Sum re-added by script in the same
+run rather than eyeballed: 7 packages, 1430, matches.
+
+### THE CONTROLLER SHOULD SEE THIS BEFORE MERGING — recorded in the coordination doc, not escalated
+
+Task 7 made **two additive cross-plan contract widenings** and left **one owner question**. All three
+are written up in the coordination doc's new section *"Plan 5 execution consequences (2026-09-01)"*.
+In one line each:
+
+1. **`TicketRollup` is four fields, not three** — `uncategorizedChildren` was added, and it is not
+   padding: a renderer showing `terminalChildren` of `totalChildren` without consulting it is showing
+   a silently incomplete progress bar. **Binding on Plans 6, 9, 10.**
+2. **`RollupView` gained two fields, so `GET /v1/workspaces/:ws/tickets/:id`'s body carries two more
+   keys** — additive, but it is Plan 4's route changed by a Plan 5 task.
+3. **OWNER QUESTION: `terminalChildren` counts children the viewer cannot see.** Shipped per the
+   product design doc's plain reading (line 116, *"5 of 8 done · 2 restricted"*), which is an
+   illustrative phrase rather than a ruling. **Cheap to reverse** — one JOIN predicate and its tests.
+   The implementer and the reviewer reached this reading independently and both flagged the same
+   doubt, which is why it is recorded rather than left implicit.
+
+**This did NOT meet the bar to interrupt the controller** (no Critical or Important, and step 9's
+scope is unchanged), so it is written where the interface authority lives instead.
+
+### THE AUTH CONTRACT T8 SET — every later route in this plan should match it, and it is measured
+
+**T8 is the first route, so its door shape is the precedent.** Verified by execution and by mutation,
+not by reading:
+
+| caller | answer |
+|---|---|
+| no session (and a FORGED bearer) | **401** `{error:'unauthenticated'}` — forged-bearer proves the session is *resolved*, not merely present |
+| valid session, **different workspace** | **404** |
+| projectId that does not exist | **404 — byte-identical.** Status, body, and every header but `date`, `content-length` included |
+| workspace member **not on** the project | **200, `columns: []`** — the emptiness is the visibility predicate answering, not the door |
+
+**The boundary is the WORKSPACE, and the identical-404 is the point.** A 403 would confirm the project
+exists. A stranger, a neighbouring workspace's owner, and a nonexistent id are indistinguishable — and
+the neighbour gets 200 on their own project in the same test, so the 404 is not a blanket refusal.
+
+**Both door mutations die, and their SHAPES were recorded rather than just their redness:** deleting
+the `preHandler` turns 401 into 404 (no `currentUserId` → null role → 404); making `requireMember`
+return unconditionally turns 404 into **200 with an empty board**, which is precisely the existence
+oracle the identical-404 exists to prevent.
+
+**Two survivors, both correctly diagnosed as unconstrained paths rather than reported as defects:** the
+route's own `t.workspace_id` clause (unfalsifiable because ingest already refuses a ledger whose two
+scopes disagree — kept as belt-and-braces, documented as such) and `appendStragglerColumns`
+(unreachable because the reducer throws on a transition to a state its workflow lacks — **owner: the
+plan's Open question 8**, which owns whether it becomes a throw).
+
+**A REUSABLE HARNESS LANDED:** `apps/server/test/helpers/read-app.ts` — the shared read world for
+Tasks 8-15. **Note it takes a `TestDatabase`, not a `Pool`, and returns the whole world including
+tokens** — the plan text says otherwise.
+
+**MORE PLAN-TEXT DEFECTS, for T9-T15:** `migrateTestDb` / `testPool` / `truncateAll` **do not exist**;
+`latestWorkflowDefs` takes a `workspaceId`; `TicketRollup` is four fields; and the plan's
+`{ pool, auth }` deps shape was NOT adopted — **the branch convention is preHandler-by-parameter and
+Tasks 9-15 should follow T8, not the plan.**
+
+### WHAT TASK 9 FOUND — a disclosure the plan text would have shipped
+
+**The plan's `epicAncestors`/`epicTitles` CTE carried no visibility and no tenancy clause.** A group's
+key is a ticket id and **its LABEL is that ticket's title** — so the walk would hand a caller who may
+see a child the *title of an ancestor they may not see*. Reachable rather than theoretical: a child
+authors its own audience and stops inheriting. Closed by putting `visibleTicketsWhere` into **both**
+CTE terms and stopping at an invisible link (`no-epic`). Forcing that predicate to `TRUE` puts
+"Confidential programme" back as a group label — and the reviewer isolated that mutation to the epic
+walk alone, confirming it is enforced there and not merely inherited from the page query.
+
+**And a flake the implementer wrote, then caught, and that generalises to this whole branch:**
+**`newUlid()` is NOT monotonic within a millisecond** — the low 80 bits are random. A cursor
+expectation derived from seeded order passed about half the time, and when it passed it sometimes
+passed **vacuously** (the derived expectation collapsed to `[]`). **Any assertion on this branch that
+assumes mint order equals id order is a coin flip.** Fixed here by computing the cursor from the ids;
+the implementer's own guess is that other seeded-order assumptions exist elsewhere on the branch.
+
+**The Minor, fixed, and it is the recurring class:** the catalogue said removing `ORDER BY` "reddens
+seven cases." The reviewer re-ran it four times: 15, 18, 4, 15 — never 7. A query with no `ORDER BY`
+has **no ordering guarantee**, so which assertions redden is a planner detail. 7.81 now states the
+reproducible claim ("it reddens *something* here") and says explicitly that a count is not a fact about
+this suite. **A number measured once is not a measurement.**
+
+### WHAT THE T9b FLOOR-LIST REVIEW PAID FOR — two Importants an ordinary review would have missed
+
+**1. A `__proto__` state id, and every live ticket in it, VANISHED from the occupancy read.** The
+implementer had already found and fixed the sibling hazard for `toString` one function below — and
+`toString` is exactly the value that made the fix look complete, because **plain assignment creates an
+own property that shadows the prototype method.** `__proto__` does not: `Object.prototype.__proto__`
+is an **accessor whose setter silently ignores a non-object value**, so `counts['__proto__'] = 0`
+creates no own key and `JSON.stringify` omits it. Verified in bare node:
+`c['__proto__']=0; c['toString']=1` → `Object.keys(c)` is `["toString"]`.
+
+**The reviewer found it by re-running the implementer's own corruption proof with a DIFFERENT value.**
+That is the generalisable move: *a proof run with one value proves that value.*
+
+Driven end-to-end through the shipped doors — the state committed, a ticket transitioned into it,
+`proj_tickets.state_id` held `__proto__`, and the read answered `{"counts":{"ok":1,"done":0}}`. Plan 8's
+publish-mapping dialog is built from that response, so an author would never be shown the state and
+could delete it believing it empty. **The escape hatch was shut too:** naming the key in a migrate body
+is refused by Fastify's parser with an opaque 400, making the type permanently unmigratable.
+
+**And the fix round caught a second-order version of the same trap:** a *literal* `{ __proto__: 1 }` in
+the expected object collapses the same way, so the assertion would have passed against the defect. It
+uses a **computed** key. **The test for a `__proto__` bug can have the `__proto__` bug.**
+
+**2. The admin gate's DEFINITION was unconstrained.** The predicate was correct, but widening it to
+admit any project admin **passed all 24 cases** — because the fixture had no plain workspace member who
+was a project admin, and the permissive variant is exported two lines away in `effective-role.ts`.
+Closed by seeding that cell; the mutation now fails naming that caller. The world also had **no
+`admin`-role viewer at all**, so `|| workspaceRole === 'admin'` had no caller that could reach it —
+also seeded, and deleting the disjunct now reddens.
+
+### RULING RECORDED — a guest may NOT call `GET /v1/workspaces/:id/members`
+
+**Executor ruling, conservative default, taken where the plan is silent.** The plan settles who is
+HIDDEN from the listing and never says who may CALL it, so it fell through to the blanket
+"not a member → 404", under which a guest passes. A guest invited to ONE shared ticket was receiving
+the workspace's entire non-guest staff directory, and nothing in that response is about their ticket.
+
+The withholding rule's own rationale decides it: a guest is *"a person invited to one shared ticket,
+not a member of the workspace's roster"*, so handing them the directory is the mirror of the leak that
+rule exists to prevent. **Recorded in the coordination doc's Plan 5 section as §5, stated as cheap to
+reverse, owner Plan 8.** Also recorded there as §4: `foldStateIdForward`'s `def.stateMapping[current]`
+carries the same prototype hazard — **pre-existing and OUT of Plan 5's scope, owner Plan 3.**
+
+### WHAT T10 FOUND, and a rule now written into the catalogue's header
+
+**The snippet-leak assertion could not see a leak.** `expect(snippet).not.toContain(secret)` **survived
+a real leak mutation**, because `ts_headline` windows onto a MATCH and never renders unmatched text —
+so the assertion was testing the headline's windowing, not the route's scoping. Replaced by two things
+that can fail: a leak pair whose secret sits *inside* a matching fragment, and the strong form —
+**the snippet must be a SUBSTRING of its own row's three columns.** Both leak mutations now die.
+This is the same shape as T2's `not.toContain` finding and T9b's `__proto__` proof: **a negative
+assertion is only as good as your ability to make it fire.**
+
+**The `simple` FTS config now has one constant** (`apps/server/src/read/fts.ts`), consumed by
+`compile-filter.ts` and the route's three uses — closing the seam T6 recorded and named T10 as owner
+of. It does NOT reach the migration's generated column (SQL predates the TypeScript); that side is
+linked *behaviourally* by a test where `licence` hits and `licences` does not, with the positive
+control in the same case.
+
+**THE COUNTING RULE, now in `test-cases/07-...md`'s header, because this file learned it twice:**
+**name the CASES a mutation kills, never the COUNT** — unless the count is deterministic AND has been
+reproduced by a second party. "Removing the `ORDER BY` reddens seven cases" was one run's artifact
+(re-runs: 15, 18, 4, 15). A "dies 6" for a visibility mutation measured **7** on re-run, the two extra
+deaths being cases whose assertions are coupled to a shared fixture query's LENGTH — a hidden
+dependency worth knowing about on its own. The one count kept is `FTS_CONFIG`→`english` = eleven,
+because it is a configuration name rather than a planner choice and a second party re-ran it.
+
+### T11 AND T12 — what is worth carrying forward from two clean tasks
+
+**T11 (`/me/work`) is the endpoint whose FILTER IS its security boundary.** The viewer id comes from
+the session only. Because Fastify hands over undeclared query keys anyway, the test *sends*
+`userId`/`user_id`/`assigneeId`/`viewerId`/`as` naming the owner and pins the response
+**byte-identical** to the one naming nobody — and the impersonation mutation (`raw.userId ??
+request.currentUserId`) dies on that case alone, with the owner's queue visibly leaking. **Being
+assigned a ticket is not being allowed to see it**, proven five ways: hidden/explicit, never-on-project,
+removed-from-project after assignment, visibility narrowed after assignment, and admin-without-bypass.
+
+**T12 (attention) is the first task on this branch where the CLOCK is load-bearing**, and it is the
+first to take the standing TZ rule seriously. The IST arithmetic is measured from **four directions**
+(18:35Z/18:31Z twins, the exact-midnight bound, a 19:30 IST evening entry, and a read a millisecond
+either side of 18:30Z) and each direction has a mutation that dies naming it. **Four mutations SURVIVED
+on first run** — staleness `>=`→`>`, the tenancy clause, `daysInFlight` as a millisecond quotient, and
+blocked-narrowed-to-active — and each was closed with a new fixture and re-run rather than explained
+away. That is the discipline working: *a survivor is a missing fixture until proven otherwise.*
+
+**The clock is now injectable**: `AppDeps.now` (optional, undefaulted) and `BuildTestAppOverrides.now`,
+with `read-app.ts` frozen at `SCENARIO_NOW`. **T14 and T15 will need this** — a heartbeat is a clock.
+
+**Recorded, owner = the coordination doc:** `latestWorkflowDefs` resolves the NEWEST published version,
+so republishing a workflow that newly flags a state re-classifies tickets already sitting in it **with
+no event on their own streams.** Defensible for a "what needs attention now" strip, and it is the
+reader every route on this branch uses — but the plan does not address it and version-pinning is an
+equally defensible product. Shipped as-is; the test comment was deliberately downgraded to a
+description of behaviour so no future reader mistakes it for pinned intent.
+
+### T14's FLOOR-LIST REVIEW — the hub was sound; both Importants were DEAD ASSERTIONS
+
+**The hub itself survived everything.** The fan-out is genuinely per-subscriber; a neighbour
+workspace's owner and a workspace guest, probed against the REAL filter and a real database, each
+received nothing but their own cursor echoed back, with a member in the same case as the positive
+control. Narrowing mid-subscription is honoured and the guard that makes it work dies when removed.
+
+**Important 1: the assertion guarding this task's central disclosure decision could not fire.**
+`expect(JSON.stringify(socket.frames.slice(-1))).not.toContain(ticket)` — and `slice(-1)` is always
+the `scope-revoked` frame, whose shape is `{type, workspaceId}` and which **structurally cannot carry a
+ticket id**. Purge frames emitted before it fall outside the slice. That one assertion carries the
+entire reason `scope-revoked` is ONE frame rather than per-id purges (per-id purges tell an outsider
+how many tickets existed in a scope they were never shown).
+
+**Important 2: the recording socket asserted against a SANITIZED COPY, not the bytes sent.**
+`fakeSocket.send` pushed the schema's *parse result*. The outer frame is `.strict()`, but the envelope
+inside is **not**, so unknown envelope keys were silently stripped — the hub could attach an
+attacker-chosen key to every envelope on the wire and 21/21 passed. **Two docblocks stated the opposite
+as a load-bearing guarantee to Plans 6, 9 and 10**, which is what made it Important rather than Minor.
+Now the raw string is recorded alongside, disclosure is asserted over the raw, and the recorder also
+proves the parse stripped nothing.
+
+**THE METHOD MOMENT WORTH KEEPING: the fix round REFUTED the reviewer's evidence while confirming the
+finding.** The reviewer's stated mutation was **inert in that fixture** — at that `afterSeq`,
+`stream.rows` holds only the revocation row, so there were no ticket rows to itemise and the mutation
+emitted nothing. Its "passes 21 tests" was therefore not evidence about the dead assertion at all. The
+finding was real; its proof was mis-attributed. A substitute mutation that actually fires was built,
+and the fix proven by a **before/after pair under ONE mutation, varying only the assertion spelling** —
+which isolates the fix from the choice of mutation. *A finding whose mechanism is refuted is not
+therefore worthless: refute the mechanism, then ask what the observation was evidence of.*
+
+### RECORDED — two items a later party owns
+
+- **The stream suite's tenancy coverage is an ARTIFACT OF TEST ORDER — owner Plan 4.** Removing the
+  workspace predicate from `visibleEventsFor` (with its param, so the mutation genuinely ran) reddened
+  only one case, incidentally: **7.134 survives because it runs FIRST and `events` is append-only, so
+  no other workspace's rows exist yet.** Re-ordering, or a `.only`, removes the coverage silently.
+- **`StreamSocket.terminate()` is declared and faked but called by nothing — owner Task 15.** Every hub
+  give-up path uses `close(code, reason)`; the real caller is a heartbeat timeout, which T15 owns.
+
+### T13 RECORDED FIVE CROSS-PLAN ITEMS — the controller should see §6b before Plan 6 runs
+
+Coordination doc §6a-6e. **§6b is the one that matters: Plan 6 declares an INCOMPATIBLE
+`UserPreferences`** (`{version, projects, savedFilters[].filter}` against the server's
+`{savedFilters[].filterSpec, listColumns, grouping}`). Informationally equivalent, so it is a naming
+conflict rather than a design one — **but it needs a ruling before Plan 6 Task 10.** §6a narrowed
+record keys `string`→`ulidString`, forced by measurement: **zod 3.25.76 parses `{"__proto__": …}`
+SUCCESSFULLY into `{}`**, so a full-replace PUT would have stored and answered a document nobody sent.
+
+**NEXT: Plan 5 Task 15** — WS `/v1/stream`, the route, heartbeat and planted stream defect, plan line
+5452. **FLOOR-LIST.** Then T16 (6047), the catalogue task, and the branch is complete.
+**`makeRequireSession` is still wrong at plan line 5915.** · T9 (2657) · **T9b (3183, FLOOR-LIST)** · T10 (4079) ·
+T13 (4551) · **T14 (4918, FLOOR-LIST)** · **T15 (5452, FLOOR-LIST)** · T16 (6047).
+
+### WHAT T5 COST AND WHAT IT BOUGHT — read before dispatching any later floor-list task
+
+**The first T5 implementer DIED on a transient network error** (ENOTFOUND) after ~15 minutes, leaving
+four untracked, unreviewed, uncommitted files. Nothing was lost only because the resume dispatch handed
+them over as **untrusted drafts with a keep/fix/delete decision per file**, rather than either deleting
+them or silently inheriting them. It rewrote one (the draft had duplicated the decision table instead of
+extracting it), kept two, and fixed one. **The standing lesson is in every dispatch from now on:
+COMMIT EARLY AND OFTEN — an uncommitted increment is the only thing a dropped connection can destroy.**
+
+**The extraction worked and is proved rather than asserted.** `listVisibleTickets` now consumes
+`visibleTicketsWhere`; `grep -rn "resolved_mode" apps/server/src/` finds the table in SQL **nowhere
+else**. The proof is a mutation: break the builder and `test/visibility/visible-tickets.test.ts` — a
+file the implementer never touched — goes red.
+
+**A plan-text defect worth carrying: the plan's Task-5 decision table and its sample predicate are both
+WRONG ABOUT THE OWNER.** They collapse owner into "member/admin/owner"; three implemented sites say
+owner is a separate always-yes row (`can-see.ts:101`, its own table, `visible-tickets.test.ts:88`). A
+predicate transcribed from the plan fails on the first owner fixture. **Owner compiles to `'TRUE'`.**
+
+**And `resolved_user_ids` is `text[]`, not jsonb** (`1787961300000_proj-visibility.sql:28`) — so
+`$n = ANY (...)`, NOT the plan's `@> to_jsonb(...)`, which raises 42883.
+
+### THE FINDING THAT ONLY A FLOOR-LIST REVIEW WOULD HAVE CAUGHT
+
+An **over-permissive guest branch survived all 520 server tests.** The predicate was correct; the
+suite could not have told you if it were not. Two reasons, and the second is the transferable one:
+
+1. the `guest x project` cell only ever asked about a guest whose project set was EMPTY — an answer no
+   implementation of that branch could get wrong; and
+2. **the `canSee`-vs-SQL agreement oracle is STRUCTURALLY BLIND wherever both implementations ignore
+   the same input.** Neither consults `eff.projects` for a guest, so they agree whatever the fixture
+   holds. **An agreement test between two implementations cannot see a rule they both ignore** —
+   generalise this to every later oracle-shaped test in this plan.
+
+Closed by seeding a guest onto a project roster and asserting their slice is unchanged. **Proven, not
+asserted:** the same mutation now fails naming `guest x project`, `visible: false` vs `true`.
+
+Two Minors closed with it: a `seeded` guard that was a JS-literal tautology (it compared literals to
+literals and could not fail — replaced by reading each cell ticket's real `resolved_mode` back out of
+`proj_visibility`), and an injection assertion that was live only in the over-permissive direction and
+now carries a positive control.
+
+### RECORDED, NOT FIXED — owner: permissions / a Plan 4-line ruling
+
+**Can an owner add a GUEST to a project roster with `projectAdmin: true`?** `check-permission.ts:488-494`
+gates `project.member_added` on the **actor's** `hasProjectAdminRights` and constrains the **target's**
+role not at all. `hasProjectAdminRights` returns true for `eff.projects.get(projectId)?.projectAdmin`,
+so such a guest would hold project-admin rights — roster changes and `visibility.set` on that project —
+**while `visibleTicketsWhere` and `canSeeResolved` still show them nothing.** The READ side's inertness
+for a guest is now proven (T5's new fixture). **The COMMAND side is not, and was not executed.** Stated
+as a question, not a confirmed defect. It surfaced only because T5's fix needed that event as a means
+to an end.
+
+### THE REGISTRATION PIN: ENUMERATED, because "three places" was a reading and it was imprecise
+
+T4's implementer found a second pin the expensive way — a red gate, 1 failed / 502 passed — and
+recorded "three places" in its commit message, which is not somewhere a later subagent reads. The
+count was never enumerated, so it is enumerated here. **The actionable answer is THREE ASSERTION
+ARRAYS ACROSS TWO FILES**, not three files:
+
+| File | What it holds | Extend on registering? |
+|---|---|---|
+| `apps/server/test/projection-order.test.ts` | **TWO** `toEqual([...])` arrays, lines 56 and 113. DB-free on purpose. The pin of record. | **YES — both arrays** |
+| `apps/server/test/entity-heads.test.ts:92` | ONE array. Postgres-bound, so it **goes silent exactly when the database is down** | **YES** |
+| `apps/server/src/projections/index.ts` | Comments only, no assertion | Prose, not a gate |
+| `apps/server/test/verify-projections.test.ts:173-179` | **NOT an order pin.** A non-emptiness anti-vacuity list of the six tables its fixture seeds — *"a clean verdict over it proves nothing"* | **No** — but see below |
+| `apps/server/test/determinism.test.ts` | Single-table usage, no list | No |
+
+**The `verify-projections` row is the one worth reading twice.** It does not need extending, but a
+projection absent from it gets a **vacuous `clean: true`** from that suite, because the verifier
+returns clean over an empty table. `proj_workspace_settings` is absent from it and T4 covered the gap
+the right way — a planted live corruption inside its own test file, reported as
+`missingFromLive: 1, extraInLive: 1` scoped to that one table. **Every later registrant owes the same
+proof somewhere, or its verifier coverage is a check that cannot fail.**
+
+### TASK 6 IS DONE AND THE `tsvector` QUESTION IS ANSWERED — this note is retired, not pending
+
+**`tsvector` DOES support the verifier.** Proven by execution, twice, independently: the implementer
+planted a live corruption and the reviewer re-ran it with a DIFFERENT corruption string to rule out a
+canned fixture. Both saw `proj_search: 1 row(s) missing from live, 1 extra in live`, then clean again
+after `rebuildProjection`. **`EXCEPT` executes over `tsvector`** — a missing equality operator would
+have raised `could not identify an equality operator for type tsvector`, not returned a wrong answer —
+and `CREATE TABLE (LIKE … INCLUDING ALL)` carries the GENERATED column and its GIN index into the
+shadow schema, so the tsvector genuinely participates in the diff.
+
+**Review was CLEAN — zero findings.** All three pin arrays extended and confirmed by mutation (register
+the projection one slot early and all three redden). Registration APPENDED on dependency grounds:
+`searchProjection.apply` reads no table at all, and no projection reads `proj_search` in a transaction.
+It does have readers — `compile-filter.ts:97` and the future Task 12 route — but both are read-time on
+a request path, never handlers, so neither creates an adjacency. The comment says that rather than
+implying a §8 slot exists.
+
+**A seam was found that would have reddened the gate:** `compile-filter.test.ts` had been creating its
+own stand-in `proj_search`, so the real migration collided with `relation "proj_search" already
+exists`. Task 2 had left a note asking Task 6 to keep the column names — it did, the stand-in is gone,
+and that test now runs against the shipped table.
+
+### RECORDED, NOT FIXED — owner: Plan 5 Task 12 (the search route)
+
+**The `'simple'` text-search configuration is pinned in THREE unlinked places and nothing forces them
+to move together:** the migration's generated column, `compile-filter.ts:97`'s
+`websearch_to_tsquery('simple', …)`, and the search test's own helper. They agree today (checked). A
+change to the QUERY side alone would leave the projection green while search quietly stopped matching.
+No shared constant was invented, deliberately — Task 12 writes the search route and is the task that
+should decide where such a constant lives, with the route in front of it. **If Task 12 does not, this
+is the seam that rots.**
+
+### THE FORWARD HAZARD T4 CREATED, and it is this series' signature failure — owner: STEP 10
+
+`applyCommitted` in `apps/server/test/helpers/apply.ts` is the seeding path for **every read model in
+Tasks 5–15**. Its docblock said *"seeds envelopes the way ingest would."* **It does not.** Verified
+against `ingest-service.ts`: real ingest also takes `lockWorkspace` + `lockEntity` (`:157-158`), reads
+the seqs from the DB via `nextWorkspaceSeq`/`nextSeq` rather than a process map, runs
+`checkPermission`, runs the rule engine, runs `bootstrapWorkspace`, and calls `notifyCommitted`.
+`applyCommitted` does `insertEvent` plus projections, and nothing else.
+
+The docblock now **enumerates those six absences** rather than calling itself simplified — *a
+partial-implementation marker enumerates the absences, not the partiality*. The consequence, written
+where the next eleven tasks will read it: **a read model green against this helper is proven correct
+about ROWS and proven nothing about whether those rows are reachable through the shipped door.**
+
+**This is exactly "a mocked contract is the thing that excuses the server from existing."** It is
+recorded, not fixed — closing it is the **integration checkpoint (sequence step 10)**, which is the
+step that exists for it. One absence is a live trap rather than a philosophical one and is called out
+by name: the seq map starts at 0 regardless of what the database already holds, so seeding into a
+non-fresh database silently collides.
+
+## THE PLAN 5 ADAPTATION MAP — three compile-breaks, one of them at EIGHT sites
+
+Run 2026-09-01, one sonnet agent, read-only against `git show origin/main:<path>` blobs (never the
+working tree, because an implementer was editing it concurrently). **Positive control: 26 cross-module
+symbols checked and found to MATCH main exactly** — a map reporting drifts and no matches would mean a
+broken method rather than a broken plan, so the matches are the evidence the misses are real.
+
+| Task | Symbol | Plan assumes | Main actually has |
+|---|---|---|---|
+| **T7** | `RollupView` (`src/visibility/rollup.ts`) | `{total, open, active, terminal, restrictedCount}`; the snippet reads `rollupView.terminal` for `TicketRollup.terminalChildren` | **`{total, restrictedCount}` — two fields.** No `terminal`, `open` or `active` exists on the type or on what `rollupFor` returns |
+| **T8 + 7 more** | `makeRequireSession` | `import … from '../auth/routes.js'` | Exported **only** from `src/auth/require-session.ts`; `auth/routes.ts` exports `registerAuthRoutes` and nothing else |
+| **T5** | `EffectiveRole` | a plain literal `{workspaceRole: null, projects: new Map()}` | **A required unexported unique-symbol brand `readonly [RESOLVED]: true` (Ruling P22).** No object literal can satisfy it structurally; main's own tests write `as unknown as EffectiveRole` |
+
+**The `makeRequireSession` one is the expensive one and it is why this map paid for itself.** The wrong
+import recurs **verbatim at plan lines 2527 (T8), 2956 (T9), 3442 (T10), 3774 (T11), 4009 (T12), 4369
+(T13), 4865 (T14's test helper) and 5915 (T15)** — every route-registration snippet in the plan. Only
+the T8 occurrence (line 2632) carries an inline self-correction; **the other seven are unmarked.** Seven
+separate implementers would each have hit it cold. Fix it at every site without re-deriving it.
+
+**All three are compile-break, i.e. self-announcing — and the map went looking for the dangerous class
+and reported the null.** It specifically hunted a T3-style *silent-wrong* (an optional field the
+snippet omits, which compiles and passes while behaving differently) across T4–T16 and found none,
+having checked `EventEnvelope`'s 11 required fields against `makeCommitted`'s literal, the
+refresh-on-publish fold-forward that T8's "unreachable now" claim rests on, and all 10
+`PROJ_TICKET_COLUMNS` against the live `CREATE TABLE`. **A reported null with its method named is worth
+more than a silent omission** — but note it is a null, not a proof, and the map states its own gaps:
+T4's and T6's full code bodies, T9/T9b's route-handler bodies, and T13's preferences SQL were not
+swept beyond their import blocks.
+
+### RECORDED BEFORE THEY WERE NEEDED — two plan/as-built drifts found by reading, not by failing
+
+Both were found while orienting for T3, before any implementer ran. Recorded here so a restart does not
+re-pay for them, and because the second is **not T3's to fix.**
+
+* **T3's registration snippet is stale, and its AS-BUILT annotation proves the plan was patched
+  incompletely.** The snippet registers `{type, version, payloadSchema}`. As-built,
+  `EventTypeRegistration` also carries **`entityKind?`**, and `parse-event.ts:79` enforces it at the
+  door. It is **optional**, so the plan's snippet *compiles and its tests pass* — which is the trap:
+  omitting it admits a `workspace.settings_set` envelope pointed at `entity.kind: 'ticket'`, and
+  **nothing in T3's supplied test suite can tell the two apart** (`parsed.ok === true` either way).
+  The task carries an explicit AS-BUILT correction for a *different* drift in the same code block (Plan
+  4 T5's `workspaceExists`). **An AS-BUILT annotation is evidence the plan was reviewed, not that it was
+  reviewed completely** — treat one as a signal to check the rest of the snippet, not as a clearance.
+* **T5 will be tempted into a THIRD copy of the visibility decision table — owner Plan 5 T5.**
+  `apps/server/src/visibility/visible-tickets.ts` is on main and already expresses that table in SQL;
+  its own docblock names the hazard: *"Once in `canSeeResolved`, once in SQL — the two-sources-of-truth
+  shape."* T5 produces `visibleTicketsWhere(eff, userId, params): string`, which **does not exist**
+  (main has `listVisibleTickets`, an async query function, not a predicate builder), and neither do
+  `workspaceOfProject` / `requireMember`. So T5 is genuinely create — but it must **extract from**
+  `visible-tickets.ts`, not re-derive beside it. Checked because Plan 4's T5 turned out to *widen*
+  rather than create; this one does not, and that was measured rather than assumed.
+
+### THE REBASE IS DONE — do not re-run it, and here is why `cherry` said what it said
+
+**Performed 2026-09-01: `git rebase --onto origin/main 8858f28`.** Four commits, replayed clean, zero
+conflicts. **Not 62** — the branch is Chain B's tip plus four, and Chain B's content was already on main
+under `6cb631d`, so only the four were ever mine to move.
+
+**The verification that makes this trustworthy is a diff, not the rebase's own success message:**
+`git diff --stat 95004e1 c3b1090` prints **exactly two files** — `docs/lanes/controller-state.md` and
+`docs/lanes/task-ledger.tsv`, i.e. the controller's docs-only `00cb2e0` and nothing else. That is
+positive evidence the branch already carried step 7's and Chain B's content **byte-identically**: had it
+not, source files would appear in that diff. A clean rebase alone would not have shown me this.
+
+`git cherry` marked all 60 pre-rebase commits `+` although 58 were merged, because **#57 and #59 were
+SQUASHED**. Main's subjects carry the **`(#57)` / `(#59)` suffix** — that suffix is the marker telling
+you the `+` is uninformative. **Post-rebase the branch is 4 ahead of `origin/main` and `cherry` is
+meaningful again.**
+
+### What batch A found — both defects were in code or plan text that predated the task
+
+* **T1:** the pulled-forward `docToPlainText` had **unbounded recursion** while its own docblock said
+  *"Total function… never throws."* Three hostile inputs (self-referential node, nested one, 100k-deep
+  chain) all threw `RangeError` **against the real exported function**. Fixed with a depth cap rather
+  than a seen-node set, because **a seen-set would misrender a document that legitimately reuses one JS
+  object in two tree positions.**
+* **T2:** the plan's own blocked-states CTE used `DISTINCT ON (workflow_id)` across all of
+  `proj_workflows`. The PK is `(workflow_id, version)` **globally**, so workspace A holding `('wf',1)`
+  and B holding `('wf',2)` means **A's `blocked` filter read A's tickets against B's flags** — a
+  **second consumer** of the same global key whose reader half was ruling P14. Fixed by correlating on
+  the ticket row's own workspace, which nothing an actor sends can aim.
+* **T2's answer to "which identifiers can vary": NONE — the allowlist is the empty set.** And it was
+  honest about the limit: the base tenancy scope stays the caller's, **"and yes, a caller can forget
+  it"**, with a test enumerating all twelve terms that fails if a new one reaches another table
+  uncorrelated.
+* **The fix round closed two Importants:** a **U+0000 the schema admitted and Postgres cannot carry**
+  (SQLSTATE 22021 — a door accepting what the store cannot hold turns a 400 into a 500), and §7's
+  arrival making two neighbouring scope notes false.
+
+### A REVIEW FINDING WORTH CARRYING INTO EVERY LATER TASK
+
+`expect(sql).not.toContain(hostile)` **measures whether the value LOOKS LIKE SQL, not whether it was
+concatenated.** Add `'$1'` to the hostile set and a **correct** compiler fails — it emits
+`t.assignee_id = $1` and binds the string safely. **A guard that fires on correct code is worse than no
+guard, because the next person deletes it.** The meaning lives in the paired execution assertion.
+
+### Three method results from batch A's fix round, worth more than the fixes
+
+* **A review nit's stated mechanism was REFUTED, and a working one substituted.** N3 proposed seeding a
+  second workspace's ordinary `proj_search` rows to make a tenancy correlation executable. That cannot
+  work: `proj_tickets.ticket_id` is a **primary key**, so ticket_id → workspace is a *function*, and a
+  correctly-filed neighbouring row can never satisfy the outer predicate. The reachable failure is
+  projection **drift** — a WS_A ticket whose `proj_search` row is filed under WS_B. Correlated → `[]`;
+  uncorrelated → the foreign row. **A reviewer's proposed experiment is a claim like any other.**
+* **N5's premise was PROVEN, not accepted.** The deleted `not.toContain` guard was restored as a
+  mutation and **failed against the correct, unmodified compiler** (`Expected: "$1"`). Replaced by a
+  pinned SQL constant plus **exact** parameter-array equality — the old `>= 5` would pass on a compiler
+  that had lost two bindings.
+* **The NUL rule was measured, not assumed.** BEL, TAB, LF, CR, ESC, DEL and a lone surrogate all
+  round-trip through Postgres; **only 0x00 raises 22021.** So the door refuses exactly what the store
+  cannot hold, rather than inventing a control-character policy nothing downstream needs. A mutation
+  widening the guard to all C0 controls is killed by a test named `refuses ONLY NUL`.
+
+## RULING P23 — SETTLED. Do not reopen; do not restore the walk.
+
+**DELETE upheld, not narrow.** What carries it, in the controller's weight order:
+1. the **blessed scope-wide emitter survives**;
+2. the residual is **under-purge** — the direction P23 explicitly named;
+3. **refusing the project-membership gate is correct**, because *being on a container is not holding the
+   entity*;
+4. **no gatable predicate exists**, so a gate here would be a deletion wearing a condition.
+
+**6.104 stands, owner Plan 10.** *(A supporting figure of 495 insertions / 0 deletions was offered and
+then withdrawn by the controller: it was measured at `eadc748`, before #57, and re-run now prints 0/0.
+It is context, not the reason — and the escalation's actual claim was forward-looking, about the
+residual reaching all per-event triggers and members, which that figure does not touch.)*
 
 ## What step 2 actually contained
 

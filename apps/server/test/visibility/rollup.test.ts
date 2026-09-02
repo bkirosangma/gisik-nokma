@@ -55,13 +55,21 @@ import {
  *
  * ## What is deliberately not here
  *
- * No case asserts `open`/`active`/`terminal`. Those need each child's
- * `state_category`, which lives in `proj_tickets` via `proj_rollups`, and
- * **neither table exists on this branch** (cases 6.82, 6.83). They are absent
- * from `RollupView` rather than zeroed, so there is nothing here to assert
- * about — writing `expect(rollup.terminal).toBeUndefined()` would pass for a
- * reason unrelated to the property it names, which is this series' signature
- * defect and the same thing case 6.66 refused to write for titles.
+ * `open` and `active` are still absent from `RollupView` (case 6.82's original
+ * reason: nothing reads them). `terminal` and `uncategorized` LANDED with Plan
+ * 5 Task 7, which is the first construction site that needed the "5 of 8 done"
+ * half, and every expectation here now names all four numbers.
+ *
+ * **This file cannot exercise `terminal`, and says so rather than pretending.**
+ * `applyAll` (`test/helpers/seed.ts`) seeds four projections and `proj_tickets`
+ * is not among them, so no child in any fixture below has a state category at
+ * all — every one of them lands in `uncategorized`, which is the honest reading
+ * of a world where nothing knows whether a child is done. A mutation that
+ * hard-wired `terminal` to 0 would survive here and is killed in
+ * `test/read/ticket-cards.test.ts`, whose fixtures go through the full
+ * projection registry. Extending `applyAll` to register `proj_tickets` would
+ * change the seeded world of twenty test files and belongs to whoever owns that
+ * helper's own recorded cleanup, not to a drive-by here.
  */
 
 let db: TestDatabase;
@@ -162,16 +170,29 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     await revokeMember(db.pool, ws, revoked);
     // `outsider` is granted nothing at all.
 
+    // `terminal: 0, uncategorized: 9` is a TRUE statement about this fixture,
+    // not a placeholder: `applyAll` seeds four projections and proj_tickets is
+    // not one of them, so no child here has a known state category. That is
+    // exactly what `uncategorized` exists to say — "nine children, none of them
+    // KNOWN to be done" rather than "nine children, none done". The `terminal`
+    // count is exercised where a fixture can actually feed it, in
+    // `test/read/ticket-cards.test.ts`.
+    const family = (restrictedCount: number): RollupView => ({
+      total: 9,
+      terminal: 0,
+      uncategorized: 9,
+      restrictedCount,
+    });
     const classes: Array<[string, string, RollupView]> = [
-      ['owner — the disclosed workspace-wide read', owner, { total: 9, restrictedCount: 0 }],
-      ['member on project A', onA, { total: 9, restrictedCount: 3 }],
-      ['member on projects A and B', onAB, { total: 9, restrictedCount: 2 }],
-      ['member on no project', offAll, { total: 9, restrictedCount: 5 }],
+      ['owner — the disclosed workspace-wide read', owner, family(0)],
+      ['member on project A', onA, family(3)],
+      ['member on projects A and B', onAB, family(2)],
+      ['member on no project', offAll, family(5)],
       // Identical to the plain member above: an admin gets NO read bypass.
-      ['workspace admin on no project', adminOffAll, { total: 9, restrictedCount: 5 }],
-      ['guest — one explicit list and nothing else', guestUser, { total: 9, restrictedCount: 8 }],
-      ['non-member', outsider, { total: 9, restrictedCount: 9 }],
-      ['revoked member, project row surviving', revoked, { total: 9, restrictedCount: 9 }],
+      ['workspace admin on no project', adminOffAll, family(5)],
+      ['guest — one explicit list and nothing else', guestUser, family(8)],
+      ['non-member', outsider, family(9)],
+      ['revoked member, project row surviving', revoked, family(9)],
     ];
 
     const observed: Array<[string, RollupView | null]> = [];
@@ -219,7 +240,7 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     await seedMember(db.pool, ws, onA, 'member', [{ projectId: prjA }]);
 
     const rollup = await rollupFor(db.pool, onA, parent);
-    expect(rollup).toEqual({ total: 9, restrictedCount: 3 });
+    expect(rollup).toEqual({ total: 9, terminal: 0, uncategorized: 9, restrictedCount: 3 });
 
     // Nine children, six this member can reach, three it cannot: three
     // DIFFERENT numbers, so no two can be swapped silently. The six comes from
@@ -257,7 +278,12 @@ describe('rollupFor — what null means, and what it must not invent', () => {
     await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: parent });
     await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: child, parentId: parent });
     await applyAll(db.pool, [setVisibilityEnv(ws, child, 'workspace')]);
-    expect(await rollupFor(db.pool, viewer, parent)).toEqual({ total: 1, restrictedCount: 0 });
+    expect(await rollupFor(db.pool, viewer, parent)).toEqual({
+      total: 1,
+      terminal: 0,
+      uncategorized: 1,
+      restrictedCount: 0,
+    });
   });
 
   it('a ticket that never existed is the same null as a leaf — no existence oracle one layer down', async () => {
@@ -307,7 +333,12 @@ describe('rollupFor — the role is resolved in each CHILD’s own workspace', (
     // The B child counts toward the TRUE total — dropping it would understate a
     // number this task exists to keep honest — and is restricted, because the
     // viewer holds no role in B.
-    expect(await rollupFor(db.pool, viewer, parent)).toEqual({ total: 3, restrictedCount: 1 });
+    expect(await rollupFor(db.pool, viewer, parent)).toEqual({
+      total: 3,
+      terminal: 0,
+      uncategorized: 3,
+      restrictedCount: 1,
+    });
 
     // This case does not depend on which child sorts first, which is why it can
     // be written against minted ULIDs: resolving ONE role from the first row

@@ -5326,3 +5326,225 @@ class produced a wrong *report*. This one produced a wrong *product*.
   alone killed nothing, dropping it from `openableInvite` alone killed one, and dropping **both** killed
   two. The two clauses are alternatives and neither is load-bearing alone — a fact only visible because
   the pair was run together rather than the survivor being reported by itself.
+
+## Plan 5 execution consequences (2026-09-01) — two contract widenings and one owner question
+
+Recorded by the serial executor at Plan 5 Task 7, in the same change set that made them, per the
+executor brief's rule that anything outside a task's scope is **recorded with a named owner rather
+than fixed silently**. Both reviews of Task 7 were clean; these are not defects. They are shape
+changes a later plan compiles against, and the expensive version of this note is the one written
+after Plan 6 fails to build.
+
+### 1. `TicketRollup` is FOUR fields, not the three Plan 5 specified — binding on Plans 6, 9 and 10
+
+Shipped shape:
+
+```ts
+type TicketRollup = {
+  totalChildren: number;        // over ALL children, viewer-invariant
+  terminalChildren: number;     // over ALL children, viewer-invariant
+  restrictedCount: number;      // per-viewer — what the disclosure is honest WITH
+  uncategorizedChildren: number; // children whose category nothing knows
+};
+```
+
+`uncategorizedChildren` is the added one and it is **not padding**. The rollup counts categories via
+`LEFT JOIN proj_tickets`, and that join CAN miss — commonly in fixtures that seed a subset of the
+registry (`test/helpers/seed.ts`'s `applyAll` seeds four projections, not `proj_tickets`). Folding a
+miss into "not done" would have been a view-model quietly asserting something it does not know, which
+is the exact failure Task 7 exists to prevent. So the miss is **counted and named**. Plans 6/9/10 render
+this through the `DataSource`: **a renderer that shows `terminalChildren` of `totalChildren` without
+consulting `uncategorizedChildren` is showing a progress bar that is silently incomplete.**
+
+### 2. `RollupView` gained `terminal` and `uncategorized`, and a SHIPPED ROUTE'S BODY CHANGED
+
+`apps/server/src/visibility/rollup.ts`'s `RollupView` was `{total, restrictedCount}`. Plan 5's text
+assumed `{total, open, active, terminal, restrictedCount}` and read `rollupView.terminal`, which did
+not exist — caught by the adaptation map before an implementer met it. It is now
+`{total, terminal, uncategorized, restrictedCount}`; `open` and `active` stay absent because nothing
+reads them.
+
+**The consequence that reaches outside Plan 5:** `GET /v1/workspaces/:ws/tickets/:id` returns the view
+verbatim, so **that response body now carries two additional keys.** Additive, so no client breaks —
+but it is Plan 4's read path, changed by a Plan 5 task. **Owner: Plan 4's read path.**
+
+The alternative — sourcing `terminalChildren` from the shipped `proj_rollups.terminal_children` column
+— looked free and was **ruled out by measurement, not taste.** `rollupFor` walks
+`proj_visibility WHERE parent_id = $1` with **no workspace clause** (deliberately, case 6.84: dropping
+a cross-workspace child would understate a total this design exists to keep honest), while `getRollup`
+and `recomputeParent` are `workspace_id`-scoped. The two enumerate **different child sets**, so a
+`totalChildren` from one table beside a `restrictedCount` from the other can emit
+`restrictedCount > totalChildren`. A test builds the cross-workspace child and watches the two counts
+part, 2 against 1 — closing case 6.83, open since Plan 3's handoff.
+
+### 3. OWNER QUESTION, not a ruling: does the done-count cross the visibility boundary?
+
+`terminalChildren` counts children **the viewer cannot see** — strictly more disclosure than
+`totalChildren`, which reveals existence; this reveals state. The implementer and the reviewer arrived
+at the same reading independently, and **both flagged the same uncertainty**, which is why it is here
+rather than buried.
+
+The support is the product design doc, line 116: *"5 of 8 done · 2 restricted … nothing pretended
+absent."* It reads unambiguously as a done-count over all children. But it is a brief's **illustrative
+phrase, not a ruling on this API shape.**
+
+**Conservative default in force: shipped as the spec's plain reading says.** If the owner reads that
+line more narrowly, `terminalChildren` becomes per-viewer and the disclosure argument collapses. The
+change would be local — one `LEFT JOIN` predicate and its tests — so this is cheap to reverse and is
+recorded rather than escalated.
+
+### 4. The prototype-key class, swept across Plan 5's own files — one fixed, one recorded
+
+Added at the Task 9b fix round (2026-09-02). A state id, a field id and a filter key are all
+`z.string().min(1)` and nothing more, so **any plain object indexed by one of them can be walked
+into `Object.prototype`.** Two distinct failure modes, and they are not the same bug:
+
+- **A method** (`toString`, `valueOf`, `constructor`) — a READ finds an inherited function where the
+  code expected `undefined`. A WRITE is safe: plain assignment creates an own property that shadows
+  the method. This is what case 7.88 closed in the bulk rebind's `stateMap`.
+- **`__proto__`** — an ACCESSOR PAIR. A read finds `Object.prototype`; a **write of a non-object is
+  silently discarded**, creating no own key and throwing nothing. This is what case 7.89 closed in
+  `readStateOccupancy`, where a whole state and its live tickets were absent from the response.
+
+**Swept:** every source file Plan 5 created — `routes/{board,list,builder-reads}.ts`,
+`read/{compile-filter,membership,sql-params,state-provenance,ticket-cards,visible-where,workflow-defs}.ts`,
+`projections/{search,workspace-settings}.ts`, `domain/src/{filter-spec,read-models}.ts` and
+`domain/src/events/workspace-settings.ts`. Every other keyed collection on the surface is already a
+`Map` or a `Set` (`blockedStateKeys`, the board's `byColumn`, the list's `buckets` and `epics`,
+`stateProvenanceFor`, `latestWorkflowDefs`). `ticket-cards.ts` reads `row.fields['title']` and
+`row.fields['dueDate']` from an actor-keyed object, but the INDEX is a fixed literal that is not on
+`Object.prototype`, so it is not an instance of this class. **`readStateOccupancy` was the only one,
+and it is fixed.**
+
+**RECORDED, NOT FIXED — outside Plan 5's files.** `foldStateIdForward` in
+`packages/domain/src/workflow.ts:120` reads `def.stateMapping[current]`, where `current` is a state
+id that came from a ticket and `stateMapping` is a plain object parsed out of a stored definition
+(`stateMappingSchema = z.record(z.string(), z.string())`, which constrains neither key nor prototype).
+A ticket parked in a state called `toString` therefore folds through a version whose mapping does not
+name it and reads `Object.prototype.toString` as the target: `mapped !== undefined`, so the walk
+continues with a FUNCTION in a variable TypeScript believes is a `string`, and the refusal that
+eventually comes out carries that function as its `unmappedStateId` instead of the state id it is
+required to name. **Owner: Plan 3, which owns THE ONE VERSION WALK** (that docblock's own words —
+the engine, the server's refresh-on-publish and Plan 10's replica all route through this function, so
+a fix here is a fix in three places and must not be made from a Plan 5 task). **Plan 8 is the first
+plan that can author a `stateMapping` at all**, so it is the plan that makes the hazard reachable
+through a shipped door, and the natural place to close it is the same one-line change made twice here.
+Not fixed from this fix round on purpose: reaching outside the task's files is what hides compounds,
+and this one is a wrong refusal MESSAGE rather than a wrong refusal.
+
+### 5. EXECUTOR RULING (2026-09-02): a guest may NOT call `GET /v1/workspaces/:id/members`
+
+A ruling on a genuine ambiguity, not a defect report, and a **conservative default taken where the
+plan is silent.**
+
+Plan 5 Task 9b settles who is **HIDDEN** from the roster listing — guests are withheld from
+non-admin callers — and never says who may **CALL** it. So the caller question fell through to this
+surface's blanket "not a member → 404", under which a guest passes `requireMember` like anyone else.
+The shipped consequence was that a guest invited to ONE shared ticket received the workspace's entire
+non-guest staff directory, user ids and display names, and nothing in that response is about their
+ticket.
+
+The withholding rule's own stated rationale decides it: a guest is *"a person invited to one shared
+ticket, not a member of the workspace's roster"*, and handing that person the full directory is the
+mirror of the leak the rule exists to prevent. The roster's stated purpose — *"the people a
+`require-different-user` rule can name"* — is workflow-builder work, which is owner/admin work.
+
+**Shipped:** the `/members` door is `no-guests`; a guest draws the same `READ_NOT_FOUND_BODY`, with
+the same headers, that every other refusal on this prefix answers. Case 7.91 asserts the refusal and
+carries three positive controls (the same guest still reads `/workflows` and `/ticket-types`; a
+non-guest member still reads the roster). The assertion that previously pinned the permissive
+behaviour — case 7.39's third case, "a guest asking for the roster gets the non-guest members" — is
+replaced by it rather than left standing beside a contradiction.
+
+**Cheap to reverse:** one enum value at `door()` and that one case. If the owner reads the plan the
+other way, a guest gets the guest-withheld roster back and nothing else moves. **Owner: Plan 8's
+workflow builder**, which is the consumer that actually needs the roster, and the plan that would
+notice if guests were meant to have it.
+
+### 6. Preferences (Task 13): a contract NARROWED, a shape Plan 6 disagrees with, and three residues
+
+Added at Plan 5 Task 13 (2026-09-02), in the same change set. Nothing here is a defect in the
+shipped code; all five are things a later plan compiles or reasons against, recorded rather than
+decided by an executor.
+
+**6a. `listColumns` and `grouping` keys are ULIDs, not arbitrary strings — a TIGHTENING of amendment
+14. Owner: this document.** The plan text declares `Record<string, …>` "keyed by project id". The
+shipped schema keys both records with `ulidString`, and that is a guard rather than tidiness:
+MEASURED on zod 3.25.76, `z.record(z.string(), …).parse(JSON.parse('{"__proto__": ["status"]}'))`
+**succeeds and answers `{}`** — the key is assigned onto a plain object, goes through
+`Object.prototype`'s accessor, and creates no own property. Under a full-replace PUT the server would
+then store, and answer, a document the caller never sent. With the ULID key schema the same document
+is refused at the door. Every project id in this product is a bare ULID (`ids.ts`: `membership` is the
+one entity kind whose id is not), so nothing legitimate is refused — but a client that PUTs a
+non-ULID key now gets a 400 where the plan text implied a 200. Cheap to widen: one constant in
+`packages/domain/src/preferences.ts`, and the domain test names what widening it costs.
+
+**6b. Plan 6 declares a DIFFERENT preferences shape, and it will not compile against the server's.**
+Plan 6's `UserPreferences` is `{ version: 1; projects: Record<string, ProjectViewPrefs>; savedFilters:
+SavedFilter[] }` with `ProjectViewPrefs = { columns; grouping }` and `SavedFilter.filter`; Plan 5 Task
+13 ships `{ savedFilters: [{ id, name, filterSpec }]; listColumns; grouping }` — no `version`, the
+per-project pair split across two records, and the saved filter's field spelled `filterSpec`. The
+server's is the one with a table, a route and tests behind it; Plan 6's is plan text with fakes.
+**Owner: this document**, to rule which shape the `DataSource` carries before Plan 6's Task 10 is
+executed. Whoever rules should note that the two are informationally equivalent — the mapping is
+mechanical either way — so the cost is a decision, not a migration.
+
+**6c. A revoked member's preferences row survives, unreachable and uncollected.** `user_preferences`
+has no foreign keys (matching every projection table here) and preferences are not events, so the
+purge tombstones `visibleEventsFor` emits on membership loss do not reach this table: the row stays,
+the door answers that person 404, and nothing ever deletes it. Harmless for storage at this scale and
+NOT harmless as a statement — it is per-user data outliving the relationship that justified it.
+**Owner: Plan 11's deployment/retention work**, which is where data lifecycle belongs.
+
+**6d. A future tightening of `preferencesDocSchema` bricks existing rows with a 500 for that user
+until they save again.** `getPreferences` re-validates on the way OUT, deliberately: answering
+`EMPTY_PREFERENCES` on a parse failure would silently discard somebody's saved filters, and answering
+the raw row would hand a client a shape its types forbid. There is no migration path and no
+per-user repair. Case 7.132 executes the behaviour so the cost is visible rather than discovered.
+**Owner: whoever next changes that schema.**
+
+**6e. Duplicate `savedFilters[].id` is unrefused.** The server never indexes by that id — the filters
+are an array and stay one — so a duplicate is a client-side confusion rather than a server-side
+ambiguity, and refusing it would be the door enforcing a rule only the renderer needs. **Owner: Plan
+6**, which renders the list.
+
+### 7. Task 14 fix round (2026-09-02): the stream suite's tenancy coverage is an ARTIFACT OF TEST ORDER
+
+**Owner: Plan 4** — the predicate is `visibility/visible-events-for.ts`'s, not the hub's, and this is
+recorded rather than fixed for that reason.
+
+`visibleEventsFor` opens with `SELECT … FROM events WHERE workspace_id = $1 AND workspace_seq > $2`.
+Removing the `workspace_id` clause **and its parameter**, so the mutation genuinely runs rather than
+failing to bind, reddened exactly ONE case in `apps/server/test/stream/hub-integration.test.ts` — and
+only incidentally.
+
+**Case 7.134 survives the mutation because it runs FIRST in the file.** The `events` table is
+append-only and refuses `TRUNCATE`, so every case mints a fresh workspace into a table that keeps
+everything the earlier cases wrote; at the moment 7.134 runs, no other workspace's rows exist for a
+workspace-blind query to pick up. Every case after it can see the mutation only because of the
+fixtures that ran before it. Nothing in the file *asserts* tenancy: re-ordering the cases, or running
+one with `.only`, removes the coverage in silence and no assertion changes.
+
+The honest fix is one case that seeds TWO workspaces itself and asserts that the second's events
+reach no subscriber of the first — a fact about the filter, independent of what ran before it. It is
+deliberately not added from a Plan 5 task: the predicate belongs to Plan 4, and a Plan 4 case can
+also cover the visibility suite, which has the same exposure. Recorded in the test file's header as
+well, where the next reader of that suite will meet it.
+
+### 8. Task 14 fix round (2026-09-02): `StreamSocket.terminate()` is declared, faked, and CALLED BY NOTHING
+
+**Owner: Task 15 (the `WS /v1/stream` route)** — named so its author does not assume the hub already
+terminates sockets.
+
+`StreamSocket` in `apps/server/src/stream/hub.ts` declares `terminate(): void`, and
+`test/helpers/stream-socket.ts` implements it, but no path in the hub invokes it. Every place the hub
+gives up on a peer — the slow-consumer bound, a drain that threw — goes through
+`close(code, reason)`, so the connection is closed with a protocol code (1013, 1011) and the client
+can tell why it happened. That is the right default and is not changing.
+
+The caller with a genuine reason to `terminate()` is the one Task 15 owns: a heartbeat that has timed
+out has no peer left to negotiate a close handshake with, and `ws`'s `close()` on a dead socket waits
+for a reply that never comes. **Task 15 should either wire `terminate()` to the heartbeat timeout or
+delete it from the interface** — it is currently an unmeasured affordance that reads, to anyone
+looking at the type, as though the hub already uses it. A Nit, recorded because leaving it silent is
+how a later plan comes to trust it.
