@@ -94,3 +94,51 @@
   font-size: 0.625rem;
   opacity: 0.7;
 }
+
+/* Editor shell + chrome: the upload chips (UI-only optimistic placeholder,
+   never a doc node) and the wrap menu shown on image selection. Structural
+   only, same rule as the rest of this file. */
+.ticket-editor {
+  position: relative;
+}
+.ticket-editor__content {
+  min-height: 4rem;
+}
+.upload-chips {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  pointer-events: none;
+}
+.upload-chips__chip {
+  font-size: 0.6875rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid currentColor;
+}
+.image-wrap-menu {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+.image-wrap-menu__option {
+  border: 1px solid currentColor;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.125rem 0.5rem;
+}
+.image-wrap-menu__option--active {
+  outline: 1px solid currentColor;
+  outline-offset: -1px;
+}
+.image-wrap-menu__alt {
+  min-width: 10rem;
+  border: 1px solid currentColor;
+  background: none;
+  color: inherit;
+  font: inherit;
+}

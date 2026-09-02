@@ -25,3 +25,11 @@ export {
   escapeSuggestionKey,
   getEscapeSuggestion,
 } from './extensions/escape-suggestion.js';
+export { UploadRefusedError, uploadAttachmentHttp, type UploadResult } from './upload.js';
+export {
+  attachmentPasteKey,
+  createAttachmentPasteExtension,
+  type AttachmentPasteOptions,
+} from './extensions/attachment-paste.js';
+export { TicketEditor, type TicketEditorProps } from './components/TicketEditor.js';
+export { ImageWrapMenu } from './components/ImageWrapMenu.js';
