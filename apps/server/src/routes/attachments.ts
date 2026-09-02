@@ -1,17 +1,18 @@
+import type { Readable as ReadableStream_ } from 'node:stream';
 import { Readable } from 'node:stream';
 import multipart from '@fastify/multipart';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { Pool } from 'pg';
-import { newUlid } from '@gisik-nokma/domain';
+import { EMBEDDABLE_IMAGE_MIME, newUlid } from '@gisik-nokma/domain';
 import type { Auth } from '../auth/auth.js';
 import { makeRequireSession } from '../auth/require-session.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
-import { insertAttachment } from '../attachments/attachment-repo.js';
+import { getAttachment, insertAttachment } from '../attachments/attachment-repo.js';
 import { sha256Hex } from '../attachments/content-hash.js';
 import { sanitizeFilename } from '../attachments/filename.js';
 import { readAtMost } from '../attachments/read-limited.js';
 import { sniffAllowedMime } from '../attachments/sniff.js';
-import type { ObjectStore } from '../attachments/object-store.js';
+import { ObjectNotFoundError, type ObjectStore } from '../attachments/object-store.js';
 
 /** 25 MiB. The one number; `maxBytes` exists so tests can prove the refusal cheaply. */
 export const ATTACHMENT_MAX_BYTES = 26_214_400;
@@ -405,5 +406,104 @@ export async function registerAttachmentRoutes(
       size: read.bytes.length,
       sha256,
     });
+  });
+
+  /**
+   * The download door: bytes leave here, and `canSee` on the OWNING TICKET
+   * decides who gets to ask for them at all.
+   *
+   * ## Same 404, three different reasons, deliberately
+   *
+   * This is the highest-risk handler in the step: the property is BYTE
+   * IDENTITY between "this does not exist" and "you may not see it", and that
+   * property has already produced disclosure rulings on this project (P19,
+   * P22, P23) that no `status === 404` assertion caught, because a status code
+   * alone does not test byte-identity — a route that 404s everything passes
+   * that assertion too. `replyNotFound` is the same shared function the POST
+   * handler above uses, which is what keeps the two doors' 404s from drifting
+   * into two different shapes over time; see its docblock for the fuller
+   * argument and its stated timing caveat, which this handler inherits
+   * unchanged (this lookup costs one query more than the nonexistent-id path,
+   * same direction, same "recorded not fixed" status).
+   *
+   * Three cases collapse into it:
+   *
+   *   (a) the row exists but its ticket is invisible to this viewer — `canSee`
+   *       returns false;
+   *   (b) the id names no row at all — `getAttachment` returns null;
+   *   (c) the row exists, `canSee` passes, but the OBJECT is gone from the
+   *       store — `store.getStream` throws `ObjectNotFoundError`.
+   *
+   * (a) and (b) are the visibility property this whole plan enforces and must
+   * be indistinguishable by construction: both reach `replyNotFound` having
+   * added nothing case-specific to the response.
+   *
+   * (c) is NOT a visibility refusal — a caller who can see the ticket asking
+   * for a real attachment id has done nothing wrong; the product has simply
+   * lost the bytes it promised. It would be defensible to answer that
+   * differently (a 500, or a distinct body naming the inconsistency) to the
+   * viewer who is allowed to know it. This handler does not: it logs the
+   * inconsistency loudly server-side (`request.log.error`, with the
+   * attachment id and object key an operator needs) and answers the caller
+   * the same anonymous 404 as (a) and (b). Two reasons, stated:
+   *
+   *   - A distinct answer here is one more bit of information leaking through
+   *     an attachment id than the rest of this door leaks through a ticket
+   *     id, for a caller who is not the one who can fix it (the object store
+   *     is broken; the requesting browser cannot repair that).
+   *   - Folding it into `replyNotFound` costs nothing extra to test: the same
+   *     "compare full response to a known-nonexistent id" assertion this
+   *     file's test suite already runs for (a) vs (b) covers (c) for free,
+   *     rather than needing a fourth response shape to reason about.
+   *
+   * `attachments-download.test.ts` proves (a)≡(b) with a positive control
+   * ahead of both, and separately proves (c)≡(b) — see its docblock for why
+   * this is a DECISION rather than a default.
+   *
+   * ## Headers set only on the path that already knows the object exists
+   *
+   * `content-type`, `content-length`, `content-disposition` and
+   * `x-content-type-options` are set AFTER the `getStream` call succeeds —
+   * never before. Setting `content-type` from `row.mime` earlier (it is read
+   * from the database row before the store call) would leak the stored mime
+   * on a case-(c) 404 even though the bytes it describes do not exist; the
+   * test suite asserts these four headers are entirely absent on every 404
+   * this route can produce, not merely that their VALUES happen to match
+   * between the two 404s.
+   */
+  app.get('/v1/attachments/:id', { preHandler: requireSession }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const row = await getAttachment(deps.pool, id);
+    if (!row) return replyNotFound(reply);
+    if (!(await canSee(deps.pool, request.currentUserId, row.ticketId))) {
+      return replyNotFound(reply);
+    }
+
+    let stream: ReadableStream_;
+    try {
+      stream = await deps.store.getStream(row.objectKey);
+    } catch (err) {
+      if (err instanceof ObjectNotFoundError) {
+        // Metadata without bytes is an internal inconsistency: log the
+        // detail loudly here, answer the same anonymous 404 out there
+        // (CODING_STANDARDS: detailed internally, generic externally).
+        request.log.error(
+          { attachmentId: id, objectKey: row.objectKey },
+          'attachment bytes missing from object store',
+        );
+        return replyNotFound(reply);
+      }
+      throw err;
+    }
+
+    const disposition = EMBEDDABLE_IMAGE_MIME.has(row.mime)
+      ? 'inline'
+      : `attachment; filename="${sanitizeFilename(row.filename)}"`;
+    return reply
+      .header('content-type', row.mime)
+      .header('content-length', String(row.size))
+      .header('content-disposition', disposition)
+      .header('x-content-type-options', 'nosniff')
+      .send(stream);
   });
 }
