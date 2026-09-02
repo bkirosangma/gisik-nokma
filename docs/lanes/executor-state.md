@@ -15,13 +15,17 @@ brief recovers only what is written here. Refreshed at every task boundary.
 |---|---|---|
 | **Branch** | **`exec/11-plan6-remainder`**, rebased onto `origin/main` `bf0ed47`, pushed. **Do not trust a number written here for the ahead-count — run the command.** | `git rev-list --count origin/main..HEAD` |
 | **Why no number in that row** | This row said **18**; the command it cites answers **19**. Not a slip: the count was taken while writing the commit that records it, so a self-referential ahead-count is **always short by one** and always looks right to its author. It had already propagated into a review brief before anyone ran the command. A count that cannot be written correctly from inside the commit that carries it should not be written at all. | measured, 2026-09-02 |
-| **Position** | **All twelve Plan 6 tasks complete.** Final whole-branch review running; **PR not yet opened.** | ledger + `git log` |
-| **Gate at HEAD** | **exit 0 · 24/24 · 0 cached · 2026 tests · Node v22.22.2 · 0 engine warnings.** domain 335 · rule-engine 280 · **server 761** · **app-core 470** · **web 69** · editor 72 · ui 31 · sync-client 8. | run by the executor at this sha, `--force` |
+| **Position** | **All twelve Plan 6 tasks complete. Final review DONE (verdict ship, all five findings against documents, all fixed). PR #77 IS OPEN, awaiting the controller's merge.** | `gh pr view 77` |
+| **Gate at HEAD** | **exit 0 · 24/24 · 0 cached · 2027 tests · Node v22.22.2 · 0 engine warnings.** domain 335 · rule-engine 280 · **server 761** · **app-core 471** · **web 69** · editor 72 · ui 31 · sync-client 8. | run by the executor at this sha, `--force` |
 | **`check:tasks` / `check:env`** | both **exit 0**. | run at this sha |
 | **The gate changed SHAPE** | **24 tasks over EIGHT packages**, because `apps/web` now exists. Any inherited "21/21 over 7" figure is spent. | `pnpm turbo run …` |
 | Orphaned, do not cite | every sha in the narrative below — this branch was rebased, and step 10's were squashed before that. | `git branch --contains` (empty = orphaned) |
 
-## WHERE I AM: **STEP 11 IS COMPLETE.** Twelve of twelve. PR not yet open.
+## WHERE I AM: **STEP 11 IS COMPLETE. PR #77 IS OPEN.** Twelve of twelve.
+
+**The executor opens PRs and NEVER merges** — that is the whole reason a second session exists, and it is
+the one authority this role does not have. **The next item in the serial sequence is STEP 12, Plan 7
+(editor + attachments)**, which inherits two boundary items recorded below.
 
 | Task | State |
 |---|---|
