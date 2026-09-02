@@ -9,24 +9,101 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > verified with `git branch --contains` (empty output = orphaned), never with `git cat-file`, which
 > passes on reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## Live anchors — 2026-09-02, rewritten AFTER STEP 9 MERGED
-
-> **The version of this table that stood here until now was STALE AND LIVE.** It said
-> `Branch in flight: exec/05-api-realtime @ c3b1090` and `main: 00cb2e0`. Both were false by the time
-> anyone could read them: step 9 had merged. **The document's own banner further down was correct, and
-> this table was not — and this table is what a restarted session reads first, because this document
-> tells it to.** That is the failure worth naming: *a pointer from a correct document to a stale one
-> reverses*, and here both documents were the same file. **A banner does not repair an anchor.**
+## Live anchors — 2026-09-02, STEP 10 IN FLIGHT
 
 | Anchor | Value | How verified |
 |---|---|---|
-| **Branch in flight** | **NONE. Nothing is in flight.** Step 9 is merged; the executor holds no open work. | `gh pr view 67` |
-| **`main`** | **`563c983`** — **STEP 9 (Plan 5, all 17 tasks) IS MERGED**, as PR #67, at 2026-09-02T00:47:41Z. **REFETCH before trusting this.** | `git rev-parse origin/main`, `gh pr view 67 --json state,mergeCommit` |
-| **`exec/05-api-realtime`** | **MERGED and SQUASHED. Its worktree still holds it; it is safe to delete.** | `gh pr view 67` |
-| **EVERY sha this document cites below is ORPHANED** | **#67 was SQUASHED**, so `da522b6` — the branch tip — is **NOT an ancestor of main**, and neither is any of the other 94. `git cat-file` passes on all of them and returns pre-merge content while looking like it worked. **The `(#67)` suffix on main's subject is the marker.** | `git merge-base --is-ancestor da522b6 origin/main` → **false** |
-| **Gate ON MERGED MAIN** | **exit 0 · 21/21 · 0 cached · 1573 tests · 0 `Unsupported engine` WARNs · Node v22.22.2.** domain 335 · rule-engine 280 · **server 717** · app-core 130 · editor 72 · ui 31 · sync-client 8. **Measured at `563c983` AFTER the merge, not carried over from the branch** — identical to the branch's, so the squash preserved everything | `rtk proxy pnpm turbo run build test typecheck --force`, summary line read |
-| Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing | `node -v` |
-| Orphaned, do not cite | `52520b0`, `72a7e3e`, `30e3db4`, `6d15e50`, `96a6ff3`, `400fbfc`, `95004e1`, `c3b1090`, `da522b6`, **and every task sha in the status table below** | `git merge-base --is-ancestor`, `git branch --contains` |
+| **Branch in flight** | **`exec/10-integration-checkpoint`**, cut from `origin/main`. Step 10, the integration checkpoint. | `git rev-parse --abbrev-ref HEAD` |
+| **`main`** | **`c9ab31c`** — step 9 (`563c983`, PR #67) plus two docs-only merges (`aa67ee3` #68, `c9ab31c` #69). **REFETCH before trusting this.** | `git rev-parse origin/main`, `git log --oneline -5` |
+| **`563c983` reachable?** | **YES**, ancestor of `c9ab31c`. The only diff `563c983..c9ab31c` is three files under `docs/lanes/`. | `git merge-base --is-ancestor 563c983 origin/main` → true; `git diff --stat` |
+| **Gate on merged main** | exit 0 · 21/21 · 0 cached · 1573 tests · Node v22.22.2. Measured by the controller at `563c983`; docs-only merges cannot move it (`turbo.json` declares no `inputs` and `docs/` is outside every package). | controller's forced gate |
+| Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing. | `node -v` |
+| Orphaned, do not cite | every sha in the narrative below the anchors, including all of Plan 5's task shas — **#67 was SQUASHED**. `git cat-file` passes on all of them and returns pre-merge content. | `git merge-base --is-ancestor` |
+
+## WHERE I AM: STEP 10, the integration checkpoint. Task A of three, in flight.
+
+**Nothing is committed on the branch yet.** If you are a restarted session, the working tree may hold
+an uncommitted Task A. Check `git status` before doing anything; do not re-dispatch work that is
+sitting in the tree.
+
+| Task | What | State |
+|---|---|---|
+| **A** | **Ruling P18** — wire `getEntityState('membership')` to `proj_memberships` | **IN FLIGHT** (opus implementer → opus reviewer) |
+| **B** | The read-route round trip: real `POST` → shipped `GET`, raw bodies asserted | not started |
+| **C** | Pin the client-contract divergences so a reconciliation cannot be silent | not started |
+| docs | coordination doc records + this file + Features/test-cases | not started |
+
+### The scope was RE-MEASURED at `c9ab31c`, and the brief and the previous recon are both wrong
+
+Do not work from the dispatch brief's description of step 10, and do not work from the predecessor's
+"six shape disagreements" either. Both were recounted from the routes' own `return` statements and
+the two type files. Findings, each with a positive control run in the same command:
+
+**1. The six `applyCommitted` absences are NOT the target — five are already closed.**
+`lockWorkspace`/`lockEntity` is the only one with no coverage anywhere. Seqs-from-the-DB,
+`checkPermission`, the rule engine, `bootstrapWorkspace` and `notifyCommitted` are each already
+exercised through the real door — the last by `stream-route.test.ts`'s `submit()`, whose docblock
+says exactly why a row-writing helper cannot drive the hub.
+
+**2. The real gap is one sentence.** *Every Plan 5 read-route test seeds through `applyCommitted`
+and none of them writes through `POST /v1/events`.* Measured: `grep -l "v1/events"` over
+`board|list|search|my-work|attention|preferences`.test.ts returns **nothing**; the same grep returns
+4 · 5 · 3 · 1 for `workspaces` · `invites` · `security` · `stream-route`. The grep can hit.
+
+**3. The write half is already proven end to end** — `workspaces.test.ts` does real sign-in →
+`POST /v1/workspaces` → `project.created` → `project.member_added` → `ticket.created`, all
+committing, then asserts **`proj_tickets` by querying the table directly**. So the missing link is
+small and precise: *nothing on `main` reads back through a shipped READ route what a real POST
+wrote.*
+
+**4. The client contract is worse than "six disagreements": 9 of 11 `DataSourceQuery` methods cannot
+be implemented over the shipped routes**, and 3 of those cannot even form their request
+(`getMyWork`, `getPreferences`, `putPreferences` take no `workspaceId`; all three routes 400
+`invalid_query` without it). The full register — per method, with the serving-gap vs data-gap
+distinction that decides who fixes each — is in the coordination doc section this step adds. The
+distinction matters: a **serving** gap is a fact the server holds and does not put on the wire (one
+route change); a **data** gap is a fact it does not have (a product decision).
+
+**5. A live defect, not a disagreement.** `packages/app-core/src/views/board.tsx` — the one real view
+component on `main`, fed by `source.query.getBoard()` — dereferences `group.workflowVersion` (line 28)
+and `card.assignee.id`/`.name` (line 94). Neither is in any response. It breaks the moment an HTTP
+`DataSource` exists. **Owner: Plan 6, which is step 11.**
+
+**6. `StreamItem` has no `scope-revoked` member**, so a revocation arrives as an unrecognised `type`
+and is silently dropped, leaving stale authorization in the client cache. Severest of the stream
+items. Owner Plan 6. Does not change this step's scope — no client consumer exists yet.
+
+### RULING TAKEN THIS STEP — `UserPreferences` (coordination doc §6b), the one with a deadline
+
+**The SERVER's shape wins; Plan 6 Task 10 adopts it.** The doc called the two "informationally
+equivalent … the cost is a decision, not a migration." True in the abstract, misleading in practice:
+the shipped schema is `.strict()`, so Plan 6's document is **refused at the door three times over** —
+unknown key `version`, `SavedFilter.filter` vs the shipped `filterSpec`, and project keys narrowed to
+`ulidString` while Plan 6's fixtures key by `prj_1`. One asymmetry the doc does not name: server →
+client is **not total**, because the client pairs `{columns, grouping}` under one project key and the
+server keeps two parallel records; a project in `listColumns` and absent from `grouping` has no
+faithful client representation, and reaching for `DEFAULT_VIEW_PREFS` there invents a preference the
+user never set. Conservative default, and reversible in one direction only while Plan 6 T10 is
+unexecuted — which is why it is ruled now.
+
+### Ruling P18 is DISCHARGED BY THIS STEP, and it was genuinely unclaimed
+
+The coordination doc hands it to *"whoever dispatches Plan 4 Task 6 or the step-10 integration
+checkpoint, whichever comes first."* Plan 4 T6 ran and did not take it: `engine-context.ts` still
+answered `null` for `'membership'` at `c9ab31c`, and the only section the doc gained from T6 is about
+determinism tests. So it falls here, and the conservative default the doc names binds — **it lands as
+its own reviewed change**, which is Task A.
+
+It is a **functionality gap, not a security defect**, and saying so is load-bearing: `restrict-to`
+fails CLOSED, so every role-gated transition rule is refused for everyone on the server path. Anyone
+reporting it as an authorisation bypass will provoke a mis-sequencing ruling. The reason nothing
+noticed is this series' signature failure in its purest form: the rule engine's own `restrict-to`
+tests pass against `memory-context.ts`, which carries `fx.memberships` and answers — green on the
+side with the fake, untested on the side with the truth.
+
+---
+
+## BELOW THIS LINE IS THE STEP 9 RECORD — history, not position. Every sha in it is orphaned.
 
 ### How to find Plan 5's work now that its shas are dead
 
