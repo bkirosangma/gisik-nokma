@@ -5,6 +5,7 @@ import { RULE_EMBED_NOT_IMAGE } from '../../src/gates/image-embed-gate.js';
 import { buildServerGates } from '../../src/gates/index.js';
 import type { ServerGate } from '../../src/gates/server-gate.js';
 import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
+import { PERMISSION_ROLE_RULE } from '../../src/permissions/check-permission.js';
 import { createProjectionRegistry } from '../../src/projections/registry.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { seedMember, seedProject, seedTicket } from '../helpers/seed.js';
@@ -13,18 +14,30 @@ import { seedMember, seedProject, seedTicket } from '../helpers/seed.js';
  * The SEAM, as distinct from the two gates that ride on it.
  *
  * `image-embed-gate.test.ts` and `evidence-gate.test.ts` prove what each gate
- * decides. This file proves the four things `ingest-service.ts` and `index.ts`
+ * decides. This file proves the five things `ingest-service.ts` and `index.ts`
  * assert in prose about HOW a gate runs, each of which is invisible to those
  * suites because a gate that decided correctly through the wrong handle, fired
- * a listener it should not have, or discarded its neighbours would pass every
- * single one of them:
+ * a listener it should not have, discarded its neighbours, or answered ahead of
+ * its turn would pass every single one of them:
  *
  *  1. the gate is handed the TRANSACTION client, and a refusal takes its work
  *     back with it;
  *  2. a gate refusal rolls back THIS event and no other — the batch answer;
  *  3. no commit listener fires for a gate-refused event;
  *  4. `buildServerGates()` covers the event types it claims to, and the seam is
- *     inert (`gates` defaults to `[]`) for every caller that omits it.
+ *     inert (`gates` defaults to `[]`) for every caller that omits it;
+ *  5. the loop's POSITION relative to its two upstream neighbours: it runs after
+ *     the permission gate and after the rule engine. Exactly those two
+ *     relations, deliberately — "last" would be a third claim and would be
+ *     unpinnable, since moving the loop below `insertEvent` changes nothing
+ *     observable (the ROLLBACK still leaves the ledger empty). Both relations
+ *     that ARE claimed have a case here, because both relocations are silent:
+ *     every other gated service in the repo pairs `buildServerGates()` with an
+ *     accept-all engine AND a permitted actor, so an engine refusal and a gate
+ *     refusal — or a permission refusal and a gate refusal — were never in
+ *     flight together anywhere. Hoisting the loop past either neighbour turns
+ *     the two embed refusals into an existence oracle answered to someone the
+ *     earlier check had already refused.
  *
  * Plus the two facts the gates themselves depend on and cannot check: the gate
  * runs at the CLIENT door as well as the internal one, and `parseEvent`'s
@@ -222,17 +235,76 @@ describe('the gate seam', () => {
     expect(await ledgerCount(event.id)).toBe(1);
   });
 
+  it('the gate loop runs AFTER the rule engine: an engine refusal wins over a gate refusal on the same event', async () => {
+    // The seam's declared slot is "after the rule engine accepts and before the
+    // append" (plan Task 11; `ingest-service.ts` says "the position is the whole
+    // point of the seam"). Until this case, nothing executed that ordering:
+    // every gated service in this repo pairs `buildServerGates()` with an
+    // accept-all engine, so a loop hoisted above `deps.evaluate` left all 852
+    // tests green. The mutation this case exists for is that hoist.
+    //
+    // It matters beyond tidiness. Hoisted, a gate answers events the engine was
+    // about to refuse — so a workflow rule's refusal is replaced by
+    // `attachment.embed-not-image`, which is a statement about which
+    // attachments this ticket holds, addressed to somebody the engine had
+    // already decided was not entitled to the answer.
+    const engineFirst = createIngestService({
+      pool: db.pool,
+      evaluate: async () => ({
+        refused: true as const,
+        rule: 'test.engine-first',
+        reason: 'the engine refused before any gate could look',
+      }),
+      projections: createProjectionRegistry(),
+      gates: buildServerGates(),
+    });
+    const engineEvent = submitted('comment.added', { body: docEmbedding(PDF_ID) });
+    const gateEvent = submitted('comment.added', { body: docEmbedding(PDF_ID) });
+
+    const [engineResult] = await engineFirst.ingestBatch([engineEvent]);
+    // POSITIVE CONTROL, and the reason this green is not vacuous: the SAME
+    // payload through a service whose only difference is an accept-all engine
+    // reaches the gate and is refused by it. Without this line, an
+    // `engineFirst` whose gates silently never ran would look identical.
+    const [gateResult] = await gated.ingestBatch([gateEvent]);
+
+    expect(engineResult).toMatchObject({ status: 'refused', rule: 'test.engine-first' });
+    expect(gateResult).toMatchObject({ status: 'refused', rule: RULE_EMBED_NOT_IMAGE });
+    expect(await ledgerCount(engineEvent.id)).toBe(0);
+  });
+
   it('an event whose entity is not a ticket never reaches a gate — parseEvent refuses the kind first', async () => {
     // `image-embed-gate.ts` records that the registry's `entityKind: 'ticket'`
     // binding is load-bearing: the gate compares `attachments.ticket_id`
     // against `event.entity.id`, which is only a ticket id because nothing else
     // gets this far. Prose in a comment cannot notice a re-registration; this
     // can.
-    const [result] = await gated.ingestBatch([
+    //
+    // ALL THREE gated types, not just the first. The docblocks rest the same
+    // weight on each — `image-embed-gate.ts` names `comment.added` and
+    // `ticket.field_set`, `evidence-gate.ts` names `ticket.transitioned` — and
+    // a re-registration of either of the other two would leave a single-type
+    // case green while turning that gate's ticket predicate into a comparison
+    // against something that is not a ticket id.
+    const results = await gated.ingestBatch([
       submitted('comment.added', { body: docEmbedding(PNG_ID) }, { kind: 'project', id: newUlid() }),
+      submitted(
+        'ticket.field_set',
+        { fieldId: 'description', value: docEmbedding(PNG_ID) },
+        { kind: 'project', id: newUlid() },
+      ),
+      submitted(
+        'ticket.transitioned',
+        { toStateId: 'done', evidenceAttachmentId: PNG_ID },
+        { kind: 'project', id: newUlid() },
+      ),
     ]);
 
-    expect(result).toMatchObject({ status: 'invalid', code: 'entity-kind-mismatch' });
+    expect(results).toMatchObject([
+      { status: 'invalid', code: 'entity-kind-mismatch' },
+      { status: 'invalid', code: 'entity-kind-mismatch' },
+      { status: 'invalid', code: 'entity-kind-mismatch' },
+    ]);
   });
 });
 
@@ -272,7 +344,7 @@ describe('the gate seam at the CLIENT door', () => {
     });
   });
 
-  function clientComment(attachmentId: string): SubmittedEvent {
+  function clientComment(attachmentId: string, actorId = MEMBER): SubmittedEvent {
     return {
       id: newUlid(),
       workspaceId: CLIENT_WS,
@@ -280,7 +352,7 @@ describe('the gate seam at the CLIENT door', () => {
       type: 'comment.added',
       version: 1,
       payload: { body: docEmbedding(attachmentId) },
-      actorId: MEMBER,
+      actorId,
       origin: 'web',
       clientTime: '2026-08-20T10:00:00.000Z',
     };
@@ -298,6 +370,35 @@ describe('the gate seam at the CLIENT door', () => {
     const event = clientComment(CLIENT_PDF);
     const [result] = await clientIngest.ingestClientBatch([event], MEMBER);
     expect(result).toMatchObject({ status: 'refused', rule: RULE_EMBED_NOT_IMAGE });
+    expect(await ledgerCount(event.id)).toBe(0);
+  });
+
+  it('the gate loop runs AFTER the permission gate: a stranger embedding a pdf is told permission, never which attachment this ticket holds', async () => {
+    // The other half of the position claim, and the half with teeth. Hoisted
+    // above `checkPermission`, the gate answers a NON-MEMBER — who then learns
+    // `attachment.embed-not-image` when the id names a pdf on this ticket and
+    // `attachment.embed-unknown` when it names nothing here. That is the
+    // P14-class existence oracle over every attachment id in the deployment,
+    // and today it is held shut by nothing but the loop sitting last.
+    //
+    // The control for this green is the case directly above: the SAME workspace,
+    // ticket and pdf, submitted by a PERMITTED member, is refused
+    // `attachment.embed-not-image`. So a permission rule here means the
+    // permission gate won the race, not that the gate declined to fire.
+    //
+    // The RULE is pinned, not the reason. Which permission refusal a stranger
+    // earns is the permission module's own ordering (Plan 4's business); that it
+    // is a permission refusal at all rather than a gate refusal is this seam's.
+    const stranger = newUlid();
+    const event = clientComment(CLIENT_PDF, stranger);
+
+    const [result] = await clientIngest.ingestClientBatch([event], stranger);
+
+    expect(result).toMatchObject({ status: 'refused', rule: PERMISSION_ROLE_RULE });
+    // `.not` alone would also be satisfied by an `invalid` result or a silent
+    // commit, so it rides behind the positive assertion rather than standing in
+    // for it.
+    expect((result as { rule?: string }).rule).not.toBe(RULE_EMBED_NOT_IMAGE);
     expect(await ledgerCount(event.id)).toBe(0);
   });
 });
