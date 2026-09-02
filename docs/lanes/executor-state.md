@@ -223,6 +223,75 @@ plainly in T14's commit which of the two it is.
 - **`schema.test.ts` carries two "CURRENT BEHAVIOUR pending Task 5" cases about paste-rule
   autoformatting that Plan 7 Task 5's text never covers.** **Owner: plan author.**
 
+## TWO FINDINGS FROM THE ADAPTATION MAP THAT REACH BEYOND ONE TASK
+
+### A. RULING REQUESTED — T13's adapter cannot be written as scoped. Four operations have a live
+### route and no seam to reach it through.
+
+Plan 8 amendment 10 says the builder consumes `WorkflowAuthoringGateway` and **`apps/web` implements
+it over Plan 6's `DataSource`**. Measured against `packages/app-core/src/data-source.ts:125-139`:
+
+| Gateway operation | `DataSourceQuery` member | Server route |
+|---|---|---|
+| `getWorkflow` | `getWorkflowDef(workspaceId, workflowId, version?)` | served |
+| `listTicketTypes` | `getTicketTypes(workspaceId)` | served |
+| `listMembers` | `getMembers(workspaceId)` — **returns `Actor[]`, not `WorkspaceMember[]`** | served |
+| `submit` | `ingest(events)` | served |
+| **`listWorkflows`** | **absent** | `/v1/workspaces/:workspaceId/workflows` — LIVE |
+| **`getStateOccupancy`** | **absent** | `…/workflows/:workflowId/state-occupancy` — LIVE |
+| **`getTypeWorkflowPopulation`** | **absent** | `…/ticket-types/:typeId/population` — LIVE |
+| **`migrateTypeToWorkflow`** | **absent** | `…/ticket-types/:typeId/migrate` — LIVE |
+
+**Four of eight operations have a real, registered, working HTTP route and no `DataSource` member to
+reach them through.** This is not the usual shape of this series' failure — the server is *ahead*,
+not behind. T13 as scoped ("an adapter over `DataSource`") is therefore **not writable** without one
+of:
+
+- **(a)** extend `packages/app-core/src/data-source.ts` with the four members — a **cross-plan touch**
+  of Plan 6's file, and it widens an interface every existing `DataSource` implementation must then
+  satisfy (the online one, the fake, and Plan 10's replica);
+- **(b)** have the `apps/web` adapter call the four routes through the existing `online/http` client
+  directly, leaving `DataSource` untouched. Amendment 10's rule is that **views** never speak HTTP;
+  the adapter is not a view, and the view still sees only the gateway. Narrower, and it does not
+  force Plan 10's replica to grow four members it has no offline answer for;
+- **(c)** defer the four to a later plan and have T4's interface carry an honest refusal for them —
+  but three of the four are load-bearing for Tasks 9 and 11, which are *in this plan*.
+
+**Conservative default if no ruling arrives before Batch D: (b)** — it is the narrowest change, it
+touches no other plan's file, and it cannot break an existing `DataSource` implementor. Recorded
+here so the choice is visible rather than made silently inside T13. **`getMembers` returning `Actor[]`
+where the gateway wants `WorkspaceMember[]` is a second, smaller reconciliation T13 owes regardless
+of which option wins.**
+
+### B. THE COORDINATION DOC CARRIES A FALSE "Done" ABOUT THIS VERY PLAN, AND IT IS THE DANGEROUS KIND
+
+Coordination doc **line 216** reads: *"~~Plan 8 — the divergence-notice component.~~ **Done** — it
+was already complete when this line was written; the agent that appeared to stall mid-insert had
+finished. **Verified against the code rather than the note**: the copy table, the population read
+with its honest-degradation states, the helper functions, the JSX, and the tests are all present,
+including 'Leave them on …' as an affirmative button beside 'Move them to …'."*
+
+**It is false.** Measured two ways, with positive controls in the same run:
+
+- `git log --all --oneline -- packages/app-core/src/workflow-builder` is **empty** — no commit on any
+  branch has ever touched that directory. Control: the same command against
+  `packages/app-core/src/views` returns commits.
+- A repo-wide sweep of the artefacts that line enumerates returns **zero files** for `Leave them on`,
+  `Move them to`, `WorkflowRebindDialog`, `rankImplications`, `migrateTypeToWorkflow` and
+  `TicketTypeEditorScreen`. Controls in the same run: `transitionOptions` → 6 files,
+  `adviseWorkflowDef` → 6 files.
+
+**What makes it dangerous is not that it is wrong but how it is wrong.** It does not merely assert
+completion — it asserts completion *and claims to have verified against the code rather than the
+note*, then enumerates five specific artefacts. That is the exact rhetorical shape a reader uses to
+decide a claim is trustworthy, which is why a reader who hits it would skip Task 11's divergence
+work entirely. **This is the "a pointer from a correct document to a stale one reverses" lesson in
+its most persuasive costume: a stale claim wearing the vocabulary of verification.**
+
+**Action: Task 11 is built in full, as if the line did not exist, and the line is corrected in the
+same change set as Task 11.** Not corrected earlier, because the honest correction is *"absent, and
+here is the commit that supplies it"*, which cannot be written until the commit exists.
+
 ## IN FLIGHT
 
 **Nothing.** The branch carries one commit: the Plan 7 ledger promotion plus this handoff.
