@@ -41,12 +41,36 @@ export type FakeGatewaySeed = {
  * `parseEvent`'s envelope check runs, and the one the real door enforces
  * first. A fake that skipped this would accept payloads the real server
  * refuses (wrong ULID shape, a missing field, an out-of-range origin), and
- * every one of the twelve later tasks would build on that false green. This
- * is deliberately narrower than the full `parseEvent` pipeline: it does not
- * check event-type registration or a payload schema (those are the
- * SERVER's registry and per-event payload shapes, not this gateway's to
- * own), only that the envelope itself is well-formed — exactly what Lane 3's
- * ruling names.
+ * every one of the twelve later tasks would build on that false green. Only
+ * that the envelope itself is well-formed — exactly what Lane 3's ruling
+ * names.
+ *
+ * It is deliberately narrower than the full `parseEvent` pipeline, and the
+ * FOUR checks it therefore does not run are enumerated rather than left to be
+ * discovered, because the status this fake returns cannot distinguish them:
+ *
+ *   1. event-type registration and version (`unknown-event-type`,
+ *      `unknown-event-version`) — the SERVER's registry, not this gateway's
+ *      to own;
+ *   2. the type-to-kind binding (`entity-kind-mismatch`);
+ *   3. the per-event payload schema (`invalid-payload`) — the registry's too;
+ *   4. the membership and invite entity-id coherence checks, which the real
+ *      door reports under `malformed-envelope`, THE SAME CODE this fake
+ *      returns. Ruling P20 applies literally: when two refusal reasons share
+ *      an identifier, asserting that identifier is not a discriminating
+ *      check — so a `malformed-envelope` from here is not evidence that
+ *      `parseEvent` would have refused for the same reason.
+ *
+ * Measured reach, so the list is not read as wider than it is: none of the
+ * four is reachable through this module's own builders while their declared
+ * types are honoured. `buildWorkflowDefinedEvent` and
+ * `buildTicketTypeDefinedEvent` emit entity kinds `workflow` and
+ * `ticket-type`, neither of which carries a coherence check, and a
+ * `PublishedWorkflowDef` that satisfies its own type also satisfies the
+ * registry's payload schema — probed against the real `parseEvent`, the
+ * nearest divergence needed `initialStateId: undefined`, which the type
+ * forbids. The exposure is a later task that hand-assembles an envelope, or
+ * submits a membership or invite event through this fake.
  */
 export function createFakeGateway(
   seed: FakeGatewaySeed = {},

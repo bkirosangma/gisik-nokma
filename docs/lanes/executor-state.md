@@ -222,6 +222,24 @@ plainly in T14's commit which of the two it is.
   **Owner: a later test-helper consolidation.**
 - **`schema.test.ts` carries two "CURRENT BEHAVIOUR pending Task 5" cases about paste-rule
   autoformatting that Plan 7 Task 5's text never covers.** **Owner: plan author.**
+- **`packages/app-core/test/helpers/fake-data-source.ts` validates nothing.** Its `ingest` pushes to
+  an array and runs no schema check, so it is the seam through which the `toStateId` payload drift
+  and the non-ULID seed `actorId`s pass silently (coordination doc §"The validating fake", 2802–2825).
+  It is the sibling of the seam Plan 8 T4 hardened (`createFakeGateway`), and T4 does not touch it.
+  **The doc's own assignment — "Owner: Lane 4" at line 2825 — names an owner that no longer exists.**
+  (The review that raised this cited 2826; that line is blank. Measured: 2825, and it is the only
+  `Owner: Lane 4` in the file — the other `Owner: Lane` is Lane 2 / Plan 4 at 2590.)
+  Lane 4's own file opens *"execution state at fold-back to serial … written 2026-08-31 when Wave 1
+  folded back into serial execution"*, and the last mention of the lane anywhere in the coordination
+  doc is line 4001 of 6169 — a back-reference to a dependency version it shipped, inside a 2026-08-31
+  section — with roughly 2,100 lines of later material naming it nowhere. Two sweeps found no
+  successor: succession vocabulary (`successor`, `inherits`, `picks up`, `passes to`, `reassign`,
+  `carried into`, `hands off`) and the item's own vocabulary (`fake-data-source`, `validating fake`,
+  `app-core/test/helpers`), each run through `rtk proxy` with a positive control from the same run.
+  Lane 4's `lane4-periphery-state.md` §6 "Open claims on other plans" does not carry this item either
+  — it carries only the `seed.ts` non-ULID half. **Owner: the serial executor chain**, recorded here
+  because this file is the surface a task boundary actually reads; Plan 6, which created the file, has
+  closed, so it must not be re-assigned there.
 
 ## TWO FINDINGS FROM THE ADAPTATION MAP THAT REACH BEYOND ONE TASK
 
