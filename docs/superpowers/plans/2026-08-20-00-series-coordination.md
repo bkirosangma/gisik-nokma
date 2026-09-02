@@ -5807,7 +5807,7 @@ the fact lives, because a serving claim with no such citation is a data gap wear
 | `getTickets` | `typeRank`, `epicId`, `stateName`, `hasRestrictedParent`, `assignedProvenance` | `proj_ticket_types.rank`; `epicAncestors` (`routes/list.ts:369-428`, docblock from `:305`) already computes the epic and uses it only as a group key; workflow defs already fetched at `:233-247` carry state names |
 | `getTicket` | `title`, `stateProvenance`, a real `TicketState` | the route answers a raw `proj_visibility` row (`routes/tickets.ts:56-64`); `proj_tickets` exists and its siblings `board.ts`/`list.ts` already read it through `read/ticket-cards.ts` |
 | `search` | `SearchHit.matchedIn` | `proj_search` stores `title`/`description`/`comments` as three independently weighted columns; `routes/search.ts:142-146` concatenates them before one `ts_headline`, so which matched is destroyed in the query, not absent from the store |
-| `getAttention` | the `contested` item kind | `proj_contested` (`migrations/1787961400000_proj-contested.sql`) holds ticket, claimant, rule, reason, timestamp |
+| `getAttention` | the `contested` item kind | **THIS ROW WAS WRONG AND IS CORRECTED.** It said the fix was joining `proj_contested` into `routes/attention.ts`. **`GET /v1/contests` is already shipped** — `sync/contests-route.ts:107`, wired at `app.ts:208`, filtered per row through `canSee`, taking `?workspaceId=&ticketId=&claimantId=&open=true` — and its own docblock says *"The ticket banner, My Work and the attention strip all read this."* A client may join it, exactly as `getBoard` joins the members route. The real gap is one field pair: **`ContestView` carries no `projectId` and no `title`**, both required by `AttentionItem`. Fix belongs in `contests-route.ts` |
 
 **One row was shipped contested by its deriver and is RESOLVED here, against the deriver.**
 `getTickets`' `assignedProvenance` was called *serving* by analogy to `read/state-provenance.ts`,
@@ -5883,7 +5883,7 @@ failure this series is named for:**
 
    | | why it is in clause 1 | shape of the change |
    |---|---|---|
-   | `getBoard` | `board.tsx` dereferences `workflowVersion` today | add `def.version` where columns are pushed — a field addition |
+   | `getBoard` | `board.tsx` dereferences `workflowVersion` today | **DONE.** `def.version` added at both push sites in `routes/board.ts`; a straggler column answers `0`, which `workflowDefSchema.version`'s `min(1)` makes uncollidable with any published version |
    | `getMyWorkspaces` | the nav (T14) has no other source of `projects` | **CORRECTED 2026-09-02, after the table was first written and reported: this is NOT a field addition.** `grep -rn "proj_projects" apps/server/src` returns the projection that writes it, one existence check, and **no route that reads it** (positive control in the same sweep: `proj_memberships` has eight readers). There is no shipped project-list read at all, so adding `projects` here means DESIGNING one, and its first question is what a project-scoped guest sees of a workspace's other projects. **A VISIBILITY DECISION** |
    | `getTicket` | the route answers a `proj_visibility` row where its name promises a ticket | **read `proj_tickets` instead. A VISIBILITY DECISION, not a field addition** |
    | `getTickets` | five fields, four of them not derivable client-side | **`hasRestrictedParent` is itself about restricted visibility; `assignedProvenance` reads the raw `events` table. A VISIBILITY DECISION** |
@@ -5923,3 +5923,29 @@ and 3 is wasted either way.
 carry one; neither has been implemented, so the assertion is a prediction from reading the routes, not
 a measurement. If it is wrong in the safe direction they are field additions like the other two; if it
 is wrong in the unsafe direction, clause 1 is bigger than a step.
+
+
+### P25 postscript, written after clause 1's one approved row was executed
+
+**Two corrections the execution produced, both against this document.**
+
+**1. The `getAttention` row above was wrong about which file closes it**, and it was wrong in the
+direction that costs most: it named a route change in `attention.ts` when a route serving exactly those
+rows was already shipped and already names the attention strip as its consumer. A register exists so a
+recorded gap does not outlive the thing it described; a register that misroutes the fix is worse than
+none, because it looks like it was checked. Found by reading `sync/contests-route.ts`, which nothing in
+the original derivation had opened — the derivation swept `apps/server/src/routes/**`, and this route
+lives in `apps/server/src/sync/`. **A sweep is a fact about the directories it walked.**
+
+**2. `getBoard`'s field addition was nearly a check that could not fail.** Every workflow a board could
+see in the test fixtures was at v1, so serving the constant `1` instead of `def.version` left all 756
+server tests green — the whole-body round-trip `toEqual` and the client-contract agreement case
+included. The fixtures were tidy, and tidy fixtures make a version field indistinguishable from a
+constant. A second workflow is now published at v2 for the sole purpose of making the two
+distinguishable. This is the brief's *"a count equal to a max because the fixtures were tidy"*, in a
+new costume.
+
+**And one measurement corrected:** step 10 recorded that adding `workflowVersion` "kills 6 tests
+including the serving gap case". Measured at execution it kills **2**. Not a mistake at the time
+necessarily — but a kill count is a fact about a suite at a moment, and this one was cited three steps
+later as though it were a property of the change.

@@ -32,10 +32,17 @@ need `apps/web`, which is Plan 6 T14.
 **Four things step 10 handed this step, all already measured — do not re-derive them from scratch, but
 DO re-verify before building on them:**
 
-1. **`packages/app-core/src/views/board.tsx` is a LIVE DEFECT, not a pending reconciliation.** The one
-   real view component dereferences `group.workflowVersion` (`:28`) and `card.assignee.id`/`.name`
-   (`:94`). **None of those three fields exists in any server response.** It works today only because
-   the sole `DataSource` implementation is a fake.
+1. ~~**`board.tsx` is a LIVE DEFECT**~~ — **CLOSED in step 11.** The claim as inherited was *"none of
+   those three fields exists in any server response"*, and it is now false on all three, by two
+   different routes. `workflowVersion` is **SERVED**: `routes/board.ts` puts `def.version` on every
+   column (P25 clause 1's one pure field addition). `assignee.id`/`.name` are **JOINED client-side**
+   from `GET /v1/workspaces/:workspaceId/members`, off the `workspaceId` the board body already carries
+   — a second shipped route, no invented fact. `getBoard` is one of the six methods the online
+   `DataSource` now answers.
+
+   **The correction is the point.** Two of the three were never serving gaps at all; the third was the
+   cheapest one on the list. An inherited "exists nowhere" is a reading of a moment, and this one was
+   already wrong about a route that a client is allowed to call.
 2. **Ruling P24 is TAKEN and binds Task 10** — the SERVER's `UserPreferences` shape wins. Plan 6's
    document is refused three ways by the shipped `.strict()` schema, so this is adoption, not a rename.
    Reversible in one direction only while T10 is unexecuted.
@@ -64,12 +71,21 @@ the nine blocked methods are gaps where **the server holds the fact and does not
 owner. That owner is Plan 5. **Plan 5 is 17/17 and merged — it has no task left to carry them.** A gap
 recorded against an owner with no remaining tasks is dropped, by the rule meant to prevent dropping it.
 
-**Proposed default, being proceeded on until the owner rules.** Four serving gaps close in the SERVER
-inside this step — `getBoard` (`workflowVersion`), `getMyWorkspaces` (`projects`), `getTicket`,
-`getTickets`. Two signature gaps close in the CLIENT (`getPreferences`/`putPreferences`, extending
-ruling P24 from the document to the signature). One data gap is answered honestly (`inTransit: []`,
-true because the web client has no outbox) and `contested` defers to **Plan 10**, which owns it in two
-server docblocks headed `EXTENSION POINT (Plan 10)` and has 13 tasks outstanding.
+**Proposed default, and what has actually been DONE under it.**
+
+- **`getBoard` — DONE.** The one pure field addition; `routes/board.ts` now serves `def.version`.
+- **`getMyWorkspaces`, `getTicket`, `getTickets` — HELD.** All three carry a visibility decision under
+  Plan 4's read enforcement. `getMyWorkspaces` was mis-priced as a field addition and corrected: no
+  route reads `proj_projects` at all, so serving `projects` means designing a read.
+- **Signature gaps — DONE in the CLIENT.** `getPreferences`/`putPreferences`/`getMyWork` take a
+  `workspaceId`, extending ruling P24 from the document to the signature.
+- **`inTransit: []` — answered honestly**, because an online client has no outbox. Not an absence.
+- **`contested` — REFUSED, and the REASON was corrected.** The inherited reason ("the attention route
+  never reads `proj_contested`") points at the wrong file. **`GET /v1/contests` is shipped**
+  (`sync/contests-route.ts:107`, wired at `app.ts:208`, gated per-row by `canSee`) and its own docblock
+  says *"The ticket banner, My Work and the attention strip all read this."* The real gap is that
+  `ContestView` carries **no `projectId` and no `title`**, both of which `AttentionItem` requires. So
+  the fix is one field pair on `/v1/contests`, not a new read in `attention.ts`.
 
 **The part that decides how big this is.** Two of the four — `getTicket` and `getTickets` — carry a
 VISIBILITY decision, not a field addition, and sit under Plan 4's read enforcement. **Those two are
@@ -270,10 +286,13 @@ distinction that decides who fixes each — is in the coordination doc section t
 distinction matters: a **serving** gap is a fact the server holds and does not put on the wire (one
 route change); a **data** gap is a fact it does not have (a product decision).
 
-**5. A live defect, not a disagreement.** `packages/app-core/src/views/board.tsx` — the one real view
-component on `main`, fed by `source.query.getBoard()` — dereferences `group.workflowVersion` (line 28)
-and `card.assignee.id`/`.name` (line 94). Neither is in any response. It breaks the moment an HTTP
-`DataSource` exists. **Owner: Plan 6, which is step 11.**
+**5. A live defect, not a disagreement.** *(CLOSED in step 11 — see the correction at the top of this
+file. `workflowVersion` is served; `assignee` is joined from the members route. The sentence below was
+true of `main` when written and is false now, and it is kept only because the correction above cites
+it.)* `packages/app-core/src/views/board.tsx` — the one real view component on `main`, fed by
+`source.query.getBoard()` — dereferences `group.workflowVersion` (line 28) and `card.assignee.id`/`.name`
+(line 94). Neither is in any response. It breaks the moment an HTTP `DataSource` exists.
+**Owner: Plan 6, which is step 11.**
 
 **6. `StreamItem` has no `scope-revoked` member**, so a revocation arrives as an unrecognised `type`
 and is silently dropped, leaving stale authorization in the client cache. Severest of the stream
