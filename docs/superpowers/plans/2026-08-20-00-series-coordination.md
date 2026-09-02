@@ -5548,3 +5548,171 @@ for a reply that never comes. **Task 15 should either wire `terminate()` to the 
 delete it from the interface** — it is currently an unmeasured affordance that reads, to anyone
 looking at the type, as though the hub already uses it. A Nit, recorded because leaving it silent is
 how a later plan comes to trust it.
+
+---
+
+## Step 10, the integration checkpoint (2026-09-02, serial executor) — what it found before it wrote a line
+
+The checkpoint's own scoping was the first thing it produced, and it corrected the two documents that
+told it what to do. Both corrections are measured, each with a positive control run in the same
+command, and both are recorded here rather than in the executor's handoff because they outlive it.
+
+### The six `applyCommitted` absences are NOT this step's target — five are already closed
+
+The dispatch brief and the preceding recon both frame step 10 as closing the six things
+`test/helpers/apply.ts` enumerates that real ingest does and `applyCommitted` does not. Counted
+against the tree at `c9ab31c`, **only `lockWorkspace`/`lockEntity` has no coverage anywhere.**
+Seqs-from-the-database, `checkPermission`, the rule engine and `bootstrapWorkspace` are all exercised
+by `test/routes/workspaces.test.ts`, and `notifyCommitted` — the one the recon explicitly called
+still-open — is exercised by `test/stream/stream-route.test.ts`'s `submit()` helper, whose own
+docblock states the reason a row-writing seeder cannot substitute: *"the hub wakes on
+`onEventCommitted`, which the ingest service fires after a transaction commits, and a helper that
+writes rows straight into `events` fires nothing."*
+
+**The real gap is one sentence:** *every Plan 5 read-route test seeds its world with `applyCommitted`
+and none of them writes through `POST /v1/events`.* The absences are closed for the WRITE path and
+open for the READ path. Measured: `grep -l "v1/events"` over `board`, `list`, `search`, `my-work`,
+`attention` and `preferences`.test.ts returns **nothing**, while the same grep in the same directory
+returns 4, 5, 3 and 1 for `workspaces`, `invites`, `security` and `stream-route`. The grep can hit.
+
+And the write half is already proven end to end — `workspaces.test.ts` walks real sign-in →
+`POST /v1/workspaces` → `project.created` → `project.member_added` → `ticket.created`, every one
+committing, and then asserts **`proj_tickets` by querying the table directly.** So the missing link
+was never "reproduce ingest"; it was the last hop, and it is a much smaller task than the one the
+brief describes.
+
+**The general form, because it will recur:** a partial-implementation marker that enumerates its
+absences is doing the right thing, and it is still not a coverage report. `applyCommitted`'s list is
+true about `applyCommitted` and says nothing about whether some other test closes the same hole
+elsewhere. **An absence enumerated in one file is a fact about that file.** Re-measure before
+scoping work off it.
+
+### The client `DataSource` contract cannot be implemented over the shipped routes — 9 of 11 methods
+
+The recon reported "six shape disagreements". Recounted from each handler's own `return` statement
+plus `packages/app-core/src/data-source.ts`, `view-types.ts` and `packages/domain/src/read-models.ts`,
+the figure is wrong and — more usefully — **the question was wrong.** A client adapter is allowed to
+rename and unwrap, so the test is not *do the shapes differ* but **can an HTTP `DataSource` produce
+the client shape from what the route answers.** By that test:
+
+| Method | Verdict | The fact the adapter cannot manufacture |
+|---|---|---|
+| `getMyWorkspaces` | **blocked** | `WorkspaceRef.projects`; no projects-per-workspace read exists |
+| `getMembers` | adaptable | rename + unwrap |
+| `getBoard` | **blocked** | `BoardCard.assignee.name` — the server sends `assigneeId` and resolves no name |
+| `getTickets` | **blocked** | `ListRow.stateName`, `typeRank`, `epicId`, `assignedProvenance`, `hasRestrictedParent` |
+| `getTicket` | **blocked, worst** | the route returns a snake_case visibility row — `{ticket_id, workspace_id, project_id, parent_id, own_mode, resolved_mode, seq}`. No title, no state, no provenance anywhere in the body |
+| `getTicketHistory` | adaptable | unwrap; the element type matches field for field |
+| `getWorkflowDef` | adaptable | `PublishedWorkflowDef` is a strict superset of `WorkflowDef` |
+| `search` | **blocked** | `SearchHit.matchedIn`; `ts_headline` blobs title+description+comments and the server cannot say which matched |
+| `getMyWork` | **blocked ×2** | a different grouping MODEL, and it takes no `workspaceId` |
+| `getAttention` | **blocked** | client `AttentionKind` includes `'contested'`; the server union has three arms and not that one |
+| `getPreferences` / `putPreferences` | **blocked (signature)** | neither takes a `workspaceId`; both routes answer **400 `invalid_query`** without one |
+
+**Sort the blocked rows into two kinds, because the sort decides who fixes each.** A **serving gap**
+is a fact the server holds and does not put on the wire — one route change. A **data gap** is a fact
+the server does not have — a product decision. `BoardGroup.workflowVersion` and `ListRow.stateName`
+are serving gaps (`proj_tickets` holds the version; 0 hits in `read-models.ts` and `board.ts`, 3 in
+`projections/tickets.ts`). `matchedIn`, `contested`, `WorkspaceRef.projects` and
+`BoardCard.assignee.name` are data gaps. **That distinction was itself nearly lost:** the first sweep
+scoped `workflowVersion` to two files, found zero, and would have reported a fact the server holds as
+one it does not. *A null scoped to two files is a fact about two files.*
+
+### A live defect, not a disagreement — `board.tsx` dereferences two fields no response carries
+
+`packages/app-core/src/views/board.tsx` is the one real view component on `main` and it is fed by
+`source.query.getBoard(...)` through `DataSource` (line 127, via `useLiveQuery`). It reads
+`group.workflowVersion` at line 28 and `card.assignee.id`/`.name` at line 94. Neither exists in any
+response — one a serving gap, one a data gap. It breaks the moment an HTTP `DataSource` exists.
+
+Recorded with that framing deliberately: **"type mismatch" reads deferrable and "the one real view
+component dereferences two fields the server never sends" reads blocking**, and the framing is what
+decides whether the next plan acts. **Owner: Plan 6, which is the very next step in the serial
+order.**
+
+### `StreamItem` has no `scope-revoked` member, so a revocation is silently dropped
+
+`packages/domain/src/stream-frames.ts` declares `scope-revoked` on `ServerStreamFrame` and the hub
+emits it; `packages/app-core/src/data-source.ts`'s `StreamItem` has no such member, so it arrives at
+a client as an unrecognised `type` and is dropped — leaving stale authorization in the client cache
+for exactly the person whose scope was revoked. The client union also carries `EventEnvelope` where
+the server sends `LedgerEvent`, so it lacks `workspaceSeq`, the field the resume protocol needs.
+**Owner: Plan 6.** It does not change step 10's scope — no client consumer exists yet — and
+`serverStreamFrameSchema` already exists as the runtime instrument for pinning it.
+
+*One correction while here:* that file names its mocking readers as **Plans 6, 9 and 10**. The
+dispatch brief says "6a, 8 and 9". The code is the primary source.
+
+---
+
+## Ruling P18 is DISCHARGED (2026-09-02, step 10) — and it was genuinely unclaimed
+
+The ruling handed the `proj_memberships` → `engine-context` wiring to *"whoever dispatches Plan 4 Task
+6 or the step-10 integration checkpoint, whichever comes first."* **Plan 4 Task 6 ran and did not take
+it** — `getEntityState('membership')` still answered `null` at `c9ab31c`, and the only section this
+document gained from T6 is about vacuous determinism tests. So the conservative default the ruling
+itself named binds, and the wiring landed as **its own reviewed change**.
+
+It reads `proj_memberships` through **`resolveEffectiveRole`**, never a SELECT of its own. That is
+the one decision here with a defect behind it rather than a preference, and the defect is measurable:
+substituting a bare `WHERE workspace_id = $1 AND user_id = $2` **passes all 720 tests**, while handing
+back a revoked person's surviving project-roster row as a role — because `membership.revoked` deletes
+the workspace-scope row alone and the guarantee lives in that function's early return.
+
+A second mutation, `role: eff.workspaceRole === 'admin' ? 'admin' : 'guest'`, **also passed all 720**,
+because `role` was only ever witnessed as `'admin'`. The `member` refusal cannot see it: a wrong role
+and a missing one are refused identically, so only a direct read of the whole `MembershipState`
+separates them. **Both survivors were found by the reviewer against a suite the implementer had
+already run green** — the per-task reviewer paying for itself twice in one task, under the thinned
+machinery.
+
+The id is decoded **fail-closed, by re-encoding the halves and comparing to the input**, rather than
+by reasoning about whether a ULID may contain a colon. And `'membership'` is answered BEFORE the head
+read: a membership head row is the §9 hazard's own instrument, and a head gate would be true for
+every membership the ledger can produce — **a check that cannot fail, sitting in an authorisation
+path.**
+
+**State it as a functionality gap, never as a bypass.** `restrict-to` fails CLOSED, so what the null
+cost was every workflow whose approval step is spelled as a role, for everyone, always — an owner
+included. Reported as an authorisation defect it would have provoked a mis-sequencing ruling.
+
+Why nothing noticed is this series' signature failure in its purest form: the rule engine's own
+`restrict-to` suite drives `memory-context.ts` and `fixtures/harness.ts`, both of which carry
+`fx.memberships` and answer. **Sixty-one fixtures green on the side with the fake; the side with the
+truth never exercised.**
+
+---
+
+## Ruling P24 (2026-09-02, serial executor) — the `UserPreferences` collision resolves to the SERVER's shape
+
+§6b left this open with a deadline: *"Owner: this document, to rule which shape the `DataSource`
+carries before Plan 6's Task 10 is executed."* Ruled here, conservative default, because step 11 is
+Plan 6 and after that the ruling is no longer cheap.
+
+**The server's shape wins. Plan 6 Task 10 adopts it.**
+
+§6b's premise needs correcting first, and the correction strengthens the conclusion. It says the two
+are *"informationally equivalent — the mapping is mechanical either way — so the cost is a decision,
+not a migration."* True in the abstract. In practice **`preferencesDocSchema` is `.strict()`, so Plan
+6's document is not renamed by an adapter — it is refused at the door, three separate ways**:
+
+1. `version: 1` is an unknown top-level key → `400 invalid_preferences`, the whole PUT lost;
+2. `SavedFilter.filter` (Plan 6) against the shipped `filterSpec`, inside a `.strict()` member;
+3. project keys are narrowed to `ulidString`, and that schema's own docblock records that **Plan 6's
+   fixtures key by `prj_1`**.
+
+And one asymmetry §6b does not name: **server → client is not total.** The client pairs
+`{columns, grouping}` under one project key; the server keeps two parallel records. A project present
+in `listColumns` and absent from `grouping` has no faithful client representation, and reaching for
+`DEFAULT_VIEW_PREFS` there presents a default as the user's own choice.
+
+Grounds: the server's shape has a table, a route, a strict schema and tests; Plan 6's is plan text
+with fakes. **Ruling for the fake over the shipped thing is this series' signature failure stated
+exactly.** The alternative — loosening `.strict()` and widening `projectIdKey` — would undo three
+deliberate decisions each with an executed test behind it, including the `__proto__` record drop that
+was measured on zod 3.25.76 and is the whole reason `projectIdKey` is `ulidString`.
+
+Client-side, `version` is not lost: it belongs on the client's cache envelope, not inside a
+server-owned document whose shape the server already versions by refusing unknown keys. The
+per-project asymmetry is the one thing an adapter must handle explicitly — a project missing from
+`grouping` surfaces as *not set*, never as a default wearing a user's authority.
