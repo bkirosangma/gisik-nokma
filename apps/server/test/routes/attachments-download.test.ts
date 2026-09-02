@@ -65,16 +65,27 @@ import { signInWithPhone } from '../helpers/session.js';
  * signal actually goes. Proven below against `insertAttachment` with no
  * matching `store.put`.
  *
- * ## `comparableHeaders` is now a FIFTH local definition
+ * ## `comparableHeaders` is now the ELEVENTH local definition
  *
- * `tickets-read.test.ts:92`, `my-work.test.ts:415`, `preferences.test.ts`, and
- * `attachments-upload.test.ts` (Task 9, same step) each carry their own copy
- * already — this file's is the fifth. RECORDED, not hoisted here: a shared
- * `test/helpers/http-compare.ts` is a one-file change with no functional
- * stakes, and duplicating a four-line pure function five times is a
- * readability cost, not a correctness one. Owner: whichever task next touches
- * one of these five files for an unrelated reason, or a dedicated cleanup task
- * if the count grows past five.
+ * SWEPT, not recalled, from the repo root — `grep -rl 'function
+ * comparableHeaders' .` excluding `node_modules`, `dist`, `.next`,
+ * `reference` and `.git` — finds ten prior copies, none outside
+ * `apps`/`packages`: `tickets-read.test.ts:92`, `my-work.test.ts:415`,
+ * `preferences.test.ts:169`, `board.test.ts:152`, `builder-reads.test.ts:113`,
+ * `search.test.ts:353`, `ticket-history.test.ts:130`, `attention.test.ts:571`,
+ * `list.test.ts:307` and `attachments-upload.test.ts:175` (Task 9, same
+ * step) — all byte-identical two-line bodies; this file's is the eleventh.
+ * RECORDED, not hoisted here: a shared `test/helpers/http-compare.ts` is a
+ * one-file change with no functional stakes, and duplicating a two-line pure
+ * function eleven times is a readability cost, not a correctness one. An
+ * earlier version of this note put the count at five and set the escalation
+ * trigger at "past five" — the count was wrong even then (it undercounted
+ * the priors that already existed), and either way the trigger has silently
+ * not fired for six copies past where it should have. Owner: whichever task
+ * next touches one of these eleven files for an unrelated reason, or a
+ * dedicated cleanup task — no further count-based trigger is set here, since
+ * the last one demonstrated that a number embedded in prose does not get
+ * re-checked as the count grows.
  */
 
 const WS = newUlid();
@@ -82,6 +93,34 @@ const PRJ = newUlid();
 
 const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 const PDF_BYTES = Buffer.from('%PDF-1.7 body');
+const UNSAFE_BYTES = Buffer.from('%PDF-1.7 unsafe-name body');
+
+/**
+ * A filename `sanitizeFilename` (`attachments/filename.ts`) actually
+ * changes: the `"` is in `UNSAFE_FILENAME_CHARS` and is stripped, leaving
+ * `badname.pdf`. This is deliberately NOT the fixture the two
+ * positive-download tests use (`shelf.png`, `gst-receipt.pdf` are both
+ * already sanitary, so a route that skipped sanitization entirely would
+ * still pass those). This one exists to prove the GET handler actually calls
+ * `sanitizeFilename(row.filename)` — the composition, not the function,
+ * which `test/attachments/filename.test.ts` already unit-tests directly —
+ * for a row some other writer put there, not one this route's own POST path
+ * sanitized on the way in.
+ *
+ * Quote-only, deliberately, not CR/LF: `sanitizeFilename` also strips CR/LF
+ * (header-injection prevention), but MEASURED — planting `bad"name\r\n.pdf`
+ * here and mutating the call site to `row.filename` — Node's http layer
+ * rejects the raw CR/LF in the header value with `ERR_INVALID_CHAR` before
+ * the response is ever sent, so the mutation reddens at `res.statusCode`
+ * (`500`, not `200`) rather than at the `content-disposition` equality
+ * below. That proves "an unsanitized CRLF filename crashes the route," a
+ * real property but not this test's, and would leave the composition claim
+ * — that the returned header VALUE is the sanitized string — with the same
+ * unexecuted-assertion gap this fixture exists to close. A quote-only name
+ * transmits fine either way, so the mutation is caught by the header-value
+ * assertion itself.
+ */
+const UNSAFE_FILENAME = 'bad"name.pdf';
 
 type InjectResponse = Awaited<ReturnType<FastifyInstance['inject']>>;
 
@@ -93,6 +132,7 @@ let guestToken = '';
 let TICKET = '';
 let IMG_ID = '';
 let PDF_ID = '';
+let UNSAFE_ID = '';
 let ORPHAN_ID = '';
 
 beforeAll(async () => {
@@ -157,6 +197,22 @@ beforeAll(async () => {
     objectKey: `w/${WS}/a/${PDF_ID}`,
   });
 
+  UNSAFE_ID = newUlid();
+  await store.put(`w/${WS}/a/${UNSAFE_ID}`, Readable.from(UNSAFE_BYTES), {
+    mime: 'application/pdf',
+    size: UNSAFE_BYTES.length,
+  });
+  await insertAttachment(db.pool, {
+    id: UNSAFE_ID,
+    workspaceId: WS,
+    ticketId: TICKET,
+    uploaderId: member.userId,
+    filename: UNSAFE_FILENAME,
+    mime: 'application/pdf',
+    size: UNSAFE_BYTES.length,
+    objectKey: `w/${WS}/a/${UNSAFE_ID}`,
+  });
+
   // Case (c): a row with no matching object in the store — deliberately no
   // `store.put` call for this one. The internal-inconsistency planted defect.
   ORPHAN_ID = newUlid();
@@ -217,12 +273,37 @@ describe('GET /v1/attachments/:id', () => {
     expect(res.rawPayload.equals(PDF_BYTES)).toBe(true);
   });
 
+  it('sanitizes a filename a row already holds unsanitized (composition, not the unit)', async () => {
+    // Mutation that reddens this: replace `sanitizeFilename(row.filename)`
+    // with `row.filename` at the call site in the GET handler. MEASURED:
+    // with the mutation applied, `res.statusCode` stays `200` (the fixture
+    // is quote-only, so Node's header transport accepts it unsanitized) and
+    // the failure lands on the `content-disposition` equality below —
+    // `attachment; filename="bad"name.pdf"`, the row's raw filename, not
+    // `attachment; filename="badname.pdf"`. That is the composition claim
+    // itself failing, not a status-code proxy for it.
+    const res = await download(memberToken, UNSAFE_ID);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-disposition']).toBe('attachment; filename="badname.pdf"');
+    expect(res.rawPayload.equals(UNSAFE_BYTES)).toBe(true);
+  });
+
   it('case (a) vs (b): an unshared guest and a nonexistent id are byte-identical 404s', async () => {
     // Mutation that reddens this: give the `canSee` refusal inside the GET
     // handler any answer of its own — a distinct body, a 403, or an extra
-    // header — and `invisible` stops matching `ghost`. Deleting the `canSee`
-    // guard reddens it the other direction, through the positive control
-    // above (the guest would then see IMG_ID's bytes).
+    // header. MEASURED, not assumed: adding
+    // `.header('x-refused', 'canSee')` to that branch's `replyNotFound` call
+    // reddens exactly one assertion in this suite — the
+    // `comparableHeaders(invisible)).toEqual(comparableHeaders(ghost))` line
+    // below — while `invisible.statusCode`/`ghost.statusCode` and both
+    // `.json()` calls above it stay green, because status and parsed body
+    // are unchanged; only the header set differs. That is the byte-identity
+    // property itself failing, not a proxy for it. Deleting the `canSee`
+    // guard entirely reddens this test directly, at
+    // `expect(invisible.statusCode).toBe(404)` two lines down (the guest
+    // gets 200 instead of 404) — it does not need the positive control
+    // above, which uses a different token (`memberToken`) and is unaffected
+    // either way.
     const invisible = await download(guestToken, IMG_ID); // ticket exists, guest may not see it
     const ghost = await download(memberToken, newUlid()); // id never existed
 
@@ -261,6 +342,13 @@ describe('GET /v1/attachments/:id', () => {
     expect(orphan.json()).toEqual(ghost.json());
     expect(comparableHeaders(orphan)).toEqual(comparableHeaders(ghost));
     expect(orphan.rawPayload.equals(ghost.rawPayload)).toBe(true);
+
+    // Explicit, not just implied by the equality above: the two headers this
+    // handler only ever adds after `getStream` succeeds must not survive
+    // onto case (c) either — the row's bytes are gone, so nothing past that
+    // call ran.
+    expect(orphan.headers['content-disposition']).toBeUndefined();
+    expect(orphan.headers['x-content-type-options']).toBeUndefined();
   });
 
   it('no session → 401', async () => {

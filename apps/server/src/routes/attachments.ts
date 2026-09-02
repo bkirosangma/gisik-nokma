@@ -466,10 +466,18 @@ export async function registerAttachmentRoutes(
    * `x-content-type-options` are set AFTER the `getStream` call succeeds —
    * never before. Setting `content-type` from `row.mime` earlier (it is read
    * from the database row before the store call) would leak the stored mime
-   * on a case-(c) 404 even though the bytes it describes do not exist; the
-   * test suite asserts these four headers are entirely absent on every 404
-   * this route can produce, not merely that their VALUES happen to match
-   * between the two 404s.
+   * on a case-(c) 404 even though the bytes it describes do not exist.
+   *
+   * What the test suite actually proves, precisely, not "all four headers
+   * vanish": MEASURED against Fastify 5.12.1 with this route's exact 404
+   * shape (`reply.code(404).send({error:'not-found'})`), `content-type` and
+   * `content-length` are never absent on a 404 — Fastify itself sets them
+   * from the JSON body (`application/json; charset=utf-8`, `21`), and the
+   * test suite asserts that fixed VALUE, not absence, for `content-type`.
+   * `content-disposition` and `x-content-type-options` are the two headers
+   * this handler itself only ever adds after `getStream` succeeds, so those
+   * two are the ones the suite asserts are entirely absent on every 404 —
+   * explicitly, for all three cases (a), (b) and (c).
    */
   app.get('/v1/attachments/:id', { preHandler: requireSession }, async (request, reply) => {
     const { id } = request.params as { id: string };
