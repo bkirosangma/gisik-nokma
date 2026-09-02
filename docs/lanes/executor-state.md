@@ -13,7 +13,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| **Branch in flight** | **`exec/10-integration-checkpoint`**, cut from `origin/main`. Step 10, the integration checkpoint. | `git rev-parse --abbrev-ref HEAD` |
+| **Branch in flight** | **`exec/10-integration-checkpoint`** @ **`44fb736`**, pushed. Step 10, the integration checkpoint. **Task A is COMMITTED; Task B is in flight and UNCOMMITTED in the tree.** | `git rev-parse HEAD`, `git branch --contains 44fb736` non-empty |
 | **`main`** | **`c9ab31c`** — step 9 (`563c983`, PR #67) plus two docs-only merges (`aa67ee3` #68, `c9ab31c` #69). **REFETCH before trusting this.** | `git rev-parse origin/main`, `git log --oneline -5` |
 | **`563c983` reachable?** | **YES**, ancestor of `c9ab31c`. The only diff `563c983..c9ab31c` is three files under `docs/lanes/`. | `git merge-base --is-ancestor 563c983 origin/main` → true; `git diff --stat` |
 | **Gate on merged main** | exit 0 · 21/21 · 0 cached · 1573 tests · Node v22.22.2. Measured by the controller at `563c983`; docs-only merges cannot move it (`turbo.json` declares no `inputs` and `docs/` is outside every package). | controller's forced gate |
@@ -28,10 +28,36 @@ sitting in the tree.
 
 | Task | What | State |
 |---|---|---|
-| **A** | **Ruling P18** — wire `getEntityState('membership')` to `proj_memberships` | **IN FLIGHT** (opus implementer → opus reviewer) |
-| **B** | The read-route round trip: real `POST` → shipped `GET`, raw bodies asserted | not started |
-| **C** | Pin the client-contract divergences so a reconciliation cannot be silent | not started |
-| docs | coordination doc records + this file + Features/test-cases | not started |
+| **A** | **Ruling P18** — wire `getEntityState('membership')` to `proj_memberships` | **DONE, committed `44fb736`, gate green** |
+| **B** | Real-door round trip + the client-contract divergence pins (C merged in — they collide on `test-cases/07` and `Features.md` §7) | **IN FLIGHT**, uncommitted in the tree |
+| docs | coordination doc records + this file | not started |
+
+### Task A — what it cost and what it bought, since a successor should not re-derive it
+
+`getEntityState('membership')` now reads `proj_memberships` through **`resolveEffectiveRole`**, never
+a SELECT of its own, and the id is decoded **fail-closed by re-encoding it and comparing to the
+input**. It is answered BEFORE the head read, because a membership head row is the §9 hazard's own
+instrument and a head gate would be true for every membership the ledger can produce — a check that
+cannot fail, in an authorisation path.
+
+**Two mutations survived a green 720-test suite and are why the task has three tests rather than
+one.** The reviewer found both; the fix round confirmed and closed both, and pushed back on the
+reviewer's METHOD (it proposed a hand-written `proj_memberships` row; the fixture is built through
+the ledger instead, which the file's own `granted()` docblock demands).
+
+1. Replacing `resolveEffectiveRole` with a bare `WHERE workspace_id = $1 AND user_id = $2` passed
+   **all 720**. It hands back a revoked person's surviving project-roster row as a role — because
+   `membership.revoked` deletes the workspace-scope row ALONE and the guarantee lives in
+   `resolveEffectiveRole`'s early return. **I re-ran this mutation myself: exactly one death, the
+   named case, `expected { kind: 'membership', …(4) } to be null`, with the ADMIN_USER `toEqual`
+   above it passing in the same run — so the mutated path is confirmed executed.**
+2. `role: eff.workspaceRole === 'admin' ? 'admin' : 'guest'` passed all 720, because `role` was only
+   ever witnessed as `'admin'`. The `member` REFUSAL cannot see it — `'guest'` is no more in
+   `['admin']` than `'member'` is — so only a direct read of the whole state catches it.
+
+Gate at `44fb736`: **exit 0 · 21/21 · 0 cached · 1576 tests · Node v22.22.2 · 0 engine warnings.**
+Decomposes: **+3 from main's 1573, entirely in `apps/server` (717 → 720), entirely in
+`engine-context.test.ts` (15 → 18 `it(`)**, the only server test file the change touches.
 
 ### The scope was RE-MEASURED at `c9ab31c`, and the brief and the previous recon are both wrong
 
