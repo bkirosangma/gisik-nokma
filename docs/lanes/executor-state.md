@@ -103,8 +103,9 @@ commit. Re-ask the ruling; do not re-earn it.
 | T10 | List view | **DONE.** `list-model.ts`, `ticket-list.tsx`, `use-preferences.ts`, 47 cases. Ruling P24 now honoured PER HALF via `Chosen<T>`. |
 | T11 | My Work + attention strip | **DONE.** `my-work.tsx`, `attention-strip.tsx`, 35 cases. Review shipped clean. |
 | T12, T12a, T13 | ticket sheet / attachments / reopen flow | **DONE.** 9 view modules + flows/guarded-child-event.ts, 104 cases. Both reviews shipped clean. |
-| T14 | `apps/web` Next.js shell | **NEXT — and it is what Plans 8 and 9 are blocked on.** Greenfield: `apps/web/` does not exist. |
-| T15, T15b, T16 | invite + doors + catalogue | **todo.** T15's Playwright smoke goes behind `test:e2e`, NOT `test` — the gate runs `test` only and CI installs no browsers. |
+| T14 | `apps/web` Next.js shell | **DONE.** New 8th workspace package; the gate went 21 → 24 tasks. **Plans 8 and 9 are unblocked.** |
+| T15, T15b | invite acceptance, Playwright smoke, the doors | **DONE.** Smoke RUN for real (chromium, `next dev`, 5 passed) and behind `test:e2e`, off the gate. |
+| T16 | catalogue + full verification | **IN FLIGHT.** It owns the §3-vs-§8 decision. |
 
 ### WHAT "REFUSES" MEANS FOR T10–T13, so a restart does not read it as blocked
 
@@ -115,13 +116,30 @@ the ONLINE source, and each one is pinned by a server-side cross-check in
 `apps/server/test/integration/client-contract.test.ts` that goes RED the day the route starts serving
 the field. Build the views. Do not weaken the refusals to make a view light up.
 
-### Gate at the T12/T12a/T13 commit, measured at the tree reported
+### Gate at the T14/T15/T15b commit, measured at the tree reported
 
-**exit 0 · 21/21 · 0 cached · 1902 tests · Node v22.22.2 · 0 engine warnings.**
-domain 335 · rule-engine 280 · **server 761** · **app-core 415** · editor 72 · ui 31 · sync-client 8.
+**exit 0 · 24/24 · 0 cached · 2026 tests · Node v22.22.2 · 0 engine warnings.** RUN TWICE, identical.
+domain 335 · rule-engine 280 · **server 761** · **app-core 470** · **web 69** · editor 72 · ui 31 ·
+sync-client 8.
 
-Decomposes from main's 1612 in four steps: app-core 130 → 224 (T7+T8) → 311 (T10+T11) → 415
-(T12+T12a+T13); server 756 → 761 (the client-contract cross-checks). **Every other package byte-identical throughout**, which
+**The gate is 24 tasks over EIGHT packages now**, because `apps/web` exists. That is the change landing,
+not a regression — but it means any inherited "21/21 over 7 packages" figure is spent.
+
+### THE FLAKE `apps/web` ALMOST SHIPPED — do not undo the fix
+
+`apps/web/tsconfig.json` carries `exclude: ['.next']`. Next's own default `include` globs
+`.next/types/**/*.ts`, a directory `next build` DELETES and regenerates, and turbo runs `typecheck`
+concurrently with it because `typecheck.dependsOn` is `^build` (upstream), not this package's own build.
+**Measured: 2 red of 3 without the exclude, 4 green of 4 with it.** It must be the exclude and not a
+narrower include, because `next build` rewrites `tsconfig.json`'s include on every run and never touches
+its exclude. Cost, stated in `apps/web/README.md`: the generated route-signature types leave `tsc`'s
+program and are checked by `next build`'s own pass, which is on the same gate.
+
+**If the gate ever comes back red on `@gisik-nokma/web:typecheck` with TS6053, look here first**, and run
+it three times before believing either answer.
+
+Decomposes from main's 1612: app-core 130 → 224 (T7+T8) → 311 (T10+T11) → 415 (T12+T12a+T13) →
+470 (the T14 seam and T15's gateways); web 0 → 69 (new); server 756 → 761 (the cross-checks). **Every other package byte-identical throughout**, which
 is the check that this branch has not touched what it does not claim to touch.
 
 ### RULING P24 WAS BEING VIOLATED BY THIS BRANCH'S OWN CODE, and the fix is a type
