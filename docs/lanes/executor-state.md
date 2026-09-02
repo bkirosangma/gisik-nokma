@@ -157,9 +157,12 @@ its route serves the field. **Do not weaken one to make a Plan 7 view light up.*
    this is why** — and run it three times before believing either answer.
 3. **`Features.md` §3, not §8, is the web client's catalogue home.** §8 was considered and refused
    because migrating means mapping 112+ live cross-referenced ids against the README's own
-   never-renumber rule. Plan 7's Task 16 targets **§9 / `test-cases/09-editor-attachments.md`**,
-   which is a different question and does not inherit that refusal — but check that §9 exists before
-   assuming it does, because §8 did not.
+   never-renumber rule. **Plan 7's Task 16 does NOT inherit that refusal, and its targets both
+   exist — verified 2026-09-02:** `Features.md` has a `## 9. Editor, documents & attachments`
+   header, and `test-cases/09-editor-attachments.md` is a real file whose highest live case id is
+   **9.62**. So T16 extends an existing catalogue rather than opening one, and **new cases continue
+   past 9.62** under the never-renumber rule. (`Features.md` runs §7 → §9 → §12; the absent §8, §10
+   and §11 are a separate matter and not T16's to resolve.)
 
 ## BATCH A — T5, T6, T7, T8. All committed, gate green at HEAD.
 
