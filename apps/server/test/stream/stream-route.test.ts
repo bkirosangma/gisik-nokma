@@ -1206,6 +1206,14 @@ describe('WS /v1/stream — the membership round trip the socket can disappear a
       // The SERVER fault: the membership read throws, which is nothing the
       // client did and nothing the client can fix.
       const serverFault = await openStream(server.port, headers);
+      // On THIS socket, before the fault: one malformed frame answered, so the
+      // silence claimed below is measured against a recorder proven live on the
+      // same socket a moment earlier. A control on the neighbouring connection
+      // would leave "no frames" and "a recorder that recorded nothing" the same
+      // reading.
+      serverFault.sendRaw('not json at all');
+      await serverFault.next((frame) => frame.type === 'error');
+      const before = serverFault.frames.length;
       const thrown = gate.fail(new Error('membership read exploded'));
       serverFault.subscribe(workspaceId, 0);
       await thrown;
@@ -1213,7 +1221,7 @@ describe('WS /v1/stream — the membership round trip the socket can disappear a
       expect(closed.code).toBe(1011);
       expect(closed.reason).toBe('stream-error');
       // And NOT as a client fault: no `bad-message` frame was sent on the way.
-      expect(serverFault.frames).toEqual([]);
+      expect(serverFault.frames.slice(before)).toEqual([]);
       // Which leaves nothing behind either — the close ran teardown.
       await waitFor(() => server.hub.stats().sockets === 0).catch(() => undefined);
       expect(server.hub.stats()).toEqual({ sockets: 0, subscriptions: 0, workspaces: 0 });
