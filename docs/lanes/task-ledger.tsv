@@ -122,24 +122,24 @@ plan	task	status	pr	merge_sha	note
 07	2	done	47	a3746fb	artefact: packages/domain/src/doc-embeds.ts (PR #47)
 07	3	done	47	a3746fb	artefact: packages/editor/src/extensions/ticket-image.ts (PR #47)
 07	4	done	47	a3746fb	artefact: packages/editor/src/extensions/mention.ts, mention-popup.ts (= PR #47 squash sha)
-07	5	in-flight	-	-	exec/12-plan7-remainder; 
-07	6	in-flight	-	-	exec/12-plan7-remainder; 
-07	7	in-flight	-	-	exec/12-plan7-remainder; 
-07	8	in-flight	-	-	exec/12-plan7-remainder; 
-07	9	in-flight	-	-	exec/12-plan7-remainder; 
-07	9a	in-flight	-	-	exec/12-plan7-remainder; 
-07	10	in-flight	-	-	exec/12-plan7-remainder; 
-07	11	in-flight	-	-	exec/12-plan7-remainder; 
-07	11a	in-flight	-	-	exec/12-plan7-remainder; 
-07	12	in-flight	-	-	exec/12-plan7-remainder; 
-07	12a	in-flight	-	-	exec/12-plan7-remainder; 
-07	12b	in-flight	-	-	exec/12-plan7-remainder; 
-07	12c	in-flight	-	-	exec/12-plan7-remainder; 
-07	13	in-flight	-	-	exec/12-plan7-remainder; 
-07	13a	in-flight	-	-	exec/12-plan7-remainder; 
-07	14	in-flight	-	-	exec/12-plan7-remainder; 
-07	15	in-flight	-	-	exec/12-plan7-remainder; 
-07	16	in-flight	-	-	exec/12-plan7-remainder; 
+07	5	done	82	7337357	exec/12-plan7-remainder; 
+07	6	done	82	7337357	exec/12-plan7-remainder; 
+07	7	done	82	7337357	exec/12-plan7-remainder; 
+07	8	done	82	7337357	exec/12-plan7-remainder; 
+07	9	done	82	7337357	exec/12-plan7-remainder; 
+07	9a	done	82	7337357	exec/12-plan7-remainder; 
+07	10	done	82	7337357	exec/12-plan7-remainder; 
+07	11	done	82	7337357	exec/12-plan7-remainder; 
+07	11a	done	82	7337357	exec/12-plan7-remainder; 
+07	12	done	82	7337357	exec/12-plan7-remainder; 
+07	12a	done	82	7337357	exec/12-plan7-remainder; 
+07	12b	done	82	7337357	exec/12-plan7-remainder; 
+07	12c	done	82	7337357	exec/12-plan7-remainder; 
+07	13	done	82	7337357	exec/12-plan7-remainder; 
+07	13a	done	82	7337357	exec/12-plan7-remainder; 
+07	14	done	82	7337357	exec/12-plan7-remainder; 
+07	15	done	82	7337357	exec/12-plan7-remainder; 
+07	16	done	82	7337357	exec/12-plan7-remainder; 
 08	1	todo	-	-	
 08	2	todo	-	-	
 08	3	todo	-	-	
