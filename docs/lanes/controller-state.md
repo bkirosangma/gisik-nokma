@@ -11,38 +11,59 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
-## Anchors — re-measured 2026-09-01 ~19:40 IST, at `3720eeb`
+## Anchors — re-measured 2026-09-02 ~04:00 IST, at `563c983` (Plan 5 merged)
 
 | what | value |
 |---|---|
-| `main` | **`3720eeb`** (#61, this file's own previous update) **— goes stale by design; refetch.** The run of merges behind it: #57 (Plan 4 T8–T14) → `dd7bfcf`, Chain B → `6cb631d` via **#59, not #58**, controller docs #60 → `00cb2e0`, controller docs #61 → `3720eeb` |
-| last forced gate | **still `6cb631d`** — `GATE_EXIT=0` **read from `$?` on the next line, not inferred**, 21/21 tasks, 0 cached, **1277 tests**, 19.25s, node **v22.22.2**, `INSTALL_EXIT=0`, `REBUILD_EXIT=0`, zero `Unsupported engine` WARNs. **NOT re-run at `3720eeb`, and that is a decision with evidence** — see the row below |
-| **why the gate anchor survives two merges** | `git diff --name-only 6cb631d origin/main` prints **exactly two rows**, `docs/lanes/controller-state.md` and `docs/lanes/task-ledger.tsv`. `turbo.json` declares no `inputs` and `docs/` is outside every package, so a docs-only delta cannot move composition. **Re-run this before the next SOURCE merge; do not inherit it** — the anchor expired once already (#55 had `package.json` in its delta) |
-| gate composition | domain **295** · rule-engine 280 · server **461** · app-core 130 · editor 72 · ui 31 · sync-client 8 = **1277**, at `6cb631d` |
-| **gate ran under** | **node v22.22.2** — see the Node section below before you trust any gate |
-| open PRs | **none** (`gh pr list --state open` empty, with `--state all` returning rows as the control). Re-measure; **do not wait for the monitor, which is blind to zero→one** — see the monitor section |
-| task ledger | **26 done · 33 claimed · 0 in-flight · 118 todo** of 177 (`pnpm check:tasks`), unchanged at this sha because #60 and #61 completed no tasks. Evidenced per task, not per PR title — see the ledger section |
-| executor | **ALIVE and healthy**, tmux `gisik:1`, worktree `gisik-nokma-exec`, branch **`exec/05-api-realtime` at `5e541ab`** (advanced from `95004e1` by its own handoff fix — **the branch NAME is the load-bearing part, the sha here is not**), context **13%**. Mid **step 9 (Plan 5)**: batch A done (T1, T2, T2 fix round); **T3 is running now** in a background Workflow alongside a read-only T4–T16 adaptation map |
+| `main` | **`563c983`** — **STEP 9 MERGED: Plan 5, all 17 tasks, PR #67.** Docs PRs #62–#66 landed before it. Refetch; this goes stale by design |
+| last forced gate | **`563c983` + this branch's ledger edit** — `FORCED_GATE_EXIT=0` **read from `$?` on its own line**, `--force` so **0 cached**, 21/21, **1573 tests**, 24.3s, node **v22.22.2**, zero `Unsupported engine` in gate or install |
+| gate composition | domain **335** · rule-engine 280 · **server 717** · app-core 130 · editor 72 · ui 31 · sync-client 8 = **1573** (was 1277; server 461 → 717) |
+| **corroboration** | the executor's independent gate at the **branch tip** reported the same 1573 and the same per-package split. **Two different trees, same numbers** — that is what makes the squash-merge trustworthy |
+| open PRs | re-measure. Do not wait for the monitor |
+| task ledger | **88/177 (49.7%) · claimed 0 · todo 89**, quoted from `pnpm check:tasks` |
+| executor | **RESTART IN PROGRESS** — see below. Was at 60% context, step-10 recon running |
 
-**Anchor rows carried forward untouched are the ones to distrust.** Only `main`, the open-PR set, the
-ledger and the executor were re-measured here; the gate row is *deliberately* not re-run, and it states
-the evidence for that rather than asserting freshness.
+> **MY FIRST FORCED GATE HERE WAS RED AND IT WAS MY OWN TYPO.** I ran
+> `pnpm turbo run test typecheck lint build`. **There is no `lint` task** — turbo said *"Could not find
+> task `lint` in project"*, exit 1, and I nearly reported `main` broken. **The real gate is
+> `.github/workflows/ci.yml:112` → `pnpm turbo run build test typecheck`** (plus `pnpm check:env`).
+> **The tell was the ABSENCE of a `Tasks:` line in a 4-line log.** This file already says *"read the
+> `Tasks:` line, it is the only honest signal"* — the corollary it was missing is that **a gate log with
+> no `Tasks:` line at all did not run the gate.** Never invent the gate command; read it from CI.
 
-> **THE INSTRUMENT THAT SETTLED THE DOCS-ONLY CHECK WAS NOT THE ONE I FIRST READ.** `git diff --name-only
-> 6cb631d origin/main | grep -v '^docs/'` came back as the literal string `--- Changes ---`, and
-> `| wc -l` on the same pipeline said **5** for a two-file diff: **`rtk` proxies `git` through the hook
-> and reformats its output**, so every count and filter downstream is computed over prose, not rows. The
-> positive control I ran beside it (`dd7bfcf..main` non-empty) **passed, and proved nothing** — it went
-> through the same proxy, so it established that `grep` was alive, not that the input was raw. What
-> actually settled it was `rtk proxy git diff --name-only`, printing the two rows.
-> **This is the "right answer about the wrong subject" class from the list below, hit again by the check
-> written to avoid it.** Operational form: **`rtk proxy` any git plumbing whose OUTPUT you are about to
-> count, filter, or diff** — and print the rows.
+## PLAN 5 LEDGER ROWS — the widened `done` rule paid off on its first use
 
-**Re-measure everything above on resume.** Recount at the sha you report; do not carry a composition
-forward — five of six package counts staying right is what makes the sixth invisible. `app-core` went
-92 → 130 at this merge, which is the kind of move a carried-forward composition hides.
+**The PR body names only 6 of the 17 tasks** (5, 9, 9b, 10, 14, 15). Under the ORIGINAL definition —
+*a PR naming that exact plan+task* — 11 finished tasks would have been unprovable, on the very next
+merge after the audit. **Artefact evidence promoted all 16 outstanding rows mechanically**, each row
+citing the file its own `Files:` block declares.
 
+**T16 is a catalogue task and was checked against the rule that refused three others, not waved through.**
+07/T16, 10/T18 and 11/T14 stay `todo` because the tasks they catalogue have not run. **Plan 5 T16's
+precondition IS met**: all 16 siblings merged in the same commit, `test-cases/07` carries 153 entries
+reaching **7.162** (late-task ids, not just early ones), and `Features.md` §7 exists. Its note records
+that basis explicitly, because the file itself was opened by T2 — so artefact presence alone would have
+been the wrong reason for the right answer.
+
+## STEP 10 IS NEXT — the integration checkpoint, and its target is already named
+
+**The executor named it in #67 and it is the sharpest thing in that PR.** `applyCommitted` enumerates
+**six** things real ingest does that it does not: no locks, seqs from a process map rather than the
+database, no permission gate, no rule engine, no `bootstrapWorkspace`, no stream notify — **and nearly
+every read test in Plan 5 is built on it.** A read model green against it is proven correct about *rows*
+and proven nothing about whether those rows are reachable through the shipped door. The executor called
+this *"this series' signature failure, written down before it was committed."* Dispatch step 10 against
+that list.
+
+## TWO ITEMS THAT NEED A RULING, one with a deadline
+
+1. **`UserPreferences` collides — DEADLINE: before Plan 6 Task 10.** Plan 6 declares a shape
+   incompatible with Plan 5 T13's. The executor measured them **informationally equivalent**, so it is a
+   naming conflict rather than a design one. Coordination doc §6b.
+2. **The executor made a ruling and recorded it** (coordination doc §5): **a guest may not call
+   `GET /v1/workspaces/:id/members`.** The plan settles who is *hidden from* the listing and never says
+   who may *call* it — so a guest invited to one shared ticket was receiving the entire non-guest staff
+   directory. Conservative default, cheap to reverse. **Left standing unless the owner objects.**
 
 ## READ FIRST IF YOU WERE JUST LAUNCHED — the brief you hold is stale
 
