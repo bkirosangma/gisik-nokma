@@ -67,16 +67,40 @@ stay with the established zone) is unchanged, only the mailbox name. Both plan d
 `sign-in@gisik-nokma.local` is untouched — it never leaves Mailpit. **No code has executed against the old
 value** — Plan 11 is 0/16 `done`, so this is a plan-text correction, not a rollback.
 
-## Anchors — re-measured 2026-09-02 ~16:00 IST, at `7b45099` (step 11 merged)
+## Anchors — re-measured 2026-09-02 ~21:56 IST, at `7337357` (step 12 merged)
 
 | what | value |
 |---|---|
-| `main` | **`7b45099`** — **STEP 11 (Plan 6 remainder, all 12 tasks) MERGED, PR #77.** `apps/web` exists: an **eighth workspace package** |
-| last forced gate | **`7b45099`** — `GATE_EXIT=0` read from `$?`, `--force` so **0 cached**, **24/24 tasks** (was 21), **2027 tests**, 40.5s, node **v22.22.2**, zero `Unsupported engine` |
-| gate composition | domain 335 · rule-engine 280 · **server 761** · **app-core 471** · **web 69 (new)** · editor 72 · ui 31 · sync-client 8 = **2027** |
-| corroboration | the executor gated its own tip and reported the same **2027** and the same split |
-| ledger | **`CHECK_EXIT=0` · 100/177 (56.5%)** · claimed 0 · in-flight 0 · todo 77 |
-| executor | restarted for **step 12 (Plan 7 remainder)**, 18 of 22 todo, T9/T11 floor-list |
+| `main` | **`7337357`** — **STEP 12 (Plan 7 remainder, all 18 tasks) MERGED, PR #82.** Ruling P27 (transition-dialog.tsx wildcard-vs-exact fix) landed in the same PR, flagged in its body as a ruling-directed addition outside T13–T16's own scope |
+| last forced gate | **`7337357`** — `GATE_EXIT=0` read from `$?`, `--force` so **0 cached**, **24/24 tasks**, **2232 tests**, 42.7s, node **v22.22.2**, zero `Unsupported engine` — install-then-gate procedure followed, `pnpm install --frozen-lockfile` first |
+| gate composition | domain 335 · rule-engine 280 · server **857** · app-core 474 · web 69 · **editor 178 (was 72)** · ui 31 · sync-client 8 = **2232** |
+| corroboration | independently re-measured, not carried from the executor's report — the executor's own account (2232, same split) matched exactly |
+| ledger | **`CHECK_EXIT=0` · 118/177 (66.7%)** · claimed 0 · in-flight 0 · todo 59 · Plan 7 now 22/22 |
+| executor | restarted immediately after the merge (fixed-point rule), context reset to ~7%, reading its own handoff. Next: **step 13 (Plan 8, T1–14 self-contained now that Plan 6 is merged, T13–14 no longer blocked)** |
+
+> ### RULING P27 VERIFIED LANDED — mutation-proved, not merely claimed
+> `transition-dialog.tsx`'s `transitionOptions` now matches `precheck.ts`'s exact-match-wins resolution.
+> Cases 3.149–3.151 pin it in both directions; the executor reports the mutation is **site-identifying**
+> (restoring the old first-declaration-wins resolution kills exactly 3.149, 1 of 20, with 3.150/3.151 still
+> green) — the positive control (3.150) is what makes 3.149 a divergence test rather than proof one ordering
+> happens to work. Not independently re-run here; cited on the executor's account plus the Features.md prose
+> diff, which names P27 explicitly and matches the ruling text.
+
+## CARRIED FORWARD, owner Plan 11 — `registerAttachmentRoutes` is never wired into the composition root
+
+**Found and recorded by the executor at step 12's close, not fixed** — registering routes is not Plan 7's
+task text, and turning an editor plan into a deployment change is not step 12's call.
+
+Verified with a positive control: `registerEventRoutes` resolves to a real call site at `app.ts:204`;
+`registerAttachmentRoutes` appears in `src/` **only at its own definition** — nothing calls it. **The
+consequence, not just the gap, is the finding**: the attachments table can never gain a row on the server
+this repo actually starts, so `image-embed-gate`'s `attachment.embed-unknown` refusal branch would refuse
+**every** inline image in a real deployment — correct about the rule, useless as a product. The gap itself
+was already disclosed (`Features.md`, cases 9.59/9.61); the consequence was not.
+
+**Owner: Plan 11's deployment work**, which owns the boot path and the start script. Surface this in Plan
+11's dispatch — a route that exists, is tested, and is never mounted is not caught by any check this series
+runs short of actually booting the server, which Plan 11 is the first plan to do.
 
 > ### ⚠ THE FORCED-GATE PROCEDURE WAS INCOMPLETE AND IT PRODUCED A FALSE RED
 > **`pnpm install --frozen-lockfile` MUST run before the gate whenever the package set may have
@@ -92,6 +116,35 @@ value** — Plan 11 is 0/16 `done`, so this is a plan-text correction, not a rol
 > and never mentioned install — **a Sonnet controller following it literally would have reported
 > `main` broken.** Trigger #4 sends a RED gate to Opus, so it would have escalated rather than
 > mis-merged, but it would have escalated a non-event. **The procedure now reads: install, then gate.**
+
+## STEP 12 CLOSED — Plan 7 complete, and the restart-then-verify shape held under a bigger diff
+
+81 files, +9983/−1260, 52 commits, 22/22 Plan 7 tasks. Independently verified rather than adopted: CI at
+the exact head sha (`gh api …/check-runs`), a fresh `pnpm install --frozen-lockfile` + forced gate
+(2232 tests, matched the executor's own count exactly), and a direct read of the merge-conflict resolution
+the executor reported (`docs/lanes/task-ledger.tsv` row 06/16 — confirmed the controller's §8-refusal note
+survived the rebase, not merely told so).
+
+**Two things worth keeping from this step's own account, because they generalise:**
+- **Shell `diff` reported two ledger-row versions as IDENTICAL when one was 241 characters longer** — the
+  same false-identical failure this file already warns about, and it fired at the one point where believing
+  it would have deleted a controller note. Caught with a Python line-compare and `cmp` (exit 1). Re-flagging
+  because it keeps recurring on this machine specifically, not as a general git property.
+- **The step's own defect distribution, stated because it bears on model policy**: across 18 tasks, the
+  defect classes were overwhelmingly *false claims in prose* and *checks that could not fail* — in two of
+  four batches, those were the ONLY classes found, and Batch A had zero implementation defects at all. The
+  executor's own escalations (reviewer→opus on T10, T12, T12c, T13, T13a, T15 — beyond what the brief
+  floor-listed) caught the step's most dangerous findings, including T10's byte-identity property having no
+  executed mutation behind it. **Recommendation carried into Plans 8–11: escalate the reviewer wherever a
+  task's point is a refusal or a disclosure, even when the brief doesn't floor-list it** — the pattern paid
+  for itself twice in this step alone.
+
+**The step-12 handoff moved the ledger to `in-flight` with placeholder notes (branch name only, no
+per-task artefact), unlike step 11's rich per-task evidence.** The controller filled in the actual
+artefact citations at promotion time from each task's own `Files:` block in the plan text, cross-checked
+against the PR's changed-file list — same `done` definition as always, just assembled by the promoting
+party this time rather than handed over pre-written. Not a defect in the handoff; recorded so a future
+promotion doesn't assume the notes will always arrive populated.
 
 ## STEP 11 CLOSED — Plan 6 complete, and the executor solved a boundary I never specified
 
