@@ -104,20 +104,20 @@ plan	task	status	pr	merge_sha	note
 06	2	done	16	2e9f405	artefact: packages/ui/test/helpers/colour-scan.ts, token-discipline.test.ts (PR #16)
 06	3	done	16	2e9f405	artefact: all 8 declared components + ui.css, each verified present (PR #16)
 06	4	done	16	2e9f405	artefact: packages/app-core scaffold, DataSource interface (PR #16)
-06	5	in-flight	-	-	no code change: all four guards were already present AND each independently covered — IngestResult (packages/domain/src/ingest-result.ts, pinned by board.test.tsx:335), docToPlainText (doc-text.ts + doc-text.test.ts), blocked (workflow.ts:13 + workflow-schema.test.ts:46), cause (workflow.ts:144 + ticket-events.test.ts:62). exec/11-plan6-remainder
+06	5	done	77	7b45099	no code change: all four guards were already present AND each independently covered — IngestResult (packages/domain/src/ingest-result.ts, pinned by board.test.tsx:335), docToPlainText (doc-text.ts + doc-text.test.ts), blocked (workflow.ts:13 + workflow-schema.test.ts:46), cause (workflow.ts:144 + ticket-events.test.ts:62).
 06	6	done	36	3fb22d3f	
-06	7	in-flight	-	-	artefact: packages/app-core/src/online/{http,mappers,online-data-source,index}.ts + 4 test files + no-http-in-views scanner; 6/12 DataSourceQuery methods answered, 6 refuse with ServingGapError. exec/11-plan6-remainder
-06	8	in-flight	-	-	artefact: packages/app-core/src/online/stream.ts + test/online/stream.test.ts (26 cases); StreamItem widened to five members with the event member carrying LedgerEvent. exec/11-plan6-remainder
+06	7	done	77	7b45099	artefact: packages/app-core/src/online/{http,mappers,online-data-source,index}.ts + 4 test files + no-http-in-views scanner; 6/12 DataSourceQuery methods answered, 6 refuse with ServingGapError.
+06	8	done	77	7b45099	artefact: packages/app-core/src/online/stream.ts + test/online/stream.test.ts (26 cases); StreamItem widened to five members with the event member carrying LedgerEvent.
 06	9	done	43	c93c910	artefact: packages/app-core/src/views/board.tsx, use-live-query.ts, rollup-text.ts (= PR #43 squash sha)
-06	10	in-flight	-	-	artefact: packages/app-core/src/views/{list-model.ts,ticket-list.tsx,use-preferences.ts} + 2 test files (47 cases); ruling P24 honoured per-half via Chosen<T>. exec/11-plan6-remainder
-06	11	in-flight	-	-	artefact: packages/app-core/src/views/{my-work.tsx,attention-strip.tsx} + 2 test files (35 cases); inTransit empty BECAUSE no outbox, asserted with that reason. exec/11-plan6-remainder
-06	12	in-flight	-	-	artefact: packages/app-core/src/views/{ticket-sheet,history-list,transition-dialog,editor-slot}.tsx + tests; both clocks labelled, history tab distinguishes loading/error/empty. exec/11-plan6-remainder
-06	12a	in-flight	-	-	artefact: packages/app-core/src/views/attachment-list.tsx + test; held file vs Drive pointer never merged. exec/11-plan6-remainder
-06	13	in-flight	-	-	artefact: packages/app-core/src/flows/guarded-child-event.ts + views/{reopen-dialog,new-ticket-dialog,create-ticket-flow}.tsx + tests; parent event before child, parent rules still apply. exec/11-plan6-remainder
-06	14	in-flight	-	-	artefact: apps/web (new package, Next.js 15 shell, 8th workspace package); gate 21->24 tasks. exec/11-plan6-remainder
-06	15	in-flight	-	-	artefact: packages/app-core/src/online/invites.ts + apps/web/app/invite/[token]/page.tsx + e2e/smoke.spec.ts (run for real, 5 passed, off the gate). exec/11-plan6-remainder
-06	15b	in-flight	-	-	artefact: online/{invites-admin,founding}.ts + views/visibility-editor.tsx + apps/web/app/w/[workspaceId]/members/page.tsx. exec/11-plan6-remainder
-06	16	in-flight	-	-	artefact: Features.md §3 web-client note, test-cases/03-foundation-ledger.md (3.145-3.147 + citations), README.md correction; §8 CONSIDERED AND REFUSED with reasoning in four places. exec/11-plan6-remainder
+06	10	done	77	7b45099	artefact: packages/app-core/src/views/{list-model.ts,ticket-list.tsx,use-preferences.ts} + 2 test files (47 cases); ruling P24 honoured per-half via Chosen<T>.
+06	11	done	77	7b45099	artefact: packages/app-core/src/views/{my-work.tsx,attention-strip.tsx} + 2 test files (35 cases); inTransit empty BECAUSE no outbox, asserted with that reason.
+06	12	done	77	7b45099	artefact: packages/app-core/src/views/{ticket-sheet,history-list,transition-dialog,editor-slot}.tsx + tests; both clocks labelled, history tab distinguishes loading/error/empty.
+06	12a	done	77	7b45099	artefact: packages/app-core/src/views/attachment-list.tsx + test; held file vs Drive pointer never merged.
+06	13	done	77	7b45099	artefact: packages/app-core/src/flows/guarded-child-event.ts + views/{reopen-dialog,new-ticket-dialog,create-ticket-flow}.tsx + tests; parent event before child, parent rules still apply.
+06	14	done	77	7b45099	artefact: apps/web (new package, Next.js 15 shell, 8th workspace package); gate 21->24 tasks.
+06	15	done	77	7b45099	artefact: packages/app-core/src/online/invites.ts + apps/web/app/invite/[token]/page.tsx + e2e/smoke.spec.ts (run for real, 5 passed, off the gate).
+06	15b	done	77	7b45099	artefact: online/{invites-admin,founding}.ts + views/visibility-editor.tsx + apps/web/app/w/[workspaceId]/members/page.tsx.
+06	16	done	77	7b45099	artefact: Features.md §3 web-client note, test-cases/03-foundation-ledger.md (3.145-3.147 + citations), README.md correction; §8 CONSIDERED AND REFUSED with reasoning in four places. | CONTROLLER: declared artefact test-cases/08-web-client.md deliberately NOT created; §8 refused because migrating 112+ live cross-referenced ids breaks the README never-renumber rule. Catalogue landed in §3. Deviation recorded, not hidden.
 07	1	done	47	a3746fb	artefact: packages/editor scaffold + document schema (PR #47, multi-task branch)
 07	2	done	47	a3746fb	artefact: packages/domain/src/doc-embeds.ts (PR #47)
 07	3	done	47	a3746fb	artefact: packages/editor/src/extensions/ticket-image.ts (PR #47)
