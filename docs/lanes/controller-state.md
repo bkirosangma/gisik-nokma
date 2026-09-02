@@ -11,59 +11,47 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
-## Anchors — re-measured 2026-09-02 ~04:00 IST, at `563c983` (Plan 5 merged)
+## Anchors — re-measured 2026-09-02 ~08:45 IST, at `ac187e8` (step 10 merged)
 
 | what | value |
 |---|---|
-| `main` | **`563c983`** — **STEP 9 MERGED: Plan 5, all 17 tasks, PR #67.** Docs PRs #62–#66 landed before it. Refetch; this goes stale by design |
-| last forced gate | **`563c983` + this branch's ledger edit** — `FORCED_GATE_EXIT=0` **read from `$?` on its own line**, `--force` so **0 cached**, 21/21, **1573 tests**, 24.3s, node **v22.22.2**, zero `Unsupported engine` in gate or install |
-| gate composition | domain **335** · rule-engine 280 · **server 717** · app-core 130 · editor 72 · ui 31 · sync-client 8 = **1573** (was 1277; server 461 → 717) |
-| **corroboration** | the executor's independent gate at the **branch tip** reported the same 1573 and the same per-package split. **Two different trees, same numbers** — that is what makes the squash-merge trustworthy |
-| open PRs | re-measure. Do not wait for the monitor |
-| task ledger | **88/177 (49.7%) · claimed 0 · todo 89**, quoted from `pnpm check:tasks` |
-| executor | **RESTART IN PROGRESS** — see below. Was at 60% context, step-10 recon running |
+| `main` | **`ac187e8`** — **STEP 10 (integration checkpoint) MERGED, PR #70.** Behind it: step 9 `563c983` (#67), docs `aa67ee3` (#68), `c9ab31c` (#69), ledger fix `75c3d1e` (#71). Refetch |
+| last forced gate | **`ac187e8`** — `GATE_EXIT=0` **read from `$?` on its own line, no pipe**, `--force` so **0 cached**, 21/21, **1612 tests**, 24.4s, node **v22.22.2**, zero `Unsupported engine` |
+| gate composition | domain 335 · rule-engine 280 · **server 756** · app-core 130 · editor 72 · ui 31 · sync-client 8 = **1612** (server 717 → 756: +21 round-trip, +15 contract) |
+| **corroboration** | the executor gated its own tip **three times** and reported the same 1612 and the same split. Different trees, same numbers |
+| ledger gate | **`CHECK_EXIT=0`** — read the same way. **88/177 (49.7%)**, claimed 0, todo 89 |
+| open PRs | re-measure |
+| executor | **RESTARTED** for **step 11 (Plan 6 remainder)**, fresh session, was 35% |
 
-> **MY FIRST FORCED GATE HERE WAS RED AND IT WAS MY OWN TYPO.** I ran
-> `pnpm turbo run test typecheck lint build`. **There is no `lint` task** — turbo said *"Could not find
-> task `lint` in project"*, exit 1, and I nearly reported `main` broken. **The real gate is
-> `.github/workflows/ci.yml:112` → `pnpm turbo run build test typecheck`** (plus `pnpm check:env`).
-> **The tell was the ABSENCE of a `Tasks:` line in a 4-line log.** This file already says *"read the
-> `Tasks:` line, it is the only honest signal"* — the corollary it was missing is that **a gate log with
-> no `Tasks:` line at all did not run the gate.** Never invent the gate command; read it from CI.
+## STEP 10 CLOSED — and the executor found the controller's ledger bug, not the other way round
 
-## PLAN 5 LEDGER ROWS — the widened `done` rule paid off on its first use
+**Ruling P18 discharged, and it was real.** `getEntityState('membership')` answered `null`
+unconditionally, so **every role-gated `restrict-to` edge refused everyone, an owner included.** It
+fails *closed*, so a functionality gap and never a bypass. It survived because the contract was **half
+witnessed** — only `fixtures/harness.ts` carried a roster, so fixtures were green on the side with the
+fake. **Two mutations of the new reader passed all 720 tests**: a bare `SELECT` of `proj_memberships`
+(hands back a revoked person's surviving row as a role), and collapsing every non-admin to `guest`
+(invisible, because a wrong role and a missing one refuse identically).
 
-**The PR body names only 6 of the 17 tasks** (5, 9, 9b, 10, 14, 15). Under the ORIGINAL definition —
-*a PR naming that exact plan+task* — 11 finished tasks would have been unprovable, on the very next
-merge after the audit. **Artefact evidence promoted all 16 outstanding rows mechanically**, each row
-citing the file its own `Files:` block declares.
+**The scoping in BOTH documents that set this step was wrong.** The six `applyCommitted` absences were
+not the target — five are already closed through the real door. **The real gap was one sentence:**
+*every Plan 5 read-route test seeds through `applyCommitted` and none writes through `POST /v1/events`.*
 
-**T16 is a catalogue task and was checked against the rule that refused three others, not waved through.**
-07/T16, 10/T18 and 11/T14 stay `todo` because the tasks they catalogue have not run. **Plan 5 T16's
-precondition IS met**: all 16 siblings merged in the same commit, `test-cases/07` carries 153 entries
-reaching **7.162** (late-task ids, not just early ones), and `Features.md` §7 exists. Its note records
-that basis explicitly, because the file itself was opened by T2 — so artefact presence alone would have
-been the wrong reason for the right answer.
+**Carried, owner Plan 6 (step 11):** `board.tsx` is a **live defect** — it dereferences
+`group.workflowVersion` and `card.assignee.id`/`.name`, none of which any response contains, and
+`board.tsx:94` already reads `card.assignee.name`. And **9 of 12 `DataSourceQuery` methods cannot be
+implemented over the shipped routes**, three because they take no `workspaceId` and those routes answer
+400 without it.
 
-## STEP 10 IS NEXT — the integration checkpoint, and its target is already named
+**RULING P24 — taken by the executor, standing: the SERVER's `UserPreferences` shape wins.** §6b called
+the two "informationally equivalent"; the shipped schema is `.strict()`, so Plan 6's document is
+**refused three ways, not renamed.** Reversible in one direction only while Plan 6 T10 is unexecuted.
+This closes the §6b deadline item.
 
-**The executor named it in #67 and it is the sharpest thing in that PR.** `applyCommitted` enumerates
-**six** things real ingest does that it does not: no locks, seqs from a process map rather than the
-database, no permission gate, no rule engine, no `bootstrapWorkspace`, no stream notify — **and nearly
-every read test in Plan 5 is built on it.** A read model green against it is proven correct about *rows*
-and proven nothing about whether those rows are reachable through the shipped door. The executor called
-this *"this series' signature failure, written down before it was committed."* Dispatch step 10 against
-that list.
-
-## TWO ITEMS THAT NEED A RULING, one with a deadline
-
-1. **`UserPreferences` collides — DEADLINE: before Plan 6 Task 10.** Plan 6 declares a shape
-   incompatible with Plan 5 T13's. The executor measured them **informationally equivalent**, so it is a
-   naming conflict rather than a design one. Coordination doc §6b.
-2. **The executor made a ruling and recorded it** (coordination doc §5): **a guest may not call
-   `GET /v1/workspaces/:id/members`.** The plan settles who is *hidden from* the listing and never says
-   who may *call* it — so a guest invited to one shared ticket was receiving the entire non-guest staff
-   directory. Conservative default, cheap to reverse. **Left standing unless the owner objects.**
+> **The final whole-branch review found six things and ALL SIX WERE IN THE EXECUTOR'S OWN PROSE, none
+> in its code** — a restart surface contradicting itself, a lesson naming the wrong module in four
+> places including a production docblock, and a "no coverage anywhere" claim falsified by a test that
+> exists. **Prose is not exempt from the falsifiability law, and it is the part no gate runs.**
 
 ## READ FIRST IF YOU WERE JUST LAUNCHED — the brief you hold is stale
 
