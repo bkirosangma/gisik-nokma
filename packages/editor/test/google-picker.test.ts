@@ -201,10 +201,18 @@ describe('the Google Picker path', () => {
     // in-suite, not via a bare `node -e` process outside it — the repo has
     // separately measured that vitest's `threads` pool gives a worker no
     // TZ reconfiguration at all, so evidence from a different process or
-    // pool would not carry over): `new Date(0).getHours()` reads 10 under
-    // TZ='UTC' and 15 under TZ='Asia/Kolkata' within a throwaway probe test
-    // run through this same `pnpm --filter @gisik-nokma/editor exec vitest
-    // run` invocation. So the loop is retained as a regression guard
+    // pool would not carry over): `new Date('2026-08-20T10:00:00.000Z')
+    // .getHours()` reads 10 under TZ='UTC' and 15 under TZ='Asia/Kolkata'
+    // within a throwaway probe test run through this package's own vitest
+    // config (same `vitest run`, same pool as the gate above) — not
+    // `new Date(0).getHours()` (which would read 0 / 5, per
+    // test-cases/03-foundation-ledger.md's 3.61 entry; that is a different
+    // expression than the one this package's probe actually ran). The
+    // probe itself was not kept in this file, so this claim is not
+    // re-checkable from the tree the way 3.61's own two controls are kept
+    // in-file — recorded as a gap, not fixed, since adding a permanent
+    // control test is outside this fix round's scope. So the loop is
+    // retained as a regression guard
     // against that specific reconstruction, not as evidence about the
     // correctness of the code that ships today.
     //
