@@ -17,6 +17,34 @@ import type { DriveReference } from '@gisik-nokma/domain';
  * optional tidy-up and was DECLINED here — this task touches
  * `packages/editor` only, and the collapse would edit a file this task has no
  * test coverage over.
+ *
+ * THREE SITES STILL SAY THIS TWIN DOES NOT EXIST, and each was true until
+ * `a409a2e` created it. RECORDED, NOT FIXED — the honest remedy is one
+ * reconciliation of both halves, and this task owns none of these files:
+ *
+ *   - `packages/app-core/src/views/attachment-list.tsx:21` — "**Measured
+ *     2026-09-02: `packages/editor` declares no `AttachmentListEntry`.**",
+ *     plus the conclusion at 22-23 that rests on it: "Nothing here has a twin
+ *     to move beside it, and nothing under `packages/editor` is touched from
+ *     here."
+ *   - `packages/app-core/test/views/attachment-list.test.tsx:83` — "That twin
+ *     does not exist yet."
+ *   - `Features.md:44` — "**it declares none today**".
+ *
+ * `packages/app-core/src/views/editor-slot.tsx:17` carries the same shape of
+ * sentence about a DIFFERENT type, `EditorSlotUpload`, and it is STILL TRUE:
+ * swept, no hit for that name anywhere under `packages/editor`. Naming the
+ * survivor is half the point — a reader who reads this entry and writes off
+ * all four as stale would break a claim that holds.
+ *
+ * This annotation does not stop the drift it records, and should not be read
+ * as though it does. A reader arriving cold at app-core sees only the stale
+ * measurement and edits app-core alone, which is precisely what the twin
+ * architecture exists to prevent; the only thing that would stop them is an
+ * annotation in app-core, which this task may not write. What it buys is that
+ * the reconciliation task finds this. Owner: Plan 6 Open question 13 for the
+ * two app-core sites; Task 16 for the `Features.md` sentence, which is
+ * separately owed a description of this component.
  */
 export type AttachmentListEntry =
   | { kind: 'upload'; attachmentId: string; filename: string; mime: string; size: number; sha256: string | null }

@@ -34,6 +34,23 @@ const REFERENCE: AttachmentListEntry = {
  * is not an object type, so the spread did not compile. A thrown fixture error
  * is also the only thing that would tell a later reader the fixture stopped
  * being a Drive reference, which a cast would have silently absorbed.
+ *
+ * NOT A PLAN DEFECT — `a409a2e`'s message said it was, and that is the one
+ * thing wrong here. That message blamed the plan text for the TS2698 spread
+ * failure; the paragraph above is accurate, because "here" means this file,
+ * but the commit message was not. SWEPT: the plan's step-1 test
+ * (`docs/superpowers/plans/2026-08-20-07-editor-attachments.md` lines
+ * 5344-5584) is four `it` blocks over UPLOAD, REFERENCE and FORBIDDEN — it
+ * re-dates no fixture, spreads `REFERENCE` nowhere, and contains no
+ * `as never`. The whole plan file's four `as never` hits sit at lines 760,
+ * 2375 and 5002 plus one prose false positive at 7136, none inside this range
+ * and none about `REFERENCE`. Positive control for both nulls, from the same
+ * runs: `REFERENCE` appears 5 times inside 5344-5584, so the greps were
+ * reaching content. This fixture exists only to feed the zone block below,
+ * which is itself an addition beyond the plan, so the construct that failed
+ * typecheck was this file's own first spelling. The cost of leaving that
+ * uncorrected is specific: a plan-defect ledger entry pointing at plan text
+ * that compiles sends a later reader on a search that cannot terminate.
  */
 function referenceCapturedAt(capturedAt: string): AttachmentListEntry {
   if (REFERENCE.kind !== 'drive-reference') throw new Error('REFERENCE is not a Drive reference');
