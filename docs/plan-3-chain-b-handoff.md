@@ -136,9 +136,18 @@ both. The plan's canonical refusal table is **six ids behind** what shipped.
   implementations moved in one change set: the server's, `fixtures/harness.ts`, `memory-context.ts`, and
   `contextFromCache` (`packages/app-core/src/precheck.ts`), which the previous attempt missed entirely.
   - `getEntityState('ticket')` — real in all four (cache-backed in `contextFromCache`). ALIGNED.
-  - `getEntityState('membership')` — server null (Plan 4 owes the wiring, ruling P18), harness real from its
-    fixture roster, memory-context null, precheck null. The harness is where restrict-to's 61 fixtures live;
-    the server's null is what makes `restrict-to` refuse on the server path today.
+  - `getEntityState('membership')` — **server REAL since the step-10 integration checkpoint discharged ruling
+    P18**, from `proj_memberships` through `resolveEffectiveRole`; harness real from its fixture roster,
+    memory-context null, precheck null. This line used to read "server null (Plan 4 owes the wiring)", and the
+    divergence it recorded was the defect: the harness is where restrict-to's 61 fixtures live, so the server's
+    null made `restrict-to` refuse every role-gated edge on the server path while every fixture stayed green —
+    the half-witnessed contract this document exists to enumerate. `memory-context` and `contextFromCache`
+    still answer null and are DELIBERATELY left there, checked rather than assumed: `precheckEvent`
+    (`packages/app-core/src/precheck.ts:125`) downgrades a `restrict-to` refusal to `not-evaluated` whenever
+    `needsMembership` says the edge carries a role criterion, so the client never shows a refusal it has no
+    roster to decide. The residue is that a role-gated edge is previewed in NEITHER direction on the client —
+    not refused, and not passed for the admin who would in fact be let through — which is unchanged by P18 and
+    is recorded as a decided non-gap at case 6.136.
   - `getEntityState` on the four identity-only kinds — the server answers `{kind,id}` from a head row;
     `memory-context` answers only for `'ticket-type'`, from its own inventory; the harness answers none;
     `contextFromCache` answers none. **They are not the same predicate and were deliberately not aligned onto

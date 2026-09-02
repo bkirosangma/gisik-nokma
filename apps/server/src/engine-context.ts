@@ -1,6 +1,8 @@
 import type { PoolClient } from 'pg';
-import type { EntityKind, OtherEntityState } from '@gisik-nokma/domain';
+import type { EntityKind, MembershipState, OtherEntityState } from '@gisik-nokma/domain';
+import { membershipId } from '@gisik-nokma/domain';
 import type { EngineContext } from '@gisik-nokma/rule-engine';
+import { resolveEffectiveRole } from './permissions/effective-role.js';
 import { readEntityHead } from './projections/entity-heads.js';
 import { getTicketTypeFromDb } from './projections/ticket-types.js';
 import { getChildrenStatesFromDb, getTicketStateFromDb } from './projections/tickets.js';
@@ -9,9 +11,15 @@ import { getWorkflowDefFromProjection } from './projections/workflows.js';
 /**
  * Kinds whose EntityState is exactly `{ kind, id }` today (`OtherEntityState`
  * in the domain's union). For these, a head row is enough to serve the state in
- * FULL: the entity exists, and existence is all the shape claims. `'membership'`
- * is the one remaining kind with domain fields this server cannot produce —
- * Plan 4's proj_memberships is what will change that — so it answers null.
+ * FULL: the entity exists, and existence is all the shape claims.
+ *
+ * `'membership'` is NOT one of them and never was — a `MembershipState` carries
+ * a `workspaceId`, a `userId` and a `role`, and a role is the whole reason the
+ * engine asks. It used to answer null for want of a table to read; ruling P18's
+ * wiring gives it `proj_memberships` through `readMembershipState` below, so
+ * every kind in the domain's union now has a body that reads something. Nothing
+ * remains that answers null for lack of state to serve; the nulls left in this
+ * file are all statements about the world — no such entity, not a member here.
  */
 const KINDS_WHOSE_STATE_IS_ONLY_IDENTITY: ReadonlySet<string> = new Set<OtherEntityState['kind']>([
   'workspace',
@@ -23,6 +31,107 @@ const KINDS_WHOSE_STATE_IS_ONLY_IDENTITY: ReadonlySet<string> = new Set<OtherEnt
 /** A type guard, not a boolean, so the return below needs no cast to be an EntityState. */
 function isIdentityOnlyKind(kind: EntityKind): kind is OtherEntityState['kind'] {
   return KINDS_WHOSE_STATE_IS_ONLY_IDENTITY.has(kind);
+}
+
+/**
+ * The `'membership'` half of `getEntityState`, which is controller ruling P18 —
+ * a wiring no task in Plan 4 owned, found by the step-10 integration checkpoint
+ * and closed here.
+ *
+ * ## What it was, said plainly
+ *
+ * This kind answered null unconditionally, and its only production caller is
+ * `restrict-to`'s role criterion (`packages/rule-engine/src/rules/restrict-to.ts`),
+ * which reads the answer and then asks `rule.roles.includes(membership.role)`.
+ * Null narrows that clause away, so EVERY role-gated `restrict-to` edge was
+ * refused on the server path, for everyone, always — an owner included. It fails
+ * CLOSED, so it was a functionality gap and never a way past a gate; what it
+ * cost was every workflow whose approval step is spelled as a role.
+ *
+ * It survived because the contract was half witnessed. The rule engine's own
+ * suite drives `restrict-to` against `memory-context.ts` and `fixtures/harness.ts`,
+ * both of which carry memberships, so the criterion was green on the side with
+ * the fake and untested on the side with the truth. `proj_memberships` landed in
+ * Plan 4 Task 4 and nothing read it through the engine.
+ *
+ * ## Why `resolveEffectiveRole` and not a SELECT of our own
+ *
+ * `proj_memberships` holds a workspace-scope row AND one row per project the
+ * user is on, and its own docblock is emphatic that a project-scope row is not
+ * on its own evidence that the user still belongs to the workspace:
+ * `membership.revoked` deletes the workspace row alone, because the roster rows
+ * are written by the PROJECT entity's stream and a cross-entity delete would
+ * make the table depend on arrival interleaving. The guarantee that delete was
+ * meant to give lives in `resolveEffectiveRole`'s early return instead. So that
+ * function is the audited reader and the only safe one, and a fresh
+ * `WHERE workspace_id = $1 AND user_id = $2` here would hand a revoked person's
+ * surviving roster row back to the engine as a role. `Queryable` is
+ * `Pool | PoolClient`, so the ingest transaction's own client goes in unchanged
+ * and this read sees the world as of the events committed before the one under
+ * judgement, like every other member of this context.
+ *
+ * A null `workspaceRole` means "not a member of this workspace at all", and the
+ * honest answer to "what is this person's membership" is then null — the engine
+ * refuses naming the roles the edge wanted, which is TRUE of the world rather
+ * than true of a gap in this file.
+ *
+ * ## Decoding the id, and why the decode is checked by re-encoding it
+ *
+ * `getEntityState` is handed an entity id, and a membership's is
+ * `membershipId(workspaceId, userId)` — `${workspaceId}:${userId}`
+ * (`packages/domain/src/entity-state.ts`). The pair has to be recovered from it,
+ * and a decode that is merely PLAUSIBLE is the thing to avoid: rather than
+ * reason about whether either half can contain a colon, the split is checked by
+ * re-encoding it and comparing to the input. Anything that does not round-trip
+ * is an id shaped differently than this function assumed, and the answer is
+ * null. That is cheaper than the reasoning it replaces and it stays correct if
+ * the id convention ever changes shape — it would start answering null instead
+ * of quietly resolving the wrong pair.
+ *
+ * It is reachable only from a caller that builds an id some other way:
+ * `restrict-to` builds this one with `membershipId` itself. It is a fail-closed
+ * decode, not a live refusal, and the test that pins it drives this function
+ * directly.
+ *
+ * ## Where this sits on the tenancy question the factory docblock answers
+ *
+ * Every other reader here is scoped deliberately, ruling P14, and the factory
+ * docblock says which and why. This one takes NO `TenantScope`, and does not
+ * need one: the id ENCODES its own workspace, so the lookup is already asked
+ * inside a named tenancy rather than resolved across every tenant at once — the
+ * shape that made `getWorkflowDef` and `getTicketTypeDef` need the predicate.
+ * The workspace in the id is not the actor's to choose either. `restrict-to`
+ * builds it from `env.workspaceId` and `env.actorId`, and the permission gate
+ * has already resolved the SESSION user's effective role in `env.workspaceId`
+ * and refused a non-member before the engine ran, so the workspace half is the
+ * event's own and the user half is the actor the door authenticated.
+ *
+ * The residue is worth naming rather than implying: an id naming ANOTHER
+ * workspace would resolve that workspace's membership here. Nothing in the
+ * product builds one — the only caller does not, and no payload field carries a
+ * membership id — and the answer would be a role for a pair that genuinely
+ * holds it, so it discloses nothing about the asking workspace. If a check ever
+ * does resolve a membership id off a payload, that is when this reader needs the
+ * `TenantScope` the other two carry, and this paragraph is the note saying so.
+ */
+async function readMembershipState(
+  client: PoolClient,
+  id: string,
+): Promise<MembershipState | null> {
+  const [workspaceId, userId] = id.split(':');
+  if (
+    workspaceId === undefined ||
+    userId === undefined ||
+    membershipId(workspaceId, userId) !== id
+  ) {
+    return null;
+  }
+
+  const eff = await resolveEffectiveRole(client, userId, workspaceId);
+  if (eff.workspaceRole === null) {
+    return null;
+  }
+  return { kind: 'membership', id, workspaceId, userId, role: eff.workspaceRole };
 }
 
 /**
@@ -78,6 +187,14 @@ function isIdentityOnlyKind(kind: EntityKind): kind is OtherEntityState['kind'] 
  * the event that would move one), so it is a fail-closed edge and not a
  * scenario.
  *
+ * `getEntityState('membership')` takes no scope either, and for a third reason
+ * again: the id IS the tenancy. `membershipId(workspaceId, userId)` spells the
+ * workspace into the entity id, so the lookup is already asked inside one named
+ * workspace and there is no global key for a foreign id to resolve against —
+ * which is the shape P14's predicate exists to close. The one caller builds that
+ * id from `env.workspaceId` and `env.actorId`. `readMembershipState` above
+ * carries the full argument, including the residue it does not close.
+ *
  * ## The divergence this server carries, stated rather than smoothed over
  *
  * `getEntityState` for the four identity-only kinds is a head read, and
@@ -105,10 +222,13 @@ export function createEngineContext(client: PoolClient): EngineContext {
       // membership came back satisfying restrict-to's
       // `membership.kind === 'membership'` narrowing with `role` undefined.
       //
-      // 'ticket' now answers for real, from proj_tickets. Plan 4 owns
-      // 'membership' via proj_memberships; until it lands, that kind stays null
-      // — the engine then refuses with "no such membership", which is TRUE of
-      // this server, instead of narrowing onto a role that is not there.
+      // 'ticket' now answers for real, from proj_tickets. 'membership' answers
+      // for real too, from proj_memberships through resolveEffectiveRole — that
+      // is ruling P18, and until it landed this method's null was the reason
+      // every role-gated restrict-to edge in the product was refused on the
+      // server path. Null is still what a non-member gets, and the engine still
+      // refuses them; the difference is that the sentence is now a statement
+      // about the person rather than about this file.
       //
       // 'ticket-type' is NOT on the identity-only list by accident and never
       // will be off it. Controller ruling P3 (2026-08-28) settled it: the domain
@@ -119,6 +239,32 @@ export function createEngineContext(client: PoolClient): EngineContext {
       // REJECTED alternative — the plan text still instructs it at three lines —
       // and it is not to be reached for because a comment or a brief points at
       // it.
+      if (kind === 'membership') {
+        // ANSWERED BEFORE THE HEAD READ, deliberately. proj_memberships is the
+        // single authority on what somebody is here, and a membership head row
+        // is precisely the instrument of the §9 hazard this file was written
+        // against — the head POINTER carries `kind: 'membership'`, which is what
+        // satisfied restrict-to's narrowing while `.role` was undefined. Reading
+        // it first would put that row back into the decision path as a
+        // precondition no ledger path can falsify — and it is the SECOND half of
+        // that sentence that carries it, so both halves are spelled out rather
+        // than left to one clause. "A membership with no head" is not reachable
+        // at all: heads are never deleted (`projections/entity-heads.ts` is an
+        // upsert and nothing else), and no event writes `proj_memberships`
+        // without writing the head in the same ingest transaction. A head gate
+        // would therefore be a condition that is TRUE for every membership the
+        // ledger can produce — a check that cannot fail, sitting in an
+        // authorisation path.
+        //
+        // "A head with no membership" is a different matter and is NOT the
+        // hand-planted-only case an earlier draft of this comment claimed. It is
+        // ordinary: grant then revoke reaches it through the ledger, because
+        // `membership.revoked` deletes the workspace-scope row and leaves the
+        // head standing at `membership.revoked`. Which is the point restated —
+        // for a revoked person a head gate would pass and decide nothing, and
+        // `resolveEffectiveRole` is what answers.
+        return await readMembershipState(client, id);
+      }
       const head = await readEntityHead(client, kind, id);
       if (head === null) {
         return null;
