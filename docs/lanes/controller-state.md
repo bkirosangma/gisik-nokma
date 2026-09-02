@@ -269,6 +269,43 @@ minute's reading; a false negative costs the defect this pass exists to find.
 **Do NOT let the post-commit hook satisfy this.** The hook is AST-only whole-repo — it keeps the
 structural graph fresh and produces **zero** inferred edges. Freshness is not the same capability.
 
+### SCHEDULED — code-comment cleanup pass, BEFORE PLAN 11 STARTS (owner request 2026-09-03)
+
+**Goal:** cross-cutting quality pass, not a plan task — apply `CODING_STANDARDS.md`'s own rule
+retroactively across shipped code. **This is a tightening pass, not a stripping pass** — see the caveat
+below before anyone runs it as a blind mechanical sweep.
+
+| | |
+|---|---|
+| **TRIGGER** | after Plan 10 (offline-sync-apps) merges — every application package/app (`packages/*`, `apps/server`, `apps/web`, `apps/desktop`, `apps/mobile`) is complete and stable; before Plan 11 (deployment/dogfooding) starts |
+| **SCOPE** | inline code comments and docblocks across `packages/*` and `apps/*`. **NOT** the plan documents, commit messages, or this file / `executor-state.md` — those serve a different audience and function, and this series already has a separate falsifiability rule for prose. **NOT** `reference/` (frozen) |
+| **NOT a ledger task** | deliberately kept outside the 177-task denominator, same reasoning as the semantic-extraction pass above — inserting it into Plan 11's numbered tasks would mean editing a locked plan document and risks the same renumbering hazard this series repeatedly guards against elsewhere |
+
+**WHY THIS TIMING, not earlier and not at the very end:**
+1. **Not now** — 60+ of the remaining tasks are client-side code that doesn't exist yet (same reason the
+   semantic pass above waits). Cleaning comments now means redoing it after every later plan's new files.
+2. **Not after Plan 11** — Plan 11 is deployment/dogfooding: Dockerfiles, the DO spec, seed scripts. Lower
+   comment-density than the application code, and delays the actual benefit (easier review) for the whole
+   rest of the series for comparatively little gain.
+3. **Right before Plan 11** — every application package is done and stable by then, so one pass covers
+   everything that actually accumulated the verbose-comment style this series is known for, and Plan 11's
+   own new files get written directly in the cleaned convention. No second pass needed for them.
+
+**⚠ CAUTION, because a blind pass here would do real damage.** A large share of this codebase's verbose
+comments are genuinely WHY-explaining — hidden constraints, workarounds, "this test's TZ loop cannot fail
+and here is why" — exactly what `CODING_STANDARDS.md` says to *keep*. Several of this series' real defects
+(the TZ-invariant test, the env-gate scanner's raw-vs-stripped mismatch, the database-timezone triple
+redundancy) were caught by someone reading precisely this kind of comment. **The job is tightening
+legitimate rationale for readability, not deleting it** — stripping WHY-comments in the name of brevity
+would remove the exact signal this series has repeatedly relied on. A blanket "shorter is better" pass is
+explicitly the wrong shape.
+
+**Exact scope left to a dedicated planning pass at trigger time, not decided here:** whether this touches
+test-file comments (planted-defect docblocks are load-bearing, not decorative) and the extensive rationale
+comments in shared low-level utilities (e.g. `ist-day.ts`'s "no dependencies, and that is not an accident
+of style") that this series has used as documentation. Run `superpowers:writing-plans` or equivalent when
+the trigger fires rather than pre-committing task-by-task now.
+
 ### The cheap scan that replaces graphifying the plans
 
 **Do NOT graphify the 13 plan documents to hunt cross-plan contract collisions.** A targeted scan does it
