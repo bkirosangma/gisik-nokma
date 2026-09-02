@@ -97,9 +97,39 @@ commit. Re-ask the ruling; do not re-earn it.
 
 | Task | What | State |
 |---|---|---|
-| T5 | Domain gap guards — `IngestResult`, `docToPlainText`, `blocked`, `cause` | **DONE — no code.** All four guards were already present AND each has a check that would notice its removal. Cited in the ledger note and the commit. |
-| T8 | Online stream — WS subscribe, reconnect, `afterSeq` | **IN FLIGHT** — implementer + reviewer running. **Both `StreamItem` drifts CLOSED in the working tree** (`scope-revoked` added; the event member moved to `LedgerEvent`), with `apps/server`'s two client-contract cases rewritten to pin the agreement. `error.code` (bare `string` vs `StreamErrorCode`) is the one stream divergence left open. |
-| T7 | Online DataSource — HTTP client, mappers, ingest | **todo** — owns finding 1 and 3. Two of its four blocked mappers are HELD on P25. |
+| T5 | Domain gap guards | **DONE, no code.** All four guards present, each with a check that notices removal. |
+| T8 | Online stream | **DONE.** `online/stream.ts`, 26 cases. `StreamItem` widened to five members, event member carries `LedgerEvent`. |
+| T7 | Online DataSource + P25's one approved route change | **DONE.** `online/{http,mappers,online-data-source,index}.ts`. **6/12 methods answer, 6 refuse by name.** |
+| T10 | List view | **NEXT.** Bound by ruling P24. Its `getTickets` REFUSES — build the view against the fake, as T9 did. |
+| T11, T12, T12a, T13 | My Work / ticket sheet / attachments / reopen flow | **todo.** T11's `getMyWork`+`getAttention` and T12's `getTicket` also refuse. |
+| T14 | `apps/web` Next.js shell | **todo** — the thing Plans 8 and 9 wait on. Its pages need T10–T12; its shell does not. |
+| T15, T15b, T16 | invite + doors + catalogue | **todo** |
+
+### WHAT "REFUSES" MEANS FOR T10–T13, so a restart does not read it as blocked
+
+Six `DataSourceQuery` methods throw a `ServingGapError` rather than invent a fact. **The views are still
+buildable and testable** — they take view types as props and are proven against
+`test/helpers/fake-data-source.ts`, exactly as T9's board was. The refusal bites only at runtime with
+the ONLINE source, and each one is pinned by a server-side cross-check in
+`apps/server/test/integration/client-contract.test.ts` that goes RED the day the route starts serving
+the field. Build the views. Do not weaken the refusals to make a view light up.
+
+### Gate at the T7 commit, measured at the tree reported
+
+**exit 0 · 21/21 · 0 cached · 1711 tests · Node v22.22.2 · 0 engine warnings.**
+domain 335 · rule-engine 280 · **server 761** · **app-core 224** · editor 72 · ui 31 · sync-client 8.
+Decomposes from main's 1612: app-core 130 → 224 (+94, of which 26 are T8's stream), server 756 → 761
+(+5, the client-contract cross-checks). Every other package byte-identical.
+
+### RECORDED FOR STEP 12 (Plan 7), from the controller's structural scan — not mine to fix
+
+- **`EditorSlotProps`**: Plan 6 declares `doc: unknown`, Plan 7 `doc: DocJson | null`.
+- **`AttachmentListEntry`**: Plan 6 inlines the drive-reference fields, Plan 7 uses `& DriveReference`.
+- **`EditorSlotUpload` was a FALSE POSITIVE** — identical fields, different line breaks. Named here so
+  nobody re-finds it.
+
+Both real ones are the "one contract written twice" seam Plan 6's Open questions 13 and 15 describe:
+edit both or neither. **Owner: step 12.**
 
 ### RECORDED FOR TASK 16, not fixed — the catalogue lives in §3, and Task 16's own text says §8
 
