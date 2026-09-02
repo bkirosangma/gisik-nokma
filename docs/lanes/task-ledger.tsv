@@ -131,10 +131,10 @@ plan	task	status	pr	merge_sha	note
 07	10	in-flight	-	-	exec/12-plan7-remainder; 
 07	11	in-flight	-	-	exec/12-plan7-remainder; 
 07	11a	in-flight	-	-	exec/12-plan7-remainder; 
-07	12	todo	-	-	
-07	12a	todo	-	-	
-07	12b	todo	-	-	
-07	12c	todo	-	-	
+07	12	in-flight	-	-	exec/12-plan7-remainder; 
+07	12a	in-flight	-	-	exec/12-plan7-remainder; 
+07	12b	in-flight	-	-	exec/12-plan7-remainder; 
+07	12c	in-flight	-	-	exec/12-plan7-remainder; 
 07	13	todo	-	-	
 07	13a	todo	-	-	
 07	14	todo	-	-	

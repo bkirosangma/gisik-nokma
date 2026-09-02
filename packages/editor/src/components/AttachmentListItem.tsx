@@ -18,33 +18,34 @@ import type { DriveReference } from '@gisik-nokma/domain';
  * `packages/editor` only, and the collapse would edit a file this task has no
  * test coverage over.
  *
- * THREE SITES STILL SAY THIS TWIN DOES NOT EXIST, and each was true until
- * `a409a2e` created it. RECORDED, NOT FIXED — the honest remedy is one
- * reconciliation of both halves, and this task owns none of these files:
+ * THREE SITES SAID THIS TWIN DID NOT EXIST, and each was true until this
+ * declaration was created. **Two are now closed; one remains.**
  *
- *   - `packages/app-core/src/views/attachment-list.tsx:21` — "**Measured
- *     2026-09-02: `packages/editor` declares no `AttachmentListEntry`.**",
- *     plus the conclusion at 22-23 that rests on it: "Nothing here has a twin
- *     to move beside it, and nothing under `packages/editor` is touched from
- *     here."
- *   - `packages/app-core/test/views/attachment-list.test.tsx:83` — "That twin
- *     does not exist yet."
- *   - `Features.md:44` — "**it declares none today**".
+ *   - `packages/app-core/src/views/attachment-list.tsx` — CLOSED. Its docblock
+ *     now names this file as the twin, and re-states the still-true
+ *     `EditorSlotUpload` sentence so the correction is not over-applied.
+ *   - `packages/app-core/test/views/attachment-list.test.tsx` — CLOSED, with
+ *     its assertion deliberately left comparing against the DOMAIN shape
+ *     rather than importing this package: app-core depending on
+ *     `packages/editor` is the thing the twin arrangement exists to avoid.
+ *   - `Features.md:44` — **STILL OPEN**: "**it declares none today**".
+ *     **Owner: Task 16**, which is separately owed a description of this
+ *     component and is the task that touches the catalogue.
  *
  * `packages/app-core/src/views/editor-slot.tsx:17` carries the same shape of
  * sentence about a DIFFERENT type, `EditorSlotUpload`, and it is STILL TRUE:
- * swept, no hit for that name anywhere under `packages/editor`. Naming the
- * survivor is half the point — a reader who reads this entry and writes off
- * all four as stale would break a claim that holds.
+ * swept at the closing commit, `packages/editor` contains no `type`,
+ * `interface` or `const` of that name — only prose mentions, this one included.
+ * Naming the survivor is half the point: a reader who sees the two corrections
+ * above and writes off every sentence of that shape would break a claim that
+ * holds.
  *
- * This annotation does not stop the drift it records, and should not be read
- * as though it does. A reader arriving cold at app-core sees only the stale
- * measurement and edits app-core alone, which is precisely what the twin
- * architecture exists to prevent; the only thing that would stop them is an
- * annotation in app-core, which this task may not write. What it buys is that
- * the reconciliation task finds this. Owner: Plan 6 Open question 13 for the
- * two app-core sites; Task 16 for the `Features.md` sentence, which is
- * separately owed a description of this component.
+ * The two app-core sites were closed by the step owner rather than by this
+ * task, which is scoped to `packages/editor` and correctly refused to reach
+ * into another package. The refusal is why they were found — an annotation
+ * naming its own blind spot is what made the blind spot actionable. But an
+ * annotation on this side cannot reach a reader who arrives cold at app-core
+ * and edits app-core alone, so recording it was never going to be sufficient.
  */
 export type AttachmentListEntry =
   | { kind: 'upload'; attachmentId: string; filename: string; mime: string; size: number; sha256: string | null }

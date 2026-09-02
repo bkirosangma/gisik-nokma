@@ -222,9 +222,81 @@ refusal, the position of a gate loop, and the one ceiling named in Global Constr
 escalation policy is doing real work** — T10 was not on the brief's floor list, and its reviewer
 found the step's most dangerous unfalsifiable check.
 
+## BATCH C — T12, T12a, T12b, T12c. All committed.
+
+| Task | Result |
+|---|---|
+| **T12** `TicketEditor`, paste/drop, wrap menu *(reviewer opus)* | **DONE**, +10 tests. Two Important, **both confirmed by the reviewer actually RUNNING the mutation rather than reasoning about it.** (1) The ordering contract in the commit's own headline — `attachment.added` before any node — **was unproven on the image branch**: hoisting the node insertion above the `await` survived all ten tests, because the call-order recorder never recorded node insertion. (2) **No test asserted any attribute of the inserted node.** `attachmentId` could be replaced with a hard-coded literal and all ten stayed green — and `attachmentId` is the load-bearing link layer 3 refuses foreign ids on. Layer 2 would have emitted a node pointing at an attachment that does not exist, with nothing in the package noticing. |
+| **T12a** Google Picker *(Drive references)* | **DONE**, +12 tests. Two Important, and **the first is a correction to an instruction I wrote** — see the `TZ` rule above. |
+| **T12b** honest rendering *(opus/opus)* | **DONE**, +10 tests. Two Important, both about prose. One is the seam closure below. |
+| **T12c** a Drive image is never an inline image *(reviewer opus)* | **DONE**, +4 tests. Two Important: a **false and internally impossible test-count reconciliation** in the commit message (it asserted "139 (was 138; +4)", and 138+4≠139), and the mime-check discrimination the task was explicitly told to state was only given for the server case. |
+
+**Three fix rounds needed a SECOND commit to correct an error the fix itself introduced**
+(`7f9afc0`, `edf8f22`, `c330dcd`). That is now six instances in this step. The pattern is not
+occasional; it is the norm, and it is the argument for the fix round being reviewed rather than
+trusted.
+
+### The twin-declaration seam: closed here, by the step owner, because its recorded owner did not exist
+
+Task 12b created `AttachmentListEntry` in `packages/editor/src/components/AttachmentListItem.tsx:49`
+— the twin Plan 6 Open question 13 promised. **That falsified a dated measurement in three places**,
+each true when written. Task 12b, correctly scoped to `packages/editor`, refused to reach into
+another package and instead **wrote an annotation naming all three sites, naming its own blind
+spot** (*"an annotation on this side cannot reach a reader who arrives cold at app-core"*), and
+assigning owners.
+
+**It assigned two of them to "Plan 6 Open question 13" — and Plan 6 closed at step 11.** That owner
+does not exist, so the sites would have shipped false. Closed here:
+
+- `packages/app-core/src/views/attachment-list.tsx` — **CLOSED**, now names the twin.
+- `packages/app-core/test/views/attachment-list.test.tsx` — **CLOSED**. Its assertion is deliberately
+  left comparing against the DOMAIN shape rather than importing `packages/editor`: app-core
+  depending on the editor package is precisely what the twin arrangement exists to avoid.
+- **`Features.md:44` — STILL OPEN.** *"it declares none today"*. **Owner: Task 16**, which touches
+  the catalogue anyway and is separately owed a description of this component.
+
+**The survivor matters as much as the corrections.** `packages/app-core/src/views/editor-slot.tsx:17`
+carries a sentence of exactly the same shape about `EditorSlotUpload`, and **that one is still
+true** — swept at the closing commit with the right predicate (`type`/`interface`/`const`, not bare
+mention): `packages/editor` contains **zero declarations** of that name and only two prose mentions,
+one of which is the annotation making the claim. A reader who sees two corrections of a sentence
+shape and writes off the third would break a claim that holds.
+
+**The transferable lesson: a scope refusal that names its own blind spot is what made this
+actionable, and an annotation is not a fix.** Task 12b did the right thing and said so plainly. The
+failure would have been the owner assignment quietly pointing at a closed plan — which is the
+`a63b326` lesson (*a pointer from a correct document to a stale one reverses*) in its owner-field
+form. **Check that a recorded owner still exists.**
+
+### The env gate went RED on a file for saying it reads no environment
+
+`check:env` failed after Batch C, naming `CANCEL` and `PICKED` as *"config vars read by code but
+undocumented in `.env.example`"*. **Neither is an environment variable.** They are members of the
+Google Picker `Action` enum in a TypeScript type declaration:
+`Action: { PICKED: string; CANCEL: string }`.
+
+The scanner admits a file to detectors D2/D3 with `if (!/process\.env|ProcessEnv/.test(source))`,
+testing the **raw source including comments**, then runs the detectors on
+`withoutCommentLines(source)`. `google-picker.ts` was admitted **on the strength of a docblock
+sentence reading *"never read from `process.env` in here"*** — a sentence asserting the file does
+**not** touch the environment — after which D3 read the two type members as config keys.
+
+**The tempting fix was to reword that sentence**, which is one word, touches only this step's file,
+and turns the gate green. It was refused: it deletes a true and useful sentence to satisfy a check,
+and leaves the defect armed for the next file that mentions `process.env` in prose. **The scanner
+was fixed instead** — the gate now tests `code`, so the admission test and the detectors read the
+same text. D1 is deliberately left on raw `source`: a commented-out `process.env.FOO` still names a
+variable someone meant to read.
+
+**Proven, with the controls in the same run**: clean at exit 0 (41 documented / 19 referenced); a
+planted `process.env.GN_PROBE_UNDOCUMENTED` is still caught (exit 1, then restored and verified with
+`git diff`); D2 still reports the `OBJECT_STORE_*` destructuring and D3 still reports
+`HOST`/`PORT`/`LOG_LEVEL`. **All three detectors demonstrably survive the fix.**
+
 ## IN FLIGHT
 
-**Nothing.** Batch C (T12, T12a, T12b, T12c) is next. No open PR for this step.
+**Nothing.** Batch D — **T13, T13a, T14, T15** — is next, then **T16** closes.
+No open PR for this step.
 
 ## RULINGS OPEN
 
@@ -254,10 +326,18 @@ found the step's most dangerous unfalsifiable check.
 - **"X appears nowhere" needs file-by-file enumeration or a second sweep, and every null prints a
   positive control from the same run.** Six silent-empty modes are recorded on this machine and all
   produce well-formed wrong answers rather than errors.
-- **Any clock-sensitive assertion must vary `TZ` explicitly.** Zero of the pre-step-11 test files
-  varied it; `packages/domain/test/ist-day.test.ts` therefore cannot distinguish *the code computes
-  IST correctly* from *the machine is already in IST*. `attachment.added` carries `capturedAt` and
-  Task 12b dates a last-seen observation — both are clock-sensitive surfaces.
+- **Any clock-sensitive assertion must vary `TZ` explicitly — AND the thing under test must
+  actually be TZ-sensitive, or the variance is theatre.** Zero of the pre-step-11 test files varied
+  `TZ`; `packages/domain/test/ist-day.test.ts` therefore cannot distinguish *the code computes IST
+  correctly* from *the machine is already in IST*. **But Task 12a proved the rule can be satisfied
+  vacuously, and it was my prompt that induced it.** Its test looped two timezones and asserted the
+  same ISO string came out both times — which is guaranteed by ECMA-262 regardless of the code
+  under test, because `Date.prototype.toISOString()` is TZ-invariant *by specification*. The loop
+  ran, `TZ` genuinely changed, and the assertion could not fail. **A TZ loop around a TZ-invariant
+  function is a check that cannot fail wearing the costume of the rule that forbids them.** Before
+  wrapping a TZ loop around anything, name the local-time accessor (`getDate`, `getMonth`,
+  `getHours`, `toLocaleString`, …) whose behaviour the loop is supposed to expose; if there isn't
+  one, the loop proves nothing and should be replaced by a test of what actually varies.
 - **A partial-implementation marker enumerates the absences, not the partiality.**
 - **The instinct to fix what you find is the one that hides compounds.** Anything outside a task's
   scope gets **recorded with a named owner**, not fixed.

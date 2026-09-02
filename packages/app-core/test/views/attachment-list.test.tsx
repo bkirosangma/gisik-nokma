@@ -80,9 +80,15 @@ describe('3.76 AttachmentList', () => {
  *
  * Plan 6 Open question 13 says `packages/editor` declares this union
  * identically, so app-core never depends on the editor package and structural
- * typing joins the two. That twin does not exist yet — `packages/editor`
- * publishes `DocJson`, the schema builder, `TicketImage` and the mention
- * extensions, and no `AttachmentListEntry` at all.
+ * typing joins the two. This comment used to say that twin did not exist yet,
+ * which was true when written; **Plan 7 Task 12b created it at
+ * `packages/editor/src/components/AttachmentListItem.tsx:49`.** The two
+ * declarations now move together or not at all.
+ *
+ * The assertion below is deliberately NOT rewritten to import the editor's
+ * copy and compare them. app-core depending on `packages/editor` is exactly
+ * what the twin arrangement exists to avoid, so the check stays where it was:
+ * against the domain's own shape, which both twins are spelled from.
  *
  * What CAN be checked today is the claim the divergence report rests on: Plan 7
  * writes the reference arm as `{kind, attachmentId} & DriveReference`, and
