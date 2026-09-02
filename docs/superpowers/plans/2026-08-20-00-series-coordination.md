@@ -5750,3 +5750,120 @@ Client-side, `version` is not lost: it belongs on the client's cache envelope, n
 server-owned document whose shape the server already versions by refusing unknown keys. The
 per-project asymmetry is the one thing an adapter must handle explicitly — a project missing from
 `grouping` surfaces as *not set*, never as a default wearing a user's authority.
+
+## Step 11 (Plan 6 remainder) — the `DataSource` register, re-derived, and RULING REQUEST P25
+
+**Status: RULING REQUESTED, not taken.** The executor proceeds on the conservative default stated at
+the end of this section and will reverse if the owner rules otherwise. Everything above the ruling is
+measurement; the ruling is the only judgement.
+
+### Why this was re-derived rather than inherited
+
+Step 10 measured "9 of 12 `DataSourceQuery` methods cannot be implemented over the shipped routes"
+and **named that sort as the claim it was least sure of.** It was re-derived from the files by an
+agent given the count as a claim to check rather than as input. The count reproduces exactly — **3
+adaptable, 9 blocked, denominator 12 counted from the `DataSourceQuery` interface body at
+`packages/app-core/src/data-source.ts:36-47`** — and the sort moves:
+
+| | step 10 | re-derived |
+|---|---|---|
+| adaptable | 3 | 3 — `getMembers`, `getTicketHistory`, `getWorkflowDef` |
+| **signature** | 3 (`getMyWork`, `getPreferences`, `putPreferences`) | **2** — `getPreferences`, `putPreferences` |
+| **serving** | not separated | **6** — `getMyWorkspaces`, `getBoard`, `getTickets`, `getTicket`, `search`, `getAttention` |
+| **data** | not separated | **1** — `getMyWork` |
+
+The disagreement is not about facts. `getMyWork` is blocked BOTH ways — it cannot form its request
+(no `workspaceId`) **and** its `inTransit` member is structurally unservable. Step 10 reported the
+signature half; the re-derivation reports the severest half. **Both readings are true of the same
+method**, which is why a register that reports one label per method must say which ordering it used.
+This one uses data > serving > signature.
+
+### The six serving gaps, each with the thing the server already holds
+
+A **serving** gap is a fact the server has and does not put on the wire. Every row below cites where
+the fact lives, because a serving claim with no such citation is a data gap wearing a cheaper label.
+
+| Method | Missing | Where the server already holds it |
+|---|---|---|
+| `getMyWorkspaces` | `WorkspaceRef.projects` | `proj_projects` (`migrations/1787961500000_proj-projects.sql`), queryable per workspace, never joined at `routes/workspaces.ts:149-165` |
+| `getBoard` | `BoardGroup.workflowVersion` | `PublishedWorkflowDef.version`, already in the `defs` Map built at `routes/board.ts:102-106` and dropped when columns are pushed at `:123-135` |
+| `getTickets` | `typeRank`, `epicId`, `stateName`, `hasRestrictedParent`, `assignedProvenance` | `proj_ticket_types.rank`; `epicAncestors` (`routes/list.ts:369-428`, docblock from `:305`) already computes the epic and uses it only as a group key; workflow defs already fetched at `:233-247` carry state names |
+| `getTicket` | `title`, `stateProvenance`, a real `TicketState` | the route answers a raw `proj_visibility` row (`routes/tickets.ts:56-64`); `proj_tickets` exists and its siblings `board.ts`/`list.ts` already read it through `read/ticket-cards.ts` |
+| `search` | `SearchHit.matchedIn` | `proj_search` stores `title`/`description`/`comments` as three independently weighted columns; `routes/search.ts:142-146` concatenates them before one `ts_headline`, so which matched is destroyed in the query, not absent from the store |
+| `getAttention` | the `contested` item kind | `proj_contested` (`migrations/1787961400000_proj-contested.sql`) holds ticket, claimant, rule, reason, timestamp |
+
+**One row is contested by its own deriver and is recorded as contested rather than resolved.**
+`getTickets`' `assignedProvenance` was called *serving* by analogy to `read/state-provenance.ts`,
+which reconstructs state provenance with a `DISTINCT ON` over the raw `events` table. But
+`packages/domain/src/read-models.ts` says in as many words that `proj_tickets.assignee_id` is a bare
+column with no provenance beside it and **the projection does not hold the difference either** — a
+deliberate note, not silence. If that note is the codebase's position rather than a not-yet, the
+honest label is *data* and `getTickets` rises a rank. **Unresolved, and it is the single least-safe
+cell in the table.**
+
+### What is NOT a gap, and would have become one
+
+Three things read as gaps and are not, and each would have cost a wrong route change:
+
+1. **`BoardCard.assignee`.** The server sends `assigneeId` and no name; `Actor` requires one. But
+   `getMembers` is *adaptable* and answers `{id, name}` for the whole workspace, and the board body
+   carries `workspaceId`. The name is a **client-side join over a shipped route** — no server change.
+2. **`BoardView.groups`.** The server returns flat `columns[]`, each already carrying `workflowId`.
+   Grouping is a pure client mapping; Plan 6's Open question 10 settled this in 2026-08-27 and the
+   flat shape is what it settled ON.
+3. **`inTransit`.** `routes/my-work.ts:91-101` states that claims in transit live in the replica's
+   outbox and are "never served from a server that by definition has not received them." **The web
+   client is online-only (Plan 6 §5): it has no outbox, so `inTransit: []` is not a degradation, it
+   is the true answer**, and the test that pins it must say *because there is no outbox*, never
+   *because the read returned nothing*.
+
+### What legitimately DEFERS, with an owner that still has tasks
+
+`contested`, in both `getAttention` and `getMyWork`. `routes/attention.ts:150` and
+`routes/my-work.ts:91` each open a docblock section naming **Plan 10** as its owner in a docblock headed `EXTENSION POINT
+(Plan 10)`, and both were written that way deliberately — `AttentionItem` is a discriminated union
+and `MyWorkResponse` nests under `groups` precisely so the fourth arm arrives additively. **Plan 10
+has 13 tasks outstanding, so this deferral has a live owner.** It is the only one here that does.
+
+### THE RULING REQUEST — and why "record it with a named owner" does not work this time
+
+The standing rule is that a finding outside the current scope is **recorded with a named owner, not
+fixed.** Applied here it names Plan 5 for all six serving gaps. **Plan 5 is 17/17 done and merged. It
+has no task left to carry them.** A gap recorded against an owner with no remaining tasks is not
+deferred; it is dropped, quietly, by a rule whose whole purpose is to prevent exactly that.
+
+And the alternative to fixing them is worse than it looks. Plan 6's adaptation rule confines all
+adaptation to `packages/app-core/src/online/` and forbids moving view types or `DataSource`
+signatures. Under that rule a mapper facing a serving gap has exactly two moves, and **both are the
+failure this series is named for:**
+
+- **invent the fact.** `workflowVersion` is the sharp case. A mapper could fetch the workflow def and
+  read its version — but `getWorkflowDef` is latest-by-default, and `workflowVersion` exists, in
+  Plan 6's own words, so that "a v2 state remap shows rather than hides." Filling it with *latest*
+  hides precisely what the field was added to show. A plausible number in the honest field is worse
+  than an absent one.
+- **widen the view type to admit absence.** That degrades a guarantee the plan names as load-bearing,
+  in the client, permanently, to accommodate a route that could serve it in one line.
+
+**Proposed ruling P25, three clauses, conservative in the direction of the server holding the fact:**
+
+1. **Serving gaps are closed in the SERVER, inside step 11**, one route change each, each with a test
+   through the real door. Not because Plan 6 owns `apps/server`, but because the fact is already in
+   the database, the client cannot honestly synthesise it, and no other plan has a task that will.
+2. **Signature gaps are closed in the CLIENT.** `getPreferences`/`putPreferences` cannot form their
+   request at all, so there is no server-side reading of the problem. This extends **ruling P24** —
+   already taken, that the shipped `.strict()` preferences document wins over Plan 6's — from the
+   document's shape to the method's signature, which is the same argument one layer out.
+   `getMyWork` takes a `workspaceId` for the same reason.
+3. **The one data gap is answered honestly, not filled.** `inTransit: []` for the online source, with
+   the reason in the assertion. `contested` defers to Plan 10, named above.
+
+**The executor proceeds on this default** and does the unblocked work first — Plan 6 T8's stream
+widening, which needs no ruling because the server already sends both missing things, and T7's
+transport and the three adaptable mappers. If the owner rules that `apps/server` is out of step 11's
+scope, clause 1 becomes a new step and Plan 6's view tasks wait for it; nothing done under clauses 2
+and 3 is wasted either way.
+
+**Least sure, stated so a reader with limited budget knows where to aim it:** the `assignedProvenance`
+cell above, and after it, whether `search`'s `matchedIn` is worth a query change at all — it is the
+only serving gap whose consuming view is not among Plan 6's twelve remaining tasks.
