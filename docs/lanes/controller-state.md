@@ -635,6 +635,118 @@ depended on an unchecked assumption, shipped one hour after that rule was writte
 
 ## Standing owner rulings currently in force
 
+- **RULING P26 (2026-09-02) — `SavedFilter`'s field is `filterSpec`. Plan 9 Task 13's `spec` is
+  SUPERSEDED before it is written.** *(Written here because the executor received P26 as a message and
+  correctly reported it had "a number, a subject, and no text" — a ruling that lives only in a pane does
+  not survive either session's restart. That is the second time in one day.)*
+  - **Three spellings of one field exist.** `packages/domain/src/preferences.ts:28` → **`filterSpec`**,
+    shipped, schema is `.strict()`. `packages/app-core/src/view-types.ts:183` → `filter`, shipped.
+    **Plan 9 Task 13 → `spec`, not yet built, 48 mentions.**
+  - **SCOPE, stated precisely because the first version of this was too wide.** The first two are **NOT
+    new**: they are one of P24's "three renames", and `client-contract.test.ts:605` already pins them —
+    *"the client's document is REFUSED whole — `.strict()` turns three renames into one 400."* **That
+    half is closed and is not reopened here.** What is new is only Plan 9's third spelling.
+  - **Plan 9 T13 is not disagreeing — it does not know.** Measured against its own text: **zero**
+    mentions of `filterSpec`, **zero** of `preferencesDocSchema`, **zero** of `Plan 5`.
+  - **The ruling needs no new argument:** a `.strict()` schema REFUSES a third spelling rather than
+    renaming it. `filterSpec` wins; Plan 9 T13 adopts it. P24's logic, a plan P24 never looked at.
+  - **Also recorded, owner step 12 (Plan 7):** `EditorSlotProps` differs (Plan 6 `doc: unknown` vs
+    Plan 7 `doc: DocJson | null`) and `AttachmentListEntry` differs structurally (Plan 6 inlines the
+    drive-reference fields, Plan 7 uses `& DriveReference`). **`EditorSlotUpload` was a FALSE POSITIVE**
+    — identical fields, different line breaks — named so nobody re-finds it.
+
+## QUOTA IS THE BINDING CONSTRAINT, NOT TIME — measured 2026-09-02
+
+**Measured, not estimated:** weekly went 1% → 33% between 03:27 and 14:20, i.e. **2.94 percentage points
+per hour across BOTH sessions**. 67% remaining ≈ **23 hours of work**, against **112 hours** until the
+stated reset. **We exhaust the week's allowance in about a day and then idle for ~3.7 days.**
+
+- **Step 11's pace is 48 min/task** (7 tasks in 5.6h), against Plan 5's 31. **UI work is genuinely
+  slower and 60 of the 89 remaining tasks are client-side — plan against 48.**
+- This weekly buys roughly **28 more tasks**. All 89 need ~3 weekly cycles; 73 (excluding Plan 11) ~2.6.
+- **A CONTROLLER ESTIMATE OF "4–6 DAYS" WAS GIVEN EARLIER AND WAS WRONG.** It measured throughput and
+  **ignored quota entirely.** Time was never the constraint. Correct form: 4–6 days *of permitted
+  execution*, spread across ~3 weekly windows.
+- **⚠ The reset semantics do not match the label.** The status line says *"resets mon 6:30am"*, but
+  weekly was observed dropping **62% → 1% overnight Tue→Wed**, which no Monday reset explains. That is
+  consistent with a ROLLING window. If it rolls, capacity replenishes continuously and the outlook is
+  materially better than the figures above, which assume hard cliffs. **Unresolved — do not present
+  either reading as settled.**
+
+## ⚠ THE CONTROLLER LOOP RUNS ON SONNET FROM THE NEXT RESTART — owner ruling 2026-09-02
+
+**This AMENDS the standing ruling** at coordination doc §"Lane controllers / orchestrators | Opus 5"
+(owner amendment 2026-08-28). **The loop is Sonnet. Rulings escalate to Opus.**
+
+### THE DESIGN PROBLEM, stated first because it is the whole difficulty
+
+**A session cannot reliably detect that it is out of its depth.** Every judgment call this role got
+right on 2026-09-02 had the same shape: *something passed every check and was still wrong* — a ledger
+audit where **both instruments said promote and the right answer was refuse**; an escalation answered
+against the nearest claim rather than the claim actually made; a graph whose numbers silently
+invalidated documentation written 40 minutes earlier. **None was flagged by a tool, and a session that
+could spot them by feel would not need the rule.**
+
+**So the triggers below are SYNTACTIC. They are things a session can detect by looking, not by
+judging.** Do not replace them with "escalate when it seems subtle" — that is the version that erodes.
+
+### STOP AND HAND TO THE OWNER FOR AN OPUS SESSION when ANY of these is true
+
+1. **A ruling is requested or needed** — the executor's PR, handoff or pane contains `escalat`,
+   `ruling`, `P2x`, or an explicit open question addressed to the controller.
+2. **A `task-ledger.tsv` STATUS would change** — any `todo`/`claimed` → `done`, or any demotion.
+   Promotion is the single act with the worst failure mode and the least loud failure.
+3. **Two documents on `main` disagree about the same fact**, or a document contradicts a measurement.
+4. **The gate is RED** — but FIRST check the log has a `Tasks:` line. **No `Tasks:` line means the gate
+   did not run and it is a command error, not an escalation** (this cost a false alarm on 2026-09-02).
+5. **The executor's report and the controller's own measurement disagree** about any number.
+6. **A controller PR would touch anything outside `docs/`** — this already goes to the owner.
+7. **NO WRITTEN PROCEDURE COVERS WHAT YOU ARE ABOUT TO DO.** This is the load-bearing one, because it
+   converts *"know when you are out of your depth"* — which is unreliable — into *"check whether a
+   procedure exists"*, which is checkable. **Never invent a procedure. The absence of one IS the
+   trigger.**
+
+### THE LOOP, which Sonnet runs — every step has a written procedure and a loud failure
+
+Verify CI at the **exact head sha** (`gh api …/commits/<sha>/check-runs`; pending is not green) · merge ·
+**restart the executor** · forced gate under **node 22** with `--force`, redirect to a file, read `$?` on
+the NEXT line, grep for `Unsupported engine` · re-anchor with **re-measured** values · quote
+`pnpm check:tasks` with its exit code read from a redirect, **never a pipe** · dispatch the next step ·
+open and merge its own **docs-only** PRs.
+
+**Two habits that are not optional, because both were violated by an Opus session today:** re-measure
+every anchor at the sha you report, and never pipe a gate — `grep`'s exit code is not the gate's.
+
+### RELAUNCH
+
+    claude --model sonnet --permission-mode bypassPermissions \
+      "$(cat /Users/kiro/my_projects/gisik-nokma-lanes/dispatch-controller-serial.md)"
+
+**Escalations are relaunched with `--model opus`, same brief.** The brief's header was updated to say so.
+
+**The honest argument against, recorded so it is not lost:** today the controller was the only party
+between a wrong ledger and `main`. **The mitigating fact is that the EXECUTOR caught this controller's
+worst bug** — the piped exit code hiding a red ledger gate — not the other way round. The two-session
+split is doing real work independent of tier, which is what makes this change safe rather than merely
+cheap.
+
+## THE CONTROLLER RESTARTS ITSELF AT THE NEXT STEP BOUNDARY — owner-instructed 2026-09-02
+
+**The owner instructed this directly.** This role has imposed a restart on the executor at every step
+boundary all day and **has never once applied it to itself** — while the spend record has it at **39% of
+$1,072, 1.4× the executor it supervises**, and context growth costs money *directly* because cache reads
+are 68% of the bill.
+
+**A controller cannot restart itself** — the restart is owner-issued (`/clear`) or owner-relaunched.
+**So the obligation is to make it free, and that is what this file is for.** Before the next step PR
+merges, confirm: anchors re-measured at the reported sha, every ruling written HERE and not only sent,
+the ledger figure quoted from `check:tasks` with the exit code read from a redirect, and the executor's
+position named by BRANCH rather than by sha. All four hold as of this commit.
+
+    claude --model opus --permission-mode bypassPermissions \
+      "$(cat /Users/kiro/my_projects/gisik-nokma-lanes/dispatch-controller-serial.md)"
+
+
 - **RULING P23 (2026-09-01) — the `ScopeRevokedInstruction` blessing is SCOPE-WIDE ONLY; 6.101's
   per-event extension is settled by PROBE, not by the docblock.** Raised by the executor when the
   escalation condition set for it actually fired — the fix agent derived that the docblock *does* bless
