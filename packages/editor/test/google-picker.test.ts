@@ -170,6 +170,12 @@ describe('the Google Picker path', () => {
     const INSTANT = new Date('2026-08-20T10:00:00.000Z');
 
     it('stamps the same ISO string under two different machine timezones', () => {
+      // This loop's own process.env.TZ assignment is what varies TZ here —
+      // it overrides whatever TZ the test runner was launched with, so a
+      // shell-level `TZ=... vitest run` in front of this file is inert for
+      // this test specifically. Confirmed live on this machine (`node -e`
+      // with `process.env.TZ` reassigned mid-process) that the reassignment
+      // genuinely moves `Date.prototype.toString()`, not just `TZ` at spawn.
       const originalTz = process.env['TZ'];
       try {
         for (const tz of ['UTC', 'Pacific/Kiritimati']) {
