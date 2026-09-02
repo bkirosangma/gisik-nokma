@@ -32,13 +32,31 @@ import type { WorkflowDef } from '@gisik-nokma/domain';
  *     the coordination doc's F5 finding (a wildcard-edge guard bypass) is
  *     the standing reminder of what assuming otherwise costs.
  *
- * This function reproduces exactly that resolution — `exact ?? wildcard`,
- * nothing unioned — so the picker's "does this move need evidence?" answer
- * can never diverge from what the server will actually enforce. An unmatched
- * `(from, to)` pair (no transition at all — the move itself is illegal)
- * answers `false`: illegal moves are the transition-legality gate's business,
- * not this one's, and offering no evidence prompt for a move that cannot
- * happen anyway is the correct silence, not a false negative.
+ * This function reproduces the EDGE-SELECTION resolution — `exact ??
+ * wildcard`, nothing unioned — but not the STATE the engine selects it
+ * against, and that second gap is real, not hedging. The engine does not
+ * match `resolved.stateId` against the ticket's stored state id; it first
+ * calls `resolveCurrentStateId` (`transition.ts:60`), which walks the
+ * ticket's state through every published `stateMapping` since it was set,
+ * and matches THAT folded id (`transition.ts:92`). This function has no
+ * such walk — it matches whatever `fromStateId` the caller hands it,
+ * verbatim, against `def.transitions`. So long as the caller supplies the
+ * already-folded id, the two resolutions agree; if a caller instead passes
+ * the ticket's raw stored state id across a workflow version that renamed
+ * or merged states, this function can select a DIFFERENT transition than
+ * the engine will, and answer wrong in either direction — a false `true`
+ * (prompting for evidence a live edge does not require) or a false `false`
+ * (skipping the prompt a live edge does require, which the server then
+ * refuses on submission for lack of `evidenceAttachmentId`). This is the
+ * same gap `packages/app-core/src/precheck.ts`'s `needsMembership` already
+ * documents against the same engine code, and this file inherits it rather
+ * than closing it: closing it means folding the state id here too, which is
+ * this function's caller's business (whoever wires it to a ticket's live
+ * state), not this lookup's. An unmatched `(from, to)` pair (no transition
+ * at all — the move itself is illegal) answers `false`: illegal moves are
+ * the transition-legality gate's business, not this one's, and offering no
+ * evidence prompt for a move that cannot happen anyway is the correct
+ * silence, not a false negative.
  */
 export function transitionRequiresEvidence(def: WorkflowDef, fromStateId: string, toStateId: string): boolean {
   const exact = def.transitions.find((t) => t.from === fromStateId && t.to === toStateId);

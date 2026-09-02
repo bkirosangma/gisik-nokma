@@ -3,17 +3,26 @@ import type { UploadResult } from '../upload.js';
 
 /**
  * An existing UPLOAD, as the evidence picker offers it. `AttachmentSummary`
- * means *uploaded attachment* and nothing else — it carries no `kind`
- * discriminator because it does not need one: the type is structurally
- * incapable of describing a Drive reference (no `driveFileId`, no
- * `webViewLink`), so nothing this component can iterate here is ever one.
- * Plan 7's own text names Task 13a as the task that extends this component
- * with a *separate* prop (`driveReferences?: DriveReferenceSummary[]`) so a
- * Drive reference can be shown — unofferable, carrying the server's own
- * reason sentence — without ever touching this array or `onPick`. That
- * extension is Task 13a's scope, not this task's; see the predicate note on
- * `EvidencePicker` below for what that leaves this component responsible
- * for today.
+ * means *uploaded attachment* and carries no `kind` discriminator — but that
+ * is a contract this type STATES, not one its shape ENFORCES. Its four
+ * fields (no `driveFileId`, no `webViewLink`) block a direct assignment FROM
+ * a `DriveReferenceSummary`, so the compiler catches the accident of handing
+ * one straight through; they do not block a caller from mapping a Drive
+ * reference's own fields onto this shape by hand (`{ attachmentId:
+ * ref.attachmentId, filename: ref.name, mime: ref.mimeType, size: 0 }` is a
+ * perfectly well-formed `AttachmentSummary`, and `ref.attachmentId` is all
+ * `onPick` ever needs to name it as evidence). Nothing in `packages/editor`
+ * builds such a summary today — Plan 6/6a's `AttachmentListEntry`
+ * (`AttachmentListItem.tsx:50-52`) already discriminates uploads from Drive
+ * references by `kind`, and this task's callers pass uploads only — but the
+ * type itself does not prevent it; only every caller upholding the prop's
+ * contract does. Plan 7's own text names Task 13a as the task that extends
+ * this component with a *separate* prop (`driveReferences?:
+ * DriveReferenceSummary[]`) so a Drive reference can be shown — unofferable,
+ * carrying the server's own reason sentence — without ever touching this
+ * array or `onPick`. That extension is Task 13a's scope, not this task's;
+ * see the predicate note on `EvidencePicker` below for what that leaves this
+ * component responsible for today.
  */
 export type AttachmentSummary = {
   attachmentId: string;
@@ -53,12 +62,14 @@ export type EvidencePickerProps = {
  *
  * WHAT THIS COMPONENT MIRRORS TODAY, AND WHAT IT DOES NOT. Every entry this
  * component can render an `.evidence-picker__option` for comes off the
- * `attachments: AttachmentSummary[]` prop, and `AttachmentSummary` cannot
- * express a Drive reference (see its own docblock) — so "never offer what
- * the gate's second branch refuses" holds here BY CONSTRUCTION OF THE TYPE,
- * not by a runtime filter, so long as callers uphold the prop's contract
- * (pass uploads only). It does NOT mirror "must exist on THIS ticket" —
- * that scope is true only of whatever array the caller passes (this
+ * `attachments: AttachmentSummary[]` prop, and this component runs no
+ * `kind === 'upload'` filter of its own over that array (see
+ * `AttachmentSummary`'s own docblock: the type does not rule out a mapped-in
+ * Drive reference, it only rules out a direct one). So "never offer what the
+ * gate's second branch refuses" holds ONLY so long as every caller upholds
+ * the prop's contract and passes uploads only — a caller-side guarantee this
+ * component has no way to check, not a structural one. It does NOT mirror
+ * "must exist on THIS ticket" — that scope is true only of whatever array the caller passes (this
  * component holds no ticket id and makes no request of its own), so a
  * caller that hands it another ticket's attachments is outside what a
  * client-side mirror can catch; the gate's per-ticket `WHERE ... AND
