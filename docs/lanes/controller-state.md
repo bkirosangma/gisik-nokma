@@ -11,6 +11,16 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## OWNER CORRECTION 2026-09-02 — magic-link sender is `contact@artsourced.in`, not `sign-in@artsourced.in`
+
+Plan 11's Open question 13 and the coordination doc's sign-off table (line 86) both recorded
+`sign-in@artsourced.in` as the owner's 2026-08-20 confirmation. **The owner corrected the local-part to
+`contact@artsourced.in` on 2026-09-02** — the apex-address reasoning (sender reputation and deliverability
+stay with the established zone) is unchanged, only the mailbox name. Both plan documents and
+`deploy/do/app.yaml`'s `MAGIC_LINK_FROM` value are corrected in place (this PR); dev/CI's
+`sign-in@gisik-nokma.local` is untouched — it never leaves Mailpit. **No code has executed against the old
+value** — Plan 11 is 0/16 `done`, so this is a plan-text correction, not a rollback.
+
 ## Anchors — re-measured 2026-09-02 ~16:00 IST, at `7b45099` (step 11 merged)
 
 | what | value |
