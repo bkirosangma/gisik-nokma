@@ -838,6 +838,29 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   6/6a), and the server's evidence gate (`apps/server/src/gates/evidence-gate.ts`, Task 11a) is the
   backstop for an id that reaches `onPick` by any other path. `packages/editor/src/components/EvidencePicker.tsx`,
   `packages/editor/src/styles/editor.css`
+- ⚙️ **Composer submissions are one mapping, not a call-site convention** — `composeEditorSubmission(mode, doc)` / `EditorSubmission`: comment mode becomes `comment.added {body}`, description mode becomes `ticket.field_set {fieldId:'description', value}`, the shapes read off `packages/domain/src/events/ticket-events.ts` rather than off the plan text. A description edit is not a mutation of a field — it is one more claim, so a description's history is the history of the claims that wrote it. The union is closed at two, so a third composer mode has to come here and name its event rather than fall through to a description save.
+  `packages/editor/src/attachments/compose-editor-submission.ts`
+- ⚙️ **`<EditorSlot>` implemented, and the contract written twice reconciled** — `TicketEditorSlot`,
+  `EditorSlotProps`, `EditorSlotUpload`, `TicketEditorSlotProps`. The concrete component behind Plan
+  6's slot boundary: a Tiptap composer plus one submit control, speaking neither HTTP nor DataSource —
+  `submit` and `emitAttachmentAdded` belong to the host, so the sheet stays the one place that appends
+  to the ledger. It STATES its gaps instead of pretending: mounted without `submit` (or read-only) the
+  button is disabled and its title says which of the two reasons applies; mounted without an uploader a
+  pasted file is refused through `onError` rather than swallowed. A refused submit never costs the user
+  their words — the clear sits inside the `try` after the `await` — and only comment mode clears at all.
+  Re-entrancy is guarded by a REF set synchronously before the first await, not by render state: two
+  clicks in one React batch both read a pre-commit `false` and both got through, measured as two
+  `comment.added` events for one comment in a ledger that can unsay neither.
+  **`doc` is `unknown`, not `DocJson | null`**: Plan 6 owns the declaration, its mount site passes an
+  `unknown` off a domain field claim, and under `strictFunctionTypes` props are compared
+  contravariantly, so the narrower half is the one that breaks. The narrowing moved from the type to
+  `isDocJson` at the mount, which keeps `null → empty composer` and extends it to every non-document.
+  Both halves of the contract moved in one commit; the compile-time proof is an assignment against a
+  transcription of app-core's declaration, guarded by a test that reads app-core's source and fails if
+  its `doc` stops saying `unknown`. **The end-to-end mount does not exist yet** — nothing passes
+  `TicketEditorSlot` to `TicketSheet`'s `editorSlot` prop, and `apps/web` does not depend on
+  `@gisik-nokma/editor` — so this is `⚙️`, not `✅`.
+  `packages/editor/src/components/TicketEditorSlot.tsx`, `packages/app-core/src/views/editor-slot.tsx`
 
 ## 12. Offline sync & the apps
 

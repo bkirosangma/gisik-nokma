@@ -1,0 +1,392 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { render } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import type { ReactElement } from 'react';
+import type { Editor } from '@tiptap/core';
+import {
+  composeEditorSubmission,
+  type EditorSubmission,
+} from '../src/attachments/compose-editor-submission.js';
+import {
+  TicketEditorSlot,
+  type EditorSlotUpload,
+  type TicketEditorSlotProps,
+} from '../src/components/TicketEditorSlot.js';
+import type { DocJson } from '../src/doc.js';
+
+const DOC: DocJson = {
+  type: 'doc',
+  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'the words' }] }],
+};
+
+const UPLOADED = {
+  attachmentId: '01J9GATA000000000000000000',
+  url: '/v1/attachments/01J9GATA000000000000000000',
+  mime: 'image/png',
+  filename: 'a.png',
+  size: 1,
+  sha256: 'd'.repeat(64),
+};
+
+describe('composeEditorSubmission', () => {
+  it('comment mode → comment.added {body}', () => {
+    expect(composeEditorSubmission('comment', DOC)).toEqual({
+      type: 'comment.added',
+      payload: { body: DOC },
+    });
+  });
+
+  it('description mode → ticket.field_set {fieldId: description, value}', () => {
+    expect(composeEditorSubmission('description', DOC)).toEqual({
+      type: 'ticket.field_set',
+      payload: { fieldId: 'description', value: DOC },
+    });
+  });
+
+  it("the field_set payload carries a `value` key — the domain door refuses one that is merely absent", () => {
+    const submission = composeEditorSubmission('description', DOC);
+    // `ticketFieldSetPayload` (packages/domain/src/events/ticket-events.ts:89)
+    // refines `value !== undefined` precisely because an absent key used to be
+    // folded into a null clearing claim. Assert the KEY, not just the value.
+    expect(Object.keys(submission.payload)).toContain('value');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ONE CONTRACT WRITTEN TWICE — the compile-time half of the proof.
+//
+// TRANSCRIBED from packages/app-core/src/views/editor-slot.tsx on 2026-09-03.
+// packages/editor must not depend on app-core (that inverts the dependency and
+// drags app-core's tree into the RN webview bundle), so the far half is COPIED
+// here and the assignment below is what proves the two halves still meet under
+// `strictFunctionTypes` — where props are a parameter and therefore compared
+// contravariantly. A transcription can go stale silently, so the runtime check
+// further down reads app-core's actual source for the one field that diverged.
+// Neither stands in for the real end-to-end proof — an actual
+// `<TicketSheet editorSlot={TicketEditorSlot} />` — which is owed by whoever
+// wires the two packages together (Plan 6 step 12).
+// ─────────────────────────────────────────────────────────────────────────────
+type AppCoreEditorSlotSubmission =
+  | { type: 'comment.added'; payload: { body: unknown } }
+  | { type: 'ticket.field_set'; payload: { fieldId: 'description'; value: unknown } };
+
+type AppCoreEditorSlotUpload = {
+  attachmentId: string;
+  filename: string;
+  mime: string;
+  size: number;
+  url: string;
+  sha256: string;
+};
+
+type AppCoreEditorSlotProps = {
+  mode: 'comment' | 'description';
+  doc: unknown;
+  readOnly: boolean;
+  workspaceId: string;
+  ticketId: string;
+  placeholder?: string;
+  autoFocus?: boolean;
+  queryUsers?: (query: string) => Promise<Array<{ userId: string; name: string }>>;
+  uploadAttachment?: (file: File) => Promise<AppCoreEditorSlotUpload>;
+  emitAttachmentAdded?: (uploaded: AppCoreEditorSlotUpload) => Promise<void>;
+  submit?: (submission: AppCoreEditorSlotSubmission) => Promise<void>;
+  onDone?: () => void;
+  onError?: (err: unknown) => void;
+};
+
+/** This assignment IS the assertion: if the halves diverge, typecheck fails. */
+const _slotFitsAppCoreContract: (props: AppCoreEditorSlotProps) => ReactElement | null = TicketEditorSlot;
+void _slotFitsAppCoreContract;
+
+// `import.meta.url` is not a file: URL under the jsdom environment, so the
+// path is resolved from vitest's cwd (this package's root) instead.
+const APP_CORE_SLOT_SOURCE = resolve(process.cwd(), '../app-core/src/views/editor-slot.tsx');
+const OWN_SOURCE = resolve(process.cwd(), 'test/ticket-editor-slot.test.tsx');
+
+describe('the <EditorSlot> contract, written twice', () => {
+  it("app-core's half still spells `doc` as unknown, which is why this half widened", () => {
+    // POSITIVE CONTROL 1: a missing file must fail here, not silently read as
+    // an empty string somewhere downstream.
+    expect(existsSync(APP_CORE_SLOT_SOURCE), `not found: ${APP_CORE_SLOT_SOURCE}`).toBe(true);
+    const source = readFileSync(APP_CORE_SLOT_SOURCE, 'utf8');
+    // POSITIVE CONTROL 2: fail loudly if this is not the declaration file, since
+    // a regex that matches nothing in the wrong file reads exactly like a pass.
+    const start = source.indexOf('export type EditorSlotProps = {');
+    expect(start).toBeGreaterThan(-1);
+    const end = source.indexOf('\n};', start);
+    expect(end).toBeGreaterThan(start);
+    const declaration = source.slice(start, end);
+    // Second control: the block we sliced really is the props block.
+    expect(declaration).toMatch(/^\s*readOnly: boolean;$/m);
+    expect(declaration).toMatch(/^\s*doc: unknown;$/m);
+  });
+
+  it('neither half of the contract has a field the other lacks', () => {
+    const source = readFileSync(APP_CORE_SLOT_SOURCE, 'utf8');
+    const appCoreFields = fieldNamesOf(source, 'export type EditorSlotProps = {');
+    const transcribedFields = fieldNamesOf(
+      readFileSync(OWN_SOURCE, 'utf8'),
+      'type AppCoreEditorSlotProps = {',
+    );
+    // CONTROLS: both extractions found a real declaration, so an empty set on
+    // either side fails here rather than passing as a vacuous equality.
+    expect(appCoreFields.length).toBeGreaterThan(10);
+    expect(transcribedFields.length).toBeGreaterThan(10);
+    // The type-level assignment above catches a field whose TYPE diverged; it
+    // cannot catch one app-core ADDS, because an optional addition still
+    // assigns and a required one this file never transcribed is simply unknown
+    // to it. Set equality is what closes that.
+    expect([...transcribedFields].sort()).toEqual([...appCoreFields].sort());
+  });
+});
+
+/** Field names of one `type X = { … };` block, by name only — types are the assignment's job. */
+function fieldNamesOf(source: string, header: string): string[] {
+  const start = source.indexOf(header);
+  expect(start, `declaration not found: ${header}`).toBeGreaterThan(-1);
+  const end = source.indexOf('\n};', start);
+  expect(end, `unterminated declaration: ${header}`).toBeGreaterThan(start);
+  return [...source.slice(start + header.length, end).matchAll(/^ {2}(\w+)\??:/gm)].map(
+    (match) => match[1] as string,
+  );
+}
+
+function makeProps(overrides: Partial<TicketEditorSlotProps> = {}): TicketEditorSlotProps {
+  return {
+    mode: 'comment',
+    doc: null,
+    readOnly: false,
+    workspaceId: 'ws_1',
+    ticketId: '01J9GTKA000000000000000000',
+    queryUsers: async () => [],
+    uploadAttachment: vi.fn(async (_file: File) => UPLOADED),
+    emitAttachmentAdded: vi.fn(async (_uploaded: EditorSlotUpload) => {}),
+    submit: vi.fn(async (_submission: EditorSubmission) => {}),
+    ...overrides,
+  };
+}
+
+/**
+ * Mount and wait for a live editor. The suite drives ProseMirror imperatively
+ * through `editorRef` — the idiom `ticket-editor.test.tsx` already proves works
+ * here — rather than firing synthetic input events at a contenteditable, which
+ * jsdom does not turn into ProseMirror transactions.
+ */
+async function mountSlot(props: TicketEditorSlotProps) {
+  const editorRef: React.MutableRefObject<Editor | null> = { current: null };
+  const view = render(<TicketEditorSlot {...props} editorRef={editorRef} />);
+  await vi.waitFor(() => {
+    expect(view.container.querySelector('.ticket-editor .ProseMirror')).not.toBeNull();
+    expect(editorRef.current).not.toBeNull();
+  });
+  return { view, editorRef, editor: editorRef.current as Editor };
+}
+
+function proseMirrorText(view: { container: HTMLElement }): string {
+  return (view.container.querySelector('.ProseMirror') as HTMLElement).textContent ?? '';
+}
+
+function submitButton(view: { container: HTMLElement }): HTMLButtonElement {
+  return view.container.querySelector('.editor-slot__submit') as HTMLButtonElement;
+}
+
+describe('TicketEditorSlot', () => {
+  it('comment mode: submit sends comment.added and clears the composer on success', async () => {
+    const submit = vi.fn(async (_submission: EditorSubmission) => {});
+    const onDone = vi.fn();
+    const { view } = await mountSlot(makeProps({ submit, onDone, doc: DOC }));
+    expect(proseMirrorText(view)).toContain('the words');
+    submitButton(view).click();
+    await vi.waitFor(() => {
+      expect(submit).toHaveBeenCalledTimes(1);
+    });
+    const submission = submit.mock.lastCall?.[0];
+    expect(submission?.type).toBe('comment.added');
+    expect(JSON.stringify(submission?.payload)).toContain('the words');
+    expect(onDone).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(proseMirrorText(view)).toBe('');
+    });
+    view.unmount();
+  });
+
+  it('description mode: submit sends ticket.field_set and keeps the content', async () => {
+    const submit = vi.fn(async (_submission: EditorSubmission) => {});
+    const { view } = await mountSlot(makeProps({ mode: 'description', doc: DOC, submit }));
+    submitButton(view).click();
+    await vi.waitFor(() => {
+      expect(submit).toHaveBeenCalledTimes(1);
+    });
+    const submission = submit.mock.lastCall?.[0];
+    expect(submission?.type).toBe('ticket.field_set');
+    expect(submission).toMatchObject({ payload: { fieldId: 'description' } });
+    // The saved value is what the field now holds; clearing it would show the
+    // user an empty description they did not empty.
+    expect(proseMirrorText(view)).toContain('the words');
+    view.unmount();
+  });
+
+  it('a refused submit reports the error and never clears the words', async () => {
+    const submit = vi.fn(async (_submission: EditorSubmission) => {
+      throw new Error('This move must carry a comment explaining it, and none was provided.');
+    });
+    const onError = vi.fn();
+    const onDone = vi.fn();
+    const { view } = await mountSlot(makeProps({ submit, onError, onDone, doc: DOC }));
+    submitButton(view).click();
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalled();
+    });
+    expect(proseMirrorText(view)).toContain('the words');
+    // Nothing was done, so onDone did not fire — and the button came back.
+    expect(onDone).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(submitButton(view).disabled).toBe(false);
+    });
+    view.unmount();
+  });
+
+  it('two clicks in one tick append ONE comment, not two — the ledger cannot take it back', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const submit = vi.fn(async (_submission: EditorSubmission) => {
+      await gate;
+    });
+    const { view } = await mountSlot(makeProps({ submit, doc: DOC }));
+    // Both clicks land in the same React batch: `disabled` is not committed yet
+    // and a `submitting` flag read from the render closure is still false for
+    // the second one. An append-only ledger has no way to unsay the duplicate.
+    submitButton(view).click();
+    submitButton(view).click();
+    release();
+    await vi.waitFor(() => {
+      expect(submit).toHaveBeenCalledTimes(1);
+    });
+    expect(submit).toHaveBeenCalledTimes(1);
+    view.unmount();
+  });
+
+  it('the doc prop arrives as unknown: a value that is not a document opens an empty composer', async () => {
+    for (const notADoc of [null, undefined, 'the words', 42, {}, [{ type: 'doc' }]]) {
+      const { view } = await mountSlot(makeProps({ doc: notADoc }));
+      expect(proseMirrorText(view)).toBe('');
+      view.unmount();
+    }
+  });
+
+  it('a real document still renders — the narrowing accepts documents, it does not refuse everything', async () => {
+    const { view } = await mountSlot(makeProps({ doc: DOC }));
+    expect(proseMirrorText(view)).toContain('the words');
+    view.unmount();
+  });
+
+  it('mounted without submit: the button is disabled and says why, instead of pretending', async () => {
+    const props = makeProps();
+    delete props.submit;
+    const { view } = await mountSlot(props);
+    const button = submitButton(view);
+    expect(button.disabled).toBe(true);
+    expect(button.title).toContain('without a submit handler');
+    view.unmount();
+  });
+
+  it('read-only: the button is disabled, says why, and the editor is not editable', async () => {
+    const { view, editor } = await mountSlot(makeProps({ readOnly: true, doc: DOC }));
+    const button = submitButton(view);
+    expect(button.disabled).toBe(true);
+    expect(button.title).toContain('Read-only');
+    expect(editor.isEditable).toBe(false);
+    view.unmount();
+  });
+
+  it('uploads route through emitAttachmentAdded — the host owns the event', async () => {
+    const emitAttachmentAdded = vi.fn(async (_uploaded: EditorSlotUpload) => {});
+    const uploadAttachment = vi.fn(async (_file: File) => UPLOADED);
+    const { view, editor } = await mountSlot(makeProps({ uploadAttachment, emitAttachmentAdded }));
+    pasteFile(editor, new File([new Uint8Array(4)], 'a.png', { type: 'image/png' }));
+    await vi.waitFor(() => {
+      expect(uploadAttachment).toHaveBeenCalledTimes(1);
+      expect(emitAttachmentAdded).toHaveBeenCalledTimes(1);
+    });
+    expect(emitAttachmentAdded.mock.lastCall?.[0]).toEqual(UPLOADED);
+    view.unmount();
+  });
+
+  it('mounted without an uploader: a pasted file is refused through onError, never silently dropped', async () => {
+    const emitAttachmentAdded = vi.fn(async (_uploaded: EditorSlotUpload) => {});
+    const onError = vi.fn();
+    const props = makeProps({ emitAttachmentAdded, onError });
+    delete props.uploadAttachment;
+    const { view, editor } = await mountSlot(props);
+    pasteFile(editor, new File([new Uint8Array(4)], 'a.png', { type: 'image/png' }));
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalled();
+    });
+    expect(String((onError.mock.lastCall?.[0] as Error).message)).toContain('without an uploader');
+    // The refusal is a refusal: no claim was emitted and no node was inserted.
+    expect(emitAttachmentAdded).not.toHaveBeenCalled();
+    expect(JSON.stringify(editor.getJSON())).not.toContain('image');
+    view.unmount();
+  });
+
+  /**
+   * MUTATION-TESTED, and the first mutation SURVIVED, which is the useful part.
+   * Recreating `TicketEditor`'s extensions on every render (`useMemo(…, [props])`
+   * instead of `[]`) did NOT redden this test: `useEditor` captures its options
+   * once and does not rebuild the Editor when the array identity changes. What
+   * DOES redden it is giving `useEditor` a deps array that varies
+   * (`useEditor({…}, [props.placeholder])` plus the changed placeholder below) —
+   * so the mechanism keeping the editor alive is `useEditor`'s empty deps, not
+   * the extensions memo. Task 14 depends on that stability and does not own it;
+   * the extensions memo's own justification is Task 12's to defend.
+   */
+  it('a parent re-render does not re-initialise the editor', async () => {
+    const editorRef: React.MutableRefObject<Editor | null> = { current: null };
+    const view = render(<TicketEditorSlot {...makeProps({ doc: DOC })} editorRef={editorRef} />);
+    await vi.waitFor(() => {
+      expect(editorRef.current).not.toBeNull();
+    });
+    const first = editorRef.current;
+    first?.commands.insertContent(' and more');
+    // Fresh callback identities on every prop — the thing that would re-create
+    // an editor whose options were not read through a ref.
+    view.rerender(
+      <TicketEditorSlot
+        {...makeProps({ doc: DOC, placeholder: 'changed', submit: vi.fn(async (_s: EditorSubmission) => {}) })}
+        editorRef={editorRef}
+      />,
+    );
+    expect(editorRef.current).toBe(first);
+    expect(proseMirrorText(view)).toContain('and more');
+    view.unmount();
+  });
+
+  it('autoFocus focuses the composer; without it the composer is left alone', async () => {
+    const focused = await mountSlot(makeProps({ autoFocus: true }));
+    await vi.waitFor(() => {
+      expect(focused.editor.isFocused).toBe(true);
+    });
+    focused.view.unmount();
+
+    const unfocused = await mountSlot(makeProps());
+    expect(unfocused.editor.isFocused).toBe(false);
+    unfocused.view.unmount();
+  });
+});
+
+/**
+ * Reach the paste path exactly as `ticket-editor.test.tsx` does: jsdom has no
+ * real clipboard, so the plugin's `handlePaste` prop is invoked directly with a
+ * synthetic event carrying the file.
+ */
+function pasteFile(editor: Editor, file: File): void {
+  const event = {
+    clipboardData: { items: [{ kind: 'file', type: file.type, getAsFile: () => file }] },
+    preventDefault: vi.fn(),
+  } as unknown as ClipboardEvent;
+  editor.view.someProp('handlePaste', (handler) => handler(editor.view, event, editor.state.doc.slice(0)));
+}

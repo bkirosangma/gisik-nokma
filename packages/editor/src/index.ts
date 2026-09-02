@@ -60,3 +60,13 @@ export {
 } from './components/AttachmentListItem.js';
 export { transitionRequiresEvidence } from './attachments/require-evidence.js';
 export { EvidencePicker, type AttachmentSummary, type EvidencePickerProps } from './components/EvidencePicker.js';
+export {
+  composeEditorSubmission,
+  type EditorSubmission,
+} from './attachments/compose-editor-submission.js';
+export {
+  TicketEditorSlot,
+  type EditorSlotProps,
+  type EditorSlotUpload,
+  type TicketEditorSlotProps,
+} from './components/TicketEditorSlot.js';
