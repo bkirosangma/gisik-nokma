@@ -9,14 +9,17 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > verified with `git branch --contains` (empty output = orphaned), never with `git cat-file`, which
 > passes on reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 12 — Plan 7 remainder. Eighteen tasks. TEN DONE.**
+## WHERE I AM: **STEP 12 — Plan 7 remainder. ALL EIGHTEEN TASKS DONE.**
 
-Done: **T5, T6, T7, T8** (Batch A) and **T9, T9a, T10, T11, T11a** (Batch B).
-**Both of the plan's independent tracks are now complete** — the editor track (T5–T6) and the whole
-server track (T7–T11a). That is the gate Tasks 12–15 were waiting on: they need both, and both exist.
+T5, T6, T7, T8 · T9, T9a, T10, T11, T11a · T12, T12a, T12b, T12c · T13, T13a, T14, T15 · **T16
+closed the catalogue.** `check:tasks` reports Plan 7 at **18 in-flight, 0 todo** — `in-flight`
+rather than `done` only because `done` requires a merge sha that is an ancestor of `origin/main`.
 
-**Next: Batch C — T12, T12a, T12b, T12c.** Then T13/T13a, T14, T15, and T16 closes.
-Nothing is awaiting a decision; no PR is open yet.
+**Plus one change outside any task's scope, on RULING P27** — the wildcard/exact divergence in
+`packages/app-core/src/views/transition-dialog.tsx`. See the ruling section below.
+
+**Remaining before the PR: the final whole-branch review — ONE opus reviewer, per the cost
+ruling — then the PR.** No PR is open yet. Nothing is awaiting a decision.
 
 Step 11 (Plan 6 remainder) **merged as PR #77 → `7b45099`**. Its twelve ledger rows said `in-flight`
 on `main` after the merge; this branch's first commit promotes them. **Nothing from step 11 is
@@ -313,7 +316,28 @@ architecture exists to prevent.** So the seam is proven against a copy, and a co
 the original. That is the irreducible cost of a contract written twice, and it should be stated
 wherever the twin arrangement is described rather than discovered again.
 
-## RULING NEEDED — F5 RECURRENCE. Reported to the controller. **PROVEN, not inferred.**
+## RULING P27 — TAKEN AND APPLIED. The F5 recurrence is FIXED, not parked.
+
+**The controller ruled Option (a): fix it in step 12**, matching `precheck.ts` exactly, with the
+probe promoted to a permanent regression test in **both directions**. Done — cases **3.149–3.151**
+in `packages/app-core/test/views/transition-dialog.test.tsx`, plus `Features.md` and
+`test-cases/03`. **The mutation is site-identifying: restoring the old resolution kills exactly 1
+of that file's 20 tests — 3.149 only — with 3.150 and 3.151 green.**
+
+**3.150 is not decoration.** It declares the exact edge first; without it, 3.149 shows only that one
+ordering yields the right answer, not that the answer is *independent of ordering*, which is the
+property the engine actually has. **3.151 guards the regression the fix itself could introduce** —
+preferring the exact edge must not drop targets that have no exact edge to prefer.
+
+**The pre-existing "reachable twice" case was renamed, not deleted.** It declares the exact edge
+first, so it answered identically under both implementations and **could never have caught this**,
+while being titled as though it pinned resolution order. Its real content — never a *merged* rule
+set — is true and kept.
+
+**Ruling P27's full text lives in `docs/lanes/controller-state.md`.** Cite that, not the message
+that carried it. Flagged in the PR body as a ruling-directed addition outside T13–T16's scope.
+
+### The finding, kept because the shape of it is the lesson
 
 **`packages/app-core` now holds BOTH answers to one question, in two files**, and the wrong one is
 on the surface a user touches.
@@ -345,12 +369,19 @@ declaration order**, and the engine's does not.
 sheet offers a transition with no evidence prompt, the user submits, and the server refuses. **It
 looks like a bug in the product rather than a rule.**
 
-**Why this is a ruling and not a fix I should make:** it is in **Plan 6's package**, and the fix is a
-behaviour change, not prose. The reviewer recorded the owner as *"the Plan 6/6a lane"* — **and Plan 6
-closed at step 11**, which is the second time on this branch that a recorded owner named something
-that no longer exists. So the honest options are (a) fix it here as a two-line change matching
-`precheck.ts`, (b) assign it to **Plan 8**, which owns workflow-def semantics and has not run, or
-(c) assign it to Plan 11's hardening. **That choice is a scope decision, which is the controller's.**
+**Why it went to the controller instead of being fixed on the spot:** it is in **Plan 6's package**
+and the fix is a behaviour change, not prose. The reviewer recorded the owner as *"the Plan 6/6a
+lane"* — **and Plan 6 closed at step 11**, the second time on this branch that a recorded owner
+named something that no longer exists. Parking it against another dead owner would have repeated
+the mistake the branch keeps finding, and fixing another plan's package unilaterally is a scope
+decision. **Ruling P27 chose to fix it here.**
+
+**The old behaviour was DELIBERATE, and that is the transferable part.** Its docblock had already
+considered the multi-edge case and rejected **merging** two rule sets into one no transition
+declares — sound reasoning, aimed at an alternative the engine does not implement either. The live
+question was exact-versus-wildcard and it was never asked. **A decision argued against a straw
+option reads as considered**, which is why it survived review and why the replacement docblock says
+so explicitly instead of presenting the new rule as though it had always been obvious.
 
 ## IN FLIGHT
 
