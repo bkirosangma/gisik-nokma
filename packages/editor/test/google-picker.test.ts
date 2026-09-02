@@ -166,16 +166,53 @@ describe('the Google Picker path', () => {
     expect(seen.visible).toBe(false);
   });
 
-  describe('capturedAt is a UTC instant, not a locale-dependent render', () => {
+  describe('capturedAt is the UTC serialization of the injected instant, per ECMA-262', () => {
     const INSTANT = new Date('2026-08-20T10:00:00.000Z');
 
-    it('stamps the same ISO string under two different machine timezones', () => {
-      // This loop's own process.env.TZ assignment is what varies TZ here —
-      // it overrides whatever TZ the test runner was launched with, so a
-      // shell-level `TZ=... vitest run` in front of this file is inert for
-      // this test specifically. Confirmed live on this machine (`node -e`
-      // with `process.env.TZ` reassigned mid-process) that the reassignment
-      // genuinely moves `Date.prototype.toString()`, not just `TZ` at spawn.
+    // CORRECTED — two earlier commits (de112cf, then its own correction
+    // e6fb2ea) overstated what this test proves. Neither claim survives:
+    // de112cf said mutating toISOString() to toString() reddened "under
+    // three separately-invoked shell TZs"; e6fb2ea retracted that (the
+    // first loop iteration sets TZ='UTC' and expect() throws right there,
+    // so the shell's own TZ never reaches the assertion) but then claimed
+    // the in-process loop itself gives "real, falsifiable TZ variance."
+    // That is also false, and for a stronger reason than either commit
+    // considered: Date.prototype.toISOString() is defined by ECMA-262 to
+    // format the internal time value in UTC unconditionally — it reads no
+    // local zone at all. Against today's implementation
+    // (capturedAt.toISOString(), google-picker.ts), both loop iterations
+    // are guaranteed byte-identical regardless of which TZ pair runs; the
+    // test cannot fail on the TZ axis for any spec-compliant call. The
+    // toISOString()->toString() mutation reddens on FORMAT, at iteration
+    // one, under any TZ including UTC — toString()'s output never matches
+    // the ISO literal even at zero offset, so the kill is not attributable
+    // to TZ variance and the second iteration never runs in the red case.
+    // The plain, non-looping assertion on `references[0].capturedAt` in
+    // "loads both Google scripts…" above already has identical
+    // discriminating power against that mutation.
+    //
+    // What the loop DOES guard against is a different, unplanted defect
+    // shape: capturedAt rebuilt from local Date getters or
+    // `toLocaleString()` instead of `toISOString()`. That would diverge
+    // between TZ='UTC' and TZ='Pacific/Kiritimati' while the current
+    // implementation stays fixed — a live distinction, not a hypothetical
+    // one: process.env.TZ reassignment mid-test genuinely moves this
+    // package's own Date getters inside its actual vitest worker (measured
+    // in-suite, not via a bare `node -e` process outside it — the repo has
+    // separately measured that vitest's `threads` pool gives a worker no
+    // TZ reconfiguration at all, so evidence from a different process or
+    // pool would not carry over): `new Date(0).getHours()` reads 10 under
+    // TZ='UTC' and 15 under TZ='Asia/Kolkata' within a throwaway probe test
+    // run through this same `pnpm --filter @gisik-nokma/editor exec vitest
+    // run` invocation. So the loop is retained as a regression guard
+    // against that specific reconstruction, not as evidence about the
+    // correctness of the code that ships today.
+    //
+    // This loop's own process.env.TZ assignment is what would vary TZ here
+    // — it overrides whatever TZ the test runner was launched with, so a
+    // shell-level `TZ=... vitest run` in front of this file is inert for
+    // this test specifically.
+    it('is fixed across TZ="UTC" and TZ="Pacific/Kiritimati" (regression guard, not TZ-dependent evidence — see comment above)', () => {
       const originalTz = process.env['TZ'];
       try {
         for (const tz of ['UTC', 'Pacific/Kiritimati']) {
