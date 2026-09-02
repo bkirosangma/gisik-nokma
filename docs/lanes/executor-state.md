@@ -13,14 +13,22 @@ brief recovers only what is written here. Refreshed at every task boundary.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| **Branch in flight** | **`exec/10-integration-checkpoint`**, pushed, **PR OPEN, awaiting the controller's merge.** All step-10 work is committed; the tree is clean; the final whole-branch review has run and its fix round has landed. | `git status --porcelain` empty, `git branch --contains <tip>` non-empty, `gh pr view` |
+| **Branch in flight** | **`exec/10-integration-checkpoint`**, pushed, **PR #70 OPEN, awaiting the controller's merge.** All step-10 work is committed; the tree is clean; the final whole-branch review has run and its fix round has landed. | `git status --porcelain` empty, `git branch --contains <tip>` non-empty, `gh pr view 70` |
 | **`main`** | **`c9ab31c`** — step 9 (`563c983`, PR #67) plus two docs-only merges (`aa67ee3` #68, `c9ab31c` #69). **REFETCH before trusting this.** | `git rev-parse origin/main`, `git log --oneline -5` |
 | **`563c983` reachable?** | **YES**, ancestor of `c9ab31c`. The only diff `563c983..c9ab31c` is three files under `docs/lanes/`. | `git merge-base --is-ancestor 563c983 origin/main` → true; `git diff --stat` |
 | **Gate on merged main** | exit 0 · 21/21 · 0 cached · 1573 tests · Node v22.22.2. Measured by the controller at `563c983`; docs-only merges cannot move it (`turbo.json` declares no `inputs` and `docs/` is outside every package). | controller's forced gate |
 | Node | **v22.22.2** under the brief's PATH export. Machine default is **v24.11.1**, outside `>=22 <23`, enforced by nothing. | `node -v` |
 | Orphaned, do not cite | every sha in the narrative below the anchors, including all of Plan 5's task shas — **#67 was SQUASHED**. `git cat-file` passes on all of them and returns pre-merge content. | `git merge-base --is-ancestor` |
 
-## WHERE I AM: STEP 10 IS COMPLETE. PR OPEN, AWAITING THE CONTROLLER'S MERGE.
+## WHERE I AM: STEP 10 IS COMPLETE. **PR #70 IS OPEN**, AWAITING THE CONTROLLER'S MERGE.
+
+**NEXT IN THE SERIAL SEQUENCE once #70 merges: step 11, Plan 6 remainder** — first in Phase 3,
+because Plan 8's T13-14 and Plan 9's T14 both need `apps/web`. **Three things this step hands it,
+all with Plan 6 as the named owner:** the `board.tsx` live defect (it dereferences two fields no
+response carries), the `StreamItem` union's missing `scope-revoked` member, and **ruling P24** —
+Plan 6 Task 10 adopts the SERVER's `UserPreferences` shape. `apps/server/test/integration/client-contract.test.ts`
+is the machine-checked register of what an HTTP `DataSource` can and cannot be built from; read it
+before writing one.
 
 **Everything is committed and pushed, and the tree is clean.** The executor's work on this step is
 finished. **The executor opens PRs and NEVER merges** — that is the whole reason a second session
@@ -33,7 +41,7 @@ exists, and it is the one authority this role does not have.
 | docs | coordination doc records (P18 discharge, ruling P24, the recounts) | **DONE, committed `2b9876d`** |
 | final review | ONE opus reviewer over the whole branch | **DONE** — 3 Important + 2 Minor + 1 Nit, **all against the DOCUMENTS, none against the code**; all fixed |
 | review fix round | prose and comments only, no behaviour touched | **DONE**, committed |
-| PR | **OPEN. The controller merges; the executor never does.** | see the anchors row |
+| PR | **#70 OPEN. The controller merges; the executor never does.** | `gh pr view 70` |
 
 ### THE FINAL REVIEW'S RESULT IS THE MOST USEFUL THING ON THIS BRANCH — read it before the code
 
