@@ -73,4 +73,29 @@ describe('attachment repo', () => {
     const negative = row('01J9GATE000000000000000000', { size: -1 });
     await expect(insertAttachment(db.pool, negative)).rejects.toThrow();
   });
+
+  it('a row inserted with no sha256 reads back as null — unknown, not a default', async () => {
+    const id = '01J9GATF000000000000000000';
+    await insertAttachment(db.pool, row(id));
+    const stored = await getAttachment(db.pool, id);
+    expect(stored?.sha256).toBeNull();
+  });
+
+  it('a real lowercase-hex sha256 round-trips verbatim', async () => {
+    const id = '01J9GATG000000000000000000';
+    const hex = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+    await insertAttachment(db.pool, row(id, { sha256: hex }));
+    const stored = await getAttachment(db.pool, id);
+    expect(stored?.sha256).toBe(hex);
+  });
+
+  it('planted defect: a non-hex sha256 violates the attachments_sha256_hex CHECK constraint', async () => {
+    const bad = row('01J9GATH000000000000000000', { sha256: 'not-hex'.padEnd(64, '0') });
+    await expect(insertAttachment(db.pool, bad)).rejects.toThrow(/attachments_sha256_hex/);
+  });
+
+  it('planted defect: uppercase hex violates the same CHECK — the regex is case-sensitive on purpose', async () => {
+    const upper = row('01J9GATJ000000000000000000', { sha256: 'A'.repeat(64) });
+    await expect(insertAttachment(db.pool, upper)).rejects.toThrow(/attachments_sha256_hex/);
+  });
 });

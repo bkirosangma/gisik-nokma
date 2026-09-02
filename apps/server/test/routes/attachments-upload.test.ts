@@ -1,9 +1,10 @@
+import { createHash } from 'node:crypto';
 import { readdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { attachmentUploadedPayload, newUlid } from '@gisik-nokma/domain';
 import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
@@ -635,5 +636,63 @@ describe('POST /v1/attachments', () => {
     expect(row?.filename).toBe('evil.png');
     // The object key was never made of the filename in the first place.
     expect(row?.objectKey).toBe(`w/${WS}/a/${body.attachmentId}`);
+  });
+
+  it('the 201 body and the stored row carry the same SHA-256 of the stored bytes', async () => {
+    const ticketId = await freshTicket();
+    const res = await upload(memberToken, ticketId, {
+      filename: 'photo.png',
+      contentType: 'image/png',
+      data: PNG,
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json() as {
+      attachmentId: string;
+      filename: string;
+      mime: string;
+      size: number;
+      sha256: string;
+    };
+    expect(body.sha256).toBe(createHash('sha256').update(PNG).digest('hex'));
+
+    // The client is required to echo the door's answer verbatim into
+    // `attachment.added` (amendment 15). Pin the 201 body against the
+    // ALREADY-LANDED wire schema — not a copy of its regex — so this test
+    // reddens if the two ever disagree, rather than passing because both
+    // sides independently agree with the same content.
+    const wirePayload = attachmentUploadedPayload.parse({
+      kind: 'upload',
+      attachmentId: body.attachmentId,
+      filename: body.filename,
+      mime: body.mime,
+      size: body.size,
+      sha256: body.sha256,
+    });
+    expect(wirePayload.sha256).toBe(body.sha256);
+
+    const row = await getAttachment(db.pool, body.attachmentId);
+    expect(row?.sha256).toBe(body.sha256);
+  });
+
+  it('planted defect: two uploads differing by one byte get different hashes, and a lying content-type changes nothing', async () => {
+    const ticketId = await freshTicket();
+    const other = Buffer.concat([PNG, Buffer.from([0x01])]);
+
+    const first = await upload(memberToken, ticketId, {
+      filename: 'a.png',
+      contentType: 'image/png',
+      data: PNG,
+    });
+    const second = await upload(memberToken, ticketId, {
+      filename: 'b.png',
+      contentType: 'application/pdf',
+      data: other,
+    });
+
+    const a = first.json() as { sha256: string };
+    const b = second.json() as { sha256: string };
+    expect(a.sha256).not.toBe(b.sha256);
+    expect(b.sha256).toBe(createHash('sha256').update(other).digest('hex'));
   });
 });

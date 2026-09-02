@@ -9,10 +9,11 @@ export type AttachmentRow = {
   mime: string;
   size: number;
   objectKey: string;
+  sha256: string | null;
   createdAt: string;
 };
 
-const COLUMNS = `id, workspace_id, ticket_id, uploader_id, filename, mime, size, object_key, created_at::text AS created_at`;
+const COLUMNS = `id, workspace_id, ticket_id, uploader_id, filename, mime, size, object_key, sha256, created_at::text AS created_at`;
 
 type DbRow = {
   id: string;
@@ -23,6 +24,7 @@ type DbRow = {
   mime: string;
   size: number;
   object_key: string;
+  sha256: string | null;
   created_at: string;
 };
 
@@ -36,15 +38,32 @@ function toRow(db: DbRow): AttachmentRow {
     mime: db.mime,
     size: db.size,
     objectKey: db.object_key,
+    sha256: db.sha256 ?? null,
     createdAt: db.created_at,
   };
 }
 
-export async function insertAttachment(db: Queryable, row: Omit<AttachmentRow, 'createdAt'>): Promise<void> {
+export async function insertAttachment(
+  db: Queryable,
+  row: Omit<AttachmentRow, 'createdAt' | 'sha256'> & { sha256?: string },
+): Promise<void> {
   await db.query(
-    `INSERT INTO attachments (id, workspace_id, ticket_id, uploader_id, filename, mime, size, object_key)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [row.id, row.workspaceId, row.ticketId, row.uploaderId, row.filename, row.mime, row.size, row.objectKey],
+    `INSERT INTO attachments (id, workspace_id, ticket_id, uploader_id, filename, mime, size, object_key, sha256)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      row.id,
+      row.workspaceId,
+      row.ticketId,
+      row.uploaderId,
+      row.filename,
+      row.mime,
+      row.size,
+      row.objectKey,
+      // The `?? null` is the *unknown* case being written honestly, not a
+      // default standing in for a real hash — see the migration's column
+      // comment.
+      row.sha256 ?? null,
+    ],
   );
 }
 

@@ -7,6 +7,7 @@ import type { Auth } from '../auth/auth.js';
 import { makeRequireSession } from '../auth/require-session.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
 import { insertAttachment } from '../attachments/attachment-repo.js';
+import { sha256Hex } from '../attachments/content-hash.js';
 import { sanitizeFilename } from '../attachments/filename.js';
 import { readAtMost } from '../attachments/read-limited.js';
 import { sniffAllowedMime } from '../attachments/sniff.js';
@@ -372,6 +373,10 @@ export async function registerAttachmentRoutes(
     const objectKey = `w/${visibility.workspaceId}/a/${attachmentId}`;
     const filename = sanitizeFilename(data.filename);
 
+    // Hash the exact buffer that is about to be stored — not the client's
+    // claim about it, and not a re-read (a re-read could hash something else).
+    const sha256 = sha256Hex(read.bytes);
+
     // Bytes first, row second. The other order can leave a row pointing at an
     // object that does not exist, which reads to every later query as a file
     // the product has lost; this order can leave an object no row names, which
@@ -389,6 +394,7 @@ export async function registerAttachmentRoutes(
       mime: sniffed.mime,
       size: read.bytes.length,
       objectKey,
+      sha256,
     });
 
     return reply.code(201).send({
@@ -397,6 +403,7 @@ export async function registerAttachmentRoutes(
       mime: sniffed.mime,
       filename,
       size: read.bytes.length,
+      sha256,
     });
   });
 }
