@@ -58,9 +58,14 @@ function paste(editor: Editor, files: File[]): boolean {
 }
 
 function hasImageNode(editor: Editor): boolean {
-  let found = false;
+  return findImageNode(editor) !== null;
+}
+
+/** The inserted image node itself, so a test can inspect its attrs — not just whether one exists. */
+function findImageNode(editor: Editor): { attrs: Record<string, unknown> } | null {
+  let found: { attrs: Record<string, unknown> } | null = null;
   editor.state.doc.descendants((node) => {
-    if (node.type.name === 'image') found = true;
+    if (node.type.name === 'image') found = node;
     return !found;
   });
   return found;
@@ -68,7 +73,17 @@ function hasImageNode(editor: Editor): boolean {
 
 describe('attachment paste/drop (layer 2)', () => {
   it('an image file uploads, emits attachment.added, THEN inserts the node with wrap block', async () => {
-    const { editor, calls } = makeEditor();
+    const { editor, calls } = makeEditor({
+      onAttachmentAdded: vi.fn(async () => {
+        // The ordering contract itself: at the moment attachment.added
+        // fires, no node has landed yet — a submit racing this flow can
+        // never observe a doc node for a claim that hasn't gone out.
+        // `calls` alone can't catch a hoisted node insertion (it never
+        // records one), so this is the assertion that actually pins order.
+        expect(hasImageNode(editor)).toBe(false);
+        calls.push('event');
+      }),
+    });
     const file = new File([new Uint8Array(12)], 'shelf.png', { type: 'image/png' });
     expect(paste(editor, [file])).toBe(true);
     await vi.waitFor(() => {
@@ -76,6 +91,32 @@ describe('attachment paste/drop (layer 2)', () => {
     });
     // Order is the contract: chip → upload → attachment.added event → node.
     expect(calls).toEqual(['start', 'upload', 'event', 'end']);
+    // The node itself, not just its presence: wrap and alt come from the
+    // upload result, and attachmentId is the load-bearing link the server's
+    // ingest gate (layer 3) checks against real attachments.
+    expect(findImageNode(editor)?.attrs).toEqual({
+      attachmentId: PNG_RESULT.attachmentId,
+      wrap: 'block',
+      alt: PNG_RESULT.filename,
+    });
+    editor.destroy();
+  });
+
+  it('attachment.added handler throwing is a failure too: no node, chip ends, reported', async () => {
+    const { editor, options } = makeEditor({
+      onAttachmentAdded: vi.fn(async () => {
+        throw new Error('host rejected the claim');
+      }),
+    });
+    const before = editor.getJSON();
+    const file = new File([new Uint8Array(12)], 'shelf.png', { type: 'image/png' });
+    expect(paste(editor, [file])).toBe(true);
+    await vi.waitFor(() => {
+      expect(options.onUploadError).toHaveBeenCalled();
+    });
+    expect(options.onUploadEnd).toHaveBeenCalled();
+    expect(hasImageNode(editor)).toBe(false);
+    expect(editor.getJSON()).toEqual(before);
     editor.destroy();
   });
 
