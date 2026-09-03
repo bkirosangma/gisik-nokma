@@ -117,8 +117,9 @@ import type {
  * adapter declined to invent, told by the caller instead, into rule summaries
  * and `require-different-user` editors. That screen is `packages/app-core`, and
  * the narrowing that would fix it is not available to it: `AuthoringReadRefused`
- * is declared in THIS file, and `app-core` depends on `domain`, `rule-engine`
- * and `ui` alone. So the fix is a contract move, not a one-line catch, and it is
+ * is declared in THIS file, and `app-core` depends on `domain`, `rule-engine`,
+ * `ui` and `@xyflow/react` — and on nothing under `apps/`, which is the part
+ * that matters here. So the fix is a contract move, not a one-line catch, and it is
  * RECORDED in the coordination doc (Plan 8 Task 13 fix round, 2026-09-03) rather
  * than annexed here. The reason the adapter still rejects is unchanged: an
  * adapter that guessed `[]` would take the choice away from every consumer,

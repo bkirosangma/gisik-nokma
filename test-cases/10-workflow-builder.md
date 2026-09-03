@@ -53,7 +53,7 @@ Mirrors `Features.md` §10. Status: `❌` not covered · `✅` covered · `🟡`
 ## Templates
 - 10.37 ✅ The three templates validate clean and clone with fresh ids, never sharing structure — `templates.test.ts`
 - 10.57 ✅ simple-kanban and approval-chain produce no advisories — `templates.test.ts` ("simple-kanban and approval-chain warn about nothing")
-- 10.38 ✅ errand-with-waits blocked-flags exactly its two waiting states — `templates.test.ts`
+- 10.38 ✅ errand-with-waits blocked-flags exactly its one waiting state — `templates.test.ts` asserts `toEqual(['waiting'])`, a one-element array, so a two-state claim would redden it
 - 10.39 ✅ approval-chain requires a second person on approve — `templates.test.ts`
 - 10.40 ✅ Gallery offers the three plus Start blank — `screens.test.tsx`
 - 10.61 ✅ errand-with-waits does **not** produce no advisories — it trips `rule-bypassable` twice on its two pinned rule-free one-hop paths into `waiting`, asserted against `adviseWorkflowDef`'s own output rather than a hardcoded expectation — `templates.test.ts` ("errand-with-waits trips rule-bypassable — recorded, not adjudicated"). Fully covered, not a gap: it is a documented, deliberate exception to Task 3's "a shipped template warns about nothing" invariant, tracked by an open ruling request in the coordination doc ("Plan 8 Task 3's frozen errand template trips `rule-bypassable`"), owned jointly by Plan 11 (the frozen template shape) and Plan 2 (the advisory design) — neither this task nor Task 3 can resolve it.

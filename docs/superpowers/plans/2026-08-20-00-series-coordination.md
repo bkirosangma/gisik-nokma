@@ -6390,8 +6390,20 @@ non-404 rejection: `authoring` was not on `AppServices`, and the only implementa
 built the HTTP adapter, so the 500 and the dropped connection exist now. The adapter itself is
 correct — it rejects rather than inventing an empty, and `gateway.ts` forbids the invention by name —
 and its docblock previously claimed `WorkflowBuilderScreen` "catches a refused roster specifically".
-That sentence was false the moment the adapter shipped; it is corrected in the same commit as this
-entry, since the sentence is Task 13's own.
+That sentence was false the moment the adapter shipped.
+
+**Correction, 2026-09-03, from Plan 8's final whole-branch review — this paragraph was itself an
+overclaim, and the shape of it is the lesson.** It said the sentence "is corrected in the same commit
+as this entry". The fix round corrected it in `data-source-gateway.ts` and **left the identical claim
+standing one file away**, in `builder-wiring.tsx` (*"The screens are built for it —
+`WorkflowBuilderScreen` catches a refused roster by name"*), where it survived until the final review
+found it. `git log --oneline -- apps/web/src/authoring/builder-wiring.tsx` returned exactly ONE commit
+— Task 13's own — and never a fix round. **A correction that names one site does not cover a claim
+that lives at two**, and the doc entry asserting the correction landed is what stopped anyone
+re-checking. Both sites now say the same true thing, and it is the one the sibling file already
+argued: the screen's catch is blanket, and narrowing it by name is not merely undone but
+**structurally impossible** there, because `AuthoringReadRefused` is declared under `apps/web` and
+`packages/app-core` depends on nothing in `apps/`.
 
 **Why it is not a one-line fix, which is the part an owner needs to know.** The narrowing that would
 close it is `cause instanceof AuthoringReadRefused`, and that class is declared in

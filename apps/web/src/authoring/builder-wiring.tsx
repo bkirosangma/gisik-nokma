@@ -53,8 +53,14 @@ import { AuthoringReadRefused } from './data-source-gateway.js';
  * 2. **404** → the no-guests door turned this caller away (executor ruling
  *    2026-09-02), or they are not a member. Either way `'guest'`, the floor of
  *    the union: `canAuthorRole('guest')` is false, so the builder mounts
- *    read-only, which is exactly what a guest should see. The screens are built
- *    for it — `WorkflowBuilderScreen` catches a refused roster by name.
+ *    read-only, which is exactly what a guest should see. **The screens are NOT
+ *    built for it**, and the sibling file says so at length:
+ *    `WorkflowBuilderScreen`'s only roster catch is blanket
+ *    (`listMembers(...).catch(() => [])`), so a 500 becomes an empty roster
+ *    rather than a refusal. Narrowing it by name is not merely undone but
+ *    IMPOSSIBLE there: `AuthoringReadRefused` is declared in this package and
+ *    `packages/app-core` depends on nothing under `apps/`. Recorded in the
+ *    coordination doc as a contract move, not a one-line catch.
  * 3. **Anything else** — a 500, a dropped connection, an unparseable body →
  *    `refused`. NOT `'guest'`. A failed read is not a role, and defaulting to
  *    one would show an owner a banner saying they may not change the thing they
