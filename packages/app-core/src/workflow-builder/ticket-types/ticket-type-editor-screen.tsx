@@ -287,6 +287,20 @@ export function TicketTypeEditorScreen(props: {
                   {`Left on "${outgoingWorkflow.name}". They keep their own board columns.`}
                 </p>
               ) : (
+                // The `!canAuthor` term on both buttons below is defence in
+                // depth, and it is NOT pinned by a test — deliberately, because
+                // no test can reach it. `diverged` is false at mount for every
+                // role (it compares def.workflowId against the initialDef's
+                // own), and the only gesture that can make it true is the
+                // Workflow combobox, which is itself `disabled={!canAuthor}`.
+                // Measured at this sha: dropping `!canAuthor` from either
+                // button reddens 0 of the 213 tests in test/workflow-builder +
+                // test/ticket-types. The lock that actually holds is the outer
+                // one, and THAT is tested — access.test.tsx's "locks the binding
+                // itself, so the divergence section a migration lives in never
+                // opens". A test aimed at these two terms would have to defeat
+                // the combobox gate in its own setup, and would then be
+                // asserting that setup rather than the gate.
                 <div className="ticket-type-editor__divergence-actions">
                   <button
                     type="button"

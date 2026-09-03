@@ -6289,6 +6289,39 @@ had that button. So the sweep is an enumeration in both directions, at this sha:
   textbox, five category comboboxes, five blocked checkboxes — every one disabled, and the admin
   render carries the identical eleven, every one enabled. That pair is the design decision stated as
   a measurement: read-only is *frozen*, not *hidden*. Nothing is omitted from a member's view.
+- **Added in this task's FIX ROUND, because the enumeration above stopped at the builder screen.** The
+  ticket-type editor is the other surface behind the same gate, and it is the one that owns
+  field-schema authoring and the rank D4's requires-parent rule reads. The gate was correct in the
+  code at the reviewed sha — every call site sits behind `canAuthor`, which is what the first bullet
+  measured — but three of its terms were pinned by NOTHING, and that is a different claim from
+  "sound". Measured: dropping `disabled` on the `IconPicker`, dropping it on the `FieldsEditor`, and
+  removing the `!canAuthor` half of the rank input's `!canAuthor || isBuiltin` each left **211 of 211**
+  green. The third is the sharpest, and the reason it hid is worth keeping: every member fixture in
+  both suites — `access.test.tsx`'s `taskType` and `ticket-types.test.tsx`'s builtin seeds — is one of
+  `BUILTIN_TICKET_TYPE_SEEDS`, so `isBuiltin` was already true and satisfied the gate whatever the
+  author half said. A CUSTOM type's rank had no non-author test at all. What closes it is one test,
+  `no authoring action is reachable by any path the TICKET-TYPE EDITOR offers a member` > `shows the
+  member every control the admin gets, disables every one of them, and every button on the screen is
+  an icon choice`, over a custom type at rank 5 carrying a text field and a select field: **eight**
+  value-bearing controls (four textboxes — the select field's options textarea reports as one — three
+  comboboxes, one spinbutton), every one disabled, and **sixteen** buttons, every one an icon choice
+  and every one disabled. Its control asserts the identical eight ENABLED and the same button
+  predicate FALSE, because on the admin's render Add field, two Remove fields and Save sit outside the
+  icon group. Re-measured at the new denominator: each of the three mutations now reddens **exactly
+  one** of **213**, and the two `canAuthorRole` mutations still redden exactly one each — the owner
+  test and the guest test, unmoved. The `isBuiltin` half of the same gate was already pinned:
+  replacing it with `!canAuthor` alone reddens `locks the rank of a built-in type and says why`, so
+  D7's UI-only lock needed nothing.
+- **NOT pinned, stated at the site rather than covered by a test that could not fail.** The
+  `!canAuthor` term on the divergence section's `Move them to ...` and `Leave them on ...` buttons is
+  unreachable for a member by construction: `diverged` compares `def.workflowId` against the
+  `initialDef`'s own, so it is false at mount for every role, and the only gesture that can make it
+  true is the Workflow combobox, itself `disabled={!canAuthor}`. Dropping `!canAuthor` from either
+  button reddens **0** of 213. The lock that actually holds is the outer one and it IS tested —
+  `locks the binding itself, so the divergence section a migration lives in never opens` — so a test
+  aimed at these two terms would have to defeat the combobox gate in its own setup and would then be
+  asserting that setup rather than the gate. The reason now sits in a comment beside the two buttons,
+  which is the honest place for a term no test reaches.
 
 **A claim this task wrote and then had to withdraw.** The first version of the sweep asserted "a
 member's builder screen offers no button at all". It is false, and the reason is the open ruling

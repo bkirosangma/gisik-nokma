@@ -449,3 +449,109 @@ describe('the server, not the UI, is the enforcer', () => {
     expect(screen.getByText('rule: workspace.frozen-for-billing')).toBeInTheDocument();
   });
 });
+
+/**
+ * The other half of the enumeration, and the half the first version of this file
+ * left out. Everything above enumerates the BUILDER screen; the ticket-type
+ * editor is the other surface behind the same gate, and it is the one that owns
+ * field-schema authoring and the rank that drives D4's requires-parent rule.
+ * Measured before these two tests existed, at the sha that added them: three
+ * separate gates on that screen were pinned by NOTHING — dropping `disabled` on
+ * the IconPicker, on the FieldsEditor, and the `!canAuthor` half of the rank
+ * input's gate each left 211/211 green. The gate itself was correct; the proof
+ * was missing, which is the same defect rulings P19, P22 and P23 name.
+ *
+ * The fixture is a CUSTOM type on purpose. Every member fixture that existed
+ * before — `taskType` here, and `ticket-types.test.tsx`'s builtin seeds — is one
+ * of BUILTIN_TICKET_TYPE_SEEDS, so `isBuiltin` is already true and the rank
+ * input's `!canAuthor || isBuiltin` is satisfied by its second term whatever the
+ * first says. A custom type is the only shape in which the author half of that
+ * gate can fail.
+ */
+const customType: TicketTypeDef = {
+  id: newUlid(),
+  name: 'Errand',
+  icon: 'truck',
+  // Deeper than the domain's DEEPEST_RANK of 4 — `rank >= DEEPEST_RANK`, so
+  // this type requires a parent. That makes the rank input exactly the field
+  // D4's requires-parent rule reads, and the one an ungated member could move.
+  rank: 5,
+  fields: [
+    { id: newUlid(), name: 'Shop', type: 'text' },
+    // A select field, so the editor also mounts its options textarea: one more
+    // value-bearing control that FieldsEditor gates and nothing pinned.
+    { id: newUlid(), name: 'Urgency', type: 'select', options: ['today', 'this week'] },
+  ],
+  workflowId: kanbanPublished.id,
+};
+
+describe('no authoring action is reachable by any path the TICKET-TYPE EDITOR offers a member', () => {
+  function renderTypeEditor(session: BuilderSession) {
+    const gateway = createFakeGateway({
+      workflows: [kanbanPublished, errandPublished],
+      ticketTypes: [customType],
+    });
+    render(
+      <TicketTypeEditorScreen
+        workspaceId={newUlid()}
+        session={session}
+        gateway={gateway}
+        initialDef={customType}
+      />,
+    );
+    return gateway;
+  }
+
+  it('shows the member every control the admin gets, disables every one of them, and every button on the screen is an icon choice', async () => {
+    renderTypeEditor(memberSession);
+    await screen.findByRole('textbox', { name: 'Type name' });
+    const memberControls = valueControls();
+    // Enumerated, not counted alone: 4 textboxes (Type name, two Field names —
+    // a textarea reports as one too, so the select field's options box is in
+    // here) + 3 comboboxes (Workflow, two Field types) + 1 spinbutton (rank).
+    expect(memberControls).toHaveLength(8);
+    for (const control of memberControls) expect(control).toBeDisabled();
+    // Named separately from the sweep because this is the D4 field and the
+    // sharpest of the three: on a builtin type `isBuiltin` would mask it.
+    expect(screen.getByRole('spinbutton', { name: 'Hierarchy rank' })).toBeDisabled();
+
+    // The button analogue of the builder screen's `everyButtonIsAJump`: every
+    // button a member is offered here is an icon choice, and every one of them
+    // is disabled. FieldsEditor's Add/Remove and the Save button are the ones
+    // that would appear if a gate came down, and they are buttons, so a count
+    // that matches the icon group is the whole claim.
+    const iconGroup = screen.getByRole('group', { name: 'Icon' });
+    const buttons = screen.queryAllByRole('button');
+    // Non-vacuity: sixteen icon choices ship at this sha, so an empty list here
+    // would mean the picker never rendered rather than that nothing escaped.
+    expect(buttons.length).toBeGreaterThan(8);
+    for (const button of buttons) {
+      expect(iconGroup.contains(button)).toBe(true);
+      expect(button).toBeDisabled();
+    }
+    // The named half, whose control is the next test — without it a typo in any
+    // of these three names would make all three assertions pass vacuously.
+    expect(screen.queryByRole('button', { name: 'Add field' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove field' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save ticket type' })).not.toBeInTheDocument();
+  });
+
+  it('control: the admin render has the SAME eight controls, every one enabled, and DOES offer Add field, Remove field and Save', async () => {
+    renderTypeEditor(adminSession);
+    await screen.findByRole('textbox', { name: 'Type name' });
+    const adminControls = valueControls();
+    expect(adminControls).toHaveLength(8);
+    for (const control of adminControls) expect(control).toBeEnabled();
+    expect(screen.getByRole('spinbutton', { name: 'Hierarchy rank' })).toBeEnabled();
+
+    // The paired control for "every button is an icon choice": on the admin's
+    // render that predicate is FALSE, because the three authoring buttons are
+    // there. A predicate that held for both roles would measure nothing.
+    const iconGroup = screen.getByRole('group', { name: 'Icon' });
+    const buttons = screen.queryAllByRole('button');
+    expect(buttons.some((button) => !iconGroup.contains(button))).toBe(true);
+    expect(screen.getByRole('button', { name: 'Add field' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Remove field' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Save ticket type' })).toBeInTheDocument();
+  });
+});
