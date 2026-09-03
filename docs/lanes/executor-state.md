@@ -9,7 +9,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9. T1-T6 DONE, GATE GREEN. T6 fix + T7 IN FLIGHT.**
+## WHERE I AM: **STEP 14 — PLAN 9. T1-T7 COMMITTED, GATE GREEN. T7 fix + T8 IN FLIGHT.**
 
 > # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
 > ```
@@ -113,6 +113,36 @@ coordination doc already pre-corrected this). T2's `docToPlainText` **already ex
 (`packages/domain/src/doc-text.ts`) — created by **Plan 5**, not Plan 7 as T2's text says; take the
 skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
 `src/index.ts` as the plan says.
+
+## PROGRESS: T1-T7 COMMITTED. T7's fix + T8 IN FLIGHT. **Measure, do not trust this line.**
+
+`/usr/bin/git log --oneline origin/main..HEAD` · `/usr/bin/git status --porcelain=v1`
+
+**T6's fix (`df4834a`) closed all four Importants and both regraded Minors** — test file only,
+`sweep.ts` never modified (sha256 matched its HEAD blob). Suite 30 -> 37. **Every "was" figure was
+RE-MEASURED rather than inherited from the review**, and its mutation harness refused to run unless the
+pattern matched exactly once and printed its own applied diff — which is how it avoided the did-not-run
+class entirely. It also found a survivor **the review had missed**: asking the date-loop's gate about
+`row.assignee_id ?? ''` instead of the resolved target survived 36/36; the stale loop's recipient
+argument was already pinned and the date loop's was not.
+
+It regraded one Minor **up** to Important and fixed it (`ticketTitle`/`field` are user-visible payload
+and the stale side was already `toEqual`-pinned — the asymmetry *was* the defect), and kept one at
+Minor while fixing it anyway. **Recorded, not fixed, owner: whoever next opens `sweep.ts`** — the
+malformed-claim branch at `sweep.ts:194-197` skips a bad `dueDate` claim with a log line and no test
+seeds one, so *"skipped, not guessed"* is unwitnessed. `expectNoNotifications` was deliberately left
+per-call rather than an `afterEach` so that branch can expect a log line when someone writes it.
+
+### T7 (the notification API) — committed, and its review found the sharpest wiring gap yet
+
+**The shipped handlers are CORRECT.** Every faithful "wrong id" mutation reddens. Three Importants,
+all proof gaps plus one missing guard:
+
+| # | Finding |
+|---|---|
+| **I1** | **The route registration has NO WITNESS.** Deleting `registerNotificationRoutes` from `app.ts:299` leaves **85 files / 937 tests green** — the inbox could ship **404ing on all three routes with a fully green gate**. A contrast mutation (route path -> `/v1/me/notificationsX`) reddens 3 tests by name, so the *handlers* are covered and the *wiring* is not. Root cause: the test hand-builds `Fastify()` instead of `buildTestApp` like **every** sibling route test — and `test/helpers/app.ts:88-92` states exactly why in its own docstring: *"every new route registered in `buildApp` has to be reachable from all of them."* |
+| **I2** | **The forged-parameter probe covers one route of three.** A client-readable `?userId=` override added to `unread-count` or `mark-read` SURVIVES 7/7; measured under mutation it returned another user's `{"unread":3}` and flipped their row to `read=true`. **Scope stated honestly by the reviewer:** these mutations ADD a parameter the shipped code never reads, so this is a proof gap, not a live leak — which is why it graded Important, not Critical. The test file claims in prose that *"rows come from the session only"* while testing it on one route. |
+| **I3** | **The route validates nothing it takes from the client.** `?limit=1.5` -> **500** (pg 22P02, `invalid input syntax for type bigint: "2.5"`); `?cursor=%00` -> **500** (pg 22021). The handler accepts any `Number.isFinite` value and the store clamps the RANGE but never rounds. **The branch already solved this one file away**: `routes/list.ts:518-527` rejects a non-integer limit with 400, and its comment names this exact trap — *"`Number('2.5')` is 2.5 and fails the integer test"*. Not production disclosure (`setErrorHandler` masks 5xx), and the raw Postgres text was visible only because the harness is a bare `Fastify()` — I1's root cause again. |
 
 ## RECOVERY ROUND CLOSED — GATE IS GREEN AGAIN. T6's fix + T7 now in flight.
 
