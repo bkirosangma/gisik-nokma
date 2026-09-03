@@ -9,6 +9,7 @@ import {
 import { buildTicketTypeDefinedEvent } from '../events.js';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from '../ui/builder-context.js';
+import { ReadOnlyBanner } from '../ui/read-only-banner.js';
 import { FieldsEditor } from './fields-editor.js';
 import { IconPicker } from './icon-picker.js';
 import { rankImplications, rankImplicationsCopy } from './rank.js';
@@ -205,6 +206,7 @@ export function TicketTypeEditorScreen(props: {
 
   return (
     <section className="ticket-type-editor">
+      {canAuthor ? null : <ReadOnlyBanner />}
       <label className="ticket-type-editor__name">
         <span>Type name</span>
         <input

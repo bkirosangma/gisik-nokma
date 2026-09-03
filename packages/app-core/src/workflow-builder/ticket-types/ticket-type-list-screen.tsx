@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BUILTIN_TICKET_TYPE_SEEDS, type TicketTypeDef } from '@gisik-nokma/domain';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from '../ui/builder-context.js';
+import { ReadOnlyBanner } from '../ui/read-only-banner.js';
 import { TypeIcon } from './icons.js';
 
 export function TicketTypeListScreen(props: {
@@ -36,6 +37,7 @@ export function TicketTypeListScreen(props: {
           </button>
         ) : null}
       </header>
+      {canAuthor ? null : <ReadOnlyBanner />}
       <ul className="ticket-type-list__rows">
         {types.map((type) => (
           <li className="ticket-type-list__row" key={type.id}>

@@ -14,6 +14,7 @@ import {
 import { InspectorPanel } from './inspector-panel.js';
 import { IssuesPanel } from './issues-panel.js';
 import { PublishControls } from './publish-controls.js';
+import { ReadOnlyBanner } from './read-only-banner.js';
 import { SystemRulesPanel } from './system-rules-panel.js';
 import { WorkflowCanvas } from './workflow-canvas.js';
 
@@ -104,6 +105,7 @@ export function WorkflowBuilderScreen(props: {
     <BuilderProvider store={store} env={env}>
       <div className="workflow-builder-screen">
         <header className="workflow-builder-screen__header">
+          {env.canAuthor ? null : <ReadOnlyBanner />}
           <WorkflowNameField />
           <AddStateButton />
           <PublishControls onPublished={props.onPublished} />

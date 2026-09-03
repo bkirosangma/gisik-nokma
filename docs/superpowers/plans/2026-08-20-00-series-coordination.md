@@ -6251,3 +6251,88 @@ assigned, not inherited.** Note the roster half is not purely cosmetic: with a g
 roster, *every* named-person reference in *every* rule renders unchecked, so a warning keyed only on
 "not in `members`" would cry wolf across the whole workflow. The honest fix distinguishes "the roster
 says this person is not here" from "there is no roster to ask" — which is design work, not a patch.
+
+## Plan 8 Task 12 (2026-09-03) — the read-only gate is sound INSIDE app-core, and the one hole is a route Task 13 has not written yet
+
+Task 12 wired the look-not-touch banner into the four screens and proved the gate end to end rather
+than affordance by affordance. Three things came out of it worth keeping.
+
+**The end-to-end claim, made falsifiable.** Naming buttons that should be absent proves nothing on
+its own — a typo in the name makes every `not.toBeInTheDocument()` pass against a screen that never
+had that button. So the sweep is an enumeration in both directions, at this sha:
+
+- Every state-mutating gateway call in `packages/app-core/src/workflow-builder` is one of **three**
+  call sites — `ui/publish-controls.tsx:73` (`submit`), `ticket-types/ticket-type-editor-screen.tsx:167`
+  (`migrateTypeToWorkflow`) and `:189` (`submit`). Controls named before the run: both files had to
+  appear, and both did. `publish-controls.tsx` returns `null` outright when `!env.canAuthor`; the
+  editor's Save button is `canAuthor ? … : null`; the migrate path is behind a Move button that is
+  `disabled={!canAuthor}` *and* only reachable once the workflow combobox has changed, which is
+  itself disabled for a non-author. Two independent locks on the only irreversible one — and that
+  one now has a test, which it did not: `migrateTypeToWorkflow` expands into a
+  `ticket.workflow_rebound` per ticket, Task 11's rebind suite drives the whole flow but its helper
+  defaults to an admin session, so no non-author had ever reached the divergence section. The new
+  test attempts the admin's own gesture as a member and asserts the section never opens and
+  `gateway.migrations` stays empty, with the admin doing the identical gesture as the control in the
+  same file. Note an assertion on `migrations` from the BUILDER screen would not have covered it:
+  that screen has no migrate path, so it could never fail.
+- All **four** of `WorkspaceRole` are exercised, not two. The gate is `canAuthorRole`, a one-line
+  predicate over that union, and a member/admin pair does not test a predicate's boundaries: measured
+  by mutation at this sha, narrowing it to `role === 'admin'` reddens **exactly one** test out of 211
+  in `test/workflow-builder/` + `test/ticket-types/` — the new owner test — and widening it to
+  `role !== 'member'` reddens exactly one, the new guest test. Before them, either mutation was
+  invisible to 210 tests, and an owner would have been shown a banner saying they may not change the
+  thing they own. Guest is the sharper half: `screens.test.tsx`'s test *named* for the guest
+  `listMembers` refusal (executor ruling 2026-09-02) passes an **admin** session, so nothing in the
+  repo pinned any guest behaviour on these screens. The new one refuses the roster and asserts the
+  screen still renders, still reads read-only, and still offers nothing but jumps.
+- On the member's builder screen the value-bearing controls number **eleven** — one workflow-name
+  textbox, five category comboboxes, five blocked checkboxes — every one disabled, and the admin
+  render carries the identical eleven, every one enabled. That pair is the design decision stated as
+  a measurement: read-only is *frozen*, not *hidden*. Nothing is omitted from a member's view.
+
+**A claim this task wrote and then had to withdraw.** The first version of the sweep asserted "a
+member's builder screen offers no button at all". It is false, and the reason is the open ruling
+request above: the frozen `ERRAND_WITH_WAITS_TEMPLATE` trips `rule-bypassable` twice, so the
+advisories panel puts two jump buttons on screen for every role. The template was not touched. The
+surviving invariant is narrower and stronger — **every button a member is offered matches
+`(issues|advisories)-panel__jump`**, whose whole effect is `store.actions.select` — and the test
+clicks every one of them, re-checking the predicate after each click, because a jump mounts an
+inspector and an inspector is where an ungated authoring button would appear. The admin control
+asserts the same predicate is **false** on the admin's opening screen; a predicate that held for both
+roles would have been measuring nothing.
+
+**RECORDED, NOT FIXED — owner Plan 8 Task 13, verified open at this sha.** `TemplateGallery` takes no
+session and applies no role check: `props.onPick` is unconditional. Inside app-core that is harmless,
+because the only thing that mounts it is the list screens' `onNew`, which is `canAuthor ? … : null`.
+The exposure is a **route**, and Task 13 is where routes get written: its own snippet for
+`apps/web/app/w/[workspaceId]/settings/workflows/new/page.tsx` renders `<TemplateGallery>` after
+`useBuilderWiring(...)` returns, and never consults `wiring.session.role` — so a member who types that
+URL is handed the gallery the list screen deliberately hid from them, picks a template, and lands on a
+read-only `WorkflowBuilderScreen`. No authoring action escapes (the banner shows, Publish is gone),
+but an authoring *entry point* is offered, and `ticket-types/new/page.tsx` has the same shape. Task 13
+is unstarted — every step box unchecked, `apps/web/src/authoring/` does not exist — and it is the task
+that writes the two files, so the gate belongs in the same commit as the pages and not retrofitted
+onto a component that has no session to consult.
+
+**Not a hole, recorded so nobody "fixes" it into one.** `WorkflowCanvas` passes `nodesDraggable`
+unconditionally, so a member can drag a node and `onNodeDragStop` calls `store.actions.moveState`.
+That is deliberate and must stay: design decision 5 says layout is presentation, not truth, and is not
+published — confirmed in the code, not inferred from the plan, at `events.ts`'s `buildPublishPayload`,
+which spreads `draft.def` (a `WorkflowDef`, carrying no coordinates) and never reads `draft.positions`.
+Gating the drag would freeze a member's ability to *read* a dense graph while protecting nothing.
+
+**Plan text wrong about this repo, for the executor of Tasks 13–15.** Task 12's Step 1 snippet asserts
+`'Must carry an attachment as evidence.'` renders on the errand template and clicks it to open the
+transition inspector. The errand template carries **no `require-evidence` rule at all** — its three
+guarded transitions (indices 3, 6 and 8) all carry `require-comment`, whose summary is identical
+across all three, so even the correct string throws on multiple matches. The test addresses the edge
+by its own `data-testid="transition-label-8"` instead. This is the same class of error Task 5's fix
+round already recorded against the same template, and the third time in this plan that a Task's
+snippet has imported `tokens.workflowBuilder.*` from `@gisik-nokma/ui`, an export that does not exist
+(Tasks 8 and 9 corrected it before; the banner's colours are a BEM class in `packages/ui/src/ui.css`
+over existing `var(--gn-*)` roles). A fourth: the snippets spell module imports `./read-only-banner.tsx`,
+and Task 13's tsconfig step exists to make that spelling typecheck — but this repo's modules import
+`.js` throughout, including every file this task touched, so the `.tsx` spelling is not the house
+style it is written as. Step 4 also predicts "20 tests" for the three suites it names; they hold
+**53** — the earlier suites grew past the plan's arithmetic, which is a stale prediction rather than
+a missing test.

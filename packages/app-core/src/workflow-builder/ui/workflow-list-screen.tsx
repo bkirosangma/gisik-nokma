@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { PublishedWorkflowDef } from '@gisik-nokma/domain';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from './builder-context.js';
+import { ReadOnlyBanner } from './read-only-banner.js';
 
 export function WorkflowListScreen(props: {
   workspaceId: string;
@@ -43,6 +44,7 @@ export function WorkflowListScreen(props: {
           </button>
         ) : null}
       </header>
+      {canAuthor ? null : <ReadOnlyBanner />}
       {workflows.length === 0 ? (
         <p className="workflow-list__empty">No workflows published yet.</p>
       ) : (
