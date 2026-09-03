@@ -9,7 +9,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9. T1-T13 COMMITTED (13/15). T13 fix + T14 IN FLIGHT. Then T15, final review, PR.**
+## WHERE I AM: **STEP 14 — PLAN 9. T1-T14 COMMITTED (14/15). T14 fix + T15 IN FLIGHT. Then final review, PR.**
 
 > # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
 > ```
@@ -253,7 +253,44 @@ coordination doc already pre-corrected this). T2's `docToPlainText` **already ex
 skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
 `src/index.ts` as the plan says.
 
-## PROGRESS: T1-T13 COMMITTED (13 of 15). T13's fix + T14 IN FLIGHT. Then T15, final review, PR.
+## PROGRESS: T1-T14 COMMITTED (14 of 15). T14's fix + T15 (the closeout) IN FLIGHT. Then final review, PR.
+
+### T14 did the mount Plan 6 skipped, and found a plan defect that would have 404'd every inbox row
+
+**The plan's deep link pointed at a route this shell does not have.** `/tickets/${'{'}id{'}'}` — `apps/web` has
+no `/tickets` route, and Board cards push `?ticket=` on the **project** page, which needs a `projectId`
+no `Notification` carries. **Every row in the inbox would have 404'd.** It added `ticket-location.ts`
+reading `project_id` off a row the existing endpoint already serves.
+
+**It closed three seams where the fake was looser than the real routes** — `markRead` must throw on
+404 (a stub that resolved let an optimistic flip stand for a row the server never marked),
+a transport-`null` now names its path instead of throwing `Cannot read properties of null`, and
+`parseNotification` runs per kind rather than a cast. **That is the series' signature failure being
+closed at the seam where it is normally introduced.**
+
+> **AN ID COLLISION ALREADY HAPPENED, AND IT IS THE ARGUMENT FOR TASK 15.** T14's first block was
+> 11.90–11.128 and **collided with ~30 of Tasks 12's and 13's ids**, because Task 13 landed on this
+> branch *while T14 worked*. It caught it by diffing every id definition in the repo and renumbered.
+> **Two lanes numbering into one unregistered section cannot see each other** — which is exactly what
+> `test-cases/11-calendar-notifications.md` not existing has meant for seven tasks.
+
+**It also corrected two of its own prose claims by measurement**, including one where it swapped in the
+hook it had claimed would leave the badge dark, found all six cases still green, and recorded that its
+claim had been false.
+
+**NOT RUN, and it said so rather than implying otherwise:** Step 4's dev walk-through against a live
+server. Typecheck and a forced `next build` passed with `/inbox` present. *"The 40 unit cases cover
+more than the walk-through would, but it is not-run, not covered."*
+
+### T14's review — three Important, and the first is the Task 7 precedent exactly
+
+| # | Finding |
+|---|---|
+| **I1** | **THE NAV MOUNT IS UNWITNESSED — one line orphans the whole feature.** Deleting the import and `<InboxNavLink />` from `app-nav.tsx` leaves **125/125 green AND typecheck clean**. `InboxNavLink` is rendered directly only by its own test; where it renders transitively, `unreadCount()` is un-stubbed, the stub rejects by name, and a bare `catch {}` swallows it. **`/inbox` has no other link anywhere** — and e2e is not in the gate. This is Task 7's finding (a route registration deleted from `buildApp` left 937 green) in its **reachable-page-with-no-door** form. |
+| **I2** | **"No survivors left standing" is FALSE.** Deleting the `isEpicType` spread on `<CalendarView>` alone survives 125/125, while both app-core forwards redden by name — so the shell half is only half-covered (the one case that builds a rank-1 predicate opens the *Timeline* tab). **This is precisely the state T14's own commit argues is worse than doing nothing**: the two tabs would answer differently about the same ticket's epic, and nothing could detect it. |
+| **I3** | **A failed "Load more" DISCARDS every message already on screen.** Measured: after a page-2 failure, **0 rows and 1 refusal panel** — because the render's first arm is the refusal, ahead of the rows arm. Neutering that catch survives 125/125. **It inverts the standard the same files argue for** — the nav badge keeps its last count rather than asserting "none" from a failed request — and it runs against the standing ruling *"a message you were sent is yours."* |
+
+ T13's fix + T14 IN FLIGHT. Then T15, final review, PR.
 
 **T12's fix built a STRONGER guard than the one it copied**: a **set EQUALITY** between the classes the
 components render and the classes `ui.css` styles, harvested from both sides and typed on neither —
