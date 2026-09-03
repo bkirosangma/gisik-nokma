@@ -209,7 +209,7 @@ describe('PublishControls — clean publish', () => {
    * The fixture DIVERGES `def.version` from `base.version` on purpose, and
    * that divergence is the whole test. `draftFromPublished` copies
    * `published.version` into BOTH `def.version` and `base.version`
-   * (draft-store.ts), and no action on DraftActions writes `def.version`
+   * (draft-store.ts), and none of the EDITING actions writes `def.version`
    * afterwards — so for any draft that helper builds, `base.version + 1` and
    * `def.version + 1` are the SAME NUMBER and this test's title would be a
    * claim it could not make. It was exactly that until this fix round: the
@@ -218,10 +218,12 @@ describe('PublishControls — clean publish', () => {
    * missing bump), the one discrimination this test is NAMED for was the one
    * it could not make.
    *
-   * The shape is not smuggled in past the store either: `loadDraft` on
-   * DraftActions takes an arbitrary `WorkflowDraft`, so a draft whose `def`
-   * carries a version its `base` does not is a state the public store API
-   * accepts. Base 2 + 1 = 3; the def reading would say 100.
+   * `loadDraft` is the deliberate exception, and it is also why the shape
+   * below is not smuggled in past the store: it takes an arbitrary
+   * `WorkflowDraft` and `set`s it whole — its entire body is `set(draft)` —
+   * `def.version` included. So a draft whose `def` carries a version its `base` does not is
+   * a state the public store API accepts, not an impossible one.
+   * Base 2 + 1 = 3; the def reading would say 100.
    */
   it('bumps from the PUBLISHED base version, not from the draft def', async () => {
     const user = userEvent.setup();
