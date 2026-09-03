@@ -9,7 +9,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 13 — Plan 8. T1-T12 DONE, gate green. Batch D (T13-T15) is the last one.**
+## WHERE I AM: **STEP 13 — Plan 8. ALL FIFTEEN TASKS DONE. Merged up to main, gate green, final review running, PR next.**
 
 > **BATCH B DIED MID-FLIGHT ON AN EXPIRED LOGIN (2026-09-03).** Seven of nine agents failed with
 > *"Login expired · Please run /login"*: T5's fix round and both agents of T6, T7 and T8. **T5's
@@ -483,6 +483,37 @@ its most persuasive costume: a stale claim wearing the vocabulary of verificatio
 **Action: Task 11 is built in full, as if the line did not exist, and the line is corrected in the
 same change set as Task 11.** Not corrected earlier, because the honest correction is *"absent, and
 here is the commit that supplies it"*, which cannot be written until the commit exists.
+
+## THE POST-MERGE GATE WENT RED ON NODE DRIFT, AND `which pnpm` DOES NOT TELL YOU THE RUNTIME
+
+Recorded because the recorded rule (*a gate result is not evidence unless it names its Node*) is
+right about the symptom and does not explain the mechanism, and the mechanism is what makes the trap
+survivable.
+
+I ran one gate without `export PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH"`. It went **RED**:
+`13 successful, 21 total`, with **4 failures in `packages/sync-client`'s `better-sqlite3` conformance
+tests** and this in the log —
+`/Users/kiro/.nvm/versions/node/**v24.11.1**/bin/pnpm run test exited (1)`. A native binding built
+for v22's ABI, loaded under v24. **Nothing about the failure text points at Node**; it reads as a
+storage regression, and it appeared in the same command as a merge, which is exactly the moment a
+red is most likely to be blamed on the merge. *Run the gate BEFORE a merge so a post-merge red is
+attributable* is why this was catchable at all.
+
+**The part worth keeping, because it defeats the obvious check:** with the export applied,
+`node --version` prints **v22.22.2** while `which pnpm` prints
+**`/Users/kiro/.nvm/versions/node/v24.11.1/bin/pnpm`** — in the same shell, at the same moment. Both
+are true and they are not in conflict. `pnpm` is installed only under v24's bin, but it is a
+`#!/usr/bin/env node` script, so **the `node` first on PATH decides the runtime regardless of which
+directory the pnpm script lives in.** A successor who "verifies the toolchain" with `which pnpm` will
+see v24 and conclude the gate is compromised when it is fine; one who checks `node --version` alone
+sees v22 and is right, but for a reason they cannot articulate and therefore cannot defend.
+
+**The check that actually discriminates is the one already in the repo:**
+`apps/server/test/node-version.test.ts` **self-asserts the Node the suite is running under**, inside
+the gate. Confirmed present in the green run. **Trust that, not `which`.**
+
+Re-run with the export: **exit 0 · 24/24 · 0 cached · 2463 tests**, identical composition to the
+pre-merge run. **The merge was never implicated.**
 
 ## IN FLIGHT
 
