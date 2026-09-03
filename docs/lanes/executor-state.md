@@ -9,7 +9,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 13 — Plan 8. T1-T5 DONE. Batch B is RESUMING AT T6.**
+## WHERE I AM: **STEP 13 — Plan 8. T1-T8 DONE, gate green. Batch C (T9-T12) is next.**
 
 > **BATCH B DIED MID-FLIGHT ON AN EXPIRED LOGIN (2026-09-03).** Seven of nine agents failed with
 > *"Login expired · Please run /login"*: T5's fix round and both agents of T6, T7 and T8. **T5's
@@ -24,7 +24,7 @@ branch's first commit promotes them to `done`, and `check:tasks` now verifies th
 ancestor of `origin/main`. **The repo stands at 118/177 (66.7%), independently recounted.**
 
 Step 13 = **Plan 8**, `docs/superpowers/plans/2026-08-20-08-workflow-builder.md`, **15 tasks.**
-**T1, T2, T3, T4, T5 are DONE and committed.** **T6-T15 remain.**
+**T1-T8 are DONE and committed.** **T9-T15 remain.**
 No PR is open. **Three rulings are open and NONE blocks Batch B** — see RULINGS OPEN.
 
 **Batching:** **A: T1-T4** (done) · **B: T5-T8** (canvas → validation) · **C: T9-T12** (publish →
@@ -44,7 +44,8 @@ clean afterwards. **Require a clean tree AND zero running agents before any gate
 | **Branch** | **`exec/13-plan8-workflow-builder`**, cut from `origin/main` `7337357`. | `git rev-parse --abbrev-ref HEAD` |
 | **Base** | `origin/main` = `73373579b906a18e3d319363a8eb3685b076eb50` | `git rev-parse origin/main`, fetched |
 | **Ahead-count** | **Not written here on purpose. Run `git rev-list --count origin/main..HEAD`.** A count taken while writing the commit that records it is *always* short by one and always looks right to its author. | — |
-| **Gate at branch HEAD (Batch A closed)** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2301 tests.** domain 335 · rule-engine 280 · server 857 · **app-core 543** · editor 178 · web 69 · ui 31 · sync-client 8. **Batch A adds +69, ALL in app-core** — and the split within it is **T1-T3 = 58, T4 = 11**, measured by excluding the task's own test file, not inferred. | run by the executor with `--force` on a clean tree with no agents running, **through `rtk proxy`**; Node printed into the same log |
+| **Gate at branch HEAD (Batch B closed)** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2364 tests.** domain 335 · rule-engine 280 · server 857 · **app-core 606** · editor 178 · web 69 · ui 31 · sync-client 8. **The branch adds +132 over the base, ALL in app-core** (474 → 606): Batch A +69, Batch B +63. | run by the executor with `--force` on a clean tree with **no agents running**, through `rtk proxy`; Node printed into the same log |
+| Gate at the Batch A boundary | exit 0 · 24/24 · 0 cached · 2301 tests; app-core 543. Batch A's own split, measured by excluding each task's test file rather than inferred: **T1-T3 = 58, T4 = 11.** | same method |
 | Gate at the base `7337357`, for the delta | exit 0 · 24/24 · 0 cached · **2232 tests**; app-core 474, all others as above. | measured at branch creation, on the second (unproxied) attempt — the first was proxy-collapsed to one package and its composition was unusable |
 | **`check:tasks`** | **exit 0**, 177 rows / 177 plan tasks, **118 done (66.7%)**, 0 claimed, 0 in-flight, **59 todo**. Plan 08 = 0 done / 15 todo. | `node scripts/check-task-ledger.mjs` after the promotion |
 | **Gate SHAPE** | **24 tasks over EIGHT packages.** Plan 8 Task 14 adds a Playwright e2e script — **if it becomes a turbo task, this figure is spent and must be recounted.** | the run above |
@@ -330,6 +331,44 @@ delta (2301 − 2232) re-used as the Tasks 1-3 figure, double-counting T4's own 
 Re-measured by excluding the task's own test file: **Tasks 1-3 added 58, T4 added 11, 58 + 11 = 69.**
 A decomposition that reconciles at the total and not at the parts reads as verified — the total was
 right, which is what made it persuasive.
+
+## BATCH B — T5, T6, T7, T8. All committed. Gate green at HEAD.
+
+| Task | Result |
+|---|---|
+| **T5** React Flow canvas | **DONE**, and it settled the harness question first, as instructed. Two Important, both **false claims in prose**, and its fix round **died mid-write on the expired login** — recovered and committed as `87ab662` after independent verification. See the harness findings below. |
+| **T6** select-to-edit inspectors | **DONE.** One Important: **the coordination doc's own test-count arithmetic was self-refuting** (`573 → 578` with a claim no pre-existing test changed status). T6 was told to measure the connect gesture and **did** — result below. |
+| **T7** rule editors | **DONE.** One Important, and it is a **finding class worth naming: every conditional affordance was asserted present-when-expected and never absent-when-not**, so none could detect OVER-firing. Load-bearing for the require-field unknown-field warning, which is the only enforcement of design decision 3 anywhere in the product. The reviewer proved it by running both directions of each mutation: `isEmpty = false` (helper never shown) reddens; **`isEmpty = true` (helper ALWAYS shown) does not.** |
+| **T8** live validation *(opus/opus)* | **DONE, verdict SHIP — 27 executed mutations, the most thorough review on this branch.** All eleven issue codes reddened individually and by name; **both** advisory codes anchored; merging the two tiers reddens five tests; truncating the advisory list reddens one. It also mutated `packages/domain/src/validate-workflow.ts` itself to confirm the app-core tests genuinely reach the real validator, and mutated `packages/ui/src/ui.css` to confirm the token-discipline check catches a raw hex. |
+
+### The jsdom harness, now measured in three parts rather than assumed
+
+1. **Rendering is real.** Mutating `state-node.tsx`'s `{data.name}` to a literal reddens canvas tests
+   by name. The canvas assertions in Tasks 5-10 are not theatre.
+2. **`setup.ts`'s `Object.defineProperty` wrapper is load-bearing for GESTURES, not clicks.** Without
+   it d3-drag's `nodrag(event.view)` throws on user-event's `view: null`, **jsdom's own dispatch
+   SWALLOWS the TypeError**, and the gesture silently no-ops while 561 tests stay green. The drag test
+   added in T5's fix round is the only assertion in app-core that reddens when the wrapper goes —
+   **verified independently by me: exactly 1 of 11 canvas tests fails, and it is the drag test.**
+3. **A connect gesture CANNOT be driven to completion in jsdom, and T6 measured it rather than
+   assuming.** The test is named for what it establishes, and its planted defect
+   (`onConnectStart` firing `addTransition`) reddens it. **The mapping layer
+   (`connectionToTransition`) carries the property instead.** Recorded in the coordination doc under
+   `## Plan 8 execution consequences (2026-09-03) — the connect gesture, measured and closed`
+   (~line 6171) so Tasks 9-10 read it rather than re-deriving it.
+4. **jsdom has no layout engine**: every `getBoundingClientRect` is 0x0 and a drag lands a **zero
+   delta**. A gesture test must assert the action firing, **never a coordinate**.
+
+### A stale citation I wrote into two dispatch briefs, caught by T8's reviewer
+
+My Batch B and C briefs cited the errand-template ruling request as *"the coordination doc's Plan 8
+execution consequences, entry 5"*. **That was true when T3 filed it and false by the time I wrote
+it**: T3's own fix round (`48c3655`) moved the entry to its **own top-level heading**,
+`## RULING REQUEST — Plan 8 Task 3's frozen errand template trips rule-bypassable` (~line 6126). Worse,
+`## Plan 8 execution consequences` (~line 6171) now exists as a **different** section — T6's
+connect-gesture record — so the stale pointer resolves to a real heading that is not the subject.
+**A pointer that lands on the wrong real section is worse than one that lands nowhere**, because
+nothing about it looks broken. Corrected in the Batch C brief; `batch-d` never carried it.
 
 ## TWO FINDINGS FROM THE ADAPTATION MAP THAT REACH BEYOND ONE TASK
 
