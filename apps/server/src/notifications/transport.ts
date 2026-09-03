@@ -14,6 +14,16 @@ import { insertNotification } from './store.js';
  * happens to store rows takes its handle at construction; one that opens a
  * socket takes none. That is what lets Plans 10 and 11 implement this without
  * inheriting `pg`.
+ *
+ * `userId` IS THE ROUTING ARGUMENT, and it is always `notification.userId` —
+ * `deliverToAll` below is the only caller and passes exactly that. The
+ * in-app transport ignores it (the stored row carries the recipient), which is
+ * precisely why the pair has to be pinned by a test rather than by a reader:
+ * Plans 10 and 11 route a device by this argument, so a transport handed the
+ * wrong one delivers a mention to the wrong person's phone — the same leak the
+ * visibility gate in `fanout.ts` exists to prevent, arriving by a different
+ * door. `test/notifications/fanout.test.ts`'s recording transport asserts both
+ * the argument and its agreement with `notification.userId`.
  */
 export interface NotificationTransport {
   readonly name: string;

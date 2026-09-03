@@ -27,6 +27,17 @@ const KIRO = '01J9GUKR000000000000000000';
 const ANSELMA = '01J9GUAN000000000000000000';
 /** A third party, mentioned alongside ANSELMA, who CAN see the ticket in every run. */
 const DIPU = '01J9GUDP000000000000000000';
+/**
+ * The SERVER identity that files a contest. Not a decoration: `claim.contested`
+ * is appended by the server on a sync-time refusal (coordination amendment 16),
+ * so its `actorId` is the server and the refused claim's `actorId` is the
+ * CLAIMANT — `sync/contest-coherence.ts` records that the two differ by design
+ * and refuses to bind them. Every contested fixture below therefore keeps them
+ * DIFFERENT. While they were the same user, addressing the notification to the
+ * contest's own actor instead of the claimant's changed nothing observable,
+ * and the one branch with no visibility gate was misroutable in silence.
+ */
+const SERVER = '01J9GSRV000000000000000000';
 
 const visible = new Set<string>();
 /**
@@ -36,14 +47,46 @@ const visible = new Set<string>();
  */
 const canSeeTicket: CanSeeFn = async (_db, userId, ticketId) => visible.has(`${userId}:${ticketId}`);
 
-function fanout(transports?: NotificationTransport[], log?: (m: string, e?: unknown) => void) {
+function fanout(
+  transports?: NotificationTransport[],
+  log?: (m: string, e?: unknown) => void,
+  canSee?: CanSeeFn,
+) {
   return createNotificationFanout({
     pool: db.pool,
     transports: transports ?? [createInAppTransport(db.pool)],
-    canSeeTicket,
+    canSeeTicket: canSee ?? canSeeTicket,
     now: () => new Date('2026-08-23T05:00:00.000Z'),
     log: log ?? (() => {}),
   });
+}
+
+/**
+ * A transport that RECORDS what it was handed, which the file previously had no
+ * way to see: the only fake here threw, and the in-app transport names its
+ * routing parameter `_userId` and reads `notification.userId` instead. So
+ * `deliverToAll` could pass any user id at all — a constant, the wrong loop
+ * variable — and every row still landed in the right inbox, because the row
+ * carries the recipient and the argument was read by nobody.
+ *
+ * It is not read by nobody for long: Plans 10 and 11 route a device by that
+ * argument. Handed the wrong one, a mention arrives on the wrong person's
+ * phone — the leak the visibility gate exists to prevent, through a door the
+ * gate does not watch. Hence a recorder, and hence assertions on the ARGUMENT
+ * rather than on the stored row.
+ */
+type DeliveryRecord = { userId: string; notification: Notification };
+function recordingTransport(name = 'recorder'): { transport: NotificationTransport; delivered: DeliveryRecord[] } {
+  const delivered: DeliveryRecord[] = [];
+  return {
+    delivered,
+    transport: {
+      name,
+      deliver: async (userId, notification) => {
+        delivered.push({ userId, notification });
+      },
+    },
+  };
 }
 
 /**
@@ -74,12 +117,23 @@ async function seedTicket(ticketId: string, assigneeId: string | null, title: st
   );
 }
 
+/**
+ * `workspace_id` is selected, not just `payload`: `listNotifications` filters an
+ * inbox by it, so a row written under the wrong workspace vanishes from the
+ * right inbox while every payload assertion still passes. It was asserted by
+ * nothing until a mutation to a wrong ULID stayed green across the whole suite.
+ */
 async function rowsFor(userId: string) {
   const result = await db.pool.query(
-    'SELECT kind, dedupe_key, payload FROM notifications WHERE user_id = $1 ORDER BY id',
+    'SELECT kind, workspace_id, dedupe_key, payload FROM notifications WHERE user_id = $1 ORDER BY id',
     [userId],
   );
-  return result.rows as Array<{ kind: string; dedupe_key: string; payload: Record<string, unknown> }>;
+  return result.rows as Array<{
+    kind: string;
+    workspace_id: string;
+    dedupe_key: string;
+    payload: Record<string, unknown>;
+  }>;
 }
 
 /**
@@ -127,11 +181,18 @@ describe('ticket.assigned', () => {
   it("notifies the assignee with the event's provenance", async () => {
     await seedTicket(TICKET, ANSELMA, 'Renew the DLT registration');
     const env = assigned();
-    await fanout().onCommitted(env);
+    const recorder = recordingTransport();
+    await fanout([createInAppTransport(db.pool), recorder.transport]).onCommitted(env);
     const rows = await rowsFor(ANSELMA);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.kind).toBe('assignment');
+    expect(rows[0]?.workspace_id).toBe(WS);
     expect(rows[0]?.dedupe_key).toBe(`assignment:${env.id}`);
+    // The ROUTING ARGUMENT, which the stored row cannot speak for: a push
+    // transport delivers to whoever this names.
+    expect(recorder.delivered.map((d) => d.userId)).toEqual([ANSELMA]);
+    expect(recorder.delivered[0]?.notification.userId).toBe(ANSELMA);
+    expect(recorder.delivered[0]?.notification.workspaceId).toBe(WS);
     expect(rows[0]?.payload).toEqual({
       ticketId: TICKET,
       ticketTitle: 'Renew the DLT registration',
@@ -156,12 +217,33 @@ describe('ticket.assigned', () => {
     expect(await rowsFor(ANSELMA)).toHaveLength(1);
   });
 
-  it('unassignment (null) tells nobody', async () => {
+  /**
+   * The `assigneeId === null` guard, pinned where the row count CANNOT pin it.
+   *
+   * Reading rows proved nothing about that guard: delete it and `null` flows
+   * into `canSeeTicket`, whose fake answers false for an id nobody granted, so
+   * the table is empty either way and the test passes for the wrong reason —
+   * production's `canSee` is not this fake and is not what the guard is for.
+   *
+   * So the gate is made permissive here (everyone sees everything) and a
+   * recording transport watches the ONE observable the guard actually governs:
+   * whether a delivery is attempted at all. Deleting the guard now sends a
+   * notification addressed to `null`.
+   */
+  it('unassignment (null) tells nobody — no delivery is even attempted', async () => {
     await seedTicket(TICKET, null, 'Renew the DLT registration');
-    await fanout().onCommitted(assigned({ payload: { assigneeId: null } }));
-    expect(await rowsFor(ANSELMA)).toHaveLength(0);
+    const seesEverything: CanSeeFn = async () => true;
+    const recorder = recordingTransport();
+    await fanout([recorder.transport], undefined, seesEverything).onCommitted(
+      assigned({ payload: { assigneeId: null } }),
+    );
+    expect(recorder.delivered).toEqual([]);
     expect(await totalNotificationRows()).toBe(0);
-    // Positive control: a non-null assignee on the same seeded ticket lands.
+    // Positive control on the same permissive gate and the same recorder: a
+    // non-null assignee IS delivered, so the emptiness above is the guard.
+    await fanout([recorder.transport], undefined, seesEverything).onCommitted(assigned());
+    expect(recorder.delivered.map((d) => d.userId)).toEqual([ANSELMA]);
+    // And through the real transport, the row still lands for a real assignee.
     await fanout().onCommitted(assigned());
     expect(await rowsFor(ANSELMA)).toHaveLength(1);
   });
@@ -262,21 +344,51 @@ describe('mentions', () => {
     });
   }
 
+  /**
+   * The payload is asserted WHOLE, the way the assignment payload always was.
+   *
+   * Field-by-field assertions had left three values constrained by nothing:
+   * `ticketId`, `ticketTitle` and the row's `workspace_id` each survived a
+   * mutation to a wrong constant across the entire server suite. None of the
+   * three is cosmetic. The visibility gate is applied to `env.entity.id` while
+   * the payload carries `ticketId`, and nothing else in the file says they are
+   * the same ticket — a payload naming a DIFFERENT ticket would be a row that
+   * passed a gate about one ticket and points the reader at another.
+   * `workspace_id` is what `listNotifications` filters an inbox by, so a wrong
+   * one silently removes the row from the inbox it was written for.
+   *
+   * A whole-object `toEqual` also fails on an ADDED field, which is the shape
+   * of the leak the ruling test guards from the other side.
+   */
   it('notifies each mentioned user except the author, with an excerpt', async () => {
     await seedTicket(TICKET, null, 'Renew the DLT registration');
     const env = commented(body);
-    await fanout().onCommitted(env);
+    const recorder = recordingTransport();
+    await fanout([createInAppTransport(db.pool), recorder.transport]).onCommitted(env);
     expect(await rowsFor(KIRO)).toHaveLength(0); // the author mentioned themselves — nothing to tell
     const rows = await rowsFor(ANSELMA);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.kind).toBe('mention');
+    expect(rows[0]?.workspace_id).toBe(WS);
     expect(rows[0]?.dedupe_key).toBe(`mention:${env.id}:${ANSELMA}`);
-    expect(rows[0]?.payload['source']).toBe('comment');
-    expect(rows[0]?.payload['mentionedBy']).toBe(KIRO);
     // The excerpt is the shared renderer's output verbatim: mentions render as
     // `@label`, so the recipient reads the comment as it was written rather
     // than a version with the addressees silently removed.
-    expect(rows[0]?.payload['excerpt']).toBe('@Anselma please check the GST filing @Kiro');
+    expect(rows[0]?.payload).toEqual({
+      ticketId: TICKET,
+      ticketTitle: 'Renew the DLT registration',
+      mentionedBy: KIRO,
+      eventId: env.id,
+      source: 'comment',
+      excerpt: '@Anselma please check the GST filing @Kiro',
+      clientTime: env.clientTime,
+      serverTime: env.serverTime,
+    });
+    // The routing argument, which no stored row can speak for: exactly one
+    // delivery, to the mentioned user and not the author.
+    expect(recorder.delivered.map((d) => d.userId)).toEqual([ANSELMA]);
+    expect(recorder.delivered[0]?.notification.userId).toBe(ANSELMA);
+    expect(recorder.delivered[0]?.notification.workspaceId).toBe(WS);
     const inbox = await inboxFor(ANSELMA);
     expect(inbox).toHaveLength(1);
     expect(inbox[0]?.kind).toBe('mention');
@@ -383,6 +495,69 @@ describe('mentions', () => {
   });
 
   /**
+   * PER-RECIPIENT ISOLATION, and the three worlds that tell it apart from a
+   * batch that aborts.
+   *
+   * The 'resilience' describe below pins a throwing `canSeeTicket` with ONE
+   * recipient, where "contained, no rows" and "the whole batch was abandoned"
+   * are the same observation. They are not the same behaviour. With a single
+   * catch around the loop, a lookup that throws for the FIRST-named recipient
+   * drops that recipient and everyone named after them, so who receives a
+   * mention would be settled by the order the names happen to sit in the prose
+   * — an order-dependent outcome on a disclosure path, decided by an author's
+   * typing rather than by any rule.
+   *
+   * The discriminator is world 2's DIPU: one row under isolation, zero under
+   * batch-abort. Worlds 1 and 3 agree under both, and are here so the test says
+   * what the rule IS (the recipient who failed is the only one who loses out)
+   * rather than merely that one arrangement produces one number.
+   */
+  it('a lookup that throws for one mentioned user does not silence the others — who fails decides, not who was named first', async () => {
+    await seedTicket(TICKET, null, 'Renew the DLT registration');
+    const explodingFor =
+      (victim: string): CanSeeFn =>
+      async (_db, userId, ticketId) => {
+        if (userId === victim) throw new Error('visibility resolver is down');
+        return visible.has(`${userId}:${ticketId}`);
+      };
+
+    // World 1 — nothing throws. Both mentioned non-authors are reached.
+    const calmLog: string[] = [];
+    await fanout(undefined, (m) => calmLog.push(m)).onCommitted(commented(bodyWithThird));
+    expect(await rowsFor(ANSELMA)).toHaveLength(1);
+    expect(await rowsFor(DIPU)).toHaveLength(1);
+    expect(calmLog).toEqual([]);
+
+    // World 2 — the FIRST-named recipient's lookup throws. This is the world
+    // that distinguishes: a batch-aborting fan-out leaves DIPU with nothing.
+    await db.pool.query('DELETE FROM notifications');
+    const firstLog: string[] = [];
+    await expect(
+      fanout(undefined, (m) => firstLog.push(m), explodingFor(ANSELMA)).onCommitted(commented(bodyWithThird)),
+    ).resolves.toBeUndefined();
+    expect(await rowsFor(ANSELMA)).toHaveLength(0);
+    expect(await rowsFor(DIPU)).toHaveLength(1);
+
+    // World 3 — the SECOND-named recipient's lookup throws. The first still
+    // has their row, and the loss lands on the recipient who actually failed.
+    await db.pool.query('DELETE FROM notifications');
+    const secondLog: string[] = [];
+    await fanout(undefined, (m) => secondLog.push(m), explodingFor(DIPU)).onCommitted(commented(bodyWithThird));
+    expect(await rowsFor(ANSELMA)).toHaveLength(1);
+    expect(await rowsFor(DIPU)).toHaveLength(0);
+
+    // The failure is recorded rather than swallowed — and the record names the
+    // EVENT, never the recipient. A lookup that fails must not answer the
+    // question the gate above refuses to answer.
+    expect(firstLog.length).toBeGreaterThan(0);
+    expect(secondLog.length).toBeGreaterThan(0);
+    expect(firstLog.some((m) => m.includes(ANSELMA))).toBe(false);
+    expect(secondLog.some((m) => m.includes(DIPU))).toBe(false);
+    // And the mentioning author is told nothing either way.
+    expect(await rowsFor(KIRO)).toHaveLength(0);
+  });
+
+  /**
    * The plan's draft of this test set `dueDate` to `{ date: '2026-08-30' }` —
    * a value with no mention nodes in it. Mutation testing caught that: deleting
    * the `fieldId === 'description'` discriminator entirely left the whole suite
@@ -434,12 +609,25 @@ describe('mentions', () => {
 });
 
 describe('claim.contested (amendment 16 — Plan 10 emits; the payload shape is an Open-questions pin)', () => {
-  function contested(): EventEnvelope {
+  /**
+   * CONTESTER != CLAIMANT, which is the normal case and was not the case here.
+   *
+   * Both fixtures on this file used to set the envelope's `actorId` and the
+   * embedded claim's `actorId` to the same user, so the notification's
+   * addressee — `originalEvent.actorId`, the claimant — could be swapped for
+   * `env.actorId`, the contest's own actor, and the whole suite stayed green.
+   * That is a misrouting of the ONE branch with no visibility gate: rule,
+   * reason, ticketId and another person's claim provenance handed to someone
+   * who did not author them. Amendment 16 has the server file the contest
+   * (`sync/contest-coherence.ts` refuses to bind the two actors precisely
+   * because they differ), so the fixture now says so.
+   */
+  function contested(overrides: { contesterId?: string } = {}): EventEnvelope {
     return makeEnvelope({
       type: 'claim.contested',
       entity: { kind: 'ticket', id: TICKET },
       workspaceId: WS,
-      actorId: ANSELMA,
+      actorId: overrides.contesterId ?? SERVER,
       payload: {
         originalEvent: {
           id: '01J9GEVT000000000000000001',
@@ -453,13 +641,22 @@ describe('claim.contested (amendment 16 — Plan 10 emits; the payload shape is 
     });
   }
 
-  it("notifies the original claimant with rule, reason, and their own claim's provenance", async () => {
+  it("notifies the original claimant — not the contest's actor — with rule, reason, and their own claim's provenance", async () => {
     const env = contested();
-    await fanout().onCommitted(env);
+    const recorder = recordingTransport();
+    await fanout([createInAppTransport(db.pool), recorder.transport]).onCommitted(env);
     const rows = await rowsFor(ANSELMA);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.kind).toBe('contested-claim');
+    expect(rows[0]?.workspace_id).toBe(WS);
     expect(rows[0]?.dedupe_key).toBe(`contested-claim:${env.id}`);
+    // The addressee, stated twice over: the server that FILED the contest is
+    // told nothing, and the routing argument a push transport would use names
+    // the claimant. This branch has no visibility gate, so the addressee is
+    // the only thing standing between the payload and the wrong reader.
+    expect(await rowsFor(SERVER)).toHaveLength(0);
+    expect(recorder.delivered.map((d) => d.userId)).toEqual([ANSELMA]);
+    expect(recorder.delivered[0]?.notification.userId).toBe(ANSELMA);
     expect(rows[0]?.payload).toEqual({
       ticketId: TICKET,
       rule: 'require-evidence',
@@ -489,6 +686,28 @@ describe('claim.contested (amendment 16 — Plan 10 emits; the payload shape is 
     visible.clear();
     await fanout().onCommitted(contested());
     expect(await rowsFor(ANSELMA)).toHaveLength(1);
+  });
+
+  /**
+   * NO SELF-EXCLUSION here, unlike assignment and mention — also a decision,
+   * and one that was pinned only by accident for as long as every fixture made
+   * contester and claimant the same user. Now that they differ, a
+   * `if (original.actorId === env.actorId) return;` added to `handleContested`
+   * for symmetry with the other two branches would pass every other test on
+   * this file, so the degenerate case is asserted on its own.
+   *
+   * The rule it states: self-assignment tells you what you just did, but a
+   * refusal is not something the claimant did — it is the fact the message
+   * exists to deliver. Whoever the contest is attributed to, the claimant is
+   * told their claim was refused.
+   */
+  it("a contest filed under the claimant's own identity still reaches them — this branch excludes nobody", async () => {
+    const env = contested({ contesterId: ANSELMA });
+    await fanout().onCommitted(env);
+    const rows = await rowsFor(ANSELMA);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.kind).toBe('contested-claim');
+    expect(rows[0]?.dedupe_key).toBe(`contested-claim:${env.id}`);
   });
 
   it('a payload that does not match the pinned shape is logged and sends nothing', async () => {
@@ -590,9 +809,20 @@ describe('boot wiring (adaptation: the hook is app.ts, not index.ts)', () => {
     const recordingIngest: IngestService = {
       ingestBatch: async () => [],
       ingestClientBatch: async () => [],
+      // The returned function REMOVES the listener, where this fake used to
+      // return `() => {}`. A no-op unsubscribe makes the `onClose` hook in
+      // `app.ts` untestable by construction: whether or not the hook exists,
+      // whether or not it is ever called, this fake's listener list looks
+      // identical afterwards. The comment on that hook makes a concrete claim
+      // — that without it a second app over one ingest service delivers every
+      // later commit twice — and a fake that cannot tell the two worlds apart
+      // is not evidence for it.
       onEventCommitted: (listener) => {
         listeners.push(listener);
-        return () => {};
+        return () => {
+          const at = listeners.indexOf(listener);
+          if (at >= 0) listeners.splice(at, 1);
+        };
       },
     };
     const app = buildApp({
@@ -621,12 +851,15 @@ describe('boot wiring (adaptation: the hook is app.ts, not index.ts)', () => {
     // no `proj_visibility` row — which answers false, so the gate correctly
     // suppresses. Grant sight the only way boot honours: assert instead that the
     // listener RAN by watching the branch that needs no visibility at all.
+    // Contester (the server) and claimant (ANSELMA) differ here too — the
+    // notification below is addressed to the claimant, and a fixture where the
+    // two are one user cannot tell that from the opposite.
     const contestEnv = {
       ...makeEnvelope({
         type: 'claim.contested',
         entity: { kind: 'ticket', id: TICKET },
         workspaceId: WS,
-        actorId: ANSELMA,
+        actorId: SERVER,
         payload: {
           originalEvent: {
             id: '01J9GEVT000000000000000002',
@@ -654,6 +887,67 @@ describe('boot wiring (adaptation: the hook is app.ts, not index.ts)', () => {
       .poll(async () => (await rowsFor(ANSELMA)).filter((r) => r.kind === 'assignment').length, { timeout: 2000 })
       .toBe(0);
 
+    // CLOSING THE APP LETS THE COMMIT FEED GO — the `onClose` hook beside the
+    // fan-out, whose comment claims a concrete failure (several apps over one
+    // ingest service would deliver every later commit once per app ever built)
+    // and which, until this line, was asserted by nothing at all.
+    //
+    // Stated as "no subscription survives" rather than as a count going down:
+    // the stream hub closes its own subscription in its own hook, so a count
+    // that merely shrinks stays green with the fan-out's hook deleted.
     await app.close();
+    expect(listeners).toEqual([]);
+
+    // And behaviourally, with a positive control so the silence means
+    // something: a commit arriving after close reaches no subscriber, while
+    // the very same event handed to a live fan-out over the same pool writes.
+    await db.pool.query('DELETE FROM notifications');
+    const afterCloseEnv = {
+      ...makeEnvelope({
+        type: 'claim.contested',
+        entity: { kind: 'ticket', id: TICKET },
+        workspaceId: WS,
+        actorId: SERVER,
+        payload: {
+          originalEvent: {
+            id: '01J9GEVT000000000000000003',
+            type: 'ticket.transitioned',
+            actorId: ANSELMA,
+            clientTime: '2026-08-22T18:00:00.000Z',
+          },
+          rule: 'require-evidence',
+          reason: 'No evidence was attached.',
+        },
+      }),
+      workspaceSeq: 3,
+    };
+    for (const listener of listeners) listener(afterCloseEnv);
+    // A DIFFERENT event through a live fan-out, awaited: it is the positive
+    // control AND the wait. `expect.poll(...).toBe(0)` would be no wait at all
+    // here — it returns on its first passing check, so it cannot distinguish
+    // "nothing was delivered" from "the insert has not happened yet". Running
+    // an equivalent delivery to completion on the same pool gives the fired
+    // listener's insert its turn, and its dedupe key is distinct so the two
+    // could never collapse into one row.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const controlEnv = makeEnvelope({
+      type: 'claim.contested',
+      entity: { kind: 'ticket', id: TICKET },
+      workspaceId: WS,
+      actorId: SERVER,
+      payload: {
+        originalEvent: {
+          id: '01J9GEVT000000000000000004',
+          type: 'ticket.transitioned',
+          actorId: ANSELMA,
+          clientTime: '2026-08-22T18:00:00.000Z',
+        },
+        rule: 'require-evidence',
+        reason: 'No evidence was attached.',
+      },
+    });
+    await fanout().onCommitted(controlEnv);
+    const afterClose = await rowsFor(ANSELMA);
+    expect(afterClose.map((r) => r.dedupe_key)).toEqual([`contested-claim:${controlEnv.id}`]);
   });
 });

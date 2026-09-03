@@ -137,24 +137,42 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
     const ticketTitle = await titleOf(env.workspaceId, env.entity.id);
     for (const userId of mentioned) {
       if (userId === env.actorId) continue;
-      // The silent gate. `continue`, never a log line and never a marker on the
-      // siblings' payloads: what the reachable recipients receive is identical
-      // whether or not this branch was taken.
-      if (!(await canSeeTicket(deps.pool, userId, env.entity.id))) continue;
-      await deliverToAll(
-        deps.transports,
-        compose('mention', userId, env.workspaceId, `mention:${env.id}:${userId}`, {
-          ticketId: env.entity.id,
-          ticketTitle,
-          mentionedBy: env.actorId,
-          eventId: env.id,
-          source,
-          excerpt,
-          clientTime: env.clientTime,
-          serverTime: env.serverTime,
-        }),
-        log,
-      );
+      // PER-RECIPIENT ISOLATION, and it is a disclosure property rather than
+      // resilience polish, which is why the catch is here and not only around
+      // `onCommitted`. With one outer catch, a `canSeeTicket` that THROWS for
+      // the recipient named first in a document would drop that recipient AND
+      // everyone named after them — so who receives a mention would be decided
+      // by the order the mentions happen to sit in the prose. Two people
+      // mentioned in one comment must not be able to silence each other by
+      // position, and a disclosure path must not have an order-dependent
+      // outcome at all. Pinned by the three-world isolation test in
+      // `test/notifications/fanout.test.ts`, which distinguishes
+      // "isolated" from "batch aborted" — a single-recipient test cannot.
+      //
+      // The log line names the EVENT and never the recipient: a lookup that
+      // fails must not become the tell the gate below refuses to be.
+      try {
+        // The silent gate. `continue`, never a log line and never a marker on the
+        // siblings' payloads: what the reachable recipients receive is identical
+        // whether or not this branch was taken.
+        if (!(await canSeeTicket(deps.pool, userId, env.entity.id))) continue;
+        await deliverToAll(
+          deps.transports,
+          compose('mention', userId, env.workspaceId, `mention:${env.id}:${userId}`, {
+            ticketId: env.entity.id,
+            ticketTitle,
+            mentionedBy: env.actorId,
+            eventId: env.id,
+            source,
+            excerpt,
+            clientTime: env.clientTime,
+            serverTime: env.serverTime,
+          }),
+          log,
+        );
+      } catch (error) {
+        log(`notification fan-out failed for one mention recipient on event ${env.id}`, error);
+      }
     }
   }
 
@@ -170,6 +188,18 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
     // and their claim's provenance — and carries no title. It discloses nothing
     // they did not themselves author, and a claimant who is told nothing about
     // their own refusal cannot act on it.
+    //
+    // THE ADDRESSEE IS `original.actorId` — THE CLAIMANT — AND NOT `env.actorId`.
+    // That is the whole of the exemption's justification, not an incidental
+    // choice of field: `env.actorId` is the SERVER identity that filed the
+    // contest (`sync/contest-coherence.ts`'s `buildContestedClaim`, whose
+    // docblock records that the two differ by design and that
+    // `proj_contested.claimant_id` reads `originalEvent.actorId` for exactly
+    // this reason). Address this row to the contest's own actor instead and it
+    // delivers rule, reason, ticketId and another person's claim provenance to
+    // someone who is NOT its author, through the one branch with no visibility
+    // gate. Pinned by a fixture whose contester and claimant are different
+    // users; while they were the same user the misrouting was invisible.
     await deliverToAll(
       deps.transports,
       compose('contested-claim', original.actorId, env.workspaceId, `contested-claim:${env.id}`, {
