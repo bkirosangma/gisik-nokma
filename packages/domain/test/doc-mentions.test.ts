@@ -48,6 +48,7 @@ describe('extractMentionedUserIds', () => {
   it('yields [] for malformed input', () => {
     expect(extractMentionedUserIds(undefined)).toEqual([]);
     expect(extractMentionedUserIds('a string')).toEqual([]);
+    expect(extractMentionedUserIds(null)).toEqual([]);
   });
 
   it('does not overflow the stack on a self-referential node, and returns partial results', () => {
