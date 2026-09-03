@@ -9,7 +9,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9. T1-T12 COMMITTED (12/15). T12 fix + T13 IN FLIGHT. Then T14, T15.**
+## WHERE I AM: **STEP 14 — PLAN 9. T1-T13 COMMITTED (13/15). T13 fix + T14 IN FLIGHT. Then T15, final review, PR.**
 
 > # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
 > ```
@@ -165,7 +165,40 @@ coordination doc already pre-corrected this). T2's `docToPlainText` **already ex
 skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
 `src/index.ts` as the plan says.
 
-## PROGRESS: T1-T12 COMMITTED (12 of 15). T12's fix + T13 IN FLIGHT. **Measure; do not trust this line.**
+## PROGRESS: T1-T13 COMMITTED (13 of 15). T13's fix + T14 IN FLIGHT. Then T15, final review, PR.
+
+**T12's fix built a STRONGER guard than the one it copied**: a **set EQUALITY** between the classes the
+components render and the classes `ui.css` styles, harvested from both sides and typed on neither —
+because *a subset check in either direction catches only one rename direction*. Its four scanners are
+proven against planted input before use. Ten mutations, ten reddened. It deleted `gn-inbox__icon`
+outright (vestigial — nothing in the repo referenced it), **which is what permitted equality rather
+than a subset**, and it said plainly that six of the review's seven renames are now caught by rename
+tests while the seventh is resolved by the class ceasing to exist.
+
+**It also DIVERGED on the accessibility fix and gave the better reason.** The review pointed at the
+sibling's `role="status"`. T12 used **`role="img"`** instead: *`status` is a live region, and what a
+live region announces on update is its CONTENT — `99+`, which is exactly the string the component
+exists to keep out of the spoken answer.* `img` makes children presentational so the label replaces
+the glyph. **And it stated its proof boundary**: the mutations witness the fix is *present*; they do
+not show the old markup went unannounced in any real AT, because jsdom is not a screen reader and no
+mutation of the component could show it.
+
+### T13 (saved filters) adopted `filterSpec` under P26 — and PROVED the choice rather than citing it
+
+`client-contract.test.ts:1022` measures the plural spelling **400ing** with the singular control at
+**200 in the same run**. It also wrote the cross-package class/rule guard **in the same commit as the
+component**, rather than a review later — the first task on this branch to do so. And it **amended its
+own commit message** when the mutation count did not reconcile (36 attempted, 35 valid), on the
+grounds that *a count a reviewer can measure and find false is worse than the thing it covered.*
+
+### T13's review — two Important
+
+| # | Finding |
+|---|---|
+| **I1** | **It named this exact class and closed half of it.** Deleting the whole `:focus-visible` rule leaves **ui 37/37 and app-core 1014/1014 green.** Its own 11.119 exists *because* a rule can vanish under a green set equality — and pins `__submit` and `__submit:disabled` only. 11.118 compares class NAMES (all four keep base rules, so the set is unchanged) and 11.120's `used.length > 3` floor goes 7 -> 6 and still passes. **Two of its three CSS tests straddle the rule and neither can see it.** Note: this was a mutation it never ATTEMPTED, so "35 killed, 0 survivors" is **not false** — the coverage was incomplete. |
+| **I2** | **A SECOND read-modify-write writer over one last-write-wins document, inside ONE client.** `views/ticket-list.tsx` `setPrefs` reads a **mount-time snapshot** (`use-preferences.ts` never re-reads before writing), spreads it whole including `savedFilters`, and PUTs. So: mount (0 filters) -> save a filter -> change grouping -> **the PUT carries the stale `savedFilters: []` and the filter is gone.** The commit pre-empts the *wrong* version of this — it argues two CLIENTS resolve last-write-wins, which is true and a different problem; **two paths inside one client is orderable.** Latent (nothing mounts the menu yet) but **recorded nowhere.** |
+
+ T12's fix + T13 IN FLIGHT. **Measure; do not trust this line.**
 
 ### A CLASS NAME AND ITS CSS RULE ARE TIED TOGETHER BY NOTHING — twice now, on two tasks
 
