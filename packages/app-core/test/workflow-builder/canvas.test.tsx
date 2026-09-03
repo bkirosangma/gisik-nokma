@@ -7,6 +7,7 @@ import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import { createDraftStore, type DraftStore } from '../../src/workflow-builder/draft-store.js';
+import type { StatePosition } from '../../src/workflow-builder/layout.js';
 import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { BuilderProvider, type BuilderEnvironment } from '../../src/workflow-builder/ui/builder-context.js';
@@ -112,6 +113,48 @@ describe('WorkflowCanvas', () => {
     expect(screen.getByText('drag from here for a from-anywhere move')).toBeInTheDocument();
   });
 
+  // The real subject of this test is packages/app-core/test/setup.ts's
+  // `Object.defineProperty` wrapper, not the drag. Measured: with that wrapper
+  // deleted, every other test in app-core still passes — d3-drag's
+  // `nodrag(event.view)` throws on user-event's `view: null`, jsdom's own
+  // dispatch catches and logs the TypeError instead of propagating it, and the
+  // only consequence is that the gesture silently never starts. This assertion
+  // is the one thing in the package that reddens when that wrapper goes
+  // (moveState call count 1 -> 0, with
+  // "TypeError: Cannot read properties of null (reading 'document')" at
+  // d3-drag/src/nodrag.js:5 logged from `mousedowned`).
+  //
+  // The assertion is deliberately the CALL, not a coordinate: jsdom has no
+  // layout engine, every getBoundingClientRect is 0x0, and the gesture lands a
+  // ZERO delta — measured, the position written back equals the one it started
+  // from. A test asserting the node moved would fail for a reason that has
+  // nothing to do with the wiring under test.
+  it('completes a node drag gesture, landing onNodeDragStop in the store', async () => {
+    const user = userEvent.setup();
+    const real = createDraftStore(draftFromTemplate(errand));
+    const moves: [string, StatePosition][] = [];
+    const store: DraftStore = {
+      getState: () => real.getState(),
+      subscribe: (listener) => real.subscribe(listener),
+      actions: {
+        ...real.actions,
+        moveState: (nodeId, position) => {
+          moves.push([nodeId, position]);
+          real.actions.moveState(nodeId, position);
+        },
+      },
+    };
+    renderCanvas(store);
+    const node = screen.getByTestId('state-node-done').closest('.react-flow__node') as HTMLElement;
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: node, coords: { clientX: 10, clientY: 10 } },
+      { target: node, coords: { clientX: 70, clientY: 95 } },
+      { keys: '[/MouseLeft]', target: node, coords: { clientX: 70, clientY: 95 } },
+    ]);
+    expect(moves).toHaveLength(1);
+    expect(moves[0]?.[0]).toBe('done');
+  });
+
   it('disables editing controls when the viewer cannot author', () => {
     const store = createDraftStore(draftFromTemplate(errand));
     renderCanvas(store, testEnv({ session: { userId: newUlid(), role: 'member' }, canAuthor: false }));
@@ -123,19 +166,46 @@ describe('WorkflowCanvas', () => {
     ).toBeDisabled();
   });
 
-  // Measured fact from the coordination doc (~line 489, recorded unfixed):
-  // transitionSchema admits a dangling `to: '*'` — a transition whose
-  // DESTINATION is the literal string '*', which names no real state — and
-  // it publishes clean today. This canvas must not crash reading that edge
-  // back. flow-graph.ts's own "drops edges whose endpoint state is missing"
-  // test only exercises a dangling FROM (`from: 'ghost'`); this is the
-  // untested TO half, and this render is the discriminating claim — the
-  // fixing of the validator is explicitly not this task's job (task brief),
-  // only surviving what it lets through.
-  it('renders without crashing when a transition dangles to the literal state "*"', () => {
+  // The coordination doc
+  // (docs/superpowers/plans/2026-08-20-00-series-coordination.md:489, verified
+  // at that exact line this session, recorded unfixed) records that
+  // transitionSchema admits a dangling `to: '*'` — a DESTINATION that is the
+  // literal string '*', naming no real state — and that it publishes clean
+  // today. This task's brief asks only that the canvas SURVIVE reading such a
+  // def back; fixing the validator is explicitly not Plan 8's job.
+  //
+  // What this test does and does not witness, established by mutating
+  // flow-graph.ts and rerunning with the assertions below already in place
+  // (each mutation reverted, the revert checked with `git diff`, never shell
+  // `diff`):
+  //  - Delete flow-graph.ts's `if (!stateIds.has(transition.to)) return;` so
+  //    the dangling edge DOES reach React Flow: every canvas test stayed
+  //    GREEN, this one included, while flow-graph.test.ts's "the count says
+  //    so" test reddened (11 edges, expected 10). React Flow declines to
+  //    render an edge whose target node is absent, so THIS layer cannot
+  //    witness that guard at all — flow-graph.test.ts owns the drop property.
+  //    An earlier version of this comment claimed this render was the
+  //    discriminating one for it; that was wrong, and the assertion it
+  //    carried (`getByText('Any state')`) targeted the any-state node
+  //    toFlowGraph pushes unconditionally on every render, so it could not
+  //    have discriminated anything.
+  //  - Retarget the dangling edge at the any-state node instead of dropping
+  //    it: also GREEN — AnyStateNode carries only a source Handle, so React
+  //    Flow renders no edge into it either.
+  //  - Retarget it at a real state (`s:done`): RED, 11 labels against 10. So
+  //    the label count below is live. What this test genuinely pins is the
+  //    pair React Flow cannot give us for free: the render does not throw on
+  //    such a def, and no "repair" quietly materialises the malformed
+  //    transition as a real edge somewhere.
+  it('survives a def whose transition dangles to the literal state "*", rendering the rest of the graph', () => {
     const draft = draftFromTemplate(errand);
+    const realTransitionCount = draft.def.transitions.length;
     draft.def = { ...draft.def, transitions: [...draft.def.transitions, { from: 'later', to: '*', rules: [] }] };
     renderCanvas(createDraftStore(draft));
-    expect(screen.getByText('Any state')).toBeInTheDocument();
+    for (const name of ['Later', 'Next', 'In progress', 'Waiting', 'Done']) {
+      expect(screen.getByText(name)).toBeInTheDocument();
+    }
+    expect(screen.getAllByTestId(/^transition-label-/)).toHaveLength(realTransitionCount);
+    expect(screen.queryByTestId(`transition-label-${realTransitionCount}`)).not.toBeInTheDocument();
   });
 });

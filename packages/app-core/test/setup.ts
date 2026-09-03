@@ -109,15 +109,48 @@ if (typeof HTMLElement !== 'undefined') {
    * @xyflow/system attaches real d3-drag/d3-zoom behaviour to the pane (pan)
    * and to draggable nodes; both unconditionally call `nodrag(event.view)` on
    * every qualifying mousedown, and `nodrag` immediately reads
-   * `view.document` — so `view === null` throws before a single test
-   * assertion runs, on ANY user-event click inside the canvas (not something
+   * `view.document`, which throws on null (not something
    * `panOnDrag`/`nodesDraggable` toggles avoid, since XYFlow's own mousedown
    * filter passes through for a left-click before nodrag is ever reached).
+   *
+   * WHAT THE THROW ACTUALLY COSTS — corrected after measurement. The first
+   * version of this block, and Task 5's commit message, both said it "throws
+   * before any test body observation" / "before a single test assertion
+   * runs". That is FALSE, and the false version is worse than no comment,
+   * because it makes the wrapper look like it is guarding clicks:
+   *  - Delete the `if (typeof MouseEvent !== 'undefined')` block below and run
+   *    app-core in full: every test still PASSES. jsdom's own dispatch catches
+   *    the TypeError and logs it as an uncaught error; it never propagates
+   *    into a test body, so no assertion is affected.
+   *  - What it does do is abort d3-drag's mousedown handler partway, so the
+   *    GESTURE never initialises and the drag silently no-ops. Measured with
+   *    canvas.test.tsx's 'completes a node drag gesture' test: WITH this
+   *    wrapper a user-event drag of a state node reaches `onNodeDragStop` ->
+   *    `moveState` exactly once; WITHOUT it that count is 0 and the run
+   *    reports "TypeError: Cannot read properties of null (reading
+   *    'document')" at d3-drag/src/nodrag.js:5 inside `mousedowned`.
+   * So the wrapper is load-bearing for GESTURES, not for clicks, and its
+   * absence fails SILENTLY. That drag test is the only assertion in app-core
+   * that reddens if this block is removed; keep them together.
+   *
    * The only working intercept point left is `Object.defineProperty` itself:
    * this wraps it so that specifically an Event's `view` getter falls back to
    * `window` instead of null, at the moment user-event installs it — before
    * it becomes non-configurable. Scoped narrowly (property name `view`,
    * target must be an `Event` instance) to avoid touching unrelated code.
+   * One side effect worth knowing: the descriptor it hands on is rewritten
+   * `configurable: true`, so inside this test process an Event's `view` is
+   * redefinable where user-event would have left it frozen.
+   *
+   * Task 6 (plan line 3127 — connecting, and the inspectors) inherits this
+   * wrapper, but must NOT read it as "dragging works under jsdom". It does
+   * not: measured here, the drag above completes with a ZERO delta, because
+   * jsdom has no layout engine and every getBoundingClientRect is 0x0. A
+   * gesture test must assert the observable effect the gesture is wired to
+   * (the action firing), never a coordinate. Whether a CONNECT gesture
+   * (mousedown on a Handle through to `onConnect`) completes under this
+   * harness is NOT MEASURED here — Task 6 must establish it with a planted
+   * defect, not assume it from this block.
    */
   if (typeof MouseEvent !== 'undefined') {
     const originalDefineProperty = Object.defineProperty;
