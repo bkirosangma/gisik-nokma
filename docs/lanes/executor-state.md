@@ -9,7 +9,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 13 — Plan 8. T1-T8 DONE, gate green. Batch C (T9-T12) is next.**
+## WHERE I AM: **STEP 13 — Plan 8. T1-T12 DONE, gate green. Batch D (T13-T15) is the last one.**
 
 > **BATCH B DIED MID-FLIGHT ON AN EXPIRED LOGIN (2026-09-03).** Seven of nine agents failed with
 > *"Login expired · Please run /login"*: T5's fix round and both agents of T6, T7 and T8. **T5's
@@ -24,7 +24,8 @@ branch's first commit promotes them to `done`, and `check:tasks` now verifies th
 ancestor of `origin/main`. **The repo stands at 118/177 (66.7%), independently recounted.**
 
 Step 13 = **Plan 8**, `docs/superpowers/plans/2026-08-20-08-workflow-builder.md`, **15 tasks.**
-**T1-T8 are DONE and committed.** **T9-T15 remain.**
+**T1-T12 are DONE and committed.** **Only T13, T14, T15 remain**, then the final whole-branch review
+(ONE opus reviewer, per the cost ruling) and the PR.
 No PR is open. **Three rulings are open and NONE blocks Batch B** — see RULINGS OPEN.
 
 **Batching:** **A: T1-T4** (done) · **B: T5-T8** (canvas → validation) · **C: T9-T12** (publish →
@@ -44,7 +45,7 @@ clean afterwards. **Require a clean tree AND zero running agents before any gate
 | **Branch** | **`exec/13-plan8-workflow-builder`**, cut from `origin/main` `7337357`. | `git rev-parse --abbrev-ref HEAD` |
 | **Base** | `origin/main` = `73373579b906a18e3d319363a8eb3685b076eb50` | `git rev-parse origin/main`, fetched |
 | **Ahead-count** | **Not written here on purpose. Run `git rev-list --count origin/main..HEAD`.** A count taken while writing the commit that records it is *always* short by one and always looks right to its author. | — |
-| **Gate at branch HEAD (Batch B closed)** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2364 tests.** domain 335 · rule-engine 280 · server 857 · **app-core 606** · editor 178 · web 69 · ui 31 · sync-client 8. **The branch adds +132 over the base, ALL in app-core** (474 → 606): Batch A +69, Batch B +63. | run by the executor with `--force` on a clean tree with **no agents running**, through `rtk proxy`; Node printed into the same log |
+| **Gate at branch HEAD (Batch C closed)** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2445 tests.** domain 335 · rule-engine 280 · server 857 · **app-core 687** · editor 178 · web 69 · ui 31 · sync-client 8. **The branch adds +213 over the base, ALL in app-core** (474 → 687): Batch A +69, Batch B +63, Batch C +81. | run by the executor with `--force` on a clean tree with **no agents running**, through `rtk proxy`; Node printed into the same log |
 | Gate at the Batch A boundary | exit 0 · 24/24 · 0 cached · 2301 tests; app-core 543. Batch A's own split, measured by excluding each task's test file rather than inferred: **T1-T3 = 58, T4 = 11.** | same method |
 | Gate at the base `7337357`, for the delta | exit 0 · 24/24 · 0 cached · **2232 tests**; app-core 474, all others as above. | measured at branch creation, on the second (unproxied) attempt — the first was proxy-collapsed to one package and its composition was unusable |
 | **`check:tasks`** | **exit 0**, 177 rows / 177 plan tasks, **118 done (66.7%)**, 0 claimed, 0 in-flight, **59 todo**. Plan 08 = 0 done / 15 todo. | `node scripts/check-task-ledger.mjs` after the promotion |
@@ -370,6 +371,50 @@ connect-gesture record — so the stale pointer resolves to a real heading that 
 **A pointer that lands on the wrong real section is worse than one that lands nowhere**, because
 nothing about it looks broken. Corrected in the Batch C brief; `batch-d` never carried it.
 
+## BATCH C — T9, T10, T11, T12. All committed.
+
+| Task | Result |
+|---|---|
+| **T9** publish flow *(opus/opus)* | **DONE.** Two Important, and **both were tests named for properties their own fixtures could not decide.** (1) `bumps from the PUBLISHED base` could not tell the base from the draft: `draftFromPublished` copies `published.version` into **both** `def.version` and `base.version`, so for every draft that file can build, `base.version + 1` and `def.version + 1` are the same number. It ruled out a hard-coded 1 and nothing else. (2) The occupancy-failure test asserted only the **first** half of its named property — it stopped at `toBeDisabled()` and never picked a target, never re-enabled, never published. **The mutation "make a failed count block publishing" SURVIVED**, which is exactly the missing half. |
+| **T10** the three screens | **DONE.** Two Important, both about error handling the plan never specified: `Promise.all([...]).catch()` collapsed a **documented-normal** guest roster refusal into a full-screen fatal error — making the empty-roster degradation path unreachable through the screen and throwing away a successfully-loaded `ticketTypes` — and `WorkflowListScreen` had **no `.catch()` at all**, so a rejection left it on "Loading workflows…" forever. |
+| **T11** ticket types *(opus/opus)* | **DONE — one CRITICAL, and it is the sharpest finding of the step.** See below. It also corrected the coordination doc's false "Done", and **corrected an absence claim of mine in the process.** |
+| **T12** admin gating *(opus/opus)* | **DONE, verdict ship on 16 mutations — but its Important is a lesson about enumeration.** The gate enumeration the commit was built on **stopped at the builder screen**. The ticket-type editor — the other half of the gate, and the half that owns field-schema and rank authoring — got no control enumeration and no button sweep, so **three of its five non-author gates were pinned by nothing and all three mutations survived the full 211-test suite.** Fixed in `c5f7c60`. |
+
+### T11's Critical: the move gate asked the wrong question, and the wrong question is answerable
+
+`ticket-type-editor-screen.tsx:249` gated an irreversible bulk migration on
+**`save.phase !== 'saved'`** — *"has this form ever been saved?"* — rather than on whether the
+**selected binding matches the saved one**. Both questions return "yes, allowed" in the common case,
+which is why it read as correct. **After saving a re-bind, an admin can re-point the combobox again
+and fire the migration at a workflow the tickets were never bound to** — an irreversible bulk
+operation aimed by a stale answer to a question nobody meant to ask. Fixed in `7d993f2`.
+
+A second Important on the same screen shares the shape: the completed-move sentence **re-read the
+live combobox** instead of the workflow the migration actually targeted, so changing the binding
+afterwards silently rewrote a statement about a past action into a false one. The `migrated` payload
+carried the count but not the destination.
+
+**The transferable form: a gate that asks a question whose usual answer coincides with the right
+one.** It is not detectable by reading the gate — only by asking what it would do when the two
+answers diverge.
+
+### T11 corrected an absence claim I wrote, and the correction is the "nobody holds the moment" rule
+
+My Batch C brief told T11 that a repo-wide sweep returned **zero files** for six names, including
+`migrateTypeToWorkflow`. **That was measured before Task 4 ran and carried forward unchanged after
+it.** At the sha T11 measured, `migrateTypeToWorkflow` returned **three** files — `gateway.ts`,
+`fake-gateway.ts` and `events.test.ts` — because **Task 4 had already landed the gateway method and
+its fake.** Re-verified by me at HEAD: **five** files now, against a control of 34 for
+`adviseWorkflowDef`.
+
+**The enumeration was true when I made it and false when I used it, and nothing about its form said
+so.** What was actually missing was every *consumer* of that method, not the method. T11 put the
+correction in the coordination doc rather than quietly dropping the row, which is the right call:
+the corrected line now names its own controls and states which row was stale.
+
+**Rule, restated because I broke it while quoting it: an absence sweep is a fact about a moment, and
+a brief that carries one across a task boundary must re-measure it or date it.**
+
 ## TWO FINDINGS FROM THE ADAPTATION MAP THAT REACH BEYOND ONE TASK
 
 ### A. RULING REQUESTED — T13's adapter cannot be written as scoped. Four operations have a live
@@ -443,7 +488,7 @@ here is the commit that supplies it"*, which cannot be written until the commit 
 
 **Nothing.** Batch A is closed, the tree is clean, and the gate is green at HEAD.
 
-## RULINGS — one taken this batch (P28), two still open, none blocking
+## RULINGS — P28 taken, line 216 closed by T11, ONE still open and it blocks nothing
 
 1. ~~**The T13 `DataSource` seam**~~ — **RULED. P28 (owner-approved, 2026-09-03), and it took the
    executor's recommended option (b).** The `apps/web` `WorkflowAuthoringGateway` adapter calls
@@ -459,8 +504,10 @@ here is the commit that supplies it"*, which cannot be written until the commit 
    doc. Fixing the template violates Plan 11's `checkErrandTemplate` oracle pin; silencing the check
    means editing a module Plan 2's own F5 ruling designed. **No later task may resolve this by
    fixing the template or weakening the check.**
-3. **Coordination doc line 216's false "Done" on Task 11** (section B above). Raised with the
-   controller. **Task 11 is built in full regardless**, and corrects the line in its own commit.
+3. ~~**Coordination doc line 216's false "Done" on Task 11**~~ — **CLOSED by T11's own commit
+   (`9bf4cbe`)**, which supplies the component the line falsely claimed existed and rewrites the line
+   to say so. The corrected line names its controls **before** the run and states which row of the
+   inherited absence claim was stale. Nothing further is owed.
 
 P25 taken (capped at `getBoard`). **P27 taken and applied** in step 12. P26 is a number with no text
 on `main` — noted, not load-bearing here.
