@@ -978,3 +978,86 @@
    all — is invisible on screen as well as in a suite: their VALUES are pinned
    in `packages/app-core/test/timeline/timeline-view.test.tsx` 11.77, by exact
    whole-class equality over all five reasons. */
+
+/* ── The inbox (Plan 9 Task 12) ─────────────────────────────────────────────
+   Colours live here, classes live in `packages/app-core/src/inbox/*`, the same
+   split `.gn-calendar` and `.gn-timeline` use. NO ROLE WAS ADDED for this
+   surface: the plan asks for `unreadDot` and `accentInk`, which are `accent`
+   and `accentText` under new words — the pair `CONTRAST_PAIRS` already holds to
+   4.5:1 in both themes, and the pair `.gn-timeline__bar` already draws with.
+   The kind icons name no colour at all: they stroke `currentColor`, so a glyph
+   inherits the row's text role and cannot become a hue the palette does not
+   own. */
+.gn-inbox {
+  background: var(--gn-surface);
+  color: var(--gn-text);
+}
+.gn-inbox__list { list-style: none; margin: 0; padding: 0; }
+.gn-inbox__item { border-bottom: 1px solid var(--gn-border); }
+.gn-inbox__row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gn-inbox__row:focus-visible,
+.gn-inbox__more:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+/* A read row's glyph recedes; an unread one's is the accent — the SAME channel
+   the dot and the headline weight use, never a third colour with a fourth
+   meaning. */
+.gn-inbox__glyph { color: var(--gn-text-muted); }
+.gn-inbox__row[data-unread] .gn-inbox__glyph { color: var(--gn-accent); }
+.gn-inbox__text { flex: 1; min-width: 0; }
+.gn-inbox__headline { display: block; }
+.gn-inbox__row[data-unread] .gn-inbox__headline { font-weight: 600; }
+.gn-inbox__body {
+  display: block;
+  color: var(--gn-text-muted);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Decorative: `data-unread` on the row is the fact, this is its picture. It is
+   drawn from a rule keyed on that attribute rather than styled inline so the
+   two cannot disagree about which rows are unread. */
+.gn-inbox__dot {
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--gn-accent);
+}
+.gn-inbox__more {
+  margin: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  cursor: pointer;
+}
+/* The unread total, on whatever chrome opens the inbox. Text on accent — the
+   declared contrast pair, not a hand-picked ink. */
+.gn-inbox__badge {
+  display: inline-block;
+  min-width: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}

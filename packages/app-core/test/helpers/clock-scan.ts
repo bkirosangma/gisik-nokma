@@ -35,6 +35,14 @@ export const CLOCK_FREE_ROOTS: readonly string[] = [
   'hierarchy',
   'filter',
   'provenance.ts',
+  // Plan 9 Task 12. The inbox turns ONE stored instant into a day —
+  // `stale-ticket.enteredAt`, through the domain's `istDayOf` — which is
+  // exactly the operation this roster exists to keep off the device. "In Doing
+  // since 1 Aug" computed from `new Date()` would be a different sentence on a
+  // collaborator's machine from the one the ticket's own history shows, and
+  // "how long has this been sitting" is the surface where reaching for the
+  // clock is most tempting.
+  'inbox',
 ];
 
 /**

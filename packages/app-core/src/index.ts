@@ -182,3 +182,19 @@ export {
 // the component reads it, and its own test measures the shift by the columns
 // that move rather than by re-stating the constant.
 export { TimelineView, type TimelineViewProps } from './timeline/timeline-view.js';
+// Plan 9 Task 12 — the inbox. Named exports with the `.js` extension, matching
+// every block above; `export *` (which the plan's draft writes five times)
+// would re-export this module's internals — `PATHS`, `sinceDay`, `CAP` — as
+// package surface. `Notification` and the payload types are deliberately absent:
+// they are the DOMAIN's declarations and re-exporting them here would give the
+// vocabulary a second path, which is the drift the calendar and timeline blocks
+// above refuse for `FilterSpec` and `IsEpicType`.
+export type { NotificationsGateway, NotificationsPage } from './inbox/gateway.js';
+export {
+  notificationBody,
+  notificationHeadline,
+  notificationTicketId,
+} from './inbox/format.js';
+export { NotificationIcon, type NotificationIconProps } from './inbox/icons.js';
+export { UnreadBadge, type UnreadBadgeProps } from './inbox/unread-badge.js';
+export { InboxView, type InboxViewProps } from './inbox/inbox-view.js';

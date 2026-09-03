@@ -205,10 +205,20 @@ describe('11.48 the scanner is proven against planted defects before it is trust
     ]);
   });
 
-  it('finds no clock read anywhere on the calendar view-model surface', () => {
+  /**
+   * Renamed by Plan 9 Task 12 from "…on the calendar view-model surface".
+   * `CLOCK_FREE_ROOTS` had already grown past the calendar — the timeline, the
+   * filter, the hierarchy — and Task 12 adds `inbox`; a description naming one
+   * of the surfaces it covers is a name that is false of the assertion under
+   * it, and a reader chasing an inbox failure would land on a test that says
+   * it is about the calendar. (The `11.48` id stays: renumbering these into
+   * their own case ids belongs to Task 15, which writes
+   * `test-cases/11-calendar-notifications.md`.)
+   */
+  it('finds no clock read anywhere on the day-deriving surfaces', () => {
     const { hits, scanned } = scanCalendarSurface();
     const report = hits.map((hit) => `${hit.file}:${hit.line} ${hit.match}`).join('\n');
-    expect(hits, `the calendar surface reached for a clock:\n${report}`).toEqual([]);
+    expect(hits, `a day-deriving surface reached for a clock:\n${report}`).toEqual([]);
     // The walk really happened, over the roots it claims.
     expect(scanned).toContain('calendar/calendar-model.ts');
     /**
@@ -224,6 +234,17 @@ describe('11.48 the scanner is proven against planted defects before it is trust
     // CLOCK_FREE_DOMAIN_FILES: a loop over the roots would assert the list
     // against itself, so deleting 'timeline' would delete its own guard.
     expect(scanned).toContain('timeline/timeline-model.ts');
+    /**
+     * The inbox, added to `CLOCK_FREE_ROOTS` by Plan 9 Task 12 and named
+     * literally here for the reason every other entry is: a loop over the
+     * roots would assert the list against itself, so deleting `'inbox'` would
+     * delete its own guard and this walk would go quiet rather than red.
+     * `format.ts` is the file that matters — it turns one stored instant
+     * (`stale-ticket.enteredAt`) into a day, and "how long has this been
+     * sitting" is the question where reaching for `new Date()` is the shortest
+     * path to something that looks right on the machine it was written on.
+     */
+    expect(scanned).toContain('inbox/format.ts');
     /**
      * The timeline's RENDERING half, named literally for the same reason
      * `calendar-view.tsx` is: `CLOCK_FREE_ROOTS` already lists `timeline`, so
