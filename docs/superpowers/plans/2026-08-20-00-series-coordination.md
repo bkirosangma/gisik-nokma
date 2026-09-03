@@ -6222,9 +6222,16 @@ supplies — a departed member, or any member at all when the roster comes back 
 `isEmpty` is a length test, and the array is not empty. So the author is shown a restriction that
 looks like it names nobody while the def still carries the reference. (Toggling another box does
 *not* silently drop it — `update()` spreads `rule.userIds ?? []`, which includes the unknown id. The
-defect is invisibility, not loss.) Contrast `RequireFieldEditor` and `RequireDifferentUserEditor`,
-which both detect exactly this shape and render an inline warning; restrict-to is the one editor of
-the three that does not.
+defect is invisibility, not loss.)
+
+Place it against the other two editors and the shape of the hole is exact. `RequireFieldEditor`
+computes `known` and renders an inline `<p>` warning when it is false — it has to, because nothing
+downstream will. `RequireDifferentUserEditor` computes `known` too but renders **no** warning on it
+(its only `<p>` is the start-state note, keyed on `initialStateId`, not on `!known`) — and it does
+not need one, because `rdu-unknown-state` catches an unknown target and Task 8's panel will say so.
+So: require-field warns inline because it is the only thing that can; rdu stays quiet because the
+validator speaks for it; restrict-to has **neither** — no inline warning and no code. That is the
+gap, and it is the only one of the three shapes that is silent end to end.
 
 **Why Task 8 is not the owner.** Task 8 renders `validateWorkflowDef` and `adviseWorkflowDef` output.
 Those emit thirteen codes between them, enumerated at this sha: no-states, duplicate-state-id,
