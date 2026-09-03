@@ -153,6 +153,33 @@ describe('11.85 PLANTED DEFECT: "since" is the IST day of the instant, not a UTC
       'In Doing since yesterday — moved there by Kiro',
     );
   });
+
+  it('and verbatim really means VERBATIM — a garbage value that is date-SHAPED is not trimmed to look like a date', () => {
+    // MEASURED SURVIVOR, now closed. `'yesterday'` is NINE characters, so the
+    // degradation arm's one plausible wrong spelling — `enteredAt.slice(0, 10)`,
+    // the ten-character slice this file's docblock forbids — returns the
+    // identical string and the case above stays green. The whole point of the
+    // arm is that garbage stays visible ON SCREEN rather than being "swallowed
+    // into a plausible date", and a value long enough to be sliced is the only
+    // input that can tell the two apart.
+    //
+    // `2026-13-45T99:99:99Z` is exactly that: month 13, day 45, hour 99, so
+    // `istDayOf` refuses it (asserted below, not assumed), and a slice would
+    // print `2026-13-45` — a string that reads as a date and is not one.
+    const shaped = notificationOf('stale-ticket', {
+      payload: { enteredAt: '2026-13-45T99:99:99Z' },
+    });
+    expect(() => istDayOf('2026-13-45T99:99:99Z')).toThrow(RangeError);
+    expect(notificationHeadline(shaped, userName)).toBe(
+      'In Doing since 2026-13-45T99:99:99Z — moved there by Kiro',
+    );
+    // Stated as its own assertion so the failure names the defect rather than
+    // showing two long strings to diff: whatever the arm returns, it is not
+    // the first ten characters.
+    expect(notificationHeadline(shaped, userName)).not.toContain(
+      'since 2026-13-45 —',
+    );
+  });
 });
 
 describe('11.86 the body is the sender’s own words, unparaphrased and unredacted', () => {

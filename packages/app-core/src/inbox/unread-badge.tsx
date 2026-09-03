@@ -13,6 +13,35 @@
  * pinned by a test rather than left to whichever was typed first;
  * `test/inbox/unread-badge.test.tsx` renders a negative count.
  *
+ * ## `role="img"`, because a bare `<span>` HAS NO ACCESSIBLE NAME TO GIVE
+ *
+ * The whole argument below — cap the glyph, keep the label truthful — rests on
+ * the label being announced, and the first version of this component put
+ * `aria-label` on a role-less `<span>`. ARIA maps that to the `generic` role,
+ * where naming is PROHIBITED: a conforming AT is not required to expose the
+ * label at all, so the design's one concession to screen-reader users could
+ * simply not exist. Three tests appeared to disprove that and could not:
+ * `getByLabelText` matches the ATTRIBUTE and never computes an accessible
+ * name, so no assertion written with it can tell a named element from an
+ * unnamed one carrying an ignored attribute.
+ *
+ * The repo's own precedent for this correction is
+ * `workflow-builder/ui/read-only-banner.tsx`, which uses `role="status"` "so a
+ * screen reader is told the same thing the sighted user is". This badge takes
+ * `role="img"` INSTEAD, and the difference is the point: `status` is a live
+ * region, and what a live region announces on update is its CONTENT — which
+ * here is `99+`, the capped string this component exists to keep OUT of the
+ * spoken answer. `role="img"` makes the children presentational, so the label
+ * REPLACES the glyph rather than competing with it, which is exactly the
+ * relationship the next paragraph describes. `img` also supports naming, which
+ * is the property `generic` lacks.
+ *
+ * What that correction can and cannot be proved to do is stated plainly in
+ * `test/inbox/unread-badge.test.tsx`: a role query reddens when the role is
+ * removed, so the fix is witnessed as PRESENT — but jsdom is not a screen
+ * reader, and no test in this repo can demonstrate what the old markup did in
+ * one.
+ *
  * ## The visible text caps; the accessible name does NOT
  *
  * Past ninety-nine the badge shows `99+`, because the exact number stops being
@@ -43,6 +72,7 @@ export function UnreadBadge({ count }: UnreadBadgeProps) {
   return (
     <span
       className="gn-inbox__badge"
+      role="img"
       data-capped={count > CAP ? 'true' : undefined}
       aria-label={`${count} unread notification${count === 1 ? '' : 's'}`}
     >

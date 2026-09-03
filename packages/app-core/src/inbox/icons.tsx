@@ -78,11 +78,22 @@ export type NotificationIconProps = { kind: NotificationKind };
  * `data-kind` is not decoration — it is how a test can tell WHICH glyph a row
  * drew, and the inbox suite reads it to prove that five kinds render five
  * different icons rather than five copies of one.
+ *
+ * NO CLASS, and that is a correction rather than an omission. This element
+ * carried `gn-inbox__icon` and `ui.css` had NO RULE for it, at any point — the
+ * class styled nothing, and the review that found it asked whether a rule had
+ * been dropped or the class was vestigial. Vestigial: the stroke is
+ * `currentColor`, which resolves from `.gn-inbox__glyph`'s `color` on the span
+ * one level up (muted normally, `var(--gn-accent)` under `[data-unread]`), and
+ * the box is the `width`/`height` attributes below. There was nothing for a
+ * rule to say. Removing it is what lets
+ * `test/inbox/inbox-css-binding.test.tsx` hold rendered classes and styled
+ * classes to EQUALITY instead of a subset — and equality is the only form of
+ * that check which also catches a rename made on the stylesheet's side.
  */
 export function NotificationIcon({ kind }: NotificationIconProps) {
   return (
     <svg
-      className="gn-inbox__icon"
       data-kind={kind}
       aria-hidden="true"
       width="16"

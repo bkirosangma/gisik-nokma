@@ -34,7 +34,15 @@ export class FakeNotificationsGateway implements NotificationsGateway {
 
   list(cursor?: string | null): Promise<NotificationsPage> {
     this.listCalls.push(cursor);
-    const after = cursor ?? null;
+    // The ROUTE'S OWN SPELLING, character for character
+    // (`routes/notifications.ts`): `typeof raw.cursor === 'string' &&
+    // raw.cursor.length > 0 ? raw.cursor : null`. An EMPTY STRING is a first
+    // page on the server — the route maps it to `null`, and `store.ts`'s
+    // `if (opts.cursor)` would drop it anyway — and a `cursor ?? null` here
+    // kept the `''` and filtered `row.id < ''`, which matches nothing. That
+    // fake was STRICTER than the server, so it hid no server bug, but the
+    // docblock above claims mirroring and this is the one place it did not.
+    const after = typeof cursor === 'string' && cursor.length > 0 ? cursor : null;
     const matching = after === null ? this.rows : this.rows.filter((row) => row.id < after);
     const lookahead = matching.slice(0, this.pageSize + 1);
     const page = lookahead.slice(0, this.pageSize);

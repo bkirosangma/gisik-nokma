@@ -88,7 +88,18 @@ export function InboxView(props: InboxViewProps) {
                 <span className="gn-inbox__headline">
                   {notificationHeadline(notification, props.userName)}
                 </span>
-                <span className="gn-inbox__body">{notificationBody(notification)}</span>
+                {/* `title` is the SAME string, not a second one: `.gn-inbox__body`
+                    clamps to a single line with `text-overflow: ellipsis`, and
+                    the string most likely to overflow it is a contested
+                    claim's refusal reason — the engine's own sentence about
+                    somebody's move, which this file is otherwise at pains to
+                    pass through character for character. Clipped with no way
+                    to see the rest, that care buys nothing. `textContent`
+                    assertions cannot see a clip, so the hover text is the
+                    cheapest affordance that is also measurable. */}
+                <span className="gn-inbox__body" title={notificationBody(notification)}>
+                  {notificationBody(notification)}
+                </span>
               </span>
               {/* Decorative twin of `data-unread` — the row's unread state is
                   already carried by the attribute above and by the heavier

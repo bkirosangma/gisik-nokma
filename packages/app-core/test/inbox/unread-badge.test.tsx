@@ -18,6 +18,26 @@ import { UnreadBadge } from '../../src/inbox/unread-badge.js';
  * Absence is asserted with `queryByText` against the DOCUMENT rather than by
  * reading a returned element, because the component returns `null` and a test
  * that only inspects what it returned cannot see an always-render mutation.
+ *
+ * ## `getByLabelText` IS NOT AN ACCESSIBLE-NAME ASSERTION, and every case
+ * below except the last group was written as if it were
+ *
+ * `getByLabelText` matches the `aria-label` ATTRIBUTE. It does not compute an
+ * accessible name, so it returns the same element whether the label is exposed
+ * to assistive technology or silently discarded — and on the role-less `<span>`
+ * this component used to render, ARIA prohibits naming (`generic`), so it was
+ * the second case. Every one of those queries stayed green through the fix,
+ * which is what makes them non-witnesses rather than failing tests. The role
+ * queries in the final group are the ones that can see the difference: they go
+ * through the accessible-name computation, and deleting `role="img"` from the
+ * component reddens them.
+ *
+ * WHAT THIS CANNOT PROVE, stated so nobody reads more into it: jsdom is not a
+ * screen reader. These cases witness that the component now carries a role
+ * that makes the label nameable. They do NOT demonstrate that the previous
+ * markup went unannounced in any particular AT — no mutation of this component
+ * could show that, and the finding was reasoned from the ARIA spec rather than
+ * measured.
  */
 describe('11.88 the badge is silent when there is nothing to say', () => {
   it('renders NOTHING at zero', () => {
@@ -70,5 +90,43 @@ describe('11.88 the accessible name agrees with itself about how many', () => {
     unmount();
     render(<UnreadBadge count={2} />);
     expect(screen.getByText('2')).toHaveAttribute('aria-label', '2 unread notifications');
+  });
+});
+
+describe('11.88 the accessible NAME exists, not merely an attribute nobody must expose', () => {
+  it('the badge is reachable BY ROLE AND NAME — the query that goes through name computation', () => {
+    render(<UnreadBadge count={137} />);
+    // `getByRole(..., { name })` computes the accessible name; `getByLabelText`
+    // reads the attribute. That is the whole difference this case exists for,
+    // and it is why the three cases above stayed green while the defect stood.
+    const badge = screen.getByRole('img', { name: '137 unread notifications' });
+    // The two halves of the design, on ONE element: the name carries the true
+    // total, the visible glyph carries the cap.
+    expect(badge).toHaveTextContent('99+');
+    expect(badge).toHaveClass('gn-inbox__badge');
+  });
+
+  it('and the CAP never reaches the name, at the boundary and below it', () => {
+    // Below the cap the two agree, which is the case that would still pass if
+    // the name were somehow derived from the content — so the capped case
+    // above is the one that discriminates, and both are kept.
+    const { unmount } = render(<UnreadBadge count={1} />);
+    expect(screen.getByRole('img', { name: '1 unread notification' })).toHaveTextContent('1');
+    unmount();
+    render(<UnreadBadge count={100} />);
+    const capped = screen.getByRole('img', { name: '100 unread notifications' });
+    expect(capped).toHaveTextContent('99+');
+    // Stated as its own assertion so a regression names itself: the cap is a
+    // layout decision and must never become what a screen reader is told.
+    expect(screen.queryByRole('img', { name: /99\+/ })).toBeNull();
+  });
+
+  it('a hidden badge is not a NAMED hidden badge — the role does not resurrect the zero case', () => {
+    // `role="img"` is on the returned element, and the component returns
+    // `null` at zero. Without this, a mutation that dropped the `count <= 0`
+    // guard would be caught only by the class-based cases above, and the role
+    // queries would be the two cases that quietly disagreed with them.
+    render(<UnreadBadge count={0} />);
+    expect(screen.queryByRole('img')).toBeNull();
   });
 });

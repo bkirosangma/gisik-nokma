@@ -115,3 +115,62 @@ describe('11.94 unreadCount is the viewer’s total, and markRead moves it', () 
     expect((await gateway.list()).notifications[0]?.read).toBe(true);
   });
 });
+
+describe('11.94 the gateway can express the server REFUSING, not only serving', () => {
+  it('markRead on an id the caller does not own rejects — the route’s 404, not a silent success', async () => {
+    const mine = notificationOf('assignment', { read: false });
+    const gateway = new FakeNotificationsGateway([mine], 5);
+
+    // `routes/notifications.ts` answers 404 `{error:'not_found'}` for a row
+    // that is not the caller's AND for one that does not exist — one shape for
+    // both, so a prober learns nothing about which. The fake models that with
+    // a rejection, and until this case existed NOTHING asserted it: turning
+    // the reject into `Promise.resolve()` left this file 7/7 green.
+    //
+    // This is the half of the contract Task 14's HTTP adapter has to get
+    // right. An adapter that swallowed a 404 into a resolved promise would be
+    // indistinguishable, here, from one that propagated it — and the whole
+    // reason this fake mirrors the store rather than inventing convenient
+    // semantics is so the interface is measured against what the server does.
+    await expect(gateway.markRead('01J9GN0Tsomebodyelses')).rejects.toThrow('not_found');
+
+    // A refusal changes NOTHING. Not the total, not the row that does exist —
+    // a fake that rejected after mutating would pass the line above.
+    expect(await gateway.unreadCount()).toBe(1);
+    expect((await gateway.list()).notifications[0]?.read).toBe(false);
+    // And the call was really attempted rather than refused by an argument
+    // check that never reached the lookup.
+    expect(gateway.markReadCalls).toEqual(['01J9GN0Tsomebodyelses']);
+  });
+
+  it('refusal and success are told apart on the SAME gateway, one call after the other', async () => {
+    // The two arms of `markRead`'s one conditional, in one test: a fake that
+    // rejected everything would pass the case above, and one that resolved
+    // everything would pass the success cases further up. Only a gateway that
+    // discriminates passes both halves of this.
+    const mine = notificationOf('mention', { read: false });
+    const gateway = new FakeNotificationsGateway([mine], 5);
+    await expect(gateway.markRead('nope')).rejects.toThrow('not_found');
+    await expect(gateway.markRead(mine.id)).resolves.toBeUndefined();
+    expect(await gateway.unreadCount()).toBe(0);
+  });
+});
+
+describe('11.94 the fake mirrors the route’s cursor spelling, including the empty one', () => {
+  it('an EMPTY-STRING cursor is the first page, the way the route reads it', async () => {
+    // `routes/notifications.ts` maps `?cursor=` to `null` before the store
+    // sees it, so `''` asks for the first page. The fake used `cursor ?? null`,
+    // which kept the `''` and filtered `row.id < ''` — nothing. Strictly
+    // stricter than the server, so it could hide no server bug; it just made
+    // the docblock's "mirroring the server's paging semantics" false at one
+    // input, and this fake exists to be a truthful mirror or nothing.
+    const rows = [notificationOf('mention'), notificationOf('stale-ticket')];
+    const gateway = new FakeNotificationsGateway(rows, 5);
+    expect(idsOf((await gateway.list('')).notifications)).toEqual(
+      idsOf((await gateway.list()).notifications),
+    );
+    // And really both rows, not two matching emptinesses — the equality above
+    // holds just as well when the fake returns nothing for every spelling.
+    expect((await gateway.list('')).notifications).toHaveLength(2);
+  });
+});

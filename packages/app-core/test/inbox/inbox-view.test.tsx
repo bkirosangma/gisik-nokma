@@ -263,6 +263,18 @@ describe('11.92 the copy on screen is format.ts’s, passed through unaltered', 
         notificationHeadline(notification, userName),
       );
       expect(body, `body of ${notification.kind}`).toBe(notificationBody(notification));
+      // The body is CLIPPED on screen: `.gn-inbox__body` in `ui.css` is
+      // `overflow: hidden; text-overflow: ellipsis; white-space: nowrap`, so
+      // the longest string this surface carries — a contested claim's refusal
+      // reason, the one string the suite works hardest to keep character for
+      // character — is the one that gets cut. `textContent` cannot see a clip,
+      // which is why nothing noticed. `title` is the affordance that gives the
+      // rest back, and it must be the SAME string rather than a second,
+      // driftable spelling of it.
+      expect(
+        row?.querySelector('.gn-inbox__body')?.getAttribute('title'),
+        `title of ${notification.kind}`,
+      ).toBe(notificationBody(notification));
     }
   });
 
