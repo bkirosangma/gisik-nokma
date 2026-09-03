@@ -9,22 +9,26 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9, 15 tasks. BATCH A CLOSED AND GREEN. BATCH B+C IS IN FLIGHT NOW.**
+## WHERE I AM: **STEP 14 — PLAN 9. A/B/C COMMITTED (T1-T6). GATE IS **RED**. RECOVERY ROUND IN FLIGHT.**
 
 > # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
 > ```
 > /usr/bin/git log --oneline origin/main..HEAD     # what is actually committed
 > /usr/bin/git status --porcelain=v1               # what a dead agent left behind
 > ```
-> **BATCH B+C (T4 -> T5 -> T6, serial) was DISPATCHED at `93a9ed5` and is running as this line is
-> written.** Six agents, each committing its own work. So by the time you read this, anywhere from
-> zero to three of T4/T5/T6 may be committed **and this section will not say so** — the handoff is
-> written before the work, and the agents do not update it.
+> **Batch B+C is DONE — T4, T5 and T6 are all committed.** What is running now is the
+> **RECOVERY ROUND** dispatched after it: T4's fix (the red gate + 4 Important), T5's fix
+> (4 Important), and **T6's review, which never ran at all** because its agent died on an API 529.
+> Three agents, each committing its own work, so by the time you read this zero to two of those fixes
+> may be committed **and this section will not say so** — the handoff is written before the work and
+> the agents do not update it.
 >
-> **A dead fan-out leaves committed tasks and no handoff entry, and it also leaves UNCOMMITTED work in
-> the tree** — Batch B of step 13 died on an expired login with a full task written but not committed,
-> and it was recovered only because someone ran `git status` before assuming a failed agent did
-> nothing. Do that before re-dispatching anything.
+> **A dead fan-out leaves COMMITTED tasks and no handoff entry, and it can also leave UNCOMMITTED work
+> in the tree.** Both have now happened here. Step 13's Batch B died on an expired login with a full
+> task written and not committed, recovered only because someone ran `git status` first. Step 14's T6
+> died on a 529 with its work **committed and amended** — so `git status` was clean and the task
+> looked untouched by the handoff while being finished on disk. **Run both commands. Neither alone
+> would have caught both cases.**
 >
 > *(This warning exists because the alternative was live, not hypothetical: the header said "BATCH B
 > (T4) IS NEXT" while T4 was already being written. That is the third instance of the stale-middle
@@ -109,6 +113,62 @@ coordination doc already pre-corrected this). T2's `docToPlainText` **already ex
 (`packages/domain/src/doc-text.ts`) — created by **Plan 5**, not Plan 7 as T2's text says; take the
 skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
 `src/index.ts` as the plan says.
+
+## BATCH B+C — T4/T5/T6 ALL COMMITTED. **THE GATE IS RED.** RECOVERY ROUND IN FLIGHT.
+
+> ### THE BRANCH DOES NOT CURRENTLY PASS ITS OWN GATE. Do not open a PR from this state.
+> `pnpm --filter @gisik-nokma/server run typecheck` **exits 2**:
+> ```
+> test/notifications/store.test.ts(132,12): error TS2532: Object is possibly 'undefined'.
+> test/notifications/store.test.ts(171,12): error TS2532: Object is possibly 'undefined'.
+> ```
+> Unguarded `page.notifications[0].x` under `noUncheckedIndexedAccess`, in **Task 4's test file**
+> (`57e6991`), whose commit message claimed full verification. **`vitest` is FULLY GREEN — 916 server
+> tests pass — and the gate still fails.** CI runs `pnpm turbo run build test typecheck`, so this is
+> the gate, not a side check. Three independent parties reported it: T4's reviewer, T5's implementer
+> (which proved it pre-existing by running `tsc` at HEAD in a detached worktree where its own files
+> were absent), and T5's reviewer. **This is the clearest instance yet of "a tests-pass report is not
+> a gate report", and it is worth more than the two-line fix: the branch was green in every way its
+> author checked.**
+
+**THE T6 FAN-OUT DIED ON AN API 529 — AND IT DIED *AFTER* COMMITTING.** T6's implementer errored at
+183K tokens / 74 tool calls with its work **committed**; T6's reviewer then failed to start at all.
+This is step 13's Batch B lesson repeating with a different cause: **a dead fan-out leaves committed
+work, not just a gap.** Measured, not assumed — tree clean, `1dad73d` present, server suite 916 green.
+
+> **`3c1dab1` IS ORPHANED. Do not cite it.** It is T6's pre-amend commit; the agent amended before
+> dying. `git branch --contains 3c1dab1` returns empty while `git cat-file` passes on it happily and
+> hands back the earlier content. **The live sha is `1dad73d`.**
+
+| Task | Committed | Review | Outcome |
+|---|---|---|---|
+| **T4** store | `57e6991` | opus, ran | **fix-required — 1 CRITICAL (the red gate) + 4 Important.** All four Importants are MISSING TESTS, not broken code: cross-user leakage in `unreadNotificationCount` survives, four of seven `rowToNotification` fields unpinned (including a `userId`/`workspace_id` **column swap**), `nextCursor` off-by-one survives, and a test named "clamps limit to 1..100 and defaults to 30" pins only the lower clamp. |
+| **T5** fan-out | `f8d7f4e` | opus, ran | **fix-required — 4 Important + 2 Minor.** The `canSee` gate itself is **well** pinned (deleting it reddens; forcing it false reddens 14). What is unpinned is everything around it — see below. |
+| **T6** sweep | **`1dad73d`** | **NEVER RAN (529)** | **UNREVIEWED CODE ON THE BRANCH.** Re-dispatched. Until that returns, T6 is committed and unexamined by anyone but its author. |
+
+**T5's sharpest finding, because it is the one branch with no visibility gate.** `claim.contested` is
+deliberately ungated, justified as *"the payload is the claimant's own refused event echoed back"*. The
+recipient is `original.actorId` — and swapping it for `env.actorId` left **18/18 fanout and 886/886
+server tests green**. Root cause is a FIXTURE defect: both fixtures set contester and claimant to the
+**same user**, so the branch's one distinguishing fact is untestable. Plan 10 amendment 16 makes
+contester != claimant the *normal* case, and the exemption's own justification evaporates the moment
+the recipient is not the claimant. **One fixture defect blinded two disclosure checks on the only
+ungated path.**
+
+**Also from T5, an order-dependence worth remembering:** the outer try/catch wraps the whole recipient
+loop, so a throwing `canSeeTicket` at recipient N drops N..end. Measured — throw at #1: nobody gets a
+row; at #2: only the first does. **Who gets notified depends on the order mentions appear in the
+document.** The existing pin uses a single recipient, where "contained" and "aborted" are the same
+observation. The task text only promises isolation across *transports*, so the reviewer honestly
+flagged it as possibly-within-spec; **my ruling was to pin the behaviour either way**, because an
+order-dependent outcome on a disclosure path must not be settled by document order.
+
+**T6's TZ question was answered by construction, and the answer needs verifying not inheriting.** The
+implementer avoided SQL date arithmetic deliberately (`sweep.ts:169` claims the predicate carries no
+`now()` and no `CURRENT_DATE`), used fixed +05:30 arithmetic via `istDayOf`/`istDayBounds`, and wrote
+a mutation table claiming Kiritimati and Niue each **diverge** under a local-clock mutation while
+Kolkata stays green. **If that reproduces, it is the first test in this repo to break the 48-file TZ
+gap.** The re-dispatched reviewer is told to reproduce it, not believe it.
 
 ## LIVE ANCHORS — step 14, Batch A closed. RECOUNTED at the sha below, not carried forward.
 
