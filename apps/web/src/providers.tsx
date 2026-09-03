@@ -6,6 +6,7 @@ import {
   withCacheFeed,
   type ClientStateCache,
   type DataSource,
+  type WorkflowAuthoringGateway,
 } from '@gisik-nokma/app-core';
 import {
   createHttpClient,
@@ -18,16 +19,29 @@ import {
   type InviteGateway,
 } from '@gisik-nokma/app-core/online';
 import { authClient } from './auth-client.js';
+import { createWebAuthoringGateway } from './authoring/data-source-gateway.js';
 
 /**
  * The shell's whole world, in one object.
  *
  * `dataSource` is amendment 10's seam and carries the thirteen read/write methods
- * a replica must also implement. The three GATEWAYS beside it are deliberately
- * not part of it: founding a workspace, minting an invitation and accepting one
- * are one-shot onboarding actions no replica ever serves offline, and putting
- * them in `DataSource` would oblige Plan 10's replica to implement something it
- * can only refuse. Each gateway module carries the argument in full.
+ * a replica must also implement. The four GATEWAYS beside it are deliberately
+ * not part of it.
+ *
+ * For the three onboarding ones — founding a workspace, minting an invitation
+ * and accepting one — these are one-shot actions no replica ever serves offline,
+ * and putting them in `DataSource` would oblige Plan 10's replica to implement
+ * something it can only refuse. Each gateway module carries the argument in full.
+ *
+ * `authoring` (Plan 8 Task 13) joins them on the SAME argument, and this
+ * docblock was corrected rather than left saying "three": four of that
+ * gateway's eight members — `listWorkflows`, `getStateOccupancy`,
+ * `getTypeWorkflowPopulation` and the bulk `migrateTypeToWorkflow` — have no
+ * `DataSourceQuery` member at all, and each has a shipped route. Widening
+ * `DataSource` to hold them would oblige the offline replica to answer for a
+ * whole-workspace occupancy count and an irreversible cross-workflow migration
+ * it cannot serve. `src/authoring/data-source-gateway.ts` states the choice, its
+ * reasoning, and the alternative that was not taken.
  *
  * They are named here, on the one injected seam, rather than constructed inside
  * the pages that use them — which is what lets `test/invite-page.test.tsx`,
@@ -41,6 +55,7 @@ export type AppServices = {
   invites: InviteGateway;
   invitesAdmin: InviteAdminGateway;
   founding: FoundingGateway;
+  authoring: WorkflowAuthoringGateway;
 };
 
 const AppServicesContext = createContext<AppServices | null>(null);
@@ -82,12 +97,19 @@ export function Providers({
       // belongs here is an ORIGIN, not a socket URL.
       streamBaseUrl: process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000',
     });
+    const dataSource = withCacheFeed(online, cache);
     return {
-      dataSource: withCacheFeed(online, cache),
+      dataSource,
       cache,
       invites: createHttpInviteGateway(http),
       invitesAdmin: createHttpInviteAdminGateway(http),
       founding: createHttpFoundingGateway(http),
+      // The SAME `dataSource` the pages read through and the SAME `http` the
+      // three gateways above use — the adapter serves four of its members
+      // through one and four through the other, so handing it a second of
+      // either would give the builder a different idea of the server than the
+      // rest of this shell has.
+      authoring: createWebAuthoringGateway({ dataSource, http }),
     };
   }, [services]);
   const value = services ?? constructed;
