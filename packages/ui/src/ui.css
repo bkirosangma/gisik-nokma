@@ -1061,3 +1061,85 @@
   font-weight: 600;
   text-align: center;
 }
+
+/* Saved filters (Plan 9 Task 13). A named FilterSpec is a QUESTION somebody
+   wrote down, not a claim about any ticket, so nothing in this block borrows a
+   claim role: no `--gn-contested`, no `--gn-pending`, no category hue. The
+   names are `--gn-accent` because they are the one affordance here that acts,
+   and the delete glyph is `--gn-text-muted` because a destructive control that
+   shouts is a control people hit by accident. NO ROLE WAS ADDED — every custom
+   property below is one `.gn-inbox` or `.gn-timeline` already draws with. */
+.gn-saved-filters {
+  background: var(--gn-surface);
+  color: var(--gn-text);
+}
+.gn-saved-filters__empty {
+  margin: 0;
+  padding: 0.5rem;
+  color: var(--gn-text-muted);
+  font-size: 0.85rem;
+}
+.gn-saved-filters__list { list-style: none; margin: 0; padding: 0; }
+.gn-saved-filters__item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--gn-border);
+}
+.gn-saved-filters__apply {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--gn-accent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gn-saved-filters__delete {
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--gn-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.gn-saved-filters__save {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+.gn-saved-filters__name {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 4px;
+  background: var(--gn-surface-sunken);
+  color: var(--gn-text);
+  font: inherit;
+}
+.gn-saved-filters__submit {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  cursor: pointer;
+}
+/* Disabled is a STATE the component sets on the element, so the rule is keyed
+   on `:disabled` rather than on a modifier class the markup could forget to
+   spell. */
+.gn-saved-filters__submit:disabled {
+  color: var(--gn-text-muted);
+  cursor: not-allowed;
+}
+.gn-saved-filters__apply:focus-visible,
+.gn-saved-filters__delete:focus-visible,
+.gn-saved-filters__name:focus-visible,
+.gn-saved-filters__submit:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}

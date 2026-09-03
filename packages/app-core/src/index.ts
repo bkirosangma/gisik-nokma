@@ -198,3 +198,27 @@ export {
 export { NotificationIcon, type NotificationIconProps } from './inbox/icons.js';
 export { UnreadBadge, type UnreadBadgeProps } from './inbox/unread-badge.js';
 export { InboxView, type InboxViewProps } from './inbox/inbox-view.js';
+// Plan 9 Task 13 — saved filters. `SavedFilter`, `PreferencesDoc` and the
+// domain's `FilterSpec` are deliberately absent from this block, and the reason
+// is sharper than the one the `FilterSpec`/`IsEpicType` notes above give: this
+// package ALREADY declares a `SavedFilter` (`view-types.ts:183`, the client
+// vocabulary, field `filter`) which leaves through the `export *` on line 3.
+// Re-exporting the domain's `SavedFilter` (field `filterSpec`, ruling P26) here
+// would put two different declarations behind one name at the package root.
+// Consumers of these functions take those types from `@gisik-nokma/domain`,
+// which is where the schema that validates them lives.
+export type { PreferencesGateway } from './preferences/preferences-gateway.js';
+export {
+  MAX_SAVED_FILTERS,
+  SavedFilterRefused,
+  deleteSavedFilter,
+  loadSavedFilters,
+  parseSavedFilters,
+  saveFilter,
+  type SavedFilterRefusalReason,
+} from './preferences/saved-filters.js';
+export {
+  SAVED_FILTERS_EMPTY_COPY,
+  SavedFiltersMenu,
+  type SavedFiltersMenuProps,
+} from './preferences/saved-filters-menu.js';
