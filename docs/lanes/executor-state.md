@@ -57,6 +57,7 @@ clean afterwards. **Require a clean tree AND zero running agents before any gate
 | **Gate at branch HEAD (Batch C closed)** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2445 tests.** domain 335 · rule-engine 280 · server 857 · **app-core 687** · editor 178 · web 69 · ui 31 · sync-client 8. **The branch adds +213 over the base, ALL in app-core** (474 → 687): Batch A +69, Batch B +63, Batch C +81. | run by the executor with `--force` on a clean tree with **no agents running**, through `rtk proxy`; Node printed into the same log |
 | Gate at the Batch A boundary | exit 0 · 24/24 · 0 cached · 2301 tests; app-core 543. Batch A's own split, measured by excluding each task's test file rather than inferred: **T1-T3 = 58, T4 = 11.** | same method |
 | Gate at the base `7337357`, for the delta | exit 0 · 24/24 · 0 cached · **2232 tests**; app-core 474, all others as above. | measured at branch creation, on the second (unproxied) attempt — the first was proxy-collapsed to one package and its composition was unusable |
+| **`check:env`** | **exit 0 at `9017ebc`** — 45 documented / 23 referenced. **Re-measure this at every sha you report; it is the half of the gate that went stale for fifteen tasks.** | `pnpm check:env`, run separately from the turbo gate |
 | **`check:tasks`** | **exit 0**, 177 rows / 177 plan tasks, **118 done (66.7%)**, 0 claimed, 0 in-flight, **59 todo**. Plan 08 = 0 done / 15 todo. | `node scripts/check-task-ledger.mjs` after the promotion |
 | **Gate SHAPE** | **24 tasks over EIGHT packages.** Plan 8 Task 14 adds a Playwright e2e script — **if it becomes a turbo task, this figure is spent and must be recounted.** | the run above |
 | Orphaned, do not cite | every sha in the narrative sections of previous handoffs. | `git branch --contains` (empty = orphaned) |
@@ -523,6 +524,36 @@ the gate. Confirmed present in the green run. **Trust that, not `which`.**
 
 Re-run with the export: **exit 0 · 24/24 · 0 cached · 2463 tests**, identical composition to the
 pre-merge run. **The merge was never implicated.**
+
+## THE GATE IS TWO COMMANDS AND I WAS ONLY RUNNING ONE — read this before reporting any gate result
+
+**`pnpm turbo run build test typecheck` IS NOT THE CI GATE. It is half of it.**
+`.github/workflows/ci.yml` runs **`pnpm check:env` FIRST**, then the turbo gate. When `check:env`
+exits 1 the turbo step **never runs and shows as skipped**, so a CI failure here does not look like a
+test failure at all.
+
+**This blocked PR #85 and my own report said the branch was green.** Task 14's Playwright spec
+introduced four `process.env` reads — `E2E_BASE_URL`, `E2E_WORKSPACE_ID`, `E2E_ADMIN_STORAGE_STATE`,
+`E2E_MEMBER_STORAGE_STATE` — and none was in `.env.example`. The controller's independent CI run
+caught it; fourteen of my own gate runs did not, because none of them asked the question.
+
+**The mechanism is the branch's own recurring defect, and this time it was mine.** The Live-anchors
+table has said **`check:env` exit 0** since branch creation. That was measured once, at the base, and
+**carried forward through fifteen tasks without re-measurement — including past the task that added
+four new environment reads.** The turbo composition was recounted at every batch boundary; the
+`check:env` half was inherited every time. **The number nobody re-measures is the number that goes
+stale, and a gate report is exactly as current as its least-recently-measured half.**
+
+**RULE, for every remaining step: a gate claim requires BOTH commands, run at the sha being
+reported.** The handoff's anchors are not evidence for either half.
+
+Fixed and verified: the four are documented in `.env.example` in the house style (with
+`E2E_MEMBER_STORAGE_STATE` marked genuinely **optional** — the spec's `configured` predicate requires
+only the first three, a distinction invisible from the names, and the entry records that nothing in
+CI sets any of them and `turbo.json` defines no e2e task). `check:env` exit 0 at **45 documented / 23
+referenced**; commenting `E2E_WORKSPACE_ID` back out reddens the check **naming exactly that
+variable**, restored and confirmed with `git diff`. Full CI-equivalent at `9017ebc`:
+**`check:env` exit 0 AND turbo 24/24, 0 cached, 2463 tests.**
 
 ## IN FLIGHT
 
