@@ -224,6 +224,16 @@ describe('11.48 the scanner is proven against planted defects before it is trust
     // CLOCK_FREE_DOMAIN_FILES: a loop over the roots would assert the list
     // against itself, so deleting 'timeline' would delete its own guard.
     expect(scanned).toContain('timeline/timeline-model.ts');
+    /**
+     * The timeline's RENDERING half, named literally for the same reason
+     * `calendar-view.tsx` is: `CLOCK_FREE_ROOTS` already lists `timeline`, so
+     * the walk reaches this file FOR FREE — and that is exactly what makes its
+     * absence invisible. It is also the file where a `new Date()` would be the
+     * shortest path to a working Earlier/Today/Later, and where reading one
+     * would put the same claim in a different week from the calendar's answer
+     * about that claim.
+     */
+    expect(scanned).toContain('timeline/timeline-view.tsx');
     expect(scanned).toContain('claims/dates.ts');
     expect(scanned).toContain('claims/claim-labels.ts');
     expect(scanned).toContain('claims/ticket-dates.ts');

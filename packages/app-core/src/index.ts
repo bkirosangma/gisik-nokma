@@ -172,3 +172,10 @@ export {
   type TimelineSideReason,
   type TimelineWeekCol,
 } from './timeline/timeline-model.js';
+// Plan 9 Task 11 — the week columns over that model. Named exports with the
+// `.js` extension, matching every block above; `export *` would re-export this
+// module's internal helpers (`CustomClaimList`, `sideEntryClassName`) as
+// package surface. `SHIFT_DAYS` is deliberately not listed: nothing outside
+// the component reads it, and its own test measures the shift by the columns
+// that move rather than by re-stating the constant.
+export { TimelineView, type TimelineViewProps } from './timeline/timeline-view.js';

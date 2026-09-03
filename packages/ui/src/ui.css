@@ -819,3 +819,140 @@
   margin: 0 0 0.25rem 0.25rem;
   cursor: pointer;
 }
+
+/* Plan 9 Task 11 — the timeline's week columns.
+
+   NO NEW ROLE. The plan's `tokens.color.barActive`, `pendingHatch`, `ink`,
+   `inkMuted`, `line`, `surface` and `customMarker` are seven names for six
+   roles this file already carries: a bar is `accent` on `accent-text`, an
+   in-transit claim is `pending`, a claim on a workspace-defined date field is
+   `custom-marker`, and the grid lines are `border`. Task 9 added the one role
+   the roster really was missing; this surface needed none.
+
+   The week track list arrives as `--timeline-week-columns`, set once by the
+   component on `.gn-timeline`, and it carries `repeat(n, 1fr)` rather than the
+   bare `n` so the var substitutes as a plain component of the value — nothing
+   here computes layout in a test, and `repeat(var(--n), 1fr)` failing to parse
+   would silently turn the whole declaration into `none`.
+
+   It is NOT `--gn-`-prefixed on purpose: that namespace is the token origin's,
+   and tokens.test.ts asserts every `var(--gn-…)` here names a declared colour
+   role. A track list is not a colour. */
+
+.gn-timeline {
+  background: var(--gn-surface);
+  color: var(--gn-text);
+  font: inherit;
+}
+.gn-timeline__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+.gn-timeline__nav {
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  font: inherit;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
+.gn-timeline__glyph { color: var(--gn-text-muted); margin: 0 0.2rem; }
+.gn-timeline__nav:focus-visible,
+.gn-timeline__bar:focus-visible,
+.gn-timeline__open:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+
+.gn-timeline__empty {
+  margin: 0;
+  padding: 0.75rem;
+  color: var(--gn-text-muted);
+  font-size: 0.85rem;
+}
+
+/* The two grids that must agree, reading ONE count. The first column is the
+   title column; week `i` is column `i + 2`, which is what the bar's computed
+   `grid-column` says too. */
+.gn-timeline__weeks,
+.gn-timeline__row {
+  display: grid;
+  grid-template-columns: 12rem var(--timeline-week-columns);
+  align-items: center;
+}
+.gn-timeline__weeks { border-bottom: 1px solid var(--gn-border); }
+.gn-timeline__week {
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--gn-text-muted);
+  border-left: 1px solid var(--gn-border);
+}
+
+.gn-timeline__group-heading {
+  margin: 0;
+  padding: 0.5rem 0.25rem 0.15rem;
+  font-size: 0.9rem;
+}
+.gn-timeline__title { padding: 0.25rem; min-width: 0; }
+.gn-timeline__title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gn-timeline__bar {
+  border: none;
+  border-radius: 4px;
+  margin: 2px 0;
+  padding: 2px 0.25rem;
+  text-align: left;
+  font: inherit;
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+}
+/* In transit: outlined, never a different hue — a claim on its way to the
+   server is the same claim, and recolouring it would say it means something
+   else. The same treatment `.gn-calendar__item--pending` uses. */
+.gn-timeline__bar[data-pending] { outline: 2px dashed var(--gn-pending); outline-offset: -1px; }
+/* A period that continues past the window's edge. Dashed at the end it is
+   clipped at, and only that end — the bar does not claim to start or finish
+   where the window happens to. */
+.gn-timeline__bar[data-clipped-start] { border-left: 2px dashed var(--gn-border-strong); border-radius: 0 4px 4px 0; }
+.gn-timeline__bar[data-clipped-end] { border-right: 2px dashed var(--gn-border-strong); border-radius: 4px 0 0 4px; }
+.gn-timeline__bar[data-clipped-start][data-clipped-end] { border-radius: 0; }
+
+.gn-timeline__claims { list-style: none; margin: 0; padding: 0; }
+.gn-timeline__claim { font-size: 0.75rem; color: var(--gn-custom-marker); }
+
+.gn-timeline__side {
+  padding: 0.5rem;
+  border-top: 1px solid var(--gn-border);
+}
+.gn-timeline__side-copy { margin: 0 0 0.35rem; color: var(--gn-text-muted); font-size: 0.8rem; }
+.gn-timeline__side-list { list-style: none; margin: 0; padding: 0; }
+.gn-timeline__side-entry { padding: 0.15rem 0; }
+.gn-timeline__open {
+  border: none;
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.gn-timeline__side-note { color: var(--gn-text-muted); margin-left: 0.5rem; font-size: 0.8rem; }
+/* The two reasons the plain heading is FALSE of: the claims are both there and
+   still cannot draw a period. Marked the way `.gn-calendar__item--unplaceable`
+   is, so the row says so as well as the heading above it. */
+.gn-timeline__side-entry--start-after-due,
+.gn-timeline__side-entry--unplaceable-day {
+  border-left: 1px dashed var(--gn-border-strong);
+  padding-left: 0.35rem;
+  font-style: italic;
+}
