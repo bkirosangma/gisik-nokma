@@ -9,7 +9,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9. T1-T7 COMMITTED, GATE GREEN. T7 fix + T8 IN FLIGHT.**
+## WHERE I AM: **STEP 14 — PLAN 9. T1-T8 COMMITTED (8/15), GATE GREEN. T8 fix + T10 IN FLIGHT.**
 
 > # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
 > ```
@@ -113,6 +113,55 @@ coordination doc already pre-corrected this). T2's `docToPlainText` **already ex
 (`packages/domain/src/doc-text.ts`) — created by **Plan 5**, not Plan 7 as T2's text says; take the
 skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
 `src/index.ts` as the plan says.
+
+## PROGRESS: T1-T8 COMMITTED (8 of 15). T8's fix + T10 IN FLIGHT. **Measure; do not trust this line.**
+
+`/usr/bin/git log --oneline origin/main..HEAD` · `/usr/bin/git status --porcelain=v1`
+
+**T7's fix (`6c7af0d`) rebuilt the test on `buildTestApp`** — the real `buildApp` — and the app.ts
+mutation that previously survived 937/937 now reddens **all ten tests in the file by name**. It also
+took a side-effect worth knowing: routing through the real `setErrorHandler` means `cursor=%00` still
+500s but now returns `INTERNAL_ERROR_BODY` instead of leaked Postgres text. **The leaked driver message
+was only ever visible because the harness was a bare `Fastify()`** — one root cause, two symptoms. The
+limit guard follows `list.ts`'s convention (refuse, don't clamp) using **`store.ts`'s own ceiling of
+100**, not `list.ts`'s unrelated `MAX_LIMIT=200` — an error in its first draft, caught before commit.
+
+### T8 (the calendar view-model) — committed, and it caught two lies in the PLAN's own draft
+
+- **The all-hidden month lie.** With every claimed date on a legend-hidden field, the plan's own model
+  returns the honest-empty sentence — telling a viewer *"no claimed dates fall in this month"* about
+  claims they hid one switch ago. New `CALENDAR_ALL_HIDDEN_COPY`.
+- **`epicAncestorOf` disagreed with the server.** The plan tests `typeId === 'epic'`; the server
+  (`routes/list.ts:388,410`) groups by **rank 1**. A workspace with its own rank-1 type would get a
+  lane on the server and *"No epic"* here. Now injectable, defaulting to the id derived from
+  `BUILTIN_TICKET_TYPE_SEEDS` **by rank**.
+
+It also declined to invent color tokens, and the reason is the good one: **Task 8 renders nothing, so
+no Task 8 test could redden if it guessed a primitive wrong — a check that cannot fail.** The landed
+`tokens.ts` is a role system (`TOKEN_ROLES` -> themes -> `CONTRAST_PAIRS`), not the plan's flat
+`color.*` map. **Owner: Task 9**, the first thing that renders one.
+
+**43 mutations, 10 survived first contact, all closed.** Its own note to the next implementer is worth
+keeping: *every one of the ten was a fixture where the correct value and the defect's value coincide* —
+the grid's string bounds silently absorb malformed days, and a fixture's declared order was also its
+alphabetical order. **It also reported one thing it could NOT prove**: deleting the cycle-guard `seen`
+set makes the walk loop forever, which hangs the runner rather than reddening a named test — a
+did-not-run, not a survivor, and it said so instead of claiming the guard was pinned.
+
+### T8's review — the sharpest finding on this branch so far
+
+**It found the model telling the SAME lie it was proud of fixing, at two other doors.** A month emptied
+by a **filter** or by a **lane** prints the honest-empty sentence about a month full of claimed dates.
+Demonstrated as shipped behaviour, not under mutation: two August-dated tickets with
+`filter:{assigneeIds:['user_nobody']}` yield `emptyCopy = "No claimed dates fall in this month…"`, and
+an unmatched `laneEpicId` yields the identical copy. **The commit set the standard — "two different
+facts, two different sentences" — and applied it at one door of three.**
+
+Second Important: **the grid's outer edge is unwitnessed at BOTH ends.** The Aug-2026 grid renders
+`2026-07-27..2026-09-06`; four mutations survive there, including one that makes **every marker on a
+padding day vanish** while **777/777 pass**. The only out-of-grid fixture sits at `2026-10-02` —
+**twenty-six days past the edge**, which is exactly why nothing bites. The series' "gate closing one
+end of a range" class, here closing **neither**.
 
 ## PROGRESS: T1-T7 COMMITTED. T7's fix + T8 IN FLIGHT. **Measure, do not trust this line.**
 
