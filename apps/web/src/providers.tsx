@@ -83,9 +83,10 @@ export function Providers({
     // the other the day someone reached for it.
     if (services !== undefined) return null;
     const cache = createClientStateCache();
-    // ONE transport for the three gateways, same-origin, so they carry the same
-    // session cookie through the same Next rewrites the DataSource uses. A
-    // second client here would be a second idea of where the server is.
+    // ONE transport for the FOUR gateways below — the three onboarding ones and
+    // the authoring adapter — same-origin, so they carry the same session cookie
+    // through the same Next rewrites the DataSource uses. A second client here
+    // would be a second idea of where the server is.
     const http = createHttpClient('', (input, init) => fetch(input, init));
     const online = createOnlineDataSource({
       // Same-origin: Next's rewrites forward /v1/* to the API server, so the
@@ -105,10 +106,10 @@ export function Providers({
       invitesAdmin: createHttpInviteAdminGateway(http),
       founding: createHttpFoundingGateway(http),
       // The SAME `dataSource` the pages read through and the SAME `http` the
-      // three gateways above use — the adapter serves four of its members
-      // through one and four through the other, so handing it a second of
-      // either would give the builder a different idea of the server than the
-      // rest of this shell has.
+      // three gateways above use — the adapter serves THREE of its eight
+      // members through the first and FIVE through the second, so handing it a
+      // second of either would give the builder a different idea of the server
+      // than the rest of this shell has.
       authoring: createWebAuthoringGateway({ dataSource, http }),
     };
   }, [services]);

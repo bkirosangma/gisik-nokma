@@ -9,34 +9,45 @@ import { HttpError, type HttpClient } from '@gisik-nokma/app-core/online';
 import type { PublishedWorkflowDef } from '@gisik-nokma/domain';
 
 /**
- * # The `WorkflowAuthoringGateway`, served half by Plan 6's `DataSource` and
- * half by the routes that shipped without a seam.
+ * # The `WorkflowAuthoringGateway`: three members through Plan 6's `DataSource`,
+ * five over the routes that shipped without a seam.
  *
  * ## The seam problem, measured rather than assumed
  *
  * Plan 8 amendment 10 says `apps/web` implements this gateway "over Plan 6's
  * `DataSource`". Measured against `packages/app-core/src/data-source.ts` at this
- * sha, that is true of exactly **four** of the gateway's **eight** members:
+ * sha, the gateway's **eight** members fall into **three** groups, and the
+ * counts below are the enumeration beside them rather than a claim about it.
  *
- * | gateway member                | `DataSourceQuery` member                    |
- * |-------------------------------|---------------------------------------------|
- * | `getWorkflow`                 | `getWorkflowDef(workspaceId, workflowId, v?)` |
- * | `listTicketTypes`             | `getTicketTypes(workspaceId)`                |
- * | `submit`                      | `DataSource.ingest(events)`                  |
- * | `listMembers`                 | `getMembers(workspaceId)` — **and it cannot**, see below |
+ * **Three ARE served, and go through `DataSource` here:**
  *
- * The other four — `listWorkflows`, `getStateOccupancy`,
- * `getTypeWorkflowPopulation`, `migrateTypeToWorkflow` — have **no
- * `DataSourceQuery` member at all**, and every one of them has a live registered
- * server route (`apps/server/src/routes/builder-reads.ts`;
- * `registerBuilderReadRoutes` is called from `apps/server/src/app.ts`). This is
- * the inverse of this series' usual gap: the server is ahead, and the seam is
- * missing.
+ * | gateway member    | `DataSourceQuery` member                      |
+ * |-------------------|-----------------------------------------------|
+ * | `getWorkflow`     | `getWorkflowDef(workspaceId, workflowId, v?)` |
+ * | `listTicketTypes` | `getTicketTypes(workspaceId)`                 |
+ * | `submit`          | `DataSource.ingest(events)`                   |
+ *
+ * **One LOOKS served and is not:** `listMembers` against
+ * `getMembers(workspaceId)`. The names line up and the types do not — the whole
+ * argument is under "`getMembers` CANNOT serve `listMembers`" below. It is
+ * counted here as its own case precisely because folding it in with the three
+ * above is the mistake this file exists to have already made once.
+ *
+ * **Four have NO `DataSourceQuery` member at all:** `listWorkflows`,
+ * `getStateOccupancy`, `getTypeWorkflowPopulation`, `migrateTypeToWorkflow` —
+ * and every one of them has a live registered server route
+ * (`apps/server/src/routes/builder-reads.ts`; `registerBuilderReadRoutes` is
+ * called from `apps/server/src/app.ts`). This is the inverse of this series'
+ * usual gap: the server is ahead, and the seam is missing.
+ *
+ * Three plus one plus four is eight, which is `WorkflowAuthoringGateway`'s
+ * whole surface.
  *
  * ## What was chosen, and the alternative that was not
  *
- * **Chosen:** the four unserved members are implemented here, in this adapter,
- * over the existing `@gisik-nokma/app-core/online` HTTP client.
+ * **Chosen:** the four unserved members — and `listMembers`, five in all — are
+ * implemented here, in this adapter, over the existing
+ * `@gisik-nokma/app-core/online` HTTP client.
  * `packages/app-core/src/data-source.ts` is untouched. Amendment 10 forbids
  * *views* speaking HTTP; an adapter is not a view, and the screens still see
  * nothing but `WorkflowAuthoringGateway`. The reason to prefer this: `DataSource`
@@ -83,12 +94,15 @@ import type { PublishedWorkflowDef } from '@gisik-nokma/domain';
  * oracle the server refused to provide.
  *
  * For `getWorkflow` that `null` is the honest answer and it is passed through —
- * "no published workflow has this id" is what the edit page renders. For the
- * other four reads there is an empty value in reach (`[]`, `{}`, `0`) and every
- * one of them would be a lie: "this workspace has no workflows", "no ticket is
- * in any state", "nothing is pinned to this workflow". `gateway.ts` forbids it
- * by name for both counts — "it may reject, and the caller says 'unavailable'
- * rather than guessing a number" — so those four throw `AuthoringReadRefused`.
+ * "no published workflow has this id" is what the edit page renders. The four
+ * reads that go over HTTP each have an empty value in reach, and every one of
+ * them would be a lie: `listWorkflows` -> `[]`, "this workspace has no
+ * workflows"; `listMembers` -> `[]`, "nobody is in this workspace";
+ * `getStateOccupancy` -> `{}`, "no ticket is in any state";
+ * `getTypeWorkflowPopulation` -> `0`, "nothing is pinned to this workflow".
+ * `gateway.ts` forbids it by name for both counts — "it may reject, and the
+ * caller says 'unavailable' rather than guessing a number" — so all four throw
+ * `AuthoringReadRefused` instead.
  *
  * The screens are already built for it: `WorkflowListScreen` renders a load
  * error, and `WorkflowBuilderScreen` catches a refused roster specifically
@@ -121,12 +135,13 @@ function answered<T>(raw: T | null, route: string): T {
 }
 
 export type WebAuthoringDeps = {
-  /** Plan 6's seam, for the four members it already serves. */
+  /** Plan 6's seam, for the three members it already serves. */
   dataSource: DataSource;
   /**
    * The same-origin transport `src/providers.tsx` builds once for the three
-   * onboarding gateways. Shared rather than constructed here: a second client
-   * would be a second idea of where the server is.
+   * onboarding gateways and now hands to this one as well. Shared rather than
+   * constructed here: a second client would be a second idea of where the
+   * server is.
    */
   http: HttpClient;
 };
