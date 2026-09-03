@@ -9,7 +9,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9. T1-T11 COMMITTED (11/15). T11 fix + T12 IN FLIGHT.**
+## WHERE I AM: **STEP 14 — PLAN 9. T1-T12 COMMITTED (12/15). T12 fix + T13 IN FLIGHT. Then T14, T15.**
 
 > # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
 > ```
@@ -165,7 +165,46 @@ coordination doc already pre-corrected this). T2's `docToPlainText` **already ex
 skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
 `src/index.ts` as the plan says.
 
-## PROGRESS: T1-T11 COMMITTED (11 of 15). T11's fix + T12 IN FLIGHT. **Measure; do not trust this line.**
+## PROGRESS: T1-T12 COMMITTED (12 of 15). T12's fix + T13 IN FLIGHT. **Measure; do not trust this line.**
+
+### A CLASS NAME AND ITS CSS RULE ARE TIED TOGETHER BY NOTHING — twice now, on two tasks
+
+**T12: seven BEM class renames survive BOTH suites.** `gn-inbox__glyph` -> `gn-inbox__glyphx` leaves
+**app-core 955/955 and ui 37/37 green**, and that class carries one of the two colour signals the
+commit itself names for unread. T12 ran 58 mutations and every one was thorough — **but all of them
+were on VALUES, and none on a selector.** A whole dimension was unexamined.
+
+**T11's fix had already built the guard for this**, one task earlier, after the identical defect on
+`--timeline-week-columns`. It lives at `timeline-view.test.tsx` and `packages/ui/test/in-transit.test.ts`.
+**The lesson is that a guard built for one surface does not generalise on its own** — the next
+component in the same package reproduced the gap while the fix for it sat two files away.
+
+### T11's fix found a survivor beyond the review's ten — and then caught itself committing the defect
+
+It measured the review's ten and added an eleventh (`start-after-due` returning the
+`--unplaceable-day` class). More telling: **its first draft of the cross-package test hand-typed
+`--timeline-week-columns` three lines above a comment claiming it never did** — the exact failure the
+round existed to close, committed inside the fix for it, caught by its own re-run.
+
+It also left **two survivors deliberately and named both**: `weeksCount ?? 8` (no input discriminates
+it — `0 ?? 8` is `0`, `null` is not type-legal, `undefined` maps to the model's own default), and
+**export completeness — deleting `TIMELINE_EMPTY_COPY` from the barrel leaves the whole repo at 24/24,
+0 cached, because the repo has no public-surface test.** Both stated rather than quietly dropped.
+
+### T12's other two Important findings
+
+- **The one place the fake models the server REFUSING is unasserted.** `markRead` rejecting an unknown
+  id can become `Promise.resolve()` with gateway tests 7/7 green. Its four PAGING mirrors are all
+  genuinely measured — **the refusal half is not.** This is the series' signature failure in miniature:
+  *a mocked contract excusing the server from existing*, and **Task 14's HTTP adapter is written
+  against this contract.**
+- **`UnreadBadge`'s accessible name may not exist.** `aria-label` sits on a role-less `<span>`, where
+  ARIA prohibits naming. Three tests appear to confirm it works — **`getByLabelText` matches the
+  ATTRIBUTE and never computes an accessible name**, so the harness that would catch it is precisely
+  the one blind to it. The reviewer ran no mutation and said so: **no mutation of the component can
+  expose it.** The repo's own precedent (`read-only-banner.tsx`, `role="status"`) is three files over.
+
+ T11's fix + T12 IN FLIGHT. **Measure; do not trust this line.**
 
 ### T11's review found the prose-claim class at its sharpest, and graded it Important
 
