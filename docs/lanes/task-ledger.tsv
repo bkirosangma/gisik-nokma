@@ -122,24 +122,24 @@ plan	task	status	pr	merge_sha	note
 07	2	done	47	a3746fb	artefact: packages/domain/src/doc-embeds.ts (PR #47)
 07	3	done	47	a3746fb	artefact: packages/editor/src/extensions/ticket-image.ts (PR #47)
 07	4	done	47	a3746fb	artefact: packages/editor/src/extensions/mention.ts, mention-popup.ts (= PR #47 squash sha)
-07	5	done	82	7337357	exec/12-plan7-remainder; 
-07	6	done	82	7337357	exec/12-plan7-remainder; 
-07	7	done	82	7337357	exec/12-plan7-remainder; 
-07	8	done	82	7337357	exec/12-plan7-remainder; 
-07	9	done	82	7337357	exec/12-plan7-remainder; 
-07	9a	done	82	7337357	exec/12-plan7-remainder; 
-07	10	done	82	7337357	exec/12-plan7-remainder; 
-07	11	done	82	7337357	exec/12-plan7-remainder; 
-07	11a	done	82	7337357	exec/12-plan7-remainder; 
-07	12	done	82	7337357	exec/12-plan7-remainder; 
-07	12a	done	82	7337357	exec/12-plan7-remainder; 
-07	12b	done	82	7337357	exec/12-plan7-remainder; 
-07	12c	done	82	7337357	exec/12-plan7-remainder; 
-07	13	done	82	7337357	exec/12-plan7-remainder; 
-07	13a	done	82	7337357	exec/12-plan7-remainder; 
-07	14	done	82	7337357	exec/12-plan7-remainder; 
-07	15	done	82	7337357	exec/12-plan7-remainder; 
-07	16	done	82	7337357	exec/12-plan7-remainder; 
+07	5	done	82	7337357	artefact: packages/editor/src/extensions/escape-suggestion.ts (PR #82)
+07	6	done	82	7337357	artefact: packages/editor/test/doc-text-conformance.test.ts (PR #82) | CONTROLLER: plan declares doc-to-plain-text.test.ts; landed under a different name, same deviation shape noted at PR #47
+07	7	done	82	7337357	artefact: apps/server/src/attachments/object-store.ts, local-disk-store.ts, migrations/1788356858695_attachments.sql (PR #82)
+07	8	done	82	7337357	artefact: apps/server/src/attachments/s3-store.ts, store-config.ts (PR #82)
+07	9	done	82	7337357	artefact: apps/server/src/attachments/sniff.ts, filename.ts, routes/attachments.ts POST half (PR #82)
+07	9a	done	82	7337357	artefact: apps/server/migrations/1788362657940_attachment-sha256.sql, src/attachments/content-hash.ts (PR #82)
+07	10	done	82	7337357	artefact: apps/server/src/routes/attachments.ts GET handler (PR #82)
+07	11	done	82	7337357	artefact: apps/server/src/gates/server-gate.ts, image-embed-gate.ts, evidence-gate.ts (PR #82)
+07	11a	done	82	7337357	artefact: packages/domain/src/attachment-kinds.ts (PR #82)
+07	12	done	82	7337357	artefact: packages/editor/src/upload.ts, extensions/attachment-paste.ts, components/UploadChips.tsx (PR #82)
+07	12a	done	82	7337357	artefact: packages/editor/src/drive/google-picker.ts, attachment-claims.ts (PR #82)
+07	12b	done	82	7337357	artefact: packages/editor/src/components/AttachmentListItem.tsx (PR #82)
+07	12c	done	82	7337357	artefact: packages/editor/test/drive-never-inline.test.ts, server/test/gates/image-embed-gate.test.ts append (PR #82)
+07	13	done	82	7337357	artefact: packages/editor/src/attachments/require-evidence.ts, components/EvidencePicker.tsx (PR #82)
+07	13a	done	82	7337357	artefact: packages/editor/src/components/EvidencePicker.tsx drive-refusal addition (PR #82)
+07	14	done	82	7337357	artefact: packages/editor/src/attachments/compose-editor-submission.ts, components/TicketEditorSlot.tsx (PR #82) | CONTROLLER: also carries ruling P27's transition-dialog.tsx fix, outside this task's own declared scope
+07	15	done	82	7337357	artefact: packages/editor/src/webview/bridge.ts, create-editor-bridge.ts, entry.tsx (PR #82)
+07	16	done	82	7337357	artefact: Features.md §9, test-cases/09-editor-attachments.md (PR #82)
 08	1	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/{draft-store,layout}.ts + tests; React Flow jsdom shims in test/setup.ts
 08	2	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/{summaries,fields,anchor-issues}.ts + tests
 08	3	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/templates.ts; packages/domain/src/workflows/errand-with-waits.ts; simple-kanban imported by identity, never re-declared
