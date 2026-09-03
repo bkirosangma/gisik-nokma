@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { TicketState } from '@gisik-nokma/domain';
 import {
+  TIMELINE_EMPTY_COPY,
+  TIMELINE_NARROWED_COPY,
+  TIMELINE_OUT_OF_WINDOW_COPY,
   TIMELINE_SIDE_LIST_COPY,
   TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
 } from '../../src/claims/claim-labels.js';
@@ -16,7 +19,7 @@ import {
 /**
  * Ids invented here that Task 15 must carry into
  * `test-cases/11-calendar-notifications.md` (which does not exist yet):
- * 11.52-11.60. Each describe below names its own; `docs/lanes/executor-state.md`
+ * 11.52-11.62. Each describe below names its own; `docs/lanes/executor-state.md`
  * carries the same list for a relaunched executor.
  */
 
@@ -230,6 +233,30 @@ describe('11.54 a claimed day that is not a day is named, and blanks nothing', (
     expect(entry.startClaim?.date).toBe('2026-02-30');
     expect(entry.dueClaim?.date).toBe('2026-09-04');
     expect(m.sideListCopy).toBe(TIMELINE_SIDE_LIST_UNDRAWABLE_COPY);
+  });
+
+  /**
+   * The SAME bad day at both ends is one bad day claimed twice, not two. The
+   * fixture above cannot see this — it uses two DIFFERENT days — and the copy
+   * used to print "2026-02-30 and 2026-02-30 are not days on the calendar",
+   * inventing a second problem and getting the verb wrong about the first.
+   */
+  it('the same bad day at both ends is named ONCE, with the singular verb', () => {
+    const m = model([
+      ticket({
+        fields: {
+          title: claimField('One bad day, claimed twice'),
+          startDate: claimField({ date: '2026-02-30' }),
+          dueDate: claimField({ date: '2026-02-30' }),
+        },
+      }),
+    ]);
+    expect(m.sideList[0]!.note).toBe(
+      '2026-02-30 is not a day on the calendar — the claim is shown as recorded, and no bar is drawn',
+    );
+    // Both claims still travel: deduping the SENTENCE never dedupes the data.
+    expect(m.sideList[0]!.startClaim?.date).toBe('2026-02-30');
+    expect(m.sideList[0]!.dueClaim?.date).toBe('2026-02-30');
   });
 
   it('both ends unplaceable are both named', () => {
@@ -802,5 +829,207 @@ describe('11.59 filters narrow rows and side list alike', () => {
     });
     const m = model([epic, child], { filter: { assigneeIds: ['user_anselma'] } });
     expect(m.groups.map((group) => group.epicTitle)).toEqual(['Still named']);
+  });
+});
+
+/**
+ * 11.61 (NEW — Task 15 must carry this id into
+ * test-cases/11-calendar-notifications.md).
+ *
+ * MEASURED BEFORE THIS BLOCK EXISTED, at this anchor: `model([])`, a filter
+ * matching nobody, an unmatched lane, and work that is fully dated but wholly
+ * outside the window all `JSON.stringify`d to the SAME bytes. Distinct count:
+ * ONE. The sibling `CalendarModel` — same package, same author — already had
+ * `emptyCopy` and three sentences for exactly this failure; the timeline had
+ * no such field at all.
+ *
+ * The window miss is the case the component cannot reconstruct: Task 11's
+ * props carry `tickets`, `filter` and `laneEpicId` and nothing about the
+ * window.
+ */
+describe('11.61 four empty timelines, and the sentences that tell them apart', () => {
+  function assigned(assigneeId: string, title: string, start?: string, due?: string): TicketDatesInput {
+    const fields: Record<string, unknown> = { title: claimField(title) };
+    if (start !== undefined) fields.startDate = claimField({ date: start });
+    if (due !== undefined) fields.dueDate = claimField({ date: due });
+    return ticket({ assigneeId, fields: fields as TicketDatesInput['state']['fields'] });
+  }
+
+  const inWindow = (): TicketDatesInput[] => [dated('2026-08-24', '2026-08-28', 'Here')];
+
+  it('nothing loaded at all says nobody claimed a period — not that something is hidden', () => {
+    const m = model([]);
+    expect(m.groups).toEqual([]);
+    expect(m.sideList).toEqual([]);
+    expect(m.emptyCopy).toBe(TIMELINE_EMPTY_COPY);
+  });
+
+  it('a FILTER that matched nobody says the filter did it', () => {
+    const m = model(inWindow(), { filter: { assigneeIds: ['user_nobody'] } });
+    expect(m.groups).toEqual([]);
+    expect(m.emptyCopy).toBe(TIMELINE_NARROWED_COPY);
+    expect(m.emptyCopy).not.toBe(TIMELINE_EMPTY_COPY);
+    expect(m.emptyCopy).not.toBe(TIMELINE_OUT_OF_WINDOW_COPY);
+  });
+
+  it('an unmatched LANE says so too — the second door, same sentence', () => {
+    const m = model(inWindow(), { laneEpicId: 'no_such_epic' });
+    expect(m.groups).toEqual([]);
+    expect(m.emptyCopy).toBe(TIMELINE_NARROWED_COPY);
+    expect(m.emptyCopy).not.toBe(TIMELINE_EMPTY_COPY);
+  });
+
+  it('work that is fully dated and merely ELSEWHERE IN TIME says exactly that', () => {
+    const m = model([dated('2026-11-02', '2026-11-06', 'Later')]);
+    expect(m.groups).toEqual([]);
+    expect(m.sideList).toEqual([]);
+    expect(m.emptyCopy).toBe(TIMELINE_OUT_OF_WINDOW_COPY);
+    expect(m.emptyCopy).not.toBe(TIMELINE_EMPTY_COPY);
+    expect(m.emptyCopy).not.toBe(TIMELINE_NARROWED_COPY);
+  });
+
+  /**
+   * The measurement itself, inverted into an assertion. The reviewer's
+   * DISTINCT COUNT was 1; anything less than 3 here means two different facts
+   * are back to being one screen.
+   */
+  it('the four empties are three distinct models, not one repeated four times', () => {
+    const serialised = [
+      model([]),
+      model(inWindow(), { filter: { assigneeIds: ['user_nobody'] } }),
+      model(inWindow(), { laneEpicId: 'no_such_epic' }),
+      model([dated('2026-11-02', '2026-11-06', 'Later')]),
+    ].map((m) => JSON.stringify(m));
+    // The filter and the lane are the same fact said one way, by design.
+    expect(new Set(serialised).size).toBe(3);
+    expect(serialised[1]).toBe(serialised[2]);
+  });
+
+  it('a timeline with anything on it has no empty sentence at all', () => {
+    expect(model(inWindow()).emptyCopy).toBeNull();
+    // A side-list entry is content too: the screen is not empty.
+    expect(
+      model([ticket({ fields: { title: claimField('Undated') } })]).emptyCopy,
+    ).toBeNull();
+  });
+
+  /**
+   * NARROWINGS STACK, and this is the pair that proves the precedence is a
+   * truth condition rather than an ordering someone liked.
+   */
+  it('a filter that removed work which WOULD have shown here outranks the window', () => {
+    const m = model(
+      [
+        assigned('user_anselma', 'Later', '2026-11-02', '2026-11-06'),
+        assigned('user_kiro', 'Undated, and would have been listed'),
+      ],
+      { filter: { assigneeIds: ['user_anselma'] } },
+    );
+    expect(m.groups).toEqual([]);
+    expect(m.sideList).toEqual([]);
+    // Widening the filter WOULD fill this screen, so "it is outside these
+    // weeks" would send the viewer to the wrong control.
+    expect(m.emptyCopy).toBe(TIMELINE_NARROWED_COPY);
+  });
+
+  it('a filter that removed only work which would ALSO have missed the window is not blamed', () => {
+    const m = model(
+      [
+        assigned('user_anselma', 'Later', '2026-11-02', '2026-11-06'),
+        assigned('user_kiro', 'Earlier', '2026-08-01', '2026-08-05'),
+      ],
+      { filter: { assigneeIds: ['user_anselma'] } },
+    );
+    expect(m.groups).toEqual([]);
+    // Widening the filter would put nothing on this screen — the window is the
+    // only control that reaches either ticket.
+    expect(m.emptyCopy).toBe(TIMELINE_OUT_OF_WINDOW_COPY);
+    expect(m.emptyCopy).not.toBe(TIMELINE_NARROWED_COPY);
+  });
+
+  /**
+   * The wording is pinned against the case that would falsify a looser one: an
+   * undated epic IS work, so a sentence saying "no work is here" would be
+   * false. "No claimed dates are here to draw" is true of it and of `[]`.
+   */
+  it('a workspace holding only an undated epic reaches the honest-empty sentence', () => {
+    const m = model([ticket({ id: 'epic_lonely', typeId: 'epic', fields: { title: claimField('Lonely lane') } })]);
+    expect(m.groups).toEqual([]);
+    expect(m.sideList).toEqual([]);
+    expect(m.emptyCopy).toBe(TIMELINE_EMPTY_COPY);
+  });
+});
+
+/**
+ * 11.62 (NEW — Task 15 must carry this id into
+ * test-cases/11-calendar-notifications.md).
+ *
+ * The undated-epic `continue` is the ONLY statement in the model that removes
+ * a ticket from BOTH outputs on the grounds of what it IS rather than what it
+ * claims, and it was witnessed on its TRUE branch only: widening the date test
+ * to `||`, and dropping it entirely, both SURVIVED. Combined with 11.61's
+ * missing `emptyCopy`, a vanished epic left nothing on screen explaining it.
+ *
+ * The behaviour below is the one chosen and now pinned: the guard fires only
+ * when the epic has nothing to say. An epic that made a claim is treated like
+ * any other ticket that made that claim.
+ */
+describe('11.62 the undated-epic skip fires only when the epic has nothing to say', () => {
+  function epic(id: string, title: string, fields: Record<string, unknown> = {}): TicketDatesInput {
+    return ticket({
+      id,
+      typeId: 'epic',
+      fields: { title: claimField(title), ...fields } as TicketDatesInput['state']['fields'],
+    });
+  }
+
+  function childOf(parentId: string, title: string): TicketDatesInput {
+    return ticket({
+      parentId,
+      fields: {
+        title: claimField(title),
+        startDate: claimField({ date: '2026-08-24' }),
+        dueDate: claimField({ date: '2026-08-28' }),
+      },
+    });
+  }
+
+  it('a HALF-dated epic is listed like any other half-dated ticket, and still heads its lane', () => {
+    const m = model([epic('epic_half', 'Half dated', { startDate: claimField({ date: '2026-08-24' }) }), childOf('epic_half', 'Child')]);
+    expect(m.sideList.map((entry) => [entry.ticketId, entry.reason])).toEqual([
+      ['epic_half', 'start-only'],
+    ]);
+    expect(m.sideList[0]!.note).toBe("starts 24 Aug — Kiro's claim");
+    // Being listed for a missing claim and naming a lane are different jobs.
+    expect(m.groups.map((group) => [group.epicId, group.epicTitle])).toEqual([
+      ['epic_half', 'Half dated'],
+    ]);
+    expect(m.groups[0]!.rows.map((row) => row.title)).toEqual(['Child']);
+  });
+
+  it('a FULLY dated epic gets a bar, inside its own lane', () => {
+    const m = model([epic('epic_full', 'Fully dated', {
+      startDate: claimField({ date: '2026-08-24' }),
+      dueDate: claimField({ date: '2026-08-28' }),
+    })]);
+    expect(m.sideList).toEqual([]);
+    expect(m.groups).toHaveLength(1);
+    expect(m.groups[0]!.epicId).toBe('epic_full');
+    expect(m.groups[0]!.rows.map((row) => row.ticketId)).toEqual(['epic_full']);
+    expect(m.groups[0]!.rows[0]!.bar).toEqual({
+      fromWeek: 1,
+      toWeek: 1,
+      clippedStart: false,
+      clippedEnd: false,
+    });
+  });
+
+  it('a TRULY undated epic is a lane and nothing else — neither a row nor missing work', () => {
+    const m = model([epic('epic_bare', 'Bare lane'), childOf('epic_bare', 'Child')]);
+    expect(m.sideList).toEqual([]);
+    expect(m.groups.map((group) => [group.epicId, group.epicTitle])).toEqual([
+      ['epic_bare', 'Bare lane'],
+    ]);
+    expect(m.groups[0]!.rows.map((row) => row.title)).toEqual(['Child']);
   });
 });

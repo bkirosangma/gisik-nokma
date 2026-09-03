@@ -36,10 +36,27 @@ export type WeekDays = readonly [string, string, string, string, string, string,
  * NaN propagates through `+`, through `isoDate`, and out the other side as a
  * rendered date — `Invalid Date` in a cell, or worse, a plausible neighbour.
  * The shape check is the domain's single `IST_DAY_REGEX`, never a local copy,
- * and the round-trip afterwards refuses the two days `Date.UTC` invents
- * instead of rejecting: `2026-02-30` (rolled into March) and `0099-01-01`
- * (read as 1999). `istDayBounds` in the domain refuses the same pair the same
- * way — one rule, stated once, applied twice.
+ * and the round-trip afterwards refuses `2026-02-30`, which the day-setter
+ * rolls into 2 March.
+ *
+ * IT IS NOT THE SAME RULE AS `istDayBounds`, and an earlier version of this
+ * block claimed it was — "one rule, stated once, applied twice", naming
+ * `0099-01-01` as a second day both refuse. Measured on this branch:
+ * `dateMs('0099-01-01')` SUCCEEDS. `istDayBounds` builds its instant with
+ * `Date.UTC(99, 0, 1)`, which folds a two-digit year into 1999 and fails its
+ * round-trip; `setUTCFullYear(99, 0, 1)` below does NOT fold, and `isoDate`
+ * pads the year back to `0099`, so this round-trip agrees and places it. The
+ * two functions agree on `2026-02-30` and disagree on `0099-01-01`: TWO rules.
+ *
+ * Left as a disagreement rather than closed, and the choice is deliberate.
+ * Making `dateMs` refuse pre-1000 years would invent a validity rule at a
+ * rendering surface that the WRITE path does not have — `IST_DAY_REGEX` admits
+ * `0099-01-01` and `dueDateValueSchema` checks nothing stronger — so the
+ * product would store a claim it then refuses to place, with no migration and
+ * nobody's decision behind it. A year-99 claim is placeable, lands far outside
+ * any window, and is therefore absent from the timeline the same way any other
+ * distant work is. `provenance.ts` already absorbs the domain's stricter
+ * refusal in a `try`/`catch` and renders such a day verbatim.
  */
 export function dateMs(isoDay: string): number {
   if (!IST_DAY_REGEX.test(isoDay)) {
@@ -119,8 +136,8 @@ export function monthGridWeeks(year: number, month: number): WeekDays[] {
  * Can this day be PLACED — i.e. does `dateMs` accept it?
  *
  * `IST_DAY_REGEX` admits days that no calendar has (`2026-02-30` rolls into
- * March, `0099-01-01` reads as 1999) and the write path checks nothing
- * stronger, so a stored claim can carry one. A surface that does day
+ * March) and the write path checks nothing stronger, so a stored claim can
+ * carry one. A surface that does day
  * ARITHMETIC — the timeline, which turns a claim into a week index — must ask
  * before it computes, because `dateMs` throws and one such claim would
  * otherwise blank the whole view. Surfaces that only COMPARE day strings (the

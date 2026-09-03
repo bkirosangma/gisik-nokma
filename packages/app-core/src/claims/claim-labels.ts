@@ -108,30 +108,90 @@ export const CALENDAR_ALL_HIDDEN_COPY =
 export const CALENDAR_NARROWED_MONTH_COPY =
   'Dates are claimed in this month — every one of them is behind a narrowing you set: the filter, the lane, or the legend. Nothing was dropped — widen the filter or switch a field back on to see them again.';
 
+/**
+ * The side-list heading when the list holds ONLY work with a MISSING claim.
+ *
+ * The sentence states a LEAVING condition — "until it carries both" — so it is
+ * true exactly of entries that will leave the moment the missing claim
+ * arrives: `no-dates`, `start-only`, `due-only`. It is FALSE over the other
+ * two: a `start-after-due` entry already carries both and is still here, and
+ * so is one whose claimed day is not a day on the calendar. That is why the
+ * model chooses between this heading and the one below rather than printing
+ * this one unconditionally as the plan's Task 10 does.
+ */
 export const TIMELINE_SIDE_LIST_COPY =
   'No bar is invented: work appears here until it carries both a claimed start and a claimed needed-by.';
 
 /**
- * The side-list heading when the list holds ONLY work with a missing end.
+ * The side-list heading for a list that holds ANY entry the plain heading is
+ * false of — the same shape as the empty-month copy above, honest per row and
+ * false in the summary unless the summary is chosen.
  *
- * NOT the unconditional heading the plan's Task 10 gives it, and the reason is
- * the sentence's own condition: "until it carries both" states what a ticket
- * must do to LEAVE the list. A `start-after-due` entry carries both and is
- * still there, and so is one whose claimed day is not a day on the calendar.
- * Printed over those, this heading is false — the same shape as the
- * empty-month copy above, honest per row and false in the summary, which is
- * why the model chooses between the two.
+ * It names the whole set of reasons rather than picking one, which is what
+ * lets it carry a mixed list truthfully.
  */
 export const TIMELINE_SIDE_LIST_UNDRAWABLE_COPY =
   'No bar is invented: work appears here whenever its claims cannot draw a period — a missing start or needed-by, a start after its needed-by, or a claimed day that is not on the calendar.';
+
+/**
+ * The FIRST empty timeline: nothing here has a date claim at all.
+ *
+ * The timeline had NO empty copy of any kind, while its sibling calendar —
+ * same package, written for exactly this failure — had three sentences. Four
+ * different emptinesses serialised to identical bytes: nothing loaded, a
+ * filter that matched nobody, a lane nobody belongs to, and work that is fully
+ * dated and merely elsewhere in time.
+ *
+ * Reached when nothing is on screen, nothing a narrowing removed would have
+ * shown here, and nothing visible is scheduled outside the window — i.e. every
+ * loaded ticket is an undated epic (a lane, not missing work) or there are
+ * none. The second sentence is the calendar's, verbatim, because it is the
+ * same promise about the same product.
+ */
+export const TIMELINE_EMPTY_COPY =
+  'No claimed dates are here to draw. Undated work is absent, not estimated — the timeline draws only the periods someone claimed.';
+
+/**
+ * The SECOND empty timeline: a narrowing the viewer set emptied it.
+ *
+ * A DISJUNCTION on purpose, and the reason is the one Task 8's fix had to
+ * discover: NARROWINGS STACK. A filter can remove some of the work while the
+ * window leaves the rest behind, and then "the filter removed everything" and
+ * "everything is outside these weeks" are each false. Naming the set the
+ * viewer set stays true whether one narrowing is live or all of them are.
+ */
+export const TIMELINE_NARROWED_COPY =
+  'Work is claimed here — every piece of it is behind a narrowing you set: the filter, the lane, or the weeks in view. Nothing was dropped — widen the filter or move the window to see it again.';
+
+/**
+ * The THIRD empty timeline, and the ONE case the component cannot reconstruct
+ * from its own props: the work is fully dated, coherent, placeable, and simply
+ * scheduled elsewhere in time.
+ *
+ * Task 11's props carry `tickets`, `filter` and `laneEpicId` but nothing about
+ * the window, so a component asked to work this out would have to redo the day
+ * arithmetic — a second statement of where the window is, free to disagree
+ * with the model's.
+ *
+ * DELIBERATELY NOT EXHAUSTIVE ("dated work here sits outside", not "every
+ * piece of dated work"). A filter can remove work that would ALSO have missed
+ * the window, which leaves this arm reachable with a second narrowing live —
+ * and an exhaustive sentence there would be the `CALENDAR_ALL_HIDDEN_COPY`
+ * failure in timeline clothes. The quantifier is what would be false; the fact
+ * stated is true either way.
+ */
+export const TIMELINE_OUT_OF_WINDOW_COPY =
+  'Dated work here sits outside the weeks in view. Nothing was dropped — move the window Earlier or Later to reach it.';
 
 /**
  * A claimed day that no calendar has, named rather than silently dropped.
  *
  * `IST_DAY_REGEX` is a SHAPE check, and the write path (`dueDateValueSchema`,
  * and Plan 3's bare-string custom date) validates nothing beyond it — so
- * `2026-02-30` and `0099-01-01` are storable claims that `dateMs` refuses to
- * place. The timeline is the first surface that converts a claim to a NUMBER
+ * `2026-02-30` is a storable claim that `dateMs` refuses to place. (`0099-01-01`
+ * used to be named here as a second one; it is NOT — `dateMs` places it. See
+ * the `dateMs` docblock, which carried the same error and now records the
+ * measurement.) The timeline is the first surface that converts a claim to a NUMBER
  * (the calendar compares day strings and never needs to), so it is the first
  * place that refusal reaches a viewer.
  *
@@ -140,9 +200,23 @@ export const TIMELINE_SIDE_LIST_UNDRAWABLE_COPY =
  * neighbour. This is `provenance.ts`'s ruling applied one surface along: a
  * blank screen is a worse answer than naming the bad day, and letting `dateMs`
  * throw here would blank the whole timeline for everyone else's tickets too.
+ *
+ * DEDUPED. A ticket whose start and needed-by carry the SAME bad day is one
+ * bad day claimed twice, not two: "2026-02-30 and 2026-02-30 are not days on
+ * the calendar" invents a second problem and gets the verb wrong about the
+ * first. The two-bad-days fixture could not see this, because it uses two
+ * different days.
+ *
+ * Deduped on the RENDERED string rather than the raw day, so the count that
+ * chooses between "is not a day" and "are not days" is the count of things
+ * actually printed. For the days that reach here the two are the same set —
+ * `formatClaimDate` hands an unrenderable day straight back — so this is a
+ * discipline rather than an observed difference, and it is the one that stays
+ * right if the renderer ever collapses two inputs.
  */
 export function unplaceableDayCopy(days: readonly string[]): string {
-  const named = days.map((day) => formatClaimDate(day)).join(' and ');
-  const verb = days.length > 1 ? 'are not days' : 'is not a day';
+  const distinct = [...new Set(days.map((day) => formatClaimDate(day)))];
+  const named = distinct.join(' and ');
+  const verb = distinct.length > 1 ? 'are not days' : 'is not a day';
   return `${named} ${verb} on the calendar — the claim is shown as recorded, and no bar is drawn`;
 }

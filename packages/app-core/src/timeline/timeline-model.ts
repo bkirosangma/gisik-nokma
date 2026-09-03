@@ -1,5 +1,8 @@
 import type { TicketState } from '@gisik-nokma/domain';
 import {
+  TIMELINE_EMPTY_COPY,
+  TIMELINE_NARROWED_COPY,
+  TIMELINE_OUT_OF_WINDOW_COPY,
   TIMELINE_SIDE_LIST_COPY,
   TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
   barProvenance,
@@ -75,11 +78,44 @@ export type TimelineSideEntry = {
 
 export type TimelineGroup = { epicId: string | null; epicTitle: string; rows: TimelineRow[] };
 
+/**
+ * Where one ticket landed, or why it landed nowhere.
+ *
+ * The two silent arms are the point of this union. A ticket that produces
+ * neither a row nor a side entry has been removed for a REASON, and the two
+ * reasons are different facts a viewer needs told apart — which is exactly
+ * what the model could not say before, because it said nothing at all.
+ */
+type TimelinePlacement =
+  | { kind: 'row'; epicId: string | null; row: TimelineRow }
+  | { kind: 'side'; entry: TimelineSideEntry }
+  /** An undated epic: a lane, not missing work. */
+  | { kind: 'lane-heading' }
+  /** Fully dated, coherent, placeable — and scheduled elsewhere in time. */
+  | { kind: 'out-of-window' };
+
 export type TimelineModel = {
   weeks: TimelineWeekCol[];
   groups: TimelineGroup[];
   sideList: TimelineSideEntry[];
   sideListCopy: string;
+  /**
+   * Why the timeline is empty, or null when it is not. THREE sentences,
+   * because they are three different facts — the same construction
+   * `CalendarModel.emptyCopy` was given, for the same reason.
+   *
+   * Measured before this field existed, anchor `2026-08-23`: `model([])`, a
+   * filter matching nobody, an unmatched `laneEpicId`, and work that is fully
+   * dated but wholly outside the window all serialised to the SAME bytes.
+   * Four different emptinesses, one indistinguishable screen.
+   *
+   * The window miss is the case Task 11 CANNOT reconstruct: its props carry
+   * `tickets`, `filter` and `laneEpicId` and nothing about the window, so a
+   * component asked to work it out would have to restate the day arithmetic —
+   * a second statement of where the window is, free to disagree with this
+   * one's. See the precedence note at the bottom of `buildTimelineModel`.
+   */
+  emptyCopy: string | null;
 };
 
 export type TimelineModelOptions = {
@@ -201,16 +237,42 @@ export function buildTimelineModel(
     return title !== '' ? title : epicId;
   }
 
-  const rowsWithEpic: Array<{ epicId: string | null; row: TimelineRow }> = [];
-  const sideList: TimelineSideEntry[] = [];
-
-  for (const input of visible) {
+  /**
+   * Claims in, placement out — the ONE construction, deliberately called twice.
+   *
+   * The second call is over the tickets a filter or a lane removed, and it
+   * exists so `emptyCopy` can tell "nobody claimed a period here" apart from
+   * "your filter removed all of them". That question has to be answered by
+   * running the SAME classification: a cheaper "did it have both dates"
+   * shortcut would answer a different question from the one the rows answer,
+   * and the two would drift. `calendar-model.ts`' `collectItems` carries the
+   * same note for the same reason.
+   */
+  function classify(input: TicketDatesInput): TimelinePlacement {
     const start = dateClaimOf(input, 'startDate');
     const due = dateClaimOf(input, 'dueDate');
     const title = titleOf(input.state);
     const ticketId = input.state.id;
-    // An undated epic is a lane, not missing work.
-    if (isEpicType(input.state.typeId) && start === null && due === null) continue;
+    /**
+     * An undated epic is a lane, not missing work — and the guard fires ONLY
+     * when the epic has nothing to say. Both halves of the condition are
+     * deliberate, and both are now pinned (11.62):
+     *
+     * - A HALF-dated epic goes to the side list like any other half-dated
+     *   ticket, and still heads its lane. Widening this to `||` would suppress
+     *   a claim on the grounds of the ticket's TYPE — someone claimed a start
+     *   for that epic, and the whole file's rule is that a claim is shown as
+     *   claimed.
+     * - A FULLY dated epic gets a bar, in its own lane (`epicAncestorOf`
+     *   returns self for an epic). Dropping the date condition would delete a
+     *   period someone claimed because of what the ticket IS.
+     *
+     * This is the only statement in the function that removes a ticket from
+     * BOTH outputs, so it is kept as narrow as its justification.
+     */
+    if (isEpicType(input.state.typeId) && start === null && due === null) {
+      return { kind: 'lane-heading' };
+    }
 
     // Custom date claims are carried, never consulted: nothing below branches
     // on them except the side-list WORDING. They cannot make a bar, move a
@@ -231,26 +293,30 @@ export function buildTimelineModel(
       .map((claim) => claim.date)
       .filter((day) => !isCalendarDay(day));
     if (unplaceable.length > 0) {
-      sideList.push({
-        ticketId,
-        title,
-        reason: 'unplaceable-day',
-        startClaim: start,
-        dueClaim: due,
-        note: unplaceableDayCopy(unplaceable),
-        customClaims,
-      });
-      continue;
+      return {
+        kind: 'side',
+        entry: {
+          ticketId,
+          title,
+          reason: 'unplaceable-day',
+          startClaim: start,
+          dueClaim: due,
+          note: unplaceableDayCopy(unplaceable),
+          customClaims,
+        },
+      };
     }
 
     if (start !== null && due !== null && start.date <= due.date) {
       // Side-list membership is about missing claims; the WINDOW is about
       // where a span is drawn. A fully-dated ticket outside it appears
-      // nowhere — navigation reaches it, it is scheduled, just not here.
-      if (due.date < windowStart || start.date > windowEnd) continue;
+      // nowhere on the grid — navigation reaches it, it is scheduled, just
+      // not here. Said in `emptyCopy` when there is nothing else to show.
+      if (due.date < windowStart || start.date > windowEnd) return { kind: 'out-of-window' };
       const clippedStart = start.date < windowStart;
       const clippedEnd = due.date > windowEnd;
-      rowsWithEpic.push({
+      return {
+        kind: 'row',
         epicId: epicAncestorOf(byId, ticketId, isEpicType),
         row: {
           ticketId,
@@ -267,42 +333,54 @@ export function buildTimelineModel(
           provenance: barProvenance(start, due, opts.userName),
           customClaims,
         },
-      });
-      continue;
+      };
     }
 
     if (start !== null && due !== null) {
-      sideList.push({
-        ticketId,
-        title,
-        reason: 'start-after-due',
-        startClaim: start,
-        dueClaim: due,
-        note: contradictionCopy(start, due),
-        customClaims,
-      });
-    } else if (due !== null) {
-      sideList.push({
-        ticketId,
-        title,
-        reason: 'due-only',
-        startClaim: null,
-        dueClaim: due,
-        note: dueClaimLabel(due, opts.userName),
-        customClaims,
-      });
-    } else if (start !== null) {
-      sideList.push({
-        ticketId,
-        title,
-        reason: 'start-only',
-        startClaim: start,
-        dueClaim: null,
-        note: startClaimLabel(start, opts.userName),
-        customClaims,
-      });
-    } else {
-      sideList.push({
+      return {
+        kind: 'side',
+        entry: {
+          ticketId,
+          title,
+          reason: 'start-after-due',
+          startClaim: start,
+          dueClaim: due,
+          note: contradictionCopy(start, due),
+          customClaims,
+        },
+      };
+    }
+    if (due !== null) {
+      return {
+        kind: 'side',
+        entry: {
+          ticketId,
+          title,
+          reason: 'due-only',
+          startClaim: null,
+          dueClaim: due,
+          note: dueClaimLabel(due, opts.userName),
+          customClaims,
+        },
+      };
+    }
+    if (start !== null) {
+      return {
+        kind: 'side',
+        entry: {
+          ticketId,
+          title,
+          reason: 'start-only',
+          startClaim: start,
+          dueClaim: null,
+          note: startClaimLabel(start, opts.userName),
+          customClaims,
+        },
+      };
+    }
+    return {
+      kind: 'side',
+      entry: {
         ticketId,
         title,
         reason: 'no-dates',
@@ -311,8 +389,19 @@ export function buildTimelineModel(
         // "no claimed dates" would be false of a ticket carrying a "Filed on".
         note: customClaims.length > 0 ? NO_DAY_CLAIMS_NOTE : NO_DATES_NOTE,
         customClaims,
-      });
-    }
+      },
+    };
+  }
+
+  const rowsWithEpic: Array<{ epicId: string | null; row: TimelineRow }> = [];
+  const sideList: TimelineSideEntry[] = [];
+  /** Visible work that is dated, coherent, placeable — and simply elsewhere. */
+  let outOfWindow = false;
+  for (const input of visible) {
+    const placement = classify(input);
+    if (placement.kind === 'row') rowsWithEpic.push({ epicId: placement.epicId, row: placement.row });
+    else if (placement.kind === 'side') sideList.push(placement.entry);
+    else if (placement.kind === 'out-of-window') outOfWindow = true;
   }
 
   const groupsById = new Map<string | null, TimelineGroup>();
@@ -358,5 +447,71 @@ export function buildTimelineModel(
     ? TIMELINE_SIDE_LIST_COPY
     : TIMELINE_SIDE_LIST_UNDRAWABLE_COPY;
 
-  return { weeks, groups, sideList, sideListCopy };
+  const hasContent = groups.length > 0 || sideList.length > 0;
+
+  /**
+   * Would the work a narrowing removed have appeared HERE?
+   *
+   * Measured by running the same `classify` over the removed inputs, and it
+   * counts only a `row` or a `side` — a filtered-out ticket that would ALSO
+   * have missed the window has not been kept off screen by the filter, and
+   * blaming the filter for it would be its own small lie. That is the
+   * mirror-image discipline `calendar-model.ts` keeps with `narrowedOutOfGrid`.
+   *
+   * Reference identity, not ids: two inputs may legitimately carry the same
+   * ticket id (the ordering fixtures do), and an id-keyed exclusion would drop
+   * the wrong one. `visible` is `inputs.filter(...)`, so the survivors ARE the
+   * input objects.
+   *
+   * Computed only when the screen is empty AND something was actually narrowed
+   * away — otherwise this is a second full classification nobody reads.
+   *
+   * SAFE TO RUN OVER UNFILTERED INPUT because the placeability guard travels
+   * INSIDE `classify`: an unplaceable day is answered before any branch
+   * reaches `weekIndexOf`, where `dateMs` throws. Hoisting that guard out of
+   * `classify` — into the `visible` loop, say — would leave this second call
+   * running arithmetic on days that are not days, and one such claim anywhere
+   * in the workspace would blank the whole timeline. That is the defect the
+   * guard was added for; it is unreachable here only because of where it sits.
+   */
+  const survived = new Set<TicketDatesInput>(visible);
+  const excluded =
+    hasContent || visible.length === inputs.length
+      ? []
+      : inputs.filter((input) => !survived.has(input));
+  const narrowedAway = excluded
+    .map((input) => classify(input))
+    .some((placement) => placement.kind === 'row' || placement.kind === 'side');
+
+  /**
+   * PRECEDENCE, and like the calendar's it is a truth condition, not a taste.
+   *
+   * `TIMELINE_NARROWED_COPY` comes first because it is the sentence that is
+   * still true when narrowings STACK — a filter that removed work which would
+   * have shown here, while what survived is merely out of window, is a screen
+   * a wider filter would fill, and saying only "it's outside these weeks"
+   * would send the viewer to the wrong control. The disjunction names the set
+   * rather than picking one.
+   *
+   * `TIMELINE_OUT_OF_WINDOW_COPY` is deliberately NOT exhaustive, which is why
+   * it is safe to reach with a filter still live: a filter can remove work
+   * that would ALSO have missed the window, leaving `narrowedAway` false and
+   * this arm reached with two narrowings in play. An "every piece of work"
+   * quantifier there would be exactly `CALENDAR_ALL_HIDDEN_COPY`'s failure in
+   * timeline clothes.
+   *
+   * `TIMELINE_EMPTY_COPY` is then reached only when every loaded ticket is an
+   * undated epic, or there are none — so "no claimed dates are here to draw"
+   * is true, and it does NOT say "no work is here": an undated epic IS work,
+   * and it is still a lane.
+   */
+  const emptyCopy = hasContent
+    ? null
+    : narrowedAway
+      ? TIMELINE_NARROWED_COPY
+      : outOfWindow
+        ? TIMELINE_OUT_OF_WINDOW_COPY
+        : TIMELINE_EMPTY_COPY;
+
+  return { weeks, groups, sideList, sideListCopy, emptyCopy };
 }

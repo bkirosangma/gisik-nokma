@@ -1218,8 +1218,9 @@ a fix round rather than trusting it, and for never citing a fix round's own summ
 
 ## TASK 10 (timeline view-model) — RECORDED, NOT FIXED
 
-**1. `dates.ts`' docblock is false about one of the two days it names. OWNER: A PLAN 9 FIX ROUND
-(Task 8's file, and the fix is a choice, not a typo.)** The block above `dateMs` says the round-trip
+**1. ~~`dates.ts`' docblock is false about one of the two days it names.~~ CLOSED by the Task 10
+fix round — the PROSE was corrected, not the code. The entry stands unedited below because the
+measurement in it is the evidence; the resolution is at the end of this item.** The block above `dateMs` says the round-trip
 "refuses the two days `Date.UTC` invents instead of rejecting: `2026-02-30` (rolled into March) and
 `0099-01-01` (read as 1999)", and closes with "`istDayBounds` in the domain refuses the same pair the
 same way — one rule, stated once, applied twice". **Measured on this branch:
@@ -1286,3 +1287,107 @@ missing. Thirty-three mutations now, all killed.
 **7. `Features.md` §11 is still absent, and Task 10 did not open it. OWNER: TASK 15.** Same
 precedent as Task 8, which landed nine source files and touched neither `Features.md` nor
 `test-cases/`. Opening §11 for one task forks what Task 15's plan text dictates verbatim.
+
+## TASK 10 FIX ROUND — two Important, three Minor, and the docblock the executor shipped
+
+Commit under review: `5d00e98`. What the review kept: bars-only-when-both-claims-exist, every window
+and clip boundary pinned at BOTH ends, and the four defects the draft carried. What follows is only
+what changed.
+
+**I1 — `emptyCopy` now exists on `TimelineModel`, and the four empties are three distinct models.**
+Measured before the fix, anchor `2026-08-23`: `model([])`, a filter matching nobody, an unmatched
+`laneEpicId`, and work fully dated but wholly outside the window all `JSON.stringify`d to the SAME
+bytes — **distinct count 1**, while the sibling `CalendarModel` in the same package had `emptyCopy`
+and three sentences for exactly this failure. Three constants added in `claim-labels.ts`
+(`TIMELINE_EMPTY_COPY`, `TIMELINE_NARROWED_COPY`, `TIMELINE_OUT_OF_WINDOW_COPY`) and the loop body
+extracted into one `classify(input): TimelinePlacement` called twice — once over `visible`, once over
+what a narrowing removed — which is `collectItems`' construction, for `collectItems`' stated reason:
+the second question must be answered by running the SAME classification, not a cheaper restatement of
+it. The filter and the lane are deliberately ONE sentence (they are one fact said two ways), so the
+pinned distinct count is **3**, with `serialised[1] === serialised[2]` asserted so a future third
+sentence has to change the number rather than slip in unnoticed.
+
+**NARROWINGS STACK, and the precedence is a truth condition.** `TIMELINE_NARROWED_COPY` outranks the
+window sentence because a filter that removed work which WOULD have shown here describes a screen a
+wider filter would fill — saying "it is outside these weeks" sends the viewer to the wrong control.
+And `TIMELINE_OUT_OF_WINDOW_COPY` is deliberately **NOT exhaustive** ("Dated work here sits outside
+the weeks in view", never "every piece of"): a filter can remove work that would ALSO have missed the
+window, which leaves `narrowedAway` false and that arm reached with a second narrowing live. An
+exhaustive quantifier there is `CALENDAR_ALL_HIDDEN_COPY`'s failure in timeline clothes. Both stacked
+cases are fixtures, and each kills a mutation the other cannot.
+
+**I2 — the undated-epic skip is decided, and the decision is KEEP CURRENT BEHAVIOUR.** The guard was
+witnessed on its true branch only: `&& … && …` → `&& (… || …)` survived, and dropping the date
+condition survived. **Chosen: the guard fires only when the epic has nothing to say.** A HALF-dated
+epic goes to the side list like any other half-dated ticket and still heads its lane; a FULLY dated
+epic gets a bar in its own lane (`epicAncestorOf` returns self). The reasoning is the file's own rule:
+this is the only statement that removes a ticket from BOTH outputs on the grounds of what it IS, so
+it stays as narrow as its justification — an epic that made a claim has made a claim, and suppressing
+it would hide a claim on the grounds of a type. New describe **11.62**.
+
+**Minor (a)** — `TIMELINE_SIDE_LIST_UNDRAWABLE_COPY` carried the OTHER constant's docblock, inverted;
+a maintainer following it literally would swap the two and reinstate the removed lie. Both docblocks
+rewritten so each sits over the constant it describes. Prose only; behaviour was already right.
+
+**Minor (b)** — `unplaceableDayCopy` named the same bad day twice when start and due carried the same
+unplaceable value. Deduped, on the RENDERED string, so the count that picks "is not a day" / "are not
+days" is the count of things printed. Note at the site that for days which actually reach this
+function the raw and rendered sets coincide — it is a discipline, not an observed difference, and
+saying so is better than implying a case that was not measured. New case under **11.54**.
+
+**ALSO CLOSED: `dates.ts`' false docblock (item 1 above), by fixing the PROSE.** Measured this
+session: `dateMs('0099-01-01')` succeeds (`setUTCFullYear` does not fold two-digit years, `isoDate`
+pads back to `0099`); `istDayBounds('0099-01-01')` throws on its round-trip (`Date.UTC(99,0,1)` →
+1999-01-01). **Two rules, not one.** The prose was chosen over the code because making `dateMs` refuse
+pre-1000 years would invent a validity rule at a RENDERING surface that the write path does not have
+— `IST_DAY_REGEX` admits it and `dueDateValueSchema` checks nothing stronger — so the product would
+store a claim it then refuses to place, with no migration and nobody's decision behind it. The code
+side is not merely defensible, it is already PINNED: `test/claims/dates.test.ts` asserts
+`isoDate(dateMs('0099-01-01')) === '0099-01-01'` under a title saying Date.UTC would read it as 1999.
+Corrected at all three source sites — `dateMs`, `isCalendarDay`, and `unplaceableDayCopy`, which
+carried the same false pair. `provenance.ts`' block was CHECKED and left: it is about `istDayBounds`,
+and it is true.
+
+**RECORDED, NOT FIXED — carried forward with owners:**
+
+- **The clock scanner catches a literal `new Date()` and misses an ALIASED one.
+  OWNER: TASK 8's `test/helpers/clock-scan.ts`.** `const CLOCK = Date; new CLOCK().valueOf()`
+  survives BOTH halves of the harness: the source scan anchors on `/\bnew\s+Date\s*\(\s*\)/`, and the
+  four-zone identity half structurally cannot see an INSTANT read, since `Date.now()` returns the
+  same number in every zone. **Not closed, and not because it was forgotten.** Every pattern that
+  would catch the alias (`/=\s*Date\b/`, bare `Date` as a value) has false positives against this
+  package's own docblocks, which name `Date`, `Date.UTC` and `new Date()` constantly and deliberately
+  in order to forbid them — `timeline-model.ts`' `anchor` block already refuses to spell the
+  constructor for exactly this reason. A scanner that goes red on prose is worse than the gap it
+  closes, and choosing the pattern is a decision about that harness's contract.
+- **`test/workflow-builder/access.test.tsx` failed once and passed on re-run, on an unchanged tree.
+  OWNER: whoever next opens that file.** In the first full gate of this fix round it failed at
+  `user.click(screen.getByTestId('transition-label-8'))`; the file passed in isolation immediately
+  after, and passed again (23 tests) in a FORCED, 0-cached app-core run — `rtk proxy pnpm turbo run
+  test typecheck --force --filter=@gisik-nokma/app-core`, 5/5, 846/846. Nothing in this fix round
+  touches the workflow builder. Recorded because a once-in-three-runs red in a suite this branch
+  relies on as its gate is worth a name, not because it was diagnosed — **it was not.**
+- **`Features.md` §11 and `test-cases/11-calendar-notifications.md` still do not exist.
+  OWNER: TASK 15** (unchanged from the entry above; verified this session — `Features.md`'s ten `##`
+  sections are 1-7, 9, 10 and 12, and there is no §11).
+
+**New test ids this round: 11.61 (four empty timelines) and 11.62 (the undated-epic skip's false
+branch), joining 11.52–11.60. 11.60 is TAKEN by `clock-free.test.ts`, not by the timeline file.**
+Task 15 carries 11.52–11.62 into `test-cases/11-calendar-notifications.md`.
+
+**Nine mutations, nine kills, each naming its own site.** app-core **833 → 846** tests, both ends
+MEASURED (the 833 by stashing this round's four files and running the package suite, not by
+subtracting 13 from 846).
+
+**The gate, named honestly.** `pnpm turbo run build test typecheck` ran **24/24, exit 0, Node
+v22.22.2**, with `apps/server/test/node-version.test.ts` — the self-asserting check this document
+already names as the trustworthy one — passing inside it. That run happened BEFORE commit `643644b`
+landed on this branch mid-session; the re-run after it was **fully cached (24 cached, 24 total)** and
+is therefore a replay, not a measurement, so it is not cited as one. What was re-measured afterwards
+is the only task whose inputs this round touches: a forced, **0-cached** app-core `test typecheck`,
+5/5, 846/846.
+
+**A concurrent commit landed on this branch during the round** (`643644b`, Task 8's fix round on the
+plan's colour tokens). It touched `docs/lanes/executor-state.md` and nothing else; this round's four
+code files were stashed by path across it and popped onto the new HEAD, and both sets of edits were
+confirmed present in the merged file afterwards rather than assumed.
