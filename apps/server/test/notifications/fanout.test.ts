@@ -882,10 +882,44 @@ describe('boot wiring (adaptation: the hook is app.ts, not index.ts)', () => {
     // Positive control on the gate at boot: the assignment for a user with no
     // visibility row is suppressed by the REAL `canSee`, not by a missing wire —
     // the contested row above proves the wire is live in this very app.
+    //
+    // The suppression is read AFTER a later commit has been seen to land, not
+    // after a poll for zero: `expect.poll(...).toBe(0)` returns on its first
+    // passing check, so it waits for nothing and cannot tell "the gate
+    // suppressed it" from "the insert has not happened yet". A second contest
+    // fired after the assignment gives the fire-and-forget listener a real
+    // turn — when the second event's row is in the table, the first event's
+    // would be too.
     for (const listener of listeners) listener(env);
+    const secondContest = {
+      ...makeEnvelope({
+        type: 'claim.contested',
+        entity: { kind: 'ticket', id: TICKET },
+        workspaceId: WS,
+        actorId: SERVER,
+        payload: {
+          originalEvent: {
+            id: '01J9GEVT000000000000000003',
+            type: 'ticket.transitioned',
+            actorId: ANSELMA,
+            clientTime: '2026-08-22T18:00:00.000Z',
+          },
+          rule: 'require-evidence',
+          reason: 'No evidence was attached.',
+        },
+      }),
+      workspaceSeq: 3,
+    };
+    for (const listener of listeners) listener(secondContest);
     await expect
-      .poll(async () => (await rowsFor(ANSELMA)).filter((r) => r.kind === 'assignment').length, { timeout: 2000 })
-      .toBe(0);
+      .poll(async () => (await rowsFor(ANSELMA)).some((r) => r.dedupe_key === `contested-claim:${secondContest.id}`), {
+        timeout: 5000,
+      })
+      .toBe(true);
+    // Waited on the LATER event's arrival, then asserted about the earlier one:
+    // the assignment was handed to the same listeners first, so if the gate had
+    // let it through its row would be here by now.
+    expect((await rowsFor(ANSELMA)).filter((r) => r.kind === 'assignment')).toEqual([]);
 
     // CLOSING THE APP LETS THE COMMIT FEED GO — the `onClose` hook beside the
     // fan-out, whose comment claims a concrete failure (several apps over one
@@ -910,7 +944,7 @@ describe('boot wiring (adaptation: the hook is app.ts, not index.ts)', () => {
         actorId: SERVER,
         payload: {
           originalEvent: {
-            id: '01J9GEVT000000000000000003',
+            id: '01J9GEVT000000000000000005',
             type: 'ticket.transitioned',
             actorId: ANSELMA,
             clientTime: '2026-08-22T18:00:00.000Z',
