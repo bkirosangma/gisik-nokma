@@ -9,11 +9,27 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9, 15 tasks. BATCH A (T1-T3) IS CLOSED AND GREEN. BATCH B (T4) IS NEXT.**
+## WHERE I AM: **STEP 14 — PLAN 9, 15 tasks. BATCH A CLOSED AND GREEN. BATCH B+C IS IN FLIGHT NOW.**
 
-*(Caught while writing this: the header said "BATCH A NEXT" three lines above a section saying Batch A
-was closed — the same stale-middle failure this file records against itself below, reproduced by its
-own author within the hour. **Grepping the file for the claim you just changed is not optional.**)*
+> # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
+> ```
+> /usr/bin/git log --oneline origin/main..HEAD     # what is actually committed
+> /usr/bin/git status --porcelain=v1               # what a dead agent left behind
+> ```
+> **BATCH B+C (T4 -> T5 -> T6, serial) was DISPATCHED at `93a9ed5` and is running as this line is
+> written.** Six agents, each committing its own work. So by the time you read this, anywhere from
+> zero to three of T4/T5/T6 may be committed **and this section will not say so** — the handoff is
+> written before the work, and the agents do not update it.
+>
+> **A dead fan-out leaves committed tasks and no handoff entry, and it also leaves UNCOMMITTED work in
+> the tree** — Batch B of step 13 died on an expired login with a full task written but not committed,
+> and it was recovered only because someone ran `git status` before assuming a failed agent did
+> nothing. Do that before re-dispatching anything.
+>
+> *(This warning exists because the alternative was live, not hypothetical: the header said "BATCH B
+> (T4) IS NEXT" while T4 was already being written. That is the third instance of the stale-middle
+> failure this file documents — and the first two were retrospective. Being able to describe a failure
+> is not the same as not committing it.)*
 
 Branch **`exec/14-plan9-calendar`**, cut from `origin/main` `4b8b048`. **Step 13 is merged and closed**
 (PR #85 -> `9b70ab9`; the controller's close is #87 -> `4b8b048`). **Plan 8's fifteen ledger rows are
@@ -196,6 +212,23 @@ that was never run at all, reporting as part of a passing suite.
   strings. The obligation there is architectural: keep them that way. A `new Date()` appearing inside
   `calendar-model.ts` or `timeline-model.ts` reintroduces exactly the conflation this plan avoids.
 
+> ### THE TZ LOOP IS INERT IF THE DAY ARITHMETIC HAPPENS IN POSTGRES — check this BEFORE believing T6
+>
+> **`TZ` on the node process does not change `CURRENT_DATE`, `now()` or `date_trunc` server-side.**
+> `apps/server` tests hit a real database on 54329. So a sweep written as
+> `WHERE due_date <= CURRENT_DATE + interval '3 days'` returns **identical results under every zone**,
+> and a reviewer running Asia/Kolkata / Pacific/Kiritimati / Pacific/Niue would report three-zone
+> agreement **as evidence the TZ discipline works, when in fact nothing varied.** That is a check
+> passing for a reason unrelated to the property it names — the exact shape this series keeps finding,
+> wearing a new costume.
+>
+> **So the discriminating question comes BEFORE the TZ loop: where is the day boundary computed?**
+> When T6's review lands, establish that first. If "today", the approaching horizon, or the staleness
+> cut-off is computed in SQL, three-zone agreement proves nothing and the real check is varying the
+> **session** timezone (`SET TIME ZONE`) or proving the arithmetic is JS-side end to end. T6's
+> dispatch pushes toward JS by telling the implementer to copy `ist-today.ts`, so this may well come
+> out fine — **but "came out fine" and "was checked" are the distinction this branch is built on.**
+
 ## BATCHES for step 14, from the pre-flight and adjusted for shared files
 
 **A: T1, T2, T3** (domain) · **B: T4** (table+store) · **C: T5 then T6, SERIAL** (T6 consumes T5) ·
@@ -204,6 +237,16 @@ models) · **G: T13** · **H: T14** · **I: T15** (closeout, last).
 
 **T2 and T3 both modify `packages/domain/src/index.ts`** — additive export lines, but run them so the
 writes do not interleave.
+
+**BATCH E RUNS SERIAL TOO. Decided now, in the quiet, rather than under pressure with three agents
+queued.** T8, T10 and T12 are genuinely independent by directory, so E is the one place the serial
+pattern could be broken — but **T8 writes `packages/ui/src/tokens.ts`, which T10 and T12 may READ
+while it is half-written**, and the pre-flight called that "a light shared-file coordination point"
+rather than no point at all. Against that: nine commits of a working serial pattern with **zero
+transient-state incidents**, a cost ruling that explicitly wants thinner machinery, and step 13's
+recorded episode where thirteen agents on one shared tree produced states another reviewer read as
+tampering and nearly filed as a security finding. **Worktree-per-agent is the alternative the brief
+allows; it is not worth its merge overhead for three tasks.** Serial.
 
 **NOT YET VERIFIED, and it is T15's to check LIVE before it writes anything:** the pre-flight took
 `Features.md` §11 and `test-cases/11-calendar-notifications.md` as free from the coordination doc's
