@@ -129,18 +129,57 @@ describe('listNotifications', () => {
     await insertNotification(db.pool, sample({ workspaceId: 'ws_2' }));
     const mine = await listNotifications(db.pool, 'user_kiro', {});
     expect(mine.notifications).toHaveLength(1);
-    expect(mine.notifications[0].workspaceId).toBe('ws_2');
+    const [mineFirst] = mine.notifications;
+    if (!mineFirst) throw new Error('expected a notification');
+    expect(mineFirst.workspaceId).toBe('ws_2');
     const scoped = await listNotifications(db.pool, 'user_kiro', { workspaceId: 'ws_1' });
     expect(scoped.notifications).toHaveLength(0);
   });
 
-  it('clamps limit to 1..100 and defaults to 30', async () => {
-    for (let i = 0; i < 3; i += 1) await insertNotification(db.pool, sample());
-    const zero = await listNotifications(db.pool, 'user_kiro', { limit: 0 });
-    expect(zero.notifications).toHaveLength(1);
-    const huge = await listNotifications(db.pool, 'user_kiro', { limit: 1000 });
-    expect(huge.notifications).toHaveLength(3);
-    expect(huge.nextCursor).toBeNull();
+  it('rowToNotification maps every column faithfully, not just id/workspaceId/payload', async () => {
+    const n = sample({ read: false });
+    await insertNotification(db.pool, n);
+    // Flip `read` through the real write path so the assertion below actually
+    // exercises the column, not just the value it was inserted with.
+    await markNotificationRead(db.pool, n.userId, n.id);
+    const page = await listNotifications(db.pool, n.userId, {});
+    const [row] = page.notifications;
+    if (!row) throw new Error('expected a notification');
+    expect(row.userId).toBe(n.userId);
+    expect(row.createdAt).toBe(n.createdAt);
+    expect(row.read).toBe(true);
+    expect(row.dedupeKey).toBe(n.dedupeKey);
+  });
+
+  it('emits no cursor when there are exactly `limit` rows (no phantom empty next page)', async () => {
+    const a = sample();
+    const b = sample();
+    await insertNotification(db.pool, a);
+    await insertNotification(db.pool, b);
+    const page = await listNotifications(db.pool, 'user_kiro', { limit: 2 });
+    expect(page.notifications.map((n) => n.id)).toEqual([b.id, a.id]);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('clamps limit to a minimum of 1', async () => {
+    await insertNotification(db.pool, sample());
+    await insertNotification(db.pool, sample());
+    const page = await listNotifications(db.pool, 'user_kiro', { limit: 0 });
+    expect(page.notifications).toHaveLength(1);
+  });
+
+  it('clamps limit to a maximum of 100', async () => {
+    for (let i = 0; i < 101; i += 1) await insertNotification(db.pool, sample());
+    const page = await listNotifications(db.pool, 'user_kiro', { limit: 1000 });
+    expect(page.notifications).toHaveLength(100);
+    expect(page.nextCursor).not.toBeNull();
+  });
+
+  it('defaults limit to 30 when none is given', async () => {
+    for (let i = 0; i < 31; i += 1) await insertNotification(db.pool, sample());
+    const page = await listNotifications(db.pool, 'user_kiro', {});
+    expect(page.notifications).toHaveLength(30);
+    expect(page.nextCursor).not.toBeNull();
   });
 });
 
@@ -158,6 +197,14 @@ describe('markNotificationRead / unreadNotificationCount', () => {
   it('unreadNotificationCount is 0 for a user with no rows at all (positive control: another user with an unread row above is 1)', async () => {
     expect(await unreadNotificationCount(db.pool, 'user_nobody')).toBe(0);
   });
+
+  it('unreadNotificationCount is scoped per user, not table-wide, when multiple users have unread rows', async () => {
+    await insertNotification(db.pool, sample({ userId: 'user_kiro' }));
+    await insertNotification(db.pool, sample({ userId: 'user_anselma' }));
+    await insertNotification(db.pool, sample({ userId: 'user_anselma' }));
+    expect(await unreadNotificationCount(db.pool, 'user_kiro')).toBe(1);
+    expect(await unreadNotificationCount(db.pool, 'user_anselma')).toBe(2);
+  });
 });
 
 describe('rows outside the projection registry', () => {
@@ -168,6 +215,20 @@ describe('rows outside the projection registry', () => {
     // tried to scrub: it must not. Reading back must still show the full
     // original payload verbatim.
     const page = await listNotifications(db.pool, 'user_kiro', {});
-    expect(page.notifications[0].payload).toEqual(n.payload);
+    const [row] = page.notifications;
+    if (!row) throw new Error('expected a notification');
+    expect(row.payload).toEqual(n.payload);
   });
+
+  // NOTE on redaction-by-visibility: this store has no `canSee`/visibility
+  // dependency to inject, so there is no state we can flip here to prove a
+  // *future* redacting join would be caught. The test above pins that the row
+  // returned today carries the payload unchanged; if a later task adds a
+  // visibility filter that drops or scrubs the row, several existing
+  // assertions in this file that check row count and field values (the
+  // isolation test, the field-mapping test, and this one) would fail --
+  // but that is incidental coverage, not a targeted regression test, and we
+  // are not claiming otherwise. A real test for that ruling needs a fixture
+  // that can represent "visibility revoked", which does not exist at this
+  // layer -- it belongs in whichever future task adds the join.
 });
