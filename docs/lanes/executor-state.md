@@ -9,7 +9,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9. T1-T10 COMMITTED, REBASED ONTO `d3e0889`. T9 fix + T11 IN FLIGHT.**
+## WHERE I AM: **STEP 14 — PLAN 9. T1-T11 COMMITTED (11/15). T11 fix + T12 IN FLIGHT.**
 
 > # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
 > ```
@@ -164,6 +164,43 @@ coordination doc already pre-corrected this). T2's `docToPlainText` **already ex
 (`packages/domain/src/doc-text.ts`) — created by **Plan 5**, not Plan 7 as T2's text says; take the
 skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
 `src/index.ts` as the plan says.
+
+## PROGRESS: T1-T11 COMMITTED (11 of 15). T11's fix + T12 IN FLIGHT. **Measure; do not trust this line.**
+
+### T11's review found the prose-claim class at its sharpest, and graded it Important
+
+**T11's commit message asserted two things its own tests do not support**, and the reviewer graded the
+false claims themselves as a finding — *"a reviewer who reads the message and takes the switch and the
+both-directions rule as settled is exactly the path by which findings 1 and 2 survive a second
+review."*
+
+| Claim in the commit | Reality |
+|---|---|
+| *"Every conditional affordance is asserted in BOTH directions"* | Falsified three times over — side-entry claim list, title text, header spacer all survive always/never mutations. |
+| *"The switch here is 1:1 over all five with a `never` default"* | **True of the SOURCE, false of the EVIDENCE.** Two of five arms can `return ''` with 26/26 green. The compiler proved exhaustiveness; no test proved the VALUES. |
+| *"24 mutations, every one red and naming its own site"* | The reviewer's 22 found **10 survivors, 8 on code that commit introduced.** |
+
+**This is the branch's recurring defect class** — step 13's whole-branch review found four findings and
+all four were prose. **A claim in a commit message is load-bearing precisely because it stops the next
+reader looking**, which is why the dispatch for the fix round now says: if you did not measure it, do
+not claim it; if a mutation survived and you left it, say so.
+
+**Two findings worth carrying beyond their fix:**
+- **A duplication removed and reintroduced one layer out.** T11 correctly collapsed a doubly-stated
+  `gridTemplateColumns` into one custom property — then stated it twice **across a package boundary**
+  instead. Typoing the consumer in `ui.css` leaves **ui 34/34 AND app-core 26/26 green**, while
+  `grid-template-columns` falls back to `none` and every row drops onto implicit tracks.
+- **The two views disagree about a fact of the product.** An in-transit custom claim is drawn as
+  pending by `CalendarView` and rendered identically to a settled one by `TimelineView` — there is no
+  `.gn-timeline__claim[data-pending]` rule. Deleting the one pending rule that does exist leaves ui
+  34/34 green, which is why the omission went unnoticed.
+
+**T9's fix closed all six one-directional claims, and it guarded against vacuity** — a zero-count is
+true of a broken render too, so each absence case first asserts the grid rendered, the marker exists,
+and (for the today ring) that today is genuinely outside this month's grid. It also **stated which of
+its own new assertions does NOT discriminate**: a `toHaveLength(1)` it added cannot see the forced
+`data-unplaceable` mutant, because that fixture has exactly one button either way. **The kill is
+entirely the new absence case, and the commit says so.**
 
 ## REBASED ONTO `d3e0889` — this branch was carrying a race I had already fixed on `main`
 
