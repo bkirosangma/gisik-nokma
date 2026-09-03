@@ -22,6 +22,11 @@ const adminSession: BuilderSession = { userId: newUlid(), role: 'admin' };
 const kanbanPublished = cloneTemplate(WORKFLOW_TEMPLATES[0]!);
 // A second published workflow, so the binding combobox has somewhere to move to.
 const errandPublished = cloneTemplate(WORKFLOW_TEMPLATES[1]!);
+// And a THIRD, because two is exactly the number that hides the defect below:
+// with only an outgoing and an incoming workflow there is nowhere to re-point
+// to after a save, so no test could reach the state where the move gate lets an
+// admin migrate at a workflow the type is not bound to.
+const approvalPublished = cloneTemplate(WORKFLOW_TEMPLATES[2]!);
 const builtins = builtinTicketTypeDefs(kanbanPublished.id);
 
 function renderEditor(
@@ -341,6 +346,134 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     // no version chain to key one on (design decision 10).
     expect(gateway.submitted.some((event) => 'stateMapping' in (event.payload as object))).toBe(false);
     expect(await screen.findByText(`14 tickets moved to "${errandPublished.name}".`)).toBeInTheDocument();
+  });
+
+  /**
+   * The gate the plan asked for is "moving existing tickets to a workflow the
+   * type is not yet bound to would leave new tickets going to the old workflow
+   * while the old tickets went to the new one". `save.phase !== 'saved'` does
+   * not implement that sentence: it asks whether the form was EVER saved, which
+   * stops being the same question the moment a second re-point happens. Bind
+   * A → pick B → Save → pick C, and the phase is still `saved` while the
+   * committed binding is B and the combobox reads C — so the move would fire at
+   * C, exactly the inversion, and the screen would still be saying it saved.
+   */
+  it('the move gate follows the SAVED binding, not merely whether anything was ever saved', async () => {
+    const user = userEvent.setup();
+    const { gateway } = renderEditor(task, {
+      workflows: [kanbanPublished, errandPublished, approvalPublished],
+      typePopulation: { task: { [kanbanPublished.id]: 14 } },
+    });
+    const combobox = await screen.findByRole('combobox', { name: 'Workflow' });
+    await user.selectOptions(combobox, errandPublished.id);
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    expect(await screen.findByText('Ticket type saved.')).toBeInTheDocument();
+
+    // A second re-point, with no second save behind it.
+    await user.selectOptions(combobox, approvalPublished.id);
+    expect((gateway.submitted[0]!.payload as TicketTypeDef).workflowId).toBe(errandPublished.id);
+    expect(screen.getByRole('button', { name: `Move them to "${approvalPublished.name}"…` })).toBeDisabled();
+    expect(
+      screen.getByText(
+        `Save the ticket type first — until it is saved, new tickets would still go to "${kanbanPublished.name}".`,
+      ),
+    ).toBeInTheDocument();
+    // …and nothing on screen claims the selected binding was saved.
+    expect(screen.queryByText('Ticket type saved.')).not.toBeInTheDocument();
+    expect(gateway.migrations).toEqual([]);
+  });
+
+  /**
+   * The same root cause one step further in: the mapping dialog's target used to
+   * be re-derived from the combobox on every render, so re-pointing while the
+   * dialog was open silently retargeted it — and the map already filled in was
+   * keyed on the OUTGOING workflow's states, which do not change, so the confirm
+   * button stayed enabled and posted one workflow's state ids against another's.
+   */
+  it('a mapping dialog in flight keeps the workflow it was opened for', async () => {
+    const user = userEvent.setup();
+    const { gateway } = renderEditor(task, {
+      workflows: [kanbanPublished, errandPublished, approvalPublished],
+      typePopulation: { task: { [kanbanPublished.id]: 14 } },
+    });
+    const combobox = await screen.findByRole('combobox', { name: 'Workflow' });
+    await user.selectOptions(combobox, errandPublished.id);
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    await screen.findByText('Ticket type saved.');
+    await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
+
+    const dialog = await screen.findByRole('dialog');
+    const target = errandPublished.states[0]!;
+    for (const state of kanbanPublished.states) {
+      await user.selectOptions(within(dialog).getByRole('combobox', { name: `Send them to — ${state.name}` }), target.id);
+    }
+    await user.selectOptions(combobox, approvalPublished.id);
+
+    expect(screen.getByRole('dialog')).toHaveAttribute(
+      'aria-label',
+      `Move existing tickets to "${errandPublished.name}"`,
+    );
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Move these tickets' }));
+    expect(gateway.migrations).toHaveLength(1);
+    expect(gateway.migrations[0]!.toWorkflowId).toBe(errandPublished.id);
+  });
+
+  /**
+   * A completed move is a record of something that happened. Re-reading the
+   * combobox to name its destination let a later re-point rewrite that record
+   * into a statement about a migration nobody ran.
+   */
+  it('the completed move names the workflow it actually moved to, whatever the combobox says later', async () => {
+    const user = userEvent.setup();
+    renderEditor(task, {
+      workflows: [kanbanPublished, errandPublished, approvalPublished],
+      typePopulation: { task: { [kanbanPublished.id]: 14 } },
+    });
+    const combobox = await screen.findByRole('combobox', { name: 'Workflow' });
+    await user.selectOptions(combobox, errandPublished.id);
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    await screen.findByText('Ticket type saved.');
+    await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
+    const dialog = await screen.findByRole('dialog');
+    for (const state of kanbanPublished.states) {
+      await user.selectOptions(
+        within(dialog).getByRole('combobox', { name: `Send them to — ${state.name}` }),
+        errandPublished.states[0]!.id,
+      );
+    }
+    await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
+    expect(await screen.findByText(`14 tickets moved to "${errandPublished.name}".`)).toBeInTheDocument();
+
+    // Nothing has moved since; the sentence must not follow the combobox.
+    await user.selectOptions(combobox, approvalPublished.id);
+    expect(screen.getByText(`14 tickets moved to "${errandPublished.name}".`)).toBeInTheDocument();
+    expect(screen.queryByText(`14 tickets moved to "${approvalPublished.name}".`)).not.toBeInTheDocument();
+  });
+
+  it('once the tickets have moved, the notice stops saying they stayed behind', async () => {
+    const { user } = await rebind({ typePopulation: { task: { [kanbanPublished.id]: 14 } } });
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    await screen.findByText('Ticket type saved.');
+    await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
+    const dialog = await screen.findByRole('dialog');
+    for (const state of kanbanPublished.states) {
+      await user.selectOptions(
+        within(dialog).getByRole('combobox', { name: `Send them to — ${state.name}` }),
+        errandPublished.states[0]!.id,
+      );
+    }
+    await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
+    expect(await screen.findByText(`14 tickets moved to "${errandPublished.name}".`)).toBeInTheDocument();
+
+    // The count behind that body was read BEFORE the move and is not re-read, so
+    // leaving it on screen printed a contradiction to itself: "14 stay on
+    // Simple kanban" beside "14 moved to Errand with waits".
+    expect(
+      screen.queryByText(
+        `14 existing tickets of this type stay on "${kanbanPublished.name}". New ones will use "${errandPublished.name}".`,
+      ),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Existing tickets stay where they are')).not.toBeInTheDocument();
   });
 
   it('renders the server refusal verbatim (planted defect: a state the target workflow does not have)', async () => {
