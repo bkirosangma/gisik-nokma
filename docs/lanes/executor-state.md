@@ -9,16 +9,27 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 13 IS COMPLETE. PR #85 IS OPEN AND AWAITING THE CONTROLLER'S MERGE.**
+## WHERE I AM: **STEP 13 IS MERGED (PR #85 → `9b70ab9`). STEP 14 — PLAN 9 — IS THE NEXT WORK.**
 
-All fifteen Plan 8 tasks done, merged up to `origin/main`, gate green, final whole-branch review
-run and its four findings closed. **Nothing is in flight and nothing is blocked.** The executor
-does not merge — PR #85 is the controller's.
+All fifteen Plan 8 tasks done, gate green, final whole-branch review run and its four findings
+closed, and the PR **squash-merged by the controller on 2026-09-03**. This branch carries only the
+P29 declaration annotation PR #86 asked for; step 14 runs on its own branch off `9b70ab9`.
 
-**If you are a restarted session: do NOT re-run step 13.** Check `gh pr view 85` first. If it has
-merged, the next work is **step 14 — Plan 9** (calendar/notifications, 15 tasks, T6 floor-list, T14
-after `apps/web`), and Plan 8's fifteen ledger rows must be promoted from `in-flight` to `done` with
-the merge sha, exactly as this branch's first commit did for Plan 7.
+**If you are a restarted session: do NOT re-run step 13.** The next work is **step 14 — Plan 9**
+(calendar/notifications, 15 tasks, T6 floor-list). **Plan 8's fifteen ledger rows still read
+`in-flight` on `main`** and must be promoted to `done` with PR `85` and sha `9b70ab9`, exactly as
+step 13's first commit did for Plan 7.
+
+> **The promotion's evidentiary basis, recorded so the next audit does not re-derive it.** PR #85
+> was **squash-merged**, so no per-task commit survives on `main` — `git log 7337357..origin/main`
+> returns three commits, not thirty-eight. The title names the step and the plan, not the tasks, so
+> on the title alone all fifteen rows would be `claimed`. They qualify on the **controller-record**
+> clause by two independent routes: the squash commit's **2,619-line body carries every per-task
+> commit message**, and the Batch D artefacts are present on `main` by direct check
+> (`apps/web/src/authoring/data-source-gateway.ts`, `apps/web/e2e/workflow-builder.spec.ts`,
+> `Features.md` §10 at line 1041, `test-cases/10-workflow-builder.md`). **Note the asymmetry that
+> made this worth checking:** this file's own per-task tables cover T1–T12 and stop — Batch D was
+> never given one — so for the last three rows the handoff is *not* sufficient basis on its own.
 
 > **BATCH B DIED MID-FLIGHT ON AN EXPIRED LOGIN (2026-09-03).** Seven of nine agents failed with
 > *"Login expired · Please run /login"*: T5's fix round and both agents of T6, T7 and T8. **T5's
@@ -33,9 +44,16 @@ branch's first commit promotes them to `done`, and `check:tasks` now verifies th
 ancestor of `origin/main`. **The repo stands at 118/177 (66.7%), independently recounted.**
 
 Step 13 = **Plan 8**, `docs/superpowers/plans/2026-08-20-08-workflow-builder.md`, **15 tasks.**
-**T1-T12 are DONE and committed.** **Only T13, T14, T15 remain**, then the final whole-branch review
-(ONE opus reviewer, per the cost ruling) and the PR.
-No PR is open. **Three rulings are open and NONE blocks Batch B** — see RULINGS OPEN.
+**ALL FIFTEEN ARE DONE AND MERGED** (PR #85 → `9b70ab9`, squash-merged 2026-09-03).
+**All rulings are closed** — see RULINGS.
+
+> **This paragraph was stale for the whole of Batch D and the correction is the point.** Through
+> PR #85 it read *"T1-T12 are DONE and committed. Only T13, T14, T15 remain … No PR is open. Three
+> rulings are open"* — every clause false by the time it merged, and **directly contradicted by this
+> file's own header eighteen lines above it.** It merged to `main` that way. The failure is not that
+> a line went stale; it is that **a handoff refreshed at its top is not a handoff refreshed.** A
+> restarted executor reading downward would have rebuilt Batch D against work already merged.
+> **When you update WHERE I AM, grep the rest of the file for the claim you just changed.**
 
 **Batching:** **A: T1-T4** (done) · **B: T5-T8** (canvas → validation) · **C: T9-T12** (publish →
 admin) · **D: T13-T15** (web, smoke, catalogue). Every fact those batches need is recorded in THIS
@@ -598,7 +616,7 @@ a true claim. **When correcting a plural, check which noun it counts.**
 repeating covered ground: the workflow-builder UI component internals beyond the named seams, the
 rule-editor suites, and the Playwright spec.
 
-## RULINGS — P28 taken, line 216 closed by T11, ONE still open and it blocks nothing
+## RULINGS — ALL CLOSED. P28 and P29 taken, line 216 closed by T11. Nothing is open.
 
 1. ~~**The T13 `DataSource` seam**~~ — **RULED. P28 (owner-approved, 2026-09-03), and it took the
    executor's recommended option (b).** The `apps/web` `WorkflowAuthoringGateway` adapter calls
@@ -610,10 +628,19 @@ rule-editor suites, and the Playwright spec.
    offline-occupancy question before that plan exists.** The `getMembers` `Actor[]` →
    `WorkspaceMember[]` reconciliation is part of the same T13 work. Full text in
    `docs/lanes/controller-state.md` as P28 — **cite that, not the message that carried it.**
-2. **The frozen errand template trips `rule-bypassable` twice** — filed by T3 in the coordination
-   doc. Fixing the template violates Plan 11's `checkErrandTemplate` oracle pin; silencing the check
-   means editing a module Plan 2's own F5 ruling designed. **No later task may resolve this by
-   fixing the template or weakening the check.**
+2. ~~**The frozen errand template trips `rule-bypassable` twice**~~ — **RULED AND CLOSED. P29
+   (owner-approved, 2026-09-03): accept both trips as known and expected; touch NEITHER
+   `checkErrandTemplate` NOR `adviseWorkflowDef`.** The advisory never blocks publishing, and the
+   template digitizes a real shop's workflow warts included — sanitizing it would invent a cleaner
+   reality than the one being recorded, which is what importing by identity exists to prevent.
+   **Scoped to this one frozen template, NOT a carve-out for `rule-bypassable` elsewhere.**
+   Rationale written at the declaration, echoed in `Features.md` §10 and case 10.61, and the
+   coordination-doc entry now opens with the ruling rather than the request.
+   **Verified with it: an admin is NOT stuck with the warning, and the guarantee is structural.**
+   The constant is `Omit<WorkflowDef, 'id' | 'version'>` — it lacks exactly the two fields a real
+   definition needs, so nothing can publish the object itself. Every live def is a copy with its own
+   id and version (`cloneTemplate`; Plan 11's seed via `workflow.defined`), editable in the builder
+   without touching the constant or the oracle.
 3. ~~**Coordination doc line 216's false "Done" on Task 11**~~ — **CLOSED by T11's own commit
    (`9bf4cbe`)**, which supplies the component the line falsely claimed existed and rewrites the line
    to say so. The corrected line names its controls **before** the run and states which row of the
