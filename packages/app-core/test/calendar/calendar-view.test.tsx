@@ -200,6 +200,37 @@ describe('11.65 per-week overflow folds, and folding is reversible', () => {
     expect(screen.getAllByRole('button', { name: /needed by 28 Aug/ })).toHaveLength(4);
   });
 
+  /**
+   * WHAT THE FOLD DROPS FIRST, and it needs its own case because the previous
+   * one cannot see it: five markers on one day fold the fifth marker, which
+   * tells you nothing about a row that mixes kinds. The model sorts bars ahead
+   * of markers, so four bars fill the row and every marker in it folds. The
+   * `+n more` control is what makes that recoverable — and the point of
+   * asserting it is that the view TAKES the model's order rather than
+   * re-ranking to keep one of each kind on screen.
+   */
+  it("the fold takes the model's order as given — four bars fold the week's markers", () => {
+    const inputs = [
+      ...[1, 2, 3, 4].map((n) =>
+        ticket({
+          fields: {
+            title: claimField(`Bar ${n}`),
+            startDate: claimField({ date: '2026-08-24' }),
+            dueDate: claimField({ date: '2026-08-28' }),
+          },
+        }),
+      ),
+      ticket({ fields: { title: claimField('Marker'), dueDate: claimField({ date: '2026-08-26' }) } }),
+    ];
+    renderCalendar(inputs);
+    expect(screen.getAllByRole('button', { name: /^Bar \d$/ })).toHaveLength(4);
+    expect(screen.queryAllByRole('button', { name: /needed by 26 Aug/ })).toHaveLength(0);
+    // Folded, not dropped: the control is present and it reveals what it hid.
+    fireEvent.click(screen.getByRole('button', { name: '+1 more' }));
+    expect(screen.getAllByRole('button', { name: /needed by 26 Aug/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Bar \d$/ })).toHaveLength(4);
+  });
+
   it('a week within the fold shows no control at all', () => {
     renderCalendar([
       ticket({ fields: { title: claimField('Alone'), dueDate: claimField({ date: '2026-08-28' }) } }),
@@ -375,5 +406,26 @@ describe('11.71 the grid says which days belong to the month it is headed by', (
     expect(august1).not.toHaveAttribute('data-outside');
     // Six rows of seven, and every one of them present.
     expect(document.querySelectorAll('[data-day]')).toHaveLength(42);
+  });
+
+  /**
+   * `data-week` is rendered for the shells that mount this component, and an
+   * attribute no test names is the one the next task builds on and breaks. It
+   * is asserted to be the row's FIRST day, which is what makes it a stable
+   * handle: the row's Monday, not its position in the grid.
+   */
+  it('labels each row by its own Monday', () => {
+    renderCalendar([ticket()]);
+    const rows = [...document.querySelectorAll('[data-week]')].map((row) =>
+      row.getAttribute('data-week'),
+    );
+    expect(rows).toEqual([
+      '2026-07-27',
+      '2026-08-03',
+      '2026-08-10',
+      '2026-08-17',
+      '2026-08-24',
+      '2026-08-31',
+    ]);
   });
 });

@@ -36,11 +36,12 @@ import { buildCalendarModel, type CalendarItem, type CalendarMonth } from './cal
  * keep it that way.
  *
  * That scan is not decoration here: the first draft of this docblock QUOTED
- * the shell's call in full, and the scanner reddened on
- * `calendar/calendar-view.tsx:29` for the bare no-argument `Date` constructor
- * inside the quotation — which is the behaviour its own controls pin down. It
- * reads source text, not intent, so the ban is described in this file rather
- * than spelled.
+ * the shell's call in full, and the scanner reddened on this file for the bare
+ * no-argument `Date` constructor inside the quotation — which is the behaviour
+ * its own controls pin down. It reads source text, not intent, so the ban is
+ * described in this file rather than spelled. (No line number is cited: it
+ * would be a fact about a file state that no longer exists, and it would rot on
+ * the next edit above it.)
  */
 
 export type CalendarViewProps = {
@@ -54,6 +55,20 @@ export type CalendarViewProps = {
   initialMonth?: CalendarMonth;
 };
 
+/**
+ * How many of a week's items are drawn before the row folds.
+ *
+ * The fold takes the MODEL'S ORDER AS GIVEN and truncates it — it does not
+ * re-rank, and it must not, because the model's order is the one the whole
+ * suite pins (bars first, then by day, then ticket id, then which claim). One
+ * consequence is worth stating rather than leaving to be discovered: bars sort
+ * ahead of markers, so a week carrying four or more bars folds every marker in
+ * that row. That is a FOLD, not a drop — `+n more` appears whenever anything is
+ * folded and reveals exactly what it hid — and it is witnessed at
+ * `calendar-view.test.tsx` 11.65, "the fold takes the model's order as given".
+ * A view that re-sorted to keep one of each kind on screen would be a second
+ * opinion about item order living one layer above the one the model states.
+ */
 export const MAX_VISIBLE_PER_WEEK = 4;
 
 /**
