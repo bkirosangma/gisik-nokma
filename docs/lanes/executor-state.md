@@ -90,6 +90,36 @@ coordination doc already pre-corrected this). T2's `docToPlainText` **already ex
 skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
 `src/index.ts` as the plan says.
 
+## STOP — PLAN 9 NAMES TEST PATHS THAT VITEST NEVER COLLECTS. 25 SITES. READ BEFORE ANY TASK.
+
+**Every test path the plan spells `packages/<pkg>/src/<name>.test.ts` is a suite that CANNOT FAIL.**
+All four packages Plan 9 touches restrict collection to `test/`:
+
+| Package | `vitest.config.ts` include |
+|---|---|
+| `packages/domain` | `['test/**/*.test.ts']` |
+| `packages/rule-engine` | `['test/**/*.test.ts']` |
+| `packages/app-core` | `['test/**/*.test.{ts,tsx}']` |
+| `apps/server` | `['test/**/*.test.ts']` |
+
+**PROVED BY CANARY, not reasoned.** A deliberately failing test (`expect(1).toBe(2)`) planted at
+`packages/domain/src/zz-canary.test.ts` left the full suite reporting **"350 passed"**. An explicit
+`vitest run src/zz-canary.test.ts` printed `include: test/**/*.test.ts` and collected nothing.
+
+**The plan names `src/*.test.ts` in 25 places** — File Structure blocks, Step instructions, the
+`vitest run` command lines at plan lines 163/248/356/364/369, and even a `git add` at line 380.
+**Task 2 and Task 3's implementers each caught it independently and deviated correctly**, but that is
+two coin flips that happened to land right, not a control. **The next implementer who follows the plan
+faithfully ships an invisible suite, and every downstream reviewer sees a green run.**
+
+**THE RULE FOR EVERY REMAINING PLAN 9 TASK, and it goes in every dispatch:** tests live under
+`packages/<pkg>/test/` (or `apps/server/test/`), importing the subject as `../src/<name>.js` —
+**never by package name**, which resolves through a stale `dist` and tests the wrong build.
+
+This is exactly the shape the brief warns about — *a check passing for a reason unrelated to the
+property it names* — with the failure moved one level out: not a test that cannot fail, but a test
+that was never run at all, reporting as part of a passing suite.
+
 ## CLOCK SENSITIVITY — the brief's named known-gap, enumerated for this plan
 
 **Only TWO places in Plan 9 read a clock, and only one of them is in production code.**
