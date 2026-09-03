@@ -6203,5 +6203,7 @@ completion in jsdom — measured, not assumed'`) and test the mapping layer for 
 The `elementFromPoint` stub is package-wide (`test/setup.ts` runs for all `app-core` test files); jsdom
 never defined the API at all, so nothing pre-existing depended on its absence — the full gate
 (`rtk proxy pnpm turbo run build test typecheck`) stayed 24/24 green across the stub's introduction,
-with the app-core test count accounting for exactly the new tests added (573 → 578, no pre-existing
-test changed status).
+with the app-core test count accounting for exactly the new tests added (562 → 578, no pre-existing
+test changed status — 562 measured directly against a clean worktree at f1610e8, the commit
+immediately before this task's first commit; the +16 delta matches inspectors.test.tsx +13,
+draft-store.test.ts +2, canvas.test.tsx +1).
