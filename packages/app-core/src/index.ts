@@ -1,4 +1,5 @@
 export type { DataSource, DataSourceQuery, StreamItem, Unsubscribe } from './data-source.js';
+export * from './workflow-builder/index.js';
 export * from './view-types.js';
 export { makeSubmittedFactory, type EnvelopeSeed, type MakeSubmitted } from './submit.js';
 export { actorLabel, formatDate, formatDateTime, formatStateProvenance } from './provenance.js';

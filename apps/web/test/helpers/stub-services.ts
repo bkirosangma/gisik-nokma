@@ -1,4 +1,9 @@
-import type { DataSource, DataSourceQuery, UserPreferences } from '@gisik-nokma/app-core';
+import type {
+  DataSource,
+  DataSourceQuery,
+  UserPreferences,
+  WorkflowAuthoringGateway,
+} from '@gisik-nokma/app-core';
 import {
   SERVING_GAPS,
   ServingGapError,
@@ -33,15 +38,24 @@ export function refuse(method: keyof typeof SERVING_GAPS): () => Promise<never> 
  * call it a pass.
  */
 /**
- * The three onboarding gateways, in the state a case has not stubbed them:
- * every method rejects BY NAME. Same rule as the un-stubbed reads above — a
- * gateway that answered `null` or `[]` by default would let a page under test
+ * The four gateways beside `DataSource`, in the state a case has not stubbed
+ * them: every method rejects BY NAME. Same rule as the un-stubbed reads above —
+ * a gateway that answered `null` or `[]` by default would let a page under test
  * render an invented blank and call it a pass.
+ *
+ * `authoring` (Plan 8 Task 13) is the fourth. Its `listMembers` is the one a
+ * case almost always has to stub even when it does not care about the roster:
+ * `useBuilderWiring` reads the SIGNED-IN USER'S OWN ROLE out of it, because
+ * `getMyWorkspaces` — the route that carries a role — refuses whole on this
+ * branch. Left un-stubbed it rejects by name and the page under test renders
+ * the refusal, which is the honest failure rather than a silent read-only
+ * screen.
  */
 export type GatewayStubs = {
   invites?: Partial<InviteGateway>;
   invitesAdmin?: Partial<InviteAdminGateway>;
   founding?: Partial<FoundingGateway>;
+  authoring?: Partial<WorkflowAuthoringGateway>;
 };
 
 export function stubServices(
@@ -96,6 +110,17 @@ export function stubServices(
     founding: {
       foundWorkspace: unstubbedGateway('founding.foundWorkspace'),
       ...gateways.founding,
+    },
+    authoring: {
+      listWorkflows: unstubbedGateway('authoring.listWorkflows'),
+      getWorkflow: unstubbedGateway('authoring.getWorkflow'),
+      listTicketTypes: unstubbedGateway('authoring.listTicketTypes'),
+      listMembers: unstubbedGateway('authoring.listMembers'),
+      getStateOccupancy: unstubbedGateway('authoring.getStateOccupancy'),
+      getTypeWorkflowPopulation: unstubbedGateway('authoring.getTypeWorkflowPopulation'),
+      migrateTypeToWorkflow: unstubbedGateway('authoring.migrateTypeToWorkflow'),
+      submit: unstubbedGateway('authoring.submit'),
+      ...gateways.authoring,
     },
   };
 }

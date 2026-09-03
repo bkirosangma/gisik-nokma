@@ -213,7 +213,8 @@ Every decision above is settled and recorded. These plan edits are **not yet app
 - ~~**Plan 4** — `proj_projects` and the honest precondition refusal.~~ **Done** (Task 9 Step 3b). The check covers every event that *names* a project, not only `ticket.created` — the membership grant is the path the hole was actually reachable through, so validating only ticket creation would have left it open. It runs **before** the membership check, so where both would fire the honest reason wins. `ticket.workflow_rebound` joined `ADMIN_ONLY_TYPES`.
 - **Type versioning (unassigned)** — the re-derivation limit recorded under the workflow-pinning decision above. Not urgent, but it should not be discovered by a verifier alarm.
 - ~~**Plan 5** — the fallback-column annotation.~~ **Done**, and the premise it was queued on was wrong; see the correction under the workflow-pinning decision above. The annotation now names the chain that actually makes the path unreachable and points at Plan 3's cases 5.27 and 5.30, where the fold is proven, rather than resting on a refusal that never guaranteed it.
-- ~~**Plan 8** — the divergence-notice component.~~ **Done** — it was already complete when this line was written; the agent that appeared to stall mid-insert had finished. Verified against the code rather than the note: the copy table, the population read with its honest-degradation states, the helper functions, the JSX, and the tests are all present, including "Leave them on …" as an affirmative button beside "Move them to …", so staying put is a decision rather than the absence of one.
+- ~~**Plan 8** — the divergence-notice component.~~ **Done, but this line was false when it was written, and the correction is the point.** It claimed the component "was already complete when this line was written" and that the claim had been "verified against the code rather than the note", enumerating a copy table, a population read with its degradation states, helper functions, JSX and tests. None of it existed. Measured on the Plan 8 execution branch before Task 11 ran: `git log --all -- packages/app-core/src/workflow-builder/ticket-types` was empty, there was no `ticket-types/` directory at all, and a `git grep` over the committed tree (`packages/**`, `apps/**`) returned zero files for "Leave them on", "Move them to", `WorkflowRebindDialog`, `rankImplications` and `TicketTypeEditorScreen` — with `transitionOptions` (6 files) and `adviseWorkflowDef` (34 files) named as controls **before** the run, so the zeros were the sweep working rather than the sweep failing. One name the earlier statement of this correction put in the zero list does **not** belong there, and saying so is part of the point: `migrateTypeToWorkflow` returns **3** files at that same sha — `gateway.ts`, `fake-gateway.ts` and `events.test.ts` — because Task 4 had already landed the gateway method and its fake. A brief that carried the absence claim forward had measured it before Task 4, so the enumeration this correction was handed was itself one row stale. What was missing was every consumer of that method, not the method. **The commit carrying this correction is the one that supplies the component**: `TicketTypeEditorScreen` with the divergence notice and its `getTypeWorkflowPopulation` read (`counting tickets…` / `ticket count unavailable`, never a substituted zero), `WorkflowRebindDialog`, `rankImplications`/`rankImplicationsCopy`, the icon and fields editors, the list screen, and 22 tests. "Leave them on …" is an affirmative button beside "Move them to …" — the thing the false line described is now true, and it is true because of that commit and not before it.
+  The lesson this line is kept for: a `Done` written from a note rather than from the code is indistinguishable, in this document, from one written from the code — and this one even said "verified against the code" while being the opposite. A verifier that reads only this file cannot tell them apart. **Nothing in this list is evidence of anything; the repository is.** Plan 10's bullet directly above learned a milder version of the same lesson, where the prose described a behaviour in three places and that is what made it look finished.
 - ~~**Plan 10** — the replica-fold tests.~~ **Done**, and this line had it backwards both ways: the tests were already written, and the fold was *not* wired. `applyServerItem` stored an arriving `workflow.defined` and never folded the tickets standing on it — only the bootstrap path refolded — so the two tests asserting it would have failed. The prose described the behaviour in three places, which is what made it look finished. `foldTicketsOntoVersion` now does it, calling domain's `foldStateIdForward`, and it writes the folded state as the ticket's new replay baseline as well as its row — without that second write the next event replays pre-fold history against the new definition and undoes the fold, or throws on a state the version dropped.
 - ~~**Plan 11** — the seed CLIs re-emitting the founding events.~~ **Done.** Both seeds now emit `workspace.created` and let Plan 4's bootstrap append the workflow, the four built-in types and the founder grant inside the same transaction; each seed keeps only what is genuinely its own (the shop's errand workflow and errand type, the dev project). Their own kanban workflow ids, built-in type definitions and owner grants are gone, along with the imports and constants that fed them — a duplicate founding sequence is one that can drift, and it would have been the version everybody saw demoed.
 
@@ -6122,3 +6123,392 @@ a purely local refusal elsewhere.
 
 **Why it is recorded rather than decided.** Both readings are defensible from one sentence, and the
 choice is a product decision about whose refusal a user should be shown, not an implementation detail.
+
+## RULING REQUEST — Plan 8 Task 3's frozen errand template trips `rule-bypassable`; Plan 2's own ruling designed the check but did not settle this shape (2026-09-03, exec/13 executor; corrected 2026-09-03, T3 fix round)
+
+`ERRAND_WITH_WAITS_TEMPLATE` (`packages/domain/src/workflows/errand-with-waits.ts`) is pinned by Plan
+11's `checkErrandTemplate` oracle (verified absent from this branch by search this session — Plan 11
+has not landed here yet) and its own docblock: *"Edit this only with that check green."* Task 3's own
+prose states the opposite invariant twice — *"a shipped template that greets the author with a warning
+is a shipped template that is wrong."*
+
+Both cannot hold. **Correction (this fix round): the prior text here claimed to have "verified Plan 2
+... doesn't claim this check in its own execution-consequences section" and titled the entry "unowned by
+any open plan." Both claims were false and are withdrawn.** `packages/domain/src/advise-workflow.ts`'s
+`rule-bypassable` check is exactly the check Plan 2's own execution-consequences §8 above (lines
+491-530) owns: §8 is the owner-ruling request for it, the owner's 2026-08-28 ruling ("option 1 —
+generalise the advisory tier," line 517) that created it, and the amendment landing note (line 526)
+that names the cover semantics — "same-kind-present, not rule-set equivalence" (line 529) — which
+`advise-workflow.ts`'s own docblock carries verbatim. So the check is owned, and its design is Plan 2's;
+what is NOT settled is the shape below. The check correctly reports two bypasses on the frozen
+template: `require-comment` guards `in-progress -> waiting`, but `later -> waiting` and `next ->
+waiting` both enter the same state carrying no `require-comment` rule — and `later -> waiting` must
+stay rule-free, because it is one of the seed's pinned one-hop paths (Task 3's own guard-step comment).
+
+Task 3 cannot resolve this: fixing the template violates Plan 11's oracle pin (owned there, not here);
+silencing `rule-bypassable` means editing a check Plan 2 designed and Task 3 does not own.
+`packages/app-core/test/workflow-builder/templates.test.ts` records the actual advisory output (2×
+`rule-bypassable`) rather than asserting the stale "warns about nothing" claim for this one template —
+the other two templates (`simple-kanban`, `approval-chain`) still assert clean per Task 3's invariant.
+
+**What actually needs a ruling.** The owner's 2026-08-28 ruling (§8 above) designed COVER as
+"same-kind-present on another edge into the same target" and explicitly made the *guarded wildcard*
+the sanctioned way to close a bypass (§8's codicil, line 517: "we should be able to have the anywhere
+arrow carry its own guard"). It did not design a way to mark an edge as *deliberately* left uncovered —
+which is what `later -> waiting` and `next -> waiting` are here: adding `require-comment` to satisfy
+COVER would break the pinned one-hop seed invariant, so this is not a case the landed design missed by
+oversight, it is a shape the design never had to address, because §8's own worked examples all involve
+closing the bypass, not preserving it as read. Either (a) the advisory tier gains an explicit
+exemption/annotation path for a deliberately-uncovered edge — the `wf_rules` fixture's own `notes`
+field (amendment requirement 4, line 530 above) is already exactly this shape, though scoped there to
+annotating the wildcard archetype rather than to any def, so extending it is a design act, not a copy —
+or (b) Task 3's "warns about nothing" invariant is amended to admit a documented exception for
+templates whose shape is pinned by a downstream oracle, or (c) the template itself changes and Plan
+11's `checkErrandTemplate` changes with it in the same commit, once Plan 11 actually lands and its
+author can make that call. This entry does not pick one — same discipline as ruling-request entries
+above (autonomous execution protocol, ruling 3: conservative default + record, never silently and
+never blocking).
+
+## Plan 8 execution consequences (2026-09-03) — the connect gesture, measured and closed
+
+Recorded at Task 6, whose brief handed it the one thing Task 5 explicitly left open: "ANSWERED FOR
+RENDER AND DRAG, OPEN FOR CONNECT — whether a CONNECT gesture (mousedown on a Handle through to
+`onConnect`) completes under this harness at all... DO NOT ASSUME IT FROM THE DRAG RESULT." Tasks 7–10
+all write canvas-adjacent component tests and would otherwise re-litigate this from scratch.
+
+**Measured: a connect gesture cannot be driven to completion in jsdom, and worse than a silent no-op —
+it throws an uncaught exception that fails the whole vitest process.** A real pointerdown-on-Handle →
+pointermove → pointerup-on-Handle sequence (`@testing-library/user-event`'s `pointer()`, the same
+primitive Task 5's drag test uses) hits `@xyflow/system`'s connection hit-testing
+(`isValidHandle`, called from its own pointermove listener), which calls
+`document.elementFromPoint` — an API jsdom has never implemented. Without a stub the sequence throws
+`TypeError: doc.elementFromPoint is not a function` as an *uncaught* exception (it escapes the test
+body — the test itself can still report passed — and fails the process, `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`
+on `pnpm --filter @gisik-nokma/app-core exec vitest run`).
+
+**Fix (already landed, Task 6): `packages/app-core/test/setup.ts` stubs `document.elementFromPoint` to
+return `null`** — "nothing is at this point," the honest answer given every element's rect is 0x0 in
+this harness (no layout engine), so no two distinct handles can ever occupy the same hit-tested pixel.
+With the stub, the identical pointer sequence completes without throwing and `onConnect` is measured
+firing **zero times** — the gesture genuinely cannot be driven to completion here, not merely landing a
+zero-delta the way the drag gesture does. Confirmed the pointerdown itself is real (not a target-selector
+miss) by temporarily wiring `onConnectStart` to force a call, observing it fire, then reverting.
+
+**What Tasks 7–10 do instead, per the brief that resolved this:** test `connectionToTransition`
+(`packages/app-core/src/workflow-builder/ui/flow-graph.ts`) directly — already fully covered,
+gesture-free, in `packages/app-core/test/workflow-builder/flow-graph.test.ts` (Task 5). Do not add a
+gesture test asserting a connect completes; write the negative measurement once (it now lives in
+`packages/app-core/test/workflow-builder/canvas.test.tsx`, `'CANNOT drive a connect gesture to
+completion in jsdom — measured, not assumed'`) and test the mapping layer for everything else.
+
+The `elementFromPoint` stub is package-wide (`test/setup.ts` runs for all `app-core` test files); jsdom
+never defined the API at all, so nothing pre-existing depended on its absence — the full gate
+(`rtk proxy pnpm turbo run build test typecheck`) stayed 24/24 green across the stub's introduction,
+with the app-core test count accounting for exactly the new tests added (562 → 578, no pre-existing
+test changed status — 562 measured directly against a clean worktree at f1610e8, the commit
+immediately before this task's first commit; the +16 delta matches inspectors.test.tsx +13,
+draft-store.test.ts +2, canvas.test.tsx +1).
+
+## Plan 8 Task 7 fix round (2026-09-03) — an off-roster restrict-to reference is invisible, and NOBODY currently owns it
+
+Recorded, not fixed: outside Task 7's scope, and — this is the point of the entry — outside every
+open task's scope too. The T7 review parked it on Task 8's issues panel. That owner does not hold.
+
+**The gap.** `RestrictToEditor` renders a checkbox per workspace member and one per role literal in
+`ALL_ROLES = ['owner','admin','member','guest']`, checked from `rule.userIds?.includes(...)` /
+`rule.roles?.includes(...)`. A rule naming a `userId` who is not on the roster the environment
+supplies — a departed member, or any member at all when the roster comes back refused or empty
+(the guest ruling, 2026-09-02) — or a `roles` entry that is not one of the four literals, renders
+**every box unchecked and no warning of any kind**. The emptiness helper does not cover it either:
+`isEmpty` is a length test, and the array is not empty. So the author is shown a restriction that
+looks like it names nobody while the def still carries the reference. (Toggling another box does
+*not* silently drop it — `update()` spreads `rule.userIds ?? []`, which includes the unknown id. The
+defect is invisibility, not loss.)
+
+Place it against the other two editors and the shape of the hole is exact. `RequireFieldEditor`
+computes `known` and renders an inline `<p>` warning when it is false — it has to, because nothing
+downstream will. `RequireDifferentUserEditor` computes `known` too but renders **no** warning on it
+(its only `<p>` is the start-state note, keyed on `initialStateId`, not on `!known`) — and it does
+not need one, because `rdu-unknown-state` catches an unknown target and Task 8's panel will say so.
+So: require-field warns inline because it is the only thing that can; rdu stays quiet because the
+validator speaks for it; restrict-to has **neither** — no inline warning and no code. That is the
+gap, and it is the only one of the three shapes that is silent end to end.
+
+**Why Task 8 is not the owner.** Task 8 renders `validateWorkflowDef` and `adviseWorkflowDef` output.
+Those emit thirteen codes between them, enumerated at this sha: no-states, duplicate-state-id,
+no-terminal-state, unknown-transition-state, duplicate-transition, unknown-initial-state,
+unreachable-state, terminal-no-inbound, empty-restrict-to, rdu-unknown-state, rdu-unenterable-state
+(validate), rdu-bypassable, rule-bypassable (advise). `empty-restrict-to` is the only restrict-to
+code and it is a pure `length > 0` test — never roster membership, never role-literal membership.
+Task 8's panel will therefore render *nothing at all* for this draft. Assigning it there would
+repeat the failure the house rules name: work parked on a task that cannot cover it.
+
+**Where it actually belongs.** This is a validator code-set gap (a `restrict-to-unknown-principal`
+issue or advisory that `validateWorkflowDef` does not have) plus the editor's inline warning that
+would anchor to it. Neither `packages/domain`'s validator nor Plan 8 has an open task for it: Plan 8's
+remaining tasks are 8–15 and none touches `validate-workflow.ts`. **No owner exists — it needs one
+assigned, not inherited.** Note the roster half is not purely cosmetic: with a guest's refused
+roster, *every* named-person reference in *every* rule renders unchecked, so a warning keyed only on
+"not in `members`" would cry wolf across the whole workflow. The honest fix distinguishes "the roster
+says this person is not here" from "there is no roster to ask" — which is design work, not a patch.
+
+## Plan 8 Task 12 (2026-09-03) — the read-only gate is sound INSIDE app-core, and the one hole is a route Task 13 has not written yet
+
+Task 12 wired the look-not-touch banner into the four screens and proved the gate end to end rather
+than affordance by affordance. Three things came out of it worth keeping.
+
+**The end-to-end claim, made falsifiable.** Naming buttons that should be absent proves nothing on
+its own — a typo in the name makes every `not.toBeInTheDocument()` pass against a screen that never
+had that button. So the sweep is an enumeration in both directions, at this sha:
+
+- Every state-mutating gateway call in `packages/app-core/src/workflow-builder` is one of **three**
+  call sites — `ui/publish-controls.tsx:73` (`submit`), `ticket-types/ticket-type-editor-screen.tsx:167`
+  (`migrateTypeToWorkflow`) and `:189` (`submit`). Controls named before the run: both files had to
+  appear, and both did. `publish-controls.tsx` returns `null` outright when `!env.canAuthor`; the
+  editor's Save button is `canAuthor ? … : null`; the migrate path is behind a Move button that is
+  `disabled={!canAuthor}` *and* only reachable once the workflow combobox has changed, which is
+  itself disabled for a non-author. Two independent locks on the only irreversible one — and that
+  one now has a test, which it did not: `migrateTypeToWorkflow` expands into a
+  `ticket.workflow_rebound` per ticket, Task 11's rebind suite drives the whole flow but its helper
+  defaults to an admin session, so no non-author had ever reached the divergence section. The new
+  test attempts the admin's own gesture as a member and asserts the section never opens and
+  `gateway.migrations` stays empty, with the admin doing the identical gesture as the control in the
+  same file. Note an assertion on `migrations` from the BUILDER screen would not have covered it:
+  that screen has no migrate path, so it could never fail.
+- All **four** of `WorkspaceRole` are exercised, not two. The gate is `canAuthorRole`, a one-line
+  predicate over that union, and a member/admin pair does not test a predicate's boundaries: measured
+  by mutation at this sha, narrowing it to `role === 'admin'` reddens **exactly one** test out of 211
+  in `test/workflow-builder/` + `test/ticket-types/` — the new owner test — and widening it to
+  `role !== 'member'` reddens exactly one, the new guest test. Before them, either mutation was
+  invisible to 210 tests, and an owner would have been shown a banner saying they may not change the
+  thing they own. Guest is the sharper half: `screens.test.tsx`'s test *named* for the guest
+  `listMembers` refusal (executor ruling 2026-09-02) passes an **admin** session, so nothing in the
+  repo pinned any guest behaviour on these screens. The new one refuses the roster and asserts the
+  screen still renders, still reads read-only, and still offers nothing but jumps.
+- On the member's builder screen the value-bearing controls number **eleven** — one workflow-name
+  textbox, five category comboboxes, five blocked checkboxes — every one disabled, and the admin
+  render carries the identical eleven, every one enabled. That pair is the design decision stated as
+  a measurement: read-only is *frozen*, not *hidden*. Nothing is omitted from a member's view.
+- **Added in this task's FIX ROUND, because the enumeration above stopped at the builder screen.** The
+  ticket-type editor is the other surface behind the same gate, and it is the one that owns
+  field-schema authoring and the rank D4's requires-parent rule reads. The gate was correct in the
+  code at the reviewed sha — every call site sits behind `canAuthor`, which is what the first bullet
+  measured — but three of its terms were pinned by NOTHING, and that is a different claim from
+  "sound". Measured: dropping `disabled` on the `IconPicker`, dropping it on the `FieldsEditor`, and
+  removing the `!canAuthor` half of the rank input's `!canAuthor || isBuiltin` each left **211 of 211**
+  green. The third is the sharpest, and the reason it hid is worth keeping: every member fixture in
+  both suites — `access.test.tsx`'s `taskType` and `ticket-types.test.tsx`'s builtin seeds — is one of
+  `BUILTIN_TICKET_TYPE_SEEDS`, so `isBuiltin` was already true and satisfied the gate whatever the
+  author half said. A CUSTOM type's rank had no non-author test at all. What closes it is one test,
+  `no authoring action is reachable by any path the TICKET-TYPE EDITOR offers a member` > `shows the
+  member every control the admin gets, disables every one of them, and every button on the screen is
+  an icon choice`, over a custom type at rank 5 carrying a text field and a select field: **eight**
+  value-bearing controls (four textboxes — the select field's options textarea reports as one — three
+  comboboxes, one spinbutton), every one disabled, and **sixteen** buttons, every one an icon choice
+  and every one disabled. Its control asserts the identical eight ENABLED and the same button
+  predicate FALSE, because on the admin's render Add field, two Remove fields and Save sit outside the
+  icon group. Re-measured at the new denominator: each of the three mutations now reddens **exactly
+  one** of **213**, and the two `canAuthorRole` mutations still redden exactly one each — the owner
+  test and the guest test, unmoved. The `isBuiltin` half of the same gate was already pinned:
+  replacing it with `!canAuthor` alone reddens `locks the rank of a built-in type and says why`, so
+  D7's UI-only lock needed nothing.
+- **NOT pinned, stated at the site rather than covered by a test that could not fail.** The
+  `!canAuthor` term on the divergence section's `Move them to ...` and `Leave them on ...` buttons is
+  unreachable for a member by construction: `diverged` compares `def.workflowId` against the
+  `initialDef`'s own, so it is false at mount for every role, and the only gesture that can make it
+  true is the Workflow combobox, itself `disabled={!canAuthor}`. Dropping `!canAuthor` from either
+  button reddens **0** of 213. The lock that actually holds is the outer one and it IS tested —
+  `locks the binding itself, so the divergence section a migration lives in never opens` — so a test
+  aimed at these two terms would have to defeat the combobox gate in its own setup and would then be
+  asserting that setup rather than the gate. The reason now sits in a comment beside the two buttons,
+  which is the honest place for a term no test reaches.
+
+**A claim this task wrote and then had to withdraw.** The first version of the sweep asserted "a
+member's builder screen offers no button at all". It is false, and the reason is the open ruling
+request above: the frozen `ERRAND_WITH_WAITS_TEMPLATE` trips `rule-bypassable` twice, so the
+advisories panel puts two jump buttons on screen for every role. The template was not touched. The
+surviving invariant is narrower and stronger — **every button a member is offered matches
+`(issues|advisories)-panel__jump`**, whose whole effect is `store.actions.select` — and the test
+clicks every one of them, re-checking the predicate after each click, because a jump mounts an
+inspector and an inspector is where an ungated authoring button would appear. The admin control
+asserts the same predicate is **false** on the admin's opening screen; a predicate that held for both
+roles would have been measuring nothing.
+
+**RECORDED, NOT FIXED — owner Plan 8 Task 13, verified open at this sha.** `TemplateGallery` takes no
+session and applies no role check: `props.onPick` is unconditional. Inside app-core that is harmless,
+because the only thing that mounts it is the list screens' `onNew`, which is `canAuthor ? … : null`.
+The exposure is a **route**, and Task 13 is where routes get written: its own snippet for
+`apps/web/app/w/[workspaceId]/settings/workflows/new/page.tsx` renders `<TemplateGallery>` after
+`useBuilderWiring(...)` returns, and never consults `wiring.session.role` — so a member who types that
+URL is handed the gallery the list screen deliberately hid from them, picks a template, and lands on a
+read-only `WorkflowBuilderScreen`. No authoring action escapes (the banner shows, Publish is gone),
+but an authoring *entry point* is offered, and `ticket-types/new/page.tsx` has the same shape. Task 13
+is unstarted — every step box unchecked, `apps/web/src/authoring/` does not exist — and it is the task
+that writes the two files, so the gate belongs in the same commit as the pages and not retrofitted
+onto a component that has no session to consult.
+
+**Not a hole, recorded so nobody "fixes" it into one.** `WorkflowCanvas` passes `nodesDraggable`
+unconditionally, so a member can drag a node and `onNodeDragStop` calls `store.actions.moveState`.
+That is deliberate and must stay: design decision 5 says layout is presentation, not truth, and is not
+published — confirmed in the code, not inferred from the plan, at `events.ts`'s `buildPublishPayload`,
+which spreads `draft.def` (a `WorkflowDef`, carrying no coordinates) and never reads `draft.positions`.
+Gating the drag would freeze a member's ability to *read* a dense graph while protecting nothing.
+
+**Plan text wrong about this repo, for the executor of Tasks 13–15.** Task 12's Step 1 snippet asserts
+`'Must carry an attachment as evidence.'` renders on the errand template and clicks it to open the
+transition inspector. The errand template carries **no `require-evidence` rule at all** — its three
+guarded transitions (indices 3, 6 and 8) all carry `require-comment`, whose summary is identical
+across all three, so even the correct string throws on multiple matches. The test addresses the edge
+by its own `data-testid="transition-label-8"` instead. This is the same class of error Task 5's fix
+round already recorded against the same template, and the third time in this plan that a Task's
+snippet has imported `tokens.workflowBuilder.*` from `@gisik-nokma/ui`, an export that does not exist
+(Tasks 8 and 9 corrected it before; the banner's colours are a BEM class in `packages/ui/src/ui.css`
+over existing `var(--gn-*)` roles). A fourth: the snippets spell module imports `./read-only-banner.tsx`,
+and Task 13's tsconfig step exists to make that spelling typecheck — but this repo's modules import
+`.js` throughout, including every file this task touched, so the `.tsx` spelling is not the house
+style it is written as. Step 4 also predicts "20 tests" for the three suites it names; they hold
+**53** — the earlier suites grew past the plan's arithmetic, which is a stale prediction rather than
+a missing test.
+
+## Plan 8 Task 13 fix round (2026-09-03) — a refusal the adapter refused to guess, guessed by the screen; and NOBODY currently owns it
+
+Recorded, not fixed, on the Task 7 entry's terms above: outside Task 13's scope, and outside every
+open task's scope too.
+
+**The gap.** `packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:70` loads the
+roster as `props.gateway.listMembers(props.workspaceId).catch(() => [] as WorkspaceMember[])` — a
+blanket catch on the promise, not a narrowing on the one refusal it was written for. Its own comment
+names that refusal correctly (a guest may not call `GET /v1/workspaces/:id/members`, executor ruling
+2026-09-02), but the code cannot tell that 404 from a 500, a dropped connection, or a roster body it
+could not parse. All four become `[]`, which flows into `data.members` and from there into every rule
+summary and the `require-different-user` editor as "nobody is in this workspace".
+
+**Why it is only now reachable, and why the entry belongs to this task's fix round rather than to
+Task 10 that wrote the line.** Before Task 13 no shipped `WorkflowAuthoringGateway` could produce a
+non-404 rejection: `authoring` was not on `AppServices`, and the only implementation was
+`fake-gateway.ts`'s `listMembers: async () => seed.members ?? []`, which cannot reject at all. Task 13
+built the HTTP adapter, so the 500 and the dropped connection exist now. The adapter itself is
+correct — it rejects rather than inventing an empty, and `gateway.ts` forbids the invention by name —
+and its docblock previously claimed `WorkflowBuilderScreen` "catches a refused roster specifically".
+That sentence was false the moment the adapter shipped.
+
+**Correction, 2026-09-03, from Plan 8's final whole-branch review — this paragraph was itself an
+overclaim, and the shape of it is the lesson.** It said the sentence "is corrected in the same commit
+as this entry". The fix round corrected it in `data-source-gateway.ts` and **left the identical claim
+standing one file away**, in `builder-wiring.tsx` (*"The screens are built for it —
+`WorkflowBuilderScreen` catches a refused roster by name"*), where it survived until the final review
+found it. `git log --oneline -- apps/web/src/authoring/builder-wiring.tsx` returned exactly ONE commit
+— Task 13's own — and never a fix round. **A correction that names one site does not cover a claim
+that lives at two**, and the doc entry asserting the correction landed is what stopped anyone
+re-checking. Both sites now say the same true thing, and it is the one the sibling file already
+argued: the screen's catch is blanket, and narrowing it by name is not merely undone but
+**structurally impossible** there, because `AuthoringReadRefused` is declared under `apps/web` and
+`packages/app-core` depends on nothing in `apps/`.
+
+**Why it is not a one-line fix, which is the part an owner needs to know.** The narrowing that would
+close it is `cause instanceof AuthoringReadRefused`, and that class is declared in
+`apps/web/src/authoring/data-source-gateway.ts` — sweep: `AuthoringReadRefused` appears in **four**
+files at this sha (`src/authoring/data-source-gateway.ts`, `src/authoring/builder-wiring.tsx`,
+`test/data-source-gateway.test.ts`, `test/authoring-routes.test.tsx`), every one under `apps/web`, and `packages/app-core/package.json` depends on
+`@gisik-nokma/domain`, `@gisik-nokma/rule-engine` and `@gisik-nokma/ui` and on nothing in `apps/`. A
+screen in app-core therefore cannot name the error its own gateway contract's implementations throw.
+Closing this means moving the refusal into `workflow-builder/gateway.ts` — a class or a predicate the
+contract owns, which `builder-wiring.tsx` and the fake would both have to adopt — and that is a
+contract change touching the adapter that throws (`data-source-gateway.ts`), the wiring that narrows
+(`builder-wiring.tsx`), the screen that should (`workflow-builder-screen.tsx`) and the fake that
+declares the contract's other implementation (`fake-gateway.ts`), not a catch clause. `builder-wiring.tsx` is the shape to copy:
+it already answers a four-arm union in which a refused read is `refused` and never a role.
+
+**The ownership sweep, run in the documents rather than from memory.** Plan 8 has two tasks left and
+neither is a slot for this: **Task 14** is the Playwright smoke, four steps, all of them config, spec,
+run and commit; **Task 15** is the catalogue and the final verification pass, four steps — Step 1 runs
+commands, Steps 2 and 3 write `Features.md` §10 and `test-cases/10-workflow-builder.md`. A behaviour
+change in an app-core screen fits neither, and parking it on Task 15 Step 1 would be parking a code
+change on a verification run. Plans 9, 10 and 11 mention neither `WorkflowBuilderScreen` nor
+`workflow-builder-screen` anywhere in their text. The only other mention of `listMembers` in this
+document is the Task 12 section's fixture note, which assigns nothing. **So it is unowned, and it is
+recorded that way rather than given a plausible-sounding owner** — this branch has already shipped one
+false owner claim ("Lane 4") together with a false claim of having verified it.
+
+**Also from this fix round, FIXED rather than recorded, and kept here because the measurement is the
+transferable part.** **Four** of the adapter's five HTTP bodies were typed by hand-spelled inline `as`
+shapes on `unknown` (`as { workflows: PublishedWorkflowDef[] }` and three siblings); the fifth, the
+migrate POST, already asserted to the shared `MigrationOutcome` and narrows its refusal arm through
+`isRefusal`, so it needed nothing. The review called it five; that half is refuted. `HttpClient.get`
+answers `Promise<unknown>`, so the assertion was 100% of the typing, and the shapes were nominally
+unlinked to the `WorkflowListResponse` / `MemberListResponse` / `StateOccupancyResponse` /
+`TypePopulationResponse` the routes annotate their answers with. Measured as a pair, not argued:
+renaming `workflows` -> `defs` on `WorkflowListResponse` in `packages/domain` reddened
+`@gisik-nokma/server:typecheck` with TS2339 and left `@gisik-nokma/web:typecheck` **green** — the
+mutation that killed nothing. After swapping the four assertions to the domain types, the identical
+rename reddens web at the read itself, and so does `members` -> `roster` on `MemberListResponse`. Both
+mutations were reverted with `git checkout --` and the revert confirmed by printing the two lines, not
+by shell `diff`. The residual gap is stated in the adapter rather than papered over: this is
+compile-time nominal linkage only, and unlike `mapWorkflowDef` nothing validates the wire, because the
+`asRecord`/`asArray`/`asString` primitives are private to `online/mappers.ts` and absent from the
+`@gisik-nokma/app-core/online` export list.
+
+**Carried forward from a commit message, because that is not where this series records.** Commit
+`2da26d1` reported `packages/app-core/test/workflow-builder/access.test.tsx` > "control: the identical
+gesture as an admin opens the same inspector..." failing ONCE in three full-gate runs on
+`[data-testid="transition-label-8"]`, and passing 5/5 alone and 6/6 as a whole app-core suite outside
+turbo — read as a concurrency-load flake in a file that commit did not touch. That measurement is
+quoted, not re-run here. Its stated owner was "Plan 8 Task 15, whose Step 1 is the full verification
+pass", which is the right owner for a flake to be re-observed under a verification run — and, for the
+avoidance of the confusion this entry could otherwise cause, is NOT an owner for the app-core
+behaviour change above.
+## Plan 8 Task 15 fix round (2026-09-03) — two things the catalogue sweep turned up in the code it was cataloguing
+
+Both **RECORDED, NOT FIXED**. Task 15 writes `Features.md` §10 and `test-cases/10-workflow-builder.md`;
+neither of these is a document, and parking a code change on a catalogue task is the same mistake the
+Task 13 fix-round entry above declined to make.
+
+**1. The withdrawn "catches a refused roster" sentence survives in a SECOND file, and the entry above
+is not wrong about it.** The Task 13 fix-round entry says the false sentence "is corrected in the same
+commit as this entry", and scopes that to "its docblock" — the adapter's. Measured: that is exactly
+true. `apps/web/src/authoring/data-source-gateway.ts:114` now opens with "`WorkflowBuilderScreen` does
+NOT" and spells out that the blanket catch turns a 500, a dropped connection or an unparseable body
+into the empty roster — so the adapter's docblock was corrected exactly as claimed.
+The reviewer's theory that the document overclaimed its own completeness is therefore **refuted**.
+What is true is narrower and was missed by everyone: the same false claim was written **twice, into
+two files**, and the withdrawal only ever covered one of them. `apps/web/src/authoring/builder-wiring.tsx:57`
+still reads, verbatim:
+
+
+    *    read-only, which is exactly what a guest should see. The screens are built
+    *    for it — `WorkflowBuilderScreen` catches a refused roster by name.
+
+It is false for the same reason the adapter's copy was: `workflow-builder-screen.tsx:70` catches the
+whole promise, by no name at all. Sweep behind this: `rtk proxy grep -rn "refused roster"` over
+`apps`, `packages`, `docs`, `Features.md` and `test-cases` returned **three** rows before this entry
+was written — the `builder-wiring.tsx:57` row above, the Task 13 entry's own quotation of the
+withdrawal at line 6392, and an unrelated `6.45` about project rosters — and returns three more now
+that this entry quotes it, which is why the count is stated as of the sha before it. Positive control
+for the same sweep: `AuthoringReadRefused` under `apps/web/src`, **8** rows across **2** files
+(`data-source-gateway.ts` 6, `builder-wiring.tsx` 2); negative control: a nonexistent string returns
+0 and exits 1.
+
+**Owner: the same unowned `gateway.ts` contract change the entry above describes.** The sentence is
+Task 13's, Task 13 is closed, and Plans 9, 10 and 11 mention `WorkflowBuilderScreen` and
+`workflow-builder-screen` **zero times each** (Plan 8: 18, as the control). Whoever moves the refusal
+into the contract deletes this sentence in the same change, because closing the gap is what would make
+it true.
+
+**2. Nothing in `apps/web` links to any of the six authoring routes.** `AppNav` renders *Workspaces*
+and *My Work* and no settings entry. Sweep: `settings` across `apps/web/app` and `apps/web/src`,
+excluding the six route files themselves, returns exactly **one** row — `builder-wiring.tsx:151`'s
+*"Sign in to open settings"* copy, which is not an `href` to them — against a positive control of 14
+`settings` hits inside the six route files. So `/w/[workspaceId]/settings/workflows` and its five
+siblings are reachable only by typing the URL today. This is disclosed in the §10 routes bullet rather
+than fixed, and it is **UNOWNED**, measured in the documents rather than from memory: `AppNav` is
+Plan 6's (10 hits in Plan 6's text, zero in every other plan), Plan 6's catalogue task closed on
+2026-09-02, and Plan 6's own text mentions `settings/workflows`, `settings/ticket-types` or `Settings`
+**zero** times (control: `my-work`, 46 hits). Plans 9, 10 and 11: zero for `AppNav` and zero for both settings route paths. The bare word `Settings` is **not** zero there, and is named so a later sweep does not think it found something: 32 hits in Plan 9, every one of them `getWorkspaceSettings` / `proj_workspace_settings` (Plan 5's server-side notification thresholds), and 1 in Plan 10, a desktop sign-in hint telling a user to paste a token in the desktop app's own Settings. Neither is a nav entry to these six routes; the discriminating term is the route path, and that is zero in every plan but Plan 8's own Task 13. Plan 8's
+own text never asks for a nav entry either — Task 13 is "the gateway adapter and the six pages". As
+with the roster gap, this is recorded as unowned rather than handed a plausible-sounding owner.
+
+**A measurement correction future ownership sweeps need.** Checkbox state in these plan files is
+**not** evidence a plan has run: `2026-08-20-08-workflow-builder.md` has **0** checked and 98
+unchecked boxes at this sha, with Tasks 1–15 executed and committed. The sweep above used artefacts
+instead — `Features.md` carries no §11 heading and `test-cases/` holds no `11-` file, which is what
+actually establishes that Plan 9 Task 15 (reserving ids 11.1–11.47) has not run.
