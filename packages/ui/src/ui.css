@@ -504,3 +504,172 @@
 .state-mapping-dialog__confirm:disabled { background: var(--gn-surface-sunken); color: var(--gn-text-muted); border-color: var(--gn-border); cursor: not-allowed; }
 .state-mapping-dialog__cancel:focus-visible,
 .state-mapping-dialog__confirm:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+
+/* Ticket-type management (Plan 8 Task 11). Colours are roles that already
+   exist — nothing here needs a new one. The divergence notice borrows the
+   warning role because it reports a consequence the admin should see, not a
+   failure; the refusal inside it borrows danger, matching the publish
+   banners. */
+.type-icon { flex: none; display: block; color: var(--gn-text-muted); }
+
+.icon-picker { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.icon-picker__choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  background: var(--gn-surface);
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.icon-picker__choice--selected { border-color: var(--gn-accent); color: var(--gn-text); background: var(--gn-surface-raised); }
+.icon-picker__choice:disabled { background: var(--gn-surface-sunken); cursor: not-allowed; }
+.icon-picker__choice:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+
+.fields-editor { display: flex; flex-direction: column; gap: 0.5rem; }
+.fields-editor__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.fields-editor__row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.4rem; }
+.fields-editor__add { align-self: flex-start; }
+
+.ticket-type-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.ticket-type-list__loading { margin: 0; color: var(--gn-text-muted); }
+.ticket-type-list__header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.ticket-type-list__title { margin: 0; font-size: 1rem; }
+.ticket-type-list__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.ticket-type-list__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  background: var(--gn-surface);
+}
+.ticket-type-list__name { font-weight: 600; font-size: 0.9rem; }
+.ticket-type-list__badge {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--gn-border-strong);
+  color: var(--gn-text-muted);
+}
+.ticket-type-list__rank,
+.ticket-type-list__fields { font-size: 0.75rem; color: var(--gn-text-muted); }
+.ticket-type-list__fields { margin-right: auto; }
+
+.ticket-type-editor { display: flex; flex-direction: column; gap: 0.6rem; }
+.ticket-type-editor__loading { margin: 0; color: var(--gn-text-muted); }
+.ticket-type-editor__name,
+.ticket-type-editor__rank,
+.ticket-type-editor__workflow { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.8rem; }
+.ticket-type-editor__builtin-note,
+.ticket-type-editor__implications { margin: 0; font-size: 0.75rem; color: var(--gn-text-muted); }
+.ticket-type-editor__issues {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  border-left: 3px solid var(--gn-danger);
+  background: var(--gn-surface-sunken);
+  font-size: 0.8rem;
+  color: var(--gn-danger);
+}
+.ticket-type-editor__save {
+  align-self: flex-start;
+  border: 1px solid var(--gn-accent);
+  border-radius: 6px;
+  padding: 0.35rem 0.9rem;
+  font: inherit;
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+  cursor: pointer;
+}
+.ticket-type-editor__save:disabled { background: var(--gn-surface-sunken); color: var(--gn-text-muted); border-color: var(--gn-border); cursor: not-allowed; }
+.ticket-type-editor__save:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.ticket-type-editor__saved { margin: 0; font-size: 0.85rem; color: var(--gn-success); }
+.ticket-type-editor__refused,
+.ticket-type-editor__invalid {
+  border-left: 3px solid var(--gn-danger);
+  background: var(--gn-surface-sunken);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+}
+.ticket-type-editor__invalid { border-left-color: var(--gn-warning); }
+.ticket-type-editor__refused p,
+.ticket-type-editor__invalid p { margin: 0 0 0.2rem; }
+
+.ticket-type-editor__divergence {
+  border: 1px solid var(--gn-border);
+  border-left: 3px solid var(--gn-warning);
+  border-radius: 6px;
+  background: var(--gn-surface-raised);
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.ticket-type-editor__divergence-title { margin: 0; font-size: 0.9rem; }
+.ticket-type-editor__divergence-count { margin: 0; font-size: 0.75rem; color: var(--gn-text-muted); }
+.ticket-type-editor__divergence-body,
+.ticket-type-editor__divergence-left,
+.ticket-type-editor__divergence-migrated { margin: 0; font-size: 0.85rem; }
+.ticket-type-editor__divergence-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+/* Deliberately the same weight as "Move them to …": leaving the tickets where
+   they are is a choice the admin makes, not a button the design discourages. */
+.ticket-type-editor__divergence-move,
+.ticket-type-editor__divergence-leave {
+  border: 1px solid var(--gn-border-strong);
+  border-radius: 6px;
+  padding: 0.3rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+  background: var(--gn-surface);
+  color: var(--gn-text);
+  cursor: pointer;
+}
+.ticket-type-editor__divergence-move:disabled { background: var(--gn-surface-sunken); color: var(--gn-text-muted); border-color: var(--gn-border); cursor: not-allowed; }
+.ticket-type-editor__divergence-move:focus-visible,
+.ticket-type-editor__divergence-leave:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.ticket-type-editor__divergence-hint { flex-basis: 100%; margin: 0; font-size: 0.75rem; color: var(--gn-text-muted); }
+.ticket-type-editor__divergence-refused {
+  border-left: 3px solid var(--gn-danger);
+  background: var(--gn-surface-sunken);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+}
+.ticket-type-editor__divergence-refused p { margin: 0 0 0.2rem; }
+
+.workflow-rebind-dialog {
+  border: 1px solid var(--gn-border);
+  border-radius: 8px;
+  background: var(--gn-surface-overlay);
+  color: var(--gn-text);
+  box-shadow: 0 8px 24px var(--gn-shadow);
+  padding: 1rem;
+}
+.workflow-rebind-dialog__title { margin: 0 0 0.4rem; font-size: 0.95rem; }
+.workflow-rebind-dialog__body { margin: 0 0 0.6rem; font-size: 0.8rem; color: var(--gn-text-muted); }
+.workflow-rebind-dialog__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.workflow-rebind-dialog__row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.workflow-rebind-dialog__state-name { font-weight: 600; font-size: 0.85rem; }
+.workflow-rebind-dialog__target { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; margin-left: auto; }
+.workflow-rebind-dialog__footer { margin: 0.6rem 0 0; font-size: 0.75rem; color: var(--gn-text-muted); }
+.workflow-rebind-dialog__actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.75rem; }
+.workflow-rebind-dialog__cancel,
+.workflow-rebind-dialog__confirm {
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  padding: 0.3rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+  background: var(--gn-surface);
+  color: var(--gn-text);
+  cursor: pointer;
+}
+.workflow-rebind-dialog__confirm { background: var(--gn-accent); color: var(--gn-accent-text); border-color: var(--gn-accent); }
+.workflow-rebind-dialog__confirm:disabled { background: var(--gn-surface-sunken); color: var(--gn-text-muted); border-color: var(--gn-border); cursor: not-allowed; }
+.workflow-rebind-dialog__cancel:focus-visible,
+.workflow-rebind-dialog__confirm:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
