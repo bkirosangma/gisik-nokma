@@ -38,7 +38,30 @@ if (typeof HTMLElement !== 'undefined') {
       this.callback = callback;
     }
     observe(target: Element): void {
-      this.callback([{ target } as ResizeObserverEntry], this as unknown as ResizeObserver);
+      // React Flow's own pan/zoom setup (@xyflow/system's XYPanZoom) reads
+      // entry.contentRect.width/height off the FIRST callback invocation to
+      // size its viewport — measured here: the plain `{ target }` this shim
+      // used to hand back left contentRect undefined and threw inside
+      // XYPanZoom before a single node ever reached the DOM. The width/height
+      // below reuse the same 180/40 defaults this file's offsetWidth/
+      // offsetHeight getters already establish, so a canvas host with no
+      // explicit size still measures as non-zero.
+      const htmlTarget = target as HTMLElement;
+      const contentRect = {
+        width: htmlTarget.offsetWidth ?? 180,
+        height: htmlTarget.offsetHeight ?? 40,
+        top: 0,
+        left: 0,
+        right: htmlTarget.offsetWidth ?? 180,
+        bottom: htmlTarget.offsetHeight ?? 40,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      } as DOMRectReadOnly;
+      this.callback(
+        [{ target, contentRect } as ResizeObserverEntry],
+        this as unknown as ResizeObserver,
+      );
     }
     unobserve(): void {}
     disconnect(): void {}
@@ -70,4 +93,49 @@ if (typeof HTMLElement !== 'undefined') {
 
   (SVGElement.prototype as unknown as { getBBox: () => DOMRect }).getBBox = () =>
     ({ x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, toJSON: () => ({}) }) as DOMRect;
+
+  /**
+   * The extra jsdom gap Task 5's canvas exposed, beyond the two React Flow
+   * shims above: @testing-library/user-event's realistic click (pointerdown →
+   * mousedown → ... → click) constructs every MouseEvent with `view: null` —
+   * measured in
+   * @testing-library/user-event/dist/esm/event/createEvent.js's `initUIEvent`,
+   * which always writes `view` as a non-configurable own accessor via
+   * `Object.defineProperty`, so it cannot be patched afterward (redefining a
+   * non-configurable accessor throws) and wrapping the dispatched event in a
+   * Proxy does not help either — jsdom's dispatch reads the event through its
+   * own internal implementation link, not through whatever object reference
+   * was passed in, so a Proxy's overridden getter is never consulted.
+   * @xyflow/system attaches real d3-drag/d3-zoom behaviour to the pane (pan)
+   * and to draggable nodes; both unconditionally call `nodrag(event.view)` on
+   * every qualifying mousedown, and `nodrag` immediately reads
+   * `view.document` — so `view === null` throws before a single test
+   * assertion runs, on ANY user-event click inside the canvas (not something
+   * `panOnDrag`/`nodesDraggable` toggles avoid, since XYFlow's own mousedown
+   * filter passes through for a left-click before nodrag is ever reached).
+   * The only working intercept point left is `Object.defineProperty` itself:
+   * this wraps it so that specifically an Event's `view` getter falls back to
+   * `window` instead of null, at the moment user-event installs it — before
+   * it becomes non-configurable. Scoped narrowly (property name `view`,
+   * target must be an `Event` instance) to avoid touching unrelated code.
+   */
+  if (typeof MouseEvent !== 'undefined') {
+    const originalDefineProperty = Object.defineProperty;
+    Object.defineProperty = function (
+      target: object,
+      property: PropertyKey,
+      descriptor: PropertyDescriptor,
+    ) {
+      if (
+        property === 'view' &&
+        typeof descriptor.get === 'function' &&
+        typeof Event !== 'undefined' &&
+        target instanceof Event
+      ) {
+        const originalGet = descriptor.get;
+        descriptor = { ...descriptor, get: () => originalGet.call(target) ?? window, configurable: true };
+      }
+      return originalDefineProperty(target, property, descriptor);
+    } as typeof Object.defineProperty;
+  }
 }

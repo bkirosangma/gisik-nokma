@@ -331,3 +331,57 @@
 .gn-new-ticket__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; }
 .gn-new-ticket__field { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.7rem; }
 .gn-create-flow__trouble { color: var(--gn-danger); margin: 0.6rem 0 0; }
+
+/* Workflow builder canvas (Plan 8 Task 5). No new token roles — the state
+   category colours, blocked ring, accent, border and surface roles this
+   canvas needs already exist (categoryOpen/Active/Terminal, blocked, accent,
+   border, surface*, text*), so it reuses them rather than adding duplicates
+   (design decision "one colour origin"). */
+.gn-workflow-canvas { width: 100%; height: 100%; min-height: 480px; }
+
+.gn-state-node {
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  border: 2px solid var(--gn-border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  min-width: 170px;
+}
+.gn-state-node--open { border-left: 6px solid var(--gn-category-open); }
+.gn-state-node--active { border-left: 6px solid var(--gn-category-active); }
+.gn-state-node--terminal { border-left: 6px solid var(--gn-category-terminal); }
+.gn-state-node--blocked { outline: 2px dashed var(--gn-blocked); }
+.gn-state-node--open.gn-state-node--selected { border-color: var(--gn-category-open); }
+.gn-state-node--active.gn-state-node--selected { border-color: var(--gn-category-active); }
+.gn-state-node--terminal.gn-state-node--selected { border-color: var(--gn-category-terminal); }
+.gn-state-node__header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.gn-state-node__name { font-weight: 600; }
+.gn-state-node__initial-badge { color: var(--gn-accent); font-size: 0.75rem; font-weight: 600; }
+.gn-state-node__category { display: flex; flex-direction: column; gap: 0.1rem; margin-top: 0.4rem; font-size: 0.8rem; color: var(--gn-text-muted); }
+.gn-state-node__blocked { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; font-size: 0.8rem; }
+
+.gn-any-state-node {
+  background: var(--gn-surface-raised);
+  color: var(--gn-text-muted);
+  border: 2px dashed var(--gn-border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+}
+.gn-any-state-node__title { font-weight: 600; }
+.gn-any-state-node__hint { font-size: 0.75rem; }
+
+.gn-transition-edge { stroke: var(--gn-border); stroke-width: 2; }
+.gn-transition-edge--selected { stroke: var(--gn-accent); }
+.gn-transition-edge__label {
+  position: absolute;
+  pointer-events: all;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text-muted);
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+  max-width: 220px;
+}
+.gn-transition-edge__label--empty { padding: 0; border: none; background: none; }
+.gn-transition-edge__label--selected { border-color: var(--gn-accent); color: var(--gn-text); }

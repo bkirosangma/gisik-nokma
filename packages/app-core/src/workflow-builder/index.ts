@@ -7,3 +7,6 @@ export * from './templates.js';
 export * from './gateway.js';
 export * from './fake-gateway.js';
 export * from './events.js';
+export * from './ui/builder-context.js';
+export * from './ui/flow-graph.js';
+export * from './ui/workflow-canvas.js';
