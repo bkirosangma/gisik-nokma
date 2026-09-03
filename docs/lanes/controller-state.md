@@ -11,6 +11,46 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## RULING P29 (2026-09-03, owner-approved) — the frozen errand-with-waits template keeps its two advisories
+
+**Escalated by the executor at step 13's close** (`exec/13-plan8-workflow-builder`, PR #85 already open,
+non-blocking — step 14 was not waiting on it). Owner explicitly asked for the consequences of the accepted
+option before ruling, so they are recorded alongside it.
+
+**THE TENSION.** `ERRAND_WITH_WAITS_TEMPLATE` — the real Convenience Corner shop's workflow, imported by
+identity for Plan 11's dogfooding, never re-declared — trips the `rule-bypassable` advisory **twice** once
+Plan 8's Task 8 covers that code (Ruling P28's FYI item 3). Two paths, both genuinely blocked:
+- **Fixing the template** violates Plan 11's `checkErrandTemplate` oracle, which pins this exact shape as
+  the ground truth for dogfooding fidelity.
+- **Silencing the check** means editing `adviseWorkflowDef` — the exact module Plan 2's F5 ruling built to
+  catch this class of issue, for every workflow, not just this one.
+
+**RULING: Option 3 — accept both trips as known and expected. Touch neither `checkErrandTemplate` nor
+`adviseWorkflowDef`.**
+
+**Why, in order of weight:**
+1. **`rule-bypassable` is advisory-only, never blocking** — Task 8's own title separates the "issues" tier
+   (blocks publish) from the "advisory" tier (does not). This costs nothing functionally; the workflow
+   works regardless.
+2. **It is the philosophically consistent answer for THIS product specifically.** Plan 11 Task 8's own
+   framing is *"frozen record in, events out, nothing invented."* The template exists to digitize the real
+   shop's actual workflow, warts included. Sanitizing it to clear an advisory panel would mean **inventing
+   a cleaner reality than the one being recorded** — the exact thing "nothing invented" forbids, and a
+   direct contradiction of the product's own founding principle (a board that cannot lie).
+3. **Scoped, not a precedent.** The acceptance names this one frozen, identity-imported template
+   specifically — it does not weaken `rule-bypassable` for any workflow a real user authors fresh.
+
+**Cost, stated honestly:** whoever opens the Workflow Builder on this workflow sees two advisories that
+never auto-clear on the frozen template/gallery entry. Mitigated if — **to be confirmed by the
+executor** — the dogfooding seed creates an independently-editable live `WorkflowDef` row rather than
+re-deriving from the frozen constant each time, in which case the shop's own admin can fix their live copy
+through the builder UI without touching the template or the oracle at all, and the permanent cost shrinks
+to "the gallery/seed source stays as originally captured," not "every real user is stuck."
+
+**Action required, not a code change:** a one-line rationale near the template's declaration (and in
+`Features.md`/`test-cases` if there's a natural home) stating the two advisories are expected and why, so
+a future session doesn't mistake them for a bug and try to "fix" the frozen template.
+
 ## RULING P28 (2026-09-03, owner-approved) — Plan 8's gateway adapter calls HTTP directly for 4 operations
 
 **Escalated by the executor mid-step-13** (`exec/13-plan8-workflow-builder`, Batch A running, no PR yet),
