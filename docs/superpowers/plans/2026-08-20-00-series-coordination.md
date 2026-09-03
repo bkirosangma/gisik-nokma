@@ -6207,3 +6207,39 @@ with the app-core test count accounting for exactly the new tests added (562 →
 test changed status — 562 measured directly against a clean worktree at f1610e8, the commit
 immediately before this task's first commit; the +16 delta matches inspectors.test.tsx +13,
 draft-store.test.ts +2, canvas.test.tsx +1).
+
+## Plan 8 Task 7 fix round (2026-09-03) — an off-roster restrict-to reference is invisible, and NOBODY currently owns it
+
+Recorded, not fixed: outside Task 7's scope, and — this is the point of the entry — outside every
+open task's scope too. The T7 review parked it on Task 8's issues panel. That owner does not hold.
+
+**The gap.** `RestrictToEditor` renders a checkbox per workspace member and one per role literal in
+`ALL_ROLES = ['owner','admin','member','guest']`, checked from `rule.userIds?.includes(...)` /
+`rule.roles?.includes(...)`. A rule naming a `userId` who is not on the roster the environment
+supplies — a departed member, or any member at all when the roster comes back refused or empty
+(the guest ruling, 2026-09-02) — or a `roles` entry that is not one of the four literals, renders
+**every box unchecked and no warning of any kind**. The emptiness helper does not cover it either:
+`isEmpty` is a length test, and the array is not empty. So the author is shown a restriction that
+looks like it names nobody while the def still carries the reference. (Toggling another box does
+*not* silently drop it — `update()` spreads `rule.userIds ?? []`, which includes the unknown id. The
+defect is invisibility, not loss.) Contrast `RequireFieldEditor` and `RequireDifferentUserEditor`,
+which both detect exactly this shape and render an inline warning; restrict-to is the one editor of
+the three that does not.
+
+**Why Task 8 is not the owner.** Task 8 renders `validateWorkflowDef` and `adviseWorkflowDef` output.
+Those emit thirteen codes between them, enumerated at this sha: no-states, duplicate-state-id,
+no-terminal-state, unknown-transition-state, duplicate-transition, unknown-initial-state,
+unreachable-state, terminal-no-inbound, empty-restrict-to, rdu-unknown-state, rdu-unenterable-state
+(validate), rdu-bypassable, rule-bypassable (advise). `empty-restrict-to` is the only restrict-to
+code and it is a pure `length > 0` test — never roster membership, never role-literal membership.
+Task 8's panel will therefore render *nothing at all* for this draft. Assigning it there would
+repeat the failure the house rules name: work parked on a task that cannot cover it.
+
+**Where it actually belongs.** This is a validator code-set gap (a `restrict-to-unknown-principal`
+issue or advisory that `validateWorkflowDef` does not have) plus the editor's inline warning that
+would anchor to it. Neither `packages/domain`'s validator nor Plan 8 has an open task for it: Plan 8's
+remaining tasks are 8–15 and none touches `validate-workflow.ts`. **No owner exists — it needs one
+assigned, not inherited.** Note the roster half is not purely cosmetic: with a guest's refused
+roster, *every* named-person reference in *every* rule renders unchecked, so a warning keyed only on
+"not in `members`" would cry wolf across the whole workflow. The honest fix distinguishes "the roster
+says this person is not here" from "there is no roster to ask" — which is design work, not a patch.
