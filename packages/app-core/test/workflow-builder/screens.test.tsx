@@ -27,7 +27,7 @@ describe('WorkflowBuilderScreen', () => {
     expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
     expect(screen.getByText('System rules — in every workflow')).toBeInTheDocument();
     expect(screen.getByText('No issues — this workflow can be published.')).toBeInTheDocument();
-    expect(screen.getByText('To do')).toBeInTheDocument(); // a canvas node
+    expect(await screen.findByText('To do')).toBeInTheDocument(); // a canvas node — React Flow renders it a tick after mount
     expect(screen.getByText('Select a state or a transition to edit it.')).toBeInTheDocument();
   });
 
@@ -80,13 +80,26 @@ describe('WorkflowBuilderScreen', () => {
       await screen.findByText('Could not load workspace people and types — reload to try again.'),
     ).toBeInTheDocument();
   });
+
+  it('disables the name field and hides Add state for non-authors', async () => {
+    render(
+      <WorkflowBuilderScreen
+        workspaceId={newUlid()}
+        session={{ userId: newUlid(), role: 'member' }}
+        gateway={createFakeGateway()}
+        initialDraft={draftFromTemplate(kanban)}
+      />,
+    );
+    expect(await screen.findByRole('textbox', { name: 'Workflow name' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Add state' })).not.toBeInTheDocument();
+  });
 });
 
 describe('WorkflowListScreen', () => {
   it('lists published workflows with version and state count, and opens one', async () => {
     const user = userEvent.setup();
     const first = cloneTemplate(kanban);
-    const workflows = [{ ...first, version: 3 }];
+    const workflows = [{ ...first, version: 7 }];
     const onOpen = vi.fn();
     render(
       <WorkflowListScreen
@@ -98,7 +111,7 @@ describe('WorkflowListScreen', () => {
       />,
     );
     expect(await screen.findByText('Simple kanban')).toBeInTheDocument();
-    expect(screen.getByText('v3')).toBeInTheDocument();
+    expect(screen.getByText('v7')).toBeInTheDocument();
     expect(screen.getByText('3 states')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Open Simple kanban' }));
     expect(onOpen).toHaveBeenCalledWith(first.id);
