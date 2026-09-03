@@ -10,3 +10,7 @@ export * from './events.js';
 export * from './ui/builder-context.js';
 export * from './ui/flow-graph.js';
 export * from './ui/workflow-canvas.js';
+export * from './ui/inspector-panel.js';
+export * from './ui/state-inspector.js';
+export * from './ui/transition-inspector.js';
+export * from './ui/rule-editors/add-rule-menu.js';
