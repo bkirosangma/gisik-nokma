@@ -52,10 +52,11 @@ Mirrors `Features.md` §10. Status: `❌` not covered · `✅` covered · `🟡`
 
 ## Templates
 - 10.37 ✅ The three templates validate clean and clone with fresh ids, never sharing structure — `templates.test.ts`
-- 10.57 🟡 Advisory cleanliness: simple-kanban and approval-chain produce no advisories — `templates.test.ts` ("simple-kanban and approval-chain warn about nothing"). errand-with-waits does **not** — it trips `rule-bypassable` twice on two pinned rule-free one-hop paths into `waiting`, asserted against the function's own output rather than a hardcoded expectation — `templates.test.ts` ("errand-with-waits trips rule-bypassable — recorded, not adjudicated"). This is a real, deliberate exception to the "shipped template warns about nothing" invariant, not a gap in coverage: see the open ruling request in the coordination doc ("Plan 8 Task 3's frozen errand template trips `rule-bypassable`"), owned jointly by Plan 11 (the frozen template shape) and Plan 2 (the advisory design) — neither this task nor Task 3 can resolve it.
+- 10.57 ✅ simple-kanban and approval-chain produce no advisories — `templates.test.ts` ("simple-kanban and approval-chain warn about nothing")
 - 10.38 ✅ errand-with-waits blocked-flags exactly its two waiting states — `templates.test.ts`
 - 10.39 ✅ approval-chain requires a second person on approve — `templates.test.ts`
 - 10.40 ✅ Gallery offers the three plus Start blank — `screens.test.tsx`
+- 10.61 ✅ errand-with-waits does **not** produce no advisories — it trips `rule-bypassable` twice on its two pinned rule-free one-hop paths into `waiting`, asserted against `adviseWorkflowDef`'s own output rather than a hardcoded expectation — `templates.test.ts` ("errand-with-waits trips rule-bypassable — recorded, not adjudicated"). Fully covered, not a gap: it is a documented, deliberate exception to Task 3's "a shipped template warns about nothing" invariant, tracked by an open ruling request in the coordination doc ("Plan 8 Task 3's frozen errand template trips `rule-bypassable`"), owned jointly by Plan 11 (the frozen template shape) and Plan 2 (the advisory design) — neither this task nor Task 3 can resolve it.
 
 ## Ticket types
 - 10.41 ✅ List with rank, field count, Built-in badges — `ticket-types.test.tsx`
@@ -64,6 +65,7 @@ Mirrors `Features.md` §10. Status: `❌` not covered · `✅` covered · `🟡`
 - 10.44 ✅ Rank implications derived live; a type at or below the deepest rank — built-in or workspace-invented, rank 4 or deeper — says plainly that its tickets will need a parent, while shallower ranks say nothing of the sort — `rank.test.ts`, `ticket-types.test.tsx`
 - 10.45 ✅ Built-in ranks locked in the UI with the reason named — `ticket-types.test.tsx`
 - 10.46 ✅ Server refusal on save rendered verbatim — `ticket-types.test.tsx`
+- 10.60 ✅ Rebinding a type to a different workflow with live tickets: the move gate follows the SAVED binding (not merely whether anything was ever saved) and only opens when the binding actually changed; confirming authors one cross-workflow population map and hands the server one `migrateTypeToWorkflow` call — never a `stateMapping` — `ticket-types.test.tsx` ("the notice appears only when the binding actually changed", "authors one cross-workflow map and hands the server one migration — never a stateMapping", "the move gate follows the SAVED binding, not merely whether anything was ever saved"), mounted from `TicketTypeEditorScreen` via `WorkflowRebindDialog`
 
 ## Admin gating & honesty
 - 10.47 ✅ Non-admins: banner, disabled fields, no publish/save/add anywhere — `access.test.tsx`, `ticket-types.test.tsx`, `screens.test.tsx`
