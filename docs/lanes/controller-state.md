@@ -115,24 +115,35 @@ stay with the established zone) is unchanged, only the mailbox name. Both plan d
 `sign-in@gisik-nokma.local` is untouched — it never leaves Mailpit. **No code has executed against the old
 value** — Plan 11 is 0/16 `done`, so this is a plan-text correction, not a rollback.
 
-## Anchors — re-measured 2026-09-02 ~21:56 IST, at `7337357` (step 12 merged)
+## Anchors — re-measured 2026-09-03 ~16:35 IST, at `9b70ab9` (step 13 merged)
 
 | what | value |
 |---|---|
-| `main` | **`7337357`** — **STEP 12 (Plan 7 remainder, all 18 tasks) MERGED, PR #82.** Ruling P27 (transition-dialog.tsx wildcard-vs-exact fix) landed in the same PR, flagged in its body as a ruling-directed addition outside T13–T16's own scope |
-| last forced gate | **`7337357`** — `GATE_EXIT=0` read from `$?`, `--force` so **0 cached**, **24/24 tasks**, **2232 tests**, 42.7s, node **v22.22.2**, zero `Unsupported engine` — install-then-gate procedure followed, `pnpm install --frozen-lockfile` first |
-| gate composition | domain 335 · rule-engine 280 · server **857** · app-core 474 · web 69 · **editor 178 (was 72)** · ui 31 · sync-client 8 = **2232** |
-| corroboration | independently re-measured, not carried from the executor's report — the executor's own account (2232, same split) matched exactly |
-| ledger | **`CHECK_EXIT=0` · 118/177 (66.7%)** · claimed 0 · in-flight 0 · todo 59 · Plan 7 now 22/22 |
-| executor | restarted immediately after the merge (fixed-point rule), context reset to ~7%, reading its own handoff. Next: **step 13 (Plan 8, T1–14 self-contained now that Plan 6 is merged, T13–14 no longer blocked)** |
+| `main` | **`9b70ab9`** — **STEP 13 (Plan 8, all 15 tasks) MERGED, PR #85.** Ruling P28 (gateway adapter HTTP-bypass) and Ruling P29 (frozen-template advisory acceptance) both apply to this step |
+| last forced gate | **`9b70ab9`** — `GATE_EXIT=0` read from `$?`, `--force` so **0 cached**, **24/24 tasks**, **2463 tests**, 52.5s, node **v22.22.2**, zero `Unsupported engine` — install-then-gate, `check:env` run as its own step first and confirmed `exit 0` before the turbo gate |
+| gate composition | domain 335 · rule-engine 280 · server 857 · **app-core 687 (was 474)** · **web 87 (was 69)** · editor 178 · ui 31 · sync-client 8 = **2463** |
+| corroboration | independently re-measured, not carried from the executor's report — matched the executor's own 2463 exactly, same split |
+| ledger | **`CHECK_EXIT=0` · 133/177 (75.1%)** · claimed 0 · in-flight 0 · todo 44 · Plan 8 now 15/15 |
+| executor | restarted immediately after the merge (fixed-point rule), context reset to ~7%. Next: **step 14 (Plan 9, calendar & notifications)** |
 
-> ### RULING P27 VERIFIED LANDED — mutation-proved, not merely claimed
+> ### PR #85's FIRST CI RUN WAS GENUINELY RED, AND THE EXECUTOR'S OWN REPORT SAID GREEN
+> Independent CI at the exact head sha (`b6e7ea4`) failed at `check:env` — Task 14's new Playwright spec
+> reads four env vars (`E2E_ADMIN_STORAGE_STATE`, `E2E_BASE_URL`, `E2E_MEMBER_STORAGE_STATE`,
+> `E2E_WORKSPACE_ID`) never added to `.env.example`. The executor's gate report said exit 0. **Root cause,
+> in the executor's own words: the CI gate is TWO commands** (`check:env` then the turbo build/test/typecheck
+> gate), and the executor's own anchors table had carried "check:env exit 0" from branch creation, never
+> re-measured after Task 14 added the reads that broke it — the fourth instance of the stale-measurement
+> defect this branch has caught. **Fixed and re-verified** (pushed at `9017ebc`, PR head became `932c194`,
+> independently confirmed green before merge): `check:env` now passes at 45 documented / 23 referenced.
+> **Standing procedure note for this controller too: `check:env` is a separate anchors row, re-measured at
+> every reported sha — the turbo composition being green is not evidence for it.**
+
+> ### RULING P27 VERIFIED LANDED — mutation-proved, not merely claimed (carried from step 12)
 > `transition-dialog.tsx`'s `transitionOptions` now matches `precheck.ts`'s exact-match-wins resolution.
 > Cases 3.149–3.151 pin it in both directions; the executor reports the mutation is **site-identifying**
 > (restoring the old first-declaration-wins resolution kills exactly 3.149, 1 of 20, with 3.150/3.151 still
 > green) — the positive control (3.150) is what makes 3.149 a divergence test rather than proof one ordering
-> happens to work. Not independently re-run here; cited on the executor's account plus the Features.md prose
-> diff, which names P27 explicitly and matches the ruling text.
+> happens to work.
 
 ## CARRIED FORWARD, owner Plan 11 — `registerAttachmentRoutes` is never wired into the composition root
 
@@ -164,6 +175,30 @@ runs short of actually booting the server, which Plan 11 is the first plan to do
 > and never mentioned install — **a Sonnet controller following it literally would have reported
 > `main` broken.** Trigger #4 sends a RED gate to Opus, so it would have escalated rather than
 > mis-merged, but it would have escalated a non-event. **The procedure now reads: install, then gate.**
+
+## STEP 13 CLOSED — Plan 8 complete, and the restart-then-verify shape caught a real red this time
+
+82 files, +10787/−485, ~54 commits, 15/15 Plan 8 tasks. **This is the step where independently re-verifying
+CI rather than trusting the executor's report actually mattered** — see the false-green box above. Gate,
+ledger and test count all independently re-confirmed at `9b70ab9` before merging: 2463 tests matched
+exactly, `check:tasks` and `check:env` both `exit 0`.
+
+**Two more carried items from this step, neither fixed here:**
+- **Task 14's Playwright spec is outside the gate entirely.** `turbo.json` defines no `e2e` task and
+  `ci.yml` explicitly defers it as needing "a deployable stack and Playwright infra" — the spec is honest
+  about what backstops it (nothing, until Plan 11 wires CI). Its env-var *reads* were still inside
+  `check:env`'s reach, which is exactly what caught the gap above.
+- **`registerAttachmentRoutes` is still never called** (inherited from step 12, unchanged — see below).
+
+**Two rulings this step, both durable:** P28 (gateway adapter bypasses `DataSource` for 4 HTTP-only
+operations) and P29 (the frozen errand-with-waits template keeps its two `rule-bypassable` advisories,
+undocumented as of this close — the executor was asked to add the one-line rationale near the template's
+declaration; **verify it landed before treating P29 as fully discharged**, since it was ruled after this
+step's PR was already open).
+
+**The ledger promotion this time arrived with rich per-task evidence already written**, unlike step 12's
+placeholder-only handoff — the executor closed exactly the gap step 12's close recorded. Promotion here was
+copy-and-attribute, not reconstruct-from-`Files:`-blocks.
 
 ## STEP 12 CLOSED — Plan 7 complete, and the restart-then-verify shape held under a bigger diff
 

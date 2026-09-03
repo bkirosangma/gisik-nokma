@@ -140,21 +140,21 @@ plan	task	status	pr	merge_sha	note
 07	14	done	82	7337357	artefact: packages/editor/src/attachments/compose-editor-submission.ts, components/TicketEditorSlot.tsx (PR #82) | CONTROLLER: also carries ruling P27's transition-dialog.tsx fix, outside this task's own declared scope
 07	15	done	82	7337357	artefact: packages/editor/src/webview/bridge.ts, create-editor-bridge.ts, entry.tsx (PR #82)
 07	16	done	82	7337357	artefact: Features.md §9, test-cases/09-editor-attachments.md (PR #82)
-08	1	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/{draft-store,layout}.ts + tests; React Flow jsdom shims in test/setup.ts
-08	2	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/{summaries,fields,anchor-issues}.ts + tests
-08	3	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/templates.ts; packages/domain/src/workflows/errand-with-waits.ts; simple-kanban imported by identity, never re-declared
-08	4	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/{gateway,fake-gateway,events}.ts + events.test.ts; fake validates through submittedEventSchema (Lane 3 ruling)
-08	5	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/ui/{builder-context,flow-graph,state-node,any-state-node,transition-edge,workflow-canvas}; canvas + flow-graph tests
-08	6	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/ui/{state-inspector,inspector-panel,transition-inspector,rule-editors/add-rule-menu}; inspectors.test.tsx; connect gesture measured unreachable in jsdom
-08	7	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/ui/rule-editors/*; rule-editors.test.tsx
-08	8	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/ui/{issues-panel,system-rules-panel}; validation.test.tsx; BOTH advisory codes covered (executor ruling)
-08	9	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/ui/publish-controls.tsx; publish.test.tsx; D9 second half
-08	10	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/ui/{workflow-builder-screen,workflow-list-screen,template-gallery}; screens.test.tsx
-08	11	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/ticket-types/*; supplies the component coordination doc line 216 falsely called Done, and corrects that line
-08	12	in-flight	-	-	exec/13-plan8-workflow-builder; packages/app-core/src/workflow-builder/ui/read-only-banner.tsx; access.test.tsx; gate enumerated over BOTH screens
-08	13	in-flight	-	-	exec/13-plan8-workflow-builder; apps/web/src/authoring/data-source-gateway.ts + six pages; RULING P28 option (b); closed an unrole-gated TemplateGallery route
-08	14	in-flight	-	-	exec/13-plan8-workflow-builder; apps/web/e2e/workflow-builder.spec.ts; NOT run by CI — see the commit for what backstops it
-08	15	in-flight	-	-	exec/13-plan8-workflow-builder; Features.md §10 (opened); test-cases/10-workflow-builder.md (opened, cases from 10.1)
+08	1	done	85	9b70ab9	artefact: packages/app-core/src/workflow-builder/{draft-store,layout}.ts + tests; React Flow jsdom shims in test/setup.ts (PR #85)
+08	2	done	85	9b70ab9	artefact: packages/app-core/src/workflow-builder/{summaries,fields,anchor-issues}.ts + tests (PR #85)
+08	3	done	85	9b70ab9	artefact: packages/app-core/src/workflow-builder/templates.ts; packages/domain/src/workflows/errand-with-waits.ts; simple-kanban imported by identity, never re-declared (PR #85)
+08	4	done	85	9b70ab9	artefact: packages/app-core/src/workflow-builder/{gateway,fake-gateway,events}.ts + events.test.ts; fake validates through submittedEventSchema (Lane 3 ruling) (PR #85)
+08	5	done	85	9b70ab9	artefact: packages/app-core/src/workflow-builder/ui/{builder-context,flow-graph,state-node,any-state-node,transition-edge,workflow-canvas}; canvas + flow-graph tests (PR #85)
+08	6	done	85	9b70ab9	artefact: packages/app-core/src/workflow-builder/ui/{state-inspector,inspector-panel,transition-inspector,rule-editors/add-rule-menu}; inspectors.test.tsx; connect gesture measured unreachable in jsdom (PR #85)
+08	7	done	85	9b70ab9	artefact: packages/app-core/src/workflow-builder/ui/rule-editors/*; rule-editors.test.tsx (PR #85)
+08	8	done	85	9b70ab9	artefact: packages/app-core/src/workflow-builder/ui/{issues-panel,system-rules-panel}; validation.test.tsx; BOTH advisory codes covered (executor ruling) (PR #85)
+08	9	done	85	9b70ab9	artefact: packages/app-core/src/workflow-builder/ui/publish-controls.tsx; publish.test.tsx; D9 second half (PR #85)
+08	10	done	85	9b70ab9	artefact: packages/app-core/src/workflow-builder/ui/{workflow-builder-screen,workflow-list-screen,template-gallery}; screens.test.tsx (PR #85)
+08	11	done	85	9b70ab9	artefact: packages/app-core/src/workflow-builder/ticket-types/*; supplies the component coordination doc line 216 falsely called Done, and corrects that line (PR #85)
+08	12	done	85	9b70ab9	artefact: packages/app-core/src/workflow-builder/ui/read-only-banner.tsx; access.test.tsx; gate enumerated over BOTH screens (PR #85)
+08	13	done	85	9b70ab9	artefact: apps/web/src/authoring/data-source-gateway.ts + six pages; RULING P28 option (b); closed an unrole-gated TemplateGallery route (PR #85)
+08	14	done	85	9b70ab9	artefact: apps/web/e2e/workflow-builder.spec.ts; NOT run by CI — see the commit for what backstops it (PR #85)
+08	15	done	85	9b70ab9	artefact: Features.md §10 (opened); test-cases/10-workflow-builder.md (opened, cases from 10.1) (PR #85)
 09	1	todo	-	-	
 09	2	todo	-	-	
 09	3	todo	-	-	
