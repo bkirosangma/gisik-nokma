@@ -9,7 +9,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9. A/B/C COMMITTED (T1-T6). GATE IS **RED**. RECOVERY ROUND IN FLIGHT.**
+## WHERE I AM: **STEP 14 — PLAN 9. T1-T6 DONE, GATE GREEN. T6 fix + T7 IN FLIGHT.**
 
 > # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
 > ```
@@ -114,9 +114,74 @@ coordination doc already pre-corrected this). T2's `docToPlainText` **already ex
 skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
 `src/index.ts` as the plan says.
 
-## BATCH B+C — T4/T5/T6 ALL COMMITTED. **THE GATE IS RED.** RECOVERY ROUND IN FLIGHT.
+## RECOVERY ROUND CLOSED — GATE IS GREEN AGAIN. T6's fix + T7 now in flight.
 
-> ### THE BRANCH DOES NOT CURRENTLY PASS ITS OWN GATE. Do not open a PR from this state.
+**The gate is no longer red.** T4's fix (`d060595`) guarded the two unindexed accesses in the style the
+production file already used — `const [row] = page.notifications; if (!row) throw` — no `!`, no `as`.
+`pnpm turbo run build test typecheck --force`: **24/24, 0 cached, server 923/923 across 84 files.**
+
+**T4's fix closed all eight surviving mutations**, each re-run and each now naming its own site. It also
+refused to fake one: the no-redaction-on-revoke ruling is left as a **comment, not a test**, because the
+store has no visibility dependency to flip into a revoked state, so no fixture here could catch a future
+redacting join. **Saying so is better than a test that would pass either way.** Owner for the real
+check: whoever adds a `canSee` join, if anyone ever does.
+
+**T5's fix closed all four Importants and both Minors — and TWO of its three commits are it correcting
+its own fix.** `4e02cb6`: *"The boot test waited for nothing: `expect.poll(...).toBe(0)` returns on its
+first check."* `60c4931`: *"Three assertions I added had no mutation of their own, and a log spy that
+could not see the leak it was written against."* **This is the branch's recorded fix-round pattern
+holding: a fix is a change like any other and needs its own verification.**
+
+Two rulings the T5 fix took, both recorded because they are decisions and not deductions:
+- **Per-recipient isolation, not documented batch-abort.** An order-dependent disclosure outcome must
+  not be settled by where a name happens to sit in a document. The per-recipient log names the *event*,
+  never the recipient — and there is now a test that reddens if the recipient leaks into either
+  argument of the log call.
+- **The contested branch excludes nobody** — a refusal is not something the claimant did — now pinned by
+  its own test, where before the fixtures pinned it by accident.
+
+## T6's REVIEW FINALLY RAN, AND THE TZ DISCIPLINE IS REAL — a first for this repo
+
+**The brief's known-gap is broken here for the first time.** The reviewer VERIFIED rather than inherited
+the implementer's claim, and did it in the one order that works:
+
+1. **Where is the day boundary computed?** Grepped every query on the sweep's path — the two sweep
+   queries, `getWorkspaceSettings`, `getWorkflowDefFromProjection`, `canSee`, `insertNotification` — for
+   `now()|CURRENT_DATE|AT TIME ZONE|current_date`: **zero matches.** The comment at `sweep.ts:169` is
+   true. **This check had to come first**, because `TZ` on the node process does not move Postgres's
+   `CURRENT_DATE`, so if the arithmetic had been in SQL the whole zone loop would have agreed for a
+   reason unrelated to the property it names.
+2. **Session-TZ controls:** forced the Postgres session to `UTC` and then to `Pacific/Kiritimati`. Both
+   green — proving the session timezone is not load-bearing anywhere on this path, so process `TZ` is
+   the correct axis.
+3. **The mutation reproduced exactly.** Replacing the IST arithmetic with a local-clock read reddens
+   **Kiritimati** (cross-midnight: both claims notify on the first sweep) and **Niue** (both cases),
+   while **Asia/Kolkata stays GREEN** — which is precisely why a suite that only ever ran in India
+   would have shipped it. The file's own predicted table matched.
+
+**Also on this branch, and it is the stale-dist trap from the brief arriving in the wild:** the reviewer
+mutated `packages/domain/src/events/workspace-settings.ts` and got 30/30 green. **Not a survivor — a
+mutation that never ran**, because `@gisik-nokma/domain` resolves to `dist/index.js`. Re-run against
+`dist` (backed up and sha256-verified on restore): **5 tests red.** It reported both legs rather than
+the flattering one.
+
+### T6's four Important findings — fix in flight
+
+| # | Finding |
+|---|---|
+| **I1** | **The `canSee` gate on BOTH sweep paths cannot fail.** Every test injects `seeEverything` (`async () => true`); no test anywhere returns false. Deleting either gate leaves **30/30 green**. A control proves the seam is live (16 red), so only the **deny** direction — the only direction a gate exists for — is unexercised. Concrete leak: `can-see.ts` states the explicit list is exactly the authored list and **assignees are not implicitly appended**, so an assignee omitted from an explicit-mode ticket is denied — and without the gate the sweep posts them a row carrying `ticketTitle` and the claim `note`. Same shape as the mention-gate finding. |
+| **I2** | **The staleness range is gated at ONE END.** Nagging a full IST day EARLY survives 30/30; only the too-late direction reddens. The "fresh" fixtures sit 3 and 22 IST days from the boundary — **never one day inside it.** The approaching horizon is correctly pinned at both ends; copy that shape. |
+| **I3** | **`state_category = 'open'` is never seeded** — and it is the commonest case there is: `simple-kanban.ts:24` gives the shipped default workflow's `todo` state category `'open'`. Narrowing the date-approaching gate silently stops warning on open tickets (SURVIVED); widening the stale gate starts nagging them (SURVIVED). "Terminal tickets never notify" is only **half** pinned — nothing says a terminal ticket is never stale-nagged. |
+| **I4** | **Plan 2's `getWorkflowDefFromProjection` is a declared consumed interface that is never witnessed.** The whole lookup can be deleted (`stateName = null`) with the suite green. The only assertion is `stateName: null`, and the test's own comment admits why: no workflow row was seeded. **The state name is what a person reads in their inbox, and the resolved path has zero coverage.** |
+
+Plus a Minor worth its own line, because it is a *class*: **eight `toHaveLength(0)` assertions cannot
+distinguish "correctly suppressed" from "attempted and crashed"** — `deliverToAll` swallows transport
+errors and every test passes `log: () => {}`. Demonstrated by accident: a mutation that hit a NOT NULL
+violation reported **30/30 green**. This is the second log-spy-that-cannot-see finding on this branch.
+
+## BATCH B+C — T4/T5/T6 committed. (The gate WAS red here; T4 fix cleared it. Kept for the lesson.)
+
+> ### THIS WAS TRUE AND IS NOW FIXED (T4 fix `d060595`). Kept because the LESSON is the point.
 > `pnpm --filter @gisik-nokma/server run typecheck` **exits 2**:
 > ```
 > test/notifications/store.test.ts(132,12): error TS2532: Object is possibly 'undefined'.
