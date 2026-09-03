@@ -3,6 +3,7 @@ import { monthGridWeeks, type WeekDays } from '../claims/dates.js';
 import {
   CALENDAR_ALL_HIDDEN_COPY,
   CALENDAR_EMPTY_MONTH_COPY,
+  CALENDAR_NARROWED_MONTH_COPY,
   barProvenance,
   claimTooltip,
   customClaimLabel,
@@ -87,9 +88,17 @@ export type CalendarModel = {
   weeks: CalendarWeek[];
   hasItems: boolean;
   /**
-   * Why the grid is empty, or null when it is not. TWO different sentences,
-   * because they are two different facts: nothing was claimed, or everything
-   * claimed here belongs to a field the viewer switched off.
+   * Why the grid is empty, or null when it is not. THREE different sentences,
+   * because they are three different facts: nothing was claimed here, or
+   * everything claimed here belongs to a field the viewer switched off, or
+   * everything claimed here sits outside the filter/lane the viewer set.
+   *
+   * The third arm was NOT in the plan and not in the first draft of this file:
+   * `visible` is narrowed before any item is built, so a month emptied by a
+   * filter reached the honest-empty sentence and told a viewer that a month
+   * full of their own claimed dates had none. Whichever arm is chosen, the
+   * sentence must be true of THIS grid — see the precedence note at the
+   * bottom of `buildCalendarModel`.
    */
   emptyCopy: string | null;
   /**
@@ -140,6 +149,99 @@ function touchesWeek(item: CalendarItem, first: string, last: string): boolean {
 }
 
 /**
+ * Claims in, items out — the ONE construction, deliberately called twice.
+ *
+ * The second call is over the tickets a filter or a lane removed, and it
+ * exists so `emptyCopy` can tell "nobody claimed a date here" apart from
+ * "your filter removed all of them". That question must be answered by
+ * building the SAME items against the SAME grid predicate: a cheaper
+ * `date.slice(0, 7) === monthKey` shortcut would answer it about the calendar
+ * month while the grid renders six days of July and six of September, which
+ * is the very off-by-a-week this file's edge tests exist to catch.
+ */
+function collectItems(
+  inputs: readonly TicketDatesInput[],
+  userName: UserNameFn,
+): { items: CalendarItem[]; customItems: CalendarMarker[] } {
+  const items: CalendarItem[] = [];
+  const customItems: CalendarMarker[] = [];
+  for (const input of inputs) {
+    const start = dateClaimOf(input, 'startDate');
+    const due = dateClaimOf(input, 'dueDate');
+    const title = titleOf(input.state);
+    const ticketId = input.state.id;
+
+    // Custom date claims are independent of the start/due story — they are
+    // collected first and unconditionally, so no `continue` below can drop
+    // them, and no pairing logic can reach them.
+    for (const claim of customDateClaimsOf(input)) {
+      const label = customClaimLabel(claim, userName);
+      customItems.push({
+        kind: 'marker',
+        ticketId,
+        title,
+        date: claim.date,
+        marker: 'custom',
+        fieldId: claim.fieldId,
+        fieldName: claim.fieldName,
+        claim,
+        label,
+        // A custom date claim carries no note (Plan 3 takes a bare
+        // 'YYYY-MM-DD'), so the tooltip is the label — nothing to quote.
+        tooltip: label,
+      });
+    }
+
+    if (start !== null && due !== null && start.date <= due.date) {
+      items.push({
+        kind: 'bar',
+        ticketId,
+        title,
+        start: start.date,
+        end: due.date,
+        startClaim: start,
+        dueClaim: due,
+        pending: start.pending || due.pending,
+        provenance: barProvenance(start, due, userName),
+      });
+      continue;
+    }
+    if (due !== null) {
+      const label = dueClaimLabel(due, userName);
+      items.push({
+        kind: 'marker',
+        ticketId,
+        title,
+        date: due.date,
+        marker: 'due',
+        fieldId: null,
+        fieldName: null,
+        claim: due,
+        label,
+        tooltip: claimTooltip(label, due),
+      });
+    }
+    if (start !== null) {
+      const label = startClaimLabel(start, userName);
+      items.push({
+        kind: 'marker',
+        ticketId,
+        title,
+        date: start.date,
+        marker: 'start',
+        fieldId: null,
+        fieldName: null,
+        claim: start,
+        label,
+        tooltip: claimTooltip(label, start),
+      });
+    }
+    // No claims → nothing. The undated ticket is absent, not estimated.
+  }
+  return { items, customItems };
+}
+
+/**
  * Pure: tickets in, month grid out. Every item traces to a claim — there is
  * no branch that fabricates a date (invariant 4). Contradictory claims
  * (start after due) render as two attributed markers, never as a bar:
@@ -177,81 +279,7 @@ export function buildCalendarModel(
     return true;
   });
 
-  const items: CalendarItem[] = [];
-  const customItems: CalendarMarker[] = [];
-  for (const input of visible) {
-    const start = dateClaimOf(input, 'startDate');
-    const due = dateClaimOf(input, 'dueDate');
-    const title = titleOf(input.state);
-    const ticketId = input.state.id;
-
-    // Custom date claims are independent of the start/due story — they are
-    // collected first and unconditionally, so no `continue` below can drop
-    // them, and no pairing logic can reach them.
-    for (const claim of customDateClaimsOf(input)) {
-      const label = customClaimLabel(claim, opts.userName);
-      customItems.push({
-        kind: 'marker',
-        ticketId,
-        title,
-        date: claim.date,
-        marker: 'custom',
-        fieldId: claim.fieldId,
-        fieldName: claim.fieldName,
-        claim,
-        label,
-        // A custom date claim carries no note (Plan 3 takes a bare
-        // 'YYYY-MM-DD'), so the tooltip is the label — nothing to quote.
-        tooltip: label,
-      });
-    }
-
-    if (start !== null && due !== null && start.date <= due.date) {
-      items.push({
-        kind: 'bar',
-        ticketId,
-        title,
-        start: start.date,
-        end: due.date,
-        startClaim: start,
-        dueClaim: due,
-        pending: start.pending || due.pending,
-        provenance: barProvenance(start, due, opts.userName),
-      });
-      continue;
-    }
-    if (due !== null) {
-      const label = dueClaimLabel(due, opts.userName);
-      items.push({
-        kind: 'marker',
-        ticketId,
-        title,
-        date: due.date,
-        marker: 'due',
-        fieldId: null,
-        fieldName: null,
-        claim: due,
-        label,
-        tooltip: claimTooltip(label, due),
-      });
-    }
-    if (start !== null) {
-      const label = startClaimLabel(start, opts.userName);
-      items.push({
-        kind: 'marker',
-        ticketId,
-        title,
-        date: start.date,
-        marker: 'start',
-        fieldId: null,
-        fieldName: null,
-        claim: start,
-        label,
-        tooltip: claimTooltip(label, start),
-      });
-    }
-    // No claims → nothing. The undated ticket is absent, not estimated.
-  }
+  const { items, customItems } = collectItems(visible, opts.userName);
 
   const gridWeeks = monthGridWeeks(opts.year, opts.month);
   const firstWeek = gridWeeks[0];
@@ -301,11 +329,53 @@ export function buildCalendarModel(
       item.date >= gridFirst &&
       item.date <= gridLast,
   );
+  /**
+   * The SAME lie at the other two doors, and it is the shipped behaviour this
+   * arm was added to end: `visible` is narrowed by `opts.filter` and
+   * `opts.laneEpicId` BEFORE any item is built, so a month whose every claim
+   * belongs to filtered-out work reached "No claimed dates fall in this
+   * month" — about a month full of claimed dates.
+   *
+   * Reference identity, not ids: two inputs may legitimately carry the same
+   * ticket id (the ordering fixtures do), and an id-keyed exclusion would
+   * then drop the wrong one. `visible` is `inputs.filter(...)`, so the
+   * surviving objects ARE the input objects.
+   *
+   * Computed only when the grid is empty and something was actually narrowed
+   * away — otherwise this is a second full build for an answer nobody reads.
+   */
+  const survived = new Set<TicketDatesInput>(visible);
+  const excluded =
+    hasItems || visible.length === inputs.length
+      ? []
+      : inputs.filter((input) => !survived.has(input));
+  const narrowedAway = collectItems(excluded, opts.userName);
+  const narrowedOutOfGrid = [...narrowedAway.items, ...narrowedAway.customItems].some((item) =>
+    touchesWeek(item, gridFirst, gridLast),
+  );
+
+  /**
+   * PRECEDENCE, and it is a truth condition rather than a preference.
+   *
+   * `CALENDAR_ALL_HIDDEN_COPY` says "EVERY claimed date in this month belongs
+   * to a field you have hidden". With a filter also removing August claims
+   * that no hidden field owns, that sentence is false — so the exhaustive
+   * sentence may only be reached when the legend is the only narrowing that
+   * emptied the grid. The narrowed sentence names the set of narrowings
+   * instead of picking one, which is what lets it carry the both-case
+   * truthfully. Witnessed at `calendar-model.test.ts` 11.50.
+   */
   return {
     month: { year: opts.year, month: opts.month },
     weeks,
     hasItems,
-    emptyCopy: hasItems ? null : hiddenInGrid ? CALENDAR_ALL_HIDDEN_COPY : CALENDAR_EMPTY_MONTH_COPY,
+    emptyCopy: hasItems
+      ? null
+      : narrowedOutOfGrid
+        ? CALENDAR_NARROWED_MONTH_COPY
+        : hiddenInGrid
+          ? CALENDAR_ALL_HIDDEN_COPY
+          : CALENDAR_EMPTY_MONTH_COPY,
     customDateFields,
   };
 }

@@ -1,10 +1,13 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { buildCalendarModel } from '../../src/calendar/calendar-model.js';
 import { monthGridWeeks } from '../../src/claims/dates.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
 import type { TicketState } from '@gisik-nokma/domain';
 import {
+  CLOCK_FREE_DOMAIN_FILES,
   CLOCK_FREE_ROOTS,
   findClockReads,
   scanCalendarSurface,
@@ -158,5 +161,34 @@ describe('11.48 the scanner is proven against planted defects before it is trust
     expect(scanned).toContain('filter/matches-filter.ts');
     expect(scanned).toContain('provenance.ts');
     expect(scanned.length).toBeGreaterThanOrEqual(CLOCK_FREE_ROOTS.length);
+  });
+
+  /**
+   * The hop OUT of app-core, which this harness used to leave unguarded: every
+   * rendered calendar date travels `claim-labels.ts` → `provenance.ts` →
+   * `@gisik-nokma/domain`, and an `Intl` read planted at the far end would have
+   * been invisible to both halves — the scan never opened the file, and
+   * `process.env.TZ` is not reliably live for `Intl` inside one process, so the
+   * zone-varying half cannot see it either. The scan is the guard here BECAUSE
+   * the runtime harness cannot be; nothing below proves the runtime half shut.
+   */
+  it('the scan crosses into the domain files the calendar actually imports', () => {
+    const { scanned } = scanCalendarSurface();
+    // NAMED LITERALLY, never looped over `CLOCK_FREE_DOMAIN_FILES`: a `for`
+    // over the constant asserts the list against itself, so deleting an entry
+    // deletes the assertion that would have caught the deletion. (Measured —
+    // that is exactly what the first draft of this test did, and dropping
+    // `clock-skew.ts` from the list left all fifty tests green.)
+    expect(scanned).toContain('domain/ist-day.ts');
+    expect(scanned).toContain('domain/clock-skew.ts');
+    expect([...CLOCK_FREE_DOMAIN_FILES].sort()).toEqual(['clock-skew.ts', 'ist-day.ts']);
+    // The chain is real and still points at these two — an import moved out of
+    // provenance.ts must move this list with it, not silently narrow the guard.
+    const provenance = readFileSync(
+      fileURLToPath(new URL('../../src/provenance.ts', import.meta.url)),
+      'utf8',
+    );
+    expect(provenance).toContain("from '@gisik-nokma/domain'");
+    expect(provenance).toContain('formatIstInstant');
   });
 });

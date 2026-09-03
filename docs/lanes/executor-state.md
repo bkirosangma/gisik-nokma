@@ -67,6 +67,57 @@ on `docs/p29-annotation`. Disjoint from #87 by file, so #88 merges clean.
 > `git diff --stat <old-head> HEAD` empty **AND** `git diff --stat origin/main HEAD` non-empty and
 > matching expectation.
 
+## RECORDED, NOT FIXED — carried forward with owners, from T8's fix round
+
+**1. Task 8 deferred the calendar's colour tokens, and the deferral is larger than "seven names are
+missing". OWNERS: TASK 9 (the calendar), TASK 11 (the timeline), TASK 12 (the inbox).**
+
+T8's review found the silence, not the decision — the decision was right: a view-model renders
+nothing, so a palette invented for it would be judged against no screen. What the first draft of
+this note got wrong, and what a `grep` for bare names hides:
+
+**`tokens.color.*` DOES NOT EXIST.** Measured, not assumed — `packages/ui/src/index.ts` exports
+`TOKEN_ROLES`, `colorOf(theme, role)`, `themes`, `primitives`, `CONTRAST_PAIRS`, `cssVariableName`,
+`themeStylesheet`. There is no `tokens` object at all, and therefore no `tokens.space`,
+`tokens.radius` or `tokens.font` either. **Every `style={{ color: tokens.color.ink, padding:
+tokens.space.md, fontFamily: tokens.font.body }}` snippet in Tasks 9, 11, 12 and 13 is written
+against an API this repo does not have.** Transcribed as written it does not compile — this is a
+plan-vs-landed-code divergence, not a missing key.
+
+Against the real `TOKEN_ROLES`, of the fourteen colour names the plan uses:
+
+- **Real roles, usable today:** `surface`, `accent`, `contested`.
+- **NOT roles — they are `primitives` keys, and reaching for them is the one thing `tokens.ts`
+  forbids** ("primitives are the palette, roles are the meaning… no colour literal is legal anywhere
+  else", enforced by `packages/ui/test/token-discipline.test.ts`): `ink`, `inkMuted`, `line`. The
+  roles that carry those meanings are **`text`, `textMuted`, `border`**. A component reaching for
+  `primitives.ink` is a literal wearing a name.
+- **Absent entirely, eight, and each one needs a light AND a dark entry in `themes` plus a
+  `CONTRAST_PAIRS` row if text sits on it:** `todayRing`, `pendingHatch`, `barActive`,
+  `barTerminal`, `marker`, `customMarker` (T9/T11), `accentInk`, `unreadDot` (T12).
+
+Per-task ownership, measured with
+`awk '/^### Task /{t=$0} /tokens\.color\./{print t}' <plan>`:
+T9 needs `todayRing`, `pendingHatch`, `barActive`, `marker`, `customMarker`; T11 repeats four of
+those and adds `barTerminal`; T12 owns `accentInk` and `unreadDot`. **T9 adds the five it renders and
+no more** — a token whose only consumer is a plan snippet is a colour nobody has looked at, and
+`CONTRAST_PAIRS` is checked numerically, so a value added blind either fails that check or is tuned
+to pass against a background that does not exist yet.
+
+Nothing shipped is false today: `grep -rn "customMarker\|barActive\|todayRing" Features.md
+test-cases/` returns nothing. It goes false the moment T9 renders a marker.
+
+**2. Two new test-case ids are Task 15's to carry, and they are not in the plan. OWNER: TASK 15.**
+Task 15 writes `test-cases/11-calendar-notifications.md`, which does not exist yet. Four ids invented
+during execution must land in it — **11.48** (the calendar view-model reads no clock, proved by
+varying `TZ` and by scanning the source, `test/calendar/clock-free.test.ts`), **11.49** (an
+all-hidden month says the field is hidden, not that nothing was claimed), **11.50** (a month emptied
+by a filter or a lane says so, and a month narrowed by both does not claim the legend did all of it),
+**11.51** (the grid's padding cells are rendered cells: markers, bars, the legend tally and the
+all-hidden check are each witnessed ON both edges and one day outside each). Each carries the same
+reminder in its own docblock; this is the copy a relaunched executor can find without opening the
+test files.
+
 ## PRE-FLIGHT IS DONE. Four findings, all verified by me on disk, not adopted from the agent.
 
 **1. NO RULING IS NEEDED FOR TASK 13, AND THE DOCUMENT THAT SAYS OTHERWISE IS WRONG.** The pre-flight

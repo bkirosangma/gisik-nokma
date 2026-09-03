@@ -7,6 +7,9 @@ export type ClockHit = { file: string; line: number; match: string };
 /** `packages/app-core/test/helpers` → two levels up is the package root. */
 export const APP_CORE_SRC = fileURLToPath(new URL('../../src', import.meta.url));
 
+/** The sibling package the calendar surface imports from. */
+export const DOMAIN_SRC = fileURLToPath(new URL('../../../domain/src', import.meta.url));
+
 /**
  * The calendar view-model's whole surface. Scoped rather than package-wide on
  * purpose: `workflow-builder/events.ts` and `precheck.ts` read the clock
@@ -25,6 +28,32 @@ export const CLOCK_FREE_ROOTS: readonly string[] = [
   'filter',
   'provenance.ts',
 ];
+
+/**
+ * The hop OUT of this package, and the gap a review named before it bit.
+ *
+ * `claim-labels.ts` → `provenance.ts` → `@gisik-nokma/domain` is a live import
+ * chain that every rendered calendar date travels, and the scan used to stop
+ * at the app-core boundary. So an `Intl.DateTimeFormat` introduced in
+ * `clock-skew.ts` would have been caught by NEITHER half of this harness: not
+ * by the source scan, which never read the file, and not by the zone-varying
+ * half, because `process.env.TZ` is live for V8's `Date` getters but NOT
+ * reliably for `Intl` — V8 may cache the zone past a runtime `TZ` change, so
+ * an `Intl` read can be invariant across `underZone` and still wrong on a
+ * collaborator's machine.
+ *
+ * THE SCAN IS THE GUARD *BECAUSE* THE RUNTIME HARNESS CANNOT BE. Listing
+ * these two files closes the source half and nothing more; it does not prove
+ * the runtime half shut, and no assertion in this repo does.
+ *
+ * Named files rather than the whole package on purpose: the domain legitimately
+ * reads the clock elsewhere (an event stamping its own `clientTime` IS a
+ * moment). These two are the only ones the calendar surface reaches —
+ * `IST_DAY_REGEX`, `istDayBounds`, `istDayOf` from `ist-day.ts` and
+ * `formatIstInstant` from `clock-skew.ts`, both fixed +330-minute arithmetic
+ * today.
+ */
+export const CLOCK_FREE_DOMAIN_FILES: readonly string[] = ['ist-day.ts', 'clock-skew.ts'];
 
 /**
  * Reading the DEVICE, in the four spellings that reach it.
@@ -73,22 +102,39 @@ export function scanCalendarSurface(): ClockScan {
   for (const root of CLOCK_FREE_ROOTS) {
     const path = join(APP_CORE_SRC, root);
     // `statSync` throws on a missing path — the loud failure, not a silent zero.
-    if (statSync(path).isDirectory()) walk(path, hits, scanned);
-    else readFile(path, hits, scanned);
+    if (statSync(path).isDirectory()) walk(path, APP_CORE_SRC, '', hits, scanned);
+    else readFile(path, APP_CORE_SRC, '', hits, scanned);
+  }
+  // Labelled `domain/…` so a reader of `scanned` can tell which package a file
+  // came from; a bare `../../domain/src/ist-day.ts` reads like an escape.
+  for (const file of CLOCK_FREE_DOMAIN_FILES) {
+    readFile(join(DOMAIN_SRC, file), DOMAIN_SRC, 'domain/', hits, scanned);
   }
   return { hits, scanned };
 }
 
-function walk(directory: string, hits: ClockHit[], scanned: string[]): void {
+function walk(
+  directory: string,
+  base: string,
+  prefix: string,
+  hits: ClockHit[],
+  scanned: string[],
+): void {
   for (const entry of readdirSync(directory)) {
     const path = join(directory, entry);
-    if (statSync(path).isDirectory()) walk(path, hits, scanned);
-    else if (entry.endsWith('.ts') || entry.endsWith('.tsx')) readFile(path, hits, scanned);
+    if (statSync(path).isDirectory()) walk(path, base, prefix, hits, scanned);
+    else if (entry.endsWith('.ts') || entry.endsWith('.tsx')) readFile(path, base, prefix, hits, scanned);
   }
 }
 
-function readFile(path: string, hits: ClockHit[], scanned: string[]): void {
-  const file = relative(APP_CORE_SRC, path).split(sep).join('/');
+function readFile(
+  path: string,
+  base: string,
+  prefix: string,
+  hits: ClockHit[],
+  scanned: string[],
+): void {
+  const file = prefix + relative(base, path).split(sep).join('/');
   scanned.push(file);
   const lines = readFileSync(path, 'utf8').split('\n');
   lines.forEach((line, index) => {

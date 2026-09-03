@@ -71,7 +71,7 @@ export const CALENDAR_EMPTY_MONTH_COPY =
   'No claimed dates fall in this month. Undated work is absent, not estimated — the calendar draws only what someone claimed.';
 
 /**
- * The OTHER empty month, and it is a different fact.
+ * The SECOND empty month, and it is a different fact.
  *
  * NOT IN THE PLAN TEXT, and added because the plan's model would have told
  * this lie: with every claimed date belonging to a legend-hidden field, the
@@ -82,9 +82,31 @@ export const CALENDAR_EMPTY_MONTH_COPY =
  * tally is already computed before hiding so the switch survives; this is the
  * same guarantee said in words for the case where the switch is all that is
  * left on screen.
+ *
+ * IT CLAIMS EXHAUSTIVITY ("every claimed date"), so the model may only reach
+ * for it when the legend is the ONLY thing standing between the viewer and
+ * this month's claims. A month narrowed by a filter or a lane as well is the
+ * third sentence's business, not this one's.
  */
 export const CALENDAR_ALL_HIDDEN_COPY =
   'Every claimed date in this month belongs to a field you have hidden. Nothing was dropped — switch a field back on in the legend to see its claims again.';
+
+/**
+ * The THIRD empty month, and the review that asked for it said why: the copy
+ * above was added because "no claimed dates fall in this month" lies to a
+ * viewer who hid the field one switch ago — and a month emptied by a FILTER or
+ * by a LANE told that same lie, at two other doors, about a month full of
+ * claimed dates. Three different facts, three different sentences.
+ *
+ * The wording is a DISJUNCTION on purpose. Narrowings stack: a filter can
+ * remove some of a month's claims while the legend hides the rest, and in that
+ * case both "every claimed date is behind the filter" and "every claimed date
+ * belongs to a hidden field" are false. Naming the set of narrowings the
+ * viewer set, rather than picking one, is the sentence that stays true whether
+ * one of them is on or all three are.
+ */
+export const CALENDAR_NARROWED_MONTH_COPY =
+  'Dates are claimed in this month — every one of them is behind a narrowing you set: the filter, the lane, or the legend. Nothing was dropped — widen the filter or switch a field back on to see them again.';
 
 export const TIMELINE_SIDE_LIST_COPY =
   'No bar is invented: work appears here until it carries both a claimed start and a claimed needed-by.';

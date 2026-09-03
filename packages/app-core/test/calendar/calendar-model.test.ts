@@ -3,6 +3,7 @@ import type { TicketState } from '@gisik-nokma/domain';
 import {
   CALENDAR_ALL_HIDDEN_COPY,
   CALENDAR_EMPTY_MONTH_COPY,
+  CALENDAR_NARROWED_MONTH_COPY,
 } from '../../src/claims/claim-labels.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
 import { buildCalendarModel, type CalendarItem, type CalendarModel } from '../../src/calendar/calendar-model.js';
@@ -405,7 +406,14 @@ describe('11.36–11.39 custom date-kind fields are claims like any other (owner
 });
 
 describe('11.6–11.8 bars, weeks, filters, pending', () => {
-  it('11.6 a start→due pair renders one bar per week row it crosses, clamped to the row', () => {
+  /**
+   * The NAME used to say "clamped to the row", and nothing here clamps: a
+   * `CalendarBar` carries the full claimed `start`/`end` and the SAME object
+   * appears in every row it touches. Clamping a bar to a row's edges is the
+   * component's geometry (Task 9), and a reader grepping for its witness must
+   * not stop here.
+   */
+  it('11.6 a start→due pair appears in every week row it crosses, carrying the full span', () => {
     const model = buildCalendarModel(
       [
         ticket({
@@ -421,6 +429,12 @@ describe('11.6–11.8 bars, weeks, filters, pending', () => {
     // 20 Aug (Thu) sits in the 17–23 row; 25 Aug (Tue) in the 24–30 row.
     const rows = model.weeks.filter((week) => week.items.length > 0).map((week) => week.days[0]);
     expect(rows).toEqual(['2026-08-17', '2026-08-24']);
+    // UNCLAMPED, said as an assertion: both rows carry the same untruncated span.
+    for (const week of model.weeks.filter((row) => row.items.length > 0)) {
+      const bar = week.items[0];
+      if (bar === undefined || bar.kind !== 'bar') throw new Error('expected a bar in every occupied row');
+      expect([bar.start, bar.end]).toEqual(['2026-08-20', '2026-08-25']);
+    }
   });
 
   it('11.6 a claim outside the rendered grid appears nowhere — and is not clamped into it', () => {
@@ -582,5 +596,258 @@ describe('11.6–11.8 bars, weeks, filters, pending', () => {
     const item = onlyItem(model);
     if (item.kind !== 'marker') throw new Error('expected a marker');
     expect(item.claim.pending).toBe(true);
+  });
+});
+
+/**
+ * 11.50 (NEW — Task 15 must carry this id into
+ * test-cases/11-calendar-notifications.md).
+ *
+ * The review that asked for this block put it exactly right: the lie fixed at
+ * one door was left standing at two others. `visible` is narrowed by the
+ * filter and the lane BEFORE any item is built, so a month whose every claim
+ * belongs to filtered-out work printed "No claimed dates fall in this month"
+ * about a month full of claimed dates — the same sentence, the same lie, a
+ * different door.
+ */
+describe('11.50 three empty months, three sentences — filter and lane get their own', () => {
+  const FILED_ON = [{ id: 'filed-on', name: 'Filed on' }];
+
+  function augustPair(): TicketDatesInput[] {
+    return [
+      ticket({ fields: { title: claimField('First'), dueDate: claimField({ date: '2026-08-11' }) } }),
+      ticket({ fields: { title: claimField('Second'), dueDate: claimField({ date: '2026-08-28' }) } }),
+    ];
+  }
+
+  it('a month emptied by a FILTER says the filter did it, not that nobody claimed a date', () => {
+    const model = buildCalendarModel(augustPair(), {
+      ...AUG,
+      userName,
+      filter: { assigneeIds: ['user_nobody'] },
+    });
+    expect(model.hasItems).toBe(false);
+    expect(model.emptyCopy).toBe(CALENDAR_NARROWED_MONTH_COPY);
+    expect(model.emptyCopy).not.toBe(CALENDAR_EMPTY_MONTH_COPY);
+    expect(model.emptyCopy).not.toBe(CALENDAR_ALL_HIDDEN_COPY);
+  });
+
+  it('a month emptied by a LANE says so too — the third door, same sentence', () => {
+    const model = buildCalendarModel(augustPair(), { ...AUG, userName, laneEpicId: 'no_such_epic' });
+    expect(model.hasItems).toBe(false);
+    expect(model.emptyCopy).toBe(CALENDAR_NARROWED_MONTH_COPY);
+    expect(model.emptyCopy).not.toBe(CALENDAR_EMPTY_MONTH_COPY);
+  });
+
+  /**
+   * The mirror image, and it is the same discipline the all-hidden sentence
+   * already keeps: a filter that removed nothing FROM THIS GRID has not
+   * emptied this month, and blaming it would be its own small lie.
+   */
+  it('a filter that removed nothing from THIS grid leaves the honest-empty sentence alone', () => {
+    const model = buildCalendarModel(
+      [
+        ticket({ fields: { title: claimField('October'), dueDate: claimField({ date: '2026-10-02' }), office: claimField('TUR') } }),
+        ticket({ fields: { title: claimField('Undated'), office: claimField('BLR') } }),
+      ],
+      { ...AUG, userName, filter: { fields: { office: 'BLR' } } },
+    );
+    expect(model.hasItems).toBe(false);
+    expect(model.emptyCopy).toBe(CALENDAR_EMPTY_MONTH_COPY);
+  });
+
+  /**
+   * The narrowed sentence must be measured against THE GRID, not the calendar
+   * month: a filtered-out claim on 6 Sep is a claim on a cell this month view
+   * renders, and a `date.slice(0, 7) === monthKey` shortcut here would rebuild
+   * the very off-by-a-week 11.51 exists to close — telling a viewer nothing was
+   * claimed while their filter hides a marker from a rendered September cell.
+   */
+  it('a claim filtered out of a PADDING cell counts as narrowed away, not as an empty month', () => {
+    const model = buildCalendarModel(
+      [
+        ticket({ fields: { title: claimField('Padding cell'), office: claimField('TUR'), dueDate: claimField({ date: '2026-09-06' }) } }),
+        ticket({ fields: { title: claimField('Kept but undated'), office: claimField('BLR') } }),
+      ],
+      { ...AUG, userName, filter: { fields: { office: 'BLR' } } },
+    );
+    expect(model.hasItems).toBe(false);
+    expect(model.emptyCopy).toBe(CALENDAR_NARROWED_MONTH_COPY);
+  });
+
+  /**
+   * THE EXHAUSTIVITY GATE. `CALENDAR_ALL_HIDDEN_COPY` says "EVERY claimed date
+   * in this month belongs to a field you have hidden"; with a filter also
+   * removing an August claim that no hidden field owns, that sentence is
+   * false. Reaching for it here would be a fourth instance of the very defect
+   * this block exists to close — so the narrowed sentence, which names the set
+   * of narrowings instead of picking one, carries the both-case.
+   */
+  it('a month narrowed by BOTH a filter and the legend does not claim the legend did all of it', () => {
+    const model = buildCalendarModel(
+      [
+        ticket({
+          fields: { title: claimField('Hidden but kept'), office: claimField('BLR'), 'filed-on': claimField('2026-08-11') },
+        }, [], FILED_ON),
+        ticket({ fields: { title: claimField('Filtered away'), office: claimField('TUR'), dueDate: claimField({ date: '2026-08-28' }) } }),
+      ],
+      { ...AUG, userName, filter: { fields: { office: 'BLR' } }, hiddenCustomFieldIds: ['filed-on'] },
+    );
+    expect(model.hasItems).toBe(false);
+    expect(model.emptyCopy).toBe(CALENDAR_NARROWED_MONTH_COPY);
+    expect(model.emptyCopy).not.toBe(CALENDAR_ALL_HIDDEN_COPY);
+    // and the switch is still on screen, so the legend half stays reversible
+    expect(model.customDateFields).toEqual([{ fieldId: 'filed-on', fieldName: 'Filed on', count: 1 }]);
+  });
+
+  it('a filter that excludes nobody still lets the all-hidden sentence stand', () => {
+    const model = buildCalendarModel(
+      [ticket({ fields: { title: claimField('Kept'), office: claimField('BLR'), 'filed-on': claimField('2026-08-11') } }, [], FILED_ON)],
+      { ...AUG, userName, filter: { fields: { office: 'BLR' } }, hiddenCustomFieldIds: ['filed-on'] },
+    );
+    expect(model.emptyCopy).toBe(CALENDAR_ALL_HIDDEN_COPY);
+  });
+});
+
+/**
+ * 11.51 (NEW — Task 15 must carry this id into
+ * test-cases/11-calendar-notifications.md).
+ *
+ * The grid the month view RENDERS is `2026-07-27 … 2026-09-06` — six days of
+ * July and six of September are real cells with real markers in them. Every
+ * bound in this file was previously witnessed only by a claim planted on
+ * `2026-10-02`, twenty-six days past the edge, so nothing bit: restricting the
+ * week filter to the calendar month, or moving any of the three grid bounds by
+ * one day, left the whole suite green while a claimed date vanished from a
+ * rendered cell.
+ */
+describe('11.51 the grid edges — the padding days are cells, and every bound is closed', () => {
+  const EDGE_FIELD = [{ id: 'filed-on', name: 'Filed on' }];
+
+  function rowsWith(model: CalendarModel, match: (item: CalendarItem) => boolean): string[] {
+    return model.weeks.filter((week) => week.items.some(match)).map((week) => week.days[0]);
+  }
+
+  function renderedDates(model: CalendarModel): string[] {
+    return allItems(model).flatMap((item) => (item.kind === 'bar' ? [item.start, item.end] : [item.date]));
+  }
+
+  it('the grid really does run 27 Jul … 6 Sep — the fixtures below cannot drift from the helper', () => {
+    const model = buildCalendarModel([], { ...AUG, userName });
+    expect(model.weeks).toHaveLength(6);
+    const firstRow = model.weeks[0];
+    const lastRow = model.weeks[model.weeks.length - 1];
+    if (firstRow === undefined || lastRow === undefined) throw new Error('expected six grid rows');
+    expect(firstRow.days[0]).toBe('2026-07-27');
+    expect(lastRow.days[6]).toBe('2026-09-06');
+  });
+
+  it('a marker on either PADDING edge renders in its cell; one day further out renders nowhere', () => {
+    const model = buildCalendarModel(
+      [
+        ticket({ fields: { title: claimField('First cell'), dueDate: claimField({ date: '2026-07-27' }) } }),
+        ticket({ fields: { title: claimField('Last cell'), dueDate: claimField({ date: '2026-09-06' }) } }),
+        ticket({ fields: { title: claimField('Day before the grid'), dueDate: claimField({ date: '2026-07-26' }) } }),
+        ticket({ fields: { title: claimField('Day after the grid'), dueDate: claimField({ date: '2026-09-07' }) } }),
+      ],
+      { ...AUG, userName },
+    );
+    // Exactly the two edge days, and by value — a week filter narrowed to the
+    // calendar month drops both while every other assertion in this file holds.
+    expect(renderedDates(model).sort()).toEqual(['2026-07-27', '2026-09-06']);
+    expect(rowsWith(model, (item) => item.kind === 'marker' && item.date === '2026-07-27')).toEqual([
+      '2026-07-27',
+    ]);
+    expect(rowsWith(model, (item) => item.kind === 'marker' && item.date === '2026-09-06')).toEqual([
+      '2026-08-31',
+    ]);
+  });
+
+  it("a marker on an interior row's FIRST day belongs to that row, not the one before it", () => {
+    const model = buildCalendarModel(
+      [ticket({ fields: { title: claimField('Row opener'), dueDate: claimField({ date: '2026-08-17' }) } })],
+      { ...AUG, userName },
+    );
+    expect(rowsWith(model, (item) => item.kind === 'marker')).toEqual(['2026-08-17']);
+  });
+
+  it('a bar touching a row by exactly one day still appears in it, at both ends of the row', () => {
+    const endsOnRowStart = ticket({
+      id: 't_ends',
+      fields: { title: claimField('Ends on the row opener'), startDate: claimField({ date: '2026-08-10' }), dueDate: claimField({ date: '2026-08-17' }) },
+    });
+    const startsOnRowEnd = ticket({
+      id: 't_starts',
+      fields: { title: claimField('Starts on the row closer'), startDate: claimField({ date: '2026-08-23' }), dueDate: claimField({ date: '2026-08-28' }) },
+    });
+    const model = buildCalendarModel([endsOnRowStart, startsOnRowEnd], { ...AUG, userName });
+    // `end >= first` — one day of overlap with the 17–23 row is still overlap.
+    expect(rowsWith(model, (item) => item.ticketId === 't_ends')).toEqual(['2026-08-10', '2026-08-17']);
+    // `start <= last` — the mirror bound, on the same row.
+    expect(rowsWith(model, (item) => item.ticketId === 't_starts')).toEqual(['2026-08-17', '2026-08-24']);
+  });
+
+  it('a bar that only overlaps the padding week renders there; one entirely off the grid renders nowhere', () => {
+    const model = buildCalendarModel(
+      [
+        ticket({
+          id: 't_july',
+          fields: { title: claimField('Into the grid'), startDate: claimField({ date: '2026-07-24' }), dueDate: claimField({ date: '2026-07-28' }) },
+        }),
+        ticket({
+          id: 't_before',
+          fields: { title: claimField('Wholly before'), startDate: claimField({ date: '2026-07-20' }), dueDate: claimField({ date: '2026-07-24' }) },
+        }),
+        ticket({
+          id: 't_after',
+          fields: { title: claimField('Wholly after'), startDate: claimField({ date: '2026-09-07' }), dueDate: claimField({ date: '2026-09-10' }) },
+        }),
+      ],
+      { ...AUG, userName },
+    );
+    expect(rowsWith(model, (item) => item.ticketId === 't_july')).toEqual(['2026-07-27']);
+    expect(allItems(model).map((item) => item.ticketId)).toEqual(['t_july']);
+  });
+
+  /**
+   * The LEGEND's bounds, which the model's own docblock states as an
+   * invariant: "A switch always corresponds to something on screen, and
+   * everything on screen has a switch." A tally bound moved by one day breaks
+   * it in the direction nobody looks — the marker renders on the padding day
+   * and the switch that hides it is missing from the legend.
+   */
+  it('the legend counts claims on BOTH padding edges, and nothing one day outside them', () => {
+    const model = buildCalendarModel(
+      [
+        ticket({ fields: { title: claimField('On the first cell'), 'filed-on': claimField('2026-07-27') } }, [], EDGE_FIELD),
+        ticket({ fields: { title: claimField('On the last cell'), 'filed-on': claimField('2026-09-06') } }, [], EDGE_FIELD),
+        ticket({ fields: { title: claimField('One day before'), 'filed-on': claimField('2026-07-26') } }, [], EDGE_FIELD),
+        ticket({ fields: { title: claimField('One day after'), 'filed-on': claimField('2026-09-07') } }, [], EDGE_FIELD),
+      ],
+      { ...AUG, userName },
+    );
+    expect(model.customDateFields).toEqual([{ fieldId: 'filed-on', fieldName: 'Filed on', count: 2 }]);
+    expect(allItems(model)).toHaveLength(2);
+  });
+
+  it('an all-hidden month is still all-hidden when its only claim sits on a padding edge', () => {
+    for (const day of ['2026-07-27', '2026-09-06']) {
+      const model = buildCalendarModel(
+        [ticket({ fields: { title: claimField(`Edge ${day}`), 'filed-on': claimField(day) } }, [], EDGE_FIELD)],
+        { ...AUG, userName, hiddenCustomFieldIds: ['filed-on'] },
+      );
+      expect(model.hasItems).toBe(false);
+      expect(model.emptyCopy, `hidden claim on ${day}`).toBe(CALENDAR_ALL_HIDDEN_COPY);
+    }
+  });
+
+  it('a hidden claim ONE DAY outside the grid does not borrow the all-hidden sentence', () => {
+    for (const day of ['2026-07-26', '2026-09-07']) {
+      const model = buildCalendarModel(
+        [ticket({ fields: { title: claimField(`Outside ${day}`), 'filed-on': claimField(day) } }, [], EDGE_FIELD)],
+        { ...AUG, userName, hiddenCustomFieldIds: ['filed-on'] },
+      );
+      expect(model.emptyCopy, `hidden claim on ${day}`).toBe(CALENDAR_EMPTY_MONTH_COPY);
+    }
   });
 });
