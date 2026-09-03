@@ -17,3 +17,5 @@ export * from './ui/state-inspector.js';
 export * from './ui/transition-inspector.js';
 export * from './ui/rule-editors/add-rule-menu.js';
 export * from './ui/rule-editors/rule-editor.js';
+export * from './ui/publish-controls.js';
+export * from './ui/state-mapping-dialog.js';
