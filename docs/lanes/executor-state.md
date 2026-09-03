@@ -19,12 +19,29 @@ better (`artefact: <path> (PR #85)` vs my branch-name prefix), so re-applying mi
 reverted it. **The repo stands at 133/177 (75.1%), 0 claimed, 0 in-flight, recounted from the ledger.**
 
 **In flight and NOT mine to merge: PR #88** (`docs/p29-annotation`, head `022f0fc`) — the P29
-declaration annotation #86 asked for. **This branch is stacked on it** (its one commit is replayed
-here). Disjoint from #87 by file, so it merges clean. **When #88 merges, rebase with
-`git rebase --onto origin/main 022f0fc` in a SCRATCH worktree** (`git worktree add --detach`), never in
-this one, so only this step's own commits replay. **Verify with a positive control**, because an empty
-diff is also what a broken diff invocation prints: `git diff --stat <old-head> HEAD` empty AND
-`git diff --stat origin/main HEAD` non-empty and matching expectation.
+declaration annotation #86 asked for. It is **not stacked** on this branch in the git sense: its commit
+was **replayed here as `555c5d8`** when this branch rebased onto `4b8b048`. `022f0fc` itself lives only
+on `docs/p29-annotation`. Disjoint from #87 by file, so #88 merges clean.
+
+> **WHEN #88 MERGES, THE REBASE BASE IS `555c5d8`, NOT `022f0fc`. Measured, not assumed:**
+>
+> ```
+> git rebase --onto origin/main 555c5d8      # correct — replays d27b073 onward, this step's own work
+> git rebase --onto origin/main 022f0fc      # WRONG — replays 4b8b048 too, the CONTROLLER'S #87 commit
+> ```
+>
+> `git merge-base --is-ancestor 022f0fc HEAD` **fails** — it is not on this branch — so
+> `022f0fc..HEAD` sweeps in `4b8b048` and would replant the controller's own merge onto `main`.
+> `git rev-list 022f0fc..HEAD` returns three commits; `git rev-list 555c5d8..HEAD` returns one.
+> **And `022f0fc` becomes ORPHANED by the very event that triggers the rebase** — #88 merging deletes
+> the only branch that reaches it — after which `git cat-file` still passes on it and hands back
+> pre-rebase content. This is the brief's named trap, arrived at from the direction that makes it look
+> right: the sha was correct when written, about a branch this one is no longer built on.
+>
+> Do it in a SCRATCH worktree (`git worktree add --detach`), never in this one. **Verify with a
+> POSITIVE CONTROL**, because an empty diff is also what a broken diff invocation prints:
+> `git diff --stat <old-head> HEAD` empty **AND** `git diff --stat origin/main HEAD` non-empty and
+> matching expectation.
 
 ## PRE-FLIGHT IS DONE. Four findings, all verified by me on disk, not adopted from the agent.
 
@@ -35,9 +52,17 @@ reading the coordination doc accurately, and the coordination doc was a day stal
 superseded before it is written. Both stale sites in the coordination doc are corrected in this branch.
 **Task 13 adopts `filterSpec`. Do not escalate this.**
 
-> **The generalisation, third instance in two days: a ruling recorded in one lane's state file is
-> invisible to the other lane's agents.** Subagents read the coordination doc; they do not read
-> `controller-state.md`. **A ruling is not landed until it is written where the work will read it.**
+> **The generalisation: a ruling recorded in one lane's state file is invisible to the other lane's
+> agents.** Subagents read the coordination doc; they do not read `controller-state.md`. **A ruling is
+> not landed until it is written where the work will read it.**
+>
+> **Two instances I can point at, not a counted trend.** P26 was first ruled in a message and reported
+> as *"a number, a subject, and no text"* — `controller-state.md`'s own note calls that "the second
+> time in one day" — and then written to `controller-state.md` while the coordination doc went on
+> asking for it. I said "third instance in two days" in the commit that made this correction and could
+> not enumerate the third when challenged. **A counted plural in a document about stale documents is a
+> bad place to round up**, and this file's own rule already says it: when correcting a plural, check
+> which noun it counts.
 
 **2. THE THREE-WAY SPLIT IS REAL AND TWO `SavedFilter` TYPES ALREADY SHIP.** Verified by direct read:
 `packages/domain/src/preferences.ts:28` -> **`filterSpec`** (schema is `.strict()`);
@@ -88,7 +113,14 @@ skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventComm
 models) · **G: T13** · **H: T14** · **I: T15** (closeout, last).
 
 **T2 and T3 both modify `packages/domain/src/index.ts`** — additive export lines, but run them so the
-writes do not interleave. **T6 is the floor-list task and carries a hard MUST from the coordination
+writes do not interleave.
+
+**NOT YET VERIFIED, and it is T15's to check LIVE before it writes anything:** the pre-flight took
+`Features.md` §11 and `test-cases/11-calendar-notifications.md` as free from the coordination doc's
+line ~6546, and said so — *"not verified in this recon pass … worth a live grep before executing."*
+**Plans 6, 7 and 8 may have claimed adjacent numbers since that line was written.** The numbering
+convention is plan N → §N+2, which puts Plan 9 at §11, but confirm on disk rather than by convention:
+this repo has already produced one controller note refusing a section number an executor assumed. **T6 is the floor-list task and carries a hard MUST from the coordination
 doc: no stub.** If Plan 5's `getWorkspaceSettings` surface were missing it must STOP and escalate, never
 substitute a local constant. It is not missing — `apps/server/src/projections/workspace-settings.ts`
 and migration `1788272876259_proj-workspace-settings.sql` are both present.

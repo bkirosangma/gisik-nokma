@@ -6012,8 +6012,11 @@ not reopened.
 > reporting this file accurately.** Had the executor forwarded that, it would have escalated a
 > settled question and spent a controller round-trip re-deciding what was decided.
 >
-> The generalisation, because this is now the *third* recorded instance in two days: **a ruling
-> recorded in one lane's state file is invisible to the other lane's agents.** `controller-state.md`
+> The generalisation: **a ruling recorded in one lane's state file is invisible to the other lane's
+> agents.** (An earlier draft of this paragraph called it the *third* instance in two days. Two are
+> demonstrable -- P26 ruled in a message with no text, then P26 written to `controller-state.md` only.
+> The third was not enumerable, and a counted plural inside a correction about stale documents is a
+> bad place to round up.) `controller-state.md`
 > is not read by dispatched subagents; this document is. **A ruling is not landed until it is written
 > where the work will read it** — which for anything binding a plan's task means here, not only there.
 
