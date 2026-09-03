@@ -50,25 +50,120 @@ jobs:
       TEST_DATABASE_ADMIN_URL: postgres://gisik:gisik@localhost:54329/postgres
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The docs-only detection below diffs against the merge base, which
+          # needs history. The default depth-1 checkout has none.
+          fetch-depth: 0
+
+      # ── Owner-directed CI optimisation, 2026-09-03 (items 1 and 2 of three;
+      # sharding the server suite was deferred to Plan 11 Task 14, which owns
+      # the pipeline). Measured baseline before this change: 5m19s per run,
+      # of which the turbo step was 5m18s -- setup was already only 24s. The
+      # server suite alone (81 files, 270s) is the critical path, so splitting
+      # server-vs-client into separate JOBS saves ~25s and is not worth it;
+      # what pays is (a) not re-running unchanged packages at all and (b) not
+      # running the suite for a change that cannot affect it. T14 still owns
+      # the full six-job split and the shard; extend this, don't revert it.
+
+      # Does this change touch anything the suite could possibly be testing?
+      # A PR that only edits docs/ cannot change a test outcome, and this repo
+      # merges a lot of controller docs PRs (rulings, re-anchors, ledger
+      # promotions). Conservative by construction: ONLY docs/** is treated as
+      # inert. Features.md and test-cases/** are deliberately NOT in the skip
+      # list even though CI does not execute them -- a narrower filter can
+      # only cost time, never correctness.
+      #
+      # This job always RUNS and always reports the `gate` check, green, so
+      # the coordination doc's auto-merge precondition ("an independent CI run
+      # green") still has a check to read. What it means for a docs-only PR is
+      # weaker, and the run says so out loud in its own log rather than
+      # letting a reader infer full verification from a green tick.
+      - id: scope
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          # A first push to a branch, or a force-push, can leave `before` as
+          # the null sha; fall back to running everything rather than skipping.
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "no usable base sha -- running the full gate"
+            echo "code_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only "$base" HEAD)"
+          echo "--- files changed against $base ---"
+          echo "$changed"
+          # An EMPTY file list is not evidence of a docs-only change -- it is
+          # evidence the detection learned nothing (a base that resolved
+          # somewhere unexpected, a range that collapsed). Measured during
+          # development: a wrong base made a real 82-file code change report
+          # zero files, which would have skipped the gate on a full plan
+          # merge. An inability to tell two cases apart takes the safe branch.
+          if [ -z "$changed" ]; then
+            echo "empty file list -- detection learned nothing, running the full gate"
+            echo "code_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          outside_docs="$(echo "$changed" | grep -v '^docs/' || true)"
+          if [ -z "$outside_docs" ]; then
+            echo "DOCS-ONLY CHANGE: every changed path is under docs/."
+            echo "The build/test/typecheck gate is SKIPPED for this run."
+            echo "This check being green means 'nothing outside docs/ changed',"
+            echo "NOT 'the suite passed'. Nothing here was verified by tests."
+            echo "code_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "--- paths outside docs/, running the full gate ---"
+            echo "$outside_docs"
+            echo "code_changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: pnpm/action-setup@v4
+        if: steps.scope.outputs.code_changed == 'true'
         # No version pinned here: reads root package.json's
         # `"packageManager": "pnpm@9.15.0"` pin.
 
       - uses: actions/setup-node@v4
+        if: steps.scope.outputs.code_changed == 'true'
         with:
           # No .nvmrc in the repo; root package.json pins
           # `"engines": { "node": ">=22.0.0 <23" }`.
           node-version: 22
           cache: pnpm
 
+      # Turbo's local cache, persisted between runs. `test` and `typecheck`
+      # were `"cache": false` in turbo.json until 2026-09-03, so every run
+      # re-executed all 24 tasks from scratch even when the packages they
+      # cover had not changed. Both are deterministic functions of their
+      # inputs, and turbo's hash covers the package plus its workspace
+      # dependencies -- PROVEN by paired control before this landed: with an
+      # unchanged tree all 20 tasks hit (17ms, FULL TURBO); touching one line
+      # of packages/domain re-ran domain AND all six packages that depend on
+      # it, leaving only `ui` (zero workspace deps) cached.
+      #
+      # THE SAFETY PROPERTY THAT MAKES THIS OK, stated so it is not lost: the
+      # controller's own pre-merge gate runs `--force`, so it never consults
+      # this cache. A cache hit here means "this exact input hash already
+      # passed"; the merge decision still rests on an uncached run.
+      - uses: actions/cache@v4
+        if: steps.scope.outputs.code_changed == 'true'
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+
       - run: pnpm install --frozen-lockfile
+        if: steps.scope.outputs.code_changed == 'true'
 
       # The env contract gate (Plan 11 Task 6): fails if code reads a
       # configuration variable `.env.example` does not document. It reads
       # source text and needs no build, so it runs before `turbo run` --
       # a stray variable is named in seconds instead of after the suite.
       - run: pnpm check:env
+        if: steps.scope.outputs.code_changed == 'true'
 
       # Job layout: a single job, not Task 14's six-job split. What the plan
       # splits into separate jobs either doesn't exist on `main` yet or
@@ -110,3 +205,4 @@ jobs:
       # Extend this job list when a plan lands the piece it owns; don't
       # replace it wholesale.
       - run: pnpm turbo run build test typecheck
+        if: steps.scope.outputs.code_changed == 'true'

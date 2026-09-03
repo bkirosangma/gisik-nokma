@@ -12,12 +12,10 @@
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "test": {
-      "dependsOn": ["^build"],
-      "cache": false
+      "dependsOn": ["^build"]
     },
     "typecheck": {
-      "dependsOn": ["^build"],
-      "cache": false
+      "dependsOn": ["^build"]
     }
   }
 }
