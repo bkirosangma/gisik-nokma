@@ -75,6 +75,39 @@ describe('TicketTypeListScreen', () => {
     expect(onOpen).toHaveBeenCalledWith(custom.id);
   });
 
+  /**
+   * `icon` is a free string on the wire — `ticketTypeDefSchema` asks only for
+   * min(1), so a `ticket-type.defined` payload written by a newer client, or by
+   * a workspace whose icon vocabulary has moved on, can name a glyph this build
+   * has never heard of. The row must still render. This is the one guarantee in
+   * icons.tsx that is written here rather than transcribed from the plan (the
+   * sixteen glyphs are stroke data, not lucide components), so it gets its own
+   * test rather than riding on the fixtures, all of which use known names.
+   */
+  it('an icon name this build has never heard of renders the row anyway — data never crashes the UI', async () => {
+    const alien: TicketTypeDef = {
+      id: newUlid(),
+      name: 'Rota',
+      icon: 'not-an-icon-this-build-knows',
+      rank: 2,
+      workflowId: kanbanPublished.id,
+      fields: [],
+    };
+    render(
+      <TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={createFakeGateway({ ticketTypes: [alien] })}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    const row = (await screen.findByText('Rota')).closest('li')!;
+    expect(within(row).getByRole('button', { name: 'Open Rota' })).toBeInTheDocument();
+    // It fell back to something drawable rather than rendering an empty glyph.
+    expect(row.querySelector('svg.type-icon')?.querySelectorAll('path, circle').length ?? 0).toBeGreaterThan(0);
+  });
+
   it('hides New ticket type from non-authors', async () => {
     render(
       <TicketTypeListScreen
