@@ -121,7 +121,7 @@ export default function InboxPage() {
    *
    * `markRead` THROWS on the route's 404 — a row that is not yours and a row
    * that does not exist are one frozen body (`routes/notifications.ts`) — and
-   * this shell's gateway does not swallow it (case 11.98). So the catch is not
+   * this shell's gateway does not swallow it (case 11.138). So the catch is not
    * defensive decoration: it is the arm that reloads the truth instead of
    * leaving a row drawn as read that the server never marked.
    */

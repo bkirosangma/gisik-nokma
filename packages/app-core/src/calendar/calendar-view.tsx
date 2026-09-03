@@ -3,6 +3,7 @@ import { IST_DAY_REGEX } from '@gisik-nokma/domain';
 import type { WeekDays } from '../claims/dates.js';
 import type { UserNameFn } from '../claims/claim-labels.js';
 import type { TicketDatesInput } from '../claims/ticket-dates.js';
+import type { IsEpicType } from '../hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../view-types.js';
 import { buildCalendarModel, type CalendarItem, type CalendarMonth } from './calendar-model.js';
 
@@ -52,6 +53,24 @@ export type CalendarViewProps = {
   onOpenTicket: (ticketId: string) => void;
   filter?: FilterSpec;
   laneEpicId?: string | null;
+  /**
+   * WHAT THIS WORKSPACE CALLS AN EPIC — forwarded UNCHANGED, never defaulted here.
+   *
+   * `buildCalendarModel` states the default (`isBuiltinEpicType`, the built-in
+   * `epic` id) and `epic-ancestor.ts` states why that default is narrower than
+   * the server's rule: the server groups by RANK 1, so a workspace whose rank-1
+   * type is "Initiative" has epics an id-matching client calls "No epic". A
+   * `?? isBuiltinEpicType` in this file would be a second statement of the same
+   * default, free to drift from the model's.
+   *
+   * Both this view and `TimelineView` gained the prop in the same change, and
+   * that is the point rather than tidiness: the model beneath each has accepted
+   * `isEpicType` since Tasks 8 and 10, and neither view forwarded it — so a
+   * shell could not narrow either lane. Fixing ONE would be worse than fixing
+   * neither: the calendar and the timeline would answer differently about the
+   * same ticket's epic on two tabs of one page.
+   */
+  isEpicType?: IsEpicType;
   initialMonth?: CalendarMonth;
 };
 
@@ -189,9 +208,18 @@ export function CalendarView(props: CalendarViewProps) {
         userName: props.userName,
         ...(props.filter === undefined ? {} : { filter: props.filter }),
         ...(props.laneEpicId === undefined ? {} : { laneEpicId: props.laneEpicId }),
+        ...(props.isEpicType === undefined ? {} : { isEpicType: props.isEpicType }),
         hiddenCustomFieldIds,
       }),
-    [props.tickets, props.userName, props.filter, props.laneEpicId, month, hiddenCustomFieldIds],
+    [
+      props.tickets,
+      props.userName,
+      props.filter,
+      props.laneEpicId,
+      props.isEpicType,
+      month,
+      hiddenCustomFieldIds,
+    ],
   );
 
   const currentMonthKey = monthKey(month);

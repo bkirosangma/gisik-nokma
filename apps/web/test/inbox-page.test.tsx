@@ -64,7 +64,7 @@ function deferred<T>() {
 }
 
 describe('/inbox — four states, because the plan’s two collapse the one that lies', () => {
-  it('11.104 says "Loading…" while the first page is in flight, NOT that the inbox is empty', async () => {
+  it('11.144 says "Loading…" while the first page is in flight, NOT that the inbox is empty', async () => {
     const first = deferred<{ notifications: Notification[]; nextCursor: string | null }>();
     render(
       <Providers
@@ -83,7 +83,7 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     await waitFor(() => expect(screen.getByText(EMPTY_INBOX_COPY)).toBeInTheDocument());
   });
 
-  it('11.105 names an empty inbox instead of rendering a blank box', async () => {
+  it('11.145 names an empty inbox instead of rendering a blank box', async () => {
     render(
       <Providers
         services={stubServices(
@@ -98,7 +98,7 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
   });
 
-  it('11.106 renders every row the gateway answered, and marks an unread one read on click', async () => {
+  it('11.146 renders every row the gateway answered, and marks an unread one read on click', async () => {
     const marked: string[] = [];
     render(
       <Providers
@@ -137,7 +137,7 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     expect(marked).toEqual(['n_2']);
   });
 
-  it('11.107 reloads the truth when markRead is refused, instead of leaving an invented read flag', async () => {
+  it('11.147 reloads the truth when markRead is refused, instead of leaving an invented read flag', async () => {
     let listCalls = 0;
     render(
       <Providers
@@ -151,7 +151,7 @@ describe('/inbox — four states, because the plan’s two collapse the one that
               },
               // The route's 404 for a row that is not yours AND for one that
               // does not exist — one frozen body, and the gateway does not
-              // swallow it (case 11.98).
+              // swallow it (case 11.138).
               markRead: async () => {
                 throw new HttpError(404, '/v1/me/notifications/n_theirs/read', {
                   error: 'not_found',
@@ -179,7 +179,7 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     );
   });
 
-  it('11.108 appends the next page rather than replacing the rows on screen', async () => {
+  it('11.148 appends the next page rather than replacing the rows on screen', async () => {
     const pages = [
       { notifications: [assignment('n_3')], nextCursor: 'n_3' },
       { notifications: [assignment('n_2')], nextCursor: null },
@@ -206,7 +206,7 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     expect(screen.queryByRole('button', { name: /more/i })).not.toBeInTheDocument();
   });
 
-  it('11.109 renders a refusal with the server’s own words when the list read fails', async () => {
+  it('11.149 renders a refusal with the server’s own words when the list read fails', async () => {
     render(
       <Providers
         services={stubServices(
@@ -239,7 +239,7 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     expect(screen.queryByText(EMPTY_INBOX_COPY)).not.toBeInTheDocument();
   });
 
-  it('11.110 sends a 401 to sign-in rather than calling an ended session a refusal', async () => {
+  it('11.150 sends a 401 to sign-in rather than calling an ended session a refusal', async () => {
     render(
       <Providers
         services={stubServices(
@@ -262,7 +262,7 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     expect(screen.queryByText(/Your inbox cannot be shown yet\./)).not.toBeInTheDocument();
   });
 
-  it('11.111 says the ticket cannot be opened — and keeps the message — when the locator answers null', async () => {
+  it('11.151 says the ticket cannot be opened — and keeps the message — when the locator answers null', async () => {
     render(
       <Providers
         services={stubServices(

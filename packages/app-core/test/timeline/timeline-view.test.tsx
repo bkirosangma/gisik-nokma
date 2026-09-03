@@ -18,6 +18,7 @@ import {
   unplaceableDayCopy,
 } from '../../src/claims/claim-labels.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
+import type { IsEpicType } from '../../src/hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../../src/view-types.js';
 import { NO_DATES_NOTE, NO_DAY_CLAIMS_NOTE } from '../../src/timeline/timeline-model.js';
 import { TimelineView } from '../../src/timeline/timeline-view.js';
@@ -129,6 +130,7 @@ function renderTimeline(
     today?: string;
     filter?: FilterSpec;
     laneEpicId?: string | null;
+    isEpicType?: IsEpicType;
     weeksCount?: number;
   } = {},
 ) {
@@ -141,6 +143,7 @@ function renderTimeline(
       onOpenTicket={onOpenTicket}
       {...(extra.filter === undefined ? {} : { filter: extra.filter })}
       {...(extra.laneEpicId === undefined ? {} : { laneEpicId: extra.laneEpicId })}
+      {...(extra.isEpicType === undefined ? {} : { isEpicType: extra.isEpicType })}
       {...(extra.weeksCount === undefined ? {} : { weeksCount: extra.weeksCount })}
     />,
   );
@@ -770,6 +773,60 @@ describe('11.81 rows are grouped under the epic that owns them, and under "No ep
     expect(screen.getByRole('heading', { name: 'Registrations' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'No epic' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Loose' })).toBeNull();
+  });
+
+  /**
+   * 11.159 — `isEpicType`, the pass-through this component never had, reaching
+   * BOTH answers the model uses it for.
+   *
+   * `buildTimelineModel` has accepted it since Task 10 and this view did not
+   * forward it, so every lane used the built-in `epic` id while the server
+   * groups by RANK 1 (`routes/list.ts`). One fixture witnesses both reaches at
+   * once, and neither alone would be enough:
+   *
+   * - `epicAncestorOf` — with the prop the child is grouped under
+   *   "Registrations"; without it the walk reaches a parent it does not know as
+   *   an epic and answers null, so the child lands under "No epic".
+   * - the `isEpicType(typeId) && start === null && due === null` arm — with the
+   *   prop the undated initiative is a LANE HEADING and gets no row and no side
+   *   entry; without it, it is an ordinary undated ticket and appears in the
+   *   side list, which is the aside this case asserts is absent.
+   *
+   * `CalendarView` gained the same prop in the same change (11.158). Fixing one
+   * view alone would have left the calendar and the timeline answering
+   * differently about the same ticket's epic on two tabs of one page.
+   */
+  it("11.159 a workspace's OWN rank-1 type heads the lane and is kept out of the side list", () => {
+    const initiative = ticket({
+      id: 'init1',
+      typeId: 'initiative',
+      fields: { title: claimField('Registrations') },
+    });
+    const child = ticket({
+      parentId: 'init1',
+      fields: {
+        title: claimField('DLT'),
+        startDate: claimField({ date: '2026-08-24' }),
+        dueDate: claimField({ date: '2026-08-28' }),
+      },
+    });
+    const { container } = renderTimeline([initiative, child], {
+      isEpicType: (typeId) => typeId === 'initiative',
+    });
+
+    expect(screen.getByRole('heading', { name: 'Registrations' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'No epic' })).toBeNull();
+    // A lane, not missing work: no row of its own, and not in the side list.
+    expect(container.querySelector('[data-ticket-id="init1"]')).toBeNull();
+    expect(screen.queryByRole('complementary')).toBeNull();
+
+    const lanes = [...container.querySelectorAll('.gn-timeline__group')].map((group) => ({
+      heading: group.querySelector('h3')?.textContent,
+      tickets: [...group.querySelectorAll('[data-ticket-id]')].map((row) =>
+        row.getAttribute('data-ticket-id'),
+      ),
+    }));
+    expect(lanes).toEqual([{ heading: 'Registrations', tickets: [child.state.id] }]);
   });
 });
 

@@ -7,6 +7,7 @@ import {
   CALENDAR_NARROWED_MONTH_COPY,
 } from '../../src/claims/claim-labels.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
+import type { IsEpicType } from '../../src/hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../../src/view-types.js';
 import type { CalendarMonth } from '../../src/calendar/calendar-model.js';
 import { CalendarView, MAX_VISIBLE_PER_WEEK } from '../../src/calendar/calendar-view.js';
@@ -69,6 +70,7 @@ function renderCalendar(
     today?: string;
     filter?: FilterSpec;
     laneEpicId?: string | null;
+    isEpicType?: IsEpicType;
     initialMonth?: CalendarMonth;
   } = {},
 ) {
@@ -81,6 +83,7 @@ function renderCalendar(
       onOpenTicket={onOpenTicket}
       {...(extra.filter === undefined ? {} : { filter: extra.filter })}
       {...(extra.laneEpicId === undefined ? {} : { laneEpicId: extra.laneEpicId })}
+      {...(extra.isEpicType === undefined ? {} : { isEpicType: extra.isEpicType })}
       {...(extra.initialMonth === undefined ? {} : { initialMonth: extra.initialMonth })}
     />,
   );
@@ -576,6 +579,50 @@ describe('11.72 what the mounting shell hands in is what the grid uses', () => {
       fields: { title: claimField('Out of lane'), dueDate: claimField({ date: '2026-08-27' }) },
     });
     renderCalendar([epic, inLane, outOfLane], { laneEpicId: 'epic1' });
+    expect(screen.getAllByRole('button', { name: /needed by 28 Aug/ })).toHaveLength(1);
+    expect(screen.queryAllByRole('button', { name: /needed by 27 Aug/ })).toHaveLength(0);
+  });
+
+  /**
+   * 11.158 — the THIRD pass-through no test supplied, and the one with a live
+   * consequence rather than a latent one.
+   *
+   * `buildCalendarModel` has accepted `isEpicType` since Task 8 and this
+   * component did not forward it, so every lane the grid drew used the built-in
+   * `epic` id — while `apps/server/src/routes/list.ts` groups by RANK 1. A
+   * workspace whose rank-1 type is "Initiative" therefore had epics the server
+   * groups by and this grid called "No epic": the product disagreeing with
+   * itself in public, which is the exact failure `epic-ancestor.ts` made the
+   * predicate injectable to prevent.
+   *
+   * The fixture below is the lane case above with `epic` renamed to
+   * `initiative`, and it is the ONLY shape that can witness the forward: with
+   * the prop the in-lane claim renders, and without it `epicAncestorOf` walks
+   * the child to a parent it does not recognise as an epic, answers null, and
+   * the lane filter removes the very ticket the lane is about. `TimelineView`
+   * gained the same prop in the same change — see 11.159 — because a calendar
+   * and a timeline answering differently about one ticket's epic, on two tabs of
+   * one page, is worse than both being narrow together.
+   */
+  it("11.158 a workspace's OWN rank-1 type heads the lane, not just the built-in 'epic'", () => {
+    const initiative = ticket({
+      id: 'init1',
+      typeId: 'initiative',
+      fields: { title: claimField('The initiative') },
+    });
+    const inLane = ticket({
+      parentId: 'init1',
+      fields: { title: claimField('In lane'), dueDate: claimField({ date: '2026-08-28' }) },
+    });
+    const outOfLane = ticket({
+      fields: { title: claimField('Out of lane'), dueDate: claimField({ date: '2026-08-27' }) },
+    });
+    renderCalendar([initiative, inLane, outOfLane], {
+      laneEpicId: 'init1',
+      isEpicType: (typeId) => typeId === 'initiative',
+    });
+    // Present AND absent, as the lane case above: the first half proves the grid
+    // drew the lane, and only the second proves it was narrowed to it.
     expect(screen.getAllByRole('button', { name: /needed by 28 Aug/ })).toHaveLength(1);
     expect(screen.queryAllByRole('button', { name: /needed by 27 Aug/ })).toHaveLength(0);
   });

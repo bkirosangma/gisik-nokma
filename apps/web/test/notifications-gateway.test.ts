@@ -15,7 +15,7 @@ import { createHttpTicketLocator, ticketSheetPath } from '../src/ticket-location
  * The scripted bodies below are the SERVER'S, copied from the routes that serve
  * them (`apps/server/src/routes/notifications.ts`,
  * `apps/server/src/notifications/store.ts`, `apps/server/src/routes/tickets.ts`)
- * rather than from the plan's sketch — cases 11.90–11.99.
+ * rather than from the plan's sketch — cases 11.130–11.139.
  */
 function scriptedHttp(routes: Record<string, { status: number; body?: unknown }>) {
   const seen: Array<{ method: string; path: string; hadBody: boolean }> = [];
@@ -59,7 +59,7 @@ function assignmentRow(id: string, read = false) {
 }
 
 describe('createHttpNotificationsGateway — against the routes that actually serve it', () => {
-  it('11.90 asks for the first page with NO query string, and parses every row through the domain', async () => {
+  it('11.130 asks for the first page with NO query string, and parses every row through the domain', async () => {
     const { http, seen } = scriptedHttp({
       'GET /v1/me/notifications': {
         status: 200,
@@ -75,7 +75,7 @@ describe('createHttpNotificationsGateway — against the routes that actually se
     expect(page.notifications[0]?.payload).toMatchObject({ ticketId: 't_7', assignedBy: 'u_ana' });
   });
 
-  it('11.91 sends the cursor back encoded, and only when there is one', async () => {
+  it('11.131 sends the cursor back encoded, and only when there is one', async () => {
     const { http, seen } = scriptedHttp({
       'GET /v1/me/notifications?cursor=n%2F1%2B2': {
         status: 200,
@@ -86,7 +86,7 @@ describe('createHttpNotificationsGateway — against the routes that actually se
     expect(seen[0]?.path).toBe('/v1/me/notifications?cursor=n%2F1%2B2');
   });
 
-  it('11.92 treats null and undefined as the same first-page request', async () => {
+  it('11.132 treats null and undefined as the same first-page request', async () => {
     const { http, seen } = scriptedHttp({
       'GET /v1/me/notifications': { status: 200, body: { notifications: [], nextCursor: null } },
     });
@@ -96,7 +96,7 @@ describe('createHttpNotificationsGateway — against the routes that actually se
     expect(seen.map((call) => call.path)).toEqual(['/v1/me/notifications', '/v1/me/notifications']);
   });
 
-  it('11.93 carries nextCursor through verbatim — the paging fact the fake could not lose', async () => {
+  it('11.133 carries nextCursor through verbatim — the paging fact the fake could not lose', async () => {
     const { http } = scriptedHttp({
       'GET /v1/me/notifications': {
         status: 200,
@@ -106,7 +106,7 @@ describe('createHttpNotificationsGateway — against the routes that actually se
     expect((await createHttpNotificationsGateway(http).list()).nextCursor).toBe('n_9');
   });
 
-  it('11.94 refuses a page whose payload does not match its kind, rather than handing it to the view', async () => {
+  it('11.134 refuses a page whose payload does not match its kind, rather than handing it to the view', async () => {
     const { http } = scriptedHttp({
       'GET /v1/me/notifications': {
         status: 200,
@@ -121,7 +121,7 @@ describe('createHttpNotificationsGateway — against the routes that actually se
     await expect(createHttpNotificationsGateway(http).list()).rejects.toThrow();
   });
 
-  it('11.95 reads the unread total off the route that serves it', async () => {
+  it('11.135 reads the unread total off the route that serves it', async () => {
     const { http, seen } = scriptedHttp({
       'GET /v1/me/notifications/unread-count': { status: 200, body: { unread: 137 } },
     });
@@ -129,7 +129,7 @@ describe('createHttpNotificationsGateway — against the routes that actually se
     expect(seen[0]?.path).toBe('/v1/me/notifications/unread-count');
   });
 
-  it('11.96 turns a 401 on either read into an HttpError that still names the status', async () => {
+  it('11.136 turns a 401 on either read into an HttpError that still names the status', async () => {
     const { http } = scriptedHttp({
       'GET /v1/me/notifications/unread-count': {
         status: 401,
@@ -142,7 +142,7 @@ describe('createHttpNotificationsGateway — against the routes that actually se
     });
   });
 
-  it('11.97 markRead POSTs to the row and accepts the route’s empty 204', async () => {
+  it('11.137 markRead POSTs to the row and accepts the route’s empty 204', async () => {
     const { http, seen } = scriptedHttp({
       'POST /v1/me/notifications/n_1/read': { status: 204 },
     });
@@ -156,7 +156,7 @@ describe('createHttpNotificationsGateway — against the routes that actually se
     });
   });
 
-  it('11.98 markRead THROWS on the route’s 404 — the seam where a stub gateway was looser', async () => {
+  it('11.138 markRead THROWS on the route’s 404 — the seam where a stub gateway was looser', async () => {
     const { http } = scriptedHttp({
       'POST /v1/me/notifications/n_theirs/read': { status: 404, body: { error: 'not_found' } },
     });
@@ -168,7 +168,7 @@ describe('createHttpNotificationsGateway — against the routes that actually se
     ).rejects.toBeInstanceOf(HttpError);
   });
 
-  it('11.99 names the path when a GET answers the transport’s null instead of a page', async () => {
+  it('11.139 names the path when a GET answers the transport’s null instead of a page', async () => {
     const { http } = scriptedHttp({
       'GET /v1/me/notifications': { status: 404, body: { error: 'not_found' } },
     });
@@ -184,7 +184,7 @@ describe('createHttpNotificationsGateway — against the routes that actually se
 describe('createHttpTicketLocator — the deep link the plan’s /tickets/:id could not make', () => {
   const ticketRoute = '/v1/workspaces/ws_1/tickets/t_7';
 
-  it('11.100 reads project_id off the proj_visibility row the route serves', async () => {
+  it('11.140 reads project_id off the proj_visibility row the route serves', async () => {
     const { http, seen } = scriptedHttp({
       [`GET ${ticketRoute}`]: {
         status: 200,
@@ -209,14 +209,14 @@ describe('createHttpTicketLocator — the deep link the plan’s /tickets/:id co
     expect(ticketSheetPath(location!, 't_7')).toBe('/w/ws_1/p/p_corner?ticket=t_7');
   });
 
-  it('11.101 answers null for the route’s one 404, without deciding which of its two causes it was', async () => {
+  it('11.141 answers null for the route’s one 404, without deciding which of its two causes it was', async () => {
     const { http } = scriptedHttp({
       [`GET ${ticketRoute}`]: { status: 404, body: { error: 'not_found' } },
     });
     expect(await createHttpTicketLocator(http).locate('ws_1', 't_7')).toBeNull();
   });
 
-  it('11.102 answers null rather than building /w/ws/p/?ticket= when the row carries no project', async () => {
+  it('11.142 answers null rather than building /w/ws/p/?ticket= when the row carries no project', async () => {
     const { http } = scriptedHttp({
       [`GET ${ticketRoute}`]: {
         status: 200,
@@ -226,7 +226,7 @@ describe('createHttpTicketLocator — the deep link the plan’s /tickets/:id co
     expect(await createHttpTicketLocator(http).locate('ws_1', 't_7')).toBeNull();
   });
 
-  it('11.103 lets a 401 through as a session event rather than flattening it to null', async () => {
+  it('11.143 lets a 401 through as a session event rather than flattening it to null', async () => {
     const { http } = scriptedHttp({
       [`GET ${ticketRoute}`]: { status: 401, body: { error: 'unauthenticated' } },
     });

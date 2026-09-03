@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe('InboxNavLink — the badge that keeps its last honest value', () => {
-  it('11.112 reads the unread total once on mount and renders it with its real accessible name', async () => {
+  it('11.152 reads the unread total once on mount and renders it with its real accessible name', async () => {
     render(
       <Providers services={stubServices({}, { notifications: { unreadCount: async () => 3 } })}>
         <InboxNavLink />
@@ -42,7 +42,7 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
     );
   });
 
-  it('11.113 does NOT poll for a signed-out viewer — a request that can only 401, forever', async () => {
+  it('11.153 does NOT poll for a signed-out viewer — a request that can only 401, forever', async () => {
     session = { isPending: false };
     let calls = 0;
     render(
@@ -68,7 +68,7 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
-  it('11.114 does not read while the session is still in flight, and reads as soon as it lands', async () => {
+  it('11.154 does not read while the session is still in flight, and reads as soon as it lands', async () => {
     session = { isPending: true };
     let calls = 0;
     const services = stubServices(
@@ -98,7 +98,7 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
     await waitFor(() => expect(calls).toBe(1));
   });
 
-  it('11.115 refreshes on the plan’s one-minute cadence', async () => {
+  it('11.155 refreshes on the plan’s one-minute cadence', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let calls = 0;
     render(
@@ -126,7 +126,7 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
     expect(await screen.findByRole('img', { name: '2 unread notifications' })).toBeInTheDocument();
   });
 
-  it('11.116 keeps the last count when a refresh fails, rather than resetting to none', async () => {
+  it('11.156 keeps the last count when a refresh fails, rather than resetting to none', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let calls = 0;
     render(
@@ -158,7 +158,7 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
     expect(screen.getByRole('img', { name: '4 unread notifications' })).toBeInTheDocument();
   });
 
-  it('11.117 stops the timer on unmount', async () => {
+  it('11.157 stops the timer on unmount', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let calls = 0;
     const { unmount } = render(

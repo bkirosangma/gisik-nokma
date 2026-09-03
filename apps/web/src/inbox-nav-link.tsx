@@ -28,7 +28,7 @@ export const REFRESH_MS = 60_000;
  * `useSessionStatus` because this component's question is specifically
  * `kind === 'signed-in'` and those three states are named rather than collapsed
  * — the same choice the project page makes, where the difference IS load-bearing
- * because it gates a WRITE. The load window is pinned as its own case (11.114),
+ * because it gates a WRITE. The load window is pinned as its own case (11.154),
  * so the equivalence stays a measured fact rather than a hope.
  *
  * ## What the badge does when the read fails, and why it is not zero

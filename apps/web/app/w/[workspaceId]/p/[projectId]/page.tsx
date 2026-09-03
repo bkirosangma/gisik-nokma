@@ -6,17 +6,26 @@ import { BUILTIN_TICKET_TYPE_SEEDS } from '@gisik-nokma/domain';
 import {
   AttentionStrip,
   Board,
+  CalendarView,
   CreateTicketFlow,
   TicketList,
   TicketSheet,
+  TimelineView,
   useAttention,
   useBoard,
   useLiveQuery,
   useTicketList,
   type GroupLabels,
+  type TicketDatesInput,
 } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../../../src/app-nav.js';
+import { istToday } from '../../../../../src/ist-today.js';
 import { ShellRefusal } from '../../../../../src/shell-refusal.js';
+import {
+  customDateFieldsByType,
+  rankOneEpicPredicate,
+  toTicketDatesInput,
+} from '../../../../../src/ticket-dates-input.js';
 import { useAppServices, useSessionStatus } from '../../../../../src/providers.js';
 import {
   ExpiredSessionNotice,
@@ -24,15 +33,29 @@ import {
 } from '../../../../../src/expired-session.js';
 
 /**
- * Board | List only.
+ * Board | List | Calendar | Timeline.
  *
- * The plan's Step 5b mounts Calendar and Timeline too, gated on Plan 9's views
- * existing. They do not: there is no `calendar/` or `timeline/` directory under
- * `packages/app-core/src`, and neither `CalendarView` nor `TimelineView` is
- * exported. Per the plan's own precondition the step is SKIPPED and the two
- * tabs stay as written here; Plan 9's Task 14 carries the mount and uses
- * `istToday()` from `src/ist-today.ts`, which ships regardless and is why that
- * helper waits on nothing.
+ * The four-way chain is Plan 6's Step 5b, landed late by Plan 9's Task 14 — the
+ * order Step 5b's own precondition names. When Plan 6 ran, `CalendarView` and
+ * `TimelineView` did not exist and the step recorded a SKIP here; both are
+ * exported now, so this task carries the mount, and `istToday()` from
+ * `src/ist-today.ts` is the day source Step 5a landed unconditionally so that
+ * this order would work.
+ *
+ * ## The two new arms refuse; they do not draw an empty month
+ *
+ * Step 5b's snippet renders the views over `(list.rows ?? []).map(...)`. Against
+ * the server that ships today `getTickets` REFUSES — `mapListView` throws a
+ * `ServingGapError` over five absent `ListRow` fields — so `list.rows` is null,
+ * `?? []` is `[]`, and `CalendarView` would draw a complete month grid with
+ * nothing on it. That grid says "no ticket in this project has a claimed date",
+ * which is the same invented fact as `attention.data ?? []` and the spinner over
+ * a refused read: the defect this page's own `parentCandidates` note was written
+ * about, one tab across. So the calendar and timeline arms use this page's own
+ * `error → ShellRefusal, null → Loading…, data → view` shape, and Step 5b's
+ * `<p>{board.error ?? 'Loading…'}</p>` spellings are NOT adopted for the two
+ * existing arms either — those would have deleted `ShellRefusal` from the board
+ * and the list on the way past.
  *
  * The Suspense boundary is `useSearchParams()`'s, exactly as on the sign-in
  * page — without it `next build` fails the route rather than warning.
@@ -99,7 +122,7 @@ function ProjectBoard() {
    */
   const session = useSessionStatus();
   const currentUserId = session.kind === 'signed-in' ? session.user.id : '';
-  const [view, setView] = useState<'board' | 'list'>('board');
+  const [view, setView] = useState<'board' | 'list' | 'calendar' | 'timeline'>('board');
 
   const board = useBoard(dataSource, workspaceId, projectId);
   const list = useTicketList(dataSource, workspaceId, projectId, currentUserId);
@@ -147,6 +170,80 @@ function ProjectBoard() {
       typeName: (typeId) => typeId,
     };
   }, [list.rows]);
+
+  /**
+   * The roster, for the two views that print a claim's AUTHOR.
+   *
+   * `getMembers` is one of the seven `DataSourceQuery` reads the shipped server
+   * actually serves, and this is the same call `app/w/[workspaceId]/members`
+   * already makes — not a second naming authority, the same one. It has NO
+   * refusal arm and that is deliberate: `UserNameFn` falls back to the raw
+   * actor id (`view-types.ts`: "a null name NEVER means anonymous"), so a roster
+   * that has not arrived or refused leaves every claim attributed to an id
+   * rather than unattributed. Narrower than the truth, never wrong about it —
+   * and a refusal panel for it would put the calendar behind a read the calendar
+   * does not need in order to be correct.
+   */
+  const members = useLiveQuery(dataSource, workspaceId, `${workspaceId}:members`, () =>
+    dataSource.query.getMembers(workspaceId),
+  );
+  const nameOf = useMemo(() => {
+    const byId = new Map((members.data ?? []).map((member) => [member.id, member.name]));
+    return (userId: string): string => byId.get(userId) ?? userId;
+  }, [members.data]);
+
+  /**
+   * THE ONE PLACE THIS SHELL DECIDES WHICH DAY IS TODAY.
+   *
+   * Computed once per render and handed to both views as a prop, because neither
+   * reads a clock — that is what makes the today-ring provable and their tests
+   * deterministic. `TimelineView` takes the same `today`: its scroll anchor is
+   * internal state seeded from it, not a second mount prop, and passing one
+   * would be inventing a second origin for the same day. `istToday` is the only
+   * thing allowed to make this decision; an ISO slice would ring yesterday's
+   * cell for five and a half hours every night.
+   */
+  const today = istToday();
+
+  /**
+   * The roster resolved into the two things the views need from it, and BOTH are
+   * omitted while it has not arrived rather than defaulted to an empty answer.
+   *
+   * `rankOneEpicPredicate([])` would answer false for every type including
+   * `epic`, which is wrong about the truth; passing nothing lets both views fall
+   * back to app-core's `isBuiltinEpicType`, which is merely narrower than it.
+   * The same reasoning is why `customDateFieldsByType` is consulted per row's
+   * own type rather than flattened across the project.
+   */
+  const dateFieldsByType = useMemo(
+    () => customDateFieldsByType(ticketTypes.data ?? []),
+    [ticketTypes.data],
+  );
+  const isEpicType = useMemo(
+    () => (ticketTypes.data === null ? undefined : rankOneEpicPredicate(ticketTypes.data)),
+    [ticketTypes.data],
+  );
+
+  /**
+   * `list.rows === null ? [] : …` and NOT `list.rows ?? []`, for the reason the
+   * `parentCandidates` note below gives at length: the two spellings agree here
+   * only because the arms that render these inputs are gated on `list.rows !==
+   * null` themselves. The gate is the guarantee; this expression never carries
+   * an empty array into a view.
+   */
+  const dateInputs = useMemo<TicketDatesInput[]>(
+    () =>
+      list.rows === null
+        ? []
+        : list.rows.map((row) =>
+            toTicketDatesInput(
+              row,
+              { workspaceId, projectId },
+              dateFieldsByType.get(row.typeId) ?? [],
+            ),
+          ),
+    [list.rows, workspaceId, projectId, dateFieldsByType],
+  );
 
   /**
    * ## THE `?? []` THAT TOLD THE USER THIS PROJECT HAS NO TICKETS
@@ -286,10 +383,57 @@ function ProjectBoard() {
               >
                 List
               </button>
+              <button
+                role="tab"
+                type="button"
+                aria-selected={view === 'calendar'}
+                onClick={() => setView('calendar')}
+              >
+                Calendar
+              </button>
+              <button
+                role="tab"
+                type="button"
+                aria-selected={view === 'timeline'}
+                onClick={() => setView('timeline')}
+              >
+                Timeline
+              </button>
               {createRegion}
             </div>
 
-            {view === 'board' ? (
+            {view === 'calendar' ? (
+              // The calendar and the timeline read the SAME list as the List
+              // tab, so they refuse for the same reason and say which view went
+              // missing — never a month grid drawn over `?? []`.
+              list.error !== null ? (
+                <ShellRefusal what="The calendar" message={list.error} />
+              ) : list.rows !== null ? (
+                <CalendarView
+                  tickets={dateInputs}
+                  today={today}
+                  userName={nameOf}
+                  onOpenTicket={openTicket}
+                  {...(isEpicType === undefined ? {} : { isEpicType })}
+                />
+              ) : (
+                <p>Loading…</p>
+              )
+            ) : view === 'timeline' ? (
+              list.error !== null ? (
+                <ShellRefusal what="The timeline" message={list.error} />
+              ) : list.rows !== null ? (
+                <TimelineView
+                  tickets={dateInputs}
+                  today={today}
+                  userName={nameOf}
+                  onOpenTicket={openTicket}
+                  {...(isEpicType === undefined ? {} : { isEpicType })}
+                />
+              ) : (
+                <p>Loading…</p>
+              )
+            ) : view === 'board' ? (
               board.error !== null ? (
                 <ShellRefusal what="The board" message={board.error} />
               ) : board.data !== null ? (

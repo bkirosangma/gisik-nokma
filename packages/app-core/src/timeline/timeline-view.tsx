@@ -2,6 +2,7 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import type { UserNameFn } from '../claims/claim-labels.js';
 import { addDays, mondayOnOrBefore } from '../claims/dates.js';
 import type { TicketDatesInput } from '../claims/ticket-dates.js';
+import type { IsEpicType } from '../hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../view-types.js';
 import {
   buildTimelineModel,
@@ -77,6 +78,19 @@ export type TimelineViewProps = {
   onOpenTicket: (ticketId: string) => void;
   filter?: FilterSpec;
   laneEpicId?: string | null;
+  /**
+   * WHAT THIS WORKSPACE CALLS AN EPIC — forwarded UNCHANGED, never defaulted
+   * here, for the same reason `weeksCount` below is: `buildTimelineModel` states
+   * the default (`isBuiltinEpicType`) and `epic-ancestor.ts` states why that
+   * default is deliberately narrower than the server's rank-1 rule.
+   *
+   * It reaches TWO answers in the model, not one: `epicAncestorOf` for the lane
+   * filter and grouping, and the `isEpicType(input.state.typeId) && start ===
+   * null && due === null` arm that decides an undated epic's side-list entry.
+   * `CalendarView` gained the same prop in the same change — see its note for
+   * why fixing one view alone would have been worse than fixing neither.
+   */
+  isEpicType?: IsEpicType;
   /**
    * Forwarded UNCHANGED, never defaulted here. `buildTimelineModel` states the
    * default (8) and refuses a count it cannot mean; a `?? 8` in this file
@@ -170,9 +184,18 @@ export function TimelineView(props: TimelineViewProps) {
         userName: props.userName,
         ...(props.filter === undefined ? {} : { filter: props.filter }),
         ...(props.laneEpicId === undefined ? {} : { laneEpicId: props.laneEpicId }),
+        ...(props.isEpicType === undefined ? {} : { isEpicType: props.isEpicType }),
         ...(props.weeksCount === undefined ? {} : { weeksCount: props.weeksCount }),
       }),
-    [props.tickets, props.userName, props.filter, props.laneEpicId, props.weeksCount, anchor],
+    [
+      props.tickets,
+      props.userName,
+      props.filter,
+      props.laneEpicId,
+      props.isEpicType,
+      props.weeksCount,
+      anchor,
+    ],
   );
 
   const layout = { '--timeline-week-columns': `repeat(${model.weeks.length}, 1fr)` } as CSSProperties;
