@@ -9,7 +9,14 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 13 — Plan 8. BATCH A (T1-T4) COMPLETE, gate green. Batch B (T5-T8) is next.**
+## WHERE I AM: **STEP 13 — Plan 8. T1-T5 DONE. Batch B is RESUMING AT T6.**
+
+> **BATCH B DIED MID-FLIGHT ON AN EXPIRED LOGIN (2026-09-03).** Seven of nine agents failed with
+> *"Login expired · Please run /login"*: T5's fix round and both agents of T6, T7 and T8. **T5's
+> implementer and reviewer completed**, and **T5's fix round had written its full work into the tree
+> but died before committing** — recovered, independently verified and committed as `87ab662`.
+> **The tree is clean and the suite is green at 562.** A dead fan-out leaves work in the tree, not
+> just a gap in the ledger: **check `git status` before assuming a failed agent did nothing.**
 
 **Step 12 (Plan 7 remainder) is MERGED as PR #82 → `7337357`.** Plan 7 is complete at 22/22.
 **Do not reopen it.** Its eighteen ledger rows read `in-flight` on `main` after the merge; this
@@ -17,7 +24,7 @@ branch's first commit promotes them to `done`, and `check:tasks` now verifies th
 ancestor of `origin/main`. **The repo stands at 118/177 (66.7%), independently recounted.**
 
 Step 13 = **Plan 8**, `docs/superpowers/plans/2026-08-20-08-workflow-builder.md`, **15 tasks.**
-**T1, T2, T3, T4 are DONE and committed** (Batch A: 12 agents, 0 errors). **T5-T15 remain.**
+**T1, T2, T3, T4, T5 are DONE and committed.** **T6-T15 remain.**
 No PR is open. **Three rulings are open and NONE blocks Batch B** — see RULINGS OPEN.
 
 **Batching:** **A: T1-T4** (done) · **B: T5-T8** (canvas → validation) · **C: T9-T12** (publish →
@@ -397,11 +404,18 @@ here is the commit that supplies it"*, which cannot be written until the commit 
 
 **Nothing.** Batch A is closed, the tree is clean, and the gate is green at HEAD.
 
-## RULINGS OPEN — three, none blocking
+## RULINGS — one taken this batch (P28), two still open, none blocking
 
-1. **The T13 `DataSource` seam** (section A above). Raised with the controller; unanswered.
-   **Standing default: the `apps/web` adapter reaches those four operations through the existing
-   online HTTP client, leaving Plan 6's `data-source.ts` untouched.** Needed by Batch D, not before.
+1. ~~**The T13 `DataSource` seam**~~ — **RULED. P28 (owner-approved, 2026-09-03), and it took the
+   executor's recommended option (b).** The `apps/web` `WorkflowAuthoringGateway` adapter calls
+   `listWorkflows`, `getStateOccupancy`, `getTypeWorkflowPopulation` and `migrateTypeToWorkflow`
+   **directly over HTTP, bypassing `DataSource`**. The ruling's reasoning, recorded because it
+   settles a rule that will be read again: **amendment 10's "no HTTP in views" binds VIEWS, not the
+   gateway adapter** — the view still only ever sees the gateway interface, unchanged. `DataSource`
+   stays untouched, so **Plan 10's offline replica is not forced to answer an offline-migration or
+   offline-occupancy question before that plan exists.** The `getMembers` `Actor[]` →
+   `WorkspaceMember[]` reconciliation is part of the same T13 work. Full text in
+   `docs/lanes/controller-state.md` as P28 — **cite that, not the message that carried it.**
 2. **The frozen errand template trips `rule-bypassable` twice** — filed by T3 in the coordination
    doc. Fixing the template violates Plan 11's `checkErrandTemplate` oracle pin; silencing the check
    means editing a module Plan 2's own F5 ruling designed. **No later task may resolve this by
