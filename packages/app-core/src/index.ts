@@ -86,3 +86,59 @@ export {
   type VisibilityClaim,
   type VisibilityEditorProps,
 } from './views/visibility-editor.js';
+// Plan 9 Task 8 — the calendar view-model and the claim readers under it.
+// `FilterSpec` is deliberately absent from this block: it is declared in
+// `view-types.ts` and already leaves through the `export *` above. The
+// predicate lives in `filter/matches-filter.ts` precisely so the TYPE keeps
+// one declaration site.
+export {
+  DAY_MS,
+  addDays,
+  dateMs,
+  isoDate,
+  mondayOnOrBefore,
+  monthGridWeeks,
+  type WeekDays,
+} from './claims/dates.js';
+export {
+  customDateClaimsOf,
+  dateClaimOf,
+  titleOf,
+  type CustomDateClaimView,
+  type CustomDateField,
+  type DateClaimView,
+  type TicketDatesInput,
+} from './claims/ticket-dates.js';
+export {
+  CALENDAR_ALL_HIDDEN_COPY,
+  CALENDAR_EMPTY_MONTH_COPY,
+  TIMELINE_SIDE_LIST_COPY,
+  barProvenance,
+  claimTooltip,
+  contradictionCopy,
+  customClaimLabel,
+  dueClaimLabel,
+  formatClaimDate,
+  startClaimLabel,
+  type AttributedDate,
+  type UserNameFn,
+} from './claims/claim-labels.js';
+export {
+  BUILTIN_EPIC_TYPE_ID,
+  EPIC_RANK,
+  epicAncestorOf,
+  isBuiltinEpicType,
+  type IsEpicType,
+} from './hierarchy/epic-ancestor.js';
+export { matchesFilter } from './filter/matches-filter.js';
+export {
+  buildCalendarModel,
+  type CalendarBar,
+  type CalendarCustomFieldTally,
+  type CalendarItem,
+  type CalendarMarker,
+  type CalendarModel,
+  type CalendarModelOptions,
+  type CalendarMonth,
+  type CalendarWeek,
+} from './calendar/calendar-model.js';
