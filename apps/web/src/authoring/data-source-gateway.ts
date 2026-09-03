@@ -1,12 +1,12 @@
 import type { DataSource } from '@gisik-nokma/app-core';
-import type {
-  MigrationOutcome,
-  MigrationRequest,
-  WorkflowAuthoringGateway,
-  WorkspaceMember,
-} from '@gisik-nokma/app-core';
+import type { MigrationOutcome, MigrationRequest, WorkflowAuthoringGateway } from '@gisik-nokma/app-core';
 import { HttpError, type HttpClient } from '@gisik-nokma/app-core/online';
-import type { PublishedWorkflowDef } from '@gisik-nokma/domain';
+import type {
+  MemberListResponse,
+  StateOccupancyResponse,
+  TypePopulationResponse,
+  WorkflowListResponse,
+} from '@gisik-nokma/domain';
 
 /**
  * # The `WorkflowAuthoringGateway`: three members through Plan 6's `DataSource`,
@@ -104,9 +104,58 @@ import type { PublishedWorkflowDef } from '@gisik-nokma/domain';
  * caller says 'unavailable' rather than guessing a number" — so all four throw
  * `AuthoringReadRefused` instead.
  *
- * The screens are already built for it: `WorkflowListScreen` renders a load
- * error, and `WorkflowBuilderScreen` catches a refused roster specifically
- * (a guest may not call the members route at all — executor ruling 2026-09-02).
+ * TWO consumers are built for it and one is NOT, and the difference matters
+ * enough to say here rather than in a commit message. `WorkflowListScreen`
+ * renders a load error on any rejection (`workflow-list-screen.tsx`, the
+ * `.catch` that sets `loadFailed`), and `builder-wiring.tsx` narrows on
+ * `AuthoringReadRefused` specifically — a 404 is "the no-guests door turned me
+ * away", anything else is `refused` and rendered as such (a guest may not call
+ * the members route at all — executor ruling 2026-09-02).
+ * `WorkflowBuilderScreen` does NOT: `listMembers(...).catch(() => [])` is
+ * blanket, so a 500, a dropped connection or an unparseable roster body becomes
+ * the empty roster — the very lie the paragraph directly above says this
+ * adapter declined to invent, told by the caller instead, into rule summaries
+ * and `require-different-user` editors. That screen is `packages/app-core`, and
+ * the narrowing that would fix it is not available to it: `AuthoringReadRefused`
+ * is declared in THIS file, and `app-core` depends on `domain`, `rule-engine`
+ * and `ui` alone. So the fix is a contract move, not a one-line catch, and it is
+ * RECORDED in the coordination doc (Plan 8 Task 13 fix round, 2026-09-03) rather
+ * than annexed here. The reason the adapter still rejects is unchanged: an
+ * adapter that guessed `[]` would take the choice away from every consumer,
+ * including the two that handle it correctly.
+ *
+ * ## What the response types buy, and what they do not
+ *
+ * Each HTTP read asserts the body to the SAME exported type the route annotates
+ * its answer with — `WorkflowListResponse`, `MemberListResponse`,
+ * `StateOccupancyResponse`, `TypePopulationResponse`, all from
+ * `@gisik-nokma/domain`, all spelled `const body: X = {...}` in
+ * `apps/server/src/routes/builder-reads.ts`. That is deliberate and it is the
+ * whole of the type safety here, because `HttpClient.get` answers `unknown`:
+ * with the shapes hand-spelled inline, as they were first written, renaming a
+ * field on the shared type reddened the server and left this file GREEN reading
+ * a key that no longer exists. Measured as a PAIR rather than reasoned: with the
+ * inline shapes, `workflows` -> `defs` on `WorkflowListResponse` reddened
+ * `@gisik-nokma/server:typecheck` (TS2339 on the renamed key) and left
+ * `@gisik-nokma/web:typecheck` GREEN — the mutation that killed nothing here.
+ * With the assertions below, the same rename reddens web at the read itself, and
+ * so does `members` -> `roster` on `MemberListResponse`.
+ *
+ * The fifth body — `migrateTypeToWorkflow`'s POST answer — was never inline: it
+ * asserts to the shared `MigrationOutcome` the gateway's own type promises, and
+ * its refusal arm is `isRefusal`, a real narrowing rather than an assertion.
+ * Its `migrated` arm gets the same nominal-only treatment as the four reads.
+ *
+ * What it does NOT buy is any check of what actually arrives. Unlike
+ * `mapWorkflowDef`, which validates field by field (`online/mappers.ts:508`),
+ * nothing here inspects the body at runtime: a deployed server that stopped
+ * sending `role` would hand `builder-wiring.tsx` an `undefined` typed as
+ * `WorkspaceRole`, and its `own?.role ?? LEAST_PRIVILEGE` would read an owner as
+ * a guest. The mapper primitives that would catch it — `asRecord`, `asArray`,
+ * `asString` — are private to `mappers.ts` and are not on the
+ * `@gisik-nokma/app-core/online` export list, so validating here means a second
+ * copy of that convention across a package boundary. That is a real gap, stated
+ * at the site rather than described as safety.
  */
 
 /**
@@ -158,7 +207,7 @@ export function createWebAuthoringGateway(deps: WebAuthoringDeps): WorkflowAutho
      */
     listWorkflows: async (workspaceId) => {
       const route = `${ws(workspaceId)}/workflows`;
-      const body = answered(await http.get(route), route) as { workflows: PublishedWorkflowDef[] };
+      const body = answered(await http.get(route), route) as WorkflowListResponse;
       return body.workflows;
     },
 
@@ -179,7 +228,7 @@ export function createWebAuthoringGateway(deps: WebAuthoringDeps): WorkflowAutho
     /** Over HTTP, and the docblock above says why `getMembers` cannot stand in. */
     listMembers: async (workspaceId) => {
       const route = `${ws(workspaceId)}/members`;
-      const body = answered(await http.get(route), route) as { members: WorkspaceMember[] };
+      const body = answered(await http.get(route), route) as MemberListResponse;
       return body.members;
     },
 
@@ -190,7 +239,7 @@ export function createWebAuthoringGateway(deps: WebAuthoringDeps): WorkflowAutho
      */
     getStateOccupancy: async (workspaceId, workflowId) => {
       const route = `${ws(workspaceId)}/workflows/${encodeURIComponent(workflowId)}/state-occupancy`;
-      const body = answered(await http.get(route), route) as { counts: Record<string, number> };
+      const body = answered(await http.get(route), route) as StateOccupancyResponse;
       return body.counts;
     },
 
@@ -203,7 +252,7 @@ export function createWebAuthoringGateway(deps: WebAuthoringDeps): WorkflowAutho
       const route =
         `${ws(workspaceId)}/ticket-types/${encodeURIComponent(typeId)}/population` +
         `?workflowId=${encodeURIComponent(workflowId)}`;
-      const body = answered(await http.get(route), route) as { count: number };
+      const body = answered(await http.get(route), route) as TypePopulationResponse;
       return body.count;
     },
 

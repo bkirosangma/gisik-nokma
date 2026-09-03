@@ -6369,3 +6369,79 @@ and Task 13's tsconfig step exists to make that spelling typecheck — but this 
 style it is written as. Step 4 also predicts "20 tests" for the three suites it names; they hold
 **53** — the earlier suites grew past the plan's arithmetic, which is a stale prediction rather than
 a missing test.
+
+## Plan 8 Task 13 fix round (2026-09-03) — a refusal the adapter refused to guess, guessed by the screen; and NOBODY currently owns it
+
+Recorded, not fixed, on the Task 7 entry's terms above: outside Task 13's scope, and outside every
+open task's scope too.
+
+**The gap.** `packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:70` loads the
+roster as `props.gateway.listMembers(props.workspaceId).catch(() => [] as WorkspaceMember[])` — a
+blanket catch on the promise, not a narrowing on the one refusal it was written for. Its own comment
+names that refusal correctly (a guest may not call `GET /v1/workspaces/:id/members`, executor ruling
+2026-09-02), but the code cannot tell that 404 from a 500, a dropped connection, or a roster body it
+could not parse. All four become `[]`, which flows into `data.members` and from there into every rule
+summary and the `require-different-user` editor as "nobody is in this workspace".
+
+**Why it is only now reachable, and why the entry belongs to this task's fix round rather than to
+Task 10 that wrote the line.** Before Task 13 no shipped `WorkflowAuthoringGateway` could produce a
+non-404 rejection: `authoring` was not on `AppServices`, and the only implementation was
+`fake-gateway.ts`'s `listMembers: async () => seed.members ?? []`, which cannot reject at all. Task 13
+built the HTTP adapter, so the 500 and the dropped connection exist now. The adapter itself is
+correct — it rejects rather than inventing an empty, and `gateway.ts` forbids the invention by name —
+and its docblock previously claimed `WorkflowBuilderScreen` "catches a refused roster specifically".
+That sentence was false the moment the adapter shipped; it is corrected in the same commit as this
+entry, since the sentence is Task 13's own.
+
+**Why it is not a one-line fix, which is the part an owner needs to know.** The narrowing that would
+close it is `cause instanceof AuthoringReadRefused`, and that class is declared in
+`apps/web/src/authoring/data-source-gateway.ts` — sweep: `AuthoringReadRefused` appears in **four**
+files at this sha (`src/authoring/data-source-gateway.ts`, `src/authoring/builder-wiring.tsx`,
+`test/data-source-gateway.test.ts`, `test/authoring-routes.test.tsx`), every one under `apps/web`, and `packages/app-core/package.json` depends on
+`@gisik-nokma/domain`, `@gisik-nokma/rule-engine` and `@gisik-nokma/ui` and on nothing in `apps/`. A
+screen in app-core therefore cannot name the error its own gateway contract's implementations throw.
+Closing this means moving the refusal into `workflow-builder/gateway.ts` — a class or a predicate the
+contract owns, which `builder-wiring.tsx` and the fake would both have to adopt — and that is a
+contract change touching the adapter that throws (`data-source-gateway.ts`), the wiring that narrows
+(`builder-wiring.tsx`), the screen that should (`workflow-builder-screen.tsx`) and the fake that
+declares the contract's other implementation (`fake-gateway.ts`), not a catch clause. `builder-wiring.tsx` is the shape to copy:
+it already answers a four-arm union in which a refused read is `refused` and never a role.
+
+**The ownership sweep, run in the documents rather than from memory.** Plan 8 has two tasks left and
+neither is a slot for this: **Task 14** is the Playwright smoke, four steps, all of them config, spec,
+run and commit; **Task 15** is the catalogue and the final verification pass, four steps — Step 1 runs
+commands, Steps 2 and 3 write `Features.md` §10 and `test-cases/10-workflow-builder.md`. A behaviour
+change in an app-core screen fits neither, and parking it on Task 15 Step 1 would be parking a code
+change on a verification run. Plans 9, 10 and 11 mention neither `WorkflowBuilderScreen` nor
+`workflow-builder-screen` anywhere in their text. The only other mention of `listMembers` in this
+document is the Task 12 section's fixture note, which assigns nothing. **So it is unowned, and it is
+recorded that way rather than given a plausible-sounding owner** — this branch has already shipped one
+false owner claim ("Lane 4") together with a false claim of having verified it.
+
+**Also from this fix round, FIXED rather than recorded, and kept here because the measurement is the
+transferable part.** **Four** of the adapter's five HTTP bodies were typed by hand-spelled inline `as`
+shapes on `unknown` (`as { workflows: PublishedWorkflowDef[] }` and three siblings); the fifth, the
+migrate POST, already asserted to the shared `MigrationOutcome` and narrows its refusal arm through
+`isRefusal`, so it needed nothing. The review called it five; that half is refuted. `HttpClient.get`
+answers `Promise<unknown>`, so the assertion was 100% of the typing, and the shapes were nominally
+unlinked to the `WorkflowListResponse` / `MemberListResponse` / `StateOccupancyResponse` /
+`TypePopulationResponse` the routes annotate their answers with. Measured as a pair, not argued:
+renaming `workflows` -> `defs` on `WorkflowListResponse` in `packages/domain` reddened
+`@gisik-nokma/server:typecheck` with TS2339 and left `@gisik-nokma/web:typecheck` **green** — the
+mutation that killed nothing. After swapping the four assertions to the domain types, the identical
+rename reddens web at the read itself, and so does `members` -> `roster` on `MemberListResponse`. Both
+mutations were reverted with `git checkout --` and the revert confirmed by printing the two lines, not
+by shell `diff`. The residual gap is stated in the adapter rather than papered over: this is
+compile-time nominal linkage only, and unlike `mapWorkflowDef` nothing validates the wire, because the
+`asRecord`/`asArray`/`asString` primitives are private to `online/mappers.ts` and absent from the
+`@gisik-nokma/app-core/online` export list.
+
+**Carried forward from a commit message, because that is not where this series records.** Commit
+`2da26d1` reported `packages/app-core/test/workflow-builder/access.test.tsx` > "control: the identical
+gesture as an admin opens the same inspector..." failing ONCE in three full-gate runs on
+`[data-testid="transition-label-8"]`, and passing 5/5 alone and 6/6 as a whole app-core suite outside
+turbo — read as a concurrency-load flake in a file that commit did not touch. That measurement is
+quoted, not re-run here. Its stated owner was "Plan 8 Task 15, whose Step 1 is the full verification
+pass", which is the right owner for a flake to be re-observed under a verification run — and, for the
+avoidance of the confusion this entry could otherwise cause, is NOT an owner for the app-core
+behaviour change above.
