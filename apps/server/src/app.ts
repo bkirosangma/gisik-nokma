@@ -12,6 +12,7 @@ import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
 import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
+import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerPreferencesRoutes } from './routes/preferences.js';
 import { registerSearchRoutes } from './routes/search.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
@@ -290,6 +291,12 @@ export function buildApp(
   // under, and there is deliberately no parameter by which a caller could name
   // somebody else's.
   registerPreferencesRoutes(app, { pool: deps.pool }, requireSession);
+  // The notification inbox (Plan 9 Task 7) — cursor-paged list, unread count,
+  // and idempotent mark-read, all three scoped to `request.currentUserId` by
+  // construction. Same preHandler by parameter as every route above it, and
+  // here it is a read-enforcement surface: another user's notification id
+  // must read as `not_found`, never as a different, more informative refusal.
+  registerNotificationRoutes(app, { pool: deps.pool }, requireSession);
   // The realtime fan-out (Plan 5 Tasks 14–15) — the FIRST thing here that is
   // not a request/response at all, and the first that decides who ELSE hears
   // about a change. The hub is created HERE, beside the ingest service whose
