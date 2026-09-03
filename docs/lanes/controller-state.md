@@ -187,7 +187,45 @@ stay with the established zone) is unchanged, only the mailbox name. Both plan d
 `sign-in@gisik-nokma.local` is untouched — it never leaves Mailpit. **No code has executed against the old
 value** — Plan 11 is 0/16 `done`, so this is a plan-text correction, not a rollback.
 
-## Anchors — re-measured 2026-09-03 ~16:35 IST, at `9b70ab9` (step 13 merged)
+## Anchors — re-measured 2026-09-04 ~01:20 IST, at `d3e0889`
+
+| what | value |
+|---|---|
+| `main` | **`d3e0889`** — step 13 merged at `9b70ab9`; four more have landed since: **#88** (P29's rationale), **#89** (CI optimisation, below), **#90** (the access.test.tsx race fix), plus #91 |
+| step 14 | **IN FLIGHT on `exec/14-plan9-calendar`** — Plan 9, T1–T8 + T10 committed (9 of 15), T9 and T10's fix round running. **No PR yet.** Named by BRANCH deliberately; its head sha moves every few minutes |
+| ledger | **`CHECK_EXIT=0` · 133/177 (75.1%)** · claimed 0 · in-flight 0 · todo 44 · Plans 1–8 all complete |
+| executor's own gate | 2,594 tests at Batch A close, its figure, on its branch — **not re-verified by me**, and it is not `main`'s number |
+| quota | **76% weekly at 2026-09-04 01:15 IST**, reset Monday 06:30. See the STOP POINT section at the top of this file — it is an owner instruction, not a suggestion |
+
+> ### ⚙ THE CI MACHINERY CHANGED ON 2026-09-04 — #89, owner-directed. A successor MUST know this.
+> **`turbo.json` no longer sets `"cache": false` on `test`/`typecheck`, and `.turbo` is persisted between
+> runs via `actions/cache`.** Measured effect on the very next code PR (#90): turbo step **5m18s → 1m44s**,
+> **18 of 24 tasks cached**, total job 5m45s → 2m27s. Correctness proven by paired control before it
+> landed: unchanged tree → 20/20 cached (17ms, FULL TURBO); one line touched in `packages/domain` → domain
+> **and all six dependents** re-ran, only dependency-free `ui` stayed cached.
+> **THE SAFETY PROPERTY, do not lose it: the controller's own forced gate runs `--force` and never consults
+> this cache.** A CI cache hit means "this exact input hash already passed"; the merge decision still rests
+> on an uncached run. Keep running the pre-merge gate with `--force`.
+> **`ci.yml` also skips the suite for docs-only PRs** — the job still runs and still reports `gate` green so
+> the auto-merge precondition has a check to read, but its log says green means "nothing outside `docs/`
+> changed", NOT "the suite passed". Only `docs/**` is inert; `Features.md` and `test-cases/**` still run the
+> full gate. An **empty** changed-file list runs everything, because during development a wrong base made a
+> real 82-file change report zero files — an empty list is "learned nothing", not "docs only".
+> **Plan 11 T14 still owns the six-job split and sharding the server suite** (270s, the critical path);
+> `ci.yml`'s comments say so, so T14 extends this rather than reverting it.
+
+> ### THE FLAKE THAT COST A ROUND, and the shape of the evidence that settled it (#90)
+> `access.test.tsx` failed one case in CI while 686 others passed — it awaited an unrelated element then
+> called **synchronous `getByTestId`** for a React Flow EDGE label, which is painted later. **Neither green
+> run was the evidence**: it had passed 17 consecutive local runs, and a re-run of the identical commit
+> also passed. What settled it was a probe measuring the DOM at the awaited instant — the edge was absent
+> **1 observation in 16**, on the first attempt of a cold run. The fix (8 sites → `await findByTestId`) was
+> then verified by a **deterministic** paired control, not repetition: synchronously after `render()` the
+> edge is absent 16/16, so at that instant `getByTestId` must throw and `findByTestId` must succeed.
+> **The executor proposed making the probe's assertion a permanent pin; that was refused — it asserts the
+> race IS happening, so it would fail ~15 runs in 16.** A probe and a pin are different artifacts.
+
+## ~~Anchors — 2026-09-03 ~16:35 IST, at `9b70ab9` (step 13 merged)~~ superseded, kept for the gate figures
 
 | what | value |
 |---|---|
