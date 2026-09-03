@@ -6124,7 +6124,39 @@ a purely local refusal elsewhere.
 **Why it is recorded rather than decided.** Both readings are defensible from one sentence, and the
 choice is a product decision about whose refusal a user should be shown, not an implementation detail.
 
-## RULING REQUEST — Plan 8 Task 3's frozen errand template trips `rule-bypassable`; Plan 2's own ruling designed the check but did not settle this shape (2026-09-03, exec/13 executor; corrected 2026-09-03, T3 fix round)
+## RULING P29 — TAKEN AND APPLIED (owner-approved 2026-09-03). Plan 8 Task 3's frozen errand template trips `rule-bypassable`, and it is ACCEPTED. Full text in `docs/lanes/controller-state.md` as P29 — cite that, not the message that carried it.
+
+**The verdict: option 3 — accept both trips as known and expected. Touch NEITHER
+`checkErrandTemplate` NOR `adviseWorkflowDef`.** Both are correct as they stand: the advisory is
+right that the guard is skippable, and the template is right to keep those paths rule-free, because
+they are the one-hop seeding paths the oracle pins.
+
+**The reasoning, recorded because it decides a class of question and not just this one.**
+`rule-bypassable` is advisory-only and never blocks publishing, so this costs nothing functionally.
+Plan 11 Task 8's framing is *"frozen record in, events out, nothing invented"* — the template exists
+to digitize the real shop's actual workflow, warts included. **Sanitizing it to clear an advisory
+panel would mean inventing a cleaner reality than the one being recorded**, which contradicts the
+reason it is imported by identity in the first place. **Scoped to this one frozen,
+identity-imported template — NOT a general carve-out for `rule-bypassable` elsewhere.**
+
+**The rationale is written at the declaration** (`packages/domain/src/workflows/errand-with-waits.ts`),
+because that is where someone meeting the warning looks first, and echoed in `Features.md` §10 and
+`test-cases/10-workflow-builder.md` case 10.61.
+
+**Verified alongside the ruling, because it changes how much this matters: an admin is NOT stuck
+with the warning.** The controller asked whether the dogfooding seed creates an independently
+editable live `WorkflowDef` row separate from the frozen constant. **It does, and the guarantee is
+structural rather than incidental:** the constant's type is `Omit<WorkflowDef, 'id' | 'version'>`, so
+it **lacks exactly the two fields a real definition requires** and nothing can publish the object
+itself. Every live def is a copy that acquired its own id and version — `cloneTemplate` (app-core)
+via `structuredClone` + `newUlid()` + `version: 1`, and Plan 11's seed via a `workflow.defined`
+payload carrying its own id. So the shop's admin can later guard those two paths on their own live
+copy through the builder, and neither this constant nor the oracle is touched by that.
+
+*(The request that preceded this ruling is kept below, because its measurement is the evidence the
+ruling rests on.)*
+
+### The original request, as filed (2026-09-03, exec/13 executor; corrected 2026-09-03, T3 fix round)
 
 `ERRAND_WITH_WAITS_TEMPLATE` (`packages/domain/src/workflows/errand-with-waits.ts`) is pinned by Plan
 11's `checkErrandTemplate` oracle (verified absent from this branch by search this session — Plan 11
