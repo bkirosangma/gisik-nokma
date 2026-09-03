@@ -60,12 +60,12 @@ describe('WorkflowBuilderScreen', () => {
     );
     await screen.findByRole('textbox', { name: 'Workflow name' });
     await user.click(screen.getByRole('button', { name: 'Add state' }));
-    expect(screen.getByText('New state')).toBeInTheDocument();
+    expect(await screen.findByText('New state')).toBeInTheDocument();
   });
 
   it('says so when workspace data cannot load', async () => {
     const gateway = createFakeGateway();
-    gateway.listMembers = async () => {
+    gateway.listTicketTypes = async () => {
       throw new Error('boom');
     };
     render(
@@ -79,6 +79,23 @@ describe('WorkflowBuilderScreen', () => {
     expect(
       await screen.findByText('Could not load workspace people and types — reload to try again.'),
     ).toBeInTheDocument();
+  });
+
+  it('degrades to an empty roster instead of a fatal error when a guest is refused the member list', async () => {
+    const gateway = createFakeGateway();
+    gateway.listMembers = async () => {
+      throw new Error('403 guest cannot list members');
+    };
+    render(
+      <WorkflowBuilderScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={gateway}
+        initialDraft={draftFromTemplate(kanban)}
+      />,
+    );
+    expect(await screen.findByRole('textbox', { name: 'Workflow name' })).toHaveValue('Simple kanban');
+    expect(screen.queryByText('Could not load workspace people and types — reload to try again.')).not.toBeInTheDocument();
   });
 
   it('disables the name field and hides Add state for non-authors', async () => {
@@ -132,6 +149,23 @@ describe('WorkflowListScreen', () => {
     expect(await screen.findByText('No workflows published yet.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'New workflow' }));
     expect(onNew).toHaveBeenCalledOnce();
+  });
+
+  it('says so when the workflow list cannot load', async () => {
+    const gateway = createFakeGateway();
+    gateway.listWorkflows = async () => {
+      throw new Error('boom');
+    };
+    render(
+      <WorkflowListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={gateway}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    expect(await screen.findByText('Could not load workflows — reload to try again.')).toBeInTheDocument();
   });
 
   it('hides New workflow from non-authors', async () => {

@@ -11,16 +11,26 @@ export function WorkflowListScreen(props: {
   onNew(): void;
 }) {
   const [workflows, setWorkflows] = useState<PublishedWorkflowDef[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    void props.gateway.listWorkflows(props.workspaceId).then((loaded) => {
-      if (!cancelled) setWorkflows(loaded);
-    });
+    setLoadFailed(false);
+    props.gateway
+      .listWorkflows(props.workspaceId)
+      .then((loaded) => {
+        if (!cancelled) setWorkflows(loaded);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      });
     return () => {
       cancelled = true;
     };
   }, [props.gateway, props.workspaceId]);
 
+  if (loadFailed) {
+    return <p className="workflow-list__load-error">Could not load workflows — reload to try again.</p>;
+  }
   if (workflows === null) return <p className="workflow-list__loading">Loading workflows…</p>;
   const canAuthor = canAuthorRole(props.session.role);
   return (

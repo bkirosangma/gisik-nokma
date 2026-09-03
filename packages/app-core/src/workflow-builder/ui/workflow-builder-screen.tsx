@@ -61,8 +61,12 @@ export function WorkflowBuilderScreen(props: {
 
   useEffect(() => {
     let cancelled = false;
+    // A guest may not call GET /v1/workspaces/:id/members (executor ruling
+    // 2026-09-02, coordination doc ~5442-5465; see gateway.ts's listMembers
+    // docstring) — that refusal is not a load failure, it is an empty roster.
+    // Only listTicketTypes rejecting is treated as fatal to this screen.
     Promise.all([
-      props.gateway.listMembers(props.workspaceId),
+      props.gateway.listMembers(props.workspaceId).catch(() => [] as WorkspaceMember[]),
       props.gateway.listTicketTypes(props.workspaceId),
     ])
       .then(([members, ticketTypes]) => {
