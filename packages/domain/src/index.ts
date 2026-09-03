@@ -15,6 +15,7 @@ export * from './advise-workflow.js';
 export * from './entity-state.js';
 export * from './ist-day.js';
 export * from './doc-text.js';
+export * from './doc-mentions.js';
 export * from './filter-spec.js';
 export * from './preferences.js';
 export * from './ticket-types.js';
