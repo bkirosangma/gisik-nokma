@@ -126,6 +126,15 @@ function CustomClaimList(props: { claims: readonly TimelineCustomClaim[] }) {
  * heading) and does not export it. A two-arm switch here would be a second
  * statement of the same grouping, free to disagree with the heading printed
  * directly above the rows it grouped. CSS decides which modifiers look alike.
+ *
+ * Today CSS gives the two undrawable reasons a treatment and the three
+ * missing-claim ones none — deliberately, and documented at the rules in
+ * `ui.css`. That is what makes the arms below dangerous: an arm returning the
+ * wrong missing-claim class, or the empty string, changes nothing on screen
+ * AND nothing in a suite that only asks whether a row was classed. The
+ * compiler proves this switch is exhaustive; it proves nothing about what the
+ * arms RETURN. All five VALUES are pinned by exact whole-class equality in
+ * `test/timeline/timeline-view.test.tsx` 11.77.
  */
 function sideEntryClassName(reason: TimelineSideReason): string {
   switch (reason) {

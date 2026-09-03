@@ -930,6 +930,17 @@
 
 .gn-timeline__claims { list-style: none; margin: 0; padding: 0; }
 .gn-timeline__claim { font-size: 0.75rem; color: var(--gn-custom-marker); }
+/* In transit, on the claim itself. Without this rule the timeline was the one
+   surface in the product that drew a custom date claim still on its way to the
+   server exactly like a settled one, while the month grid drew it — one
+   product, two answers about whether a claim is in transit, which is the thing
+   the timeline component's own header argues against for week placement.
+   The TREATMENT is the calendar's and the bar's — a dashed outline in the
+   `pending` role, never a different hue. Only the weight differs: a bar is a
+   filled block and takes a 2px outline inset over its own background, while
+   this is a line of 0.75rem text on the page background, where an inset 2px
+   rule would cross the glyphs. */
+.gn-timeline__claim[data-pending] { outline: 1px dashed var(--gn-pending); outline-offset: 1px; }
 
 .gn-timeline__side {
   padding: 0.5rem;
@@ -956,3 +967,14 @@
   padding-left: 0.35rem;
   font-style: italic;
 }
+/* The other THREE modifiers — `--no-dates`, `--start-only`, `--due-only` —
+   carry no rule here, and that is the decision, not an omission. They are
+   exactly the model's `MISSING_CLAIM_REASONS`, the set the plain heading above
+   the list is true of, and each entry already prints a note naming the claim
+   that is absent; a treatment per reason would decorate a sentence that has
+   already been said. They are emitted one-to-one anyway so this file can split
+   them later without the component learning a second partition. Because they
+   style nothing, a switch arm returning the wrong one of them — or nothing at
+   all — is invisible on screen as well as in a suite: their VALUES are pinned
+   in `packages/app-core/test/timeline/timeline-view.test.tsx` 11.77, by exact
+   whole-class equality over all five reasons. */
