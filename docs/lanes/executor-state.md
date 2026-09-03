@@ -9,7 +9,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9. T1-T8 COMMITTED (8/15), GATE GREEN. T8 fix + T10 IN FLIGHT.**
+## WHERE I AM: **STEP 14 — PLAN 9. T1-T8 + T10 COMMITTED, GATE GREEN. T10 fix + T9 IN FLIGHT.**
 
 > # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
 > ```
@@ -164,6 +164,61 @@ coordination doc already pre-corrected this). T2's `docToPlainText` **already ex
 (`packages/domain/src/doc-text.ts`) — created by **Plan 5**, not Plan 7 as T2's text says; take the
 skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
 `src/index.ts` as the plan says.
+
+## STOP — THE PLAN'S STYLING API DOES NOT EXIST. 57 SITES. BLOCKS T9, T11, T12, T13.
+
+**The plan writes `tokens.color.ink`, `tokens.space.md` and similar in 57 places.
+`@gisik-nokma/ui` exports NO `tokens` object at all.** Verified on disk at
+`packages/ui/src/tokens.ts`, which exports:
+
+`primitives` · `PrimitiveName` · `TOKEN_ROLES` · `TokenRole` · `themes` · `CONTRAST_PAIRS` ·
+`colorOf(theme, role)` · `cssVariableName(role)` · `themeStylesheet()`
+
+It is a **role system** — role -> primitive -> theme, with a contrast check — not the flat map the plan
+drafts against. **Every `tokens.*` snippet in Tasks 9, 11, 12 and 13 fails to compile as transcribed.**
+
+Of the plan's fourteen colour names: **3 are real roles** (`surface`, `accent`, `contested`); **3 are
+`primitives` keys the package's own discipline forbids a client from touching** (`ink`, `inkMuted`,
+`line` — the roles are `text`, `textMuted`, `border`); **8 are absent** — `todayRing`, `pendingHatch`,
+`barActive`, `barTerminal`, `marker`, `customMarker` (T9/T11) and `accentInk`, `unreadDot` (**T12**).
+`barActive`/`barTerminal` may simply be the existing `categoryActive`/`categoryTerminal` — check before
+inventing. Adding a role means picking primitives for BOTH themes and satisfying `CONTRAST_PAIRS`, and
+**a raw hex where a token belongs is a recorded failure class here with a check that catches it.**
+
+**Task 8 was RIGHT to defer this and its reasoning is the reusable part:** Task 8 renders nothing, so
+no Task 8 test could have reddened if it guessed a primitive wrong — *a check that cannot fail*. The
+work belongs to the first task that renders a colour, which is **T9**.
+
+## PROGRESS: T1-T10 COMMITTED (9 of 15 built; T9 pending). T10's fix + T9 IN FLIGHT.
+
+**T8's fix (`9e28e81`) closed both Importants and found the case the review had not named: NARROWINGS
+STACK.** With a filter removing one August claim and the legend hiding the other, the all-hidden
+sentence's *"EVERY claimed date belongs to a field you have hidden"* is false — and so is any
+filter-only phrasing. **Emitting either would have been a fourth instance of the defect the fix exists
+to close.** So the new arm is a disjunction, the exhaustive sentence is reachable only when the legend
+is the sole narrowing, and that precedence is witnessed. It also closed **four more boundary mutations
+the review never enumerated**, found by asking which *other* end of which *other* range had no fixture.
+
+> **It caught a defect in its own fix, by mutation.** Its first draft asserted the clock-scan file list
+> against itself — a loop over `CLOCK_FREE_DOMAIN_FILES` checking `scanned` contained each entry.
+> **Deleting a file from the list left all 50 tests green.** Names are literal now. *A list asserted
+> against itself is a check that cannot fail, and this is the second time that exact shape has appeared
+> on this branch.*
+
+**T10 (the timeline model) predicted its own defect class and found it.** `TIMELINE_SIDE_LIST_COPY`
+says work stays in the list *"until it carries both"* a start and a needed-by — but a **start-after-due**
+entry carries both and is still listed. Per-entry copy honest, heading false. Every side-list case in
+the plan holds ONE reason, so none of them could see it; the fixture that does holds two. It also
+found `dateMs` throws on `2026-02-30` — **storable, because `dueDateValueSchema` is regex-only** — where
+one such claim would have blanked the entire timeline.
+
+### T10's review — two Important, and one hole in the purity guard itself
+
+| # | Finding |
+|---|---|
+| **I1** | **`TimelineModel` has no `emptyCopy` at all.** Four different empties — no tickets, filtered out, laned out, and **fully-dated work wholly outside the window** — `JSON.stringify` to the SAME bytes. **DISTINCT COUNT: 1.** The sibling `CalendarModel`, same package and same author, declares `emptyCopy` for exactly this. The window-miss case is the one **Task 11 cannot reconstruct** — its props carry no window. Ruled: Task 10's, on the model. |
+| **I2** | **The undated-epic `continue` is witnessed on its true branch only.** Two mutations survive: a HALF-dated epic vanishes from rows *and* side list; a FULLY dated epic's bar vanishes. A control proves the true branch is pinned. It is the only statement that removes a ticket on the grounds of what it **is** rather than what it **claims** — and with I1, a vanished epic leaves nothing on screen explaining it. |
+| **Minor** | **The purity guard has a hole, and it is Task 8's harness, not Task 10's.** A literal `new Date()` is caught and named. An **aliased** read — `const CLOCK = Date; new CLOCK().valueOf()` — **survives both halves**: the scanner anchors on `\bnew\s+Date\s*\(`, and the four-zone identity test structurally cannot catch an *instant* read, since `Date.now()` returns the same number in every zone. The harness's own docblock already concedes the scan is the guard *because* the runtime harness cannot be. |
 
 ## PROGRESS: T1-T8 COMMITTED (8 of 15). T8's fix + T10 IN FLIGHT. **Measure; do not trust this line.**
 
