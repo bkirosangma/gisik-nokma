@@ -211,6 +211,15 @@ describe('11.48 the scanner is proven against planted defects before it is trust
     expect(hits, `the calendar surface reached for a clock:\n${report}`).toEqual([]);
     // The walk really happened, over the roots it claims.
     expect(scanned).toContain('calendar/calendar-model.ts');
+    /**
+     * The RENDERING half, named literally for the same reason every other
+     * entry here is: `CLOCK_FREE_ROOTS` already lists `calendar`, so the walk
+     * reaches this file for free — and that is exactly what makes its absence
+     * invisible. `calendar-view.tsx` is the surface that draws the today ring,
+     * the one place in this plan where a `new Date()` would be the shortest
+     * path to a working feature and would ring a collaborator's own timezone.
+     */
+    expect(scanned).toContain('calendar/calendar-view.tsx');
     // Named literally for the reason the comment below gives about
     // CLOCK_FREE_DOMAIN_FILES: a loop over the roots would assert the list
     // against itself, so deleting 'timeline' would delete its own guard.

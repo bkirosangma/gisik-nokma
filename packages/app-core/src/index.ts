@@ -146,6 +146,14 @@ export {
   type CalendarMonth,
   type CalendarWeek,
 } from './calendar/calendar-model.js';
+// Plan 9 Task 9 — the month grid over that model. Named exports with the `.js`
+// extension, matching every other block here; `export *` would re-export the
+// module's internal helpers as package surface.
+export {
+  CalendarView,
+  MAX_VISIBLE_PER_WEEK,
+  type CalendarViewProps,
+} from './calendar/calendar-view.js';
 // Plan 9 Task 10 — the timeline view-model. `FilterSpec` and `IsEpicType` are
 // deliberately absent from this block: both already leave through the
 // declarations above, and a second export path would fork the vocabulary the

@@ -683,3 +683,139 @@
   color: var(--gn-text-muted);
   font-size: 0.8rem;
 }
+
+/* --- The calendar month grid (Plan 9 Task 9) ------------------------------
+   The first surface in the product that renders a calendar colour, and every
+   one of them is a role: the today ring and a bar are `accent`, an in-transit
+   claim is `pending`, and a claim on a workspace-defined date field is
+   `customMarker` — the one meaning the roster did not already carry. The
+   plan's `todayRing`/`pendingHatch`/`barActive`/`barTerminal`/`marker` were
+   five new names for four existing roles.
+
+   `barActive`/`barTerminal` are absent on purpose: `CalendarBar` carries no
+   state category, so a two-colour bar would be colouring a distinction the
+   model cannot make. One fill, and pending shows as a dashed outline —
+   the same treatment `.gn-state-node--blocked` already uses. */
+
+.gn-calendar {
+  background: var(--gn-surface);
+  color: var(--gn-text);
+  font: inherit;
+}
+.gn-calendar__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+.gn-calendar__nav {
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  font: inherit;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
+.gn-calendar__nav:focus-visible,
+.gn-calendar__fold:focus-visible,
+.gn-calendar__item:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+.gn-calendar__month { margin: 0; font-size: 1rem; }
+
+.gn-calendar__empty {
+  margin: 0;
+  padding: 0.75rem;
+  color: var(--gn-text-muted);
+  font-size: 0.85rem;
+}
+
+.gn-calendar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0.5rem 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+}
+.gn-calendar__legend-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--gn-custom-marker);
+}
+
+.gn-calendar__days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-top: 1px solid var(--gn-border);
+}
+.gn-calendar__day {
+  padding: 0.25rem;
+  min-height: 2rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+}
+/* The ring, and it is drawn from a PROP: `today` never comes from a clock. */
+.gn-calendar__day--today {
+  outline: 2px solid var(--gn-accent);
+  outline-offset: -2px;
+}
+.gn-calendar__day--outside { color: var(--gn-text-muted); }
+
+.gn-calendar__items {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0.25rem;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.gn-calendar__item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 0.25rem;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  background: transparent;
+  color: var(--gn-text);
+}
+.gn-calendar__item--bar {
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+}
+.gn-calendar__glyph { color: var(--gn-accent); margin-right: 0.2rem; }
+.gn-calendar__item--custom { color: var(--gn-custom-marker); }
+.gn-calendar__item--custom .gn-calendar__glyph { color: var(--gn-custom-marker); }
+/* In transit: outlined, never a different hue — a claim on its way to the
+   server is the same claim, and recolouring it would say it means something
+   else. */
+.gn-calendar__item--pending { outline: 2px dashed var(--gn-pending); outline-offset: -1px; }
+/* A claimed day that is not a day on this row (`2026-02-30` sorts into the
+   23 Feb – 1 Mar week and is none of its seven days). Spanning the row says
+   "this week", which is all the comparison established; pointing at a column
+   would name a day nobody claimed. */
+.gn-calendar__item--unplaceable {
+  border: 1px dashed var(--gn-border-strong);
+  font-style: italic;
+}
+.gn-calendar__slot { min-width: 0; }
+
+.gn-calendar__fold {
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text-muted);
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.5rem;
+  margin: 0 0 0.25rem 0.25rem;
+  cursor: pointer;
+}
