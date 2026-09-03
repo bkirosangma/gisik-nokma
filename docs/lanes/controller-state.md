@@ -11,6 +11,54 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## RULING P28 (2026-09-03, owner-approved) — Plan 8's gateway adapter calls HTTP directly for 4 operations
+
+**Escalated by the executor mid-step-13** (`exec/13-plan8-workflow-builder`, Batch A running, no PR yet),
+via cross-session message — non-blocking, the executor had a conservative default and kept working while
+this was pending.
+
+**THE FINDING.** Amendment 10 says `apps/web` implements `WorkflowAuthoringGateway` "over Plan 6's
+`DataSource`." Measured against `packages/app-core/src/data-source.ts:125-139`: **four of the gateway's
+eight operations have no `DataSourceQuery` member at all** — `listWorkflows`, `getStateOccupancy`,
+`getTypeWorkflowPopulation`, `migrateTypeToWorkflow`. All four have a **live, registered** server route
+(`routes/builder-reads.ts`, `registerBuilderReadRoutes` at `app.ts:253`). **This is the inverse of the
+series' usual failure** — the server is ahead, and the client-side seam is missing, not the other way round.
+
+**RULING: Option (b) — the gateway ADAPTER calls those four directly over HTTP, bypassing `DataSource`.**
+Amendment 10's "no HTTP in views" rule binds **views**, not the adapter that implements the gateway — the
+view still only ever sees the `WorkflowAuthoringGateway` interface, unchanged. Narrowest change: touches no
+other plan's file, and does not force Plan 10's not-yet-built offline replica to invent an answer for
+"what does migrating a ticket type mean with no network" before that plan exists.
+
+**Rejected:**
+- **(a) Widen `DataSource` itself** with the four members. More architecturally uniform long-term, but a
+  cross-plan touch to Plan 6's already-shipped file, and it widens an interface **every** `DataSource`
+  implementor must satisfy — including Plan 10's, which has no offline story for a migration or an
+  occupancy count and would be forced to invent one under time pressure from an unrelated plan.
+- **(c) Defer the four operations** with an honest refusal, same shape as the `ServingGapError` pattern
+  used elsewhere in this series. Rejected because **three of the four are load-bearing for Tasks 9 and 11,
+  in this same plan** — unlike prior deferrals (P25), which parked things genuinely out of scope, this
+  would break in-plan work rather than defer future work.
+
+**Also folded in, same T13 scope, no separate ruling needed:** reconcile `getMembers`'s `Actor[]` against
+the gateway's wanted `WorkspaceMember[]`.
+
+**Two things flagged alongside this, neither needing a ruling:**
+- **The coordination doc carries a false "Done" claim about Plan 8's divergence-notice component**
+  (line 216), phrased as if verified against the code and naming five artefacts — `git log --all --
+  packages/app-core/src/workflow-builder` is **empty** (positive control: the same command on
+  `app-core/src/views` finds commits), and a repo-wide sweep for `WorkflowRebindDialog`, `rankImplications`,
+  `migrateTypeToWorkflow`, `TicketTypeEditorScreen`, and the two named button labels returns **zero** files
+  (controls in the same run: `transitionOptions` and `adviseWorkflowDef` each return 6). **The dangerous
+  part is the vocabulary, not the falsehood alone** — "verified against the code" plus five named artefacts
+  reads as already-checked, which is exactly what makes a reader skip the task it describes as done.
+  Executor is building Task 11 in full as if the line did not exist, correcting it in the same change set
+  once the real commit exists — the only honest order, since "absent, and here is the commit that supplies
+  it" cannot be written before that commit does.
+- **Plan 8's text predates the F5 amendment**: `rule-bypassable` appears 0 times in the plan against
+  `rdu-bypassable`'s 17, while `adviseWorkflowDef` ships both. Conservative default taken: cover both codes
+  in T8, correct the one dictated `Features.md` sentence in T15, domain untouched.
+
 ## RULING P27 (2026-09-02/03, owner-approved) — F5 recurrence in `packages/app-core`: fix now in step 12
 
 **Escalated by the executor mid-step-12** (`exec/12-plan7-remainder`, T16 running, no PR open yet), via a
