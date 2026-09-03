@@ -1,3 +1,4 @@
+import { inspect } from 'node:util';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { makeEnvelope, type EventEnvelope, type Notification } from '@gisik-nokma/domain';
 import { buildApp } from '../../src/app.js';
@@ -237,8 +238,11 @@ describe('ticket.assigned', () => {
     await fanout([recorder.transport], undefined, seesEverything).onCommitted(
       assigned({ payload: { assigneeId: null } }),
     );
+    // The recorder is the whole instrument here, and a row count deliberately
+    // is not: with only the recorder wired, the table cannot hold a row under
+    // any mutation, so `totalNotificationRows()` would be zero for a reason
+    // that has nothing to do with the guard.
     expect(recorder.delivered).toEqual([]);
-    expect(await totalNotificationRows()).toBe(0);
     // Positive control on the same permissive gate and the same recorder: a
     // non-null assignee IS delivered, so the emptiness above is the guard.
     await fanout([recorder.transport], undefined, seesEverything).onCommitted(assigned());
@@ -521,9 +525,21 @@ describe('mentions', () => {
         return visible.has(`${userId}:${ticketId}`);
       };
 
+    // BOTH log arguments are captured, not just the message. The seam is
+    // `(message, error?)` and the production default is
+    // `console.error(message, error)`, so a leak that moves the recipient into
+    // the second argument — `log(msg, { userId, error })` — reaches a real log
+    // file exactly as a leak in the first would, while a spy that keeps only
+    // messages sees nothing. `inspect` is used rather than `JSON.stringify`
+    // because an `Error` serialises to `{}` and would hide anything hung off it.
+    const named = (entries: Array<{ message: string; error?: unknown }>, userId: string): boolean =>
+      entries.some((e) => e.message.includes(userId) || inspect(e.error, { depth: 6 }).includes(userId));
+
     // World 1 — nothing throws. Both mentioned non-authors are reached.
-    const calmLog: string[] = [];
-    await fanout(undefined, (m) => calmLog.push(m)).onCommitted(commented(bodyWithThird));
+    const calmLog: Array<{ message: string; error?: unknown }> = [];
+    await fanout(undefined, (message, error) => calmLog.push({ message, error })).onCommitted(
+      commented(bodyWithThird),
+    );
     expect(await rowsFor(ANSELMA)).toHaveLength(1);
     expect(await rowsFor(DIPU)).toHaveLength(1);
     expect(calmLog).toEqual([]);
@@ -531,9 +547,11 @@ describe('mentions', () => {
     // World 2 — the FIRST-named recipient's lookup throws. This is the world
     // that distinguishes: a batch-aborting fan-out leaves DIPU with nothing.
     await db.pool.query('DELETE FROM notifications');
-    const firstLog: string[] = [];
+    const firstLog: Array<{ message: string; error?: unknown }> = [];
     await expect(
-      fanout(undefined, (m) => firstLog.push(m), explodingFor(ANSELMA)).onCommitted(commented(bodyWithThird)),
+      fanout(undefined, (message, error) => firstLog.push({ message, error }), explodingFor(ANSELMA)).onCommitted(
+        commented(bodyWithThird),
+      ),
     ).resolves.toBeUndefined();
     expect(await rowsFor(ANSELMA)).toHaveLength(0);
     expect(await rowsFor(DIPU)).toHaveLength(1);
@@ -541,18 +559,26 @@ describe('mentions', () => {
     // World 3 — the SECOND-named recipient's lookup throws. The first still
     // has their row, and the loss lands on the recipient who actually failed.
     await db.pool.query('DELETE FROM notifications');
-    const secondLog: string[] = [];
-    await fanout(undefined, (m) => secondLog.push(m), explodingFor(DIPU)).onCommitted(commented(bodyWithThird));
+    const secondLog: Array<{ message: string; error?: unknown }> = [];
+    await fanout(undefined, (message, error) => secondLog.push({ message, error }), explodingFor(DIPU)).onCommitted(
+      commented(bodyWithThird),
+    );
     expect(await rowsFor(ANSELMA)).toHaveLength(1);
     expect(await rowsFor(DIPU)).toHaveLength(0);
 
     // The failure is recorded rather than swallowed — and the record names the
     // EVENT, never the recipient. A lookup that fails must not answer the
-    // question the gate above refuses to answer.
+    // question the gate above refuses to answer, and "the resolver was down for
+    // this one person" answers it as plainly as a refusal would.
     expect(firstLog.length).toBeGreaterThan(0);
     expect(secondLog.length).toBeGreaterThan(0);
-    expect(firstLog.some((m) => m.includes(ANSELMA))).toBe(false);
-    expect(secondLog.some((m) => m.includes(DIPU))).toBe(false);
+    expect(named(firstLog, ANSELMA)).toBe(false);
+    expect(named(secondLog, DIPU)).toBe(false);
+    // The control for the two assertions above: this spy DOES see an id when
+    // one is passed, in either argument. Without it, `named` returning false
+    // would be equally consistent with a spy that reads nothing.
+    expect(named([{ message: `failed for ${ANSELMA}` }], ANSELMA)).toBe(true);
+    expect(named([{ message: 'failed', error: { userId: ANSELMA } }], ANSELMA)).toBe(true);
     // And the mentioning author is told nothing either way.
     expect(await rowsFor(KIRO)).toHaveLength(0);
   });
