@@ -33,3 +33,4 @@ export * from './doc-embeds.js';
 export * from './attachment-kinds.js';
 export * from './events/workspace-settings.js';
 export * from './read-models.js';
+export * from './notifications.js';
