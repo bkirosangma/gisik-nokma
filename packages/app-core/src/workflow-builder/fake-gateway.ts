@@ -41,9 +41,9 @@ export type FakeGatewaySeed = {
  * `parseEvent`'s envelope check runs, and the one the real door enforces
  * first. A fake that skipped this would accept payloads the real server
  * refuses (wrong ULID shape, a missing field, an out-of-range origin), and
- * every one of the twelve later tasks would build on that false green. Only
- * that the envelope itself is well-formed — exactly what Lane 3's ruling
- * names.
+ * every one of the twelve later tasks would build on that false green. It
+ * checks only that the envelope itself is well-formed — exactly what Lane 3's
+ * ruling names.
  *
  * It is deliberately narrower than the full `parseEvent` pipeline, and the
  * FOUR checks it therefore does not run are enumerated rather than left to be

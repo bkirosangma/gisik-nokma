@@ -222,7 +222,8 @@ plainly in T14's commit which of the two it is.
   **Owner: a later test-helper consolidation.**
 - **`schema.test.ts` carries two "CURRENT BEHAVIOUR pending Task 5" cases about paste-rule
   autoformatting that Plan 7 Task 5's text never covers.** **Owner: plan author.**
-- **`packages/app-core/test/helpers/fake-data-source.ts` validates nothing.** Its `ingest` pushes to
+- *(raised in step 13, not carried from step 12.)* **`packages/app-core/test/helpers/fake-data-source.ts`
+  validates nothing.** Its `ingest` pushes to
   an array and runs no schema check, so it is the seam through which the `toStateId` payload drift
   and the non-ULID seed `actorId`s pass silently (coordination doc §"The validating fake", 2802–2825).
   It is the sibling of the seam Plan 8 T4 hardened (`createFakeGateway`), and T4 does not touch it.
@@ -237,9 +238,13 @@ plainly in T14's commit which of the two it is.
   `carried into`, `hands off`) and the item's own vocabulary (`fake-data-source`, `validating fake`,
   `app-core/test/helpers`), each run through `rtk proxy` with a positive control from the same run.
   Lane 4's `lane4-periphery-state.md` §6 "Open claims on other plans" does not carry this item either
-  — it carries only the `seed.ts` non-ULID half. **Owner: the serial executor chain**, recorded here
-  because this file is the surface a task boundary actually reads; Plan 6, which created the file, has
-  closed, so it must not be re-assigned there.
+  — it carries only the `seed.ts` non-ULID half, **and that bullet names no owner at all**, so it is
+  orphaned by the same fold-back and needs one too. **Owner: the serial executor chain**, recorded
+  here because this file is the surface a task boundary actually reads. **Do not re-assign to Plan 6**,
+  which created the file and has closed: measured in `task-ledger.tsv`, all eighteen `06` rows read
+  `done` with a merge sha, against a positive control of fifteen `08` rows reading `todo` in the same
+  run. (`executor-state.md`'s own lesson list says step 12 twice mis-assigned work to Plan 6 after it
+  closed; that aside is what prompted the check, not what settles it.)
 
 ## TWO FINDINGS FROM THE ADAPTATION MAP THAT REACH BEYOND ONE TASK
 
