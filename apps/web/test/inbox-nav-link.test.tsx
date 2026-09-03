@@ -158,6 +158,39 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
     expect(screen.getByRole('img', { name: '4 unread notifications' })).toBeInTheDocument();
   });
 
+  /**
+   * 11.169 — the transition neither 11.153 nor 11.154 exercises.
+   *
+   * 11.153 mounts a viewer who is ALREADY signed out and 11.154 walks loading →
+   * signed-in. Neither walks signed-in → signed-out, which is the direction a
+   * cookie expiring in place takes: the Sign out button navigates away, so the
+   * nav unmounts and nothing is left behind, but an expiring session leaves this
+   * component mounted with a count on screen. This component's docblock promises
+   * the badge "keeps its last honest value"; a count belonging to a session that
+   * has ended is not that viewer's count, and leaving it would make the sentence
+   * a claim a reader believes and stops checking behind.
+   */
+  it('11.169 clears the badge when the session ends in place, rather than showing the last one’s count', async () => {
+    const services = stubServices({}, { notifications: { unreadCount: async () => 3 } });
+    const { rerender } = render(
+      <Providers services={services}>
+        <InboxNavLink />
+      </Providers>,
+    );
+    expect(await screen.findByRole('img', { name: '3 unread notifications' })).toBeInTheDocument();
+
+    session = { isPending: false };
+    rerender(
+      <Providers services={services}>
+        <InboxNavLink />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.queryByRole('img')).not.toBeInTheDocument());
+    // The link itself stays: the inbox is still somewhere to go, and a viewer
+    // who signs in again should find it where it was.
+    expect(screen.getByRole('link', { name: /Inbox/ })).toBeInTheDocument();
+  });
+
   it('11.157 stops the timer on unmount', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let calls = 0;

@@ -31,13 +31,21 @@ export const REFRESH_MS = 60_000;
  * because it gates a WRITE. The load window is pinned as its own case (11.154),
  * so the equivalence stays a measured fact rather than a hope.
  *
- * ## What the badge does when the read fails, and why it is not zero
+ * ## What the badge does when a REFRESH fails, and why that is not zero
  *
  * `unread` starts at 0 and `UnreadBadge` renders nothing at 0, so before the
  * first answer there is no badge — an absence, which claims nothing. After an
  * answer, a FAILED refresh leaves the last count standing rather than resetting
  * it: "you have 3 unread" that is a minute stale is a smaller error than "you
- * have none" asserted from a request that failed. Nothing here surfaces the
+ * have none" asserted from a request that failed.
+ *
+ * That promise is about a failed REFRESH and nothing else, and the wording is
+ * narrow on purpose. It does NOT extend across a session ending: a count that
+ * outlives the session it was read for is not a stale honest value, it is the
+ * previous viewer's. The `!signedIn` arm below clears it, and 11.169 is the case
+ * that would catch its removal. The first version of this file had the early
+ * return without the clear and this paragraph promising "its last honest value"
+ * — the prose was the part that was wrong. Nothing here surfaces the
  * error, deliberately — a nav that grew a refusal panel would put a network
  * complaint on every page in the product, and the inbox page itself says the
  * true thing when it is opened.
@@ -55,7 +63,19 @@ export function InboxNavLink() {
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
-    if (!signedIn) return;
+    if (!signedIn) {
+      // NOT just an early return, and the difference is a sentence on screen.
+      // A session can end IN PLACE — a cookie expiring while the tab sits open —
+      // and this component stays mounted through it. Without this line the nav
+      // keeps rendering the PREVIOUS session's count to whoever is looking now,
+      // which is a stranger's unread total in someone else's chrome. The Sign
+      // out button hides the bug rather than avoiding it: it navigates, so the
+      // nav unmounts and the count goes with it. Witnessed at 11.169, which is
+      // the signed-in -> signed-out direction neither 11.153 (signed out from
+      // mount) nor 11.154 (loading -> signed in) walks.
+      setUnread(0);
+      return;
+    }
     let cancelled = false;
 
     async function refresh(): Promise<void> {
