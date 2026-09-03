@@ -95,6 +95,7 @@ export {
   DAY_MS,
   addDays,
   dateMs,
+  isCalendarDay,
   isoDate,
   mondayOnOrBefore,
   monthGridWeeks,
@@ -114,6 +115,7 @@ export {
   CALENDAR_EMPTY_MONTH_COPY,
   CALENDAR_NARROWED_MONTH_COPY,
   TIMELINE_SIDE_LIST_COPY,
+  TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
   barProvenance,
   claimTooltip,
   contradictionCopy,
@@ -121,6 +123,7 @@ export {
   dueClaimLabel,
   formatClaimDate,
   startClaimLabel,
+  unplaceableDayCopy,
   type AttributedDate,
   type UserNameFn,
 } from './claims/claim-labels.js';
@@ -143,3 +146,21 @@ export {
   type CalendarMonth,
   type CalendarWeek,
 } from './calendar/calendar-model.js';
+// Plan 9 Task 10 — the timeline view-model. `FilterSpec` and `IsEpicType` are
+// deliberately absent from this block: both already leave through the
+// declarations above, and a second export path would fork the vocabulary the
+// calendar and the timeline must share to agree about one claim.
+export {
+  NO_DATES_NOTE,
+  NO_DAY_CLAIMS_NOTE,
+  buildTimelineModel,
+  type TimelineBarSpan,
+  type TimelineCustomClaim,
+  type TimelineGroup,
+  type TimelineModel,
+  type TimelineModelOptions,
+  type TimelineRow,
+  type TimelineSideEntry,
+  type TimelineSideReason,
+  type TimelineWeekCol,
+} from './timeline/timeline-model.js';

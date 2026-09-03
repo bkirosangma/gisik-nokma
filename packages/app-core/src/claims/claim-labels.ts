@@ -110,3 +110,39 @@ export const CALENDAR_NARROWED_MONTH_COPY =
 
 export const TIMELINE_SIDE_LIST_COPY =
   'No bar is invented: work appears here until it carries both a claimed start and a claimed needed-by.';
+
+/**
+ * The side-list heading when the list holds ONLY work with a missing end.
+ *
+ * NOT the unconditional heading the plan's Task 10 gives it, and the reason is
+ * the sentence's own condition: "until it carries both" states what a ticket
+ * must do to LEAVE the list. A `start-after-due` entry carries both and is
+ * still there, and so is one whose claimed day is not a day on the calendar.
+ * Printed over those, this heading is false — the same shape as the
+ * empty-month copy above, honest per row and false in the summary, which is
+ * why the model chooses between the two.
+ */
+export const TIMELINE_SIDE_LIST_UNDRAWABLE_COPY =
+  'No bar is invented: work appears here whenever its claims cannot draw a period — a missing start or needed-by, a start after its needed-by, or a claimed day that is not on the calendar.';
+
+/**
+ * A claimed day that no calendar has, named rather than silently dropped.
+ *
+ * `IST_DAY_REGEX` is a SHAPE check, and the write path (`dueDateValueSchema`,
+ * and Plan 3's bare-string custom date) validates nothing beyond it — so
+ * `2026-02-30` and `0099-01-01` are storable claims that `dateMs` refuses to
+ * place. The timeline is the first surface that converts a claim to a NUMBER
+ * (the calendar compares day strings and never needs to), so it is the first
+ * place that refusal reaches a viewer.
+ *
+ * The day is printed through `formatClaimDate`, which hands an unrenderable
+ * day straight back verbatim — the claim as claimed, never a plausible
+ * neighbour. This is `provenance.ts`'s ruling applied one surface along: a
+ * blank screen is a worse answer than naming the bad day, and letting `dateMs`
+ * throw here would blank the whole timeline for everyone else's tickets too.
+ */
+export function unplaceableDayCopy(days: readonly string[]): string {
+  const named = days.map((day) => formatClaimDate(day)).join(' and ');
+  const verb = days.length > 1 ? 'are not days' : 'is not a day';
+  return `${named} ${verb} on the calendar — the claim is shown as recorded, and no bar is drawn`;
+}

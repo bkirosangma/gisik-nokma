@@ -114,3 +114,27 @@ export function monthGridWeeks(year: number, month: number): WeekDays[] {
   }
   return weeks;
 }
+
+/**
+ * Can this day be PLACED — i.e. does `dateMs` accept it?
+ *
+ * `IST_DAY_REGEX` admits days that no calendar has (`2026-02-30` rolls into
+ * March, `0099-01-01` reads as 1999) and the write path checks nothing
+ * stronger, so a stored claim can carry one. A surface that does day
+ * ARITHMETIC — the timeline, which turns a claim into a week index — must ask
+ * before it computes, because `dateMs` throws and one such claim would
+ * otherwise blank the whole view. Surfaces that only COMPARE day strings (the
+ * calendar grid) never need this.
+ *
+ * Implemented as a question to `dateMs` rather than as a second round-trip
+ * check: two statements of "what a real day is" are two chances to disagree,
+ * and this one must agree with the function that will do the arithmetic.
+ */
+export function isCalendarDay(isoDay: string): boolean {
+  try {
+    dateMs(isoDay);
+    return true;
+  } catch {
+    return false;
+  }
+}

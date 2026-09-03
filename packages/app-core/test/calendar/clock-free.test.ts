@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { buildCalendarModel } from '../../src/calendar/calendar-model.js';
+import { buildTimelineModel } from '../../src/timeline/timeline-model.js';
 import { monthGridWeeks } from '../../src/claims/dates.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
 import type { TicketState } from '@gisik-nokma/domain';
@@ -123,6 +124,62 @@ describe('11.48 the calendar view-model reads no clock — proved by varying the
   });
 });
 
+/**
+ * 11.60 — the timeline view-model, held to the same standard, and the reason
+ * it needs its own case rather than riding the calendar's: the calendar only
+ * ever COMPARES day strings, while the timeline divides a millisecond
+ * difference to get a week index. That arithmetic is where a device getter
+ * would place the same claim in a different column depending on who is
+ * looking, and it is the only place in this surface that does any.
+ */
+describe('11.60 the timeline view-model reads no clock either', () => {
+  it('the whole model — weeks, bars, side list — is byte-identical in every zone', () => {
+    const inputs = [
+      ticket(
+        {
+          title: claimField('Zone-proof span'),
+          startDate: claimField({ date: '2026-08-17' }),
+          dueDate: claimField({ date: '2026-10-11' }),
+          'filed-on': claimField('2026-08-31'),
+        },
+        [{ id: 'filed-on', name: 'Filed on' }],
+      ),
+    ];
+    const models = ZONES.map((zone) =>
+      underZone(zone, () =>
+        JSON.stringify(buildTimelineModel(inputs, { anchor: '2026-08-23', userName })),
+      ),
+    );
+    expect(new Set(models).size).toBe(1);
+    // The window's two edge days really rendered — an empty model must not
+    // pass this by being empty, and both ends are where a zone shift lands.
+    expect(models[0]).toContain('2026-08-17');
+    expect(models[0]).toContain('2026-10-11');
+    // And the arithmetic actually ran: an unclipped span across all 8 columns.
+    expect(models[0]).toContain('"fromWeek":0');
+    expect(models[0]).toContain('"toWeek":7');
+  });
+
+  it('the week a claim falls in is the same week in every zone, on the Sunday|Monday seam', () => {
+    const seam = ZONES.map((zone) =>
+      underZone(zone, () => {
+        const model = buildTimelineModel(
+          [
+            ticket({
+              title: claimField('Sunday'),
+              startDate: claimField({ date: '2026-08-23' }),
+              dueDate: claimField({ date: '2026-08-23' }),
+            }),
+          ],
+          { anchor: '2026-08-23', userName },
+        );
+        return model.groups[0]?.rows[0]?.bar.fromWeek;
+      }),
+    );
+    expect(seam).toEqual([0, 0, 0, 0]);
+  });
+});
+
 describe('11.48 the scanner is proven against planted defects before it is trusted', () => {
   it('catches the four spellings that reach the device', () => {
     expect(findClockReads('const now = new Date();')).toEqual(['clock read']);
@@ -154,6 +211,10 @@ describe('11.48 the scanner is proven against planted defects before it is trust
     expect(hits, `the calendar surface reached for a clock:\n${report}`).toEqual([]);
     // The walk really happened, over the roots it claims.
     expect(scanned).toContain('calendar/calendar-model.ts');
+    // Named literally for the reason the comment below gives about
+    // CLOCK_FREE_DOMAIN_FILES: a loop over the roots would assert the list
+    // against itself, so deleting 'timeline' would delete its own guard.
+    expect(scanned).toContain('timeline/timeline-model.ts');
     expect(scanned).toContain('claims/dates.ts');
     expect(scanned).toContain('claims/claim-labels.ts');
     expect(scanned).toContain('claims/ticket-dates.ts');

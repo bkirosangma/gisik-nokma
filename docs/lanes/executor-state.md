@@ -1160,3 +1160,74 @@ a fix round rather than trusting it, and for never citing a fix round's own summ
 - **Never run a state-changing git command in a shell whose cwd was set for a read.** Use `git -C`.
 - Verify any file restoration with `git diff` or by reading the file — **never a shell `diff`**,
   which has returned a false "identical" on this machine, on this repo's own ledger.
+
+## TASK 10 (timeline view-model) — RECORDED, NOT FIXED
+
+**1. `dates.ts`' docblock is false about one of the two days it names. OWNER: A PLAN 9 FIX ROUND
+(Task 8's file, and the fix is a choice, not a typo.)** The block above `dateMs` says the round-trip
+"refuses the two days `Date.UTC` invents instead of rejecting: `2026-02-30` (rolled into March) and
+`0099-01-01` (read as 1999)", and closes with "`istDayBounds` in the domain refuses the same pair the
+same way — one rule, stated once, applied twice". **Measured on this branch:
+`dateMs('0099-01-01')` SUCCEEDS.** `dateMs` uses `setUTCFullYear(99, 0, 1)` — which is precisely the
+constructor that does NOT fold two-digit years into 1900+, unlike `Date.UTC` — and `isoDate` pads the
+year back to `0099`, so the round-trip agrees and nothing is refused. `istDayBounds` still refuses it
+(`provenance.ts` wraps that call in a `try/catch` for exactly this reason). So the pair does NOT
+"refuse the same pair the same way": they agree on `2026-02-30` and disagree on `0099-01-01`.
+Discovered because a Task 10 fixture used `0099-01-01` as an unplaceable day and the test went red
+against the docblock's claim; the fixture now uses `2026-02-30` and `2027-04-31`, both genuinely
+refused. **Not fixed here**: the honest correction is either to make `dateMs` refuse pre-1000 years
+or to strike the sentence, and both are decisions about Task 8's contract.
+
+**2. `TimelineSideReason` has a FIFTH arm the plan does not list, and Task 11 must render it.
+OWNER: TASK 11.** `'unplaceable-day'`. The plan's four reasons are each a statement the model would
+otherwise have made falsely: a stored `{date: '2026-02-30'}` passes `IST_DAY_REGEX` (and
+`dueDateValueSchema` checks nothing stronger), reaches `weekIndexOf`, and `dateMs` THROWS — one such
+claim anywhere in the workspace blanks the whole timeline for every other ticket. Calling it
+`'due-only'` would deny a start claim the ticket carries; calling it `'start-after-due'` would assert
+an ordering against a day that does not exist. `provenance.ts` already ruled on the underlying
+question ("a blank screen is a worse answer than an invented date"); this applies it one surface
+along. A `TimelineView` that `switch`es on four reasons will fall through on the fifth.
+
+**3. `TimelineModelOptions` takes `isEpicType`, which the plan's Task 10 signature omits.
+OWNER: TASK 11 (thread it through `TimelineView`).** The plan hardcoded `typeId === 'epic'` at the
+undated-epic skip while routing grouping through `epicAncestorOf`'s injectable predicate — so a
+workspace whose rank-1 type is "Initiative" would have its undated initiative land in the side list
+as MISSING WORK while the same model grouped tickets under it. It is now one predicate at all three
+sites (skip, lane filter, grouping), defaulting to `isBuiltinEpicType`, matching what Task 8 landed
+in `CalendarModelOptions`.
+
+**4. The side-list heading was false at one of its own doors, and is now chosen.** `Task 8`'s
+`TIMELINE_SIDE_LIST_COPY` states a LEAVING condition — work stays here "until it carries both a
+claimed start and a claimed needed-by" — that a `start-after-due` entry already satisfies while
+sitting in the list. Added `TIMELINE_SIDE_LIST_UNDRAWABLE_COPY` and a precedence rule, the same shape
+as `emptyCopy`'s three sentences. **Task 11 must render `model.sideListCopy`, never the constant**:
+hardcoding `TIMELINE_SIDE_LIST_COPY` in the component puts the lie back with the model still right.
+The fixture that catches this class is a side list holding TWO DIFFERENT reasons at once; every
+side-list case in the plan text holds one, so none of them can see it.
+
+**5. Nine new test-case ids are Task 15's to carry, 11.52-11.60. OWNER: TASK 15.** Added to the four
+already recorded above (11.48-11.51): **11.52** (bars require both claims; equal start/due is a one-day
+period, not a contradiction), **11.53** (the side-list heading is true of every entry under it),
+**11.54** (a claimed day that is not a day is named verbatim and blanks nothing else),
+**11.55** (the window at both ends and one day either side — clipping, membership, the
+Sunday|Monday seam, `weeksCount`, and the zero-column refusal), **11.56** (exact week indices and
+two-author provenance), **11.57** (epic grouping, the untitled-epic lane, and the injected epic
+predicate at skip / lane / grouping), **11.58** (custom date claims ride along and change no
+geometry), **11.59** (filters narrow rows and the side list alike, and a filtered-out epic still
+names the lane of the child that survived), **11.60** (the timeline view-model reads no
+clock — the only surface that turns a claimed day into a NUMBER, so the only one where a device
+getter would file a claim under a different week from the calendar's own answer).
+
+**6. Four comparator arms had no fixture, and the mutations that named them survived until they did.**
+Recorded because the shape recurs: ordering code written BEYOND the plan text (the group title
+comparison, the `epicId` tie-break, the row `ticketId` tie-break) is exactly the code no plan-derived
+fixture exercises. Every grouping fixture in the plan holds ONE non-null epic — where the null-last
+arm decides everything and reversing the title comparison changes nothing — and the row-order fixture
+uses two different claimed starts, so the id tie-break never runs. Two epics with non-trivially
+ordered titles, two epics sharing a title, and two rows sharing a start close all three; a fourth
+(`customClaims` dropped from an `unplaceable-day` entry) needed the case where the OTHER end is
+missing. Thirty-three mutations now, all killed.
+
+**7. `Features.md` §11 is still absent, and Task 10 did not open it. OWNER: TASK 15.** Same
+precedent as Task 8, which landed nine source files and touched neither `Features.md` nor
+`test-cases/`. Opening §11 for one task forks what Task 15's plan text dictates verbatim.

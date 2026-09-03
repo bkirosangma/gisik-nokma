@@ -11,6 +11,13 @@ export const APP_CORE_SRC = fileURLToPath(new URL('../../src', import.meta.url))
 export const DOMAIN_SRC = fileURLToPath(new URL('../../../domain/src', import.meta.url));
 
 /**
+ * `timeline` joins on the same terms and for a sharper reason than the
+ * calendar's: it is the only surface that turns a claimed day into a NUMBER
+ * (a week index), so a device getter there would not merely mislabel a cell —
+ * it would file a claim under a different week from the calendar's own answer
+ * about the same claim. One product, two answers, which is the failure this
+ * whole scan exists to prevent.
+ *
  * The calendar view-model's whole surface. Scoped rather than package-wide on
  * purpose: `workflow-builder/events.ts` and `precheck.ts` read the clock
  * legitimately — they stamp a `clientTime` on an event being submitted, which
@@ -24,6 +31,7 @@ export const DOMAIN_SRC = fileURLToPath(new URL('../../../domain/src', import.me
 export const CLOCK_FREE_ROOTS: readonly string[] = [
   'claims',
   'calendar',
+  'timeline',
   'hierarchy',
   'filter',
   'provenance.ts',
