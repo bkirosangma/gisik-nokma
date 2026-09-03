@@ -9,7 +9,16 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 13 — Plan 8. ALL FIFTEEN TASKS DONE. Merged up to main, gate green, final review running, PR next.**
+## WHERE I AM: **STEP 13 IS COMPLETE. PR #85 IS OPEN AND AWAITING THE CONTROLLER'S MERGE.**
+
+All fifteen Plan 8 tasks done, merged up to `origin/main`, gate green, final whole-branch review
+run and its four findings closed. **Nothing is in flight and nothing is blocked.** The executor
+does not merge — PR #85 is the controller's.
+
+**If you are a restarted session: do NOT re-run step 13.** Check `gh pr view 85` first. If it has
+merged, the next work is **step 14 — Plan 9** (calendar/notifications, 15 tasks, T6 floor-list, T14
+after `apps/web`), and Plan 8's fifteen ledger rows must be promoted from `in-flight` to `done` with
+the merge sha, exactly as this branch's first commit did for Plan 7.
 
 > **BATCH B DIED MID-FLIGHT ON AN EXPIRED LOGIN (2026-09-03).** Seven of nine agents failed with
 > *"Login expired · Please run /login"*: T5's fix round and both agents of T6, T7 and T8. **T5's
@@ -517,7 +526,46 @@ pre-merge run. **The merge was never implicated.**
 
 ## IN FLIGHT
 
-**Nothing.** Batch A is closed, the tree is clean, and the gate is green at HEAD.
+**PR #85** — https://github.com/bkirosangma/gisik-nokma/pull/85 — all fifteen tasks, 54 commits,
+81 files, gate green at 2463. Awaiting the controller's merge. Nothing else is outstanding.
+
+## FINAL WHOLE-BRANCH REVIEW — verdict `fix`, no Critical, and ALL FOUR findings were PROSE
+
+One opus reviewer, per the cost ruling. **Four findings, zero code defects.** All four verified
+independently before correcting, all four closed, gate unchanged at 2463 — which is what a
+prose-only fix round should look like.
+
+**The first finding explains why the other three survived fifteen task reviews, and it is the
+strongest argument on this branch for keeping the whole-branch pass.** `builder-wiring.tsx` claimed
+`WorkflowBuilderScreen` *"catches a refused roster by name"* — not merely false but **structurally
+impossible**: the narrowing needs `AuthoringReadRefused`, declared under `apps/web`, and
+`packages/app-core` depends on nothing there. **Its sibling one directory away already said so,
+correctly and at length.** Two files in the same directory contradicted each other about the same
+screen, and it shipped because **each was reviewed alone**. That is the seam a per-task stage cannot
+see by construction.
+
+**And the coordination doc asserted the correction had already landed.** The earlier fix round
+corrected the sentence in `data-source-gateway.ts` and **left the identical claim standing one file
+away**; `git log` on `builder-wiring.tsx` returns exactly ONE commit — Task 13's own — and never a fix
+round. **A correction that names one site does not cover a claim that lives at two, and a doc entry
+asserting the fix landed is precisely what stops anyone re-checking.** Both sites and the doc entry
+are corrected.
+
+The other three: the catalogue said the errand template blocked-flags "two waiting states" (**it has
+one**, and the test it cites asserts `toEqual(['waiting'])`, a one-element array that would have
+reddened on the claim written beside it); `Features.md` said the fake *"cannot reject at all"* (**it
+can**, on two seeded flags — the absolute belongs to `listMembers` alone, and the coordination doc
+had it scoped correctly while `Features.md` dropped the scoping); and a docblock said app-core
+depends on three packages *"alone"* (**there is a fourth**, `@xyflow/react`).
+
+**One claim was deliberately NOT "fixed":** that the template trips `rule-bypassable` **twice on two
+pinned rule-free one-hop paths**. That is correct — **two paths into one state**. The plural was
+wrong about states and right about paths, and a sweep that corrected both numbers would have broken
+a true claim. **When correcting a plural, check which noun it counts.**
+
+**Where the reviewer did NOT look, in its own words** — a re-reviewer starts here rather than
+repeating covered ground: the workflow-builder UI component internals beyond the named seams, the
+rule-editor suites, and the Playwright spec.
 
 ## RULINGS — P28 taken, line 216 closed by T11, ONE still open and it blocks nothing
 
