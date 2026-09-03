@@ -205,11 +205,33 @@ describe('PublishControls — clean publish', () => {
     expect(published).toHaveLength(1);
   });
 
+  /**
+   * The fixture DIVERGES `def.version` from `base.version` on purpose, and
+   * that divergence is the whole test. `draftFromPublished` copies
+   * `published.version` into BOTH `def.version` and `base.version`
+   * (draft-store.ts), and no action on DraftActions writes `def.version`
+   * afterwards — so for any draft that helper builds, `base.version + 1` and
+   * `def.version + 1` are the SAME NUMBER and this test's title would be a
+   * claim it could not make. It was exactly that until this fix round: the
+   * planted `draft.base === null ? 1 : draft.def.version + 1` left all 626
+   * tests green — so whatever else the old fixture pinned (a hard-coded 1, a
+   * missing bump), the one discrimination this test is NAMED for was the one
+   * it could not make.
+   *
+   * The shape is not smuggled in past the store either: `loadDraft` on
+   * DraftActions takes an arbitrary `WorkflowDraft`, so a draft whose `def`
+   * carries a version its `base` does not is a state the public store API
+   * accepts. Base 2 + 1 = 3; the def reading would say 100.
+   */
   it('bumps from the PUBLISHED base version, not from the draft def', async () => {
     const user = userEvent.setup();
     const workflowId = newUlid();
     // Nothing dropped, so no dialog: version 2 published, version 3 submitted.
-    const store = createDraftStore(draftFromPublished(publishedKanban(workflowId)));
+    const fromPublished = draftFromPublished(publishedKanban(workflowId));
+    const store = createDraftStore({
+      ...fromPublished,
+      def: { ...fromPublished.def, version: 99 },
+    });
     store.actions.renameState('review', 'In review');
     const gateway = setup(store);
     await user.click(screen.getByRole('button', { name: 'Publish' }));
@@ -377,14 +399,34 @@ describe('PublishControls — the state-mapping dialog', () => {
     expect(options).toEqual(['todo', 'done']);
   });
 
-  it('says so when the count read fails, and still demands the mapping', async () => {
+  /**
+   * Both halves of "the count is a courtesy, the mapping is the contract",
+   * with the read REFUSED. The first half — still demands a destination — is
+   * the disabled assertion. The second half is the one this test lacked until
+   * this fix round: that a failed count does not itself block publishing.
+   * Planting `disabled={!complete || props.occupancyFailed}` on the confirm
+   * button left all 626 tests green, i.e. a dialog that turned the courtesy
+   * into a blocker passed the suite. So the mapping is now PICKED under the
+   * failure, the confirm asserted to re-enable, clicked, and the submitted
+   * stateMapping read back.
+   */
+  it('says so when the count read fails, and still demands the mapping — then publishes', async () => {
     const user = userEvent.setup();
     const store = draftDroppingReview(newUlid());
-    setup(store, { occupancyError: true });
+    const gateway = setup(store, { occupancyError: true });
     await user.click(screen.getByRole('button', { name: 'Publish' }));
     const row = await screen.findByTestId('mapping-row-review');
     expect(await within(row).findByText('ticket count unavailable')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Publish with this mapping' })).toBeDisabled();
+    const confirm = screen.getByRole('button', { name: 'Publish with this mapping' });
+    expect(confirm).toBeDisabled();
+
+    await user.selectOptions(within(row).getByRole('combobox', { name: 'Send them to — Review' }), 'todo');
+    expect(confirm).toBeEnabled();
+    await user.click(confirm);
+
+    expect(await screen.findByText('Version 3 published.')).toBeInTheDocument();
+    const payload = gateway.submitted[0]!.payload as PublishedWorkflowDef;
+    expect(payload.stateMapping).toEqual({ review: 'todo' });
   });
 
   it('cancel closes the dialog without submitting anything', async () => {
