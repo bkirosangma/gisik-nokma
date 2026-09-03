@@ -141,23 +141,60 @@ const NOW_INSTANT = '2026-08-23T05:00:00.000Z';
 const seeEverything: CanSeeFn = async () => true;
 
 /**
+ * A gate that DENIES a named `${userId}:${ticketId}` pair and allows the rest —
+ * the house pattern from `fanout.test.ts`'s `visible` set, inverted so the
+ * default stays permissive and only the pair under test is refused.
+ *
+ * Every other test in this file passed `seeEverything`, so before this existed
+ * the gate's FALSE branch was never taken on either loop and deleting the gate
+ * outright from either one left the suite fully green (mutations M17a/M17b in
+ * the task report). A visibility gate exists for the deny direction; an
+ * allow-only fake exercises the seam and proves nothing about the decision.
+ *
+ * The leak it closes is concrete. `can-see.ts` states that "the explicit list
+ * is exactly the authored list. Creator and assignee are not implicitly
+ * appended" — so an assignee on an explicit-mode ticket that omits them is
+ * DENIED, and an ungated sweep would post that person a row carrying the
+ * ticket's title and the claim's note.
+ */
+function gateDenying(pairs: string[]): CanSeeFn {
+  const denied = new Set(pairs);
+  return async (_db, userId, ticketId) => !denied.has(`${userId}:${ticketId}`);
+}
+
+/**
+ * What the sweep logged, per test.
+ *
+ * `deliverToAll` CATCHES every transport failure and reports it only through
+ * this callback. With the `log: () => {}` this file used to pass, an assertion
+ * that no notification arrived could not tell "correctly suppressed" from
+ * "attempted, and the insert threw" — and that is not hypothetical: a mutation
+ * during review deleted the null-assignee guard, every delivery hit a NOT NULL
+ * violation on `user_id`, and the suite reported 30/30 green. Reads go through
+ * `expectNoNotifications` below, which checks BOTH observables.
+ */
+let loggedProblems: Array<{ message: string; error?: unknown }> = [];
+
+/**
  * The sweep at an arbitrary instant — the IST-boundary block drives it directly.
  * Note what is NOT here: a `windows` argument. The sweep has no threshold
  * parameter to pass, by design; a test that wants different windows claims them
  * with `seedWorkspaceSettings` below, the way an admin would.
  */
-function sweepAt(instant: string) {
+function sweepAt(instant: string, canSeeTicket: CanSeeFn = seeEverything) {
   return runNotificationSweep({
     pool: db.pool,
     transports: [createInAppTransport(db.pool)],
-    canSeeTicket: seeEverything,
+    canSeeTicket,
     now: () => new Date(instant),
-    log: () => {},
+    log: (message, error) => {
+      loggedProblems.push({ message, error });
+    },
   });
 }
 
-function sweep() {
-  return sweepAt(NOW_INSTANT);
+function sweep(canSeeTicket: CanSeeFn = seeEverything) {
+  return sweepAt(NOW_INSTANT, canSeeTicket);
 }
 
 type SeedTicket = {
@@ -234,6 +271,62 @@ async function seedWorkspaceSettings(
 }
 
 /**
+ * The name `wf-basic` publishes for the `doing` state — deliberately unlike the
+ * id in more than case. That gap is what lets the payload assertion tell the
+ * resolved NAME from the id it was resolved by: with `SIMPLE_KANBAN_TEMPLATE`'s
+ * own `'Doing'` the discriminator would have been a single capital letter, and
+ * a one-character-case difference is a weak thing to rest a claim on.
+ */
+const DOING_STATE_NAME = 'Being worked on';
+
+/**
+ * Publish `wf-basic` v1 — the workflow every `seedTicket` row above says it is
+ * on — as a real `workflow.defined` event through the same `applyCommitted`
+ * path, so `proj_workflows` holds what a production publish would leave there
+ * and `getWorkflowDefFromProjection` reads it back the way the engine does.
+ *
+ * Until this existed the sweep's ONLY assertion about Plan 2's reader was
+ * `stateName: null` — the unresolved path — and the test's own comment admitted
+ * why: no `workflow.defined` row was ever seeded. So the whole resolved branch
+ * was dead to the suite: `?.name` could be `?.id` and the lookup could be
+ * deleted outright and nothing reddened (M18/M18b). The state name is the part
+ * of a stale-ticket notification a person actually reads.
+ *
+ * The envelope shape is `test/proj-workflows.test.ts`'s, and the counters come
+ * from THIS suite's shared `seq` for the same reason `seedWorkspaceSettings`
+ * documents: `makeCommitted`'s own maps start at 1 and would collide with the
+ * hand-seeded ledger rows on `UNIQUE (workspace_id, workspace_seq)`.
+ */
+async function seedWorkflow(workspaceId: string = WS): Promise<void> {
+  seq += 1;
+  await applyCommitted(db.pool, [
+    makeCommitted({
+      workspaceId,
+      entity: { kind: 'workflow', id: 'wf-basic' },
+      type: 'workflow.defined',
+      payload: {
+        id: 'wf-basic',
+        version: 1,
+        name: 'Basic',
+        initialStateId: 'todo',
+        states: [
+          { id: 'todo', name: 'Not started', category: 'open' },
+          { id: 'doing', name: DOING_STATE_NAME, category: 'active' },
+          { id: 'done', name: 'Finished', category: 'terminal' },
+        ],
+        transitions: [
+          { from: 'todo', to: 'doing', rules: [] },
+          { from: 'doing', to: 'done', rules: [] },
+        ],
+      },
+      actorId: KIRO,
+      seq,
+      workspaceSeq: seq,
+    }),
+  ]);
+}
+
+/**
  * Append a state-entering event straight into the ledger (append-only: inserts
  * are legal). The column list is Plan 1's: `events` carries BOTH counters —
  * `seq` (per entity, UNIQUE (entity_kind, entity_id, seq)) and `workspace_seq`
@@ -285,6 +378,23 @@ function at<T>(rows: T[], index: number): T {
   return row;
 }
 
+/**
+ * "Nothing was sent" asserted so that it cannot also mean "something was sent
+ * and the write blew up".
+ *
+ * The row count alone is the weaker half: `deliverToAll` swallows a throwing
+ * transport, so a sweep that ATTEMPTED a delivery and crashed leaves exactly
+ * the same empty table as a sweep that correctly stayed silent. The log is the
+ * other half of the observable, and it is checked here so every suppression
+ * claim in this file gets both. Per-call rather than in an `afterEach`, because
+ * `sweep.ts`'s malformed-claim branch logs LEGITIMATELY and a test written for
+ * it must be free to expect a line.
+ */
+async function expectNoNotifications(kind?: string): Promise<void> {
+  expect(await notificationRows(kind)).toHaveLength(0);
+  expect(loggedProblems).toEqual([]);
+}
+
 async function notificationRows(kind?: string) {
   const result = kind
     ? await db.pool.query('SELECT user_id, kind, dedupe_key, payload FROM notifications WHERE kind = $1 ORDER BY id', [kind])
@@ -294,12 +404,20 @@ async function notificationRows(kind?: string) {
 
 beforeEach(async () => {
   vi.restoreAllMocks();
+  loggedProblems = [];
   await db.pool.query('DELETE FROM notifications');
   await db.pool.query('DELETE FROM proj_tickets');
   // Each test starts from an unclaimed workspace, so "the default" in these
   // tests always means the settings defaults the reader applies — never a
   // number this file remembers.
   await db.pool.query('DELETE FROM proj_workspace_settings');
+  // And from a workspace that has published no workflow. The projection's
+  // insert is `ON CONFLICT (workflow_id, version) DO NOTHING`, so one seeded
+  // `wf-basic` v1 row would otherwise outlive its own test and resolve
+  // `stateName` for every test declared after it — including the one that
+  // asserts `stateName: null` because nothing was published. That test is now
+  // true under any ordering rather than by luck.
+  await db.pool.query('DELETE FROM proj_workflows');
 });
 
 describe('the zone knob itself', () => {
@@ -390,12 +508,24 @@ describe('date-approaching', () => {
     expect(rows).toHaveLength(1);
     expect(at(rows, 0).user_id).toBe(ANSELMA);
     expect(at(rows, 0).dedupe_key).toBe(`date-approaching:${ticketId}:2026-08-30`);
-    expect(at(rows, 0).payload.claim).toEqual({
-      date: '2026-08-30',
-      note: 'GST filing',
-      actorId: KIRO,
-      clientTime: '2026-08-19T10:00:00.000Z',
-      serverTime: '2026-08-19T10:00:01.000Z',
+    // WHOLESALE, matching what the stale-ticket payload has always done.
+    // Reaching into `.claim` alone left the two fields beside it unpinned:
+    // `ticketTitle` and `field` could both be deleted from the payload and this
+    // suite stayed green (M20). `ticketTitle` is the only words in the row —
+    // an inbox entry without it says a date is approaching and never says on
+    // what — and `field` is what tells `dueDate` from every other date claim a
+    // ticket can carry.
+    expect(at(rows, 0).payload).toEqual({
+      ticketId,
+      ticketTitle: 'Renew the DLT registration',
+      field: 'dueDate',
+      claim: {
+        date: '2026-08-30',
+        note: 'GST filing',
+        actorId: KIRO,
+        clientTime: '2026-08-19T10:00:00.000Z',
+        serverTime: '2026-08-19T10:00:01.000Z',
+      },
     });
   });
 
@@ -410,13 +540,13 @@ describe('date-approaching', () => {
   it('an undated ticket produces nothing — there is no date to approach (planted defect: the invented date is impossible)', async () => {
     await seedTicket({ ticketId: freshTicketId(), assigneeId: ANSELMA, dueDate: null });
     await sweep();
-    expect(await notificationRows('date-approaching')).toHaveLength(0);
+    await expectNoNotifications('date-approaching');
   });
 
   it('a claim beyond the window is not yet news', async () => {
     await seedTicket({ ticketId: freshTicketId(), assigneeId: ANSELMA, dueDate: { date: '2026-09-15' } });
     await sweep();
-    expect(await notificationRows('date-approaching')).toHaveLength(0);
+    await expectNoNotifications('date-approaching');
   });
 
   it('an already-passed claimed date still notifies once — overdue is inside the window, not past it', async () => {
@@ -431,7 +561,7 @@ describe('date-approaching', () => {
   it('a terminal ticket never notifies — done work has no approaching deadline', async () => {
     await seedTicket({ ticketId: freshTicketId(), stateCategory: 'terminal', stateId: 'done', assigneeId: ANSELMA, dueDate: { date: '2026-08-30' } });
     await sweep();
-    expect(await notificationRows('date-approaching')).toHaveLength(0);
+    await expectNoNotifications('date-approaching');
   });
 
   it("an unassigned ticket notifies the claim's author — the person who claimed the date owns the caring", async () => {
@@ -440,6 +570,90 @@ describe('date-approaching', () => {
     const rows = await notificationRows('date-approaching');
     expect(rows).toHaveLength(1);
     expect(at(rows, 0).user_id).toBe(KIRO);
+  });
+
+  /**
+   * The gate is `state_category <> 'terminal'`, and that is NOT `= 'active'`.
+   *
+   * Three categories exist — `open`, `active`, `terminal` — and this suite
+   * seeded only two of them, so narrowing the predicate to `= 'active'` left
+   * every test green (M15). What that mutation silences is the commonest
+   * ticket there is: `packages/domain/src/simple-kanban.ts` gives the shipped
+   * default workflow a `todo` state whose category is **'open'**, so a ticket
+   * someone just created with a due date next week sits in `open` and would
+   * stop warning entirely.
+   *
+   * Asserted as one sweep over all three categories rather than as three
+   * absence checks, because a set of keys distinguishes "the open one was
+   * correctly included" from "the seed silently failed" — an empty table
+   * cannot.
+   */
+  it("an OPEN ticket's claimed date still approaches — the gate is 'not terminal', which is not 'active'", async () => {
+    const open = freshTicketId();
+    const active = freshTicketId();
+    const terminal = freshTicketId();
+    await seedTicket({ ticketId: open, stateId: 'todo', stateCategory: 'open', assigneeId: ANSELMA, dueDate: { date: '2026-08-30' } });
+    await seedTicket({ ticketId: active, stateId: 'doing', stateCategory: 'active', assigneeId: ANSELMA, dueDate: { date: '2026-08-30' } });
+    await seedTicket({ ticketId: terminal, stateId: 'done', stateCategory: 'terminal', assigneeId: ANSELMA, dueDate: { date: '2026-08-30' } });
+    await sweep();
+    const keys = (await notificationRows('date-approaching')).map((row) => row.dedupe_key);
+    // Sorted: the sweep's SELECT has no ORDER BY, so WHICH of the two arrives
+    // first is not a fact this test is entitled to pin — only which two.
+    expect(keys.slice().sort()).toEqual(
+      [`date-approaching:${open}:2026-08-30`, `date-approaching:${active}:2026-08-30`].sort(),
+    );
+  });
+
+  /**
+   * THE DENY DIRECTION, which is the only direction a visibility gate exists
+   * for. Every other test in this file hands the sweep `seeEverything`, so
+   * before this test the gate at `sweep.ts`'s date-approaching loop could be
+   * DELETED and all 30 tests stayed green (M17a).
+   *
+   * Both tickets are candidates and one is refused, so the report's counters
+   * come apart here in a way no green-path test can make them: `dueCandidates`
+   * counts rows read out of `proj_tickets`, `delivered` counts rows that got
+   * past the gate. An implementation that incremented `delivered` alongside the
+   * candidate — or one that returned zeros for the whole report (M21) — passes
+   * every other assertion in this file and fails this one.
+   */
+  it('a target who cannot SEE the ticket is told nothing about its date, and the report says so', async () => {
+    const refused = freshTicketId();
+    const permitted = freshTicketId();
+    await seedTicket({ ticketId: refused, assigneeId: ANSELMA, dueDate: { date: '2026-08-30' } });
+    await seedTicket({ ticketId: permitted, assigneeId: ANSELMA, dueDate: { date: '2026-08-30' } });
+    const report = await sweep(gateDenying([`${ANSELMA}:${refused}`]));
+    expect((await notificationRows('date-approaching')).map((row) => row.dedupe_key)).toEqual([
+      `date-approaching:${permitted}:2026-08-30`,
+    ]);
+    expect(report).toEqual({ dueCandidates: 2, staleCandidates: 0, delivered: 1 });
+  });
+
+  /**
+   * WHICH PERSON the date-approaching gate is asked about, on the branch where
+   * that is not the assignee.
+   *
+   * The target is `row.assignee_id ?? claim.data.actorId`, and the test above
+   * seeds an assignee — so it witnesses only the first half of that `??`. Ask
+   * the gate about `row.assignee_id ?? ''` instead of the target and every one
+   * of the 36 tests stayed green (M17d): the unassigned test hands the sweep a
+   * permissive gate, which says yes to the empty string as readily as to
+   * anyone. The recipient is still the claim's author, so the sweep would post
+   * a title and a note to someone it never asked about.
+   *
+   * The stale loop has no matching hole — its recipient is `row.assignee_id`
+   * and its `entered_by` is a different person in the fixture above, so
+   * swapping the gate's user argument to `row.entered_by` already reddens
+   * (M17e). This test is what makes the two loops equally covered.
+   */
+  it("the gate is asked about the person who will RECEIVE it — for an unassigned ticket that is the claim's author, not the absent assignee", async () => {
+    const ticketId = freshTicketId();
+    await seedTicket({ ticketId, assigneeId: null, dueDate: { date: '2026-08-30' } });
+    // KIRO authored the claim (`seedTicket` stamps every field with him), so
+    // KIRO is who this row would be addressed to, and KIRO is who is refused.
+    const report = await sweep(gateDenying([`${KIRO}:${ticketId}`]));
+    await expectNoNotifications('date-approaching');
+    expect(report).toEqual({ dueCandidates: 1, staleCandidates: 0, delivered: 0 });
   });
 });
 
@@ -457,10 +671,139 @@ describe('stale-ticket', () => {
       ticketId,
       ticketTitle: 'Renew the DLT registration',
       stateId: 'doing',
-      stateName: null, // no workflow.defined row seeded — name honestly unresolvable, id always present
+      // No workflow.defined row seeded (and `beforeEach` now DELETEs
+      // proj_workflows, so that is true under any ordering rather than by
+      // luck) — the name is honestly unresolvable and the id is always
+      // present. The resolved path is pinned by its own test below.
+      stateName: null,
       enteredAt: '2026-08-01T09:00:00.000Z',
       enteredBy: KIRO,
     });
+  });
+
+  /**
+   * PLAN 2's `getWorkflowDefFromProjection` is a DECLARED CONSUMED INTERFACE of
+   * this task, and until this test the only thing the suite ever saw it return
+   * was `null` — the branch where nothing was published. So `?.name` could be
+   * `?.id` (M18) and the lookup could be deleted entirely for a hardcoded
+   * `null` (M18b) and nothing reddened. The state NAME is what a person reads
+   * in their inbox; `doing` is not an answer to "where is this stuck?".
+   *
+   * The published name is `'Being worked on'` and the state id is `'doing'`,
+   * which is what makes this assertion able to tell the two apart: had the
+   * fixture used `SIMPLE_KANBAN_TEMPLATE`'s own `'Doing'`, the discriminator
+   * would have been one capital letter.
+   */
+  it("names the state from Plan 2's published workflow — the inbox says WHERE a ticket is stuck, not an opaque id", async () => {
+    await seedWorkflow();
+    const ticketId = freshTicketId();
+    await seedTicket({ ticketId, assigneeId: ANSELMA });
+    await seedEnteredState(ticketId, '2026-08-01T09:00:00.000Z', KIRO);
+    await sweep();
+    const rows = await notificationRows('stale-ticket');
+    expect(rows).toHaveLength(1);
+    expect(at(rows, 0).payload).toEqual({
+      ticketId,
+      ticketTitle: 'Renew the DLT registration',
+      stateId: 'doing',
+      // Written out rather than referencing DOING_STATE_NAME: the whole point
+      // is that a reader sees `stateId: 'doing'` and `stateName: 'Being worked
+      // on'` one line apart and can tell at a glance which one the sweep
+      // resolved. `?.id` in place of `?.name` would put 'doing' on both lines.
+      stateName: 'Being worked on',
+      enteredAt: '2026-08-01T09:00:00.000Z',
+      enteredBy: KIRO,
+    });
+  });
+
+  /**
+   * THE RANGE IS CLOSED AT BOTH ENDS, and it was not.
+   *
+   * The two "fresh" fixtures in this file sit 3 and 22 IST days from the
+   * boundary — one comfortably inside, one comfortably outside, and neither
+   * one day INSIDE it. So widening the threshold by a day (nagging a full IST
+   * day EARLY) left every test green (M2), while narrowing it reddened three
+   * (M3). A range gated at one end is half a range.
+   *
+   * The arithmetic, at the unclaimed default of DEFAULT_STALE_DAYS = 7 and
+   * today = IST day 2026-08-23: the cut-off DAY is 2026-08-16, and
+   * `istDayBounds` makes the comparison a strict `<` against its `endUtc`,
+   * 2026-08-16T18:30:00.000Z.
+   *
+   *   entered 2026-08-16T09:00Z (14:30 IST, 16 Aug) -> before endUtc -> STALE
+   *   entered 2026-08-17T09:00Z (14:30 IST, 17 Aug) -> after  endUtc -> FRESH
+   *
+   * They are ADJACENT IST days, so moving the threshold by one in EITHER
+   * direction moves one of them across: -6 makes the 17th stale (two rows),
+   * -8 makes the 16th fresh (no rows). That is the shape the approaching
+   * horizon already had, copied.
+   */
+  it('the staleness range is closed at BOTH ends — the last stale IST day nags and the first fresh one does not', async () => {
+    const lastStaleDay = freshTicketId();
+    const firstFreshDay = freshTicketId();
+    await seedTicket({ ticketId: lastStaleDay, assigneeId: ANSELMA });
+    await seedTicket({ ticketId: firstFreshDay, assigneeId: ANSELMA });
+    await seedEnteredState(lastStaleDay, '2026-08-16T09:00:00.000Z', KIRO);
+    await seedEnteredState(firstFreshDay, '2026-08-17T09:00:00.000Z', KIRO);
+    await sweep();
+    expect((await notificationRows('stale-ticket')).map((row) => row.dedupe_key)).toEqual([
+      `stale-ticket:${lastStaleDay}:doing:2026-08-16T09:00:00.000Z`,
+    ]);
+  });
+
+  /**
+   * Only an ACTIVE state goes stale, and the two categories that do not are
+   * pinned in the SAME sweep as the one that does.
+   *
+   * Widening the gate from `= 'active'` to `<> 'terminal'` used to leave every
+   * test green (M16), because no test ever seeded an `'open'` ticket at all —
+   * and `open` is where the shipped default workflow's `todo` sits. That
+   * mutation starts nagging people about tickets nobody has picked up yet,
+   * which is a queue, not a stall. The terminal half was only half pinned too:
+   * the suite proved a terminal ticket has no approaching DATE and never that
+   * it goes un-nagged for sitting still.
+   *
+   * All three entered the same state on the same instant, 22 IST days back, so
+   * the ONLY thing separating them is the category — and the assertion is the
+   * exact key set, which an empty-table check could never be.
+   */
+  it('only ACTIVE states go stale — an open ticket is waiting, not stuck, and a terminal one is finished', async () => {
+    const open = freshTicketId();
+    const active = freshTicketId();
+    const terminal = freshTicketId();
+    await seedTicket({ ticketId: open, stateId: 'todo', stateCategory: 'open', assigneeId: ANSELMA });
+    await seedTicket({ ticketId: active, stateId: 'doing', stateCategory: 'active', assigneeId: ANSELMA });
+    await seedTicket({ ticketId: terminal, stateId: 'done', stateCategory: 'terminal', assigneeId: ANSELMA });
+    for (const ticketId of [open, active, terminal]) {
+      await seedEnteredState(ticketId, '2026-08-01T09:00:00.000Z', KIRO);
+    }
+    await sweep();
+    expect((await notificationRows('stale-ticket')).map((row) => row.dedupe_key)).toEqual([
+      `stale-ticket:${active}:doing:2026-08-01T09:00:00.000Z`,
+    ]);
+  });
+
+  /**
+   * The deny direction on the OTHER loop — deleting the stale loop's gate was
+   * its own surviving mutation (M17b), and the leak it opens is the worse of
+   * the two: the stale payload carries the ticket's title AND the id and name
+   * of the state it is sitting in.
+   *
+   * Same report reasoning as the date-approaching deny test: two candidates,
+   * one delivery.
+   */
+  it('an assignee who cannot SEE the ticket is not nagged about it, and the report says so', async () => {
+    const refused = freshTicketId();
+    const permitted = freshTicketId();
+    await seedTicket({ ticketId: refused, assigneeId: ANSELMA });
+    await seedTicket({ ticketId: permitted, assigneeId: ANSELMA });
+    await seedEnteredState(refused, '2026-08-01T09:00:00.000Z', KIRO);
+    await seedEnteredState(permitted, '2026-08-01T09:00:00.000Z', KIRO);
+    const report = await sweep(gateDenying([`${ANSELMA}:${refused}`]));
+    expect((await notificationRows('stale-ticket')).map((row) => row.dedupe_key)).toEqual([
+      `stale-ticket:${permitted}:doing:2026-08-01T09:00:00.000Z`,
+    ]);
+    expect(report).toEqual({ dueCandidates: 0, staleCandidates: 2, delivered: 1 });
   });
 
   it('a fresh active ticket is not stale', async () => {
@@ -468,7 +811,7 @@ describe('stale-ticket', () => {
     await seedTicket({ ticketId, assigneeId: ANSELMA });
     await seedEnteredState(ticketId, '2026-08-20T09:00:00.000Z', KIRO); // 3 days
     await sweep();
-    expect(await notificationRows('stale-ticket')).toHaveLength(0);
+    await expectNoNotifications('stale-ticket');
   });
 
   it('an unassigned stale ticket sends nothing — the read-time attention strip owns it', async () => {
@@ -476,7 +819,7 @@ describe('stale-ticket', () => {
     await seedTicket({ ticketId, assigneeId: null });
     await seedEnteredState(ticketId, '2026-08-01T09:00:00.000Z', KIRO);
     await sweep();
-    expect(await notificationRows('stale-ticket')).toHaveLength(0);
+    await expectNoNotifications('stale-ticket');
   });
 
   it('re-running after the notification does not re-nag; a NEW entry into the same state may', async () => {
@@ -623,7 +966,7 @@ describe('the sweep windows ARE the workspace settings — one origin, not two',
     await seedEnteredState(ticketId, '2026-08-18T09:00:00.000Z', KIRO);
 
     await sweep();
-    expect(await notificationRows('stale-ticket')).toHaveLength(0); // unclaimed: the default holds it back
+    await expectNoNotifications('stale-ticket'); // unclaimed: the default holds it back
 
     await seedWorkspaceSettings({ staleDays: 3 }, { actorId: KIRO });
     await sweep();
@@ -639,14 +982,14 @@ describe('the sweep windows ARE the workspace settings — one origin, not two',
     await seedTicket({ ticketId, assigneeId: ANSELMA });
     await seedEnteredState(ticketId, '2026-08-01T09:00:00.000Z', KIRO); // 22 IST days: stale under the default, fresh under 30
     await sweep();
-    expect(await notificationRows('stale-ticket')).toHaveLength(0);
+    await expectNoNotifications('stale-ticket');
   });
 
   it("the approaching window is the workspace's dueSoonDays — narrowing it holds back a claim the default would have warned about", async () => {
     await seedWorkspaceSettings({ dueSoonDays: 2 });
     await seedTicket({ ticketId: freshTicketId(), assigneeId: ANSELMA, dueDate: { date: '2026-08-30' } });
     await sweep();
-    expect(await notificationRows('date-approaching')).toHaveLength(0); // horizon 2026-08-25, the claim is beyond it
+    await expectNoNotifications('date-approaching'); // horizon 2026-08-25, the claim is beyond it
 
     await seedWorkspaceSettings({ dueSoonDays: 21 });
     await sweep();
