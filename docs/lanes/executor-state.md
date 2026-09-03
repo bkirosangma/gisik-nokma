@@ -9,7 +9,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9. T1-T8 + T10 COMMITTED, GATE GREEN. T10 fix + T9 IN FLIGHT.**
+## WHERE I AM: **STEP 14 — PLAN 9. T1-T10 COMMITTED, REBASED ONTO `d3e0889`. T9 fix + T11 IN FLIGHT.**
 
 > # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
 > ```
@@ -164,6 +164,60 @@ coordination doc already pre-corrected this). T2's `docToPlainText` **already ex
 (`packages/domain/src/doc-text.ts`) — created by **Plan 5**, not Plan 7 as T2's text says; take the
 skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
 `src/index.ts` as the plan says.
+
+## REBASED ONTO `d3e0889` — this branch was carrying a race I had already fixed on `main`
+
+**T10's fix agent hit an intermittent failure in `access.test.tsx` on an unchanged tree**, reported it
+honestly as *"recorded, not diagnosed"*, and it was **PR #90's race arriving in my own work.** This
+branch was cut from `eb20d7c`, #90 merged after, so every agent here was running against the
+pre-fix `getByTestId`. Rebased; verified with two positive controls:
+
+- `git diff <old-head> HEAD` shows **only `access.test.tsx`** — #90 arriving, nothing else moved.
+- `git diff origin/main..HEAD` is **non-empty and is the Plan 9 work** (46 files).
+- Code-level `user.click(screen.getByTestId` count is now **0** (the 4 remaining matches are inside
+  the comment I wrote, which quotes the old spelling deliberately).
+
+**The lesson is about branch age, not about the race.** A long-lived branch keeps every bug that was
+fixed on `main` after it was cut, and the symptom arrives as *someone else's* flake in *your* agent's
+report. **Re-fetch and rebase at batch boundaries, not only when a PR merges.**
+
+## PROGRESS: T1-T11 in flight; T1-T10 committed (T9 done, T11 building). T9 fix + T11 IN FLIGHT.
+
+**T9 (`CalendarView`) is the first task that rendered a colour, and it did the token work right —
+ONE new role, not fourteen.** Most plan names turned out to be existing roles under new words. It
+**declined `barActive`/`barTerminal` outright**, because `CalendarBar` carries no `stateCategory` and
+two bar colours would *colour a distinction the model cannot make*. It added `customMarker` with a
+`CONTRAST_PAIRS` entry **at the text minimum, not the glyph minimum**, because the label renders in it.
+
+**It found two more silent defects in the plan's code.** `2026-02-30` passes `IST_DAY_REGEX`, so the
+model places it by string comparison into a week where `days.indexOf` is `-1` — and the plan's
+`index + 1` produced `grid-column: 0 / 1`, **which CSS discards, so the auto-placer drops the claim
+onto a day nobody claimed.** And the plan renders ONE empty-month sentence where the model has three
+arms; all three now render verbatim.
+
+**It also closed a hole nothing was watching:** `token-discipline.test.ts` proves no colour *literal*
+escapes `tokens.ts`, but nothing proved a `var(--gn-…)` names a role that **exists** — a typo resolves
+to nothing, the element inherits, the suite stays green, and the colour is simply gone.
+`packages/ui/test/tokens.test.ts` now cross-checks every `var(--gn-…)` against `TOKEN_ROLES`.
+
+### T9's review — three Important, and all three are ONE class
+
+**Asserted present-when-expected, never absent-when-not, so nothing can detect OVER-firing.** This is
+already a recorded failure class on this branch and it produced every finding here:
+
+| Mutation | Result |
+|---|---|
+| today ring compares day-of-month only (`day.slice(8)`) — rings 09-23 as "today" in September | **SURVIVED 25/25.** Both ring tests assert presence *inside August*, where day-of-month 23 and 10 each occur once. |
+| drop every item on a leading/trailing **padding** cell | **SURVIVED 25/25.** Every fixture is `2026-08-xx`. **This is the exact defect the MODEL shipped with 777 green — same blind spot, one layer up.** |
+| make a **bar's** `onClick` dead | **SURVIVED 25/25.** Only markers are ever clicked; the bar test asserts `title` and `gridColumn`. |
+
+**T10's fix took `emptyCopy` from distinct-count 1 to 3**, and made a design call worth keeping: **the
+window sentence is deliberately NOT exhaustive** — *"Dated work here sits outside the weeks in view"*,
+never *"every piece of"* — because a filter can remove work that would ALSO have missed the window, and
+an exhaustive quantifier there is the all-hidden failure in timeline clothes. It kept the undated-epic
+guard as-is and pinned both halves. It fixed the **prose** of the `0099-01-01` docblock rather than the
+code, on the grounds that refusing pre-1000 years would invent a validity rule at a *rendering* surface
+the write path does not have — the product would store a claim it then refuses to place.
 
 ## STOP — THE PLAN'S STYLING API DOES NOT EXIST. 57 SITES. BLOCKS T9, T11, T12, T13.
 
