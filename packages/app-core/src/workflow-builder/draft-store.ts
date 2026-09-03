@@ -203,16 +203,21 @@ export function createDraftStore(initial: WorkflowDraft): DraftStore {
     },
     removeTransition(index) {
       // BuilderSelection addresses a transition by index (the plan's Produces
-      // contract), so this clears only a selection pointing AT the removed one.
-      // A selection with a HIGHER index keeps its number while the transitions
-      // shift down under it: measured on a 3-transition def, selection index 2
-      // survived removeTransition(0) and then addressed nothing — 2 is past the
-      // new end. Nearer the front it would instead address a different
-      // transition. Reconciling that is a selection-semantics decision (clear,
-      // or decrement) that belongs to the task owning the inspector.
-      const keepSelection =
-        state.selection.kind === 'transition' && state.selection.index === index
-          ? ({ kind: 'none' } as const)
+      // contract). Task 6 (the task owning the inspector) settles the
+      // reconciliation this comment used to leave open: a selection pointing
+      // AT the removed transition clears to none; a selection at a HIGHER
+      // index decrements to keep naming the SAME transition as it shifts down
+      // under it (toFlowGraph and the inspector both key off `index` alone,
+      // so decrementing keeps edge selection, node highlighting, and the
+      // inspector panel all pointed at one transition); a selection at a
+      // LOWER index is unaffected — nothing shifted under it.
+      const keepSelection: BuilderSelection =
+        state.selection.kind === 'transition'
+          ? state.selection.index === index
+            ? { kind: 'none' }
+            : state.selection.index > index
+              ? { kind: 'transition', index: state.selection.index - 1 }
+              : state.selection
           : state.selection;
       set({
         ...state,

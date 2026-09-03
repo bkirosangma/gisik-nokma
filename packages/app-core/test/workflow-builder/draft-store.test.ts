@@ -154,6 +154,31 @@ describe('transition and rule actions', () => {
     expect(store.getState().def.transitions).toHaveLength(1);
     expect(store.getState().selection).toEqual({ kind: 'none' });
   });
+
+  // Task 6 (owning the inspector) settles the case the removeTransition
+  // comment used to leave open: a selection at a HIGHER index than the one
+  // removed must decrement to keep naming the SAME transition, not silently
+  // start naming its neighbour once the array shifts down under it.
+  // Falsifiable: reverting the `> index` branch to "leave it alone" makes
+  // this assert `{ kind: 'transition', index: 3 }` instead — the transition
+  // that used to be at index 3 (done -> doing) is now at index 2, so an
+  // un-decremented selection would point the inspector at whatever slid into
+  // index 3, a transition the user never selected.
+  it('removeTransition decrements a selection at a higher index so it keeps naming the same transition', () => {
+    const store = storeWith(kanbanDef());
+    const removedTarget = store.getState().def.transitions[3];
+    store.actions.select({ kind: 'transition', index: 3 }); // done -> doing
+    store.actions.removeTransition(1); // doing -> todo, ahead of the selection
+    expect(store.getState().selection).toEqual({ kind: 'transition', index: 2 });
+    expect(store.getState().def.transitions[2]).toEqual(removedTarget);
+  });
+
+  it('removeTransition leaves a selection at a lower index untouched', () => {
+    const store = storeWith(kanbanDef());
+    store.actions.select({ kind: 'transition', index: 0 }); // todo -> doing
+    store.actions.removeTransition(2); // doing -> done, behind the selection
+    expect(store.getState().selection).toEqual({ kind: 'transition', index: 0 });
+  });
 });
 
 describe('subscribe and selectors', () => {

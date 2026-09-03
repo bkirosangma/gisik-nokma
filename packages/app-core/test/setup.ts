@@ -152,6 +152,36 @@ if (typeof HTMLElement !== 'undefined') {
    * harness is NOT MEASURED here — Task 6 must establish it with a planted
    * defect, not assume it from this block.
    */
+  /**
+   * Task 6's connect-gesture measurement (plan line 3127, "OPEN FOR CONNECT"
+   * in this file's own comment above): a real pointerdown-on-Handle ->
+   * pointermove -> pointerup-on-Handle sequence, driven with the SAME
+   * pointer() gesture the drag test above uses, does not merely no-op the
+   * way the drag gesture does without the `view` wrapper — it throws an
+   * UNCAUGHT exception that fails the whole vitest process (not just the
+   * test), because @xyflow/system's connection hit-testing
+   * (`isValidHandle`, called from its pointermove handler) calls
+   * `document.elementFromPoint`, an API jsdom has never implemented.
+   * Measured: delete this shim and run
+   * `test/workflow-builder/canvas.test.tsx` — the connect-gesture test still
+   * reports 12/12 passed (the crash lands after the test body's assertions
+   * already ran), but the process exits 1 on "doc.elementFromPoint is not a
+   * function", which fails `pnpm turbo run test` package-wide.
+   *
+   * The stub returns null unconditionally — "nothing is at this point" — the
+   * honest answer here: every element's rect is 0x0 (no layout engine), so
+   * there is no real position at which two distinct handles' rects could
+   * ever both cover the same point the way a real browser's could. With this
+   * shim in place, the SAME pointer sequence completes without throwing and
+   * `onConnect` is measured never firing — that is Task 6's actual finding,
+   * not a shim-induced one: connectionToTransition (the mapping layer
+   * onConnect calls) is proven separately, without any gesture, in
+   * flow-graph.test.ts.
+   */
+  if (typeof document !== 'undefined' && typeof document.elementFromPoint !== 'function') {
+    document.elementFromPoint = () => null;
+  }
+
   if (typeof MouseEvent !== 'undefined') {
     const originalDefineProperty = Object.defineProperty;
     Object.defineProperty = function (

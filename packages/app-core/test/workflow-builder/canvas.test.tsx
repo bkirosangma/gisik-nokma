@@ -155,6 +155,71 @@ describe('WorkflowCanvas', () => {
     expect(moves[0]?.[0]).toBe('done');
   });
 
+  // MEASUREMENT, not a feature test: Task 5 rendered nodes and drove a drag,
+  // but explicitly left open whether a CONNECT gesture (pointerdown on a
+  // source Handle through to `onConnect`) completes in this harness at all.
+  // React Flow resolves a drop target during a connect drag by hit-testing
+  // handle DOM rects against the pointer position via
+  // `document.elementFromPoint` — an API jsdom does not implement at all
+  // (confirmed by first running this test WITHOUT test/setup.ts's stub: the
+  // pointer sequence throws an UNCAUGHT `TypeError: doc.elementFromPoint is
+  // not a function` from @xyflow/system's `isValidHandle`, which fails the
+  // whole vitest process, not merely this test — worse than the drag
+  // gesture's silent no-op). With the stub in place (setup.ts, "nothing is
+  // at this point" — honest given every rect here is 0x0), the identical
+  // pointer sequence completes without throwing, and:
+  //
+  // MEASURED RESULT: addTransition is called ZERO times. The connect drag
+  // starts but never resolves onto the target handle, so `onConnect` never
+  // fires — a connect gesture cannot be driven to completion in this
+  // harness, full stop, not merely "landed a zero delta" the way drag did.
+  //
+  // Per the brief: since the gesture cannot be driven end-to-end here, this
+  // is not a gesture assertion that would pass vacuously — it pins the
+  // negative result (planted-defect below), and connectionToTransition (the
+  // mapping layer `onConnect` actually calls) already has full coverage in
+  // flow-graph.test.ts, proven independently of any pointer gesture.
+  //
+  // Planted-defect check for this test itself, run manually and reverted
+  // (`git diff` confirms workflow-canvas.tsx matches committed state):
+  // wiring `onConnectStart` to call `store.actions.addTransition('todo',
+  // 'FORCED')` unconditionally (bypassing hit-testing) DOES push into
+  // `additions` on the same pointer sequence — proving the pointerdown truly
+  // lands on the handle and starts a real connection drag, and that it is
+  // specifically the move/hit-test resolution this harness cannot complete.
+  it('CANNOT drive a connect gesture to completion in jsdom — measured, not assumed', async () => {
+    const user = userEvent.setup();
+    const real = createDraftStore(draftFromTemplate(errand));
+    const additions: [string, string][] = [];
+    const store: DraftStore = {
+      getState: () => real.getState(),
+      subscribe: (listener) => real.subscribe(listener),
+      actions: {
+        ...real.actions,
+        addTransition: (from, to) => {
+          additions.push([from, to]);
+          real.actions.addTransition(from, to);
+        },
+      },
+    };
+    renderCanvas(store);
+    const sourceNode = screen.getByTestId('state-node-later').closest('.react-flow__node') as HTMLElement;
+    const targetNode = screen.getByTestId('state-node-done').closest('.react-flow__node') as HTMLElement;
+    const sourceHandle = sourceNode.querySelector('.react-flow__handle.source') as HTMLElement;
+    const targetHandle = targetNode.querySelector('.react-flow__handle.target') as HTMLElement;
+    expect(sourceHandle).toBeTruthy();
+    expect(targetHandle).toBeTruthy();
+    await user.pointer([
+      { keys: '[MouseLeft>]', target: sourceHandle, coords: { clientX: 10, clientY: 10 } },
+      { target: targetHandle, coords: { clientX: 300, clientY: 300 } },
+      { keys: '[/MouseLeft]', target: targetHandle, coords: { clientX: 300, clientY: 300 } },
+    ]);
+    expect(additions).toHaveLength(0);
+    // The mapping layer this gesture would drive IS proven, separately and
+    // without a gesture: flow-graph.test.ts's `connectionToTransition`
+    // describe block.
+  });
+
   it('disables editing controls when the viewer cannot author', () => {
     const store = createDraftStore(draftFromTemplate(errand));
     renderCanvas(store, testEnv({ session: { userId: newUlid(), role: 'member' }, canAuthor: false }));

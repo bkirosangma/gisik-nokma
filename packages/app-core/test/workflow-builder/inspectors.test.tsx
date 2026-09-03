@@ -11,6 +11,7 @@ import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { BuilderProvider, type BuilderEnvironment } from '../../src/workflow-builder/ui/builder-context.js';
 import { InspectorPanel } from '../../src/workflow-builder/ui/inspector-panel.js';
+import { defaultRuleFor } from '../../src/workflow-builder/ui/rule-editors/add-rule-menu.js';
 
 const kanban = WORKFLOW_TEMPLATES.find((template) => template.id === 'simple-kanban')!;
 
@@ -95,6 +96,40 @@ describe('TransitionInspector', () => {
     store.actions.select({ kind: 'transition', index: 4 });
     renderPanel(store);
     expect(screen.getByText('From Any state to Done')).toBeInTheDocument();
+  });
+
+  // "The add-rule menu offers EXACTLY the five kinds from the domain Rule
+  // union with honest defaults — no sixth thing" (this task's own brief).
+  // The plan's own test above, despite its title "adds a rule of each kind",
+  // exercises exactly ONE kind (require-comment) — misdescribed coverage
+  // recorded here rather than left implicit. This pair closes the gap: the
+  // menu's full contents, and every kind's default, asserted directly.
+  it('offers exactly the five Rule kinds and no sixth thing', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(kanban));
+    store.actions.select({ kind: 'transition', index: 2 });
+    renderPanel(store);
+    await user.click(screen.getByRole('button', { name: 'Add rule' }));
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Restrict who may move it',
+      'Require a comment',
+      'Require evidence (attachment)',
+      'Require a field to be set',
+      'Require a different user (four eyes)',
+    ]);
+  });
+
+  it('defaultRuleFor gives an honest default for every one of the five kinds', () => {
+    const draft = draftFromTemplate(kanban);
+    expect(defaultRuleFor('restrict-to', draft.def)).toEqual({ kind: 'restrict-to', assignee: true });
+    expect(defaultRuleFor('require-comment', draft.def)).toEqual({ kind: 'require-comment' });
+    expect(defaultRuleFor('require-evidence', draft.def)).toEqual({ kind: 'require-evidence' });
+    expect(defaultRuleFor('require-field', draft.def)).toEqual({ kind: 'require-field', field: 'dueDate' });
+    // Kanban's transitions[0] is todo -> doing, so the first inbound target is 'doing'.
+    expect(defaultRuleFor('require-different-user', draft.def)).toEqual({
+      kind: 'require-different-user',
+      thanActorOf: { to: 'doing' },
+    });
   });
 
   it('adds a rule of each kind with honest defaults', async () => {
