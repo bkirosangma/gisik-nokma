@@ -6445,3 +6445,58 @@ quoted, not re-run here. Its stated owner was "Plan 8 Task 15, whose Step 1 is t
 pass", which is the right owner for a flake to be re-observed under a verification run — and, for the
 avoidance of the confusion this entry could otherwise cause, is NOT an owner for the app-core
 behaviour change above.
+## Plan 8 Task 15 fix round (2026-09-03) — two things the catalogue sweep turned up in the code it was cataloguing
+
+Both **RECORDED, NOT FIXED**. Task 15 writes `Features.md` §10 and `test-cases/10-workflow-builder.md`;
+neither of these is a document, and parking a code change on a catalogue task is the same mistake the
+Task 13 fix-round entry above declined to make.
+
+**1. The withdrawn "catches a refused roster" sentence survives in a SECOND file, and the entry above
+is not wrong about it.** The Task 13 fix-round entry says the false sentence "is corrected in the same
+commit as this entry", and scopes that to "its docblock" — the adapter's. Measured: that is exactly
+true. `apps/web/src/authoring/data-source-gateway.ts:114` now opens with "`WorkflowBuilderScreen` does
+NOT" and spells out that the blanket catch turns a 500, a dropped connection or an unparseable body
+into the empty roster — so the adapter's docblock was corrected exactly as claimed.
+The reviewer's theory that the document overclaimed its own completeness is therefore **refuted**.
+What is true is narrower and was missed by everyone: the same false claim was written **twice, into
+two files**, and the withdrawal only ever covered one of them. `apps/web/src/authoring/builder-wiring.tsx:57`
+still reads, verbatim:
+
+
+    *    read-only, which is exactly what a guest should see. The screens are built
+    *    for it — `WorkflowBuilderScreen` catches a refused roster by name.
+
+It is false for the same reason the adapter's copy was: `workflow-builder-screen.tsx:70` catches the
+whole promise, by no name at all. Sweep behind this: `rtk proxy grep -rn "refused roster"` over
+`apps`, `packages`, `docs`, `Features.md` and `test-cases` returned **three** rows before this entry
+was written — the `builder-wiring.tsx:57` row above, the Task 13 entry's own quotation of the
+withdrawal at line 6392, and an unrelated `6.45` about project rosters — and returns three more now
+that this entry quotes it, which is why the count is stated as of the sha before it. Positive control
+for the same sweep: `AuthoringReadRefused` under `apps/web/src`, **8** rows across **2** files
+(`data-source-gateway.ts` 6, `builder-wiring.tsx` 2); negative control: a nonexistent string returns
+0 and exits 1.
+
+**Owner: the same unowned `gateway.ts` contract change the entry above describes.** The sentence is
+Task 13's, Task 13 is closed, and Plans 9, 10 and 11 mention `WorkflowBuilderScreen` and
+`workflow-builder-screen` **zero times each** (Plan 8: 18, as the control). Whoever moves the refusal
+into the contract deletes this sentence in the same change, because closing the gap is what would make
+it true.
+
+**2. Nothing in `apps/web` links to any of the six authoring routes.** `AppNav` renders *Workspaces*
+and *My Work* and no settings entry. Sweep: `settings` across `apps/web/app` and `apps/web/src`,
+excluding the six route files themselves, returns exactly **one** row — `builder-wiring.tsx:151`'s
+*"Sign in to open settings"* copy, which is not an `href` to them — against a positive control of 14
+`settings` hits inside the six route files. So `/w/[workspaceId]/settings/workflows` and its five
+siblings are reachable only by typing the URL today. This is disclosed in the §10 routes bullet rather
+than fixed, and it is **UNOWNED**, measured in the documents rather than from memory: `AppNav` is
+Plan 6's (10 hits in Plan 6's text, zero in every other plan), Plan 6's catalogue task closed on
+2026-09-02, and Plan 6's own text mentions `settings/workflows`, `settings/ticket-types` or `Settings`
+**zero** times (control: `my-work`, 46 hits). Plans 9, 10 and 11: zero for `AppNav` and zero for both settings route paths. The bare word `Settings` is **not** zero there, and is named so a later sweep does not think it found something: 32 hits in Plan 9, every one of them `getWorkspaceSettings` / `proj_workspace_settings` (Plan 5's server-side notification thresholds), and 1 in Plan 10, a desktop sign-in hint telling a user to paste a token in the desktop app's own Settings. Neither is a nav entry to these six routes; the discriminating term is the route path, and that is zero in every plan but Plan 8's own Task 13. Plan 8's
+own text never asks for a nav entry either — Task 13 is "the gateway adapter and the six pages". As
+with the roster gap, this is recorded as unowned rather than handed a plausible-sounding owner.
+
+**A measurement correction future ownership sweeps need.** Checkbox state in these plan files is
+**not** evidence a plan has run: `2026-08-20-08-workflow-builder.md` has **0** checked and 98
+unchecked boxes at this sha, with Tasks 1–15 executed and committed. The sweep above used artefacts
+instead — `Features.md` carries no §11 heading and `test-cases/` holds no `11-` file, which is what
+actually establishes that Plan 9 Task 15 (reserving ids 11.1–11.47) has not run.
