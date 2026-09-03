@@ -6167,3 +6167,41 @@ templates whose shape is pinned by a downstream oracle, or (c) the template itse
 author can make that call. This entry does not pick one — same discipline as ruling-request entries
 above (autonomous execution protocol, ruling 3: conservative default + record, never silently and
 never blocking).
+
+## Plan 8 execution consequences (2026-09-03) — the connect gesture, measured and closed
+
+Recorded at Task 6, whose brief handed it the one thing Task 5 explicitly left open: "ANSWERED FOR
+RENDER AND DRAG, OPEN FOR CONNECT — whether a CONNECT gesture (mousedown on a Handle through to
+`onConnect`) completes under this harness at all... DO NOT ASSUME IT FROM THE DRAG RESULT." Tasks 7–10
+all write canvas-adjacent component tests and would otherwise re-litigate this from scratch.
+
+**Measured: a connect gesture cannot be driven to completion in jsdom, and worse than a silent no-op —
+it throws an uncaught exception that fails the whole vitest process.** A real pointerdown-on-Handle →
+pointermove → pointerup-on-Handle sequence (`@testing-library/user-event`'s `pointer()`, the same
+primitive Task 5's drag test uses) hits `@xyflow/system`'s connection hit-testing
+(`isValidHandle`, called from its own pointermove listener), which calls
+`document.elementFromPoint` — an API jsdom has never implemented. Without a stub the sequence throws
+`TypeError: doc.elementFromPoint is not a function` as an *uncaught* exception (it escapes the test
+body — the test itself can still report passed — and fails the process, `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`
+on `pnpm --filter @gisik-nokma/app-core exec vitest run`).
+
+**Fix (already landed, Task 6): `packages/app-core/test/setup.ts` stubs `document.elementFromPoint` to
+return `null`** — "nothing is at this point," the honest answer given every element's rect is 0x0 in
+this harness (no layout engine), so no two distinct handles can ever occupy the same hit-tested pixel.
+With the stub, the identical pointer sequence completes without throwing and `onConnect` is measured
+firing **zero times** — the gesture genuinely cannot be driven to completion here, not merely landing a
+zero-delta the way the drag gesture does. Confirmed the pointerdown itself is real (not a target-selector
+miss) by temporarily wiring `onConnectStart` to force a call, observing it fire, then reverting.
+
+**What Tasks 7–10 do instead, per the brief that resolved this:** test `connectionToTransition`
+(`packages/app-core/src/workflow-builder/ui/flow-graph.ts`) directly — already fully covered,
+gesture-free, in `packages/app-core/test/workflow-builder/flow-graph.test.ts` (Task 5). Do not add a
+gesture test asserting a connect completes; write the negative measurement once (it now lives in
+`packages/app-core/test/workflow-builder/canvas.test.tsx`, `'CANNOT drive a connect gesture to
+completion in jsdom — measured, not assumed'`) and test the mapping layer for everything else.
+
+The `elementFromPoint` stub is package-wide (`test/setup.ts` runs for all `app-core` test files); jsdom
+never defined the API at all, so nothing pre-existing depended on its absence — the full gate
+(`rtk proxy pnpm turbo run build test typecheck`) stayed 24/24 green across the stub's introduction,
+with the app-core test count accounting for exactly the new tests added (573 → 578, no pre-existing
+test changed status).
