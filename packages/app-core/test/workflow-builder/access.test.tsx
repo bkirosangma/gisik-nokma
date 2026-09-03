@@ -14,6 +14,25 @@ import { WorkflowListScreen } from '../../src/workflow-builder/ui/workflow-list-
 import { TicketTypeListScreen } from '../../src/workflow-builder/ticket-types/ticket-type-list-screen.js';
 import { TicketTypeEditorScreen } from '../../src/workflow-builder/ticket-types/ticket-type-editor-screen.js';
 
+// EVERY testid lookup in this file is `await findByTestId`, never `getByTestId`,
+// and that is load-bearing rather than stylistic. React Flow measures and lays
+// out before it paints edge labels, so awaiting the name textbox does NOT imply
+// the edges exist: `getByTestId` asserts on the first tick, and the first tick
+// can be empty. This reddened CI on 2026-09-03 at the member case below --
+// `Unable to find an element by: [data-testid="transition-label-8"]` -- with 686
+// of 687 app-core tests passing and its own admin control case passing in the
+// same run, which is a race signature, not a bad selector.
+//
+// Measured twice, because "it passes now" proves nothing here -- it passed 17
+// consecutive local runs before anyone found the window:
+//   - Post-textbox-await, the instant this file used to query: the edge was
+//     absent 1 observation in 16, and the hit landed on the first attempt of a
+//     cold run -- the same shape as a cold CI runner.
+//   - Synchronously after render(): absent 16/16, no variance. At that instant
+//     `getByTestId` throws 8/8 and `await findByTestId` succeeds 8/8 -- a
+//     deterministic paired control that needs no luck to reproduce.
+// Do not "simplify" these back to getByTestId.
+
 const errand = WORKFLOW_TEMPLATES.find((template) => template.id === 'errand-with-waits')!;
 
 // Hardcoded, NOT imported from the component. If both sides read one constant a
@@ -139,7 +158,7 @@ describe('read-only workflow views for non-admins', () => {
     // multiple matches. The plan's snippet asserts `Must carry an attachment as
     // evidence.` instead — the errand template has no require-evidence rule at
     // all, so that click could never have landed (see the report note).
-    await user.click(screen.getByTestId('transition-label-8'));
+    await user.click(await screen.findByTestId('transition-label-8'));
     // The inspector opens with the rule visible…
     expect(screen.getByText('From In progress to Done')).toBeInTheDocument();
     // …but nothing is editable.
@@ -152,7 +171,7 @@ describe('read-only workflow views for non-admins', () => {
     const user = userEvent.setup();
     renderBuilder(adminSession);
     await screen.findByRole('textbox', { name: 'Workflow name' });
-    await user.click(screen.getByTestId('transition-label-8'));
+    await user.click(await screen.findByTestId('transition-label-8'));
     expect(screen.getByText('From In progress to Done')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add rule' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove rule' })).toBeInTheDocument();
@@ -313,10 +332,10 @@ describe('no authoring action is reachable by any path the builder screen offers
     // The two gestures that MOUNT new components (TransitionInspector,
     // StateInspector) — the two other ways a button could appear after the
     // first paint.
-    await user.click(screen.getByTestId('transition-label-8'));
+    await user.click(await screen.findByTestId('transition-label-8'));
     expect(screen.getByText('From In progress to Done')).toBeInTheDocument();
     everyButtonIsAJump();
-    await user.click(screen.getByTestId('state-node-waiting'));
+    await user.click(await screen.findByTestId('state-node-waiting'));
     expect(screen.getByRole('textbox', { name: 'State name' })).toBeDisabled();
     everyButtonIsAJump();
   });
@@ -333,9 +352,9 @@ describe('no authoring action is reachable by any path the builder screen offers
     expect(adminOpening.some((button) => !/(issues|advisories)-panel__jump/.test(button.className))).toBe(true);
     expect(screen.getByRole('button', { name: 'Add state' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
-    await user.click(screen.getByTestId('transition-label-8'));
+    await user.click(await screen.findByTestId('transition-label-8'));
     expect(screen.getByRole('button', { name: 'Delete transition' })).toBeInTheDocument();
-    await user.click(screen.getByTestId('state-node-waiting'));
+    await user.click(await screen.findByTestId('state-node-waiting'));
     expect(screen.getByRole('button', { name: 'Delete state' })).toBeInTheDocument();
   });
 
@@ -348,8 +367,8 @@ describe('no authoring action is reachable by any path the builder screen offers
       const button = screen.queryAllByRole('button').find((candidate) => candidate.textContent === name);
       if (button !== undefined) await user.click(button);
     }
-    await user.click(screen.getByTestId('transition-label-8'));
-    await user.click(screen.getByTestId('state-node-waiting'));
+    await user.click(await screen.findByTestId('transition-label-8'));
+    await user.click(await screen.findByTestId('state-node-waiting'));
     expect(memberGateway.submitted).toEqual([]);
     screen.getByText(BANNER); // still the same screen we swept
 
