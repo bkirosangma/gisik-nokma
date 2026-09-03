@@ -118,6 +118,94 @@ all-hidden check are each witnessed ON both edges and one day outside each). Eac
 reminder in its own docblock; this is the copy a relaunched executor can find without opening the
 test files.
 
+**3. A SECOND read-modify-write writer over one last-write-wins preferences document, INSIDE ONE
+CLIENT. OWNER: PLAN 6 — the shell that mounts both.** (From T13's fix round.)
+
+`views/ticket-list.tsx:432-438` (`setPrefs`) composes its whole-document PUT from
+`usePreferences`'s `document`, which is a **mount-time snapshot** — `views/use-preferences.ts` never
+re-reads before writing — and spreads it whole, `savedFilters` included. Meanwhile
+`packages/app-core/src/preferences/saved-filters.ts` writes the same document through
+`PreferencesGateway`. One screen holding both loses a filter **with no concurrency at all**: mount
+(no filters) → the person saves one through the gateway (the server holds one) → the person changes
+the grouping → `setPrefs` PUTs the mount-time `savedFilters: []`.
+
+**T13's docblock pre-empted the WRONG version of this** and the fix round corrected it: it argued
+*"two clients still resolve last-write-wins … not fixable from this side"*, which is true and a
+different problem. **Two paths inside ONE client is orderable by that client.** `ticket-list.tsx`
+already understands the shape — `ticket-list.tsx:434` reads *"refuse: see the docblock — this PUT
+would erase the rest"* —
+but the window it guards is the one BEFORE the first load, not the one the gateway opens after it.
+
+**Not fixed, and the reason is not shyness:** the two writers speak different vocabularies
+(`PreferencesDoc` vs `view-types.ts`'s `UserPreferences`) over different transports, and nothing in
+`app-core/preferences` can order writes it cannot see. The ordering belongs to whatever mounts both,
+which is Plan 6 — the implementer `preferences-gateway.ts` already names for this interface.
+
+**Nothing shipped is false today:** nothing mounts `SavedFiltersMenu` and no `PreferencesGateway`
+implementation exists — `grep -rn --include='*.ts' --include='*.tsx' "PreferencesGateway" packages
+apps` finds the interface, the store, the barrel, the two fakes under `test/preferences/`, and
+`dist/` echoes of the same (build output); `SavedFiltersMenu` is mounted only from two test files.
+**No implementation, and no screen.** **It goes
+false the moment one screen holds both writers.** Also carried in `saved-filters.ts`'s docblock,
+because a Plan 6 agent has no reason to open this file first.
+
+**4. The test-case ids Task 15 must carry now run to 11.122, and entry 2 above names only 11.48-11.51.
+OWNER: TASK 15.** Measured this round, not recalled —
+`grep -rEoh "\b11\.[0-9]+\b" packages/*/test apps/*/test | sort -u` answers **11.1-11.8, 11.18,
+11.36-11.39 and 11.48-11.122**, and `test-cases/11-calendar-notifications.md` still does not exist
+(`ls test-cases/` has no `11-`). T13 alone invented 11.96-11.120; its fix round adds **11.121** (every
+control a person can tab to is in the `:focus-visible` rule, and the reverse — the cross-package
+set equality in `test/preferences/saved-filters-css-binding.test.tsx`) and **11.122** (an absent
+preferences document reads as `[]` and refuses every write, which pins the gateway's precondition).
+This entry does not re-derive what 11.63-11.95 mean; it records that the range is continuous to 122
+so Task 15 does not carry only the four ids entry 2 names.
+
+**5. THE SAME FOCUS-RING SURVIVOR LIVES ON THREE OTHER SURFACES, AND THE GUARD THAT NOW CATCHES IT
+IS IN THE PREFERENCES SUITE ONLY. OWNER: TASK 15** — the plan's own *"full verification"* task and
+the last one on this branch; if it judges three components' guards outside its stated scope (a scope
+guard, `Features.md` §11 and the test-cases file) it must carry this entry forward rather than drop
+it. (Found by T13's fix round while building 11.121.)
+
+**Measured, three mutations, each re-run on the committed tree (app-core 1,019 after this round):**
+
+| deleted from `packages/ui/src/ui.css` | surface | app-core | ui | verdict |
+|---|---|---|---|---|
+| `:1010-1014` `.gn-inbox__{row,more}:focus-visible` | T12's inbox | 1019/1019 | 37/37 | **SURVIVES** |
+| `:863-868` `.gn-timeline__{nav,bar,open}:focus-visible` | T11's timeline | 1019/1019 | 37/37 | **SURVIVES** |
+| `:720-725` `.gn-calendar__{nav,fold,item}:focus-visible` | T9's calendar | 1019/1019 | 37/37 | **SURVIVES** |
+
+**The mechanism DIFFERS PER ROW, and that difference is the job being handed over. Measured, not
+assumed — the first draft of this entry asserted one shared cause for all three and was wrong about
+two of them:**
+
+- **inbox — a BLIND guard.** `test/inbox/inbox-css-binding.test.tsx:174` (11.95) *is* the class-name
+  set equality, plus a data-attribute check. The ring survives because a `:focus-visible` rule adds
+  no new class name — exactly the blindness the review found in T13's copy of the same instrument.
+  The job here is to GENERALISE an existing guard.
+- **timeline — NO class/rule guard exists.** `test/timeline/timeline-view.test.tsx` reads `ui.css`
+  only to pin the custom property `--timeline-week-columns` and its substitution form (`grep -n
+  "ui.css"` in that file hits 377, 383, 819 and 830, all inside that one case). There is no class-set
+  comparison for the timeline block at all. The job here is to WRITE one.
+- **calendar — nothing reads `ui.css` for it.** `grep -rn "ui.css" packages/app-core/test
+  packages/ui/test` answers the preferences, inbox and timeline files plus `packages/ui/test/
+  in-transit.test.ts` and `tokens.test.ts`, and no calendar file. Same job as the timeline, one
+  surface older.
+
+**This is the fourth appearance of the class this file
+already names** — *"a guard built for one surface does not generalise on its own … the next
+component in the same package reproduced the gap while the fix for it sat two files away"* — and it
+is the first time the gap has been measured on the surfaces that came BEFORE the guard rather than
+after it.
+
+**Not fixed here on purpose:** T13's fix round is not three other components' guards, and a fix
+written blind into `inbox-css-binding.test.tsx` would be a fourth copy of an instrument rather than
+the shared one the recurrence argues for. The shape to copy is
+`test/preferences/saved-filters-css-binding.test.tsx`'s `focusVisibleRules` +
+`focusableRenderedClasses` set equality; it needs each component's own maximal fixture, which is why
+it is not a mechanical transplant. **What is false today is only the coverage, not any claim any
+commit made** — and, as with T13, deleting these rules removes the design-system ring, not all focus
+indication: the browser's UA outline still renders and nothing in this repo can see it.
+
 ## PRE-FLIGHT IS DONE. Four findings, all verified by me on disk, not adopted from the agent.
 
 **1. NO RULING IS NEEDED FOR TASK 13, AND THE DOCUMENT THAT SAYS OTHERWISE IS WRONG.** The pre-flight

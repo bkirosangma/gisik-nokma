@@ -63,6 +63,53 @@ function declarationsFor(css: string, selector: string): string | null {
   return rule?.[1] ?? null;
 }
 
+/**
+ * The elements a person can TAB TO. Spelled as a DOM query rather than as a
+ * list of class names, so a control added to the component without a focus rule
+ * reddens on the day it is added — a typed list would have to be remembered.
+ * `[tabindex="-1"]` is excluded because programmatic focus is not tab order.
+ */
+const FOCUSABLE = 'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])';
+
+function focusableRenderedClasses(root: ParentNode): string[] {
+  const hits = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].flatMap((element) =>
+    [...element.classList].filter((name) => name.startsWith(PREFIX)),
+  );
+  return [...new Set(hits)].sort();
+}
+
+/**
+ * Every rule whose selector list names a `.gn-saved-filters…:focus-visible`, as
+ * the classes it rings and the declarations that do the ringing.
+ *
+ * `declarationsFor` cannot be reused: it anchors on a selector that starts a
+ * line, and the ring's selector list is FOUR lines. This walks whole rules
+ * instead.
+ *
+ * The flat `{…}` walk and NESTED AT-RULES: measured rather than guarded
+ * against. An earlier draft asserted `ui.css` contains no `@media`, on the
+ * theory that nesting would pair a selector with the wrong body. It does not —
+ * `[^{}]+` cannot cross a brace, so the walk simply skips the at-rule prelude
+ * and reads the inner rule with its own declarations. The planted test below
+ * measures that, and the guard whose reason was false is gone. What follows
+ * from it is worth knowing: a dark-theme `:focus-visible` override arrives as
+ * its OWN entry, so one that outlined with a different role would redden
+ * 11.121's ring check — which is the intended reading of "every focus rule in
+ * this block paints `--gn-focus-ring`", not a false alarm.
+ */
+function focusVisibleRules(css: string): { classes: string[]; declarations: string }[] {
+  return [...stripComments(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)].flatMap((rule) => {
+    const classes = [
+      ...new Set(
+        [...(rule[1] ?? '').matchAll(/\.(gn-saved-filters[A-Za-z0-9_-]*):focus-visible/g)].flatMap(
+          (hit) => hit[1] ?? [],
+        ),
+      ),
+    ].sort();
+    return classes.length === 0 ? [] : [{ classes, declarations: rule[2] ?? '' }];
+  });
+}
+
 describe('11.118 the scanners are proven against planted input before they are trusted', () => {
   it('reads classes out of selectors, ignores commented-out ones, and is not fooled by a prefix', () => {
     const planted = [
@@ -94,6 +141,63 @@ describe('11.118 the scanners are proven against planted input before they are t
     ].join('\n');
     expect(declarationsFor(planted, '.gn-saved-filters__submit')).toBe(' color: var(--gn-text); ');
     expect(declarationsFor(planted, '.gn-saved-filters__nothing')).toBeNull();
+  });
+
+  it('focusVisibleRules reads a MULTI-LINE selector list, keeps its body, and ignores other blocks', () => {
+    const planted = [
+      '/* .gn-saved-filters__ghost:focus-visible { outline: 2px solid red; } — DELETED */',
+      '.gn-saved-filters__name:focus-visible,',
+      '.gn-saved-filters__apply:focus-visible {',
+      '  outline: 2px solid var(--gn-focus-ring);',
+      '}',
+      '.gn-inbox__row:focus-visible { outline: 2px solid var(--gn-focus-ring); }',
+      '.gn-saved-filters__submit:disabled { cursor: not-allowed; }',
+    ].join('\n');
+    expect(focusVisibleRules(planted)).toEqual([
+      {
+        classes: ['gn-saved-filters__apply', 'gn-saved-filters__name'],
+        declarations: '\n  outline: 2px solid var(--gn-focus-ring);\n',
+      },
+    ]);
+  });
+
+  it('focusVisibleRules reads a rule nested in an at-rule with its OWN body, not the wrong one', () => {
+    // The measurement that replaced a guard whose stated reason was false. It
+    // also fixes what a future dark-theme override will look like to 11.121:
+    // a separate entry, judged on its own declarations.
+    const planted = [
+      '.gn-saved-filters__submit:focus-visible { outline: 2px solid var(--gn-focus-ring); }',
+      '@media (prefers-color-scheme: dark) {',
+      '  .gn-saved-filters__apply:focus-visible { outline: 2px solid var(--gn-accent); }',
+      '}',
+    ].join('\n');
+    expect(focusVisibleRules(planted)).toEqual([
+      {
+        classes: ['gn-saved-filters__submit'],
+        declarations: ' outline: 2px solid var(--gn-focus-ring); ',
+      },
+      {
+        classes: ['gn-saved-filters__apply'],
+        declarations: ' outline: 2px solid var(--gn-accent); ',
+      },
+    ]);
+  });
+
+  it('focusableRenderedClasses answers the controls, not every element carrying a class', () => {
+    const host = document.createElement('div');
+    host.innerHTML = [
+      '<div class="gn-saved-filters">',
+      '<span class="gn-saved-filters__item">not focusable</span>',
+      '<button class="gn-saved-filters__apply"></button>',
+      '<input class="gn-saved-filters__name" />',
+      '<div tabindex="-1" class="gn-saved-filters__pane"></div>',
+      '<button class="gn-inbox__more"></button>',
+      '</div>',
+    ].join('');
+    expect(focusableRenderedClasses(host)).toEqual([
+      'gn-saved-filters__apply',
+      'gn-saved-filters__name',
+    ]);
   });
 });
 
@@ -176,5 +280,42 @@ describe('11.118 every class the menu renders is a class ui.css styles, and the 
         `var(${role})`,
       );
     }
+  });
+
+  /**
+   * 11.121 — THE FOCUS RING IS A RULE, AND THE THREE TESTS ABOVE ALL STRADDLE IT.
+   *
+   * Deleting `.gn-saved-filters__{apply,delete,name,submit}:focus-visible`
+   * whole left ui 37/37 AND app-core 1014/1014 green. Each test above has a
+   * reason it cannot see that: 11.118 compares CLASS NAMES and all four classes
+   * keep their base rules, so its set is unchanged; 11.119 reads two named
+   * selectors and neither is this one; 11.120's `used.length > 3` floor goes
+   * 7 -> 6 and still passes. The gap was in the COVERAGE, not in any claim —
+   * this mutation was never attempted.
+   *
+   * What actually vanishes is the DESIGN-SYSTEM ring, not all focus indication:
+   * the browser's own UA outline still renders, and no test in this repo can
+   * see a UA outline. `ui.css` has no global `*:focus-visible` base — all 24
+   * occurrences are per-block — so this rule is the only thing putting
+   * `--gn-focus-ring` on these controls.
+   *
+   * The instrument is 11.118's, not 11.119's: harvest both sides and compare
+   * SETS. Naming the four classes would have been a fourth spelling of each and
+   * would say nothing about a fifth control added later.
+   */
+  it('11.121 every control a person can tab to is in the focus-ring rule, and the reverse', () => {
+    const { container } = renderBothArms();
+    const rules = focusVisibleRules(css);
+    const ringed = [...new Set(rules.flatMap((rule) => rule.classes))].sort();
+    const focusable = focusableRenderedClasses(container);
+
+    // FLOOR, for the reason 11.118 carries one: two empty walks are equal.
+    expect(focusable.length).toBeGreaterThanOrEqual(4);
+    expect(ringed).toEqual(focusable);
+
+    // The selectors are not the ring. A rule kept and emptied — or one that
+    // outlines with a DIFFERENT role, `var(--gn-accent)` — leaves the equality
+    // above green while the design-system focus ring is gone. Both measured.
+    expect(rules.filter((rule) => !rule.declarations.includes('var(--gn-focus-ring)'))).toEqual([]);
   });
 });

@@ -149,8 +149,39 @@ async function readDocument(gateway: PreferencesGateway) {
  * it last saw, and the other two keys are not in its hands at all. This reads
  * the document at the moment it writes, so the body it sends is the body it
  * loaded with `savedFilters` replaced and `listColumns`/`grouping` carried
- * across untouched. Two clients still resolve last-write-wins — that is the
+ * across untouched. Two CLIENTS still resolve last-write-wins — that is the
  * route's behaviour and is not fixable from this side.
+ *
+ * ## Two paths inside ONE client is a DIFFERENT problem, and it is not fixed here
+ *
+ * A client can order its own two writers, so the paragraph above must not be
+ * read as covering this. `views/ticket-list.tsx:432-438` (`setPrefs`) composes
+ * its PUT from `usePreferences`'s `document` — a snapshot taken when the view
+ * mounted, which `views/use-preferences.ts` never re-reads before writing — and
+ * spreads it WHOLE, `savedFilters` included. One screen holding both writers
+ * therefore loses a filter with no concurrency at all:
+ *
+ *   mount (the document carries no filters) -> the person saves one through
+ *   this module (the server now holds one) -> the person changes the grouping
+ *   -> `setPrefs` PUTs the mount-time `savedFilters: []`, and the saved filter
+ *   is gone.
+ *
+ * That side already understands the shape of it — `ticket-list.tsx:434` reads
+ * *"refuse: see the docblock — this PUT would erase the rest"* — but the window
+ * it guards is the one BEFORE the first load, not the one this module opens
+ * after it.
+ *
+ * LATENT TODAY, stated with the event that ends that: nothing mounts
+ * `SavedFiltersMenu` and no `PreferencesGateway` implementation exists, so no
+ * screen holds both writers yet. It goes false the moment one does.
+ *
+ * NOT FIXED HERE because the fix is not on this side: the two writers speak
+ * different vocabularies (`PreferencesDoc` here, `view-types.ts`'s
+ * `UserPreferences` there) over different transports, and this package cannot
+ * order writes it cannot see. OWNER: PLAN 6 — the shell that mounts both, and
+ * the gateway's implementer `preferences-gateway.ts` already names. Carried in
+ * `docs/lanes/executor-state.md` too, because a Plan 6 agent has no reason to
+ * open this file first.
  *
  * The id is minted here with `newUlid()`. `preferences.ts` notes that the id
  * is deliberately not REQUIRED to be a ULID — the document is the client's to

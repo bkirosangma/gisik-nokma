@@ -132,6 +132,42 @@ describe('11.100 loadSavedFilters reads the document and salvages what it can', 
   });
 });
 
+/**
+ * 11.122 — AN ABSENT DOCUMENT IS NOT AN EMPTY ONE.
+ *
+ * `readDocument` runs the `.strict()` schema whose three keys are all REQUIRED,
+ * so a `load` resolving `undefined` is UNREADABLE, not empty — while
+ * `loadSavedFilters` goes through the tolerant member path and answers `[]`.
+ * The two halves therefore disagree about the same store, and the disagreement
+ * lands on the first-ever save.
+ *
+ * This does not bless the asymmetry; it pins it, because the answer is a
+ * PRECONDITION on the gateway rather than a case for this module to invent a
+ * document for. `preferences-gateway.ts` now states it and this is what makes
+ * that statement a measurement: the shipped route answers `EMPTY_PREFERENCES`
+ * for a never-saved user, so the requirement bites on the implementations that
+ * do not exist yet — Plan 10's replica above all. The control below is a
+ * gateway that meets it, in the same run.
+ */
+describe('11.122 an absent document reads as [] and refuses every write', () => {
+  it('load answers [], save refuses, and NOTHING is written — then the control saves', async () => {
+    const absent = new FakePreferencesGateway(undefined);
+    expect(await loadSavedFilters(absent)).toEqual([]);
+    await expect(saveFilter(absent, 'The first one', {})).rejects.toMatchObject({
+      reason: 'unreadable-document',
+    });
+    // The refusal alone is not the finding: a write attempted and rejected
+    // downstream would look the same from the caller's side.
+    expect(absent.saves).toEqual([]);
+
+    // CONTROL, same run: a gateway that MEETS the precondition — the empty
+    // store answering EMPTY_PREFERENCES — takes the same first save.
+    const stocked = new FakePreferencesGateway(EMPTY_PREFERENCES);
+    expect(await saveFilter(stocked, 'The first one', {})).toHaveLength(1);
+    expect(stocked.saves).toHaveLength(1);
+  });
+});
+
 /* ------------------------------------------------------------------ *
  * saveFilter — the read-modify-write, and its four refusals.
  * ------------------------------------------------------------------ */

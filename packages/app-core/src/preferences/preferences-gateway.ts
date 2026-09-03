@@ -27,6 +27,28 @@ import type { PreferencesDoc } from '@gisik-nokma/domain';
  * does the read-modify-write in one place so no caller writes a document it
  * did not first read.
  *
+ * ## PRECONDITION: `load` answers a COMPLETE document, or REJECTS
+ *
+ * An ABSENT document is not an empty one, and this interface has no third
+ * answer for it. `saved-filters.ts` parses what `load` returns against
+ * `preferencesDocSchema`, whose three keys are all REQUIRED, so a `load`
+ * resolving `undefined` reads as UNREADABLE rather than as empty — measured in
+ * `test/preferences/saved-filters.test.ts` (11.122): `loadSavedFilters` answers
+ * `[]` through its tolerant member path while `saveFilter` refuses
+ * `unreadable-document` with NOTHING written, which would make the
+ * first-ever save impossible for that implementation.
+ *
+ * The shipped route already meets this precondition, which is a fact on disk
+ * rather than an assumption about the server: `apps/server/src/preferences/
+ * store.ts:50` is `if (row === undefined) return EMPTY_PREFERENCES;`, and
+ * `apps/server/test/routes/preferences.test.ts:207` measures the GET body of a
+ * never-saved user equalling `EMPTY_PREFERENCES`. So the requirement bites on
+ * the OTHER implementers: Plan 10's
+ * replica must answer `EMPTY_PREFERENCES` for an empty store rather than
+ * `undefined`, and must REJECT (not resolve `undefined`) when it cannot read.
+ * The refusal is deliberately kept for a document that is PRESENT and corrupt:
+ * that is the case where a tolerant write would delete a half nobody read.
+ *
  * ## `load` answers `unknown`; `save` takes a `PreferencesDoc`
  *
  * The asymmetry is deliberate. What comes back from the world — an HTTP body,
@@ -65,7 +87,11 @@ import type { PreferencesDoc } from '@gisik-nokma/domain';
  * (ruling P26), so nothing it writes needs that translation.
  */
 export interface PreferencesGateway {
-  /** The stored document, unvalidated. Parsed by `saved-filters.ts`. */
+  /**
+   * The stored document, unvalidated. Parsed by `saved-filters.ts`.
+   * Answers `EMPTY_PREFERENCES` when nothing is stored — see the precondition
+   * above; `undefined` here is a document no write can repair.
+   */
   load(): Promise<unknown>;
   /** Replaces the whole document. Last-write-wins, as the route does. */
   save(document: PreferencesDoc): Promise<void>;
