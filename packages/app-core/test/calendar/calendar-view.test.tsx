@@ -8,6 +8,7 @@ import {
 } from '../../src/claims/claim-labels.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
 import type { FilterSpec } from '../../src/view-types.js';
+import type { CalendarMonth } from '../../src/calendar/calendar-model.js';
 import { CalendarView, MAX_VISIBLE_PER_WEEK } from '../../src/calendar/calendar-view.js';
 
 /**
@@ -63,7 +64,13 @@ const TODAY = '2026-08-23';
 
 function renderCalendar(
   tickets: TicketDatesInput[],
-  extra: { onOpenTicket?: (ticketId: string) => void; today?: string; filter?: FilterSpec } = {},
+  extra: {
+    onOpenTicket?: (ticketId: string) => void;
+    today?: string;
+    filter?: FilterSpec;
+    laneEpicId?: string | null;
+    initialMonth?: CalendarMonth;
+  } = {},
 ) {
   const onOpenTicket = extra.onOpenTicket ?? vi.fn();
   render(
@@ -73,6 +80,8 @@ function renderCalendar(
       userName={userName}
       onOpenTicket={onOpenTicket}
       {...(extra.filter === undefined ? {} : { filter: extra.filter })}
+      {...(extra.laneEpicId === undefined ? {} : { laneEpicId: extra.laneEpicId })}
+      {...(extra.initialMonth === undefined ? {} : { initialMonth: extra.initialMonth })}
     />,
   );
   return onOpenTicket;
@@ -142,6 +151,32 @@ describe('11.62 a bar is drawn only from a claimed pair, and it spans the days i
     // 2026-08-26 is the Wednesday of row five (24th–30th): columns 1 → 4.
     expect(second?.closest('li')).toHaveStyle({ gridColumn: '1 / 4' });
   });
+
+  /**
+   * A BAR IS A BUTTON TOO, and until this case nothing said so: the two cases
+   * above read a bar's `title` and its `gridColumn` and never press it, while
+   * every click in this file lands on a marker. Half of "every item opens its
+   * ticket" was therefore unwitnessed — a dead `onClick` on the bar branch left
+   * the whole suite green. Both segments are pressed, because a bar clipped
+   * across two rows is one claim drawn twice and either half must open the
+   * same ticket — not the ticket whose row it happens to be sharing.
+   */
+  it('every segment of a clipped bar opens the bar\'s own ticket', () => {
+    const input = ticket({
+      fields: {
+        title: claimField('Long'),
+        startDate: claimField({ date: '2026-08-19' }),
+        dueDate: claimField({ date: '2026-08-26' }),
+      },
+    });
+    const onOpenTicket = renderCalendar([input]);
+    const segments = screen.getAllByRole('button', { name: 'Long' });
+    expect(segments).toHaveLength(2);
+    for (const segment of segments) fireEvent.click(segment);
+    expect(onOpenTicket).toHaveBeenCalledTimes(2);
+    expect(onOpenTicket).toHaveBeenNthCalledWith(1, input.state.id);
+    expect(onOpenTicket).toHaveBeenNthCalledWith(2, input.state.id);
+  });
 });
 
 describe('11.63 the three empty months are three different sentences, rendered verbatim', () => {
@@ -177,12 +212,42 @@ describe('11.64 today is a prop — the ring never asks the device what day it i
     expect(ringed).toHaveLength(1);
     expect(ringed[0]).toHaveAttribute('data-day', TODAY);
     expect(ringed[0]).toHaveAttribute('data-today', 'true');
+    // COUNTED, not merely read off the ringed cell. `data-today` is named in
+    // the produced interface as part of the ring contract, so a shell may key
+    // on it — and an attribute stamped onto every cell would still satisfy a
+    // `toHaveAttribute` on the one cell we already know is today's.
+    expect(document.querySelectorAll('[data-today]')).toHaveLength(1);
   });
 
   it('a different `today` rings a different cell — nothing here is read from a clock', () => {
     renderCalendar([ticket()], { today: '2026-08-10' });
     expect(document.querySelector('[aria-current="date"]')).toHaveAttribute('data-day', '2026-08-10');
+    expect(document.querySelectorAll('[data-today]')).toHaveLength(1);
     expect(screen.getByRole('heading', { name: 'August 2026' })).toBeInTheDocument();
+  });
+
+  /**
+   * THE RING'S ABSENCE, and neither case above can see it. Both assert a ring
+   * is PRESENT somewhere inside August, and the Aug-2026 grid holds
+   * day-of-month 23 and day-of-month 10 exactly once each — so a ring computed
+   * from the day-of-month alone (`day.slice(8) === today.slice(8)`) passes
+   * both while ringing 2026-09-23 in a September grid. Over-firing is only
+   * visible from a month that contains no candidate at all.
+   *
+   * The two `data-day` probes are not decoration: without them the zero counts
+   * below would also pass on a grid that failed to render, and on a September
+   * grid that happened to contain 2026-08-23. The September grid runs
+   * 31 Aug – 11 Oct, so `today` is genuinely outside it and the honest answer
+   * is no ring anywhere.
+   */
+  it('rings nothing at all in a month that does not hold the day it was handed', () => {
+    renderCalendar([ticket()]);
+    fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+    expect(screen.getByRole('heading', { name: 'September 2026' })).toBeInTheDocument();
+    expect(document.querySelector('[data-day="2026-09-23"]')).not.toBeNull();
+    expect(document.querySelector(`[data-day="${TODAY}"]`)).toBeNull();
+    expect(document.querySelectorAll('[aria-current="date"]')).toHaveLength(0);
+    expect(document.querySelectorAll('[data-today]')).toHaveLength(0);
   });
 });
 
@@ -392,8 +457,27 @@ describe('11.70 a day that is not a day is never placed on a day that is', () =>
     const marker = screen.getByRole('button', { name: /2026-02-30/ });
     expect(marker).toHaveAttribute('data-unplaceable', 'true');
     expect(marker.closest('li')).toHaveStyle({ gridColumn: '1 / 8' });
+    // Exactly one, because the mark means THIS claim's day and not "an item".
+    expect(document.querySelectorAll('[data-unplaceable]')).toHaveLength(1);
     // And no cell in the grid pretends to BE that day.
     expect(document.querySelector('[data-day="2026-02-30"]')).toBeNull();
+  });
+
+  /**
+   * The other direction, and it is the one that was missing: every fixture in
+   * this file claims a real day, so nothing said what a PLACEABLE claim looks
+   * like. `data-unplaceable` stamped onto every item button would have gone on
+   * reading "true" wherever it was asked for. The marker is asserted present
+   * first — a zero count over a grid with no items would pass under that
+   * mutant too.
+   */
+  it('a claim on a real day carries no unplaceable mark', () => {
+    renderCalendar([
+      ticket({ fields: { title: claimField('Placeable'), dueDate: claimField({ date: '2026-08-28' }) } }),
+    ]);
+    const marker = screen.getByRole('button', { name: /needed by 28 Aug/ });
+    expect(marker.closest('li')).toHaveStyle({ gridColumn: '5 / 6' });
+    expect(document.querySelectorAll('[data-unplaceable]')).toHaveLength(0);
   });
 });
 
@@ -427,5 +511,72 @@ describe('11.71 the grid says which days belong to the month it is headed by', (
       '2026-08-24',
       '2026-08-31',
     ]);
+  });
+
+  /**
+   * A CLAIM ON A PADDING DAY, which every other case in this file is blind to:
+   * every date fixture here is `2026-08-xx` (the one exception, 11.70's
+   * impossible `2026-02-30`, shares the headed month's `slice(0, 7)` too), so
+   * a view that quietly dropped anything outside the headed month kept the
+   * whole suite green. That is the same blind spot the MODEL shipped with, one
+   * layer up — and the grid draws twelve neighbouring-month days it would be
+   * lying about.
+   *
+   * The row matters as much as the column: a padding claim belongs to the row
+   * whose seven days contain it, not to the first row of the headed month.
+   */
+  it('draws a claim that falls on a padding day, in that day\'s own row and column', () => {
+    renderCalendar([
+      ticket({ fields: { title: claimField('July'), dueDate: claimField({ date: '2026-07-31' }) } }),
+      ticket({ fields: { title: claimField('September'), dueDate: claimField({ date: '2026-09-01' }) } }),
+    ]);
+    // 2026-07-31 is the Friday of the leading row (27 Jul – 2 Aug).
+    const july = screen.getByRole('button', { name: "needed by 31 Jul — Kiro's claim" });
+    expect(july.closest('li')).toHaveStyle({ gridColumn: '5 / 6' });
+    expect(july.closest('[data-week]')).toHaveAttribute('data-week', '2026-07-27');
+    // 2026-09-01 is the Tuesday of the trailing row (31 Aug – 6 Sep).
+    const september = screen.getByRole('button', { name: "needed by 1 Sep — Kiro's claim" });
+    expect(september.closest('li')).toHaveStyle({ gridColumn: '2 / 3' });
+    expect(september.closest('[data-week]')).toHaveAttribute('data-week', '2026-08-31');
+    // Neither is the honesty note's business: the month is not empty.
+    expect(screen.queryByRole('note')).toBeNull();
+  });
+});
+
+/**
+ * 11.72 THE MOUNT CONTRACT — the two props no test supplied.
+ *
+ * `initialMonth` and `laneEpicId` are pass-throughs, and both could be deleted
+ * from `CalendarView` with all twenty-five preceding cases green: no test ever
+ * handed either one in. They are not spare parts. Plan 6's shell mounts this
+ * grid inside a lane, and Plan 10's opens it on a month the route names — a
+ * silently dropped forward is invisible until one of those shells mounts and
+ * shows the wrong work on the wrong month.
+ */
+describe('11.72 what the mounting shell hands in is what the grid uses', () => {
+  it('opens on `initialMonth`, and Today still returns to the day it was handed', () => {
+    renderCalendar([ticket()], { initialMonth: { year: 2027, month: 3 } });
+    expect(screen.getByRole('heading', { name: 'March 2027' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Today' }));
+    expect(screen.getByRole('heading', { name: 'August 2026' })).toBeInTheDocument();
+  });
+
+  /**
+   * The lane is asserted by ABSENCE as much as presence: the in-lane claim
+   * rendering proves the grid works, and only the out-of-lane claim NOT
+   * rendering proves `laneEpicId` reached the model at all.
+   */
+  it("a lane narrows the grid to the epic's own work, and says nothing about the rest", () => {
+    const epic = ticket({ id: 'epic1', typeId: 'epic', fields: { title: claimField('The epic') } });
+    const inLane = ticket({
+      parentId: 'epic1',
+      fields: { title: claimField('In lane'), dueDate: claimField({ date: '2026-08-28' }) },
+    });
+    const outOfLane = ticket({
+      fields: { title: claimField('Out of lane'), dueDate: claimField({ date: '2026-08-27' }) },
+    });
+    renderCalendar([epic, inLane, outOfLane], { laneEpicId: 'epic1' });
+    expect(screen.getAllByRole('button', { name: /needed by 28 Aug/ })).toHaveLength(1);
+    expect(screen.queryAllByRole('button', { name: /needed by 27 Aug/ })).toHaveLength(0);
   });
 });
