@@ -9,7 +9,11 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9 (calendar & notifications), 15 tasks. PRE-FLIGHT DONE, BATCH A NEXT.**
+## WHERE I AM: **STEP 14 — PLAN 9, 15 tasks. BATCH A (T1-T3) IS CLOSED AND GREEN. BATCH B (T4) IS NEXT.**
+
+*(Caught while writing this: the header said "BATCH A NEXT" three lines above a section saying Batch A
+was closed — the same stale-middle failure this file records against itself below, reproduced by its
+own author within the hour. **Grepping the file for the claim you just changed is not optional.**)*
 
 Branch **`exec/14-plan9-calendar`**, cut from `origin/main` `4b8b048`. **Step 13 is merged and closed**
 (PR #85 -> `9b70ab9`; the controller's close is #87 -> `4b8b048`). **Plan 8's fifteen ledger rows are
@@ -89,6 +93,62 @@ coordination doc already pre-corrected this). T2's `docToPlainText` **already ex
 (`packages/domain/src/doc-text.ts`) — created by **Plan 5**, not Plan 7 as T2's text says; take the
 skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
 `src/index.ts` as the plan says.
+
+## LIVE ANCHORS — step 14, Batch A closed. RECOUNTED at the sha below, not carried forward.
+
+| Anchor | Value | How verified |
+|---|---|---|
+| **Branch** | `exec/14-plan9-calendar`, rebased onto `origin/main` after #88 merged | `git rev-parse --abbrev-ref HEAD` |
+| **Base** | `origin/main` — **re-fetch before trusting; it moved four times today** (#87, #88, #89, #90) | `git rev-parse origin/main` |
+| **Branch HEAD at Batch A close** | `0520a1c` | `git rev-parse HEAD` |
+| **Ahead-count** | **Deliberately not written. Run `git rev-list --count origin/main..HEAD`.** A count taken while writing the commit that records it is always short by one and always looks right to its author. | — |
+| **GATE at `0520a1c`** | **check:env exit 0** (45 documented / 23 referenced) · **check:tasks exit 0** · **turbo 24 successful / 24 total, 0 cached, exit 0** · Node v22.22.2 · clean tree at gate start | all three run together on a clean tree with **zero agents running**; exit codes captured explicitly, not inferred from a trailing echo |
+| **Test total** | **2,594** — ui 31 · domain **464** · rule-engine **282** · sync-client 8 · editor 178 · web 87 · app-core 687 · server 857 | the same run |
+| **Delta, and it RECONCILES** | main = 2,463. Batch A adds **+131**: domain 335 -> 464 (**+129**), rule-engine 280 -> 282 (**+2**). 2,463 + 131 = **2,594**, exact. | subtraction against the controller's post-#85 re-verify figure |
+| **Gate SHAPE** | 24 tasks over EIGHT packages — unchanged by Batch A | the run above |
+
+**A NOTE ON `git status` IN THIS WORKTREE, found by the T3 fix agent and worth inheriting.** The
+`rtk` hook rewrite can return the single token `ok` for a clean tree instead of porcelain output.
+That is fine to read and useless to parse. **Every tree-state claim above used
+`/usr/bin/git status --porcelain=v1`**, bypassing the hook. Do the same before asserting a tree is
+clean — "ok" and "no output" are not the same evidence.
+
+## BATCH A IS CLOSED — T1, T2, T3 done, fix rounds applied, gate green
+
+| Task | Outcome |
+|---|---|
+| **T1** startDate day-claim | **SHIP, zero findings.** It was a verification task and the honest answer was that Plan 3's work was already correct — the implementer said so rather than rebuilding it. 4 mutations, all reddened AND named their site. Added 2 rule-engine fixtures (the first to run a built-in day claim through the real engine) and bumped the exact-count pin 84 -> 86. |
+| **T2** mention walkers | **One Important, fixed.** `extractMentionedUserIds(null)` was unpinned — `typeof null === 'object'`, so deleting `\|\| node === null` from the guard survived all four tests while flipping null's behaviour from `[]` to a thrown TypeError. The task's own text names `null` as a case to cover, so this was a gap against the contract, not a reviewer's preference. Took the skip branch on `docToPlainText` correctly. |
+| **T3** notification vocabulary | **THIRTEEN SURVIVING MUTATIONS behind a "ship" verdict.** The reviewer graded `ship` while listing three Importants and thirteen survivors; **I treated the findings, not the verdict.** All thirteen were MISSING TESTS, not broken schemas — the production code was right throughout and was not touched. Now closed and re-measured in both directions; **no survivors remain.** |
+
+**The T3 fix agent corrected my own dispatch, which is the behaviour to keep.** I handed it thirteen
+survivors transcribed from the review. It re-measured the baseline itself instead of trusting me and
+found **M12 was never a survivor** — it already reddened. It also ran two mutations *wider* than the
+review had (`nonEmpty` spelled a second way; `serverTime` optional at all four sites, not one).
+
+**What the thirteen actually were, because the shape recurs:** almost all were `.strict()` guarantees
+that existed in the schema and were asserted nowhere — pinned on 2 of 5 payload schemas, absent on the
+nested `claim` object the commit called "carried verbatim", absent on `notificationBaseSchema`. Plus a
+day-shape regex with **no test at all** (every input used the one valid value `2026-08-30`). The test
+named for the planted defect probed only the TOP level, so invented urgency could live one level down.
+
+**One pin is a TYPECHECK pin, not a vitest pin, and `vitest run` says nothing about it.** The
+`NotificationPayload` exhaustiveness check is a type-level identity between the schema map's inferred
+outputs and the union. A 6th kind with schema and map entry but a stale union used to typecheck
+**clean**; it now fails `tsc` with TS2344. **Anyone verifying with the test suite alone will not see
+it** — this is why the gate runs `typecheck`, and why a "tests pass" report is not a gate report.
+
+**RECORDED, NOT FIXED — carried forward with owners:**
+- **The `as NotificationPayload` cast in `parseNotification` remains.** It cannot be removed from
+  inside a test file, and the plan's Interfaces block fixes the non-discriminated `{ kind, payload }`
+  shape, so the fix agent had no licence. The drift it hides is now caught at compile time; the
+  residual risk is that deleting one type alias in the test file silently removes the only check.
+  **Owner: whoever revisits Task 3's source.**
+- **Batch A added ~131 tests with no `test-cases/` entry.** **Owner: Plan 9 Task 15**, which opens
+  §11 and reserves ids 11.1-11.47 — it must back-fill these or they never get catalogued.
+- **`extractMentionedUserIds(42)` / `(true)` / `({content:'x'})` are unpinned.** Structurally safe
+  (traced), and the task contract does not name them, so not built. **Owner: next owner of
+  `doc-mentions.ts`**, if parity with `docToPlainText`'s malformed-input list is ever wanted.
 
 ## STOP — PLAN 9 NAMES TEST PATHS THAT VITEST NEVER COLLECTS. 25 SITES. READ BEFORE ANY TASK.
 
