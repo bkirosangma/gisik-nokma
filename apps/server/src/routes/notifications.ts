@@ -33,6 +33,15 @@ import { listNotifications, markNotificationRead, unreadNotificationCount } from
  * message you were sent is yours; revocation removes future sight, not
  * letters delivered").
  */
+/**
+ * The ceiling `listNotifications` (`notifications/store.ts`) already clamps
+ * to (`Math.min(Math.max(opts.limit ?? 30, 1), 100)`). This route follows
+ * `src/routes/list.ts`'s CONVENTION — refuse an out-of-range or non-integer
+ * `limit` with 400 rather than silently clamping or defaulting it — using
+ * `list.ts`'s own ceiling value (100), not its `MAX_LIMIT` (200).
+ */
+const MAX_LIMIT = 100;
+
 export function registerNotificationRoutes(
   app: FastifyInstance,
   deps: { pool: Queryable },
@@ -41,12 +50,27 @@ export function registerNotificationRoutes(
   app.get<{ Querystring: { cursor?: string; limit?: string; workspaceId?: string } }>(
     '/v1/me/notifications',
     { preHandler: requireSession },
-    async (request) => {
+    async (request, reply) => {
       const raw = request.query;
       const cursor = typeof raw.cursor === 'string' && raw.cursor.length > 0 ? raw.cursor : null;
       const workspaceId = typeof raw.workspaceId === 'string' && raw.workspaceId.length > 0 ? raw.workspaceId : null;
-      const parsedLimit = typeof raw.limit === 'string' ? Number(raw.limit) : NaN;
-      const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
+
+      let limit: number | undefined;
+      // `raw.limit !== undefined`, not a `typeof === 'string'` check: Fastify
+      // hands a REPEATED query param (`?limit=1&limit=2`) through as an
+      // array, and `list.ts` sends that through `Number()` too (-> NaN ->
+      // refused) rather than silently treating it as absent.
+      if (raw.limit !== undefined) {
+        // `Number` and not `parseInt`, same reasoning as `list.ts`:
+        // `parseInt('2.5')` is 2 and passes an integer test that should have
+        // refused it. `Number('2.5')` is 2.5 and fails `Number.isInteger`,
+        // which is what stops a fractional limit from ever reaching
+        // `LIMIT $n` in `listNotifications` (Postgres 22P02 otherwise).
+        limit = Number(raw.limit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
+          return reply.status(400).send({ error: 'invalid_limit' });
+        }
+      }
 
       return listNotifications(deps.pool, request.currentUserId, { cursor, limit, workspaceId });
     },
