@@ -5953,7 +5953,7 @@ including the serving gap case". Measured at execution it kills **2**. Not a mis
 necessarily — but a kill count is a fact about a suite at a moment, and this one was cited three steps
 later as though it were a property of the change.
 
-## RULING P26 EXISTS AS A NUMBER WITH NO TEXT — recorded by the executor, 2026-09-02
+## ~~RULING P26 EXISTS AS A NUMBER WITH NO TEXT~~ — SUPERSEDED. P26 was written 2026-09-02; see the correction at the end of this section. Recorded by the executor 2026-09-02, corrected by the step-14 executor 2026-09-03
 
 `docs/lanes/controller-state.md:159` says the cross-plan shape scan found *"1 live (`SavedFilter`, now
 Ruling P26)"*. **Searched at `origin/main`: the string `P26` appears in that one line and nowhere else
@@ -5988,10 +5988,34 @@ P24 now, and Task 7's `mapPreferences` already implements the translation.
 step 14's, and it is written here rather than left in a number so step 14 inherits the evidence rather
 than the citation.
 
-**Not resolved by the executor**, because P26 is the controller's ruling and inventing its text would be
-worse than reporting it missing. The ask is one sentence: *does P24's reasoning extend to Plan 9's
-`spec`?* If it does — and the same `.strict()` argument applies unchanged — then P26 is that sentence
-and Plan 9's Open questions should carry it before step 14 dispatches.
+~~**Not resolved by the executor**, because P26 is the controller's ruling and inventing its text would
+be worse than reporting it missing. The ask is one sentence: *does P24's reasoning extend to Plan 9's
+`spec`?*~~
+
+**ANSWERED. P26 WAS WRITTEN ON 2026-09-02 AND THE ANSWER IS YES — `filterSpec` WINS, AND PLAN 9 TASK
+13'S `spec` IS SUPERSEDED BEFORE IT IS WRITTEN.** The full text is in `docs/lanes/controller-state.md`
+under *"Standing owner rulings currently in force"*. Its reasoning is exactly the extension this
+section asked for: **a `.strict()` schema REFUSES a third spelling rather than renaming it**, so
+`filterSpec` wins on P24's own logic applied to a plan P24 never looked at. P26 also records that Plan
+9 T13 *is not disagreeing — it does not know*: measured against its own text, **zero** mentions of
+`filterSpec`, **zero** of `preferencesDocSchema`, **zero** of `Plan 5`.
+
+**Step 14 needs no ruling here. Task 13 adopts `filterSpec`.** The other two spellings — app-core's
+`filter` and Plan 6's — are **closed under P24** and pinned by `client-contract.test.ts:605`; they are
+not reopened.
+
+> **Why this correction is worth more than the line it fixes.** The section above, and the one at
+> *"RULING P26 EXISTS AS A NUMBER WITH NO TEXT"*, both still described P26 as unwritten **the day
+> after it was written**, because the ruling landed in `controller-state.md` and nothing came back
+> here. Step 14's pre-flight agent read *this* document — the interface authority — and duly reported
+> the question as "OPEN / UNRESOLVED … needs an explicit ruling before or during Task 13". **It was
+> reporting this file accurately.** Had the executor forwarded that, it would have escalated a
+> settled question and spent a controller round-trip re-deciding what was decided.
+>
+> The generalisation, because this is now the *third* recorded instance in two days: **a ruling
+> recorded in one lane's state file is invisible to the other lane's agents.** `controller-state.md`
+> is not read by dispatched subagents; this document is. **A ruling is not landed until it is written
+> where the work will read it** — which for anything binding a plan's task means here, not only there.
 
 ---
 

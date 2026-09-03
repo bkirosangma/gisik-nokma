@@ -9,92 +9,113 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 13 IS MERGED (PR #85 → `9b70ab9`). STEP 14 — PLAN 9 — IS THE NEXT WORK.**
+## WHERE I AM: **STEP 14 — PLAN 9 (calendar & notifications), 15 tasks. PRE-FLIGHT DONE, BATCH A NEXT.**
 
-All fifteen Plan 8 tasks done, gate green, final whole-branch review run and its four findings
-closed, and the PR **squash-merged by the controller on 2026-09-03**. This branch carries only the
-P29 declaration annotation PR #86 asked for; step 14 runs on its own branch off `9b70ab9`.
+Branch **`exec/14-plan9-calendar`**, cut from `origin/main` `4b8b048`. **Step 13 is merged and closed**
+(PR #85 -> `9b70ab9`; the controller's close is #87 -> `4b8b048`). **Plan 8's fifteen ledger rows are
+ALREADY PROMOTED on `main` by #87 — do NOT promote them again.** I wrote that promotion commit before
+seeing #87 and dropped it; the status/PR/sha matched exactly but the controller's *notes* column is
+better (`artefact: <path> (PR #85)` vs my branch-name prefix), so re-applying mine would have silently
+reverted it. **The repo stands at 133/177 (75.1%), 0 claimed, 0 in-flight, recounted from the ledger.**
 
-**If you are a restarted session: do NOT re-run step 13.** The next work is **step 14 — Plan 9**
-(calendar/notifications, 15 tasks, T6 floor-list). **Plan 8's fifteen ledger rows still read
-`in-flight` on `main`** and must be promoted to `done` with PR `85` and sha `9b70ab9`, exactly as
-step 13's first commit did for Plan 7.
+**In flight and NOT mine to merge: PR #88** (`docs/p29-annotation`, head `022f0fc`) — the P29
+declaration annotation #86 asked for. **This branch is stacked on it** (its one commit is replayed
+here). Disjoint from #87 by file, so it merges clean. **When #88 merges, rebase with
+`git rebase --onto origin/main 022f0fc` in a SCRATCH worktree** (`git worktree add --detach`), never in
+this one, so only this step's own commits replay. **Verify with a positive control**, because an empty
+diff is also what a broken diff invocation prints: `git diff --stat <old-head> HEAD` empty AND
+`git diff --stat origin/main HEAD` non-empty and matching expectation.
 
-> **The promotion's evidentiary basis, recorded so the next audit does not re-derive it.** PR #85
-> was **squash-merged**, so no per-task commit survives on `main` — `git log 7337357..origin/main`
-> returns three commits, not thirty-eight. The title names the step and the plan, not the tasks, so
-> on the title alone all fifteen rows would be `claimed`. They qualify on the **controller-record**
-> clause by two independent routes: the squash commit's **2,619-line body carries every per-task
-> commit message**, and the Batch D artefacts are present on `main` by direct check
-> (`apps/web/src/authoring/data-source-gateway.ts`, `apps/web/e2e/workflow-builder.spec.ts`,
-> `Features.md` §10 at line 1041, `test-cases/10-workflow-builder.md`). **Note the asymmetry that
-> made this worth checking:** this file's own per-task tables cover T1–T12 and stop — Batch D was
-> never given one — so for the last three rows the handoff is *not* sufficient basis on its own.
+## PRE-FLIGHT IS DONE. Four findings, all verified by me on disk, not adopted from the agent.
 
-> **BATCH B DIED MID-FLIGHT ON AN EXPIRED LOGIN (2026-09-03).** Seven of nine agents failed with
-> *"Login expired · Please run /login"*: T5's fix round and both agents of T6, T7 and T8. **T5's
-> implementer and reviewer completed**, and **T5's fix round had written its full work into the tree
-> but died before committing** — recovered, independently verified and committed as `87ab662`.
-> **The tree is clean and the suite is green at 562.** A dead fan-out leaves work in the tree, not
-> just a gap in the ledger: **check `git status` before assuming a failed agent did nothing.**
+**1. NO RULING IS NEEDED FOR TASK 13, AND THE DOCUMENT THAT SAYS OTHERWISE IS WRONG.** The pre-flight
+reported the saved-filter field name as *"OPEN / UNRESOLVED … needs an explicit ruling"*. **It was
+reading the coordination doc accurately, and the coordination doc was a day stale.** **P26 was written
+2026-09-02** in `controller-state.md`: `SavedFilter`'s field is **`filterSpec`**; Plan 9 T13's `spec` is
+superseded before it is written. Both stale sites in the coordination doc are corrected in this branch.
+**Task 13 adopts `filterSpec`. Do not escalate this.**
 
-**Step 12 (Plan 7 remainder) is MERGED as PR #82 → `7337357`.** Plan 7 is complete at 22/22.
-**Do not reopen it.** Its eighteen ledger rows read `in-flight` on `main` after the merge; this
-branch's first commit promotes them to `done`, and `check:tasks` now verifies the merge sha is an
-ancestor of `origin/main`. **The repo stands at 118/177 (66.7%), independently recounted.**
+> **The generalisation, third instance in two days: a ruling recorded in one lane's state file is
+> invisible to the other lane's agents.** Subagents read the coordination doc; they do not read
+> `controller-state.md`. **A ruling is not landed until it is written where the work will read it.**
 
-Step 13 = **Plan 8**, `docs/superpowers/plans/2026-08-20-08-workflow-builder.md`, **15 tasks.**
-**ALL FIFTEEN ARE DONE AND MERGED** (PR #85 → `9b70ab9`, squash-merged 2026-09-03).
-**All rulings are closed** — see RULINGS.
+**2. THE THREE-WAY SPLIT IS REAL AND TWO `SavedFilter` TYPES ALREADY SHIP.** Verified by direct read:
+`packages/domain/src/preferences.ts:28` -> **`filterSpec`** (schema is `.strict()`);
+`packages/app-core/src/view-types.ts:183` -> **`filter`**; Plan 9 text line 5795 -> **`spec`**. The
+first two are closed under P24 and pinned by `client-contract.test.ts:605` — **not reopened.**
 
-> **This paragraph was stale for the whole of Batch D and the correction is the point.** Through
-> PR #85 it read *"T1-T12 are DONE and committed. Only T13, T14, T15 remain … No PR is open. Three
-> rulings are open"* — every clause false by the time it merged, and **directly contradicted by this
-> file's own header eighteen lines above it.** It merged to `main` that way. The failure is not that
-> a line went stale; it is that **a handoff refreshed at its top is not a handoff refreshed.** A
-> restarted executor reading downward would have rebuilt Batch D against work already merged.
-> **When you update WHERE I AM, grep the rest of the file for the claim you just changed.**
+**3. TASK 14 IS BIGGER THAN ITS OWN TEXT SUGGESTS — Plan 6's Step 5b was SKIPPED.**
+`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:29-33` carries an explicit comment saying so and
+naming Plan 9 T14 as the carrier. **Verified with a positive control**: the only `CalendarView` /
+`TimelineView` hit anywhere in `apps/web/` is that comment itself, while a control grep for
+`BoardView|ListView` returns real files — so the absence is real and not an eaten glob. **T14 must add
+the calendar/timeline mount (four-way board|list|calendar|timeline chain) on top of the inbox wiring.**
+Pull the tab mechanics from Plan 6's own Step 5b text, not from the comment's paraphrase — that was the
+pre-flight's own least-sure claim and I have not closed it.
 
-**Batching:** **A: T1-T4** (done) · **B: T5-T8** (canvas → validation) · **C: T9-T12** (publish →
-admin) · **D: T13-T15** (web, smoke, catalogue). Every fact those batches need is recorded in THIS
-file — a restarted executor should rebuild its dispatches from here, not hunt for scratchpad scripts,
-which do not survive a restart.
+**4. TASK 8 IS TOLD TO CREATE A TYPE THAT ALREADY EXISTS ELSEWHERE.** The plan says create
+`packages/app-core/src/filter/filter-spec.ts` "guarded — Plan 6's wins if landed". Plan 6's **did**
+land, at a different path and a richer shape: `packages/app-core/src/view-types.ts:70`. **Consume it;
+do not create the guarded path.** Task 8's Step 0 scaffold guard likewise resolves to "Both exist" —
+`packages/app-core` and `packages/ui` are fully populated. The *tokens* it needs are genuinely new.
 
-**A PROCESS ERROR MADE ONCE THIS STEP — DO NOT REPEAT IT.** I started the boundary gate while a
-reviewer was still planting mutations. **Concurrent mutation and verification corrupts both** — a
-false red for the gate, disturbed measurements for the reviewer. Killed it; tree and `dist` verified
-clean afterwards. **Require a clean tree AND zero running agents before any gate run.**
+Smaller, verified: T1's plan path `src/ticket-types.test.ts` is really `packages/domain/test/…` (the
+coordination doc already pre-corrected this). T2's `docToPlainText` **already exists**
+(`packages/domain/src/doc-text.ts`) — created by **Plan 5**, not Plan 7 as T2's text says; take the
+skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
+`src/index.ts` as the plan says.
 
-## Live anchors — 2026-09-03, step 13 opening
+## CLOCK SENSITIVITY — the brief's named known-gap, enumerated for this plan
 
-| Anchor | Value | How verified |
-|---|---|---|
-| **Branch** | **`exec/13-plan8-workflow-builder`**, cut from `origin/main` `7337357`. | `git rev-parse --abbrev-ref HEAD` |
-| **Base** | `origin/main` = `73373579b906a18e3d319363a8eb3685b076eb50` | `git rev-parse origin/main`, fetched |
-| **Ahead-count** | **Not written here on purpose. Run `git rev-list --count origin/main..HEAD`.** A count taken while writing the commit that records it is *always* short by one and always looks right to its author. | — |
-| **Gate at branch HEAD (Batch C closed)** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2445 tests.** domain 335 · rule-engine 280 · server 857 · **app-core 687** · editor 178 · web 69 · ui 31 · sync-client 8. **The branch adds +213 over the base, ALL in app-core** (474 → 687): Batch A +69, Batch B +63, Batch C +81. | run by the executor with `--force` on a clean tree with **no agents running**, through `rtk proxy`; Node printed into the same log |
-| Gate at the Batch A boundary | exit 0 · 24/24 · 0 cached · 2301 tests; app-core 543. Batch A's own split, measured by excluding each task's test file rather than inferred: **T1-T3 = 58, T4 = 11.** | same method |
-| Gate at the base `7337357`, for the delta | exit 0 · 24/24 · 0 cached · **2232 tests**; app-core 474, all others as above. | measured at branch creation, on the second (unproxied) attempt — the first was proxy-collapsed to one package and its composition was unusable |
-| **`check:env`** | **exit 0 at `9017ebc`** — 45 documented / 23 referenced. **Re-measure this at every sha you report; it is the half of the gate that went stale for fifteen tasks.** | `pnpm check:env`, run separately from the turbo gate |
-| **`check:tasks`** | **exit 0**, 177 rows / 177 plan tasks, **118 done (66.7%)**, 0 claimed, 0 in-flight, **59 todo**. Plan 08 = 0 done / 15 todo. | `node scripts/check-task-ledger.mjs` after the promotion |
-| **Gate SHAPE** | **24 tasks over EIGHT packages.** Plan 8 Task 14 adds a Playwright e2e script — **if it becomes a turbo task, this figure is spent and must be recounted.** | the run above |
-| Orphaned, do not cite | every sha in the narrative sections of previous handoffs. | `git branch --contains` (empty = orphaned) |
+**Only TWO places in Plan 9 read a clock, and only one of them is in production code.**
 
-### The Plan 7 ledger promotion in this branch's first commit, and its evidentiary basis
+- **T6 (the sweep)** injects `now: () => Date` everywhere it is tested, which is already the right
+  design. The risk is a future test falling back to the `deps.now ?? (() => new Date())` default and
+  passing because **both machines are Asia/Kolkata**. Every dedupe-key/boundary assertion in
+  `sweep.test.ts` must run at least once under a forced non-IST `TZ`.
+- **T14** is the one unmocked `new Date()` -> `istToday()` in production. `apps/web/src/ist-today.ts`
+  **already exists** (Plan 6) **and already carries the TZ discipline** — a documented
+  Asia/Kolkata / Pacific/Kiritimati / Pacific/Niue loop. **Reuse it; do not reinvent a day computation
+  inline.**
+- **T8, T9, T10, T11 are clock-FREE by construction** — `today`, `month` and `anchor` are injected
+  strings. The obligation there is architectural: keep them that way. A `new Date()` appearing inside
+  `calendar-model.ts` or `timeline-model.ts` reintroduces exactly the conflation this plan avoids.
 
-Eighteen Plan 7 rows (`07/5, 6, 7, 8, 9, 9a, 10, 11, 11a, 12, 12a, 12b, 12c, 13, 13a, 14, 15, 16`)
-still read `in-flight` on `main` after PR #82 merged. They are promoted to `done`, PR `82`, sha
-`7337357`.
+## BATCHES for step 14, from the pre-flight and adjusted for shared files
 
-**The basis matters, because this repo has already run one ledger audit that refused three rows.**
-The vocabulary grants `done` to "a merged PR whose title **or the controller record** names THIS
-plan AND task specifically". PR #82's *title* names the step, not the tasks — on the title alone
-these rows would be `claimed`. They qualify on the **controller-record** clause: step 12's handoff
-on `main` carries per-task Batch A/B/C/D tables naming each of the eighteen DONE with its artefact
-and test delta. **This is the same basis step 12 used to promote Plan 6's twelve rows**, recorded
-again here so the next audit does not re-derive it.
+**A: T1, T2, T3** (domain) · **B: T4** (table+store) · **C: T5 then T6, SERIAL** (T6 consumes T5) ·
+**D: T7** (API) · **E: T8, T10, T12** (disjoint app-core dirs) · **F: T9, T11** (components over E's
+models) · **G: T13** · **H: T14** · **I: T15** (closeout, last).
 
-## THE SEQUENCE, and where step 13 sits
+**T2 and T3 both modify `packages/domain/src/index.ts`** — additive export lines, but run them so the
+writes do not interleave. **T6 is the floor-list task and carries a hard MUST from the coordination
+doc: no stub.** If Plan 5's `getWorkspaceSettings` surface were missing it must STOP and escalate, never
+substitute a local constant. It is not missing — `apps/server/src/projections/workspace-settings.ts`
+and migration `1788272876259_proj-workspace-settings.sql` are both present.
+
+## COORDINATION OBLIGATIONS BINDING PLAN 9 (verified present in the doc)
+
+- **Notification rows stay UNREDACTED after a user's visibility is revoked** — *"a message you were
+  sent is yours; revocation removes future sight, not letters delivered."* T4/T7 must not scrub history.
+- **The mention gate stays SILENT server-side** — a mention notification must never become a probe for
+  who can see a ticket. Apply `canSee` before delivering. Editor-side "unreachable mention" warnings are
+  *permissible polish, not queued scope*.
+- **Preferences are whole-document** `GET/PUT /v1/me/preferences?workspaceId=`, not the per-key
+  `PUT /:key` Plan 9 assumed. T13's gateway does read-modify-write, inheriting last-write-wins. **Do not
+  "fix" it back toward the plan's text.**
+
+# ============================================================================
+# EVERYTHING BELOW THIS LINE IS STEP 13 (PLAN 8) HISTORY. Step 13 is MERGED.
+#
+# It is kept because its LESSONS are live and several were expensive to learn.
+# It is NOT a position, and nothing below it tells you what to do next --
+# the sections above do. Read below for method, never for state: its "next
+# work", "in flight", "remaining" and "no PR is open" phrasings are all spent.
+# This banner exists because the previous version of this file was refreshed
+# at its top and stale twenty lines down, and merged to main that way.
+# ============================================================================
+
+## THE SEQUENCE, and where step 13 sat
 
 Spine: `1,2 → 3,4 → 5 → {6,7,8,9,10} → 11`. **Steps 1–12 are closed.**
 
@@ -646,8 +667,14 @@ rule-editor suites, and the Playwright spec.
    to say so. The corrected line names its controls **before** the run and states which row of the
    inherited absence claim was stale. Nothing further is owed.
 
-P25 taken (capped at `getBoard`). **P27 taken and applied** in step 12. P26 is a number with no text
-on `main` — noted, not load-bearing here.
+P25 taken (capped at `getBoard`). **P27 taken and applied** in step 12.
+
+**P26 IS NOT "a number with no text" — that claim was already stale when written here, and it is
+load-bearing for step 14.** P26 was written on 2026-09-02 into `controller-state.md`: **`SavedFilter`'s
+field is `filterSpec`, and Plan 9 Task 13's `spec` is SUPERSEDED before it is written.** Step 14's
+Task 13 adopts `filterSpec` and needs no ruling. The coordination doc carried the same stale claim in
+two places and both are now corrected there — which is the fix that matters, because that document is
+the one dispatched subagents read and this one is not.
 
 ## THE FIX-ROUND PATTERN IS NOT OCCASIONAL ON THIS BRANCH, IT IS THE NORM
 
