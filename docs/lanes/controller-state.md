@@ -11,6 +11,38 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## ⛔ OWNER-SET STOP POINT — ASK BEFORE DISPATCHING PLAN 10 T14 (2026-09-04)
+
+**The owner instructed this directly: stop at the boundary below and ASK before going further. Do not
+dispatch past it on the autonomy grant — the standing auto-merge authorization does NOT cover this.**
+
+**STOP AFTER Plan 10 T13. ASK before dispatching T14.**
+
+Permitted without asking: finish Plan 9 (T9, T11–T15), then Plan 10 **T5, T6, T7, T9, T10, T11, T12, T13**
+— the whole server-side sync surface, the replica core, and its app-core UX.
+
+**Ask first for: T14, T15 (dual-client harness + scenarios) and T16, T17 (Tauri desktop, Expo mobile).**
+
+**WHY THIS BOUNDARY AND NOT A ROUND NUMBER.** Quota is the binding constraint, not time. Measured
+2026-09-04 at 01:15 IST: **weekly 76% used, 24 points left, reset Monday 2026-09-07 06:30 (77h out)**.
+Plan 9's remainder is ~2.4M tokens (~5–7 points); Plan 10's remaining 13 tasks are ~8–9.5M
+(~18–29 points, the spread depending on whether controller overhead lands in the same bucket). So roughly
+**8–9 of Plan 10's 13 tasks fit this week, not 13.** At the recent 1.3–2.1 points/hour, the 24 points are
+~11–18 hours of work against 77 hours to reset — **you will run out of quota, not clock.**
+
+**The four deferred tasks are the four WORST to interrupt, which is the actual reason the line is here:**
+T14/T15 need contiguous attention to get six distributed-systems scenarios honest, and T16/T17 each stand
+up a **new native toolchain** (Rust/Cargo for Tauri, Expo for RN) that this repo has never built before and
+that the gate cannot fully verify — no simulator, Playwright already deferred. Starting any of them with
+three points left wastes the setup cost and leaves a half-built app shell on a branch.
+
+**Estimate honesty, because the number that decides this is the soft one:** the tokens-per-quota-point
+conversion is **330k–450k**, a 35% spread, and it is what separates "Plan 10 nearly fits" from "well
+short." Plan the pessimistic end. There is also an unresolved question recorded below about whether the
+weekly window is a hard Monday cliff or a ROLLING window — weekly was once observed dropping 62% → 1%
+overnight Tue→Wed, which no Monday reset explains. If it rolls, this whole outlook improves and the stop
+point should be re-derived rather than obeyed mechanically. **Re-measure before acting on it.**
+
 ## RULING P29 (2026-09-03, owner-approved) — the frozen errand-with-waits template keeps its two advisories
 
 **Escalated by the executor at step 13's close** (`exec/13-plan8-workflow-builder`, PR #85 already open,
