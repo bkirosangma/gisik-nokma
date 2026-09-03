@@ -9,15 +9,26 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 13 — Plan 8, the workflow builder. JUST STARTED.**
+## WHERE I AM: **STEP 13 — Plan 8. BATCH A (T1-T4) COMPLETE, gate green. Batch B (T5-T8) is next.**
 
 **Step 12 (Plan 7 remainder) is MERGED as PR #82 → `7337357`.** Plan 7 is complete at 22/22.
 **Do not reopen it.** Its eighteen ledger rows read `in-flight` on `main` after the merge; this
 branch's first commit promotes them to `done`, and `check:tasks` now verifies the merge sha is an
 ancestor of `origin/main`. **The repo stands at 118/177 (66.7%), independently recounted.**
 
-Step 13 = **Plan 8**, `docs/superpowers/plans/2026-08-20-08-workflow-builder.md`, **15 tasks, all
-`todo`**. Nothing is in flight. No PR is open. Nothing is awaiting a decision.
+Step 13 = **Plan 8**, `docs/superpowers/plans/2026-08-20-08-workflow-builder.md`, **15 tasks.**
+**T1, T2, T3, T4 are DONE and committed** (Batch A: 12 agents, 0 errors). **T5-T15 remain.**
+No PR is open. **Three rulings are open and NONE blocks Batch B** — see RULINGS OPEN.
+
+**Batching:** **A: T1-T4** (done) · **B: T5-T8** (canvas → validation) · **C: T9-T12** (publish →
+admin) · **D: T13-T15** (web, smoke, catalogue). Every fact those batches need is recorded in THIS
+file — a restarted executor should rebuild its dispatches from here, not hunt for scratchpad scripts,
+which do not survive a restart.
+
+**A PROCESS ERROR MADE ONCE THIS STEP — DO NOT REPEAT IT.** I started the boundary gate while a
+reviewer was still planting mutations. **Concurrent mutation and verification corrupts both** — a
+false red for the gate, disturbed measurements for the reviewer. Killed it; tree and `dist` verified
+clean afterwards. **Require a clean tree AND zero running agents before any gate run.**
 
 ## Live anchors — 2026-09-03, step 13 opening
 
@@ -26,7 +37,8 @@ Step 13 = **Plan 8**, `docs/superpowers/plans/2026-08-20-08-workflow-builder.md`
 | **Branch** | **`exec/13-plan8-workflow-builder`**, cut from `origin/main` `7337357`. | `git rev-parse --abbrev-ref HEAD` |
 | **Base** | `origin/main` = `73373579b906a18e3d319363a8eb3685b076eb50` | `git rev-parse origin/main`, fetched |
 | **Ahead-count** | **Not written here on purpose. Run `git rev-list --count origin/main..HEAD`.** A count taken while writing the commit that records it is *always* short by one and always looks right to its author. | — |
-| **Gate at the base `7337357`** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2232 tests.** domain 335 · rule-engine 280 · server 857 · app-core 474 · editor 178 · web 69 · ui 31 · sync-client 8. **This is the delta baseline for step 13.** | run by the executor with `--force` at branch creation, **through `rtk proxy`** — the first attempt was proxy-collapsed to one package and its composition was unusable |
+| **Gate at branch HEAD (Batch A closed)** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2301 tests.** domain 335 · rule-engine 280 · server 857 · **app-core 543** · editor 178 · web 69 · ui 31 · sync-client 8. **Batch A adds +69, ALL in app-core** — and the split within it is **T1-T3 = 58, T4 = 11**, measured by excluding the task's own test file, not inferred. | run by the executor with `--force` on a clean tree with no agents running, **through `rtk proxy`**; Node printed into the same log |
+| Gate at the base `7337357`, for the delta | exit 0 · 24/24 · 0 cached · **2232 tests**; app-core 474, all others as above. | measured at branch creation, on the second (unproxied) attempt — the first was proxy-collapsed to one package and its composition was unusable |
 | **`check:tasks`** | **exit 0**, 177 rows / 177 plan tasks, **118 done (66.7%)**, 0 claimed, 0 in-flight, **59 todo**. Plan 08 = 0 done / 15 todo. | `node scripts/check-task-ledger.mjs` after the promotion |
 | **Gate SHAPE** | **24 tasks over EIGHT packages.** Plan 8 Task 14 adds a Playwright e2e script — **if it becomes a turbo task, this figure is spent and must be recounted.** | the run above |
 | Orphaned, do not cite | every sha in the narrative sections of previous handoffs. | `git branch --contains` (empty = orphaned) |
@@ -246,6 +258,72 @@ plainly in T14's commit which of the two it is.
   run. (`executor-state.md`'s own lesson list says step 12 twice mis-assigned work to Plan 6 after it
   closed; that aside is what prompted the check, not what settles it.)
 
+## BATCH A — T1, T2, T3, T4. All committed. Gate green at HEAD.
+
+| Task | Result |
+|---|---|
+| **T1** draft store + layered auto-layout | **DONE.** One Important: **the copy-on-write immutability the plan's own header names was pinned by NOTHING** — mutating `renameState` to assign in place left all 497 app-core tests green and `tsc` silent. The implementer's own commit title records the sequel: *"the test I wrote to pin it passed on mutating code twice before it worked."* The reviewer also reported a genuine **survivor** (dropping the dangling-marker guard in `layoutDraft` kills nothing) and — this is the part that matters — **stated in the same breath that the mutation demonstrably ran**, which is the distinction between an unconstrained path and a mutation that never executed. Only the second condemns a check that is fine. |
+| **T2** summaries, field choices, per-code anchoring | **DONE.** Two Important: `BUILTIN_FIELD_CHOICES` was missing `startDate` against domain's own `BUILTIN_FIELD_IDS`, and a `duplicate-transition` anchor queue whose fixture could not distinguish one-anchor-per-repeat from the correct grouping — **the reviewer reported that mutation as a non-site-identifying survivor rather than a pass**, and the fix round replaced the fixture. Anchoring was separately verified order-independent by reversing `validateWorkflowDef`'s output and re-running. |
+| **T3** template gallery | **DONE, and it did not fall into the trap.** It imported `SIMPLE_KANBAN_TEMPLATE` from `packages/domain/src/simple-kanban.ts` and created only the genuinely-absent `errand-with-waits.ts`. **It also found a real conflict nobody had ruled** — see below. One **Critical**, and it was against T3's own ruling-request prose. |
+| **T4** gateway, validating fake, event builders | **DONE.** Nine mutations run, **every one site-identifying**. One Important, again against prose: the commit's owner-verification claim for a recorded item was false in both its parts. |
+
+**The through-line of Batch A: eight of the ten findings were against PROSE, not code** — false owner
+verifications, a present-tense claim the same commit falsified, an incomplete absence enumeration, and
+arithmetic that did not close. **The tests, where mutation-proved, held.** That is the same
+distribution steps 11 and 12 produced, and it is the argument for keeping the reviewer stage at the
+lowered floors: the gate does not run prose.
+
+### T3 found a conflict that no plan had ruled, and correctly refused to resolve it
+
+`ERRAND_WITH_WAITS_TEMPLATE` is pinned by Plan 11's `checkErrandTemplate` oracle and its own docblock
+(*"Edit this only with that check green"*). It trips **`rule-bypassable` twice**: `require-comment`
+guards `in-progress → waiting`, while `later → waiting` and `next → waiting` enter the same state
+carrying no such rule — and `later → waiting` **must stay rule-free**, because it is one of the seed's
+pinned one-hop paths. Task 3's own prose asserts the opposite invariant twice: *"a shipped template
+that greets the author with a warning is a shipped template that is wrong."* **Both cannot hold.**
+
+T3 took the conservative path: it recorded the **actual** advisory output in `templates.test.ts`
+rather than asserting the stale "warns about nothing" claim for that one template (the other two
+still assert clean), touched neither the template nor the check, and filed a ruling request.
+**Recorded as an open ruling — do not let a later task resolve it by fixing the template or
+weakening the check.**
+
+### The Critical was an overclaim inside the ruling request itself, and the fix needed two commits
+
+T3's ruling request titled itself *"unowned by any open plan"* and asserted it had **verified** Plan 2
+does not claim the check. Its reviewer refuted this: the **F5 ruling at coordination lines 512 and 521
+designed `rule-bypassable` into existence** (*"adviseWorkflowDef emits a `rule-bypassable`-style
+advisory for any guarded target also reachable by a lower-guard edge, for every rule kind"*). The
+heading now reads *"Plan 2's own ruling designed the check but did not settle this shape"*, which is
+the honest narrowing.
+
+**The fix round then needed a SECOND commit (`bdcb5a6`) to withdraw the claim properly** — the first
+correction was itself incomplete. That is this series' most reliably recurring pattern, now observed
+again on this branch, and it is the whole argument for reviewing a fix round rather than trusting it.
+
+### T4's reviewer compared the fake against the REAL door, and the fake's absence list was short
+
+The coordination doc's Lane 3 ruling (*"the validating fake"*, ~lines 2806-2825) is **not in Plan 8's
+own Task 4 text**; it was injected into the dispatch and implemented — `createFakeGateway` now runs
+every submitted event through the shipped `submittedEventSchema`, proven by two mutations (disabling
+validation, and recording an invalid envelope as submitted) that each redden exactly one test.
+
+But the fake's docblock enumerated its divergences from the real door **incompletely**. A probe that
+ran the same events through both found two more: **entity-kind mismatch** (`parseEvent` refuses a
+`workflow.defined` filed against a ticket; the fake commits it) and **duplicate event id** (the real
+door answers `{status:'invalid', code:'duplicate-event-id'}`; the fake commits it twice, returning
+the same `eventId` with `seq` 1 then 2). **An absence enumeration that is short is exactly as
+misleading as a partiality marker**, which is why the rule says enumerate rather than say "partial".
+
+### The test-delta arithmetic did not close, and the shape of the error is worth keeping
+
+T4's commit claimed app-core `474 → 543` with *"Tasks 1-3 already added 69 before this one"* and
+*"this task added 11"*. **474 + 69 = 543 leaves nothing for the 11.** The 69 was the whole-workspace
+delta (2301 − 2232) re-used as the Tasks 1-3 figure, double-counting T4's own contribution.
+Re-measured by excluding the task's own test file: **Tasks 1-3 added 58, T4 added 11, 58 + 11 = 69.**
+A decomposition that reconciles at the total and not at the parts reads as verified — the total was
+right, which is what made it persuasive.
+
 ## TWO FINDINGS FROM THE ADAPTATION MAP THAT REACH BEYOND ONE TASK
 
 ### A. RULING REQUESTED — T13's adapter cannot be written as scoped. Four operations have a live
@@ -317,12 +395,37 @@ here is the commit that supplies it"*, which cannot be written until the commit 
 
 ## IN FLIGHT
 
-**Nothing.** The branch carries one commit: the Plan 7 ledger promotion plus this handoff.
+**Nothing.** Batch A is closed, the tree is clean, and the gate is green at HEAD.
 
-## RULINGS OPEN
+## RULINGS OPEN — three, none blocking
 
-**None blocking step 13.** P25 taken (capped at `getBoard`). **P27 taken and applied** in step 12.
-P26 exists as a number and subject with no text on `main` — noted, not load-bearing here.
+1. **The T13 `DataSource` seam** (section A above). Raised with the controller; unanswered.
+   **Standing default: the `apps/web` adapter reaches those four operations through the existing
+   online HTTP client, leaving Plan 6's `data-source.ts` untouched.** Needed by Batch D, not before.
+2. **The frozen errand template trips `rule-bypassable` twice** — filed by T3 in the coordination
+   doc. Fixing the template violates Plan 11's `checkErrandTemplate` oracle pin; silencing the check
+   means editing a module Plan 2's own F5 ruling designed. **No later task may resolve this by
+   fixing the template or weakening the check.**
+3. **Coordination doc line 216's false "Done" on Task 11** (section B above). Raised with the
+   controller. **Task 11 is built in full regardless**, and corrects the line in its own commit.
+
+P25 taken (capped at `getBoard`). **P27 taken and applied** in step 12. P26 is a number with no text
+on `main` — noted, not load-bearing here.
+
+## THE FIX-ROUND PATTERN IS NOT OCCASIONAL ON THIS BRANCH, IT IS THE NORM
+
+**Three of Batch A's four fix rounds needed a SECOND commit to correct an error the fix itself
+introduced**, and the titles say so in the authors' own words:
+
+- `9154e67` — *"I fixed the false-present-tense comment I happened to be reading, then found the same
+  defect in the file I had not opened — and my first correction to it was itself false"*
+- `bdcb5a6` — *"withdraw the false 'unowned/unverified' claim on rule-bypassable"*, after `48c3655`
+  had already tried to soften the same overclaim
+- `460ebdc` — *"Second commit of the same fix round: the fragment my own edit left, and the one fact
+  in it I had not measured"*, after `340192a`
+
+Step 12 recorded six instances; this is three more in four tasks. **It is the argument for reviewing
+a fix round rather than trusting it, and for never citing a fix round's own summary as evidence.**
 
 ## METHOD FOR THIS STEP — the cost ruling, applied
 
