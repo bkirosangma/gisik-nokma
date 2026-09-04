@@ -2317,3 +2317,55 @@ Node v22.22.2 — `pnpm exec node --version`, i.e. as the toolchain resolves it,
 **`0 cached` is the point.** Every per-task gate this batch ran with 21 of 24 tasks served from turbo's
 cache. That is fine per task and is NOT acceptable as a branch's final evidence, because a cached task
 is a claim about a previous tree.
+
+---
+
+# BATCH B IS OPEN — PLAN 10 T9, T10 (2026-09-04 ~10:45)
+
+**PR #98 is open for Batch A and is NOT mine to merge.** https://github.com/bkirosangma/gisik-nokma/pull/98
+
+| anchor | value |
+|---|---|
+| branch | **`exec/16-plan10-replica`**, cut from Batch A's head |
+| **REBASE BASE — write it down, it gets orphaned** | **`32393beffaab6357aea5b2b30c1b825a8dfd7b96`** |
+| Batch A branch | `exec/15-plan10-sync`, head `32393be`, pushed, PR #98 open |
+| tasks | T9 (replica) → T10 (outbox + local pre-check). Sequential. |
+
+## THE REBASE, WRITTEN BEFORE IT IS NEEDED
+
+When PR #98 merges, `main` moves and **`32393be` is orphaned by that exact event** — `git cat-file`
+will still pass on it and hand back pre-merge content. That is the trap that cost step 13→14 a round.
+
+```
+git rebase --onto origin/main 32393beffaab6357aea5b2b30c1b825a8dfd7b96   # correct
+```
+
+Do it in a scratch worktree (`git worktree add --detach`), never in the working one. **Verify with a
+POSITIVE CONTROL, because an empty diff is also what a broken diff invocation prints:**
+`git diff --stat <old-head> HEAD` empty **AND** `git diff --stat origin/main HEAD` non-empty and
+matching expectation.
+
+## WHAT BATCH A HANDS BATCH B — a live consequence, not background
+
+`GET /v1/sync/bootstrap` now serves **five** backfilled ticket-entity types, not four:
+`comment.added`, `attachment.added`, `claim.contested`, `claim.contested_resolved`, **`visibility.set`**
+— that last one added by Batch A's whole-branch review, which found it belonged to neither the folded
+set nor the backfilled set and therefore travelled or didn't depending on when a snapshot pass ran.
+
+**So the replica receives ticket-entity events that `applyTicketEvent` does NOT fold.** Thirteen types
+bind to `entityKind: 'ticket'`; only ten are foldable. **T9 must filter before folding or it throws on
+the first contest** — and `claim.contested` is always backfilled, so this is not a rare path, it is the
+common one. Enumerated at `32393be`, with 26 registrations across 7 entity kinds as the control:
+
+```
+entityKind 'ticket'        13
+TICKET_EVENT_TYPES         10   <- what applyTicketEvent accepts
+BOOTSTRAP_BACKFILL_TYPES    5
+residue                     0
+```
+
+## OPEN — awaiting the controller, not blocking
+
+Asked the controller for a quota re-measurement. **If it comes back with headroom, Batches B and C
+collapse into one PR**; the branch topology is identical up to the moment a PR opens. Absent an answer,
+three PRs stands.
