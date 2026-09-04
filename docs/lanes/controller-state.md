@@ -1161,6 +1161,32 @@ judging.** Do not replace them with "escalate when it seems subtle" — that is 
    procedure exists"*, which is checkable. **Never invent a procedure. The absence of one IS the
    trigger.**
 
+### OWNER AUTHORIZATION 2026-09-04 — trigger #2's REMEDY is amended: dispatch an Opus subagent, don't hand back
+
+**The owner instructed this directly**, immediately after this controller correctly stopped at trigger #2
+for Plan 9's promotion and reported it rather than acting: *"going forward you can spin up an opus
+subagent and do the ledger promotion autonomously."* **This changes only trigger #2's remedy, not the
+trigger itself** — a ledger status change still requires Opus-level judgment; it no longer requires an
+owner-relaunched Opus **controller session** to supply it.
+
+**What this licenses:** when trigger #2 fires, this (Sonnet) controller may dispatch an Opus subagent
+(`Agent` tool, `model: "opus"`, a fresh general-purpose agent — not a fork, since the subagent needs no
+controller-session context, only the plan document, the merged PR, and this file) to perform the
+promotion: read the plan's task `Files:` blocks, cross-check each against the merged PR's actual
+changed-file list (not the plan's claim about it), apply the `done`/`claimed`/`todo` vocabulary and the
+**catalogue/verification-task refusal rule** exactly as documented above (`## Task-level progress is now
+tracked`), edit `task-ledger.tsv`, run `pnpm check:tasks` to confirm the new counts and `exit 0`, and open
+a **docs-only PR** — never merge its own. **The controller still performs the merge-side check**: docs-only
+diff (`git diff --name-only origin/main HEAD`, read the rows), independent CI green at the exact head sha —
+the same two-party split as every other PR in this topology, subagent or executor. **The subagent supplies
+the judgment; the controller still owns the gate.**
+
+**What this does NOT license:** the other six triggers are unchanged and still hand back to the owner. This
+does not make the Sonnet controller itself competent to edit `task-ledger.tsv` directly — it still may not.
+And it does not license skipping the refusal rule for catalogue/verification tasks, or inventing evidence a
+subagent could not find: a row with no clean per-task artefact stays `todo` and is reported, never guessed
+— the same standard the manual 2026-09-02 audit held itself to.
+
 ### THE LOOP, which Sonnet runs — every step has a written procedure and a loud failure
 
 Verify CI at the **exact head sha** (`gh api …/commits/<sha>/check-runs`; pending is not green) · merge ·
