@@ -192,6 +192,17 @@ export function createSyncEngine(deps: {
    * one. Recovery is a deliberate `start()`, which is where a shell can decide
    * to re-bootstrap — and where `needsBootstrap` will refuse to if there is a
    * local baseline to lose.
+   *
+   * **THE FLUSH DOOR CAN REACH THIS WITH `handle === null`, and that is fine
+   * for a stated reason rather than by luck.** `flush()` is public and takes no
+   * stream: a caller may drain the outbox before `start()` or after `stop()`,
+   * and a fold failure there lands here with no socket open. `closeStream`'s
+   * `handle?.close()` absorbs it and `setStatus('offline')` is already true, so
+   * the whole function reduces to recording the failure — which is the honest
+   * outcome, because the failure is the replica's and not the stream's. Written
+   * down rather than left to the `?.`: a caller reaching this function by a
+   * route no case walks is the shape that produced the third-door defect one
+   * screen down.
    */
   function stall(err: unknown, item: SyncItem | null): void {
     if (stalled) return;
