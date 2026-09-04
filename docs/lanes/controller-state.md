@@ -43,6 +43,24 @@ weekly window is a hard Monday cliff or a ROLLING window — weekly was once obs
 overnight Tue→Wed, which no Monday reset explains. If it rolls, this whole outlook improves and the stop
 point should be re-derived rather than obeyed mechanically. **Re-measure before acting on it.**
 
+> ### ⚠ RE-MEASURED 2026-09-04 ~10:40 IST, at PR #98's merge — the arithmetic above no longer holds, and it
+> points the WRONG way
+> **Weekly is now 87–89% used** (own status line 87%, own banner 89%), against the **76%** this section's
+> "8–9 of 13 tasks fit" estimate was built on. That is **~11–13 points left**, not 24. Applying the same
+> per-task cost this section already derived (~18–29 points for 13 tasks, i.e. ~1.4–2.2 points/task): **at
+> 11–13 points, roughly 5–7 of Plan 10's remaining tasks fit, not 8–9** — short of reaching T13, the
+> boundary this whole stop point is built around. Two tasks (T5–T7 = Batch A) already landed since the 76%
+> reading, consistent with the pace this section assumed; the gap is that quota moved faster than the
+> reading it was priced against, not that the per-task cost estimate was wrong.
+> **Also observed, weakly relevant to the unresolved rolling-window question above:** the reset date shown
+> on this session's own status line and banner is **Sep 7**, consistent with the Monday-cliff reading, not
+> a rolling window. One data point, not a resolution — flagged, not treated as settled.
+> **This is an owner call, not a controller one — passed up, not resolved here.** Options as of this
+> reading: hold the stop point where it is (accept reaching fewer than T5–T13 in full this week), move it
+> earlier than T13, or treat this as further evidence for re-deriving on a rolling-window assumption if the
+> owner has direct visibility into which reset model actually applies. **Not obeyed mechanically either
+> way — surfaced, per this section's own instruction.**
+
 ## STEP 14 CLOSED — Plan 9 complete at 148/177, promoted via an Opus SUBAGENT, not an owner-relaunched session
 
 **First use of the new trigger-#2 remedy** (see the "OWNER AUTHORIZATION 2026-09-04" section below): rather
@@ -144,6 +162,86 @@ of a relaunched session. Worked cleanly on the first try; kept as the template.
 > 3. **`buildMemoryContext` already exists for T10's local pre-check** — its docblock names Plan 10's
 >    offline replica explicitly, same reducer as `proj_tickets`, "so a rule cannot answer one way in a unit
 >    test and another on the server." The map missed this too.
+
+## STEP 15 IS THREE PRs, NOT ONE — Batch A closed, Batch B in flight
+
+**Topology change, executor's call, reasoned rather than announced.** Step 15 (Plan 10's remaining tasks)
+is shipping as three batch PRs on clean task seams (server sync surface / replica core / engine+DataSource+
+UX) instead of one step-close PR, because the executor cannot read quota from its own session and judged
+the errors asymmetric: split-wrongly costs one round-trip, batch-wrongly risks eight tasks on a
+never-reviewed branch at full price with no gate. **Batch A (T5, T6, T7) merged as PR #98 at `999d486`** —
+independently re-verified: CI green at the exact head sha (a REAL suite result, unlike a docs-only PR —
+#89's skip does not apply to source changes), gate re-run locally 24/24, 3109 tests, matching the
+executor's own figure exactly. **Batch B (T9 → T10) is running now on `exec/16-plan10-replica`, cut from
+`32393be`.** The executor's first handoff said this sha would be orphaned by Batch A's merge — **corrected
+by the executor itself, same session**: `git branch --contains` still names both local branches holding it
+alive, so it orphans only once `exec/15-plan10-sync` is deleted, not at the merge. Rebase (`--onto
+origin/main 32393be`) is deliberately deferred to the Batch B boundary, in a scratch worktree — not now,
+because Batch B's agents are mid-flight committing to this branch and rebasing under them is how a task
+gets lost. Recorded as an example of the executor catching its own overstated timing claim, the exact
+class of finding this whole branch has been surfacing all session.
+
+**Promotion**: T5/T6/T7 promoted via the same Opus-subagent delegation as step 14 (PR pending at time of
+writing — see the trigger-#2 authorization above). Kept per-batch rather than deferred to a single
+end-of-step promotion — deferring would leave landed work invisible in the ledger across a quota boundary
+that may land mid-step, the same "no ledger row citing it" failure mode the 2026-09-02 audit already found.
+
+**Quota decision, changed by the executor after this controller's re-derivation was sent across**: Batch C
+is **NOT auto-dispatched**. The executor will stop after Batch B's PR opens and check in with a fresh
+reading before starting a three-task batch it may not be able to gate at 4–6-tasks-fit. If the numbers then
+support only part of it, T11 alone (the sync engine) is a coherent unit, with T12+T13 following separately.
+
+> ### CARRIED to the owner — `StreamItem` should be REPLACED by `ServerStreamFrame`; DEFERRED, with named
+> guardrails, and Plan 10 has no task to own it
+> Verified directly: `packages/app-core/src/data-source.ts:60-63`'s own docblock states the replacement is
+> owed, "owner Plan 10." Swept T9–T13's own text: **zero mentions in any of them.** This controller
+> initially asked the executor to fold it into Batch C; **the executor pushed back, correctly** — the
+> replacement touches `data-source.ts`, `online/stream.ts`, and every subscriber, which is strictly larger
+> than T11 or T12 and collides with the executor's own (unrecorded outside its scratch, referenced here as
+> **P30**) ruling for T12: the replica `DataSource` is built as a structural superset of the shipped one,
+> `data-source.ts` itself is NOT widened, matching the class of constraint P24/P25 already set. Taking the
+> `StreamItem` replacement on inside Batch C at 11–13 points is exactly the "full price, no gate" outcome
+> the batch split exists to avoid.
+> **Why the deferral doesn't decay while it waits**: the executor is writing two constraints into Batch C's
+> own commit (greppable from code, not only from this file) that keep the eventual replacement the same
+> size it is today — T11 reuses `online/stream.ts`'s existing `WebSocketLike`-injection and lenient-parsing
+> pattern rather than inventing a second WS abstraction for the same wire protocol, and T11/T12 consume the
+> REAL five-kind `StreamItem`, never a parallel or truncated union declared locally in `sync-client`. Under
+> those two constraints the replacement stays one type/N consumers/one seam whenever it is eventually taken.
+> **OWNER: this needs a TASK Plan 10 does not currently have** — not T12 (would silently absorb a
+> cross-cutting change under a task titled for something narrower), not Plan 11 (owns the boot path, not
+> the wire types). Creating a task is the owner's call. Carry this to the owner framed as *"Plan 10 owns a
+> decision it never allocated a task for,"* not as a routine T14-conversation item.
+
+> ### CARRIED to the T14 owner conversation, per the executor's own request — two items
+> 1. **No server identity exists in this system.** Three docblocks say a contest should attribute to "the
+>    server identity"; every `actorId` ULID in that position is actually a real person's. T7 followed
+>    `bootstrapWorkspace`'s precedent and attributed to the claimant instead, so `claimant_id` equals the
+>    contest's own `actorId` — fan-out mis-routing becomes invisible against production data, detectable
+>    only through its own fixture. Minting a system user is a product decision no plan has taken.
+> 2. **`isUniqueViolation` matches only `events_pkey`** — closed for `POST /v1/sync` (T7), open for every
+>    other `ingestBatch` caller.
+
+> ### FOUR SELF-FALSIFYING COUNTS on the Batch-A branch — same shape every time, worth a named rule
+> A confident sentence about coverage standing in for the argument that a change is safe. Worst: case
+> 12.93 claimed a mutation "reddens seven cases"; it reddens exactly one, 974/975 green. Three of the four
+> were caught only by the reviewer AFTER the implementer, not by the implementer's own check. This is the
+> Traps section's **"PRINT THE ROWS, NOT THE COUNT"** rule (above) recurring in a new package. The
+> executor's suggestion — name it explicitly in `docs/superpowers/plans/2026-08-20-00-series-coordination.md`
+> (the "interface authority" it reads first) with these four instances as evidence — is sound and
+> docs-only, but **deliberately not done this turn**: that file is ~3700 lines and quota is at 87–89%. The
+> rule already binds via this file, which every executor session reads. **Pending, not forgotten** — do it
+> when quota allows, not urgently.
+
+> ### CORRECTION — `SendMessage` controller→executor DOES work now, contradicting the earlier trap entry
+> The "How a controller reaches the executor" section above records `SendMessage` as HELD-then-declined on
+> a permission-mode class mismatch, tmux as the only working channel. **Not true this session**: the
+> executor reached this controller via a cross-session message (a different channel, `uds:` socket) and a
+> reply via `SendMessage` to `gisik-nokma-exec-a2` delivered successfully (`{"success":true}`, confirmed —
+> not merely sent). **Do not delete the tmux fallback** — the mismatch condition that caused the original
+> failure may still exist under some permission-mode combination this session didn't hit; recorded as "now
+> observed working," not as "the old finding was wrong." If `SendMessage` fails again, fall back to tmux
+> per the original section rather than assuming the tool is broken outright.
 
 ## RULING P29 (2026-09-03, owner-approved) — the frozen errand-with-waits template keeps its two advisories
 
