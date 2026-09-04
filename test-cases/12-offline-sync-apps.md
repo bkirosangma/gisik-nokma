@@ -22,11 +22,24 @@ One consequence worth stating rather than leaving to be discovered: **12.15 is a
 — `apps/server/test/sync/stream-seq.test.ts` shipped with Plan 10 Task 2 — but it is a reserved id and
 is deliberately not flipped here. *Owner: Plan 10 Task 18.*
 
-**Scope of this file today.** Plan 10 Tasks 4, 5, 6 and 7. Task 4 as lifted out of the plan's position:
-the §11 envelope-coherence closer, `proj_contested`, `getContest` and `GET /v1/contests`. Task 5: the
-snapshot writer and the ledger-sourced reducer deps. Task 6: `GET /v1/sync/bootstrap`. Task 7:
-`POST /v1/sync`. Nothing else from Plan 10 is catalogued — Tasks 8–17 (sync-client, the replica, the
-outbox, the two app shells, the dual-client harness) are absent rather than missing.
+**Scope of this file today.** Plan 10 Tasks 4, 5, 6, 7, 9 and 10. Task 4 as lifted out of the plan's
+position: the §11 envelope-coherence closer, `proj_contested`, `getContest` and `GET /v1/contests`.
+Task 5: the snapshot writer and the ledger-sourced reducer deps. Task 6: `GET /v1/sync/bootstrap`.
+Task 7: `POST /v1/sync`. Task 9: the replica (12.119–12.137). Task 10: the outbox and the local
+pre-check (12.138–12.153). Nothing else from Plan 10 is catalogued — Task 8 (the `sync-client` scaffold
+and the storage seam), Task 11 (the sync engine), Tasks 12–13 (the replica `DataSource` and app-core's
+offline UX), Tasks 14–15 (the dual-client harness and its scenarios) and Tasks 16–17 (the two app
+shells) are absent rather than missing. **Task 8's absence is measured, not assumed**: this file has no
+Task 8 section and no case id for it — `grep -n "Task 8" test-cases/12-offline-sync-apps.md` returns
+one line, a passing mention of its `outbox` table inside a Task 7 case — and its storage-conformance
+and barrel-guard suites (the "+4 and +4" in `packages/sync-client`'s 45) are catalogued in no
+`test-cases/` file at all. *Owner for placing them: Plan 10 Task 18.*
+
+**This paragraph was itself the drift the header line above warns about.** Written for Task 7 (commit
+`09765d0`), it went on saying "Tasks 8–17 … the replica, the outbox … are absent rather than missing"
+through Task 9's replica section and Task 10's outbox section landing in this same file — it named as
+absent two things a reader could scroll to. The HIGHEST/NEXT-FREE line got bumped both times and this
+sentence did not. Rewrite this enumeration in the SAME change set as any section you add.
 
 **Terminology.** "envelope-origin" throughout means `EventEnvelope.origin`, the provenance enum
 `'web' | 'mobile' | 'desktop' | 'server'`. It is NOT the browser `Origin` header; nothing in this file
@@ -658,8 +671,18 @@ mutations were run; **none survived**.
 - 12.139 ✅ **the reopen pair** — the parent's reopen is queued first, and the child create that 12.138
   refuses is then ACCEPTED, because the pre-check reads confirmed state with the outbox overlaid. The
   only difference between the two cases is the queued reopen. *Mutation: hold one `EngineContext` on
-  the `createOutbox` closure, which is what the plan's snippet does → red here, on 12.141 and on
-  12.144.*
+  the `createOutbox` closure, which is what the plan's snippet does → red here, on 12.141, on 12.144
+  **and on 12.151** (`Tests 4 failed | 41 passed (45)`). This bullet and `outbox.ts`'s docblock both
+  said THREE for one task, and the missing id is a measurement of WHEN the held context is built: build
+  it eagerly in the `createOutbox` body — which is what "one built at `createOutbox` time" means and
+  what the plan's snippet does — and four go red; memoise it lazily on the first `enqueue` (`??=`) and
+  12.151 stays green, because that test's first `enqueue` is its only one, so its "held" context is
+  built after the `applyServerItem` that confirms the ticket. Both runs are real; only the eager one is
+  the mutation the prose describes. 12.151's failure is also the OTHER half of the staleness: 12.139
+  and 12.144 fail because a frozen context cannot see what was QUEUED after it, while 12.151 fails
+  because it cannot see what the replica CONFIRMED after it — `applyServerItem` creates that ticket
+  after `fixture()`, so the frozen context refuses the transition, nothing is queued, and `pendingFor`
+  answers `null`.*
 - 12.140 ✅ `getEntityState('membership', …)` answers the actor's OWN membership out of bootstrap's
   `me`, `null` for anyone else, and `null` for an id that is not a `workspace:user` pair at all.
 - 12.141 ✅ **definitions come from the replica's TABLES, never from its event log.** After a

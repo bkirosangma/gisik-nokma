@@ -972,16 +972,23 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 
 ## 12. Offline sync & the apps
 
-*(Plan 10, Tasks 4, 5, 6 and 7 — the LIFTED §11 closer, the contested-claims read path, the snapshot
-writer, the replica bootstrap and the sync ingress. Plan 10's own catalogue task (Task 18) owns §12's
-full body and will replace this scope note; what follows is what those four tasks added, and nothing
-else. §8/§10/§11 stay absent because the coordination doc assigns `Features.md` sections one per
-implementation plan and numbering is claimed from that table, never taken next-free. Still absent
-rather than missing from this section: the outbox and both app shells — Plan 10 Tasks 10–17. **Task 9's
-replica is now here, at the end of this section, while Task 8's storage substrate sits in §3** —
-that split is real and is left standing rather than tidied: Task 8 catalogued itself beside the ledger
-and its persistence, Task 9's brief placed the replica in §12, and Task 18 owns the reconciliation with
-its own measurement, exactly as the §3 notes say.)*
+*(Plan 10, Tasks 4, 5, 6, 7, 9 and 10 — the LIFTED §11 closer, the contested-claims read path, the
+snapshot writer, the replica bootstrap, the sync ingress, the local replica, and the outbox with its
+local pre-check. Plan 10's own catalogue task (Task 18) owns §12's full body and will replace this
+scope note; what follows is what those six tasks added, and nothing else. §8/§10/§11 stay absent
+because the coordination doc assigns `Features.md` sections one per implementation plan and numbering
+is claimed from that table, never taken next-free. Still absent rather than missing from this section:
+the sync engine, the replica `DataSource`, app-core's offline UX, the dual-client harness and both app
+shells — Plan 10 Tasks 11–17. **Task 9's replica and Task 10's outbox are now here, at the end of this
+section, while Task 8's storage substrate sits in §3** — that split is real and is left standing rather
+than tidied: Task 8 catalogued itself beside the ledger and its persistence, Tasks 9 and 10 placed the
+replica and the outbox in §12, and Task 18 owns the reconciliation with its own measurement, exactly as
+the §3 notes say. **This banner was itself the drift it warns about**: written for Task 7 (commit
+`ae712d0`), it still read "Tasks 4, 5, 6 and 7 … and nothing else" and listed Task 10's outbox as
+absent while Task 10's own two ✅ bullets sat below it in this same section. Whoever adds a task's
+bullets here rewrites this enumeration in the SAME change set — an appended "Task 9's replica is now
+here" clause patched the tail and left the head saying four tasks, which is how the contradiction
+survived a whole task.)*
 
 - ✅ **A contest cannot lie about which claim it is contesting** — `claim.contested` embeds the
   refused claim whole, and the embedded claim must name the **same workspace, the same entity kind

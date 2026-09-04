@@ -150,10 +150,29 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
    * child under it — would refuse the child against a parent that is still
    * terminal in a world an hour old.
    *
-   * MEASURED: holding the context on this closure fails three cases — 12.139
-   * (the reopen pair), 12.141 (a revoked scope the stale context still knows)
-   * and 12.144 (an ordered create-then-edit pair, where the second claim is
-   * judged against a world without the first).
+   * MEASURED: holding the context on this closure fails FOUR cases — 12.139
+   * (the reopen pair), 12.141 (a revoked scope the stale context still knows),
+   * 12.144 (an ordered create-then-edit pair, where the second claim is judged
+   * against a world without the first) and 12.151 (a queued transition whose
+   * pending reading never appears). `Tests 4 failed | 41 passed (45)`.
+   *
+   * This paragraph said THREE for a whole task, and the missing id is a
+   * measurement of WHEN the held context is built. Built EAGERLY here in the
+   * `createOutbox` body — which is what "one built at `createOutbox` time"
+   * means, and what the plan's snippet does — four go red. Memoised LAZILY on
+   * the first `enqueue` (`??=`), only three do, because 12.151's first
+   * `enqueue` is its only one and its held context is therefore built after
+   * the `applyServerItem` that confirms the ticket. Both runs are real; the
+   * eager one is the mutation this prose describes, so four is the number.
+   *
+   * 12.151 is also the OTHER HALF of the staleness, and the half the paragraph
+   * above does not describe. 12.139 and 12.144 fail because a frozen context
+   * cannot see what was QUEUED after it — the outbox half. 12.151 fails
+   * because it cannot see what the replica CONFIRMED after it: its ticket is
+   * created by `applyServerItem` after the outbox exists, so the frozen
+   * context refuses the transition outright, nothing is queued, and
+   * `pendingFor` answers `null`. A context held here is stale in BOTH
+   * directions, and only one of them was written down.
    */
   async function overlayFor(ticketId: string): Promise<PendingTicket | null> {
     const overlay = await buildPendingOverlay(contextDeps);
