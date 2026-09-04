@@ -1092,7 +1092,13 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
   everyone including guests (a guest cannot render a status without the workflow definition, Plan 4
   §5). The whole read runs inside one `REPEATABLE READ` transaction with the workspace's stream cursor
   read FIRST, so the response is a consistent cut and subscribing at the returned `streamSeq` can only
-  re-deliver an event the client already has, never skip one. 403 `{error:'not_a_member'}` when the
+  re-deliver an event the client already has, never skip one — both halves of that claim are now pinned
+  by the tests rather than only by this sentence: `streamSeq` is checked against the real cursor
+  (`readStreamSeq`), not merely a positive number, and the transaction's literal `BEGIN ISOLATION LEVEL
+  REPEATABLE READ` is asserted directly. The un-snapshotted branch (a ticket too new to have a snapshot
+  yet: `snapshot: null`, `events` is its full history) and the `definitions` query's per-workspace scoping
+  (a sibling workspace's own `workflow.defined`/`ticket-type.defined` rows must not appear) are likewise
+  exercised now, not merely implied by the shape of the response type. 403 `{error:'not_a_member'}` when the
   caller resolves no workspace role; 401 with no session. `apps/server/src/sync/sync-routes.ts`
 - ⚙️ **`EffectiveRole.projects` is a `Map`, and the wire shape is not** — `me.projectIds` is
   `[...eff.projects.keys()]`, not `[...eff.projects]`: the map itself spreads as `[key, value]` TUPLES,

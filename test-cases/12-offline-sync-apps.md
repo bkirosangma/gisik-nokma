@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.97`. THE NEXT FREE ID IS `12.98`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, and said `12.93` for the time between that and Task 6's four bootstrap cases landing. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.99`. THE NEXT FREE ID IS `12.100`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, and said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -141,12 +141,14 @@ implementation mutations named below was run and reddened the case named beside 
   can see, `me.projectIds` as real ULIDs and not `[key, value]` tuples (the plan's own snippet spreads
   `[...eff.projects]` — a `Map` — instead of `[...eff.projects.keys()]`; this case pins the fix by
   seeding the member onto a real project, so the bug and the fix disagree on the assertion rather than
-  both producing `[]`), a `streamSeq` greater than zero, and a tail that excludes everything at or below
-  the snapshot's seq EXCEPT the four backfill types — content and contests are not ticket state, so a
-  `comment.added` filed before the snapshot still travels. *Mutations, both confirmed red against this
-  same test: reintroduce the tuple spread → `expected {…} to deeply equal {…}`, `projectIds` carrying
-  arrays instead of strings; drop the backfill clause from the tail filter → the comment goes missing
-  from `visible.events`.* (bootstrap.test.ts)
+  both producing `[]`), the ACTUAL `streamSeq` (checked against `readStreamSeq(db.pool, WS)`, not merely
+  `> 0` — a hardcoded wrong value used to pass this case, fixed in the same round that added 12.98), and
+  a tail that excludes everything at or below the snapshot's seq EXCEPT the four backfill types — content
+  and contests are not ticket state, so a `comment.added` filed before the snapshot still travels.
+  *Mutations, all confirmed red against this same test: reintroduce the tuple spread → `expected {…} to
+  deeply equal {…}`, `projectIds` carrying arrays instead of strings; drop the backfill clause from the
+  tail filter → the comment goes missing from `visible.events`; `const streamSeq = 1` → `expected 1 to be
+  28`.* (bootstrap.test.ts)
 - 12.95 ✅ planted defect: an invisible ticket is absent from a member's bootstrap — no id, no stub,
   nothing — with a positive control in the SAME request: the visible ticket's id must actually appear in
   the response body, so "invisible one absent" cannot pass by the route answering nothing to anyone.
@@ -155,15 +157,38 @@ implementation mutations named below was run and reddened the case named beside 
   (bootstrap.test.ts)
 - 12.96 ✅ a guest gets definitions and exactly the ticket explicitly shared with them, not the
   workspace-mode ticket a member sees — a positive control on the empty case: "the guest gets `[]`"
-  would otherwise pass for a route that returns `[]` to everyone. *Mutation: `listVisibleTickets` call
-  replaced with a constant `[]` → red here AND on 12.94, since the member's ticket also disappears; the
-  guest case adds the proof that a NON-empty answer (the shared ticket) is reachable at all, which the
-  member case alone does not establish for a guest's role branch.* (bootstrap.test.ts)
+  would otherwise pass for a route that returns `[]` to everyone. Also the ONLY case in this bucket
+  exercising the un-snapshotted branch (`bootstrapTicket`'s `snapshot?.seq ?? 0` fallback): the shared
+  ticket has too few events to have a snapshot yet, so this asserts `snapshot === null` and that its
+  `events` carries its full history (`ticket.created`) — 12.94's ticket has a snapshot and never touches
+  this branch. *Mutations: `listVisibleTickets` call replaced with a constant `[]` → red here AND on
+  12.94, since the member's ticket also disappears; the guest case adds the proof that a NON-empty
+  answer (the shared ticket) is reachable at all, which the member case alone does not establish for a
+  guest's role branch; the `?? 0` fallback changed to `?? Number.MAX_SAFE_INTEGER` → red here
+  (`expected false to be true`), while 12.94 stays green because its ticket does have a snapshot.*
+  (bootstrap.test.ts)
 - 12.97 ✅ `GET /v1/sync/bootstrap` 403s `{error:'not_a_member'}` for a signed-in caller who resolves no
   workspace role, and 401s a request carrying no session at all. *Mutation: `preHandler: requireSession`
   removed → red on the 401 assertion here, and red on every other case in this file too — every
   authenticated call in 12.94-12.96 now reaches the handler with no `request.currentUserId` to read.*
   (bootstrap.test.ts)
+- 12.98 ✅ `GET /v1/sync/bootstrap` opens its transaction with the literal `BEGIN ISOLATION LEVEL
+  REPEATABLE READ`, asserted directly rather than inferred from any value in the response body — no
+  field in the payload can tell REPEATABLE READ apart from plain READ COMMITTED in a single-request test
+  with no concurrent writer. `db.pool.connect` is wrapped for the duration of one request to record every
+  SQL string every connection issues, and the literal is checked by membership rather than position
+  (`requireSession` and other request machinery may open connections of their own). *Mutation: `BEGIN
+  ISOLATION LEVEL REPEATABLE READ` changed to plain `BEGIN` → red, `expected […] to include 'BEGIN
+  ISOLATION LEVEL REPEATABLE READ'`.* (bootstrap.test.ts)
+- 12.99 ✅ the `definitions` query's `workspace_id = $1` filter, made observable the way 12.93 makes its
+  sibling loader's: a second workspace (`WS2`) is seeded in `beforeAll` with its own
+  `workflow.defined`/`ticket-type.defined` events and nothing else, and a member's bootstrap of `WS`
+  asserts WS2's definition ids are absent and WS's own two are exactly what comes back. Without this
+  fixture a single-workspace test cannot catch the filter being dropped — there is nothing foreign for a
+  leak to carry. *Mutation: `workspace_id = $1` in the definitions query replaced with a harmless `$1 =
+  $1` (keeping the bind count so the route does not 500 for an unrelated reason) → red on three cases at
+  once — 12.94 (`expected […] to deeply equal […]`, extra types from WS2), 12.96 (`expected […] to have a
+  length of 2 but got 4`), and this case directly (`expected […] to not include`).* (bootstrap.test.ts)
 
 ## Carried, with owners — recorded here rather than fixed
 

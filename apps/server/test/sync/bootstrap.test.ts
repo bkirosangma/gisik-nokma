@@ -7,6 +7,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { applyAll, seedGuest, seedMember, setVisibilityEnv } from '../helpers/seed.js';
 import { signInWithPhone } from '../helpers/session.js';
 import { runSnapshotPass } from '../../src/sync/snapshot-writer.js';
+import { readStreamSeq } from '../../src/sync/stream-seq.js';
 
 /**
  * `GET /v1/sync/bootstrap` — 12.94-12.97 (`test-cases/12-offline-sync-apps.md`).
@@ -34,6 +35,15 @@ const SHARED = newUlid();
 // `'wf_basic'`/`'task'` throw at the envelope parse (`malformed-envelope`).
 const WF_BASIC = newUlid();
 const TASK_TYPE = newUlid();
+// A second workspace, seeded with its own definitions and nothing else
+// (12.99, mirroring 12.93's `WS2` precedent in `snapshot-writer.test.ts`): a
+// single-workspace fixture cannot catch the `definitions` query dropping its
+// `workspace_id = $1` filter, because there is nothing foreign for a leak to
+// carry. This gives WS a sibling with real `workflow.defined`/`ticket-type.defined`
+// rows that must never appear in WS's own bootstrap.
+const WS2 = newUlid();
+const WS2_WF = newUlid();
+const WS2_TYPE = newUlid();
 
 let memberId = '';
 let guestId = '';
@@ -108,6 +118,39 @@ beforeAll(async () => {
     expect(result.status).toBe('committed');
   }
 
+  // WS2's own definitions (12.99) — a workspace WS's bootstrap must never see.
+  const ws2Results = await ingest.ingestBatch([
+    newSubmittedEvent({
+      workspaceId: WS2,
+      entity: { kind: 'workflow', id: WS2_WF },
+      type: 'workflow.defined',
+      payload: {
+        id: WS2_WF,
+        version: 1,
+        name: 'WS2 workflow',
+        initialStateId: 'todo',
+        states: [
+          { id: 'todo', name: 'To do', category: 'open' },
+          { id: 'done', name: 'Done', category: 'terminal' },
+        ],
+        transitions: [{ from: '*', to: 'done', rules: [] }],
+      },
+      actorId: memberId,
+      origin: 'server',
+    }),
+    newSubmittedEvent({
+      workspaceId: WS2,
+      entity: { kind: 'ticket-type', id: WS2_TYPE },
+      type: 'ticket-type.defined',
+      payload: { id: WS2_TYPE, name: 'WS2 type', icon: 'check', rank: 1, workflowId: WS2_WF, fields: [] },
+      actorId: memberId,
+      origin: 'server',
+    }),
+  ]);
+  for (const result of ws2Results) {
+    expect(result.status).toBe('committed');
+  }
+
   // 22 more field_sets so VISIBLE's snapshot lands (threshold 20): 1 created +
   // 1 comment + 22 field_sets = seq 24. `title` is a built-in every ticket type
   // carries — a custom field (e.g. `notes`) would need a declared field on the
@@ -159,7 +202,13 @@ describe('GET /v1/sync/bootstrap', () => {
     // `[[PROJECT, {projectAdmin:false}]]` — the tuple form fails this
     // assertion loudly rather than passing on an empty array.
     expect(body.me).toEqual({ userId: memberId, workspaceRole: 'member', projectIds: [PROJECT] });
-    expect(body.streamSeq).toBeGreaterThan(0);
+    // The real cursor, not merely a positive number: `readStreamSeq` is called
+    // directly (the same function the route calls) so a hardcoded stand-in —
+    // e.g. `const streamSeq = 1` — fails this equality even though `1` also
+    // satisfies `toBeGreaterThan(0)`. Read AFTER the request: the route's own
+    // transaction is the only writer touching WS in this window, so the
+    // post-request cursor and the one the route saw agree.
+    expect(body.streamSeq).toBe(await readStreamSeq(db.pool, WS));
     expect(body.definitions.map((d: { type: string }) => d.type).sort()).toEqual([
       'ticket-type.defined',
       'workflow.defined',
@@ -210,6 +259,17 @@ describe('GET /v1/sync/bootstrap', () => {
     const body = res.json();
     expect(body.tickets.map((t: { ticketId: string }) => t.ticketId)).toEqual([SHARED]);
     expect(body.definitions).toHaveLength(2); // definitions go to everyone incl. guests (Plan 4 §5)
+
+    // The un-snapshotted branch (`snapshot: null`, full history), never
+    // exercised anywhere else in this file: SHARED has too few events to
+    // snapshot (`ticket.created` only), so `bootstrapTicket`'s `snapshot?.seq
+    // ?? 0` fallback is what decides its whole tail. A fallback of
+    // `Number.MAX_SAFE_INTEGER` (which would silently empty `events` for
+    // every un-snapshotted ticket) passes every OTHER assertion in this file
+    // but fails these two.
+    const shared = body.tickets[0];
+    expect(shared.snapshot).toBeNull();
+    expect(shared.events.some((e: { type: string }) => e.type === 'ticket.created')).toBe(true);
   });
 
   it('12.97 403s a non-member naming this workspace; 401s a request with no session at all', async () => {
@@ -224,5 +284,64 @@ describe('GET /v1/sync/bootstrap', () => {
 
     const anon = await app.inject({ method: 'GET', url: `/v1/sync/bootstrap?workspaceId=${WS}` });
     expect(anon.statusCode).toBe(401);
+  });
+
+  it('12.98 opens its transaction at REPEATABLE READ, not the default READ COMMITTED — the consistent-cut guarantee the route\'s own doc comment claims', async () => {
+    // Neither `streamSeq`'s value nor any other field in the response body
+    // can distinguish `BEGIN ISOLATION LEVEL REPEATABLE READ` from a plain
+    // `BEGIN` in a single-request test with no concurrent writer — both
+    // produce the same numbers. The isolation level is a transaction-setup
+    // fact, not a value in the payload, so it is asserted directly: wrap
+    // `db.pool.connect` to record every SQL string every connection this
+    // request opens issues, and check the exact literal was one of them.
+    const originalConnect = db.pool.connect.bind(db.pool);
+    const queries: string[] = [];
+    // pg's `connect` overloads (callback vs promise form) aren't worth
+    // reproducing here — cast the replacement rather than fight the type.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (db.pool as any).connect = async (...args: unknown[]) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const client = await (originalConnect as any)(...args);
+      const originalQuery = client.query.bind(client);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      client.query = (...queryArgs: any[]) => {
+        if (typeof queryArgs[0] === 'string') queries.push(queryArgs[0]);
+        return originalQuery(...queryArgs);
+      };
+      return client;
+    };
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: `/v1/sync/bootstrap?workspaceId=${WS}`,
+        headers: memberHeaders,
+      });
+      expect(res.statusCode).toBe(200);
+    } finally {
+      db.pool.connect = originalConnect;
+    }
+    // `requireSession` and other machinery may issue their own `pool.connect`
+    // calls on the same request (auth lookups, etc.) — this route's own
+    // transaction-opener is asserted by content, not by position.
+    expect(queries).toContain('BEGIN ISOLATION LEVEL REPEATABLE READ');
+  });
+
+  it('12.99 the definitions query is scoped to the requested workspace — a sibling workspace\'s workflow/ticket-type definitions never leak in', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/sync/bootstrap?workspaceId=${WS}`,
+      headers: memberHeaders,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    // WS2 (seeded in beforeAll, mirroring 12.93's cross-workspace fixture) has
+    // its own workflow.defined/ticket-type.defined rows. If the `definitions`
+    // query's `workspace_id = $1` clause were dropped, WS2's rows would be
+    // in this list too — this is the assertion 12.94's fixed-length check
+    // only catches incidentally; here it is named directly.
+    const defIds = body.definitions.map((d: { entity: { id: string } }) => d.entity.id);
+    expect(defIds).not.toContain(WS2_WF);
+    expect(defIds).not.toContain(WS2_TYPE);
+    expect(defIds.sort()).toEqual([TASK_TYPE, WF_BASIC].sort());
   });
 });
