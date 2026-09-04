@@ -1961,3 +1961,28 @@ therefore measured against the OLD guard and came back green, which I nearly rea
 does not work". **Caught only because a green result where I predicted red is itself a finding.**
 Redone, backed up to a file first, and re-mutated with `cp` restores. The general rule: `git checkout`
 is not an undo for work that has never been committed.
+
+## PR #93 IS OPEN — STEP 14 IS DONE FROM THIS SIDE (2026-09-04 ~07:20)
+
+**https://github.com/bkirosangma/gisik-nokma/pull/93** — `exec/14-plan9-calendar` → `main`,
+**MERGEABLE**, CI `gate` pending at the time of writing.
+
+| anchor | value |
+|---|---|
+| HEAD | **`59f834b`** — pushed, reachable (`git branch --contains` names the branch) |
+| behind `main` | **0** — `origin/main` `421db9f` is merged in, not rebased over |
+| tree | clean |
+| commits | 52 · 87 files · +19,578/−104 |
+| gate | **24/24, `0 cached`, 43.5s, 3,074 tests / 225 files**, Node named from inside the run |
+
+**Plan 9 is complete: Tasks 1–15, plus the final review's fix round.** The next executor step in the
+serial sequence is **step 15 — Plan 10 remainder** *(T7, T9, T14, T15 floor-list)*. **Note the owner's
+stop point recorded at the top of `controller-state.md`: ask before dispatching Plan 10 T14.**
+
+**The controller merges. Ledger rows are NOT promoted from this side** — Plan 8's were promoted by
+the controller in #87 and a duplicate written from here had to be dropped, so Plan 9's fifteen rows
+are the controller's to write.
+
+**If you are a fresh executor reading this after a restart:** the position above is the merged,
+pushed truth. Verify it rather than adopting it — `git rev-parse HEAD`, `git branch --contains HEAD`,
+`gh pr view 93`. If #93 has merged, `main` has moved and this file's anchors are history.
