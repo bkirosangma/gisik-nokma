@@ -2239,3 +2239,81 @@ take a batch down because someone forgot to add it to a list.
    on is unmeasurable from this session, so the robust option wins over the optimal one.
 4. **Batch B (T9 → T10)** branches from Batch A's head and rebases when A merges. **Capture Batch A's
    head sha in writing BEFORE the merge** — it is orphaned by the very event that triggers the rebase.
+
+## WHOLE-BRANCH REVIEW DONE — one opus reviewer, and it found the seam no per-task reviewer could
+
+Fix landed as `d400bf5`. **This is the entry that justifies the whole-branch stage existing.**
+
+**The defect: `visibility.set` was in neither list.** The domain registry binds **13** event types to
+`entityKind: 'ticket'`. T5's `TICKET_EVENT_TYPES` folds **10**; T6's `BOOTSTRAP_BACKFILL_TYPES` carried
+**4**, two overlapping. Union: 12. The residue was `visibility.set` — and it was dropped from a
+replica's payload **only when it sat at or below the ticket's snapshot seq**, because the writer skips
+it while still advancing `seq` past it. One seq higher and the identical event travelled in full.
+
+**That asymmetry is the defect. Not an exclusion — an accident of timing.** Whether a replica received
+a visibility change depended on when a background maintenance pass last ran.
+
+**Verified independently by the executor at `d400bf5`, by enumeration rather than by count** (this
+branch has produced four wrong counts, so a bare number is not evidence here):
+
+```
+entityKind 'ticket'          13   control: 26 registrations parsed across 7 entity kinds
+TICKET_EVENT_TYPES           10
+BOOTSTRAP_BACKFILL_TYPES      5   (was 4; visibility.set added)
+RESIDUE                       0   <- empty, and meaningful because the three sets above are populated
+```
+
+**Why it was invisible: no fixture could produce it.** `applyAll` + `setVisibilityEnv` run the
+PROJECTIONS only and write no `events` row, so the entire bootstrap file held **zero** `visibility.set`
+ledger rows. A gap that no fixture can express is not found by adding assertions to that fixture.
+
+**And the root cause of why T6's author could not see it was off-branch and pre-existing:**
+`packages/domain/src/ticket-state.ts` said *"the ten registered against `entityKind: 'ticket'`"* when
+thirteen are. One stale docblock invited every reader to treat `TICKET_EVENT_TYPES` as the complete
+ticket-entity set. Corrected in `d400bf5`.
+
+### Three more seams that nothing was holding
+
+1. **The contest backfill was unconstrained.** Deleting BOTH contest types from
+   `BOOTSTRAP_BACKFILL_TYPES` — which silently omits every contest predating a ticket's snapshot, the
+   exact failure the design note exists to prevent — left **all 971 server tests green**. T5's half of
+   that cross-task property was pinned, T7's was pinned, **T6's was pinned by nothing.** Now 12.116.
+2. **The route ordered `definitions` by `(entity_kind, entity_id, seq)`** — the ordering this branch's
+   own case **12.92 exists to prove picks the LOSER**, because a ticket type's key lives in its payload
+   and successive definitions of one key arrive on different entity streams. Now `workspace_seq`,
+   matching `buildLedgerDeps`. 12.117.
+3. **"The cursor is read FIRST" was asserted in three places and pinned in none.** 12.98 checked the
+   isolation level by MEMBERSHIP, and membership cannot see position — moving `readStreamSeq` to just
+   before `COMMIT` left all six bootstrap cases green. 12.118.
+
+### FOUR SELF-FALSIFYING COUNTS ON ONE BRANCH — the class, with its worst instance
+
+The review corrected five prose claims. The worst: **12.93 said dropping the workspace filter reddens
+"seven cases". Measured: exactly ONE** — 12.93 itself, with 974 of 975 green across all 88 server test
+files. Seven claimed against one actual.
+
+Together with T7's three (residual scoped to `events_pkey`; "four cases" that measured as eight; my own
+approving relay), that is **four wrong counts on a single branch, every one of them stated confidently
+and none of them measured when written.** Two came from a round that updated a HIGHEST-ID header and
+not the two sentences quoting the old maximum.
+
+**The counter-move is already in the brief and now has four same-day instances behind it: print the
+rows, not the count.** A count is a claim; an enumeration is evidence. Where a count must be stated,
+state the command that produces it beside it.
+
+## GATE — the branch's own evidence, `0 cached`
+
+Run by the executor, not reported by an agent:
+
+```
+pnpm turbo run build test typecheck --force
+Tasks:    24 successful, 24 total
+Cached:   0 cached, 24 total
+Time:     41.389s          exit 0
+3,109 tests across 228 files, 8 packages
+Node v22.22.2 — `pnpm exec node --version`, i.e. as the toolchain resolves it, not merely my shell PATH
+```
+
+**`0 cached` is the point.** Every per-task gate this batch ran with 21 of 24 tasks served from turbo's
+cache. That is fine per task and is NOT acceptable as a branch's final evidence, because a cached task
+is a claim about a previous tree.
