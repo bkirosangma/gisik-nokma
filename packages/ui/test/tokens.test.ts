@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { REPO_ROOT } from './helpers/colour-scan.js';
 import {
   CONTRAST_PAIRS,
   TOKEN_ROLES,
@@ -77,5 +80,29 @@ describe('CSS variable emission', () => {
     expect(stylesheet).toContain(`[data-theme="dark"] { --gn-surface: ${colorOf('dark', 'surface')};`);
     expect(stylesheet).toContain('@media (prefers-color-scheme: dark)');
     expect(stylesheet).toContain(':root:not([data-theme="light"])');
+  });
+
+  /**
+   * The gap between the two halves of the discipline, and the one nothing was
+   * watching. `token-discipline.test.ts` proves no COLOUR LITERAL is written
+   * outside this file; nothing proved that a `var(--gn-…)` written instead
+   * names a role that exists. A typo — `var(--gn-custom-marker-)`, or a role
+   * renamed in `TOKEN_ROLES` with `ui.css` left behind — resolves to nothing
+   * and the element inherits, so the component renders, the suite stays green,
+   * and the colour is simply gone. Measured: adding `--gn-nonexistent` to
+   * ui.css reddens this and no other test in the repo.
+   */
+  it('every var(--gn-…) in ui.css names a declared role', () => {
+    const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+    const referenced = [...new Set([...css.matchAll(/var\((--gn-[a-z0-9-]*)\)/g)].map((hit) => hit[1]))];
+    const declared = new Set<string>(TOKEN_ROLES.map(cssVariableName));
+    expect(referenced.filter((name) => name !== undefined && !declared.has(name))).toEqual([]);
+    // The walk really read a stylesheet that uses variables — an empty match
+    // list would pass the assertion above by finding nothing at all.
+    expect(referenced.length).toBeGreaterThan(10);
+    // And the role Plan 9 Task 9 added is actually reached from the CSS, not
+    // merely declared in TypeScript.
+    expect(referenced).toContain('--gn-custom-marker');
+    expect(themeStylesheet()).toContain(`--gn-custom-marker: ${colorOf('light', 'customMarker')};`);
   });
 });

@@ -683,3 +683,463 @@
   color: var(--gn-text-muted);
   font-size: 0.8rem;
 }
+
+/* --- The calendar month grid (Plan 9 Task 9) ------------------------------
+   The first surface in the product that renders a calendar colour, and every
+   one of them is a role: the today ring and a bar are `accent`, an in-transit
+   claim is `pending`, and a claim on a workspace-defined date field is
+   `customMarker` — the one meaning the roster did not already carry. The
+   plan's `todayRing`/`pendingHatch`/`barActive`/`barTerminal`/`marker` were
+   five new names for four existing roles.
+
+   `barActive`/`barTerminal` are absent on purpose: `CalendarBar` carries no
+   state category, so a two-colour bar would be colouring a distinction the
+   model cannot make. One fill, and pending shows as a dashed outline —
+   the same treatment `.gn-state-node--blocked` already uses. */
+
+.gn-calendar {
+  background: var(--gn-surface);
+  color: var(--gn-text);
+  font: inherit;
+}
+.gn-calendar__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+.gn-calendar__nav {
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  font: inherit;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
+.gn-calendar__nav:focus-visible,
+.gn-calendar__fold:focus-visible,
+.gn-calendar__item:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+.gn-calendar__month { margin: 0; font-size: 1rem; }
+
+.gn-calendar__empty {
+  margin: 0;
+  padding: 0.75rem;
+  color: var(--gn-text-muted);
+  font-size: 0.85rem;
+}
+
+.gn-calendar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0.5rem 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+}
+.gn-calendar__legend-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--gn-custom-marker);
+}
+
+.gn-calendar__days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-top: 1px solid var(--gn-border);
+}
+.gn-calendar__day {
+  padding: 0.25rem;
+  min-height: 2rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+}
+/* The ring, and it is drawn from a PROP: `today` never comes from a clock. */
+.gn-calendar__day--today {
+  outline: 2px solid var(--gn-accent);
+  outline-offset: -2px;
+}
+.gn-calendar__day--outside { color: var(--gn-text-muted); }
+
+.gn-calendar__items {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0.25rem;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.gn-calendar__item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 0.25rem;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  background: transparent;
+  color: var(--gn-text);
+}
+.gn-calendar__item--bar {
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+}
+.gn-calendar__glyph { color: var(--gn-accent); margin-right: 0.2rem; }
+.gn-calendar__item--custom { color: var(--gn-custom-marker); }
+.gn-calendar__item--custom .gn-calendar__glyph { color: var(--gn-custom-marker); }
+/* In transit: outlined, never a different hue — a claim on its way to the
+   server is the same claim, and recolouring it would say it means something
+   else. */
+.gn-calendar__item--pending { outline: 2px dashed var(--gn-pending); outline-offset: -1px; }
+/* A claimed day that is not a day on this row (`2026-02-30` sorts into the
+   23 Feb – 1 Mar week and is none of its seven days). Spanning the row says
+   "this week", which is all the comparison established; pointing at a column
+   would name a day nobody claimed. */
+.gn-calendar__item--unplaceable {
+  border: 1px dashed var(--gn-border-strong);
+  font-style: italic;
+}
+.gn-calendar__slot { min-width: 0; }
+
+.gn-calendar__fold {
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text-muted);
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.5rem;
+  margin: 0 0 0.25rem 0.25rem;
+  cursor: pointer;
+}
+
+/* Plan 9 Task 11 — the timeline's week columns.
+
+   NO NEW ROLE. The plan's `tokens.color.barActive`, `pendingHatch`, `ink`,
+   `inkMuted`, `line`, `surface` and `customMarker` are seven names for six
+   roles this file already carries: a bar is `accent` on `accent-text`, an
+   in-transit claim is `pending`, a claim on a workspace-defined date field is
+   `custom-marker`, and the grid lines are `border`. Task 9 added the one role
+   the roster really was missing; this surface needed none.
+
+   The week track list arrives as `--timeline-week-columns`, set once by the
+   component on `.gn-timeline`, and it carries `repeat(n, 1fr)` rather than the
+   bare `n` so the var substitutes as a plain component of the value — nothing
+   here computes layout in a test, and `repeat(var(--n), 1fr)` failing to parse
+   would silently turn the whole declaration into `none`.
+
+   It is NOT `--gn-`-prefixed on purpose: that namespace is the token origin's,
+   and tokens.test.ts asserts every `var(--gn-…)` here names a declared colour
+   role. A track list is not a colour. */
+
+.gn-timeline {
+  background: var(--gn-surface);
+  color: var(--gn-text);
+  font: inherit;
+}
+.gn-timeline__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+.gn-timeline__nav {
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  font: inherit;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
+.gn-timeline__glyph { color: var(--gn-text-muted); margin: 0 0.2rem; }
+.gn-timeline__nav:focus-visible,
+.gn-timeline__bar:focus-visible,
+.gn-timeline__open:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+
+.gn-timeline__empty {
+  margin: 0;
+  padding: 0.75rem;
+  color: var(--gn-text-muted);
+  font-size: 0.85rem;
+}
+
+/* The two grids that must agree, reading ONE count. The first column is the
+   title column; week `i` is column `i + 2`, which is what the bar's computed
+   `grid-column` says too. */
+.gn-timeline__weeks,
+.gn-timeline__row {
+  display: grid;
+  grid-template-columns: 12rem var(--timeline-week-columns);
+  align-items: center;
+}
+.gn-timeline__weeks { border-bottom: 1px solid var(--gn-border); }
+.gn-timeline__week {
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--gn-text-muted);
+  border-left: 1px solid var(--gn-border);
+}
+
+.gn-timeline__group-heading {
+  margin: 0;
+  padding: 0.5rem 0.25rem 0.15rem;
+  font-size: 0.9rem;
+}
+.gn-timeline__title { padding: 0.25rem; min-width: 0; }
+.gn-timeline__title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gn-timeline__bar {
+  border: none;
+  border-radius: 4px;
+  margin: 2px 0;
+  padding: 2px 0.25rem;
+  text-align: left;
+  font: inherit;
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+}
+/* In transit: outlined, never a different hue — a claim on its way to the
+   server is the same claim, and recolouring it would say it means something
+   else. The same treatment `.gn-calendar__item--pending` uses. */
+.gn-timeline__bar[data-pending] { outline: 2px dashed var(--gn-pending); outline-offset: -1px; }
+/* A period that continues past the window's edge. Dashed at the end it is
+   clipped at, and only that end — the bar does not claim to start or finish
+   where the window happens to. */
+.gn-timeline__bar[data-clipped-start] { border-left: 2px dashed var(--gn-border-strong); border-radius: 0 4px 4px 0; }
+.gn-timeline__bar[data-clipped-end] { border-right: 2px dashed var(--gn-border-strong); border-radius: 4px 0 0 4px; }
+.gn-timeline__bar[data-clipped-start][data-clipped-end] { border-radius: 0; }
+
+.gn-timeline__claims { list-style: none; margin: 0; padding: 0; }
+.gn-timeline__claim { font-size: 0.75rem; color: var(--gn-custom-marker); }
+/* In transit, on the claim itself. Without this rule the timeline was the one
+   surface in the product that drew a custom date claim still on its way to the
+   server exactly like a settled one, while the month grid drew it — one
+   product, two answers about whether a claim is in transit, which is the thing
+   the timeline component's own header argues against for week placement.
+   The TREATMENT is the calendar's and the bar's — a dashed outline in the
+   `pending` role, never a different hue. Only the weight differs: a bar is a
+   filled block and takes a 2px outline inset over its own background, while
+   this is a line of 0.75rem text on the page background, where an inset 2px
+   rule would cross the glyphs. */
+.gn-timeline__claim[data-pending] { outline: 1px dashed var(--gn-pending); outline-offset: 1px; }
+
+.gn-timeline__side {
+  padding: 0.5rem;
+  border-top: 1px solid var(--gn-border);
+}
+.gn-timeline__side-copy { margin: 0 0 0.35rem; color: var(--gn-text-muted); font-size: 0.8rem; }
+.gn-timeline__side-list { list-style: none; margin: 0; padding: 0; }
+.gn-timeline__side-entry { padding: 0.15rem 0; }
+.gn-timeline__open {
+  border: none;
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.gn-timeline__side-note { color: var(--gn-text-muted); margin-left: 0.5rem; font-size: 0.8rem; }
+/* The two reasons the plain heading is FALSE of: the claims are both there and
+   still cannot draw a period. Marked the way `.gn-calendar__item--unplaceable`
+   is, so the row says so as well as the heading above it. */
+.gn-timeline__side-entry--start-after-due,
+.gn-timeline__side-entry--unplaceable-day {
+  border-left: 1px dashed var(--gn-border-strong);
+  padding-left: 0.35rem;
+  font-style: italic;
+}
+/* The other THREE modifiers — `--no-dates`, `--start-only`, `--due-only` —
+   carry no rule here, and that is the decision, not an omission. They are
+   exactly the model's `MISSING_CLAIM_REASONS`, the set the plain heading above
+   the list is true of, and each entry already prints a note naming the claim
+   that is absent; a treatment per reason would decorate a sentence that has
+   already been said. They are emitted one-to-one anyway so this file can split
+   them later without the component learning a second partition. Because they
+   style nothing, a switch arm returning the wrong one of them — or nothing at
+   all — is invisible on screen as well as in a suite: their VALUES are pinned
+   in `packages/app-core/test/timeline/timeline-view.test.tsx` 11.77, by exact
+   whole-class equality over all five reasons. */
+
+/* ── The inbox (Plan 9 Task 12) ─────────────────────────────────────────────
+   Colours live here, classes live in `packages/app-core/src/inbox/*`, the same
+   split `.gn-calendar` and `.gn-timeline` use. NO ROLE WAS ADDED for this
+   surface: the plan asks for `unreadDot` and `accentInk`, which are `accent`
+   and `accentText` under new words — the pair `CONTRAST_PAIRS` already holds to
+   4.5:1 in both themes, and the pair `.gn-timeline__bar` already draws with.
+   The kind icons name no colour at all: they stroke `currentColor`, so a glyph
+   inherits the row's text role and cannot become a hue the palette does not
+   own. */
+.gn-inbox {
+  background: var(--gn-surface);
+  color: var(--gn-text);
+}
+.gn-inbox__list { list-style: none; margin: 0; padding: 0; }
+.gn-inbox__item { border-bottom: 1px solid var(--gn-border); }
+.gn-inbox__row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gn-inbox__row:focus-visible,
+.gn-inbox__more:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+/* A read row's glyph recedes; an unread one's is the accent — the SAME channel
+   the dot and the headline weight use, never a third colour with a fourth
+   meaning. */
+.gn-inbox__glyph { color: var(--gn-text-muted); }
+.gn-inbox__row[data-unread] .gn-inbox__glyph { color: var(--gn-accent); }
+.gn-inbox__text { flex: 1; min-width: 0; }
+.gn-inbox__headline { display: block; }
+.gn-inbox__row[data-unread] .gn-inbox__headline { font-weight: 600; }
+.gn-inbox__body {
+  display: block;
+  color: var(--gn-text-muted);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Decorative: `data-unread` on the row is the fact, this is its picture. It is
+   drawn from a rule keyed on that attribute rather than styled inline so the
+   two cannot disagree about which rows are unread. */
+.gn-inbox__dot {
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--gn-accent);
+}
+.gn-inbox__more {
+  margin: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  cursor: pointer;
+}
+/* The unread total, on whatever chrome opens the inbox. Text on accent — the
+   declared contrast pair, not a hand-picked ink. */
+.gn-inbox__badge {
+  display: inline-block;
+  min-width: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Saved filters (Plan 9 Task 13). A named FilterSpec is a QUESTION somebody
+   wrote down, not a claim about any ticket, so nothing in this block borrows a
+   claim role: no `--gn-contested`, no `--gn-pending`, no category hue. The
+   names are `--gn-accent` because they are the one affordance here that acts,
+   and the delete glyph is `--gn-text-muted` because a destructive control that
+   shouts is a control people hit by accident. NO ROLE WAS ADDED — every custom
+   property below is one `.gn-inbox` or `.gn-timeline` already draws with. */
+.gn-saved-filters {
+  background: var(--gn-surface);
+  color: var(--gn-text);
+}
+.gn-saved-filters__empty {
+  margin: 0;
+  padding: 0.5rem;
+  color: var(--gn-text-muted);
+  font-size: 0.85rem;
+}
+.gn-saved-filters__list { list-style: none; margin: 0; padding: 0; }
+.gn-saved-filters__item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--gn-border);
+}
+.gn-saved-filters__apply {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--gn-accent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gn-saved-filters__delete {
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--gn-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.gn-saved-filters__save {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+.gn-saved-filters__name {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 4px;
+  background: var(--gn-surface-sunken);
+  color: var(--gn-text);
+  font: inherit;
+}
+.gn-saved-filters__submit {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  cursor: pointer;
+}
+/* Disabled is a STATE the component sets on the element, so the rule is keyed
+   on `:disabled` rather than on a modifier class the markup could forget to
+   spell. */
+.gn-saved-filters__submit:disabled {
+  color: var(--gn-text-muted);
+  cursor: not-allowed;
+}
+.gn-saved-filters__apply:focus-visible,
+.gn-saved-filters__delete:focus-visible,
+.gn-saved-filters__name:focus-visible,
+.gn-saved-filters__submit:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}

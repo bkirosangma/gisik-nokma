@@ -6,6 +6,7 @@ import {
   withCacheFeed,
   type ClientStateCache,
   type DataSource,
+  type NotificationsGateway,
   type WorkflowAuthoringGateway,
 } from '@gisik-nokma/app-core';
 import {
@@ -20,6 +21,8 @@ import {
 } from '@gisik-nokma/app-core/online';
 import { authClient } from './auth-client.js';
 import { createWebAuthoringGateway } from './authoring/data-source-gateway.js';
+import { createHttpNotificationsGateway } from './notifications-gateway.js';
+import { createHttpTicketLocator, type TicketLocator } from './ticket-location.js';
 
 /**
  * The shell's whole world, in one object.
@@ -56,6 +59,8 @@ export type AppServices = {
   invitesAdmin: InviteAdminGateway;
   founding: FoundingGateway;
   authoring: WorkflowAuthoringGateway;
+  notifications: NotificationsGateway;
+  ticketLocation: TicketLocator;
 };
 
 const AppServicesContext = createContext<AppServices | null>(null);
@@ -111,6 +116,11 @@ export function Providers({
       // second of either would give the builder a different idea of the server
       // than the rest of this shell has.
       authoring: createWebAuthoringGateway({ dataSource, http }),
+      // The SAME `http` again, and for the same reason: these two speak to
+      // `/v1/me/notifications*` and `/v1/workspaces/:ws/tickets/:id` through the
+      // same same-origin rewrites carrying the same session cookie.
+      notifications: createHttpNotificationsGateway(http),
+      ticketLocation: createHttpTicketLocator(http),
     };
   }, [services]);
   const value = services ?? constructed;

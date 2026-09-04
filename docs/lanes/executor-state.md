@@ -16,92 +16,877 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-## WHERE I AM: **STEP 13 IS MERGED (PR #85 → `9b70ab9`). STEP 14 — PLAN 9 — IS THE NEXT WORK.**
+## WHERE I AM: **STEP 14 — PLAN 9 IS COMPLETE. T1–T15 ALL COMMITTED. Merged `origin/main`
+`421db9f`. NEXT: the single opus whole-branch review, then the PR. The controller merges.**
 
-All fifteen Plan 8 tasks done, gate green, final whole-branch review run and its four findings
-closed, and the PR **squash-merged by the controller on 2026-09-03**. This branch carries only the
-P29 declaration annotation PR #86 asked for; step 14 runs on its own branch off `9b70ab9`.
+> # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
+> ```
+> /usr/bin/git log --oneline origin/main..HEAD     # what is actually committed
+> /usr/bin/git status --porcelain=v1               # what a dead agent left behind
+> ```
+> **Batch B+C is DONE — T4, T5 and T6 are all committed.** What is running now is the
+> **RECOVERY ROUND** dispatched after it: T4's fix (the red gate + 4 Important), T5's fix
+> (4 Important), and **T6's review, which never ran at all** because its agent died on an API 529.
+> Three agents, each committing its own work, so by the time you read this zero to two of those fixes
+> may be committed **and this section will not say so** — the handoff is written before the work and
+> the agents do not update it.
+>
+> **A dead fan-out leaves COMMITTED tasks and no handoff entry, and it can also leave UNCOMMITTED work
+> in the tree.** Both have now happened here. Step 13's Batch B died on an expired login with a full
+> task written and not committed, recovered only because someone ran `git status` first. Step 14's T6
+> died on a 529 with its work **committed and amended** — so `git status` was clean and the task
+> looked untouched by the handoff while being finished on disk. **Run both commands. Neither alone
+> would have caught both cases.**
+>
+> *(This warning exists because the alternative was live, not hypothetical: the header said "BATCH B
+> (T4) IS NEXT" while T4 was already being written. That is the third instance of the stale-middle
+> failure this file documents — and the first two were retrospective. Being able to describe a failure
+> is not the same as not committing it.)*
 
-**If you are a restarted session: do NOT re-run step 13.** The next work is **step 14 — Plan 9**
-(calendar/notifications, 15 tasks, T6 floor-list). **Plan 8's fifteen ledger rows still read
-`in-flight` on `main`** and must be promoted to `done` with PR `85` and sha `9b70ab9`, exactly as
-step 13's first commit did for Plan 7.
+Branch **`exec/14-plan9-calendar`**, cut from `origin/main` `4b8b048`. **Step 13 is merged and closed**
+(PR #85 -> `9b70ab9`; the controller's close is #87 -> `4b8b048`). **Plan 8's fifteen ledger rows are
+ALREADY PROMOTED on `main` by #87 — do NOT promote them again.** I wrote that promotion commit before
+seeing #87 and dropped it; the status/PR/sha matched exactly but the controller's *notes* column is
+better (`artefact: <path> (PR #85)` vs my branch-name prefix), so re-applying mine would have silently
+reverted it. **The repo stands at 133/177 (75.1%), 0 claimed, 0 in-flight, recounted from the ledger.**
 
-> **The promotion's evidentiary basis, recorded so the next audit does not re-derive it.** PR #85
-> was **squash-merged**, so no per-task commit survives on `main` — `git log 7337357..origin/main`
-> returns three commits, not thirty-eight. The title names the step and the plan, not the tasks, so
-> on the title alone all fifteen rows would be `claimed`. They qualify on the **controller-record**
-> clause by two independent routes: the squash commit's **2,619-line body carries every per-task
-> commit message**, and the Batch D artefacts are present on `main` by direct check
-> (`apps/web/src/authoring/data-source-gateway.ts`, `apps/web/e2e/workflow-builder.spec.ts`,
-> `Features.md` §10 at line 1041, `test-cases/10-workflow-builder.md`). **Note the asymmetry that
-> made this worth checking:** this file's own per-task tables cover T1–T12 and stop — Batch D was
-> never given one — so for the last three rows the handoff is *not* sufficient basis on its own.
+**In flight and NOT mine to merge: PR #88** (`docs/p29-annotation`, head `022f0fc`) — the P29
+declaration annotation #86 asked for. It is **not stacked** on this branch in the git sense: its commit
+was **replayed here as `555c5d8`** when this branch rebased onto `4b8b048`. `022f0fc` itself lives only
+on `docs/p29-annotation`. Disjoint from #87 by file, so #88 merges clean.
 
-> **BATCH B DIED MID-FLIGHT ON AN EXPIRED LOGIN (2026-09-03).** Seven of nine agents failed with
-> *"Login expired · Please run /login"*: T5's fix round and both agents of T6, T7 and T8. **T5's
-> implementer and reviewer completed**, and **T5's fix round had written its full work into the tree
-> but died before committing** — recovered, independently verified and committed as `87ab662`.
-> **The tree is clean and the suite is green at 562.** A dead fan-out leaves work in the tree, not
-> just a gap in the ledger: **check `git status` before assuming a failed agent did nothing.**
+> **WHEN #88 MERGES, THE REBASE BASE IS `555c5d8`, NOT `022f0fc`. Measured, not assumed:**
+>
+> ```
+> git rebase --onto origin/main 555c5d8      # correct — replays d27b073 onward, this step's own work
+> git rebase --onto origin/main 022f0fc      # WRONG — replays 4b8b048 too, the CONTROLLER'S #87 commit
+> ```
+>
+> `git merge-base --is-ancestor 022f0fc HEAD` **fails** — it is not on this branch — so
+> `022f0fc..HEAD` sweeps in `4b8b048` and would replant the controller's own merge onto `main`.
+> `git rev-list 022f0fc..HEAD` returns three commits; `git rev-list 555c5d8..HEAD` returns one.
+> **And `022f0fc` becomes ORPHANED by the very event that triggers the rebase** — #88 merging deletes
+> the only branch that reaches it — after which `git cat-file` still passes on it and hands back
+> pre-rebase content. This is the brief's named trap, arrived at from the direction that makes it look
+> right: the sha was correct when written, about a branch this one is no longer built on.
+>
+> Do it in a SCRATCH worktree (`git worktree add --detach`), never in this one. **Verify with a
+> POSITIVE CONTROL**, because an empty diff is also what a broken diff invocation prints:
+> `git diff --stat <old-head> HEAD` empty **AND** `git diff --stat origin/main HEAD` non-empty and
+> matching expectation.
 
-**Step 12 (Plan 7 remainder) is MERGED as PR #82 → `7337357`.** Plan 7 is complete at 22/22.
-**Do not reopen it.** Its eighteen ledger rows read `in-flight` on `main` after the merge; this
-branch's first commit promotes them to `done`, and `check:tasks` now verifies the merge sha is an
-ancestor of `origin/main`. **The repo stands at 118/177 (66.7%), independently recounted.**
+## RECORDED, NOT FIXED — carried forward with owners, from T8's fix round
 
-Step 13 = **Plan 8**, `docs/superpowers/plans/2026-08-20-08-workflow-builder.md`, **15 tasks.**
-**ALL FIFTEEN ARE DONE AND MERGED** (PR #85 → `9b70ab9`, squash-merged 2026-09-03).
-**All rulings are closed** — see RULINGS.
+**1. Task 8 deferred the calendar's colour tokens, and the deferral is larger than "seven names are
+missing". OWNERS: TASK 9 (the calendar), TASK 11 (the timeline), TASK 12 (the inbox).**
 
-> **This paragraph was stale for the whole of Batch D and the correction is the point.** Through
-> PR #85 it read *"T1-T12 are DONE and committed. Only T13, T14, T15 remain … No PR is open. Three
-> rulings are open"* — every clause false by the time it merged, and **directly contradicted by this
-> file's own header eighteen lines above it.** It merged to `main` that way. The failure is not that
-> a line went stale; it is that **a handoff refreshed at its top is not a handoff refreshed.** A
-> restarted executor reading downward would have rebuilt Batch D against work already merged.
-> **When you update WHERE I AM, grep the rest of the file for the claim you just changed.**
+T8's review found the silence, not the decision — the decision was right: a view-model renders
+nothing, so a palette invented for it would be judged against no screen. What the first draft of
+this note got wrong, and what a `grep` for bare names hides:
 
-**Batching:** **A: T1-T4** (done) · **B: T5-T8** (canvas → validation) · **C: T9-T12** (publish →
-admin) · **D: T13-T15** (web, smoke, catalogue). Every fact those batches need is recorded in THIS
-file — a restarted executor should rebuild its dispatches from here, not hunt for scratchpad scripts,
-which do not survive a restart.
+**`tokens.color.*` DOES NOT EXIST.** Measured, not assumed — `packages/ui/src/index.ts` exports
+`TOKEN_ROLES`, `colorOf(theme, role)`, `themes`, `primitives`, `CONTRAST_PAIRS`, `cssVariableName`,
+`themeStylesheet`. There is no `tokens` object at all, and therefore no `tokens.space`,
+`tokens.radius` or `tokens.font` either. **Every `style={{ color: tokens.color.ink, padding:
+tokens.space.md, fontFamily: tokens.font.body }}` snippet in Tasks 9, 11, 12 and 13 is written
+against an API this repo does not have.** Transcribed as written it does not compile — this is a
+plan-vs-landed-code divergence, not a missing key.
 
-**A PROCESS ERROR MADE ONCE THIS STEP — DO NOT REPEAT IT.** I started the boundary gate while a
-reviewer was still planting mutations. **Concurrent mutation and verification corrupts both** — a
-false red for the gate, disturbed measurements for the reviewer. Killed it; tree and `dist` verified
-clean afterwards. **Require a clean tree AND zero running agents before any gate run.**
+Against the real `TOKEN_ROLES`, of the fourteen colour names the plan uses:
 
-## Live anchors — 2026-09-03, step 13 opening
+- **Real roles, usable today:** `surface`, `accent`, `contested`.
+- **NOT roles — they are `primitives` keys, and reaching for them is the one thing `tokens.ts`
+  forbids** ("primitives are the palette, roles are the meaning… no colour literal is legal anywhere
+  else", enforced by `packages/ui/test/token-discipline.test.ts`): `ink`, `inkMuted`, `line`. The
+  roles that carry those meanings are **`text`, `textMuted`, `border`**. A component reaching for
+  `primitives.ink` is a literal wearing a name.
+- **Absent entirely, eight, and each one needs a light AND a dark entry in `themes` plus a
+  `CONTRAST_PAIRS` row if text sits on it:** `todayRing`, `pendingHatch`, `barActive`,
+  `barTerminal`, `marker`, `customMarker` (T9/T11), `accentInk`, `unreadDot` (T12).
+
+Per-task ownership, measured with
+`awk '/^### Task /{t=$0} /tokens\.color\./{print t}' <plan>`:
+T9 needs `todayRing`, `pendingHatch`, `barActive`, `marker`, `customMarker`; T11 repeats four of
+those and adds `barTerminal`; T12 owns `accentInk` and `unreadDot`. **T9 adds the five it renders and
+no more** — a token whose only consumer is a plan snippet is a colour nobody has looked at, and
+`CONTRAST_PAIRS` is checked numerically, so a value added blind either fails that check or is tuned
+to pass against a background that does not exist yet.
+
+Nothing shipped is false today: `grep -rn "customMarker\|barActive\|todayRing" Features.md
+test-cases/` returns nothing. It goes false the moment T9 renders a marker.
+
+**2. Two new test-case ids are Task 15's to carry, and they are not in the plan. OWNER: TASK 15.**
+Task 15 writes `test-cases/11-calendar-notifications.md`, which does not exist yet. Four ids invented
+during execution must land in it — **11.48** (the calendar view-model reads no clock, proved by
+varying `TZ` and by scanning the source, `test/calendar/clock-free.test.ts`), **11.49** (an
+all-hidden month says the field is hidden, not that nothing was claimed), **11.50** (a month emptied
+by a filter or a lane says so, and a month narrowed by both does not claim the legend did all of it),
+**11.51** (the grid's padding cells are rendered cells: markers, bars, the legend tally and the
+all-hidden check are each witnessed ON both edges and one day outside each). Each carries the same
+reminder in its own docblock; this is the copy a relaunched executor can find without opening the
+test files.
+
+**3. A SECOND read-modify-write writer over one last-write-wins preferences document, INSIDE ONE
+CLIENT. OWNER: PLAN 6 — the shell that mounts both.** (From T13's fix round.)
+
+`views/ticket-list.tsx:432-438` (`setPrefs`) composes its whole-document PUT from
+`usePreferences`'s `document`, which is a **mount-time snapshot** — `views/use-preferences.ts` never
+re-reads before writing — and spreads it whole, `savedFilters` included. Meanwhile
+`packages/app-core/src/preferences/saved-filters.ts` writes the same document through
+`PreferencesGateway`. One screen holding both loses a filter **with no concurrency at all**: mount
+(no filters) → the person saves one through the gateway (the server holds one) → the person changes
+the grouping → `setPrefs` PUTs the mount-time `savedFilters: []`.
+
+**T13's docblock pre-empted the WRONG version of this** and the fix round corrected it: it argued
+*"two clients still resolve last-write-wins … not fixable from this side"*, which is true and a
+different problem. **Two paths inside ONE client is orderable by that client.** `ticket-list.tsx`
+already understands the shape — `ticket-list.tsx:434` reads *"refuse: see the docblock — this PUT
+would erase the rest"* —
+but the window it guards is the one BEFORE the first load, not the one the gateway opens after it.
+
+**Not fixed, and the reason is not shyness:** the two writers speak different vocabularies
+(`PreferencesDoc` vs `view-types.ts`'s `UserPreferences`) over different transports, and nothing in
+`app-core/preferences` can order writes it cannot see. The ordering belongs to whatever mounts both,
+which is Plan 6 — the implementer `preferences-gateway.ts` already names for this interface.
+
+**Nothing shipped is false today:** nothing mounts `SavedFiltersMenu` and no `PreferencesGateway`
+implementation exists — `grep -rn --include='*.ts' --include='*.tsx' "PreferencesGateway" packages
+apps` finds the interface, the store, the barrel, the two fakes under `test/preferences/`, and
+`dist/` echoes of the same (build output); `SavedFiltersMenu` is mounted only from two test files.
+**No implementation, and no screen.** **It goes
+false the moment one screen holds both writers.** Also carried in `saved-filters.ts`'s docblock,
+because a Plan 6 agent has no reason to open this file first.
+
+**4. The test-case ids Task 15 must carry now run to 11.122, and entry 2 above names only 11.48-11.51.
+OWNER: TASK 15.** Measured this round, not recalled —
+`grep -rEoh "\b11\.[0-9]+\b" packages/*/test apps/*/test | sort -u` answers **11.1-11.8, 11.18,
+11.36-11.39 and 11.48-11.122**, and `test-cases/11-calendar-notifications.md` still does not exist
+(`ls test-cases/` has no `11-`). T13 alone invented 11.96-11.120; its fix round adds **11.121** (every
+control a person can tab to is in the `:focus-visible` rule, and the reverse — the cross-package
+set equality in `test/preferences/saved-filters-css-binding.test.tsx`) and **11.122** (an absent
+preferences document reads as `[]` and refuses every write, which pins the gateway's precondition).
+This entry does not re-derive what 11.63-11.95 mean; it records that the range is continuous to 122
+so Task 15 does not carry only the four ids entry 2 names.
+
+**5. THE SAME FOCUS-RING SURVIVOR LIVES ON THREE OTHER SURFACES, AND THE GUARD THAT NOW CATCHES IT
+IS IN THE PREFERENCES SUITE ONLY. OWNER: TASK 15** — the plan's own *"full verification"* task and
+the last one on this branch; if it judges three components' guards outside its stated scope (a scope
+guard, `Features.md` §11 and the test-cases file) it must carry this entry forward rather than drop
+it. (Found by T13's fix round while building 11.121.)
+
+**Measured, three mutations, each re-run on the committed tree (app-core 1,019 after this round):**
+
+| deleted from `packages/ui/src/ui.css` | surface | app-core | ui | verdict |
+|---|---|---|---|---|
+| `:1010-1014` `.gn-inbox__{row,more}:focus-visible` | T12's inbox | 1019/1019 | 37/37 | **SURVIVES** |
+| `:863-868` `.gn-timeline__{nav,bar,open}:focus-visible` | T11's timeline | 1019/1019 | 37/37 | **SURVIVES** |
+| `:720-725` `.gn-calendar__{nav,fold,item}:focus-visible` | T9's calendar | 1019/1019 | 37/37 | **SURVIVES** |
+
+**The mechanism DIFFERS PER ROW, and that difference is the job being handed over. Measured, not
+assumed — the first draft of this entry asserted one shared cause for all three and was wrong about
+two of them:**
+
+- **inbox — a BLIND guard.** `test/inbox/inbox-css-binding.test.tsx:174` (11.95) *is* the class-name
+  set equality, plus a data-attribute check. The ring survives because a `:focus-visible` rule adds
+  no new class name — exactly the blindness the review found in T13's copy of the same instrument.
+  The job here is to GENERALISE an existing guard.
+- **timeline — NO class/rule guard exists.** `test/timeline/timeline-view.test.tsx` reads `ui.css`
+  only to pin the custom property `--timeline-week-columns` and its substitution form (`grep -n
+  "ui.css"` in that file hits 377, 383, 819 and 830, all inside that one case). There is no class-set
+  comparison for the timeline block at all. The job here is to WRITE one.
+- **calendar — nothing reads `ui.css` for it.** `grep -rn "ui.css" packages/app-core/test
+  packages/ui/test` answers the preferences, inbox and timeline files plus `packages/ui/test/
+  in-transit.test.ts` and `tokens.test.ts`, and no calendar file. Same job as the timeline, one
+  surface older.
+
+**This is the fourth appearance of the class this file
+already names** — *"a guard built for one surface does not generalise on its own … the next
+component in the same package reproduced the gap while the fix for it sat two files away"* — and it
+is the first time the gap has been measured on the surfaces that came BEFORE the guard rather than
+after it.
+
+**Not fixed here on purpose:** T13's fix round is not three other components' guards, and a fix
+written blind into `inbox-css-binding.test.tsx` would be a fourth copy of an instrument rather than
+the shared one the recurrence argues for. The shape to copy is
+`test/preferences/saved-filters-css-binding.test.tsx`'s `focusVisibleRules` +
+`focusableRenderedClasses` set equality; it needs each component's own maximal fixture, which is why
+it is not a mechanical transplant. **What is false today is only the coverage, not any claim any
+commit made** — and, as with T13, deleting these rules removes the design-system ring, not all focus
+indication: the browser's UA outline still renders and nothing in this repo can see it.
+
+## PRE-FLIGHT IS DONE. Four findings, all verified by me on disk, not adopted from the agent.
+
+**1. NO RULING IS NEEDED FOR TASK 13, AND THE DOCUMENT THAT SAYS OTHERWISE IS WRONG.** The pre-flight
+reported the saved-filter field name as *"OPEN / UNRESOLVED … needs an explicit ruling"*. **It was
+reading the coordination doc accurately, and the coordination doc was a day stale.** **P26 was written
+2026-09-02** in `controller-state.md`: `SavedFilter`'s field is **`filterSpec`**; Plan 9 T13's `spec` is
+superseded before it is written. Both stale sites in the coordination doc are corrected in this branch.
+**Task 13 adopts `filterSpec`. Do not escalate this.**
+
+> **The generalisation: a ruling recorded in one lane's state file is invisible to the other lane's
+> agents.** Subagents read the coordination doc; they do not read `controller-state.md`. **A ruling is
+> not landed until it is written where the work will read it.**
+>
+> **Two instances I can point at, not a counted trend.** P26 was first ruled in a message and reported
+> as *"a number, a subject, and no text"* — `controller-state.md`'s own note calls that "the second
+> time in one day" — and then written to `controller-state.md` while the coordination doc went on
+> asking for it. I said "third instance in two days" in the commit that made this correction and could
+> not enumerate the third when challenged. **A counted plural in a document about stale documents is a
+> bad place to round up**, and this file's own rule already says it: when correcting a plural, check
+> which noun it counts.
+
+**2. THE THREE-WAY SPLIT IS REAL AND TWO `SavedFilter` TYPES ALREADY SHIP.** Verified by direct read:
+`packages/domain/src/preferences.ts:28` -> **`filterSpec`** (schema is `.strict()`);
+`packages/app-core/src/view-types.ts:183` -> **`filter`**; Plan 9 text line 5795 -> **`spec`**. The
+first two are closed under P24 and pinned by `client-contract.test.ts:605` — **not reopened.**
+
+**3. TASK 14 IS BIGGER THAN ITS OWN TEXT SUGGESTS — Plan 6's Step 5b was SKIPPED.**
+`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:29-33` carries an explicit comment saying so and
+naming Plan 9 T14 as the carrier. **Verified with a positive control**: the only `CalendarView` /
+`TimelineView` hit anywhere in `apps/web/` is that comment itself, while a control grep for
+`BoardView|ListView` returns real files — so the absence is real and not an eaten glob. **T14 must add
+the calendar/timeline mount (four-way board|list|calendar|timeline chain) on top of the inbox wiring.**
+Pull the tab mechanics from Plan 6's own Step 5b text, not from the comment's paraphrase — that was the
+pre-flight's own least-sure claim and I have not closed it.
+
+**4. TASK 8 IS TOLD TO CREATE A TYPE THAT ALREADY EXISTS ELSEWHERE.** The plan says create
+`packages/app-core/src/filter/filter-spec.ts` "guarded — Plan 6's wins if landed". Plan 6's **did**
+land, at a different path and a richer shape: `packages/app-core/src/view-types.ts:70`. **Consume it;
+do not create the guarded path.** Task 8's Step 0 scaffold guard likewise resolves to "Both exist" —
+`packages/app-core` and `packages/ui` are fully populated. The *tokens* it needs are genuinely new.
+
+Smaller, verified: T1's plan path `src/ticket-types.test.ts` is really `packages/domain/test/…` (the
+coordination doc already pre-corrected this). T2's `docToPlainText` **already exists**
+(`packages/domain/src/doc-text.ts`) — created by **Plan 5**, not Plan 7 as T2's text says; take the
+skip branch. T5's fan-out hook is `apps/server/src/app.ts:294-300` (`onEventCommitted`), not
+`src/index.ts` as the plan says.
+
+## PROGRESS: T1-T14 COMMITTED (14 of 15). T14's fix + T15 (the closeout) IN FLIGHT. Then final review, PR.
+
+### T14 did the mount Plan 6 skipped, and found a plan defect that would have 404'd every inbox row
+
+**The plan's deep link pointed at a route this shell does not have.** `/tickets/${'{'}id{'}'}` — `apps/web` has
+no `/tickets` route, and Board cards push `?ticket=` on the **project** page, which needs a `projectId`
+no `Notification` carries. **Every row in the inbox would have 404'd.** It added `ticket-location.ts`
+reading `project_id` off a row the existing endpoint already serves.
+
+**It closed three seams where the fake was looser than the real routes** — `markRead` must throw on
+404 (a stub that resolved let an optimistic flip stand for a row the server never marked),
+a transport-`null` now names its path instead of throwing `Cannot read properties of null`, and
+`parseNotification` runs per kind rather than a cast. **That is the series' signature failure being
+closed at the seam where it is normally introduced.**
+
+> **AN ID COLLISION ALREADY HAPPENED, AND IT IS THE ARGUMENT FOR TASK 15.** T14's first block was
+> 11.90–11.128 and **collided with ~30 of Tasks 12's and 13's ids**, because Task 13 landed on this
+> branch *while T14 worked*. It caught it by diffing every id definition in the repo and renumbered.
+> **Two lanes numbering into one unregistered section cannot see each other** — which is exactly what
+> `test-cases/11-calendar-notifications.md` not existing has meant for seven tasks.
+
+**It also corrected two of its own prose claims by measurement**, including one where it swapped in the
+hook it had claimed would leave the badge dark, found all six cases still green, and recorded that its
+claim had been false.
+
+**NOT RUN, and it said so rather than implying otherwise:** Step 4's dev walk-through against a live
+server. Typecheck and a forced `next build` passed with `/inbox` present. *"The 40 unit cases cover
+more than the walk-through would, but it is not-run, not covered."*
+
+### T14's review — three Important, and the first is the Task 7 precedent exactly
+
+| # | Finding |
+|---|---|
+| **I1** | **THE NAV MOUNT IS UNWITNESSED — one line orphans the whole feature.** Deleting the import and `<InboxNavLink />` from `app-nav.tsx` leaves **125/125 green AND typecheck clean**. `InboxNavLink` is rendered directly only by its own test; where it renders transitively, `unreadCount()` is un-stubbed, the stub rejects by name, and a bare `catch {}` swallows it. **`/inbox` has no other link anywhere** — and e2e is not in the gate. This is Task 7's finding (a route registration deleted from `buildApp` left 937 green) in its **reachable-page-with-no-door** form. |
+| **I2** | **"No survivors left standing" is FALSE.** Deleting the `isEpicType` spread on `<CalendarView>` alone survives 125/125, while both app-core forwards redden by name — so the shell half is only half-covered (the one case that builds a rank-1 predicate opens the *Timeline* tab). **This is precisely the state T14's own commit argues is worse than doing nothing**: the two tabs would answer differently about the same ticket's epic, and nothing could detect it. |
+| **I3** | **A failed "Load more" DISCARDS every message already on screen.** Measured: after a page-2 failure, **0 rows and 1 refusal panel** — because the render's first arm is the refusal, ahead of the rows arm. Neutering that catch survives 125/125. **It inverts the standard the same files argue for** — the nav badge keeps its last count rather than asserting "none" from a failed request — and it runs against the standing ruling *"a message you were sent is yours."* |
+
+ T13's fix + T14 IN FLIGHT. Then T15, final review, PR.
+
+**T12's fix built a STRONGER guard than the one it copied**: a **set EQUALITY** between the classes the
+components render and the classes `ui.css` styles, harvested from both sides and typed on neither —
+because *a subset check in either direction catches only one rename direction*. Its four scanners are
+proven against planted input before use. Ten mutations, ten reddened. It deleted `gn-inbox__icon`
+outright (vestigial — nothing in the repo referenced it), **which is what permitted equality rather
+than a subset**, and it said plainly that six of the review's seven renames are now caught by rename
+tests while the seventh is resolved by the class ceasing to exist.
+
+**It also DIVERGED on the accessibility fix and gave the better reason.** The review pointed at the
+sibling's `role="status"`. T12 used **`role="img"`** instead: *`status` is a live region, and what a
+live region announces on update is its CONTENT — `99+`, which is exactly the string the component
+exists to keep out of the spoken answer.* `img` makes children presentational so the label replaces
+the glyph. **And it stated its proof boundary**: the mutations witness the fix is *present*; they do
+not show the old markup went unannounced in any real AT, because jsdom is not a screen reader and no
+mutation of the component could show it.
+
+### T13 (saved filters) adopted `filterSpec` under P26 — and PROVED the choice rather than citing it
+
+`client-contract.test.ts:1022` measures the plural spelling **400ing** with the singular control at
+**200 in the same run**. It also wrote the cross-package class/rule guard **in the same commit as the
+component**, rather than a review later — the first task on this branch to do so. And it **amended its
+own commit message** when the mutation count did not reconcile (36 attempted, 35 valid), on the
+grounds that *a count a reviewer can measure and find false is worse than the thing it covered.*
+
+### T13's review — two Important
+
+| # | Finding |
+|---|---|
+| **I1** | **It named this exact class and closed half of it.** Deleting the whole `:focus-visible` rule leaves **ui 37/37 and app-core 1014/1014 green.** Its own 11.119 exists *because* a rule can vanish under a green set equality — and pins `__submit` and `__submit:disabled` only. 11.118 compares class NAMES (all four keep base rules, so the set is unchanged) and 11.120's `used.length > 3` floor goes 7 -> 6 and still passes. **Two of its three CSS tests straddle the rule and neither can see it.** Note: this was a mutation it never ATTEMPTED, so "35 killed, 0 survivors" is **not false** — the coverage was incomplete. |
+| **I2** | **A SECOND read-modify-write writer over one last-write-wins document, inside ONE client.** `views/ticket-list.tsx` `setPrefs` reads a **mount-time snapshot** (`use-preferences.ts` never re-reads before writing), spreads it whole including `savedFilters`, and PUTs. So: mount (0 filters) -> save a filter -> change grouping -> **the PUT carries the stale `savedFilters: []` and the filter is gone.** The commit pre-empts the *wrong* version of this — it argues two CLIENTS resolve last-write-wins, which is true and a different problem; **two paths inside one client is orderable.** Latent (nothing mounts the menu yet) but **recorded nowhere.** |
+
+ T12's fix + T13 IN FLIGHT. **Measure; do not trust this line.**
+
+### A CLASS NAME AND ITS CSS RULE ARE TIED TOGETHER BY NOTHING — twice now, on two tasks
+
+**T12: seven BEM class renames survive BOTH suites.** `gn-inbox__glyph` -> `gn-inbox__glyphx` leaves
+**app-core 955/955 and ui 37/37 green**, and that class carries one of the two colour signals the
+commit itself names for unread. T12 ran 58 mutations and every one was thorough — **but all of them
+were on VALUES, and none on a selector.** A whole dimension was unexamined.
+
+**T11's fix had already built the guard for this**, one task earlier, after the identical defect on
+`--timeline-week-columns`. It lives at `timeline-view.test.tsx` and `packages/ui/test/in-transit.test.ts`.
+**The lesson is that a guard built for one surface does not generalise on its own** — the next
+component in the same package reproduced the gap while the fix for it sat two files away.
+
+### T11's fix found a survivor beyond the review's ten — and then caught itself committing the defect
+
+It measured the review's ten and added an eleventh (`start-after-due` returning the
+`--unplaceable-day` class). More telling: **its first draft of the cross-package test hand-typed
+`--timeline-week-columns` three lines above a comment claiming it never did** — the exact failure the
+round existed to close, committed inside the fix for it, caught by its own re-run.
+
+It also left **two survivors deliberately and named both**: `weeksCount ?? 8` (no input discriminates
+it — `0 ?? 8` is `0`, `null` is not type-legal, `undefined` maps to the model's own default), and
+**export completeness — deleting `TIMELINE_EMPTY_COPY` from the barrel leaves the whole repo at 24/24,
+0 cached, because the repo has no public-surface test.** Both stated rather than quietly dropped.
+
+### T12's other two Important findings
+
+- **The one place the fake models the server REFUSING is unasserted.** `markRead` rejecting an unknown
+  id can become `Promise.resolve()` with gateway tests 7/7 green. Its four PAGING mirrors are all
+  genuinely measured — **the refusal half is not.** This is the series' signature failure in miniature:
+  *a mocked contract excusing the server from existing*, and **Task 14's HTTP adapter is written
+  against this contract.**
+- **`UnreadBadge`'s accessible name may not exist.** `aria-label` sits on a role-less `<span>`, where
+  ARIA prohibits naming. Three tests appear to confirm it works — **`getByLabelText` matches the
+  ATTRIBUTE and never computes an accessible name**, so the harness that would catch it is precisely
+  the one blind to it. The reviewer ran no mutation and said so: **no mutation of the component can
+  expose it.** The repo's own precedent (`read-only-banner.tsx`, `role="status"`) is three files over.
+
+ T11's fix + T12 IN FLIGHT. **Measure; do not trust this line.**
+
+### T11's review found the prose-claim class at its sharpest, and graded it Important
+
+**T11's commit message asserted two things its own tests do not support**, and the reviewer graded the
+false claims themselves as a finding — *"a reviewer who reads the message and takes the switch and the
+both-directions rule as settled is exactly the path by which findings 1 and 2 survive a second
+review."*
+
+| Claim in the commit | Reality |
+|---|---|
+| *"Every conditional affordance is asserted in BOTH directions"* | Falsified three times over — side-entry claim list, title text, header spacer all survive always/never mutations. |
+| *"The switch here is 1:1 over all five with a `never` default"* | **True of the SOURCE, false of the EVIDENCE.** Two of five arms can `return ''` with 26/26 green. The compiler proved exhaustiveness; no test proved the VALUES. |
+| *"24 mutations, every one red and naming its own site"* | The reviewer's 22 found **10 survivors, 8 on code that commit introduced.** |
+
+**This is the branch's recurring defect class** — step 13's whole-branch review found four findings and
+all four were prose. **A claim in a commit message is load-bearing precisely because it stops the next
+reader looking**, which is why the dispatch for the fix round now says: if you did not measure it, do
+not claim it; if a mutation survived and you left it, say so.
+
+**Two findings worth carrying beyond their fix:**
+- **A duplication removed and reintroduced one layer out.** T11 correctly collapsed a doubly-stated
+  `gridTemplateColumns` into one custom property — then stated it twice **across a package boundary**
+  instead. Typoing the consumer in `ui.css` leaves **ui 34/34 AND app-core 26/26 green**, while
+  `grid-template-columns` falls back to `none` and every row drops onto implicit tracks.
+- **The two views disagree about a fact of the product.** An in-transit custom claim is drawn as
+  pending by `CalendarView` and rendered identically to a settled one by `TimelineView` — there is no
+  `.gn-timeline__claim[data-pending]` rule. Deleting the one pending rule that does exist leaves ui
+  34/34 green, which is why the omission went unnoticed.
+
+**T9's fix closed all six one-directional claims, and it guarded against vacuity** — a zero-count is
+true of a broken render too, so each absence case first asserts the grid rendered, the marker exists,
+and (for the today ring) that today is genuinely outside this month's grid. It also **stated which of
+its own new assertions does NOT discriminate**: a `toHaveLength(1)` it added cannot see the forced
+`data-unplaceable` mutant, because that fixture has exactly one button either way. **The kill is
+entirely the new absence case, and the commit says so.**
+
+## REBASED ONTO `d3e0889` — this branch was carrying a race I had already fixed on `main`
+
+**T10's fix agent hit an intermittent failure in `access.test.tsx` on an unchanged tree**, reported it
+honestly as *"recorded, not diagnosed"*, and it was **PR #90's race arriving in my own work.** This
+branch was cut from `eb20d7c`, #90 merged after, so every agent here was running against the
+pre-fix `getByTestId`. Rebased; verified with two positive controls:
+
+- `git diff <old-head> HEAD` shows **only `access.test.tsx`** — #90 arriving, nothing else moved.
+- `git diff origin/main..HEAD` is **non-empty and is the Plan 9 work** (46 files).
+- Code-level `user.click(screen.getByTestId` count is now **0** (the 4 remaining matches are inside
+  the comment I wrote, which quotes the old spelling deliberately).
+
+**The lesson is about branch age, not about the race.** A long-lived branch keeps every bug that was
+fixed on `main` after it was cut, and the symptom arrives as *someone else's* flake in *your* agent's
+report. **Re-fetch and rebase at batch boundaries, not only when a PR merges.**
+
+## PROGRESS: T1-T11 in flight; T1-T10 committed (T9 done, T11 building). T9 fix + T11 IN FLIGHT.
+
+**T9 (`CalendarView`) is the first task that rendered a colour, and it did the token work right —
+ONE new role, not fourteen.** Most plan names turned out to be existing roles under new words. It
+**declined `barActive`/`barTerminal` outright**, because `CalendarBar` carries no `stateCategory` and
+two bar colours would *colour a distinction the model cannot make*. It added `customMarker` with a
+`CONTRAST_PAIRS` entry **at the text minimum, not the glyph minimum**, because the label renders in it.
+
+**It found two more silent defects in the plan's code.** `2026-02-30` passes `IST_DAY_REGEX`, so the
+model places it by string comparison into a week where `days.indexOf` is `-1` — and the plan's
+`index + 1` produced `grid-column: 0 / 1`, **which CSS discards, so the auto-placer drops the claim
+onto a day nobody claimed.** And the plan renders ONE empty-month sentence where the model has three
+arms; all three now render verbatim.
+
+**It also closed a hole nothing was watching:** `token-discipline.test.ts` proves no colour *literal*
+escapes `tokens.ts`, but nothing proved a `var(--gn-…)` names a role that **exists** — a typo resolves
+to nothing, the element inherits, the suite stays green, and the colour is simply gone.
+`packages/ui/test/tokens.test.ts` now cross-checks every `var(--gn-…)` against `TOKEN_ROLES`.
+
+### T9's review — three Important, and all three are ONE class
+
+**Asserted present-when-expected, never absent-when-not, so nothing can detect OVER-firing.** This is
+already a recorded failure class on this branch and it produced every finding here:
+
+| Mutation | Result |
+|---|---|
+| today ring compares day-of-month only (`day.slice(8)`) — rings 09-23 as "today" in September | **SURVIVED 25/25.** Both ring tests assert presence *inside August*, where day-of-month 23 and 10 each occur once. |
+| drop every item on a leading/trailing **padding** cell | **SURVIVED 25/25.** Every fixture is `2026-08-xx`. **This is the exact defect the MODEL shipped with 777 green — same blind spot, one layer up.** |
+| make a **bar's** `onClick` dead | **SURVIVED 25/25.** Only markers are ever clicked; the bar test asserts `title` and `gridColumn`. |
+
+**T10's fix took `emptyCopy` from distinct-count 1 to 3**, and made a design call worth keeping: **the
+window sentence is deliberately NOT exhaustive** — *"Dated work here sits outside the weeks in view"*,
+never *"every piece of"* — because a filter can remove work that would ALSO have missed the window, and
+an exhaustive quantifier there is the all-hidden failure in timeline clothes. It kept the undated-epic
+guard as-is and pinned both halves. It fixed the **prose** of the `0099-01-01` docblock rather than the
+code, on the grounds that refusing pre-1000 years would invent a validity rule at a *rendering* surface
+the write path does not have — the product would store a claim it then refuses to place.
+
+## STOP — THE PLAN'S STYLING API DOES NOT EXIST. 57 SITES. BLOCKS T9, T11, T12, T13.
+
+**The plan writes `tokens.color.ink`, `tokens.space.md` and similar in 57 places.
+`@gisik-nokma/ui` exports NO `tokens` object at all.** Verified on disk at
+`packages/ui/src/tokens.ts`, which exports:
+
+`primitives` · `PrimitiveName` · `TOKEN_ROLES` · `TokenRole` · `themes` · `CONTRAST_PAIRS` ·
+`colorOf(theme, role)` · `cssVariableName(role)` · `themeStylesheet()`
+
+It is a **role system** — role -> primitive -> theme, with a contrast check — not the flat map the plan
+drafts against. **Every `tokens.*` snippet in Tasks 9, 11, 12 and 13 fails to compile as transcribed.**
+
+Of the plan's fourteen colour names: **3 are real roles** (`surface`, `accent`, `contested`); **3 are
+`primitives` keys the package's own discipline forbids a client from touching** (`ink`, `inkMuted`,
+`line` — the roles are `text`, `textMuted`, `border`); **8 are absent** — `todayRing`, `pendingHatch`,
+`barActive`, `barTerminal`, `marker`, `customMarker` (T9/T11) and `accentInk`, `unreadDot` (**T12**).
+`barActive`/`barTerminal` may simply be the existing `categoryActive`/`categoryTerminal` — check before
+inventing. Adding a role means picking primitives for BOTH themes and satisfying `CONTRAST_PAIRS`, and
+**a raw hex where a token belongs is a recorded failure class here with a check that catches it.**
+
+**Task 8 was RIGHT to defer this and its reasoning is the reusable part:** Task 8 renders nothing, so
+no Task 8 test could have reddened if it guessed a primitive wrong — *a check that cannot fail*. The
+work belongs to the first task that renders a colour, which is **T9**.
+
+## PROGRESS: T1-T10 COMMITTED (9 of 15 built; T9 pending). T10's fix + T9 IN FLIGHT.
+
+**T8's fix (`9e28e81`) closed both Importants and found the case the review had not named: NARROWINGS
+STACK.** With a filter removing one August claim and the legend hiding the other, the all-hidden
+sentence's *"EVERY claimed date belongs to a field you have hidden"* is false — and so is any
+filter-only phrasing. **Emitting either would have been a fourth instance of the defect the fix exists
+to close.** So the new arm is a disjunction, the exhaustive sentence is reachable only when the legend
+is the sole narrowing, and that precedence is witnessed. It also closed **four more boundary mutations
+the review never enumerated**, found by asking which *other* end of which *other* range had no fixture.
+
+> **It caught a defect in its own fix, by mutation.** Its first draft asserted the clock-scan file list
+> against itself — a loop over `CLOCK_FREE_DOMAIN_FILES` checking `scanned` contained each entry.
+> **Deleting a file from the list left all 50 tests green.** Names are literal now. *A list asserted
+> against itself is a check that cannot fail, and this is the second time that exact shape has appeared
+> on this branch.*
+
+**T10 (the timeline model) predicted its own defect class and found it.** `TIMELINE_SIDE_LIST_COPY`
+says work stays in the list *"until it carries both"* a start and a needed-by — but a **start-after-due**
+entry carries both and is still listed. Per-entry copy honest, heading false. Every side-list case in
+the plan holds ONE reason, so none of them could see it; the fixture that does holds two. It also
+found `dateMs` throws on `2026-02-30` — **storable, because `dueDateValueSchema` is regex-only** — where
+one such claim would have blanked the entire timeline.
+
+### T10's review — two Important, and one hole in the purity guard itself
+
+| # | Finding |
+|---|---|
+| **I1** | **`TimelineModel` has no `emptyCopy` at all.** Four different empties — no tickets, filtered out, laned out, and **fully-dated work wholly outside the window** — `JSON.stringify` to the SAME bytes. **DISTINCT COUNT: 1.** The sibling `CalendarModel`, same package and same author, declares `emptyCopy` for exactly this. The window-miss case is the one **Task 11 cannot reconstruct** — its props carry no window. Ruled: Task 10's, on the model. |
+| **I2** | **The undated-epic `continue` is witnessed on its true branch only.** Two mutations survive: a HALF-dated epic vanishes from rows *and* side list; a FULLY dated epic's bar vanishes. A control proves the true branch is pinned. It is the only statement that removes a ticket on the grounds of what it **is** rather than what it **claims** — and with I1, a vanished epic leaves nothing on screen explaining it. |
+| **Minor** | **The purity guard has a hole, and it is Task 8's harness, not Task 10's.** A literal `new Date()` is caught and named. An **aliased** read — `const CLOCK = Date; new CLOCK().valueOf()` — **survives both halves**: the scanner anchors on `\bnew\s+Date\s*\(`, and the four-zone identity test structurally cannot catch an *instant* read, since `Date.now()` returns the same number in every zone. The harness's own docblock already concedes the scan is the guard *because* the runtime harness cannot be. |
+
+## PROGRESS: T1-T8 COMMITTED (8 of 15). T8's fix + T10 IN FLIGHT. **Measure; do not trust this line.**
+
+`/usr/bin/git log --oneline origin/main..HEAD` · `/usr/bin/git status --porcelain=v1`
+
+**T7's fix (`6c7af0d`) rebuilt the test on `buildTestApp`** — the real `buildApp` — and the app.ts
+mutation that previously survived 937/937 now reddens **all ten tests in the file by name**. It also
+took a side-effect worth knowing: routing through the real `setErrorHandler` means `cursor=%00` still
+500s but now returns `INTERNAL_ERROR_BODY` instead of leaked Postgres text. **The leaked driver message
+was only ever visible because the harness was a bare `Fastify()`** — one root cause, two symptoms. The
+limit guard follows `list.ts`'s convention (refuse, don't clamp) using **`store.ts`'s own ceiling of
+100**, not `list.ts`'s unrelated `MAX_LIMIT=200` — an error in its first draft, caught before commit.
+
+### T8 (the calendar view-model) — committed, and it caught two lies in the PLAN's own draft
+
+- **The all-hidden month lie.** With every claimed date on a legend-hidden field, the plan's own model
+  returns the honest-empty sentence — telling a viewer *"no claimed dates fall in this month"* about
+  claims they hid one switch ago. New `CALENDAR_ALL_HIDDEN_COPY`.
+- **`epicAncestorOf` disagreed with the server.** The plan tests `typeId === 'epic'`; the server
+  (`routes/list.ts:388,410`) groups by **rank 1**. A workspace with its own rank-1 type would get a
+  lane on the server and *"No epic"* here. Now injectable, defaulting to the id derived from
+  `BUILTIN_TICKET_TYPE_SEEDS` **by rank**.
+
+It also declined to invent color tokens, and the reason is the good one: **Task 8 renders nothing, so
+no Task 8 test could redden if it guessed a primitive wrong — a check that cannot fail.** The landed
+`tokens.ts` is a role system (`TOKEN_ROLES` -> themes -> `CONTRAST_PAIRS`), not the plan's flat
+`color.*` map. **Owner: Task 9**, the first thing that renders one.
+
+**43 mutations, 10 survived first contact, all closed.** Its own note to the next implementer is worth
+keeping: *every one of the ten was a fixture where the correct value and the defect's value coincide* —
+the grid's string bounds silently absorb malformed days, and a fixture's declared order was also its
+alphabetical order. **It also reported one thing it could NOT prove**: deleting the cycle-guard `seen`
+set makes the walk loop forever, which hangs the runner rather than reddening a named test — a
+did-not-run, not a survivor, and it said so instead of claiming the guard was pinned.
+
+### T8's review — the sharpest finding on this branch so far
+
+**It found the model telling the SAME lie it was proud of fixing, at two other doors.** A month emptied
+by a **filter** or by a **lane** prints the honest-empty sentence about a month full of claimed dates.
+Demonstrated as shipped behaviour, not under mutation: two August-dated tickets with
+`filter:{assigneeIds:['user_nobody']}` yield `emptyCopy = "No claimed dates fall in this month…"`, and
+an unmatched `laneEpicId` yields the identical copy. **The commit set the standard — "two different
+facts, two different sentences" — and applied it at one door of three.**
+
+Second Important: **the grid's outer edge is unwitnessed at BOTH ends.** The Aug-2026 grid renders
+`2026-07-27..2026-09-06`; four mutations survive there, including one that makes **every marker on a
+padding day vanish** while **777/777 pass**. The only out-of-grid fixture sits at `2026-10-02` —
+**twenty-six days past the edge**, which is exactly why nothing bites. The series' "gate closing one
+end of a range" class, here closing **neither**.
+
+## PROGRESS: T1-T7 COMMITTED. T7's fix + T8 IN FLIGHT. **Measure, do not trust this line.**
+
+`/usr/bin/git log --oneline origin/main..HEAD` · `/usr/bin/git status --porcelain=v1`
+
+**T6's fix (`df4834a`) closed all four Importants and both regraded Minors** — test file only,
+`sweep.ts` never modified (sha256 matched its HEAD blob). Suite 30 -> 37. **Every "was" figure was
+RE-MEASURED rather than inherited from the review**, and its mutation harness refused to run unless the
+pattern matched exactly once and printed its own applied diff — which is how it avoided the did-not-run
+class entirely. It also found a survivor **the review had missed**: asking the date-loop's gate about
+`row.assignee_id ?? ''` instead of the resolved target survived 36/36; the stale loop's recipient
+argument was already pinned and the date loop's was not.
+
+It regraded one Minor **up** to Important and fixed it (`ticketTitle`/`field` are user-visible payload
+and the stale side was already `toEqual`-pinned — the asymmetry *was* the defect), and kept one at
+Minor while fixing it anyway. **Recorded, not fixed, owner: whoever next opens `sweep.ts`** — the
+malformed-claim branch at `sweep.ts:194-197` skips a bad `dueDate` claim with a log line and no test
+seeds one, so *"skipped, not guessed"* is unwitnessed. `expectNoNotifications` was deliberately left
+per-call rather than an `afterEach` so that branch can expect a log line when someone writes it.
+
+### T7 (the notification API) — committed, and its review found the sharpest wiring gap yet
+
+**The shipped handlers are CORRECT.** Every faithful "wrong id" mutation reddens. Three Importants,
+all proof gaps plus one missing guard:
+
+| # | Finding |
+|---|---|
+| **I1** | **The route registration has NO WITNESS.** Deleting `registerNotificationRoutes` from `app.ts:299` leaves **85 files / 937 tests green** — the inbox could ship **404ing on all three routes with a fully green gate**. A contrast mutation (route path -> `/v1/me/notificationsX`) reddens 3 tests by name, so the *handlers* are covered and the *wiring* is not. Root cause: the test hand-builds `Fastify()` instead of `buildTestApp` like **every** sibling route test — and `test/helpers/app.ts:88-92` states exactly why in its own docstring: *"every new route registered in `buildApp` has to be reachable from all of them."* |
+| **I2** | **The forged-parameter probe covers one route of three.** A client-readable `?userId=` override added to `unread-count` or `mark-read` SURVIVES 7/7; measured under mutation it returned another user's `{"unread":3}` and flipped their row to `read=true`. **Scope stated honestly by the reviewer:** these mutations ADD a parameter the shipped code never reads, so this is a proof gap, not a live leak — which is why it graded Important, not Critical. The test file claims in prose that *"rows come from the session only"* while testing it on one route. |
+| **I3** | **The route validates nothing it takes from the client.** `?limit=1.5` -> **500** (pg 22P02, `invalid input syntax for type bigint: "2.5"`); `?cursor=%00` -> **500** (pg 22021). The handler accepts any `Number.isFinite` value and the store clamps the RANGE but never rounds. **The branch already solved this one file away**: `routes/list.ts:518-527` rejects a non-integer limit with 400, and its comment names this exact trap — *"`Number('2.5')` is 2.5 and fails the integer test"*. Not production disclosure (`setErrorHandler` masks 5xx), and the raw Postgres text was visible only because the harness is a bare `Fastify()` — I1's root cause again. |
+
+## RECOVERY ROUND CLOSED — GATE IS GREEN AGAIN. T6's fix + T7 now in flight.
+
+**The gate is no longer red.** T4's fix (`d060595`) guarded the two unindexed accesses in the style the
+production file already used — `const [row] = page.notifications; if (!row) throw` — no `!`, no `as`.
+`pnpm turbo run build test typecheck --force`: **24/24, 0 cached, server 923/923 across 84 files.**
+
+**T4's fix closed all eight surviving mutations**, each re-run and each now naming its own site. It also
+refused to fake one: the no-redaction-on-revoke ruling is left as a **comment, not a test**, because the
+store has no visibility dependency to flip into a revoked state, so no fixture here could catch a future
+redacting join. **Saying so is better than a test that would pass either way.** Owner for the real
+check: whoever adds a `canSee` join, if anyone ever does.
+
+**T5's fix closed all four Importants and both Minors — and TWO of its three commits are it correcting
+its own fix.** `4e02cb6`: *"The boot test waited for nothing: `expect.poll(...).toBe(0)` returns on its
+first check."* `60c4931`: *"Three assertions I added had no mutation of their own, and a log spy that
+could not see the leak it was written against."* **This is the branch's recorded fix-round pattern
+holding: a fix is a change like any other and needs its own verification.**
+
+Two rulings the T5 fix took, both recorded because they are decisions and not deductions:
+- **Per-recipient isolation, not documented batch-abort.** An order-dependent disclosure outcome must
+  not be settled by where a name happens to sit in a document. The per-recipient log names the *event*,
+  never the recipient — and there is now a test that reddens if the recipient leaks into either
+  argument of the log call.
+- **The contested branch excludes nobody** — a refusal is not something the claimant did — now pinned by
+  its own test, where before the fixtures pinned it by accident.
+
+## T6's REVIEW FINALLY RAN, AND THE TZ DISCIPLINE IS REAL — a first for this repo
+
+**The brief's known-gap is broken here for the first time.** The reviewer VERIFIED rather than inherited
+the implementer's claim, and did it in the one order that works:
+
+1. **Where is the day boundary computed?** Grepped every query on the sweep's path — the two sweep
+   queries, `getWorkspaceSettings`, `getWorkflowDefFromProjection`, `canSee`, `insertNotification` — for
+   `now()|CURRENT_DATE|AT TIME ZONE|current_date`: **zero matches.** The comment at `sweep.ts:169` is
+   true. **This check had to come first**, because `TZ` on the node process does not move Postgres's
+   `CURRENT_DATE`, so if the arithmetic had been in SQL the whole zone loop would have agreed for a
+   reason unrelated to the property it names.
+2. **Session-TZ controls:** forced the Postgres session to `UTC` and then to `Pacific/Kiritimati`. Both
+   green — proving the session timezone is not load-bearing anywhere on this path, so process `TZ` is
+   the correct axis.
+3. **The mutation reproduced exactly.** Replacing the IST arithmetic with a local-clock read reddens
+   **Kiritimati** (cross-midnight: both claims notify on the first sweep) and **Niue** (both cases),
+   while **Asia/Kolkata stays GREEN** — which is precisely why a suite that only ever ran in India
+   would have shipped it. The file's own predicted table matched.
+
+**Also on this branch, and it is the stale-dist trap from the brief arriving in the wild:** the reviewer
+mutated `packages/domain/src/events/workspace-settings.ts` and got 30/30 green. **Not a survivor — a
+mutation that never ran**, because `@gisik-nokma/domain` resolves to `dist/index.js`. Re-run against
+`dist` (backed up and sha256-verified on restore): **5 tests red.** It reported both legs rather than
+the flattering one.
+
+### T6's four Important findings — fix in flight
+
+| # | Finding |
+|---|---|
+| **I1** | **The `canSee` gate on BOTH sweep paths cannot fail.** Every test injects `seeEverything` (`async () => true`); no test anywhere returns false. Deleting either gate leaves **30/30 green**. A control proves the seam is live (16 red), so only the **deny** direction — the only direction a gate exists for — is unexercised. Concrete leak: `can-see.ts` states the explicit list is exactly the authored list and **assignees are not implicitly appended**, so an assignee omitted from an explicit-mode ticket is denied — and without the gate the sweep posts them a row carrying `ticketTitle` and the claim `note`. Same shape as the mention-gate finding. |
+| **I2** | **The staleness range is gated at ONE END.** Nagging a full IST day EARLY survives 30/30; only the too-late direction reddens. The "fresh" fixtures sit 3 and 22 IST days from the boundary — **never one day inside it.** The approaching horizon is correctly pinned at both ends; copy that shape. |
+| **I3** | **`state_category = 'open'` is never seeded** — and it is the commonest case there is: `simple-kanban.ts:24` gives the shipped default workflow's `todo` state category `'open'`. Narrowing the date-approaching gate silently stops warning on open tickets (SURVIVED); widening the stale gate starts nagging them (SURVIVED). "Terminal tickets never notify" is only **half** pinned — nothing says a terminal ticket is never stale-nagged. |
+| **I4** | **Plan 2's `getWorkflowDefFromProjection` is a declared consumed interface that is never witnessed.** The whole lookup can be deleted (`stateName = null`) with the suite green. The only assertion is `stateName: null`, and the test's own comment admits why: no workflow row was seeded. **The state name is what a person reads in their inbox, and the resolved path has zero coverage.** |
+
+Plus a Minor worth its own line, because it is a *class*: **eight `toHaveLength(0)` assertions cannot
+distinguish "correctly suppressed" from "attempted and crashed"** — `deliverToAll` swallows transport
+errors and every test passes `log: () => {}`. Demonstrated by accident: a mutation that hit a NOT NULL
+violation reported **30/30 green**. This is the second log-spy-that-cannot-see finding on this branch.
+
+## BATCH B+C — T4/T5/T6 committed. (The gate WAS red here; T4 fix cleared it. Kept for the lesson.)
+
+> ### THIS WAS TRUE AND IS NOW FIXED (T4 fix `d060595`). Kept because the LESSON is the point.
+> `pnpm --filter @gisik-nokma/server run typecheck` **exits 2**:
+> ```
+> test/notifications/store.test.ts(132,12): error TS2532: Object is possibly 'undefined'.
+> test/notifications/store.test.ts(171,12): error TS2532: Object is possibly 'undefined'.
+> ```
+> Unguarded `page.notifications[0].x` under `noUncheckedIndexedAccess`, in **Task 4's test file**
+> (`57e6991`), whose commit message claimed full verification. **`vitest` is FULLY GREEN — 916 server
+> tests pass — and the gate still fails.** CI runs `pnpm turbo run build test typecheck`, so this is
+> the gate, not a side check. Three independent parties reported it: T4's reviewer, T5's implementer
+> (which proved it pre-existing by running `tsc` at HEAD in a detached worktree where its own files
+> were absent), and T5's reviewer. **This is the clearest instance yet of "a tests-pass report is not
+> a gate report", and it is worth more than the two-line fix: the branch was green in every way its
+> author checked.**
+
+**THE T6 FAN-OUT DIED ON AN API 529 — AND IT DIED *AFTER* COMMITTING.** T6's implementer errored at
+183K tokens / 74 tool calls with its work **committed**; T6's reviewer then failed to start at all.
+This is step 13's Batch B lesson repeating with a different cause: **a dead fan-out leaves committed
+work, not just a gap.** Measured, not assumed — tree clean, `1dad73d` present, server suite 916 green.
+
+> **`3c1dab1` IS ORPHANED. Do not cite it.** It is T6's pre-amend commit; the agent amended before
+> dying. `git branch --contains 3c1dab1` returns empty while `git cat-file` passes on it happily and
+> hands back the earlier content. **The live sha is `1dad73d`.**
+
+| Task | Committed | Review | Outcome |
+|---|---|---|---|
+| **T4** store | `57e6991` | opus, ran | **fix-required — 1 CRITICAL (the red gate) + 4 Important.** All four Importants are MISSING TESTS, not broken code: cross-user leakage in `unreadNotificationCount` survives, four of seven `rowToNotification` fields unpinned (including a `userId`/`workspace_id` **column swap**), `nextCursor` off-by-one survives, and a test named "clamps limit to 1..100 and defaults to 30" pins only the lower clamp. |
+| **T5** fan-out | `f8d7f4e` | opus, ran | **fix-required — 4 Important + 2 Minor.** The `canSee` gate itself is **well** pinned (deleting it reddens; forcing it false reddens 14). What is unpinned is everything around it — see below. |
+| **T6** sweep | **`1dad73d`** | **NEVER RAN (529)** | **UNREVIEWED CODE ON THE BRANCH.** Re-dispatched. Until that returns, T6 is committed and unexamined by anyone but its author. |
+
+**T5's sharpest finding, because it is the one branch with no visibility gate.** `claim.contested` is
+deliberately ungated, justified as *"the payload is the claimant's own refused event echoed back"*. The
+recipient is `original.actorId` — and swapping it for `env.actorId` left **18/18 fanout and 886/886
+server tests green**. Root cause is a FIXTURE defect: both fixtures set contester and claimant to the
+**same user**, so the branch's one distinguishing fact is untestable. Plan 10 amendment 16 makes
+contester != claimant the *normal* case, and the exemption's own justification evaporates the moment
+the recipient is not the claimant. **One fixture defect blinded two disclosure checks on the only
+ungated path.**
+
+**Also from T5, an order-dependence worth remembering:** the outer try/catch wraps the whole recipient
+loop, so a throwing `canSeeTicket` at recipient N drops N..end. Measured — throw at #1: nobody gets a
+row; at #2: only the first does. **Who gets notified depends on the order mentions appear in the
+document.** The existing pin uses a single recipient, where "contained" and "aborted" are the same
+observation. The task text only promises isolation across *transports*, so the reviewer honestly
+flagged it as possibly-within-spec; **my ruling was to pin the behaviour either way**, because an
+order-dependent outcome on a disclosure path must not be settled by document order.
+
+**T6's TZ question was answered by construction, and the answer needs verifying not inheriting.** The
+implementer avoided SQL date arithmetic deliberately (`sweep.ts:169` claims the predicate carries no
+`now()` and no `CURRENT_DATE`), used fixed +05:30 arithmetic via `istDayOf`/`istDayBounds`, and wrote
+a mutation table claiming Kiritimati and Niue each **diverge** under a local-clock mutation while
+Kolkata stays green. **If that reproduces, it is the first test in this repo to break the 48-file TZ
+gap.** The re-dispatched reviewer is told to reproduce it, not believe it.
+
+## LIVE ANCHORS — step 14, Batch A closed. RECOUNTED at the sha below, not carried forward.
 
 | Anchor | Value | How verified |
 |---|---|---|
-| **Branch** | **`exec/13-plan8-workflow-builder`**, cut from `origin/main` `7337357`. | `git rev-parse --abbrev-ref HEAD` |
-| **Base** | `origin/main` = `73373579b906a18e3d319363a8eb3685b076eb50` | `git rev-parse origin/main`, fetched |
-| **Ahead-count** | **Not written here on purpose. Run `git rev-list --count origin/main..HEAD`.** A count taken while writing the commit that records it is *always* short by one and always looks right to its author. | — |
-| **Gate at branch HEAD (Batch C closed)** | **exit 0 · 24/24 tasks · 0 cached · Node v22.22.2 · 2445 tests.** domain 335 · rule-engine 280 · server 857 · **app-core 687** · editor 178 · web 69 · ui 31 · sync-client 8. **The branch adds +213 over the base, ALL in app-core** (474 → 687): Batch A +69, Batch B +63, Batch C +81. | run by the executor with `--force` on a clean tree with **no agents running**, through `rtk proxy`; Node printed into the same log |
-| Gate at the Batch A boundary | exit 0 · 24/24 · 0 cached · 2301 tests; app-core 543. Batch A's own split, measured by excluding each task's test file rather than inferred: **T1-T3 = 58, T4 = 11.** | same method |
-| Gate at the base `7337357`, for the delta | exit 0 · 24/24 · 0 cached · **2232 tests**; app-core 474, all others as above. | measured at branch creation, on the second (unproxied) attempt — the first was proxy-collapsed to one package and its composition was unusable |
-| **`check:env`** | **exit 0 at `9017ebc`** — 45 documented / 23 referenced. **Re-measure this at every sha you report; it is the half of the gate that went stale for fifteen tasks.** | `pnpm check:env`, run separately from the turbo gate |
-| **`check:tasks`** | **exit 0**, 177 rows / 177 plan tasks, **118 done (66.7%)**, 0 claimed, 0 in-flight, **59 todo**. Plan 08 = 0 done / 15 todo. | `node scripts/check-task-ledger.mjs` after the promotion |
-| **Gate SHAPE** | **24 tasks over EIGHT packages.** Plan 8 Task 14 adds a Playwright e2e script — **if it becomes a turbo task, this figure is spent and must be recounted.** | the run above |
-| Orphaned, do not cite | every sha in the narrative sections of previous handoffs. | `git branch --contains` (empty = orphaned) |
+| **Branch** | `exec/14-plan9-calendar`, rebased onto `origin/main` after #88 merged | `git rev-parse --abbrev-ref HEAD` |
+| **Base** | `origin/main` — **re-fetch before trusting; it moved four times today** (#87, #88, #89, #90) | `git rev-parse origin/main` |
+| **Branch HEAD at Batch A close** | `0520a1c` | `git rev-parse HEAD` |
+| **Ahead-count** | **Deliberately not written. Run `git rev-list --count origin/main..HEAD`.** A count taken while writing the commit that records it is always short by one and always looks right to its author. | — |
+| **GATE at `0520a1c`** | **check:env exit 0** (45 documented / 23 referenced) · **check:tasks exit 0** · **turbo 24 successful / 24 total, 0 cached, exit 0** · Node v22.22.2 · clean tree at gate start | all three run together on a clean tree with **zero agents running**; exit codes captured explicitly, not inferred from a trailing echo |
+| **Test total** | **2,594** — ui 31 · domain **464** · rule-engine **282** · sync-client 8 · editor 178 · web 87 · app-core 687 · server 857 | the same run |
+| **Delta, and it RECONCILES** | main = 2,463. Batch A adds **+131**: domain 335 -> 464 (**+129**), rule-engine 280 -> 282 (**+2**). 2,463 + 131 = **2,594**, exact. | subtraction against the controller's post-#85 re-verify figure |
+| **Gate SHAPE** | 24 tasks over EIGHT packages — unchanged by Batch A | the run above |
 
-### The Plan 7 ledger promotion in this branch's first commit, and its evidentiary basis
+**A NOTE ON `git status` IN THIS WORKTREE, found by the T3 fix agent and worth inheriting.** The
+`rtk` hook rewrite can return the single token `ok` for a clean tree instead of porcelain output.
+That is fine to read and useless to parse. **Every tree-state claim above used
+`/usr/bin/git status --porcelain=v1`**, bypassing the hook. Do the same before asserting a tree is
+clean — "ok" and "no output" are not the same evidence.
 
-Eighteen Plan 7 rows (`07/5, 6, 7, 8, 9, 9a, 10, 11, 11a, 12, 12a, 12b, 12c, 13, 13a, 14, 15, 16`)
-still read `in-flight` on `main` after PR #82 merged. They are promoted to `done`, PR `82`, sha
-`7337357`.
+## BATCH A IS CLOSED — T1, T2, T3 done, fix rounds applied, gate green
 
-**The basis matters, because this repo has already run one ledger audit that refused three rows.**
-The vocabulary grants `done` to "a merged PR whose title **or the controller record** names THIS
-plan AND task specifically". PR #82's *title* names the step, not the tasks — on the title alone
-these rows would be `claimed`. They qualify on the **controller-record** clause: step 12's handoff
-on `main` carries per-task Batch A/B/C/D tables naming each of the eighteen DONE with its artefact
-and test delta. **This is the same basis step 12 used to promote Plan 6's twelve rows**, recorded
-again here so the next audit does not re-derive it.
+| Task | Outcome |
+|---|---|
+| **T1** startDate day-claim | **SHIP, zero findings.** It was a verification task and the honest answer was that Plan 3's work was already correct — the implementer said so rather than rebuilding it. 4 mutations, all reddened AND named their site. Added 2 rule-engine fixtures (the first to run a built-in day claim through the real engine) and bumped the exact-count pin 84 -> 86. |
+| **T2** mention walkers | **One Important, fixed.** `extractMentionedUserIds(null)` was unpinned — `typeof null === 'object'`, so deleting `\|\| node === null` from the guard survived all four tests while flipping null's behaviour from `[]` to a thrown TypeError. The task's own text names `null` as a case to cover, so this was a gap against the contract, not a reviewer's preference. Took the skip branch on `docToPlainText` correctly. |
+| **T3** notification vocabulary | **THIRTEEN SURVIVING MUTATIONS behind a "ship" verdict.** The reviewer graded `ship` while listing three Importants and thirteen survivors; **I treated the findings, not the verdict.** All thirteen were MISSING TESTS, not broken schemas — the production code was right throughout and was not touched. Now closed and re-measured in both directions; **no survivors remain.** |
 
-## THE SEQUENCE, and where step 13 sits
+**The T3 fix agent corrected my own dispatch, which is the behaviour to keep.** I handed it thirteen
+survivors transcribed from the review. It re-measured the baseline itself instead of trusting me and
+found **M12 was never a survivor** — it already reddened. It also ran two mutations *wider* than the
+review had (`nonEmpty` spelled a second way; `serverTime` optional at all four sites, not one).
+
+**What the thirteen actually were, because the shape recurs:** almost all were `.strict()` guarantees
+that existed in the schema and were asserted nowhere — pinned on 2 of 5 payload schemas, absent on the
+nested `claim` object the commit called "carried verbatim", absent on `notificationBaseSchema`. Plus a
+day-shape regex with **no test at all** (every input used the one valid value `2026-08-30`). The test
+named for the planted defect probed only the TOP level, so invented urgency could live one level down.
+
+**One pin is a TYPECHECK pin, not a vitest pin, and `vitest run` says nothing about it.** The
+`NotificationPayload` exhaustiveness check is a type-level identity between the schema map's inferred
+outputs and the union. A 6th kind with schema and map entry but a stale union used to typecheck
+**clean**; it now fails `tsc` with TS2344. **Anyone verifying with the test suite alone will not see
+it** — this is why the gate runs `typecheck`, and why a "tests pass" report is not a gate report.
+
+**RECORDED, NOT FIXED — carried forward with owners:**
+- **The `as NotificationPayload` cast in `parseNotification` remains.** It cannot be removed from
+  inside a test file, and the plan's Interfaces block fixes the non-discriminated `{ kind, payload }`
+  shape, so the fix agent had no licence. The drift it hides is now caught at compile time; the
+  residual risk is that deleting one type alias in the test file silently removes the only check.
+  **Owner: whoever revisits Task 3's source.**
+- **Batch A added ~131 tests with no `test-cases/` entry.** **Owner: Plan 9 Task 15**, which opens
+  §11 and reserves ids 11.1-11.47 — it must back-fill these or they never get catalogued.
+- **`extractMentionedUserIds(42)` / `(true)` / `({content:'x'})` are unpinned.** Structurally safe
+  (traced), and the task contract does not name them, so not built. **Owner: next owner of
+  `doc-mentions.ts`**, if parity with `docToPlainText`'s malformed-input list is ever wanted.
+
+## STOP — PLAN 9 NAMES TEST PATHS THAT VITEST NEVER COLLECTS. 25 SITES. READ BEFORE ANY TASK.
+
+**Every test path the plan spells `packages/<pkg>/src/<name>.test.ts` is a suite that CANNOT FAIL.**
+All four packages Plan 9 touches restrict collection to `test/`:
+
+| Package | `vitest.config.ts` include |
+|---|---|
+| `packages/domain` | `['test/**/*.test.ts']` |
+| `packages/rule-engine` | `['test/**/*.test.ts']` |
+| `packages/app-core` | `['test/**/*.test.{ts,tsx}']` |
+| `apps/server` | `['test/**/*.test.ts']` |
+
+**PROVED BY CANARY, not reasoned.** A deliberately failing test (`expect(1).toBe(2)`) planted at
+`packages/domain/src/zz-canary.test.ts` left the full suite reporting **"350 passed"**. An explicit
+`vitest run src/zz-canary.test.ts` printed `include: test/**/*.test.ts` and collected nothing.
+
+**The plan names `src/*.test.ts` in 25 places** — File Structure blocks, Step instructions, the
+`vitest run` command lines at plan lines 163/248/356/364/369, and even a `git add` at line 380.
+**Task 2 and Task 3's implementers each caught it independently and deviated correctly**, but that is
+two coin flips that happened to land right, not a control. **The next implementer who follows the plan
+faithfully ships an invisible suite, and every downstream reviewer sees a green run.**
+
+**THE RULE FOR EVERY REMAINING PLAN 9 TASK, and it goes in every dispatch:** tests live under
+`packages/<pkg>/test/` (or `apps/server/test/`), importing the subject as `../src/<name>.js` —
+**never by package name**, which resolves through a stale `dist` and tests the wrong build.
+
+This is exactly the shape the brief warns about — *a check passing for a reason unrelated to the
+property it names* — with the failure moved one level out: not a test that cannot fail, but a test
+that was never run at all, reporting as part of a passing suite.
+
+## CLOCK SENSITIVITY — the brief's named known-gap, enumerated for this plan
+
+**Only TWO places in Plan 9 read a clock, and only one of them is in production code.**
+
+- **T6 (the sweep)** injects `now: () => Date` everywhere it is tested, which is already the right
+  design. The risk is a future test falling back to the `deps.now ?? (() => new Date())` default and
+  passing because **both machines are Asia/Kolkata**. Every dedupe-key/boundary assertion in
+  `sweep.test.ts` must run at least once under a forced non-IST `TZ`.
+- **T14** is the one unmocked `new Date()` -> `istToday()` in production. `apps/web/src/ist-today.ts`
+  **already exists** (Plan 6) **and already carries the TZ discipline** — a documented
+  Asia/Kolkata / Pacific/Kiritimati / Pacific/Niue loop. **Reuse it; do not reinvent a day computation
+  inline.**
+- **T8, T9, T10, T11 are clock-FREE by construction** — `today`, `month` and `anchor` are injected
+  strings. The obligation there is architectural: keep them that way. A `new Date()` appearing inside
+  `calendar-model.ts` or `timeline-model.ts` reintroduces exactly the conflation this plan avoids.
+
+> ### THE TZ LOOP IS INERT IF THE DAY ARITHMETIC HAPPENS IN POSTGRES — check this BEFORE believing T6
+>
+> **`TZ` on the node process does not change `CURRENT_DATE`, `now()` or `date_trunc` server-side.**
+> `apps/server` tests hit a real database on 54329. So a sweep written as
+> `WHERE due_date <= CURRENT_DATE + interval '3 days'` returns **identical results under every zone**,
+> and a reviewer running Asia/Kolkata / Pacific/Kiritimati / Pacific/Niue would report three-zone
+> agreement **as evidence the TZ discipline works, when in fact nothing varied.** That is a check
+> passing for a reason unrelated to the property it names — the exact shape this series keeps finding,
+> wearing a new costume.
+>
+> **So the discriminating question comes BEFORE the TZ loop: where is the day boundary computed?**
+> When T6's review lands, establish that first. If "today", the approaching horizon, or the staleness
+> cut-off is computed in SQL, three-zone agreement proves nothing and the real check is varying the
+> **session** timezone (`SET TIME ZONE`) or proving the arithmetic is JS-side end to end. T6's
+> dispatch pushes toward JS by telling the implementer to copy `ist-today.ts`, so this may well come
+> out fine — **but "came out fine" and "was checked" are the distinction this branch is built on.**
+
+## BATCHES for step 14, from the pre-flight and adjusted for shared files
+
+**A: T1, T2, T3** (domain) · **B: T4** (table+store) · **C: T5 then T6, SERIAL** (T6 consumes T5) ·
+**D: T7** (API) · **E: T8, T10, T12** (disjoint app-core dirs) · **F: T9, T11** (components over E's
+models) · **G: T13** · **H: T14** · **I: T15** (closeout, last).
+
+**T2 and T3 both modify `packages/domain/src/index.ts`** — additive export lines, but run them so the
+writes do not interleave.
+
+**BATCH E RUNS SERIAL TOO. Decided now, in the quiet, rather than under pressure with three agents
+queued.** T8, T10 and T12 are genuinely independent by directory, so E is the one place the serial
+pattern could be broken — but **T8 writes `packages/ui/src/tokens.ts`, which T10 and T12 may READ
+while it is half-written**, and the pre-flight called that "a light shared-file coordination point"
+rather than no point at all. Against that: nine commits of a working serial pattern with **zero
+transient-state incidents**, a cost ruling that explicitly wants thinner machinery, and step 13's
+recorded episode where thirteen agents on one shared tree produced states another reviewer read as
+tampering and nearly filed as a security finding. **Worktree-per-agent is the alternative the brief
+allows; it is not worth its merge overhead for three tasks.** Serial.
+
+**NOT YET VERIFIED, and it is T15's to check LIVE before it writes anything:** the pre-flight took
+`Features.md` §11 and `test-cases/11-calendar-notifications.md` as free from the coordination doc's
+line ~6546, and said so — *"not verified in this recon pass … worth a live grep before executing."*
+**Plans 6, 7 and 8 may have claimed adjacent numbers since that line was written.** The numbering
+convention is plan N → §N+2, which puts Plan 9 at §11, but confirm on disk rather than by convention:
+this repo has already produced one controller note refusing a section number an executor assumed. **T6 is the floor-list task and carries a hard MUST from the coordination
+doc: no stub.** If Plan 5's `getWorkspaceSettings` surface were missing it must STOP and escalate, never
+substitute a local constant. It is not missing — `apps/server/src/projections/workspace-settings.ts`
+and migration `1788272876259_proj-workspace-settings.sql` are both present.
+
+## COORDINATION OBLIGATIONS BINDING PLAN 9 (verified present in the doc)
+
+- **Notification rows stay UNREDACTED after a user's visibility is revoked** — *"a message you were
+  sent is yours; revocation removes future sight, not letters delivered."* T4/T7 must not scrub history.
+- **The mention gate stays SILENT server-side** — a mention notification must never become a probe for
+  who can see a ticket. Apply `canSee` before delivering. Editor-side "unreachable mention" warnings are
+  *permissible polish, not queued scope*.
+- **Preferences are whole-document** `GET/PUT /v1/me/preferences?workspaceId=`, not the per-key
+  `PUT /:key` Plan 9 assumed. T13's gateway does read-modify-write, inheriting last-write-wins. **Do not
+  "fix" it back toward the plan's text.**
+
+# ============================================================================
+# EVERYTHING BELOW THIS LINE IS STEP 13 (PLAN 8) HISTORY. Step 13 is MERGED.
+#
+# It is kept because its LESSONS are live and several were expensive to learn.
+# It is NOT a position, and nothing below it tells you what to do next --
+# the sections above do. Read below for method, never for state: its "next
+# work", "in flight", "remaining" and "no PR is open" phrasings are all spent.
+# This banner exists because the previous version of this file was refreshed
+# at its top and stale twenty lines down, and merged to main that way.
+# ============================================================================
+
+## THE SEQUENCE, and where step 13 sat
 
 Spine: `1,2 → 3,4 → 5 → {6,7,8,9,10} → 11`. **Steps 1–12 are closed.**
 
@@ -653,8 +1438,14 @@ rule-editor suites, and the Playwright spec.
    to say so. The corrected line names its controls **before** the run and states which row of the
    inherited absence claim was stale. Nothing further is owed.
 
-P25 taken (capped at `getBoard`). **P27 taken and applied** in step 12. P26 is a number with no text
-on `main` — noted, not load-bearing here.
+P25 taken (capped at `getBoard`). **P27 taken and applied** in step 12.
+
+**P26 IS NOT "a number with no text" — that claim was already stale when written here, and it is
+load-bearing for step 14.** P26 was written on 2026-09-02 into `controller-state.md`: **`SavedFilter`'s
+field is `filterSpec`, and Plan 9 Task 13's `spec` is SUPERSEDED before it is written.** Step 14's
+Task 13 adopts `filterSpec` and needs no ruling. The coordination doc carried the same stale claim in
+two places and both are now corrected there — which is the fix that matters, because that document is
+the one dispatched subagents read and this one is not.
 
 ## THE FIX-ROUND PATTERN IS NOT OCCASIONAL ON THIS BRANCH, IT IS THE NORM
 
@@ -720,3 +1511,478 @@ a fix round rather than trusting it, and for never citing a fix round's own summ
 - **Never run a state-changing git command in a shell whose cwd was set for a read.** Use `git -C`.
 - Verify any file restoration with `git diff` or by reading the file — **never a shell `diff`**,
   which has returned a false "identical" on this machine, on this repo's own ledger.
+
+## TASK 10 (timeline view-model) — RECORDED, NOT FIXED
+
+**1. ~~`dates.ts`' docblock is false about one of the two days it names.~~ CLOSED by the Task 10
+fix round — the PROSE was corrected, not the code. The entry stands unedited below because the
+measurement in it is the evidence; the resolution is at the end of this item.** The block above `dateMs` says the round-trip
+"refuses the two days `Date.UTC` invents instead of rejecting: `2026-02-30` (rolled into March) and
+`0099-01-01` (read as 1999)", and closes with "`istDayBounds` in the domain refuses the same pair the
+same way — one rule, stated once, applied twice". **Measured on this branch:
+`dateMs('0099-01-01')` SUCCEEDS.** `dateMs` uses `setUTCFullYear(99, 0, 1)` — which is precisely the
+constructor that does NOT fold two-digit years into 1900+, unlike `Date.UTC` — and `isoDate` pads the
+year back to `0099`, so the round-trip agrees and nothing is refused. `istDayBounds` still refuses it
+(`provenance.ts` wraps that call in a `try/catch` for exactly this reason). So the pair does NOT
+"refuse the same pair the same way": they agree on `2026-02-30` and disagree on `0099-01-01`.
+Discovered because a Task 10 fixture used `0099-01-01` as an unplaceable day and the test went red
+against the docblock's claim; the fixture now uses `2026-02-30` and `2027-04-31`, both genuinely
+refused. **Not fixed here**: the honest correction is either to make `dateMs` refuse pre-1000 years
+or to strike the sentence, and both are decisions about Task 8's contract.
+
+**2. `TimelineSideReason` has a FIFTH arm the plan does not list, and Task 11 must render it.
+OWNER: TASK 11.** `'unplaceable-day'`. The plan's four reasons are each a statement the model would
+otherwise have made falsely: a stored `{date: '2026-02-30'}` passes `IST_DAY_REGEX` (and
+`dueDateValueSchema` checks nothing stronger), reaches `weekIndexOf`, and `dateMs` THROWS — one such
+claim anywhere in the workspace blanks the whole timeline for every other ticket. Calling it
+`'due-only'` would deny a start claim the ticket carries; calling it `'start-after-due'` would assert
+an ordering against a day that does not exist. `provenance.ts` already ruled on the underlying
+question ("a blank screen is a worse answer than an invented date"); this applies it one surface
+along. A `TimelineView` that `switch`es on four reasons will fall through on the fifth.
+
+**3. `TimelineModelOptions` takes `isEpicType`, which the plan's Task 10 signature omits.
+OWNER: TASK 11 (thread it through `TimelineView`).** The plan hardcoded `typeId === 'epic'` at the
+undated-epic skip while routing grouping through `epicAncestorOf`'s injectable predicate — so a
+workspace whose rank-1 type is "Initiative" would have its undated initiative land in the side list
+as MISSING WORK while the same model grouped tickets under it. It is now one predicate at all three
+sites (skip, lane filter, grouping), defaulting to `isBuiltinEpicType`, matching what Task 8 landed
+in `CalendarModelOptions`.
+
+**4. The side-list heading was false at one of its own doors, and is now chosen.** `Task 8`'s
+`TIMELINE_SIDE_LIST_COPY` states a LEAVING condition — work stays here "until it carries both a
+claimed start and a claimed needed-by" — that a `start-after-due` entry already satisfies while
+sitting in the list. Added `TIMELINE_SIDE_LIST_UNDRAWABLE_COPY` and a precedence rule, the same shape
+as `emptyCopy`'s three sentences. **Task 11 must render `model.sideListCopy`, never the constant**:
+hardcoding `TIMELINE_SIDE_LIST_COPY` in the component puts the lie back with the model still right.
+The fixture that catches this class is a side list holding TWO DIFFERENT reasons at once; every
+side-list case in the plan text holds one, so none of them can see it.
+
+**5. Nine new test-case ids are Task 15's to carry, 11.52-11.60. OWNER: TASK 15.** Added to the four
+already recorded above (11.48-11.51): **11.52** (bars require both claims; equal start/due is a one-day
+period, not a contradiction), **11.53** (the side-list heading is true of every entry under it),
+**11.54** (a claimed day that is not a day is named verbatim and blanks nothing else),
+**11.55** (the window at both ends and one day either side — clipping, membership, the
+Sunday|Monday seam, `weeksCount`, and the zero-column refusal), **11.56** (exact week indices and
+two-author provenance), **11.57** (epic grouping, the untitled-epic lane, and the injected epic
+predicate at skip / lane / grouping), **11.58** (custom date claims ride along and change no
+geometry), **11.59** (filters narrow rows and the side list alike, and a filtered-out epic still
+names the lane of the child that survived), **11.60** (the timeline view-model reads no
+clock — the only surface that turns a claimed day into a NUMBER, so the only one where a device
+getter would file a claim under a different week from the calendar's own answer).
+
+**6. Four comparator arms had no fixture, and the mutations that named them survived until they did.**
+Recorded because the shape recurs: ordering code written BEYOND the plan text (the group title
+comparison, the `epicId` tie-break, the row `ticketId` tie-break) is exactly the code no plan-derived
+fixture exercises. Every grouping fixture in the plan holds ONE non-null epic — where the null-last
+arm decides everything and reversing the title comparison changes nothing — and the row-order fixture
+uses two different claimed starts, so the id tie-break never runs. Two epics with non-trivially
+ordered titles, two epics sharing a title, and two rows sharing a start close all three; a fourth
+(`customClaims` dropped from an `unplaceable-day` entry) needed the case where the OTHER end is
+missing. Thirty-three mutations now, all killed.
+
+**7. `Features.md` §11 is still absent, and Task 10 did not open it. OWNER: TASK 15.** Same
+precedent as Task 8, which landed nine source files and touched neither `Features.md` nor
+`test-cases/`. Opening §11 for one task forks what Task 15's plan text dictates verbatim.
+
+## TASK 10 FIX ROUND — two Important, three Minor, and the docblock the executor shipped
+
+Commit under review: `5d00e98`. What the review kept: bars-only-when-both-claims-exist, every window
+and clip boundary pinned at BOTH ends, and the four defects the draft carried. What follows is only
+what changed.
+
+**I1 — `emptyCopy` now exists on `TimelineModel`, and the four empties are three distinct models.**
+Measured before the fix, anchor `2026-08-23`: `model([])`, a filter matching nobody, an unmatched
+`laneEpicId`, and work fully dated but wholly outside the window all `JSON.stringify`d to the SAME
+bytes — **distinct count 1**, while the sibling `CalendarModel` in the same package had `emptyCopy`
+and three sentences for exactly this failure. Three constants added in `claim-labels.ts`
+(`TIMELINE_EMPTY_COPY`, `TIMELINE_NARROWED_COPY`, `TIMELINE_OUT_OF_WINDOW_COPY`) and the loop body
+extracted into one `classify(input): TimelinePlacement` called twice — once over `visible`, once over
+what a narrowing removed — which is `collectItems`' construction, for `collectItems`' stated reason:
+the second question must be answered by running the SAME classification, not a cheaper restatement of
+it. The filter and the lane are deliberately ONE sentence (they are one fact said two ways), so the
+pinned distinct count is **3**, with `serialised[1] === serialised[2]` asserted so a future third
+sentence has to change the number rather than slip in unnoticed.
+
+**NARROWINGS STACK, and the precedence is a truth condition.** `TIMELINE_NARROWED_COPY` outranks the
+window sentence because a filter that removed work which WOULD have shown here describes a screen a
+wider filter would fill — saying "it is outside these weeks" sends the viewer to the wrong control.
+And `TIMELINE_OUT_OF_WINDOW_COPY` is deliberately **NOT exhaustive** ("Dated work here sits outside
+the weeks in view", never "every piece of"): a filter can remove work that would ALSO have missed the
+window, which leaves `narrowedAway` false and that arm reached with a second narrowing live. An
+exhaustive quantifier there is `CALENDAR_ALL_HIDDEN_COPY`'s failure in timeline clothes. Both stacked
+cases are fixtures, and each kills a mutation the other cannot.
+
+**I2 — the undated-epic skip is decided, and the decision is KEEP CURRENT BEHAVIOUR.** The guard was
+witnessed on its true branch only: `&& … && …` → `&& (… || …)` survived, and dropping the date
+condition survived. **Chosen: the guard fires only when the epic has nothing to say.** A HALF-dated
+epic goes to the side list like any other half-dated ticket and still heads its lane; a FULLY dated
+epic gets a bar in its own lane (`epicAncestorOf` returns self). The reasoning is the file's own rule:
+this is the only statement that removes a ticket from BOTH outputs on the grounds of what it IS, so
+it stays as narrow as its justification — an epic that made a claim has made a claim, and suppressing
+it would hide a claim on the grounds of a type. New describe **11.62**.
+
+**Minor (a)** — `TIMELINE_SIDE_LIST_UNDRAWABLE_COPY` carried the OTHER constant's docblock, inverted;
+a maintainer following it literally would swap the two and reinstate the removed lie. Both docblocks
+rewritten so each sits over the constant it describes. Prose only; behaviour was already right.
+
+**Minor (b)** — `unplaceableDayCopy` named the same bad day twice when start and due carried the same
+unplaceable value. Deduped, on the RENDERED string, so the count that picks "is not a day" / "are not
+days" is the count of things printed. Note at the site that for days which actually reach this
+function the raw and rendered sets coincide — it is a discipline, not an observed difference, and
+saying so is better than implying a case that was not measured. New case under **11.54**.
+
+**ALSO CLOSED: `dates.ts`' false docblock (item 1 above), by fixing the PROSE.** Measured this
+session: `dateMs('0099-01-01')` succeeds (`setUTCFullYear` does not fold two-digit years, `isoDate`
+pads back to `0099`); `istDayBounds('0099-01-01')` throws on its round-trip (`Date.UTC(99,0,1)` →
+1999-01-01). **Two rules, not one.** The prose was chosen over the code because making `dateMs` refuse
+pre-1000 years would invent a validity rule at a RENDERING surface that the write path does not have
+— `IST_DAY_REGEX` admits it and `dueDateValueSchema` checks nothing stronger — so the product would
+store a claim it then refuses to place, with no migration and nobody's decision behind it. The code
+side is not merely defensible, it is already PINNED: `test/claims/dates.test.ts` asserts
+`isoDate(dateMs('0099-01-01')) === '0099-01-01'` under a title saying Date.UTC would read it as 1999.
+Corrected at all three source sites — `dateMs`, `isCalendarDay`, and `unplaceableDayCopy`, which
+carried the same false pair. `provenance.ts`' block was CHECKED and left: it is about `istDayBounds`,
+and it is true.
+
+**RECORDED, NOT FIXED — carried forward with owners:**
+
+- **The clock scanner catches a literal `new Date()` and misses an ALIASED one.
+  OWNER: TASK 8's `test/helpers/clock-scan.ts`.** `const CLOCK = Date; new CLOCK().valueOf()`
+  survives BOTH halves of the harness: the source scan anchors on `/\bnew\s+Date\s*\(\s*\)/`, and the
+  four-zone identity half structurally cannot see an INSTANT read, since `Date.now()` returns the
+  same number in every zone. **Not closed, and not because it was forgotten.** Every pattern that
+  would catch the alias (`/=\s*Date\b/`, bare `Date` as a value) has false positives against this
+  package's own docblocks, which name `Date`, `Date.UTC` and `new Date()` constantly and deliberately
+  in order to forbid them — `timeline-model.ts`' `anchor` block already refuses to spell the
+  constructor for exactly this reason. A scanner that goes red on prose is worse than the gap it
+  closes, and choosing the pattern is a decision about that harness's contract.
+- **`test/workflow-builder/access.test.tsx` failed once and passed on re-run, on an unchanged tree.
+  OWNER: whoever next opens that file.** In the first full gate of this fix round it failed at
+  `user.click(screen.getByTestId('transition-label-8'))`; the file passed in isolation immediately
+  after, and passed again (23 tests) in a FORCED, 0-cached app-core run — `rtk proxy pnpm turbo run
+  test typecheck --force --filter=@gisik-nokma/app-core`, 5/5, 846/846. Nothing in this fix round
+  touches the workflow builder. Recorded because a once-in-three-runs red in a suite this branch
+  relies on as its gate is worth a name, not because it was diagnosed — **it was not.**
+- **`Features.md` §11 and `test-cases/11-calendar-notifications.md` still do not exist.
+  OWNER: TASK 15** (unchanged from the entry above; verified this session — `Features.md`'s ten `##`
+  sections are 1-7, 9, 10 and 12, and there is no §11).
+
+**New test ids this round: 11.61 (four empty timelines) and 11.62 (the undated-epic skip's false
+branch), joining 11.52–11.60. 11.60 is TAKEN by `clock-free.test.ts`, not by the timeline file.**
+Task 15 carries 11.52–11.62 into `test-cases/11-calendar-notifications.md`.
+
+**Nine mutations, nine kills, each naming its own site.** app-core **833 → 846** tests, both ends
+MEASURED (the 833 by stashing this round's four files and running the package suite, not by
+subtracting 13 from 846).
+
+**The gate, named honestly.** `pnpm turbo run build test typecheck` ran **24/24, exit 0, Node
+v22.22.2**, with `apps/server/test/node-version.test.ts` — the self-asserting check this document
+already names as the trustworthy one — passing inside it. That run happened BEFORE commit `643644b`
+landed on this branch mid-session; the re-run after it was **fully cached (24 cached, 24 total)** and
+is therefore a replay, not a measurement, so it is not cited as one. What was re-measured afterwards
+is the only task whose inputs this round touches: a forced, **0-cached** app-core `test typecheck`,
+5/5, 846/846.
+
+**A concurrent commit landed on this branch during the round** (`643644b`, Task 8's fix round on the
+plan's colour tokens). It touched `docs/lanes/executor-state.md` and nothing else; this round's four
+code files were stashed by path across it and popped onto the new HEAD, and both sets of edits were
+confirmed present in the merged file afterwards rather than assumed.
+
+## TASK 14 FIX ROUND (web wiring) — THE HANDOFF RANGE, CORRECTED, AND THREE THINGS RECORDED
+
+**THE HANDOFF RANGE TASK 15 MUST CARRY IS `11.130–11.177`, NOT the `11.130–11.168` commit `fe320fc`
+says.** That message was written before `b300f43` added **11.169**, and this fix round adds
+**11.170–11.177**. Worse than the off-by-one: the range lived ONLY in a commit body and in no `.md`
+in the repo, so the one place Task 15 reads had nothing to correct. It is written here now.
+
+**Re-measured rather than incremented**, by listing every `it(`/`describe(` id definition in the repo
+and sorting. In use: **11.1–11.8, 11.18, 11.36–11.39, 11.48–11.122 with NO gaps, and 11.130–11.177**
+— **136 ids**. 11.123–11.129 are permanently unused (the gap Task 14's renumber left), as are
+11.9–11.17, 11.19–11.35 and 11.40–11.47 (Plan 9's own nominal one-id-per-area block, superseded on
+this branch by one-id-per-test from 11.48). Per `test-cases/README.md`'s rule all of them stay unused
+rather than being backfilled. **New cases continue from 11.178.**
+
+> **CORRECTION, 2026-09-04, made by the session that inherited this file: the "gaps at 11.97 and
+> 11.106" this paragraph used to assert DO NOT EXIST.** Both are live `it(` titles in
+> `packages/app-core/test/preferences/saved-filters.test.ts` (`:67` and `:266`). The sharp part is
+> the sentence that stood beside the error: this paragraph *claimed* its sweep "catches
+> 11.158/11.159's double-quoted titles that a single-quote-only sweep misses" — and 11.97 and 11.106
+> are double-quoted too, so the very hazard it named by name is the one it then reported wrongly.
+> **Naming a failure mode is not the same as having avoided it**, which is this branch's third
+> instance of a sweep-shape claim outrunning its own result. The re-measure that caught it separated
+> ids appearing in *test titles* from ids appearing anywhere (a `grep -rhoE` for a quoted id also
+> matches backtick-quoted prose in docblocks), and printed a positive control for each null.
+
+The eight this round adds: **11.170** (the nav hangs the `/inbox` link, name AND href), **11.171**
+(Workspaces always, My Work only inside a workspace), **11.172** (a failed "Load more" keeps the rows,
+names the failure, keeps the control, shows no refusal panel, and the retry clears it), **11.173** (a
+successful open clears the "cannot be opened" notice), **11.174** (no badge before the first answer),
+**11.175**/**11.176** (a 200 of the wrong shape is named on each read instead of throwing an unnamed
+`TypeError`), **11.177** (a reload drops the paging complaint about rows it replaced).
+
+**`Features.md` §11 and `test-cases/11-calendar-notifications.md` STILL do not exist, and this round
+deliberately did not open them. OWNER: TASK 15** — unchanged, and for the reason recorded twice
+already: Task 15's plan text dictates §11 verbatim and pins that file as its own creation, so a
+partial section written here forks its Files block. The debt is now stated with a correct range
+instead of a wrong one.
+
+**RECORDED, NOT FIXED — carried forward with owners:**
+
+- **The shell's `isEpicType` forward to `CalendarView` is INERT, and it is kept anyway.
+  OWNER: whoever wires a calendar lane filter.** The review reported it as half-covered; measured, it
+  is stronger than that. `CalendarView` hands `isEpicType` to `buildCalendarModel`, which reads it at
+  exactly one site — the `laneEpicId` lane filter (`calendar-model.ts:275`, inside `laneEpicId !==
+  undefined && !== null`). **`laneEpicId` has zero occurrences anywhere in `apps/web`**, and app-core's
+  own 11.158 says the lane fixture "is the ONLY shape that can witness the forward". So no case
+  reachable from the project page can distinguish that spread's presence: **deleting it survives
+  133/133**, and deleting the TIMELINE spread beside it reddens 11.165 by name — the asymmetry
+  measured both ways in the same session. It is a survivor left standing ON PURPOSE, with the site
+  commented, rather than covered by a prop-capture test that would watch the line instead of its
+  consequence. It stays because `calendar-view.tsx`'s docblock forbids exactly the state deleting it
+  would create: the calendar and the timeline answering differently about one ticket's epic on two
+  tabs of one page, surfacing silently the day a lane filter is wired.
+- **`today` is computed once per render and never re-derived. OWNER: whoever next opens the project
+  page's date wiring.** A tab left open across IST midnight keeps yesterday's ring until something
+  else re-renders. The day COMPUTATION is right (11.164 pins it at the instant the UTC and IST
+  spellings disagree); this is only about when it is recomputed. Not fixed because the fix is a timer,
+  and a timer is a re-render mechanism that needs its own case, its own cleanup, and its own argument
+  about cadence — none of which is Task 14's subject. Noted at the site.
+- **The nav's mount was invisible to a 125-test suite, and only the inbox half is now watched.**
+  `app-nav.test.tsx` exists because deleting one line orphaned a whole feature with build, test and
+  typecheck green — Task 7's `buildApp` finding in its reachable-page-with-no-door form. **Every other
+  page in this shell mounts `AppNav` and no page asserts its own mount either.** This round watched
+  the nav's three links; nothing yet watches that a PAGE renders the nav. OWNER: unassigned, and worth
+  a sweep, because the failure mode is a suite that covers everything the wiring connects.
+
+## TASK 15 (Plan 9's last) — IN FLIGHT 2026-09-04, written by the post-crash session
+
+**Position: Step 14 = Plan 9. T1–T14 committed (T14's fix round is `aee7cc7`, pushed). T15 is the
+last task in the plan.** After it: rebase onto `main`, ONE opus whole-branch review, PR. The
+controller merges; I do not.
+
+**The crash recovery, for the record.** The machine was force-restarted 05:31:56 on 2026-09-04 with
+T14's fix round STAGED AND UNCOMMITTED — eight files whose only record was `git diff --cached`. They
+are now commit `aee7cc7`. Nothing was lost, but nothing was safe either: `git status` was the only
+thing standing between that work and the bin.
+
+**Two measurement errors this session found in what it inherited, both of which had passed review:**
+
+1. **The gate that was a replay.** `pnpm turbo run build test typecheck` returned 24/24 green — and
+   `Cached: 24 cached, 24 total, FULL TURBO`. Its stored server log said `Start at 04:48:03`, which
+   is BEFORE the ~05:10 red run the crash override reported. A cache hit is a fact about a hash, not
+   about a tree. Forced, it went RED on 69 server files.
+2. **The database was not running.** This worktree's `docker-compose.yml` maps `54329:5432`; the only
+   postgres on the machine was an unrelated container on 5432. `docker compose up -d` from THIS
+   directory fixed it. **If a fresh session sees mass server-test failure, check the port before
+   reading a single stack trace.**
+
+**The gate, honestly named.** After starting the database: **24/24, `0 cached`, 46.8s**, Node
+confirmed FROM INSIDE the run by `apps/server/test/node-version.test.ts` — not by the absent
+`Unsupported engine` warning, which that test's own docblock explains is inert for per-package
+scripts. Composition recounted at this tree: **3,063 tests over 224 files** — app-core 1021/62,
+server 940/85, web 133/17 (134/17 after 11.185), domain 464/27, rule-engine 282/12, editor 178/15,
+ui 37/4, sync-client 8/2. **The handoff's earlier app-core figure of 846 is stale; the baseline is
+1021.**
+
+**A red herring, resolved so nobody re-chases it.** Turbo names
+`/Users/kiro/.nvm/versions/node/v24.11.1/bin/pnpm` in its error lines because the pinned
+`v22.22.2/bin` contains **no pnpm** — but pnpm is a `#!/usr/bin/env node` script, so the workers run
+whatever `node` resolves to, which is v22. `node-version.test.ts` passing inside the gate is the
+evidence; the path in the error line is not.
+
+**The override's unverified 23:40 lead is closed:** `apps/server/test/routes/attachments-upload.test.ts`
+passes, 16 tests, 8.5s. Its `:364` neighbourhood allocates 25 MiB, which is why it was the first
+thing to die under 22.4 GB of orphaned workers. It was a symptom of the crash, not a defect.
+
+**What Task 15 produced, and where it deviates from its plan text — deliberately, each measured:**
+
+- `packages/app-core/test/reporting-scope-guard.test.ts`, cases **11.178–11.184**. Three deviations
+  from the plan's literal code, none cosmetic:
+  - **`SCANNED_ROOTS` gains `apps/web/src` and `apps/web/app`** (seven roots, 274 non-test source
+    files). The plan's own argument for including `rule-engine` — "a root list that omits it is a
+    guard that states an invariant it does not enforce" — is the argument for these, since Task 14
+    wired day rendering into `apps/web`. Both were measured CLEAN before being added, and both were
+    then proven to BITE: a `forecast` probe in `apps/web/src/notifications-gateway.ts` and a zone
+    literal in `apps/web/app/inbox/page.tsx` each reddened the right case naming its own `file:line`.
+  - **`REPO_ROOT` is found, not counted to.** The plan's
+    `resolve(new URL('.', import.meta.url).pathname, '../../..')` resolves to `/` under vitest's
+    transform — measured, it scanned `/packages/app-core/src` and threw ENOENT. It now walks up to
+    `pnpm-workspace.yaml` and THROWS if it cannot find it, because the alternative failure is a clean
+    pass over nothing.
+  - **The missing-root `try/catch { continue }` is GONE, and two CONTROLS were added.** Every
+    assertion in that file is `expect(offenders).toEqual([])` — a shape that passes just as happily
+    when the walker reached no files or the needle stopped matching. **Demonstrated, not argued:**
+    with `ZONE_LITERAL` made stale, the zone scan 11.182 **stayed GREEN** and only the control went
+    red. That is the whole reason the controls exist.
+- `Features.md` §11 and `test-cases/11-calendar-notifications.md` — **the plan's catalogue text is
+  STALE and was not copied.** It reserves 11.1–11.47 one-id-per-AREA; the branch shipped
+  one-id-per-TEST. **Live: 147 ids** (11.1–11.8, 11.18, 11.36–11.39, 11.48–11.122, 11.130–11.188) after the final review's fix round.
+  **Permanently unused for TWO different reasons**: 11.9–11.17, 11.19–11.35, 11.40–11.47 (the
+  superseded nominal block — the `§9`/9.1–9.34 precedent in `test-cases/README.md` is the template)
+  and 11.123–11.129 (Task 14's renumber gap). **New cases continue from 11.186.**
+- **Three paths in the plan's `Features.md` block do not resolve** and were corrected against disk:
+  `packages/app-core/src/filters/` → `src/preferences/`; `calendar/CalendarView.tsx` →
+  `calendar/calendar-view.tsx`; `packages/domain/src/ticket-types.test.ts` → `domain/test/`.
+- `test-cases/README.md` — its §11 passage asserted the bucket did not exist. Task 15 falsifies it.
+- `docs/superpowers/plans/2026-08-20-00-series-coordination.md` — **same problem, one level up.** At
+  its line ~6572 the doc uses "`Features.md` carries no §11 heading" as its EVIDENCE that Task 15 has
+  not run. Amended rather than deleted, because the method (artefacts, not checkboxes) is right and
+  only its reading changed.
+
+**A claim I wrote and then had to retract, recorded because the retraction is the lesson.** I first
+wrote that case **11.171** would tell whoever wires a Settings link into `AppNav` that the nav
+changed. **It would not, and cannot** — it asserts three links are PRESENT, and a presence assertion
+is blind to a fourth. Measured by wiring `settings/workflows` into `AppNav`: **11.170 and 11.171 both
+stayed GREEN; only the new closed-set case died.** So **11.185** was written to assert the hrefs are
+EXACTLY `/workspaces`, `/w/<id>/my-work`, `/inbox`. This is the same blindness, one level up, that
+let a deleted `<InboxNavLink />` leave 125 tests green — and it very nearly shipped as a sentence in
+the interface authority saying a tripwire existed where none did.
+
+**STILL OPEN AT THIS LINE:** the catalogue's both-directions reconciliation (every id in the `.md`
+exists in the repo AND every repo id appears in the `.md`) has NOT yet been run by me — a subagent
+was asked to check it, and a subagent's clean report is not a measurement I have made. **11.185 post-
+dates the inventory the catalogue was written from, so the catalogue is KNOWN to be missing it and
+its "continue from" line is KNOWN to say 11.185 instead of 11.186.** Fix both, then re-run the full
+gate, then rebase onto `main` (`421db9f`; the ONLY colliding file is this one), then the single opus
+whole-branch review, then the PR.
+
+## PLAN 9 COMPLETE — MERGED `main`, GATE GREEN, FINAL REVIEW IN FLIGHT (2026-09-04 ~07:00)
+
+**ANCHORS, verified reachable with `git branch --contains` (not `cat-file`):**
+
+| what | value |
+|---|---|
+| branch | `exec/14-plan9-calendar` |
+| HEAD | **`b897404`** — pushed, `origin` identical |
+| base | `origin/main` `421db9f`, **MERGED IN** — 0 behind, 51 ahead |
+| tree | clean |
+| gate | at `6ff2591`: **24/24, `0 cached`, 43.7s, 3,071 tests / 225 files** |
+
+**Task 15 is committed (`1046fce`). Plan 9's T1–T15 are ALL DONE.** Commits since: the `main` merge
+(`6ff2591`) and one comment fix (`b897404`).
+
+**Why this is a MERGE and not a rebase.** 21 of 48 commits touched this file and #92 inserted its
+block near its top, so `git rebase origin/main` conflicted on commit **1 of 48** and would have asked
+for the same resolution up to twenty more times. Twenty-one hand resolutions of the restart surface
+is how a handoff loses content. Merged instead, resolved once, and verified afterwards that #92's
+rule block, this file's Task 15 section, and its "gaps at 11.97/11.106" correction all survived.
+
+**What remains before the PR:** the single opus whole-branch review is IN FLIGHT (workflow
+`wf_5f7ac57a-24f`). A fix round only if it returns Important or worse. Then the PR — body drafted at
+`scratchpad/pr-body.md`. **The controller merges; I do not.** Ledger rows are NOT promoted here,
+deliberately: Plan 8's were promoted by the controller in #87 and a duplicate written from this side
+had to be dropped.
+
+**TWO FIGURES IN THE DISPATCH BRIEF ARE NOW STALE — measured, not assumed:**
+
+- **"Zero of 48 test files vary `TZ`" is no longer true of `main`.** Twelve TZ-varying test files are
+  already on `origin/main`; this branch adds two more (`apps/server/test/notifications/sweep.test.ts`
+  and `packages/app-core/test/calendar/clock-free.test.ts`). The GAP the brief names is real history,
+  but quoting its number today would misdescribe the tree.
+- **The brief's "~109 of 177 tasks remain" predates this step.** Recount from the ledger; do not
+  carry it.
+
+**A third self-falsifying claim, and the pattern is now worth naming as a class.** Three times on
+this branch a *claim about a check* outran the check itself:
+1. "gaps at 11.97 and 11.106" — asserted in the same paragraph that named double-quoted titles as
+   the hazard, and 11.97/11.106 are double-quoted.
+2. "11.171 will tell you if the nav changes" — measured false; a presence assertion is blind to a
+   fourth link. 11.185 was written because of it.
+3. "grep returns zero hits" for `laneEpicId` in `apps/web` — true when measured, false the instant it
+   was written into a comment containing the word.
+**All three were caught by re-running the stated check rather than by reading the claim.** None was
+caught by review. That is the cheap habit worth carrying to Plan 10: *before repeating a measurement
+someone else recorded, run it.*
+
+## FINAL WHOLE-BRANCH REVIEW — RESULT AND FIX ROUND (2026-09-04)
+
+One opus reviewer, ~45 mutations across app-core, server and the web shell. **No Critical.** Two
+Important, three Minor. It reviewed at `9c44200` rather than the assigned `6ff2591` because the
+branch moved under it; the intervening diff is one code comment and this file, so its measurements
+hold for both.
+
+**Both Important findings were re-measured by me before being acted on** — an agent's finding is not
+a measurement I have made.
+
+**IMPORTANT 1 — FIXED. The loading arm of the Calendar and Timeline tabs had no witness.**
+`) : list.rows !== null ? (` → `) : true ? (` on the calendar arm leaves **134/134 web tests green**,
+and the same on the timeline arm also leaves 134/134 green. Confirmed by my own mutation. The product
+code was CORRECT; the guard was simply unconstrained. What the mutant renders is the exact sentence
+this product exists not to say — *"No claimed dates fall in this month. Undated work is absent, not
+estimated"* — asserted from a read that has not answered. 11.161/11.162 pin the REFUSAL half, which
+is why the pair looked covered. **11.186 and 11.187** now pin the loading half, one per arm, and each
+mutation is killed only by its own case — proven both ways.
+
+**IMPORTANT 2 — FIXED. `Features.md` §11 marked three things `✅` that no user can reach.**
+Verified by grep: nothing mounts `SavedFiltersMenu`, no `PreferencesGateway` implementation exists
+outside the test fake (`saved-filters.ts:175` already conceded it), and no filter or lane prop is
+passed anywhere in `apps/web`. Both bullets are now **⚙️** with the gap named and an owner.
+**One thing the review got wrong and I did not adopt:** it listed `data-pending` as unreachable
+alongside the others. It is not a gap — `toTicketDatesInput` hard-codes `pendingFieldIds: []` because
+this shell is *online-only*, so nothing is ever in transit when a list read lands; Plan 10's replica
+is where that array stops being empty. The file's own docblock says so. §11 now records that
+distinction rather than flattening it.
+
+**MINOR 4 — FIXED, and it was my own overclaim.** The guard's describe is titled *"THE CONTROL FOR
+EVERY NULL ABOVE"*; 11.178 controlled the zone and day needles and **nothing controlled the
+estimation needle**. Writing that control exposed a second, larger thing: the plan's
+`/\b(velocity|burndown|forecast)\b/i` **cannot match `velocityChart`**, because `C` is a word
+character. A file could declare `const velocityChart` and the guard whose stated property is "no
+source speaks the estimation vocabulary" would return clean. Measured before widening: a substring
+scan over all seven roots is **also clean today**, so the needle is now `/(velocity|burndown|forecast)/i`
+at no cost and with no allow-list. **11.188** witnesses both halves, and three mutations prove it:
+reverting to `\b` kills it naming the compound regression, rotting the words kills it naming
+"velocity", and planting `velocityChart` in `inbox/gateway.ts` kills **11.180** end-to-end.
+
+**RECORDED, NOT FIXED — with owners, per the Minor policy:**
+
+- **MINOR 3 — the stale gate's exclusive end is untested.** `apps/server/src/notifications/sweep.ts:256`
+  (`AND entered.server_time < $2`): `<` → `<=` survives 37/37. The docblock states the half-open
+  contract explicitly, but the two boundary cases sit 9.5 hours either side of the cut-off, so
+  nothing exercises `server_time === endUtc`. Breaking input the reviewer names: with `staleDays = 14`
+  and today `2026-08-24` IST, a ticket entering its state at exactly `2026-08-10T18:30:00.000Z` is
+  flagged stale a day early. The OTHER end is well pinned (`.endUtc`→`.startUtc` reddens 4;
+  `<= $2` on the due horizon reddens 9). **OWNER: whoever next opens the sweep's windows** — this is
+  Plan 9 Task 6's surface, and the fix is one boundary fixture, not a code change.
+- **MINOR 5 — the notification kind vocabulary has a THIRD statement nothing holds to the other two.**
+  `apps/server/migrations/1788437881385_notifications.sql:12`'s `notifications_kind_check` versus
+  `NOTIFICATION_KINDS`. 11.181 ties the payload schema map to the domain list; nothing ties the SQL
+  `CHECK` to either. The consequence is quiet rather than loud: `deliverToAll` catches per transport,
+  so a sixth kind added to the domain without a migration **silently drops every notification of that
+  kind**, leaving only a log line. **Not measured** — `apps/server` imports the domain by package
+  name, which resolves through `./dist`, so the reviewer could not mutate it and neither claim is
+  test-backed. **OWNER: whoever adds a sixth notification kind**; the cheap closure is one test
+  iterating `NOTIFICATION_KINDS` and inserting each against the real table.
+
+**A MISTAKE I MADE MID-FIX, recorded because the recovery is the lesson.** After mutating the guard I
+restored it with `git checkout -- <file>` — which restores from the INDEX, and my widening and 11.188
+were not yet committed. The checkout silently discarded them, and the two mutations I ran next were
+therefore measured against the OLD guard and came back green, which I nearly read as "the control
+does not work". **Caught only because a green result where I predicted red is itself a finding.**
+Redone, backed up to a file first, and re-mutated with `cp` restores. The general rule: `git checkout`
+is not an undo for work that has never been committed.
+
+## PR #93 IS OPEN — STEP 14 IS DONE FROM THIS SIDE (2026-09-04 ~07:20)
+
+**https://github.com/bkirosangma/gisik-nokma/pull/93** — `exec/14-plan9-calendar` → `main`,
+**MERGEABLE**, CI `gate` pending at the time of writing.
+
+| anchor | value |
+|---|---|
+| HEAD | **`59f834b`** — pushed, reachable (`git branch --contains` names the branch) |
+| behind `main` | **0** — `origin/main` `421db9f` is merged in, not rebased over |
+| tree | clean |
+| commits | 52 · 87 files · +19,578/−104 |
+| gate | **24/24, `0 cached`, 43.5s, 3,074 tests / 225 files**, Node named from inside the run |
+
+**Plan 9 is complete: Tasks 1–15, plus the final review's fix round.** The next executor step in the
+serial sequence is **step 15 — Plan 10 remainder** *(T7, T9, T14, T15 floor-list)*. **Note the owner's
+stop point recorded at the top of `controller-state.md`: ask before dispatching Plan 10 T14.**
+
+**The controller merges. Ledger rows are NOT promoted from this side** — Plan 8's were promoted by
+the controller in #87 and a duplicate written from here had to be dropped, so Plan 9's fifteen rows
+are the controller's to write.
+
+**If you are a fresh executor reading this after a restart:** the position above is the merged,
+pushed truth. Verify it rather than adopting it — `git rev-parse HEAD`, `git branch --contains HEAD`,
+`gh pr view 93`. If #93 has merged, `main` has moved and this file's anchors are history.

@@ -1,6 +1,7 @@
 import type {
   DataSource,
   DataSourceQuery,
+  NotificationsGateway,
   UserPreferences,
   WorkflowAuthoringGateway,
 } from '@gisik-nokma/app-core';
@@ -12,6 +13,7 @@ import {
   type InviteGateway,
 } from '@gisik-nokma/app-core/online';
 import type { AppServices } from '../../src/providers.js';
+import type { TicketLocator } from '../../src/ticket-location.js';
 
 export const EMPTY_PREFERENCES: UserPreferences = {
   version: 1,
@@ -56,6 +58,13 @@ export type GatewayStubs = {
   invitesAdmin?: Partial<InviteAdminGateway>;
   founding?: Partial<FoundingGateway>;
   authoring?: Partial<WorkflowAuthoringGateway>;
+  /**
+   * Plan 9 Task 14's two. Same rule as every gateway above: un-stubbed members
+   * reject BY NAME, so a case that forgot to stub `unreadCount` sees the nav
+   * badge stay dark for a stated reason rather than reading 0 and passing.
+   */
+  notifications?: Partial<NotificationsGateway>;
+  ticketLocation?: Partial<TicketLocator>;
 };
 
 export function stubServices(
@@ -121,6 +130,16 @@ export function stubServices(
       migrateTypeToWorkflow: unstubbedGateway('authoring.migrateTypeToWorkflow'),
       submit: unstubbedGateway('authoring.submit'),
       ...gateways.authoring,
+    },
+    notifications: {
+      list: unstubbedGateway('notifications.list'),
+      unreadCount: unstubbedGateway('notifications.unreadCount'),
+      markRead: unstubbedGateway('notifications.markRead'),
+      ...gateways.notifications,
+    },
+    ticketLocation: {
+      locate: unstubbedGateway('ticketLocation.locate'),
+      ...gateways.ticketLocation,
     },
   };
 }

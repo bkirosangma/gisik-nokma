@@ -1,0 +1,255 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { InboxView, notificationTicketId, type NotificationsPage } from '@gisik-nokma/app-core';
+import type { Notification } from '@gisik-nokma/domain';
+import { AppNav } from '../../src/app-nav.js';
+import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../src/expired-session.js';
+import { useAppServices } from '../../src/providers.js';
+import { ShellRefusal } from '../../src/shell-refusal.js';
+import { ticketSheetPath } from '../../src/ticket-location.js';
+
+/**
+ * What an inbox with nothing in it says.
+ *
+ * Task 12 recorded this as Task 14's: `InboxView` renders a bare `<ul>` for an
+ * empty list, so a reader with no notifications got an empty box, while the
+ * calendar and the timeline both name their emptiness out loud (`NO_DATES_NOTE`,
+ * `NO_DAY_CLAIMS_NOTE`). The two siblings source that copy from a model
+ * constant; the inbox has no model layer, so the shell that composes it owns
+ * the sentence. Exported so the test asserts THIS string rather than a
+ * paraphrase of it.
+ */
+export const EMPTY_INBOX_COPY = 'Nothing in your inbox. You will be told here when someone assigns you a ticket, mentions you, contests a claim, or a claimed day comes near.';
+
+/**
+ * What the page says when it knows the ticket but the server will not place it.
+ *
+ * `TicketLocator.locate` answers `null` for the ONE 404 the ticket route sends
+ * for both "no such ticket" and "not yours" — see `src/ticket-location.ts`. The
+ * notification itself stays on screen and stays readable, because the standing
+ * ruling is that a delivered message is the reader's own; what is unavailable is
+ * the ticket behind it, and this says exactly that and nothing more.
+ */
+export const CANNOT_OPEN_COPY =
+  'That ticket cannot be opened from here — it may have been removed, or it is no longer visible to you. The message itself is yours and stays.';
+
+/**
+ * What the page says when the NEXT page fails — beside the control, not instead
+ * of the messages.
+ *
+ * Measured before it was written: with `loadMore`'s failure routed into `error`,
+ * a page-2 refusal left ZERO rows on screen and one refusal panel, because the
+ * render's first arm is `ShellRefusal` and it stands ahead of the rows. So a
+ * request that FAILED took away messages that had already ARRIVED — which is the
+ * standing ruling ("a message you were sent is yours") read backwards, and the
+ * opposite of what `inbox-nav-link.tsx` does one file over, where a failed
+ * refresh deliberately keeps the last count rather than asserting "none" from a
+ * request that did not answer.
+ *
+ * The rows already delivered therefore stay, the Load-more control stays (the
+ * cursor is unchanged, so the retry is real), and this sentence appears next to
+ * it. The prefix is the server's own words, appended by the caller.
+ */
+export const PAGING_FAILURE_PREFIX = 'More of your inbox could not be loaded, so what is below is only part of it: ';
+
+/**
+ * `/inbox` — a GLOBAL route, and that is a decision rather than an accident.
+ *
+ * There is no `[workspaceId]` segment above this page, so there is no workspace
+ * in scope, which is the second of the two reasons
+ * `createHttpNotificationsGateway` sends no `workspaceId` on the list query (the
+ * first being the interface's own contract with Plan 10's replica). Notifications
+ * carry their own `workspaceId` per row, and the deep link uses it.
+ *
+ * ## FOUR states, because the sketch's two collapse the one that lies
+ *
+ * The plan's draft holds `notifications: Notification[]` initialised to `[]` and
+ * branches on `failed`. That renders the loaded-and-empty view during the FIRST
+ * READ — the same falsehood as `?? []` on the attention strip and a spinner over
+ * a refused read, one layer up: a reader whose inbox is still arriving is told
+ * it is empty. So the page holds `page: NotificationsPage | null`, `null`
+ * meaning "not answered yet", and the four arms below are refused / loading /
+ * empty / loaded.
+ *
+ * A FIFTH state is deliberately not one of the four: a failed SECOND page. It is
+ * held in `pagingError` and rendered beside the Load-more control inside the
+ * loaded arm, because it is not a reason the page cannot be shown — the page is
+ * on screen and the rows in it are real. Routing it through `error`, which is
+ * what the first version of this file did, put the refusal panel in the first
+ * arm and took every delivered message off the screen; measured with a probe,
+ * zero rows and one panel. See `PAGING_FAILURE_PREFIX`.
+ *
+ * ## Display names are ids, and the reason is not "not yet wired"
+ *
+ * The plan's Guard says to use the shell's member-directory hook if one exists.
+ * Measured: `grep -rn "useWorkspaceMembers\|memberName\|userName" apps/web/src
+ * apps/web/app` returns nothing — there is no such hook. `DataSource.getMembers`
+ * exists and is served, but it is keyed BY WORKSPACE and this page has no
+ * workspace: a cross-workspace inbox would have to fan out one roster read per
+ * distinct `workspaceId` on the page and rebuild it as rows page in. That is a
+ * directory, not a wiring line, and inventing a half of one here would put a
+ * second naming authority in the product beside whatever Plan 6's eventually is.
+ * So the actor id renders — attributed, if unpolished, and never anonymous.
+ * Recorded as a finding rather than left as a silent `(id) => id`.
+ */
+export default function InboxPage() {
+  const router = useRouter();
+  const { notifications: gateway, ticketLocation } = useAppServices();
+
+  const [page, setPage] = useState<NotificationsPage | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [openFailure, setOpenFailure] = useState<string | null>(null);
+  /**
+   * The NEXT page's failure, held apart from `error` on purpose. `error` means
+   * "this page cannot be shown"; this means "this page is shown and there is
+   * more of it that would not come". Collapsing them into one string is exactly
+   * the defect this round fixed — see `PAGING_FAILURE_PREFIX`.
+   */
+  const [pagingError, setPagingError] = useState<string | null>(null);
+
+  /**
+   * Both reads and the mark-read write fail the same way, so the message is
+   * extracted the same way. `HttpError`'s message is `HTTP ${status} for
+   * ${path}` — the format `isExpiredSession` matches on — so a 401 anywhere on
+   * this page reaches the sign-in redirect rather than a refusal panel that
+   * names the wrong cause.
+   */
+  const messageOf = (cause: unknown): string =>
+    cause instanceof Error ? cause.message : String(cause);
+
+  const loadFirstPage = useCallback(async (): Promise<void> => {
+    try {
+      setPage(await gateway.list());
+      setError(null);
+      // A fresh first page REPLACES the rows, so a complaint about a second page
+      // that no longer exists would be describing nothing on screen. Decided
+      // rather than left ambiguous: the first read clears it, the retry below
+      // clears it, and nothing else does.
+      setPagingError(null);
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  }, [gateway]);
+
+  useEffect(() => {
+    void loadFirstPage();
+  }, [loadFirstPage]);
+
+  const expired = useSignInOnExpiredSession([error, openFailure, pagingError]);
+
+  async function loadMore(): Promise<void> {
+    if (page === null || page.nextCursor === null) return;
+    try {
+      const next = await gateway.list(page.nextCursor);
+      // Appended to the rows already on screen. `page` is read from the closure
+      // the click was rendered with, and a second click cannot race a first
+      // because `onLoadMore` is withdrawn while `nextCursor` is null.
+      setPage({
+        notifications: [...page.notifications, ...next.notifications],
+        nextCursor: next.nextCursor,
+      });
+      // A retry that worked withdraws the complaint about the try that did not.
+      setPagingError(null);
+    } catch (cause) {
+      // NOT `setError`. That arm blanks the page; this one keeps the rows the
+      // server already delivered and says, beside the control, that there is
+      // more it would not give. See `PAGING_FAILURE_PREFIX`.
+      setPagingError(messageOf(cause));
+    }
+  }
+
+  /**
+   * The optimistic flip, and the reload that undoes it.
+   *
+   * `markRead` THROWS on the route's 404 — a row that is not yours and a row
+   * that does not exist are one frozen body (`routes/notifications.ts`) — and
+   * this shell's gateway does not swallow it (case 11.138). So the catch is not
+   * defensive decoration: it is the arm that reloads the truth instead of
+   * leaving a row drawn as read that the server never marked.
+   */
+  function markRead(id: string): void {
+    setPage((current) =>
+      current === null
+        ? current
+        : {
+            ...current,
+            notifications: current.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
+          },
+    );
+    void gateway.markRead(id).catch(() => loadFirstPage());
+  }
+
+  /**
+   * The deep link. A notification names a ticket and a workspace; the shell's
+   * ticket sheet needs a PROJECT, which no notification payload carries — so the
+   * project is asked for rather than guessed. `src/ticket-location.ts` carries
+   * the whole argument, including why the plan's `/tickets/${id}` names a route
+   * this shell does not have.
+   */
+  function open(notification: Notification): void {
+    const ticketId = notificationTicketId(notification);
+    setOpenFailure(null);
+    void (async () => {
+      try {
+        const location = await ticketLocation.locate(notification.workspaceId, ticketId);
+        if (location === null) {
+          setOpenFailure(CANNOT_OPEN_COPY);
+          return;
+        }
+        router.push(ticketSheetPath(location, ticketId));
+      } catch (cause) {
+        setOpenFailure(messageOf(cause));
+      }
+    })();
+  }
+
+  return (
+    <main className="gn-shell">
+      <AppNav />
+      <h1 className="gn-page-title">Inbox</h1>
+      <div className="gn-shell__main">
+        {expired ? (
+          <ExpiredSessionNotice />
+        ) : (
+          <>
+            {openFailure !== null ? (
+              <p role="status" className="gn-inbox__open-failure">
+                {openFailure}
+              </p>
+            ) : null}
+            {error !== null ? (
+              <ShellRefusal what="Your inbox" message={error} />
+            ) : page === null ? (
+              <p role="status">Loading…</p>
+            ) : page.notifications.length === 0 ? (
+              <p role="status" className="gn-inbox__empty">
+                {EMPTY_INBOX_COPY}
+              </p>
+            ) : (
+              <>
+                <InboxView
+                  notifications={page.notifications}
+                  userName={(id) => id}
+                  onOpen={open}
+                  onMarkRead={markRead}
+                  onLoadMore={page.nextCursor === null ? null : loadMore}
+                />
+                {/* AFTER the view, which is where the Load-more button it is
+                    about sits — and inside the loaded arm, so it can never
+                    stand in place of the rows. */}
+                {pagingError !== null ? (
+                  <p role="status" className="gn-inbox__paging-failure">
+                    {PAGING_FAILURE_PREFIX}
+                    {pagingError}
+                  </p>
+                ) : null}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </main>
+  );
+}

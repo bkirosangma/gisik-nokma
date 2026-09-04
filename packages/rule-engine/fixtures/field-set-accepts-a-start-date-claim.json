@@ -1,0 +1,29 @@
+{
+  "name": "a start date is a claim like a due date — {date, note?} accepted",
+  "notes": "Same world as field-set-refuses-a-malformed-start-date, a fitting value: the twin that catches a kind check refusing everything.",
+  "workflowDefs": [
+    {
+      "id": "wf-basic", "version": 1, "name": "Basic", "initialStateId": "todo",
+      "states": [
+        { "id": "todo", "name": "To do", "category": "open" },
+        { "id": "doing", "name": "Doing", "category": "active" },
+        { "id": "done", "name": "Done", "category": "terminal" }
+      ],
+      "transitions": [
+        { "from": "*", "to": "doing", "rules": [] },
+        { "from": "*", "to": "done", "rules": [] }
+      ]
+    }
+  ],
+  "priorEvents": [
+    { "type": "ticket-type.defined", "entity": { "kind": "ticket-type", "id": "task" }, "actorId": "user-kiro",
+      "payload": { "id": "task", "name": "Task", "icon": "check", "rank": 3, "workflowId": "wf-basic", "fields": [] } },
+    { "type": "ticket.created", "entity": { "kind": "ticket", "id": "01J9GTKA000000000000000000" }, "actorId": "user-kiro",
+      "payload": { "typeId": "task", "projectId": "01J9GPRJ000000000000000000", "parentId": null, "title": "Renew the DLT registration", "workflowId": "wf-basic" } }
+  ],
+  "candidateEvent": {
+    "type": "ticket.field_set", "entity": { "kind": "ticket", "id": "01J9GTKA000000000000000000" }, "actorId": "user-kiro",
+    "payload": { "fieldId": "startDate", "value": { "date": "2026-09-01", "note": "after the bank account opens" } }
+  },
+  "expected": { "refused": false }
+}

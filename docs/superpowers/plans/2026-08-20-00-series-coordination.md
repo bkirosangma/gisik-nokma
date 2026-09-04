@@ -5953,7 +5953,7 @@ including the serving gap case". Measured at execution it kills **2**. Not a mis
 necessarily — but a kill count is a fact about a suite at a moment, and this one was cited three steps
 later as though it were a property of the change.
 
-## RULING P26 EXISTS AS A NUMBER WITH NO TEXT — recorded by the executor, 2026-09-02
+## ~~RULING P26 EXISTS AS A NUMBER WITH NO TEXT~~ — SUPERSEDED. P26 was written 2026-09-02; see the correction at the end of this section. Recorded by the executor 2026-09-02, corrected by the step-14 executor 2026-09-03
 
 `docs/lanes/controller-state.md:159` says the cross-plan shape scan found *"1 live (`SavedFilter`, now
 Ruling P26)"*. **Searched at `origin/main`: the string `P26` appears in that one line and nowhere else
@@ -5988,10 +5988,37 @@ P24 now, and Task 7's `mapPreferences` already implements the translation.
 step 14's, and it is written here rather than left in a number so step 14 inherits the evidence rather
 than the citation.
 
-**Not resolved by the executor**, because P26 is the controller's ruling and inventing its text would be
-worse than reporting it missing. The ask is one sentence: *does P24's reasoning extend to Plan 9's
-`spec`?* If it does — and the same `.strict()` argument applies unchanged — then P26 is that sentence
-and Plan 9's Open questions should carry it before step 14 dispatches.
+~~**Not resolved by the executor**, because P26 is the controller's ruling and inventing its text would
+be worse than reporting it missing. The ask is one sentence: *does P24's reasoning extend to Plan 9's
+`spec`?*~~
+
+**ANSWERED. P26 WAS WRITTEN ON 2026-09-02 AND THE ANSWER IS YES — `filterSpec` WINS, AND PLAN 9 TASK
+13'S `spec` IS SUPERSEDED BEFORE IT IS WRITTEN.** The full text is in `docs/lanes/controller-state.md`
+under *"Standing owner rulings currently in force"*. Its reasoning is exactly the extension this
+section asked for: **a `.strict()` schema REFUSES a third spelling rather than renaming it**, so
+`filterSpec` wins on P24's own logic applied to a plan P24 never looked at. P26 also records that Plan
+9 T13 *is not disagreeing — it does not know*: measured against its own text, **zero** mentions of
+`filterSpec`, **zero** of `preferencesDocSchema`, **zero** of `Plan 5`.
+
+**Step 14 needs no ruling here. Task 13 adopts `filterSpec`.** The other two spellings — app-core's
+`filter` and Plan 6's — are **closed under P24** and pinned by `client-contract.test.ts:605`; they are
+not reopened.
+
+> **Why this correction is worth more than the line it fixes.** The section above, and the one at
+> *"RULING P26 EXISTS AS A NUMBER WITH NO TEXT"*, both still described P26 as unwritten **the day
+> after it was written**, because the ruling landed in `controller-state.md` and nothing came back
+> here. Step 14's pre-flight agent read *this* document — the interface authority — and duly reported
+> the question as "OPEN / UNRESOLVED … needs an explicit ruling before or during Task 13". **It was
+> reporting this file accurately.** Had the executor forwarded that, it would have escalated a
+> settled question and spent a controller round-trip re-deciding what was decided.
+>
+> The generalisation: **a ruling recorded in one lane's state file is invisible to the other lane's
+> agents.** (An earlier draft of this paragraph called it the *third* instance in two days. Two are
+> demonstrable -- P26 ruled in a message with no text, then P26 written to `controller-state.md` only.
+> The third was not enumerable, and a counted plural inside a correction about stale documents is a
+> bad place to round up.) `controller-state.md`
+> is not read by dispatched subagents; this document is. **A ruling is not landed until it is written
+> where the work will read it** — which for anything binding a plan's task means here, not only there.
 
 ---
 
@@ -6544,3 +6571,22 @@ with the roster gap, this is recorded as unowned rather than handed a plausible-
 unchecked boxes at this sha, with Tasks 1–15 executed and committed. The sweep above used artefacts
 instead — `Features.md` carries no §11 heading and `test-cases/` holds no `11-` file, which is what
 actually establishes that Plan 9 Task 15 (reserving ids 11.1–11.47) has not run.
+
+> **SUPERSEDED 2026-09-04 by the event it was predicting: Plan 9 Task 15 HAS now run**, on
+> `exec/14-plan9-calendar`. `Features.md` carries a §11 heading and `test-cases/` holds
+> `11-calendar-notifications.md`, so the artefact test above now returns the opposite answer. The
+> *method* stands and is the reason this note is amended rather than deleted — checkbox state is
+> still not evidence, and artefacts still are. Two facts the sweep above could not have known,
+> both measured at that branch: the reserved range it cites is **not** what shipped — Plan 9's
+> nominal `11.1–11.47` was superseded on the branch by a one-id-per-test scheme, and the live
+> range is **11.1–11.188 with 11.9–11.17, 11.19–11.35, 11.40–11.47 and 11.123–11.129
+> permanently unused**; and the *second* half of the sweep above — that nothing in `apps/web`
+> links to Plan 8's six authoring routes — is now pinned by a test rather than only disclosed.
+> `apps/web/test/app-nav.test.tsx` case **11.185** asserts `AppNav`'s hrefs are EXACTLY
+> `/workspaces`, `/w/<id>/my-work` and `/inbox`, so whoever wires a settings entry is told by a red
+> test naming itself that the nav changed and the catalogue needs a case. **11.171, which asserts the
+> same three links are present, is not that test and cannot be**: measured by wiring a
+> `settings/workflows` link into `AppNav`, 11.170 and 11.171 both stayed GREEN and only 11.185 went
+> red. A presence assertion cannot see a fourth door — which is the same blindness, one level up,
+> that let a deleted `<InboxNavLink />` leave 125 tests green. The gap stays **UNOWNED**; only its
+> silence is fixed.

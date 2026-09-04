@@ -74,6 +74,26 @@ export const TOKEN_ROLES = [
   'pending',
   'restricted',
   'contested',
+  /**
+   * A claim on a workspace-DEFINED date field, as against the two built-ins.
+   *
+   * Added by Plan 9 Task 9, the first surface that renders a calendar colour.
+   * The plan asked for six colour names (`todayRing`, `pendingHatch`,
+   * `barActive`, `barTerminal`, `marker`, `customMarker`); five of them are
+   * existing roles wearing new words — the today ring and a bar are `accent`,
+   * an in-transit claim is `pending`, and a built-in marker's glyph is
+   * `accent` too — and a role invented for each would have been six ways to
+   * say four things. This one is not: "a day someone's own field claimed" is a
+   * meaning the roster did not carry, and it is the ONE distinction the
+   * calendar's legend exists to make visible.
+   *
+   * It shares `restricted`'s primitives deliberately, the way `blocked` shares
+   * `danger`'s and `pending` shares `warning`'s: roles are meanings, primitives
+   * are the palette, and the two never appear in one another's surfaces (a
+   * visibility chip's dot, a calendar marker's glyph). A future palette edit
+   * that wants them apart moves this line, not every call site.
+   */
+  'customMarker',
 ] as const;
 
 export type TokenRole = (typeof TOKEN_ROLES)[number];
@@ -106,6 +126,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     pending: 'amber700',
     restricted: 'violet600',
     contested: 'magenta600',
+    customMarker: 'violet600',
   },
   dark: {
     surface: 'coal',
@@ -134,6 +155,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     pending: 'amber300',
     restricted: 'violet300',
     contested: 'magenta300',
+    customMarker: 'violet300',
   },
 };
 
@@ -150,6 +172,14 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'dangerText', bg: 'danger', minimum: 4.5 },
   { fg: 'warningText', bg: 'warning', minimum: 4.5 },
   { fg: 'successText', bg: 'success', minimum: 4.5 },
+  /**
+   * The calendar renders a custom date claim's LABEL in this role, not just a
+   * glyph, so it is held to the text minimum rather than the 3:1 a decorative
+   * mark would earn. Measured on this palette: 5.22 in light, 7.86 in dark. A
+   * role added without a pair here would be a colour with no guarantee — the
+   * one thing this file exists to make impossible.
+   */
+  { fg: 'customMarker', bg: 'surface', minimum: 4.5 },
 ];
 
 export function colorOf(theme: ThemeName, role: TokenRole): string {

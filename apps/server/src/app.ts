@@ -4,12 +4,15 @@ import type { Auth } from './auth/auth.js';
 import { registerAuthRoutes } from './auth/routes.js';
 import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
+import { createNotificationFanout } from './notifications/fanout.js';
+import { createInAppTransport } from './notifications/transport.js';
 import { registerAttentionRoutes } from './routes/attention.js';
 import { registerBoardRoutes } from './routes/board.js';
 import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
 import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
+import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerPreferencesRoutes } from './routes/preferences.js';
 import { registerSearchRoutes } from './routes/search.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
@@ -288,6 +291,12 @@ export function buildApp(
   // under, and there is deliberately no parameter by which a caller could name
   // somebody else's.
   registerPreferencesRoutes(app, { pool: deps.pool }, requireSession);
+  // The notification inbox (Plan 9 Task 7) — cursor-paged list, unread count,
+  // and idempotent mark-read, all three scoped to `request.currentUserId` by
+  // construction. Same preHandler by parameter as every route above it, and
+  // here it is a read-enforcement surface: another user's notification id
+  // must read as `not_found`, never as a different, more informative refusal.
+  registerNotificationRoutes(app, { pool: deps.pool }, requireSession);
   // The realtime fan-out (Plan 5 Tasks 14–15) — the FIRST thing here that is
   // not a request/response at all, and the first that decides who ELSE hears
   // about a change. The hub is created HERE, beside the ingest service whose
@@ -308,6 +317,44 @@ export function buildApp(
   });
   app.decorate('streamHub', hub);
   registerStreamRoute(app, { ...deps.stream, pool: deps.pool, hub, now: deps.now }, requireSession);
+  // The notification fan-out (Plan 9 Task 5) — the SECOND listener on the commit
+  // feed, and the only one that addresses a person rather than a connection.
+  //
+  // ADAPTATION, recorded: the plan says wire this in `src/index.ts`. It goes
+  // here instead, beside the stream hub, because this is where the commit feed
+  // is actually reachable — `index.ts` builds the ingest service but hands it
+  // straight to `buildApp`, and a subscription made there would be one the app
+  // could neither observe nor unsubscribe. Here it is also inside the one
+  // composition path every assembled app takes, so it is pinned by a test
+  // (`test/notifications/fanout.test.ts`, 'boot wiring') rather than only by a
+  // typecheck that cannot notice an unsubscribed listener.
+  //
+  // FIRE-AND-FORGET, and that is the disclosure property, not an optimisation:
+  // `onCommitted` is not awaited, so no request's response — and no request's
+  // TIMING — can depend on whether a mention was delivered or silently refused.
+  // The mention gate's silence rests on this line as much as on the gate.
+  // `onCommitted` never rejects (it logs its own failures), so the floating
+  // promise can carry nothing back here.
+  //
+  // The listener receives `LedgerEvent = EventEnvelope & { workspaceSeq: number }`.
+  // That is a structural extension, so it passes as an `EventEnvelope` with no
+  // cast, and the fan-out deliberately ignores the cursor: a notification is
+  // addressed to a person, never resumed from a stream position. The hub above
+  // is the listener that needs `workspaceSeq`; this one does not.
+  const notificationFanout = createNotificationFanout({
+    pool: deps.pool,
+    transports: [createInAppTransport(deps.pool)],
+  });
+  const unsubscribeNotifications = deps.ingest.onEventCommitted((event) => {
+    void notificationFanout.onCommitted(event);
+  });
+  // Same reason the hub is closed above, and the same failure if it is not: a
+  // test file that builds several apps over one ingest service would otherwise
+  // leave a live fan-out on each, and every later commit would be delivered
+  // once per app ever built.
+  app.addHook('onClose', () => {
+    unsubscribeNotifications();
+  });
   registerAuthRoutes(app, deps.auth);
 
   return app;
