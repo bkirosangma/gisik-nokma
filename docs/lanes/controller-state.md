@@ -1269,6 +1269,14 @@ Every one below was violated by a controller that had just written it. **Assume 
 
 - Never run a state-changing git command in a shell whose cwd was set for a read — use `git -C`. Violated;
   it swapped a live lane's worktree for 26 seconds and contaminated a running review.
+- **A pipe has a second failure mode, and it is worse than the exit code.** `| head` (and `grep -m N`)
+  closes the pipe early, so the runner's parent dies on EPIPE and its fork workers are orphaned at
+  `ppid=1` — spinning at ~1 core each and growing, with the tool call reporting success. On 2026-09-04
+  a task-14 agent's `pnpm exec vitest run 2>&1 | head -6` left six workers behind at 05:05; by 05:28 they
+  held 22.4 GB on a 16 GB machine and the machine had to be force-restarted. The control is in the same
+  transcript: the same suite through `| tail -6`, five seconds later, left nothing. Reproduced on demand
+  in 30 seconds. Same lesson as the two entries below it — **do not pipe a run at all**: redirect to a
+  file and read the file. A machine-local `PreToolUse` hook now refuses the piped form.
 - **A gate's exit code is the LAST command's exit code.** The known form is the pipe (`| tail` reports
   `tail`'s status). It was re-hit 2026-08-31 in a new costume: a trailing `echo` made the harness report
   **"exit code 0"** for a gate whose summary said `Tasks: 11 successful, 18 total / Failed:
