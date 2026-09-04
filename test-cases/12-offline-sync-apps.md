@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.118`. THE NEXT FREE ID IS `12.119`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, and said `12.114` until Batch A's whole-branch review round added 12.115–12.118. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.155`. THE NEXT FREE ID IS `12.156`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), and said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check). A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -22,11 +22,24 @@ One consequence worth stating rather than leaving to be discovered: **12.15 is a
 — `apps/server/test/sync/stream-seq.test.ts` shipped with Plan 10 Task 2 — but it is a reserved id and
 is deliberately not flipped here. *Owner: Plan 10 Task 18.*
 
-**Scope of this file today.** Plan 10 Tasks 4, 5, 6 and 7. Task 4 as lifted out of the plan's position:
-the §11 envelope-coherence closer, `proj_contested`, `getContest` and `GET /v1/contests`. Task 5: the
-snapshot writer and the ledger-sourced reducer deps. Task 6: `GET /v1/sync/bootstrap`. Task 7:
-`POST /v1/sync`. Nothing else from Plan 10 is catalogued — Tasks 8–17 (sync-client, the replica, the
-outbox, the two app shells, the dual-client harness) are absent rather than missing.
+**Scope of this file today.** Plan 10 Tasks 4, 5, 6, 7, 9 and 10. Task 4 as lifted out of the plan's
+position: the §11 envelope-coherence closer, `proj_contested`, `getContest` and `GET /v1/contests`.
+Task 5: the snapshot writer and the ledger-sourced reducer deps. Task 6: `GET /v1/sync/bootstrap`.
+Task 7: `POST /v1/sync`. Task 9: the replica (12.119–12.137). Task 10: the outbox and the local
+pre-check (12.138–12.153). Nothing else from Plan 10 is catalogued — Task 8 (the `sync-client` scaffold
+and the storage seam), Task 11 (the sync engine), Tasks 12–13 (the replica `DataSource` and app-core's
+offline UX), Tasks 14–15 (the dual-client harness and its scenarios) and Tasks 16–17 (the two app
+shells) are absent rather than missing. **Task 8's absence is measured, not assumed**: this file has no
+Task 8 section and no case id for it — `grep -n "Task 8" test-cases/12-offline-sync-apps.md` returns
+one line, a passing mention of its `outbox` table inside a Task 7 case — and its storage-conformance
+and barrel-guard suites (the "+4 and +4" in `packages/sync-client`'s 45) are catalogued in no
+`test-cases/` file at all. *Owner for placing them: Plan 10 Task 18.*
+
+**This paragraph was itself the drift the header line above warns about.** Written for Task 7 (commit
+`09765d0`), it went on saying "Tasks 8–17 … the replica, the outbox … are absent rather than missing"
+through Task 9's replica section and Task 10's outbox section landing in this same file — it named as
+absent two things a reader could scroll to. The HIGHEST/NEXT-FREE line got bumped both times and this
+sentence did not. Rewrite this enumeration in the SAME change set as any section you add.
 
 **Terminology.** "envelope-origin" throughout means `EventEnvelope.origin`, the provenance enum
 `'web' | 'mobile' | 'desktop' | 'server'`. It is NOT the browser `Origin` header; nothing in this file
@@ -398,3 +411,456 @@ refusal, which fires on both doors and therefore proves nothing about which was 
   ever wants a real door test for that comparison: whoever adds a second server-side contest producer;
   there is exactly one today.*
 
+
+## The replica (Task 9) — `packages/sync-client/test/replica.test.ts`
+
+**EVERY ENUMERATION IN THIS SECTION IS A RUN OF `vitest run test/replica.test.ts` ALONE**, which is
+what its `(20)` denominators mean. Task 9 also owns 12.154–12.155, which live in
+`packages/sync-client/test/recorded-hazards.test.ts` and have their own section at the end of this
+file; run package-wide, some of the mutations below ALSO redden those two — measured for 12.128
+(it does) and 12.129 (it does not), and not measured for the other seventeen.
+
+**Nineteen `it` declarations, one per id 12.119–12.137, running as TWENTY tests** — 12.132's `it`
+sits inside a two-zone loop, so it executes twice. Both numbers are stated because neither implies the
+other, and each is measured: `grep -nE "^[[:space:]]*it\(" packages/sync-client/test/replica.test.ts`
+prints nineteen lines, one per id, **enumerated rather than counted**: a count with no rows behind it
+is how the wrong number in this very paragraph survived once before. The runner's own line reads
+`Tests 20 passed (20)`.
+**Every one of the nineteen ids was proved able to fail** — enumerated case by case below, each with
+the mutation that reddened it. Twenty source mutations have now been applied one at a time to
+`packages/sync-client/src/replica/`, restored by `cp` from a pre-mutation backup between runs and
+re-verified with `git diff` (never `git checkout --`, and never shell `diff`, which has returned a
+false "identical" on this machine). The harness's own control was a null mutation (text replaced with
+itself) → `20 passed (20)`, so the reddenings are the mutations and not the harness.
+
+**Every "red here alone" below was RE-MEASURED in the fix round, and four enumerations were false.**
+The corrections are in the notes themselves; the pattern they share is worth naming once, because it is
+the one this file's own header warns about: an enumeration is a fact about a moment, and nothing
+re-derives it when a case is appended below. 12.120's and 12.125's were falsified by cases in the very
+round that wrote them; 12.121's by 12.135 a round later; 12.122's claim about what it discriminates was
+never true.
+
+**One thing in this module is deliberately NOT covered here, recorded rather than left implicit**: the
+`DELETE FROM outbox WHERE event_id = ?` in `applyServerItem` — "an echo of our own claim confirms it".
+The `outbox` table exists (Task 8's schema) so the statement compiles and an echo cannot leave a queued
+row behind forever, but its semantics belong to the outbox, and no case here exercises them. *Owner:
+Plan 10 Task 10 (outbox + local pre-check).* It gets no id of its own, because an id here would burn
+the number Task 10's own echo case will want and the never-renumber rule would keep it burned.
+
+- 12.119 ✅ `ticket.created` + `ticket.transitioned` + `ticket.field_set` fold into a `TicketState`
+  through `applyTicketEvent`, and the transition log entry keeps `toStateId`, `actorId`, `seq`,
+  `workflowId` and the `workflowVersion` its destination is written in. **The payload spells the
+  destination `to` and the log entry spells it `toStateId`; both are correct and deliberately not
+  unified** (`packages/domain/src/ticket-state.ts` header) — the plan's own snippet for this task
+  builds the payload as `{ toStateId }`, which zod refuses. *Mutation: hand the reducer a constant
+  per-entity `seq` from `rowToEnvelope` → red here, on 12.122, 12.123, 12.124 and 12.137
+  (`Tests 5 failed | 15 passed (20)`). 12.137 was added after this note and is included by
+  re-measurement, not by inheritance.*
+- 12.120 ✅ a duplicate event id answers `{ applied: false }` and adds no second ledger row —
+  at-least-once delivery is the contract. *Mutation: drop the `SELECT 1 FROM events WHERE id = ?`
+  guard → red here **and on 12.133** (`Tests 2 failed | 18 passed (20)`). This note said "red here
+  alone" until it was measured: 12.133 asserts that `onChange` does not fire on a redelivered event,
+  and `applyServerItem` answers `applied: false` — which is what holds the beat count at 1 — only
+  because of this guard. The two cases were written in the same round and neither was checked against
+  the other.*
+- 12.121 ✅ a `claim.contested` folds into the `contests` table and NOT into ticket state (the ticket
+  stays in `todo`), `claimantId` is the actor of the **refused claim** rather than of the contest the
+  server filed, and `claim.contested_resolved` flips `resolved`/`resolution` so `{ open: true }`
+  empties. The `[]` carries a positive control from the same call: unfiltered, the contest is still
+  there. *Mutation: skip `applyContest` → red here, on 12.127, on 12.135, on 12.137 and on both
+  12.132 runs — FIVE ids across SIX runs (`Tests 6 failed | 14 passed (20)`). This note said "red here,
+  on 12.127 and on both 12.132 runs" — four runs — and was already false when 12.135 landed in a later
+  round without it being re-derived; 12.137 has since been added on top.*
+- 12.122 ✅ bootstrap folds a snapshot plus the events past its `seq`: a backfilled `comment.added` at
+  seq 2 sits below a snapshot at seq 3, the seq-4 transition folds, and the ticket lands in `doing`
+  with a one-entry transition log. The cursor lands at `streamSeq`, and `searchLocal` finds the ticket
+  by comment text through `docToPlainText`, with a positive control (a phrase in no comment and no
+  title) returning `[]` from the same call. **What this case does NOT constrain, corrected because the
+  sentence here claimed otherwise:** it read *"the transition log's LENGTH is what tells a correct fold
+  from a whole-tail replay"*, and that is measured false — forcing `refoldTicket` to replay from seq 0
+  leaves this case GREEN and reddens 12.124 alone (`Tests 1 failed | 19 passed (20)`). The only
+  sub-snapshot event in the fixture is a `comment.added`, and `applyTicketEvent` returns state
+  unchanged for it (`packages/domain/src/ticket-state.ts`), so a windowed fold and a whole-tail replay
+  produce the identical one-entry log. **And no realistic bootstrap fixture could do better**: of the
+  five `BOOTSTRAP_BACKFILL_TYPES`, only `comment.added` and `attachment.added` are in
+  `TICKET_EVENT_TYPES`, and both are reducer no-ops — so on any input the server actually sends, the
+  `AND seq > ?` window is unobservable through this module's public surface. That is the same fact
+  12.131 records from the other side ("every backfilled type that can sit below a snapshot today is a
+  reducer no-op"), and it is why the window is held by **12.124**, where the fold's own snapshot puts a
+  DROPPED state behind the baseline and replaying it throws. *Mutation: read the title from a top-level `title` property instead of the
+  `fields.title` claim the reducer writes → red here alone.*
+- 12.123 ✅ an arriving `workflow.defined` whose new version RE-CATEGORISES a state moves the ticket's
+  `stateCategory` and `workflowVersion` without moving the ticket, and leaves the transition log
+  byte-identical — each entry keeps the workflow and version whose vocabulary its `toStateId` is
+  written in, which is the only thing that lets `require-different-user` walk it forward later.
+  *Mutation: write the fold's snapshot but leave the `tickets` row stale → red here, on 12.124 and on
+  12.125's positive control.*
+- 12.124 ✅ a version that DROPS the state a ticket stands in moves it where `stateMapping` says, and
+  **the fold writes the folded state as the ticket's replay baseline**, asserted on the `snapshots`
+  row directly. The next `ticket.transitioned` then folds on top of that baseline. *Mutation: delete
+  the `writeSnapshot` call in `foldTicketsOntoVersion` → red here and on 12.131; the failure is the
+  planted defect the plan describes — `refoldTicket` replays the seq-2 move into `doing`, a state v2
+  no longer has, and `applyTicketEvent` throws.*
+- 12.125 ✅ a HOLE in the version chain (v1 held, v3 arrives, v2 never delivered) is refused as a hole
+  — `foldTicketToWorkflowVersion`'s own pre-check message — and not as an unmapped drop, and the whole
+  arrival rolls back: no `events` row, no `workflows` row, ticket unmoved. **Positive control in the
+  same case**: the identical v3 publish succeeds once v2 is delivered first, so the refusal is about
+  the hole. *Mutation: make `workflowVersionsOf` answer the latest definition for every version —
+  i.e. unify it with the reducer's lookup → red here **and on 12.134** (`Tests 2 failed |
+  18 passed (20)`), and silently WRONG rather than loud: the ticket folds to v3 through a definition it
+  never sat in. This note said "red here alone"; 12.134 asserts `versions(3)` is `null` directly, in
+  the same file, deliberately pairing the two lookups — and a lookup that answers the latest definition
+  for every version cannot answer `null`. Two cases written to pair with each other, neither
+  cross-checked against the other's mutation.*
+- 12.126 ✅ purge leaves no readable trace: `getTicket` null, `listEntityEvents` empty, and the
+  `events` / `tickets` / `snapshots` / `contests` **rows** (printed, not counted) empty for that id,
+  plus no row anywhere whose payload still contains the comment text. A second ticket created
+  afterwards in the same store is the positive control, so those empties are deletions and not an
+  empty database. **The `searchLocal` assertion in this case is decoration and says so in the file**:
+  `searchLocal` skips a comment whose ticket row is gone, so it would be `[]` even if every event row
+  had survived. *Mutation: stop deleting the ledger rows → red here alone.*
+- 12.127 ✅ purge keeps **this user's own** contested-claim stub and drops another user's, both halves
+  in one case (honesty invariant 5: the `originalEvent` in my own stub is what I authored on this
+  device). *Mutation: delete every contest regardless of claimant → red here alone.*
+- 12.128 ✅ a workspace `scope-revoked` empties the replica of that workspace — tickets, definitions
+  (`workflows`, `ticket_types`) and the resume cursor — and a re-delivered instruction is a no-op
+  rather than a throw. *Mutation: keep the definitions → red here alone IN THIS FILE'S OWN RUN; over
+  this file plus `test/recorded-hazards.test.ts` it reddens **12.155** too (`Tests 2 failed |
+  20 passed (22)`), because 12.155's workspace-wide half depends on `ticket_types` being emptied.
+  Measured, not inferred — and it is why those two cases are not in this file.*
+- 12.129 ✅ a project `scope-revoked` removes that project's tickets alone, leaves another project's
+  ticket standing, and leaves the definitions and the cursor in place — the member is still in the
+  workspace. *Mutation: ignore `projectId` → red here alone, and still alone over this file plus
+  `test/recorded-hazards.test.ts` (`Tests 1 failed | 21 passed (22)`) — measured, because 12.155's
+  project-scoped half deletes its ticket under either behaviour.*
+- 12.130 ✅ **filter before folding, on both doors.** Thirteen event types bind to
+  `entityKind: 'ticket'` and `applyTicketEvent` folds ten; a `visibility.set` arriving over sync AND a
+  `visibility.set` in a bootstrap ticket tail are both stored without folding and without throwing.
+  This is the common path, not an edge case — bootstrap backfills `claim.contested` unconditionally.
+  *Mutation: drop the `TICKET_EVENT_TYPES` membership test in `refoldTicket` → red here **and on
+  12.137** (`Tests 2 failed | 18 passed (20)`), with `applyTicketEvent: not a ticket event:
+  visibility.set` here and `… : claim.contested` there.* **Read this case's scope narrowly**: the only
+  type it puts in front of the guard is `visibility.set`. The sentence above — and `replica.ts`'s own
+  docblock, and `Features.md` §12 — rest the "common path, not an edge case" claim on `claim.contested`,
+  and until 12.137 was added no case put a `claim.contested` where the filter had to catch it: a
+  contest arriving over sync is answered by `applyServerItem`'s `CONTEST_TYPES` branch before the
+  ticket branch and triggers no refold of its own, and 12.135's contest sits below the snapshot `seq`
+  where the window keeps it away from the reducer whatever the filter does. The guard was proved on the
+  secondary example and asserted on the primary one.
+- 12.131 ✅ the fold never moves a ticket's replay baseline BACKWARDS: bootstrap can leave backfilled
+  ticket-entity events below the snapshot's `seq`, and a fold that set the new baseline to
+  `MAX(events.seq)` alone would drop it from 5 to 2, putting pre-fold history back in front of the
+  reducer in a vocabulary that no longer contains it. **Stated honestly: every backfilled type that
+  can sit below a snapshot today is a reducer no-op, so the damage is not yet observable through the
+  public surface** — which is why the `snapshots` row is asserted directly. *Mutation: drop the
+  `Math.max` against the standing baseline → red here alone.*
+- 12.132 ✅ instants survive the replica **byte-for-byte**, and the case runs twice: under
+  `TZ=America/Los_Angeles` and under `TZ=Asia/Kolkata`. `serverTime`, `clientTime` and a contest's
+  `contestedAt` come back as the ISO `Z` strings that went in; ordering `contested_at` as TEXT is
+  chronological across IST midnight (`18:29:59.999Z` / `18:30:00.000Z`); and `istDayOf` over those
+  stored strings answers `2026-08-20` / `2026-08-21` **identically under both timezones**. Each run
+  opens with a positive control — `new Date('…18:30:00.000Z').getHours()` is 11 under LA and 0 under
+  IST — because without it the case could pass while the process never left the machine's own zone.
+  **A claim in the brief that commissioned this task is corrected rather than repeated: `TZ` is NOT
+  unvaried in this repo**, and the lane's own commit says the same thing independently. Measured with
+  the command, both property-access spellings:
+  `grep -rlE "process\.env(\.TZ|\['TZ'\]) *=" --include='*.ts' --include='*.tsx' packages apps` →
+  **16 files, this one included**. The first attempt at this number here said *four*, because it
+  matched only `process.env.TZ` and this repo's strict settings push most call sites to
+  `process.env['TZ']` — a grep that sees one spelling of two returns a well-formed wrong answer with
+  no error, which is why the count above ships with its command. **This bullet said 15 until the fix
+  round, and 15 was true when it was written**: `origin/main` measured 14, this batch's `40762a6`
+  (which added this very case) 15, and `e0c73ba` — Task 10's own commit, later in the same PR — 16,
+  because 12.152 in `test/outbox.test.ts` varies `TZ` too and does it with the dotted spelling, moving
+  both this count and the dotted sub-count. So this is the first TZ-varying test WRITTEN in
+  sync-client rather than the only one, 12.152 is the second, and the control follows a convention
+  several of those files already spell out. They also record the limit it inherits: `process.env.TZ` is live for V8's `Date` getters
+  under vitest's `forks` pool (sync-client sets no `pool`, so it gets the v3 default) and INERT under
+  `threads`, where every zone claim would silently be a no-op. **And the honest ceiling, since the
+  lane's correction names it**: varying `TZ` is evidence only where the value under test moves with it.
+  Here the device-offset mutation reddens under BOTH zones, so the non-IST run catches no bug the IST
+  run misses; what it establishes is the negative — that nothing on this path moves with the machine's
+  zone — which an IST-only run on an IST machine cannot show, and which is the property Tasks 12 and 13
+  build their day math on. *Mutation: re-render
+  `serverTime` through the device offset in `rowToEnvelope` → red under **both** timezones, measured
+  rather than assumed. The non-IST run is not catching a bug the IST run misses; what it establishes
+  is that the case is evidence about the code and not about a machine that happens to be in
+  Asia/Kolkata.* Task 9 itself derives no days — its produced surface has no day-shaped method and its
+  implementation calls no ist-day symbol — so what it owes Tasks 12 and 13 is exactly this: unparsed,
+  un-re-rendered instants for their `istDayOf` to read.
+- 12.133 ✅ `onChange` fires once per APPLIED item, not on a duplicate (a view that re-rendered on
+  every at-least-once redelivery would flicker for a whole catch-up), and the returned unsubscribe is
+  honoured. *Mutation: notify unconditionally → red here alone.*
+- 12.134 ✅ `setCursor`/`getCursor` round-trip, a cursor for an unheld workspace is 0 rather than this
+  one's, `getMe` returns what bootstrap stored, and `buildDeps` answers **any** workflow id at the
+  **latest** version (the `getWorkflow` pure-by-id contract `ticket.workflow_rebound` depends on),
+  while `workflowVersionsOf` still answers for the older version and `null` beyond the newest — the
+  two lookups over one table, side by side, in one case. *Mutation: make `buildLocalDeps` take the
+  OLDEST version → red here and on 12.124.*
+- 12.135 ✅ a `claim.contested` BELOW a snapshot's `seq` lands in the contests table and is never
+  folded. This is the shape bootstrap actually produces — `claim.contested` is backfilled
+  unconditionally, so it arrives at whatever seq it was recorded at, snapshot or no snapshot — and no
+  other case in this file puts a contest below a baseline. The two halves are held by different code
+  and the mutations say so: the contests half by `loadBootstrap` applying contest types irrespective
+  of seq (*mutation: gate `applyContest` on `seq > snapshot.seq` → red here alone*), the never-folded
+  half by the `TICKET_EVENT_TYPES` membership test, not by the seq window — measured, not assumed:
+  *making `refoldTicket` replay from seq 0 reddens 12.124 and NOT this case*, because the filter
+  catches the contest either way.
+- 12.136 ✅ **refresh on publish, on the BOOTSTRAP door** — a snapshot recorded at `workflowVersion: 1`
+  arriving alongside a bootstrap that ships v1 AND v2 is folded forward before its tail is replayed:
+  the re-categorised half lands `{stateId: 'doing', stateCategory: 'open', workflowVersion: 2}`,
+  byte-identical to what 12.123 asserts on the stream door, with the transition log carried across
+  unchanged in v1's vocabulary; the DROPPED half — which a re-categorisation cannot show — moves where
+  `stateMapping` says rather than leaving the ticket standing in a state the workflow no longer has;
+  the folded state is written as the replay baseline with the baseline `seq` **carried across
+  unchanged** (asserted on the `snapshots` row), because the tail above it has not been applied yet and
+  raising the baseline would skip it; and a positive control from the same helper — a bootstrap whose
+  newest definition is the one the snapshot already sits on — leaves the ticket at v1, so the two
+  assertions above are the fold and not this case rewriting every ticket it sees. **This was a real
+  absence, not a missing test**: `foldTicketsOntoVersion` had exactly one call site
+  (`applyServerItem`'s definition branch), `loadBootstrap` stored the same `workflow.defined` events
+  through `applyDefinition` and never folded, and the two doors answered differently on identical
+  input — stream `{v:2, cat:'open'}`, bootstrap `{v:1, cat:'active'}`. Nothing healed it: the two
+  backfilled types the reducer folds are both state-unchanged no-ops. *Mutation: make
+  `foldSnapshotForward` return its input → red here alone (`Tests 1 failed | 19 passed (20)`).*
+  **RECORDED, NOT FIXED — the half no client-side fold can repair.** A bootstrap tail can carry a
+  `ticket.transitioned` INTO a state the new version dropped; that event is history in the old
+  vocabulary sitting ABOVE the snapshot, and `applyTicketEvent` throws on it
+  (`applyTicketEvent: workflow "…" has no state "doing"`) whether or not the snapshot was folded first
+  — measured on this branch both before and after the fold landed. The repair is a snapshot above the
+  offending event, which only the server can write: today `apps/server/src/sync/snapshot-writer.ts`
+  has no `workflowVersion` handling and `apps/server/src/ledger/snapshot-store.ts` has no DELETE, so
+  publishing a version invalidates no snapshot anywhere. *Owner: Plan 10 Task 6 (the bootstrap route
+  and the snapshot writer).* **RECORDED, NOT FIXED — the other direction of the baseline, and it is LIVE.**
+  `writeSnapshot`'s `ON CONFLICT … DO UPDATE SET seq = excluded.seq` is unconditional, and this door
+  passes the response's `snapshot.seq` with no `Math.max` against the baseline already standing
+  locally, so a replica whose stream-door fold had raised its baseline to `MAX(events.seq) = 6` drops
+  to 5 on a re-bootstrap and replays event 6 — pre-fold history against new vocabulary, exactly the
+  failure 12.131 exists to prevent on the other door. **Now pinned by 12.154, which is why this
+  paragraph no longer ends "unreachable today, because nothing calls `loadBootstrap` a second time":
+  that sentence was false in the commit that wrote it**, refuted 94 lines below by 12.149, which calls
+  `loadBootstrap` a second time on an already-bootstrapped replica and whose own docblock calls the
+  sequence "a live sequence, not a contrivance". *Owner: Plan 10 Task 11 (the sync engine), the first
+  PRODUCTION caller that will re-bootstrap a live replica — 12.149 already re-bootstraps one in a
+  test.*
+- 12.137 ✅ **filter before folding, proved on `claim.contested`** — the type every sentence around the
+  guard calls the common path, and which no case reached until this one. A `claim.contested` stored in
+  the ledger above the replay baseline (printed, not assumed: `listEntityEvents` shows
+  `ticket.created@1` and `claim.contested@2`, and the `snapshots` rows for the ticket are empty, so the
+  baseline is 0) is replayed by `refoldTicket` when a LATER `ticket.transitioned` arrives — and the
+  `TICKET_EVENT_TYPES` membership test is the only thing between it and a reducer that throws on it.
+  The ticket still moves to `doing`, the contest is still there to be shown (skipped is not dropped),
+  and the transition log holds the seq-3 move alone. *Mutation: replace the membership test in
+  `refoldTicket` with an unconditional fold → red here and on 12.130 (`Tests 2 failed |
+  18 passed (20)`), here with `applyTicketEvent: not a ticket event: claim.contested`.* **Why nothing
+  reached this path before**: `applyServerItem` tests `CONTEST_TYPES` before the ticket branch, so a
+  contest triggers no refold of its own; 12.121, 12.127 and 12.132 apply no foldable ticket event after
+  their contests, so the stored row is never replayed; and 12.135 puts its contest below the snapshot
+  `seq`, where the window keeps it away from the reducer regardless of the filter. What forces it in
+  front of the guard is a foldable ticket event arriving AFTER it, which is this case's whole shape.
+
+## The outbox and the local pre-check (Task 10) — `packages/sync-client/test/precheck.test.ts`, `test/outbox.test.ts`
+
+**THREE numbers, stated separately because no one of them implies the others and a single grep
+appears to refute the first.** Each is measured, with the command beside it:
+
+1. **Sixteen `it` declarations** across the two files —
+   `grep -cE "^[[:space:]]*it\(" packages/sync-client/test/precheck.test.ts packages/sync-client/test/outbox.test.ts`
+   prints `6` and `10`.
+2. **Fifteen of those name an id** — `grep -nE "it\('12\.[0-9]+" …` enumerates fifteen lines. The
+   sixteenth declaration is 12.152's, named `holds under TZ=${tz}` because it is a two-zone loop: it
+   carries the sixteenth id (12.138–12.153 is sixteen ids) and it is why a reader running the grep in
+   (2) gets fifteen and must not read that as the id range being wrong.
+3. **Seventeen executions** — sixteen declarations, one of which runs twice.
+
+The package's own run reads `Tests 47 passed (47)`, and the sum is stated so it can be checked: these
+seventeen, Task 9's twenty, the two recorded-hazard cases below, the barrel guard's four, and the
+storage conformance suite's four. It read 45 until the fix round added
+`test/recorded-hazards.test.ts`; every `(45)` in this file has been re-measured rather than
+recomputed, and both re-measurements are quoted where they stand.
+
+**Every id below was proved able to fail**, each with the mutation that reddens it and the full list of
+cases that mutation takes down — a mutation that reddens five cases is not evidence about one, and
+saying "red here alone" without running it is how this branch produced four wrong counts. Eight
+mutations were run; **none survived**.
+
+### The local pre-check — `test/precheck.test.ts`
+
+- 12.138 ✅ creating under a TERMINAL parent is refused `hierarchy.parent-terminal` before anything is
+  queued, with the engine's own sentence (it names the parent's title and the state's name), and the
+  outbox rows are printed empty rather than counted. *This case is also 12.139's control.*
+- 12.139 ✅ **the reopen pair** — the parent's reopen is queued first, and the child create that 12.138
+  refuses is then ACCEPTED, because the pre-check reads confirmed state with the outbox overlaid. The
+  only difference between the two cases is the queued reopen. *Mutation: hold one `EngineContext` on
+  the `createOutbox` closure, which is what the plan's snippet does → red here, on 12.141, on 12.144
+  **and on 12.151** (`Tests 4 failed | 43 passed (47)`, re-measured after `test/recorded-hazards.test.ts` landed — the same four ids). This bullet and `outbox.ts`'s docblock both
+  said THREE for one task, and the missing id is a measurement of WHEN the held context is built: build
+  it eagerly in the `createOutbox` body — which is what "one built at `createOutbox` time" means and
+  what the plan's snippet does — and four go red; memoise it lazily on the first `enqueue` (`??=`) and
+  12.151 stays green, because that test's first `enqueue` is its only one, so its "held" context is
+  built after the `applyServerItem` that confirms the ticket. Both runs are real; only the eager one is
+  the mutation the prose describes. 12.151's failure is also the OTHER half of the staleness: 12.139
+  and 12.144 fail because a frozen context cannot see what was QUEUED after it, while 12.151 fails
+  because it cannot see what the replica CONFIRMED after it — `applyServerItem` creates that ticket
+  after `fixture()`, so the frozen context refuses the transition, nothing is queued, and `pendingFor`
+  answers `null`.*
+- 12.140 ✅ `getEntityState('membership', …)` answers the actor's OWN membership out of bootstrap's
+  `me`, `null` for anyone else, and `null` for an id that is not a `workspace:user` pair at all.
+- 12.141 ✅ **definitions come from the replica's TABLES, never from its event log.** After a
+  workspace-wide `revokeScope` the same claim that was legal a line earlier is refused
+  `ticket.unknown-type` — while the `ticket-type.defined` rows are still standing in `events`, printed
+  to prove it. A context rebuilt by replaying the log would resurrect exactly the definitions the
+  replica purged. *Mutation: seed `memory.ticketTypes` from `events` instead of `ticket_types` → red
+  here and nowhere else.*
+- 12.142 ✅ `restrict-to: {roles:['admin']}` refuses a member and accepts an admin, through the real
+  engine. **The admin half is the load-bearing half**: a `null` membership refuses just as a wrong role
+  does, so the member half passes with the membership door unimplemented. *Mutation: replace the
+  membership arm with `return null` → red on 12.140 and on this case's SECOND half only.*
+- 12.143 ✅ a queued claim the reducer can no longer fold (its definitions went with a scope
+  revocation, while outbox rows deliberately stay) leaves the device working: the claim is still
+  counted, still offered by `nextBatch`, and its pending READING is `null` rather than a partial fold
+  wearing a pending label. *Mutation: drop the `try`/`catch` in `buildPendingOverlay` → red here and on
+  12.141, both with `applyTicketEvent: unknown ticket type "…"` — and in production, every `enqueue`
+  after a revocation throws, offline, permanently.*
+
+### The outbox — `test/outbox.test.ts`
+
+- 12.144 ✅ enqueue order is preserved and `nextBatch(limit)` respects the limit; the ids are
+  enumerated in order, because a batch that lost the order would send a `field_set` for a ticket the
+  server has not been told about.
+- 12.145 ✅ a `committed` answer folds the claim into the local ledger through `applyServerItem` — with
+  the SERVER's `serverTime`, printed — and clears the row; the ticket stops being a pending creation.
+- 12.146 ✅ a `contested` answer records the contest locally from the response and clears the row. The
+  claim is preserved verbatim in `original_event`, because if visibility was lost with the refusal the
+  real `claim.contested` envelope never streams in and this stub is the claimant's only record.
+- 12.147 ✅ a `refused` answer is TERMINAL: the row goes `status='failed'`, leaves `nextBatch`, appears
+  in `failedItems`, and carries the server's words in `last_error`.
+- 12.148 ✅ `recordFailure` is TRANSIENT: it backs off, holds the batch until due, and **leaves the row
+  `queued`** — the assertion that stops a future reader "tidying" it into a `failed` write and
+  stranding every retryable claim on the device forever.
+- 12.149 ✅ a claim that came home through a RE-BOOTSTRAP is still cleared by its own answer.
+  `loadBootstrap` inserts the device's already-committed claim into `events` and touches the outbox not
+  at all, so `applyServerItem` then returns `{applied: false}` and RETURNS BEFORE its own
+  `DELETE FROM outbox` — `applyResult`'s delete is the only thing that clears the row, and without it
+  the claim is flushed forever. *Mutation: drop that delete → red here alone
+  (`Tests 1 failed | 46 passed (47)`, re-measured after `test/recorded-hazards.test.ts` landed).* **The first draft of this case tested the ECHO race instead and
+  its comment claimed the same thing about it — wrongly.** A stream echo is the FIRST arrival of that
+  id, so it is `{applied: true}` and clears the row itself; the case had to re-insert the row by hand to
+  have anything left to delete, which tests only that a hand-inserted row can be deleted. Recorded
+  because the sentence read as a measured causal claim and the run beside it said otherwise.
+- 12.150 ✅ **PENDING IS NEVER SETTLED FACT.** A ticket that exists only as a queued claim is absent
+  from every settled surface — `getTicket`, `listTickets`, `listEntityEvents`, `searchLocal`, and the
+  `tickets` and `snapshots` tables read directly — and present in exactly one, `pendingCreatedTickets`,
+  with the claim ids that made it. Another workspace's caller sees nothing of it. *Mutation: make
+  `enqueue` also upsert the overlaid state into `tickets` → red here, on 12.151 and on 12.139.*
+- 12.151 ✅ a queued transition moves the pending reading and NOT the confirmed one; the provisional
+  `seq` sits above the confirmed transition log, which is the property require-different-user's sort
+  depends on. Once the claim leaves the outbox, `pendingFor` answers `null` rather than confirmed state
+  wearing a pending label. *Mutation: return confirmed state when nothing is queued → red here alone.*
+- 12.152 ✅ `next_attempt_at` is a Z instant under a NON-IST `TZ` as well as under IST, with a positive
+  control (`new Date(t0).getHours()`) proving the zone switch took effect. *Mutation: render it with
+  `getFullYear()/getHours()` and append `Z` → red under BOTH zones and on 12.148.* **The honest
+  ceiling, stated because the map's correction is right that varying `TZ` is ceremony where the value
+  does not move with it:** that mutation reddens under IST too, so the non-IST run catches no bug the
+  IST run misses. What it establishes is the NEGATIVE — nothing on this path moves with the machine's
+  zone — which is not knowable from an IST-only run on an IST machine, and which is what Tasks 12 and
+  13 will build their day math on. Every other case in these two files is zone-free and deliberately
+  does not vary `TZ`.
+- 12.153 ✅ `backoffMs` is enumerated at eight points (`1000, 2000, 4000, 8000, 16_000, 32_000, 60_000,
+  60_000`) rather than asserted at the cap, because a single cap assertion cannot tell "capped" from
+  "constant". It is **a different function from `app-core`'s `backoffDelayMs`** (500 ms initial, 30 s
+  cap, ±20% jitter): outbox flush versus websocket reconnect, two surfaces, two independently chosen
+  curves. Do not dedupe them. **The two "initial" delays are not comparable, and `outbox.ts`'s
+  docblock used to compare them** — it read "1 s initial" against app-core's "500 ms initial", true of
+  the two functions and false of the two callers: `stream.ts` increments its counter AFTER calling, so
+  500 ms is really its first reconnect delay, while `recordFailure` increments BEFORE calling, so the
+  first flush retry waits `backoffMs(1)` = 2 s and `backoffMs(0)` = 1 s is unreachable from the only
+  production caller. 12.148 pins that through the function (its first retry falls due at `backoffMs(1)`,
+  its second at `backoffMs(2)`) and 12.152 asserts the literal `…00:00:02.000Z`; only the prose was
+  wrong.
+
+### Carried, with owners — Task 10
+
+- **The `SyncEventResult` mirror can drift silently.** `packages/sync-client/src/outbox/outbox.ts`
+  re-declares the wire shape of `POST /v1/sync`'s answer because this package may not depend on
+  `apps/server`; there is no compile-time link, exactly as for `SyncItem` in `replica/sync-item.ts`.
+  Both belong in `@gisik-nokma/domain`. *Owner: Plan 10 Task 11 (the sync engine), which consumes the
+  same shape over HTTP and would otherwise inherit a third copy.*
+- **`pendingCreatedTickets` filters by the workspace of the FOLDED state, not by the outbox row's
+  `workspace_id`.** The two cannot disagree today — the local store is implicitly single-workspace
+  (`revokeScope`'s recorded note: `workflows` and `ticket_types` carry no `workspace_id`) — and the
+  folded state is the more honest source, since it is what would be rendered. *Owner: whoever widens
+  `packages/sync-client/src/storage/schema.ts` to hold more than one workspace.*
+
+## Recorded hazards, pinned as executable cases (Task 9 fix round) — `packages/sync-client/test/recorded-hazards.test.ts`
+
+**TWO `it` declarations, running as two tests.** `vitest run test/recorded-hazards.test.ts` reads
+`Tests 2 passed (2)`; the package's run reads `Tests 47 passed (47)`, which is the 45 above plus
+these two. Both mutations below were run over `test/recorded-hazards.test.ts` **and**
+`test/replica.test.ts` together (22 executions), because what each mutation does NOT redden in the
+task's own file is half of what it establishes.
+
+**Why these two are not in `test/replica.test.ts`.** That file carries nineteen mutation
+enumerations and every one is a FILE-SCOPED measurement — "red here and on 12.137 (`Tests 2 failed |
+18 passed (20)`)" is a fact about a run of `vitest run test/replica.test.ts`. Appending two cases
+would silently change what all nineteen measured, and would have falsified AT LEAST ONE outright.
+**Two of the nineteen were run against the merged pair; the other seventeen were not, and this
+sentence claims nothing about them.** 12.128's mutation ("keep the definitions" on a workspace
+revocation) reddens 12.155 as well — measured, `red: ['12.128', '12.155']`, `Tests 2 failed |
+20 passed (22)` — so its "red here alone" would have become false the moment the two files were
+merged. 12.129's ("ignore `projectId`") does NOT: it reddens 12.129 alone (`Tests 1 failed |
+21 passed (22)`), because 12.155's project-scoped half deletes that ticket under either behaviour.
+This paragraph claimed both until the pair was actually run, and then claimed "one" — a count over
+nineteen from a sample of two — until that was caught as the same reflex again.
+The split also makes the category difference operational: **these two assert behaviour nobody wants
+and are DELETED when their owner fixes them**, while `replica.test.ts` holds the task's contract.
+Measured after the split: `vitest run test/replica.test.ts` still reads `Tests 20 passed (20)`.
+
+- 12.154 ✅ **the bootstrap door LOWERS a baseline the stream door raised, and the replay then
+  throws.** A snapshot at seq 5 arrives; the stream moves the ticket to `doing` at seq 6; a v2 that
+  DROPS `doing` arrives and `foldTicketsOntoVersion` folds the ticket to `todo` and raises the
+  baseline to 6 (asserted on the `snapshots` row, and on both transition-log entries). The device then
+  re-bootstraps against the server's **still-stale** snapshot at seq 5 — nothing on the server
+  invalidates a snapshot when a workflow is published — `writeSnapshot`'s unconditional
+  `ON CONFLICT … DO UPDATE SET seq = excluded.seq` drops the baseline back to 5, and `refoldTicket`
+  replays event 6 against v2's vocabulary: `applyTicketEvent: workflow "…" has no state "doing"`,
+  thrown out of `loadBootstrap` with the whole response rolled back (baseline and ledger rows printed
+  afterwards, unchanged). So the consequence is not "one ticket is wrong": every re-bootstrap throws
+  identically for as long as the server keeps serving that snapshot and the offending event stays
+  stored locally, and nothing on either side clears either. **`events` is `[]` on both bootstraps, and that is what separates this from the
+  tail hazard 12.136 records for Task 6**: no response tail is involved, the throwing row is a locally
+  stored event the stream fold had already moved past, and only the baseline drop puts it back in
+  front of the reducer. *Mutation — and it is the "obvious fix", which is the point: wrap the `seq` in
+  `Math.max(ticket.snapshot.seq, await snapshotSeqOf(tx, ticket.ticketId))` → red **here alone**
+  (`Tests 1 failed | 21 passed (22)`). It removes the throw and every case in `replica.test.ts` stays
+  green, because it writes the SERVER's seq-5 state under the LOCAL seq-6 baseline: the seq-6
+  transition then vanishes from the log while its row still stands in `events` — measured,
+  `transitions` came back with the seq-5 entry alone. A loud throw traded for a quiet divergence in
+  the log `require-different-user` sorts on, caught by nothing. The consistent repair is the other
+  shape — keep the higher local baseline, write no older snapshot, fold the LOCAL state forward — and
+  that is a decision about what a re-bootstrap means.* *Owner: Plan 10 Task 11 (the sync engine), the
+  first PRODUCTION caller that will re-bootstrap a live replica.*
+- 12.155 ✅ **a stream item that lands after a scope revocation throws out of `applyServerItem`, where
+  the pre-check door catches the identical fold.** Both halves in one case: a project-scoped
+  revocation followed by an in-flight `ticket.transitioned` for the ticket it just deleted gives
+  `applyTicketEvent: ticket.transitioned for ticket … that was never created`; a workspace-wide
+  revocation followed by an in-flight `ticket.created` gives `applyTicketEvent: unknown ticket type
+  "…"`, because `ticket_types` is empty **by design** while the `ticket-type.defined` event still
+  stands in `events` (printed, which is 12.141's point). The throw is inside `storage.transaction`, so
+  the envelope insert rolls back with it — asserted against the exact row list from before the
+  arrival, so the item is absent from the local ledger too, not merely unfolded. A positive control
+  from the same helpers and the same door runs both arrivals with no revocation and gets
+  `{applied: true}` twice, so the throws are the revocation and not a malformed fixture. **The finding
+  is the ASYMMETRY, not the throw**: `buildPendingOverlay` wraps this reducer in `try`/`catch` and its
+  docblock says why in words that apply here unchanged (12.143 pins it; dropping that catch reddens
+  12.141 and 12.143), while `refoldTicket` folds the same reducer against the same `buildLocalDeps`
+  object with no catch and nobody wrote the sentence. **It stays a throw on purpose**: `enqueue` is a
+  user's offline action and must not brick the device, while `applyServerItem` is machine-driven and
+  its contract is per-arrival rollback (12.125); catching here would mean inventing what an unfoldable
+  CONFIRMED ticket is and where it surfaces. *Mutation — mirror Task 10 and wrap `refoldTicket`'s fold
+  in `try`/`catch` → red here **and on 12.154** (`Tests 2 failed | 20 passed (22)`), and — the part
+  worth writing down — **nothing in `test/replica.test.ts` reddens at all**, so before these two cases
+  existed nothing in the package constrained that behaviour either way.* *Owner: Plan 10 Task 11 (the
+  sync engine), the first caller of `applyServerItem` with a cursor to advance — a cursor left
+  unadvanced on a throw is handed the same item again, which is a wedged stream, offline, after a
+  revocation.*

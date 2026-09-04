@@ -35,11 +35,42 @@ clockSkewMs  14 lines   }
 TZ            0 lines   <- genuine absence
 ```
 
-Thirty-six lines of clock-sensitive plan text, zero of which pin a timezone. This is the executor
-brief's known gap #2, live: on `main`, zero of 48 test files vary `TZ` while seven are day- or
-clock-sensitive — including `packages/domain/test/ist-day.test.ts`, which therefore **cannot
-distinguish "the code computes IST correctly" from "the machine is already in IST."** Both clocks here
-are Asia/Kolkata by owner decision and every machine matches, so the wrong version passes.
+Thirty-six lines of clock-sensitive plan text, zero of which pin a timezone. **That half is measured
+at `e09666c` and stands.**
+
+**CORRECTED 2026-09-04 — the second half of this section was FALSE and it caused a false claim
+downstream.** It read: *"on `main`, zero of 48 test files vary `TZ` while seven are day- or
+clock-sensitive."* That is the executor brief's known gap #2 quoted as current, and it is **a reading of
+a 48-test-file tree.** The repo now has **228** test files and **14** of them assign `process.env.TZ`.
+Enumerated at `32393be`, not counted:
+
+```
+apps/server/test/helpers/read-scenario.test.ts        packages/app-core/test/provenance.test.ts
+apps/server/test/integration/real-door-round-trip.ts  packages/app-core/test/views/attention-strip.tsx
+apps/server/test/notifications/sweep.test.ts          packages/app-core/test/views/board.test.tsx
+apps/server/test/routes/attention.test.ts             packages/app-core/test/views/history-list.tsx
+apps/web/test/ist-today.test.ts                       packages/app-core/test/views/my-work.test.tsx
+packages/app-core/test/calendar/clock-free.test.ts    packages/app-core/test/views/ticket-list.tsx
+packages/editor/test/attachment-list-item.test.tsx    packages/editor/test/google-picker.test.ts
+```
+
+**This repo already has good `TZ` discipline, and it is more careful than the blanket rule this section
+first gave.** `apps/server/test/routes/board.test.ts:80-87` reasons the other way and is right to:
+*"Nothing on this response moves with `TZ` … so a `TZ`-varying case here would be a check that cannot
+fail."* `board.test.tsx:304` records a restore bug "caught only by mutating it". Varying `TZ` is
+evidence **only where the value under test actually moves with it**; everywhere else it is ceremony that
+reads as rigour.
+
+**What this section should have said, and now does:** Plan 10's own text pins a timezone nowhere across
+36 clock-sensitive lines, so a task transcribing it inherits no `TZ` discipline even though the repo
+around it has plenty. Vary `TZ` where the value moves with it; where it does not, say so in a comment
+the way `board.test.ts` does, and do not add the case.
+
+**Recorded because the failure mode is the branch's own signature:** the stale half was carried into the
+executor handoff, this map, and Task 9's dispatch prompt as settled fact, and Task 9's implementer then
+wrote "FIRST TEST IN THIS REPO TO VARY `TZ` AT ALL" — a stronger false claim, reasonably derived from a
+false premise it was handed. A count quoted from an older tree is the same defect as a count never
+measured; it is just harder to notice, because it was true once.
 
 **Any clock-sensitive assertion T9, T10 or T13 writes must set `TZ` explicitly** — at minimum one case
 under a non-IST `TZ` that still expects the IST-correct answer. A test that only ever runs in
