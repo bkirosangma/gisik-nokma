@@ -1845,3 +1845,51 @@ dates the inventory the catalogue was written from, so the catalogue is KNOWN to
 its "continue from" line is KNOWN to say 11.185 instead of 11.186.** Fix both, then re-run the full
 gate, then rebase onto `main` (`421db9f`; the ONLY colliding file is this one), then the single opus
 whole-branch review, then the PR.
+
+## PLAN 9 COMPLETE — MERGED `main`, GATE GREEN, FINAL REVIEW IN FLIGHT (2026-09-04 ~07:00)
+
+**ANCHORS, verified reachable with `git branch --contains` (not `cat-file`):**
+
+| what | value |
+|---|---|
+| branch | `exec/14-plan9-calendar` |
+| HEAD | **`b897404`** — pushed, `origin` identical |
+| base | `origin/main` `421db9f`, **MERGED IN** — 0 behind, 51 ahead |
+| tree | clean |
+| gate | at `6ff2591`: **24/24, `0 cached`, 43.7s, 3,071 tests / 225 files** |
+
+**Task 15 is committed (`1046fce`). Plan 9's T1–T15 are ALL DONE.** Commits since: the `main` merge
+(`6ff2591`) and one comment fix (`b897404`).
+
+**Why this is a MERGE and not a rebase.** 21 of 48 commits touched this file and #92 inserted its
+block near its top, so `git rebase origin/main` conflicted on commit **1 of 48** and would have asked
+for the same resolution up to twenty more times. Twenty-one hand resolutions of the restart surface
+is how a handoff loses content. Merged instead, resolved once, and verified afterwards that #92's
+rule block, this file's Task 15 section, and its "gaps at 11.97/11.106" correction all survived.
+
+**What remains before the PR:** the single opus whole-branch review is IN FLIGHT (workflow
+`wf_5f7ac57a-24f`). A fix round only if it returns Important or worse. Then the PR — body drafted at
+`scratchpad/pr-body.md`. **The controller merges; I do not.** Ledger rows are NOT promoted here,
+deliberately: Plan 8's were promoted by the controller in #87 and a duplicate written from this side
+had to be dropped.
+
+**TWO FIGURES IN THE DISPATCH BRIEF ARE NOW STALE — measured, not assumed:**
+
+- **"Zero of 48 test files vary `TZ`" is no longer true of `main`.** Twelve TZ-varying test files are
+  already on `origin/main`; this branch adds two more (`apps/server/test/notifications/sweep.test.ts`
+  and `packages/app-core/test/calendar/clock-free.test.ts`). The GAP the brief names is real history,
+  but quoting its number today would misdescribe the tree.
+- **The brief's "~109 of 177 tasks remain" predates this step.** Recount from the ledger; do not
+  carry it.
+
+**A third self-falsifying claim, and the pattern is now worth naming as a class.** Three times on
+this branch a *claim about a check* outran the check itself:
+1. "gaps at 11.97 and 11.106" — asserted in the same paragraph that named double-quoted titles as
+   the hazard, and 11.97/11.106 are double-quoted.
+2. "11.171 will tell you if the nav changes" — measured false; a presence assertion is blind to a
+   fourth link. 11.185 was written because of it.
+3. "grep returns zero hits" for `laneEpicId` in `apps/web` — true when measured, false the instant it
+   was written into a comment containing the word.
+**All three were caught by re-running the stated check rather than by reading the claim.** None was
+caught by review. That is the cheap habit worth carrying to Plan 10: *before repeating a measurement
+someone else recorded, run it.*
