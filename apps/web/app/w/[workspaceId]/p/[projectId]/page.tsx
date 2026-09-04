@@ -429,8 +429,18 @@ function ProjectBoard() {
                      which reads it at exactly one site: the `laneEpicId` lane
                      filter (`calendar-model.ts:275`, inside `laneEpicId !==
                      undefined && !== null`). This page passes no `laneEpicId`
-                     and neither does anything else in `apps/web` — grep returns
-                     zero hits — so deleting this spread changes NOTHING
+                     and neither does anything else in `apps/web`. The check,
+                     written so it can actually be RUN: every occurrence in
+                     `apps/web` source is inside THIS comment, so
+                     `grep -rn laneEpicId apps/web/src apps/web/app` must return
+                     only comment lines and no JSX prop — four of them today,
+                     one being the grep line you are reading. (It said "zero hits"
+                     until this comment was written, at which point the sentence
+                     falsified itself — a verification instruction that stops
+                     being runnable the moment it is recorded is worth no more
+                     than the claim it was meant to support. `.next/` also
+                     matches, which is build output and gitignored.)
+                     So deleting this spread changes NOTHING
                      observable through this page, and app-core's own 11.158
                      says as much: the lane fixture "is the ONLY shape that can
                      witness the forward".
