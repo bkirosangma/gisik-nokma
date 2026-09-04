@@ -178,8 +178,8 @@ plan	task	status	pr	merge_sha	note
 10	6	done	98	999d486	artefact: apps/server/src/sync/sync-routes.ts (GET /v1/sync/bootstrap, BOOTSTRAP_BACKFILL_TYPES), test/sync/bootstrap.test.ts. Declared mount site index.ts; LANDED in src/app.ts inside buildApp — house pattern, per plan10-adaptation-map.md cross-cutting fact 1. packages/domain/src/ticket-state.ts docblock corrects the TICKET_EVENT_TYPES-is-not-the-entity-set defect found here
 10	7	done	98	999d486	artefact: apps/server/src/sync/sync-service.ts (createSyncService, VISIBILITY_REFUSAL_RULE), test/sync/sync-route.test.ts; POST /v1/sync added to src/sync/sync-routes.ts — same squash as T6, distinct route in a shared file
 10	8	done	23	b62be74	artefact: packages/sync-client scaffold (PR #23, subject names it)
-10	9	todo	-	-	
-10	10	todo	-	-	
+10	9	done	102	f03838d	artefact: packages/sync-client/src/replica/replica.ts (+827, new), src/replica/local-deps.ts (+65, new), test/replica.test.ts (+1031, new); src/index.ts exports — all four Task 9 **Files:** entries landed by PR #102, whose title names Plan 10 Batch B
+10	10	done	102	f03838d	artefact: packages/sync-client/src/precheck/local-context.ts (+297, new), src/outbox/outbox.ts (+376, new), test/precheck.test.ts (+331, new), test/outbox.test.ts (+449, new); src/index.ts exports — all five Task 10 **Files:** entries landed by PR #102
 10	11	todo	-	-	
 10	12	todo	-	-	
 10	13	todo	-	-	
