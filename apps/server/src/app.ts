@@ -223,7 +223,18 @@ export function buildApp(
   // route would throw against it. No test does that today. Same preHandler by
   // parameter, same reason as every route above: the handler reads
   // `request.currentUserId` and resolves its whole gate from it.
-  registerSyncRoutes(app, { pool: deps.pool as Pool }, requireSession);
+  // Both doors, and which is which is the whole of Plan 10 Task 7: the client's
+  // offline claims go through the GATED `deps.ingest` (`ClientIngest`, no
+  // `ingestBatch` on it at all), and the server's own `claim.contested` appends
+  // through the named `serverAppend` — the same two-door shape
+  // `registerInviteRoutes` takes below, for the same reason. The plan's snippet
+  // asked for the full `IngestService` here, which is exactly what would let a
+  // client claim reach the ungated door and skip `checkPermission`.
+  registerSyncRoutes(
+    app,
+    { pool: deps.pool as Pool, ingest: deps.ingest, serverAppend: deps.serverAppend },
+    requireSession,
+  );
   // The ticket read surface (Plan 4 Task 8) — list, single read, and history,
   // each enforcing visibility server-side. Same preHandler by parameter, same
   // reason: all three handlers read `request.currentUserId`.

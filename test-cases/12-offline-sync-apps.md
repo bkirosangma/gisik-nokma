@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.99`. THE NEXT FREE ID IS `12.100`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, and said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.113`. THE NEXT FREE ID IS `12.114`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, and said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -22,11 +22,11 @@ One consequence worth stating rather than leaving to be discovered: **12.15 is a
 — `apps/server/test/sync/stream-seq.test.ts` shipped with Plan 10 Task 2 — but it is a reserved id and
 is deliberately not flipped here. *Owner: Plan 10 Task 18.*
 
-**Scope of this file today.** Plan 10 Tasks 4 and 5. Task 4 as lifted out of the plan's position: the
-§11 envelope-coherence closer, `proj_contested`, `getContest` and `GET /v1/contests`. Task 5: the
-snapshot writer and the ledger-sourced reducer deps. Nothing else from Plan 10 is catalogued — Tasks
-6–17 (bootstrap, `POST /v1/sync`, sync-client, the two app shells, the dual-client harness) are absent
-rather than missing.
+**Scope of this file today.** Plan 10 Tasks 4, 5, 6 and 7. Task 4 as lifted out of the plan's position:
+the §11 envelope-coherence closer, `proj_contested`, `getContest` and `GET /v1/contests`. Task 5: the
+snapshot writer and the ledger-sourced reducer deps. Task 6: `GET /v1/sync/bootstrap`. Task 7:
+`POST /v1/sync`. Nothing else from Plan 10 is catalogued — Tasks 8–17 (sync-client, the replica, the
+outbox, the two app shells, the dual-client harness) are absent rather than missing.
 
 **Terminology.** "envelope-origin" throughout means `EventEnvelope.origin`, the provenance enum
 `'web' | 'mobile' | 'desktop' | 'server'`. It is NOT the browser `Origin` header; nothing in this file
@@ -190,10 +190,115 @@ implementation mutations named below was run and reddened the case named beside 
   once — 12.94 (`expected […] to deeply equal […]`, extra types from WS2), 12.96 (`expected […] to have a
   length of 2 but got 4`), and this case directly (`expected […] to not include`).* (bootstrap.test.ts)
 
-## Carried, with owners — recorded here rather than fixed
+## `POST /v1/sync` (Task 7) — `apps/server/test/sync/sync-route.test.ts`
 
-- 12.76 ❌ nothing establishes that a contest's embedded claim was **actually refused**, by the rule the contest names; the coherence check cannot see it and says so. *Owner: Plan 10 Task 7 (`POST /v1/sync`), the one path that holds a real refusal.*
-- 12.77 ❌ `POST /v1/sync` does not exist, so the door it will open is not enumerated by 12.54–12.58. It must call `ingestClientBatch`, which is where it inherits both the permission gate and this coherence check. *Owner: Plan 10 Task 7.*
-- 12.82 ❌ the coherence check binds `workspaceId`, `entity.kind` and `entity.id` and leaves the rest of the embedded claim FREE, and two of those free fields carry consequences that 12.76 does not cover. **`originalEvent.actorId` becomes `proj_contested.claimant_id` verbatim** — verified live: a coherent contest naming a fabricated actor committed, and `SELECT claimant_id` returned the fabrication — so `GET /v1/contests?claimantId=<victim>` surfaces it and Plan 5's My Work will show it as that person's contested claim. **`originalEvent.type` and `payload` are checked only by `submittedEventSchema`** (`type: z.string().min(1)`, payload unvalidated against any registry schema) and flow verbatim into `renderContestedClaimText`'s comment body, in an append-only table where it can only be superseded. Reachable today only through `ingestBatch`, which no production caller uses for contests. **Not a defect this task introduced** — `renderContestedClaimText` is Plan 10 Task 1's — but the binding rationale understated it, and P19 forbids leaving a category looking closed. *Owner: Plan 10 Task 7, with 12.76.*
-- 12.83 ❌ `proj_contested`'s UNIQUE index on `original_event_id` is enforced with **no lookup guarding it**, and `isUniqueViolation` matches only on `events_pkey`, so a second contest embedding the same `originalEvent.id` rethrows out of `commitOne` and **rejects the entire batch call** — the already-committed events in that batch never return their answers, and a legal third event is never appended. Verified by driving the batch through the real `ingestBatch`: the call threw on `proj_contested_original_idx` and `events` held one row, then none. A retry does not recover, because a re-minted contest carries a fresh event id and never reaches the `events_pkey` duplicate path the recovery story relies on. The migration COMMENT and `Features.md` §12 both describe the index as making a sync retry *find* the prior contest; **nothing in this branch performs that lookup.** *Owner: Plan 10 Task 7, which inherits the index, the missing lookup and the retry story together.*
-- 12.84 ❌ the `entity.kind` binding — one of the coherence check's three comparisons — is exercised only as a pure function and has **no door test**, so nothing pins that this third of the check is reachable through a real submission path. Deleting that comparison reddens exactly one test, and it is the unit one. The path is LIVE, not dead code: a hand-built contest with an outer `{kind:'ticket'}` and an embedded `{kind:'workspace'}` at the same id was refused `contest.incoherent-original` at `ingestBatch` with the entity-kind sentence and appended nothing. What is unproven is whether anything legitimate would ever walk it — `parseEvent` pins the outer kind to `'ticket'` and `buildContestedClaim` structurally cannot produce a mismatch — which is why this is recorded rather than fixed. *Owner: Plan 10 Task 7, alongside 12.77's door enumeration.*
+Every case here seeds through REAL events and REAL projections and signs its caller in over the wire,
+so the session user id under test is the one the token resolves to. **The two cases marked DOOR TEST
+are the reason this file exists**: they are the only ones that discriminate `ingestClientBatch` (the
+gated door, which this route must use for the client's own claim) from `ingestBatch`/`serverAppend`
+(the internal one, which the plan's own snippet reached for). Every other refusal here is an ENGINE
+refusal, which fires on both doors and therefore proves nothing about which was used.
+
+- 12.100 ✅ a legal offline claim commits and the answer carries the REAL workspace stream position —
+  `seq`, `workspaceSeq` and `serverTime` compared against the row ingest actually wrote, not merely
+  `typeof === 'number'`, which a hardcoded constant satisfies (sync-route.test.ts)
+- 12.101 ✅ an engine refusal (`restrict-to` on an assignee-only edge) becomes a `claim.contested`
+  ledger event carrying envelope-origin `'server'`, one `proj_contested` row keyed to both event ids,
+  and an embedded claim whose workspace and entity match the contest's — coherence being STRUCTURAL
+  here, because the append goes through `buildContestedClaim` rather than a hand-rolled
+  `newSubmittedEvent` (sync-route.test.ts)
+- 12.102 ✅ **DOOR TEST** — an offline claim wearing envelope-origin `'server'` is still refused by
+  `checkRolePermission` (`permission.role`, `SERVER_ORIGIN_REASON`) and contested; the forged claim
+  itself never reaches the ledger. No engine rule refuses a `ticket.field_set` for its provenance, so
+  through the internal door this claim COMMITS and a client wears the server's own provenance in an
+  append-only ledger. *Mutation: `deps.ingest.ingestClientBatch([event], userId)` replaced with
+  `deps.serverAppend([event])` → red, `expected { status: 'committed', …(4) } to match object
+  { status: 'contested', …(3) }`. And the reflex form does not even compile: `deps.ingest.ingestBatch`
+  → `error TS2339: Property 'ingestBatch' does not exist on type 'ClientIngest'`.*
+  (sync-route.test.ts)
+- 12.103 ✅ **DOOR TEST** — a claim on a ticket the caller can no longer see is contested
+  `permission.visibility` / `TICKET_NOT_VISIBLE_REASON` by `checkVisibilityPermission`, a DIFFERENT
+  gate check from 12.102's, so neither door test is load-bearing alone. It is a door test at all only
+  because the plan's step-6 local visibility pre-check was deliberately not implemented — with a
+  duplicate check in `sync-service.ts` this case would pass through the ungated door too. *Mutation:
+  the same `serverAppend([event])` swap → red, same sentence.* (sync-route.test.ts)
+- 12.104 ✅ a retried committed claim re-answers the same INSTANT, seq and cursor with no second ledger
+  row — instants via `Date.parse`, not string equality, so a change in how either side spells an
+  instant is caught as a formatting change instead of being mistaken for a broken idempotency contract
+  (sync-route.test.ts)
+- 12.105 ✅ a retried CONTESTED claim answers the one recorded contest — same `contestEventId`, one
+  `proj_contested` row, no second `claim.contested` — and the request is 200 rather than a 500 taking
+  the batch with it. Case 12.83's sequential half (sync-route.test.ts)
+- 12.106 ✅ the SAME refused claim twice in ONE batch is answered twice from the contest the earlier
+  iteration committed, and the batch's legal third event still commits. The failure this pins is not
+  the duplicate contest but what it did to its NEIGHBOURS: the throw left `processBatch` entirely.
+  *Mutation, run in two stages: disabling the `storedContest` lookup alone changes nothing (the
+  constraint catch covers it); disabling BOTH → red here and on 12.105, `expected 500 to be 200`,
+  which is 12.83 reproduced.* (sync-route.test.ts)
+- 12.107 ✅ a claim whose `actorId` is not the session user is `invalid` `actor-mismatch` and records
+  no contest — which is also what makes 12.82's claimant-forgery half unreachable through this door
+  (sync-route.test.ts)
+- 12.108 ✅ a client-supplied `claim.contested` is `invalid` `reserved-type`, and the answer is that
+  rather than `contest.incoherent-original` even though the embedded claim names a different entity
+  kind AND a different entity — the door's step 3 is upstream of ingest entirely, which is 12.84's
+  question answered rather than left open (sync-route.test.ts)
+- 12.109 ✅ an envelope error answers `invalid` and records NO contest — a malformed claim is not a
+  well-formed claim, so there is nothing coherent to embed in a contest's payload (sync-route.test.ts)
+- 12.110 ✅ the interactive door NEVER records a contest for the same refusal — no `proj_contested`
+  row, no ledger row — with the sync door's contest for the same refusal asserted in the same test as
+  the control, so "the interactive path recorded nothing" cannot pass for a fixture in which nothing
+  was refusable (sync-route.test.ts)
+- 12.111 ✅ a refusal on a NON-ticket entity (`membership.granted` by a member) answers `refused` with
+  no contest — there is no ticket to attach one to. Incidentally a third door discriminator: the same
+  `serverAppend` swap turns it into a commit (sync-route.test.ts)
+- 12.112 ✅ 401 without a session, and 400 for an `events: []` body — HTTP status means "was this a
+  batch", per-event answers ride inside `results` (sync-route.test.ts)
+- 12.113 ✅ a retry of an ALREADY-COMMITTED claim is answered from the ledger even after the caller has
+  lost the ticket, with a fresh claim on the same ticket refused in the same test as the control. This
+  is the case that decides the ledger lookup must sit BEFORE ingest: 12.104 cannot tell the two
+  placements apart, because the `duplicate-event-id` fallback produces an identical result object while
+  the caller can still see the ticket. *Mutation: the step-4 lookup replaced with a constant `null` →
+  red here alone (`expected { status: 'contested', …(4) } to deeply equal { status: 'committed',
+  …(4) }`), all thirteen other cases green.* (sync-route.test.ts)
+
+## Carried, with owners — and what Task 7 closed
+
+- 12.76 ✅ **closed by Task 7, and scoped rather than declared shut.** Nothing at the coherence layer
+  can establish that a contest's embedded claim was actually refused, by the rule the contest names —
+  that is still true and `contest-coherence.ts` still says so. What changed is the producer: the ONE
+  production caller that files contests is `POST /v1/sync`, and it passes the `Refusal` it is holding
+  straight into `buildContestedClaim`, so on that path the guarantee is structural at the point of
+  construction. 12.101 asserts the contest carries the rule the refusal named; 12.102/12.103 assert it
+  for two refusals produced by the permission gate. *The class is not closed for a contest built any
+  other way — `checkContestCoherence` remains the net for those, and it still cannot see this.*
+- 12.77 ✅ the `POST /v1/sync` door is enumerated, by 12.100-12.113. It calls `ingestClientBatch`, so it
+  inherits both the permission gate and the coherence check; the two DOOR TESTs above pin that, and the
+  route's deps type makes the wrong call a compile error rather than a comment.
+- 12.82 🟡 **narrowed by this door, NOT closed as a class.** Two of the free fields the coherence check
+  leaves alone are unreachable through `POST /v1/sync`: `originalEvent.actorId` cannot be forged,
+  because step 2 refuses any claim whose actor is not the session (12.107), so no contest filed through
+  this door can name a claimant who did not submit it; and `originalEvent.type`/`payload` are NOT
+  merely `submittedEventSchema`-shaped here, because the embedded claim has already been through
+  `parseEvent`, which validates the type against the registry and the payload against that type's own
+  schema. **Both remain fully open through `ingestBatch`**, which is where 12.82 measured them, and
+  `renderContestedClaimText` still renders whatever it is given. *Owner for the general case: unchanged
+  — whoever closes the `ingestBatch` contest path, or Plan 10 Task 18 if it re-scopes.*
+- 12.83 ✅ **confirmed as a live defect and closed FOR THIS DOOR.** Reproduced here, not inherited: with
+  both guards removed, a second sync request carrying the same refused claim answers **500** and takes
+  its whole batch with it (`expected 500 to be 200`, 12.105 and 12.106). `POST /v1/sync` now performs
+  the `proj_contested.original_event_id` lookup the index's own migration COMMENT describes, and
+  catches `proj_contested_original_idx` by name for the residual two concurrent requests can still race
+  into. **The defect itself is untouched**: `isUniqueViolation` still matches only `events_pkey`, so any
+  other `ingestBatch` caller that appends two contests embedding one refused claim still rejects its
+  whole batch. *Owner for the general case: whoever next touches `commitOne`'s duplicate handling —
+  named here rather than fixed inside a route task.*
+- 12.84 🚫 **out of scope for this door, with the reason measured rather than asserted.** The
+  `entity.kind` comparison cannot be reached through `POST /v1/sync` at all: step 3 refuses every
+  client-supplied `claim.contested` as `reserved-type` before ingest is called, which 12.108 pins by
+  submitting a contest whose embedded claim names a different entity kind AND asserting the answer is
+  `reserved-type` and not `contest.incoherent-original`. So this task cannot supply the door test 12.84
+  asks for — it can only prove the door does not open. The remaining production path,
+  `buildContestedClaim`, is structurally incapable of a mismatch (12.59/12.60). *Owner if the series
+  ever wants a real door test for that comparison: whoever adds a second server-side contest producer;
+  there is exactly one today.*
+

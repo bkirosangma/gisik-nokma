@@ -6,6 +6,10 @@ import { listVisibleTickets } from '../visibility/visible-tickets.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { readLatestSnapshot } from '../ledger/snapshot-store.js';
 import { readStreamSeq } from './stream-seq.js';
+import type { ClientIngest } from '../ingest/ingest-service.js';
+import type { ServerAppend } from '../routes/invites.js';
+import { MAX_BATCH_SIZE } from '../routes/events.js';
+import { createSyncService } from './sync-service.js';
 
 /**
  * Content and contests are not ticket *state*, so a snapshot does not carry
@@ -82,11 +86,30 @@ async function bootstrapTicket(client: PoolClient, ticketId: string): Promise<Bo
  * for the consequence: this route is not compatible with a `BuildTestAppOverrides.pool`
  * wrapper that lacks `.connect()`.
  */
+export type SyncRouteDeps = {
+  pool: Pool;
+  /**
+   * The GATED door, for the client's own offline claims. Narrowed to
+   * `ClientIngest` on purpose — see `sync-service.ts`'s door note. The full
+   * `IngestService` the plan's snippet asks for is what makes an ungated
+   * `ingestBatch([event])` for a client claim compile.
+   */
+  ingest: ClientIngest;
+  /** The INTERNAL door, named rather than reached for: server-authored contests only. */
+  serverAppend: ServerAppend;
+};
+
 export function registerSyncRoutes(
   app: FastifyInstance,
-  deps: { pool: Pool },
+  deps: SyncRouteDeps,
   requireSession: preHandlerHookHandler,
 ): void {
+  const syncService = createSyncService({
+    pool: deps.pool,
+    ingest: deps.ingest,
+    serverAppend: deps.serverAppend,
+  });
+
   app.get<{ Querystring: { workspaceId: string } }>(
     '/v1/sync/bootstrap',
     {
@@ -148,6 +171,47 @@ export function registerSyncRoutes(
       } finally {
         client.release();
       }
+    },
+  );
+
+  /**
+   * `POST /v1/sync` — the sync ingress (amendment 16). Body
+   * `{events: [raw SubmittedEvent, …]}`, 1-`MAX_BATCH_SIZE` of them (the same
+   * bound `POST /v1/events` uses, imported rather than restated), answered 200
+   * `{results: SyncEventResult[]}` index-aligned with the request array.
+   *
+   * HTTP status means "was this a batch"; every per-event answer — envelope
+   * error, refusal, contest — rides inside `results`, exactly as the
+   * interactive door does.
+   *
+   * The two doors this handler's service submits through, and why each one, are
+   * `sync-service.ts`'s opening docblock. The short version, because it is the
+   * thing a reader of THIS file needs: the client's offline claim goes through
+   * `ingestClientBatch` (gated), the server's `claim.contested` append goes
+   * through `serverAppend` (internal, and forced — a contest is server-origin
+   * and the client door refuses that value).
+   *
+   * `additionalProperties: false` matches `/v1/events`: a body carrying a
+   * second key is not a batch this door recognises.
+   */
+  app.post(
+    '/v1/sync',
+    {
+      preHandler: requireSession,
+      schema: {
+        body: {
+          type: 'object',
+          required: ['events'],
+          additionalProperties: false,
+          properties: {
+            events: { type: 'array', minItems: 1, maxItems: MAX_BATCH_SIZE },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const { events } = request.body as { events: unknown[] };
+      return { results: await syncService.processBatch(request.currentUserId, events) };
     },
   );
 }
