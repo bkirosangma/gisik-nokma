@@ -43,7 +43,8 @@ import { createReplica, type BootstrapResponse, type Replica } from '../src/repl
  * The consequence is stated so it can be checked: this file adds two executions
  * to the package. That took the package's own run from 45 to `Tests 47 passed
  * (47)` when this file landed, and Task 11's `test/sync-engine.test.ts` has
- * since taken it to **`Tests 61 passed (61)`** — the number to re-run, not to
+ * since taken it to `Tests 61 passed (61)` and then, with that task's fix round
+ * adding 12.170 and 12.171, to **`Tests 63 passed (63)`** — the number to re-run, not to
  * recompute, and the reason the FILE-scoped denominators in this file are the
  * durable ones. Per-file, `vitest run test/recorded-hazards.test.ts` still
  * reads `Tests 2 passed (2)`, and the two-file `(22)` runs quoted below are

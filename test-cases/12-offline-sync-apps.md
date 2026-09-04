@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.169`. THE NEXT FREE ID IS `12.170`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.171`. THE NEXT FREE ID IS `12.172`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists). A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -26,15 +26,23 @@ is deliberately not flipped here. *Owner: Plan 10 Task 18.*
 position: the §11 envelope-coherence closer, `proj_contested`, `getContest` and `GET /v1/contests`.
 Task 5: the snapshot writer and the ledger-sourced reducer deps. Task 6: `GET /v1/sync/bootstrap`.
 Task 7: `POST /v1/sync`. Task 9: the replica (12.119–12.137). Task 10: the outbox and the local
-pre-check (12.138–12.153). Task 11: the sync engine and its HTTP/WS transport (12.156–12.169).
+pre-check (12.138–12.153). Task 11: the sync engine and its HTTP/WS transport (12.156–12.171, the last two from its fix round).
 Nothing else from Plan 10 is catalogued — Task 8 (the `sync-client` scaffold
 and the storage seam), Tasks 12–13 (the replica `DataSource` and app-core's
 offline UX), Tasks 14–15 (the dual-client harness and its scenarios) and Tasks 16–17 (the two app
 shells) are absent rather than missing. **Task 8's absence is measured, not assumed**: this file has no
-Task 8 section and no case id for it — `grep -n "Task 8" test-cases/12-offline-sync-apps.md` returns
-one line, a passing mention of its `outbox` table inside a Task 7 case — and its storage-conformance
+Task 8 section and no case id for it. **The command this sentence used to quote is the wrong command,
+and quoting it was one of this work's false claims**: it read *"`grep -n "Task 8" …` returns one
+line"*, and a plain name-match returns this paragraph itself — which names Task 8 repeatedly in order
+to say it is absent — plus the passing mention of its `outbox` table in the replica section's
+uncovered-behaviour note. That count is SELF-REFERENTIAL: every correction to this sentence changes
+it, which is exactly what happened when the "one line" version was first repaired. So the measure is
+the one that cannot move with the prose:
+`grep -nE "^## .*Task 8|^- 12\.[0-9]+ .*Task 8" test-cases/12-offline-sync-apps.md` returns NOTHING —
+no Task 8 heading, no Task 8 case line — with `grep -cE "^## " …` printing **10** as the
+control that the pattern can match a heading at all (re-measured here, not carried). Its storage-conformance
 and barrel-guard suites (the "+4 and +4" inside `packages/sync-client`'s package run, which read 45 at
-Task 10, 47 after the recorded-hazard file, and **61** since Task 11) are catalogued in no
+Task 10, 47 after the recorded-hazard file, 61 at Task 11, and **63** since Task 11's fix round) are catalogued in no
 `test-cases/` file at all. *Owner for placing them: Plan 10 Task 18.*
 
 **This paragraph was itself the drift the header line above warns about.** Written for Task 7 (commit
@@ -675,13 +683,28 @@ appears to refute the first.** Each is measured, with the command beside it:
    (2) gets fifteen and must not read that as the id range being wrong.
 3. **Seventeen executions** — sixteen declarations, one of which runs twice.
 
-The package's own run reads **`Tests 61 passed (61)`**, and the sum is stated so it can be checked:
-these seventeen, Task 9's twenty, the two recorded-hazard cases below, Task 11's fourteen
-(12.156–12.169), the barrel guard's four, and the storage conformance suite's four. It read 45 until
-the fix round added `test/recorded-hazards.test.ts`, then 47 until Task 11 added
-`test/sync-engine.test.ts`; every package-wide denominator in this file has been RE-RUN at 60 rather
-than recomputed from it, and where a re-run changed the failing set as well as the denominator — 12.139
-did, from four ids to six — the new set is written out.
+The package's own run reads **`Tests 63 passed (63)`**, and the sum is stated so it can be checked:
+these seventeen, Task 9's twenty, the two recorded-hazard cases below, Task 11's sixteen
+(12.156–12.171), the barrel guard's four, and the storage conformance suite's four. It read 45 until
+the fix round added `test/recorded-hazards.test.ts`, 47 until Task 11 added
+`test/sync-engine.test.ts`, and 61 until Task 11's FIX round added 12.170 and 12.171.
+
+**THE RULE THIS FILE FOLLOWS ABOUT DENOMINATORS, stated because the sentence that used to stand here
+claimed more than it could keep.** It read *"every package-wide denominator in this file has been
+RE-RUN at 60"* — a universal over a file this long, and false twice over (the package was 61, and it
+is 63 now). What is actually true, and checkable: a package-wide denominator quoted as the CURRENT
+state is re-run at the tree that writes it, and a denominator inside a MUTATION result is left at the
+tree that mutation was measured on, because a mutation result is a fact about a tree and a recomputed
+one is a fiction. So `(47)`, `(60)` and `(61)` still appear below inside mutation records and are not
+errors; a *current* `(61)` would be.
+
+**THIS PARAGRAPH IS WHERE TWO OF THIS WORK'S FALSE CLAIMS LIVED, and both were self-inflicted in the
+way it warns about.** It said "RE-RUN at **60**" four lines after stating `Tests 61 passed (61)`, and
+it said the 12.139 re-run went "from four ids to **six**" while the bullet twenty lines below it —
+edited in the same commit — correctly listed SEVEN. Neither was a hard measurement to make; both were
+recomputed from a remembered number instead of re-run. The failing set is now written where it is
+measured (the 12.139 bullet) and this paragraph points at it rather than restating it, so there is one
+copy to go stale instead of two.
 
 **Every id below was proved able to fail**, each with the mutation that reddens it and the full list of
 cases that mutation takes down — a mutation that reddens five cases is not evidence about one, and
@@ -696,16 +719,19 @@ mutations were run; **none survived**.
 - 12.139 ✅ **the reopen pair** — the parent's reopen is queued first, and the child create that 12.138
   refuses is then ACCEPTED, because the pre-check reads confirmed state with the outbox overlaid. The
   only difference between the two cases is the queued reopen. *Mutation: hold one `EngineContext` on
-  the `createOutbox` closure, which is what the plan's snippet does → red here, on 12.141, on 12.144,
-  **on 12.151, and — since Task 11 — on 12.159, 12.160 and 12.169** (`Tests 7 failed | 54 passed (61)`,
-  re-run at 61; it read `Tests 6 failed | 54 passed (60)` before 12.169 was added,
-  `Tests 4 failed | 43 passed (47)` at 47, and `41 passed (45)` at 45 — the count moved three times and
-  every move was inside the change set that caused it. The three new ids are the engine's flush cases,
-  whose claims are enqueued after the replica was bootstrapped, so a context frozen at `createOutbox`
-  time judges them against an empty world). This bullet and `outbox.ts`'s docblock both
+  the `createOutbox` closure, which is what the plan's snippet does → red on **eight ids, written out
+  rather than counted: 12.139, 12.141, 12.144, 12.151, 12.159, 12.160, 12.169 and 12.170**
+  (`Tests 8 failed | 55 passed (63)`, re-run at 63 on the tree that added 12.170). It read
+  `Tests 7 failed | 54 passed (61)` before this fix round, `Tests 6 failed | 54 passed (60)` before
+  12.169 was added, `Tests 4 failed | 43 passed (47)` at 47, and `41 passed (45)` at 45 — the set has
+  moved FOUR times and every move was inside the change set that caused it. **One of those moves is
+  why this bullet is now an enumeration**: the paragraph above this section said the re-run went "from
+  four ids to six" while this bullet, edited in the same commit, said seven. The four engine ids are
+  the flush cases, whose claims are enqueued after the replica was bootstrapped, so a context frozen at
+  `createOutbox` time judges them against an empty world. This bullet and `outbox.ts`'s docblock both
   said THREE for one task, and the missing id is a measurement of WHEN the held context is built: build
   it eagerly in the `createOutbox` body — which is what "one built at `createOutbox` time" means and
-  what the plan's snippet does — and four go red; memoise it lazily on the first `enqueue` (`??=`) and
+  what the plan's snippet does — and the eight above go red; memoise it lazily on the first `enqueue` (`??=`) and
   12.151 stays green, because that test's first `enqueue` is its only one, so its "held" context is
   built after the `applyServerItem` that confirms the ticket. Both runs are real; only the eager one is
   the mutation the prose describes. 12.151's failure is also the OTHER half of the staleness: 12.139
@@ -804,9 +830,9 @@ mutations were run; **none survived**.
 ## Recorded hazards, pinned as executable cases (Task 9 fix round) — `packages/sync-client/test/recorded-hazards.test.ts`
 
 **TWO `it` declarations, running as two tests.** `vitest run test/recorded-hazards.test.ts` reads
-`Tests 2 passed (2)`; the package's run reads `Tests 61 passed (61)` since Task 11's fourteen landed,
-and read `Tests 47 passed (47)` when this paragraph was written, which is the 45 above plus
-these two. Both mutations below were run over `test/recorded-hazards.test.ts` **and**
+`Tests 2 passed (2)`; the package's run reads `Tests 63 passed (63)` since Task 11's fourteen and its
+fix round's two landed, read `Tests 61 passed (61)` in between, and read `Tests 47 passed (47)` when
+this paragraph was written, which is the 45 above plus these two. Both mutations below were run over `test/recorded-hazards.test.ts` **and**
 `test/replica.test.ts` together (22 executions), because what each mutation does NOT redden in the
 task's own file is half of what it establishes.
 
@@ -887,8 +913,16 @@ Measured after the split: `vitest run test/replica.test.ts` still reads `Tests 2
 ## The sync engine and its transport (Task 11) — `packages/sync-client/test/sync-engine.test.ts`
 
 **EVERY ENUMERATION IN THIS SECTION IS A RUN OF `vitest run test/sync-engine.test.ts` ALONE**, which is
-what its `(14)` denominators mean. The package-wide run is `Tests 61 passed (61)` and is quoted in the
-Task 10 section, where the sum is itemised.
+what its denominators mean. The file holds SIXTEEN cases and its denominator is `(16)`; every `(14)`
+below belongs to a mutation run recorded when the file held fourteen, and each of those is left at the
+number it was actually measured at rather than being recomputed to 16 — a mutation result is a fact
+about the tree it ran on. The package-wide run is `Tests 63 passed (63)` and is quoted in the Task 10
+section, where the sum is itemised.
+
+**The fix round added 12.170 and 12.171**, and both are corrections to claims this section made about
+itself: 12.170 because "the guard is on BOTH doors of the pair" counted two of three callers of
+`applyServerItem`, and 12.171 because "the ONE field held to the server's own rule" left the value
+this client actually PERSISTS unchecked.
 
 **This section placed itself at the END and not beside the replica's, and the reason is the one the
 file header gives.** Cases here are grouped by surface, not by number, so the largest id is not the
@@ -897,10 +931,12 @@ Task 11 is also the OWNER of two recorded hazards catalogued above (12.154, 12.1
 deleted: the engine closed the production route to one and changed what happens after the other, and
 both owner lines say so in the same change set as this section.
 
-**Four of these cases are about what the engine does with an already-measured failure one layer
-down** — 12.163, 12.164, 12.165, 12.166 — and each carries its own mutation, because the engine is the
-first caller of `loadBootstrap` and `applyServerItem` that has a cursor to advance. Before this file,
-nothing in the repository constrained that behaviour in either direction.
+**FIVE of these cases are about what the engine does with a failure measured one layer down** —
+12.163, 12.164, 12.165, 12.166 and 12.170 — and each carries its own mutation, because the engine is
+the first caller of `loadBootstrap` and `applyServerItem` that has a cursor to advance. Before this
+file, nothing in the repository constrained that behaviour in either direction. *(This said "four"
+until the fix round found the third caller of `applyServerItem` and added 12.170; the ids are written
+out so the next such move is visible rather than arithmetic.)*
 
 - 12.156 ✅ **an empty replica bootstraps exactly once, subscribes at the bootstrap cursor, and goes
   live at `caught-up`.** `bootstraps` is 1, the subscription is `[{afterSeq: 7}]` — `streamSeq` off the
@@ -961,8 +997,10 @@ nothing in the repository constrained that behaviour in either direction.
   said 12.164 stayed green; that is true of the cursor and false of the case, because 12.164 waits for
   `lastApplyFailure()` to appear before it sends its `caught-up`, and a swallowed failure never
   appears.*
-- 12.164 ✅ **a `caught-up` arriving after a failed item does NOT advance the cursor — the second door
-  of a pair inside one function.** The plan's snippet writes `.catch(() => undefined)` TWICE, and the
+- 12.164 ✅ **a `caught-up` arriving after a failed item does NOT advance the cursor — the second of
+  the two CURSOR doors inside one function.** (The engine has a third caller of `applyServerItem`
+  that neither this case nor 12.163 touches; it went unguarded until 12.170, and "both doors of the
+  pair" is the sentence that hid it.) The plan's snippet writes `.catch(() => undefined)` TWICE, and the
   cursor advance lives on the second one, so fixing only the item's chain leaves the permanent skip
   intact. *Mutation: drop the stall guard from `onCaughtUp`'s chain alone → red here **alone**
   (`Tests 1 failed | 13 passed (14)`); 12.163 stays green because it never sends a `caught-up` after
@@ -1003,8 +1041,9 @@ nothing in the repository constrained that behaviour in either direction.
   fields, which is this case's job.*
 - 12.168 ✅ **what the parser refuses, and what it deliberately does not.** Seven inputs produce ZERO
   handler calls — non-string data, unparseable bytes, an unknown frame type, an event frame whose
-  `envelope.workspaceSeq` is 0 (the one field held to the server's own rule, because a frame without a
-  resumable position is one this subscription cannot resume from), and purge / `caught-up` /
+  `envelope.workspaceSeq` is 0 (one of the TWO fields held to the server's own rule — the other is
+  `caught-up.seq`, unguarded until 12.171 — because a frame without a resumable position is one this
+  subscription cannot resume from), and purge / `caught-up` /
   `scope-revoked` frames naming a DIFFERENT workspace, which are crossed streams and would otherwise
   move this cursor by a number that means nothing here. An `error` frame with `workspaceId: null` is
   then delivered, because amendment 19 uses null for connection-level errors raised before any
@@ -1012,3 +1051,56 @@ nothing in the repository constrained that behaviour in either direction.
   non-vacuous by the same handler set that later fires. Everything else is deliberately MORE permissive
   than `serverStreamFrameSchema`, for the reason `packages/app-core/src/online/stream.ts` argues at
   length: a client that hard-drops a frame it could have delivered fails silently.
+  **What this case does NOT cover, and the summary prose that said it did**: an `event` frame whose
+  `envelope.workspaceId` names ANOTHER workspace is delivered to `onItem`. The `event` branch returns
+  before the `frame.workspaceId !== workspaceId` comparison and checks the envelope's `workspaceSeq`
+  alone, so the three frames listed above are the whole of what "cross-workspace" means here. The
+  transport's own inline comment enumerates those three correctly; `Features.md` and this case's
+  docblock said "cross-workspace frames are dropped" flatly, and both now say what the code does.
+  *Recorded, not fixed: adding the guard is a behaviour change with its own case, not a prose repair.
+  Owner: Plan 10 Task 12, the next task to own this seam.*
+
+### The fix round — two claims this section made about itself, and the cases that make them true
+
+- 12.170 ✅ **a `committed` verdict the replica cannot fold STALLS the flush door — the THIRD caller of
+  `applyServerItem`, which "both doors of the pair" did not cover.** 12.163 and 12.164 pin the two
+  CURSOR chains; `outbox.applyResult` folds a `committed` claim through the same throwing function, and
+  the flush loop called it with no catch. Sequence: bootstrap, stream a `ticket.created`, enqueue a
+  `ticket.transitioned` for it (the pre-check passes — the ticket is still there), deliver a
+  project-scoped `scope-revoked` (which deletes the ticket and leaves the outbox row by design), then
+  `flush()` against a `committed` answer. *Measured BEFORE the fix, and it is the whole reason the case
+  exists: `flush()` REJECTED with `applyTicketEvent: … that was never created`; `status()` was
+  `catching-up`, not stalled; `lastApplyFailure()` was `null`, so a shell could see nothing;
+  `recordFailure` never ran, so the row stood at `attempts: 0, status: 'queued'` with
+  `next_attempt_at` unmoved; and the next `flush()` re-sent the IDENTICAL batch — the hot loop
+  `sync-engine.ts`'s own docblock says the engine exists to prevent. `onCaughtUp` reaches this code
+  through `await engine.flush()`, so identical input produced a visible terminal stall on one path and
+  a silent no-backoff resubmit on the other.* After the fix the case asserts, printed as rows rather
+  than counted: `flush()` RESOLVES, `lastApplyFailure()` carries the reducer's own words, `status()` is
+  `offline`, `nextBatch()` at the current clock is `[]` (backoff applied) while `nextBatch` at
+  2100-01-01 is exactly `[{attempts: 1, status: 'queued'}]` for that event id, and the ids that reached
+  the transport across two flushes are `[[claim.id]]` — one batch, not two. *Mutation: delete the
+  `try`/`catch` around `outbox.applyResult` → red HERE ALONE (`Tests 1 failed | 15 passed (16)`), the
+  rejection thrown out of the unguarded `await engine.flush()`; 12.163 and 12.164 stay green, because
+  neither flushes a claim the replica cannot fold — which is precisely why this door went unseen.*
+  *Also reddened by the outbox's held-context mutation; see 12.139, which was re-run for it.*
+- 12.171 ✅ **`caught-up.seq` is held to the same rule as `envelope.workspaceSeq`, and it is the one
+  that PERSISTS.** The event branch four lines above refuses a non-positive-integer `workspaceSeq`; the
+  `caught-up` branch accepted its `seq` on `typeof 'number'` alone — and that value is what
+  `replica.setCursor` writes to durable storage as `String(seq)`, read back by `getCursor` as
+  `Number(value)`. `1e999` is the reachable input: JSON has no NaN literal, but `1e999` is legal JSON
+  and `JSON.parse` yields `Infinity` with `typeof 'number'`. *Measured one layer down before the fix:
+  the cursor persisted as `"Infinity"`, `needsBootstrap` returned false forever because
+  `Infinity !== 0`, and every later subscribe serialised as `{"afterSeq":null}` — a device that can
+  neither resume nor re-bootstrap, silently, across process restarts. A negative or fractional `seq` is
+  milder and was equally unrefused; a too-large finite one advances the cursor past events never
+  delivered.* The case sends `1e999`, `-1`, `1.5` and `"9"` as RAW STRINGS — not through
+  `JSON.stringify`, which turns `Infinity` into `"null"` and would test a frame the wire cannot send —
+  asserts zero handler calls, then sends `0` and `12` and asserts `['caught-up:0', 'caught-up:12']`.
+  **The `0` half is the non-vacuity control and also the reason the bound is `>= 0` rather than the
+  event branch's `> 0`**: `readStreamSeq` answers 0 for an empty workspace, so copying the stricter
+  rule would strand every empty workspace at `catching-up` forever. *Mutation: restore
+  `if (typeof frame.seq !== 'number') return;` → red HERE ALONE (`Tests 1 failed | 15 passed (16)`),
+  with `['caught-up:Infinity', 'caught-up:-1', 'caught-up:1.5']` delivered where the case expects
+  nothing. Every other case in this file drives `onCaughtUp` through the fake handlers directly and
+  never through the parser, which is why nothing caught it.*

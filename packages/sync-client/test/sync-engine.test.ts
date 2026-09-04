@@ -15,17 +15,22 @@ import { createHttpTransport, type WebSocketLike } from '../src/net/http-transpo
 
 /**
  * Plan 10 Task 11 — the sync engine and its HTTP/WS transport. Cases
- * 12.156–12.169.
+ * 12.156–12.171, the last two added by the fix round: 12.170 (the THIRD door
+ * into `applyServerItem`, which the "both doors of the pair" claim did not
+ * cover) and 12.171 (`caught-up.seq`, the value this client PERSISTS, held to
+ * the rule the same function already applied to `envelope.workspaceSeq`).
  *
  * ## What this file is the FIRST caller of, and why that matters
  *
  * Two hazards were recorded against the replica (12.154, 12.155) and both name
  * this task as owner, because both only become reachable when something drives
  * `loadBootstrap` and `applyServerItem` with a CURSOR TO ADVANCE. Nothing did
- * until this file. So the cases below are not only "the engine works": four of
- * them (12.163, 12.164, 12.165, 12.166) exist specifically to say what this door
- * does about an already-measured failure one layer down, and each carries the
- * mutation that reddens it.
+ * until this file. So the cases below are not only "the engine works": FIVE of
+ * them exist specifically to say what this door does about a failure measured
+ * one layer down, and each carries the mutation that reddens it — 12.163,
+ * 12.164, 12.165, 12.166, and 12.170, which the fix round added when the throw
+ * turned out to have a third caller here. Written as ids rather than as a
+ * number, because the number moved.
  *
  * ## Fixtures are duplicated rather than shared
  *
@@ -36,7 +41,9 @@ import { createHttpTransport, type WebSocketLike } from '../src/net/http-transpo
  * measures `Tests 2 passed (2)` for its own file and its two cases are quoted
  * with `(22)` denominators in `test-cases/12-offline-sync-apps.md`. Adding the
  * engine's cases to that file would silently falsify both. This file's own
- * denominator is `(14)`; the package's is `Tests 61 passed (61)`.
+ * denominator is `(16)`; the package's is `Tests 63 passed (63)` — both moved
+ * by the fix round's two cases, and both re-run at this tree rather than
+ * recomputed from the old pair.
  *
  * ## No `TZ` case here, and that is a decision rather than an omission
  *
@@ -201,7 +208,7 @@ async function fixture(over: Partial<Pick<Script, 'syncImpl' | 'bootstrapImpl'>>
   return { script, replica, outbox, engine };
 }
 
-describe('12.156-12.164 + 12.169 sync engine lifecycle and flush', () => {
+describe('12.156-12.164 + 12.169-12.170 sync engine lifecycle and flush', () => {
   it('12.156 bootstraps once, subscribes at the bootstrap cursor, and goes live at caught-up', async () => {
     const { script, replica, engine } = await fixture();
     await engine.start(WS);
@@ -545,6 +552,96 @@ describe('12.156-12.164 + 12.169 sync engine lifecycle and flush', () => {
     expect(await replica.getCursor(WS)).toBe(9);
     engine.stop();
   });
+
+  /**
+   * 12.170 — THE THIRD DOOR INTO `applyServerItem`, WHICH "BOTH DOORS OF THE
+   * PAIR" DID NOT COVER.
+   *
+   * 12.163 and 12.164 pin the two CURSOR chains, and the sentence they earned —
+   * "the guard is on both doors of the pair" — was true of those two and blind
+   * to a third: `outbox.applyResult` on a `committed` verdict folds the
+   * envelope through the SAME `replica.applyServerItem`, and the flush loop
+   * called it with no catch. The highest-yield defect shape in this codebase is
+   * a behaviour implemented on one door of a pair; this is the same shape with
+   * the pair miscounted, which is worse, because the count was written down and
+   * believed.
+   *
+   * MEASURED BEFORE THE FIX, on exactly this sequence: `flush()` REJECTED with
+   * `applyTicketEvent: ticket.transitioned for ticket … that was never
+   * created`; `status()` was `catching-up`, not stalled; `lastApplyFailure()`
+   * was `null`, so a shell could see nothing at all; the outbox row stood at
+   * `attempts: 0, status: 'queued'` because `recordFailure` never ran, so
+   * `next_attempt_at` was never pushed out; and the next `flush()` re-sent the
+   * IDENTICAL batch. That is verbatim the failure `sync-engine.ts`'s own
+   * docblock says the engine exists to prevent — "the same item is redelivered
+   * and throws again: a hot loop that never converges and never says anything."
+   *
+   * And `onCaughtUp` reaches this same code through its own
+   * `await engine.flush()`, where the rejection instead became `stall(err,
+   * null)`. So identical input yielded a visible terminal stall on one path and
+   * a silent no-backoff resubmit on the other, one `await` apart.
+   *
+   * *Mutation: delete the `try`/`catch` around `outbox.applyResult` in `flush`
+   * (the shape the loop shipped in) → red HERE ALONE
+   * (`Tests 1 failed | 15 passed (16)` in this file), with
+   * `Error: applyTicketEvent: … that was never created` thrown out of the
+   * unguarded `await engine.flush()`. 12.163 and 12.164 stay green, because
+   * neither of them flushes a claim the replica cannot fold — which is the
+   * whole reason this door went unnoticed.*
+   */
+  it('12.170 a committed verdict the replica cannot fold stalls the flush door, with backoff and no resubmit', async () => {
+    const { script, replica, outbox, engine } = await fixture();
+    await engine.start(WS);
+    script.handlers!.onCaughtUp(9);
+    await vi.waitFor(async () => expect(await replica.getCursor(WS)).toBe(9));
+
+    const ticketId = newUlid();
+    script.handlers!.onItem(created(ticketId));
+    await vi.waitFor(async () => expect(await replica.getTicket(ticketId)).not.toBeNull());
+
+    // Queued while the ticket is still here, so the pre-check passes: the claim
+    // is legal when it is made and unfoldable by the time it is answered. That
+    // gap is the whole scenario, and it is not contrived — it is 12.155's
+    // project-scoped half with a claim already in the outbox.
+    const claim = newSubmittedEvent({
+      workspaceId: WS,
+      entity: { kind: 'ticket', id: ticketId },
+      type: 'ticket.transitioned',
+      payload: { to: 'doing' },
+      actorId: USER_A,
+      origin: 'desktop',
+    });
+    expect(await outbox.enqueue(claim)).toMatchObject({ queued: true });
+
+    // The project goes; the ticket goes with it and the outbox row deliberately
+    // stays (`buildPendingOverlay`'s note: the claim is unrenderable, not lost).
+    script.handlers!.onItem({ kind: 'scope-revoked', workspaceId: WS, projectId: PROJECT });
+    await vi.waitFor(async () => expect(await replica.getTicket(ticketId)).toBeNull());
+    expect(await outbox.queuedCount(WS)).toBe(1);
+
+    // The server says `committed`. The fold throws anyway — and this line
+    // RESOLVING rather than rejecting is half of what the case asserts.
+    await engine.flush();
+
+    expect(engine.lastApplyFailure()).not.toBeNull();
+    expect(engine.lastApplyFailure()!.code).toBe('apply-failed');
+    expect(engine.lastApplyFailure()!.message).toContain('never created');
+    expect(engine.status()).toBe('offline'); // the same terminal state 12.163 reaches
+
+    // Backoff was applied, so nothing is due now — printed as the rows, not as
+    // a count, on both sides of the clock.
+    expect(await outbox.nextBatch()).toEqual([]);
+    const later = await outbox.nextBatch(10, () => new Date('2100-01-01T00:00:00.000Z'));
+    expect(later.map((i) => ({ id: i.eventId, attempts: i.attempts, status: i.status }))).toEqual([
+      { id: claim.id, attempts: 1, status: 'queued' },
+    ]);
+
+    // …and the batch is not re-sent. Enumerated as the ids that reached the
+    // transport rather than counted: before the fix this read the same id twice.
+    await engine.flush();
+    expect(script.syncBatches.map((b) => b.map((e) => e.id))).toEqual([[claim.id]]);
+    engine.stop();
+  });
 });
 
 describe('12.165-12.166 the bootstrap door, which this engine is the first production caller of', () => {
@@ -654,7 +751,7 @@ describe('12.165-12.166 the bootstrap door, which this engine is the first produ
   });
 });
 
-describe('12.167-12.168 the HTTP/WS transport', () => {
+describe('12.167-12.168 + 12.171 the HTTP/WS transport', () => {
   class FakeSocket implements WebSocketLike {
     sent: string[] = [];
     closed = 0;
@@ -747,13 +844,26 @@ describe('12.167-12.168 the HTTP/WS transport', () => {
    * server's own rule is `envelope.workspaceSeq` — a positive integer — because
    * a frame without it is one this subscriber cannot resume from.
    *
-   * Cross-workspace frames are dropped rather than delivered: one socket holds
-   * one subscription, so a frame naming another workspace is a crossed stream
-   * and honouring it would advance THIS cursor by a number that means nothing
-   * here (amendment 19). The `error` frame is the exception — it carries
-   * `workspaceId: null` for connection-level errors raised before any subscribe.
+   * Cross-workspace **`purge`, `scope-revoked` and `caught-up`** frames are
+   * dropped rather than delivered: those three carry a top-level `workspaceId`,
+   * one socket holds one subscription, and honouring one from another workspace
+   * would advance THIS cursor by a number that means nothing here, or empty a
+   * replica nobody revoked (amendment 19). The `error` frame is the exception —
+   * it carries `workspaceId: null` for connection-level errors raised before any
+   * subscribe.
+   *
+   * **AN `event` FRAME IS NOT IN THAT LIST, and this docblock used to say it
+   * was.** The `event` branch returns before the `frame.workspaceId !==
+   * workspaceId` line, and it checks `envelope.workspaceSeq` and nothing else —
+   * so an envelope naming another workspace IS delivered to `onItem`. The
+   * transport's own inline comment enumerates the three correctly; only this
+   * summary and `Features.md`'s overstated it. *Recorded, not fixed: the guard
+   * is a behaviour change with its own case, not a prose repair, and the honest
+   * move is to say what the code does. Owner: Plan 10 Task 12, which owns the
+   * transport seam next.* The row below is the enumeration of what this case
+   * actually drops.
    */
-  it('12.168 drops unparseable, cross-workspace and unresumable frames, and keeps connection-level errors', () => {
+  it('12.168 drops unparseable, unresumable and cross-workspace purge/caught-up/scope-revoked frames, and keeps connection-level errors', () => {
     const { transport, socketOf } = transportFixture();
     const seen: string[] = [];
     transport.openStream(WS, 0, {
@@ -777,5 +887,66 @@ describe('12.167-12.168 the HTTP/WS transport', () => {
 
     sendFrame({ type: 'error', workspaceId: null, code: 'bad-message', message: 'before subscribe' });
     expect(seen).toEqual(['error:bad-message']);
+  });
+
+  /**
+   * 12.171 — `caught-up.seq` IS HELD TO THE SAME RULE AS
+   * `envelope.workspaceSeq`, AND IT IS THE ONE THAT PERSISTS.
+   *
+   * The `event` branch four lines above refuses a frame whose `workspaceSeq` is
+   * not a positive integer, with a docblock arguing that a frame carrying no
+   * resumable position must be refused. The `caught-up` branch accepted its
+   * `seq` on `typeof 'number'` alone — and THAT is the value written to durable
+   * storage: `replica.setCursor` stores `String(seq)` and `getCursor` returns
+   * `Number(value)`. So the weaker check guarded the more dangerous field.
+   *
+   * `1e999` IS THE REACHABLE ONE. JSON has no NaN literal, but `1e999` is legal
+   * JSON and `JSON.parse` yields `Infinity` with `typeof 'number'` — asserted
+   * below rather than asserted about, and sent as a RAW STRING rather than
+   * through `JSON.stringify`, because `JSON.stringify(Infinity)` is `"null"`
+   * and a round-tripped fixture would test a frame the wire cannot send.
+   * Measured one layer down before the fix: the cursor persisted as
+   * `"Infinity"`, `getCursor` returned `Infinity`, `needsBootstrap` was false
+   * forever because `Infinity !== 0`, and every later subscribe serialised as
+   * `{"afterSeq":null}` — a device that can neither resume nor re-bootstrap,
+   * silently, across process restarts.
+   *
+   * `seq: 0` IS ACCEPTED, and that half is the non-vacuity control rather than
+   * a courtesy: `readStreamSeq` answers 0 for an empty workspace, so copying
+   * the event branch's `> 0` here would strand every empty workspace at
+   * `catching-up` forever. The two branches are deliberately different bounds.
+   *
+   * *Mutation: restore `if (typeof frame.seq !== 'number') return;` → red HERE
+   * ALONE (`Tests 1 failed | 15 passed (16)` in this file), with
+   * `['caught-up:Infinity', 'caught-up:-1', 'caught-up:1.5']` delivered where
+   * the case expects nothing. Every other case in this file drives
+   * `onCaughtUp` through the fake handlers directly and never through the
+   * parser, which is exactly why nothing caught this.*
+   */
+  it('12.171 refuses a caught-up seq that is not a non-negative integer, and accepts zero', () => {
+    // The premise, checked rather than asserted: this is what the wire can send.
+    expect((JSON.parse('{"seq":1e999}') as { seq: number }).seq).toBe(Infinity);
+
+    const { transport, socketOf } = transportFixture();
+    const seen: string[] = [];
+    transport.openStream(WS, 0, {
+      onItem: () => seen.push('item'),
+      onCaughtUp: (seq) => seen.push(`caught-up:${seq}`),
+      onError: (err) => seen.push(`error:${err.code}`),
+      onClose: () => seen.push('close'),
+    });
+    const socket = socketOf();
+    const send = (raw: string): void => socket.onmessage!({ data: raw });
+
+    send(`{"type":"caught-up","workspaceId":"${WS}","seq":1e999}`);
+    send(`{"type":"caught-up","workspaceId":"${WS}","seq":-1}`);
+    send(`{"type":"caught-up","workspaceId":"${WS}","seq":1.5}`);
+    send(`{"type":"caught-up","workspaceId":"${WS}","seq":"9"}`);
+    expect(seen).toEqual([]);
+
+    // Both legitimate positions: an empty workspace, and a populated one.
+    send(`{"type":"caught-up","workspaceId":"${WS}","seq":0}`);
+    send(`{"type":"caught-up","workspaceId":"${WS}","seq":12}`);
+    expect(seen).toEqual(['caught-up:0', 'caught-up:12']);
   });
 });

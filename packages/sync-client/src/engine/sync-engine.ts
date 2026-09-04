@@ -43,7 +43,18 @@ export type ApplyFailure = {
   code: 'apply-failed';
   /** `applyTicketEvent`'s own words, unedited. */
   message: string;
-  /** The item that could not be applied, or `null` when the failure was not an item's. */
+  /**
+   * The item that could not be applied, or `null` when this engine does not
+   * hold one to name.
+   *
+   * TWO DIFFERENT REASONS FOR `null`, and the second was added by the flush
+   * door's fix, which is why this sentence no longer reads "when the failure
+   * was not an item's": a `caught-up` link that fails has no item at all, while
+   * a failing `applyResult` DOES have one — the `LedgerEvent` `outbox.ts` builds
+   * from the queued row plus the server's verdict — and the engine deliberately
+   * does not rebuild it here. `lastError()`'s message carries the reducer's own
+   * words either way.
+   */
   item: SyncItem | null;
 };
 
@@ -102,6 +113,18 @@ function messageOf(err: unknown): string {
  *    the deliberate per-arrival-rollback contract (12.125), where the pre-check
  *    door catches the identical fold. The engine STALLS on it — see `stall` —
  *    rather than skipping the item or re-delivering it forever.
+ *
+ *    **THREE CALLERS REACH THAT THROW FROM THIS FILE, not two, and the count is
+ *    written as an enumeration because the two-door version of this sentence
+ *    stood here while the third door was open.** `onItem`'s chain calls
+ *    `applyOne` → `replica.applyServerItem`; `onCaughtUp`'s chain calls
+ *    `engine.flush()`; and `flush` itself calls `outbox.applyResult`, which
+ *    folds a `committed` verdict through `replica.applyServerItem` too. The
+ *    first two had `.catch(… stall)` from the first draft; the third had
+ *    nothing, so a fold failure on the flush path rejected `flush()`, left
+ *    `status()` at `catching-up` and `lastApplyFailure()` at `null`, and — with
+ *    no `recordFailure` — re-sent the identical batch on the next flush.
+ *    Case 12.170.
  *
  * ## What is NOT decided here
  *
@@ -399,8 +422,51 @@ export function createSyncEngine(deps: {
               );
               return;
             }
+            // THE THIRD DOOR INTO `applyServerItem`, AND IT WAS THE OPEN ONE.
+            //
+            // `applyResult` on a `committed` verdict folds the envelope through
+            // `replica.applyServerItem` (`outbox.ts`), which throws per-arrival
+            // by the same 12.125/12.155 contract the stream door lives under.
+            // This engine's stall design was written for `onItem` and
+            // `onCaughtUp` and called that "both doors of the pair"; the flush
+            // loop is a third caller of the same throwing function and it had
+            // no catch at all. MEASURED before the fix, on the sequence 12.170
+            // now runs: `flush()` REJECTED, `status()` stayed `catching-up`,
+            // `lastApplyFailure()` stayed `null` — a shell could see nothing —
+            // and because `recordFailure` never ran, `next_attempt_at` was
+            // never pushed out, so the very next `flush()` re-sent the
+            // IDENTICAL batch. That is verbatim the failure this module's
+            // docblock says the engine exists to prevent.
+            //
+            // The two moves are ordered, and the order is the substance:
+            //
+            // 1. `recordFailure(ids.slice(i))` — rows `0..i-1` were judged and
+            //    their outbox rows are gone; the row at `i` still stands,
+            //    because `applyServerItem` threw before `applyResult` reached
+            //    its own `DELETE`; rows `i+1..n` were never judged. Failing the
+            //    whole unjudged tail is what applies backoff, and backoff is
+            //    what makes the resubmit loop impossible rather than unlikely.
+            //    (`recordFailure` skips ids with no row, so a raced delete is
+            //    absorbed rather than throwing here.)
+            // 2. `stall(err, null)` — the flush door then reaches the same
+            //    visible terminal state the stream door does. Before this,
+            //    identical input produced a stall on one path and a silent
+            //    no-backoff resubmit on the other, because `onCaughtUp` reaches
+            //    this same code through its own `await engine.flush()`.
+            //
+            // `item` is `null` rather than the folded envelope: the `LedgerEvent`
+            // is built inside `applyResult` from the row plus the verdict, and
+            // rebuilding it here to decorate a failure would be a second
+            // construction of the same value — one more door of a pair to keep
+            // in step, which is the shape this file keeps being bitten by.
             for (let i = 0; i < batch.length; i += 1) {
-              await outbox.applyResult(batch[i]!.eventId, results[i]!);
+              try {
+                await outbox.applyResult(batch[i]!.eventId, results[i]!);
+              } catch (err) {
+                await outbox.recordFailure(ids.slice(i), messageOf(err));
+                stall(err, null);
+                return;
+              }
             }
           }
         } finally {
