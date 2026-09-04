@@ -222,3 +222,22 @@ export {
   SavedFiltersMenu,
   type SavedFiltersMenuProps,
 } from './preferences/saved-filters-menu.js';
+
+// Plan 10 Task 12 — the replica `DataSource` (amendment 10's second
+// implementation). It is at the ROOT and not behind a subpath, unlike
+// `./online`: that subpath exists because `no-http-in-views.test.ts` enforces
+// "no view may speak HTTP", and this module speaks no protocol at all — it
+// takes a `Replica`, an `Outbox` and a `SyncEngine` as injected dependencies
+// and reads a local store through them.
+export {
+  OfflineAcceptError,
+  REPLICA_GAPS,
+  ReplicaGapError,
+  createReplicaDataSource,
+  type LocalIngestResult,
+  type ReplicaAbsence,
+  type ReplicaDataSource,
+  type ReplicaDataSourceDeps,
+  type ReplicaOnlyQuery,
+  type TicketSummary,
+} from './replica/replica-data-source.js';

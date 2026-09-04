@@ -82,6 +82,49 @@ export type SyncEngine = {
    */
   settled(): Promise<void>;
   onStatus(cb: (status: SyncStatus) => void): () => void;
+  /**
+   * Every item this engine applied FROM THE STREAM, in arrival order, after the
+   * replica folded it. Returns the unsubscribe.
+   *
+   * ## The OTHER door into `applyServerItem`, named rather than left to be found
+   *
+   * `flush()` reaches `applyServerItem` too — through `outbox.applyResult`,
+   * which rebuilds the device's own committed claim into a `LedgerEvent` and
+   * folds it. **This observer does not fire there**, and the reason it is safe
+   * is a property of the protocol rather than of this file: a flush only runs
+   * while the engine is `live`, i.e. subscribed, and the server streams every
+   * event this device may see — so the same envelope arrives on the stream and
+   * IS announced, by id, through the branch above. `applyServerItem` ignores it
+   * as the duplicate it is; this observer still reports it, which is what a
+   * view needs. Announcing at both doors would fire twice for one claim.
+   * Enumerated from the call graph (`applyOne`, `outbox.applyResult`), not from
+   * a count in a docblock — the third door into this function is exactly what
+   * Task 11's fix round found by counting a docblock's word "pair".
+   *
+   * ## Why an observer and not `replica.onChange`
+   *
+   * `onChange` is a bare "something moved" signal with no frame in it, and Plan
+   * 10 Task 12's `DataSource.subscribe` must hand its callback the real 5-kind
+   * `StreamItem` — the executor ruling forbids declaring a parallel or
+   * truncated frame union to get around that. This engine is the only component
+   * that ever holds a frame-shaped value, so the choice was to expose the one
+   * it already has (`SyncItem`, no new union) or to let the replica source
+   * synthesize frames it was never sent. `packages/app-core/src/views/
+   * use-live-query.ts` re-queries only on `event` and `purge`, so the
+   * synthesizing option ends in every offline view frozen while looking wired
+   * up — a failure that surfaces as "the app does not refresh", never as a type
+   * error.
+   *
+   * AFTER the fold, deliberately: a subscriber told about an item the replica
+   * then failed to apply would re-query and read a store that does not contain
+   * it. A stalling item (`stall`) is therefore never announced, which is the
+   * same rule the cursor follows.
+   *
+   * A listener that throws must not take the apply chain down with it — the
+   * chain's rejection path is `stall`, and a view's render error is not a fold
+   * failure. Errors are swallowed here for that reason.
+   */
+  onItem(cb: (item: SyncItem) => void): () => void;
 };
 
 function messageOf(err: unknown): string {
@@ -162,6 +205,7 @@ export function createSyncEngine(deps: {
   let lastStreamError: { code: string; message: string } | null = null;
   let applyFailure: ApplyFailure | null = null;
   const statusListeners = new Set<(s: SyncStatus) => void>();
+  const itemListeners = new Set<(item: SyncItem) => void>();
 
   function setStatus(next: SyncStatus): void {
     if (next === currentStatus) return;
@@ -240,6 +284,18 @@ export function createSyncEngine(deps: {
     if (isSyncInstruction(item) && item.kind === 'scope-revoked' && item.projectId === undefined) {
       streamEnded = true;
       closeStream();
+    }
+    // AFTER the fold and after the revocation branch, so a subscriber that
+    // re-queries on this signal reads a store that already contains the item —
+    // or, for a revocation, one that has already emptied itself. A listener
+    // that throws is swallowed: this link's rejection path is `stall`, and a
+    // view's render error is not a fold failure.
+    for (const cb of itemListeners) {
+      try {
+        cb(item);
+      } catch {
+        // deliberately ignored — see `onItem`
+      }
     }
   }
 
@@ -506,6 +562,13 @@ export function createSyncEngine(deps: {
       statusListeners.add(cb);
       return () => {
         statusListeners.delete(cb);
+      };
+    },
+
+    onItem(cb) {
+      itemListeners.add(cb);
+      return () => {
+        itemListeners.delete(cb);
       };
     },
   };

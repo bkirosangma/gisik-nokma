@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.171`. THE NEXT FREE ID IS `12.172`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists). A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.186`. THE NEXT FREE ID IS `12.187`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.186 (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -22,15 +22,18 @@ One consequence worth stating rather than leaving to be discovered: **12.15 is a
 — `apps/server/test/sync/stream-seq.test.ts` shipped with Plan 10 Task 2 — but it is a reserved id and
 is deliberately not flipped here. *Owner: Plan 10 Task 18.*
 
-**Scope of this file today.** Plan 10 Tasks 4, 5, 6, 7, 9, 10 and 11. Task 4 as lifted out of the plan's
+**Scope of this file today.** Plan 10 Tasks 4, 5, 6, 7, 9, 10, 11 and 12. Task 4 as lifted out of the plan's
 position: the §11 envelope-coherence closer, `proj_contested`, `getContest` and `GET /v1/contests`.
 Task 5: the snapshot writer and the ledger-sourced reducer deps. Task 6: `GET /v1/sync/bootstrap`.
 Task 7: `POST /v1/sync`. Task 9: the replica (12.119–12.137). Task 10: the outbox and the local
 pre-check (12.138–12.153). Task 11: the sync engine and its HTTP/WS transport (12.156–12.171, the last two from its fix round).
-Nothing else from Plan 10 is catalogued — Task 8 (the `sync-client` scaffold
-and the storage seam), Tasks 12–13 (the replica `DataSource` and app-core's
+Task 12: the replica `DataSource` (12.172–12.186), which lives in `packages/app-core` and is the first
+part of this bucket that does. Nothing else from Plan 10 is catalogued — Task 8 (the `sync-client` scaffold
+and the storage seam), Task 13 (app-core's
 offline UX), Tasks 14–15 (the dual-client harness and its scenarios) and Tasks 16–17 (the two app
-shells) are absent rather than missing. **Task 8's absence is measured, not assumed**: this file has no
+shells) are absent rather than missing. **Task 12 came off that absent list in the change set that
+landed it**, together with the HIGHEST-ID line and the section enumeration above — the omission that
+produced two of this work's false claims was updating one of those three and not the others. **Task 8's absence is measured, not assumed**: this file has no
 Task 8 section and no case id for it. **The command this sentence used to quote is the wrong command,
 and quoting it was one of this work's false claims**: it read *"`grep -n "Task 8" …` returns one
 line"*, and a plain name-match returns this paragraph itself — which names Task 8 repeatedly in order
@@ -1104,3 +1107,170 @@ out so the next such move is visible rather than arithmetic.)*
   with `['caught-up:Infinity', 'caught-up:-1', 'caught-up:1.5']` delivered where the case expects
   nothing. Every other case in this file drives `onCaughtUp` through the fake handlers directly and
   never through the parser, which is why nothing caught it.*
+
+## Task 12 — the replica `DataSource` (`packages/app-core`)
+
+**A DIFFERENT PACKAGE, AND THEREFORE A DIFFERENT DENOMINATOR.** Every case above runs in
+`packages/sync-client`, whose current run is `Tests 63 passed (63)` — unchanged by this task, which
+added no test there. These fifteen run in `packages/app-core`: the file's own current run is
+`Tests 15 passed (15)`, and the package's is `Tests 1044 passed (1044)` across 64 files, both re-run at
+the tree that ships them. A mutation record below that quotes `(15)` is a fact about the tree the
+mutation ran on and is deliberately not re-run.
+
+**The one widening this task made outside its own files:** `ListRow.pending` (ruling P30's permitted
+one). `TicketListView` is untouched, so `packages/app-core/test/views/list-model.test.ts`'s
+compile-time tripwire — which asserts that view type's keys are exactly `rows` and `projectId` — stays
+green, and its staying green is the guard working rather than the guard being avoided. **Exactly three
+`ListRow` literals existed in the repo and `tsc` enumerated them, not a grep**: `app-core/test/helpers/
+seed.ts`, `apps/web/test/project-calendar-timeline.test.tsx` and `apps/web/test/project-create-gate.
+test.tsx`. The third names no `ListRow` type anywhere in the file, so the name-grep that found the
+first two missed it and the gate found it — which is the same "match on the name and filter after"
+failure this bucket has recorded before, caught here by a compiler instead of by a second reading.
+
+- 12.172 ✅ **the replica source IS a `DataSource` — ruling P30's falsifier, as a compiled line.**
+  `const assignable: DataSource = ds` inside the case body. Its evidence is that `typecheck` accepts
+  it and its kill is `tsc` refusing it; `packages/app-core/tsconfig.typecheck.json` includes `test`, so
+  the line is in the gate's program (verified by `tsc --listFiles`, which lists both
+  `src/replica/replica-data-source.ts` and this test file). Deliberately a `const` with an explicit
+  annotation and not a cast — a cast compiles whatever the shape is. The runtime half names the three
+  members plus two replica-only ones, so a reader who does not run `tsc` still sees the claim.
+  *Mutation: declare `ReplicaDataSource` as a sibling with the PLAN'S OWN `subscribe(workspaceId,
+  afterSeq, cb: () => void)` instead of `DataSource & {...}` → `typecheck` red at
+  `test/replica/replica-data-source.test.ts(216,11)` with `TS2322: Type 'ReplicaDataSource' is not
+  assignable to type 'DataSource'. Types of property 'subscribe' are incompatible … Target signature
+  provides too few arguments.` The plan's snippet is exactly the shape that fails.*
+- 12.173 ✅ **a locally-accepted claim answers pending — through a throw, never as an `IngestResult`.**
+  `ingest` rejects with `OfflineAcceptError` whose `results` is `[{status:'pending', eventId}]` and
+  whose `queuedEventIds` is that id; `outbox.queuedCount` is 1, so "pending" is a statement about the
+  outbox rather than a mood. **The fixture had to DECLARE a `notes` field on the ticket type**: the
+  local pre-check runs the real rule engine, so a `ticket.field_set` for an id the type does not
+  declare is refused before it is queued — a fixture with `fields: []` (which the plan's snippet has)
+  measures the refusal path while claiming to measure the accepted one, and it did, red, before the
+  fixture was corrected.
+- 12.174 ✅ **the settled columns do not move; the claim in transit is visible and DISTINCT.**
+  `replica.getTicket(...).confirmed.fields['notes']` is `undefined` after the claim is queued, while
+  `query.getTicketWithPending` answers both halves side by side — `confirmed` unchanged, `pending.
+  pending.fields['notes'].value` the claimed text, `pendingEventIds` the claim's id. This is
+  `outbox.ts`'s own invariant ("nothing here writes to `tickets`, `snapshots` or `events`") asserted at
+  the surface that renders it.
+- 12.175 ✅ **the badge renders on BOTH doors of the pair — the list row AND the board card.**
+  One queued claim, and `getTickets` reports `pending: true` on that row and `false` on the untouched
+  one, while `getBoard` reports the same pair on the cards. This is the case that exists because the
+  highest-yield defect in this codebase is a behaviour implemented on one door of a pair, and this
+  pair was ALREADY half-implemented before the task started: `BoardCard.pending` shipped in Plan 6 and
+  `ListRow` had no such field. *Mutation: hardcode `pending: false` in `rowOf` (the list half) → red
+  HERE ALONE, `Tests 1 failed | 14 passed (15)`. The board half stays green, which is exactly how the
+  asymmetry survived being shipped.*
+- 12.176 ✅ **a rule violation refuses instantly with the named rule, RETURNS a real `IngestResult`, and
+  queues nothing.** A `ticket.transitioned` to a state whose transition carries `{kind:'require-comment'}`,
+  with no comment: `ingest` RESOLVES (it does not throw — there is nothing accepted-for-now in the
+  batch) with `[{status:'refused', rule:'require-comment', …}]`, and `queuedCount` is 0. The refusal is
+  the server's own answer arriving early, which is why it is a real `IngestResult` and the acceptance
+  is not.
+- 12.177 ✅ **`ingest` can never answer `committed` — enumerated over the whole outcome space, not
+  asserted.** Three batches: all-refused (returns, statuses `['refused']`), all-accepted (throws), and
+  MIXED (throws, and the error's `results` is `['pending','refused']` — so a caller that catches loses
+  neither the rule nor the reason). The enumeration is total because `outbox.enqueue` answers
+  `{queued:true}` or `{queued:false, rule, reason}` and has no third arm, so no input reaches a
+  `committed`. *Mutation: annotate `ingest` as `Promise<LocalIngestResult[]>` — the plan's own
+  `LocalIngestResult` as the return type → `typecheck` red at `src/replica/replica-data-source.ts`
+  with `TS2322 … Type '{ status: "pending"; eventId: string; }' is not assignable to type
+  'IngestResult'`. That is return-type covariance refusing the fourth member, which is the mechanism
+  ruling P30 names, measured rather than quoted.*
+- 12.178 ✅ **`getTickets` fills all FIVE fields `online/mappers.ts` refuses `getTickets` over**, as
+  rows and not as "five": `typeRank` 3 (the local ticket-type roster), `epicId` the epic's id (the
+  workspace's OWN rank-1 types, which is the server's `rank = EPIC_RANK` rule rather than
+  `isBuiltinEpicType`'s narrower built-in-id test — the roster is local, so this client can agree with
+  the server exactly), `stateName` `'To do'` (the ticket's own workflow VERSION, not the latest),
+  `hasRestrictedParent` false, and `assignedProvenance` the assigning event's actor and both clocks
+  with `actorName: null`. `rollup` is asserted null in the same case: `restrictedCount` counts children
+  this viewer may not see and a replica cannot count what it was never sent, so null under-claims
+  rather than inventing a number.
+- 12.179 ✅ **`hasRestrictedParent` stays FALSE while the engine is not live — lag is not restriction.**
+  The parent is purged, so it is genuinely absent from local scope, and the field still answers false
+  because `engine.status()` is `offline`. Locally the two causes — "you may not see it" and "it has not
+  arrived yet" — are one observation, and the field names only the first. The narrower answer follows
+  `hierarchy/epic-ancestor.ts`'s own rule: narrower than the truth shows less, wrong about the truth
+  shows the wrong work.
+- 12.180 ✅ **`getWorkflowDef` answers a NAMED version, not merely the latest.** With v1 and v2 both
+  stored: no argument → v2, `1` → `'Basic'`, `2` → `'Basic (renamed states)'`, `9` → null (a hole in
+  the version chain reports as a hole), and a foreign workspace id → null. It reads through
+  `workflowVersionsOf`, sync-client's own version-accurate lookup, rather than `buildDeps` — which
+  `local-deps.ts` says in its own words is "the quiet way to lose the version chain".
+- 12.181 ✅ **board columns are the definition's own states, in the definition's order, carrying its
+  `blocked` flag.** One group at `workflowVersion: 1`, columns `['todo','doing','waiting','done']`,
+  `blocked` `[false,false,true,false]` — the flag lives on the workflow state (`workflowStateSchema`'s
+  optional `blocked`), so it is read from the definition and never defaulted. Columns are never
+  invented and a state no published definition names lands in a straggler group at
+  `workflowVersion: 0`, the convention copied from `apps/server/src/routes/board.ts` rather than
+  re-decided — `0` cannot collide with a published version because `workflowDefSchema` is
+  `version: z.number().int().min(1)`.
+- 12.182 ✅ **`myWork` separates assigned, claims in transit, and contested.** One assigned ticket with
+  one queued claim: it appears in `assigned` and in `claimsInTransit`, and `contested` is empty. The
+  base `getMyWork` REFUSES (12.185) because `WorkItem.projectName` is not a fact this device holds;
+  this is the replica-only door that answers what it can, in a shape that carries no project name.
+- 12.183 ✅ **search names its source: the base method REFUSES, and only the offline-copy door
+  answers.** `query.search` rejects with a `ReplicaGapError` whose absences are exactly
+  `['SearchHit.matchedIn','SearchHit.snippet']`, and `query.searchOfflineCopy` answers
+  `{offlineCopy: true, hits:[…]}`. The plan's honesty pin — the UI must say "searching the offline
+  copy" — survives the type change because the flag rides on the only search this source serves.
+- 12.184 ✅ **`syncStatus` reports the engine, the queue depth and the terminal failures.**
+  `{status:'offline', queued:0, failed:0}` before, `{status:'offline', queued:2, failed:0}` after two
+  accepted claims. This is one of the two channels ruling P30 names for accepted-for-now, and the case
+  measures it moving rather than existing.
+- 12.185 ✅ **SEVEN methods refuse, enumerated by id rather than counted**, and the enumeration is
+  compared against `Object.keys(REPLICA_GAPS)` so the registry and the behaviour cannot drift:
+  `getMyWorkspaces`, `getMembers`, `search`, `getMyWork`, `getAttention`, `getPreferences`,
+  `putPreferences`. **NOT the online source's SIX**, and the difference is enumerated rather than
+  characterised, because "nearly disjoint" was written here first and is false. Online refuses
+  `getMyWorkspaces`, `getTickets`, `getTicket`, `search`, `getMyWork`, `getAttention`. FOUR are
+  refused by both (`getMyWorkspaces`, `search`, `getMyWork`, `getAttention`); TWO are refused online
+  and ANSWERED here (`getTickets`, `getTicket` — the replica holds the `TicketState` and the raw
+  events the wire does not carry); THREE are answered online and refused here (`getMembers`,
+  `getPreferences`, `putPreferences` — a roster and amendment-14 rows, neither of which is replicated).
+  6 + 7 over 13 methods with a 4-way overlap: the two implementations are not each other's complement
+  and no sentence should say they are. The case also
+  asserts, structurally, that every absence object has exactly `field`/`because`/`owner` and no
+  `wireKey`/`wireRoute`: an `online/mappers.ts` `Absence` carries those because
+  `apps/server/test/integration/client-contract.test.ts` measures each against a real `/v1` body, and a
+  REPLICA absence has no route to measure — feeding one into `SERVING_GAPS` would either break that
+  suite or pass vacuously through a `wireRoute: null`, which is a check that cannot fail wearing the
+  costume of one that can. Every `owner` is checked to start with `Plan 10 — `, i.e. to name something
+  the CLIENT would have to change. And the two methods that do NOT refuse are named beside them
+  (`getTicketTypes`, `getTicketHistory`), because a refusal list is only evidence next to the list of
+  what answers.
+- 12.186 ✅ **`subscribe` hands its callback a real `StreamItem` — the kind `useLiveQuery` acts on.**
+  A frame delivered through the engine's own stream door arrives at the subscriber as
+  `{type:'event', envelope}`, and after `off()` a second frame arrives at nobody. **This case exists
+  because the plan's `subscribe(..., cb: () => void)` would have shipped a source that looks wired up
+  and repaints nothing**: `packages/app-core/src/views/use-live-query.ts` re-queries ONLY on
+  `item.type === 'event'` or `'purge'`, so a bare signal — or a synthesized `caught-up` in its place —
+  leaves every app-core view frozen against the offline copy with no type error anywhere. The frames
+  come from `SyncEngine.onItem`, added by this task: the engine is the only component that holds a
+  frame-shaped value, and it exposes the union it already has (`SyncItem`) rather than declaring a
+  parallel or truncated one, which the deferred `StreamItem` → `ServerStreamFrame` ruling forbids.
+  *Mutation: delete the `itemListeners` fan-out at the end of the engine's `applyOne` → red HERE ALONE,
+  `Tests 1 failed | 14 passed (15)`, with zero `event` frames delivered where the case expects one.*
+
+**RECORDED, NOT FIXED — Task 12's additions, with owners.**
+
+1. **A queued claim repaints nothing on any OTHER view.** `use-live-query.ts` reloads on `event`/`purge`
+   frames, and a local `ticket.field_set` sitting in the outbox produces no frame — it is not a
+   `LedgerEvent` and has no `seq`, `serverTime` or `workspaceSeq`, so emitting one would be inventing
+   the three fields the server assigns. The view that CALLED `ingest` learns immediately, because
+   `OfflineAcceptError` reaches it; a second view of the same workspace does not, until the server
+   commits the claim and streams it back. OWNER: **Plan 10 Task 13** (app-core's offline UX), which is
+   the first code to render an offline list beside an offline board.
+2. **`getBoard` and `getTickets` read the local event log once per ticket** (`listEntityEvents`, for
+   provenance), so a project with N tickets costs N+1 queries. Correct and unmeasured at scale. OWNER:
+   unassigned; a `Replica` accessor that batches provenance would close it.
+3. **`subscribe` never emits the `error` arm.** The engine keeps the server's amendment-19 error frame
+   in `lastError()` and does not re-broadcast it, so emitting one here would mean choosing a moment the
+   engine never named. A shell can read `lastError()` directly. OWNER: **Plan 10 Task 11's engine** if
+   an error observer is ever wanted; deliberately not invented here.
+4. **`ReplicaDataSourceDeps` takes a `workspaceId` and a `SyncStorage` that the plan's `deps` do not.**
+   Both are forced by the repo rather than chosen: `getBoard`/`getTickets` are keyed by PROJECT while
+   every local table is keyed by workspace and `Replica` exposes no accessor for the id it bootstrapped
+   with; and a version-accurate workflow lookup is `workflowVersionsOf(storage, …)`, which takes the
+   store. OWNER: unassigned — a `Replica.workspaceId()` and a `Replica.getWorkflowDef(id, version?)`
+   would let both come off the deps.

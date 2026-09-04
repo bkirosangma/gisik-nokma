@@ -70,6 +70,9 @@ export function listRowSeed(overrides: Partial<ListRow> = {}): ListRow {
     fields: {},
     rollup: null,
     hasRestrictedParent: false,
+    // Same default as `boardCardSeed` above and the same meaning: a seeded row
+    // is settled fact unless a case says otherwise.
+    pending: false,
     ...overrides,
   };
 }

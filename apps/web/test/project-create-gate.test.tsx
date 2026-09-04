@@ -124,6 +124,9 @@ const LIST: TicketListView = {
       fields: {},
       rollup: null,
       hasRestrictedParent: false,
+      // This shell is online-only, so nothing is ever in transit — the same
+      // `false` the board card above carries, for the same reason.
+      pending: false,
     },
   ],
 };
