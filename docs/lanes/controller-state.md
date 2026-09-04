@@ -11,6 +11,74 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## ⛔ OWNER PRIORITY CHANGE 2026-09-04 — CLOSE THE THREE UNOWNED ITEMS BEFORE ANY FURTHER PLAN WORK
+
+**The owner instructed this directly**, after being shown that "Plans 1–9 complete, 153/177" does not mean
+the browser application works: *"lets finish this before we move on to the rest. close all 3."* **Plan 10
+T13 and everything after it defers until these are closed.**
+
+**WHY THIS CAME UP, because the measurement is the point.** Asked whether the browser app was
+feature-complete, the answer measured on `main` was no, and not marginally: **six reads refuse
+unconditionally.** `mapWorkspaceRefs`, `mapListView`, `mapTicketRead`, `mapSearchHits`, `mapMyWork`,
+`mapAttention` are all `(_raw: unknown): never` — they throw, always. Consequences, from the shell's own
+docblocks rather than inferred: the **workspaces list is the first screen after sign-in and it refuses**;
+List / Calendar / Timeline tabs refuse; **New ticket is not offered at all** (*"no ticket can be created
+from this page — not even at project root"*); opening a ticket refuses; my-work, the attention strip and
+search refuse. What works is the surfaces that bypass `DataSource` — the authoring gateway (workflow
+builder, ticket types, per Ruling P28) and the notifications gateway (inbox) — plus the **Board tab**,
+which is served, plus writes. **Task completion and product completeness diverged here and nothing in the
+ledger could show it**, because every one of those refusals is a task that landed exactly as declared.
+
+### THE THREE, in dispatch order — cheapest and least-blocked first
+
+| # | item | why this position |
+|---|---|---|
+| 1 | **Snapshot invalidation** — publishing a workflow version invalidates no snapshot (0 `workflowVersion` hits vs 25 `snapshot` as control, no `DELETE`; verified directly on `main`) | cheapest, pure correctness, no design question |
+| 2 | **Serving gaps — BUILDABLE SUBSET ONLY** (below) | the user-visible payoff |
+| 3 | **`StreamItem` → `ServerStreamFrame`** | zero user-visible benefit, priced above T11 or T12 by the executor, already protected by its two guardrails. **This is the one that drops if quota runs short** |
+
+**Quota reality, stated rather than discovered later: ~11 points left at 89% weekly, and the three price at
+roughly 9–16.** Probably not all three this week. Dropping #3 is the planned response, not a failure.
+
+### CLOSING THESE IS RULING P25 CLAUSE 1 BEING DISCHARGED — and its condition is still live
+
+Nearly every absent field in `mappers.ts` carries `owner: 'P25 clause 1 — HELD'`. The owner's "close all 3"
+discharges the priority half of that hold. **It does not discharge P25's condition**, which still binds:
+*each must be implemented by APPLYING AN EXISTING Plan 4 visibility rule; if any requires a NEW rule,
+ESCALATE BEFORE BUILDING.*
+
+- **Buildable now, no visibility decision:** `ListRow.typeRank`, `ListRow.epicId`, `ListRow.stateName`,
+  `ListRow.assignedProvenance` (its own note says `read/state-provenance.ts` already ships the shape),
+  `TicketRead.stateProvenance`, `TicketRead.ticket`.
+- **Build only after naming the existing rule being applied:** `ListRow.hasRestrictedParent` (*"a statement
+  about what this viewer may not see"*) and `TicketRead.title` (*"reading `proj_tickets` here is a
+  visibility decision"*).
+- **⛔ HELD — WITH THE OWNER, DO NOT BUILD: `WorkspaceRef.projects` (`getMyWorkspaces`) and
+  `WorkItem.projectName` (`getMyWork`).** **P25's escalation condition has ALREADY FIRED on these** — the
+  mapper's own owner line reads *"HELD pending the owner ruling, because it carries a visibility
+  decision,"* and P25's text says there is **no shipped project-list read at all**, so adding one means
+  *designing* what a project-scoped guest sees of a workspace's **other** projects. That is Plan 4's
+  read-enforcement surface, which has produced **P19, P22 and P23 — every one a disclosure no test
+  caught.** "Close all 3" is a priority instruction, not a ruling on that semantics. **Question is with the
+  owner; both stay refusing until answered.**
+
+### TWO THINGS THAT WILL OTHERWISE BE MIS-READ
+
+- **`client-contract.test.ts` goes RED by design as each gap closes.** It names five of the six gaps
+  server-side, so *"a refusal goes RED the day its route starts serving"* (P25 clause 3) — that is the
+  self-expiring gap working. Update in the same change set; **the first red is not a regression.**
+- **"All three closed" will NOT mean zero serving gaps.** `SearchHit.matchedIn` and the two `FilterSpec`
+  absences are not P25 items (`owner: Plan 6 — the client type, not a route`), and
+  `ContestedClaim.title`/`claim.serverTime` belong to **T13, which is deferred.**
+
+**TRACKING: no ledger rows.** These are not plan tasks — same precedent as the semantic-extraction and
+comment-cleanup passes, deliberately kept outside the 177 denominator rather than editing locked plan
+documents. Progress lives here.
+
+**Batch C sequencing:** T11 complete (impl+review+fix), T12 was at 2/3 agents when this landed — it
+finishes, then the executor **stops before T13** and PRs T11+T12. Stopping there is free (T13 unstarted)
+where killing T12 would have discarded two agents' work.
+
 ## ⛔ OWNER-SET STOP POINT — ASK BEFORE DISPATCHING PLAN 10 T14 (2026-09-04)
 
 **The owner instructed this directly: stop at the boundary below and ASK before going further. Do not
