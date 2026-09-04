@@ -1132,10 +1132,12 @@ survived a whole task.)*
   the candidate query carries no snapshot-existence filter for that reason: below `SNAPSHOT_MIN_EVENTS`
   the background pass has written no row, bootstrap serves such a ticket its FULL history, and that
   history holds the offending event too — so it needs a snapshot above that event more than a
-  snapshotted ticket does, not less. The publish therefore folds those tickets from event 1 rather than
-  from a tail, and writes rows below the threshold that the background pass would not; both are the
-  price of the repair, and narrowing the query to tickets that already hold a snapshot reopens the throw
-  for everything under twenty events (measured — 12.159 reds, 12.156–12.158 stay green).
+  snapshotted ticket does, not less. The publish therefore folds such a ticket from event 1 rather than
+  from a tail, and writes a row below the threshold that the background pass would not; both are the
+  price of the repair, and both are a FIRST-publish cost per ticket — the row this door leaves at the
+  head is what its next publish resumes from. Narrowing the query to tickets that already hold a
+  snapshot reopens the throw for everything under twenty events, permanently, since under that filter
+  neither door ever writes them a first row (measured — 12.159 reds, 12.156–12.158 stay green).
   `apps/server/src/sync/snapshot-refresh.ts`,
   `apps/server/src/ingest/ingest-service.ts`
 - ⚙️ **`SNAPSHOT_INTERVAL_MS` (300000) and `SNAPSHOT_MIN_EVENTS` (20)** — additive config, both

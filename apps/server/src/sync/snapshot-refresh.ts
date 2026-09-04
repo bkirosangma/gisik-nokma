@@ -146,7 +146,11 @@ const EMPTY: SnapshotRefreshOutcome = { rewritten: [], skipped: [] };
  *   `foldTicketHead` reads `readLatestSnapshot` first and binds its tail read
  *   `afterSeq = previous?.seq ?? 0`, so where there is no row the "tail" IS the
  *   ticket's whole stream. `SNAPSHOT_MIN_EVENTS` is 20 and the background pass
- *   writes nothing below it, so every ticket under twenty events is in this
+ *   writes nothing below it, so any ticket under twenty events that has not yet
+ *   met a version-raising publish is in this case. It is a FIRST-publish cost per
+ *   ticket rather than a standing one: this door leaves a row at that ticket's
+ *   head, so its next publish resumes from there — the same induction the
+ *   `belowWorkspaceSeq` section above runs, with 12.159's fixture as its base
  *   case. The cost is deliberate, and the saving that suggests itself is a
  *   regression: a ticket with no snapshot is served its FULL history by
  *   bootstrap, and that history holds the offending `ticket.transitioned` too —

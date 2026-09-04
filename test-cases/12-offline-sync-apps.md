@@ -648,8 +648,9 @@ the number Task 10's own echo case will want and the never-renumber rule would k
   offending event, which only the server can write. **NOW WRITTEN — this paragraph's "NOT FIXED" and
   its two grep readings were true when written and are not now.** `apps/server/src/sync/snapshot-refresh.ts`
   re-snapshots every affected ticket at its head inside the publish's own transaction; cases
-  12.156–12.159 in this file pin it, and the fix was measured red first (`Tests 3 failed (3)`, both
-  throwing this exact message — a reading of the three cases that existed then, not of the four now). The RESIDUE is a tail that already spanned an older state-dropping
+  12.156–12.158 in this file pinned it and were measured red first (`Tests 3 failed (3)`, both throwing
+  this exact message). 12.159 was added by that pass's own fix round and pins it too, for the ticket
+  that has never been snapshotted. The RESIDUE is a tail that already spanned an older state-dropping
   publish before that shipped: such a ticket is skipped server-side and can still throw here, which is
   why `foldSnapshotForward` stays. *No longer Plan 10 Task 6's; the closure took no ledger row.*
   **RECORDED, NOT FIXED — the other direction of the baseline, and it is LIVE.**
