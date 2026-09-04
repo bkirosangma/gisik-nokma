@@ -174,9 +174,9 @@ plan	task	status	pr	merge_sha	note
 10	2	done	23	b62be74	artefact: packages/rule-engine/src/contests.ts (PR #23, subject names it)
 10	3	done	23	b62be74	artefact: apps/server/src/sync/stream-seq.ts (PR #23, subject names it)
 10	4	done	53	33538bee	lifted to Phase 1; closes the §11 envelope-origin window
-10	5	todo	-	-	
-10	6	todo	-	-	
-10	7	todo	-	-	
+10	5	done	98	999d486	artefact: apps/server/src/sync/ledger-deps.ts (buildLedgerDeps), src/sync/snapshot-writer.ts (runSnapshotPass, startSnapshotWriter), test/sync/snapshot-writer.test.ts; src/config.ts SNAPSHOT_INTERVAL_MS/SNAPSHOT_MIN_EVENTS and src/index.ts interval wiring both as declared; .env.example + test/config.test.ts cover the two new fields
+10	6	done	98	999d486	artefact: apps/server/src/sync/sync-routes.ts (GET /v1/sync/bootstrap, BOOTSTRAP_BACKFILL_TYPES), test/sync/bootstrap.test.ts. Declared mount site index.ts; LANDED in src/app.ts inside buildApp — house pattern, per plan10-adaptation-map.md cross-cutting fact 1. packages/domain/src/ticket-state.ts docblock corrects the TICKET_EVENT_TYPES-is-not-the-entity-set defect found here
+10	7	done	98	999d486	artefact: apps/server/src/sync/sync-service.ts (createSyncService, VISIBILITY_REFUSAL_RULE), test/sync/sync-route.test.ts; POST /v1/sync added to src/sync/sync-routes.ts — same squash as T6, distinct route in a shared file
 10	8	done	23	b62be74	artefact: packages/sync-client scaffold (PR #23, subject names it)
 10	9	todo	-	-	
 10	10	todo	-	-	
