@@ -1816,7 +1816,7 @@ thing to die under 22.4 GB of orphaned workers. It was a symptom of the crash, n
     red. That is the whole reason the controls exist.
 - `Features.md` §11 and `test-cases/11-calendar-notifications.md` — **the plan's catalogue text is
   STALE and was not copied.** It reserves 11.1–11.47 one-id-per-AREA; the branch shipped
-  one-id-per-TEST. **Live: 143 ids** (11.1–11.8, 11.18, 11.36–11.39, 11.48–11.122, 11.130–11.185).
+  one-id-per-TEST. **Live: 147 ids** (11.1–11.8, 11.18, 11.36–11.39, 11.48–11.122, 11.130–11.188) after the final review's fix round.
   **Permanently unused for TWO different reasons**: 11.9–11.17, 11.19–11.35, 11.40–11.47 (the
   superseded nominal block — the `§9`/9.1–9.34 precedent in `test-cases/README.md` is the template)
   and 11.123–11.129 (Task 14's renumber gap). **New cases continue from 11.186.**
@@ -1893,3 +1893,71 @@ this branch a *claim about a check* outran the check itself:
 **All three were caught by re-running the stated check rather than by reading the claim.** None was
 caught by review. That is the cheap habit worth carrying to Plan 10: *before repeating a measurement
 someone else recorded, run it.*
+
+## FINAL WHOLE-BRANCH REVIEW — RESULT AND FIX ROUND (2026-09-04)
+
+One opus reviewer, ~45 mutations across app-core, server and the web shell. **No Critical.** Two
+Important, three Minor. It reviewed at `9c44200` rather than the assigned `6ff2591` because the
+branch moved under it; the intervening diff is one code comment and this file, so its measurements
+hold for both.
+
+**Both Important findings were re-measured by me before being acted on** — an agent's finding is not
+a measurement I have made.
+
+**IMPORTANT 1 — FIXED. The loading arm of the Calendar and Timeline tabs had no witness.**
+`) : list.rows !== null ? (` → `) : true ? (` on the calendar arm leaves **134/134 web tests green**,
+and the same on the timeline arm also leaves 134/134 green. Confirmed by my own mutation. The product
+code was CORRECT; the guard was simply unconstrained. What the mutant renders is the exact sentence
+this product exists not to say — *"No claimed dates fall in this month. Undated work is absent, not
+estimated"* — asserted from a read that has not answered. 11.161/11.162 pin the REFUSAL half, which
+is why the pair looked covered. **11.186 and 11.187** now pin the loading half, one per arm, and each
+mutation is killed only by its own case — proven both ways.
+
+**IMPORTANT 2 — FIXED. `Features.md` §11 marked three things `✅` that no user can reach.**
+Verified by grep: nothing mounts `SavedFiltersMenu`, no `PreferencesGateway` implementation exists
+outside the test fake (`saved-filters.ts:175` already conceded it), and no filter or lane prop is
+passed anywhere in `apps/web`. Both bullets are now **⚙️** with the gap named and an owner.
+**One thing the review got wrong and I did not adopt:** it listed `data-pending` as unreachable
+alongside the others. It is not a gap — `toTicketDatesInput` hard-codes `pendingFieldIds: []` because
+this shell is *online-only*, so nothing is ever in transit when a list read lands; Plan 10's replica
+is where that array stops being empty. The file's own docblock says so. §11 now records that
+distinction rather than flattening it.
+
+**MINOR 4 — FIXED, and it was my own overclaim.** The guard's describe is titled *"THE CONTROL FOR
+EVERY NULL ABOVE"*; 11.178 controlled the zone and day needles and **nothing controlled the
+estimation needle**. Writing that control exposed a second, larger thing: the plan's
+`/\b(velocity|burndown|forecast)\b/i` **cannot match `velocityChart`**, because `C` is a word
+character. A file could declare `const velocityChart` and the guard whose stated property is "no
+source speaks the estimation vocabulary" would return clean. Measured before widening: a substring
+scan over all seven roots is **also clean today**, so the needle is now `/(velocity|burndown|forecast)/i`
+at no cost and with no allow-list. **11.188** witnesses both halves, and three mutations prove it:
+reverting to `\b` kills it naming the compound regression, rotting the words kills it naming
+"velocity", and planting `velocityChart` in `inbox/gateway.ts` kills **11.180** end-to-end.
+
+**RECORDED, NOT FIXED — with owners, per the Minor policy:**
+
+- **MINOR 3 — the stale gate's exclusive end is untested.** `apps/server/src/notifications/sweep.ts:256`
+  (`AND entered.server_time < $2`): `<` → `<=` survives 37/37. The docblock states the half-open
+  contract explicitly, but the two boundary cases sit 9.5 hours either side of the cut-off, so
+  nothing exercises `server_time === endUtc`. Breaking input the reviewer names: with `staleDays = 14`
+  and today `2026-08-24` IST, a ticket entering its state at exactly `2026-08-10T18:30:00.000Z` is
+  flagged stale a day early. The OTHER end is well pinned (`.endUtc`→`.startUtc` reddens 4;
+  `<= $2` on the due horizon reddens 9). **OWNER: whoever next opens the sweep's windows** — this is
+  Plan 9 Task 6's surface, and the fix is one boundary fixture, not a code change.
+- **MINOR 5 — the notification kind vocabulary has a THIRD statement nothing holds to the other two.**
+  `apps/server/migrations/1788437881385_notifications.sql:12`'s `notifications_kind_check` versus
+  `NOTIFICATION_KINDS`. 11.181 ties the payload schema map to the domain list; nothing ties the SQL
+  `CHECK` to either. The consequence is quiet rather than loud: `deliverToAll` catches per transport,
+  so a sixth kind added to the domain without a migration **silently drops every notification of that
+  kind**, leaving only a log line. **Not measured** — `apps/server` imports the domain by package
+  name, which resolves through `./dist`, so the reviewer could not mutate it and neither claim is
+  test-backed. **OWNER: whoever adds a sixth notification kind**; the cheap closure is one test
+  iterating `NOTIFICATION_KINDS` and inserting each against the real table.
+
+**A MISTAKE I MADE MID-FIX, recorded because the recovery is the lesson.** After mutating the guard I
+restored it with `git checkout -- <file>` — which restores from the INDEX, and my widening and 11.188
+were not yet committed. The checkout silently discarded them, and the two mutations I ran next were
+therefore measured against the OLD guard and came back green, which I nearly read as "the control
+does not work". **Caught only because a green result where I predicted red is itself a finding.**
+Redone, backed up to a file first, and re-mutated with `cp` restores. The general rule: `git checkout`
+is not an undo for work that has never been committed.

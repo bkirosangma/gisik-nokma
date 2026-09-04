@@ -175,6 +175,13 @@ computed "now".
   (`app-nav.test.tsx`)
 
 ## Project calendar/timeline mount (`apps/web`)
+- **11.186** ✅ The Calendar tab says "Loading…" and draws NO grid before the list read answers — the
+  loading window, distinct from the refusal window 11.161 pins. Measured first: deleting
+  `list.rows !== null` from the calendar arm leaves all 134 web tests green, and what it renders is
+  the sentence this product exists not to say — "Undated work is absent, not estimated" — asserted
+  from a read that has not come back — (`project-calendar-timeline.test.tsx`)
+- **11.187** ✅ The Timeline tab does the same, as its own case: the guard is per-arm, and each
+  deletion is killed only by its own witness — (`project-calendar-timeline.test.tsx`)
 - **11.160** ✅ Offers all four tabs, with Board selected by default and each tab selectable alone — (`project-calendar-timeline.test.tsx`)
 - **11.161** ✅ The Calendar tab names its own refusal instead of drawing an empty month — (`project-calendar-timeline.test.tsx`)
 - **11.162** ✅ The Timeline tab does the same, naming itself rather than the ticket list — (`project-calendar-timeline.test.tsx`)
@@ -198,10 +205,15 @@ empty scan result would be indistinguishable from a stale or vacuous scanner.
 - **11.182** ✅ No file but `ist-day.ts` writes the IANA zone as a literal — every view imports `IST_TIME_ZONE` instead — (`reporting-scope-guard.test.ts`)
 - **11.183** ✅ No file but `ist-day.ts` re-declares the day shape — everyone imports `IST_DAY_REGEX` instead — (`reporting-scope-guard.test.ts`)
 - **11.184** ✅ The zone string every view actually formats with comes from the domain package, and is the real IANA name — (`reporting-scope-guard.test.ts`)
+- **11.188** ✅ CONTROL: the estimation needle still matches the words it names — bare and camelCase —
+  and does not match ordinary source. Added because this describe's title promised "the control for
+  every null above" and the estimation scan had none; and because writing it exposed that the plan's
+  `\b`-anchored pattern could not see `velocityChart` at all, which is why the needle is now a
+  substring match — (`reporting-scope-guard.test.ts`)
 
 ## Permanently unused id ranges
 
-Two disjoint ranges below 11.186 will never be filled, for two different reasons. Neither is a gap
+Two disjoint ranges below 11.189 will never be filled, for two different reasons. Neither is a gap
 to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) for the same pattern.
 
 - **11.9–11.17, 11.19–11.35, 11.40–11.47** — Plan 9 Task 15's own plan text reserved this range
@@ -213,4 +225,4 @@ to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) 
   rule against renumbering existing ids (`test-cases/README.md`) means a range vacated by a
   renumber stays vacated rather than being reused by a later, unrelated case.
 
-**New cases continue from 11.186.**
+**New cases continue from 11.189.**

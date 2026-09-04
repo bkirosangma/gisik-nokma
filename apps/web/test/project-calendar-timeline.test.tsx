@@ -379,4 +379,79 @@ describe('the roster is a convenience, never a gate', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
   });
+
+  /**
+   * 11.186/11.187 — THE LOADING WINDOW, and why the refusal cases above do not
+   * already cover it.
+   *
+   * This file's whole argument is that `(list.rows ?? []).map(...)` would draw a
+   * complete month grid over a read that did not answer. 11.161/11.162 pin the
+   * half of that where the read REFUSES. Nothing pinned the half where it has
+   * simply not answered YET — and `useTicketList` documents `rows` as
+   * `ListRow[] | null`, "`null` until the rows load", so that window is a real
+   * state on every first paint, not a contrivance.
+   *
+   * Measured before these were written: deleting `list.rows !== null` from the
+   * calendar arm (`) : list.rows !== null ? (` -> `) : true ? (`) leaves
+   * **134/134 web tests green**, and the same deletion on the timeline arm also
+   * leaves 134/134 green. The guard the page's own docblock argues for at
+   * length was therefore unconstrained in both places.
+   *
+   * What that mutation renders is the exact sentence this product exists to not
+   * say: "No claimed dates fall in this month. Undated work is absent, not
+   * estimated" — an assertion about claims, made from a read that has not come
+   * back. So the assertion here is deliberately two-sided: the loading state is
+   * present AND the honest-empty copy is absent. Asserting only "Loading…"
+   * would pass against a page that rendered both.
+   *
+   * `getTickets` returns a promise that never settles, which is the state
+   * itself rather than a race: no `act` flush can advance past it.
+   */
+  it('11.186 the Calendar tab says it is loading — it does not draw an empty month over a read that has not answered', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => ({ projectId: 'p_1', groups: [] }),
+          getAttention: async () => [],
+          getMembers: async () => MEMBERS,
+          getTicketTypes: async () => [typeDef()],
+          getTickets: () => new Promise<TicketListView>(() => {}),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await openTab('Calendar');
+
+    expect(await screen.findByText('Loading\u2026')).toBeInTheDocument();
+    // The grid is not merely empty — it is not drawn at all.
+    expect(document.querySelector('.gn-calendar')).toBeNull();
+    // And the claim about claims is not made.
+    expect(screen.queryByText(/Undated work is absent, not estimated/)).not.toBeInTheDocument();
+    // Nor is this mistaken for a refusal: nothing failed.
+    expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
+  });
+
+  it('11.187 the Timeline tab does the same — the guard is per-arm, so one witness cannot cover both', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => ({ projectId: 'p_1', groups: [] }),
+          getAttention: async () => [],
+          getMembers: async () => MEMBERS,
+          getTicketTypes: async () => [typeDef()],
+          getTickets: () => new Promise<TicketListView>(() => {}),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await openTab('Timeline');
+
+    expect(await screen.findByText('Loading\u2026')).toBeInTheDocument();
+    expect(document.querySelector('.gn-timeline')).toBeNull();
+    expect(screen.queryByText(/Undated work is absent, not estimated/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
+  });
+
 });

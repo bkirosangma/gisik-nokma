@@ -63,7 +63,24 @@ const SCANNED_ROOTS = [
   'apps/web/src',
   'apps/web/app',
 ];
-const FORBIDDEN = /\b(velocity|burndown|forecast)\b/i;
+/**
+ * SUBSTRING, not word-boundary — a fourth measured deviation from the plan's text.
+ *
+ * The plan writes `/\b(velocity|burndown|forecast)\b/i`. Measured while writing
+ * 11.188's control: that pattern does NOT match `velocityChart`, because `C` is a
+ * word character and `\b` therefore fails after `velocity`. So a file could
+ * declare `const velocityChart = ...` and the guard whose stated property is
+ * "no source file speaks the estimation vocabulary" would return clean — a check
+ * passing for a reason unrelated to the property it names, which is the exact
+ * failure class this file exists to prevent, committed by this file.
+ *
+ * Widening was measured before it was made: a substring scan over all seven
+ * roots returns ZERO hits today, so this closes the hole at no cost and with no
+ * allow-list. If it ever fires on an innocent identifier, the fix is to rename
+ * the identifier — the three words have no legitimate use in this product, which
+ * is the whole premise of spec §7.
+ */
+const FORBIDDEN = /(velocity|burndown|forecast)/i;
 
 /**
  * The one file allowed to state the zone and the day shape (Plan 1, Task 4a).
@@ -143,6 +160,37 @@ describe('the scans can see what they forbid (controls — without these, every 
     // The origin exclusion is doing work rather than decorating: with it lifted,
     // the zone scan finds exactly that file and nothing else.
     expect(offendersWhere((line) => line.includes(ZONE_LITERAL), false)).toEqual([`${TIME_ORIGIN}:18`]);
+  });
+
+  /**
+   * 11.188 — the control this describe's own title PROMISED and did not have.
+   *
+   * The heading above says "THE CONTROL FOR EVERY NULL ABOVE". It was not true:
+   * 11.178 controls the zone and day needles, and nothing controlled FORBIDDEN.
+   * Measured at the final review — replacing the pattern with
+   * `/(velocityZZ|burndownZZ|forecastZZ)/i` leaves every other case GREEN, so
+   * 11.180's empty result would have survived the needle rotting away entirely.
+   *
+   * Each alternative is asserted separately rather than through one string
+   * containing all three, because a single probe passes while two of the three
+   * arms are dead. Both the bare word and the camelCase compound are asserted,
+   * the compound being the direct witness on the widening above. And the
+   * negative cases are here because a pattern matching everything would satisfy
+   * every positive probe while making 11.180 fail for a reason unrelated to scope.
+   */
+  it('11.188 the estimation needle still matches the words it names, and not ordinary source', () => {
+    for (const word of ['velocity', 'burndown', 'forecast']) {
+      expect(FORBIDDEN.test(`// ${word} of the team`), `FORBIDDEN no longer matches "${word}"`).toBe(true);
+      expect(
+        FORBIDDEN.test(`const ${word}Chart = compute();`),
+        `FORBIDDEN no longer matches the compound "${word}Chart" — the word-boundary regression`,
+      ).toBe(true);
+    }
+    // Case-insensitive, as the /i says — a `Burndown` identifier is the same defect.
+    expect(FORBIDDEN.test('function renderBurndown() {}')).toBe(true);
+    // Not matching everything: ordinary source must NOT trip it.
+    expect(FORBIDDEN.test("const claimed = row.fields['dueDate'];")).toBe(false);
+    expect(FORBIDDEN.test('import { istDayOf } from "@gisik-nokma/domain";')).toBe(false);
   });
 
   it('11.179 every scanned root yields source files — a root that walks up empty would make its scan vacuous', () => {

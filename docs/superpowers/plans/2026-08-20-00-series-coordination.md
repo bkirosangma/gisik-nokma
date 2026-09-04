@@ -6579,7 +6579,7 @@ actually establishes that Plan 9 Task 15 (reserving ids 11.1–11.47) has not ru
 > still not evidence, and artefacts still are. Two facts the sweep above could not have known,
 > both measured at that branch: the reserved range it cites is **not** what shipped — Plan 9's
 > nominal `11.1–11.47` was superseded on the branch by a one-id-per-test scheme, and the live
-> range is **11.1–11.185 with 11.9–11.17, 11.19–11.35, 11.40–11.47 and 11.123–11.129
+> range is **11.1–11.188 with 11.9–11.17, 11.19–11.35, 11.40–11.47 and 11.123–11.129
 > permanently unused**; and the *second* half of the sweep above — that nothing in `apps/web`
 > links to Plan 8's six authoring routes — is now pinned by a test rather than only disclosed.
 > `apps/web/test/app-nav.test.tsx` case **11.185** asserts `AppNav`'s hrefs are EXACTLY
