@@ -2371,3 +2371,137 @@ residue                     0
 Asked the controller for a quota re-measurement. **If it comes back with headroom, Batches B and C
 collapse into one PR**; the branch topology is identical up to the moment a PR opens. Absent an answer,
 three PRs stands.
+
+---
+
+# BATCH B IS COMPLETE — PLAN 10 T9, T10 (2026-09-04 ~13:15)
+
+Branch `exec/16-plan10-replica`, **rebased onto `origin/main` after PR #98 merged as `999d486`**.
+Rebase verified in BOTH directions with positive controls, because an empty diff is also what a broken
+diff invocation prints: pre- vs post-rebase differs by exactly `controller-state.md` + `task-ledger.tsv`
+(main's own content, the controller's Plan 9 promotion), and `main..HEAD` is non-empty at 14 files,
++3877/−25, all `packages/sync-client` plus three docs. Batch A's twelve commits are gone from the
+history. A `backup/batch-b-pre-rebase` ref was taken first and still exists.
+
+## THE CRITICAL FINDING, AND WHY THE SUGGESTED FIX WAS REFUSED
+
+**The baseline-lowering hazard is LIVE, and the sentence excusing it was refuted by a test in the same
+PR.** `replica.ts` and `test-cases/12` both said *"unreachable today, because nothing calls
+`loadBootstrap` a second time."* Case **12.149**, 94 lines later in the same catalogue and the same
+change set, calls `loadBootstrap` a second time on an already-bootstrapped replica and calls that
+sequence *"a live sequence, not a contrivance."*
+
+Measured: bootstrap ships a snapshot at seq 5; a `ticket.transitioned` to `doing` arrives at seq 6 over
+the stream; a `workflow.defined` v2 that DROPS `doing` arrives and the stream door folds the ticket to
+`todo`, raising the baseline to 6. A re-bootstrap serving the server's still-stale seq-5 snapshot lowers
+the baseline to 5, replays event 6 against v2's vocabulary, and throws out of `loadBootstrap` with the
+whole response rolled back. **The device can never re-bootstrap again.**
+
+**The reviewer's suggested `Math.max(...)` guard was applied, measured, and REJECTED.** It removes the
+throw and leaves every case green — while writing the server's seq-5 state under the local seq-6
+baseline, so `refoldTicket` replays nothing above 6 and **the seq-6 transition vanishes from the
+transition log while its row still stands in `events`.** Measured under the guard: `transitions` came
+back with the seq-5 entry alone where the stream fold had left both. **A loud throw traded for a quiet
+divergence in the very log `require-different-user` sorts on, caught by nothing.**
+
+So the RECORD route was taken instead, with the hazard pinned by an executable case (12.154) rather than
+by prose. *Prefer the check whose failure is loud, even when it is slower* — applied against a
+reviewer's own suggestion, with the measurement to back it.
+
+## THE ONE-DOOR CLASS HAS NOW APPEARED THREE TIMES
+
+1. **Batch A:** the contest backfill was pinned on T5's side and T7's side and by nothing on T6's.
+2. **Batch B, T9's fix round:** `foldTicketsOntoVersion` was called from `applyServerItem` and not from
+   `loadBootstrap`, so the two doors answered differently on identical input.
+3. **Batch B, whole-branch:** T10's `buildPendingOverlay` wraps `applyTicketEvent` in try/catch and its
+   docblock explains why — `revokeScope` empties `workflows`/`ticket_types` while outbox rows stay.
+   **T9's `refoldTicket` folds the same reducer against the same deps object with no catch.** Neither
+   task's own reviewer could see it: T9's tests never deliver an event after `revokeScope`, and T10 does
+   not own `applyServerItem`.
+
+**This is now a named class, and it is the highest-yield thing a whole-branch reviewer can look for in
+this codebase: a behaviour implemented on one door of a pair.** Put it first in Batch C's review brief.
+
+## TEN SELF-FALSIFYING CLAIMS, AND THE TWO REMEDIES THAT DO NOT WORK
+
+Running list on this line of work: the `events_pkey` residual · "four cases" that measured eight ·
+"red in seven cases" that measured one · "FIRST TEST IN THIS REPO TO VARY TZ" (it was the fifteenth) ·
+four "red here alone" notes · 12.149's description contradicting its own run in the same commit · two
+scope banners naming absent the code beneath them · the banner rewritten to fix that, still claiming two
+present sections absent · "unreachable because nothing calls `loadBootstrap` twice" · and the "15 files"
+TZ count, **stale by one in three places, falsified by T10's own commit inside the same PR.**
+
+**Two standing remedies were measured NOT to work here:**
+
+- **A positive control does not catch a pattern blind to an equivalent spelling.**
+  `grep -rl "process\.env\.TZ *="` returns 6 where the truth is 16, because strict
+  `noPropertyAccessFromIndexSignature` pushes call sites to `process.env['TZ']` — and a control written
+  with the same regex agrees with the wrong answer. **Only two independent readings caught it.**
+- **Stating a count WITH the command that produced it is not enough either.** `replica.test.ts:642` did
+  exactly that — the right discipline — and the count still went stale, because the same PR added the
+  sixteenth file after the sentence was written. **A count is only true of a tree, and a PR is not a
+  tree until it stops moving.** Re-measure every quoted count in the FINAL pre-PR pass, not when written.
+
+## RECORDED, NOT FIXED — Batch B's additions, with owners
+
+1. **The baseline-lowering hazard on the bootstrap door.** OWNER: **Plan 10 Task 11** (the sync engine),
+   the first production caller that re-bootstraps a live replica. Pinned by case 12.154.
+2. **The `refoldTicket` / `buildPendingOverlay` door asymmetry.** Kept as a throw deliberately
+   (per-arrival rollback, contract 12.125) and now stated on BOTH doors. OWNER: **Plan 10 Task 11**,
+   the first caller of `applyServerItem` with a cursor to advance — a throwing item leaves the cursor
+   unadvanced, so the same item is redelivered and throws again: **a wedged stream, offline, after a
+   revocation.** Pinned by case 12.155.
+3. **`buildLocalDeps`' `ticket_types` lookup is an unconstrained path** — rewriting it to replay the
+   event log leaves the whole suite green, while the `workflows` half is pinned by 12.143. Minor: the
+   workflows lookup throws first in every sequence that could expose it. OWNER: Plan 10 Task 11.
+
+### AND TWO DEFECTS IN ALREADY-MERGED CODE — these are Batch A's, found by Batch B
+
+4. **Publishing a workflow version invalidates no snapshot.** `snapshot-writer.ts` has **0**
+   `workflowVersion` hits (control: 25 `snapshot` hits in the same file) and there is no snapshot
+   DELETE, so a bootstrap tail can carry a `ticket.transitioned` into a state the new version dropped
+   and throw on replay. OWNER: needs one — it is in `main` as of `999d486`.
+5. The re-bootstrap hazard above is partly Batch A's too, since the stale snapshot the server serves is
+   what does the lowering.
+
+## A STRUCTURAL FIX WORTH SOMEONE'S TIME — recorded, not built
+
+Scope banners in `Features.md` and `test-cases/` assert "X is absent" and go stale **in the same change
+set that lands X**, twice on this branch. **A test that extracts absence claims from those files and
+fails when the named symbol is present would be a check that CAN fail** — which is exactly what those
+banners currently are not. First proposal in this project for that class that does not rely on someone
+remembering. OWNER: unassigned; suggest raising with the owner alongside the T14 items.
+
+## NEXT — AND I AM STOPPING HERE FOR A QUOTA READING
+
+PR for Batch B, then **STOP**. The controller measured weekly **87–89%** used (up from the 76% the stop
+point was derived against), leaving ~11–13 points, and re-derived that **4–6 of Plan 10's remaining
+tasks fit, not 8–9.** Batch B lands at 5 of 8. **Batch C (T11 → T12 → T13) is NOT auto-dispatched** —
+starting a three-task batch that cannot be gated is the "full price, no gate" outcome one level down.
+If the pool supports only part of it, **T11 alone is a coherent unit** (the sync engine) and it now
+carries three inherited obligations: the two hazards above, plus the `StreamItem` constraint below.
+
+**Ruling on `StreamItem` → `ServerStreamFrame` (executor, conservative default):** DEFERRED, because it
+touches `data-source.ts`, the online source and every subscriber — larger than T11 or T12, and the same
+class as the P24/P25 rulings. **Owner: Plan 10 owns a decision it never allocated a task for**; surface
+to the owner. **The deferral is protected by two constraints binding Batch C**: T11 must reuse
+`online/stream.ts`'s `WebSocketLike`-injection and lenient-parsing pattern rather than inventing a
+second WS abstraction, and neither T11 nor T12 may declare a parallel or truncated frame union locally.
+Under those, the replacement stays one type / N consumers / one seam and does not get more expensive by
+waiting.
+
+## GATE — Batch B's own evidence, `0 cached`, run by the executor
+
+```
+pnpm turbo run build test typecheck --force
+Tasks:    24 successful, 24 total
+Cached:   0 cached, 24 total
+Time:     40.888s        exit 0
+3,148 tests across 232 files, 8 packages
+Node v22.22.2 — as `pnpm exec` resolves it
+```
+
+**Every quoted count re-measured at THIS sha before the PR, which is the remedy this batch learned.**
+TZ-varying test files: **16**, by two independent methods that agree (alternation regex; and name-match
+then filter, a different method rather than the same regex twice). Dotted-only returns **6** — the blind
+pattern, kept as the comparison. No orphaned vitest at ppid=1.
