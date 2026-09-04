@@ -219,11 +219,17 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
           // fold identically and the second is ignored as the duplicate it is.
           await replica.applyServerItem(env);
         }
-        // NOT redundant with `applyServerItem`'s own `DELETE FROM outbox`, which
-        // is the mistake this line looks like. That delete sits AFTER the
-        // duplicate check and the check returns early, so when the stream echo
-        // beat the HTTP response home the row was never cleared — and the claim
-        // would be flushed again forever. Case 12.149.
+        // NOT redundant with `applyServerItem`'s own `DELETE FROM outbox`, and
+        // the reachable path is worth naming precisely, because the obvious
+        // guess is wrong. A stream ECHO that beats the HTTP answer home is
+        // `{applied: true}` — it reaches that delete and clears the row itself,
+        // so this line is a no-op there. The path where this line is the ONLY
+        // thing that clears the row is a RE-BOOTSTRAP: `loadBootstrap` inserts
+        // the device's own already-committed claim into `events` and does not
+        // touch the outbox, so the row survives; `applyServerItem` then returns
+        // `{applied: false}` on the duplicate id and RETURNS BEFORE its delete.
+        // Without this line that claim is flushed again, forever. Case 12.149
+        // walks exactly that sequence.
         await storage.run('DELETE FROM outbox WHERE event_id = ?', [eventId]);
         return;
       }

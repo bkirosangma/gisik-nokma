@@ -244,25 +244,44 @@ describe('12.147–12.149 the two kinds of failure, and the echo that arrives fi
     await storage.close();
   });
 
-  it('12.149 the stream echo arriving BEFORE the http answer still clears the row', async () => {
+  /**
+   * WHY THIS IS A RE-BOOTSTRAP AND NOT THE ECHO RACE, which is what the first
+   * draft of this case tested and what its comment claimed.
+   *
+   * A stream ECHO that beats the HTTP answer home is `{applied: true}` — the
+   * first arrival of that id — so `applyServerItem` reaches its OWN
+   * `DELETE FROM outbox` and clears the row without help. Measured: after the
+   * echo, `queuedCount` is already 0. A case built on that shape has to
+   * re-INSERT the row by hand to have anything left to clear, which tests only
+   * that a hand-inserted row can be deleted.
+   *
+   * The path where `applyResult`'s delete is the ONLY thing that clears the row
+   * needs `applyServerItem` to return `{applied: false}` while an outbox row
+   * still stands, and `loadBootstrap` is the door that produces it: it inserts
+   * the device's own already-committed claim into `events` and touches the
+   * outbox not at all. That is a live sequence, not a contrivance — the flush
+   * goes out, the server commits, the device re-bootstraps before the answer
+   * comes home, and the claim arrives back in its own ticket history.
+   */
+  it('12.149 a claim that came home through a re-bootstrap is still cleared by its own answer', async () => {
     const { storage, replica, outbox } = await fixture();
     const create = createTicket();
     await outbox.enqueue(create);
-    const echo: LedgerEvent = { ...create, serverTime: '2026-08-20T01:00:00.000Z', seq: 1, workspaceSeq: 11 };
+    const landed: LedgerEvent = { ...create, serverTime: '2026-08-20T01:00:00.000Z', seq: 1, workspaceSeq: 11 };
 
-    // The stream wins the race; `applyServerItem` deletes the outbox row itself.
-    expect(await replica.applyServerItem(echo)).toEqual({ applied: true });
-    expect(await outbox.queuedCount(WS)).toBe(0);
+    await replica.loadBootstrap({
+      ...bootstrapOf(),
+      tickets: [{ ticketId: create.entity.id, snapshot: null, events: [landed] }],
+    });
+    // The bootstrap took the claim into the ledger and left the outbox alone.
+    expect(await outbox.queuedCount(WS)).toBe(1);
+    expect((await replica.listEntityEvents(create.entity.id)).map((env) => env.id)).toEqual([create.id]);
 
-    // Now the HTTP answer lands for the same claim. `applyServerItem` returns
-    // early on the duplicate id and NEVER reaches its own delete — so if
-    // `applyResult` did not delete for itself, a re-enqueued row here would be
-    // flushed forever. This is why that delete is not redundant.
-    await storage.run(
-      'INSERT INTO outbox (event_id, workspace_id, entity_kind, entity_id, envelope) VALUES (?, ?, ?, ?, ?)',
-      [create.id, WS, 'ticket', create.entity.id, JSON.stringify(create)],
-    );
-    expect(await outbox.queuedCount(WS)).toBe(1); // the row is really there to be cleared
+    // So the HTTP answer's own `applyServerItem` is a DUPLICATE: it returns
+    // before reaching the delete that would otherwise clear the row.
+    expect(await replica.applyServerItem(landed)).toEqual({ applied: false });
+    expect(await outbox.queuedCount(WS)).toBe(1);
+
     await outbox.applyResult(create.id, {
       status: 'committed',
       eventId: create.id,
@@ -271,7 +290,7 @@ describe('12.147–12.149 the two kinds of failure, and the echo that arrives fi
       serverTime: '2026-08-20T01:00:00.000Z',
     });
     expect(await storage.all('SELECT event_id FROM outbox')).toEqual([]);
-    // And the duplicate did not fold twice.
+    // And nothing folded twice.
     expect(await replica.listEntityEvents(create.entity.id)).toHaveLength(1);
     await storage.close();
   });

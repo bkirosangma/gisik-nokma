@@ -630,18 +630,24 @@ the number Task 10's own echo case will want and the never-renumber rule would k
 
 ## The outbox and the local pre-check (Task 10) — `packages/sync-client/test/precheck.test.ts`, `test/outbox.test.ts`
 
-**Sixteen `it` declarations across the two files, one per id 12.138–12.153, running as SEVENTEEN
-tests** — 12.152's `it` sits inside a two-zone loop, so it executes twice. Both numbers are stated
-because neither implies the other, and both are measured:
-`grep -cE "^[[:space:]]*it\(" packages/sync-client/test/precheck.test.ts packages/sync-client/test/outbox.test.ts`
-prints `6` and `10`, and `grep -nE "it\('12\.[0-9]+" …` **enumerates fifteen id-bearing lines** — the
-sixteenth is the loop's `holds under TZ=${tz}`. The package's own run reads `Tests 45 passed (45)`, and the
-sum is stated so it can be checked: these seventeen, Task 9's twenty, the barrel guard's four, and the
-storage conformance suite's four.
+**THREE numbers, stated separately because no one of them implies the others and a single grep
+appears to refute the first.** Each is measured, with the command beside it:
+
+1. **Sixteen `it` declarations** across the two files —
+   `grep -cE "^[[:space:]]*it\(" packages/sync-client/test/precheck.test.ts packages/sync-client/test/outbox.test.ts`
+   prints `6` and `10`.
+2. **Fifteen of those name an id** — `grep -nE "it\('12\.[0-9]+" …` enumerates fifteen lines. The
+   sixteenth declaration is 12.152's, named `holds under TZ=${tz}` because it is a two-zone loop: it
+   carries the sixteenth id (12.138–12.153 is sixteen ids) and it is why a reader running the grep in
+   (2) gets fifteen and must not read that as the id range being wrong.
+3. **Seventeen executions** — sixteen declarations, one of which runs twice.
+
+The package's own run reads `Tests 45 passed (45)`, and the sum is stated so it can be checked: these
+seventeen, Task 9's twenty, the barrel guard's four, and the storage conformance suite's four.
 
 **Every id below was proved able to fail**, each with the mutation that reddens it and the full list of
 cases that mutation takes down — a mutation that reddens five cases is not evidence about one, and
-saying "red here alone" without running it is how this branch produced four wrong counts. Seven
+saying "red here alone" without running it is how this branch produced four wrong counts. Eight
 mutations were run; **none survived**.
 
 ### The local pre-check — `test/precheck.test.ts`
@@ -688,9 +694,16 @@ mutations were run; **none survived**.
 - 12.148 ✅ `recordFailure` is TRANSIENT: it backs off, holds the batch until due, and **leaves the row
   `queued`** — the assertion that stops a future reader "tidying" it into a `failed` write and
   stranding every retryable claim on the device forever.
-- 12.149 ✅ the stream echo arriving BEFORE the HTTP answer still clears the row. `applyServerItem`
-  returns early on the duplicate id and never reaches its own `DELETE FROM outbox`, so `applyResult`'s
-  delete is not the redundancy it looks like.
+- 12.149 ✅ a claim that came home through a RE-BOOTSTRAP is still cleared by its own answer.
+  `loadBootstrap` inserts the device's already-committed claim into `events` and touches the outbox not
+  at all, so `applyServerItem` then returns `{applied: false}` and RETURNS BEFORE its own
+  `DELETE FROM outbox` — `applyResult`'s delete is the only thing that clears the row, and without it
+  the claim is flushed forever. *Mutation: drop that delete → red here alone
+  (`Tests 1 failed | 44 passed (45)`).* **The first draft of this case tested the ECHO race instead and
+  its comment claimed the same thing about it — wrongly.** A stream echo is the FIRST arrival of that
+  id, so it is `{applied: true}` and clears the row itself; the case had to re-insert the row by hand to
+  have anything left to delete, which tests only that a hand-inserted row can be deleted. Recorded
+  because the sentence read as a measured causal claim and the run beside it said otherwise.
 - 12.150 ✅ **PENDING IS NEVER SETTLED FACT.** A ticket that exists only as a queued claim is absent
   from every settled surface — `getTicket`, `listTickets`, `listEntityEvents`, `searchLocal`, and the
   `tickets` and `snapshots` tables read directly — and present in exactly one, `pendingCreatedTickets`,
