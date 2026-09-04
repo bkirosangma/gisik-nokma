@@ -56,6 +56,36 @@ deliberate, greppable act — and **every safety property proved of `canSeeResol
 having come from `resolveEffectiveRole`**, because that is what makes a null workspace role imply an
 empty project set. Do not hand-build one to make a test pass.
 
+## ⛔ CORRECTION, ADDED 2026-09-04 AFTER TASK 7 SHIPPED — THE MAP'S HEADLINE FINDING IS HALF WRONG
+
+**The map is right that the plan's snippet takes the ungated door. It is WRONG that the compiler cannot
+stop it, and that wrong half is repeated three times below** — in "The single highest-value finding in
+the map" immediately following, in Task 7's disagreement 3, and in "most likely to go wrong" item 2,
+where it is called "a live-security miss, not a style nit".
+
+The map reasoned: this module needs both doors, therefore it needs the type that has both doors,
+therefore the guard falls back to review. **That is true of `IngestService` as a single object and false
+the moment the two doors are two parameters** — and the repo had already made them two parameters,
+before Plan 10 Task 7 existed. Measured at `ba6bfe6`:
+
+- `apps/server/src/app.ts:88` — `AppDeps` already declared `serverAppend: ServerAppend`.
+- `apps/server/src/routes/invites.ts:45` — `registerInviteRoutes` already took it, calling it at `:497`.
+
+So `sync-service.ts` takes the narrowed **`ClientIngest`** (which has no `ingestBatch` at all) **plus
+`ServerAppend`** as a separately-named capability, and a reflex `deps.ingest.ingestBatch(...)` is a
+**compile error**. `sync-service.ts:97-100` is the shipped shape.
+
+**The lesson is the reusable part: an option priced as unacceptable is sometimes an option scoped too
+widely.** Nobody checked whether the repo had already solved it. It had — one file away, in a route
+doing the same job.
+
+**Why this correction is written loudly rather than quietly deleted:** the false half had already
+propagated into the executor handoff on a `main`-bound branch, into Task 7's own dispatch prompt, and
+into a status report, before anyone tested it. A later reader designing a second client-writable route
+would have inherited "the compiler cannot help here" as settled and reached for the weaker guard the
+finding itself was warning about. **A wrong claim about where a guard is impossible is worse than no
+claim, because it stops the search.**
+
 ## The single highest-value finding in the map
 
 Plan 10 T7's own snippet calls `deps.ingest.ingestBatch([event])` for the **client-submitted offline

@@ -2030,9 +2030,11 @@ The three findings from it that will cost a round each if missed:
 
 1. **T7: `ingestBatch` vs `ingestClientBatch`.** The plan's own snippet calls the internal, UNGATED door
    for the client-submitted offline event. `ingest-service.ts`'s docblock names this exact case by name.
-   `sync-service.ts` legitimately needs BOTH doors (the server-authored `claim.contested` append is a
-   proper internal-door use), so its deps type **cannot** be narrowed to `ClientIngest` and the compiler
-   will **not** catch a wrong call. Discipline falls back to review. Write down which door each call uses.
+   ~~`sync-service.ts` legitimately needs BOTH doors, so its deps type **cannot** be narrowed to
+   `ClientIngest` and the compiler will **not** catch a wrong call.~~ **THAT SENTENCE WAS FALSE AND IS
+   CORRECTED BELOW — see "THE CORRECTION THAT MATTERS MOST" in the Batch A section.** The compiler DOES
+   catch it: take `ClientIngest` plus `ServerAppend` as two named parameters, not `IngestService` as one
+   wide object.
 2. **T12: the plan's `ReplicaQuery`/`LocalIngestResult` are not the shipped `DataSource`.** The real
    `DataSourceQuery` has 13 methods under different names; the plan's has 6. `LocalIngestResult`'s 4th
    `'pending'` status is not assignable where `DataSource.ingest`'s 3-status `IngestResult[]` is
@@ -2103,3 +2105,137 @@ not by default.**
 
 The anchors above were verified with `git branch --contains`, not `git cat-file`. Re-verify anyway.
 Nothing is in flight as of this commit: no subagent is running, no PR is open from this branch.
+
+---
+
+# BATCH A IS COMPLETE — PLAN 10 T5, T6, T7 (2026-09-04 ~09:40)
+
+**Everything above this line about "PLAN OF ATTACK" still holds; the position has moved.** Batch A
+(server sync surface) is committed and pushed. Batch B (T9 → T10) is next and has not started.
+
+| anchor | value |
+|---|---|
+| branch | `exec/15-plan10-sync`, pushed |
+| merge-base with `main` | `e09666c` |
+| behind `main` | **0** — `origin/main` merged in, not rebased over (it gained the controller's Plan 9 ledger promotion, 148/177, while Batch A ran) |
+| my changes vs merge-base | **16 files, +3701/−19** — recounted at this sha, not carried forward |
+| tree | clean |
+| ledger | Plan 10 T5/T6/T7 still read `todo` — **correct**, the controller promotes after merge. Do NOT promote from this side. |
+
+**Recount before relying on any number above.** The first count taken here said "18 files" and "21
+files" from two commands run seconds apart; both were `origin/main..HEAD` **endpoint** diffs taken while
+`main` had moved four commits ahead, so each was measuring my work plus main's in one direction or the
+other. The merge-base number is the only one that answers "what did I change".
+
+## THE CORRECTION THAT MATTERS MOST — the compiler CAN catch the ungated door
+
+**The pre-flight map's headline finding is half wrong, and the wrong half was written into this file,
+into Task 7's dispatch prompt, and into a status report before anyone tested it.**
+
+The map said: `sync-service.ts` needs both ingest doors, so its deps type cannot be narrowed to
+`ClientIngest`, so `deps.ingest.ingestBatch(...)` for a client event cannot be a compile error and
+"discipline falls back to review." **It does not.** Measured at `ba6bfe6`, BEFORE Task 7 existed:
+
+- `apps/server/src/app.ts:88` already declared `serverAppend: ServerAppend` on `AppDeps`.
+- `apps/server/src/routes/invites.ts:45` already took it as its own parameter, calling it at `:497`.
+
+Two doors as **two named parameters**, not one wide interface. `sync-service.ts:97-100` now takes
+`ingest: ClientIngest` (which has no `ingestBatch` at all) plus `serverAppend: ServerAppend`, and the
+reflex call is `Property 'ingestBatch' does not exist on type 'ClientIngest'`.
+
+**The reusable lesson: an option priced as unacceptable is sometimes an option scoped too widely.** The
+map reasoned "needs both doors → needs the type with both doors" and never asked whether the repo had
+already split them. It had, one file away, in a route doing the same job.
+
+The map now carries this correction as a banner above its own headline section. **A wrong claim about
+where a guard is impossible is worse than no claim, because it stops the search.**
+
+## THREE INSTANCES OF ONE FAILURE IN A SINGLE TASK — this is a class, not three accidents
+
+Task 7 produced the same move three times, each caught by the next party:
+
+1. Its implementation scoped case 12.83's residual to *"`isUniqueViolation` matches only `events_pkey`,
+   so it stays live for every other `ingestBatch` caller — closed for this door, not as a class."*
+   **Wrong.** A second batch-killing throw sat in `contest()` itself, in Task 7's own new code,
+   reachable with no duplicate and no unique violation anywhere on the path.
+2. The fix for that then argued the degrade was safe because *"four existing cases assert a ticket
+   refusal DOES become recorded history."* **Reasoned, not measured.** Forcing the degrade arm to take
+   every contest-append reddens **eight**: 12.101, 12.102, 12.103, 12.105, 12.106, 12.110, 12.113 and
+   12.114's second control.
+3. I relayed instance 1 approvingly in a status report before instance 2 refuted it.
+
+**The shape each time: a confident sentence about coverage standing in for the argument that a change is
+safe.** It is cheap to write, reads as diligence, and is only falsifiable by running something. The
+counter-move is the one already in the brief — print the rows, not the count — and it now has three
+same-day instances behind it.
+
+## THE DEFECT BATCH A ACTUALLY FOUND — a permanent sync wedge
+
+`commitOne` refuses a ticket bound to another workspace. `processOne` sends any ticket refusal to
+`contest()`. `buildContestedClaim` copies the refused claim's workspace and entity **verbatim** — the
+property that makes contests coherent by construction — so the contest is the same mis-filing, meets the
+same guard, and comes back refused. `contest()` threw, and the throw left `processBatch` entirely.
+
+Measured on `[legal1, bad, legal2]`: `legal1` committed **but its answer was lost**, `legal2` was never
+processed, and both the retry and the solo claim 500'd again. **An outbox holding that item never
+drains, and nothing queued behind it ever syncs** — out of a route whose whole contract is that every
+per-event answer rides inside `results`.
+
+Fixed by **degrading** a refused contest-append to the claim's own refusal, reporting the original rule
+and reason — character-for-character what `POST /v1/events` answers for the identical claim. Degrading
+rather than enumerating uncontestable rules is deliberate: it closes the class, so no future refusal can
+take a batch down because someone forgot to add it to a list.
+
+## RECORDED, NOT FIXED — with named owners
+
+1. **`isUniqueViolation` matches only `events_pkey`.** Closed for `POST /v1/sync`; open for every other
+   `ingestBatch` caller. OWNER: unassigned — surface at the T14 stop point.
+2. **There is no server identity.** Three docblocks say a contest should be attributed to one; `actorId`
+   is a ULID and every ULID in that position is a real person. T7 followed `bootstrapWorkspace`'s
+   precedent and attributed to the claimant, so `claimant_id` equals the contest's own `actorId` —
+   making fan-out mis-routing invisible against production data and detectable only via its own
+   fixture. Minting a system user is a PRODUCT decision no plan has taken. OWNER: **the owner**, at the
+   T14 stop point.
+3. **`StreamItem` should be REPLACED by `ServerStreamFrame`, not re-synchronised with it.**
+   `packages/app-core/src/data-source.ts:60-63` names **Plan 10** as owner and **no task in T5–T13 names
+   it**. OWNER: Plan 10, unassigned task. Surface at the T14 stop point.
+4. **Snapshot retention is unowned** — one row per snapshot per entity, nothing deletes superseded ones.
+   Correctness unaffected (`readLatestSnapshot` is `ORDER BY seq DESC LIMIT 1`); cost is unbounded
+   storage. OWNER: the first plan that runs this against a real ledger.
+5. **`startSnapshotWriter` is not re-entrant** — `setInterval` overlap collides on the snapshots primary
+   key; caught and logged, ledger untouched. Unguarded on purpose: nothing yet establishes what a
+   realistic pass costs, and a guard sized by guesswork is a second thing to be wrong about.
+   OWNER: Plan 11 (boot path).
+6. **`previous.state` is cast, not parsed** — no `ticketStateSchema` exists to validate a `jsonb`
+   snapshot against (swept, with `ticketTypeDefSchema` as the control). A row corrupted out of band is
+   folded onto rather than refused. OWNER: whoever adds `ticketStateSchema`.
+
+## PROCESS DEVIATIONS — recorded, deliberately NOT corrected
+
+- **Two fix rounds used `commit --amend`** rather than a new commit, so those fixes are not separately
+  auditable in the PR, and two shas quoted in live status reports (`87a9e72`, `0c0ef35`) are now
+  **orphaned** — `git branch --contains` empty, `git cat-file` still passing on both. Content intact and
+  reachable at `658239c` and `09765d0`. **Not rewritten: rewriting history to fix history is the wrong
+  direction.**
+- **Two subjects carry conventional-commit prefixes** (`feat(server):`, `fix(test-cases):`) against this
+  repo's prose convention. Both bodies are house-style and thorough. **Deliberately not amended** —
+  rewriting two commits to fix a subject *prefix* would orphan shas for cosmetics, which is the exact
+  hazard this file spends its length warning about.
+- **One fix round verified a mutation restore with shell `diff`**, a method recorded on this machine as
+  having returned a false "identical" for differing files. Independently re-verified with `git diff`
+  plus a positive control: production untouched across both T6 fix commits, and both mutation targets
+  present in the shipped file (`sync-routes.ts:109` REPEATABLE READ, `:119` `workspace_id = $1`).
+- **Reviewers were told "do NOT fix anything" and at least one fixed anyway** (T5's amend). Outcome was
+  good; the instruction was still not followed, which matters for reading any review's findings list as
+  a complete account of what it changed.
+
+## NEXT — in order
+
+1. **One opus whole-branch review** of Batch A, then its fix round if it finds Critical/Important.
+2. **Gate with `0 cached`** — every per-task gate this batch ran with 21 of 24 tasks served from turbo's
+   cache. That is fine per task and NOT fine as the branch's final evidence.
+3. **PR** for Batch A. The controller merges. **Step 15 ships as three PRs, one per batch seam** — the
+   reasoning is in the section above; the short version is that the quota number the one-PR plan depends
+   on is unmeasurable from this session, so the robust option wins over the optimal one.
+4. **Batch B (T9 → T10)** branches from Batch A's head and rebases when A merges. **Capture Batch A's
+   head sha in writing BEFORE the merge** — it is orphaned by the very event that triggers the rebase.
