@@ -1117,9 +1117,26 @@ Plan 10 Tasks 8–17.)*
   an id already contested is answered with the ONE recorded contest; otherwise the claim goes to
   ingest, and a refusal on a **ticket** becomes a `claim.contested` ledger event (`contested`, carrying
   the contest's own event id) while a refusal on any other entity is `refused`, since there is no ticket
-  to attach a contest to. A refused contest-append is a server integrity failure and throws — the
-  server answering "refused" while its ledger holds no account of it is the silent drop honesty
-  invariant 5 forbids. `apps/server/src/sync/sync-service.ts`, `apps/server/src/sync/sync-routes.ts`
+  to attach a contest to. **`refused` therefore does NOT mean "the entity was not a ticket"** — the
+  plan's snippet glossed it that way and a replica written to that gloss would be wrong; it means *a
+  refusal no coherent contest can record*, and `entity-workspace-mismatch` on a ticket is the second
+  shape that reaches it (next bullet). `apps/server/src/sync/sync-service.ts`,
+  `apps/server/src/sync/sync-routes.ts`
+- ✅ **A refusal whose contest the server's own door refuses is answered, not 500'd** — when
+  `serverAppend` comes back `refused` for the `claim.contested`, the claimant is told the ORIGINAL
+  refusal's `rule` and `reason` inside `results`, character for character the answer `POST /v1/events`
+  gives for the identical claim. One shape reaches this today and it is live rather than theoretical: a
+  claim stamping workspace A on a ticket bound to workspace B is refused `entity-workspace-mismatch`,
+  and `buildContestedClaim` copies that `workspaceId` and `entity` onto the contest verbatim, so the
+  contest is the SAME mis-filing and the same `commitOne` guard refuses it. Throwing there — which is
+  what the plan's step 7b prescribed and what shipped first — made `POST /v1/sync` answer **500** from a
+  route whose whole contract is that per-event answers ride inside `results`: measured on
+  `[legal1, bad, legal2]`, `legal1` committed but its answer lost, `legal2` never processed at all, and
+  the retry and the solo claim both 500 again — **an outbox wedged with no path out**. Degrading rather
+  than enumerating the uncontestable rules is what closes it as a class. *The throw is KEPT for a
+  contest-append that comes back `invalid` or is absent: a server-built envelope the server's own door
+  calls malformed has no honest per-event answer, only a bug to surface.*
+  `apps/server/src/sync/sync-service.ts`
 - ✅ **The client's offline claim goes through the GATED door, and the deps type is what says so** —
   `POST /v1/sync` submits the claim with `ingestClientBatch`, so being made offline buys an event
   nothing: every membership, role, envelope-origin and visibility question is asked exactly as it is on
@@ -1156,7 +1173,11 @@ Plan 10 Tasks 8–17.)*
   `expected 500 to be 200`. `POST /v1/sync` now reads `proj_contested` by `original_event_id` before
   minting a contest, and catches the constraint by name for the concurrent-request residual two
   requests can still race into. *The defect stays live for every other `ingestBatch` caller — this
-  closes the sync door, not the class.* `apps/server/src/sync/sync-service.ts`
+  closes the sync door, not the class.* **The first round then scoped the whole residual to this one
+  mechanism, and that was wrong**: a second batch-killing throw sat in `contest()`, reachable with no
+  unique violation anywhere on the path — see the "refusal whose contest the server's own door refuses"
+  bullet above, which closes that one. The two are different mechanisms and only the `events_pkey` half
+  is still open. `apps/server/src/sync/sync-service.ts`
 - ⚙️ **The visibility pre-check the plan asked for is deliberately absent** — Plan 10's step 6 (an
   explicit `getResolvedVisibility` + `canSee` pass before ingest) duplicates
   `checkVisibilityPermission`, which already refuses every ticket-entity event whose ticket the caller

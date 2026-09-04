@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { membershipId, newSubmittedEvent, newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import {
+  ENTITY_WORKSPACE_MISMATCH_RULE,
+  membershipId,
+  newSubmittedEvent,
+  newUlid,
+  type SubmittedEvent,
+} from '@gisik-nokma/domain';
 import type { IngestService } from '../../src/ingest/ingest-service.js';
 import {
   PERMISSION_ROLE_RULE,
@@ -68,6 +74,22 @@ const WF = newUlid();
 const TYPE = newUlid();
 /** The ticket's assignee, and never a session user: `restrict-to` must refuse. */
 const OTHER = newUlid();
+
+/**
+ * A SECOND workspace, and a ticket that lives in it (12.114). The claim under
+ * test stamps `WS` on `TICKET_IN_B`, which is the shape a workspace-scoped
+ * replica produces after a workspace switch on a shared device.
+ *
+ * The member is deliberately NOT seeded into `WS_B`, and that is not an
+ * oversight: the entity↔workspace guard runs INSIDE `commitOne` before
+ * `checkPermission` (`ingest-service.ts`, the `readEntityHead` block sits above
+ * the gate), which is exactly why this refusal reaches `contest()` at all.
+ */
+const WS_B = newUlid();
+const WF_B = newUlid();
+const TYPE_B = newUlid();
+const PROJECT_B = newUlid();
+const TICKET_IN_B = newUlid();
 
 let memberId = '';
 let memberHeaders: Record<string, string> = {};
@@ -194,6 +216,58 @@ beforeAll(async () => {
     setVisibilityEnv(WS, HIDDEN, 'explicit', [OTHER]),
     setVisibilityEnv(WS, REVOKED, 'workspace'),
   ]);
+
+  // The second workspace (12.114). Its own definitions, because definitions
+  // are workspace-scoped: a ticket in `WS_B` naming `WS`'s ticket-type would
+  // not resolve, and `ticket.created` would answer `invalid`/refused instead of
+  // committing — which would leave `proj_entity_heads` with no row for
+  // `TICKET_IN_B`, `readEntityHead` answering null, and 12.114 passing on some
+  // OTHER refusal entirely. The committed-assertion below is what makes that
+  // fail here, loudly, instead of there, quietly.
+  await seedProject(db.pool, WS_B, PROJECT_B);
+  const submitB = (entity: SubmittedEvent['entity'], type: string, payload: unknown): SubmittedEvent =>
+    newSubmittedEvent({ workspaceId: WS_B, entity, type, payload, actorId: memberId, origin: 'server' });
+  const seededB = await ingest.ingestBatch([
+    submitB({ kind: 'workflow', id: WF_B }, 'workflow.defined', {
+      id: WF_B,
+      version: 1,
+      name: 'Other workspace',
+      initialStateId: 'todo',
+      // A terminal state is REQUIRED — `workflow-structure` refuses a
+      // definition with none ("no ticket could ever finish"), and it was the
+      // committed-assertion above that said so rather than 12.114 failing on a
+      // refusal that named some other rule.
+      states: [
+        { id: 'todo', name: 'To do', category: 'open' },
+        { id: 'done', name: 'Done', category: 'terminal' },
+      ],
+      transitions: [
+        { from: '*', to: 'todo', rules: [] },
+        { from: 'todo', to: 'done', rules: [] },
+      ],
+    }),
+    submitB({ kind: 'ticket-type', id: TYPE_B }, 'ticket-type.defined', {
+      id: TYPE_B,
+      name: 'Task',
+      icon: 'check',
+      rank: 3,
+      workflowId: WF_B,
+      fields: [],
+    }),
+    submitB({ kind: 'ticket', id: TICKET_IN_B }, 'ticket.created', {
+      typeId: TYPE_B,
+      projectId: PROJECT_B,
+      parentId: null,
+      title: 'Lives in the other workspace',
+    }),
+  ]);
+  for (const result of seededB) {
+    if (result.status !== 'committed') {
+      // eslint-disable-next-line no-console
+      console.error('WS_B seed result not committed:', JSON.stringify(result));
+    }
+    expect(result.status).toBe('committed');
+  }
 });
 
 afterAll(async () => {
@@ -515,6 +589,99 @@ describe('POST /v1/sync — the sync ingress', () => {
     const retry = await syncPost(memberHeaders, [e]);
     expect(retry.json().results[0]).toEqual(first.json().results[0]);
     expect(await contestRows(e.id)).toHaveLength(0);
+  });
+
+  it('12.114 a claim on a ticket bound to ANOTHER workspace is answered inside results — the throw no longer takes the batch, or the outbox, with it', async () => {
+    // The reachable half of the class case 12.83 named, which the first round
+    // scoped away to `isUniqueViolation`/`events_pkey` alone. There is no
+    // unique violation anywhere on this path.
+    //
+    // `commitOne` refuses `entity-workspace-mismatch` for a ticket bound
+    // elsewhere; the `refused` arm sends any TICKET refusal to `contest()`;
+    // `buildContestedClaim` copies the refused claim's `workspaceId` and
+    // `entity` verbatim, so the contest is the same mis-filing and meets the
+    // same guard. `contest()` used to throw on that, rejecting `processBatch`
+    // entirely.
+    //
+    // *Mutation: restore `if (appended?.status !== 'committed') { throw … }` in
+    // `sync-service.ts` in place of the `refused` arm → red here with
+    // `expected 500 to be 200`, and only here; all thirteen other cases in this
+    // file stay green, which is the point — nothing else in the suite could see
+    // this.*
+    //
+    // The batch shape is the case, not the solo claim. The solo claim only
+    // shows the 500 is gone; the batch shows what the 500 COST: the answers
+    // already decided for committed neighbours were lost, and every event
+    // queued behind the bad one never ran, with no retry that could clear it.
+    const legal1 = offlineField('queued ahead of the bad claim');
+    const bad = offline(
+      'ticket.field_set',
+      { fieldId: 'title', value: 'stamped with the wrong workspace' },
+      TICKET_IN_B,
+    );
+    const legal2 = offlineField('queued behind the bad claim');
+
+    const res = await syncPost(memberHeaders, [legal1, bad, legal2]);
+    expect(res.statusCode).toBe(200); // was 500
+    const results = res.json().results;
+    expect(results).toHaveLength(3); // index-aligned, as the route's contract says
+    expect(results[0]).toMatchObject({ status: 'committed', eventId: legal1.id });
+    expect(results[1]).toMatchObject({
+      status: 'refused',
+      eventId: bad.id,
+      rule: ENTITY_WORKSPACE_MISMATCH_RULE,
+    });
+    // The rule id alone would also be satisfied by a refusal about some other
+    // pair of workspaces; the reason names both, so this asserts it is THIS
+    // mis-filing.
+    expect(results[1].reason).toContain(WS_B);
+    expect(results[1].reason).toContain(WS);
+    expect(results[2]).toMatchObject({ status: 'committed', eventId: legal2.id });
+
+    // The event queued BEHIND the bad one actually ran. This is the assertion
+    // the finding turns on: under the throw, `legal2` was never processed.
+    const behind = await db.pool.query('SELECT count(*)::int AS n FROM events WHERE id = $1', [
+      legal2.id,
+    ]);
+    expect(behind.rows[0].n).toBe(1);
+    // And nothing was recorded for the bad claim — no ledger row, no contest.
+    // A contest here would be a permanent cross-workspace row, which is the
+    // thing the guard exists to prevent.
+    expect(await contestRows(bad.id)).toHaveLength(0);
+    const badRow = await db.pool.query('SELECT count(*)::int AS n FROM events WHERE id = $1', [
+      bad.id,
+    ]);
+    expect(badRow.rows[0].n).toBe(0);
+
+    // Retrying answers identically instead of 500ing forever, so an outbox
+    // holding this item drains rather than wedges.
+    const retry = await syncPost(memberHeaders, [bad]);
+    expect(retry.statusCode).toBe(200);
+    expect(retry.json().results[0]).toEqual(results[1]);
+
+    // POSITIVE CONTROL 1, from this same run: the interactive door gives the
+    // identical answer for the identical claim. That side-by-side comparison is
+    // what `packages/sync-client` (Tasks 10/11) is written against.
+    const interactive = await eventsPost(memberHeaders, [
+      { ...bad, id: newUlid(), origin: 'web' as const },
+    ]);
+    expect(interactive.statusCode).toBe(200);
+    expect(interactive.json().results[0]).toMatchObject({
+      status: 'refused',
+      rule: ENTITY_WORKSPACE_MISMATCH_RULE,
+      reason: results[1].reason,
+    });
+
+    // POSITIVE CONTROL 2, from this same run: a ticket refusal in THIS
+    // workspace still becomes recorded history. Without it, a fixture whose
+    // membership or visibility seeds had quietly stopped working would refuse
+    // everything and this case would pass for the wrong reason — and the
+    // degraded `refused` arm would be indistinguishable from having turned the
+    // sync door back into the interactive one.
+    const inWorkspace = await syncPost(memberHeaders, [offlineTransition()]);
+    const contested = inWorkspace.json().results[0];
+    expect(contested).toMatchObject({ status: 'contested', rule: 'restrict-to' });
+    expect(await contestRows(contested.eventId)).toHaveLength(1);
   });
 
   it('12.112 answers 401 without a session and 400 for a body that is not a batch', async () => {

@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.113`. THE NEXT FREE ID IS `12.114`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, and said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.114`. THE NEXT FREE ID IS `12.115`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, and said `12.113` until Task 7's fix round added the cross-workspace batch case. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -260,6 +260,19 @@ refusal, which fires on both doors and therefore proves nothing about which was 
   the caller can still see the ticket. *Mutation: the step-4 lookup replaced with a constant `null` →
   red here alone (`expected { status: 'contested', …(4) } to deeply equal { status: 'committed',
   …(4) }`), all thirteen other cases green.* (sync-route.test.ts)
+- 12.114 ✅ a claim naming a ticket bound to ANOTHER workspace answers `refused`
+  `entity-workspace-mismatch` **inside `results`**, and the batch around it survives: `[legal1, bad,
+  legal2]` → 200 with three index-aligned answers, `legal2` actually in the ledger, no ledger row and
+  no `proj_contested` row for the bad claim, and a retry answering identically so an outbox holding it
+  drains instead of wedging. Before the fix this was a **500**: `contest()` threw because
+  `buildContestedClaim` copies the refused claim's `workspaceId` and `entity` verbatim, so the contest
+  is the SAME mis-filing and meets the SAME `commitOne` guard. Two positive controls run in the same
+  test — `POST /v1/events` answering the identical claim with the identical `rule` and `reason`
+  (the side-by-side the wire contract is written against), and an in-workspace ticket refusal still
+  becoming a recorded contest, without which a fixture whose seeds had quietly stopped working would
+  refuse everything and pass this case for the wrong reason. *Mutation: restore
+  `if (appended?.status !== 'committed') { throw … }` → red here alone, `expected 500 to be 200`, the
+  other fourteen cases green.* (sync-route.test.ts)
 
 ## Carried, with owners — and what Task 7 closed
 
@@ -283,15 +296,32 @@ refusal, which fires on both doors and therefore proves nothing about which was 
   schema. **Both remain fully open through `ingestBatch`**, which is where 12.82 measured them, and
   `renderContestedClaimText` still renders whatever it is given. *Owner for the general case: unchanged
   — whoever closes the `ingestBatch` contest path, or Plan 10 Task 18 if it re-scopes.*
-- 12.83 ✅ **confirmed as a live defect and closed FOR THIS DOOR.** Reproduced here, not inherited: with
+- 12.83 ✅ **confirmed as a live defect and closed FOR THIS DOOR — and the first round's scoping of the
+  residual was WRONG, which is why this entry was rewritten.** Reproduced here, not inherited: with
   both guards removed, a second sync request carrying the same refused claim answers **500** and takes
-  its whole batch with it (`expected 500 to be 200`, 12.105 and 12.106). `POST /v1/sync` now performs
-  the `proj_contested.original_event_id` lookup the index's own migration COMMENT describes, and
-  catches `proj_contested_original_idx` by name for the residual two concurrent requests can still race
-  into. **The defect itself is untouched**: `isUniqueViolation` still matches only `events_pkey`, so any
-  other `ingestBatch` caller that appends two contests embedding one refused claim still rejects its
-  whole batch. *Owner for the general case: whoever next touches `commitOne`'s duplicate handling —
-  named here rather than fixed inside a route task.*
+  its whole batch with it (`expected 500 to be 200`, 12.105 and 12.106). `POST /v1/sync` performs the
+  `proj_contested.original_event_id` lookup the index's own migration COMMENT describes, and catches
+  `proj_contested_original_idx` by name for the residual two concurrent requests can still race into.
+
+  **What the first round got wrong.** It scoped the residual SOLELY to `isUniqueViolation` matching only
+  `events_pkey` — i.e. to duplicate contests — and on that basis called the class closed for this door.
+  It was not: a second batch-killing throw sat in `contest()` itself, reachable through a path with no
+  unique violation anywhere in it. `commitOne` refuses `entity-workspace-mismatch` as a `refused` on a
+  ticket entity; `processOne` sends any ticket refusal to `contest()`; `buildContestedClaim` copies the
+  refused claim's `workspaceId` and `entity` verbatim, so the contest is the same mis-filing and the
+  same guard refuses it; `contest()` threw on the non-committed append and rejected the whole
+  `processBatch`. **500, unrecoverably** — the retry 500s, the solo claim 500s, and every event queued
+  behind it in the outbox never syncs. Closed by degrading a `refused` contest-append to the claim's
+  own refusal instead of throwing, which closes it as a CLASS rather than as a rule: any future refusal
+  a server-authored contest cannot survive now rides inside `results`. 12.114 pins it. The throw is kept
+  for a contest-append that comes back `invalid` or absent — a server-built envelope the server's own
+  door calls malformed, which has no honest per-event answer to give.
+
+  **What remains open, stated as the absence and not as partiality**: `isUniqueViolation` still matches
+  only `events_pkey`, so any OTHER `ingestBatch` caller that appends two contests embedding one refused
+  claim still rejects its whole batch — that half is untouched, and it is a different mechanism from the
+  one 12.114 closes. *Owner: whoever next touches `commitOne`'s duplicate handling — named here rather
+  than fixed inside a route task.*
 - 12.84 🚫 **out of scope for this door, with the reason measured rather than asserted.** The
   `entity.kind` comparison cannot be reached through `POST /v1/sync` at all: step 3 refuses every
   client-supplied `claim.contested` as `reserved-type` before ingest is called, which 12.108 pins by

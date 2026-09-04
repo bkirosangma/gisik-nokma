@@ -28,9 +28,32 @@ export const VISIBILITY_REFUSAL_RULE = PERMISSION_VISIBILITY_RULE;
 
 export type SyncInvalidCode = IngestErrorCode | 'actor-mismatch' | 'reserved-type';
 
+/**
+ * The wire shape `packages/sync-client` consumes (Plan 10 Tasks 10/11).
+ *
+ * **`refused` means MORE than the plan's snippet said, and a replica written to
+ * the older gloss will be wrong.** The plan annotated this member
+ * `// non-ticket entity: no contest recordable`, which reads as *`refused`
+ * implies the entity was not a ticket*. That was never the property; the
+ * property is **a refusal no coherent contest can record**, and a ticket-entity
+ * claim can satisfy it. Two shapes reach it today:
+ *
+ * 1. The entity is not a ticket, so there is nothing to file a contest ON.
+ * 2. The entity IS a ticket, but the refusal is about the claim's own
+ *    workspace↔entity pair (`entity-workspace-mismatch`). `buildContestedClaim`
+ *    copies that pair onto the contest verbatim, so the contest is the SAME
+ *    mis-filing and the same guard inside `commitOne` refuses it. Recording it
+ *    would be the permanent cross-workspace ledger row the guard exists to
+ *    prevent, so the honest answer is the refusal itself — the identical answer
+ *    `POST /v1/events` gives for the identical claim.
+ *
+ * A replica that switches on `status === 'refused'` to conclude "not a ticket"
+ * would mis-file case 2. Switch on the entity, or on `rule`.
+ */
 export type SyncEventResult =
   | { status: 'committed'; eventId: string; seq: number; workspaceSeq: number; serverTime: string }
   | { status: 'contested'; eventId: string; rule: string; reason: string; contestEventId: string }
+  /** A refusal no coherent contest can record — see the docblock above. */
   | { status: 'refused'; eventId: string; rule: string; reason: string }
   | { status: 'invalid'; eventId: string | null; code: SyncInvalidCode; message: string };
 
@@ -140,7 +163,10 @@ export function createSyncService(deps: SyncServiceDeps): SyncService {
   }
 
   /**
-   * Records a refusal as history.
+   * Records a refusal as history — or, when the contest the refusal implies is
+   * one the server's own door will not accept, answers the refusal itself. See
+   * the `refused` arm below; that arm is the one that keeps a single bad claim
+   * from taking its whole batch, and the client's whole outbox, with it.
    *
    * The envelope is built by `buildContestedClaim` and NOT by a local
    * `newSubmittedEvent` call as the plan's snippet does. That is the difference
@@ -209,13 +235,55 @@ export function createSyncService(deps: SyncServiceDeps): SyncService {
       }
       return { status: 'contested', eventId: event.id, ...raced };
     }
-    if (appended?.status !== 'committed') {
-      // The server failing to record its own refusal is an integrity failure,
-      // not a client error: answering the claimant "refused" while the ledger
-      // holds no account of it is the silent drop honesty invariant 5 forbids.
+    if (appended === undefined || appended.status === 'invalid') {
+      // STILL A THROW, and the absences are enumerated rather than declared
+      // impossible — the claim this fix replaced was an unreachability claim
+      // that turned out to be wrong. What is left here is: `serverAppend`
+      // answered nothing at all for one event, or the server's own door called
+      // the server's own envelope malformed. Neither has an honest per-event
+      // answer to give the claimant — there is no refusal to report, only a bug
+      // — so this stays the loud failure. Nothing in `buildContestedClaim`'s
+      // output is known to reach it: the id is a fresh ULID, the envelope comes
+      // out of `newSubmittedEvent`, and `claimContestedPayloadSchema` caps
+      // neither `rule` nor `reason` (both `z.string().min(1)`, and a refusal
+      // carries non-empty strings for both).
       throw new Error(
         `failed to append claim.contested for ${event.id}: ${JSON.stringify(appended)}`,
       );
+    }
+    if (appended.status === 'refused') {
+      // A refusal the CONTEST cannot survive is answered as the claim's own
+      // refusal, not as a 500.
+      //
+      // This is the reachable half of the class case 12.83 named, and the half
+      // the previous round scoped away: 12.83's paragraph blamed
+      // `isUniqueViolation` matching only `events_pkey`, but a batch-killing
+      // throw is reachable here through a path with no unique violation in it.
+      // `commitOne` refuses `entity-workspace-mismatch` for a ticket bound to a
+      // different workspace; `processOne`'s `refused` arm sends any ticket
+      // refusal to `contest()`; `buildContestedClaim` copies the refused
+      // claim's `workspaceId` and `entity` onto the contest verbatim, so the
+      // contest is the SAME mis-filing and meets the SAME guard. Throwing there
+      // rejected `processBatch` entirely: HTTP 500 from a route whose contract
+      // is that every per-event answer rides inside `results`, the answers
+      // already decided for the batch's committed neighbours lost, every event
+      // queued BEHIND the bad one never processed, and no retry that can ever
+      // clear it — a permanently wedged outbox.
+      //
+      // The reported `rule` and `reason` are the ORIGINAL claim's, not the
+      // contest-append's, because that is what the claimant asked about and it
+      // makes this answer character-for-character the one `POST /v1/events`
+      // gives for the identical claim.
+      //
+      // Degrading rather than enumerating the uncontestable rules is deliberate
+      // and is what makes this close the CLASS: any future refusal reachable by
+      // a server-authored contest stops taking its batch down without anyone
+      // having to remember to list it. It cannot quietly turn this door back
+      // into the interactive one, because that a refusal on a ticket DOES
+      // become recorded history is pinned by four independent cases (12.101,
+      // 12.105, 12.106 and 12.110's side-by-side control), all of which go red
+      // if contests stop committing.
+      return { status: 'refused', eventId: event.id, rule, reason };
     }
     return { status: 'contested', eventId: event.id, rule, reason, contestEventId: contestEvent.id };
   }
@@ -335,6 +403,12 @@ export function createSyncService(deps: SyncServiceDeps): SyncService {
       case 'refused':
         // A ticket can carry the contest; anything else has nothing to attach
         // one to, so the client surfaces it as a failed outbox item instead.
+        //
+        // Reaching `contest()` is not the same as recording one: a ticket
+        // refusal whose contest the server's own door refuses comes back
+        // `refused` from there too. `SyncEventResult`'s docblock says which
+        // refusals those are and why `refused` therefore does NOT mean "the
+        // entity was not a ticket".
         if (event.entity.kind === 'ticket') {
           return contest(event, result.rule, result.reason);
         }
