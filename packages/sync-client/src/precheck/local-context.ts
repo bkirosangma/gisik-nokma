@@ -91,6 +91,16 @@ function provisionalSeqBase(state: TicketState | undefined): number {
  * vanishes"*). Unwrapped, the first `enqueue` after a scope revocation throws
  * out of every pre-check on the device, offline, with no way back.
  *
+ * THE OTHER DOOR THAT FOLDS THIS REDUCER DOES **NOT** WRAP IT, and the asymmetry
+ * is deliberate rather than an oversight — named here because it was found by
+ * reading these two docblocks side by side and finding only one of them written.
+ * `replica.ts`'s `refoldTicket` folds the same reducer against the same
+ * `buildLocalDeps` object with no catch, so the same revocation race takes the
+ * whole arrival down (case 12.155, `test/recorded-hazards.test.ts`). That door
+ * is machine-driven and its contract is per-arrival rollback; this one is a
+ * user's offline action and must not brick the device. `refoldTicket`'s own
+ * docblock carries the full statement and the owner.
+ *
  * So a claim that cannot be folded stops that ticket's fold and names the
  * ticket in `unfoldable`. The LAST GOOD state stays in `states` — confirmed, or
  * as far as the fold got — because the rules must still see the ticket that

@@ -59,11 +59,32 @@ export type OutboxItem = {
  * Outbox flush retry. **A DIFFERENT FUNCTION FROM `backoffDelayMs` in
  * `packages/app-core/src/online/stream.ts`, and they must not be deduped.**
  * That one is the websocket RECONNECT backoff — 500 ms initial, 30 s cap, ±20%
- * jitter; this one is the claim-flush backoff — 1 s initial, 60 s cap, no
- * jitter. Two retry surfaces, two independently chosen constants: a stream that
- * reconnects slowly leaves the UI stale, while an outbox that retries a rejected
- * batch too eagerly hammers a door that has already said no. Merging them would
- * quietly re-tune whichever caller lost the argument.
+ * jitter; this one is the claim-flush curve `min(1000·2^attempts, 60_000)`,
+ * 60 s cap, no jitter. Two retry surfaces, two independently chosen constants:
+ * a stream that reconnects slowly leaves the UI stale, while an outbox that
+ * retries a rejected batch too eagerly hammers a door that has already said no.
+ * Merging them would quietly re-tune whichever caller lost the argument.
+ *
+ * THE TWO "INITIAL" DELAYS ARE NOT COMPARABLE, and this paragraph used to
+ * compare them anyway — it read *"1 s initial"* against app-core's *"500 ms
+ * initial"*, which is true of the two FUNCTIONS and false of the two CALLERS.
+ * The delays a caller actually produces depend on which side of the call it
+ * increments:
+ *
+ * - `stream.ts` starts at `let attempt = 0` and does
+ *   `setTimeout(connect, backoffDelayMs(attempt, random)); attempt += 1;` — it
+ *   increments AFTER, so its first reconnect delay really is the 500 ms one.
+ * - `recordFailure` below reads the stored `attempts`, adds one, and calls
+ *   `backoffMs(attempts)` — it increments BEFORE, so the first flush retry
+ *   waits `backoffMs(1)` = **2 s** and `backoffMs(0)` = 1 s is unreachable from
+ *   the only production caller this function has.
+ *
+ * 12.148 pins the increment-before behaviour through the function rather than a
+ * literal — its first retry falls due at `backoffMs(1)` and its second at
+ * `backoffMs(2)` — and 12.152 is the case that asserts the literal instant
+ * (`next_attempt_at` lands on `…00:00:02.000Z` after one failure). Only the
+ * prose here was wrong. The enumeration in 12.153 is about the function and
+ * stays as it is.
  *
  * No jitter here on purpose, and it is a real difference rather than an
  * oversight: reconnect storms are a THUNDERING-HERD problem (every client's

@@ -17,6 +17,12 @@ import { workflowVersionsOf } from '../src/replica/local-deps.js';
 /**
  * Plan 10 Task 9 — the replica. Cases 12.119–12.137.
  *
+ * Task 9 also owns 12.154–12.155, and they are deliberately NOT here: they pin
+ * RECORDED hazards (behaviour nobody wants, deleted when their owner fixes it)
+ * and live in `test/recorded-hazards.test.ts`, whose docblock says why. The
+ * consequence for this file is that every `(20)` below stays a measurement of
+ * what it measured.
+ *
  * This line said `12.119–12.132` from the task's first commit through the round
  * that added 12.133–12.135 and the one that added 12.136–12.137: a range in a
  * docblock is a fact about a moment, and nothing recomputes it. Enumerated, not
@@ -630,7 +636,7 @@ describe('12.130–12.131 what the reducer does not fold, and what the fold must
  * on this project are Asia/Kolkata, which is exactly why an IST-only run is
  * evidence about the machine rather than about the code.
  *
- * ## This is sync-client's first TZ-varying test, and it is the repo's fifteenth
+ * ## The first TZ-varying test WRITTEN in sync-client, and the fifteenth of sixteen
  *
  * The brief commissioning this task said `TZ` is varied by no test file. That
  * was true of the tree it was measured against and is false of this one, and
@@ -639,11 +645,29 @@ describe('12.130–12.131 what the reducer does not fold, and what the fold must
  *
  *     grep -rlE "process\.env(\.TZ|\['TZ'\]) *=" --include='*.ts' --include='*.tsx' packages apps
  *
- * → 15 files, this one included. **A regex matching `process.env.TZ` alone
- * finds 4 of the 14 others** — the bracket form is what this repo's strict
+ * → 16 files, this one included. **A regex matching `process.env.TZ` alone
+ * returns 6 of those files, i.e. 5 of the 15 others** (and one of the six,
+ * `app-core/test/views/attention-strip.test.tsx`, matches only inside a
+ * COMMENT, so four other files actually ASSIGN through the dotted spelling) —
+ * the bracket form is what this repo's strict
  * `noPropertyAccessFromIndexSignature` settings force in most of them, and a
  * grep that sees one spelling of two returns a well-formed wrong answer with no
  * error. That is why the number here is stated with the command that produced it.
+ *
+ * ## AND THE NUMBERS ABOVE WERE STALE BY ONE WHEN THIS PR ENDED
+ *
+ * The heading used to read *"sync-client's first TZ-varying test, and it is the
+ * repo's fifteenth"*, and the paragraph *"15 files… 4 of the 14 others"*. Both
+ * were correctly measured at the commit that wrote them and both were falsified
+ * by a LATER commit in the same PR: 12.152 in `test/outbox.test.ts` is a second
+ * TZ-varying file, and it uses the dotted spelling, so it moved both counts.
+ * Walked commit by commit with
+ * `git grep -lE … <commit> -- '*.ts' '*.tsx'`: `origin/main` 14, `f56fd4c` 14,
+ * `40762a6`–`0832b81` 15, `e0c73ba`–HEAD 16. "First in sync-client" survives
+ * only as an order-of-writing claim, which is why the heading now says WRITTEN;
+ * 12.152 is the second, and there is no third. The ordinal moved too: this file
+ * is the FIFTEENTH of the repo's sixteen (it is what took the count from 14 to
+ * 15 at `40762a6`), and `test/outbox.test.ts` is the sixteenth (`e0c73ba`).
  *
  * So the control below follows an established convention rather than inventing
  * one; several of those files open with a case named

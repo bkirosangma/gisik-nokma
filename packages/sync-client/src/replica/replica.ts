@@ -337,17 +337,51 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
    *
    * "Unchanged" means UNCHANGED RELATIVE TO THE RESPONSE, not relative to the
    * baseline already standing locally, and the difference is worth naming
-   * because the sentence above invites the question. RECORDED, NOT FIXED:
-   * `writeSnapshot`'s `ON CONFLICT … DO UPDATE SET seq = excluded.seq` is
+   * because the sentence above invites the question. RECORDED, NOT FIXED, AND
+   * LIVE: `writeSnapshot`'s `ON CONFLICT … DO UPDATE SET seq = excluded.seq` is
    * unconditional and this door applies no `Math.max` against the standing
    * baseline, so a replica whose stream-door fold had raised its baseline to
-   * `MAX(events.seq) = 7`, re-bootstrapping against a server snapshot at seq 5,
-   * would LOWER it to 5 and replay events 6–7 — pre-fold history against new
-   * vocabulary, exactly what 12.131 exists to prevent on the other door. The
-   * unconditional overwrite predates this change and is unreachable today,
-   * because nothing calls `loadBootstrap` a second time. *Owner: Plan 10
-   * Task 11 (the sync engine), which is what will first re-bootstrap a live
-   * replica.*
+   * `MAX(events.seq) = 6`, re-bootstrapping against a server snapshot at seq 5,
+   * LOWERS it to 5 and replays event 6 — pre-fold history against new
+   * vocabulary, exactly what 12.131 exists to prevent on the other door.
+   * **Case 12.154 (`test/recorded-hazards.test.ts`) walks that sequence and
+   * ends in `applyTicketEvent: workflow "…" has no state "doing"`, thrown out
+   * of `loadBootstrap` with the whole response rolled back. So the failure is
+   * not "one ticket is wrong": every re-bootstrap throws identically for as
+   * long as the server keeps serving that snapshot and the offending event
+   * stays stored locally, and nothing on either side clears either.**
+   *
+   * THIS PARAGRAPH USED TO END *"and is unreachable today, because nothing
+   * calls `loadBootstrap` a second time"*, and that was FALSE IN THE COMMIT
+   * THAT WROTE IT. Case 12.149 (`test/outbox.test.ts`) calls `loadBootstrap` a
+   * second time on an already-bootstrapped replica, and its own docblock calls
+   * the sequence "a live sequence, not a contrivance". The sentence is gone
+   * rather than softened: a hazard defended by a claim about the whole tree is
+   * re-derived by nothing, which is why the record now points at a case.
+   *
+   * IT IS ALSO NOT THE HAZARD THE PARAGRAPH BELOW RECORDS. That one needs the
+   * throwing `ticket.transitioned` in the RESPONSE's tail (`ticket.events`) and
+   * is Task 6's, because only a server-written snapshot above the event repairs
+   * it. Here both bootstraps carry `events: []`; the throwing row is a LOCALLY
+   * STORED event the stream-door fold had already moved past, and only the
+   * baseline drop puts it back in front of the reducer.
+   *
+   * AND THE OBVIOUS GUARD IS WORSE THAN THE THROW — measured, not reasoned.
+   * Wrapping the `seq` above in `Math.max(ticket.snapshot.seq,
+   * await snapshotSeqOf(tx, ticket.ticketId))` — the guard
+   * `foldTicketsOntoVersion` applies on the stream door — removes the throw and
+   * leaves all twenty cases in `test/replica.test.ts` green, because it writes
+   * the SERVER's seq-5 state under the LOCAL seq-6 baseline: `refoldTicket`
+   * then replays nothing above 6, and the seq-6 transition vanishes from the
+   * log while its row still stands in `events`. Under the guard `transitions`
+   * came back with the seq-5 entry alone where the stream fold had left both.
+   * That trades a loud throw for a quiet divergence in the log
+   * `require-different-user` sorts on. The consistent repair is the other
+   * shape — keep the higher local baseline, write no older snapshot at all, and
+   * fold the LOCAL state forward — which is a decision about what a
+   * re-bootstrap MEANS. *Owner: Plan 10 Task 11 (the sync engine), the first
+   * PRODUCTION caller that will re-bootstrap a live replica; 12.149 already
+   * re-bootstraps one in a test.*
    *
    * A HOLE IN THE VERSION CHAIN NOW FAILS THE WHOLE BOOTSTRAP, and that is a
    * decision rather than a discovery. `foldTicketToWorkflowVersion` refuses a
@@ -429,6 +463,34 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
    * and `claim.contested_resolved` are the other three, and bootstrap backfills
    * all three (`claim.contested` unconditionally), so an unfiltered replay would
    * throw on an ordinary first sync.
+   *
+   * ## A TYPE THIS DOES FOLD CAN STILL THROW, AND HERE THAT IS DELIBERATE
+   *
+   * Stated because the OTHER door that folds this reducer wraps it and this one
+   * does not, and an unstated difference between two doors reads as an
+   * oversight. `buildPendingOverlay` (`precheck/local-context.ts`) wraps its
+   * `applyTicketEvent` in `try`/`catch`, for a reason that applies here word for
+   * word: `revokeScope` empties `workflows` and `ticket_types` while outbox
+   * rows deliberately stay, so a replica reaches "unknown ticket type" honestly
+   * rather than through broken integrity. Same reducer, same `buildLocalDeps`
+   * object, no catch on this side — and case 12.155
+   * (`test/recorded-hazards.test.ts`) measures both halves of the throw: a
+   * project-scoped revocation followed by an in-flight `ticket.transitioned`
+   * gives `… for ticket … that was never created`, and a workspace-wide one
+   * followed by an in-flight `ticket.created` gives `unknown ticket type "…"`.
+   *
+   * THE DIFFERENCE IS INTENDED, and the two doors answer different questions.
+   * `enqueue` is a USER's offline action and must not brick the device, so an
+   * unfoldable claim is named `unfoldable` and stays queued and flushable.
+   * `applyServerItem` is machine-driven and its stated contract is per-arrival
+   * rollback (12.125): an arrival this replica cannot fold is refused whole
+   * rather than half-applied — and the rollback takes the envelope insert with
+   * it, so the item is absent from the local ledger too. Catching here would
+   * mean inventing what an unfoldable CONFIRMED ticket is and where it
+   * surfaces. *RECORDED, NOT FIXED. Owner: Plan 10 Task 11 (the sync engine),
+   * the first caller of `applyServerItem` with a cursor to advance — a cursor
+   * left unadvanced on a throw is handed the same item again, which is a wedged
+   * stream, offline, after a revocation.*
    */
   async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: TicketStateDeps): Promise<void> {
     const snapRows = await tx.all("SELECT seq, state FROM snapshots WHERE entity_kind = 'ticket' AND entity_id = ?", [
