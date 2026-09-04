@@ -2065,6 +2065,8 @@ and the map's closing paragraph can be read as resolved.
 
 **2. The brief's known gap #2 is live in this plan and now quantified.** Plan 10's text is
 clock-sensitive on **36 lines** — `istDayOf` on 22, `clockSkewMs` on 14 — and sets `TZ` on **zero**.
+**[CORRECTED LATER — see "THE TZ PREMISE WAS STALE" below. The claim about Plan 10's own text stands;
+the claim about `main` having no TZ-varying tests did not, and it caused a false claim downstream.]**
 That is the `ist-day.test.ts` failure exactly: a test that cannot distinguish *the code computes IST
 correctly* from *the machine is already in IST*. **T9, T10 and T13 dispatches must carry an explicit
 `TZ` instruction**, because the map does not mention `TZ` across its 440 lines either and the map is
