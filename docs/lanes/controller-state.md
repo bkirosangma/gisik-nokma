@@ -43,12 +43,61 @@ weekly window is a hard Monday cliff or a ROLLING window — weekly was once obs
 overnight Tue→Wed, which no Monday reset explains. If it rolls, this whole outlook improves and the stop
 point should be re-derived rather than obeyed mechanically. **Re-measure before acting on it.**
 
-## Anchors — re-measured 2026-09-04 ~07:47 IST, at `e09666c` — STEP 14 MERGED, LEDGER PROMOTION PENDING
+## STEP 14 CLOSED — Plan 9 complete at 148/177, promoted via an Opus SUBAGENT, not an owner-relaunched session
 
-**This is a measurement re-anchor only. It is deliberately NOT a "STEP 14 CLOSED" section** — that heading
-carries ledger promotion with it everywhere else in this file, and the ledger still reads Plan 9 as 0/15.
-Promoting those 15 rows is a `task-ledger.tsv` **status change**, trigger #2 of the Sonnet/Opus split
-below — a Sonnet controller session does not perform it. Flagged to the owner; not done here.
+**First use of the new trigger-#2 remedy** (see the "OWNER AUTHORIZATION 2026-09-04" section below): rather
+than handing back to the owner for a full Opus controller session, this Sonnet controller dispatched an
+Opus **subagent** to do the promotion judgment, then independently verified and merged its output itself —
+same two-party split as every other PR here, just with the judgment-supplying party now a subagent instead
+of a relaunched session. Worked cleanly on the first try; kept as the template.
+
+**What the subagent did, and how it was checked before merging, not after:**
+- Read each of Plan 9's 15 tasks' own `Files:` blocks, cross-checked against PR #93's **actual** changed-file
+  list (`gh pr view 93 --json files`), not the plan's claim about it. All 15 promoted `todo` → `done`, `pr`
+  93, `merge_sha` `e09666c` — none refused, none guessed.
+- **The catalogue-task refusal rule (07/T16's precedent) was checked explicitly for T15** ("full
+  verification"), not assumed satisfied just because it's a `Files:`-present task: T1–T14's own artefacts
+  are confirmed present in the *same* squash, so the precondition holds here — unlike 07/T16, 10/T18,
+  11/T14 at the 2026-09-02 audit, which stayed `todo` because their precondition did NOT hold.
+- **Two guarded creates deliberately excluded from citation** — `doc-text.ts` (actually landed under Plan 5,
+  PR #67) and Task 8's app-core/ui scaffolding (actually landed under Plan 8, PR #85) — the
+  `docToPlainText` precedent avoided a second time: crediting Plan 9 for work another plan's PR put on
+  `main` first.
+- **`git merge-base --is-ancestor e09666c origin/main`** confirmed, plus a direct spot-check of three cited
+  artefact paths against `origin/main` content (not just existence — read the file head), plus
+  `gh api .../commits/e09666c/pulls` confirming `93` is the owning PR. This controller did not adopt the
+  subagent's word for any of these; each was re-run independently before merging.
+
+> ### ⚠ NEW FINDING, the subagent's own: **CI green on a ledger-only PR verifies NOTHING about the ledger**
+> `check:tasks` (`scripts/check-task-ledger.mjs`) is **not wired into `.github/workflows/ci.yml` at all** —
+> `grep -rn "check:tasks\|check-task-ledger" .github/` returns empty. And PR #96's sole changed file was
+> `docs/lanes/task-ledger.tsv`, entirely under `docs/`, so #89's docs-only skip fired: the `gate` job
+> reported **green in 22s with every substantive step (`check:env`, the turbo build/test/typecheck) marked
+> `skipped`.** So for THIS class of PR — a pure ledger assertion — "independent CI green at the exact head
+> sha" is a green with nothing behind it. **The standing auto-merge criterion is insufficient here and this
+> controller does not treat it as sufficient**: `check:tasks` was independently re-run in a detached scratch
+> worktree at the PR's exact head sha (`8f68a886`) before merging, node 22, exit read from `$?` on its own
+> line — `148/177 (83.6%)`, matching the subagent's own figure exactly. **Standing procedure from here:
+> any PR whose entire diff is `docs/lanes/task-ledger.tsv` must have `check:tasks` independently re-run by
+> the controller at its exact head sha before merging — CI's green cannot be read as covering it.**
+
+> ### CARRIED, not fixed — PR #93 contains real work no Plan 9 task declares
+> `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`, `apps/web/src/{providers,ticket-dates-input,
+> ticket-location}.ts(x)`, `apps/web/test/project-calendar-timeline.test.tsx`, `packages/ui/src/ui.css`,
+> and the `app-core/test/helpers/clock-scan.ts` + `calendar/clock-free.test.ts` pair — the calendar/timeline
+> actually mounted in the web shell, plus a clock-purity sweep, neither one cited by any of the 15 rows'
+> evidence (none of the 15 rows depend on it, so this doesn't put the promotion in doubt). Same direction as
+> the unattributed-PR list `check:tasks` already prints, one level down — undeclared work inside an
+> otherwise-declared PR rather than a whole undeclared PR. No owner assigned; noted for whoever next reviews
+> Plan 9's `Features.md`/`test-cases` catalogue for completeness.
+
+> ### CARRIED, not fixed — Plan 9's plan TEXT drifts from landed paths in 9 of its 15 tasks
+> PascalCase→kebab-case filenames, co-located tests moved to `test/`, a `filters/` directory that landed as
+> `preferences/`, `src/lib/` that landed as `src/`. Each verified by exported symbol (`CalendarView`,
+> `TimelineView`, `InboxView`, `UnreadBadge`, `SavedFiltersMenu`, `InboxNavLink`, all present under the
+> renamed files) rather than by path, so the promotion itself is sound — but **Plans 10 and 11 predate the
+> same file-layout conventions Plan 9 landed under**, so whoever promotes their rows next should expect this
+> same drift and verify by symbol, not by transcribing the plan's own path.
 
 | what | value |
 |---|---|
@@ -57,7 +106,7 @@ below — a Sonnet controller session does not perform it. Flagged to the owner;
 | last forced gate | **`e09666c`** — `GATE_EXIT=0` read from `$?` on the next line (never piped), `--force` so **0 cached**, **24/24 tasks**, **3074 tests**, 42.9s, node **v22.22.2**, zero `Unsupported engine` matches. `pnpm install --frozen-lockfile` run first (package set may have changed); `pnpm rebuild better-sqlite3` run before the gate (see trap below) |
 | gate composition | domain 464 · rule-engine 282 · server 940 · app-core 1029 · web 136 · editor 178 · ui 37 · sync-client 8 = **3074** |
 | `check:env` | own row, re-measured separately per standing note — **exit 0** |
-| ledger | **`CHECK_EXIT=0` · 133/177 (75.1%)** · claimed 0 · in-flight 0 · todo 44 · **Plan 9 still shows 0/15 done, 15/15 todo — the merged work is not yet reflected, pending Opus-session promotion** |
+| ledger | **`CHECK_EXIT=0` · 148/177 (83.6%)** · claimed 0 · in-flight 0 · todo 29 · **Plan 9 promoted 15/15 via PR #96**, independently re-verified at its exact head sha before merging (see below) |
 | quota | executor's own status line: **84% weekly** (was 82% at this session's start, 76% at the last full measurement). Re-derivation of the stop point (hard-cliff vs rolling) is an owner call, passed up, not resolved here |
 
 > ### ⚠ NEW TRAP: `nvm use 22` in one Bash tool call does NOT survive into the next — a fresh gate run
