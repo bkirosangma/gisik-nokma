@@ -1084,6 +1084,19 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
   the real projection registry, returning the app, its own OTP sender and the ungated internal ingest
   door. It replaces four hand-copied assemblies that had to be extended one by one every time
   `buildApp` gained a route. `apps/server/test/helpers/app.ts`
+- ✅ **`GET /v1/sync/bootstrap`** — first-run replica build without replaying full history: for every
+  ticket the caller `canSee`, the latest reducer-folded snapshot (if one exists) plus a per-entity tail
+  — everything after the snapshot's seq, PLUS every `comment.added` / `attachment.added` /
+  `claim.contested` / `claim.contested_resolved` regardless of position, because content and contests
+  never fold into ticket state. Every `workflow.defined` and `ticket-type.defined` event goes to
+  everyone including guests (a guest cannot render a status without the workflow definition, Plan 4
+  §5). The whole read runs inside one `REPEATABLE READ` transaction with the workspace's stream cursor
+  read FIRST, so the response is a consistent cut and subscribing at the returned `streamSeq` can only
+  re-deliver an event the client already has, never skip one. 403 `{error:'not_a_member'}` when the
+  caller resolves no workspace role; 401 with no session. `apps/server/src/sync/sync-routes.ts`
+- ⚙️ **`EffectiveRole.projects` is a `Map`, and the wire shape is not** — `me.projectIds` is
+  `[...eff.projects.keys()]`, not `[...eff.projects]`: the map itself spreads as `[key, value]` TUPLES,
+  which the plan's own snippet got wrong. `apps/server/src/sync/sync-routes.ts`
 
 ## 10. Workflow builder & ticket types
 
