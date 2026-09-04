@@ -11,6 +11,38 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## ⛔ OWNER-SET STOP POINT — ASK BEFORE DISPATCHING PLAN 10 T14 (2026-09-04)
+
+**The owner instructed this directly: stop at the boundary below and ASK before going further. Do not
+dispatch past it on the autonomy grant — the standing auto-merge authorization does NOT cover this.**
+
+**STOP AFTER Plan 10 T13. ASK before dispatching T14.**
+
+Permitted without asking: finish Plan 9 (T9, T11–T15), then Plan 10 **T5, T6, T7, T9, T10, T11, T12, T13**
+— the whole server-side sync surface, the replica core, and its app-core UX.
+
+**Ask first for: T14, T15 (dual-client harness + scenarios) and T16, T17 (Tauri desktop, Expo mobile).**
+
+**WHY THIS BOUNDARY AND NOT A ROUND NUMBER.** Quota is the binding constraint, not time. Measured
+2026-09-04 at 01:15 IST: **weekly 76% used, 24 points left, reset Monday 2026-09-07 06:30 (77h out)**.
+Plan 9's remainder is ~2.4M tokens (~5–7 points); Plan 10's remaining 13 tasks are ~8–9.5M
+(~18–29 points, the spread depending on whether controller overhead lands in the same bucket). So roughly
+**8–9 of Plan 10's 13 tasks fit this week, not 13.** At the recent 1.3–2.1 points/hour, the 24 points are
+~11–18 hours of work against 77 hours to reset — **you will run out of quota, not clock.**
+
+**The four deferred tasks are the four WORST to interrupt, which is the actual reason the line is here:**
+T14/T15 need contiguous attention to get six distributed-systems scenarios honest, and T16/T17 each stand
+up a **new native toolchain** (Rust/Cargo for Tauri, Expo for RN) that this repo has never built before and
+that the gate cannot fully verify — no simulator, Playwright already deferred. Starting any of them with
+three points left wastes the setup cost and leaves a half-built app shell on a branch.
+
+**Estimate honesty, because the number that decides this is the soft one:** the tokens-per-quota-point
+conversion is **330k–450k**, a 35% spread, and it is what separates "Plan 10 nearly fits" from "well
+short." Plan the pessimistic end. There is also an unresolved question recorded below about whether the
+weekly window is a hard Monday cliff or a ROLLING window — weekly was once observed dropping 62% → 1%
+overnight Tue→Wed, which no Monday reset explains. If it rolls, this whole outlook improves and the stop
+point should be re-derived rather than obeyed mechanically. **Re-measure before acting on it.**
+
 ## RULING P29 (2026-09-03, owner-approved) — the frozen errand-with-waits template keeps its two advisories
 
 **Escalated by the executor at step 13's close** (`exec/13-plan8-workflow-builder`, PR #85 already open,
@@ -155,7 +187,45 @@ stay with the established zone) is unchanged, only the mailbox name. Both plan d
 `sign-in@gisik-nokma.local` is untouched — it never leaves Mailpit. **No code has executed against the old
 value** — Plan 11 is 0/16 `done`, so this is a plan-text correction, not a rollback.
 
-## Anchors — re-measured 2026-09-03 ~16:35 IST, at `9b70ab9` (step 13 merged)
+## Anchors — re-measured 2026-09-04 ~01:20 IST, at `d3e0889`
+
+| what | value |
+|---|---|
+| `main` | **`d3e0889`** — step 13 merged at `9b70ab9`; four more have landed since: **#88** (P29's rationale), **#89** (CI optimisation, below), **#90** (the access.test.tsx race fix), plus #91 |
+| step 14 | **IN FLIGHT on `exec/14-plan9-calendar`** — Plan 9, T1–T8 + T10 committed (9 of 15), T9 and T10's fix round running. **No PR yet.** Named by BRANCH deliberately; its head sha moves every few minutes |
+| ledger | **`CHECK_EXIT=0` · 133/177 (75.1%)** · claimed 0 · in-flight 0 · todo 44 · Plans 1–8 all complete |
+| executor's own gate | 2,594 tests at Batch A close, its figure, on its branch — **not re-verified by me**, and it is not `main`'s number |
+| quota | **76% weekly at 2026-09-04 01:15 IST**, reset Monday 06:30. See the STOP POINT section at the top of this file — it is an owner instruction, not a suggestion |
+
+> ### ⚙ THE CI MACHINERY CHANGED ON 2026-09-04 — #89, owner-directed. A successor MUST know this.
+> **`turbo.json` no longer sets `"cache": false` on `test`/`typecheck`, and `.turbo` is persisted between
+> runs via `actions/cache`.** Measured effect on the very next code PR (#90): turbo step **5m18s → 1m44s**,
+> **18 of 24 tasks cached**, total job 5m45s → 2m27s. Correctness proven by paired control before it
+> landed: unchanged tree → 20/20 cached (17ms, FULL TURBO); one line touched in `packages/domain` → domain
+> **and all six dependents** re-ran, only dependency-free `ui` stayed cached.
+> **THE SAFETY PROPERTY, do not lose it: the controller's own forced gate runs `--force` and never consults
+> this cache.** A CI cache hit means "this exact input hash already passed"; the merge decision still rests
+> on an uncached run. Keep running the pre-merge gate with `--force`.
+> **`ci.yml` also skips the suite for docs-only PRs** — the job still runs and still reports `gate` green so
+> the auto-merge precondition has a check to read, but its log says green means "nothing outside `docs/`
+> changed", NOT "the suite passed". Only `docs/**` is inert; `Features.md` and `test-cases/**` still run the
+> full gate. An **empty** changed-file list runs everything, because during development a wrong base made a
+> real 82-file change report zero files — an empty list is "learned nothing", not "docs only".
+> **Plan 11 T14 still owns the six-job split and sharding the server suite** (270s, the critical path);
+> `ci.yml`'s comments say so, so T14 extends this rather than reverting it.
+
+> ### THE FLAKE THAT COST A ROUND, and the shape of the evidence that settled it (#90)
+> `access.test.tsx` failed one case in CI while 686 others passed — it awaited an unrelated element then
+> called **synchronous `getByTestId`** for a React Flow EDGE label, which is painted later. **Neither green
+> run was the evidence**: it had passed 17 consecutive local runs, and a re-run of the identical commit
+> also passed. What settled it was a probe measuring the DOM at the awaited instant — the edge was absent
+> **1 observation in 16**, on the first attempt of a cold run. The fix (8 sites → `await findByTestId`) was
+> then verified by a **deterministic** paired control, not repetition: synchronously after `render()` the
+> edge is absent 16/16, so at that instant `getByTestId` must throw and `findByTestId` must succeed.
+> **The executor proposed making the probe's assertion a permanent pin; that was refused — it asserts the
+> race IS happening, so it would fail ~15 runs in 16.** A probe and a pin are different artifacts.
+
+## ~~Anchors — 2026-09-03 ~16:35 IST, at `9b70ab9` (step 13 merged)~~ superseded, kept for the gate figures
 
 | what | value |
 |---|---|
@@ -1199,6 +1269,14 @@ Every one below was violated by a controller that had just written it. **Assume 
 
 - Never run a state-changing git command in a shell whose cwd was set for a read — use `git -C`. Violated;
   it swapped a live lane's worktree for 26 seconds and contaminated a running review.
+- **A pipe has a second failure mode, and it is worse than the exit code.** `| head` (and `grep -m N`)
+  closes the pipe early, so the runner's parent dies on EPIPE and its fork workers are orphaned at
+  `ppid=1` — spinning at ~1 core each and growing, with the tool call reporting success. On 2026-09-04
+  a task-14 agent's `pnpm exec vitest run 2>&1 | head -6` left six workers behind at 05:05; by 05:28 they
+  held 22.4 GB on a 16 GB machine and the machine had to be force-restarted. The control is in the same
+  transcript: the same suite through `| tail -6`, five seconds later, left nothing. Reproduced on demand
+  in 30 seconds. Same lesson as the two entries below it — **do not pipe a run at all**: redirect to a
+  file and read the file. A machine-local `PreToolUse` hook now refuses the piped form.
 - **A gate's exit code is the LAST command's exit code.** The known form is the pipe (`| tail` reports
   `tail`'s status). It was re-hit 2026-08-31 in a new costume: a trailing `echo` made the harness report
   **"exit code 0"** for a gate whose summary said `Tasks: 11 successful, 18 total / Failed:

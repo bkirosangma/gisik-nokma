@@ -9,7 +9,15 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > `git branch --contains` (empty output = orphaned), never with `git cat-file`, which passes on
 > reflog-only commits and hands you pre-rebase content while looking like it worked.
 
-## WHERE I AM: **STEP 14 — PLAN 9. T1-T14 COMMITTED (14/15). T14 fix + T15 IN FLIGHT. Then final review, PR.**
+> **Never pipe a test run into `head`.** `pnpm exec vitest run 2>&1 | head -6` returns in seconds looking
+> like a pass and orphans the whole fork pool at `ppid=1`, ~1 core each, growing. That command, run at
+> 05:05 on 2026-09-04 by a task-14 agent, put six workers on the machine that reached 22.4 GB and forced a
+> restart. `| tail -N` is safe — it drains the pipe. So is `> /tmp/run.log 2>&1; head -N /tmp/run.log`, and
+> so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
+> A machine-local `PreToolUse` hook now refuses the piped form outright.
+
+## WHERE I AM: **STEP 14 — PLAN 9 IS COMPLETE. T1–T15 ALL COMMITTED. Merged `origin/main`
+`421db9f`. NEXT: the single opus whole-branch review, then the PR. The controller merges.**
 
 > # DO NOT TRUST THE WORD "NEXT" ANYWHERE IN THIS FILE. MEASURE INSTEAD.
 > ```
