@@ -147,9 +147,19 @@ type Due = { workspaceId: string; entityId: string };
  *   not feared. What removes the span is `snapshot-refresh.ts`: every publish
  *   that raises a version re-snapshots each affected ticket AT ITS HEAD, so the
  *   next tail this pass reads starts above that publish. The two are one
- *   mechanism in two halves; weakening either re-opens the throw. The tickets
- *   the refresh skips (it enumerates them) are exactly the ones on which this
- *   pass can still throw, and its interval wrapper logs and swallows that.
+ *   mechanism in two halves; weakening either re-opens the throw. A ticket the
+ *   refresh SKIPS (it enumerates those) is one this pass can still throw on —
+ *   but the converse fails, and the EQUALITY this sentence used to assert was
+ *   false. `snapshot-refresh.ts` names a second population in the same
+ *   enumeration: a ticket it never SEES. Its candidates come from
+ *   `proj_tickets`, while this pass's own due query reads `events` and
+ *   `snapshots` and never consults that table, so a workspace whose projections
+ *   were reset but not rebuilt refreshes nothing, enumerates nothing, and
+ *   arrives here with its tail unrepaired. A third difference is not about throwing at all: a
+ *   candidate whose fold returns `null` lands in neither `rewritten` nor
+ *   `skipped`, so that outcome does not partition its own candidates either.
+ *   `skipped` is a LOWER BOUND on what can still throw here, never the set. The
+ *   interval wrapper logs and swallows it whichever population it came from.
  * - **The whole due set is folded in one call, serially.** Bounded by the
  *   number of tickets that crossed the threshold since the last pass, not by
  *   ledger size, but nothing here yields between entities.

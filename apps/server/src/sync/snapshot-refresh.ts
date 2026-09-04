@@ -98,10 +98,24 @@ const EMPTY: SnapshotRefreshOutcome = { rewritten: [], skipped: [] };
  * `proj_tickets` — the same row set `refreshTicketsForWorkflow` selects. That
  * projection runs in the same transaction and sets those rows TO
  * `target.version`. Run after it, this query matches zero rows and the whole
- * module is a silent no-op that every test still passes. `ingest-service.ts`
- * calls this immediately after `insertEvent` and before the projections; the
- * ledger read this needs is already satisfied there, because `insertEvent` has
- * landed the new version and `belowWorkspaceSeq` excludes it again on purpose.
+ * module is a silent no-op.
+ *
+ * Silent, but NOT unobserved. This sentence used to end "…a silent no-op that
+ * every test still passes", and that second half was false the day it was
+ * written — the test file added in the same commit as this module pins the
+ * ordering. *Measured 2026-09-04: the `refreshSnapshotsForWorkflowPublish` call
+ * in `ingest-service.ts` moved to sit AFTER the projection loop and nothing else
+ * changed — `Test Files 2 failed (2)`, `Tests 4 failed (4)`; 12.156, 12.157 and
+ * 12.159 all on `applyTicketEvent: workflow "…" has no state "doing"` and 12.158
+ * on the row list.* Every case that pins this module reds, which is what a
+ * no-op means here. What a reader must not carry away is that the ordering is
+ * unguarded; what stays true is that getting it wrong is a silence rather than
+ * an error, which is why the guard has to be a test and cannot be a throw.
+ *
+ * `ingest-service.ts` calls this immediately after `insertEvent` and before the
+ * projections; the ledger read this needs is already satisfied there, because
+ * `insertEvent` has landed the new version and `belowWorkspaceSeq` excludes it
+ * again on purpose.
  *
  * `proj_tickets` supplies the ticket IDS only. The `state` is folded from the
  * ledger through `foldTicketHead`, never read from that table — the
@@ -128,10 +142,34 @@ const EMPTY: SnapshotRefreshOutcome = { rewritten: [], skipped: [] };
  *   SQL guard is `workflow_version < target.version`, the monotone guard
  *   `foldTicketToWorkflowVersion` holds independently. A ticket at or above the
  *   target has nothing to fold.
- * - **It is unbounded in the number of tickets.** One tail fold and one row
- *   write per affected ticket, inside the publish's transaction. That is the
- *   same row set `refreshTicketsForWorkflow` already updates there, but each
- *   row costs a replay rather than an UPDATE. Nothing here batches or yields.
+ * - **It folds a ticket with NO prior snapshot from event 1, not from a tail.**
+ *   `foldTicketHead` reads `readLatestSnapshot` first and binds its tail read
+ *   `afterSeq = previous?.seq ?? 0`, so where there is no row the "tail" IS the
+ *   ticket's whole stream. `SNAPSHOT_MIN_EVENTS` is 20 and the background pass
+ *   writes nothing below it, so every ticket under twenty events is in this
+ *   case. The cost is deliberate, and the saving that suggests itself is a
+ *   regression: a ticket with no snapshot is served its FULL history by
+ *   bootstrap, and that history holds the offending `ticket.transitioned` too —
+ *   it needs a snapshot above that event MORE than a ticket that already has
+ *   one, not less. It is the same argument this docblock makes above against
+ *   DELETING a superseded snapshot, reached from the other end. *Measured
+ *   2026-09-04 with `AND EXISTS (SELECT 1 FROM snapshots …)` added to the
+ *   candidate query below — the narrowing an outside review proposed — `Tests 1
+ *   failed | 3 passed (4)`: 12.159 throwing `applyTicketEvent: workflow "…" has
+ *   no state "doing"` while 12.156–12.158, every one of which uses a ticket that
+ *   HAS a snapshot, stayed green.*
+ * - **It therefore writes rows the background pass would not.** Measured in
+ *   12.159: a ticket holding two events comes out of a publish with a snapshot
+ *   at seq 2, eighteen events below the threshold whose whole purpose is to keep
+ *   such rows out of the table. That is a CONSEQUENCE of the bullet above rather
+ *   than a second decision — the row is the repair — and a `minEvents` guard
+ *   bolted onto this door to spare the writes would reopen the same throw by a
+ *   second road.
+ * - **It is unbounded in the number of tickets.** One fold and one row write per
+ *   affected ticket, inside the publish's transaction. That is the same row set
+ *   `refreshTicketsForWorkflow` already updates there, but each row costs a
+ *   replay rather than an UPDATE — a FULL replay wherever the ticket had no
+ *   snapshot to resume from. Nothing here batches or yields.
  */
 export async function refreshSnapshotsForWorkflowPublish(
   client: PoolClient,

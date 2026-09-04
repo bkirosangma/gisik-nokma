@@ -1128,7 +1128,15 @@ survived a whole task.)*
   `verify-projections.ts`'s `search_path` fence and writes LIVE during a verify. Each ticket folds
   inside a `SAVEPOINT`, so a fold that cannot be walked forward leaves that ticket's stale snapshot
   standing and the publish still commits — *a skip is silent on the live path; ingest has no logger to
-  put the returned list in.* `apps/server/src/sync/snapshot-refresh.ts`,
+  put the returned list in.* **"Every ticket" includes tickets that have never been snapshotted**, and
+  the candidate query carries no snapshot-existence filter for that reason: below `SNAPSHOT_MIN_EVENTS`
+  the background pass has written no row, bootstrap serves such a ticket its FULL history, and that
+  history holds the offending event too — so it needs a snapshot above that event more than a
+  snapshotted ticket does, not less. The publish therefore folds those tickets from event 1 rather than
+  from a tail, and writes rows below the threshold that the background pass would not; both are the
+  price of the repair, and narrowing the query to tickets that already hold a snapshot reopens the throw
+  for everything under twenty events (measured — 12.159 reds, 12.156–12.158 stay green).
+  `apps/server/src/sync/snapshot-refresh.ts`,
   `apps/server/src/ingest/ingest-service.ts`
 - ⚙️ **`SNAPSHOT_INTERVAL_MS` (300000) and `SNAPSHOT_MIN_EVENTS` (20)** — additive config, both
   `.positive()` integers refused at the door. Not tidiness on either: `setInterval(fn, 0)` runs the

@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.191`. THE NEXT FREE ID IS `12.192`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.191 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.192`. THE NEXT FREE ID IS `12.193`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -29,7 +29,7 @@ Task 7: `POST /v1/sync`. Task 9: the replica (12.119–12.137). Task 10: the out
 pre-check (12.138–12.153). Task 11: the sync engine and its HTTP/WS transport (12.156–12.171, the last two from its fix round).
 Task 12: the replica `DataSource` (12.172–12.187), which lives in `packages/app-core` and is the first
 part of this bucket that does. **Plus ONE section that belongs to no plan task at all**: refresh on
-publish, snapshot door (12.189–12.191) — the snapshot-invalidation gap the ledger row for Task 5 flags
+publish, snapshot door (12.189–12.192) — the snapshot-invalidation gap the ledger row for Task 5 flags
 in its own notes (`docs/lanes/task-ledger.tsv`, commit `b65f6fb`). It was carried with no owner, it
 gets no ledger row, and it is catalogued here because the surface it fixes is this bucket's, not
 because a task claims it. Nothing else from Plan 10 is catalogued — Task 8 (the `sync-client` scaffold
@@ -648,8 +648,8 @@ the number Task 10's own echo case will want and the never-renumber rule would k
   offending event, which only the server can write. **NOW WRITTEN — this paragraph's "NOT FIXED" and
   its two grep readings were true when written and are not now.** `apps/server/src/sync/snapshot-refresh.ts`
   re-snapshots every affected ticket at its head inside the publish's own transaction; cases
-  12.156–12.158 in this file pin it, and the fix was measured red first (`Tests 3 failed (3)`, both
-  throwing this exact message). The RESIDUE is a tail that already spanned an older state-dropping
+  12.156–12.159 in this file pin it, and the fix was measured red first (`Tests 3 failed (3)`, both
+  throwing this exact message — a reading of the three cases that existed then, not of the four now). The RESIDUE is a tail that already spanned an older state-dropping
   publish before that shipped: such a ticket is skipped server-side and can still throw here, which is
   why `foldSnapshotForward` stays. *No longer Plan 10 Task 6's; the closure took no ledger row.*
   **RECORDED, NOT FIXED — the other direction of the baseline, and it is LIVE.**
@@ -1407,7 +1407,41 @@ under `ORDER BY ticket_id` changes nothing about what is proven.
   it did to anything else — the check-that-cannot-fail shape this file's header warns about, and the
   first draft of this case had exactly it. (snapshot-refresh.test.ts)
 
-**What these three do NOT cover, enumerated.**
+**All three cases above use a ticket that HAS a snapshot, and that is a hole this fix round found.**
+`SNAPSHOT_MIN_EVENTS` is 20 and `runSnapshotPass` writes nothing below it, so a ticket under twenty
+events has never been snapshotted and never would be — a population none of 12.189–12.191 touches. The
+publish door repairs it anyway, because its candidate query carries no snapshot-existence filter, and
+that absence is load-bearing rather than an oversight: bootstrap serves an unsnapshotted ticket its
+FULL history, which holds the same offending `ticket.transitioned` the stale-snapshot case is about.
+*"No stale snapshot to invalidate" is not "nothing to repair"* — it is the same argument the module
+already makes against DELETING a superseded snapshot, reached from the other end.
+
+- 12.192 ✅ **a publish repairs a ticket that never crossed `SNAPSHOT_MIN_EVENTS`, writing its first
+  snapshot at head.** The 12.189 fixture with the snapshot step removed: two events on the ticket, the
+  second the `ticket.transitioned` into the state v2 drops, and no snapshot pass run at all. Asserted
+  in 12.189's order — damage first, mechanism second. Pre-publish the WHOLE `snapshots` table is `[]`,
+  the served payload is snapshot-`null` plus full history, and that full history replays clean to
+  `doing`/v1: the positive control, so a post-publish throw is caused by the publish and not by a
+  fixture that never replayed at all. Post-publish the replay lands `todo`/v2 — this is where the case
+  reds — the served tail is empty, the table holds exactly `['ticket:T:2:todo:v2']` (one row at the
+  ticket's own head seq 2, eighteen events below the threshold, a row the background pass would never
+  write), and the `ticket.transitioned` is still in the ledger, so the repair is not a rewrite of
+  history. In its own file rather than in `snapshot-refresh.test.ts`, because that fixture snapshots
+  both its tickets and 12.191 asserts the whole table — a third ticket would change row lists this file
+  quotes as historical evidence. *Mutation record — `AND EXISTS (SELECT 1 FROM snapshots …)` added to
+  the candidate query in `snapshot-refresh.ts`, the narrowing an outside review proposed to spare the
+  publish a full replay: `Test Files 1 failed | 1 passed (2)`, `Tests 1 failed | 3 passed (4)`. 12.192
+  fails with `applyTicketEvent: workflow "…" has no state "doing"`; 12.189, 12.190 and 12.191 all stay
+  GREEN — which is exactly why this case had to exist before the docblock could call that absence
+  deliberate. Restored by `cp` from a backup taken first and verified by `git hash-object`, then `Tests
+  4 passed (4)`.* A second mutation, of the wiring rather than the query — the
+  `refreshSnapshotsForWorkflowPublish` call moved to sit AFTER the projection loop in
+  `ingest-service.ts`, nothing else changed — gives `Test Files 2 failed (2)`, `Tests 4 failed (4)`:
+  12.189, 12.190 and 12.192 on the throw, 12.191 on the row list. Recorded because the module's own
+  prose used to call that late ordering a no-op "that every test still passes", and it is not.
+  (snapshot-refresh-unsnapshotted.test.ts)
+
+**What these four do NOT cover, enumerated.**
 - **A fold that throws is SKIPPED, silently, on the live path.** Each ticket is folded inside a
   `SAVEPOINT`; a throw rolls back that ticket alone and leaves it with its stale snapshot, so the
   publish still commits. That is deliberate — letting it escape trades a broken bootstrap for a broken
