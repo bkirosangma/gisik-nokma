@@ -163,6 +163,72 @@ of a relaunched session. Worked cleanly on the first try; kept as the template.
 >    offline replica explicitly, same reducer as `proj_tickets`, "so a rule cannot answer one way in a unit
 >    test and another on the server." The map missed this too.
 
+## STEP 15 BATCH B CLOSED — PR #102 (T9, T10), quota flat at 89%, executor self-gating past this point
+
+**PR #102 merged (`c3bf254` → `f03838d`)**, independently re-verified: real CI green (source PR, not
+docs-only), local forced gate 24/24, **3148 tests**, node 22, 0 cached — matches the executor's own figure
+exactly. Rebase onto `999d486` verified both directions with positive controls (the executor's own
+account, not re-derived here — same rigor as its Batch A report). Ledger promotion for T9/T10 in flight via
+the same Opus-subagent delegation, isolated in a scratch worktree this time (see the collision trap above)
+to avoid repeating the working-directory hazard.
+
+**Quota re-measured at merge time: 89% weekly, essentially flat from the 87–89% reading two batches ago.**
+Plan 10 now **10/18 done** (T1–T10) once T9/T10 promote. **The executor is NOT auto-dispatching further** —
+it is holding at Batch B and waiting for a fresh reading before T11, exactly as it said it would. T11 alone
+(not T11–T13 as a batch) is its stated preference if the numbers support only partial further work. **Note
+for whoever reads this next: T11–T13 do NOT need owner permission** — the stop point already covers T5–T13
+without asking; only T14+ needs an explicit ask. The quota question here is practical (will a batch finish
+cleanly) not one of authorization.
+
+> ### CARRIED, confirmed directly — Batch A's snapshot writer invalidates no snapshot on a workflow-version
+> publish
+> Executor's claim, verified before recording: `grep -c workflowVersion apps/server/src/sync/
+> snapshot-writer.ts` → **0**, control `grep -c snapshot` (same file) → **25** (the grep itself works), and
+> **no `DELETE` of any kind** in the file. **Confirmed live on `main` as of `999d486` (Batch A, already
+> merged and promoted `done`).** Consequence: a bootstrap tail can carry a `ticket.transitioned` into a
+> workflow state a newer version dropped, and throw on replay. **Not in any T5–T13 task's own text — no
+> current owner.** Not production-live (no shipping client yet), so not a rollback trigger, and the
+> promoted `done` status for T5 stands (the artefact landed as declared; a discovered defect in landed code
+> is a carried item, not grounds to reverse a promotion — same precedent as every other carried gap in this
+> file). **Needs an owner decision the same way `StreamItem`→`ServerStreamFrame` did**: no task currently
+> claims it. Raised with the owner alongside that item, not resolved here.
+
+> ### THE HIGHEST-YIELD REVIEW HEURISTIC THIS SERIES HAS PRODUCED, per the executor — "find the pair, check
+> both doors"
+> **A behaviour implemented on one door of a pair, silently missing from the other.** Three appearances now:
+> Batch A's contest backfill pinned on T5 and T7 by nothing on T6; `foldTicketsOntoVersion` called from
+> `applyServerItem` and not `loadBootstrap`; `refoldTicket` folding a reducer with no `try/catch` where
+> `buildPendingOverlay` wraps the identical call against the identical deps. **The third crosses a task
+> boundary, which is exactly why per-task review cannot see it — only a whole-branch or cross-task pass
+> can.** Recorded here rather than in the 3700-line coordination doc (deliberately, quota) — the executor's
+> own request was to put this "at the top of every whole-branch review brief"; until it lands there, **any
+> session running a whole-branch review on this repo should apply it explicitly**: for every interface with
+> more than one implementer or more than one call site, check that a change to one shows up at all of them.
+
+> ### TWO PROCESS REMEDIES ALREADY IN THIS FILE, MEASURED NOT TO WORK — amend, don't re-cite as-is
+> 1. **A positive control does not catch a pattern blind to an equivalent SPELLING.** The existing "print
+>    the rows" / positive-control practice (Traps section) assumes a wrong instrument and a right one
+>    disagree; it does not cover an instrument that is wrong **the same way its own control is wrong**.
+>    Measured: `grep -rl "process\.env\.TZ *="` returns 6 where the true count is 16, because strict
+>    `noPropertyAccessFromIndexSignature` pushes call sites to `process.env['TZ']` — a control written with
+>    the same regex family agrees with the wrong answer. **Amended remedy: two INDEPENDENT readings, by
+>    different method, not merely a second needle in the same search family** (e.g. a regex sweep plus a
+>    TypeScript AST/compiler-level check, not two regexes).
+> 2. **"State the count with the command that produced it" is insufficient — it is silent about WHEN.**
+>    `replica.test.ts` did exactly that, correctly, and went stale anyway because a later commit **in the
+>    same PR** added a 16th file after the count was taken. **A count is only true of a tree, and a PR is
+>    not a tree until it stops moving.** Amended remedy: re-measure every quoted count in the FINAL pre-PR
+>    pass, not merely once, cited honestly, earlier in the branch's life. The executor applied this to
+>    itself before opening #102 (two methods, agreed at 16) — the fix generalises past this one instance.
+
+> ### RAISED WITH THE OWNER, not implemented — scope banners that assert absence go stale silently
+> `Features.md`/`test-cases/` banners asserting "X is absent" have gone stale twice on this branch, once in
+> a banner that had ALREADY been rewritten once to fix the first instance. **Executor's proposal: a test
+> that extracts absence claims from these banners and fails when the named symbol is actually present** —
+> the first proposal for this class that doesn't depend on someone remembering to check. This is tooling
+> scope (a new script, likely Plan 11's), not something this controller builds. Passed to the owner as a
+> structural suggestion, alongside the quota re-derivation and the two unowned-defect items above.
+
 ## STEP 15 IS THREE PRs, NOT ONE — Batch A closed, Batch B in flight
 
 **Topology change, executor's call, reasoned rather than announced.** Step 15 (Plan 10's remaining tasks)
