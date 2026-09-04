@@ -21,6 +21,7 @@ import {
 import { createBetterSqliteStorage } from '@gisik-nokma/sync-client/testing';
 import type { DataSource, StreamItem } from '../../src/data-source.js';
 import {
+  OFFLINE_BORN_ABSENCE,
   OfflineAcceptError,
   REPLICA_GAPS,
   ReplicaGapError,
@@ -29,7 +30,7 @@ import {
 } from '../../src/replica/replica-data-source.js';
 
 /**
- * Plan 10 Task 12 — the replica `DataSource`. Cases 12.172–12.186.
+ * Plan 10 Task 12 — the replica `DataSource`. Cases 12.172–12.187.
  *
  * ## What ruling P30 asked for, and where the evidence for it is
  *
@@ -522,5 +523,52 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
     await engine.settled();
     expect(seen.filter((item) => item.type === 'event')).toHaveLength(1);
     engine.stop();
+  });
+});
+
+describe('12.187 the three doors an offline-born ticket reaches', () => {
+  it('12.187 a ticket that exists only as a queued claim is in the summaries and in NEITHER settled listing', async () => {
+    const { ds } = await fixture();
+    const bornId = newUlid();
+    const born = newSubmittedEvent({
+      workspaceId: WS,
+      entity: { kind: 'ticket', id: bornId },
+      type: 'ticket.created',
+      payload: { typeId: TYPE_TASK, projectId: PROJECT, parentId: null, title: 'Born on a plane' },
+      actorId: USER_A,
+      origin: 'desktop',
+    });
+    const thrown = await ds.ingest([born]).then(
+      () => null,
+      (err: unknown) => err as OfflineAcceptError,
+    );
+    expect(thrown?.queuedEventIds).toEqual([born.id]);
+
+    // Door 1 — the summary door, which exists for exactly this ticket and
+    // carries no provenance field.
+    const summaries = await ds.query.listTicketSummaries(WS);
+    const summary = summaries.find((s) => s.ticketId === bornId);
+    expect(summary).toMatchObject({ title: 'Born on a plane', pending: true, pendingEventIds: [born.id] });
+
+    // Doors 2 and 3 — the settled listings. ABSENT, and this assertion is the
+    // whole reason the absence is not silent: `ListRow` and `BoardCard` both
+    // require a `stateProvenance` whose `serverTime` no server has assigned,
+    // and `outbox.ts`'s own invariant is that such a ticket is "never in any
+    // settled listing". THE FIRST DRAFT PUT IT IN `getTickets` AND NOT ON THE
+    // BOARD, and `getTickets` then THREW `ReplicaGapError` on the ordinary
+    // offline path — the one-door class, with a third behaviour on the third
+    // door. Nothing in this file reached it until this case did.
+    const list = await ds.query.getTickets(PROJECT, {}, 'flat');
+    expect(list.rows.map((row) => row.ticketId)).not.toContain(bornId);
+    // It does not throw either, which is the half the first draft failed.
+    expect(list.rows.length).toBeGreaterThan(0);
+
+    const board = await ds.query.getBoard(PROJECT);
+    const cards = board.groups.flatMap((group) => group.columns.flatMap((column) => column.cards));
+    expect(cards.map((card) => card.ticketId)).not.toContain(bornId);
+
+    // And the absence has a NAME and an owner, so a shell can render the
+    // union rather than rediscovering the gap.
+    expect(OFFLINE_BORN_ABSENCE.owner).toMatch(/^Plan 10 Task 13 — /);
   });
 });

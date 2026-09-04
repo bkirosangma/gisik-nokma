@@ -296,6 +296,43 @@ const PREFERENCES_ABSENCES: readonly ReplicaAbsence[] = [
   },
 ];
 
+/**
+ * WHY A TICKET BORN OFFLINE IS IN `listTicketSummaries` AND IN NEITHER
+ * `getTickets` NOR `getBoard`.
+ *
+ * This is a whole-row absence rather than a whole-method refusal, so it is
+ * stated here loudly rather than thrown: *"a card silently missing from a board
+ * is a lie with a longer fuse"* (`routes/board.ts`), and the way this one stops
+ * being silent is that all THREE doors are pinned together by case 12.187.
+ *
+ * `ListRow` and `BoardCard` both require a `stateProvenance`, and
+ * `ClaimProvenance` requires a `serverTime`. A ticket that exists only as a
+ * queued claim has none: `SubmittedEvent` omits `serverTime` and `seq` by
+ * construction because they are the server's to assign, and nothing has
+ * assigned them. `buildPendingOverlay` DOES fold such a ticket, and it fills
+ * `serverTime: submitted.clientTime` — a substitution it documents at the point
+ * it makes it ("the device clock is what this claim honestly has"). Repeating
+ * that substitution HERE would launder a device clock into a row whose
+ * `stateProvenance` reads, to every consumer, as the server's answer — the same
+ * shape as the `committed` this source refuses to say about the same claim.
+ *
+ * `TicketSummary` is the door that exists for these tickets, and it carries no
+ * provenance field at all — which is the plan's design rather than an omission.
+ * `outbox.ts` states the invariant these two methods are keeping: tickets that
+ * exist only as queued claims are "never in any settled listing".
+ *
+ * RECORDED, NOT FIXED: an offline shell that wants one project list containing
+ * both must union `getTickets` with `listTicketSummaries` and render the second
+ * kind as claims. OWNER: **Plan 10 Task 13**, the first code to draw an offline
+ * list beside an offline board.
+ */
+export const OFFLINE_BORN_ABSENCE: ReplicaAbsence = {
+  field: 'ListRow.stateProvenance / BoardCard.stateProvenance (for a ticket that exists only as a queued claim)',
+  because:
+    'ClaimProvenance requires a serverTime and a SubmittedEvent has none by construction; the pending overlay substitutes the device clock and says so, and repeating that substitution in a view row would read as the server\'s answer',
+  owner: 'Plan 10 Task 13 — an offline list that unions getTickets with listTicketSummaries',
+};
+
 /** Every refusal this source makes, so a caller can enumerate them without calling. */
 export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> = {
   getMyWorkspaces: MY_WORKSPACES_ABSENCES,
@@ -557,6 +594,11 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
      * — and `views/list-model.ts`'s `groupRows` partitions it client-side. The
      * online source passes `groupBy` to the route only because the route insists
      * on one. Nothing local needs it.
+     *
+     * SETTLED ROWS ONLY. A ticket that exists only as a queued claim is not
+     * here and not on the board either — `OFFLINE_BORN_ABSENCE` carries the
+     * argument, and case 12.187 pins all three doors together so the omission
+     * cannot go quiet.
      */
     async getTickets(projectId: string, filter: FilterSpec, _grouping: Grouping): Promise<TicketListView> {
       const byId = await confirmedById(ownWorkspaceId);
@@ -578,18 +620,12 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         const pending = await outbox.pendingFor(state.id);
         rows.push(await rowOf(state, byId, types, isEpicType, stateNameOf, pending !== null));
       }
-      // Offline-born tickets: they are the claim, so they are always badged.
-      for (const born of await outbox.pendingCreatedTickets(ownWorkspaceId)) {
-        if (born.pending.projectId !== projectId) continue;
-        if (!matchesFilter(born.pending, filter)) continue;
-        const bornDefs = await defsFor([born.pending]);
-        rows.push(
-          await rowOf(born.pending, byId, types, isEpicType, stateNameFrom(bornDefs), true),
-        );
-      }
+      // OFFLINE-BORN TICKETS ARE NOT HERE, and the reason is a type rather than
+      // an oversight — see `OFFLINE_BORN_ABSENCE` and case 12.187.
       return { projectId, rows };
     },
 
+    /** Settled cards only — offline-born tickets are absent; see `OFFLINE_BORN_ABSENCE`. */
     async getBoard(projectId: string): Promise<BoardView> {
       const byId = await confirmedById(ownWorkspaceId);
       const inProject = [...byId.values()].filter((state) => state.projectId === projectId);

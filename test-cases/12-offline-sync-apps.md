@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.186`. THE NEXT FREE ID IS `12.187`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.186 (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.187`. THE NEXT FREE ID IS `12.188`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.187 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -27,7 +27,7 @@ position: the §11 envelope-coherence closer, `proj_contested`, `getContest` and
 Task 5: the snapshot writer and the ledger-sourced reducer deps. Task 6: `GET /v1/sync/bootstrap`.
 Task 7: `POST /v1/sync`. Task 9: the replica (12.119–12.137). Task 10: the outbox and the local
 pre-check (12.138–12.153). Task 11: the sync engine and its HTTP/WS transport (12.156–12.171, the last two from its fix round).
-Task 12: the replica `DataSource` (12.172–12.186), which lives in `packages/app-core` and is the first
+Task 12: the replica `DataSource` (12.172–12.187), which lives in `packages/app-core` and is the first
 part of this bucket that does. Nothing else from Plan 10 is catalogued — Task 8 (the `sync-client` scaffold
 and the storage seam), Task 13 (app-core's
 offline UX), Tasks 14–15 (the dual-client harness and its scenarios) and Tasks 16–17 (the two app
@@ -1112,10 +1112,12 @@ out so the next such move is visible rather than arithmetic.)*
 
 **A DIFFERENT PACKAGE, AND THEREFORE A DIFFERENT DENOMINATOR.** Every case above runs in
 `packages/sync-client`, whose current run is `Tests 63 passed (63)` — unchanged by this task, which
-added no test there. These fifteen run in `packages/app-core`: the file's own current run is
-`Tests 15 passed (15)`, and the package's is `Tests 1044 passed (1044)` across 64 files, both re-run at
-the tree that ships them. A mutation record below that quotes `(15)` is a fact about the tree the
-mutation ran on and is deliberately not re-run.
+added no test there. These sixteen run in `packages/app-core`: the file's own current run is
+`Tests 16 passed (16)`, and the package's is `Tests 1045 passed (1045)` across 64 files, both re-run at
+the tree that ships them. **The mutation records for 12.175 and 12.186 below quote `(15)`** — they were
+measured before 12.187 existed, and a mutation denominator is a fact about the tree the mutation ran on;
+recomputing it to `(16)` would falsify the record rather than update it. A *current* `(15)` would be an
+error, and there is none.
 
 **The one widening this task made outside its own files:** `ListRow.pending` (ruling P30's permitted
 one). `TicketListView` is untouched, so `packages/app-core/test/views/list-model.test.ts`'s
@@ -1252,8 +1254,43 @@ failure this bucket has recorded before, caught here by a compiler instead of by
   *Mutation: delete the `itemListeners` fan-out at the end of the engine's `applyOne` → red HERE ALONE,
   `Tests 1 failed | 14 passed (15)`, with zero `event` frames delivered where the case expects one.*
 
+- 12.187 ✅ **a ticket born offline reaches THREE doors, and this case is the only thing that made them
+  agree.** One `ticket.created` submitted through `ingest` while offline, then all three read doors
+  asserted together: `listTicketSummaries` CARRIES it (`pending: true`, `pendingEventIds` the claim's
+  id), `getTickets` does NOT contain it and does not throw, `getBoard` does NOT contain it.
+  *The first draft of this task had all three behaving differently and the whole-file run was green.*
+  `getTickets` included offline-born rows and `rowOf` then threw `ReplicaGapError` — "no ticket.created
+  or ticket.transitioned event is stored … so no actor or clock can be named" — on the ORDINARY offline
+  path, because `outbox.ts` writes nothing to `events` by design and the error's own docblock calls
+  that a corrupt store. `getBoard` never read `pendingCreatedTickets` at all and omitted the ticket in
+  silence. `listTicketSummaries` carried it, because `TicketSummary` reads the overlay and no events.
+  Three doors, three behaviours, and 12.175 stayed green throughout because it badges an EXISTING
+  ticket carrying a queued `field_set` rather than a ticket that is only a claim.
+  **The fix is a type fact, not a preference:** `ListRow` and `BoardCard` both require a
+  `stateProvenance` and `ClaimProvenance` requires a `serverTime`, which `SubmittedEvent` omits by
+  construction because it is the server's to assign. `buildPendingOverlay` does fold such a ticket and
+  fills `serverTime: submitted.clientTime` — a substitution it documents where it makes it — and
+  repeating that in a view row would launder a device clock into the field every consumer reads as the
+  server's answer, which is the same shape as the `committed` this source refuses to say about the same
+  claim. So the settled listings keep `outbox.ts`'s own invariant ("never in any settled listing") and
+  `OFFLINE_BORN_ABSENCE` names the gap and its owner; the case asserts the owner string too, so the
+  absence cannot lose its owner and go quiet. *Mutation: restore the `pendingCreatedTickets` loop in
+  `getTickets` → red HERE ALONE (`Tests 1 failed | 15 passed (16)`), failing with the very
+  `ReplicaGapError` the shipped defect produced.*
+
 **RECORDED, NOT FIXED — Task 12's additions, with owners.**
 
+0. **`ingest`'s CONTRACT CHANGE reaches four call sites that do not catch.** The read path is
+   interchangeable; the write door is not, and the callers are enumerated rather than characterised —
+   `grep -rn "\.ingest(" packages/app-core/src apps/web/src apps/web/app` returns six:
+   `cache-feed.ts:17` and `apps/web/src/authoring/data-source-gateway.ts:296` pass the promise through,
+   while `views/ticket-sheet.tsx:276`, `views/visibility-editor.tsx:176`,
+   `flows/guarded-child-event.ts:54` (`ingestOne`) and
+   `apps/web/app/w/[workspaceId]/members/page.tsx:137` each `await` it and branch on the array without
+   catching a rejection. Against the replica each sees an `OfflineAcceptError` where it saw an array.
+   That is the honest signal arriving at the caller — there is no `IngestResult` to hand it — and it is
+   the caller that must learn to read it. Nothing today mounts a view on the replica source, so nothing
+   is broken; the day one does, these four are the sites. OWNER: **Plan 10 Task 13**.
 1. **A queued claim repaints nothing on any OTHER view.** `use-live-query.ts` reloads on `event`/`purge`
    frames, and a local `ticket.field_set` sitting in the outbox produces no frame — it is not a
    `LedgerEvent` and has no `seq`, `serverTime` or `workspaceSeq`, so emitting one would be inventing

@@ -230,6 +230,7 @@ export {
 // takes a `Replica`, an `Outbox` and a `SyncEngine` as injected dependencies
 // and reads a local store through them.
 export {
+  OFFLINE_BORN_ABSENCE,
   OfflineAcceptError,
   REPLICA_GAPS,
   ReplicaGapError,
