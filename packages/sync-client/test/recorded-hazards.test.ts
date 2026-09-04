@@ -41,9 +41,13 @@ import { createReplica, type BootstrapResponse, type Replica } from '../src/repl
  * them, while `replica.test.ts` holds the task's contract.
  *
  * The consequence is stated so it can be checked: this file adds two executions
- * to the package, whose own run therefore reads `Tests 47 passed (47)` rather
- * than 45. Per-file, `vitest run test/recorded-hazards.test.ts` reads
- * `Tests 2 passed (2)`.
+ * to the package. That took the package's own run from 45 to `Tests 47 passed
+ * (47)` when this file landed, and Task 11's `test/sync-engine.test.ts` has
+ * since taken it to **`Tests 61 passed (61)`** — the number to re-run, not to
+ * recompute, and the reason the FILE-scoped denominators in this file are the
+ * durable ones. Per-file, `vitest run test/recorded-hazards.test.ts` still
+ * reads `Tests 2 passed (2)`, and the two-file `(22)` runs quoted below are
+ * unchanged by Task 11 because they name their two files.
  *
  * Fixtures are duplicated here rather than shared, following this package's own
  * convention — `replica.test.ts`, `outbox.test.ts` and `precheck.test.ts` each
@@ -200,6 +204,15 @@ describe('12.154–12.155 recorded hazards on the replica, pinned as executable 
    * *Owner: Plan 10 Task 11 (the sync engine), the first PRODUCTION caller that
    * will re-bootstrap a live replica — 12.149 already re-bootstraps one in a
    * test, which is why the old "nothing calls it twice" defence is gone.*
+   *
+   * *TASK 11 SHIPPED AND THIS CASE STAYS, which is the honest outcome rather
+   * than an omission. The engine closed the only production route to this door
+   * (`needsBootstrap` refuses to re-bootstrap a replica holding a local
+   * baseline; case 12.165 pins it, `Tests 1 failed | 13 passed (14)` under the
+   * mutation that reopens it) and did NOT re-apply the guard measured and
+   * rejected above. So the hazard below is still exactly reproducible through
+   * `loadBootstrap` — which is what this case runs — and the owner of an actual
+   * FIX is still open.*
    */
   it('12.154 a re-bootstrap LOWERS the replay baseline and the replay then throws — recorded, not fixed', async () => {
     const storage = createBetterSqliteStorage();
@@ -320,6 +333,14 @@ describe('12.154–12.155 recorded hazards on the replica, pinned as executable 
    *
    * *Owner: Plan 10 Task 11 (the sync engine), the first caller of
    * `applyServerItem` that has a cursor to advance.*
+   *
+   * *TASK 11 SHIPPED AND THIS CASE STAYS. The throw below is unchanged and
+   * deliberately so; what the engine added is what happens NEXT to the cursor.
+   * It stalls: the stream is closed, no reconnect is scheduled, the cursor is
+   * frozen, and the reason is kept in `lastApplyFailure()` where a shell can
+   * read it — so the wedge this note predicts is now a visible terminal state
+   * instead of a silent hot loop. Cases 12.163 (the item's own door) and 12.164
+   * (the `caught-up` door, the other half of the same pair) pin it.*
    */
   it('12.155 a stream item that lands after a scope revocation throws out of applyServerItem — recorded, not fixed', async () => {
     // HALF ONE — project-scoped revocation, then an in-flight transition for the

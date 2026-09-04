@@ -30,6 +30,24 @@ import type { LedgerEvent } from '@gisik-nokma/domain';
  * wise inherit a third copy.* Until then this is a mirror, and a mirror can
  * drift silently — it is a wire contract with no compile-time link.
  *
+ * **TASK 11 DID NOT INHERIT A THIRD COPY, AND THAT MUCH IS ENFORCED.**
+ * `net/http-transport.ts` translates the wire into THESE types and declares no
+ * frame union of its own; the executor ruling deferring `StreamItem` →
+ * `ServerStreamFrame` forbids one, and the transport carries a compile-time
+ * assertion that every member of `@gisik-nokma/domain`'s `ServerStreamFrame`
+ * has a branch (verified by deletion: dropping one makes `typecheck` red with
+ * `TS2344: Type 'false' does not satisfy the constraint 'true'`). So the
+ * INSTRUCTION half of the union is now linked to the published wire
+ * declaration by the compiler, at the one place the wire is read.
+ *
+ * What is still unlinked is the shapes themselves: `PurgeInstruction` and
+ * `ScopeRevokedInstruction` above are structural copies of
+ * `apps/server/src/visibility/visible-events-for.ts:84` and `:127`, and nothing
+ * fails if one side grows a field. Moving them is a bigger job than the
+ * `SyncEventResult` move costed in `outbox/outbox.ts` — `visible-events-for.ts`
+ * is the server's visibility core, not a two-file route — so it is recorded and
+ * not attempted. *Owner: still open.*
+ *
  * ## Discriminating it
  *
  * `entity.kind` is NESTED, so a top-level `'kind' in item` is a sound test for

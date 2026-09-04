@@ -95,7 +95,16 @@ describe('root barrel cleanliness', () => {
     // would make both assertions above pass on an empty set.
     const reached = [...graph.keys()].map((f) => relative(SRC, f)).sort();
     expect(reached).toEqual([
+      // Plan 10 Task 11's sync engine and its HTTP/WS transport. The transport
+      // is the reason this list is worth re-reading rather than re-sorting: it
+      // reaches for the platform's `fetch` and `WebSocket` as GLOBALS and
+      // imports neither, so nothing here can be a `node:` specifier — and its
+      // socket seam is a hand-injectable `WebSocketLike`, so a shell that has
+      // no global `WebSocket` supplies its own without this package importing
+      // one.
+      'engine/sync-engine.ts',
       'index.ts',
+      'net/http-transport.ts',
       // Plan 10 Task 10's outbox and local pre-check. These two reach
       // `@gisik-nokma/rule-engine`'s ROOT — `evaluateEvent` and
       // `buildMemoryContext` — and deliberately NOT its `./fixtures` subpath,

@@ -19,6 +19,32 @@ import type { SyncStorage } from '../storage/storage.js';
  * Collapsing the two into one "get the workflow" helper is the quiet way to
  * lose the version chain, and losing it makes a two-hop fold silently pick the
  * wrong destination state on every client at once.
+ *
+ * ## THE `ticket_types` LOOKUP IS CONSTRAINED AFTER ALL — a recorded finding,
+ * ## corrected by measurement rather than inherited
+ *
+ * Plan 10 Task 9's whole-branch review recorded this lookup as an unconstrained
+ * path, with the evidence "rewriting it to replay the event log leaves the
+ * whole suite green" and Plan 10 Task 11 named as owner. **Re-measured at Task
+ * 11 on a green tree, that is FALSE.** Replacing the two lines below with a
+ * replay —
+ *
+ *     SELECT payload FROM events
+ *      WHERE entity_kind = 'ticket-type' AND type = 'ticket-type.defined'
+ *      ORDER BY workspace_seq
+ *
+ * — is red on **12.155 alone**, `Tests 1 failed | 60 passed (61)` over
+ * `packages/sync-client`. 12.155's workspace-wide half is what catches it:
+ * `revokeScope` empties `ticket_types` BY DESIGN while the `ticket-type.defined`
+ * event still stands in `events`, so a replay-sourced lookup answers for a type
+ * this device is no longer entitled to and the arrival that should throw folds
+ * cleanly instead.
+ *
+ * The finding was true when it was written and stopped being true in the same
+ * batch that wrote it — 12.155 landed alongside it. Recorded here rather than
+ * deleted, because the useful part is not "there is no gap": it is that the
+ * TABLE is the entitlement boundary and the event log is not, which is exactly
+ * why the two must not be swapped for each other.
  */
 export async function buildLocalDeps(storage: SyncStorage): Promise<TicketStateDeps> {
   const wfRows = await storage.all(

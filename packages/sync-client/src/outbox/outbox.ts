@@ -13,6 +13,35 @@ import { buildLocalEngineContext, buildPendingOverlay, type LocalContextDeps } f
  * could share one declaration. *Owner: Plan 10 Task 11 (the sync engine), which
  * consumes this same shape over HTTP.*
  *
+ * ## TASK 11 CONSUMED IT AND DID NOT MOVE IT — with the cost of the move
+ * ## enumerated, so the next reader is not deciding blind
+ *
+ * `createHttpTransport` casts `POST /v1/sync`'s body to `SyncEventResult[]` and
+ * the engine's flush loop switches on it, so the mirror now has a second
+ * consumer and still no compile-time link. What a move would actually touch,
+ * counted rather than guessed (`grep -rln 'SyncEventResult\|SyncInvalidCode'
+ * --include='*.ts' packages apps`, `dist/` and `node_modules` excluded):
+ *
+ * - **`apps/server`: 2 files** — `sync/sync-service.ts` (the declaration and
+ *   its docblock) and `sync/sync-routes.ts`.
+ * - **`packages/sync-client`: 5 files** — this one, `engine/sync-engine.ts`,
+ *   `net/http-transport.ts`, `index.ts`, `test/sync-engine.test.ts`.
+ * - **`packages/domain`: nothing missing.** `IngestErrorCode` — the base of
+ *   `SyncInvalidCode` — is already there (`ingest-result.ts:3`), and
+ *   `ingest-result.ts` already declares an `{status:'invalid'; eventId: string
+ *   | null; code; message}` member of the same shape. The type has a home
+ *   waiting for it.
+ * - **No sync-client test constructs an `invalid` result at all** — measured,
+ *   `grep -rn "'invalid'" packages/sync-client/test` returns nothing — so
+ *   narrowing `code` from `string` to `SyncInvalidCode` would break no test in
+ *   this package. That is the objection this record used to rest on, and it is
+ *   empirically not the blocker.
+ *
+ * The blocker that remains is scope, not difficulty: the move edits a shipped
+ * server module and a shipped server route from inside a client task, on a
+ * branch carrying two more tasks behind it. *Owner: still open — and now with a
+ * seven-file cost instead of a shrug.*
+ *
  * TWO DELIBERATE DIFFERENCES FROM THE SERVER'S DECLARATION, both widenings:
  *
  * - `code` is `string`, where the server narrows it to `SyncInvalidCode`
@@ -171,22 +200,36 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
    * child under it — would refuse the child against a parent that is still
    * terminal in a world an hour old.
    *
-   * MEASURED: holding the context on this closure fails FOUR cases — 12.139
+   * MEASURED: holding the context on this closure fails SEVEN cases — 12.139
    * (the reopen pair), 12.141 (a revoked scope the stale context still knows),
    * 12.144 (an ordered create-then-edit pair, where the second claim is judged
-   * against a world without the first) and 12.151 (a queued transition whose
-   * pending reading never appears). `Tests 4 failed | 43 passed (47)`,
-   * re-measured after `test/recorded-hazards.test.ts` landed — the same four
-   * ids; it read `41 passed (45)` against the 45-execution tree.
+   * against a world without the first), 12.151 (a queued transition whose
+   * pending reading never appears), and — added by Task 11 — 12.159 (the
+   * engine's ordered flush, whose two claims are enqueued after the replica
+   * was bootstrapped) and 12.160 (the flush that must survive a transport
+   * failure, same reason) and 12.169 (the misaligned-results guard, whose two
+   * claims are enqueued the same way). `Tests 7 failed | 54 passed (61)`.
    *
-   * This paragraph said THREE for a whole task, and the missing id is a
-   * measurement of WHEN the held context is built. Built EAGERLY here in the
+   * THE COUNT IN THIS PARAGRAPH HAS NOW GONE STALE THREE TIMES, and every
+   * time inside the change set that moved it. It said THREE for a whole task
+   * (the missing id was 12.151); it then said FOUR with
+   * `Tests 4 failed | 43 passed (47)` — true of a 47-execution package — until
+   * Task 11 added `test/sync-engine.test.ts`; it then said SIX, correctly, for
+   * exactly as long as it took that same task to add ONE MORE case that also
+   * enqueues here (12.169). Not one of the three was caught by reading; all
+   * three were caught by re-running the mutation. **Re-run it; do not recompute
+   * it.**
+   *
+   * The missing id in the THREE-vs-FOUR round was a measurement of WHEN the
+   * held context is built. Built EAGERLY here in the
    * `createOutbox` body — which is what "one built at `createOutbox` time"
-   * means, and what the plan's snippet does — four go red. Memoised LAZILY on
-   * the first `enqueue` (`??=`), only three do, because 12.151's first
+   * means, and what the plan's snippet does — seven go red. Memoised LAZILY on
+   * the first `enqueue` (`??=`), 12.151 was measured green, because its first
    * `enqueue` is its only one and its held context is therefore built after
    * the `applyServerItem` that confirms the ticket. Both runs are real; the
-   * eager one is the mutation this prose describes, so four is the number.
+   * eager one is the mutation this prose describes, so seven is the number —
+   * and the lazy variant was measured at THREE against a 47-execution package
+   * and has NOT been re-measured since Task 11 grew it to 60.
    *
    * 12.151 is also the OTHER HALF of the staleness, and the half the paragraph
    * above does not describe. 12.139 and 12.144 fail because a frozen context
