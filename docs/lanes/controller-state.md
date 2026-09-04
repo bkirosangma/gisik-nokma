@@ -43,6 +43,59 @@ weekly window is a hard Monday cliff or a ROLLING window — weekly was once obs
 overnight Tue→Wed, which no Monday reset explains. If it rolls, this whole outlook improves and the stop
 point should be re-derived rather than obeyed mechanically. **Re-measure before acting on it.**
 
+## Anchors — re-measured 2026-09-04 ~07:47 IST, at `e09666c` — STEP 14 MERGED, LEDGER PROMOTION PENDING
+
+**This is a measurement re-anchor only. It is deliberately NOT a "STEP 14 CLOSED" section** — that heading
+carries ledger promotion with it everywhere else in this file, and the ledger still reads Plan 9 as 0/15.
+Promoting those 15 rows is a `task-ledger.tsv` **status change**, trigger #2 of the Sonnet/Opus split
+below — a Sonnet controller session does not perform it. Flagged to the owner; not done here.
+
+| what | value |
+|---|---|
+| `main` | **`e09666c`** — PR #93 (step 14, Plan 9: calendar, timeline, notification engine) merged. CI verified green at the exact head sha `5d0be1d5` (`gate` conclusion `success`) before merging, per the standing auto-merge authorization |
+| executor | **restarted immediately after the merge** (fixed-point rule), fresh session confirmed reading `dispatch-executor-serial.md` → `executor-state.md` |
+| last forced gate | **`e09666c`** — `GATE_EXIT=0` read from `$?` on the next line (never piped), `--force` so **0 cached**, **24/24 tasks**, **3074 tests**, 42.9s, node **v22.22.2**, zero `Unsupported engine` matches. `pnpm install --frozen-lockfile` run first (package set may have changed); `pnpm rebuild better-sqlite3` run before the gate (see trap below) |
+| gate composition | domain 464 · rule-engine 282 · server 940 · app-core 1029 · web 136 · editor 178 · ui 37 · sync-client 8 = **3074** |
+| `check:env` | own row, re-measured separately per standing note — **exit 0** |
+| ledger | **`CHECK_EXIT=0` · 133/177 (75.1%)** · claimed 0 · in-flight 0 · todo 44 · **Plan 9 still shows 0/15 done, 15/15 todo — the merged work is not yet reflected, pending Opus-session promotion** |
+| quota | executor's own status line: **84% weekly** (was 82% at this session's start, 76% at the last full measurement). Re-derivation of the stop point (hard-cliff vs rolling) is an owner call, passed up, not resolved here |
+
+> ### ⚠ NEW TRAP: `nvm use 22` in one Bash tool call does NOT survive into the next — a fresh gate run
+> silently reverts to node 24
+> This machine's `Bash` tool does not persist shell state (env vars, `nvm`'s shell function) across
+> separate tool calls, only the working directory. Running `nvm use 22` in one call, then the gate in a
+> **later, separate** call, silently re-resolves `node`/`pnpm` back to whatever the default shell init
+> lands on — measured here as **node v24.11.1**, even though a `node -v` run immediately after `nvm use 22`
+> in the SAME call correctly printed `v22.22.2`. The gate then failed exactly as the documented
+> `better-sqlite3` ABI false red describes: `sync-client#test` 4/8 failed with `NODE_MODULE_VERSION`
+> mismatch, **and the `Unsupported engine` WARN was present in the log** — the loud tell this file already
+> names, and it caught the false red correctly. **This is a new costume of the "install-then-gate" hole
+> already documented below**, same family: the written procedure ("forced gate under node 22") is
+> incomplete about *how* node 22 is selected, not merely *that* it must be. **Operative rule: `source
+> ~/.nvm/nvm.sh && nvm use 22 && pnpm rebuild better-sqlite3 && <gate command>` must be ONE chained shell
+> invocation, in one tool call — never split across calls and trusted to persist.**
+
+> ### Carried forward from the executor's final pre-restart message, step 15's dispatch must include these
+> **`docs/lanes/plan10-adaptation-map.md` exists, untracked on purpose, 33KB, confirmed present after the
+> executor restart** (untracked files live in the worktree, not the session — verified with `git status
+> --porcelain` before writing this). Its substance is good; **two of three spot-checked file paths in it
+> were wrong** (cited `visibility/effective-role.ts` and `apps/server/src/ingest/ingest-result.ts`, neither
+> exists) while being substantively correct — caveat is at the top of the file itself.
+> Three findings the executor flagged as needing to land IN step 15's dispatch text, not just in a killed
+> pane (the file's own standing rule: an obligation assigned from outside a task must be written into that
+> task's own text or the next reader will not perform it):
+> 1. **Plan 10 T7's own snippet calls `ingestBatch` for client-submitted offline events — an ungated door.**
+>    `ingest-service.ts`'s docblock names this exact case for `POST /v1/sync`. `ClientIngest` now makes the
+>    wrong call a compile error, so it is a design note, not a live hole — but `sync-service.ts` needs BOTH
+>    doors (server-authored `claim.contested` append is a legitimate internal use), so the type cannot just
+>    be narrowed. **T7 must decide this deliberately.**
+> 2. **`EffectiveRole` is brand-protected by a non-exported symbol (Ruling P22) — the adaptation map missed
+>    it.** Every safety property of `canSeeResolved` rests on the value having come from
+>    `resolveEffectiveRole`. T6/T7 must not hand-build one to make a test pass.
+> 3. **`buildMemoryContext` already exists for T10's local pre-check** — its docblock names Plan 10's
+>    offline replica explicitly, same reducer as `proj_tickets`, "so a rule cannot answer one way in a unit
+>    test and another on the server." The map missed this too.
+
 ## RULING P29 (2026-09-03, owner-approved) — the frozen errand-with-waits template keeps its two advisories
 
 **Escalated by the executor at step 13's close** (`exec/13-plan8-workflow-builder`, PR #85 already open,
