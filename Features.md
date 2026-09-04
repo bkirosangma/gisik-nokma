@@ -1085,7 +1085,7 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
   door. It replaces four hand-copied assemblies that had to be extended one by one every time
   `buildApp` gained a route. `apps/server/test/helpers/app.ts`
 - ✅ **`GET /v1/sync/bootstrap`** — first-run replica build without replaying full history: for every
-  ticket the caller `canSee`, the latest reducer-folded snapshot (if one exists) plus a per-entity tail
+  ticket `listVisibleTickets` returns for the caller, the latest reducer-folded snapshot (if one exists) plus a per-entity tail
   — everything after the snapshot's seq, PLUS every `comment.added` / `attachment.added` /
   `claim.contested` / `claim.contested_resolved` regardless of position, because content and contests
   never fold into ticket state. Every `workflow.defined` and `ticket-type.defined` event goes to

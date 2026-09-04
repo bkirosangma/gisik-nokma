@@ -141,24 +141,29 @@ implementation mutations named below was run and reddened the case named beside 
   can see, `me.projectIds` as real ULIDs and not `[key, value]` tuples (the plan's own snippet spreads
   `[...eff.projects]` — a `Map` — instead of `[...eff.projects.keys()]`; this case pins the fix by
   seeding the member onto a real project, so the bug and the fix disagree on the assertion rather than
-  both producing `[]`), and a `streamSeq` greater than zero. *Mutation: reintroduce the tuple spread →
-  red, `expected {…} to deeply equal {…}`, `projectIds` carrying arrays instead of strings.*
-  (bootstrap.test.ts)
-- 12.95 ✅ the tail excludes everything at or below the snapshot's seq EXCEPT the four backfill types —
-  content and contests are not ticket state, so a `comment.added` filed before the snapshot still
-  travels. *Mutation: drop the backfill clause from the tail filter → red, the comment goes missing
+  both producing `[]`), a `streamSeq` greater than zero, and a tail that excludes everything at or below
+  the snapshot's seq EXCEPT the four backfill types — content and contests are not ticket state, so a
+  `comment.added` filed before the snapshot still travels. *Mutations, both confirmed red against this
+  same test: reintroduce the tuple spread → `expected {…} to deeply equal {…}`, `projectIds` carrying
+  arrays instead of strings; drop the backfill clause from the tail filter → the comment goes missing
   from `visible.events`.* (bootstrap.test.ts)
-- 12.96 ✅ an invisible ticket is absent from a member's bootstrap — no id, no stub, nothing — while
-  a DIFFERENT ticket shared only with a guest is absent from that SAME member's response too, proven by
-  a positive control: signed in as the guest instead, that ticket is the ONLY one returned, and the
-  workspace-mode ticket is not. Without the control, "the guest gets `[]`" would pass for a route that
-  returns `[]` to everyone. *Mutation: `listVisibleTickets` call replaced with a constant `[]` → red on
-  the guest's case, not the member's — the constant satisfies "member sees one, invisible one absent"
-  by accident and only the positive control catches it.* (bootstrap.test.ts)
+- 12.95 ✅ planted defect: an invisible ticket is absent from a member's bootstrap — no id, no stub,
+  nothing — with a positive control in the SAME request: the visible ticket's id must actually appear in
+  the response body, so "invisible one absent" cannot pass by the route answering nothing to anyone.
+  *Mutation: `listVisibleTickets` call replaced with a constant `[]` → red here (the positive control
+  fails: the visible ticket's id is gone too) and red on 12.94 (`tickets` no longer has length 1).*
+  (bootstrap.test.ts)
+- 12.96 ✅ a guest gets definitions and exactly the ticket explicitly shared with them, not the
+  workspace-mode ticket a member sees — a positive control on the empty case: "the guest gets `[]`"
+  would otherwise pass for a route that returns `[]` to everyone. *Mutation: `listVisibleTickets` call
+  replaced with a constant `[]` → red here AND on 12.94, since the member's ticket also disappears; the
+  guest case adds the proof that a NON-empty answer (the shared ticket) is reachable at all, which the
+  member case alone does not establish for a guest's role branch.* (bootstrap.test.ts)
 - 12.97 ✅ `GET /v1/sync/bootstrap` 403s `{error:'not_a_member'}` for a signed-in caller who resolves no
   workspace role, and 401s a request carrying no session at all. *Mutation: `preHandler: requireSession`
-  removed → red on the 401 assertion (and on 12.96's guest case, which also depends on the session
-  reading `request.currentUserId`).* (bootstrap.test.ts)
+  removed → red on the 401 assertion here, and red on every other case in this file too — every
+  authenticated call in 12.94-12.96 now reaches the handler with no `request.currentUserId` to read.*
+  (bootstrap.test.ts)
 
 ## Carried, with owners — recorded here rather than fixed
 

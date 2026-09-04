@@ -190,7 +190,13 @@ describe('GET /v1/sync/bootstrap', () => {
       url: `/v1/sync/bootstrap?workspaceId=${WS}`,
       headers: memberHeaders,
     });
+    expect(res.statusCode).toBe(200);
     const raw = JSON.stringify(res.json());
+    // Positive control, same run: a route that answered `tickets: []` to
+    // everyone would also make HIDDEN "absent" for a reason unrelated to
+    // visibility. VISIBLE must actually be present for the absence to mean
+    // anything.
+    expect(raw).toContain(VISIBLE);
     expect(raw).not.toContain(HIDDEN);
   });
 
