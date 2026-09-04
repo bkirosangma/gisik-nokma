@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.137`. THE NEXT FREE ID IS `12.138`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path). A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.153`. THE NEXT FREE ID IS `12.154`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), and said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check). A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -627,3 +627,103 @@ the number Task 10's own echo case will want and the never-renumber rule would k
   their contests, so the stored row is never replayed; and 12.135 puts its contest below the snapshot
   `seq`, where the window keeps it away from the reducer regardless of the filter. What forces it in
   front of the guard is a foldable ticket event arriving AFTER it, which is this case's whole shape.
+
+## The outbox and the local pre-check (Task 10) — `packages/sync-client/test/precheck.test.ts`, `test/outbox.test.ts`
+
+**Sixteen `it` declarations across the two files, one per id 12.138–12.153, running as SEVENTEEN
+tests** — 12.152's `it` sits inside a two-zone loop, so it executes twice. Both numbers are stated
+because neither implies the other, and both are measured:
+`grep -cE "^[[:space:]]*it\(" packages/sync-client/test/precheck.test.ts packages/sync-client/test/outbox.test.ts`
+prints `6` and `10`, and `grep -nE "it\('12\.[0-9]+" …` **enumerates fifteen id-bearing lines** — the
+sixteenth is the loop's `holds under TZ=${tz}`. The package's own run reads `Tests 45 passed (45)`, and the
+sum is stated so it can be checked: these seventeen, Task 9's twenty, the barrel guard's four, and the
+storage conformance suite's four.
+
+**Every id below was proved able to fail**, each with the mutation that reddens it and the full list of
+cases that mutation takes down — a mutation that reddens five cases is not evidence about one, and
+saying "red here alone" without running it is how this branch produced four wrong counts. Seven
+mutations were run; **none survived**.
+
+### The local pre-check — `test/precheck.test.ts`
+
+- 12.138 ✅ creating under a TERMINAL parent is refused `hierarchy.parent-terminal` before anything is
+  queued, with the engine's own sentence (it names the parent's title and the state's name), and the
+  outbox rows are printed empty rather than counted. *This case is also 12.139's control.*
+- 12.139 ✅ **the reopen pair** — the parent's reopen is queued first, and the child create that 12.138
+  refuses is then ACCEPTED, because the pre-check reads confirmed state with the outbox overlaid. The
+  only difference between the two cases is the queued reopen. *Mutation: hold one `EngineContext` on
+  the `createOutbox` closure, which is what the plan's snippet does → red here, on 12.141 and on
+  12.144.*
+- 12.140 ✅ `getEntityState('membership', …)` answers the actor's OWN membership out of bootstrap's
+  `me`, `null` for anyone else, and `null` for an id that is not a `workspace:user` pair at all.
+- 12.141 ✅ **definitions come from the replica's TABLES, never from its event log.** After a
+  workspace-wide `revokeScope` the same claim that was legal a line earlier is refused
+  `ticket.unknown-type` — while the `ticket-type.defined` rows are still standing in `events`, printed
+  to prove it. A context rebuilt by replaying the log would resurrect exactly the definitions the
+  replica purged. *Mutation: seed `memory.ticketTypes` from `events` instead of `ticket_types` → red
+  here and nowhere else.*
+- 12.142 ✅ `restrict-to: {roles:['admin']}` refuses a member and accepts an admin, through the real
+  engine. **The admin half is the load-bearing half**: a `null` membership refuses just as a wrong role
+  does, so the member half passes with the membership door unimplemented. *Mutation: replace the
+  membership arm with `return null` → red on 12.140 and on this case's SECOND half only.*
+- 12.143 ✅ a queued claim the reducer can no longer fold (its definitions went with a scope
+  revocation, while outbox rows deliberately stay) leaves the device working: the claim is still
+  counted, still offered by `nextBatch`, and its pending READING is `null` rather than a partial fold
+  wearing a pending label. *Mutation: drop the `try`/`catch` in `buildPendingOverlay` → red here and on
+  12.141, both with `applyTicketEvent: unknown ticket type "…"` — and in production, every `enqueue`
+  after a revocation throws, offline, permanently.*
+
+### The outbox — `test/outbox.test.ts`
+
+- 12.144 ✅ enqueue order is preserved and `nextBatch(limit)` respects the limit; the ids are
+  enumerated in order, because a batch that lost the order would send a `field_set` for a ticket the
+  server has not been told about.
+- 12.145 ✅ a `committed` answer folds the claim into the local ledger through `applyServerItem` — with
+  the SERVER's `serverTime`, printed — and clears the row; the ticket stops being a pending creation.
+- 12.146 ✅ a `contested` answer records the contest locally from the response and clears the row. The
+  claim is preserved verbatim in `original_event`, because if visibility was lost with the refusal the
+  real `claim.contested` envelope never streams in and this stub is the claimant's only record.
+- 12.147 ✅ a `refused` answer is TERMINAL: the row goes `status='failed'`, leaves `nextBatch`, appears
+  in `failedItems`, and carries the server's words in `last_error`.
+- 12.148 ✅ `recordFailure` is TRANSIENT: it backs off, holds the batch until due, and **leaves the row
+  `queued`** — the assertion that stops a future reader "tidying" it into a `failed` write and
+  stranding every retryable claim on the device forever.
+- 12.149 ✅ the stream echo arriving BEFORE the HTTP answer still clears the row. `applyServerItem`
+  returns early on the duplicate id and never reaches its own `DELETE FROM outbox`, so `applyResult`'s
+  delete is not the redundancy it looks like.
+- 12.150 ✅ **PENDING IS NEVER SETTLED FACT.** A ticket that exists only as a queued claim is absent
+  from every settled surface — `getTicket`, `listTickets`, `listEntityEvents`, `searchLocal`, and the
+  `tickets` and `snapshots` tables read directly — and present in exactly one, `pendingCreatedTickets`,
+  with the claim ids that made it. Another workspace's caller sees nothing of it. *Mutation: make
+  `enqueue` also upsert the overlaid state into `tickets` → red here, on 12.151 and on 12.139.*
+- 12.151 ✅ a queued transition moves the pending reading and NOT the confirmed one; the provisional
+  `seq` sits above the confirmed transition log, which is the property require-different-user's sort
+  depends on. Once the claim leaves the outbox, `pendingFor` answers `null` rather than confirmed state
+  wearing a pending label. *Mutation: return confirmed state when nothing is queued → red here alone.*
+- 12.152 ✅ `next_attempt_at` is a Z instant under a NON-IST `TZ` as well as under IST, with a positive
+  control (`new Date(t0).getHours()`) proving the zone switch took effect. *Mutation: render it with
+  `getFullYear()/getHours()` and append `Z` → red under BOTH zones and on 12.148.* **The honest
+  ceiling, stated because the map's correction is right that varying `TZ` is ceremony where the value
+  does not move with it:** that mutation reddens under IST too, so the non-IST run catches no bug the
+  IST run misses. What it establishes is the NEGATIVE — nothing on this path moves with the machine's
+  zone — which is not knowable from an IST-only run on an IST machine, and which is what Tasks 12 and
+  13 will build their day math on. Every other case in these two files is zone-free and deliberately
+  does not vary `TZ`.
+- 12.153 ✅ `backoffMs` is enumerated at eight points (`1000, 2000, 4000, 8000, 16_000, 32_000, 60_000,
+  60_000`) rather than asserted at the cap, because a single cap assertion cannot tell "capped" from
+  "constant". It is **a different function from `app-core`'s `backoffDelayMs`** (500 ms initial, 30 s
+  cap, ±20% jitter): outbox flush versus websocket reconnect, two surfaces, two independently chosen
+  curves. Do not dedupe them.
+
+### Carried, with owners — Task 10
+
+- **The `SyncEventResult` mirror can drift silently.** `packages/sync-client/src/outbox/outbox.ts`
+  re-declares the wire shape of `POST /v1/sync`'s answer because this package may not depend on
+  `apps/server`; there is no compile-time link, exactly as for `SyncItem` in `replica/sync-item.ts`.
+  Both belong in `@gisik-nokma/domain`. *Owner: Plan 10 Task 11 (the sync engine), which consumes the
+  same shape over HTTP and would otherwise inherit a third copy.*
+- **`pendingCreatedTickets` filters by the workspace of the FOLDED state, not by the outbox row's
+  `workspace_id`.** The two cannot disagree today — the local store is implicitly single-workspace
+  (`revokeScope`'s recorded note: `workflows` and `ticket_types` carry no `workspace_id`) — and the
+  folded state is the more honest source, since it is what would be rendered. *Owner: whoever widens
+  `packages/sync-client/src/storage/schema.ts` to hold more than one workspace.*

@@ -96,6 +96,18 @@ describe('root barrel cleanliness', () => {
     const reached = [...graph.keys()].map((f) => relative(SRC, f)).sort();
     expect(reached).toEqual([
       'index.ts',
+      // Plan 10 Task 10's outbox and local pre-check. These two reach
+      // `@gisik-nokma/rule-engine`'s ROOT — `evaluateEvent` and
+      // `buildMemoryContext` — and deliberately NOT its `./fixtures` subpath,
+      // which imports `node:fs`/`node:path`/`node:url` at module top level. The
+      // walker below only follows RELATIVE imports, so it cannot see across that
+      // package boundary; what keeps it honest is rule-engine's own barrel
+      // comment and a standing grep:
+      //   grep -rn "from 'node:" --include='*.ts' packages/rule-engine/src
+      // → three hits, all in `src/fixtures/harness.ts`, none reachable from its
+      // `src/index.ts`.
+      'outbox/outbox.ts',
+      'precheck/local-context.ts',
       // Plan 10 Task 9's replica. It reaches `@gisik-nokma/domain` and nothing
       // else the barrel forbids, which is the point of listing it here rather
       // than loosening the assertion to a subset check: the day this set grows
