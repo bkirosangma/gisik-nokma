@@ -179,6 +179,41 @@ describe('createHttpNotificationsGateway — against the routes that actually se
       /\/v1\/me\/notifications answered 404/,
     );
   });
+
+  /**
+   * 11.175/11.176 — the 200 THIS CLIENT CANNOT READ.
+   *
+   * The pair to 11.139, and stated on the same terms: both are unreachable
+   * against the route that ships, and both arrive from outside the pair this
+   * file is written against — a rewrite, a proxy, a wrong origin. Before the
+   * guard the envelope was an unchecked cast, so a 200 of the wrong shape threw
+   * `Cannot read properties of undefined (reading 'map')` — the exact unnamed
+   * `TypeError` the null guard one line above exists to prevent.
+   *
+   * The scripted body is a REFUSAL ENVELOPE served with a 200, which is what a
+   * misconfigured gateway in front of this route actually does, rather than an
+   * invented nonsense value.
+   */
+  it('11.175 names the path when the list route answers a 200 of the wrong shape', async () => {
+    const { http } = scriptedHttp({
+      'GET /v1/me/notifications': { status: 200, body: { error: 'upstream_unavailable' } },
+    });
+    await expect(createHttpNotificationsGateway(http).list()).rejects.toThrow(
+      /\/v1\/me\/notifications answered 200 with a body this client cannot read/,
+    );
+  });
+
+  it('11.176 does the same for the unread-count route, rather than badging undefined', async () => {
+    const { http } = scriptedHttp({
+      'GET /v1/me/notifications/unread-count': { status: 200, body: { count: 3 } },
+    });
+    // `{ count: 3 }` and not `{}`: a RENAMED field is the shape a cast is
+    // likeliest to meet and likeliest to pass, and `body.unread` on it is
+    // `undefined` — a badge drawn from nothing.
+    await expect(createHttpNotificationsGateway(http).unreadCount()).rejects.toThrow(
+      /unread-count answered 200 with a body this client cannot read/,
+    );
+  });
 });
 
 describe('createHttpTicketLocator — the deep link the plan’s /tickets/:id could not make', () => {

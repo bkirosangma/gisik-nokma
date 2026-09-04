@@ -1679,3 +1679,69 @@ is the only task whose inputs this round touches: a forced, **0-cached** app-cor
 plan's colour tokens). It touched `docs/lanes/executor-state.md` and nothing else; this round's four
 code files were stashed by path across it and popped onto the new HEAD, and both sets of edits were
 confirmed present in the merged file afterwards rather than assumed.
+
+## TASK 14 FIX ROUND (web wiring) — THE HANDOFF RANGE, CORRECTED, AND THREE THINGS RECORDED
+
+**THE HANDOFF RANGE TASK 15 MUST CARRY IS `11.130–11.177`, NOT the `11.130–11.168` commit `fe320fc`
+says.** That message was written before `b300f43` added **11.169**, and this fix round adds
+**11.170–11.177**. Worse than the off-by-one: the range lived ONLY in a commit body and in no `.md`
+in the repo, so the one place Task 15 reads had nothing to correct. It is written here now.
+
+**Re-measured rather than incremented**, by listing every `it(`/`describe(` id definition in the repo
+and sorting. In use: **11.1–11.8, 11.18, 11.36–11.39, 11.48–11.122 with NO gaps, and 11.130–11.177**
+— **136 ids**. 11.123–11.129 are permanently unused (the gap Task 14's renumber left), as are
+11.9–11.17, 11.19–11.35 and 11.40–11.47 (Plan 9's own nominal one-id-per-area block, superseded on
+this branch by one-id-per-test from 11.48). Per `test-cases/README.md`'s rule all of them stay unused
+rather than being backfilled. **New cases continue from 11.178.**
+
+> **CORRECTION, 2026-09-04, made by the session that inherited this file: the "gaps at 11.97 and
+> 11.106" this paragraph used to assert DO NOT EXIST.** Both are live `it(` titles in
+> `packages/app-core/test/preferences/saved-filters.test.ts` (`:67` and `:266`). The sharp part is
+> the sentence that stood beside the error: this paragraph *claimed* its sweep "catches
+> 11.158/11.159's double-quoted titles that a single-quote-only sweep misses" — and 11.97 and 11.106
+> are double-quoted too, so the very hazard it named by name is the one it then reported wrongly.
+> **Naming a failure mode is not the same as having avoided it**, which is this branch's third
+> instance of a sweep-shape claim outrunning its own result. The re-measure that caught it separated
+> ids appearing in *test titles* from ids appearing anywhere (a `grep -rhoE` for a quoted id also
+> matches backtick-quoted prose in docblocks), and printed a positive control for each null.
+
+The eight this round adds: **11.170** (the nav hangs the `/inbox` link, name AND href), **11.171**
+(Workspaces always, My Work only inside a workspace), **11.172** (a failed "Load more" keeps the rows,
+names the failure, keeps the control, shows no refusal panel, and the retry clears it), **11.173** (a
+successful open clears the "cannot be opened" notice), **11.174** (no badge before the first answer),
+**11.175**/**11.176** (a 200 of the wrong shape is named on each read instead of throwing an unnamed
+`TypeError`), **11.177** (a reload drops the paging complaint about rows it replaced).
+
+**`Features.md` §11 and `test-cases/11-calendar-notifications.md` STILL do not exist, and this round
+deliberately did not open them. OWNER: TASK 15** — unchanged, and for the reason recorded twice
+already: Task 15's plan text dictates §11 verbatim and pins that file as its own creation, so a
+partial section written here forks its Files block. The debt is now stated with a correct range
+instead of a wrong one.
+
+**RECORDED, NOT FIXED — carried forward with owners:**
+
+- **The shell's `isEpicType` forward to `CalendarView` is INERT, and it is kept anyway.
+  OWNER: whoever wires a calendar lane filter.** The review reported it as half-covered; measured, it
+  is stronger than that. `CalendarView` hands `isEpicType` to `buildCalendarModel`, which reads it at
+  exactly one site — the `laneEpicId` lane filter (`calendar-model.ts:275`, inside `laneEpicId !==
+  undefined && !== null`). **`laneEpicId` has zero occurrences anywhere in `apps/web`**, and app-core's
+  own 11.158 says the lane fixture "is the ONLY shape that can witness the forward". So no case
+  reachable from the project page can distinguish that spread's presence: **deleting it survives
+  133/133**, and deleting the TIMELINE spread beside it reddens 11.165 by name — the asymmetry
+  measured both ways in the same session. It is a survivor left standing ON PURPOSE, with the site
+  commented, rather than covered by a prop-capture test that would watch the line instead of its
+  consequence. It stays because `calendar-view.tsx`'s docblock forbids exactly the state deleting it
+  would create: the calendar and the timeline answering differently about one ticket's epic on two
+  tabs of one page, surfacing silently the day a lane filter is wired.
+- **`today` is computed once per render and never re-derived. OWNER: whoever next opens the project
+  page's date wiring.** A tab left open across IST midnight keeps yesterday's ring until something
+  else re-renders. The day COMPUTATION is right (11.164 pins it at the instant the UTC and IST
+  spellings disagree); this is only about when it is recomputed. Not fixed because the fix is a timer,
+  and a timer is a re-render mechanism that needs its own case, its own cleanup, and its own argument
+  about cadence — none of which is Task 14's subject. Noted at the site.
+- **The nav's mount was invisible to a 125-test suite, and only the inbox half is now watched.**
+  `app-nav.test.tsx` exists because deleting one line orphaned a whole feature with build, test and
+  typecheck green — Task 7's `buildApp` finding in its reachable-page-with-no-door form. **Every other
+  page in this shell mounts `AppNav` and no page asserts its own mount either.** This round watched
+  the nav's three links; nothing yet watches that a PAGE renders the nav. OWNER: unassigned, and worth
+  a sweep, because the failure mode is a suite that covers everything the wiring connects.

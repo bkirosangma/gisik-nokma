@@ -28,7 +28,11 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-import InboxPage, { CANNOT_OPEN_COPY, EMPTY_INBOX_COPY } from '../app/inbox/page.js';
+import InboxPage, {
+  CANNOT_OPEN_COPY,
+  EMPTY_INBOX_COPY,
+  PAGING_FAILURE_PREFIX,
+} from '../app/inbox/page.js';
 
 afterEach(() => {
   push.mockClear();
@@ -287,6 +291,175 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     expect(push).not.toHaveBeenCalled();
     // ...and the delivered message is still on the page: "a message you were
     // sent is yours; revocation removes future sight, not letters delivered".
+    expect(screen.getByRole('button', { name: /Restock the cold shelf/ })).toBeInTheDocument();
+  });
+  /**
+   * 11.172 — A FAILED "Load more" MUST NOT TAKE AWAY THE MESSAGES THAT ARRIVED.
+   *
+   * Measured before the fix, with a throwaway probe: page 1 serving one
+   * notification and page 2 throwing left **0 rows on screen and 1 refusal
+   * panel**. The mechanism was not subtle and not defensive — `loadMore`'s catch
+   * called `setError`, and `ShellRefusal` is the render's FIRST arm, ahead of
+   * both the loading and the rows arms — so a request that FAILED removed
+   * messages the server had already DELIVERED.
+   *
+   * That inverts the standard the two files either side of it argue for at
+   * length. `inbox-nav-link.tsx` keeps its last count rather than asserting
+   * "none" from a request that did not answer; this page's whole four-arm shape
+   * exists so "a reader whose inbox is still arriving is not told it is empty".
+   * And it runs straight against the standing ruling that a message you were
+   * sent is yours.
+   *
+   * Four things are asserted, because three of them alone would each pass over a
+   * different half-fix: the rows stay, the failure is NAMED with the server's own
+   * words, the refusal panel is ABSENT (the arm that used to eat the page), and
+   * the Load-more control is still offered — `nextCursor` never moved, so the
+   * retry is real, and a control withdrawn on failure would strand the reader on
+   * a partial inbox with no way forward. The retry then clears the notice in the
+   * same case, so the fix does not ship Minor (a)'s defect in new code.
+   */
+  it('11.172 keeps the rows already on screen when the next page fails, and retries', async () => {
+    let call = 0;
+    render(
+      <Providers
+        services={stubServices(
+          {},
+          {
+            notifications: {
+              list: async () => {
+                call += 1;
+                if (call === 1) return { notifications: [assignment('n_3')], nextCursor: 'n_3' };
+                if (call === 2) throw new Error('the cursor has expired');
+                return { notifications: [assignment('n_2')], nextCursor: null };
+              },
+            },
+          },
+        )}
+      >
+        <InboxPage />
+      </Providers>,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: /more/i }));
+    await waitFor(() => expect(call).toBe(2));
+
+    // 1. The message that DID arrive is still the reader's.
+    expect(screen.getAllByRole('button', { name: /Restock the cold shelf/ })).toHaveLength(1);
+    // 2. Named, in the server's own words rather than a paraphrase.
+    const notice = await screen.findByText(new RegExp(PAGING_FAILURE_PREFIX.slice(0, 40)));
+    expect(notice.textContent).toContain('the cursor has expired');
+    // 3. NOT the arm that blanks the page. Asserted on the panel's own words:
+    //    `findByRole('status')` is ambiguous here, as 11.149 records.
+    expect(screen.queryByText(/Your inbox cannot be shown yet\./)).not.toBeInTheDocument();
+    // 4. Still offered: the cursor did not move, so there is still a next page.
+    const retry = screen.getByRole('button', { name: /more/i });
+
+    await userEvent.click(retry);
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /Restock the cold shelf/ })).toHaveLength(2),
+    );
+    // The complaint about the try that failed is withdrawn by the try that worked.
+    expect(
+      screen.queryByText(new RegExp(PAGING_FAILURE_PREFIX.slice(0, 40))),
+    ).not.toBeInTheDocument();
+  });
+
+  /**
+   * 11.173 — a successful open CLEARS the notice a failed one left.
+   *
+   * `open()` opens with `setOpenFailure(null)`, and removing that line survived
+   * the whole file: every case that produces the notice ends with it on screen,
+   * and no case ever opened a ticket successfully afterwards. The consequence of
+   * the gap is a sentence that outlives its cause — "that ticket cannot be
+   * opened" still on the page while the reader is being navigated to a different
+   * ticket that opened fine.
+   *
+   * `locate` answers per call: the first row click meets the ticket route's one
+   * 404, the second meets a real placement.
+   */
+  it('11.173 clears the “cannot be opened” notice when the next open succeeds', async () => {
+    let locates = 0;
+    render(
+      <Providers
+        services={stubServices(
+          {},
+          {
+            notifications: {
+              list: async () => ({ notifications: [assignment('n_1')], nextCursor: null }),
+              markRead: async () => undefined,
+            },
+            ticketLocation: {
+              locate: async () => {
+                locates += 1;
+                return locates === 1 ? null : { workspaceId: 'ws_1', projectId: 'p_1' };
+              },
+            },
+          },
+        )}
+      >
+        <InboxPage />
+      </Providers>,
+    );
+
+    const row = await screen.findByRole('button', { name: /Restock the cold shelf/ });
+    await userEvent.click(row);
+    expect(await screen.findByText(CANNOT_OPEN_COPY)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Restock the cold shelf/ }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/w/ws_1/p/p_1?ticket=t_n_1'));
+    // The stale sentence is gone rather than sitting under a successful navigation.
+    expect(screen.queryByText(CANNOT_OPEN_COPY)).not.toBeInTheDocument();
+  });
+  /**
+   * 11.177 — the reload takes the paging complaint with it.
+   *
+   * Written because the mutation round found `loadFirstPage`'s
+   * `setPagingError(null)` surviving: 11.172 pins the retry path, and nothing
+   * stood on the other path that replaces the rows. The trigger is real rather
+   * than contrived — a refused `markRead` reloads the truth (11.147) — and the
+   * consequence of the gap is a sentence describing a second page that is no
+   * longer on screen, sitting under a freshly read first one.
+   */
+  it('11.177 drops the paging failure when a reload replaces the rows it described', async () => {
+    let listCalls = 0;
+    render(
+      <Providers
+        services={stubServices(
+          {},
+          {
+            notifications: {
+              list: async () => {
+                listCalls += 1;
+                if (listCalls === 2) throw new Error('the cursor has expired');
+                return { notifications: [assignment('n_3')], nextCursor: 'n_3' };
+              },
+              markRead: async () => {
+                throw new HttpError(404, '/v1/me/notifications/n_3/read', { error: 'not_found' });
+              },
+            },
+            // Answers the route's one 404 so the click produces no navigation;
+            // this case is about the paging notice, not the deep link.
+            ticketLocation: { locate: async () => null },
+          },
+        )}
+      >
+        <InboxPage />
+      </Providers>,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: /more/i }));
+    await screen.findByText(new RegExp(PAGING_FAILURE_PREFIX.slice(0, 40)));
+
+    // The refused markRead reloads the first page (11.147's mechanism).
+    await userEvent.click(screen.getByRole('button', { name: /Restock the cold shelf/ }));
+    await waitFor(() => expect(listCalls).toBe(3));
+    await waitFor(() =>
+      expect(
+        screen.queryByText(new RegExp(PAGING_FAILURE_PREFIX.slice(0, 40))),
+      ).not.toBeInTheDocument(),
+    );
+    // And the reloaded row is on screen, so the notice went away with its subject
+    // rather than with the whole page.
     expect(screen.getByRole('button', { name: /Restock the cold shelf/ })).toBeInTheDocument();
   });
 });

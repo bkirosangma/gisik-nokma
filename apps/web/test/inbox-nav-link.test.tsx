@@ -23,6 +23,15 @@ vi.mock('../src/auth-client.js', () => ({
 
 import { InboxNavLink, REFRESH_MS } from '../src/inbox-nav-link.js';
 
+/** A promise this test resolves by hand, so the PRE-ANSWER window is a state and not a race. */
+function deferred<T>() {
+  let settle!: (value: T) => void;
+  const promise = new Promise<T>((resolve) => {
+    settle = resolve;
+  });
+  return { promise, settle };
+}
+
 beforeEach(() => {
   session = { data: { user: { id: 'u_kiro', name: 'Kiro' } } };
 });
@@ -217,5 +226,43 @@ describe('InboxNavLink — the badge that keeps its last honest value', () => {
       await vi.advanceTimersByTimeAsync(REFRESH_MS * 3);
     });
     expect(calls).toBe(1);
+  });
+  /**
+   * 11.174 — "before the first answer there is no badge", which the docblock
+   * promises and nothing pinned.
+   *
+   * `useState(0)` -> `useState(7)` survived the whole file. 11.153's absence
+   * assertion is masked, because the `!signedIn` arm clears the count to 0
+   * before anything is drawn; 11.152 reaches for `findByRole`, which waits past
+   * the pre-answer window and sees only the settled value. So the one window the
+   * promise is ABOUT — signed in, request in flight, nothing answered yet — was
+   * the one window no case stood in.
+   *
+   * The deferred read holds it open, and the pattern is borrowed from
+   * `inbox-page.test.tsx` 11.144, which pins the same shape of window one file
+   * over. The count is settled to 7 on purpose: it is the mutant's own value, so
+   * this case cannot pass by accidentally agreeing with it afterwards.
+   *
+   * The link is asserted PRESENT in the same breath as the badge is asserted
+   * absent — otherwise "no `img`" would be satisfied just as well by a component
+   * that rendered nothing at all.
+   */
+  it('11.174 draws no badge before the first answer — an absence claims nothing, a 0 would not', async () => {
+    const first = deferred<number>();
+    render(
+      <Providers
+        services={stubServices({}, { notifications: { unreadCount: async () => first.promise } })}
+      >
+        <InboxNavLink />
+      </Providers>,
+    );
+
+    // The door is up...
+    expect(await screen.findByRole('link', { name: /Inbox/ })).toBeInTheDocument();
+    // ...and it carries no number, because no number has been read yet.
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+
+    first.settle(7);
+    expect(await screen.findByRole('img', { name: '7 unread notifications' })).toBeInTheDocument();
   });
 });

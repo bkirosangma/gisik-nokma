@@ -36,6 +36,25 @@ export const CANNOT_OPEN_COPY =
   'That ticket cannot be opened from here — it may have been removed, or it is no longer visible to you. The message itself is yours and stays.';
 
 /**
+ * What the page says when the NEXT page fails — beside the control, not instead
+ * of the messages.
+ *
+ * Measured before it was written: with `loadMore`'s failure routed into `error`,
+ * a page-2 refusal left ZERO rows on screen and one refusal panel, because the
+ * render's first arm is `ShellRefusal` and it stands ahead of the rows. So a
+ * request that FAILED took away messages that had already ARRIVED — which is the
+ * standing ruling ("a message you were sent is yours") read backwards, and the
+ * opposite of what `inbox-nav-link.tsx` does one file over, where a failed
+ * refresh deliberately keeps the last count rather than asserting "none" from a
+ * request that did not answer.
+ *
+ * The rows already delivered therefore stay, the Load-more control stays (the
+ * cursor is unchanged, so the retry is real), and this sentence appears next to
+ * it. The prefix is the server's own words, appended by the caller.
+ */
+export const PAGING_FAILURE_PREFIX = 'More of your inbox could not be loaded, so what is below is only part of it: ';
+
+/**
  * `/inbox` — a GLOBAL route, and that is a decision rather than an accident.
  *
  * There is no `[workspaceId]` segment above this page, so there is no workspace
@@ -53,6 +72,14 @@ export const CANNOT_OPEN_COPY =
  * it is empty. So the page holds `page: NotificationsPage | null`, `null`
  * meaning "not answered yet", and the four arms below are refused / loading /
  * empty / loaded.
+ *
+ * A FIFTH state is deliberately not one of the four: a failed SECOND page. It is
+ * held in `pagingError` and rendered beside the Load-more control inside the
+ * loaded arm, because it is not a reason the page cannot be shown — the page is
+ * on screen and the rows in it are real. Routing it through `error`, which is
+ * what the first version of this file did, put the refusal panel in the first
+ * arm and took every delivered message off the screen; measured with a probe,
+ * zero rows and one panel. See `PAGING_FAILURE_PREFIX`.
  *
  * ## Display names are ids, and the reason is not "not yet wired"
  *
@@ -74,6 +101,13 @@ export default function InboxPage() {
   const [page, setPage] = useState<NotificationsPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openFailure, setOpenFailure] = useState<string | null>(null);
+  /**
+   * The NEXT page's failure, held apart from `error` on purpose. `error` means
+   * "this page cannot be shown"; this means "this page is shown and there is
+   * more of it that would not come". Collapsing them into one string is exactly
+   * the defect this round fixed — see `PAGING_FAILURE_PREFIX`.
+   */
+  const [pagingError, setPagingError] = useState<string | null>(null);
 
   /**
    * Both reads and the mark-read write fail the same way, so the message is
@@ -89,6 +123,11 @@ export default function InboxPage() {
     try {
       setPage(await gateway.list());
       setError(null);
+      // A fresh first page REPLACES the rows, so a complaint about a second page
+      // that no longer exists would be describing nothing on screen. Decided
+      // rather than left ambiguous: the first read clears it, the retry below
+      // clears it, and nothing else does.
+      setPagingError(null);
     } catch (cause) {
       setError(messageOf(cause));
     }
@@ -98,7 +137,7 @@ export default function InboxPage() {
     void loadFirstPage();
   }, [loadFirstPage]);
 
-  const expired = useSignInOnExpiredSession([error, openFailure]);
+  const expired = useSignInOnExpiredSession([error, openFailure, pagingError]);
 
   async function loadMore(): Promise<void> {
     if (page === null || page.nextCursor === null) return;
@@ -111,8 +150,13 @@ export default function InboxPage() {
         notifications: [...page.notifications, ...next.notifications],
         nextCursor: next.nextCursor,
       });
+      // A retry that worked withdraws the complaint about the try that did not.
+      setPagingError(null);
     } catch (cause) {
-      setError(messageOf(cause));
+      // NOT `setError`. That arm blanks the page; this one keeps the rows the
+      // server already delivered and says, beside the control, that there is
+      // more it would not give. See `PAGING_FAILURE_PREFIX`.
+      setPagingError(messageOf(cause));
     }
   }
 
@@ -184,13 +228,24 @@ export default function InboxPage() {
                 {EMPTY_INBOX_COPY}
               </p>
             ) : (
-              <InboxView
-                notifications={page.notifications}
-                userName={(id) => id}
-                onOpen={open}
-                onMarkRead={markRead}
-                onLoadMore={page.nextCursor === null ? null : loadMore}
-              />
+              <>
+                <InboxView
+                  notifications={page.notifications}
+                  userName={(id) => id}
+                  onOpen={open}
+                  onMarkRead={markRead}
+                  onLoadMore={page.nextCursor === null ? null : loadMore}
+                />
+                {/* AFTER the view, which is where the Load-more button it is
+                    about sits — and inside the loaded arm, so it can never
+                    stand in place of the rows. */}
+                {pagingError !== null ? (
+                  <p role="status" className="gn-inbox__paging-failure">
+                    {PAGING_FAILURE_PREFIX}
+                    {pagingError}
+                  </p>
+                ) : null}
+              </>
             )}
           </>
         )}

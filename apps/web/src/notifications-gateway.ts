@@ -70,6 +70,52 @@ export function createHttpNotificationsGateway(http: HttpClient): NotificationsG
     return body;
   }
 
+  /**
+   * The envelope, CHECKED rather than cast — for the reason `read` above is a
+   * guard rather than a `!`.
+   *
+   * `(await read(path)) as { notifications: unknown[]; nextCursor: string | null }`
+   * is a promise the compiler cannot keep. A 200 whose body is not that shape —
+   * a rewrite answering an HTML page, a proxy's own JSON, a future route
+   * renaming the field — reaches `body.notifications.map` and throws `Cannot
+   * read properties of undefined (reading 'map')`, which names neither the door
+   * nor the cause. That is the EXACT unnamed `TypeError` the null guard above
+   * exists to prevent, one line further in.
+   *
+   * Stated honestly: this is NOT reachable against the route that ships today
+   * (`apps/server/src/routes/notifications.ts` serves the shape, and its own
+   * tests hold it there), and no case here pretends otherwise. It is here on the
+   * same terms as the 404 guard — which is also unreachable against a correct
+   * deployment and is also tested (11.139) — because both failures arrive from
+   * OUTSIDE the pair this file is written against: the transport, the rewrites,
+   * the origin.
+   */
+  function listEnvelope(
+    path: string,
+    body: unknown,
+  ): { notifications: readonly unknown[]; nextCursor: string | null } {
+    const envelope = body as { notifications?: unknown; nextCursor?: unknown };
+    const rows = envelope.notifications;
+    const cursor = envelope.nextCursor;
+    if (!Array.isArray(rows) || (cursor !== null && typeof cursor !== 'string')) {
+      throw new Error(
+        `${path} answered 200 with a body this client cannot read — expected { notifications: [...], nextCursor: string | null }`,
+      );
+    }
+    return { notifications: rows, nextCursor: cursor };
+  }
+
+  /** The same check for the one-field envelope. See `listEnvelope`. */
+  function unreadEnvelope(path: string, body: unknown): number {
+    const unread = (body as { unread?: unknown }).unread;
+    if (typeof unread !== 'number' || !Number.isFinite(unread)) {
+      throw new Error(
+        `${path} answered 200 with a body this client cannot read — expected { unread: <number> }`,
+      );
+    }
+    return unread;
+  }
+
   return {
     async list(cursor?: string | null): Promise<NotificationsPage> {
       // `cursor` is opaque: it comes back from `nextCursor` and goes out unread.
@@ -77,10 +123,8 @@ export function createHttpNotificationsGateway(http: HttpClient): NotificationsG
       // knows what is in it.
       const query =
         cursor === undefined || cursor === null ? '' : `?cursor=${encodeURIComponent(cursor)}`;
-      const body = (await read(`/v1/me/notifications${query}`)) as {
-        notifications: unknown[];
-        nextCursor: string | null;
-      };
+      const path = `/v1/me/notifications${query}`;
+      const body = listEnvelope(path, await read(path));
       /**
        * `parseNotification` on EVERY row, and it is the domain's boundary
        * parser rather than a cast. The rows crossing here are the only place in
@@ -102,8 +146,8 @@ export function createHttpNotificationsGateway(http: HttpClient): NotificationsG
     },
 
     async unreadCount(): Promise<number> {
-      const body = (await read('/v1/me/notifications/unread-count')) as { unread: number };
-      return body.unread;
+      const path = '/v1/me/notifications/unread-count';
+      return unreadEnvelope(path, await read(path));
     },
 
     /**

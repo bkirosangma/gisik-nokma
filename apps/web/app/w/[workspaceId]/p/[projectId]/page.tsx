@@ -204,6 +204,16 @@ function ProjectBoard() {
    * cell for five and a half hours every night.
    */
   const today = istToday();
+  /*
+   * RECORDED, NOT FIXED: `today` is computed once per RENDER and never
+   * re-derived on its own, so a tab left open across IST midnight keeps
+   * yesterday's ring until something else re-renders this page. The day
+   * COMPUTATION is right — 11.164 pins it at the instant the UTC and IST
+   * spellings disagree — and this is only about when it is recomputed.
+   * Deliberately not fixed here: the fix is a timer, and a timer is a
+   * re-render mechanism that needs its own case, its own cleanup and its own
+   * argument about cadence. OWNER: whoever next opens this page's date wiring.
+   */
 
   /**
    * The roster resolved into the two things the views need from it, and BOTH are
@@ -414,6 +424,25 @@ function ProjectBoard() {
                   today={today}
                   userName={nameOf}
                   onOpenTicket={openTicket}
+                  /* INERT TODAY, AND KEPT ANYWAY — measured, not assumed.
+                     `CalendarView` passes `isEpicType` to `buildCalendarModel`,
+                     which reads it at exactly one site: the `laneEpicId` lane
+                     filter (`calendar-model.ts:275`, inside `laneEpicId !==
+                     undefined && !== null`). This page passes no `laneEpicId`
+                     and neither does anything else in `apps/web` — grep returns
+                     zero hits — so deleting this spread changes NOTHING
+                     observable through this page, and app-core's own 11.158
+                     says as much: the lane fixture "is the ONLY shape that can
+                     witness the forward".
+                     So no shell case can kill this mutation, and it is reported
+                     as a survivor rather than covered by a test that watches the
+                     line instead of its consequence. It stays because
+                     `calendar-view.tsx`'s docblock forbids exactly the state
+                     deleting it would create: the calendar and the timeline
+                     answering differently about one ticket's epic on two tabs of
+                     one page. The timeline's forward below IS live (11.165), so
+                     dropping this one would build that asymmetry one layer up,
+                     to surface silently the day a lane filter is wired. */
                   {...(isEpicType === undefined ? {} : { isEpicType })}
                 />
               ) : (
@@ -428,6 +457,10 @@ function ProjectBoard() {
                   today={today}
                   userName={nameOf}
                   onOpenTicket={openTicket}
+                  /* LIVE, unlike the calendar's above: `timeline-model.ts` reads
+                     `isEpicType` for its GROUPING (`:273`, `:320`) and not only
+                     for a lane filter, so a rank-1 predicate reaching here
+                     changes the lane heading on screen. Witnessed at 11.165. */
                   {...(isEpicType === undefined ? {} : { isEpicType })}
                 />
               ) : (
