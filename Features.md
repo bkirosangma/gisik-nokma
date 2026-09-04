@@ -975,9 +975,14 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 *(Plan 10, Tasks 4, 5, 6, 7, 9 and 10 — the LIFTED §11 closer, the contested-claims read path, the
 snapshot writer, the replica bootstrap, the sync ingress, the local replica, and the outbox with its
 local pre-check. Plan 10's own catalogue task (Task 18) owns §12's full body and will replace this
-scope note; what follows is what those six tasks added, and nothing else. §8/§10/§11 stay absent
-because the coordination doc assigns `Features.md` sections one per implementation plan and numbering
-is claimed from that table, never taken next-free. Still absent rather than missing from this section:
+scope note; what follows is what those six tasks added, and nothing else. **§8 — Plan 6's web client —
+stays absent**, because the coordination doc assigns `Features.md` sections one per implementation plan
+and numbering is claimed from that table, never taken next-free. That clause used to read "§8/§10/§11
+stay absent" and was still saying it here after Plan 8 wrote §10 and Plan 9 wrote §11: both are in this
+file, BELOW this section (`grep -n '^## ' Features.md` — §10 at the workflow builder, §11 at calendar
+and notifications, both after §12). The reservation table governs a section's NUMBER, not the order
+sections appear in the file, and §12 landing above §10 and §11 is that rule working rather than
+failing. Still absent rather than missing from this section:
 the sync engine, the replica `DataSource`, app-core's offline UX, the dual-client harness and both app
 shells — Plan 10 Tasks 11–17. **Task 9's replica and Task 10's outbox are now here, at the end of this
 section, while Task 8's storage substrate sits in §3** — that split is real and is left standing rather
