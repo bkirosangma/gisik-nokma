@@ -1042,18 +1042,28 @@ Plan 10 Tasks 8–17.)*
 - ⚙️ **Snapshot writer — the fold is the DOMAIN reducer, never `proj_tickets`** — Plan 1 shipped the
   `snapshots` table with no writer; this is the writer. `runSnapshotPass` snapshots every ticket whose
   head seq has run `SNAPSHOT_MIN_EVENTS` past its latest snapshot, and the stored `state` is
-  `applyTicketEvent` folded over the ledger — the same reducer a replica runs, so snapshot + tail is
-  exactly full replay on every client. Reading `proj_tickets` instead would look right indefinitely:
+  `applyTicketEvent` folded over the ledger — the same reducer a replica runs. "Snapshot + tail is
+  exactly full replay on every client" follows, but only JOINTLY with the serving side, and it was false
+  until the fix round that added this clause: this writer skips every type outside `TICKET_EVENT_TYPES`
+  while still advancing `seq` past it, so such an event reaches a replica only because
+  `BOOTSTRAP_BACKFILL_TYPES` names it — and `visibility.set` was not named. Reading `proj_tickets`
+  instead would look right indefinitely:
   that table is maintained by the same reducer today, so the two agree until the day they don't, and
   then a replica's bootstrap state differs from its own replay with nothing pointing at why. The
   equivalence is held by a test whose fixture leaves all three projections EMPTY and asserts it —
   under a fixture seeded through the full ingest path both implementations produce identical bytes and
   the assertion would distinguish nothing. `apps/server/src/sync/snapshot-writer.ts`
-- ⚙️ **The snapshot's seq counts EVENTS, not folds** — `claim.contested` and `claim.contested_resolved`
-  are filed against `kind: 'ticket'` and are deliberately absent from `TICKET_EVENT_TYPES`, so they
+- ⚙️ **The snapshot's seq counts EVENTS, not folds** — `visibility.set`, `claim.contested` and
+  `claim.contested_resolved` are all three filed against `kind: 'ticket'` and are deliberately absent
+  from `TICKET_EVENT_TYPES`, so they
   move the cursor without moving the state. A writer that advanced the seq only on folded events would
   store a snapshot sitting behind events it had already passed, and a replica resuming from that cursor
-  would be re-delivered them on every bootstrap. `apps/server/src/sync/snapshot-writer.ts`
+  would be re-delivered them on every bootstrap. The cost of that design is paid on the serving side:
+  those three exist in no snapshot, so bootstrap has to name every one of them or the ones it misses
+  vanish below the cut. `TICKET_EVENT_TYPES` is TEN of the registry's thirteen `entityKind: 'ticket'`
+  types, not all of them, and its own docblock used to say "the ten registered against
+  `entityKind: 'ticket'`" — which is the most plausible reason `visibility.set` was missed.
+  `apps/server/src/sync/snapshot-writer.ts`, `packages/domain/src/ticket-state.ts`
 - ⚙️ **Reducer deps folded from the ledger's own definition events** — `buildLedgerDeps` builds
   `TicketStateDeps` from `workflow.defined` / `ticket-type.defined` rows, ordered by `workspace_seq`
   and NOT by `(entity_kind, entity_id, seq)`: a ticket type's key lives in its PAYLOAD and successive
@@ -1061,10 +1071,16 @@ Plan 10 Tasks 8–17.)*
   so per-entity seq cannot order them against each other at all. Greatest `workspace_seq` wins for
   types and greatest `version` wins for workflows — the same two rules `proj_ticket_types`' guarded
   `DO UPDATE` and `proj_workflows`' `DO NOTHING` + `ORDER BY version DESC` already enforce, so the
-  ledger fold and the projections cannot disagree about which definition is current. Both rules are
+  ledger fold and the projections cannot disagree about which definition is current — and neither can a
+  replica, because `GET /v1/sync/bootstrap` serves `definitions` in this same `workspace_seq` order
+  (12.117). It did not, for one task: the route shipped the plan text's `(entity_kind, entity_id, seq)`,
+  so a workspace that had ever redefined a ticket-type key handed the replica the definitions in the one
+  order this loader's docblock says cannot resolve them. Both rules are
   pinned by a fixture that defines one key TWICE, with the winning definition deliberately given the
   smaller ULID entity id so the plan text's ordering picks the loser, and the maps never cross a
-  workspace. `apps/server/src/sync/ledger-deps.ts`
+  workspace. *That workspace filter is pinned by ONE case — dropping it reddens 12.93 and nothing else,
+  974 of 975 green across all 88 server test files, re-measured; the "red in seven cases" this file's
+  test-case entry used to claim was never run.* `apps/server/src/sync/ledger-deps.ts`
 - ⚙️ **The writer's absences, named** — no locking (safe because the row is keyed by seq and the fold is
   pure below it, so a late arrival is the next pass's work, not a corruption), tickets only (there is no
   other reducer to fold), no visibility or tenancy gate (a background sweep has no caller identity — the
@@ -1093,15 +1109,27 @@ Plan 10 Tasks 8–17.)*
 - ✅ **`GET /v1/sync/bootstrap`** — first-run replica build without replaying full history: for every
   ticket `listVisibleTickets` returns for the caller, the latest reducer-folded snapshot (if one exists) plus a per-entity tail
   — everything after the snapshot's seq, PLUS every `comment.added` / `attachment.added` /
-  `claim.contested` / `claim.contested_resolved` regardless of position, because content and contests
-  never fold into ticket state. Every `workflow.defined` and `ticket-type.defined` event goes to
+  `visibility.set` / `claim.contested` / `claim.contested_resolved` regardless of position. That list is
+  not a taste judgement and it is not hand-kept: it is **every one of the thirteen types the registry
+  binds to `entityKind: 'ticket'` that the reducer does not fold**, because the snapshot writer skips
+  exactly those while still advancing `seq` past them, so an unlisted one is in neither the snapshot nor
+  the tail. `visibility.set` was missing from the list and was therefore dropped — but only when it sat
+  at or below a ticket's snapshot seq, so what a replica received depended on when a background
+  maintenance pass last ran (12.115). Every `workflow.defined` and `ticket-type.defined` event goes to
   everyone including guests (a guest cannot render a status without the workflow definition, Plan 4
-  §5). The whole read runs inside one `REPEATABLE READ` transaction with the workspace's stream cursor
+  §5), **in ascending `workspace_seq` order** — the same order `buildLedgerDeps` folds them in, so a
+  replica that applies them in the order it received them lands where the server did. That order is part
+  of the contract: the route shipped `(entity_kind, entity_id, seq)`, which is the ordering 12.92 exists
+  to prove picks the LOSER when one ticket-type key has been redefined (12.117). The whole read runs
+  inside one `REPEATABLE READ` transaction with the workspace's stream cursor
   read FIRST, so the response is a consistent cut and subscribing at the returned `streamSeq` can only
-  re-deliver an event the client already has, never skip one — both halves of that claim are now pinned
-  by the tests rather than only by this sentence: `streamSeq` is checked against the real cursor
-  (`readStreamSeq`), not merely a positive number, and the transaction's literal `BEGIN ISOLATION LEVEL
-  REPEATABLE READ` is asserted directly. The un-snapshotted branch (a ticket too new to have a snapshot
+  re-deliver an event the client already has, never skip one. Both halves of that claim are pinned by
+  the tests rather than only by this sentence — **and for a while only one of them was**: `streamSeq` is
+  checked against the real cursor (`readStreamSeq`), not merely a positive number, and the transaction's
+  literal `BEGIN ISOLATION LEVEL REPEATABLE READ` is asserted directly, but that second check is a
+  MEMBERSHIP check and membership cannot see position, so the ORDERING half went unpinned until 12.118
+  asserted the cursor query is issued before the first per-ticket tail read. The un-snapshotted branch (a
+  ticket too new to have a snapshot
   yet: `snapshot: null`, `events` is its full history) and the `definitions` query's per-workspace scoping
   (a sibling workspace's own `workflow.defined`/`ticket-type.defined` rows must not appear) are likewise
   exercised now, not merely implied by the shape of the response type. 403 `{error:'not_a_member'}` when the

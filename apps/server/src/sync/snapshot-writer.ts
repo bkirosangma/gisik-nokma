@@ -23,9 +23,24 @@ type Due = { workspaceId: string; entityId: string };
  * `state` is the DOMAIN REDUCER's fold at `seq` — `applyTicketEvent`, with deps
  * from `buildLedgerDeps`, never `proj_tickets`. That equivalence is the whole
  * point: a snapshot must be exactly the state a client computes from the same
- * events, so snapshot + tail ≡ full replay on every replica. `proj_tickets`
- * happens to be maintained by the same reducer today, which is precisely why
- * reading it would be an invisible mistake — it would agree until it didn't.
+ * events.
+ *
+ * "Snapshot + tail ≡ full replay on every replica" is the property that follows
+ * — but only jointly with the SERVING side, and it was false until the fix
+ * round that added this paragraph. This writer skips every type outside
+ * `TICKET_EVENT_TYPES` while still advancing `seq` past it (see "seq counts
+ * events, not folds" below), so such an event is in neither the snapshot nor,
+ * by default, the tail. It reaches the replica only because
+ * `BOOTSTRAP_BACKFILL_TYPES` names it, and that list has to cover EVERY
+ * unfolded `entityKind: 'ticket'` type or the equivalence breaks for any ticket
+ * whose stream carries the missing one below its snapshot seq. `visibility.set`
+ * was missing from it, so the claim was false for exactly those tickets, and
+ * silently — an identical event one seq higher was delivered in full.
+ * `sync-routes.ts` carries the membership rule and the arithmetic.
+ *
+ * `proj_tickets` happens to be maintained by the same reducer today, which is
+ * precisely why reading it would be an invisible mistake — it would agree until
+ * it didn't.
  *
  * ## `seq` counts events, not folds
  *

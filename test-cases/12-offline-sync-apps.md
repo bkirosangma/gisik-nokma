@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.114`. THE NEXT FREE ID IS `12.115`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, and said `12.113` until Task 7's fix round added the cross-workspace batch case. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.118`. THE NEXT FREE ID IS `12.119`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, and said `12.114` until Batch A's whole-branch review round added 12.115–12.118. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -135,8 +135,13 @@ implementation mutations named below was run and reddened the case named beside 
   in both directions, with the neighbouring workspace's own definitions resolving in the same run so
   "invisible here" cannot be satisfied by a loader that finds nothing anywhere. *Mutations: version
   comparison flipped → red, `expected 1 to be 3`; the tie loosened to `<=` → red, `expected 'A v3
-  second' to be 'A v3 first'`; the workspace filter dropped → red in seven cases.*
-  (snapshot-writer.test.ts)
+  second' to be 'A v3 first'`; the workspace filter dropped → **red in exactly ONE case, this one**
+  (`expected {…} to be undefined`), 974 of 975 green across all 88 server test files.* *(That last
+  number said "red in seven cases" until it was measured. It was never measured; it was estimated from
+  how many cases touch `buildLedgerDeps`, and it is the largest of the four self-falsifying counts this
+  branch produced — 7 claimed against 1 actual. The lesson is not "count more carefully": a mutation's
+  blast radius is not derivable from reading, only from running, so the number goes in AFTER the run or
+  not at all.)* (snapshot-writer.test.ts)
 - 12.94 ✅ `GET /v1/sync/bootstrap` hands a member the reducer-folded snapshot + tail for a ticket they
   can see, `me.projectIds` as real ULIDs and not `[key, value]` tuples (the plan's own snippet spreads
   `[...eff.projects]` — a `Map` — instead of `[...eff.projects.keys()]`; this case pins the fix by
@@ -189,6 +194,58 @@ implementation mutations named below was run and reddened the case named beside 
   $1` (keeping the bind count so the route does not 500 for an unrelated reason) → red on three cases at
   once — 12.94 (`expected […] to deeply equal […]`, extra types from WS2), 12.96 (`expected […] to have a
   length of 2 but got 4`), and this case directly (`expected […] to not include`).* (bootstrap.test.ts)
+- 12.115 ✅ a `visibility.set` filed BELOW a ticket's snapshot seq still reaches the replica. The
+  registry binds THIRTEEN types to `entityKind: 'ticket'`; `TICKET_EVENT_TYPES` folds ten and
+  `BOOTSTRAP_BACKFILL_TYPES` carried four, two of them overlapping — union twelve, and the one type in
+  neither set was `visibility.set`. The snapshot writer skipped it while still advancing `seq` past it,
+  so below the snapshot it was dropped from the payload entirely while an identical event ONE SEQ ABOVE
+  travelled in full: not an exclusion but an accident of when the background pass last ran.
+  **No existing fixture could see it** — `applyAll` + `setVisibilityEnv` run the PROJECTIONS only
+  (`test/helpers/seed.ts`) and write no `events` row, so the whole file contained zero `visibility.set`
+  ledger rows. This case seeds a REAL one, at seq 2 under a snapshot at seq 27, and asserts the snapshot
+  seq as a PREMISE first so the case cannot pass vacuously if the fixture's arithmetic ever shifts the
+  event above the cut. *Mutation: `'visibility.set'` removed from `BOOTSTRAP_BACKFILL_TYPES` → red here
+  alone, `expected [] to have a length of 1 but got +0`, the other nine cases in the file green.*
+  (bootstrap.test.ts)
+- 12.116 ✅ a `claim.contested` and its `claim.contested_resolved`, both filed BELOW a ticket's snapshot
+  seq, travel in full — the case that makes the two contest entries in `BOOTSTRAP_BACKFILL_TYPES`
+  load-bearing. **Before it, they were decorative:** deleting BOTH from the constant — which makes
+  bootstrap silently omit every contest predating a ticket's snapshot, exactly the failure the design
+  note exists to prevent — left the whole server suite green (*measured by the review at `06b6ec2`, where
+  the suite was 971 tests over 88 files; this sha's suite is 975 over 88, and the same mutation now
+  reddens this case*). 12.94's "drop the backfill clause" mutation
+  pins the CLAUSE and only through `comment.added`; the fixture had no `claim.contested` on any
+  snapshotted ticket. This is the T6 half of the branch's one cross-task property (T5 advances the
+  cursor past a contest without folding it — 12.88; T7 appends it — the degrade set; T6 must backfill it
+  regardless of position — here). *Mutation: both contest entries deleted from
+  `BOOTSTRAP_BACKFILL_TYPES` → red here alone, `expected undefined to be defined`, the other nine green.*
+  (bootstrap.test.ts)
+- 12.117 ✅ `definitions` arrives in ASCENDING `workspace_seq` order, so a replica folding it in the
+  order received resolves the same definition the server's own `buildLedgerDeps` does — asserted by
+  doing exactly that fold and comparing against `buildLedgerDeps` in the same test. The route shipped
+  `ORDER BY entity_kind, entity_id, seq`, which is the ordering **this file's own 12.92 exists to prove
+  wrong**: a ticket type's key lives in its PAYLOAD and successive definitions of one key arrive on
+  different entity streams, so per-entity `seq` is 1 for both and the id ordering resolves the winner by
+  ULID collation. Nothing constrained it — 12.94 `.sort()`s the types before comparing, 12.96 checks a
+  length, 12.99 checks ids by membership. The fixture mirrors 12.92's construction in a third workspace:
+  one key defined twice, the WINNER given the smaller ULID, so the shipped ordering hands the replica
+  the loser last. The premises are stated order-INSENSITIVELY on purpose, so the mutation fails on the
+  consequence rather than on a premise. *Mutation: `ORDER BY workspace_seq` → `ORDER BY entity_kind,
+  entity_id, seq` → red here alone, `expected '<WS3_WF_OLD>' to be '<WS3_WF_NEW>'` — the replica
+  resolving the superseded workflow binding — the other nine green.* (bootstrap.test.ts)
+- 12.118 ✅ the stream cursor is read BEFORE the first per-ticket tail read, not merely inside the same
+  transaction. Three places on this branch asserted the ordering and Features.md claimed "both halves of
+  that claim are now pinned by the tests"; only one half was. 12.98 checks the isolation level **by
+  membership**, and its own note says so — membership cannot see position, so it constrained nothing
+  about where the cursor read sits. Moving `readStreamSeq` to immediately before `COMMIT`, after the
+  whole visible-ticket loop, left every bootstrap case green (*measured by the review at `06b6ec2`, where
+  this file held six*). This reuses 12.98's `db.pool.connect`
+  recorder, which already captured every SQL string in issue order, and compares `indexOf` of
+  `readStreamSeq`'s literal against `readEntityEvents`'. Both indexes are asserted `>= 0` FIRST: the
+  recorder only sees queries passed as plain strings, and a query passed as a `{text, values}` config
+  object would record nothing, making `-1 < -1` false but `-1 < 0` true for a reason unrelated to
+  ordering. *Mutation: `readStreamSeq` moved to immediately before `COMMIT` → red here alone, `expected
+  24 to be less than 21`, the other nine green.* (bootstrap.test.ts)
 
 ## `POST /v1/sync` (Task 7) — `apps/server/test/sync/sync-route.test.ts`
 
@@ -259,7 +316,11 @@ refusal, which fires on both doors and therefore proves nothing about which was 
   placements apart, because the `duplicate-event-id` fallback produces an identical result object while
   the caller can still see the ticket. *Mutation: the step-4 lookup replaced with a constant `null` →
   red here alone (`expected { status: 'contested', …(4) } to deeply equal { status: 'committed',
-  …(4) }`), all thirteen other cases green.* (sync-route.test.ts)
+  …(4) }`), all **fourteen** other cases green — `PASS (14) FAIL (1)`, re-measured.* *(This said
+  "thirteen" because it was written when 12.113 was the file's last case; the round that added 12.114
+  updated the HIGHEST-ID line and not this sentence. A count of "the others" is a fact about the file's
+  size at one moment, so it goes stale the next time the file grows — which is why the recount is
+  stated with the runner's own line rather than as a bare number.)* (sync-route.test.ts)
 - 12.114 ✅ a claim naming a ticket bound to ANOTHER workspace answers `refused`
   `entity-workspace-mismatch` **inside `results`**, and the batch around it survives: `[legal1, bad,
   legal2]` → 200 with three index-aligned answers, `legal2` actually in the ledger, no ledger row and
@@ -284,7 +345,9 @@ refusal, which fires on both doors and therefore proves nothing about which was 
   construction. 12.101 asserts the contest carries the rule the refusal named; 12.102/12.103 assert it
   for two refusals produced by the permission gate. *The class is not closed for a contest built any
   other way — `checkContestCoherence` remains the net for those, and it still cannot see this.*
-- 12.77 ✅ the `POST /v1/sync` door is enumerated, by 12.100-12.113. It calls `ingestClientBatch`, so it
+- 12.77 ✅ the `POST /v1/sync` door is enumerated, by 12.100-**12.114** (fifteen cases; this read
+  `12.100-12.113` until the recount, the same stale-by-one artifact as 12.113's own sentence — and in an
+  entry that reads as a CLOSURE claim, where an undercount silently narrows what was closed). It calls `ingestClientBatch`, so it
   inherits both the permission gate and the coherence check; the two DOOR TESTs above pin that, and the
   route's deps type makes the wrong call a compile error rather than a comment.
 - 12.82 🟡 **narrowed by this door, NOT closed as a class.** Two of the free fields the coherence check

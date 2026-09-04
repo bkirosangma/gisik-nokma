@@ -12,13 +12,50 @@ import { MAX_BATCH_SIZE } from '../routes/events.js';
 import { createSyncService } from './sync-service.js';
 
 /**
- * Content and contests are not ticket *state*, so a snapshot does not carry
- * them — they backfill in full regardless of where they sit relative to a
- * ticket's snapshot seq. See `bootstrapTicket` below.
+ * The ticket-entity event types a snapshot does NOT carry, so bootstrap must
+ * hand them over in full regardless of where they sit relative to a ticket's
+ * snapshot seq. See `bootstrapTicket` below.
+ *
+ * The membership rule is mechanical, not a taste judgement: the snapshot writer
+ * folds exactly `TICKET_EVENT_TYPES` and skips everything else while still
+ * advancing `seq` past it (`snapshot-writer.ts`, "seq counts events, not
+ * folds"), so an event filed against `entityKind: 'ticket'` that the reducer
+ * does not fold is invisible in the snapshot AND below its seq — dropped from
+ * the replica entirely unless it is named here.
+ *
+ * **This list plus `TICKET_EVENT_TYPES` must equal the registry's whole
+ * `entityKind: 'ticket'` set**, or "snapshot + tail ≡ full replay" is false for
+ * any ticket whose stream carries the missing type below its snapshot seq. The
+ * registry binds THIRTEEN types to that kind (`vocabulary.ts`);
+ * `TICKET_EVENT_TYPES` is ten of them, and the three it omits —
+ * `visibility.set`, `claim.contested`, `claim.contested_resolved` — are exactly
+ * the three below that are not also folded. `comment.added` and
+ * `attachment.added` appear in both lists on purpose: they fold into state AND
+ * are content a replica needs verbatim.
+ *
+ * `visibility.set` was the one that got missed, and the miss was silent and
+ * ASYMMETRIC: filed above a ticket's snapshot seq it travelled, filed at or
+ * below it, it vanished — so what a replica received depended on when a
+ * background maintenance pass last ran. It is here for the reason
+ * `vocabulary.ts` already gives: it "is filed against the TICKET whose audience
+ * it changes — a claim on that ticket's own history, exactly as `comment.added`
+ * is". Case 12.115 pins it with a REAL ledger event below a snapshot; the
+ * projection-only `setVisibilityEnv` seed the rest of the fixture uses cannot
+ * produce one.
+ *
+ * *Absence, named rather than implied: the membership rule above is held by
+ * this comment and by arithmetic done once, NOT by a check. Nothing fails when
+ * a fourteenth type is registered against `entityKind: 'ticket'` and added to
+ * neither list — it reappears as exactly the defect 12.115 was written for, and
+ * silently. Deriving this list from the registry instead would close it, but it
+ * would also mean 12.94's hardcoded literals and this constant shrink together,
+ * which is the property that check exists to deny. Owner: whoever registers the
+ * next ticket-entity event type.*
  */
 export const BOOTSTRAP_BACKFILL_TYPES = [
   'comment.added',
   'attachment.added',
+  'visibility.set',
   'claim.contested',
   'claim.contested_resolved',
 ] as const;
@@ -36,6 +73,13 @@ export type BootstrapResponse = {
   workspaceId: string;
   me: BootstrapMe;
   streamSeq: number;
+  /**
+   * Every `workflow.defined` / `ticket-type.defined` in the workspace, in
+   * ASCENDING `workspace_seq` order — the same order `buildLedgerDeps` folds
+   * them in, so a replica that applies them in the order it received them
+   * resolves the same current definition the server does. The order is part of
+   * the contract, not an accident of the query: see the query's own comment.
+   */
   definitions: LedgerEvent[];
   tickets: BootstrapTicket[];
 };
@@ -43,8 +87,9 @@ export type BootstrapResponse = {
 /**
  * One ticket's replica-build payload: the latest snapshot (if any) plus every
  * event a replica still needs on top of it — everything after the snapshot's
- * seq, PLUS every backfill-type event regardless of position, because content
- * and contests never fold into the reducer's state.
+ * seq, PLUS every `BOOTSTRAP_BACKFILL_TYPES` event regardless of position,
+ * because those are the ticket-entity types the reducer never folds and a
+ * snapshot therefore never carries.
  */
 async function bootstrapTicket(client: PoolClient, ticketId: string): Promise<BootstrapTicket> {
   const snapshot = await readLatestSnapshot(client, 'ticket', ticketId);
@@ -70,11 +115,19 @@ async function bootstrapTicket(client: PoolClient, ticketId: string): Promise<Bo
 /**
  * `GET /v1/sync/bootstrap?workspaceId=<id>` — first-run replica build without
  * replaying full history: reducer-folded snapshots plus per-entity tails, full
- * comment/contest backfill, definitions for everyone including guests (a guest
- * cannot render status without the workflow definition, Plan 4 §5), and a
- * stream cursor read FIRST inside one `REPEATABLE READ` transaction so the
- * whole response is a consistent cut — subscribing at `streamSeq` can only
- * re-deliver an event the client already has, never skip one.
+ * backfill of every ticket-entity type the reducer does not fold
+ * (`BOOTSTRAP_BACKFILL_TYPES`), definitions in `workspace_seq` order for
+ * everyone including guests (a guest cannot render status without the workflow
+ * definition, Plan 4 §5), and a stream cursor read FIRST inside one
+ * `REPEATABLE READ` transaction so the whole response is a consistent cut —
+ * subscribing at `streamSeq` can only re-deliver an event the client already
+ * has, never skip one.
+ *
+ * "Read FIRST" is a claim about ORDER, and order is what a membership check
+ * cannot see: 12.98 asserts the `BEGIN ISOLATION LEVEL REPEATABLE READ` literal
+ * was issued, which constrains the isolation level and nothing about where the
+ * cursor read sits. Case 12.118 pins the placement directly — the
+ * `readStreamSeq` query must be issued before the first per-ticket tail read.
  *
  * 401 without a session (`requireSession`, threaded in by `app.ts` exactly as
  * every other route here takes it — house pattern, not this route's own
@@ -137,10 +190,22 @@ export function registerSyncRoutes(
         }
         const workspaceRole = eff.workspaceRole;
         const streamSeq = await readStreamSeq(client, workspaceId);
+        // `ORDER BY workspace_seq`, and NOT the plan text's `(entity_kind,
+        // entity_id, seq)`, for the reason `ledger-deps.ts`'s docblock spells
+        // out and case 12.92 proves: a ticket type's key lives in its PAYLOAD
+        // and successive definitions of one key arrive on DIFFERENT entity
+        // streams, each with a fresh ULID entity id, so per-entity `seq` is 1
+        // for both and cannot order them against each other at all — the id
+        // ordering resolves the winner by ULID collation, which is only
+        // accidentally chronological. Serving that order would hand the replica
+        // the LOSER under naive last-write-wins, disagreeing with the server's
+        // own fold. This is the order `buildLedgerDeps` reads in, so a client
+        // that folds these in the order it received them lands where the server
+        // did. Case 12.117.
         const { rows: defRows } = await client.query<EventRow>(
           `SELECT * FROM events
             WHERE workspace_id = $1 AND entity_kind IN ('workflow', 'ticket-type')
-            ORDER BY entity_kind, entity_id, seq`,
+            ORDER BY workspace_seq`,
           [workspaceId],
         );
         const definitions = defRows.map(rowToEnvelope);
