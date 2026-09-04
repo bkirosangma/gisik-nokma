@@ -57,19 +57,57 @@ import type { Queryable } from '../db/queryable.js';
  * - It does not validate that the definitions are mutually coherent (a ticket
  *   type naming a workflow that was never published still parses here). The
  *   reducer throws on that when it reaches it, naming the missing id.
+ *
+ * ## `belowWorkspaceSeq` — the as-of reading, and why "below" is in the name
+ *
+ * With no options this loads the whole workspace and resolves the NEWEST
+ * definition of everything. That is right for the background pass, whose tail
+ * never spans a publish, and it is WRONG for the publish door itself
+ * (`snapshot-refresh.ts`): the events it is about to re-fold were written in
+ * the vocabulary in force before the publish, and resolving them against the
+ * version being published is precisely the throw the whole refresh exists to
+ * prevent — `applyTicketEvent: workflow "…" has no state "doing"`.
+ *
+ * `belowWorkspaceSeq` is STRICT: `workspace_seq < n`, so passing the publish
+ * event's own `workspaceSeq` yields the definitions as they stood immediately
+ * before it, the new version excluded. The exclusivity is in the name rather
+ * than in a comment because an off-by-one here is invisible — the fold would
+ * still succeed on every ticket whose history happens not to name a dropped
+ * state.
  */
-export async function buildLedgerDeps(db: Queryable, workspaceId: string): Promise<TicketStateDeps> {
+export type LedgerDepsOptions = {
+  /** Strict upper bound: only definitions with `workspace_seq <` this are loaded. */
+  belowWorkspaceSeq?: number;
+};
+
+export async function buildLedgerDeps(
+  db: Queryable,
+  workspaceId: string,
+  options: LedgerDepsOptions = {},
+): Promise<TicketStateDeps> {
   const workflows = new Map<string, WorkflowDef>();
   const ticketTypes = new Map<string, TicketTypeDef>();
 
-  const { rows } = await db.query<{ type: string; payload: unknown }>(
-    `SELECT type, payload FROM events
-      WHERE workspace_id = $1
-        AND entity_kind IN ('workflow', 'ticket-type')
-        AND type IN ('workflow.defined', 'ticket-type.defined')
-      ORDER BY workspace_seq`,
-    [workspaceId],
-  );
+  const bound = options.belowWorkspaceSeq;
+  const { rows } =
+    bound === undefined
+      ? await db.query<{ type: string; payload: unknown }>(
+          `SELECT type, payload FROM events
+            WHERE workspace_id = $1
+              AND entity_kind IN ('workflow', 'ticket-type')
+              AND type IN ('workflow.defined', 'ticket-type.defined')
+            ORDER BY workspace_seq`,
+          [workspaceId],
+        )
+      : await db.query<{ type: string; payload: unknown }>(
+          `SELECT type, payload FROM events
+            WHERE workspace_id = $1
+              AND entity_kind IN ('workflow', 'ticket-type')
+              AND type IN ('workflow.defined', 'ticket-type.defined')
+              AND workspace_seq < $2
+            ORDER BY workspace_seq`,
+          [workspaceId, bound],
+        );
 
   for (const row of rows) {
     if (row.type === 'workflow.defined') {
@@ -88,4 +126,49 @@ export async function buildLedgerDeps(db: Queryable, workspaceId: string): Promi
     getWorkflow: (id) => workflows.get(id),
     getTicketType: (id) => ticketTypes.get(id),
   };
+}
+
+/**
+ * Every published version of ONE workflow, keyed by version number, read from
+ * the LEDGER for the same reason `buildLedgerDeps` above reads it: this ladder
+ * feeds `foldStateIdForward`, which the offline replica also runs, and a server
+ * that walked `proj_workflows` while a replica walked its own copy of the
+ * definition events would agree only until they didn't.
+ *
+ * Ties resolve the way `buildLedgerDeps` resolves them — FIRST publisher of a
+ * given version wins, which is what `ORDER BY workspace_seq` plus the
+ * `ladder.has` guard says. `proj_workflows` is `ON CONFLICT (workflow_id,
+ * version) DO NOTHING`, the same rule by another road.
+ *
+ * The map is deliberately keyed by version and not by workspace position:
+ * `foldStateIdForward` asks for "the definition of version N" and returns
+ * `null` for one that cannot be supplied, so a HOLE in the chain reports as a
+ * hole rather than as an unmapped drop (`ticket-state.ts`).
+ *
+ * The query selects EVERY `workflow.defined` in the workspace and filters by id
+ * in JS rather than in SQL, deliberately and not by oversight: the workflow key
+ * lives in the PAYLOAD, so a SQL predicate would have to reach into the jsonb
+ * and would then be a second statement of "which field is the key" beside
+ * `workflowDefinedPayloadSchema`'s. The cost is parsing every workflow's
+ * payload on every publish, which is a builder-sized number, not a
+ * ledger-sized one — the same bound `buildLedgerDeps` already accepts above.
+ */
+export async function readWorkflowVersions(
+  db: Queryable,
+  workspaceId: string,
+  workflowId: string,
+): Promise<Map<number, WorkflowDef>> {
+  const { rows } = await db.query<{ payload: unknown }>(
+    `SELECT payload FROM events
+      WHERE workspace_id = $1 AND entity_kind = 'workflow' AND type = 'workflow.defined'
+      ORDER BY workspace_seq`,
+    [workspaceId],
+  );
+  const ladder = new Map<number, WorkflowDef>();
+  for (const row of rows) {
+    const def = workflowDefinedPayloadSchema.parse(row.payload);
+    if (def.id !== workflowId) continue;
+    if (!ladder.has(def.version)) ladder.set(def.version, def);
+  }
+  return ladder;
 }

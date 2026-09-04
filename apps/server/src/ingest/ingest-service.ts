@@ -22,6 +22,7 @@ import {
 } from '../ledger/event-store.js';
 import { checkPermission, type SubmissionGate } from '../permissions/check-permission.js';
 import { checkContestCoherence } from '../sync/contest-coherence.js';
+import { refreshSnapshotsForWorkflowPublish } from '../sync/snapshot-refresh.js';
 import { bootstrapWorkspace } from '../workspaces/bootstrap-workspace.js';
 import { readEntityHead } from '../projections/entity-heads.js';
 import type { ProjectionRegistry } from '../projections/registry.js';
@@ -335,6 +336,22 @@ export function createIngestService(deps: IngestDeps): IngestService {
       }
 
       await insertEvent(client, envelope);
+      // REFRESH ON PUBLISH, SNAPSHOT DOOR — before the projections, and both
+      // halves of that are load-bearing.
+      //
+      // Not a projection: `snapshots` is not a `proj_` table, so
+      // `verify-projections.ts` makes no shadow copy of it and an unqualified
+      // write from inside a projection escapes `search_path` to write LIVE
+      // during a verify. Not after the loop either: `proj_tickets`'s own
+      // refresh-on-publish sets exactly the rows this selects to the new
+      // version, so running second would match nothing and be a silent no-op.
+      // `snapshot-refresh.ts` carries the argument in full.
+      //
+      // The outcome is discarded here and that is the one thing this call site
+      // gives up: a ticket whose fold could not be walked forward keeps its
+      // stale snapshot and says so only in the returned value, and ingest has
+      // no logger to put it in.
+      await refreshSnapshotsForWorkflowPublish(client, envelope);
       for (const projection of deps.projections.all()) {
         await projection.apply(envelope, client);
       }

@@ -20,6 +20,30 @@ export async function writeSnapshot(client: PoolClient, snapshot: Snapshot): Pro
   );
 }
 
+/**
+ * The PUBLISH door's write, and the one difference from `writeSnapshot` above
+ * is the whole reason it exists: it may land on a seq that already has a row.
+ *
+ * A workflow publish does not add an event to any ticket's stream, so a ticket
+ * whose head is already snapshotted has its head state RE-STATED at the same
+ * seq — the same events, folded onto the new vocabulary. `writeSnapshot`'s bare
+ * INSERT dies on `snapshots_pkey` there, and it is right to: for the background
+ * pass a collision means two passes overlapped and one of them is redundant
+ * (`snapshot-writer.ts`, "not re-entrant"), which is a fault worth surfacing.
+ * Here a collision is the ORDINARY case and the update is the point.
+ *
+ * Kept as a second named function rather than an `ON CONFLICT` added to
+ * `writeSnapshot`, because that would silence the pass's collision too — the
+ * one `test/sync/snapshot-writer.test.ts` case 12.89 exists to observe.
+ */
+export async function overwriteSnapshot(client: PoolClient, snapshot: Snapshot): Promise<void> {
+  await client.query(
+    `INSERT INTO snapshots (entity_kind, entity_id, seq, state) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (entity_kind, entity_id, seq) DO UPDATE SET state = excluded.state`,
+    [snapshot.entityKind, snapshot.entityId, snapshot.seq, JSON.stringify(snapshot.state)],
+  );
+}
+
 export async function readLatestSnapshot(
   client: PoolClient | Pool,
   kind: EntityKind,
