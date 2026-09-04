@@ -2614,3 +2614,86 @@ and a silent no-backoff resubmit on another.
 asserting its own set was complete — this project's signature defect wearing a new costume. The
 heuristic as it should be stated: **find every caller of the throwing function, enumerated from the
 call graph, and never trust a docblock's count of them.**
+
+---
+
+# OWNER PRIORITY CHANGE — T13 IS DEFERRED; THREE CLOSURES COME FIRST (2026-09-04 ~16:10)
+
+Relayed by the controller. **Batch C ships as T11 + T12 only.** T13 had not started when the change
+arrived — verified, not assumed: none of its four declared files existed, with
+`replica/replica-data-source.ts` present as the control — so stopping cost nothing.
+
+## WHAT I DID WITH THE INTERRUPTED WORK, because killing a workflow mid-task is exactly the hazard
+
+Stopping the workflow left **uncommitted work in the tree**: a further T12 refinement round, killed
+between writing a docblock and writing its test. `git status` showed two modified files and an untracked
+probe. **This is the "a dead fan-out leaves uncommitted work" case this file has warned about twice, and
+it is the first time it has happened to work that was GOOD rather than debris.**
+
+What it contained: the `OFFLINE_BORN_OMISSIONS` export (real, at `replica-data-source.ts:386`); a
+docblock correcting "an app-core view runs unchanged against the offline copy" to name the WRITE door
+as the exception — *and noting that the earlier correction itself landed on one door of a pair*; and a
+**fourth door**, `searchOfflineCopy`, which deliberately DOES include offline-born tickets where the
+settled listings do not.
+
+**And a dangling citation: the docblock referenced case 12.188, which did not exist.** Committing that
+as-is would have shipped exactly this branch's signature defect. So I finished it rather than reverting
+good work or shipping a false reference:
+
+- Wrote **12.188** in the file's own voice, asserting the fourth door's inclusion beside 12.187's
+  exclusions, with a non-vacuity control (a needle matching nothing) so a `searchOfflineCopy` returning
+  every ticket unfiltered would not satisfy it.
+- **Mutation-proved it**: neutralising the `pendingCreatedTickets` loop reddens **12.188 alone** —
+  `Tests 1 failed | 16 passed (17)`, 12.187 green. The failure identifies its own site.
+- **Restore verified by `git hash-object`**, not by a diff — the working file and the pre-mutation
+  backup hash identically (`a1baa955…`). A `git diff --stat` here is NON-empty for an unrelated reason
+  (the uncommitted refinement), so "empty diff" was not available as evidence and I nearly used it as
+  such. **When a tree is already dirty, a diff cannot prove a restore; a content hash can.**
+- Removed the probe file.
+
+## THE THREE CLOSURES — order is deliberate, cheapest and least-blocked first
+
+Quota ~11 points; all three plausibly price at 9–16, so **the third may not fit and that must be said
+rather than started.** These are NOT plan tasks: **no ledger rows**, same precedent as the
+semantic-extraction and comment-cleanup passes, which were kept outside the 177 denominator rather than
+editing locked plan documents. The controller records them in `controller-state.md`.
+
+**1. SNAPSHOT INVALIDATION — cheapest, pure correctness, no design question.**
+Publishing a workflow version invalidates no snapshot. `snapshot-writer.ts` has **0** `workflowVersion`
+hits against **25** `snapshot` hits as the control, and no DELETE of any kind. A bootstrap tail can
+carry a `ticket.transitioned` into a state the new version dropped and throw on replay. Verified
+directly on `main` by the controller as well as here — my finding, independently confirmed.
+
+**2. THE SERVING GAPS — BUILDABLE SUBSET ONLY.** P25 clause 1, discharged by owner instruction.
+
+*Build (no visibility decision):* `ListRow.typeRank`, `ListRow.epicId`, `ListRow.stateName`,
+`ListRow.assignedProvenance` (its own note says `read/state-provenance.ts` already ships the shape),
+`TicketRead.stateProvenance`, `TicketRead.ticket` (the domain `TicketState`).
+
+*Two require the RULE NAMED FIRST, per P25's live condition* — each must be implemented by **applying
+an EXISTING Plan 4 visibility rule**, and if it turns out to need a new one, **escalate instead of
+building**: `ListRow.hasRestrictedParent` ("a statement about what this viewer may not see") and
+`TicketRead.title` ("reading `proj_tickets` here is a visibility decision").
+
+*HELD — DO NOT BUILD:* `WorkspaceRef.projects` (`getMyWorkspaces`) and `WorkItem.projectName`
+(`getMyWork`). P25's escalation condition has already fired: the mapper's own owner line reads *"HELD
+pending the owner ruling, because it carries a visibility decision,"* and there is **no shipped
+project-list read at all**, so adding one means designing what a project-scoped guest sees of a
+workspace's OTHER projects. That is product semantics on the surface that produced **P19, P22 and P23,
+every one an uncaught disclosure.** With the owner. **Leave both refusing.**
+
+**3. `StreamItem` → `ServerStreamFrame` LAST, and expect it not to fit.** Zero user-visible benefit,
+priced above T11 or T12, and the two guardrails already stop it decaying. **If quota runs short this is
+the one that drops — say so rather than starting it.**
+
+## EXPECTED RED — do not mis-diagnose it as a regression
+
+`apps/server/test/integration/client-contract.test.ts` names **five of the six** gaps server-side, so
+its refusal tests go **RED as each gap closes**. That is the self-expiring gap working exactly as P25
+clause 3 described. **Update them in the same change set.**
+
+## SCOPE HONESTY for a later reader
+
+Closing all three still does NOT mean zero serving gaps. `SearchHit.matchedIn` and the two `FilterSpec`
+absences are **not** P25 items (owner: Plan 6's client type, not a route), and `ContestedClaim.title` /
+`claim.serverTime` belong to **T13, which is deferred.**

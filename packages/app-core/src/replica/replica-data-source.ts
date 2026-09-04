@@ -156,9 +156,17 @@ export type TicketSummary = {
  * and `DataSourceQuery` has no method for.
  *
  * Every member here is ADDITIVE. `ReplicaDataSource` is a structural SUPERSET
- * of `DataSource`, so a view written against the online source runs unchanged
- * against this one; these are what a view written FOR the offline shells can
- * ask on top.
+ * of `DataSource`, so a view's READ path runs unchanged against this one; these
+ * are what a view written FOR the offline shells can ask on top.
+ *
+ * THE WRITE DOOR IS NOT UNCHANGED, and this sentence used to say it was.
+ * `Features.md` §12 carried the qualification and this docblock did not — the
+ * correction itself landed on one door of a pair, which is this codebase's
+ * signature defect. `ingest` THROWS `OfflineAcceptError` where the online
+ * source returns an `IngestResult[]`, so the six call sites `Features.md` §12
+ * enumerates see a rejection where they saw an array. Assignability is a
+ * compile-time fact (12.172); "runs unchanged" is a claim about behaviour and
+ * it is true of reads alone.
  */
 export type ReplicaOnlyQuery = {
   /** Confirmed tickets plus offline-born ones, every one badged. */
@@ -180,6 +188,13 @@ export type ReplicaOnlyQuery = {
    * the UI must say "searching the offline copy". The base `search` REFUSES
    * (see `SEARCH_ABSENCES`), so this is the only search this source serves and
    * the flag cannot be dropped on the way through.
+   *
+   * OFFLINE-BORN TICKETS ARE IN THESE HITS, unlike `getTickets` and `getBoard`.
+   * A hit is `{ticketId, title}` and carries no `stateProvenance`, so the type
+   * argument that keeps a queued claim out of a `ListRow` does not reach here —
+   * and the door exists precisely so a device with no network can answer. A
+   * ticket created on a plane that cannot be found by its own title is the
+   * failure this method exists to prevent. Case 12.188.
    */
   searchOfflineCopy(
     workspaceId: string,
@@ -297,13 +312,22 @@ const PREFERENCES_ABSENCES: readonly ReplicaAbsence[] = [
 ];
 
 /**
- * WHY A TICKET BORN OFFLINE IS IN `listTicketSummaries` AND IN NEITHER
- * `getTickets` NOR `getBoard`.
+ * WHY A TICKET BORN OFFLINE IS IN SOME DOORS AND NOT OTHERS.
+ *
+ * **THIS DOCBLOCK SAID "ALL THREE DOORS" AND THERE ARE NINE READINGS.** The
+ * three it named were the three the author had looked at; a probe over every
+ * read door found `searchOfflineCopy` omitting an offline-born ticket with no
+ * absence anywhere naming it — a user creating a ticket on a plane and unable
+ * to find it by title, on the door that exists so an offline device can answer.
+ * That omission is now FIXED (`searchOfflineCopy` unions the outbox; case
+ * 12.188) rather than documented. Do not restore a count here: case 12.188's
+ * sibling 12.187 enumerates every door by name and asserts what each answers,
+ * and `OFFLINE_BORN_OMISSIONS` below is the enumerable half of the same list.
  *
  * This is a whole-row absence rather than a whole-method refusal, so it is
  * stated here loudly rather than thrown: *"a card silently missing from a board
- * is a lie with a longer fuse"* (`routes/board.ts`), and the way this one stops
- * being silent is that all THREE doors are pinned together by case 12.187.
+ * is a lie with a longer fuse"* (`routes/board.ts`), and the way it stops being
+ * silent is that 12.187 asserts every door together.
  *
  * `ListRow` and `BoardCard` both require a `stateProvenance`, and
  * `ClaimProvenance` requires a `serverTime`. A ticket that exists only as a
@@ -327,10 +351,42 @@ const PREFERENCES_ABSENCES: readonly ReplicaAbsence[] = [
  * list beside an offline board.
  */
 export const OFFLINE_BORN_ABSENCE: ReplicaAbsence = {
-  field: 'ListRow.stateProvenance / BoardCard.stateProvenance (for a ticket that exists only as a queued claim)',
+  // THE THIRD NAME WAS MISSING AND IS THE SAME ARGUMENT: `getTicket` returns
+  // `null` for exactly these tickets, because `TicketRead.stateProvenance` is
+  // as unfillable as the two view-row fields. An absence value whose whole
+  // purpose is to be the enumerable name of a gap was itself under-enumerated.
+  field:
+    'ListRow.stateProvenance / BoardCard.stateProvenance / TicketRead.stateProvenance (for a ticket that exists only as a queued claim)',
   because:
     'ClaimProvenance requires a serverTime and a SubmittedEvent has none by construction; the pending overlay substitutes the device clock and says so, and repeating that substitution in a view row would read as the server\'s answer',
   owner: 'Plan 10 Task 13 — an offline list that unions getTickets with listTicketSummaries',
+};
+
+/**
+ * The doors that OMIT an offline-born ticket, keyed by method, so a caller can
+ * enumerate them without calling — the same purpose `REPLICA_GAPS` serves for
+ * the methods that REFUSE, and deliberately a second export rather than an
+ * entry in that one: `REPLICA_GAPS`'s members all throw `ReplicaGapError`, and
+ * 12.185 compares its keys against the methods that actually reject. A door
+ * that answers with the ticket left out is a different thing from a door that
+ * refuses, and merging the two would make each key mean whichever the reader
+ * assumed.
+ *
+ * `getTicketHistory` IS NOT HERE, and its emptiness is not an absence. There
+ * are no ledger events for a ticket no server has seen, so `[]` is the true
+ * answer rather than an unfillable field — `outbox.ts` writes nothing to
+ * `events` by design. Minting an absence for a true answer would turn this
+ * registry from "the fields this source cannot fill" into "anything that came
+ * back empty", which is worth less than nothing to enumerate. 12.187 asserts
+ * the empty history anyway, beside the doors that do omit.
+ *
+ * `searchOfflineCopy` is not here either, and used to belong here: it omitted
+ * these tickets and nothing named the omission. It now carries them (12.188).
+ */
+export const OFFLINE_BORN_OMISSIONS: Readonly<Record<string, ReplicaAbsence>> = {
+  getTickets: OFFLINE_BORN_ABSENCE,
+  getBoard: OFFLINE_BORN_ABSENCE,
+  getTicket: OFFLINE_BORN_ABSENCE,
 };
 
 /** Every refusal this source makes, so a caller can enumerate them without calling. */
@@ -819,8 +875,40 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       };
     },
 
+    /**
+     * THE SETTLED SCAN PLUS THE OFFLINE-BORN TITLES, and the union is made HERE
+     * rather than inside `Replica.searchLocal` on purpose: `outbox.ts`'s own
+     * invariant names `searchLocal` among the settled surfaces that "keep
+     * answering from confirmed state alone", and folding a queued claim into
+     * that function would break it. `listTicketSummaries` draws the same seam in
+     * the same place — sync-client stays settled-only, and the app-core door
+     * that has no provenance field to fill does the union.
+     *
+     * `workspaceId` IS THE ARGUMENT AND NOT `ownWorkspaceId`: `searchLocal`
+     * filters on the caller's workspace (`WHERE workspace_id = ?`), so reading
+     * the outbox at this replica's own id instead would answer a foreign-
+     * workspace query with this workspace's queued claims — a leak on the door
+     * being fixed.
+     *
+     * The matcher is `searchLocal`'s own — lowercased `includes` over the title
+     * — because two different matchers on two halves of one result set is the
+     * one-door class inside the fix for a one-door defect.
+     *
+     * NO DEDUPE, because the two halves cannot overlap and a guard that cannot
+     * fire is a check that cannot fail: `pendingCreatedTickets` skips every
+     * ticket in `overlay.confirmed`, and `searchLocal` reads the `tickets` table
+     * — i.e. the confirmed ones — so a ticket in the second list is by
+     * construction absent from the first.
+     */
     async searchOfflineCopy(workspaceId, text) {
-      return { offlineCopy: true, hits: await replica.searchLocal(workspaceId, text) };
+      const hits = await replica.searchLocal(workspaceId, text);
+      const needle = text.toLowerCase();
+      for (const born of await outbox.pendingCreatedTickets(workspaceId)) {
+        const title = titleOf(born.pending);
+        if (!title.toLowerCase().includes(needle)) continue;
+        hits.push({ ticketId: born.pending.id, title });
+      }
+      return { offlineCopy: true, hits };
     },
 
     async syncStatus(workspaceId) {

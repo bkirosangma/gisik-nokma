@@ -571,4 +571,53 @@ describe('12.187 the three doors an offline-born ticket reaches', () => {
     // union rather than rediscovering the gap.
     expect(OFFLINE_BORN_ABSENCE.owner).toMatch(/^Plan 10 Task 13 — /);
   });
+
+  /**
+   * THE FOURTH DOOR, and the one where INCLUSION is the correct answer.
+   *
+   * 12.187 pins three doors that agree by excluding. This one differs on
+   * purpose, so a later reader does not "fix" it into agreement with them.
+   *
+   * The type argument that keeps a queued claim out of the settled listings is
+   * that `ListRow` and `BoardCard` both require a `stateProvenance`, and
+   * `ClaimProvenance` requires a `serverTime` no server has assigned. A search
+   * hit is `{ticketId, title}`. It carries no provenance field, so the argument
+   * does not reach here — and the method exists precisely so a device with no
+   * network can still answer. A ticket created on a plane that cannot be found
+   * by its own title is the failure `searchOfflineCopy` exists to prevent.
+   *
+   * `search` and `searchOfflineCopy` are therefore NOT a pair that should
+   * agree: one is the wire shape this device cannot fill, the other is the
+   * local answer. The distinction is the point of the second method.
+   */
+  it('12.188 the offline-born ticket the settled listings omit IS findable by its own title', async () => {
+    const { ds } = await fixture();
+    const bornId = newUlid();
+    const born = newSubmittedEvent({
+      workspaceId: WS,
+      entity: { kind: 'ticket', id: bornId },
+      type: 'ticket.created',
+      payload: { typeId: TYPE_TASK, projectId: PROJECT, parentId: null, title: 'Written above the Atlantic' },
+      actorId: USER_A,
+      origin: 'desktop',
+    });
+    await ds.ingest([born]).catch(() => undefined);
+
+    const found = await ds.query.searchOfflineCopy(WS, 'Atlantic');
+    expect(found.offlineCopy).toBe(true);
+    expect(found.hits.map((hit) => hit.ticketId)).toContain(bornId);
+
+    // The same ticket, through the settled door 12.187 pins: still absent.
+    // Asserted HERE as well as there, because the two facts are only
+    // interesting together — either one alone reads as an ordinary filter.
+    const list = await ds.query.getTickets(PROJECT, {}, 'flat');
+    expect(list.rows.map((row) => row.ticketId)).not.toContain(bornId);
+
+    // NON-VACUITY: the search door is answering, not empty. Without this a
+    // `searchOfflineCopy` that returned every ticket unfiltered would also
+    // satisfy the assertion above, and so would one that returned nothing if
+    // `toContain` were ever loosened.
+    const miss = await ds.query.searchOfflineCopy(WS, 'Pacific');
+    expect(miss.hits.map((hit) => hit.ticketId)).not.toContain(bornId);
+  });
 });

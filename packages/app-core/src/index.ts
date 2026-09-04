@@ -231,6 +231,7 @@ export {
 // and reads a local store through them.
 export {
   OFFLINE_BORN_ABSENCE,
+  OFFLINE_BORN_OMISSIONS,
   OfflineAcceptError,
   REPLICA_GAPS,
   ReplicaGapError,
