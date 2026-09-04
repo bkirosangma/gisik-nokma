@@ -972,12 +972,12 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 
 ## 12. Offline sync & the apps
 
-*(Plan 10, Task 4 only — the LIFTED §11 closer and the contested-claims read path. Plan 10's own
-catalogue task (Task 18) owns §12's full body and will replace this scope note; what follows is what
-Task 4 added, and nothing else. §8/§10/§11 stay absent because the coordination doc assigns
-`Features.md` sections one per implementation plan and numbering is claimed from that table, never
-taken next-free. Still absent rather than missing from this section: the snapshot writer, the replica
-bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Tasks 5–17.)*
+*(Plan 10, Tasks 4 and 5 — the LIFTED §11 closer, the contested-claims read path, and the snapshot
+writer. Plan 10's own catalogue task (Task 18) owns §12's full body and will replace this scope note;
+what follows is what those two tasks added, and nothing else. §8/§10/§11 stay absent because the
+coordination doc assigns `Features.md` sections one per implementation plan and numbering is claimed
+from that table, never taken next-free. Still absent rather than missing from this section: the replica
+bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Tasks 6–17.)*
 
 - ✅ **A contest cannot lie about which claim it is contesting** — `claim.contested` embeds the
   refused claim whole, and the embedded claim must name the **same workspace, the same entity kind
@@ -1033,6 +1033,53 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
   rather than a 403, so empty and forbidden are the same answer and the route is not an existence
   oracle. It never builds an `EffectiveRole` by hand and never reads `proj_memberships` directly — a
   project-scope row survives `membership.revoked` by design. `apps/server/src/sync/contests-route.ts`
+- ⚙️ **Snapshot writer — the fold is the DOMAIN reducer, never `proj_tickets`** — Plan 1 shipped the
+  `snapshots` table with no writer; this is the writer. `runSnapshotPass` snapshots every ticket whose
+  head seq has run `SNAPSHOT_MIN_EVENTS` past its latest snapshot, and the stored `state` is
+  `applyTicketEvent` folded over the ledger — the same reducer a replica runs, so snapshot + tail is
+  exactly full replay on every client. Reading `proj_tickets` instead would look right indefinitely:
+  that table is maintained by the same reducer today, so the two agree until the day they don't, and
+  then a replica's bootstrap state differs from its own replay with nothing pointing at why. The
+  equivalence is held by a test whose fixture leaves all three projections EMPTY and asserts it —
+  under a fixture seeded through the full ingest path both implementations produce identical bytes and
+  the assertion would distinguish nothing. `apps/server/src/sync/snapshot-writer.ts`
+- ⚙️ **The snapshot's seq counts EVENTS, not folds** — `claim.contested` and `claim.contested_resolved`
+  are filed against `kind: 'ticket'` and are deliberately absent from `TICKET_EVENT_TYPES`, so they
+  move the cursor without moving the state. A writer that advanced the seq only on folded events would
+  store a snapshot sitting behind events it had already passed, and a replica resuming from that cursor
+  would be re-delivered them on every bootstrap. `apps/server/src/sync/snapshot-writer.ts`
+- ⚙️ **Reducer deps folded from the ledger's own definition events** — `buildLedgerDeps` builds
+  `TicketStateDeps` from `workflow.defined` / `ticket-type.defined` rows, ordered by `workspace_seq`
+  and NOT by `(entity_kind, entity_id, seq)`: a ticket type's key lives in its PAYLOAD and successive
+  definitions of one key arrive on different entity streams (each event gets a fresh ULID entity id),
+  so per-entity seq cannot order them against each other at all. Greatest `workspace_seq` wins for
+  types and greatest `version` wins for workflows — the same two rules `proj_ticket_types`' guarded
+  `DO UPDATE` and `proj_workflows`' `DO NOTHING` + `ORDER BY version DESC` already enforce, so the
+  ledger fold and the projections cannot disagree about which definition is current. Both rules are
+  pinned by a fixture that defines one key TWICE, with the winning definition deliberately given the
+  smaller ULID entity id so the plan text's ordering picks the loser, and the maps never cross a
+  workspace. `apps/server/src/sync/ledger-deps.ts`
+- ⚙️ **The writer's absences, named** — no locking (safe because the row is keyed by seq and the fold is
+  pure below it, so a late arrival is the next pass's work, not a corruption), tickets only (there is no
+  other reducer to fold), no visibility or tenancy gate (a background sweep has no caller identity — the
+  route that SERVES a snapshot owes that), and no retention: the table grows one row per snapshot per
+  entity forever. *Retention is unowned.* `apps/server/src/sync/snapshot-writer.ts`
+- ⚙️ **`SNAPSHOT_INTERVAL_MS` (300000) and `SNAPSHOT_MIN_EVENTS` (20)** — additive config, both
+  `.positive()` integers refused at the door. Not tidiness on either: `setInterval(fn, 0)` runs the
+  pass on every tick of the event loop, and a zero `MIN_EVENTS` makes every ticket due on every pass,
+  which recomputes a snapshot at a seq that already has a row and collides on the snapshots primary
+  key. Neither is a correctness knob — a server that never writes a snapshot answers with exactly the
+  same state, only slower. `apps/server/src/config.ts`, `.env.example`
+- ⚙️ **Started at the one boot path, stopped by Fastify's `onClose` — because the shutdown path the
+  plan named does not exist** — `apps/server/src/index.ts` has no SIGTERM handler, no `pool.end()` and
+  no `app.close()`. Rather than invent a signal handler (Plan 11 owns the boot path) or leave an
+  unstoppable timer, `startSnapshotWriter`'s stop function is hung on `app.addHook('onClose', …)`,
+  registered BEFORE `app.listen` because fastify 5 throws `FST_ERR_INSTANCE_ALREADY_LISTENING` on an
+  `addHook` after start. It is not registered inside `buildApp` with the routes: `buildApp` is called
+  by around sixty test files, and a five-minute timer in each of them could fire mid-test and write
+  snapshots into a fixture nothing expects them in. Today nothing calls `app.close()`, so the writer
+  runs for the life of the dev process — which costs nothing, the interval is `unref`'d — and it stops
+  by itself on the day a real shutdown lands. `apps/server/src/index.ts`
 - ⚙️ **One assembled test server** — `buildTestApp(db)` builds the real app, real auth, real ingest and
   the real projection registry, returning the app, its own OTP sender and the ungated internal ingest
   door. It replaces four hand-copied assemblies that had to be extended one by one every time

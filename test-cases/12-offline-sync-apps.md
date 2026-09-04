@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.84`. THE NEXT FREE ID IS `12.85`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.93`. THE NEXT FREE ID IS `12.94`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -22,10 +22,11 @@ One consequence worth stating rather than leaving to be discovered: **12.15 is a
 — `apps/server/test/sync/stream-seq.test.ts` shipped with Plan 10 Task 2 — but it is a reserved id and
 is deliberately not flipped here. *Owner: Plan 10 Task 18.*
 
-**Scope of this file today.** Plan 10 Task 4 as lifted out of the plan's position: the §11
-envelope-coherence closer, `proj_contested`, `getContest` and `GET /v1/contests`. Nothing else from
-Plan 10 is catalogued — Tasks 5–17 (snapshot writer, bootstrap, `POST /v1/sync`, sync-client, the two
-app shells, the dual-client harness) are absent rather than missing.
+**Scope of this file today.** Plan 10 Tasks 4 and 5. Task 4 as lifted out of the plan's position: the
+§11 envelope-coherence closer, `proj_contested`, `getContest` and `GET /v1/contests`. Task 5: the
+snapshot writer and the ledger-sourced reducer deps. Nothing else from Plan 10 is catalogued — Tasks
+6–17 (bootstrap, `POST /v1/sync`, sync-client, the two app shells, the dual-client harness) are absent
+rather than missing.
 
 **Terminology.** "envelope-origin" throughout means `EventEnvelope.origin`, the provenance enum
 `'web' | 'mobile' | 'desktop' | 'server'`. It is NOT the browser `Origin` header; nothing in this file
@@ -78,6 +79,64 @@ on both doors (`apps/server/test/sync/contest-coherence-door.test.ts`).*
 - 12.78 ✅ a resolution naming no recorded contest is refused `contest.unknown` — `null` here means "never recorded", which is what makes a refusal honest rather than a wiring bug in disguise (engine-context.test.ts)
 - 12.79 ✅ a resolution aimed at a contest on ANOTHER ticket is refused `contest.wrong-ticket`, which is what makes the returned `ticketId` load-bearing rather than decorative (engine-context.test.ts)
 - 12.80 ✅ a second resolution of the same contest is refused `contest.already-resolved` — the `resolved` column read back, so a hard-coded `false` cannot pass (engine-context.test.ts)
+
+## Snapshot writer (Task 5) — `apps/server/test/sync/snapshot-writer.test.ts`
+
+Every case in this section seeds the LEDGER ONLY — `insertEvent`, no projection — so `proj_tickets`,
+`proj_workflows` and `proj_ticket_types` are empty throughout. That is not a shortcut, it is the whole
+discriminator: `proj_tickets` is maintained by the SAME reducer the writer folds, so against a fixture
+seeded through the full ingest path a writer that read the projection and a writer that folded the
+ledger produce identical bytes and an equality assertion distinguishes nothing. Each of the six
+implementation mutations named below was run and reddened the case named beside it.
+
+- 12.85 ✅ below the threshold the pass writes nothing — asserted against a ledger the SAME run proves
+  holds eleven events for the entity, so the empty result cannot be satisfied by an empty fixture or a
+  query aimed at the wrong entity kind (snapshot-writer.test.ts)
+- 12.86 ✅ the stored `state` equals a full independent fold of the ledger through `applyTicketEvent`,
+  AND all three projections it could have been read from are asserted empty in the same test — the
+  equality alone cannot see a wrong deps SOURCE, because the independent fold calls the same
+  `buildLedgerDeps`. *Mutation: deps sourced from something empty in this fixture (what
+  `proj_workflows` would be) → red, `applyTicketEvent: unknown ticket type "snap-task"`.*
+  (snapshot-writer.test.ts)
+- 12.87 ✅ the next pass RESUMES from the previous snapshot rather than folding from event 1 — pinned by
+  the `afterSeq` bind value `readEntityEvents` is called with (exactly 21, the previous snapshot's
+  seq), because both strategies compute the same state and an equality assertion here would be a check
+  that cannot fail. *Mutation: fold from scratch → red, `expected [ +0 ] to deeply equal [ 21 ]`.*
+  (snapshot-writer.test.ts)
+- 12.88 ✅ a `claim.contested` sitting LAST on the ticket's stream still advances the snapshot's seq
+  past it (61, not 60) and is not folded. Last, not mid-stream: with a foldable event after it both a
+  correct and a broken writer answer 61. That seq is Task 6's resume cursor. *Mutations: advance seq
+  only on folded events → red on the seq; drop the `TICKET_EVENT_TYPES` filter → red,
+  `applyTicketEvent: not a ticket event: claim.contested`.* (snapshot-writer.test.ts)
+- 12.89 ✅ a repeated pass at `minEvents: 0` — the only door that makes every entity due every pass —
+  does not collide on the snapshots primary key. *Mutation: drop the guard → red, `duplicate key value
+  violates unique constraint "snapshots_pkey"`.* (snapshot-writer.test.ts)
+- 12.90 ✅ `startSnapshotWriter` writes REAL snapshots on its interval and the returned stop function
+  halts it — the entity is made due again after stopping and the ledger head is asserted, so "nothing
+  more was written" is a fact about the stop function rather than about there being nothing to write.
+  Real timers, not fake ones: vitest's fake timers patch the timer functions only and do not wait for a
+  pg round trip, so an advanced fake clock would read the snapshots table before the pass that writes
+  it has returned. *Mutation: stop() made a no-op → red.* (snapshot-writer.test.ts)
+- 12.91 ✅ a pass that rejects is logged with the failure's own words and the timer survives to run
+  again, then stops when told to — a background sweep that can take the process down is a worse failure
+  than a snapshot one interval late (snapshot-writer.test.ts)
+
+- 12.92 ✅ a ticket type redefined in one workspace resolves to the LAST definition on the WORKSPACE
+  stream, not the last by entity id — the two definitions sit on different entity streams (each
+  `ticket-type.defined` gets a fresh ULID entity id, so per-entity `seq` is 1 for both and cannot order
+  them against each other) and the WINNING one is deliberately given the SMALLER ULID, so the plan
+  text's `(entity_kind, entity_id, seq)` ordering picks the loser. The id ordering is a premise the
+  test asserts before relying on it — `newUlid()` turned out not to be monotonic within a millisecond,
+  which that guard caught on its first run. *Mutation: the plan's ordering → red, `expected 'wf-a' to
+  be 'wf-b'`.* (snapshot-writer.test.ts)
+- 12.93 ✅ a workflow resolves to its GREATEST version even though a lower version was published later
+  on the stream, the FIRST publisher of the winning version wins a tie (matching `proj_workflows`'
+  `ON CONFLICT (workflow_id, version) DO NOTHING`), and neither map ever crosses a workspace — asserted
+  in both directions, with the neighbouring workspace's own definitions resolving in the same run so
+  "invisible here" cannot be satisfied by a loader that finds nothing anywhere. *Mutations: version
+  comparison flipped → red, `expected 1 to be 3`; the tie loosened to `<=` → red, `expected 'A v3
+  second' to be 'A v3 first'`; the workspace filter dropped → red in seven cases.*
+  (snapshot-writer.test.ts)
 
 ## Carried, with owners — recorded here rather than fixed
 
