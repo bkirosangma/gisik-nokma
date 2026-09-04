@@ -181,10 +181,43 @@ because Batch B's agents are mid-flight committing to this branch and rebasing u
 gets lost. Recorded as an example of the executor catching its own overstated timing claim, the exact
 class of finding this whole branch has been surfacing all session.
 
-**Promotion**: T5/T6/T7 promoted via the same Opus-subagent delegation as step 14 (PR pending at time of
-writing — see the trigger-#2 authorization above). Kept per-batch rather than deferred to a single
-end-of-step promotion — deferring would leave landed work invisible in the ledger across a quota boundary
-that may land mid-step, the same "no ledger row citing it" failure mode the 2026-09-02 audit already found.
+**Promotion**: T5/T6/T7 promoted via the same Opus-subagent delegation as step 14, merged as **PR #100**
+(`0c97de4` → `c95e840`) — see the trigger-#2 authorization above. Kept per-batch rather than deferred to a
+single end-of-step promotion — deferring would leave landed work invisible in the ledger across a quota
+boundary that may land mid-step, the same "no ledger row citing it" failure mode the 2026-09-02 audit
+already found. **Ledger now 151/177 (85.3%)**, independently re-verified (ancestry, PR attribution, three
+artefact spot-checks, `check:tasks` re-run in a detached scratch worktree at the exact head sha — matched
+the subagent's own figure exactly).
+
+> ### ⚠ NEW TRAP: a subagent sharing this session's working directory can silently switch the CONTROLLER's
+> own checked-out branch
+> The Plan 9 (#96) and Plan 10 Batch A (#100) promotion subagents both ran in the SAME physical working
+> directory as this controller session (`/Users/kiro/my_projects/gisik-nokma`), not an isolated worktree —
+> `Agent`-dispatched subagents are not automatically sandboxed the way `git worktree` isolates the executor
+> from the controller. On the #100 promotion, the subagent's own `git checkout -b
+> docs/promote-plan10-batchA-ledger origin/main` **silently switched this controller's checked-out branch
+> mid-task**, discovered only when a subsequent `gh pr create` (which defaults to the current branch) failed
+> with "you must first push the current branch." **No work was lost** — a prior `git push` had already
+> landed the controller's own commit on the remote before the collision, verified by reading the remote ref
+> directly rather than trusting local state. **The fix used, and the one to reuse:** `gh pr create --head
+> <branch> --base main` names the branch explicitly, bypassing dependence on the current local checkout, and
+> `gh pr merge <n> --squash` operates entirely through the API — neither needs the working directory to be
+> on the right branch. **General rule: once a subagent has been dispatched into the same working directory,
+> treat every subsequent LOCAL git command in that directory as unsafe until the subagent completes** —
+> prefer read-only commands (`git show origin/...`, `gh api`) or explicit `--head`/API-based forms over
+> anything that depends on the current checkout.
+
+> ### A subagent's OWN account of CI is not evidence — same lesson as an author reporting their own artefact
+> The #100 promotion subagent reported *"CI at head `0c97de4`: 1 check run, `gate | completed | success` —
+> a real green, not an empty list, despite the docs-only skip path."* **Checked directly and found wrong**:
+> `gh api .../actions/runs/<id>/jobs` shows `check:env` and the turbo build/test/typecheck steps **both
+> `skipped`** — identical to PR #96's case, not a "real green." The subagent read only the check-run's
+> top-level `conclusion`, not the job's per-step breakdown. **This is exactly why the standing procedure
+> (independently re-run `check:tasks` for any ledger-only PR, never rely on CI's word) exists, and it just
+> paid for itself a second time** — the independent re-run still matched (151/177), so the promotion itself
+> was fine, but the subagent's CLAIM about why it was safe to trust CI was false. **Corollary: an agent's
+> account of its own CI status is subject to the same "worst-placed party to report" rule as its account of
+> its own artefacts** — verify the check-run's STEPS, not just its top-level conclusion.
 
 **Quota decision, changed by the executor after this controller's re-derivation was sent across**: Batch C
 is **NOT auto-dispatched**. The executor will stop after Batch B's PR opens and check in with a fresh
