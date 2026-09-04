@@ -6571,3 +6571,22 @@ with the roster gap, this is recorded as unowned rather than handed a plausible-
 unchecked boxes at this sha, with Tasks 1–15 executed and committed. The sweep above used artefacts
 instead — `Features.md` carries no §11 heading and `test-cases/` holds no `11-` file, which is what
 actually establishes that Plan 9 Task 15 (reserving ids 11.1–11.47) has not run.
+
+> **SUPERSEDED 2026-09-04 by the event it was predicting: Plan 9 Task 15 HAS now run**, on
+> `exec/14-plan9-calendar`. `Features.md` carries a §11 heading and `test-cases/` holds
+> `11-calendar-notifications.md`, so the artefact test above now returns the opposite answer. The
+> *method* stands and is the reason this note is amended rather than deleted — checkbox state is
+> still not evidence, and artefacts still are. Two facts the sweep above could not have known,
+> both measured at that branch: the reserved range it cites is **not** what shipped — Plan 9's
+> nominal `11.1–11.47` was superseded on the branch by a one-id-per-test scheme, and the live
+> range is **11.1–11.185 with 11.9–11.17, 11.19–11.35, 11.40–11.47 and 11.123–11.129
+> permanently unused**; and the *second* half of the sweep above — that nothing in `apps/web`
+> links to Plan 8's six authoring routes — is now pinned by a test rather than only disclosed.
+> `apps/web/test/app-nav.test.tsx` case **11.185** asserts `AppNav`'s hrefs are EXACTLY
+> `/workspaces`, `/w/<id>/my-work` and `/inbox`, so whoever wires a settings entry is told by a red
+> test naming itself that the nav changed and the catalogue needs a case. **11.171, which asserts the
+> same three links are present, is not that test and cannot be**: measured by wiring a
+> `settings/workflows` link into `AppNav`, 11.170 and 11.171 both stayed GREEN and only 11.185 went
+> red. A presence assertion cannot see a fourth door — which is the same blindness, one level up,
+> that let a deleted `<InboxNavLink />` leave 125 tests green. The gap stays **UNOWNED**; only its
+> silence is fixed.

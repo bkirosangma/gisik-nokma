@@ -97,4 +97,34 @@ describe('AppNav — the mounts, not the components', () => {
     // `app-nav.tsx`'s own comment records.
     expect(screen.getByRole('link', { name: /Inbox/ })).toHaveAttribute('href', '/inbox');
   });
+
+  /**
+   * 11.185 — the nav's link set is CLOSED, which 11.171 above does not say.
+   *
+   * 11.171 asserts that three links are present. Presence assertions cannot
+   * notice a FOURTH link, and that distinction is load-bearing right now: the
+   * coordination doc records, as an UNOWNED gap, that nothing in `apps/web`
+   * links to Plan 8's six workflow/ticket-type authoring routes — they are
+   * reachable only by typing the URL. That gap is disclosed in prose and
+   * nothing watches it, so the day someone wires a Settings entry the nav
+   * changes and no test anywhere says so, in either direction.
+   *
+   * Asserting the exact set turns the disclosure into a tripwire. Adding a
+   * legitimate nav entry reddens this case by name, and the fix is one line
+   * here plus a case id in `test-cases/11-calendar-notifications.md` — which
+   * is precisely the bookkeeping that otherwise gets skipped. It is asserted
+   * by href rather than by accessible name because the href is what makes a
+   * link a door; a renamed label is a copy change, a changed href is a
+   * different destination.
+   */
+  it('11.185 hangs exactly three doors and no more — a fourth link must be a deliberate act', () => {
+    render(
+      <Providers services={stubServices({}, { notifications: { unreadCount: async () => 0 } })}>
+        <AppNav workspaceId="ws_1" />
+      </Providers>,
+    );
+
+    const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(hrefs).toEqual(['/workspaces', '/w/ws_1/my-work', '/inbox']);
+  });
 });

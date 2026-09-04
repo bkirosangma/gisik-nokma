@@ -1745,3 +1745,95 @@ instead of a wrong one.
   page in this shell mounts `AppNav` and no page asserts its own mount either.** This round watched
   the nav's three links; nothing yet watches that a PAGE renders the nav. OWNER: unassigned, and worth
   a sweep, because the failure mode is a suite that covers everything the wiring connects.
+
+## TASK 15 (Plan 9's last) — IN FLIGHT 2026-09-04, written by the post-crash session
+
+**Position: Step 14 = Plan 9. T1–T14 committed (T14's fix round is `aee7cc7`, pushed). T15 is the
+last task in the plan.** After it: rebase onto `main`, ONE opus whole-branch review, PR. The
+controller merges; I do not.
+
+**The crash recovery, for the record.** The machine was force-restarted 05:31:56 on 2026-09-04 with
+T14's fix round STAGED AND UNCOMMITTED — eight files whose only record was `git diff --cached`. They
+are now commit `aee7cc7`. Nothing was lost, but nothing was safe either: `git status` was the only
+thing standing between that work and the bin.
+
+**Two measurement errors this session found in what it inherited, both of which had passed review:**
+
+1. **The gate that was a replay.** `pnpm turbo run build test typecheck` returned 24/24 green — and
+   `Cached: 24 cached, 24 total, FULL TURBO`. Its stored server log said `Start at 04:48:03`, which
+   is BEFORE the ~05:10 red run the crash override reported. A cache hit is a fact about a hash, not
+   about a tree. Forced, it went RED on 69 server files.
+2. **The database was not running.** This worktree's `docker-compose.yml` maps `54329:5432`; the only
+   postgres on the machine was an unrelated container on 5432. `docker compose up -d` from THIS
+   directory fixed it. **If a fresh session sees mass server-test failure, check the port before
+   reading a single stack trace.**
+
+**The gate, honestly named.** After starting the database: **24/24, `0 cached`, 46.8s**, Node
+confirmed FROM INSIDE the run by `apps/server/test/node-version.test.ts` — not by the absent
+`Unsupported engine` warning, which that test's own docblock explains is inert for per-package
+scripts. Composition recounted at this tree: **3,063 tests over 224 files** — app-core 1021/62,
+server 940/85, web 133/17 (134/17 after 11.185), domain 464/27, rule-engine 282/12, editor 178/15,
+ui 37/4, sync-client 8/2. **The handoff's earlier app-core figure of 846 is stale; the baseline is
+1021.**
+
+**A red herring, resolved so nobody re-chases it.** Turbo names
+`/Users/kiro/.nvm/versions/node/v24.11.1/bin/pnpm` in its error lines because the pinned
+`v22.22.2/bin` contains **no pnpm** — but pnpm is a `#!/usr/bin/env node` script, so the workers run
+whatever `node` resolves to, which is v22. `node-version.test.ts` passing inside the gate is the
+evidence; the path in the error line is not.
+
+**The override's unverified 23:40 lead is closed:** `apps/server/test/routes/attachments-upload.test.ts`
+passes, 16 tests, 8.5s. Its `:364` neighbourhood allocates 25 MiB, which is why it was the first
+thing to die under 22.4 GB of orphaned workers. It was a symptom of the crash, not a defect.
+
+**What Task 15 produced, and where it deviates from its plan text — deliberately, each measured:**
+
+- `packages/app-core/test/reporting-scope-guard.test.ts`, cases **11.178–11.184**. Three deviations
+  from the plan's literal code, none cosmetic:
+  - **`SCANNED_ROOTS` gains `apps/web/src` and `apps/web/app`** (seven roots, 274 non-test source
+    files). The plan's own argument for including `rule-engine` — "a root list that omits it is a
+    guard that states an invariant it does not enforce" — is the argument for these, since Task 14
+    wired day rendering into `apps/web`. Both were measured CLEAN before being added, and both were
+    then proven to BITE: a `forecast` probe in `apps/web/src/notifications-gateway.ts` and a zone
+    literal in `apps/web/app/inbox/page.tsx` each reddened the right case naming its own `file:line`.
+  - **`REPO_ROOT` is found, not counted to.** The plan's
+    `resolve(new URL('.', import.meta.url).pathname, '../../..')` resolves to `/` under vitest's
+    transform — measured, it scanned `/packages/app-core/src` and threw ENOENT. It now walks up to
+    `pnpm-workspace.yaml` and THROWS if it cannot find it, because the alternative failure is a clean
+    pass over nothing.
+  - **The missing-root `try/catch { continue }` is GONE, and two CONTROLS were added.** Every
+    assertion in that file is `expect(offenders).toEqual([])` — a shape that passes just as happily
+    when the walker reached no files or the needle stopped matching. **Demonstrated, not argued:**
+    with `ZONE_LITERAL` made stale, the zone scan 11.182 **stayed GREEN** and only the control went
+    red. That is the whole reason the controls exist.
+- `Features.md` §11 and `test-cases/11-calendar-notifications.md` — **the plan's catalogue text is
+  STALE and was not copied.** It reserves 11.1–11.47 one-id-per-AREA; the branch shipped
+  one-id-per-TEST. **Live: 143 ids** (11.1–11.8, 11.18, 11.36–11.39, 11.48–11.122, 11.130–11.185).
+  **Permanently unused for TWO different reasons**: 11.9–11.17, 11.19–11.35, 11.40–11.47 (the
+  superseded nominal block — the `§9`/9.1–9.34 precedent in `test-cases/README.md` is the template)
+  and 11.123–11.129 (Task 14's renumber gap). **New cases continue from 11.186.**
+- **Three paths in the plan's `Features.md` block do not resolve** and were corrected against disk:
+  `packages/app-core/src/filters/` → `src/preferences/`; `calendar/CalendarView.tsx` →
+  `calendar/calendar-view.tsx`; `packages/domain/src/ticket-types.test.ts` → `domain/test/`.
+- `test-cases/README.md` — its §11 passage asserted the bucket did not exist. Task 15 falsifies it.
+- `docs/superpowers/plans/2026-08-20-00-series-coordination.md` — **same problem, one level up.** At
+  its line ~6572 the doc uses "`Features.md` carries no §11 heading" as its EVIDENCE that Task 15 has
+  not run. Amended rather than deleted, because the method (artefacts, not checkboxes) is right and
+  only its reading changed.
+
+**A claim I wrote and then had to retract, recorded because the retraction is the lesson.** I first
+wrote that case **11.171** would tell whoever wires a Settings link into `AppNav` that the nav
+changed. **It would not, and cannot** — it asserts three links are PRESENT, and a presence assertion
+is blind to a fourth. Measured by wiring `settings/workflows` into `AppNav`: **11.170 and 11.171 both
+stayed GREEN; only the new closed-set case died.** So **11.185** was written to assert the hrefs are
+EXACTLY `/workspaces`, `/w/<id>/my-work`, `/inbox`. This is the same blindness, one level up, that
+let a deleted `<InboxNavLink />` leave 125 tests green — and it very nearly shipped as a sentence in
+the interface authority saying a tripwire existed where none did.
+
+**STILL OPEN AT THIS LINE:** the catalogue's both-directions reconciliation (every id in the `.md`
+exists in the repo AND every repo id appears in the `.md`) has NOT yet been run by me — a subagent
+was asked to check it, and a subagent's clean report is not a measurement I have made. **11.185 post-
+dates the inventory the catalogue was written from, so the catalogue is KNOWN to be missing it and
+its "continue from" line is KNOWN to say 11.185 instead of 11.186.** Fix both, then re-run the full
+gate, then rebase onto `main` (`421db9f`; the ONLY colliding file is this one), then the single opus
+whole-branch review, then the PR.
