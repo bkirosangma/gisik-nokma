@@ -370,7 +370,8 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
    * Wrapping the `seq` above in `Math.max(ticket.snapshot.seq,
    * await snapshotSeqOf(tx, ticket.ticketId))` — the guard
    * `foldTicketsOntoVersion` applies on the stream door — removes the throw and
-   * leaves all twenty cases in `test/replica.test.ts` green, because it writes
+   * leaves all nineteen cases in `test/replica.test.ts` green — twenty
+   * executions, because 12.132 runs twice — because it writes
    * the SERVER's seq-5 state under the LOCAL seq-6 baseline: `refoldTicket`
    * then replays nothing above 6, and the seq-6 transition vanishes from the
    * log while its row still stands in `events`. Under the guard `transitions`

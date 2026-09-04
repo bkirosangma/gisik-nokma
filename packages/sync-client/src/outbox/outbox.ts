@@ -175,7 +175,9 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
    * (the reopen pair), 12.141 (a revoked scope the stale context still knows),
    * 12.144 (an ordered create-then-edit pair, where the second claim is judged
    * against a world without the first) and 12.151 (a queued transition whose
-   * pending reading never appears). `Tests 4 failed | 41 passed (45)`.
+   * pending reading never appears). `Tests 4 failed | 43 passed (47)`,
+   * re-measured after `test/recorded-hazards.test.ts` landed — the same four
+   * ids; it read `41 passed (45)` against the 45-execution tree.
    *
    * This paragraph said THREE for a whole task, and the missing id is a
    * measurement of WHEN the held context is built. Built EAGERLY here in the

@@ -184,8 +184,9 @@ describe('12.154–12.155 recorded hazards on the replica, pinned as executable 
    *
    * `Math.max(ticket.snapshot.seq, await snapshotSeqOf(tx, ticket.ticketId))` —
    * the guard `foldTicketsOntoVersion` already applies on the stream door — was
-   * tried on this exact input. It removes the throw and leaves all twenty cases
-   * in `replica.test.ts` green, and it writes the SERVER's seq-5 state under the
+   * tried on this exact input. It removes the throw and leaves all nineteen
+   * cases in `replica.test.ts` green — twenty executions, since 12.132 runs
+   * twice — and it writes the SERVER's seq-5 state under the
    * LOCAL seq-6 baseline: `refoldTicket` then replays nothing above 6, and the
    * seq-6 transition is silently dropped from the log while its row still stands
    * in `events`. Measured under the guard, `transitions` came back as
