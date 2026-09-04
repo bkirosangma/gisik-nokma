@@ -155,21 +155,21 @@ plan	task	status	pr	merge_sha	note
 08	13	done	85	9b70ab9	artefact: apps/web/src/authoring/data-source-gateway.ts + six pages; RULING P28 option (b); closed an unrole-gated TemplateGallery route (PR #85)
 08	14	done	85	9b70ab9	artefact: apps/web/e2e/workflow-builder.spec.ts; NOT run by CI — see the commit for what backstops it (PR #85)
 08	15	done	85	9b70ab9	artefact: Features.md §10 (opened); test-cases/10-workflow-builder.md (opened, cases from 10.1) (PR #85)
-09	1	todo	-	-	
-09	2	todo	-	-	
-09	3	todo	-	-	
-09	4	todo	-	-	
-09	5	todo	-	-	
-09	6	todo	-	-	
-09	7	todo	-	-	
-09	8	todo	-	-	
-09	9	todo	-	-	
-09	10	todo	-	-	
-09	11	todo	-	-	
-09	12	todo	-	-	
-09	13	todo	-	-	
-09	14	todo	-	-	
-09	15	todo	-	-	
+09	1	done	93	e09666c	artefact: packages/rule-engine/fixtures/field-set-refuses-a-malformed-start-date.json, field-set-accepts-a-start-date-claim.json; packages/domain/test/ticket-types.test.ts (Plan 9 consumption pin appended, Plan 3's assertions unchanged)
+09	2	done	93	e09666c	artefact: packages/domain/src/doc-mentions.ts, packages/domain/test/doc-mentions.test.ts; packages/domain/src/index.ts (shared re-export, modified by T2/T3). Guarded doc-text.ts/doc-text.test.ts NOT cited — put on main by PR #67 (Plan 5), so the guard resolved to pre-existing
+09	3	done	93	e09666c	artefact: packages/domain/src/notifications.ts, packages/domain/test/notifications.test.ts; packages/domain/src/index.ts (shared re-export, modified by T2/T3)
+09	4	done	93	e09666c	artefact: apps/server/migrations/1788437881385_notifications.sql, apps/server/src/notifications/store.ts, apps/server/test/notifications/store.test.ts
+09	5	done	93	e09666c	artefact: apps/server/src/notifications/transport.ts, fanout.ts, apps/server/test/notifications/fanout.test.ts; boot wiring in apps/server/src/app.ts (declared src/index.ts; app.ts is Plan 1's actual boot site, shared with T7)
+09	6	done	93	e09666c	artefact: apps/server/src/notifications/sweep.ts, apps/server/src/tools/sweep-notifications.ts, apps/server/test/notifications/sweep.test.ts; apps/server/package.json (sweep:notifications script)
+09	7	done	93	e09666c	artefact: apps/server/src/routes/notifications.ts, apps/server/test/routes/notifications.test.ts; registerNotificationRoutes wired in apps/server/src/app.ts (shared with T5, distinct files)
+09	8	done	93	e09666c	artefact: packages/app-core/src/calendar/calendar-model.ts, claims/dates.ts, claims/ticket-dates.ts, claims/claim-labels.ts, hierarchy/epic-ancestor.ts, filter/matches-filter.ts (guarded FilterSpec resolved to Plan 6's view-types.js); tests under packages/app-core/test/. Guarded Step 0 scaffolding NOT cited — app-core/ui packages landed in PR #85
+09	9	done	93	e09666c	artefact: packages/app-core/src/calendar/calendar-view.tsx (declared CalendarView.tsx; kebab-case rename, exports CalendarView), packages/app-core/test/calendar/calendar-view.test.tsx; packages/app-core/src/index.ts (shared, T9-T13)
+09	10	done	93	e09666c	artefact: packages/app-core/src/timeline/timeline-model.ts, packages/app-core/test/timeline/timeline-model.test.ts; packages/app-core/src/index.ts (shared, T9-T13)
+09	11	done	93	e09666c	artefact: packages/app-core/src/timeline/timeline-view.tsx (declared TimelineView.tsx; kebab-case rename, exports TimelineView), packages/app-core/test/timeline/timeline-view.test.tsx; packages/app-core/src/index.ts (shared, T9-T13)
+09	12	done	93	e09666c	artefact: packages/app-core/src/inbox/gateway.ts, format.ts, icons.tsx, unread-badge.tsx, inbox-view.tsx (declared UnreadBadge.tsx/InboxView.tsx; kebab-case rename, exports UnreadBadge/InboxView); tests under packages/app-core/test/inbox/
+09	13	done	93	e09666c	artefact: packages/app-core/src/preferences/preferences-gateway.ts, saved-filters.ts, saved-filters-menu.tsx (declared under filters/; landed under preferences/, exports SavedFiltersMenu); tests under packages/app-core/test/preferences/
+09	14	done	93	e09666c	artefact: apps/web/app/inbox/page.tsx, apps/web/src/notifications-gateway.ts (declared src/lib/; shell convention is flat src/), apps/web/src/inbox-nav-link.tsx (declared src/components/InboxNavLink.tsx, exports InboxNavLink); nav layout apps/web/src/app-nav.tsx
+09	15	done	93	e09666c	artefact: packages/app-core/test/reporting-scope-guard.test.ts, test-cases/11-calendar-notifications.md, Features.md §11. Catalogue-task precondition CHECKED, not assumed: T1-T14's own artefacts are all in this same squash, so the 07/T16 refusal rule does not bite
 10	1	done	23	b62be74	artefact: packages/domain/src/events/contest-events.ts (PR #23, subject names it)
 10	2	done	23	b62be74	artefact: packages/rule-engine/src/contests.ts (PR #23, subject names it)
 10	3	done	23	b62be74	artefact: apps/server/src/sync/stream-seq.ts (PR #23, subject names it)
