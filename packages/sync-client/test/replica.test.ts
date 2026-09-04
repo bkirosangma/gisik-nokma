@@ -15,7 +15,15 @@ import { createReplica, type BootstrapResponse, type Replica } from '../src/repl
 import { workflowVersionsOf } from '../src/replica/local-deps.js';
 
 /**
- * Plan 10 Task 9 — the replica. Cases 12.119–12.132.
+ * Plan 10 Task 9 — the replica. Cases 12.119–12.137.
+ *
+ * This line said `12.119–12.132` from the task's first commit through the round
+ * that added 12.133–12.135 and the one that added 12.136–12.137: a range in a
+ * docblock is a fact about a moment, and nothing recomputes it. Enumerated, not
+ * counted — `grep -nE "^[[:space:]]*it\(" test/replica.test.ts` prints NINETEEN
+ * declarations, one per id 12.119–12.137, and the runner's own line reads
+ * `Tests 20 passed (20)` because 12.132's `it` sits inside a two-zone loop and
+ * executes twice.
  *
  * ## `to` versus `toStateId`, and please do not "reconcile" them
  *
@@ -514,7 +522,11 @@ describe('12.130–12.131 what the reducer does not fold, and what the fold must
     // and bootstrap backfills it — so filtering before folding is the common
     // path, not an edge case. Mutation: drop the TICKET_EVENT_TYPES membership
     // test in `refoldTicket` and this reddens with
-    // `applyTicketEvent: not a ticket event: visibility.set`.
+    // `applyTicketEvent: not a ticket event: visibility.set` — measured, it
+    // reddens 12.137 alongside it and nothing else. `visibility.set` is the
+    // only type THIS case puts in front of the guard; 12.137 puts the
+    // `claim.contested` there, which is the type every sentence around the
+    // guard calls the common path.
     const storage = createBetterSqliteStorage();
     const replica = await seededReplica(storage);
     await replica.applyServerItem(created(TICKET, 'Audience changes'));
@@ -830,6 +842,166 @@ describe('12.135 a contest below the snapshot seq lands in the contests table an
       claimantId: USER_B,
       resolved: false,
     });
+    await storage.close();
+  });
+});
+
+describe('12.136–12.137 the bootstrap door carries the same two rules the stream door does', () => {
+  /**
+   * A bootstrap that ships v1 AND v2 alongside a snapshot still recorded at
+   * `workflowVersion: 1` — the shape the server actually produces, because
+   * nothing on the server invalidates a snapshot when a workflow is published
+   * (`snapshot-writer.ts` has no `workflowVersion` handling and
+   * `snapshot-store.ts` has no DELETE), so every device that bootstraps after a
+   * publish receives a pre-publish snapshot.
+   */
+  function bootstrapWithSnapshotAtV1(latest: unknown, stateId: string, category: string): BootstrapResponse {
+    return bootstrapOf({
+      definitions: [workflowDefined(wfV1, 1), workflowDefined(latest, 2), typeDefined(1)],
+      tickets: [
+        {
+          ticketId: TICKET,
+          snapshot: {
+            seq: 5,
+            state: {
+              kind: 'ticket',
+              id: TICKET,
+              workspaceId: WS,
+              projectId: PROJECT,
+              typeId: TYPE,
+              parentId: null,
+              workflowId: WF,
+              workflowVersion: 1,
+              stateId,
+              stateCategory: category as TicketState['stateCategory'],
+              assigneeId: null,
+              collaboratorIds: [],
+              fields: { title: { value: 'Bootstrapped after a publish', actorId: USER_A, clientTime: CLIENT_TIME, serverTime: SERVER_TIME } },
+              transitions: [{ toStateId: stateId, actorId: USER_A, seq: 5, workflowId: WF, workflowVersion: 1 }],
+            },
+          },
+          events: [],
+        },
+      ],
+    });
+  }
+
+  it('12.136 a bootstrap snapshot recorded before a publish is folded forward, re-categorised AND dropped', async () => {
+    // The absence this case exists for: `foldTicketsOntoVersion` had exactly one
+    // call site — `applyServerItem`'s definition branch — so `loadBootstrap`
+    // stored the very same `workflow.defined` events through `applyDefinition`
+    // and never folded. Measured before the fix, the two doors DISAGREED on
+    // identical input: stream `{v:2, cat:'open'}`, bootstrap `{v:1,
+    // cat:'active'}`. Nothing healed it either — the two backfilled types the
+    // reducer folds (`comment.added`, `attachment.added`) both return state
+    // unchanged.
+    const recat = createBetterSqliteStorage();
+    seqCounter = 0;
+    const replica = await createReplica({ storage: recat });
+    await replica.loadBootstrap(bootstrapWithSnapshotAtV1(wfV2Recategorised, 'doing', 'active'));
+
+    // Byte-identical to what 12.123 asserts on the stream door.
+    const ticket = await replica.getTicket(TICKET);
+    expect(ticket?.confirmed).toMatchObject({ stateId: 'doing', stateCategory: 'open', workflowVersion: 2 });
+    // The log is carried across unchanged here too — v1 vocabulary, kept.
+    expect(ticket?.confirmed?.transitions).toEqual([
+      { toStateId: 'doing', actorId: USER_A, seq: 5, workflowId: WF, workflowVersion: 1 },
+    ]);
+
+    // The folded state IS the new replay baseline, and the baseline `seq` is
+    // carried across UNCHANGED rather than recomputed: the tail above seq 5 has
+    // not been applied yet, and raising the baseline would skip it. (That is
+    // the deliberate difference from `foldTicketsOntoVersion`, which raises it
+    // because the whole local history is already behind the fold.)
+    const snap = await recat.all("SELECT seq, state FROM snapshots WHERE entity_kind = 'ticket' AND entity_id = ?", [TICKET]);
+    expect(snap).toHaveLength(1);
+    expect(Number(snap[0]!.seq)).toBe(5);
+    expect(JSON.parse(snap[0]!.state as string) as TicketState).toMatchObject({ stateCategory: 'open', workflowVersion: 2 });
+
+    // THE HALF A RE-CATEGORISATION CANNOT SHOW. When v2 DROPS the snapshot's
+    // state, an unfolded bootstrap leaves the ticket standing in a state the
+    // workflow no longer has — not merely a stale category. Same door, same
+    // fold, `stateMapping` deciding where it goes.
+    const dropped = createBetterSqliteStorage();
+    seqCounter = 0;
+    const second = await createReplica({ storage: dropped });
+    await second.loadBootstrap(bootstrapWithSnapshotAtV1(wfV2Dropped, 'doing', 'active'));
+    expect((await second.getTicket(TICKET))?.confirmed).toMatchObject({
+      stateId: 'todo',
+      stateCategory: 'open',
+      workflowVersion: 2,
+    });
+
+    // POSITIVE CONTROL from the same helper against the same code: a bootstrap
+    // whose newest definition is the one the snapshot already sits on leaves the
+    // ticket exactly where it was, so the two assertions above are the fold and
+    // not this case rewriting every ticket it sees.
+    const inert = createBetterSqliteStorage();
+    seqCounter = 0;
+    const third = await createReplica({ storage: inert });
+    await third.loadBootstrap(
+      bootstrapOf({
+        definitions: [workflowDefined(wfV1, 1), typeDefined(1)],
+        tickets: bootstrapWithSnapshotAtV1(wfV2Recategorised, 'doing', 'active').tickets,
+      }),
+    );
+    expect((await third.getTicket(TICKET))?.confirmed).toMatchObject({
+      stateId: 'doing',
+      stateCategory: 'active',
+      workflowVersion: 1,
+    });
+
+    await recat.close();
+    await dropped.close();
+    await inert.close();
+  });
+
+  it('12.137 a stored claim.contested is skipped by a LATER refold — the filter on the type the docs call the common path', async () => {
+    // 12.130 proves filter-before-folding with a `visibility.set`. This case
+    // proves it with `claim.contested`, which is the type every sentence around
+    // the guard rests on ("backfilled unconditionally, so an unfiltered replay
+    // throws on an ordinary first sync") and which no case reached: a contest
+    // arriving over sync is answered by `applyServerItem`'s CONTEST_TYPES branch
+    // before the ticket branch, so it triggers no refold of its own, and 12.135
+    // puts its contest BELOW the snapshot seq, where the seq window keeps it
+    // away from the reducer whatever the filter does.
+    //
+    // What forces the contest past the window is a foldable ticket event
+    // ARRIVING AFTER it: `refoldTicket` then replays every ticket-entity row
+    // above the baseline, the stored `claim.contested` among them.
+    const storage = createBetterSqliteStorage();
+    const replica = await seededReplica(storage);
+    await replica.applyServerItem(created(TICKET, 'Contested then moved', PROJECT, 1));
+    const original = refusedClaim(USER_B, 'done');
+    const contest = contestOf(original);
+    contest.seq = 2;
+    await replica.applyServerItem(contest);
+
+    // The row is in the ledger, above the replay baseline (there is no snapshot
+    // yet, so the baseline is 0) — printed rather than assumed, because the
+    // whole case rests on the contest being inside the replay window.
+    expect((await replica.listEntityEvents(TICKET)).map((e) => ({ type: e.type, seq: e.seq }))).toEqual([
+      { type: 'ticket.created', seq: 1 },
+      { type: 'claim.contested', seq: 2 },
+    ]);
+    expect(await storage.all("SELECT seq FROM snapshots WHERE entity_kind = 'ticket' AND entity_id = ?", [TICKET])).toEqual([]);
+
+    // Mutation: replace the TICKET_EVENT_TYPES membership test in `refoldTicket`
+    // with an unconditional fold and this line throws
+    // `applyTicketEvent: not a ticket event: claim.contested`.
+    await replica.applyServerItem(transitioned(TICKET, 'doing', 3));
+
+    const ticket = await replica.getTicket(TICKET);
+    expect(ticket?.confirmed).toMatchObject({ stateId: 'doing', stateCategory: 'active' });
+    // The contest was skipped by the reducer and is nonetheless still there to
+    // be shown — skipped is not dropped.
+    expect(ticket?.contests).toHaveLength(1);
+    expect(ticket?.contests[0]).toMatchObject({ contestedEventId: contest.id, claimantId: USER_B, resolved: false });
+    // The log holds the seq-3 move alone: nothing about the contest reached the
+    // ticket's state.
+    expect(ticket?.confirmed?.transitions).toEqual([
+      { toStateId: 'doing', actorId: USER_A, seq: 3, workflowId: WF, workflowVersion: 1 },
+    ]);
     await storage.close();
   });
 });

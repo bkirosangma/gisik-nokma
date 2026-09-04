@@ -304,6 +304,69 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
     }
   }
 
+  /**
+   * The bootstrap door's half of refresh-on-publish, and it is a SEPARATE
+   * function from `foldTicketsOntoVersion` for one reason: that one walks the
+   * `tickets` TABLE, and a bootstrapped ticket has no row in it yet. Its state
+   * arrives as a snapshot, is folded here, and only then is replayed forward by
+   * `refoldTicket`.
+   *
+   * WHY THIS EXISTS AT ALL. It was missing, and the absence was invisible from
+   * the stream door's tests: `loadBootstrap` stored every `workflow.defined` in
+   * `definitions` through `applyDefinition` and never folded, so a bootstrap
+   * carrying v1 AND v2 alongside a snapshot still recorded at
+   * `workflowVersion: 1` left the ticket at v1's category forever. Measured
+   * before the fix: the bootstrap door answered `{v:1, cat:'active'}` where the
+   * identical publish through `applyServerItem` answers `{v:2, cat:'open'}` —
+   * and worse, a v2 that DROPPED the snapshot's state left the ticket standing
+   * in a state the workflow no longer has. Nothing heals it: the two backfilled
+   * types the reducer folds (`comment.added`, `attachment.added`) both return
+   * state unchanged.
+   *
+   * ORDER MATTERS: fold the snapshot BEFORE replaying the tail, never after.
+   * The tail is replayed against `localDeps`, which answers at the LATEST
+   * version, so a tail folded onto a stale baseline would be reducing new
+   * vocabulary onto old state. Same rule the stream door states as "the
+   * snapshot is the load-bearing half".
+   *
+   * The baseline `seq` is carried across UNCHANGED — `writeSnapshot` is called
+   * with `snapshot.seq`, not with a recomputed maximum. `foldTicketsOntoVersion`
+   * raises the baseline because it folds a ticket whose whole local history is
+   * already behind it; here the tail above `snapshot.seq` has NOT been applied
+   * yet and raising the baseline would skip it.
+   *
+   * A HOLE IN THE VERSION CHAIN NOW FAILS THE WHOLE BOOTSTRAP, and that is a
+   * decision rather than a discovery. `foldTicketToWorkflowVersion` refuses a
+   * chain it cannot walk, this call is inside `loadBootstrap`'s transaction, so
+   * the entire response rolls back instead of one arrival (which is what the
+   * stream door does, case 12.125). It is the right shape here: bootstrap is
+   * specified to ship EVERY `workflow.defined`, so a hole means the response
+   * itself was incomplete, and half-loading a replica out of an incomplete
+   * response is the failure that would be discovered days later on a board that
+   * disagrees with the server.
+   *
+   * RECORDED, NOT FIXED — the pre-existing hazard this fold does not remove.
+   * A bootstrap tail can contain a `ticket.transitioned` INTO a state the new
+   * version dropped. That event is history, written in the old vocabulary,
+   * above the snapshot, and `applyTicketEvent` throws on it
+   * (`workflow "…" has no state "doing"`) whether or not the snapshot was
+   * folded first — measured on this branch before and after this change. No
+   * client-side fold can repair it, because the fix is a snapshot ABOVE the
+   * offending event: the server would have to re-snapshot the tickets it folds
+   * when a workflow is published, and today `apps/server/src/sync/snapshot-writer.ts`
+   * has no `workflowVersion` handling and `snapshot-store.ts` has no DELETE, so
+   * a published version invalidates nothing. *Owner: Plan 10 Task 6 (the
+   * bootstrap route and the snapshot writer).*
+   */
+  async function foldSnapshotForward(
+    tx: SyncStorage,
+    state: TicketState,
+    latest: PublishedWorkflowDef | undefined,
+  ): Promise<TicketState> {
+    if (latest === undefined || state.workflowVersion >= latest.version) return state;
+    return foldTicketToWorkflowVersion(state, latest, await workflowVersionsOf(tx, latest.id));
+  }
+
   async function applyContest(tx: SyncStorage, env: LedgerEvent): Promise<void> {
     if (env.type === 'claim.contested') {
       const p = claimContestedPayloadSchema.parse(env.payload);
@@ -385,10 +448,20 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
         await tx.run("INSERT INTO meta (key, value) VALUES ('me', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [
           JSON.stringify(data.me),
         ]);
+        // The highest `workflow.defined` per workflow, kept as `applyDefinition`
+        // PARSED it rather than re-read from the payload — the same value the
+        // `workflows` row holds. Bootstrap ships EVERY definition, not a delta
+        // (`BootstrapResponse.definitions`), so this map is complete for every
+        // workflow the response covers, and a workflow it does not cover is one
+        // this response gives no reason to fold onto.
+        const latestByWorkflow = new Map<string, PublishedWorkflowDef>();
         for (const def of data.definitions) {
           const dupe = await tx.all('SELECT 1 FROM events WHERE id = ?', [def.id]);
           if (dupe.length === 0) await insertEnvelope(tx, def);
-          await applyDefinition(tx, def);
+          const published = await applyDefinition(tx, def);
+          if (published === null) continue;
+          const held = latestByWorkflow.get(published.id);
+          if (held === undefined || published.version > held.version) latestByWorkflow.set(published.id, published);
         }
         // Definitions first, then one deps read for the whole batch: the
         // reducer must be able to resolve ANY workflow id an event asks for
@@ -398,8 +471,21 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
         const localDeps = await buildLocalDeps(tx);
         for (const ticket of data.tickets) {
           if (ticket.snapshot !== null) {
-            await writeSnapshot(tx, ticket.ticketId, ticket.snapshot.seq, ticket.snapshot.state);
+            // REFRESH ON PUBLISH, BOOTSTRAP DOOR. The server serves the snapshot
+            // it last wrote, at whatever version the ticket was on then, and
+            // nothing on the server invalidates it when a workflow is published
+            // — so the fold has to happen here or not at all.
+            const folded = await foldSnapshotForward(
+              tx,
+              ticket.snapshot.state,
+              latestByWorkflow.get(ticket.snapshot.state.workflowId),
+            );
+            await writeSnapshot(tx, ticket.ticketId, ticket.snapshot.seq, folded);
           }
+          // A ticket with NO snapshot needs no fold: `events` is then its full
+          // history and `ticket.created` resolves the workflow through
+          // `localDeps`, which answers at the latest version — so the replay
+          // lands on the current vocabulary by construction.
           for (const env of ticket.events) {
             const dupe = await tx.all('SELECT 1 FROM events WHERE id = ?', [env.id]);
             if (dupe.length === 0) await insertEnvelope(tx, env);

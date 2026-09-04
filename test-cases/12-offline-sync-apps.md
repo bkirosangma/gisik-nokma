@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.135`. THE NEXT FREE ID IS `12.136`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, and said `12.118` until Task 9's replica landed 12.119–12.135. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.137`. THE NEXT FREE ID IS `12.138`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path). A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -401,17 +401,25 @@ refusal, which fires on both doors and therefore proves nothing about which was 
 
 ## The replica (Task 9) — `packages/sync-client/test/replica.test.ts`
 
-**Seventeen `it` declarations, one per id 12.119–12.135, running as EIGHTEEN tests** — 12.132's `it`
+**Nineteen `it` declarations, one per id 12.119–12.137, running as TWENTY tests** — 12.132's `it`
 sits inside a two-zone loop, so it executes twice. Both numbers are stated because neither implies the
-other, and each is measured: `grep -cE "^\s*it\(" packages/sync-client/test/replica.test.ts` → 17, and
-the runner's own line → `test/replica.test.ts (18 tests)`. (This sentence said "eighteen `it` blocks"
-for the few minutes between being written and being checked, from a grep that matched only two of the
-three indents in the file — the same class of error as the `TZ` count two paragraphs down.) **Every one
-of the seventeen ids was proved able to fail** — enumerated case by case below, each with the mutation
-that reddened it. Eighteen source mutations were applied one at a time to
-`packages/sync-client/src/replica/`, restored between runs and hash-verified against a backup taken
-before the first. The harness's own control was a null mutation (text replaced with itself) →
-`18 passed (18)`, so the reddenings are the mutations and not the harness.
+other, and each is measured: `grep -nE "^[[:space:]]*it\(" packages/sync-client/test/replica.test.ts`
+prints nineteen lines, one per id, **enumerated rather than counted** — the `-c` form of this very
+command returned 17 against a file holding 17 once, matching only two of the three indents, and a count
+with no rows behind it is how that survived. The runner's own line reads `Tests 20 passed (20)`.
+**Every one of the nineteen ids was proved able to fail** — enumerated case by case below, each with
+the mutation that reddened it. Twenty source mutations have now been applied one at a time to
+`packages/sync-client/src/replica/`, restored by `cp` from a pre-mutation backup between runs and
+re-verified with `git diff` (never `git checkout --`, and never shell `diff`, which has returned a
+false "identical" on this machine). The harness's own control was a null mutation (text replaced with
+itself) → `20 passed (20)`, so the reddenings are the mutations and not the harness.
+
+**Every "red here alone" below was RE-MEASURED in the fix round, and four enumerations were false.**
+The corrections are in the notes themselves; the pattern they share is worth naming once, because it is
+the one this file's own header warns about: an enumeration is a fact about a moment, and nothing
+re-derives it when a case is appended below. 12.120's and 12.125's were falsified by cases in the very
+round that wrote them; 12.121's by 12.135 a round later; 12.122's claim about what it discriminates was
+never true.
 
 **One thing in this module is deliberately NOT covered here, recorded rather than left implicit**: the
 `DELETE FROM outbox WHERE event_id = ?` in `applyServerItem` — "an echo of our own claim confirms it".
@@ -426,21 +434,41 @@ the number Task 10's own echo case will want and the never-renumber rule would k
   destination `to` and the log entry spells it `toStateId`; both are correct and deliberately not
   unified** (`packages/domain/src/ticket-state.ts` header) — the plan's own snippet for this task
   builds the payload as `{ toStateId }`, which zod refuses. *Mutation: hand the reducer a constant
-  per-entity `seq` from `rowToEnvelope` → red here, on 12.122, 12.123 and 12.124.*
+  per-entity `seq` from `rowToEnvelope` → red here, on 12.122, 12.123, 12.124 and 12.137
+  (`Tests 5 failed | 15 passed (20)`). 12.137 was added after this note and is included by
+  re-measurement, not by inheritance.*
 - 12.120 ✅ a duplicate event id answers `{ applied: false }` and adds no second ledger row —
   at-least-once delivery is the contract. *Mutation: drop the `SELECT 1 FROM events WHERE id = ?`
-  guard → red here alone.*
+  guard → red here **and on 12.133** (`Tests 2 failed | 18 passed (20)`). This note said "red here
+  alone" until it was measured: 12.133 asserts that `onChange` does not fire on a redelivered event,
+  and `applyServerItem` answers `applied: false` — which is what holds the beat count at 1 — only
+  because of this guard. The two cases were written in the same round and neither was checked against
+  the other.*
 - 12.121 ✅ a `claim.contested` folds into the `contests` table and NOT into ticket state (the ticket
   stays in `todo`), `claimantId` is the actor of the **refused claim** rather than of the contest the
   server filed, and `claim.contested_resolved` flips `resolved`/`resolution` so `{ open: true }`
   empties. The `[]` carries a positive control from the same call: unfiltered, the contest is still
-  there. *Mutation: skip `applyContest` → red here, on 12.127 and on both 12.132 runs.*
-- 12.122 ✅ bootstrap folds a snapshot plus only the events past its `seq`: a backfilled `comment.added`
-  at seq 2 sits below a snapshot at seq 3 and does not fold again, while the seq-4 transition does —
-  **the transition log's LENGTH is what tells a correct fold from a whole-tail replay**, since both
-  land in `doing`. The cursor lands at `streamSeq`, and `searchLocal` finds the ticket by comment text
-  through `docToPlainText`, with a positive control (a phrase in no comment and no title) returning
-  `[]` from the same call. *Mutation: read the title from a top-level `title` property instead of the
+  there. *Mutation: skip `applyContest` → red here, on 12.127, on 12.135, on 12.137 and on both
+  12.132 runs — FIVE ids across SIX runs (`Tests 6 failed | 14 passed (20)`). This note said "red here,
+  on 12.127 and on both 12.132 runs" — four runs — and was already false when 12.135 landed in a later
+  round without it being re-derived; 12.137 has since been added on top.*
+- 12.122 ✅ bootstrap folds a snapshot plus the events past its `seq`: a backfilled `comment.added` at
+  seq 2 sits below a snapshot at seq 3, the seq-4 transition folds, and the ticket lands in `doing`
+  with a one-entry transition log. The cursor lands at `streamSeq`, and `searchLocal` finds the ticket
+  by comment text through `docToPlainText`, with a positive control (a phrase in no comment and no
+  title) returning `[]` from the same call. **What this case does NOT constrain, corrected because the
+  sentence here claimed otherwise:** it read *"the transition log's LENGTH is what tells a correct fold
+  from a whole-tail replay"*, and that is measured false — forcing `refoldTicket` to replay from seq 0
+  leaves this case GREEN and reddens 12.124 alone (`Tests 1 failed | 19 passed (20)`). The only
+  sub-snapshot event in the fixture is a `comment.added`, and `applyTicketEvent` returns state
+  unchanged for it (`packages/domain/src/ticket-state.ts`), so a windowed fold and a whole-tail replay
+  produce the identical one-entry log. **And no realistic bootstrap fixture could do better**: of the
+  five `BOOTSTRAP_BACKFILL_TYPES`, only `comment.added` and `attachment.added` are in
+  `TICKET_EVENT_TYPES`, and both are reducer no-ops — so on any input the server actually sends, the
+  `AND seq > ?` window is unobservable through this module's public surface. That is the same fact
+  12.131 records from the other side ("every backfilled type that can sit below a snapshot today is a
+  reducer no-op"), and it is why the window is held by **12.124**, where the fold's own snapshot puts a
+  DROPPED state behind the baseline and replaying it throws. *Mutation: read the title from a top-level `title` property instead of the
   `fields.title` claim the reducer writes → red here alone.*
 - 12.123 ✅ an arriving `workflow.defined` whose new version RE-CATEGORISES a state moves the ticket's
   `stateCategory` and `workflowVersion` without moving the ticket, and leaves the transition log
@@ -459,8 +487,12 @@ the number Task 10's own echo case will want and the never-renumber rule would k
   arrival rolls back: no `events` row, no `workflows` row, ticket unmoved. **Positive control in the
   same case**: the identical v3 publish succeeds once v2 is delivered first, so the refusal is about
   the hole. *Mutation: make `workflowVersionsOf` answer the latest definition for every version —
-  i.e. unify it with the reducer's lookup → red here alone, and silently WRONG rather than loud: the
-  ticket folds to v3 through a definition it never sat in.*
+  i.e. unify it with the reducer's lookup → red here **and on 12.134** (`Tests 2 failed |
+  18 passed (20)`), and silently WRONG rather than loud: the ticket folds to v3 through a definition it
+  never sat in. This note said "red here alone"; 12.134 asserts `versions(3)` is `null` directly, in
+  the same file, deliberately pairing the two lookups — and a lookup that answers the latest definition
+  for every version cannot answer `null`. Two cases written to pair with each other, neither
+  cross-checked against the other's mutation.*
 - 12.126 ✅ purge leaves no readable trace: `getTicket` null, `listEntityEvents` empty, and the
   `events` / `tickets` / `snapshots` / `contests` **rows** (printed, not counted) empty for that id,
   plus no row anywhere whose payload still contains the comment text. A second ticket created
@@ -481,8 +513,16 @@ the number Task 10's own echo case will want and the never-renumber rule would k
   `entityKind: 'ticket'` and `applyTicketEvent` folds ten; a `visibility.set` arriving over sync AND a
   `visibility.set` in a bootstrap ticket tail are both stored without folding and without throwing.
   This is the common path, not an edge case — bootstrap backfills `claim.contested` unconditionally.
-  *Mutation: drop the `TICKET_EVENT_TYPES` membership test in `refoldTicket` → red here alone, with
-  `applyTicketEvent: not a ticket event: visibility.set`.*
+  *Mutation: drop the `TICKET_EVENT_TYPES` membership test in `refoldTicket` → red here **and on
+  12.137** (`Tests 2 failed | 18 passed (20)`), with `applyTicketEvent: not a ticket event:
+  visibility.set` here and `… : claim.contested` there.* **Read this case's scope narrowly**: the only
+  type it puts in front of the guard is `visibility.set`. The sentence above — and `replica.ts`'s own
+  docblock, and `Features.md` §12 — rest the "common path, not an edge case" claim on `claim.contested`,
+  and until 12.137 was added no case put a `claim.contested` where the filter had to catch it: a
+  contest arriving over sync is answered by `applyServerItem`'s `CONTEST_TYPES` branch before the
+  ticket branch and triggers no refold of its own, and 12.135's contest sits below the snapshot `seq`
+  where the window keeps it away from the reducer whatever the filter does. The guard was proved on the
+  secondary example and asserted on the primary one.
 - 12.131 ✅ the fold never moves a ticket's replay baseline BACKWARDS: bootstrap can leave backfilled
   ticket-entity events below the snapshot's `seq`, and a fold that set the new baseline to
   `MAX(events.seq)` alone would drop it from 5 to 2, putting pre-fold history back in front of the
@@ -538,3 +578,44 @@ the number Task 10's own echo case will want and the never-renumber rule would k
   half by the `TICKET_EVENT_TYPES` membership test, not by the seq window — measured, not assumed:
   *making `refoldTicket` replay from seq 0 reddens 12.124 and NOT this case*, because the filter
   catches the contest either way.
+- 12.136 ✅ **refresh on publish, on the BOOTSTRAP door** — a snapshot recorded at `workflowVersion: 1`
+  arriving alongside a bootstrap that ships v1 AND v2 is folded forward before its tail is replayed:
+  the re-categorised half lands `{stateId: 'doing', stateCategory: 'open', workflowVersion: 2}`,
+  byte-identical to what 12.123 asserts on the stream door, with the transition log carried across
+  unchanged in v1's vocabulary; the DROPPED half — which a re-categorisation cannot show — moves where
+  `stateMapping` says rather than leaving the ticket standing in a state the workflow no longer has;
+  the folded state is written as the replay baseline with the baseline `seq` **carried across
+  unchanged** (asserted on the `snapshots` row), because the tail above it has not been applied yet and
+  raising the baseline would skip it; and a positive control from the same helper — a bootstrap whose
+  newest definition is the one the snapshot already sits on — leaves the ticket at v1, so the two
+  assertions above are the fold and not this case rewriting every ticket it sees. **This was a real
+  absence, not a missing test**: `foldTicketsOntoVersion` had exactly one call site
+  (`applyServerItem`'s definition branch), `loadBootstrap` stored the same `workflow.defined` events
+  through `applyDefinition` and never folded, and the two doors answered differently on identical
+  input — stream `{v:2, cat:'open'}`, bootstrap `{v:1, cat:'active'}`. Nothing healed it: the two
+  backfilled types the reducer folds are both state-unchanged no-ops. *Mutation: make
+  `foldSnapshotForward` return its input → red here alone (`Tests 1 failed | 19 passed (20)`).*
+  **RECORDED, NOT FIXED — the half no client-side fold can repair.** A bootstrap tail can carry a
+  `ticket.transitioned` INTO a state the new version dropped; that event is history in the old
+  vocabulary sitting ABOVE the snapshot, and `applyTicketEvent` throws on it
+  (`applyTicketEvent: workflow "…" has no state "doing"`) whether or not the snapshot was folded first
+  — measured on this branch both before and after the fold landed. The repair is a snapshot above the
+  offending event, which only the server can write: today `apps/server/src/sync/snapshot-writer.ts`
+  has no `workflowVersion` handling and `apps/server/src/ledger/snapshot-store.ts` has no DELETE, so
+  publishing a version invalidates no snapshot anywhere. *Owner: Plan 10 Task 6 (the bootstrap route
+  and the snapshot writer).*
+- 12.137 ✅ **filter before folding, proved on `claim.contested`** — the type every sentence around the
+  guard calls the common path, and which no case reached until this one. A `claim.contested` stored in
+  the ledger above the replay baseline (printed, not assumed: `listEntityEvents` shows
+  `ticket.created@1` and `claim.contested@2`, and the `snapshots` rows for the ticket are empty, so the
+  baseline is 0) is replayed by `refoldTicket` when a LATER `ticket.transitioned` arrives — and the
+  `TICKET_EVENT_TYPES` membership test is the only thing between it and a reducer that throws on it.
+  The ticket still moves to `doing`, the contest is still there to be shown (skipped is not dropped),
+  and the transition log holds the seq-3 move alone. *Mutation: replace the membership test in
+  `refoldTicket` with an unconditional fold → red here and on 12.130 (`Tests 2 failed |
+  18 passed (20)`), here with `applyTicketEvent: not a ticket event: claim.contested`.* **Why nothing
+  reached this path before**: `applyServerItem` tests `CONTEST_TYPES` before the ticket branch, so a
+  contest triggers no refold of its own; 12.121, 12.127 and 12.132 apply no foldable ticket event after
+  their contests, so the stored row is never replayed; and 12.135 puts its contest below the snapshot
+  `seq`, where the window keeps it away from the reducer regardless of the filter. What forces it in
+  front of the guard is a foldable ticket event arriving AFTER it, which is this case's whole shape.
