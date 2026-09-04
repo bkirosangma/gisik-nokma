@@ -1986,3 +1986,120 @@ are the controller's to write.
 **If you are a fresh executor reading this after a restart:** the position above is the merged,
 pushed truth. Verify it rather than adopting it — `git rev-parse HEAD`, `git branch --contains HEAD`,
 `gh pr view 93`. If #93 has merged, `main` has moved and this file's anchors are history.
+
+---
+
+# STEP 15 IS OPEN — PLAN 10, TASKS 5–13 (2026-09-04 ~07:45)
+
+**Everything above this line is HISTORY.** PR #93 merged as `e09666c`; the "PR #93 IS OPEN" section
+immediately above is a fact about 07:20 and its anchors (`59f834b`, `exec/14-plan9-calendar`) are now
+history. `origin/exec/14-plan9-calendar` still points at `5d0be1d`, but its content lives on `main`.
+
+## WHERE I AM
+
+**Step 15 — Plan 10 remainder. Branch `exec/15-plan10-sync`, cut from `origin/main` `e09666c`.**
+
+| anchor | value |
+|---|---|
+| branch | `exec/15-plan10-sync` |
+| cut from | `origin/main` **`e09666c`** ("Plan 9: the calendar, the timeline and the notification engine…") |
+| HEAD at write time | `e09666c` — zero own commits yet beyond this handoff |
+| tree | clean apart from this commit |
+| ledger | Plan 10: T1, T2, T3, T4, T8 **done**; T5, T6, T7, T9–T18 **todo** — read from `task-ledger.tsv`, not inferred |
+
+## ⛔ THE STOP POINT IS REAL AND IT IS EIGHT TASKS AWAY
+
+`controller-state.md:15-21` — owner-set, 2026-09-04. **Permitted without asking: T5, T6, T7, T9, T10,
+T11, T12, T13.** **STOP AFTER T13. ASK before dispatching T14.** T14/T15 (dual-client harness and
+scenarios) and T16/T17 (Tauri, Expo) are all behind the ask. The standing auto-merge authorization does
+**not** cover this boundary. The reason is quota, not tidiness, and the controller's own note says to
+**re-derive rather than obey mechanically** if the weekly window turns out to roll.
+
+## PRE-FLIGHT IS DONE AND IT IS NOW TRACKED
+
+`docs/lanes/plan10-adaptation-map.md` — 440 lines, one sonnet agent plus an executor addendum that
+closed the map's own "not verified" entries. **It was untracked until this commit; it is committed
+now**, because the condition its header set ("untracked on purpose until step 15's branch is cut off
+the merged `main`") is discharged.
+
+**Read its header before using any citation in it.** Its substance is good and its *directory paths are
+not*: three spot-checked high-value claims were all substantively correct and two cited a path that does
+not exist. Re-locate every file yourself.
+
+The three findings from it that will cost a round each if missed:
+
+1. **T7: `ingestBatch` vs `ingestClientBatch`.** The plan's own snippet calls the internal, UNGATED door
+   for the client-submitted offline event. `ingest-service.ts`'s docblock names this exact case by name.
+   `sync-service.ts` legitimately needs BOTH doors (the server-authored `claim.contested` append is a
+   proper internal-door use), so its deps type **cannot** be narrowed to `ClientIngest` and the compiler
+   will **not** catch a wrong call. Discipline falls back to review. Write down which door each call uses.
+2. **T12: the plan's `ReplicaQuery`/`LocalIngestResult` are not the shipped `DataSource`.** The real
+   `DataSourceQuery` has 13 methods under different names; the plan's has 6. `LocalIngestResult`'s 4th
+   `'pending'` status is not assignable where `DataSource.ingest`'s 3-status `IngestResult[]` is
+   expected. Build against the real types.
+3. **T6/T7: `EffectiveRole` is brand-protected** (non-exported `unique symbol`, Ruling P22). Do not
+   hand-build one to make a test pass — every safety property of `canSeeResolved` rests on the value
+   having come from `resolveEffectiveRole`.
+
+## TWO SWEEPS RUN AT THIS SHA, BOTH WITH POSITIVE CONTROLS ON THE SAME FILE
+
+Run against `docs/superpowers/plans/2026-08-20-10-offline-sync-apps.md` (7,629 lines). The controls
+matter because five of the six silent-empty modes this repo has recorded produce a well-formed zero:
+
+```
+DataSource   45 lines   } controls — non-zero, so the path and the tool both work
+istDayOf     22 lines   }
+clockSkewMs  14 lines   }
+useLiveQuery  0 lines   <- genuine absence
+TZ            0 lines   <- genuine absence
+```
+
+**1. The adaptation map's own "least-sure claim" is CLOSED, and the answer is the reassuring one.**
+The map could not determine whether Plan 10's T9/T11–T13 text carries a stale 3- or 4-argument
+`useLiveQuery` call needing the Ruling P17 5-arg form. It does not: **Plan 10's text contains zero
+`useLiveQuery` calls at all.** So there is no transcription trap. P17 still binds any view T13 *writes*
+(5-arg form; the key must name every input `load` closes over) — but no plan snippet needs correcting,
+and the map's closing paragraph can be read as resolved.
+
+**2. The brief's known gap #2 is live in this plan and now quantified.** Plan 10's text is
+clock-sensitive on **36 lines** — `istDayOf` on 22, `clockSkewMs` on 14 — and sets `TZ` on **zero**.
+That is the `ist-day.test.ts` failure exactly: a test that cannot distinguish *the code computes IST
+correctly* from *the machine is already in IST*. **T9, T10 and T13 dispatches must carry an explicit
+`TZ` instruction**, because the map does not mention `TZ` across its 440 lines either and the map is
+what the implementers read.
+
+## PLAN OF ATTACK — three batches on clean dependency seams
+
+Sequential within a batch. **No `pipeline()`/`parallel()` across tasks in a batch**: they mutate one
+tree, and T6/T7 both write `sync-routes.ts`. The shared-tree hazard is the recorded one.
+
+| batch | tasks | seam |
+|---|---|---|
+| **A** | T5 → T6 → T7 | server sync surface; T6/T7 share `sync-routes.ts`, T6 reads T5's snapshots |
+| **B** | T9 → T10 | replica core; T10's outbox sits on T9's replica |
+| **C** | T11 → T12 → T13 | sync engine → replica `DataSource` → app-core UX |
+
+Per-task: implementer → reviewer. Fix round only on Important or worse. HARD CAP 6 subagents/task.
+
+**Model assignment** (brief's table; sonnet is the default, opus the exception):
+T5 opus/high impl (it is a fold) + sonnet/med review · T6 sonnet/med both · **T7 FLOOR-LIST: opus/high
+both** · **T9 FLOOR-LIST: opus/high both** · T10 opus/high impl (a pre-check that can disagree with the
+server is worse than none) + sonnet/med review · T11 opus/high impl (stream/sync) + sonnet/med review ·
+**T12 opus/high both — an ESCALATION I am taking deliberately**, not a floor-list entry: the map names
+it "the riskiest by a wide margin" and its failure mode is invisible until T13 or a later app shell ·
+T13 opus/high impl (honesty-carrying view-models) + sonnet/med review.
+
+## THE ONE DECISION I HAVE NOT TAKEN YET — PR granularity
+
+Precedent is one PR per step (#93 carried 15 tasks). Against that: the controller's arithmetic said
+**8–9 of Plan 10's 13 tasks fit this week, not 13**, measured at 01:15 before Plan 9's remainder was
+spent. If the pool is thinner than that estimate, **one 8-task branch that dies at T11 leaves five tasks
+unmerged — "full price, no gate", the worst available outcome by the brief's own naming.** The three
+batches sit on clean seams, so a PR at the Batch A seam costs one controller round-trip and makes three
+tasks durable. **Recorded here as an open call, to be taken at the Batch A boundary on a re-measurement,
+not by default.**
+
+## IF YOU ARE A FRESH EXECUTOR READING THIS
+
+The anchors above were verified with `git branch --contains`, not `git cat-file`. Re-verify anyway.
+Nothing is in flight as of this commit: no subagent is running, no PR is open from this branch.
