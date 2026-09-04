@@ -180,8 +180,8 @@ plan	task	status	pr	merge_sha	note
 10	8	done	23	b62be74	artefact: packages/sync-client scaffold (PR #23, subject names it)
 10	9	done	102	f03838d	artefact: packages/sync-client/src/replica/replica.ts (+827, new), src/replica/local-deps.ts (+65, new), test/replica.test.ts (+1031, new); src/index.ts exports — all four Task 9 **Files:** entries landed by PR #102, whose title names Plan 10 Batch B
 10	10	done	102	f03838d	artefact: packages/sync-client/src/precheck/local-context.ts (+297, new), src/outbox/outbox.ts (+376, new), test/precheck.test.ts (+331, new), test/outbox.test.ts (+449, new); src/index.ts exports — all five Task 10 **Files:** entries landed by PR #102
-10	11	todo	-	-	
-10	12	todo	-	-	
+10	11	done	107	9a5275c	artefact: packages/sync-client/src/engine/sync-engine.ts, src/net/http-transport.ts, test/sync-engine.test.ts, src/index.ts exports — all four declared **Files:** entries landed exactly as declared
+10	12	done	107	9a5275c	artefact: packages/app-core/src/replica/replica-data-source.ts, test/replica/replica-data-source.test.ts, src/index.ts exports (L226-245). DEVIATION: declared under packages/sync-client/src/data-source/, which does not exist — landed in app-core because DataSource is declared there, keeping the dependency direction app-core→sync-client rather than inverting it. Verified no native module reaches the web bundle: sync-client runtime deps are domain+rule-engine only, better-sqlite3 dev-only in both. Deviation undocumented by PR #107; recorded here	
 10	13	todo	-	-	
 10	14	todo	-	-	
 10	15	todo	-	-	
