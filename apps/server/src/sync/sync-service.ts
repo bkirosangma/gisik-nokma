@@ -279,10 +279,14 @@ export function createSyncService(deps: SyncServiceDeps): SyncService {
       // and is what makes this close the CLASS: any future refusal reachable by
       // a server-authored contest stops taking its batch down without anyone
       // having to remember to list it. It cannot quietly turn this door back
-      // into the interactive one, because that a refusal on a ticket DOES
-      // become recorded history is pinned by four independent cases (12.101,
-      // 12.105, 12.106 and 12.110's side-by-side control), all of which go red
-      // if contests stop committing.
+      // into the interactive one, and that is MEASURED rather than argued:
+      // forcing this arm to take EVERY contest-append (`if (true as boolean)`)
+      // reddens EIGHT cases in `sync-route.test.ts` — 12.101, 12.102, 12.103,
+      // 12.105, 12.106, 12.110, 12.113, and 12.114's own second control. So a
+      // change that stopped contests committing at all cannot hide behind this
+      // arm. (The count is written down because it was first guessed at four,
+      // and a redundancy claim standing in for the argument that a degrade is
+      // safe is exactly the kind of claim this fix round exists to correct.)
       return { status: 'refused', eventId: event.id, rule, reason };
     }
     return { status: 'contested', eventId: event.id, rule, reason, contestEventId: contestEvent.id };

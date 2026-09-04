@@ -313,7 +313,10 @@ refusal, which fires on both doors and therefore proves nothing about which was 
   `processBatch`. **500, unrecoverably** — the retry 500s, the solo claim 500s, and every event queued
   behind it in the outbox never syncs. Closed by degrading a `refused` contest-append to the claim's
   own refusal instead of throwing, which closes it as a CLASS rather than as a rule: any future refusal
-  a server-authored contest cannot survive now rides inside `results`. 12.114 pins it. The throw is kept
+  a server-authored contest cannot survive now rides inside `results`. 12.114 pins it. *That the degrade
+  cannot quietly turn this door back into the interactive one is measured, not argued: forcing the
+  degrade to take EVERY contest-append reddens eight cases — 12.101, 12.102, 12.103, 12.105, 12.106,
+  12.110, 12.113 and 12.114's second control.* The throw is kept
   for a contest-append that comes back `invalid` or absent — a server-built envelope the server's own
   door calls malformed, which has no honest per-event answer to give.
 

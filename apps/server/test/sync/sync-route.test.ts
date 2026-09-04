@@ -681,6 +681,10 @@ describe('POST /v1/sync — the sync ingress', () => {
     const inWorkspace = await syncPost(memberHeaders, [offlineTransition()]);
     const contested = inWorkspace.json().results[0];
     expect(contested).toMatchObject({ status: 'contested', rule: 'restrict-to' });
+    // `eventId` on a `contested` answer is the REFUSED CLAIM's id, which is what
+    // `contestRows` keys on (`original_event_id`) — not `contestEventId`, which
+    // is the contest's own. Every other call site in this file passes the claim
+    // id for the same reason.
     expect(await contestRows(contested.eventId)).toHaveLength(1);
   });
 
