@@ -8,6 +8,7 @@ import { createPool } from './db.js';
 import { buildServerGates } from './gates/index.js';
 import { createIngestService } from './ingest/ingest-service.js';
 import { buildProjectionRegistry } from './projections/index.js';
+import { startSnapshotWriter } from './sync/snapshot-writer.js';
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env);
@@ -92,6 +93,52 @@ async function main(): Promise<void> {
     },
     { logLevel: config.logLevel },
   );
+  // The snapshot writer (Plan 10 Task 5), and THREE deliberate departures from
+  // what the plan text said to do here. Each is a place the repo disagreed with
+  // the plan, and the repo won.
+  //
+  // 1. **Not inside `buildApp`.** Every route in this server is registered
+  //    there, so that is where a reader looks first — but this is an interval
+  //    timer, not a route, and `buildApp` is called by around sixty test files.
+  //    Registering it there would start a five-minute timer in each of them, and
+  //    a pass firing mid-test would write snapshots into a fixture database
+  //    nothing expects them in. `index.ts` is the one non-test boot path, which
+  //    makes it the honest home for a background sweep.
+  //
+  // 2. **Before `app.listen`, not after.** The plan says "after the server
+  //    starts listening". Fastify refuses `addHook` once the instance has
+  //    started — probed against this repo's fastify 5, which throws
+  //    `FST_ERR_INSTANCE_ALREADY_LISTENING: Fastify instance is already
+  //    listening. Cannot call "addHook"!` — so the registration has to happen
+  //    first, and
+  //    splitting the pair across the listen call would leave the writer running
+  //    with nothing arranged to stop it. Nothing fires immediately — the first
+  //    pass is one whole interval away — so starting before listen costs
+  //    nothing.
+  //
+  // 3. **Stopped on Fastify's `onClose`, because the shutdown path the plan
+  //    named DOES NOT EXIST.** The plan says to "call `stopSnapshots()` in the
+  //    shutdown path beside the existing pool/app close calls". There is no
+  //    SIGTERM handler in this file, no `pool.end()` and no `app.close()` — this
+  //    process runs until it is killed. Inventing a signal handler here would be
+  //    turning a snapshot task into a deployment change, and **Plan 11 owns the
+  //    boot path** (see the `attachments` note above, which defers to it for the
+  //    same reason). So the stop function is hung on the hook Fastify already
+  //    provides: today nothing calls `app.close()` and the writer runs for the
+  //    life of the dev process — which is correct, an unref'd interval holds
+  //    nothing open — and on the day Plan 11 adds a real shutdown, the writer
+  //    stops without anyone having to remember it exists.
+  const stopSnapshots = startSnapshotWriter(pool, {
+    intervalMs: config.snapshotIntervalMs,
+    minEvents: config.snapshotMinEvents,
+    log: (msg) => {
+      app.log.warn(msg);
+    },
+  });
+  app.addHook('onClose', () => {
+    stopSnapshots();
+  });
+
   await app.listen({ port: config.port, host: config.host });
 }
 

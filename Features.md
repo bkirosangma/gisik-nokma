@@ -972,12 +972,13 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 
 ## 12. Offline sync & the apps
 
-*(Plan 10, Task 4 only — the LIFTED §11 closer and the contested-claims read path. Plan 10's own
-catalogue task (Task 18) owns §12's full body and will replace this scope note; what follows is what
-Task 4 added, and nothing else. §8/§10/§11 stay absent because the coordination doc assigns
-`Features.md` sections one per implementation plan and numbering is claimed from that table, never
-taken next-free. Still absent rather than missing from this section: the snapshot writer, the replica
-bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Tasks 5–17.)*
+*(Plan 10, Tasks 4, 5, 6 and 7 — the LIFTED §11 closer, the contested-claims read path, the snapshot
+writer, the replica bootstrap and the sync ingress. Plan 10's own catalogue task (Task 18) owns §12's
+full body and will replace this scope note; what follows is what those four tasks added, and nothing
+else. §8/§10/§11 stay absent because the coordination doc assigns `Features.md` sections one per
+implementation plan and numbering is claimed from that table, never taken next-free. Still absent
+rather than missing from this section: the sync-client, the replica, the outbox and both app shells —
+Plan 10 Tasks 8–17.)*
 
 - ✅ **A contest cannot lie about which claim it is contesting** — `claim.contested` embeds the
   refused claim whole, and the embedded claim must name the **same workspace, the same entity kind
@@ -994,7 +995,12 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
   is structural there rather than checked. `checkContestCoherence` is the door that catches a contest
   built any other way. What neither can establish, and it is named rather than implied: that the
   embedded claim was **actually refused**, by the rule the contest names. Only the path that holds a
-  real refusal can answer that — *owner: Plan 10 Task 7, `POST /v1/sync`*. `apps/server/src/sync/contest-coherence.ts`
+  real refusal can answer that, and now one does: **`POST /v1/sync` is the only production caller, and it
+  passes the `Refusal` it is holding straight into `buildContestedClaim`** — so on that path the
+  guarantee is structural in the PRODUCER while remaining, correctly, uncheckable at the consumer. The
+  coherence check still cannot see whether a claim was refused and still says so; what changed is that
+  every contest in the product is now built from a refusal the server made itself, rather than merely
+  being well-formed. `apps/server/src/sync/contest-coherence.ts`, `apps/server/src/sync/sync-service.ts`
 - ⚙️ **Contested-claims projection (`proj_contested`)** — one row per `claim.contested`, keyed by the
   contest event id and UNIQUE on the refused claim's id, so a sync retry finds the prior contest
   instead of filing a second one. `claimant_id` is the actor of the **refused claim**, not of the
@@ -1033,10 +1039,190 @@ bootstrap, `POST /v1/sync`, the sync-client and both app shells — Plan 10 Task
   rather than a 403, so empty and forbidden are the same answer and the route is not an existence
   oracle. It never builds an `EffectiveRole` by hand and never reads `proj_memberships` directly — a
   project-scope row survives `membership.revoked` by design. `apps/server/src/sync/contests-route.ts`
+- ⚙️ **Snapshot writer — the fold is the DOMAIN reducer, never `proj_tickets`** — Plan 1 shipped the
+  `snapshots` table with no writer; this is the writer. `runSnapshotPass` snapshots every ticket whose
+  head seq has run `SNAPSHOT_MIN_EVENTS` past its latest snapshot, and the stored `state` is
+  `applyTicketEvent` folded over the ledger — the same reducer a replica runs. "Snapshot + tail is
+  exactly full replay on every client" follows, but only JOINTLY with the serving side, and it was false
+  until the fix round that added this clause: this writer skips every type outside `TICKET_EVENT_TYPES`
+  while still advancing `seq` past it, so such an event reaches a replica only because
+  `BOOTSTRAP_BACKFILL_TYPES` names it — and `visibility.set` was not named. Reading `proj_tickets`
+  instead would look right indefinitely:
+  that table is maintained by the same reducer today, so the two agree until the day they don't, and
+  then a replica's bootstrap state differs from its own replay with nothing pointing at why. The
+  equivalence is held by a test whose fixture leaves all three projections EMPTY and asserts it —
+  under a fixture seeded through the full ingest path both implementations produce identical bytes and
+  the assertion would distinguish nothing. `apps/server/src/sync/snapshot-writer.ts`
+- ⚙️ **The snapshot's seq counts EVENTS, not folds** — `visibility.set`, `claim.contested` and
+  `claim.contested_resolved` are all three filed against `kind: 'ticket'` and are deliberately absent
+  from `TICKET_EVENT_TYPES`, so they
+  move the cursor without moving the state. A writer that advanced the seq only on folded events would
+  store a snapshot sitting behind events it had already passed, and a replica resuming from that cursor
+  would be re-delivered them on every bootstrap. The cost of that design is paid on the serving side:
+  those three exist in no snapshot, so bootstrap has to name every one of them or the ones it misses
+  vanish below the cut. `TICKET_EVENT_TYPES` is TEN of the registry's thirteen `entityKind: 'ticket'`
+  types, not all of them, and its own docblock used to say "the ten registered against
+  `entityKind: 'ticket'`" — which is the most plausible reason `visibility.set` was missed.
+  `apps/server/src/sync/snapshot-writer.ts`, `packages/domain/src/ticket-state.ts`
+- ⚙️ **Reducer deps folded from the ledger's own definition events** — `buildLedgerDeps` builds
+  `TicketStateDeps` from `workflow.defined` / `ticket-type.defined` rows, ordered by `workspace_seq`
+  and NOT by `(entity_kind, entity_id, seq)`: a ticket type's key lives in its PAYLOAD and successive
+  definitions of one key arrive on different entity streams (each event gets a fresh ULID entity id),
+  so per-entity seq cannot order them against each other at all. Greatest `workspace_seq` wins for
+  types and greatest `version` wins for workflows — the same two rules `proj_ticket_types`' guarded
+  `DO UPDATE` and `proj_workflows`' `DO NOTHING` + `ORDER BY version DESC` already enforce, so the
+  ledger fold and the projections cannot disagree about which definition is current — and neither can a
+  replica, because `GET /v1/sync/bootstrap` serves `definitions` in this same `workspace_seq` order
+  (12.117). It did not, for one task: the route shipped the plan text's `(entity_kind, entity_id, seq)`,
+  so a workspace that had ever redefined a ticket-type key handed the replica the definitions in the one
+  order this loader's docblock says cannot resolve them. Both rules are
+  pinned by a fixture that defines one key TWICE, with the winning definition deliberately given the
+  smaller ULID entity id so the plan text's ordering picks the loser, and the maps never cross a
+  workspace. *That workspace filter is pinned by ONE case — dropping it reddens 12.93 and nothing else,
+  974 of 975 green across all 88 server test files, re-measured; the "red in seven cases" this file's
+  test-case entry used to claim was never run.* `apps/server/src/sync/ledger-deps.ts`
+- ⚙️ **The writer's absences, named** — no locking (safe because the row is keyed by seq and the fold is
+  pure below it, so a late arrival is the next pass's work, not a corruption), tickets only (there is no
+  other reducer to fold), no visibility or tenancy gate (a background sweep has no caller identity — the
+  route that SERVES a snapshot owes that), and no retention: the table grows one row per snapshot per
+  entity forever. *Retention is unowned.* `apps/server/src/sync/snapshot-writer.ts`
+- ⚙️ **`SNAPSHOT_INTERVAL_MS` (300000) and `SNAPSHOT_MIN_EVENTS` (20)** — additive config, both
+  `.positive()` integers refused at the door. Not tidiness on either: `setInterval(fn, 0)` runs the
+  pass on every tick of the event loop, and a zero `MIN_EVENTS` makes every ticket due on every pass,
+  which recomputes a snapshot at a seq that already has a row and collides on the snapshots primary
+  key. Neither is a correctness knob — a server that never writes a snapshot answers with exactly the
+  same state, only slower. `apps/server/src/config.ts`, `.env.example`
+- ⚙️ **Started at the one boot path, stopped by Fastify's `onClose` — because the shutdown path the
+  plan named does not exist** — `apps/server/src/index.ts` has no SIGTERM handler, no `pool.end()` and
+  no `app.close()`. Rather than invent a signal handler (Plan 11 owns the boot path) or leave an
+  unstoppable timer, `startSnapshotWriter`'s stop function is hung on `app.addHook('onClose', …)`,
+  registered BEFORE `app.listen` because fastify 5 throws `FST_ERR_INSTANCE_ALREADY_LISTENING` on an
+  `addHook` after start. It is not registered inside `buildApp` with the routes: `buildApp` is called
+  by around sixty test files, and a five-minute timer in each of them could fire mid-test and write
+  snapshots into a fixture nothing expects them in. Today nothing calls `app.close()`, so the writer
+  runs for the life of the dev process — which costs nothing, the interval is `unref`'d — and it stops
+  by itself on the day a real shutdown lands. `apps/server/src/index.ts`
 - ⚙️ **One assembled test server** — `buildTestApp(db)` builds the real app, real auth, real ingest and
   the real projection registry, returning the app, its own OTP sender and the ungated internal ingest
   door. It replaces four hand-copied assemblies that had to be extended one by one every time
   `buildApp` gained a route. `apps/server/test/helpers/app.ts`
+- ✅ **`GET /v1/sync/bootstrap`** — first-run replica build without replaying full history: for every
+  ticket `listVisibleTickets` returns for the caller, the latest reducer-folded snapshot (if one exists) plus a per-entity tail
+  — everything after the snapshot's seq, PLUS every `comment.added` / `attachment.added` /
+  `visibility.set` / `claim.contested` / `claim.contested_resolved` regardless of position. That list is
+  not a taste judgement and it is not hand-kept: it is **every one of the thirteen types the registry
+  binds to `entityKind: 'ticket'` that the reducer does not fold**, because the snapshot writer skips
+  exactly those while still advancing `seq` past them, so an unlisted one is in neither the snapshot nor
+  the tail. `visibility.set` was missing from the list and was therefore dropped — but only when it sat
+  at or below a ticket's snapshot seq, so what a replica received depended on when a background
+  maintenance pass last ran (12.115). Every `workflow.defined` and `ticket-type.defined` event goes to
+  everyone including guests (a guest cannot render a status without the workflow definition, Plan 4
+  §5), **in ascending `workspace_seq` order** — the same order `buildLedgerDeps` folds them in, so a
+  replica that applies them in the order it received them lands where the server did. That order is part
+  of the contract: the route shipped `(entity_kind, entity_id, seq)`, which is the ordering 12.92 exists
+  to prove picks the LOSER when one ticket-type key has been redefined (12.117). The whole read runs
+  inside one `REPEATABLE READ` transaction with the workspace's stream cursor
+  read FIRST, so the response is a consistent cut and subscribing at the returned `streamSeq` can only
+  re-deliver an event the client already has, never skip one. Both halves of that claim are pinned by
+  the tests rather than only by this sentence — **and for a while only one of them was**: `streamSeq` is
+  checked against the real cursor (`readStreamSeq`), not merely a positive number, and the transaction's
+  literal `BEGIN ISOLATION LEVEL REPEATABLE READ` is asserted directly, but that second check is a
+  MEMBERSHIP check and membership cannot see position, so the ORDERING half went unpinned until 12.118
+  asserted the cursor query is issued before the first per-ticket tail read. The un-snapshotted branch (a
+  ticket too new to have a snapshot
+  yet: `snapshot: null`, `events` is its full history) and the `definitions` query's per-workspace scoping
+  (a sibling workspace's own `workflow.defined`/`ticket-type.defined` rows must not appear) are likewise
+  exercised now, not merely implied by the shape of the response type. 403 `{error:'not_a_member'}` when the
+  caller resolves no workspace role; 401 with no session. `apps/server/src/sync/sync-routes.ts`
+- ⚙️ **`EffectiveRole.projects` is a `Map`, and the wire shape is not** — `me.projectIds` is
+  `[...eff.projects.keys()]`, not `[...eff.projects]`: the map itself spreads as `[key, value]` TUPLES,
+  which the plan's own snippet got wrong. `apps/server/src/sync/sync-routes.ts`
+- ✅ **`POST /v1/sync`** — the sync ingress (amendment 16): a batch of offline-originated claims, 1-100,
+  answered 200 with one index-aligned `SyncEventResult` each. Per event, in order: an envelope error is
+  `invalid` (a malformed claim is not a claim, so there is nothing coherent to contest); a claim whose
+  `actorId` is not the session is `invalid` `actor-mismatch`; a client-supplied `claim.contested` is
+  `invalid` `reserved-type`; an id already in the ledger is answered `committed` from the STORED row;
+  an id already contested is answered with the ONE recorded contest; otherwise the claim goes to
+  ingest, and a refusal on a **ticket** becomes a `claim.contested` ledger event (`contested`, carrying
+  the contest's own event id) while a refusal on any other entity is `refused`, since there is no ticket
+  to attach a contest to. **`refused` therefore does NOT mean "the entity was not a ticket"** — the
+  plan's snippet glossed it that way and a replica written to that gloss would be wrong; it means *a
+  refusal no coherent contest can record*, and `entity-workspace-mismatch` on a ticket is the second
+  shape that reaches it (next bullet). `apps/server/src/sync/sync-service.ts`,
+  `apps/server/src/sync/sync-routes.ts`
+- ✅ **A refusal whose contest the server's own door refuses is answered, not 500'd** — when
+  `serverAppend` comes back `refused` for the `claim.contested`, the claimant is told the ORIGINAL
+  refusal's `rule` and `reason` inside `results`, character for character the answer `POST /v1/events`
+  gives for the identical claim. One shape reaches this today and it is live rather than theoretical: a
+  claim stamping workspace A on a ticket bound to workspace B is refused `entity-workspace-mismatch`,
+  and `buildContestedClaim` copies that `workspaceId` and `entity` onto the contest verbatim, so the
+  contest is the SAME mis-filing and the same `commitOne` guard refuses it. Throwing there — which is
+  what the plan's step 7b prescribed and what shipped first — made `POST /v1/sync` answer **500** from a
+  route whose whole contract is that per-event answers ride inside `results`: measured on
+  `[legal1, bad, legal2]`, `legal1` committed but its answer lost, `legal2` never processed at all, and
+  the retry and the solo claim both 500 again — **an outbox wedged with no path out**. Degrading rather
+  than enumerating the uncontestable rules is what closes it as a class. *The throw is KEPT for a
+  contest-append that comes back `invalid` or is absent: a server-built envelope the server's own door
+  calls malformed has no honest per-event answer, only a bug to surface.*
+  `apps/server/src/sync/sync-service.ts`
+- ✅ **The client's offline claim goes through the GATED door, and the deps type is what says so** —
+  `POST /v1/sync` submits the claim with `ingestClientBatch`, so being made offline buys an event
+  nothing: every membership, role, envelope-origin and visibility question is asked exactly as it is on
+  `POST /v1/events`. The plan's own snippet called `ingestBatch` — the internal, ungated door — for
+  that very event, which would have skipped `checkPermission` for **every offline-originated event in
+  the product**, the case `ingest-service.ts`'s docblock names by name. This route needs BOTH doors (a
+  contest is envelope-origin `'server'`, which the client door refuses by design), and the shape that
+  keeps that from re-opening the hole is the one `registerInviteRoutes` already uses: the narrowed
+  `ClientIngest` plus `ServerAppend` as a **separately named capability**, never the full
+  `IngestService`. A reflex `deps.ingest.ingestBatch(...)` here does not compile — *Property
+  'ingestBatch' does not exist on type 'ClientIngest'* — and two route tests fail on two different gate
+  checks if the call is swapped for the internal door. `apps/server/src/sync/sync-service.ts`
+- ⚙️ **A contest is built by the constructor, not by hand** — the append goes through
+  `buildContestedClaim`, which reads the contest's `workspaceId` and `entity` off the refused claim and
+  therefore has no parameter through which they could disagree; the plan's snippet hand-rolled the
+  envelope with `newSubmittedEvent`, which is exactly the shape `checkContestCoherence` exists to catch.
+  The contest is attributed to the **claimant**, and that is a deviation from three of this repo's own
+  docblocks, recorded rather than quietly taken: they describe `env.actorId` on a contest as "the SERVER
+  identity", and **no such identity exists** — `actorId` is a ULID, every ULID in the actor position is
+  a real person, and `bootstrapWorkspace` (the other server-authored sequence) likewise attributes its
+  appends to the human who caused them, with envelope-origin `'server'` carrying the "the server wrote
+  this" fact. Minting a system user is a product decision no plan has taken. *Consequence, stated
+  because it is invisible otherwise: on this path `proj_contested.claimant_id` equals the contest's own
+  `actorId`, so the fan-out mis-routing that module guards against would be undetectable against
+  production data — it stays detectable only because `notifications/fanout.ts`'s fixture uses two
+  different users. Owner for minting a system identity, if the product ever wants one: Plan 11.*
+  `apps/server/src/sync/sync-service.ts`
+- ⚙️ **The `proj_contested` UNIQUE index finally has the lookup it was built for** — the migration
+  comment and this section both said the index makes a sync retry *find* the prior contest; nothing
+  performed that lookup, and `isUniqueViolation` matches only `events_pkey`, so a second contest
+  embedding the same refused claim raised 23505 out of `commitOne` and **rejected the whole batch call**
+  — the answers already decided for that batch's committed neighbours never reached the client, and a
+  retry could not recover because a re-minted contest carries a fresh event id. Measured before the fix:
+  `expected 500 to be 200`. `POST /v1/sync` now reads `proj_contested` by `original_event_id` before
+  minting a contest, and catches the constraint by name for the concurrent-request residual two
+  requests can still race into. *The defect stays live for every other `ingestBatch` caller — this
+  closes the sync door, not the class.* **The first round then scoped the whole residual to this one
+  mechanism, and that was wrong**: a second batch-killing throw sat in `contest()`, reachable with no
+  unique violation anywhere on the path — see the "refusal whose contest the server's own door refuses"
+  bullet above, which closes that one. The two are different mechanisms and only the `events_pkey` half
+  is still open. `apps/server/src/sync/sync-service.ts`
+- ⚙️ **The visibility pre-check the plan asked for is deliberately absent** — Plan 10's step 6 (an
+  explicit `getResolvedVisibility` + `canSee` pass before ingest) duplicates
+  `checkVisibilityPermission`, which already refuses every ticket-entity event whose ticket the caller
+  cannot see, INSIDE the ingest transaction against the client the workspace lock has settled. Two
+  checks answering one question is how a pair drifts and how one of them stops being exercised; the
+  observable answer is identical, and dropping the local copy is what makes the invisible-ticket case a
+  **door test** rather than a test of a duplicate. `VISIBILITY_REFUSAL_RULE` stays exported, because the
+  replica compares that string — defined as `PERMISSION_VISIBILITY_RULE` rather than spelled again.
+  `apps/server/src/sync/sync-service.ts`
+- ⚙️ **`duplicate-event-id` is an idempotent ACCEPT on this path, twice over** — retries are expected
+  here, so the ledger lookup answers one before ingest is ever attempted, and a duplicate coming back
+  OUT of ingest (the race between that read and the insert) is re-read and accepted rather than passed
+  through as `invalid`, which the plan's own switch does and which would contradict amendment 16 for
+  exactly the case retries produce. The order matters beyond tidiness: placed after ingest, a retry of
+  an already-committed claim is re-judged by the gate, so a caller who has since lost the ticket is told
+  their committed claim was rejected and the ledger grows a contest for an event sitting in it.
+  `apps/server/src/sync/sync-service.ts`
 
 ## 10. Workflow builder & ticket types
 

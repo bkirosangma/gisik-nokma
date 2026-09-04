@@ -1986,3 +1986,334 @@ are the controller's to write.
 **If you are a fresh executor reading this after a restart:** the position above is the merged,
 pushed truth. Verify it rather than adopting it — `git rev-parse HEAD`, `git branch --contains HEAD`,
 `gh pr view 93`. If #93 has merged, `main` has moved and this file's anchors are history.
+
+---
+
+# STEP 15 IS OPEN — PLAN 10, TASKS 5–13 (2026-09-04 ~07:45)
+
+**Everything above this line is HISTORY.** PR #93 merged as `e09666c`; the "PR #93 IS OPEN" section
+immediately above is a fact about 07:20 and its anchors (`59f834b`, `exec/14-plan9-calendar`) are now
+history. `origin/exec/14-plan9-calendar` still points at `5d0be1d`, but its content lives on `main`.
+
+## WHERE I AM
+
+**Step 15 — Plan 10 remainder. Branch `exec/15-plan10-sync`, cut from `origin/main` `e09666c`.**
+
+| anchor | value |
+|---|---|
+| branch | `exec/15-plan10-sync` |
+| cut from | `origin/main` **`e09666c`** ("Plan 9: the calendar, the timeline and the notification engine…") |
+| HEAD at write time | `e09666c` — zero own commits yet beyond this handoff |
+| tree | clean apart from this commit |
+| ledger | Plan 10: T1, T2, T3, T4, T8 **done**; T5, T6, T7, T9–T18 **todo** — read from `task-ledger.tsv`, not inferred |
+
+## ⛔ THE STOP POINT IS REAL AND IT IS EIGHT TASKS AWAY
+
+`controller-state.md:15-21` — owner-set, 2026-09-04. **Permitted without asking: T5, T6, T7, T9, T10,
+T11, T12, T13.** **STOP AFTER T13. ASK before dispatching T14.** T14/T15 (dual-client harness and
+scenarios) and T16/T17 (Tauri, Expo) are all behind the ask. The standing auto-merge authorization does
+**not** cover this boundary. The reason is quota, not tidiness, and the controller's own note says to
+**re-derive rather than obey mechanically** if the weekly window turns out to roll.
+
+## PRE-FLIGHT IS DONE AND IT IS NOW TRACKED
+
+`docs/lanes/plan10-adaptation-map.md` — 440 lines, one sonnet agent plus an executor addendum that
+closed the map's own "not verified" entries. **It was untracked until this commit; it is committed
+now**, because the condition its header set ("untracked on purpose until step 15's branch is cut off
+the merged `main`") is discharged.
+
+**Read its header before using any citation in it.** Its substance is good and its *directory paths are
+not*: three spot-checked high-value claims were all substantively correct and two cited a path that does
+not exist. Re-locate every file yourself.
+
+The three findings from it that will cost a round each if missed:
+
+1. **T7: `ingestBatch` vs `ingestClientBatch`.** The plan's own snippet calls the internal, UNGATED door
+   for the client-submitted offline event. `ingest-service.ts`'s docblock names this exact case by name.
+   ~~`sync-service.ts` legitimately needs BOTH doors, so its deps type **cannot** be narrowed to
+   `ClientIngest` and the compiler will **not** catch a wrong call.~~ **THAT SENTENCE WAS FALSE AND IS
+   CORRECTED BELOW — see "THE CORRECTION THAT MATTERS MOST" in the Batch A section.** The compiler DOES
+   catch it: take `ClientIngest` plus `ServerAppend` as two named parameters, not `IngestService` as one
+   wide object.
+2. **T12: the plan's `ReplicaQuery`/`LocalIngestResult` are not the shipped `DataSource`.** The real
+   `DataSourceQuery` has 13 methods under different names; the plan's has 6. `LocalIngestResult`'s 4th
+   `'pending'` status is not assignable where `DataSource.ingest`'s 3-status `IngestResult[]` is
+   expected. Build against the real types.
+3. **T6/T7: `EffectiveRole` is brand-protected** (non-exported `unique symbol`, Ruling P22). Do not
+   hand-build one to make a test pass — every safety property of `canSeeResolved` rests on the value
+   having come from `resolveEffectiveRole`.
+
+## TWO SWEEPS RUN AT THIS SHA, BOTH WITH POSITIVE CONTROLS ON THE SAME FILE
+
+Run against `docs/superpowers/plans/2026-08-20-10-offline-sync-apps.md` (7,629 lines). The controls
+matter because five of the six silent-empty modes this repo has recorded produce a well-formed zero:
+
+```
+DataSource   45 lines   } controls — non-zero, so the path and the tool both work
+istDayOf     22 lines   }
+clockSkewMs  14 lines   }
+useLiveQuery  0 lines   <- genuine absence
+TZ            0 lines   <- genuine absence
+```
+
+**1. The adaptation map's own "least-sure claim" is CLOSED, and the answer is the reassuring one.**
+The map could not determine whether Plan 10's T9/T11–T13 text carries a stale 3- or 4-argument
+`useLiveQuery` call needing the Ruling P17 5-arg form. It does not: **Plan 10's text contains zero
+`useLiveQuery` calls at all.** So there is no transcription trap. P17 still binds any view T13 *writes*
+(5-arg form; the key must name every input `load` closes over) — but no plan snippet needs correcting,
+and the map's closing paragraph can be read as resolved.
+
+**2. The brief's known gap #2 is live in this plan and now quantified.** Plan 10's text is
+clock-sensitive on **36 lines** — `istDayOf` on 22, `clockSkewMs` on 14 — and sets `TZ` on **zero**.
+That is the `ist-day.test.ts` failure exactly: a test that cannot distinguish *the code computes IST
+correctly* from *the machine is already in IST*. **T9, T10 and T13 dispatches must carry an explicit
+`TZ` instruction**, because the map does not mention `TZ` across its 440 lines either and the map is
+what the implementers read.
+
+## PLAN OF ATTACK — three batches on clean dependency seams
+
+Sequential within a batch. **No `pipeline()`/`parallel()` across tasks in a batch**: they mutate one
+tree, and T6/T7 both write `sync-routes.ts`. The shared-tree hazard is the recorded one.
+
+| batch | tasks | seam |
+|---|---|---|
+| **A** | T5 → T6 → T7 | server sync surface; T6/T7 share `sync-routes.ts`, T6 reads T5's snapshots |
+| **B** | T9 → T10 | replica core; T10's outbox sits on T9's replica |
+| **C** | T11 → T12 → T13 | sync engine → replica `DataSource` → app-core UX |
+
+Per-task: implementer → reviewer. Fix round only on Important or worse. HARD CAP 6 subagents/task.
+
+**Model assignment** (brief's table; sonnet is the default, opus the exception):
+T5 opus/high impl (it is a fold) + sonnet/med review · T6 sonnet/med both · **T7 FLOOR-LIST: opus/high
+both** · **T9 FLOOR-LIST: opus/high both** · T10 opus/high impl (a pre-check that can disagree with the
+server is worse than none) + sonnet/med review · T11 opus/high impl (stream/sync) + sonnet/med review ·
+**T12 opus/high both — an ESCALATION I am taking deliberately**, not a floor-list entry: the map names
+it "the riskiest by a wide margin" and its failure mode is invisible until T13 or a later app shell ·
+T13 opus/high impl (honesty-carrying view-models) + sonnet/med review.
+
+## THE ONE DECISION I HAVE NOT TAKEN YET — PR granularity
+
+Precedent is one PR per step (#93 carried 15 tasks). Against that: the controller's arithmetic said
+**8–9 of Plan 10's 13 tasks fit this week, not 13**, measured at 01:15 before Plan 9's remainder was
+spent. If the pool is thinner than that estimate, **one 8-task branch that dies at T11 leaves five tasks
+unmerged — "full price, no gate", the worst available outcome by the brief's own naming.** The three
+batches sit on clean seams, so a PR at the Batch A seam costs one controller round-trip and makes three
+tasks durable. **Recorded here as an open call, to be taken at the Batch A boundary on a re-measurement,
+not by default.**
+
+## IF YOU ARE A FRESH EXECUTOR READING THIS
+
+The anchors above were verified with `git branch --contains`, not `git cat-file`. Re-verify anyway.
+Nothing is in flight as of this commit: no subagent is running, no PR is open from this branch.
+
+---
+
+# BATCH A IS COMPLETE — PLAN 10 T5, T6, T7 (2026-09-04 ~09:40)
+
+**Everything above this line about "PLAN OF ATTACK" still holds; the position has moved.** Batch A
+(server sync surface) is committed and pushed. Batch B (T9 → T10) is next and has not started.
+
+| anchor | value |
+|---|---|
+| branch | `exec/15-plan10-sync`, pushed |
+| merge-base with `main` | `e09666c` |
+| behind `main` | **0** — `origin/main` merged in, not rebased over (it gained the controller's Plan 9 ledger promotion, 148/177, while Batch A ran) |
+| my changes vs merge-base | **16 files, +3701/−19** — recounted at this sha, not carried forward |
+| tree | clean |
+| ledger | Plan 10 T5/T6/T7 still read `todo` — **correct**, the controller promotes after merge. Do NOT promote from this side. |
+
+**Recount before relying on any number above.** The first count taken here said "18 files" and "21
+files" from two commands run seconds apart; both were `origin/main..HEAD` **endpoint** diffs taken while
+`main` had moved four commits ahead, so each was measuring my work plus main's in one direction or the
+other. The merge-base number is the only one that answers "what did I change".
+
+## THE CORRECTION THAT MATTERS MOST — the compiler CAN catch the ungated door
+
+**The pre-flight map's headline finding is half wrong, and the wrong half was written into this file,
+into Task 7's dispatch prompt, and into a status report before anyone tested it.**
+
+The map said: `sync-service.ts` needs both ingest doors, so its deps type cannot be narrowed to
+`ClientIngest`, so `deps.ingest.ingestBatch(...)` for a client event cannot be a compile error and
+"discipline falls back to review." **It does not.** Measured at `ba6bfe6`, BEFORE Task 7 existed:
+
+- `apps/server/src/app.ts:88` already declared `serverAppend: ServerAppend` on `AppDeps`.
+- `apps/server/src/routes/invites.ts:45` already took it as its own parameter, calling it at `:497`.
+
+Two doors as **two named parameters**, not one wide interface. `sync-service.ts:97-100` now takes
+`ingest: ClientIngest` (which has no `ingestBatch` at all) plus `serverAppend: ServerAppend`, and the
+reflex call is `Property 'ingestBatch' does not exist on type 'ClientIngest'`.
+
+**The reusable lesson: an option priced as unacceptable is sometimes an option scoped too widely.** The
+map reasoned "needs both doors → needs the type with both doors" and never asked whether the repo had
+already split them. It had, one file away, in a route doing the same job.
+
+The map now carries this correction as a banner above its own headline section. **A wrong claim about
+where a guard is impossible is worse than no claim, because it stops the search.**
+
+## THREE INSTANCES OF ONE FAILURE IN A SINGLE TASK — this is a class, not three accidents
+
+Task 7 produced the same move three times, each caught by the next party:
+
+1. Its implementation scoped case 12.83's residual to *"`isUniqueViolation` matches only `events_pkey`,
+   so it stays live for every other `ingestBatch` caller — closed for this door, not as a class."*
+   **Wrong.** A second batch-killing throw sat in `contest()` itself, in Task 7's own new code,
+   reachable with no duplicate and no unique violation anywhere on the path.
+2. The fix for that then argued the degrade was safe because *"four existing cases assert a ticket
+   refusal DOES become recorded history."* **Reasoned, not measured.** Forcing the degrade arm to take
+   every contest-append reddens **eight**: 12.101, 12.102, 12.103, 12.105, 12.106, 12.110, 12.113 and
+   12.114's second control.
+3. I relayed instance 1 approvingly in a status report before instance 2 refuted it.
+
+**The shape each time: a confident sentence about coverage standing in for the argument that a change is
+safe.** It is cheap to write, reads as diligence, and is only falsifiable by running something. The
+counter-move is the one already in the brief — print the rows, not the count — and it now has three
+same-day instances behind it.
+
+## THE DEFECT BATCH A ACTUALLY FOUND — a permanent sync wedge
+
+`commitOne` refuses a ticket bound to another workspace. `processOne` sends any ticket refusal to
+`contest()`. `buildContestedClaim` copies the refused claim's workspace and entity **verbatim** — the
+property that makes contests coherent by construction — so the contest is the same mis-filing, meets the
+same guard, and comes back refused. `contest()` threw, and the throw left `processBatch` entirely.
+
+Measured on `[legal1, bad, legal2]`: `legal1` committed **but its answer was lost**, `legal2` was never
+processed, and both the retry and the solo claim 500'd again. **An outbox holding that item never
+drains, and nothing queued behind it ever syncs** — out of a route whose whole contract is that every
+per-event answer rides inside `results`.
+
+Fixed by **degrading** a refused contest-append to the claim's own refusal, reporting the original rule
+and reason — character-for-character what `POST /v1/events` answers for the identical claim. Degrading
+rather than enumerating uncontestable rules is deliberate: it closes the class, so no future refusal can
+take a batch down because someone forgot to add it to a list.
+
+## RECORDED, NOT FIXED — with named owners
+
+1. **`isUniqueViolation` matches only `events_pkey`.** Closed for `POST /v1/sync`; open for every other
+   `ingestBatch` caller. OWNER: unassigned — surface at the T14 stop point.
+2. **There is no server identity.** Three docblocks say a contest should be attributed to one; `actorId`
+   is a ULID and every ULID in that position is a real person. T7 followed `bootstrapWorkspace`'s
+   precedent and attributed to the claimant, so `claimant_id` equals the contest's own `actorId` —
+   making fan-out mis-routing invisible against production data and detectable only via its own
+   fixture. Minting a system user is a PRODUCT decision no plan has taken. OWNER: **the owner**, at the
+   T14 stop point.
+3. **`StreamItem` should be REPLACED by `ServerStreamFrame`, not re-synchronised with it.**
+   `packages/app-core/src/data-source.ts:60-63` names **Plan 10** as owner and **no task in T5–T13 names
+   it**. OWNER: Plan 10, unassigned task. Surface at the T14 stop point.
+4. **Snapshot retention is unowned** — one row per snapshot per entity, nothing deletes superseded ones.
+   Correctness unaffected (`readLatestSnapshot` is `ORDER BY seq DESC LIMIT 1`); cost is unbounded
+   storage. OWNER: the first plan that runs this against a real ledger.
+5. **`startSnapshotWriter` is not re-entrant** — `setInterval` overlap collides on the snapshots primary
+   key; caught and logged, ledger untouched. Unguarded on purpose: nothing yet establishes what a
+   realistic pass costs, and a guard sized by guesswork is a second thing to be wrong about.
+   OWNER: Plan 11 (boot path).
+6. **`previous.state` is cast, not parsed** — no `ticketStateSchema` exists to validate a `jsonb`
+   snapshot against (swept, with `ticketTypeDefSchema` as the control). A row corrupted out of band is
+   folded onto rather than refused. OWNER: whoever adds `ticketStateSchema`.
+
+## PROCESS DEVIATIONS — recorded, deliberately NOT corrected
+
+- **Two fix rounds used `commit --amend`** rather than a new commit, so those fixes are not separately
+  auditable in the PR, and two shas quoted in live status reports (`87a9e72`, `0c0ef35`) are now
+  **orphaned** — `git branch --contains` empty, `git cat-file` still passing on both. Content intact and
+  reachable at `658239c` and `09765d0`. **Not rewritten: rewriting history to fix history is the wrong
+  direction.**
+- **Two subjects carry conventional-commit prefixes** (`feat(server):`, `fix(test-cases):`) against this
+  repo's prose convention. Both bodies are house-style and thorough. **Deliberately not amended** —
+  rewriting two commits to fix a subject *prefix* would orphan shas for cosmetics, which is the exact
+  hazard this file spends its length warning about.
+- **One fix round verified a mutation restore with shell `diff`**, a method recorded on this machine as
+  having returned a false "identical" for differing files. Independently re-verified with `git diff`
+  plus a positive control: production untouched across both T6 fix commits, and both mutation targets
+  present in the shipped file (`sync-routes.ts:109` REPEATABLE READ, `:119` `workspace_id = $1`).
+- **Reviewers were told "do NOT fix anything" and at least one fixed anyway** (T5's amend). Outcome was
+  good; the instruction was still not followed, which matters for reading any review's findings list as
+  a complete account of what it changed.
+
+## NEXT — in order
+
+1. **One opus whole-branch review** of Batch A, then its fix round if it finds Critical/Important.
+2. **Gate with `0 cached`** — every per-task gate this batch ran with 21 of 24 tasks served from turbo's
+   cache. That is fine per task and NOT fine as the branch's final evidence.
+3. **PR** for Batch A. The controller merges. **Step 15 ships as three PRs, one per batch seam** — the
+   reasoning is in the section above; the short version is that the quota number the one-PR plan depends
+   on is unmeasurable from this session, so the robust option wins over the optimal one.
+4. **Batch B (T9 → T10)** branches from Batch A's head and rebases when A merges. **Capture Batch A's
+   head sha in writing BEFORE the merge** — it is orphaned by the very event that triggers the rebase.
+
+## WHOLE-BRANCH REVIEW DONE — one opus reviewer, and it found the seam no per-task reviewer could
+
+Fix landed as `d400bf5`. **This is the entry that justifies the whole-branch stage existing.**
+
+**The defect: `visibility.set` was in neither list.** The domain registry binds **13** event types to
+`entityKind: 'ticket'`. T5's `TICKET_EVENT_TYPES` folds **10**; T6's `BOOTSTRAP_BACKFILL_TYPES` carried
+**4**, two overlapping. Union: 12. The residue was `visibility.set` — and it was dropped from a
+replica's payload **only when it sat at or below the ticket's snapshot seq**, because the writer skips
+it while still advancing `seq` past it. One seq higher and the identical event travelled in full.
+
+**That asymmetry is the defect. Not an exclusion — an accident of timing.** Whether a replica received
+a visibility change depended on when a background maintenance pass last ran.
+
+**Verified independently by the executor at `d400bf5`, by enumeration rather than by count** (this
+branch has produced four wrong counts, so a bare number is not evidence here):
+
+```
+entityKind 'ticket'          13   control: 26 registrations parsed across 7 entity kinds
+TICKET_EVENT_TYPES           10
+BOOTSTRAP_BACKFILL_TYPES      5   (was 4; visibility.set added)
+RESIDUE                       0   <- empty, and meaningful because the three sets above are populated
+```
+
+**Why it was invisible: no fixture could produce it.** `applyAll` + `setVisibilityEnv` run the
+PROJECTIONS only and write no `events` row, so the entire bootstrap file held **zero** `visibility.set`
+ledger rows. A gap that no fixture can express is not found by adding assertions to that fixture.
+
+**And the root cause of why T6's author could not see it was off-branch and pre-existing:**
+`packages/domain/src/ticket-state.ts` said *"the ten registered against `entityKind: 'ticket'`"* when
+thirteen are. One stale docblock invited every reader to treat `TICKET_EVENT_TYPES` as the complete
+ticket-entity set. Corrected in `d400bf5`.
+
+### Three more seams that nothing was holding
+
+1. **The contest backfill was unconstrained.** Deleting BOTH contest types from
+   `BOOTSTRAP_BACKFILL_TYPES` — which silently omits every contest predating a ticket's snapshot, the
+   exact failure the design note exists to prevent — left **all 971 server tests green**. T5's half of
+   that cross-task property was pinned, T7's was pinned, **T6's was pinned by nothing.** Now 12.116.
+2. **The route ordered `definitions` by `(entity_kind, entity_id, seq)`** — the ordering this branch's
+   own case **12.92 exists to prove picks the LOSER**, because a ticket type's key lives in its payload
+   and successive definitions of one key arrive on different entity streams. Now `workspace_seq`,
+   matching `buildLedgerDeps`. 12.117.
+3. **"The cursor is read FIRST" was asserted in three places and pinned in none.** 12.98 checked the
+   isolation level by MEMBERSHIP, and membership cannot see position — moving `readStreamSeq` to just
+   before `COMMIT` left all six bootstrap cases green. 12.118.
+
+### FOUR SELF-FALSIFYING COUNTS ON ONE BRANCH — the class, with its worst instance
+
+The review corrected five prose claims. The worst: **12.93 said dropping the workspace filter reddens
+"seven cases". Measured: exactly ONE** — 12.93 itself, with 974 of 975 green across all 88 server test
+files. Seven claimed against one actual.
+
+Together with T7's three (residual scoped to `events_pkey`; "four cases" that measured as eight; my own
+approving relay), that is **four wrong counts on a single branch, every one of them stated confidently
+and none of them measured when written.** Two came from a round that updated a HIGHEST-ID header and
+not the two sentences quoting the old maximum.
+
+**The counter-move is already in the brief and now has four same-day instances behind it: print the
+rows, not the count.** A count is a claim; an enumeration is evidence. Where a count must be stated,
+state the command that produces it beside it.
+
+## GATE — the branch's own evidence, `0 cached`
+
+Run by the executor, not reported by an agent:
+
+```
+pnpm turbo run build test typecheck --force
+Tasks:    24 successful, 24 total
+Cached:   0 cached, 24 total
+Time:     41.389s          exit 0
+3,109 tests across 228 files, 8 packages
+Node v22.22.2 — `pnpm exec node --version`, i.e. as the toolchain resolves it, not merely my shell PATH
+```
+
+**`0 cached` is the point.** Every per-task gate this batch ran with 21 of 24 tasks served from turbo's
+cache. That is fine per task and is NOT acceptable as a branch's final evidence, because a cached task
+is a claim about a previous tree.

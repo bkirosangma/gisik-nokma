@@ -23,7 +23,43 @@ describe('loadConfig', () => {
       betterAuthUrl: 'http://localhost:3000',
       betterAuthSecret: 'test-secret-not-used-anywhere-real',
       webOrigin: 'http://localhost:3001',
+      snapshotIntervalMs: 300000,
+      snapshotMinEvents: 20,
     });
+  });
+
+  /**
+   * Plan 10 Task 5's two additive fields. Asserted here as well as in the
+   * whole-object case above because the exact-shape assertion states the
+   * defaults only as a side effect of stating everything, and a reader looking
+   * for "what does SNAPSHOT_MIN_EVENTS default to" should find it named.
+   *
+   * The refusals are the load-bearing half. `.positive()` on the interval is
+   * not tidiness: `setInterval(fn, 0)` runs the snapshot pass on every tick of
+   * the event loop, each pass opening a pool connection and folding every due
+   * ticket. And a zero MIN_EVENTS makes every ticket due on every pass, which
+   * recomputes a snapshot at a seq that already has a row and collides on the
+   * snapshots primary key. Both are refused at the door so no environment can
+   * reach either.
+   */
+  it('honours explicit snapshot settings and refuses a non-positive one', () => {
+    const config = loadConfig({
+      ...VALID_ENV,
+      SNAPSHOT_INTERVAL_MS: '60000',
+      SNAPSHOT_MIN_EVENTS: '5',
+    });
+    expect(config.snapshotIntervalMs).toBe(60000);
+    expect(config.snapshotMinEvents).toBe(5);
+
+    expect(() => loadConfig({ ...VALID_ENV, SNAPSHOT_INTERVAL_MS: '0' })).toThrowError(
+      'invalid server configuration — check: SNAPSHOT_INTERVAL_MS',
+    );
+    expect(() => loadConfig({ ...VALID_ENV, SNAPSHOT_MIN_EVENTS: '0' })).toThrowError(
+      'invalid server configuration — check: SNAPSHOT_MIN_EVENTS',
+    );
+    expect(() => loadConfig({ ...VALID_ENV, SNAPSHOT_MIN_EVENTS: '2.5' })).toThrowError(
+      'invalid server configuration — check: SNAPSHOT_MIN_EVENTS',
+    );
   });
 
   it('honours explicit PORT, HOST, LOG_LEVEL', () => {
@@ -166,6 +202,8 @@ describe('loadConfig', () => {
       'BETTER_AUTH_URL',
       'BETTER_AUTH_SECRET',
       'WEB_ORIGIN',
+      'SNAPSHOT_INTERVAL_MS',
+      'SNAPSHOT_MIN_EVENTS',
     ]) {
       expect(documented, `.env.example should document ${key}`).toHaveProperty(key);
     }

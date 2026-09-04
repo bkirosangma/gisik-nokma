@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import type { FastifyError, FastifyInstance, FastifyRequest } from 'fastify';
+import type { Pool } from 'pg';
 import type { Auth } from './auth/auth.js';
 import { registerAuthRoutes } from './auth/routes.js';
 import { makeRequireSession } from './auth/require-session.js';
@@ -20,6 +21,7 @@ import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
 import { registerContestsRoute } from './sync/contests-route.js';
+import { registerSyncRoutes } from './sync/sync-routes.js';
 import { createStreamHub } from './stream/hub.js';
 import { registerStreamRoute, type StreamRouteDeps } from './stream/routes.js';
 import type { Queryable } from './db/queryable.js';
@@ -209,6 +211,30 @@ export function buildApp(
   // parameter for the same reason the events door does: a route that reads
   // `request.currentUserId` cannot be assembled without the thing that sets it.
   registerContestsRoute(app, { pool: deps.pool }, requireSession);
+  // The replica bootstrap (Plan 10 Task 6) — first-run sync without replaying
+  // full history. It genuinely needs a `pg.Pool`, not the narrower `Queryable`
+  // this field is typed as: the whole read runs inside one
+  // `REPEATABLE READ` transaction it opens itself with `deps.pool.connect()`,
+  // and `PoolClient` has no `.connect()` of its own. The cast is safe for every
+  // real caller (`index.ts` and `buildTestApp` both pass a real `Pool` here) —
+  // the one caller it is NOT safe for is a test that swaps in
+  // `BuildTestAppOverrides.pool`, a wrapper built to observe/delay/fail a read
+  // for the stream route's races; such a wrapper has no `.connect()` and this
+  // route would throw against it. No test does that today. Same preHandler by
+  // parameter, same reason as every route above: the handler reads
+  // `request.currentUserId` and resolves its whole gate from it.
+  // Both doors, and which is which is the whole of Plan 10 Task 7: the client's
+  // offline claims go through the GATED `deps.ingest` (`ClientIngest`, no
+  // `ingestBatch` on it at all), and the server's own `claim.contested` appends
+  // through the named `serverAppend` — the same two-door shape
+  // `registerInviteRoutes` takes below, for the same reason. The plan's snippet
+  // asked for the full `IngestService` here, which is exactly what would let a
+  // client claim reach the ungated door and skip `checkPermission`.
+  registerSyncRoutes(
+    app,
+    { pool: deps.pool as Pool, ingest: deps.ingest, serverAppend: deps.serverAppend },
+    requireSession,
+  );
   // The ticket read surface (Plan 4 Task 8) — list, single read, and history,
   // each enforcing visibility server-side. Same preHandler by parameter, same
   // reason: all three handlers read `request.currentUserId`.

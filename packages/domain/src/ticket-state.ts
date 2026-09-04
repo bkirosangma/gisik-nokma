@@ -51,8 +51,18 @@ export type TicketStateDeps = {
 };
 
 /**
- * The event types this reducer folds — the ten registered against
- * `entityKind: 'ticket'`. `ticket-type.defined` is deliberately absent: it is
+ * The event types this reducer folds — TEN of the THIRTEEN registered against
+ * `entityKind: 'ticket'`, not all of them. **This is not the ticket-entity
+ * set**, and reading it as one has already cost a defect: `visibility.set`,
+ * `claim.contested` and `claim.contested_resolved` are filed against a ticket
+ * and are absent here on purpose, because none of them moves head state.
+ * Anything that iterates a ticket's stream and needs completeness — the replica
+ * bootstrap's backfill list is the live example (`sync-routes.ts`) — must
+ * account for those three separately; a reader who believed this list was
+ * exhaustive dropped `visibility.set` from a replica's payload and the omission
+ * was invisible for a whole task.
+ *
+ * `ticket-type.defined` is deliberately absent for a different reason: it is
  * about a ticket TYPE, has its own entity kind and its own stream, and changing
  * a type's workflow binding does not move any existing ticket (owner decision
  * 2026-08-26: a ticket pins the workflow it was created under).

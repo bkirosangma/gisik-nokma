@@ -37,6 +37,24 @@ const configSchema = z.object({
    * the reader arriving, so it moves into the LIVE set there in the same change.
    */
   WEB_ORIGIN: z.string().url(),
+  /**
+   * How often the snapshot writer sweeps for tickets whose replay has grown
+   * past the threshold, and how far past it a ticket must be to earn a
+   * snapshot (Plan 10 Task 5). Both are `.positive()`, and on the interval that
+   * is not decoration: `setInterval(fn, 0)` runs the pass on every tick of the
+   * event loop, and the pass opens a pool connection and folds every due
+   * entity — a zero here would spend the server on itself. A zero MIN_EVENTS
+   * makes every ticket due on every pass, which then recomputes a snapshot at a
+   * seq that already has a row and collides on the snapshots primary key; the
+   * writer guards that path for its programmatic callers, but the environment
+   * cannot reach it at all.
+   *
+   * Neither is a correctness knob. Snapshots bound replay COST; a server that
+   * never writes one still answers with exactly the same state, only slower —
+   * which is why these carry defaults and `DATABASE_URL` does not.
+   */
+  SNAPSHOT_INTERVAL_MS: z.coerce.number().int().positive().default(300000),
+  SNAPSHOT_MIN_EVENTS: z.coerce.number().int().positive().default(20),
 });
 
 export type AppConfig = {
@@ -47,6 +65,8 @@ export type AppConfig = {
   betterAuthUrl: string;
   betterAuthSecret: string;
   webOrigin: string;
+  snapshotIntervalMs: number;
+  snapshotMinEvents: number;
 };
 
 export class ConfigError extends Error {}
@@ -65,5 +85,7 @@ export function loadConfig(env: NodeJS.ProcessEnv | Record<string, string>): App
     betterAuthUrl: parsed.data.BETTER_AUTH_URL,
     betterAuthSecret: parsed.data.BETTER_AUTH_SECRET,
     webOrigin: parsed.data.WEB_ORIGIN,
+    snapshotIntervalMs: parsed.data.SNAPSHOT_INTERVAL_MS,
+    snapshotMinEvents: parsed.data.SNAPSHOT_MIN_EVENTS,
   };
 }
