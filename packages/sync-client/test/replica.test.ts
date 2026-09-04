@@ -617,6 +617,41 @@ describe('12.130–12.131 what the reducer does not fold, and what the fold must
  * positive control proving the timezone switch actually took effect. Both clocks
  * on this project are Asia/Kolkata, which is exactly why an IST-only run is
  * evidence about the machine rather than about the code.
+ *
+ * ## This is sync-client's first TZ-varying test, and it is the repo's fifteenth
+ *
+ * The brief commissioning this task said `TZ` is varied by no test file. That
+ * was true of the tree it was measured against and is false of this one, and
+ * the lane's own correction commit says so. Measured, both property-access
+ * spellings, because the first attempt here used only the dotted one:
+ *
+ *     grep -rlE "process\.env(\.TZ|\['TZ'\]) *=" --include='*.ts' --include='*.tsx' packages apps
+ *
+ * → 15 files, this one included. **A regex matching `process.env.TZ` alone
+ * finds 4 of the 14 others** — the bracket form is what this repo's strict
+ * `noPropertyAccessFromIndexSignature` settings force in most of them, and a
+ * grep that sees one spelling of two returns a well-formed wrong answer with no
+ * error. That is why the number here is stated with the command that produced it.
+ *
+ * So the control below follows an established convention rather than inventing
+ * one; several of those files open with a case named
+ * `CONTROL — setting process.env.TZ really does change what this process thinks
+ * local time is`. The convention exists because they also record the limit this
+ * one inherits: `process.env.TZ` is live for V8's `Date` getters under vitest's
+ * `forks` pool (this package sets no `pool`, so it gets the v3 default) and
+ * INERT under `threads`, where the reassignment silently does nothing and every
+ * zone claim is a no-op.
+ *
+ * ## And the honest ceiling on what varying TZ buys HERE
+ *
+ * The lane's correction also says, rightly, that varying `TZ` is evidence only
+ * where the value under test moves with it, and ceremony that reads as rigour
+ * everywhere else. Measured for this case: the device-offset mutation on
+ * `rowToEnvelope` reddens under BOTH zones, so the non-IST run catches no bug
+ * the IST run misses. What it does establish is the negative — that no value on
+ * this path moves with the machine's zone — which is not knowable from an
+ * IST-only run on a machine that is already in IST, and which is exactly the
+ * property Tasks 12 and 13 will build their day math on.
  */
 describe('12.132 instants survive the replica byte-for-byte, under any TZ', () => {
   const ORIGINAL_TZ = process.env.TZ;
@@ -733,6 +768,68 @@ describe('12.133–12.134 the rest of the produced surface, so Tasks 10–13 do 
     expect(versions(1)?.version).toBe(1);
     expect(versions(2)?.version).toBe(2);
     expect(versions(3)).toBeNull();
+    await storage.close();
+  });
+});
+
+describe('12.135 a contest below the snapshot seq lands in the contests table and is never folded', () => {
+  it('12.135 bootstrap applies contest events regardless of seq, while the reducer replay skips them', async () => {
+    // Two independent guards stand between a `claim.contested` and the reducer
+    // that would throw on it — the `seq > snapshot.seq` window and the
+    // `TICKET_EVENT_TYPES` membership test — and the contests table is filled
+    // from a THIRD path that respects neither, because a contest below the
+    // baseline is still a contest this user must be shown. Nothing else in this
+    // file exercises a contest below a snapshot, which is exactly the shape
+    // bootstrap produces: `claim.contested` is backfilled unconditionally, so
+    // it arrives at whatever seq it was recorded at, snapshot or no snapshot.
+    const storage = createBetterSqliteStorage();
+    seqCounter = 0;
+    const replica = await createReplica({ storage });
+    const original = refusedClaim(USER_B, 'done');
+    const contest = contestOf(original, { serverTime: SERVER_TIME });
+    contest.seq = 3;
+    await replica.loadBootstrap(
+      bootstrapOf({
+        tickets: [
+          {
+            ticketId: TICKET,
+            snapshot: {
+              seq: 5,
+              state: {
+                kind: 'ticket',
+                id: TICKET,
+                workspaceId: WS,
+                projectId: PROJECT,
+                typeId: TYPE,
+                parentId: null,
+                workflowId: WF,
+                workflowVersion: 1,
+                stateId: 'doing',
+                stateCategory: 'active',
+                assigneeId: null,
+                collaboratorIds: [],
+                fields: { title: { value: 'Contested below', actorId: USER_A, clientTime: CLIENT_TIME, serverTime: SERVER_TIME } },
+                transitions: [],
+              },
+            },
+            events: [contest],
+          },
+        ],
+      }),
+    );
+
+    // Folded from the snapshot alone: the contest neither moved the ticket nor
+    // reached `applyTicketEvent`, which would have thrown on it.
+    const ticket = await replica.getTicket(TICKET);
+    expect(ticket?.confirmed).toMatchObject({ stateId: 'doing', stateCategory: 'active' });
+    // …and it is nonetheless there to be shown.
+    expect(ticket?.contests).toHaveLength(1);
+    expect(ticket?.contests[0]).toMatchObject({
+      contestedEventId: contest.id,
+      originalEventId: original.id,
+      claimantId: USER_B,
+      resolved: false,
+    });
     await storage.close();
   });
 });

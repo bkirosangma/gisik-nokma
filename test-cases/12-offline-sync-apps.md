@@ -401,12 +401,24 @@ refusal, which fires on both doors and therefore proves nothing about which was 
 
 ## The replica (Task 9) — `packages/sync-client/test/replica.test.ts`
 
-Seventeen `it` blocks cover 12.119–12.134 (12.132 is one case run twice, once per timezone); 12.135
-is recorded out of scope and has no test. **Every one of those sixteen ids was proved able to fail** —
-enumerated case by case below, each with the mutation that reddened it. Sixteen source mutations were
-applied one at a time to `packages/sync-client/src/replica/`, restored between runs and hash-verified
-against a backup taken before the first. The harness's own control was a null mutation (text replaced
-with itself) → `17 passed (17)`, so the reddenings are the mutations and not the harness.
+**Seventeen `it` declarations, one per id 12.119–12.135, running as EIGHTEEN tests** — 12.132's `it`
+sits inside a two-zone loop, so it executes twice. Both numbers are stated because neither implies the
+other, and each is measured: `grep -cE "^\s*it\(" packages/sync-client/test/replica.test.ts` → 17, and
+the runner's own line → `test/replica.test.ts (18 tests)`. (This sentence said "eighteen `it` blocks"
+for the few minutes between being written and being checked, from a grep that matched only two of the
+three indents in the file — the same class of error as the `TZ` count two paragraphs down.) **Every one
+of the seventeen ids was proved able to fail** — enumerated case by case below, each with the mutation
+that reddened it. Eighteen source mutations were applied one at a time to
+`packages/sync-client/src/replica/`, restored between runs and hash-verified against a backup taken
+before the first. The harness's own control was a null mutation (text replaced with itself) →
+`18 passed (18)`, so the reddenings are the mutations and not the harness.
+
+**One thing in this module is deliberately NOT covered here, recorded rather than left implicit**: the
+`DELETE FROM outbox WHERE event_id = ?` in `applyServerItem` — "an echo of our own claim confirms it".
+The `outbox` table exists (Task 8's schema) so the statement compiles and an echo cannot leave a queued
+row behind forever, but its semantics belong to the outbox, and no case here exercises them. *Owner:
+Plan 10 Task 10 (outbox + local pre-check).* It gets no id of its own, because an id here would burn
+the number Task 10's own echo case will want and the never-renumber rule would keep it burned.
 
 - 12.119 ✅ `ticket.created` + `ticket.transitioned` + `ticket.field_set` fold into a `TicketState`
   through `applyTicketEvent`, and the transition log entry keeps `toStateId`, `actorId`, `seq`,
@@ -484,8 +496,24 @@ with itself) → `17 passed (17)`, so the reddenings are the mutations and not t
   chronological across IST midnight (`18:29:59.999Z` / `18:30:00.000Z`); and `istDayOf` over those
   stored strings answers `2026-08-20` / `2026-08-21` **identically under both timezones**. Each run
   opens with a positive control — `new Date('…18:30:00.000Z').getHours()` is 11 under LA and 0 under
-  IST — because without it the case could pass while the process never left the machine's own zone,
-  which is the failure this repo's day-sensitive tests have been living with. *Mutation: re-render
+  IST — because without it the case could pass while the process never left the machine's own zone.
+  **A claim in the brief that commissioned this task is corrected rather than repeated: `TZ` is NOT
+  unvaried in this repo**, and the lane's own commit says the same thing independently. Measured with
+  the command, both property-access spellings:
+  `grep -rlE "process\.env(\.TZ|\['TZ'\]) *=" --include='*.ts' --include='*.tsx' packages apps` →
+  **15 files, this one included**. The first attempt at this number here said *four*, because it
+  matched only `process.env.TZ` and this repo's strict settings push most call sites to
+  `process.env['TZ']` — a grep that sees one spelling of two returns a well-formed wrong answer with
+  no error, which is why the count above ships with its command. So this is sync-client's first
+  TZ-varying test, not the repo's, and the control follows a convention several of those files already
+  spell out. They also record the limit it inherits: `process.env.TZ` is live for V8's `Date` getters
+  under vitest's `forks` pool (sync-client sets no `pool`, so it gets the v3 default) and INERT under
+  `threads`, where every zone claim would silently be a no-op. **And the honest ceiling, since the
+  lane's correction names it**: varying `TZ` is evidence only where the value under test moves with it.
+  Here the device-offset mutation reddens under BOTH zones, so the non-IST run catches no bug the IST
+  run misses; what it establishes is the negative — that nothing on this path moves with the machine's
+  zone — which an IST-only run on an IST machine cannot show, and which is the property Tasks 12 and 13
+  build their day math on. *Mutation: re-render
   `serverTime` through the device offset in `rowToEnvelope` → red under **both** timezones, measured
   rather than assumed. The non-IST run is not catching a bug the IST run misses; what it establishes
   is that the case is evidence about the code and not about a machine that happens to be in
@@ -501,8 +529,12 @@ with itself) → `17 passed (17)`, so the reddenings are the mutations and not t
   while `workflowVersionsOf` still answers for the older version and `null` beyond the newest — the
   two lookups over one table, side by side, in one case. *Mutation: make `buildLocalDeps` take the
   OLDEST version → red here and on 12.124.*
-- 12.135 🚫 out of scope, recorded rather than left implicit: the `DELETE FROM outbox WHERE event_id`
-  in `applyServerItem` — "an echo of our own claim confirms it" — is **not exercised here**. The
-  `outbox` table exists (Task 8's schema) so the statement compiles and an echo cannot leave a queued
-  row behind forever, but its semantics are Task 10's. *Owner: Plan 10 Task 10 (outbox + local
-  pre-check).*
+- 12.135 ✅ a `claim.contested` BELOW a snapshot's `seq` lands in the contests table and is never
+  folded. This is the shape bootstrap actually produces — `claim.contested` is backfilled
+  unconditionally, so it arrives at whatever seq it was recorded at, snapshot or no snapshot — and no
+  other case in this file puts a contest below a baseline. The two halves are held by different code
+  and the mutations say so: the contests half by `loadBootstrap` applying contest types irrespective
+  of seq (*mutation: gate `applyContest` on `seq > snapshot.seq` → red here alone*), the never-folded
+  half by the `TICKET_EVENT_TYPES` membership test, not by the seq window — measured, not assumed:
+  *making `refoldTicket` replay from seq 0 reddens 12.124 and NOT this case*, because the filter
+  catches the contest either way.

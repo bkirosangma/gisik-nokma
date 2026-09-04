@@ -286,6 +286,15 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
       // the baseline already in place, and lowering a baseline is exactly how
       // pre-fold history gets replayed against the new vocabulary. The baseline
       // only ever moves forward.
+      //
+      // WHEN THIS GUARD STOPS BEING INERT, stated so the next reader does not
+      // have to re-derive it. Today the intersection of `BOOTSTRAP_BACKFILL_TYPES`
+      // and `TICKET_EVENT_TYPES` is exactly {`comment.added`, `attachment.added`},
+      // and both of those `return state` unchanged — so a lowered baseline replays
+      // only no-ops and the damage is not observable through this module's public
+      // surface. It becomes observable the moment a backfilled type MUTATES state.
+      // 12.131 therefore asserts the stored `seq` directly rather than a folded
+      // value: a behavioural assertion here would be a check that cannot fail.
       const seqRows = await tx.all(
         "SELECT COALESCE(MAX(seq), 0) AS seq FROM events WHERE entity_kind = 'ticket' AND entity_id = ?",
         [next.id],
