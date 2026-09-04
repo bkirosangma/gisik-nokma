@@ -335,6 +335,20 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
    * already behind it; here the tail above `snapshot.seq` has NOT been applied
    * yet and raising the baseline would skip it.
    *
+   * "Unchanged" means UNCHANGED RELATIVE TO THE RESPONSE, not relative to the
+   * baseline already standing locally, and the difference is worth naming
+   * because the sentence above invites the question. RECORDED, NOT FIXED:
+   * `writeSnapshot`'s `ON CONFLICT … DO UPDATE SET seq = excluded.seq` is
+   * unconditional and this door applies no `Math.max` against the standing
+   * baseline, so a replica whose stream-door fold had raised its baseline to
+   * `MAX(events.seq) = 7`, re-bootstrapping against a server snapshot at seq 5,
+   * would LOWER it to 5 and replay events 6–7 — pre-fold history against new
+   * vocabulary, exactly what 12.131 exists to prevent on the other door. The
+   * unconditional overwrite predates this change and is unreachable today,
+   * because nothing calls `loadBootstrap` a second time. *Owner: Plan 10
+   * Task 11 (the sync engine), which is what will first re-bootstrap a live
+   * replica.*
+   *
    * A HOLE IN THE VERSION CHAIN NOW FAILS THE WHOLE BOOTSTRAP, and that is a
    * decision rather than a discovery. `foldTicketToWorkflowVersion` refuses a
    * chain it cannot walk, this call is inside `loadBootstrap`'s transaction, so
@@ -450,10 +464,18 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
         ]);
         // The highest `workflow.defined` per workflow, kept as `applyDefinition`
         // PARSED it rather than re-read from the payload — the same value the
-        // `workflows` row holds. Bootstrap ships EVERY definition, not a delta
-        // (`BootstrapResponse.definitions`), so this map is complete for every
-        // workflow the response covers, and a workflow it does not cover is one
-        // this response gives no reason to fold onto.
+        // `workflows` row holds.
+        //
+        // COMPLETENESS IS THE LOAD-BEARING ASSUMPTION HERE, and it is read off
+        // the server rather than off this file's own type comment:
+        // `apps/server/src/sync/sync-routes.ts` builds `definitions` as
+        // `SELECT * FROM events WHERE workspace_id = $1 AND entity_kind IN
+        // ('workflow', 'ticket-type') ORDER BY workspace_seq` — every
+        // definition event in the workspace, no version filter and no delta. So
+        // this map holds the true latest version of every workflow the response
+        // covers, and a workflow it does not cover is one this response gives
+        // no reason to fold onto. If that query ever becomes incremental, this
+        // fold silently folds onto a stale "latest".
         const latestByWorkflow = new Map<string, PublishedWorkflowDef>();
         for (const def of data.definitions) {
           const dupe = await tx.all('SELECT 1 FROM events WHERE id = ?', [def.id]);

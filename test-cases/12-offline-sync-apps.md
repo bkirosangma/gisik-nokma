@@ -404,9 +404,9 @@ refusal, which fires on both doors and therefore proves nothing about which was 
 **Nineteen `it` declarations, one per id 12.119–12.137, running as TWENTY tests** — 12.132's `it`
 sits inside a two-zone loop, so it executes twice. Both numbers are stated because neither implies the
 other, and each is measured: `grep -nE "^[[:space:]]*it\(" packages/sync-client/test/replica.test.ts`
-prints nineteen lines, one per id, **enumerated rather than counted** — the `-c` form of this very
-command returned 17 against a file holding 17 once, matching only two of the three indents, and a count
-with no rows behind it is how that survived. The runner's own line reads `Tests 20 passed (20)`.
+prints nineteen lines, one per id, **enumerated rather than counted**: a count with no rows behind it
+is how the wrong number in this very paragraph survived once before. The runner's own line reads
+`Tests 20 passed (20)`.
 **Every one of the nineteen ids was proved able to fail** — enumerated case by case below, each with
 the mutation that reddened it. Twenty source mutations have now been applied one at a time to
 `packages/sync-client/src/replica/`, restored by `cp` from a pre-mutation backup between runs and
@@ -603,7 +603,15 @@ the number Task 10's own echo case will want and the never-renumber rule would k
   offending event, which only the server can write: today `apps/server/src/sync/snapshot-writer.ts`
   has no `workflowVersion` handling and `apps/server/src/ledger/snapshot-store.ts` has no DELETE, so
   publishing a version invalidates no snapshot anywhere. *Owner: Plan 10 Task 6 (the bootstrap route
-  and the snapshot writer).*
+  and the snapshot writer).* **RECORDED, NOT FIXED — the other direction of the baseline, found while
+  writing this case.** `writeSnapshot`'s `ON CONFLICT … DO UPDATE SET seq = excluded.seq` is
+  unconditional, and this door passes the response's `snapshot.seq` with no `Math.max` against the
+  baseline already standing locally. A replica whose stream-door fold had raised its baseline to
+  `MAX(events.seq) = 7`, re-bootstrapping against a server snapshot at seq 5, would drop to 5 and
+  replay events 6–7 — pre-fold history against new vocabulary, exactly the failure 12.131 exists to
+  prevent on the other door. Pre-existing (the unconditional overwrite predates this round) and
+  unreachable today, because nothing calls `loadBootstrap` a second time. *Owner: Plan 10 Task 11 (the
+  sync engine), which is what will first re-bootstrap a live replica.*
 - 12.137 ✅ **filter before folding, proved on `claim.contested`** — the type every sentence around the
   guard calls the common path, and which no case reached until this one. A `claim.contested` stored in
   the ledger above the replay baseline (printed, not assumed: `listEntityEvents` shows
