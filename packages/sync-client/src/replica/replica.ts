@@ -384,6 +384,15 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
    * PRODUCTION caller that will re-bootstrap a live replica; 12.149 already
    * re-bootstraps one in a test.*
    *
+   * **ANSWERED BY TASK 11, AND NOT BY CHANGING THIS LINE.** The engine's
+   * `needsBootstrap` (`engine/sync-engine.ts`) refuses to call this door at all
+   * on a replica that holds a local baseline, so the only production path to
+   * the drop is closed — pinned by case 12.165, with the mutation that reopens
+   * it. THE HAZARD ITSELF STANDS: the `ON CONFLICT` below is still
+   * unconditional, and any future caller that re-bootstraps by another route
+   * still meets it. The rejected `Math.max` guard was deliberately NOT
+   * re-applied.
+   *
    * A HOLE IN THE VERSION CHAIN NOW FAILS THE WHOLE BOOTSTRAP, and that is a
    * decision rather than a discovery. `foldTicketToWorkflowVersion` refuses a
    * chain it cannot walk, this call is inside `loadBootstrap`'s transaction, so
@@ -488,10 +497,16 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
    * rather than half-applied — and the rollback takes the envelope insert with
    * it, so the item is absent from the local ledger too. Catching here would
    * mean inventing what an unfoldable CONFIRMED ticket is and where it
-   * surfaces. *RECORDED, NOT FIXED. Owner: Plan 10 Task 11 (the sync engine),
-   * the first caller of `applyServerItem` with a cursor to advance — a cursor
-   * left unadvanced on a throw is handed the same item again, which is a wedged
-   * stream, offline, after a revocation.*
+   * surfaces. *RECORDED, NOT FIXED HERE. Owner: Plan 10 Task 11 (the sync
+   * engine), the first caller of `applyServerItem` with a cursor to advance — a
+   * cursor left unadvanced on a throw is handed the same item again, which is a
+   * wedged stream, offline, after a revocation.*
+   *
+   * *ANSWERED AT THE ENGINE, NOT HERE: `createSyncEngine` STALLS on a throw
+   * from this door — stream closed, no reconnect, cursor frozen, the reducer's
+   * own message kept in `lastApplyFailure()`. The asymmetry with
+   * `buildPendingOverlay` therefore stands on purpose and both sides now say
+   * so. Cases 12.163 and 12.164.*
    */
   async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: TicketStateDeps): Promise<void> {
     const snapRows = await tx.all("SELECT seq, state FROM snapshots WHERE entity_kind = 'ticket' AND entity_id = ?", [

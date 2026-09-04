@@ -102,6 +102,22 @@ export type ListRow = {
   fields: Record<string, FieldClaim>;
   rollup: RollupToViewer | null;
   hasRestrictedParent: boolean;
+  /**
+   * True only between submit and the server's answer — the SAME field, with the
+   * same meaning, that `BoardCard` has carried since Plan 6.
+   *
+   * It was on the board and not on the list, and the asymmetry was silent: the
+   * board could badge a claim in transit and the list could not, while Plan
+   * 10's replica source pins its honesty contract as "how every board/list badge
+   * renders". An offline list is the surface where a queued claim is most
+   * common, so the half that was missing is the half that needed it most.
+   * Ruling P30 permits this one widening for that reason — it mirrors a shipped
+   * field rather than inventing one, and the ONLINE mapper's answer was already
+   * written and already correct: `online/mappers.ts` refuses `getTickets`
+   * outright, and an online-only shell has no outbox, so nothing is ever in
+   * transit for it.
+   */
+  pending: boolean;
 };
 
 export type TicketListView = { projectId: string; rows: ListRow[] };

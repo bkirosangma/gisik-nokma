@@ -76,6 +76,9 @@ function row(overrides: Partial<ListRow> = {}): ListRow {
     fields: { title: claim('Restock the cold shelf') },
     rollup: null,
     hasRestrictedParent: false,
+    // This shell is online-only, so nothing is ever in transit for it — the
+    // same reason `online/mappers.ts` fills `BoardCard.pending` with `false`.
+    pending: false,
   };
   return { ...base, ...overrides, fields: { ...base.fields, ...overrides.fields } };
 }
