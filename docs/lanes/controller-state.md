@@ -11,6 +11,54 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## BATCH C CLOSED AS T11+T12 (PR #107) — 155/177, and the promotion was taken IN-SESSION, not delegated
+
+**PR #107 merged (`270f0f9` → `9a5275c`)**, T13 deferred per the owner priority change. Independently
+re-verified: real CI green at the exact head sha (source PR), local forced gate **24/24, 3181 tests, 0
+cached**, node 22 — matches the executor's own figure exactly. Ledger **155/177 (87.6%)**, Plan 10 **12/18**.
+
+> **⚙ THE SESSION IS OPUS NOW (owner switched the model mid-session), so trigger #2's remedy is satisfied
+> IN-SESSION.** The 2026-09-04 authorization lets a *Sonnet* controller dispatch an Opus subagent for a
+> ledger promotion because a Sonnet session may not take that judgment itself. An Opus controller session
+> **is** the thing that authorization was routing to, so this promotion was taken directly — the same path
+> steps 11–13 used before the Sonnet split existed. **Saves the delegation overhead** (~70–100k tokens per
+> promotion, material at ~11 points) **and loses nothing**, because the check that matters was never the
+> subagent: it is that the EXECUTOR does the work and the controller verifies it. That split is intact.
+> **The evidence standard is unchanged and was met**: declared `Files:` blocks read, cross-checked against
+> PR #107's actual changed-file list, ancestry (`merge-base --is-ancestor`) and PR attribution
+> (`commits/9a5275c/pulls` → 107) confirmed, `check:tasks` exit read from its own line.
+
+> ### ⚠ T12 LANDED IN A DIFFERENT PACKAGE THAN IT DECLARED, AND THE PR DID NOT SAY SO
+> Declared `packages/sync-client/src/data-source/replica-data-source.ts` (+ that package's barrel and
+> test). **That directory does not exist.** It landed as `packages/app-core/src/replica/
+> replica-data-source.ts`, with app-core's barrel and test. **The relocation is CORRECT** — `DataSource` is
+> declared in app-core, so implementing it there keeps the dependency direction **app-core → sync-client**
+> instead of inverting it — but it is a *package* change, not a path tidy, and **PR #107's body explains
+> T12's behaviour at length while never mentioning it**; `executor-state.md` does not either.
+> **Checked before promoting, because the obvious risk here is real:** app-core gained a **runtime**
+> dependency on `@gisik-nokma/sync-client`, and app-core feeds the Next.js browser bundle. **No native
+> module reaches it** — `sync-client`'s runtime deps are `domain` + `rule-engine` only, `better-sqlite3` is
+> a devDependency in *both* packages, and sync-client's barrel is deliberately narrow (its docblock: the
+> engine "lives behind" the interface). Layering holds. Deviation is named in row 10/12's note, per the T6
+> mount-site precedent.
+> **The general point: a deviation big enough to change a package is big enough to state.** The PR was
+> unusually rigorous about everything it *did* discuss, which is exactly what makes an unmentioned
+> structural change easy to miss.
+
+> ### THE EXECUTOR'S OWN CATCH, worth keeping: "stop before T13" ≠ "no uncommitted work"
+> The instruction was to stop before T13, and T13 genuinely had not started (verified: its four declared
+> files absent, `replica-data-source.ts` present as the control). **But stopping the workflow killed T12's
+> last refinement round mid-write** — between a docblock and its test, leaving a citation to case 12.188
+> that did not exist. The executor finished it by hand rather than reverting or shipping the dangling
+> reference (wrote 12.188, mutation-proved it reddens alone, removed the probe). **A stop instruction names
+> a task boundary; it says nothing about the working tree at the moment the stop lands.** Anyone issuing a
+> mid-workflow stop should check `git status` as a separate condition — the two conditions are independent
+> and only one of them was in the instruction.
+> **Same family as the sharper form the executor reached on the one-door heuristic this round:** *find the
+> pair, check both doors* invites stopping at two, and both instances this branch found were **three**, the
+> third hidden by **a docblock asserting its own set was complete**. Restated properly: **enumerate every
+> caller from the call graph; never trust a docblock's count of them.**
+
 ## ⛔ OWNER PRIORITY CHANGE 2026-09-04 — CLOSE THE THREE UNOWNED ITEMS BEFORE ANY FURTHER PLAN WORK
 
 **The owner instructed this directly**, after being shown that "Plans 1–9 complete, 153/177" does not mean
