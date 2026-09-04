@@ -2582,3 +2582,35 @@ the online source — **which is the entire point of amendment 10.**
 - **Ruling P17:** `useLiveQuery<T>(source, workspaceId, queryKey, load, debounceMs=200)` — 5 args, and
   **the key must name every input `load` closes over.** Plan 10's text contains ZERO `useLiveQuery`
   calls (measured, with controls), so nothing needs correcting — but any view T13 writes is bound.
+
+## CORRECTION TO A RULE I PROPAGATED — "re-measure every count" is WRONG for one category
+
+I put this in every Batch C dispatch prompt: *"Re-measure every quoted count in your final pass, not
+when you write it."* **That is right for one kind of count and actively destructive for another**, and
+Task 11's fix round drew the line correctly where I had not:
+
+- **A CURRENT denominator** — "the package runs 61 tests", "16 files vary `TZ`" — is a claim about the
+  tree that ships, and **must be re-run at that tree**. This is the rule that caught the "15 files" TZ
+  count going stale inside its own PR.
+- **A denominator inside a MUTATION RECORD** — "deleting the try/catch reddens 12.170 alone,
+  `Tests 1 failed | 15 passed (16)`" — is a claim about **the tree the mutation ran on**. It is
+  historical evidence. **Updating it falsifies it.** An agent obeying my instruction literally would
+  have rewritten its own evidence to match a later tree and destroyed the record of what was measured.
+
+`test-cases/12` now states the distinction and marks which of its `(47)` / `(60)` / `(61)` denominators
+are historical and therefore correctly not re-run. **Carry the distinction, not the blanket rule.**
+
+## AND THE ONE-DOOR HEURISTIC NEEDS ITS OWN GUARD — "the pair" was three
+
+`sync-engine.ts`'s docblock said the stall design covered *"both doors of the pair"* — `onItem` and
+`onCaughtUp`. **There were three.** `flush()` reaches `applyServerItem` through
+`outbox.applyResult` and had no catch. Measured: `flush()` rejected, `status()` stayed `catching-up`,
+`lastApplyFailure()` stayed `null` so a shell could see nothing, and with `recordFailure` never running
+the row stood at `attempts: 0` — **so the next flush re-sent the identical batch, which is verbatim the
+hot loop the engine exists to prevent.** Identical input produced a visible terminal stall on one path
+and a silent no-backoff resubmit on another.
+
+**So: "find the pair, check both doors" invites you to stop at two.** The failure was a docblock
+asserting its own set was complete — this project's signature defect wearing a new costume. The
+heuristic as it should be stated: **find every caller of the throwing function, enumerated from the
+call graph, and never trust a docblock's count of them.**
