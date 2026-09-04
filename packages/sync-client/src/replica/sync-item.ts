@@ -1,0 +1,69 @@
+import type { LedgerEvent } from '@gisik-nokma/domain';
+
+/**
+ * What sync-down hands a replica — the CLIENT-SIDE MIRROR of
+ * `apps/server/src/visibility/visible-events-for.ts`.
+ *
+ * ## Three members, not two
+ *
+ * Plan 10 Task 9's own Interfaces list names only `SyncItem` and
+ * `PurgeInstruction`, and Plan 4 Task 11's header pins the union at those two.
+ * The shipped server type has THREE members, and the server file says in its
+ * own words why the two-member reading is dangerous: *"a consumer written to
+ * the header alone treats a `scope-revoked` as neither a purge nor an envelope
+ * and silently drops the one instruction that tells a removed device to empty
+ * itself."* A replica that dropped it would keep showing a guest work they were
+ * revoked from, offline, forever.
+ *
+ * So this file states all three, and `applyServerItem` discriminates all three.
+ *
+ * ## Why it is mirrored rather than imported
+ *
+ * `@gisik-nokma/sync-client` cannot depend on `apps/server` — the whole point
+ * of the package is that Expo and Tauri can import it. There is no shared home
+ * for these types today: they live in the server's visibility module, and both
+ * sides depend on `@gisik-nokma/domain`, which is where they would belong.
+ * **RECORDED, not fixed here**: moving `PurgeInstruction` /
+ * `ScopeRevokedInstruction` / `SyncItem` into `@gisik-nokma/domain` so the
+ * server and this package share one declaration. *Owner: Plan 10 Task 11 (the
+ * sync engine), which consumes the same union over the wire and would other-
+ * wise inherit a third copy.* Until then this is a mirror, and a mirror can
+ * drift silently — it is a wire contract with no compile-time link.
+ *
+ * ## Discriminating it
+ *
+ * `entity.kind` is NESTED, so a top-level `'kind' in item` is a sound test for
+ * "this is not an envelope". That is the server file's rule, restated here
+ * because this is where the client reads it.
+ */
+
+/** One entity is gone: delete every local trace of it. */
+export type PurgeInstruction = { kind: 'purge'; entityId: string };
+
+/**
+ * "Everything you held in this scope is gone" — what a device receives at a
+ * scope-revocation boundary instead of one purge per ticket. Per-id purges
+ * would tell the recipient how many tickets existed in the scope, including
+ * ids they never held. `projectId` absent means the whole workspace went.
+ *
+ * Handling is a local delete by scope, so it is idempotent exactly as a purge
+ * is: every statement is a delete, and a re-delivered instruction changes
+ * nothing.
+ */
+export type ScopeRevokedInstruction = { kind: 'scope-revoked'; workspaceId: string; projectId?: string };
+
+export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction;
+
+/** The two members that carry a top-level `kind`. */
+export type SyncInstruction = PurgeInstruction | ScopeRevokedInstruction;
+
+/**
+ * `true` when `item` is an instruction rather than an event envelope.
+ *
+ * Written as a predicate so the narrowing lives in one place: a call site that
+ * spells `'kind' in item` inline gets the same narrowing, but only this
+ * function can be pointed at when the union grows.
+ */
+export function isSyncInstruction(item: SyncItem): item is SyncInstruction {
+  return 'kind' in item;
+}

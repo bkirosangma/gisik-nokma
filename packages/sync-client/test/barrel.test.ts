@@ -94,7 +94,18 @@ describe('root barrel cleanliness', () => {
     // Without this, deleting src/index.ts's imports (or breaking the walker)
     // would make both assertions above pass on an empty set.
     const reached = [...graph.keys()].map((f) => relative(SRC, f)).sort();
-    expect(reached).toEqual(['index.ts', 'storage/schema.ts', 'storage/storage.ts']);
+    expect(reached).toEqual([
+      'index.ts',
+      // Plan 10 Task 9's replica. It reaches `@gisik-nokma/domain` and nothing
+      // else the barrel forbids, which is the point of listing it here rather
+      // than loosening the assertion to a subset check: the day this set grows
+      // by a module nobody meant to ship to Expo, this line says so.
+      'replica/local-deps.ts',
+      'replica/replica.ts',
+      'replica/sync-item.ts',
+      'storage/schema.ts',
+      'storage/storage.ts',
+    ]);
   });
 
   it('the walker finds the forbidden imports where they really live', () => {

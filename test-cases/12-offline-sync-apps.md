@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.118`. THE NEXT FREE ID IS `12.119`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, and said `12.114` until Batch A's whole-branch review round added 12.115–12.118. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.135`. THE NEXT FREE ID IS `12.136`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, and said `12.118` until Task 9's replica landed 12.119–12.135. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -398,3 +398,111 @@ refusal, which fires on both doors and therefore proves nothing about which was 
   ever wants a real door test for that comparison: whoever adds a second server-side contest producer;
   there is exactly one today.*
 
+
+## The replica (Task 9) — `packages/sync-client/test/replica.test.ts`
+
+Seventeen `it` blocks cover 12.119–12.134 (12.132 is one case run twice, once per timezone); 12.135
+is recorded out of scope and has no test. **Every one of those sixteen ids was proved able to fail** —
+enumerated case by case below, each with the mutation that reddened it. Sixteen source mutations were
+applied one at a time to `packages/sync-client/src/replica/`, restored between runs and hash-verified
+against a backup taken before the first. The harness's own control was a null mutation (text replaced
+with itself) → `17 passed (17)`, so the reddenings are the mutations and not the harness.
+
+- 12.119 ✅ `ticket.created` + `ticket.transitioned` + `ticket.field_set` fold into a `TicketState`
+  through `applyTicketEvent`, and the transition log entry keeps `toStateId`, `actorId`, `seq`,
+  `workflowId` and the `workflowVersion` its destination is written in. **The payload spells the
+  destination `to` and the log entry spells it `toStateId`; both are correct and deliberately not
+  unified** (`packages/domain/src/ticket-state.ts` header) — the plan's own snippet for this task
+  builds the payload as `{ toStateId }`, which zod refuses. *Mutation: hand the reducer a constant
+  per-entity `seq` from `rowToEnvelope` → red here, on 12.122, 12.123 and 12.124.*
+- 12.120 ✅ a duplicate event id answers `{ applied: false }` and adds no second ledger row —
+  at-least-once delivery is the contract. *Mutation: drop the `SELECT 1 FROM events WHERE id = ?`
+  guard → red here alone.*
+- 12.121 ✅ a `claim.contested` folds into the `contests` table and NOT into ticket state (the ticket
+  stays in `todo`), `claimantId` is the actor of the **refused claim** rather than of the contest the
+  server filed, and `claim.contested_resolved` flips `resolved`/`resolution` so `{ open: true }`
+  empties. The `[]` carries a positive control from the same call: unfiltered, the contest is still
+  there. *Mutation: skip `applyContest` → red here, on 12.127 and on both 12.132 runs.*
+- 12.122 ✅ bootstrap folds a snapshot plus only the events past its `seq`: a backfilled `comment.added`
+  at seq 2 sits below a snapshot at seq 3 and does not fold again, while the seq-4 transition does —
+  **the transition log's LENGTH is what tells a correct fold from a whole-tail replay**, since both
+  land in `doing`. The cursor lands at `streamSeq`, and `searchLocal` finds the ticket by comment text
+  through `docToPlainText`, with a positive control (a phrase in no comment and no title) returning
+  `[]` from the same call. *Mutation: read the title from a top-level `title` property instead of the
+  `fields.title` claim the reducer writes → red here alone.*
+- 12.123 ✅ an arriving `workflow.defined` whose new version RE-CATEGORISES a state moves the ticket's
+  `stateCategory` and `workflowVersion` without moving the ticket, and leaves the transition log
+  byte-identical — each entry keeps the workflow and version whose vocabulary its `toStateId` is
+  written in, which is the only thing that lets `require-different-user` walk it forward later.
+  *Mutation: write the fold's snapshot but leave the `tickets` row stale → red here, on 12.124 and on
+  12.125's positive control.*
+- 12.124 ✅ a version that DROPS the state a ticket stands in moves it where `stateMapping` says, and
+  **the fold writes the folded state as the ticket's replay baseline**, asserted on the `snapshots`
+  row directly. The next `ticket.transitioned` then folds on top of that baseline. *Mutation: delete
+  the `writeSnapshot` call in `foldTicketsOntoVersion` → red here and on 12.131; the failure is the
+  planted defect the plan describes — `refoldTicket` replays the seq-2 move into `doing`, a state v2
+  no longer has, and `applyTicketEvent` throws.*
+- 12.125 ✅ a HOLE in the version chain (v1 held, v3 arrives, v2 never delivered) is refused as a hole
+  — `foldTicketToWorkflowVersion`'s own pre-check message — and not as an unmapped drop, and the whole
+  arrival rolls back: no `events` row, no `workflows` row, ticket unmoved. **Positive control in the
+  same case**: the identical v3 publish succeeds once v2 is delivered first, so the refusal is about
+  the hole. *Mutation: make `workflowVersionsOf` answer the latest definition for every version —
+  i.e. unify it with the reducer's lookup → red here alone, and silently WRONG rather than loud: the
+  ticket folds to v3 through a definition it never sat in.*
+- 12.126 ✅ purge leaves no readable trace: `getTicket` null, `listEntityEvents` empty, and the
+  `events` / `tickets` / `snapshots` / `contests` **rows** (printed, not counted) empty for that id,
+  plus no row anywhere whose payload still contains the comment text. A second ticket created
+  afterwards in the same store is the positive control, so those empties are deletions and not an
+  empty database. **The `searchLocal` assertion in this case is decoration and says so in the file**:
+  `searchLocal` skips a comment whose ticket row is gone, so it would be `[]` even if every event row
+  had survived. *Mutation: stop deleting the ledger rows → red here alone.*
+- 12.127 ✅ purge keeps **this user's own** contested-claim stub and drops another user's, both halves
+  in one case (honesty invariant 5: the `originalEvent` in my own stub is what I authored on this
+  device). *Mutation: delete every contest regardless of claimant → red here alone.*
+- 12.128 ✅ a workspace `scope-revoked` empties the replica of that workspace — tickets, definitions
+  (`workflows`, `ticket_types`) and the resume cursor — and a re-delivered instruction is a no-op
+  rather than a throw. *Mutation: keep the definitions → red here alone.*
+- 12.129 ✅ a project `scope-revoked` removes that project's tickets alone, leaves another project's
+  ticket standing, and leaves the definitions and the cursor in place — the member is still in the
+  workspace. *Mutation: ignore `projectId` → red here alone.*
+- 12.130 ✅ **filter before folding, on both doors.** Thirteen event types bind to
+  `entityKind: 'ticket'` and `applyTicketEvent` folds ten; a `visibility.set` arriving over sync AND a
+  `visibility.set` in a bootstrap ticket tail are both stored without folding and without throwing.
+  This is the common path, not an edge case — bootstrap backfills `claim.contested` unconditionally.
+  *Mutation: drop the `TICKET_EVENT_TYPES` membership test in `refoldTicket` → red here alone, with
+  `applyTicketEvent: not a ticket event: visibility.set`.*
+- 12.131 ✅ the fold never moves a ticket's replay baseline BACKWARDS: bootstrap can leave backfilled
+  ticket-entity events below the snapshot's `seq`, and a fold that set the new baseline to
+  `MAX(events.seq)` alone would drop it from 5 to 2, putting pre-fold history back in front of the
+  reducer in a vocabulary that no longer contains it. **Stated honestly: every backfilled type that
+  can sit below a snapshot today is a reducer no-op, so the damage is not yet observable through the
+  public surface** — which is why the `snapshots` row is asserted directly. *Mutation: drop the
+  `Math.max` against the standing baseline → red here alone.*
+- 12.132 ✅ instants survive the replica **byte-for-byte**, and the case runs twice: under
+  `TZ=America/Los_Angeles` and under `TZ=Asia/Kolkata`. `serverTime`, `clientTime` and a contest's
+  `contestedAt` come back as the ISO `Z` strings that went in; ordering `contested_at` as TEXT is
+  chronological across IST midnight (`18:29:59.999Z` / `18:30:00.000Z`); and `istDayOf` over those
+  stored strings answers `2026-08-20` / `2026-08-21` **identically under both timezones**. Each run
+  opens with a positive control — `new Date('…18:30:00.000Z').getHours()` is 11 under LA and 0 under
+  IST — because without it the case could pass while the process never left the machine's own zone,
+  which is the failure this repo's day-sensitive tests have been living with. *Mutation: re-render
+  `serverTime` through the device offset in `rowToEnvelope` → red under **both** timezones, measured
+  rather than assumed. The non-IST run is not catching a bug the IST run misses; what it establishes
+  is that the case is evidence about the code and not about a machine that happens to be in
+  Asia/Kolkata.* Task 9 itself derives no days — its produced surface has no day-shaped method and its
+  implementation calls no ist-day symbol — so what it owes Tasks 12 and 13 is exactly this: unparsed,
+  un-re-rendered instants for their `istDayOf` to read.
+- 12.133 ✅ `onChange` fires once per APPLIED item, not on a duplicate (a view that re-rendered on
+  every at-least-once redelivery would flicker for a whole catch-up), and the returned unsubscribe is
+  honoured. *Mutation: notify unconditionally → red here alone.*
+- 12.134 ✅ `setCursor`/`getCursor` round-trip, a cursor for an unheld workspace is 0 rather than this
+  one's, `getMe` returns what bootstrap stored, and `buildDeps` answers **any** workflow id at the
+  **latest** version (the `getWorkflow` pure-by-id contract `ticket.workflow_rebound` depends on),
+  while `workflowVersionsOf` still answers for the older version and `null` beyond the newest — the
+  two lookups over one table, side by side, in one case. *Mutation: make `buildLocalDeps` take the
+  OLDEST version → red here and on 12.124.*
+- 12.135 🚫 out of scope, recorded rather than left implicit: the `DELETE FROM outbox WHERE event_id`
+  in `applyServerItem` — "an echo of our own claim confirms it" — is **not exercised here**. The
+  `outbox` table exists (Task 8's schema) so the statement compiles and an echo cannot leave a queued
+  row behind forever, but its semantics are Task 10's. *Owner: Plan 10 Task 10 (outbox + local
+  pre-check).*
