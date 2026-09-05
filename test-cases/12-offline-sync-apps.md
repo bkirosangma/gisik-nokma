@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.223`. THE NEXT FREE ID IS `12.240` — NOT `12.224`.** **`12.224`–`12.239` ARE RESERVED**: 12.224–12.227 to Lane D (Task 17, Expo) and 12.228–12.239 to Lane C (Task 16, Tauri), by a cross-lane allocation taken 2026-09-06 after this file collided twice in one day. **Ids in §12 are now ALLOCATED, not discovered** — a lane takes its assigned range and does not read the next number off this line, because that is precisely what two branches did simultaneously, from correct readings, and collided. The recount rule below still applies to what is IN USE; it is the NEXT-FREE half that a lane may no longer derive for itself.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.193-12.223 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, and said `12.215` until Ruling P34's follow-up added 12.216-12.219, and said `12.219` until THIS branch's own rebase onto closure 1 moved Task 13's four colliding ids to 12.220-12.223 — the SECOND time in this file that two branches minted the same range from this one line off different fork points, and the clause above records the first. Both times both sides obeyed never-renumber and collided anyway, because that rule protects LANDED ids and neither branch can see the other. The range is re-checked against `main` at REBASE, not only at authoring, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives). Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.229`. THE NEXT FREE ID IS `12.240` — NOT `12.230` AND NOT `12.224`.** **`12.230`–`12.239` remain RESERVED to Lane C (Task 16) and `12.224`–`12.227` to Lane D (Task 17, Expo)**, by the cross-lane allocation taken 2026-09-06 after this file collided twice in one day. **Ids in §12 are now ALLOCATED, not discovered** — a lane takes its assigned range and does not read the next number off this line, because that is precisely what two branches did simultaneously, from correct readings, and collided. The recount rule below still applies to what is IN USE; it is the NEXT-FREE half that a lane may no longer derive for itself.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.193-12.223 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, and said `12.215` until Ruling P34's follow-up added 12.216-12.219, and said `12.219` until THIS branch's own rebase onto closure 1 moved Task 13's four colliding ids to 12.220-12.223 — the SECOND time in this file that two branches minted the same range from this one line off different fork points, and the clause above records the first. Both times both sides obeyed never-renumber and collided anyway, because that rule protects LANDED ids and neither branch can see the other. The range is re-checked against `main` at REBASE, not only at authoring, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives), and said `12.223` until Task 16 filled the FIRST two of its own reserved block, 12.228-12.229 (`apps/desktop`'s storage adapter — a THIRD package denominator: it lives in `apps/desktop` itself, consuming both prior packages without being either), minted from an allocation rather than derived from this line, so no third collision instance was possible here. Those two ids were minted twice before landing on their allocated range — 12.189-12.190 at this branch's own fork point where those were free, then 12.193-12.194 once this branch discovered the snapshot-door section's prior landing — a per-branch history the allocation system now makes unnecessary going forward. `12.230`-`12.239` remain free for this lane's own later use without a further allocation request. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -28,16 +28,20 @@ Task 5: the snapshot writer and the ledger-sourced reducer deps. Task 6: `GET /v
 Task 7: `POST /v1/sync`. Task 9: the replica (12.119–12.137). Task 10: the outbox and the local
 pre-check (12.138–12.153). Task 11: the sync engine and its HTTP/WS transport (12.156–12.171, the last two from its fix round).
 Task 12: the replica `DataSource` (12.172–12.187), which lives in `packages/app-core` and is the first
-part of this bucket that does. **Plus ONE section that belongs to no plan task at all**: refresh on
-Task 13: app-core's offline/sync UX (12.193–12.223), which also lives in `packages/app-core`.
-publish, snapshot door (12.189–12.192) — the snapshot-invalidation gap the ledger row for Task 5 flags
+part of this bucket that does. Task 13: app-core's offline/sync UX (12.193–12.223), which also lives in
+`packages/app-core`. **Plus ONE section that belongs to no plan task at all**: refresh on publish,
+snapshot door (12.189–12.192) — the snapshot-invalidation gap the ledger row for Task 5 flags
 in its own notes (`docs/lanes/task-ledger.tsv`, commit `b65f6fb`). It was carried with no owner, it
 gets no ledger row, and it is catalogued here because the surface it fixes is this bucket's, not
-because a task claims it. Nothing else from Plan 10 is catalogued — Task 8 (the `sync-client` scaffold
-and the storage seam), Tasks 14–15 (the dual-client harness and its scenarios) and Tasks 16–17 (the two app
-shells) are absent rather than missing. **Task 13 came off that absent list in the change set that
-landed it**, together with the HIGHEST-ID line, its running parenthesis, and the section enumeration
-above — all four in one edit, which is what the sentence after this one exists to enforce. **Task 12 came off that absent list in the change set that
+because a task claims it. Task 16: `apps/desktop`'s storage adapter (12.228–12.229, from this lane's
+12.228–12.239 allocation — see the HIGHEST-ID line) — its whole test surface, since the lane owning
+this task scoped its gate to `cargo check` + `tsc` + `vitest` on the adapter alone, with no case for the
+shell's UI wiring or for anything a simulator/app-launch would show. Nothing else from Plan 10 is
+catalogued — Task 8 (the `sync-client` scaffold and the storage seam), Tasks 14–15 (the dual-client
+harness and its scenarios) and Task 17 (the Expo mobile shell) are absent rather than missing. **Task 13
+came off that absent list in the change set that landed it**, together with the HIGHEST-ID line, its
+running parenthesis, and the section enumeration above — all four in one edit, which is what the
+sentence after this one exists to enforce. **Task 12 came off that absent list in the change set that
 landed it**, together with the HIGHEST-ID line and the section enumeration above — the omission that
 produced two of this work's false claims was updating one of those three and not the others. **Task 8's absence is measured, not assumed**: this file has no
 Task 8 section and no case id for it. **The command this sentence used to quote is the wrong command,
@@ -1462,7 +1466,6 @@ already makes against DELETING a superseded snapshot, reached from the other end
 - **No case asserts the route's own 500-or-not.** It does not throw, before or after — asserting that
   it did would have been a check that could not fail.
 
-
 ## Task 13 — app-core's offline/sync UX (`packages/app-core`)
 
 The contested-claim banner and its three resolutions, the offline reopen pair, the clock-skew flag and
@@ -1610,3 +1613,55 @@ than by content. Raised as R-B1; **P34 ruled that none was Task 13's and that no
   `createSyncEngine`**, not in a view: whether `not-a-member` should end the retry loop is a judgement
   about a membership that may be restored, and no view can take it. The engine's docblock was split in
   two to say exactly that. *Owner of the remaining policy half: unassigned.*
+
+## Task 16 — `apps/desktop`'s storage adapter (`apps/desktop/src/storage/*.test.ts`)
+
+The gate for this task, per the lane owning it, is `cargo check` + `tsc` + `vitest` on the storage
+adapter alone — no simulator, no app launch, no `tauri build` claim. These cases are that adapter's
+whole test surface; this package has no other test file. Numbered 12.228–12.229 per the controller's
+explicit allocation to this lane, made once three lanes minting into this one file concurrently had
+already collided twice on "next free" — see this file's HIGHEST-ID line.
+
+- 12.228 ✅ **`wrapTauriDatabase` maps `run`→`execute` and `all`→`select` with positional params, and the
+  transaction sequence is exactly `BEGIN IMMEDIATE` / the body's statement / `COMMIT`, or `BEGIN
+  IMMEDIATE` / `ROLLBACK` when the body throws.** `apps/desktop/src/storage/tauri-sql-storage.test.ts`,
+  a fixture over a `vi.fn()` `{execute, select}` pair asserting the exact call sequence.
+  *Mutation: swap the `catch` branch's `db.execute('ROLLBACK')` for `db.execute('COMMIT')` → red on both
+  files at once, `Tests 2 failed | 3 passed (5)` (this case's own exact-sequence assertion, plus 12.229
+  below), restored and re-verified green by reading the file back rather than by a shell `diff` against
+  an untracked path — `git diff` is silent on an untracked file regardless of its content, which is not
+  evidence of anything.*
+- 12.229 ✅ **The SAME `SyncStorage` behavioural contract every adapter answers to — DDL/DML round-trip,
+  transaction atomicity with rollback, and non-interleaving of concurrent transactions — holds for this
+  adapter's actual `BEGIN IMMEDIATE`/`COMMIT`/`ROLLBACK` statement logic, not only for the exact-string
+  fixture above.** `apps/desktop/src/storage/tauri-sql-storage.conformance.test.ts` imports
+  `storageConformanceTests` from `@gisik-nokma/sync-client/testing` (the same suite
+  `packages/sync-client/test/storage.test.ts` runs against `better-sqlite3` itself) and runs it against
+  `wrapTauriDatabase` wrapping a small fake `{execute, select}` shim backed by a REAL in-memory
+  `better-sqlite3` database — not a second `vi.fn()` mock re-answering canned values, which would be
+  exactly the "mocked contract that excuses the real thing from existing" this series has a name for.
+  *Mutation: shared with 12.228 above (same statement sequence, same guard).*
+
+**RECORDED, NOT FIXED — one limitation neither case above can see.**
+
+0. **The queue above serialises this module's JS callers; it cannot pin a pooled connection — and this
+   is MEASURED as a live failure, not argued as a theoretical race.** `tauri-plugin-sql` 2.4.1's public
+   `Builder` exposes no pool-size or connection-pinning option, `DbPool::connect` opens the database
+   through sqlx's `Pool::connect` (default `max_connections` 10, no `busy_timeout` set anywhere in the
+   plugin), and every `execute`/`select` Tauri command independently acquires/releases a pooled
+   connection for one `sqlx::query(sql)` call — read from the crate's own source in the local cargo
+   registry cache, not inferred. *Standalone probe (a scratch `sqlx = "=0.8.6"` binary, the plugin's
+   pinned version, replicating its exact `Pool::connect`/`sqlx::query`/`pool.execute` calls): one
+   `BEGIN IMMEDIATE` then one `INSERT` as two sequential `pool.execute()` calls — this adapter's own
+   pattern, with ZERO concurrency — reproducibly errors `(code: 5) database is locked` on the INSERT,
+   the pool reporting a second physical connection opened despite the first sitting idle. A single
+   `execute()` call carrying a WHOLE transaction as one multi-statement string was also measured and
+   DOES work (all statements land on the one connection that call acquires, pool left clean after) —
+   but every real production caller of `SyncStorage.transaction`
+   (`packages/sync-client/src/storage/schema.ts`; all four transaction sites in
+   `packages/sync-client/src/replica/replica.ts`) reads with `tx.all()` INSIDE the transaction and
+   branches on what it reads, which no single pre-built SQL string can express.* Both 12.228 and 12.229
+   back the wrapper with exactly ONE `better-sqlite3` handle, which has no pool to race against and no
+   separate command boundary to violate — no case here can fail on this, by construction, so none
+   claims to have closed it. OWNER: whoever next hardens this adapter for real multi-device use, a
+   decision no task owns yet.
