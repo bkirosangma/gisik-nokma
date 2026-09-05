@@ -43,7 +43,7 @@ the rule is print the rows, not the count. `main` was 3181; 3210 - 3181 = **29**
 |---|---|---|
 | 1 | **T13** — app-core contested-claim UX, offline reopen pair, skew badge, sync status bar | **DONE.** PR #117 open, rebased onto `a23d686`, re-gated under the lock. Includes Ruling P34's follow-up and the §12 id re-allocation. |
 | 2 | T14 — dual-client harness rig (Fable author + reviewer) | **DONE. PR #126 open**, head `cd584dd`. Rig suite **7 passed**; full gate under the lock **24/24, 0 cached, 3225 tests / 8 packages** (server 979→986). Fable review returned: no Critical, three Important — all fixed and each pinned by a case that fails specifically. |
-| 3 | T15 — scenarios S1–S6 (Fable author + reviewer) | **IN PROGRESS** — Fable author writing `scenarios.test.ts` against a 16-item verified correction list. **S4's central premise is FALSE** (see below); the author is instructed to write it against what the product does and say so, not to bend the rig. |
+| 3 | T15 — scenarios S1–S6 (Fable author + reviewer) | **DONE.** Six scenarios, cases 12.267–12.274, Fable review returned 1 Critical + 2 Important, **all corrected**. In #126 with T14. *(old status below)* **WAS: IN PROGRESS** — Fable author writing `scenarios.test.ts` against a 16-item verified correction list. **S4's central premise is FALSE** (see below); the author is instructed to write it against what the product does and say so, not to bend the rig. |
 | 4 | T18 — `Features.md` §12 + `test-cases/12` final shape | **HELD** until Lanes C (T16) and D (T17) have MERGED to `main`. Poll `origin/main` for their merge commits. |
 
 **In flight: T13's PR, awaiting controller merge.** **One ruling is pending** (see OPEN RULINGS below)
@@ -314,6 +314,45 @@ flush · `goOnline()` flushes then catches up, the INVERSE of the product, so ca
 where the intermediate state matters (measured benign for S1/S2, **not measured for S5**) · do not
 `snapshotPass()` then create a client and call `ds.query.getTicket` (product defect M3) ·
 `engine.settled()` deadlocks while offline.
+
+## ⭐ NEXT TASK: CLOSURE 5 — RULING P37 (2026-09-06). READ THIS BEFORE ANYTHING ELSE.
+
+**Owner: THIS LANE. Sequenced AFTER #126 merges and BEFORE T18.** The controller restarts this session
+at that boundary with closure 5 and T18 in the override. **Do not start it before #126 merges.**
+
+**What it is: "the copy nobody gives back and the copy nobody takes away" — two halves of one gap.**
+- **12.274, the GRANT side.** There is NO backfill-on-grant in the product. A client whose cursor moved
+  past a narrowing never gets the ticket's history back when it is re-widened. Measured twice: one
+  unrelated visible commit between narrow and widen → cursor 4→7 past narrow(5) and contest(6), client
+  holds 2 events where the server holds 4, **permanent, no resync path**.
+- **6.104's purge half, the NARROW side.** A member un-shared by a plain `visibility.set` keeps the
+  stale copy until a full resync.
+
+**P37's DESIGN CONSTRAINTS — these are constraints, not a design; measure within them:**
+1. **Grant side:** the trigger is the visibility EVENT ITSELF, never a reconstructed prior audience
+   (6.82/6.94 stand). On a widening, the server delivers that ticket's full history — or a per-ticket
+   snapshot in the bootstrap's own shape, whichever the replica already folds — to every viewer in the
+   NEW audience, cursor notwithstanding. Over-delivery to a viewer who already held it is acceptable
+   **iff replay is idempotent — MEASURE that, do not assume it.** A viewer NOT in the new audience gets
+   nothing: that is the excluding fixture. **Mutate the audience check to permit and confirm red.**
+2. **Narrow side:** the server NEVER initiates a purge for an entity a device may never have held —
+   that is P23 and it is not reopened. So the purge is **CLIENT-PRESENTED**: the client names the ids
+   it holds (on catch-up or a reconcile door) and the server answers only about ids the client named,
+   "no longer yours" for those outside the current audience. **Excluding fixtures: the answer must
+   never contain an id the client did not present (mutate to enumerate → red), and presenting an id
+   never held yields nothing beyond "not yours"** — the same register as `{kind:'restricted', id}`.
+   This resolves "cannot distinguish lost from never-had" in the SAFE direction: **the client's own
+   holding is the relationship.**
+3. **The 12.274 probe becomes the GREEN case** (`replicasEqual` true after narrow → other → widen).
+   6.104's residual flips 🚫 → ✅ **only when a narrowed ticket is actually removed by the
+   client-presented path** — never by an assertion bolted onto a scenario that is still divergent.
+4. **P30 holds.** Closure 1's snapshot invalidation and P36's provenance block are untouched. **If
+   either half needs a NEW visibility rule rather than an application of `canSee` /
+   `resolveEffectiveRole`, ESCALATE BEFORE BUILDING.**
+
+**Collision to manage:** Lane A's closure 4 (P36) touches `sync-routes.ts`'s bootstrap payload; this
+lane touches the CATCH-UP path. **Announce the file list to Lane A (`gisik-nokma-exec-06`) before
+starting; whoever lands second rebases.**
 
 ## ⚠️ THE FOUR THINGS A RESTART MUST KNOW BEFORE TOUCHING T14
 
