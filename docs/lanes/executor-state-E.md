@@ -867,3 +867,47 @@ dissolves the `resolveJsonModule`/TS2732 trap. `TRUST_PROXY` is `z.enum(['true',
 `z.coerce.boolean()` turns the string `'false'` into `true` — the one spelling an operator writes for
 "off". `MAGIC_LINK_FROM` defaults to the **dev** `sign-in@gisik-nokma.local`; `contact@artsourced.in`
 appears in **no** code default and **no** test.
+
+---
+
+# ⚠️ CATALOGUE DEBT THIS LANE HAS ACCRUED — must clear before the seam-1 PR
+
+**T1 and T5 catalogued NOTHING**, and that is a gap I created by telling their implementers not to touch
+`Features.md` or `test-cases/` (to avoid a five-lane collision). Measured: my commits touched
+`Features.md` twice — A0's attachment bullets and T5's correction of a stale "no Dockerfile" claim — and
+`test-cases/09-editor-attachments.md` once, for A0's cases 9.240/9.241. **A0 is correctly catalogued in
+§9 (attachments). T1's nine config variables, the deploy sha, the CA fix and the strict-URL refusal are
+catalogued NOWHERE. Neither are T5's two Dockerfiles.**
+
+The lane brief holds the Plan 11 catalogue to **T16** ("HELD until T1–T15 have MERGED"), which is why the
+implementers were told to stay out. **The controller has now superseded that for the file's EXISTENCE:**
+Lane C's #134 (T14) **CREATES** `Features.md` §13 and `test-cases/13-deployment-dogfooding.md` and claims
+§13 in the `test-cases/README.md` index. **T16's final SHAPE stays this lane's.**
+
+**So the standing instruction changes to:** this lane's seam-1 PR **APPENDS its own subsections to an
+existing §13** — it must NOT create the file, and a rebase must land C's version first.
+
+**Owed, and to be cleared in one dedicated commit after rebasing onto C's #134:**
+- §13 + `test-cases/13` entries for **T1** (nine variables, `/healthz` deploy sha, the CA fix, the
+  strict-URL refusal closing case 6.124) and **T5** (both Dockerfiles, the `node-pg-migrate` move).
+- Then **T2, T3, T4, T6** catalogue in their own change sets, as the convention actually requires.
+- **Case ids: re-measure §13's max on `origin/main` at rebase and mint above it.** C opened the bucket,
+  so its reserved range is C's to state; do not assume 13.1.
+
+# Lane C's #134 — what it does to this lane's CI surface
+
+`ci.yml` becomes **8 jobs**, server suite **sharded 4-way**, `check:tasks` its own job,
+**`postgresql-client-16` installed in server-tests with a version check**, plus two new guards:
+
+1. **`scripts/check-no-silent-skips.mjs`** run on the server suite — reads vitest's native
+   `--reporter=json` output (`testResults[].assertionResults[].status`) and fails when a file contributes
+   zero real tests. **This is aimed straight at T11/T12's `describe.skipIf(!pgDumpAvailable())`**: if
+   `pg_dump` is missing in CI, the suite no longer skips quietly — it goes red. That is the intended
+   behaviour, not a problem to work around. C installs `postgresql-client-16` precisely so it passes.
+2. **`scripts/check-skipif-coverage.mjs`** in check-env — **FAILS if `.skipIf(` appears ANYWHERE outside
+   `apps/server/test/`.** Verified on this branch: zero occurrences anywhere at all (the positive control
+   was also empty, so this is "none exists yet", not "correctly placed"). **T11/T12 must keep their
+   `skipIf` under `apps/server/test/`.**
+
+**The e2e job only DETECTS `docker-compose.dev.yml` and prints that T13 must supply the real invocation.
+T13 stays this lane's**, and so does T6's compose file that the detection looks for.
