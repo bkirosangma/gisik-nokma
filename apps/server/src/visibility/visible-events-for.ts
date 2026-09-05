@@ -79,8 +79,19 @@ import { grantBackfillFor, isGrantBackfillTrigger } from './grant-backfill.js';
  * a full resync. Stale local data is the safe direction — an id on a device the
  * server does not control is never retrieved, while retained data is corrected
  * by the next bootstrap.
- * *Owner: Plan 10 (the WS catch-up/purge protocol), case 6.104 — the sibling of
- * 6.102, which records the identical residual on the guest side.*
+ *
+ * **The residual now has a door, and it is not this one.** Closure 5 (ruling
+ * P37) closes case 6.104 by inverting the direction rather than restoring the
+ * walk: `POST /v1/sync/reconcile` lets the CLIENT name the ids it holds and
+ * answers only about those (`../sync/reconcile-route.ts`). Nothing above this
+ * line changes — a server-initiated purge is still refused, still for P23's
+ * reason, and this module still emits none. What changed is that a device is no
+ * longer without a way to ask. Cases 12.284-12.289; the end-to-end one runs on
+ * the dual-client rig.
+ * *Was: owner Plan 10 (the WS catch-up/purge protocol), case 6.104 — the
+ * sibling of 6.102, which records the identical residual on the guest side.
+ * 6.102's GUEST side is unchanged and still open: a guest reconciling is the
+ * same primitive and nobody has measured it.*
  */
 export interface PurgeInstruction {
   kind: 'purge';

@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE ON THIS BRANCH IS `12.274`. A LANE DOES NOT DERIVE THE NEXT FREE ID HERE — IT USES ITS ALLOCATED BLOCK.** Blocks, controller-allocated 2026-09-06 after this file collided twice in one day: **Lane D 12.224–12.227** (Task 17, Expo) · **Lane C 12.228–12.239** (Task 16, Tauri) · **Lane A 12.240–12.259** · **Lane B 12.260–12.289** (Tasks 14, 15). **The next free block is `12.290`, and it is allocated by the controller ON REQUEST ONLY.** Recount the MAXIMUM against `origin/main` at every rebase — that is the control — but never mint from it. **Ids in §12 are now ALLOCATED, not discovered** — a lane takes its assigned range and does not read the next number off this line, because that is precisely what two branches did simultaneously, from correct readings, and collided. The recount rule below still applies to what is IN USE; it is the NEXT-FREE half that a lane may no longer derive for itself.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.193-12.223 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, and said `12.215` until Ruling P34's follow-up added 12.216-12.219, and said `12.219` until THIS branch's own rebase onto closure 1 moved Task 13's four colliding ids to 12.220-12.223 — the SECOND time in this file that two branches minted the same range from this one line off different fork points, and the clause above records the first. Both times both sides obeyed never-renumber and collided anyway, because that rule protects LANDED ids and neither branch can see the other. The range is re-checked against `main` at REBASE, not only at authoring, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives). Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE ON THIS BRANCH IS `12.289`. A LANE DOES NOT DERIVE THE NEXT FREE ID HERE — IT USES ITS ALLOCATED BLOCK.** Blocks, controller-allocated 2026-09-06 after this file collided twice in one day: **Lane D 12.224–12.227** (Task 17, Expo) · **Lane C 12.228–12.239** (Task 16, Tauri) · **Lane A 12.240–12.259** · **Lane B 12.260–12.289** (Tasks 14, 15). **The next free block is `12.290`, and it is allocated by the controller ON REQUEST ONLY.** Recount the MAXIMUM against `origin/main` at every rebase — that is the control — but never mint from it. **Ids in §12 are now ALLOCATED, not discovered** — a lane takes its assigned range and does not read the next number off this line, because that is precisely what two branches did simultaneously, from correct readings, and collided. The recount rule below still applies to what is IN USE; it is the NEXT-FREE half that a lane may no longer derive for itself.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.193-12.223 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, and said `12.215` until Ruling P34's follow-up added 12.216-12.219, and said `12.219` until THIS branch's own rebase onto closure 1 moved Task 13's four colliding ids to 12.220-12.223 — the SECOND time in this file that two branches minted the same range from this one line off different fork points, and the clause above records the first. Both times both sides obeyed never-renumber and collided anyway, because that rule protects LANDED ids and neither branch can see the other. The range is re-checked against `main` at REBASE, not only at authoring, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives). and said `12.274` until closure 5 (ruling P37) added 12.275-12.289 and FLIPPED 12.274 itself from a recorded defect to the case that proves it closed — the first time a line in this file changed status because the product changed under it rather than because a test was added. Lane B's block 12.260-12.289 is now EXHAUSTED: 12.289 is its last id, and the next §12 work from this lane needs a controller-allocated block. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -1897,24 +1897,132 @@ written; they are recorded in `docs/lanes/executor-state-B.md`.
   retry. *The plan built its own service instance here, which would have hidden a duplicate-suppression
   bug living in per-instance state.*
 
-- 12.274 🚫 **A RE-WIDENED TICKET NEVER COMES BACK IF THE CLIENT READ ANYTHING ELSE MEANWHILE — recorded,
-  not asserted, and it is a PRODUCT DEFECT rather than a harness one.** The sync cursor is the highest
-  `workspaceSeq` DELIVERED, so any visible event committed while a ticket is narrowed carries the
-  client's cursor PAST the narrowing and past any contest on it. Re-widening then delivers only the
-  widening: the earlier rows are below the cursor and **nothing ever re-sends them**. There is no
-  backfill-on-grant in the product — `visible-events-for.ts` names it as "Plan 10's job, on top of this
-  primitive" and it has not been built.
-  *Measured twice and independently — by the Task 15 floor-list reviewer, then reproduced by this lane
-  with its own probe. Insert ONE unrelated visible commit between the narrowing and the re-widening:
-  the client's cursor goes 4 → 7, past narrow(5) and contest(6), head 8; after re-widening the client
-  holds 2 events where the server holds 4, `bHasNarrow: false`, `replicasEqual: false`. The divergence
-  is PERMANENT — no purge, no backfill, no resync path.*
-  **This is the sibling of 6.104 on the other side of the same gap**: 6.104 is the stale copy nobody
-  takes away, this is the fresh copy nobody gives back. It is recorded rather than asserted for 6.104's
-  own reason — a test pinning the divergence hardens the wrong half of a gap this branch wants closed.
-  **12.270's convergence assertion holds only because that scenario's workspace is quiet between the
-  narrow and the widen**, and its docblock now says so. *Owner: Plan 10 — the WS catch-up/purge
-  protocol, unassigned to any task, alongside 6.104's purge half.*
+- 12.274 ✅ **A RE-WIDENED TICKET COMES BACK EVEN IF THE CLIENT READ SOMETHING ELSE MEANWHILE.**
+  *This case was 🚫 and recorded a PRODUCT DEFECT. Closure 5 (ruling P37) closed it, and P37 constraint 3
+  makes this probe the GREEN case rather than retiring it — so the script is unchanged and only the
+  expected outcome moved.* The defect, kept because it is what the case measures: the sync cursor is the
+  highest `workspaceSeq` DELIVERED, so any visible event committed while a ticket is narrowed carried the
+  client's cursor PAST the narrowing and past any row filed on it meanwhile; re-widening then delivered
+  only the widening, the earlier rows sat below the cursor, and **nothing ever re-sent them**. Measured
+  twice and independently — by the Task 15 floor-list reviewer and then by this lane's own probe: one
+  unrelated visible commit between narrow and widen took the cursor 4 → 7 past narrow(5) and contest(6),
+  and the client ended holding 2 events where the server held 4, permanently.
+  **What closed it:** `visibleEventsFor` now backfills on newly GRANTED visibility
+  (`apps/server/src/visibility/grant-backfill.ts`). The executable form is **12.275**, which runs this
+  exact script and additionally ASSERTS the control that made it a defect — B's cursor must have run past
+  the narrowing before the widening, or the test is 12.270's quiet shape under a new name.
+  *`visible-events-for.ts` had named this absence in prose since Task 11 — "Plan 10's job, on top of this
+  primitive" — and for that whole time nothing did it. A sentence naming an owner is what made the absence
+  look like a decision.*
+
+### Closure 5 — the grant half (ruling P37, 2026-09-06)
+
+`apps/server/test/dual-client/grant-backfill.test.ts` (against two real replicas) and
+`apps/server/test/visibility/grant-backfill.test.ts` (at the filter, where the decision is made).
+
+- 12.275 ✅ **12.274's probe, executable and green.** Narrow → ONE unrelated visible commit → re-widen.
+  B ends holding all four of the ticket's events, `replicasEqual` in both directions, and the SERVER's
+  `proj_tickets` equals the folded replica. **The control is the case:** the workspace_seq of the
+  narrowing and of the row filed after it are both asserted BELOW B's cursor before the widening, so a
+  green run cannot be 12.270's quiet shape. Both cursors stand at the stream head afterwards.
+- 12.276 ✅ **Replay is idempotent — MEASURED, because P37 makes over-delivery acceptable only if it is.**
+  A ticket's whole history handed back to a replica that already holds it: `applyServerItem` answers
+  `[false, false, false]`, and the ticket, the full local history, the contest table and the cursor are
+  all equal to what they were. The rows, not a count. Vacuity is excluded first — the replica is asserted
+  to hold three events and a non-null confirmed state before anything is re-delivered.
+- 12.277 ✅ **A viewer OUTSIDE the new audience receives nothing, and a narrowing is not a trigger for the
+  person it narrowed away.** The excluding fixture P37 names. The narrowed ticket's id appears in NO field
+  of ANY yielded item; the insider, from the same cursor on the same call, does get the backfill.
+  *This is the one case the trigger-list mutation does NOT redden, and that is the informative half: its
+  property is held by `visibleEventsFor`'s own `canSee`, not by the trigger list. A widening self-selects,
+  a narrowing self-excludes, and that is why no before-image is needed and 6.82/6.94 stay untouched.*
+- 12.278 ✅ **A widening hands back the ticket's pre-cursor history AND every inheriting descendant's** —
+  parent, child and grandchild, eight envelopes, each delivered exactly once (`new Set(ids).size ===
+  ids.length`, so the per-drain ledger is asserted rather than assumed). The viewer is current at the head
+  first and receives nothing, so the delivery is the backfill's doing and not the ordinary range's.
+- 12.279 ✅ **A descendant that AUTHORED its own audience is pruned** — the ancestor's widening does not
+  reach it, and its id appears nowhere in the answer. Positive control on the same call: the parent's
+  history did come back. This is `reResolveSubtree`'s own prune, applied read-only.
+- 12.280 ✅ **An inheriting child in ANOTHER project is refused by the backfill's own `canSee`.** The case
+  exists to make that guard killable: for every ORDINARY descendant the guard is redundant (an inheriting
+  child copies the authoring ancestor's `resolved_mode` and `resolved_user_ids`, so `canSee` returns the
+  answer the caller already had), and it is load-bearing only where the inherited mode is `'project'` and
+  the child's OWN `project_id` differs — because `canSeeResolved` asks `eff.projects.has(v.projectId)`
+  against the CHILD's row. **Without this fixture the guard would be unkillable and would have had to be
+  dropped**, on `stream/hub.ts`'s own precedent of four masked `sub.ended` guards.
+- 12.281 ✅ **`ticket.reparented` is a trigger too** — inheritance is an audience, so moving an unauthored
+  ticket under a visible parent widens it exactly as a `visibility.set` does. The payload field is
+  `newParentId`; `parentId` is the plan text's spelling and leaves `parent_id` unchanged for ever.
+- 12.282 ✅ **Bounded to PRE-cursor rows, and once per widening.** An event above the cursor arrives
+  exactly once (from the ordinary range, not also as backfill), and a second drain from the advanced
+  cursor yields nothing — the trigger is out of range, so the cost is one backfill per subscriber per
+  widening rather than one per drain.
+- 12.283 🚫 **The THIRD shape of grant, recorded and NOT built.** Visibility also widens when the READER's
+  reach grows rather than the ticket's — `membership.granted` at a higher role, or a `project.member_added`
+  onto a project full of project-mode tickets. Every ticket those newly reveal carries the identical
+  pre-cursor gap. They are ROSTER events, and P37 scopes closure 5 to "the visibility event itself", so
+  this is disclosed rather than fixed. It is named in `GRANT_BACKFILL_TRIGGERS`' own docblock so a reader
+  cannot infer from the module's existence that it is covered. *Owner: the WS catch-up/purge protocol,
+  unassigned to any task.*
+
+### Closure 5 — the narrow half (ruling P37, 2026-09-06)
+
+`apps/server/test/sync/reconcile-route.test.ts`, `packages/sync-client/test/sync-engine.test.ts` and the
+end-to-end case on the dual-client rig.
+
+- 12.284 ✅ **`POST /v1/sync/reconcile` answers `{kind:'restricted', id}` for the narrowed ticket and says
+  nothing about the one still held** — asserted as an EXACT response, because `toContainEqual` alone would
+  pass on an answer that restricted both, and that answer wipes a replica. A caller with no role gets
+  403 `{error:'not_a_member'}` for the SAME ids the member just got a real answer for, so the refusal is
+  about the caller and not about the ids: a stranger never reaches `canSee` and cannot use this door as
+  an id probe. *This case alone does NOT catch a handler that enumerates the workspace — it presents both
+  ids, so enumeration adds nothing to its fixture. 12.285 is why it is caught.*
+- 12.285 ✅ **The answer can only name ids the caller presented.** Presenting only the lost ticket must not
+  mention the kept one, whose id appears in no field of the response; presenting only the kept one yields
+  an empty `restricted` rather than an opportunistic list.
+- 12.286 ✅ **An id that never existed answers EXACTLY as a genuine loss — no existence oracle.** This is
+  the case that would go green under a wrong implementation of everything else: a handler that OMITTED ids
+  it had no row for, and restricted only the known-but-invisible, would make presence-versus-absence the
+  oracle — "lost versus never-had" closed in the content and reopened in the SHAPE. Asserted by
+  substitution: replacing the fabricated id with the real one makes the two responses byte-identical.
+  Mixed in one request both are named in the caller's own order, so position leaks nothing either, and a
+  repeated id is answered once so length is not a second channel. *`canSee` already answers unknown and
+  invisible identically and says so; this door is the second reader depending on that sentence.*
+- 12.287 ✅ **The engine purges only ids it presented.** Given an answer naming a held ticket it never
+  presented, the engine purges the presented one and leaves the other standing. The server cannot name an
+  unpresented id — its reply is built by walking the request — but a purge is destructive and LOCAL, and
+  this device does not need to trust a remote party in order to be safe from it. Vacuity excluded: the
+  replica is asserted to hold both tickets before the reconcile.
+- 12.288 🚫 **Nothing calls `reconcile` on a schedule, and that is recorded rather than implied.** When a
+  device should reconcile — every reconnect, on a timer, on pull-to-refresh — is a product decision with a
+  cost attached (one request per 100 tickets held) and no plan states it. The primitive is built,
+  correct and unscheduled. *Owner: unassigned.* **Its sibling, same owner:** the engine presents
+  `replica.listTickets`, so a ticket held only as unfolded events with no local `tickets` row is not
+  presented and therefore not reconciled.
+- 12.289 ✅ **6.104's residual actually closes, end to end, by the CLIENT-PRESENTED path.** The residual is
+  witnessed first — after a narrowing B still holds the ticket, its history and its searchable title, and
+  no tombstone ever arrived — then `engine.reconcile` removes it: `getTicket` null, `listEntityEvents`
+  empty, offline search blank. **Bounded:** a ticket B still legitimately holds is untouched, so the same
+  assertions could not pass against a reconcile that wiped everything. **Honesty invariant 5:** B's own
+  contested claim survives the purge, because `purgeEntity` deliberately keeps contests this user
+  authored. A is unaffected. A second reconcile presents one fewer ticket and purges nothing.
+  *P37 constraint 3 requires exactly this path — a rig driver calling `purgeEntity` per id would be
+  asserting the harness rather than the product.*
+
+### Mutations run for closure 5 — each result is the measurement, not the intent
+
+| mutation | result |
+|---|---|
+| `GRANT_BACKFILL_TRIGGERS` → `[]` | **`5 failed \| 1 passed`.** 12.278, 12.279, 12.280, 12.281, 12.282 red. Not "alone", and it should not be — emptying it removes the mechanism. The survivor is 12.277, and that is the finding: exclusion is the caller's `canSee`, not this list. |
+| `grantBackfillFor`'s own `canSee` → permits everything | **`1 failed \| 5 passed` — 12.280 ALONE.** Edit confirmed present in the file before the run, so this is a killed guard and not a mutation that never fired. |
+| the reconcile route enumerates `proj_visibility` instead of walking the request | **`2 failed \| 10 passed`** — 12.285 and 12.286. 12.284 stayed GREEN, which is why 12.285 exists. |
+| the engine drops `chunk.includes(item.id)` | **`1 failed \| 63 passed` — 12.287 ALONE.** |
+
+*A restore trap recurred and is recorded because it will recur again: `git checkout HEAD -- <path>` does
+NOT restore an UNTRACKED file — it fails with "pathspec did not match any file(s) known to git", which is
+easy to skim past in a background log. The first run of the second mutation above was therefore executed
+with the FIRST mutation still applied and its result was discarded as confounded. The fix is to commit
+before mutating, not to remember.*
 
 ### Carried, with owners — Task 15
 
