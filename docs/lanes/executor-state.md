@@ -3017,3 +3017,45 @@ every existing caller is unchanged), then one case with mixed children — one t
 asserts `terminal: 1, uncategorized: 1`. That restores both dimensions and retires the docblock's
 limitation rather than quietly widening it.
 
+
+---
+
+# LANE A — CLOSURE 2 IS DONE AND IN PR #125. THIS IS THE CURRENT POSITION.
+
+**PR #125** (`exec/19-serving-gaps`), gate GREEN at `182d097`: 24/24, `0 cached`, 3,229 tests / 240
+files, node v22.22.2 (spawn-probed), `GATE_EXIT=0`. Awaiting controller merge. **#109 merged as
+`a23d686`.**
+
+## WHAT THE FIX ROUND ACTUALLY CHANGED — both Criticals, one build break, four reds, nine doc sites
+- **C1** rollup spelling: translated server-side in `routes/tickets.ts`, mirroring `ticket-cards.ts`.
+- **C2** truncated list: `mapListView` REFUSES a non-null `nextCursor`.
+- **`ListRow.pending: false`** — a required field whose justification was "the function throws".
+- **`seedTicket` gained optional `stateCategory`** (default `'open'`; `null` = NO head row, because
+  `state_category` is NOT NULL and `uncategorized` counts the LEFT JOIN's miss). One new
+  `rollup.test.ts` case drives terminal/uncategorized apart; mutation kills exactly it and leaves 5.
+- Doc sweep + 7.210/7.211/7.212 catalogued.
+
+## STILL OPEN FROM THE REVIEW — recorded, NOT fixed, with owners
+1. **No test executes a mapper against a real `/v1` body.** The hole BOTH Criticals came through.
+   `client-contract.test.ts` reads `mappers.ts` as text; `apps/server` has no `app-core` dependency and
+   `apps/server/package.json` is on the collision map. *Owner: client-contract harness.*
+2. **7.210 folded-versus-latest unconstrained** — every fixture workflow has ONE published version.
+3. **7.211's dangling-`parent_id` branch has no fixture** and survives its own mutation.
+4. Eleven Minor items are enumerated in the earlier review section above; the doc ones are now fixed,
+   the fixture ones (1-3) are not.
+
+## NEXT, IN ORDER — nothing here has started
+1. **Closure 3** — `StreamItem` → `ServerStreamFrame`. Also the natural home for **C2's proper close**
+   (a cursor on `TicketListView` or a paging loop): both are one-type/N-consumers/one-seam, and
+   `packages/app-core/src/index.ts` collides with Lane B's T13 — whoever lands second rebases.
+2. **Closure 2b (Ruling P34)** — the offline-born list unioning `getTickets` with
+   `listTicketSummaries` (`replica-data-source.ts:353`, `OFFLINE_BORN_ABSENCE`), and a renderer for
+   `ListRow.pending`. NOTE: `pending` now has a real value from the online mapper, so the renderer has
+   something true to render on both sources.
+3. **HELD pair LAST, under Ruling P32** — guest sees only `eff.projects`; a project NAME is a
+   disclosure; `WorkItem.projectName` served iff the project is in `eff.projects`, else id-only. **The
+   non-guest half must also be an application of existing role resolution — ESCALATE if it needs a rule
+   that does not exist.** The excluding fixture is the whole test: a guest on X who must not receive
+   Y's name OR id, mutated to permit, confirmed red.
+
+**§12 id allocation: Lane A mints from `12.240`.** Re-measure main's ceiling at rebase as the control.
