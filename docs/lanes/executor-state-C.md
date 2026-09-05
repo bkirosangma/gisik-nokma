@@ -5,97 +5,128 @@
 `git branch --contains` — empty means orphaned).
 **Base at last check:** `origin/main` = `1e372e3` ("Resume as five parallel lanes...", PR #111).
 
-## SAFETY CORRECTION (received from gisik-nokma-0d / Lane E, 2026-09-06) — supersedes the base brief's reap command
+## STATUS: Task 16 implemented, gated, and ready for PR — check for an open PR before redoing this
 
-The base brief's "reap `pgrep -f vitest` survivors" is DANGEROUS under five concurrent lane sessions:
-`pgrep -f vitest` matches every lane session's own command line (each embeds the brief text, which
-contains the word "vitest") plus any peer's live test run. Running `pkill -f vitest` or killing
-`pgrep -f vitest`'s output would kill lanes A–E and a peer's live gate.
+If you are resuming and `gh pr list --head exec/21-plan10-t16-desktop` shows an open PR, **this task is
+done** — go straight to reporting/waiting on the controller, do not re-implement.
 
-**The orphan criterion is `ppid=1` (reparented to launchd), never a name/arg substring match alone.** The
-only reap command to use from now on — lists ONLY orphaned vitest node workers:
+## SAFETY CORRECTIONS received from peers this session — adopt all, supersede the base brief where noted
+
+**1. The reap command (from gisik-nokma-0d / Lane E).** The base brief's "reap `pgrep -f vitest`
+survivors" is DANGEROUS under five concurrent lane sessions: `pgrep -f vitest` matches every lane
+session's own command line (each embeds the brief text, which contains the word "vitest") plus any
+peer's live test run. Running `pkill -f vitest` or killing `pgrep -f vitest`'s output would kill lanes
+A–E and a peer's live gate. **The orphan criterion is `ppid=1` (reparented to launchd), never a name/arg
+substring match alone.** The only reap command to use from now on:
 
     ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}'
 
 Read the list before killing anything; expect it EMPTY. Never `pkill -f vitest`, never blind-kill
-`pgrep -f vitest` output.
+`pgrep -f vitest` output. (Used twice this session — both times empty, as expected for package-scoped
+`vitest run` invocations that complete before the next command.)
 
-## Where this is
+**2. The gate lock protocol (from Lane B, then refined by Lane E) — relevant ONLY if you ever run the
+FULL `pnpm turbo run build test typecheck` gate, which this task's own scope does not require.** The
+original `echo $$ > pid` pattern never actually held the lock — each Bash tool call is a fresh shell, so
+the recorded pid dies within seconds and every peer's stale-check reclaims the lock almost immediately.
+Two 9-worker pools ran concurrently on 2026-09-06 and the box hit ~66MB free / 65% swap (the 2026-09-04
+crash shape). If a full gate is ever needed from this lane, use ONE backgrounded invocation
+(`run_in_background: true`), never split across calls or foregrounded with a sleep:
 
-Fresh lane start, 2026-09-06. No prior executor-state-C.md existed. Read `docs/lanes/controller-state.md`
-top section (`⚡ RESUMED 2026-09-06`) for the five-lane topology — this file only tracks Lane C's own
-position.
+    until mkdir /tmp/gisik-gate.lock 2>/dev/null; do
+      p=$(cat /tmp/gisik-gate.lock/pid 2>/dev/null)
+      if [ -n "$p" ]; then
+        if ! ps -p "$p" >/dev/null 2>&1; then rm -f /tmp/gisik-gate.lock/pid; rmdir /tmp/gisik-gate.lock 2>/dev/null; fi
+      else
+        # empty-pid lock = a holder that died between mkdir and writing pid; reclaim after 60s, say so.
+        : # (age check omitted here; see Lane E's refinement — 60s grace before reclaiming a pidless lock)
+      fi
+      sleep 15
+    done
+    echo $$ > /tmp/gisik-gate.lock/pid
+    trap 'rm -f /tmp/gisik-gate.lock/pid; rmdir /tmp/gisik-gate.lock 2>/dev/null' EXIT
+    # bound the zero-live-pools wait (~10 min) and say so loudly if you hit the bound — a silent wait
+    # reads as a hang.
+    while [ "$(ps -eo comm= | grep -c '^node (vitest')" -gt 0 ]; do sleep 15; done
+    source ~/.nvm/nvm.sh && nvm use 22 && pnpm turbo run build test typecheck --force --concurrency=1 > gate.log 2>&1
+    echo GATE_EXIT=$? >> gate.log
 
-**In flight:** a background Workflow (`wf_3df8650b-3fb`, task id `w1n32eoc7`) is implementing Task 16 —
-`apps/desktop`, a Tauri 2 + Vite React shell over the replica `DataSource`. Three phases: Implement
-(sonnet, medium) → Review (opus, high, the one honesty-carrying file: `tauri-sql-storage.ts`) → conditional
-Fix (sonnet, medium, only if the reviewer found Important/Critical). No fable anywhere in this lane per the
-lane brief ("a Tauri shell is a scaffold... do not use a butcher's knife to kill a chicken").
+This task did NOT need the full gate — package-scoped `cargo check` + `tsc` + `vitest` in `apps/desktop`
+touches nothing in `apps/server`, so no lock was taken. Recorded here only so a future task in this lane
+does not rediscover the crash.
 
-## Research done before dispatch (so a restart does not redo it)
+## What Task 16 actually is, and the one thing it could not close
 
-Verified against real source, not the plan doc alone — the plan text at
-`docs/superpowers/plans/2026-08-20-10-offline-sync-apps.md:6524-6931` (Task 16) is stale in several places:
+`apps/desktop` — Tauri 2 + Vite React shell over the replica `DataSource`. Implemented via a background
+Workflow (sonnet scaffold → opus review of `tauri-sql-storage.ts`, the one honesty-carrying file → no
+fable anywhere in this lane), then hardened directly:
 
-1. `createReplicaDataSource` / `ReplicaDataSource` / `TicketSummary` live in **`@gisik-nokma/app-core`**
-   (`packages/app-core/src/replica/replica-data-source.ts`), NOT `@gisik-nokma/sync-client` as the plan's
-   `app.tsx` snippet imports them from. Consistent with Ruling P30 and the deviation controller-state.md
-   already recorded for T11/T12.
-2. `ReplicaDataSourceDeps` is `{ workspaceId: string; replica; outbox; engine; storage }` — the plan's
-   snippet calls `createReplicaDataSource({replica, outbox, engine})`, missing `workspaceId` and `storage`.
-3. `SyncStatusBar` / `ContestBanner` do not exist anywhere in `@gisik-nokma/app-core` yet (grepped the
-   whole package) — Plan 6 has not landed them; the plan's own text flags this as an assumption. The shell
-   must render sync status inline instead.
-4. `ds.query.listTickets` does not exist. The real, already-shipped method is
-   `listTicketSummaries(workspaceId): Promise<TicketSummary[]>`, returning exactly the shape the plan's
-   hand-rolled ticket-list rendering expects (`title`, `stateId`, `pending`, `openContests`).
-5. `apps/desktop`'s `package.json` `build` script must be `"vite build"` only (lane brief supersedes the
-   plan's `"tsc ... && vite build"`) — turbo's generic pipeline gates it; a separate `"typecheck"` script
-   carries `tsc`.
-6. React version should be `^19.0.0` (matching `@gisik-nokma/app-core`'s peer dependency and `apps/web`),
-   not the plan's pinned `18.3.1` — installing 18 would create a second incompatible React copy in the
-   workspace. This is a judgment call I made, not an owner ruling — flagged for the reviewer.
-7. `packages/sync-client`'s `./testing` subpath (`storageConformanceTests`) exists precisely so every
-   `SyncStorage` adapter is checked against ONE behavioural contract. The plan's Step 2 test alone (a
-   fixture with `vi.fn()`) is NOT that suite — I required the implementer to add a second test,
-   `tauri-sql-storage.conformance.test.ts`, wrapping a real in-memory `better-sqlite3` database behind a
-   fake matching `tauri-plugin-sql`'s `execute`/`select` shape, run through the real
-   `storageConformanceTests`. This is the check most likely to catch a transaction-queue bug the fixture
-   test's exact-string-sequence assertion would miss.
-8. `apps/desktop/src/vite-env.d.ts` (a triple-slash `vite/client` reference) is required for
-   `import.meta.env.VITE_API_BASE` to typecheck — the plan's file list omits it.
+- **Real deviations from the plan's stale Task 16 text**, verified against actual source, not guessed:
+  `createReplicaDataSource`/`ReplicaDataSource`/`TicketSummary` live in `@gisik-nokma/app-core` (not
+  `sync-client`) with `ReplicaDataSourceDeps` needing `workspaceId` + `storage` the plan's snippet omits;
+  `SyncStatusBar`/`ContestBanner` do not exist yet (Plan 6 hasn't landed them — rendered inline instead);
+  `ds.query.listTickets` does not exist — used the real `listTicketSummaries`; react pinned to `^19.0.0`
+  (not the plan's `18.3.1`) to match `app-core`'s peer dependency; `build` script is `vite build` only
+  per this lane's override, with a separate `typecheck` script; `apps/desktop/src/vite-env.d.ts` added
+  (plan's file list omits it, `import.meta.env` needs it).
+- **Beyond the plan's own fixture test**: added
+  `apps/desktop/src/storage/tauri-sql-storage.conformance.test.ts`, running the real
+  `storageConformanceTests` (from `@gisik-nokma/sync-client/testing`) against the adapter backed by a
+  real in-memory `better-sqlite3` database, not another mock. Both test files' load-bearing-ness was
+  proven by mutation (swap the catch-branch `ROLLBACK` for `COMMIT` → both files go red,
+  `Tests 2 failed | 3 passed (5)`; restored and re-verified green by reading the file back — **`git diff`
+  is silent on an untracked path regardless of content and is NOT evidence of restoration; I made this
+  mistake mid-session and caught it by re-reading the file, not by trusting the silent diff**).
+- **`apps/desktop/src-tauri/icons/icon.png`** (placeholder) was required beyond the plan's file list —
+  `tauri::generate_context!()` unconditionally needs it on a Unix target (verified in `tauri-codegen`'s
+  own source); real artwork still needed before any actual build.
+- **`.gitignore`** gained `**/src-tauri/target/` and `**/src-tauri/gen/` (globstar, not a bare
+  `src-tauri/gen/`, which would anchor to the repo root and never match a nested app).
 
-Gate for this task, per the lane brief: `cargo check` in `src-tauri`, `tsc`, and `vitest` on the storage
-adapter. **No simulator, no app-launch, no `tauri build` claim** — must say so explicitly in the PR and in
-the `Features.md` / `test-cases/12` entries.
+**CRITICAL, RECORDED NOT FIXED — reported to gisik-nokma-0d, this is a scope question, not a to-do:**
+`tauri-plugin-sql` 2.4.1's public `Builder` (verified by reading its own source in the local cargo
+registry cache: `~/.cargo/registry/src/index.crates.io-*/tauri-plugin-sql-2.4.1/`) exposes NO pool-size
+or connection-pinning option — `DbPool::connect` uses sqlx's `Pool::connect`, defaulting
+`max_connections` to 10. `wrapTauriDatabase`'s promise queue serialises this module's JS callers but
+CANNOT guarantee `BEGIN IMMEDIATE`/writes/`COMMIT`/`ROLLBACK` land on the same pooled SQLite connection —
+a concurrent unqueued read (which `app.tsx` issues on every change notification) can be routed to a
+second connection mid-transaction. **This cannot be closed from apps/desktop's TypeScript** — it needs
+either a Rust-side fork of the plugin or a different plugin/architecture, both outside a Tauri-shell
+scaffold task. Documented in the adapter's own docblock, in `Features.md` §12, and in `test-cases/12`
+(12.190's "RECORDED, NOT FIXED" item 0), each naming the owner as "whoever next hardens this adapter for
+real multi-device use — a decision no task owns yet." The Important finding from the same review (
+`createTauriSqlStorage` minted a fresh queue on every call, defeated by React.StrictMode's double-invoke)
+WAS fixed — see the module-level `openStorages` cache in `tauri-sql-storage.ts`.
 
-## What is NOT done yet
+## Gate — independently re-verified by me, not just the workflow's self-report
 
-- Workflow result not yet returned (implement/review/fix). Do not assume pass — read the actual result
-  when the notification lands, then independently re-run `cargo check` / `tsc` / `vitest` myself before
-  writing any gate-honesty claim into a commit or PR (per "verify what the handoff claims, do not adopt
-  it" — that rule applies to my own workflow's self-report too).
-- `Features.md` §Plan 10 T16 entry and `test-cases/12` T16 catalogue rows: NOT YET WRITTEN. Append only —
-  never touch other lanes' entries in the same section (collision map: A, B, C, D each append only their
-  own plan's section; Lane B's T18 owns §12's final shape).
-- Commit, push, PR: NOT YET DONE.
-- `pnpm-lock.yaml` will have changed (new package added) — expect a conflict on rebase if another lane
-  also touched it; resolve by re-running `pnpm install`, never by hand (named collision in
-  controller-state.md).
+Node 22 (`nvm use 22`). From `apps/desktop`: `pnpm exec tsc -p tsconfig.json` → `TypeScript: No errors
+found`, exit 0. From `apps/desktop/src-tauri`: `cargo check` → `Finished` profile, exit 0 (cargo/rustc
+1.95.0). From `apps/desktop`: `rtk proxy "pnpm exec vitest run --reporter=verbose"` (plain `pnpm exec
+vitest run` gets collapsed by the rtk hook to a bare `PASS/FAIL` line with no counts — use the proxy form
+for real counts) → `Test Files 2 passed (2)`, `Tests 5 passed (5)`. No orphaned vitest workers after any
+run (checked with the corrected `ppid=1` filter above, each time empty).
+
+**Full monorepo gate does NOT reach `apps/desktop` on this branch** — confirmed via
+`pnpm turbo run build test typecheck --dry-run=json` (safe, no execution): `@gisik-nokma/desktop#build`
+depends on `@gisik-nokma/app-core#build`, which fails with 8 pre-existing TypeScript errors in
+`packages/app-core/src/precheck.ts:168,201` — confirmed present on unmodified `origin/main`
+(`git diff origin/main -- packages/app-core/src/precheck.ts` returns empty) and NOT introduced by this
+task. State this plainly in the PR: this task's own three checks are the honest T16 gate; a full gate on
+this branch currently fails upstream of `apps/desktop` for a pre-existing, unrelated reason.
+
+**No simulator, no app launch, no `tauri build` claim anywhere** — `vite build`/`tauri dev`/`tauri build`
+were never run, per this lane's explicit scope.
 
 ## Next steps on resume
 
-1. Check workflow `wf_3df8650b-3fb` / task `w1n32eoc7` result (via task notification, or `Workflow`
-   resume with the same `scriptPath` + `resumeFromRunId` if the notification was missed — cached agent
-   results return instantly).
-2. Independently re-run: node 22 (`nvm use 22`), `cargo check` in `apps/desktop/src-tauri`,
-   `pnpm exec tsc -p apps/desktop/tsconfig.json` (or via turbo), `pnpm exec vitest run` in `apps/desktop`
-   (package-scoped — does NOT touch `apps/server`, so the gate lock is not needed for this package's own
-   tests; only a *full* `pnpm turbo run build test typecheck` invocation would need the lock).
-3. Append `Features.md` (Plan 10 section) and `test-cases/12` (own T16 rows only) with the honest gate
-   description — name exactly cargo check + tsc + vitest, and name exactly what was NOT verified
-   (simulator, app launch, `tauri build`).
-4. Commit (`Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>` per the base brief's
-   convention), push, open ONE PR. Rebase onto `origin/main` first if it has moved.
-5. Report to `gisik-nokma-0d` (or tmux `gisik:0`) with head sha, `Tasks:` line, test count, node version,
-   `0 cached`, and the honest not-verified sentence. Signed "Lane C".
+1. If no PR is open yet: stage `apps/desktop/**` (excluding `node_modules`, `src-tauri/target`,
+   `src-tauri/gen` — the `.gitignore` edit already excludes the latter two), `.gitignore`, `Features.md`,
+   `test-cases/12-offline-sync-apps.md`, `pnpm-lock.yaml`, and this file; commit; push; open ONE PR
+   against `main` from `exec/21-plan10-t16-desktop`. Rebase onto `origin/main` first if it has moved —
+   `pnpm-lock.yaml` conflicts resolve by re-running `pnpm install`, never by hand.
+2. Report to `gisik-nokma-0d` with head sha, the three-check summary (cargo/tsc/vitest, all exit 0, 5
+   tests), node version (22.22.2), `0 cached`, the Critical finding (own paragraph, named as a scope
+   question per this lane's own reporting rule: Critical AND changes the step's scope), and the full-gate
+   pre-existing-failure note above. Sign "Lane C".
+3. Do not merge — the controller merges.

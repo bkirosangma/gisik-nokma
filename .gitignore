@@ -33,3 +33,10 @@ graphify-out/
 # Local-disk ObjectStore root (apps/server/src/attachments/local-disk-store.ts,
 # default var/attachments): dev/test attachment bytes, never committed.
 var/
+
+# Tauri/Cargo build output (apps/desktop, Task 16): compiled crates and the
+# schema/bindings tauri-build regenerates every build. `**/` rather than a
+# bare name — an unanchored `src-tauri/gen/` would anchor to this file's own
+# directory and never match a nested app.
+**/src-tauri/target/
+**/src-tauri/gen/
