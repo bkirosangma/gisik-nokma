@@ -1014,6 +1014,20 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
       record['hasRestrictedParent'],
       `${path}.hasRestrictedParent`,
     ),
+    // `false`, and it is a FACT here rather than a default. `pending` means "a
+    // claim for this ticket is sitting in the outbox, unacknowledged". An
+    // online-only shell HAS no outbox — `createOnlineDataSource` builds none and
+    // ingest goes straight to the door — so nothing is ever in transit for it.
+    // `view-types.ts`'s own argument for widening `ListRow` under ruling P30
+    // says exactly this, and says the online mapper's answer "was already
+    // written and already correct" BECAUSE `getTickets` refused outright. That
+    // premise expired when P25 clause 1 made this mapper answer, and the
+    // conclusion had to be written down rather than inherited: a required field
+    // whose justification was "the function throws" needs a value the moment it
+    // stops throwing. It is NOT read off the wire — the list route has no
+    // concept of this client's outbox, so a `pending` on the body would be the
+    // server asserting something only the client can know.
+    pending: false,
   };
 }
 
@@ -1064,6 +1078,40 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
  */
 export function mapListView(raw: unknown): TicketListView {
   const record = asRecord(raw, 'list');
+
+  // A TRUNCATED PAGE IS REFUSED, not silently served as the whole project.
+  //
+  // `GET /v1/projects/:id/tickets` pages at `DEFAULT_LIMIT = 50` and emits a
+  // non-null `nextCursor` when it saw a 51st row. `TicketListView` is
+  // `{projectId, rows}` — it has nowhere to put a cursor and no way to say
+  // "there are more". So a mapper that dropped the cursor handed every consumer
+  // fifty rows wearing the meaning "this project's tickets", and nothing
+  // downstream could tell a page from a set: the project page renders fifty as
+  // the complete list, and a calendar with no cell for row 51 then asserts
+  // nothing is due on a day that has work on it.
+  //
+  // This is `mapRollup`'s rule, applied — not a new one. That mapper refuses a
+  // non-zero `uncategorizedChildren` because `RollupToViewer` has no field to
+  // carry it and rendering the other counts would present an admittedly
+  // incomplete total as a complete one. Same sentence, same file, one level up:
+  // the view type cannot express partiality, so partiality is refused rather
+  // than dropped.
+  //
+  // Loud, and deliberately not degraded to fifty-rows-plus-a-warning: the
+  // caller cannot render a warning it has no field to receive. Closing this
+  // properly means either a cursor on `TicketListView` or a paging loop in the
+  // online source, and BOTH are larger than a mapper — the type is exported
+  // from `packages/app-core/src/index.ts`, which is on the cross-lane collision
+  // map. Refusing is the conservative default that cannot lie while that is
+  // decided.
+  const cursor = record['nextCursor'];
+  if (cursor !== null && cursor !== undefined) {
+    throw new MappingError(
+      'list.nextCursor',
+      `null — the server answered a PAGE (it emitted the cursor ${JSON.stringify(cursor)}, meaning at least one more ticket exists) and TicketListView has no field to say the list is incomplete, so serving these rows would present a page as the whole project`,
+    );
+  }
+
   const roster: ReadonlyMap<string, string> = new Map();
   const rows: ListRow[] = [];
   asArray(record['groups'], 'list.groups').forEach((entry, groupIndex) => {

@@ -1008,9 +1008,34 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
           cards: [serverListCard({ ticketId: 't2' }), serverListCard({ ticketId: 't3' })],
         },
       ],
-      nextCursor: 't3',
+      // `null`, and it USED to read `'t3'` here. This case is about flattening
+      // groups in order, and it carried a non-null cursor incidentally — which
+      // means it asserted that a PAGE maps to a complete list. The fixture was
+      // encoding the defect, not merely failing to catch it.
+      nextCursor: null,
     };
     expect(mapListView(body).rows.map((row) => row.ticketId)).toEqual(['t1', 't2', 't3']);
+  });
+
+  it('REFUSES a page: a non-null nextCursor is not served as the whole project', () => {
+    // The server pages at 50 and emits a cursor when it saw a 51st row.
+    // `TicketListView` is `{projectId, rows}` — no cursor, no "there is more" —
+    // so dropping it hands the caller fifty rows meaning "this project's
+    // tickets". The project page renders that as the complete set and a
+    // calendar then asserts nothing is due on a day that has work on it.
+    const paged = {
+      projectId: 'p',
+      groupBy: 'flat',
+      groups: [{ key: 'all', label: 'A', cards: [serverListCard({ ticketId: 't1' })] }],
+      nextCursor: 't1',
+    };
+    expect(() => mapListView(paged)).toThrow(MappingError);
+
+    // THE CONTROL, in the same run and over the same body: with the cursor
+    // null, the identical rows map. So this is a fact about the cursor and not
+    // about `mapListView` having stopped answering — the distinction the
+    // "flattens groups" case above could not make while its own cursor was set.
+    expect(mapListView({ ...paged, nextCursor: null }).rows.map((r) => r.ticketId)).toEqual(['t1']);
   });
 
   it('refuses a row whose hasRestrictedParent is missing rather than reading it as false', () => {
