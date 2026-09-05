@@ -1,0 +1,244 @@
+# DigitalOcean App Platform spec -- the ONLY file that knows the provider.
+# Region: blr (Bengaluru) -- the audience constraint is India-reachable,
+# phone-first; the region is the point, not a default. Spaces is BLR1 for
+# the same reason: user uploads stay in India, beside the ledger.
+# DOMAINS: pm.artsourced.in serves the web app, pm-api.artsourced.in serves
+# the API. Two sibling single-label subdomains in the artsourced.in zone,
+# not a nested name: two plain CNAMEs, one each (see README.md Step 5).
+#
+# NOT APPLIED TO ANY LIVE APP. This is a written spec only -- Plan 11's scope
+# explicitly excludes the act of deploying it (owner instruction, 2026-09-06).
+#
+# Env var names below are written against apps/server/src/config.ts's zod
+# schema and .env.example on origin/main at the sha this file was written
+# (see the PR that added it for the exact sha), NOT against this plan
+# section's own original draft -- that draft named `S3_ENDPOINT`,
+# `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` for object
+# storage and `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL` for the web client,
+# and none of those five are read by any shipped code:
+#   - Attachments (Plan 7 Task 8's createObjectStoreFromEnv) reads
+#     OBJECT_STORE, OBJECT_STORE_DIR, OBJECT_STORE_S3_REGION,
+#     OBJECT_STORE_S3_BUCKET, OBJECT_STORE_S3_ACCESS_KEY_ID,
+#     OBJECT_STORE_S3_SECRET_ACCESS_KEY, OBJECT_STORE_S3_ENDPOINT,
+#     OBJECT_STORE_S3_FORCE_PATH_STYLE -- a separate, later-added variable
+#     set from the unread `S3_*` block .env.example's own header warns about.
+#   - The web shell reads SERVER_ORIGIN (dev/build-time proxy target,
+#     never sent to the browser) and NEXT_PUBLIC_SERVER_URL (baked into the
+#     bundle, the origin the WebSocket dials directly -- streamUrl() appends
+#     /v1/stream and rewrites http->ws itself, so this is an origin, not a
+#     socket URL). Neither NEXT_PUBLIC_API_URL nor NEXT_PUBLIC_WS_URL has a
+#     reader anywhere in apps/web.
+name: gisik-nokma
+region: blr
+
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    production: true
+    cluster_name: gisik-nokma-db
+
+services:
+  - name: server
+    dockerfile_path: apps/server/Dockerfile
+    source_dir: /
+    github:
+      repo: bkirosangma/gisik-nokma
+      branch: main
+      deploy_on_push: true
+    http_port: 3000
+    instance_size_slug: professional-xs
+    instance_count: 1
+    health_check:
+      http_path: /healthz
+      initial_delay_seconds: 20
+    envs:
+      - key: DATABASE_URL
+        value: ${db.DATABASE_URL}
+        scope: RUN_TIME
+      # Documented ahead of its reader in .env.example (Plan 11); not yet in
+      # config.ts's zod schema on the sha this file was written against.
+      # Forward-referenced the same way .env.example itself does -- becomes
+      # load-bearing the moment Task 1 lands, inert until then.
+      - key: DATABASE_CA_CERT
+        value: ${db.CA_CERT}
+        scope: RUN_TIME
+      - key: HOST
+        value: "0.0.0.0"
+      # Owner decision 2026-08-20: time is Asia/Kolkata. TZ sets the Node
+      # process's own zone, so server logs and any `Date` the runtime
+      # formats agree with the database's own clock (set separately, on the
+      # managed database itself -- README.md Step 6, not from the app side).
+      - key: TZ
+        value: Asia/Kolkata
+      # DEPLOY_SHA (apps/server/src/config.ts, `z.string().min(1)
+      # .default('dev')`, forthcoming on Lane E's branch -- confirmed against
+      # their working tree, uncommitted as of this file's writing) is
+      # DELIBERATELY NOT set here. /healthz serves it verbatim on BOTH its
+      # 200 and 503 branches so an operator can tell which commit answered
+      # during an incident -- that is the whole reason Ruling P33 exists.
+      # App Platform does not populate a commit sha into a static spec on
+      # its own, and this file cannot make itself current on every deploy;
+      # setting an explicit placeholder value here (`dev`) would read as a
+      # deliberate production value a reviewer skims past, when what it
+      # actually means is "nobody has wired this yet". An absent key falls
+      # through to config.ts's own `dev` default with the same runtime
+      # behaviour, honestly. Closing the actual gap -- a CI step that
+      # patches this key to the pushed sha and calls
+      # `doctl apps update <app-id> --spec deploy/do/app.yaml` after
+      # `deploy_on_push` fires -- belongs in `.github/workflows/ci.yml`
+      # (Task 14, this lane's other file) but is NOT built here: it would
+      # itself be a live-deploy action, which is explicitly out of scope
+      # for both tasks (owner instruction, 2026-09-06).
+      # Required behind App Platform's router (every client would otherwise
+      # share one rate-limit bucket). With Fastify's naive trustProxy, this
+      # setting alone lets a caller pick its own rate-limit bucket via a
+      # forged leftmost X-Forwarded-For entry -- Plan 11 T2 (not yet on
+      # main) fixes this by keying the limiter on the RIGHTMOST XFF entry
+      # (the nearest trusted proxy's own observation, which a caller cannot
+      # write) instead. Until T2 lands, TRUST_PROXY=true is still required
+      # here -- without it every client in the world shares one bucket --
+      # but the forged-header gap above is open on whatever is on main.
+      - key: TRUST_PROXY
+        value: "true"
+      - key: WEB_ORIGIN
+        value: https://pm.artsourced.in
+      - key: BETTER_AUTH_URL
+        value: https://pm-api.artsourced.in
+      - key: BETTER_AUTH_SECRET
+        type: SECRET
+      - key: SMTP_URL
+        type: SECRET
+      # Confirmed by the owner 2026-08-20, corrected 2026-09-02: the apex
+      # address, not a subdomain one.
+      - key: MAGIC_LINK_FROM
+        value: contact@artsourced.in
+      - key: ALERT_WEBHOOK_URL
+        type: SECRET
+      - key: RATE_LIMIT_AUTH_MAX
+        value: "10"
+      - key: RATE_LIMIT_EVENTS_MAX
+        value: "120"
+      - key: RATE_LIMIT_WINDOW_SEC
+        value: "60"
+      # Attachments (Plan 7 Task 8) -- 's3' selects the S3-protocol
+      # implementation; DO Spaces is S3-compatible. Subdomain-style
+      # addressing, not path-style (that's MinIO's shape, for local dev).
+      - key: OBJECT_STORE
+        value: s3
+      - key: OBJECT_STORE_S3_ENDPOINT
+        value: https://blr1.digitaloceanspaces.com
+      - key: OBJECT_STORE_S3_REGION
+        value: blr1
+      - key: OBJECT_STORE_S3_BUCKET
+        value: gisik-nokma-attachments
+      - key: OBJECT_STORE_S3_FORCE_PATH_STYLE
+        value: "false"
+      - key: OBJECT_STORE_S3_ACCESS_KEY_ID
+        type: SECRET
+      - key: OBJECT_STORE_S3_SECRET_ACCESS_KEY
+        type: SECRET
+      # Backup daemon's own bucket name (Plan 11); documented in
+      # .env.example, not yet read by any shipped code on the sha this file
+      # was written against (Task 11 hasn't landed).
+      - key: BACKUP_S3_BUCKET
+        value: gisik-nokma-backups
+
+  - name: web
+    dockerfile_path: apps/web/Dockerfile
+    source_dir: /
+    github:
+      repo: bkirosangma/gisik-nokma
+      branch: main
+      deploy_on_push: true
+    http_port: 3000
+    instance_size_slug: basic-xs
+    instance_count: 1
+    envs:
+      # Read by apps/web/next.config.ts at build time for the /v1/* and
+      # /api/auth/* rewrites; never sent to the browser. BUILD_TIME because
+      # Next resolves rewrites at build, not at request time.
+      - key: SERVER_ORIGIN
+        value: https://pm-api.artsourced.in
+        scope: BUILD_TIME
+      # Baked into the bundle (NEXT_PUBLIC_ means exactly that) -- the
+      # origin the browser dials the WebSocket at directly, since Next's
+      # production server does not proxy protocol upgrades. An https://
+      # origin, not wss:// -- streamUrl() does that rewrite itself.
+      - key: NEXT_PUBLIC_SERVER_URL
+        value: https://pm-api.artsourced.in
+        scope: BUILD_TIME
+
+workers:
+  - name: backup
+    dockerfile_path: apps/server/Dockerfile
+    source_dir: /
+    github:
+      repo: bkirosangma/gisik-nokma
+      branch: main
+      deploy_on_push: true
+    # Path per Plan 11 Task 11's own naming; unverified against shipped code
+    # on the sha this file was written against (Task 11 hasn't landed) --
+    # confirm the compiled entry path when Task 11 ships before relying on
+    # this worker definition.
+    run_command: node dist/ops/backup-daemon-main.js
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    envs:
+      - key: DATABASE_URL
+        value: ${db.DATABASE_URL}
+        scope: RUN_TIME
+      - key: DATABASE_CA_CERT
+        value: ${db.CA_CERT}
+        scope: RUN_TIME
+      # The worker formats log timestamps too -- same clock as the server,
+      # or a backup failure gets read against the wrong evening.
+      - key: TZ
+        value: Asia/Kolkata
+      - key: ALERT_WEBHOOK_URL
+        type: SECRET
+      # UNRESOLVED (Task 11's to settle, not this task's): whether the
+      # backup daemon shares the app's OBJECT_STORE_S3_* credentials or
+      # gets its own. .env.example documents only BACKUP_S3_BUCKET (a
+      # bucket name) -- no separate credential variables exist yet. Reusing
+      # the app's pair is this file's working assumption; change it here
+      # when Task 11 decides otherwise.
+      - key: OBJECT_STORE_S3_ACCESS_KEY_ID
+        type: SECRET
+      - key: OBJECT_STORE_S3_SECRET_ACCESS_KEY
+        type: SECRET
+      - key: BACKUP_S3_BUCKET
+        value: gisik-nokma-backups
+      # The *_UTC schedule names stay UTC on purpose and are NOT affected by
+      # TZ above: the schedule reads only setUTCHours/getUTCDay, so the dump
+      # fires at the same absolute instant whatever the process zone is. Do
+      # not "correct" these to IST -- the runbook translates them (21:00 UTC
+      # = 02:30 IST), and a schedule that drifts with a container's locale
+      # is the bug this shape avoids.
+      - key: BACKUP_TIME_UTC
+        value: "21:00"
+      - key: LEDGER_EXPORT_TIME_UTC
+        value: "22:00"
+      - key: LEDGER_EXPORT_DOW_UTC
+        value: "0"
+
+domains:
+  - domain: pm.artsourced.in
+    type: PRIMARY
+    zone: artsourced.in
+  - domain: pm-api.artsourced.in
+    type: ALIAS
+    zone: artsourced.in
+
+ingress:
+  rules:
+    - match:
+        authority:
+          exact: pm-api.artsourced.in
+      component:
+        name: server
+    - match:
+        authority:
+          exact: pm.artsourced.in
+      component:
+        name: web

@@ -10,9 +10,11 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "check:env": "node scripts/check-env-example.mjs",
-    "check:tasks": "node scripts/check-task-ledger.mjs"
+    "check:tasks": "node scripts/check-task-ledger.mjs",
+    "check:db-tz": "node scripts/check-db-timezone.mjs"
   },
   "devDependencies": {
+    "pg": "^8.13.0",
     "turbo": "^2.5.0"
   }
 }

@@ -10,108 +10,112 @@ relaunched from the controller's override recovers only what is written here.
 
 ---
 
-## RE-TASKED, 2026-09-06 ~02:25 IST
+## STATUS AS OF THIS WRITE: T14 PR #134 open with two amendments, third CI run in flight; T15 committed locally, not yet its own PR
 
-T16 (Tauri desktop) **MERGED as PR #120 at `9e8777e`, promoted 157/177 by #127**. Do not re-implement it.
-Controller re-tasked this lane onto **Plan 11 T14 (extend `ci.yml`) then T15 (`deploy/do/` spec file)**,
-file-disjoint from Lane E's current seam (Lane E owns the manifest / config surface / Dockerfiles / dev
-compose stack; T14 is one file nobody else touches, T15 is a new directory).
+**PR #134** (Plan 11 T14, ci.yml 8-job split) head is `0761d08`, rebased onto `63296d2`. Two amendments
+landed on top of the original `e78212b`:
+1. Root-`package.json` script omission stated explicitly + §13 id-block allocation header (controller's
+   first catch: the plan's Files: block names root scripts this PR never added or explained).
+2. Two more controller catches, both fixed: (a) `test-cases/13`'s 13.7/13.8 described T15 artifacts
+   (`deploy/do/app.yaml`, `check-db-timezone.mjs`) not on this branch — flipped to `❌` naming Task 15's
+   PR as the real landing point; (b) added `scripts/check-case-ids.mjs` (a cross-style duplicate-case-id
+   detector, self-tested against a checked-in fixture BEFORE trusting the real sweep — this session's own
+   first draft had a real bug the fixture caught: a greedy marker-group swallowed a compound id line
+   whole and reported the wrong number as duplicated), which found two genuine pre-existing ambiguities
+   in `test-cases/07-api-realtime-search.md` (not this PR's file). Controller ruled: reword the two
+   ambiguous lines rather than add a checker exception (an exception for that section shape would itself
+   be a check that cannot fail for what it exempts) — done, Lane A notified (it mints in §7).
+
+**CI run in flight at push time** (`33995268917`) — **re-check its conclusion, do not assume green.** Two
+earlier runs at prior heads were both fully green (all 11 jobs each, verified via `gh api .../jobs`, not
+just top-level conclusion): `e78212b` (original) and the first-amendment head. The SECOND amendment's own
+run has not yet been read by this session as of this write.
+
+**T15** (deploy/do/ spec) is fully drafted, sonnet-reviewed (one nit, fixed), and refined via repeated
+cross-session exchange with Lane E (DEPLOY_SHA shape/scope, an sslmode/verify-full downgrade risk, pg
+moved to root devDependencies not a new dependencies block). Committed LOCALLY as a WIP checkpoint on
+top of PR #134's current head — **NOT yet pushed as its own branch/PR**, held per "two PRs, T14 first"
+until #134 actually merges.
 
 ## LIVE ANCHORS — verified 2026-09-06, re-verify before trusting
 
 | anchor | value | how verified |
 |---|---|---|
 | worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane3-plan7-8` | `pwd` |
-| branch | `exec/24-plan11-ci-deploy` | `git branch --show-current`, cut fresh from `origin/main` (NOT the old `exec/21-plan10-t16-desktop`) |
-| `origin/main` at branch-cut | `5abc113` (Plan 10 T16 promoted 157/177, #127) | `git fetch origin && git log origin/main --oneline -5` |
-| ahead of `origin/main` | 0 commits made yet (working tree has staged/unstaged changes, nothing committed) | `git status` |
-| tree state | build/typecheck verified green at branch-cut sha via `pnpm turbo run build --concurrency=1` (9/9 cached, FULL TURBO) | ran directly |
-| Lane E's branch | `origin/exec/23-plan11` at `26c0f7e` (T1/config.ts NOT yet landed there — checked directly, no deploy-sha var exists in config.ts at this sha) | `git diff origin/main...origin/exec/23-plan11 --stat` |
-| gate composition at this sha | `pnpm turbo run build test typecheck --force --concurrency=1` — full run launched under the lock, see below for outcome | `/tmp/laneC-gate.log` |
+| branch | `exec/24-plan11-ci-deploy` | `git branch --show-current` |
+| PR #134 head | `0761d08` | `git log --oneline`, matches what was pushed |
+| local HEAD (T15 WIP on top) | one commit ahead of `0761d08` | `git log --oneline -3` |
+| `0761d08`'s parent chain | `0761d08` → `19f68b3` (amendment 1) → `9c19d2a` (T14) → `63296d2` (origin/main at rebase time) | `git log --oneline` |
+| full rebuild at this HEAD | green, cached FULL TURBO; `actionlint`/`check:env`/`check-skipif-coverage`/`check-case-ids`/`check-task-ledger` all clean | ran directly, this session |
+| PR #134's 3rd CI run | in flight at write time (`33995268917`) — **re-check**, do not assume green | `gh run view 33995268917` |
 
-## WHAT'S DONE (staged, not yet committed as of this write)
+## WHAT'S IN #134 (T14, both amendments included)
 
-**T14 files** (staged in git index): `.github/workflows/ci.yml` (single `gate` job → 8 jobs: `scope`,
-`check-env`, `check-tasks`, `build`, `typecheck`, `server-tests` [4-way sharded], `other-tests`, `e2e`,
-final `gate` aggregator), `scripts/check-no-silent-skips.mjs` (new — fails a shard if a `.skipIf(`-guarded
-file contributes zero passed/failed tests; verified with three planted, uncommitted probe files: no-skipIf
-ignored, partial-skip passes, fully-skipped-file fails at exit 1), `Features.md` §13 stub (Task 14 entries
-only — 2 bullets), `test-cases/13-deployment-dogfooding.md` (new, cases 13.1–13.5, opens the bucket early
-per README convention), `test-cases/README.md` (index entry for the new bucket).
+`.github/workflows/ci.yml` split into 8 jobs (`scope`, `check-env` + `check-skipif-coverage.mjs` +
+`check-case-ids.mjs`, `check-tasks`, `build`, `typecheck`, `server-tests` [4-shard], `other-tests`, `e2e`,
+aggregating `gate`), `scripts/check-no-silent-skips.mjs`, `scripts/check-skipif-coverage.mjs`,
+`scripts/check-case-ids.mjs` + `scripts/fixtures/check-case-ids-fixture.md`, `Features.md` §13 stub,
+`test-cases/13-deployment-dogfooding.md` (opened early, merged with Lane D's Tasks 7/8 cases at rebase),
+`test-cases/07-api-realtime-search.md` (two disposition bullets reworded), `test-cases/README.md`.
 
-**T15 files** (unstaged/untracked, NOT yet committed — waiting on T14's PR first, per the "two PRs, T14
-first" instruction): `deploy/do/app.yaml`, `deploy/do/README.md`, `scripts/check-db-timezone.mjs` (verified
-falsifiable against a throwaway db forced to UTC — exit 1 — and against the shared dev postgres, server-
-wide `-c timezone=Asia/Kolkata` — exit 0), `package.json` (+`check:db-tz` script, +root `pg` dependency
-`^8.13.0` matching `apps/server`'s own range — pnpm resolved both to 8.23.0), `pnpm-lock.yaml` (regenerated
-by `pnpm install`, 26-line diff, not hand-edited).
+**Opus review findings on the original ci.yml split, all fixed**: (1) `check-no-silent-skips.mjs`'s
+`assertions.length > 0` guard let a skipIf file with ZERO assertionResults (an empty-fixture-list guard)
+print "ok" — dropped the guard. (2) The guard only covered `server-tests`; added
+`check-skipif-coverage.mjs` as a trip-wire in `check-env`. (3) The `e2e` job's stack-detection would have
+mis-triggered on `apps/web/playwright.config.ts`, which already exists for an unrelated, deliberately
+off-gate mock smoke — fixed to check only for `docker-compose.dev.yml` and never attempt a run.
 
-**Corrections made against the plan's own draft** (docs/superpowers/plans/2026-08-20-11-deployment-
-dogfooding.md T15 section, ~lines 3780-4157) — the plan's `app.yaml` snippet uses `S3_ENDPOINT`/
-`S3_REGION`/`S3_BUCKET`/`S3_ACCESS_KEY`/`S3_SECRET_KEY` and `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL`,
-and NONE of those five are read by any shipped code (confirmed via `pnpm check:env`, which passes
-unchanged with the corrected names: `OBJECT_STORE`, `OBJECT_STORE_S3_*` (attachments,
-`store-config.ts`), `SERVER_ORIGIN` + `NEXT_PUBLIC_SERVER_URL` (web, `next.config.ts` / `providers.tsx`)).
+## WHAT'S IN THE LOCAL T15 WIP (not yet its own PR)
 
-**Two open items recorded, not resolved** (in `deploy/do/README.md`'s own "does NOT resolve" section):
-1. The **deploy-sha env var** `/healthz` is meant to serve (per a controller ruling recorded in
-   claude-mem, not yet in any file this lane can cite by path) — checked `origin/exec/23-plan11` at
-   `26c0f7e` directly, confirmed no such variable exists in `config.ts` yet. Lane E notified
-   (msg sent 2026-09-06, see SendMessage log) to reconcile the exact name once it lands.
-2. Whether the **backup worker's S3 credentials** are its own or shared with the app's
-   `OBJECT_STORE_S3_*` pair — `.env.example` only documents `BACKUP_S3_BUCKET` (a bucket name), no
-   separate credential vars exist yet. `app.yaml`'s `backup` worker currently reuses the app's pair as
-   a stated working assumption. Task 11 (not this lane's) settles it.
+`deploy/do/app.yaml`, `deploy/do/README.md`, `scripts/check-db-timezone.mjs`, root `package.json`
+(+`check:db-tz` script, +`pg` in devDependencies), `pnpm-lock.yaml` (regenerated via `pnpm install`),
+`Features.md`/`test-cases/13`'s T15 bullets (13.7–13.8, currently `❌` inside PR #134's committed
+content — flip them to `🧪` in T15's own PR once these files actually land).
 
-**Root `package.json` collision with Lane E**: flagged to `lane5-plan11-1d` via SendMessage BEFORE
-staging the T15 commit — the two-line addition (`check:db-tz` script, root `pg` dependency) is the exact
-shape to reconcile at rebase if Lane E's `exec/23-plan11` touches the same blocks first.
+**Corrected against the plan's own draft**: object-storage/web-client env var names
+(`OBJECT_STORE_S3_*`/`SERVER_ORIGIN`/`NEXT_PUBLIC_SERVER_URL`, confirmed via `pnpm check:env`'s own
+output — not the plan's `S3_*`/`NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL`, which nothing reads).
+`DEPLOY_SHA` deliberately OMITTED from `app.yaml` (Lane E confirmed the shape, forthcoming on their
+branch; the CI step to keep it current per-deploy is a live-deploy action, out of scope). A third open
+item (`sslmode=require` vs `verify-full` on `pg` major bumps) is documented in `deploy/do/README.md`'s
+unresolved section.
 
-## REVIEW STATUS
+## GATE LOCK PROTOCOL, AND A MEMORY-PRESSURE NOTE
 
-Two Workflow-orchestrated reviews launched (ultracode opt-in this session):
-- `ci-yml-opus-review` (opus, high effort) — adversarial review of the 8-job `ci.yml` split, hunting
-  specifically for "silently skips a suite" class bugs (this lane's own re-task brief names this as the
-  reason ci.yml gets an opus reviewer, not the table's default sonnet). Run id in `/tmp` workflow logs;
-  outcome not yet folded into this file as of this write — check for a later revision of this section.
-- `deploy-spec-review` (sonnet, medium effort) — independent verification of every env var name in
-  `deploy/do/app.yaml` against the actual `store-config.ts`/`next.config.ts`/`config.ts` reads, not
-  trusting this file's own comments.
-**If this file is being read after a restart and these reviews aren't mentioned as resolved below, they
-may still be running or their findings may not yet be applied — check `/tmp/laneC-*` logs and this
-session's workflow transcripts before assuming the diff is final.**
+ONE backgrounded invocation, `mkdir`-based lock, 60s empty-pid grace, 10-min loud-proceed bound. Never
+`pkill -f vitest`. **Background wait loops for another lane's PR merge status got killed twice this
+session for system-wide memory pressure** (verified: zero of this lane's own orphaned vitest processes
+both times) — prefer single lightweight `gh pr view`/`gh run view` checks over a polling loop.
 
-## GATE LOCK PROTOCOL USED THIS SESSION
+## A STAGING MISTAKE MADE TWICE THIS SESSION — the actual trap for a restarted session
 
-The current (not the stale inline `echo $$`) form, ONE backgrounded invocation, `mkdir`-based lock with
-a 60s empty-pid grace and a 10-minute loud-proceed bound on the live-vitest-pool drain wait. Script at
-`/tmp/laneC-gate.sh`, log at `/tmp/laneC-gate.log`. Reap orphans by `ppid=1` only if ever needed — never
-`pkill -f vitest`, never kill `pgrep -f vitest`'s output (five lanes' sessions all contain that string).
+**`git reset --soft <ref>` does NOT unstage anything — it only moves HEAD, leaving the index exactly as
+it was.** Twice this session, after `git reset --soft` to re-split a combined commit, `git add <the T14
+files>` was additive on top of an index that STILL had T15's files staged from before the reset — and
+`git commit` (no pathspec) picked up everything staged, silently recombining T14 and T15 into one commit
+again. The fix both times: after `reset --soft`, explicitly `git restore --staged <files to exclude>`
+before committing — never assume the index is clean just because the working tree diff looks right.
+**Verify with `git diff --cached --name-only` before every commit that is supposed to be scoped.**
 
 ## NEXT STEPS, IN ORDER
 
-1. Confirm `/tmp/laneC-gate.log`'s `GATE_EXIT=` line is `0` before committing anything (full forced gate,
-   no cache, against the T14-staged tree — T15's files are untracked so this run does NOT yet cover them).
-2. Fold both review workflows' findings in (fix only Important/Critical; note Minor/Nit as accepted or
-   fixed at discretion).
-3. Commit T14 alone (files listed above), push `exec/24-plan11-ci-deploy`, open PR #1. Report to
-   `gisik-nokma-0d` per the standard format (head sha, `Tasks:` line, test count, node version,
-   `0 cached`, `check:env` on its own line, honest not-verified sentence: "Actions job steps verified from
-   the PR's own run at <sha>: <list>" once that run exists).
-4. Rebase onto `origin/main` again (in case T14's own PR or anything else landed), re-run the gate scoped
-   to T15's files (a full forced gate again, since `package.json`/`pnpm-lock.yaml` change affects the
-   whole install), stage + commit T15 alone, push, open PR #2. Report similarly, with the honest sentence
-   "the spec was not applied to any live app".
-5. Do NOT start any other Plan 11 task without a controller message (Lane D has T7/T8, Lane E has
-   everything else named in the file map).
+1. Check `gh run view 33995268917 --json conclusion` and read job steps via `gh api
+   repos/bkirosangma/gisik-nokma/actions/runs/33995268917/jobs` before reporting or assuming green.
+2. Wait for the controller to merge #134. Do not start T15's PR before that (two-PRs-T14-first).
+3. Once #134 merges: `git log --oneline` to find the T15 WIP commit fresh (its sha will have moved),
+   `git fetch origin`, rebase T15 onto the new `origin/main`, re-run the FULL forced gate (package.json/
+   lockfile changed, so a cached partial run is not sufficient evidence), flip 13.7/13.8 back to `🧪`
+   in `test-cases/13-deployment-dogfooding.md` and the matching Features.md bullets, commit for real
+   (drop the "WIP" message), push, open PR #2.
+4. Report PR #2 to the controller: head sha, `Tasks:` line, test count, node version, `0 cached`,
+   `check:env` on its own line, "the spec was not applied to any live app".
+5. Do NOT start any other Plan 11 task without a controller message.
 
 ## THINGS A RESTARTED SESSION MUST NOT ASSUME
 
-- The gate run launched at branch-cut may still be in flight, may have found a real failure, or may have
-  been superseded by a later run against a rebased tree — its log's mtime and `GATE_EXIT=` line are the
-  only trustworthy signal, not this prose.
-- Both review workflows' findings are NOT summarized here yet (written before they returned) — do not
-  proceed to commit without checking whether a later edit to this file folded them in, and if not,
-  checking the workflow transcripts directly before assuming "no findings" == "clean".
-- `origin/exec/23-plan11`'s sha will have moved. Re-check it before trusting anything above about Lane
-  E's current state (the deploy-sha variable, the root `package.json` collision shape).
+- A CI run starting, or even a prior head's run being green, is not this head's run being green —
+  always re-check the specific run id's conclusion and read its job steps.
+- Any sha quoted above will be stale the moment another lane's PR merges — `origin/main` moved five
+  times in this session's roughly two hours of work. `git fetch` and compare before trusting an anchor.
+- The T15 WIP commit's position and sha will have moved if this session did anything after writing this
+  section — use `git log --oneline` fresh.
