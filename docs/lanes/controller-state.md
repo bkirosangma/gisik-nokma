@@ -173,6 +173,54 @@ gate found (21/24), pinning `getTickets`/`getTicket` as **served** rather than d
 The override's step 0 is "commit these first; never `git checkout --`". A window kill does not touch a
 worktree, so nothing was lost — but a fresh session reading `main` would not have known they existed.
 
+### RULING P33 (2026-09-06, controller as ruling tier) — "Plan 11 done" means its 16 tasks PLUS the 18 errands other plans deferred to it by name
+
+**Lane E's seam-1 pre-flight found that Plan 11's own T1–T16 text claims almost none of the work other
+plans deferred to it** — 18 errands, each with a `file:line`, invisible to a `Plan 11` grep because they
+say *"the deployment errand"* or *"whoever owns the boot path."* Found by sweeping `apps/server/src` and
+`packages/` for the deferral **phrasing**, not the plan name. **The owner's instruction answers the
+ruling** — *"make sure every single thing is completed"* — so: **a deferral naming Plan 11 IS Plan 11's
+work, and the ledger's 16 rows going `done` does not close Plan 11 until these do.** Recorded here
+because the ledger cannot show them (they are not `### Task` headings), which is exactly the gap this
+file exists to cover.
+
+**Adopted into Lane E's seams — the six in seam 1 first, because they are the server's deployment
+surface and Lane E owns those files alone:**
+1. **CSRF: HTTP-Origin on cookie-authenticated product mutations** (standing owner ruling; Plan 4 T5
+   declined it in writing and named Plan 11; **no line in `apps/server/src` reads `Origin` today**; CORS
+   is not a substitute — `pm.` and `pm-api.` share a registrable domain, so `SameSite=Lax` was never
+   going to protect this deployment) → T2.
+2. **The shutdown path** — no SIGTERM handler, no `pool.end()`, no `app.close()`; `index.ts:124-131`
+   hung the snapshot writer's stop on Fastify's `onClose` for "the day Plan 11 adds a real shutdown";
+   Node as PID 1 ignores SIGTERM by default, so a rolling deploy is a hard kill without it → T5.
+3. **`LogOtpSender`'s two production faults** — logs every code; accumulates every code ever issued in
+   an unbounded in-process array (`coordination:2455-2460`, "Plan 11 owns the replacement") → T4.
+4. **Invite-issuance rate limiting** — `check-permission.ts:321-329` and case 6.123 name Plan 11; each
+   issuance mints a credential and T2's two buckets do not cover `POST /v1/invites` → T2.
+5. **`WEB_ORIGIN`/`BETTER_AUTH_URL` are `z.string().url()`, which requires only a scheme** —
+   `localhost:3001` parses and mints dead invitation links (case 6.124) → T1.
+6. **Assert `pnpm-lock.yaml` carries no `@better-auth/cli` inside the Docker build** — in the build,
+   not CI, so it cannot regress (`coordination:1791-1803`) → T5.
+**Seams 2/3:** `ops:sweep-orphans` (coordination:310 — "no task, no Files entry, no steps anywhere in
+Plan 11"), the `invite_tokens` sweep (6.131), `user_preferences` retention for revoked members
+(coordination:5495-5502), scheduling the notification-sweep CLI, the verifier's DDL credential in
+`app.yaml`, the interim-plumbing CI gate, CI wiring for `apps/web/e2e`.
+
+**DEFERRED — to LANE F by name, not to "an owner":** the repo-wide test-cases↔test citation convention
+(coordination:3749/:4108 — today no ✅ is grep-checkable and deleting a test reddens nothing). It is a
+convention, not a deployment task, **and it is the worst possible collision surface while five lanes
+are writing tests.** It runs in the serial end-of-run passes because the owner also said *"testing
+thoroughly done."* Stream load/soak (7.35) stays 🚫.
+
+**Two further rulings taken inline:** `/healthz`'s version — `healthz` appears **zero** times in the
+6592-line coordination doc, so this is an originated disclosure decision, not an inherited one — is the
+**deploy sha only**, unauthenticated (the platform's probe and an operator verifying a rollout both need
+it without a session), recorded at the handler as a bounded disclosure. And **this controller's own
+override was wrong**: `contact@artsourced.in` binds **T15's `app.yaml` only** (it appears once in the
+plan, line 3859); every `sign-in@gisik-nokma.local` in T1–T4 is the dev default the 2026-09-02 correction
+explicitly preserves, and a production domain must not enter a code default or a unit test. Lane E's
+fan-out caught it; the plan was right.
+
 ### RULING P32 (2026-09-06, owner: *"use the defaults"*) — the HELD pair is UNBLOCKED; guest project visibility is membership-only
 
 **The question P25 held for the owner** — *what does a project-scoped guest see of a workspace's other
