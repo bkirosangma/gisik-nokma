@@ -22,10 +22,10 @@ the brief's Sonnet gating does not apply; rulings are taken in-session.**
 
 | what | value |
 |---|---|
-| `main` | **`e407bf5`** — six merges this context, in order: **#127** (T16 promoted, `5abc113`) · **#121** (Plan 10 T17 Expo mobile, `dca435d`, independent CI green at `73f5fe7`) · **#125** (Lane A closure 2, `7bb93cc`, CI green at `53f2909`) · **#129** (T17 promoted, `c017cdf`) · **#130** (this file, `4fbc5aa`) · **#128** (Lane A closure 3 `StreamItem`→`ServerStreamFrame`, `e407bf5`, CI green at the rebased head `4199b7a`). Each `gh pr merge` exit read from `$?` on its own line, never piped |
-| ledger | **`CHECK_EXIT=0` · 158/177 (89.3%)** · claimed 0 · in-flight 0 · todo 19 · Plan 10 **15/18** (T14, T15, T18 open) · Plan 11 1/16 done — both promotions independently re-run at the PR's exact tree, node 22 |
-| last forced gate | **`e407bf5`** — ONE backgrounded invocation under the lock (acquired 02:38:22, released clean), `pnpm install --frozen-lockfile` exit 0, `pnpm rebuild better-sqlite3` exit 0, **`check:env` exit 0** on its own line, `pnpm turbo run build test typecheck --force --concurrency=1`: **`GATE_EXIT=0` · Tasks 30 successful, 30 total · 0 cached · 1m31.3s · node v22.22.2** (printed by the script) · zero `Unsupported engine` · **3254 tests / 245 files** — domain 464 · rule-engine 282 · server 983 · app-core 1086 · web 136 · editor 178 · ui 37 · sync-client 63 · desktop 5 · mobile 20. Identical count to the `7bb93cc` gate (closure 3 re-aimed one contract case for one deleted) and to Lane A's independent 3254 at `4199b7a`. *(Previous: `7bb93cc`, same composition, 1m28.9s.)* |
-| open PRs | **#126 only** (Lane B, `9d888a7`, **T14 + T15 on one branch**; T15's six scenarios pass on first execution; Fable review in flight; MERGEABLE against `e407bf5` without a rebase — Features.md/test-cases/12 merge in different regions; **HELD until the review's fix round lands**, then merged as one PR and 10/14 + 10/15 promoted together; T18 released to B after that). #128 merged. |
+| `main` | **`ece4b24`** — nine merges this context, in order: **#127** (T16 promoted) · **#121** (Plan 10 T17 Expo mobile, `dca435d`, CI green at `73f5fe7`) · **#125** (Lane A closure 2, `7bb93cc`) · **#129** (T17 promoted) · **#130** (this file) · **#128** (Lane A closure 3, `e407bf5`, CI green at the rebased `4199b7a`) · **#131** (anchors) · **#126** (Lane B **T14 + T15**, `c7c2b8e`, CI green at `dc382d5`; gated by the lane at `65eaa31`, the head adds one docs file — verified by the controller) · **#132** (T14+T15 promoted, `ece4b24`). Every `gh pr merge` exit read from `$?` on its own line |
+| ledger | **`CHECK_EXIT=0` · 160/177 (90.4%)** · claimed 0 · in-flight 0 · todo 17 · Plan 10 **17/18** (only T18 open) · Plan 11 1/16 — every promotion independently re-run at the PR's exact tree, node 22, exit read from `$?` |
+| last forced gate | **`c7c2b8e`** (code-identical to `ece4b24`, which added two ledger rows) — ONE backgrounded invocation under the lock (queued 30 s, acquired 02:56:37, released clean), `pnpm install --frozen-lockfile` exit 0, `pnpm rebuild better-sqlite3` exit 0, **`check:env` exit 0** on its own line, `pnpm turbo run build test typecheck --force --concurrency=1`: **`GATE_EXIT=0` · Tasks 30 successful, 30 total · 0 cached · 1m27.8s · node v22.22.2** (printed by the script) · zero `Unsupported engine` · **3267 tests / 247 files** — domain 464 · rule-engine 282 · **server 996** (was 983: +7 rig cases +6 scenarios, exactly #126's delta) · app-core 1086 · web 136 · editor 178 · ui 37 · sync-client 63 · desktop 5 · mobile 20. **Matches Lane B's independent 3267 at `65eaa31`.** *(Previous gates this context: `e407bf5` 3254, `7bb93cc` 3254 — same composition minus #126.)* |
+| open PRs | **none** at 03:00. Expected next: Lane A closure 2b (`exec/25-snapshot-provenance`, built + green at `9cfa978`, Fable whole-branch review running) → closure 4 stacked on it; Lane C T14 (`exec/24-plan11-ci-deploy`); Lane D T7+T8 (`exec/25-plan11-seed`); Lane E seam 1 (`exec/23-plan11`, T1 in flight at last report); Lane B closure 5 (`exec/26-closure5-catchup`) |
 | watch | **re-armed as a `Monitor` task** (this session's `ctl-watch.sh`, 120 s poll: `origin/main`, open-PR set with head+mergeable, per-PR check-run state, pane set; sentinel-initialised so the zero→one PR transition IS reported). It is a child of this session and dies with it — re-arm at every relaunch |
 | machine | swap **3.8 GB of 5 GB used at 02:08, 3.6 at 02:26**, ~76 MB free pages — five lanes plus their fan-outs. The gate lock keeps pools at one at a time; nothing crashed. Not a blocker; watch it |
 | watchdogs | `launchctl list`: limit-resumer, net-resumer, idle-nudger all present (the nudger still does not submit — memory file) |
@@ -100,6 +100,69 @@ payload in `sync-routes.ts`, `replica.ts`, `replica-data-source.ts` — none are
 branch level (sync surface). Lane B carries a ❌ case for the door meanwhile and asserts through
 `replica.getTicket`; no red test on `main`, no skipped scenario.
 
+**P36 AMENDED 03:00 (Lane A's read-only prep, adopted verbatim): the provenance block must be CARRIED
+FORWARD, or a re-snapshot silently drops it.** `writeSnapshotsForWorkspace` folds from `previous.state` and
+reads only the TAIL past the previous seq; closure 1's invalidation pass re-states head state under the new
+vocabulary with an EMPTY tail (`seq === previousSeq` is its ordinary case, per the writer's own docblock), so a
+writer that captures provenance only from events it folds would write a NULL block over a good one and the
+door would refuse again on tickets it had just fixed — **latent on a fresh device, visible only after a
+workflow publish (the P14 shape).** Rule: capture from the tail when the tail carries a state claim, otherwise
+carry the previous snapshot's block forward unchanged — carrying forward is copying the same recorded instant
+one more hop. **`snapshot-store.ts` joins the file list** (`readLatestSnapshot` selects `seq, state` only
+today; the `Snapshot` type changes). **The excluding fixture gets a second half:** snapshot a ticket, run the
+invalidation pass with an empty tail, assert the provenance survives; mutating the carry-forward to write null
+must redden it alone. Both halves are built.
+
+### RULING P37 (2026-09-06, controller as ruling tier) — case 12.274 and 6.104's purge half are CLOSURE 5, owner Lane B: backfill-on-grant, and a CLIENT-PRESENTED purge
+
+**Found by Lane B against its own PR, after a Fable review's Critical it reproduced before accepting.**
+The lane had reported that T15's S4(c) "partially discharges" 6.104's newly-GRANTED backfill half. **False**,
+and retracted in place: **there is no backfill-on-grant anywhere in the product** (`visible-events-for.ts`
+says so — "Plan 10's job, on top of this primitive"). S4's re-widening re-delivered the history ONLY because
+that scenario's workspace was silent between the narrow and the widen, so B's cursor never advanced past
+them. The lane's own probe with ONE unrelated visible commit in between — the ordinary shape —
+`C1PROBE {cursorAfterNarrow:4, cursorAfterOther:7, head:8, bCount:2, aCount:4, replicasEqual:false}`:
+**B holds two events where the server holds four, never receives the narrowing or the contest, and the
+divergence is permanent — no purge, no backfill, no resync path.** Recorded as **12.274, 🚫, owner Plan 10,
+no task** — recorded and not asserted, for 6.104's own reason. *A degenerate fixture excusing the server from
+existing — this series' signature failure — committed and then caught by the lane that had just written that
+sentence into three commit messages.* The 6.104 amendment is withdrawn and left visible as withdrawn.
+
+**The owner's instruction answers the "task-wanting question": it gets BUILT.** Two defects, siblings across
+one gap — **6.104 is the stale copy nobody takes away; 12.274 is the fresh copy nobody gives back.**
+**OWNER: Lane B, as closure 5, after #126 merged and before T18** — it holds the rig that reproduces both
+halves and the harness is the test bed; Lane A's queue already carries closure 2b/4, C2, the HELD pair and
+the contract test, none of which touch `visible-events-for.ts`. **Constraints, not a design:**
+1. **GRANT side:** the trigger is the visibility event ITSELF, never a reconstructed prior audience
+   (6.82/6.94 stand). Deliver the ticket's full history (or a per-ticket snapshot in the bootstrap's own
+   shape) to every viewer in the NEW audience, cursor notwithstanding; over-delivery to a viewer who already
+   held it is acceptable **iff replay is idempotent — measured, not assumed.** Excluding fixture: a viewer NOT
+   in the new audience receives nothing; mutate the audience check to permit → red, alone.
+2. **NARROW side is CLIENT-PRESENTED:** the server never initiates a purge for an entity a device may never
+   have held — P23 is not reopened. The client names the ids it holds (on catch-up or a reconcile door); the
+   server answers ONLY about ids the client named, "no longer yours" in the `{kind:'restricted', id}`
+   register. Excluding fixtures: the answer never contains an id the client did not present (mutate to
+   enumerate → red); a client presenting an id it never held learns nothing beyond "not yours". **This
+   resolves "cannot distinguish lost from never-had" in the SAFE direction: the client's own holding IS the
+   relationship** 6.101's ruling named as the missing axis. (Lane B's restatement, adopted.)
+3. The 12.274 probe becomes the GREEN case (`replicasEqual: true`); 6.104's residual flips 🚫 → ✅ only when a
+   narrowed ticket is actually removed from B by the client-presented path.
+4. P30 holds; closure 1 and P36's provenance block are untouched; a NEW visibility rule escalates before
+   building. **Collision:** Lane A's closure 4 touches `sync-routes.ts`'s bootstrap payload; closure 5
+   touches the catch-up path and the reconcile door — file lists exchanged before either starts; whoever
+   lands second rebases. Lane B's cases from **12.275** inside its block.
+
+**Also from #126's review, kept because each generalises:** the P35(b) mutation (visibility gate forced to
+permit) reddened S4 **and S5** — S5 depends on the same gate for the child's `claim.contested` reaching
+nobody; a mutation proving two scenarios, not a failure to isolate. S5's prose "both cursors sit permanently
+at `head − 1`" was false (what is permanent is the NON-delivery; the next visible envelope carries both
+cursors past the invisible row) — the assertion was right, the sentence was not, corrected and left visible.
+S4's control was a wall-clock race (`not.toEqual` on a whole contest object whose only differing field is
+`contestedAt`) — failed safe, now compares the field. **And a refuted tooling scare:** the T15 author reported
+the hook-rewritten `tsc` returns a FALSE GREEN; Lane B planted a TS2322 and both paths exit 2 naming it — the
+author had compared a fresh-dist run against a stale-`packages/domain/dist` run. **The typechecker does not
+lie; stale dist does. Not broadcast, because it was checked first.**
+
 ### §12 CASE-ID BLOCKS — allocated 2026-09-06 02:20, the only source of truth until the header says otherwise
 
 **Lane D 12.224–12.227 (landed with #121)** · **Lane C 12.228–12.239 (12.228–12.229 landed with #120)** ·
@@ -137,6 +200,26 @@ catalogue commit 186, max 12.266, zero duplicates.
   `react-native-webview` 13.15.0 → 13.17.0 through its `^` range and **broke `apps/mobile`'s typecheck
   outright** (WebView prop types resolved to `never` — three `@types/react` copies in the store). Pinned
   exact. **A caret range is a rebase hazard on every native-toolchain package.**
+- **P36 constraint (d) is MEASURED (Lane A):** the door derives provenance from local events in exactly two
+  places — `stateClaimOf` → `stateProvenance` (three doors) and `assignedClaimOf` → `assignedProvenance`
+  (`getTickets`). The control that explains why nothing else qualifies: `dueDate` is a `FieldClaim` carrying
+  its own `actorId`/`clientTime`/`serverTime` INSIDE `TicketState`, so it already survives a snapshot-bounded
+  bootstrap — **field claims are carried in the state; the state claim and the assignment claim are not.**
+  Closure 4's scope is those two, one PR.
+- **Closure 2b is BUILT** (`exec/25-snapshot-provenance` at `9cfa978`, 30/30, 3259 tests): `listProjectWithOfflineBorn`
+  unions the settled list with offline-born tickets tagged by kind (12.240–12.242); the OPPOSITE answer to P36
+  is stated in the type's docblock — an offline-born ticket has no `serverTime` because NO row recorded one,
+  so it renders as a CLAIM, never as a row missing a field. Fable whole-branch review running; PR follows.
+- **`test-cases/03` has no id allocation and no highest-id marker** — the gap that produced today's 12.156
+  collision, in another file. Lane A minted 3.149 by re-measuring `main`'s ceiling and adds the header line
+  in closure 2b's PR.
+- **`vitest: command not found` on `mobile#test` after a rebase** = the install-then-gate trap in a new
+  package's costume (the worktree had no `node_modules` for a package `main` gained with #121). Reinstall after
+  every rebase; not a defect.
+- **Lane B restarted 02:55 at the #126 fixed point** (`override-laneB.md` rewritten: closure 5 → T18; the old
+  one saved as `override-laneB-t13-t15-done.md.bak`); fresh session was reading `visible-events-for.ts` within
+  a minute. **T18 stays behind closure 5 AND Lane A's remaining §12 writes (12.240–12.259)** — a catalogue task
+  cannot close on a moving §12.
 - **Lane B's phrasing, adopted as a method rule:** *a mutation that fails nothing is an UNCONSTRAINED
   PATH only if the edit was confirmed present in the file before the run; otherwise it is a mutation that
   never fired, and the two are indistinguishable from outside.* Say which, every time.
