@@ -973,3 +973,46 @@ preserve**, because it checks state presence, reachability, `waiting.blocked` an
    elsewhere, but that is a fact about the last measurement, not this one — re-preview at rebase.
 3. **#134** (Lane C, the eight-job `ci.yml`) — lands after its own rebase. **Rebase ONCE MORE after that
    if the seam-1 PR is not yet open, so CI runs the new workflow rather than the old one.**
+
+---
+
+# CASE-ID RECOUNT — three styles, and the measured numbers for the sections this lane touches
+
+**The trap (controller, 2026-09-06; Lane B proved it at its rebase):** these files carry **at least three
+id spellings**, and a recount written against ONE reports *"0 duplicates"* through a collision it
+structurally cannot see, because the colliding id is in a style it never matched.
+
+    - 12.274 🚫 …          bare
+    - **12.240** ✅ …      bold
+    - 🧪 **13.1 — …        marker-first
+
+**MEASURED, and the warning is real with a number: §12 carries 4 BOLD ids among 200 bare.** A bare-only
+recount reports 200 and silently misses four.
+
+Tool: `scratchpad/recount-case-ids.mjs` (this lane's working copy — **the repo's own
+`scripts/check-case-ids.mjs` is assigned to Lane C's #134 amendment**, so this does not compete with it).
+It matches **line HEADS only**, so an id quoted mid-sentence is treated as a citation, not a definition —
+counting citations is its own false-duplicate source. It prints **per-style counts as the positive
+control** and compares the union against their sum: *union < sum* means the union misses a style.
+
+## Numbers at the shas named — RE-MEASURE at rebase, these move
+
+| section | file | ids | style split | min / max | duplicates | gaps |
+|---|---|---|---|---|---|---|
+| §13 | `origin/main` | 36 | 36 bare | **13.41 / 13.76** | none | none |
+| §9 | this branch | 207 | 207 bare | 9.35 / **9.241** | none | none |
+| §12 | `origin/main` | 204 | **200 bare + 4 bold** | 12.45 / 12.274 | none | 12.230–239, 12.244–259 |
+
+§13's max is **13.76** because **Lane C's 13.1–13.6 are not merged yet** (#134 pending). E mints from
+**13.101** regardless — from the BLOCK, never from the file's apparent max, which is the whole point.
+§9's 9.240/9.241 are this lane's A0 cases and sit correctly at the top.
+
+## The control needed its own control, and that is the part worth keeping
+
+`markerFirst` returned **0 on all three real files**, which is exactly the shape of a broken matcher —
+and I could not tell "style absent" from "matcher blind" from those files alone. Resolved by running the
+counter over a **synthetic file containing all four spellings plus a mid-sentence citation**: bare 1,
+bold 1, markerFirst 2, union 4 = sum 4, and the mid-sentence `13.99` correctly **excluded** (max read
+13.44). So the zeros are absence, established rather than assumed.
+
+**PR-body obligation:** state these counts — per style, max, duplicates — for every section touched.
