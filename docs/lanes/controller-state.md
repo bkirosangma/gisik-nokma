@@ -130,14 +130,34 @@ gate found (21/24), pinning `getTickets`/`getTicket` as **served** rather than d
 The override's step 0 is "commit these first; never `git checkout --`". A window kill does not touch a
 worktree, so nothing was lost — but a fresh session reading `main` would not have known they existed.
 
-### Still with the owner — the ONE thing that blocks work, restated with a recommended default
+### RULING P32 (2026-09-06, owner: *"use the defaults"*) — the HELD pair is UNBLOCKED; guest project visibility is membership-only
 
-**Guest visibility across projects** (`WorkspaceRef.projects` → `getMyWorkspaces`, `WorkItem.projectName`
-→ `getMyWork`): *what does a project-scoped guest see of a workspace's other projects?* **Recommended
-default: only the projects the guest holds a membership in — the workspaces list shows a partial
-workspace, and a project name is itself treated as a disclosure.** Lane A sequences this LAST and **stops
-and reports rather than building if unanswered** — P25's condition does not move because five lanes are
-running.
+**The question P25 held for the owner** — *what does a project-scoped guest see of a workspace's other
+projects?* — **is answered: nothing.** A guest is served only the projects they hold a membership in. **A
+project's NAME is itself a disclosure and is not served for any other project.** The workspaces list
+therefore shows a guest a *partial* workspace, and that is the correct answer, not a defect — say so in
+`Features.md` and the case that pins it.
+
+**This is an APPLICATION of an existing rule, which is what P25's condition requires** — the set is
+**`EffectiveRole.projects`**, produced only by `resolveEffectiveRole` (brand-protected, P22), the same set
+`canSeeResolved` already consults for project-mode tickets (`can-see.ts`: `eff.projects.has(v.projectId)`,
+with **no admin bypass — deliberate**). Both mappers close against it:
+- **`WorkspaceRef.projects` (`getMyWorkspaces`)** — for a guest, the list IS `eff.projects` and nothing
+  else. For owner/admin/member the implementer applies the same existing role resolution; **if serving a
+  non-guest's project list turns out to need a rule that does not already exist, ESCALATE before
+  building** — P25's condition binds the non-guest half exactly as it bound the guest half.
+- **`WorkItem.projectName` (`getMyWork`)** — a my-work item is a ticket the viewer already sees; its
+  project's name is served **iff that project is in `eff.projects`**, otherwise the item carries the
+  project id and no name — the existence-without-title register `routes/tickets.ts:304` already uses for
+  a restricted parent. Same rule, one level up.
+
+**The excluding fixture is the whole test** (closure 1's lesson, binding hardest on this surface): the case
+that proves this is a guest on project X who must NOT receive project Y's name or id in either response —
+mutate the rule to permit and confirm red. A suite built only from the allowed case cannot distinguish a
+correct exclusion from no exclusion at all.
+
+**Lane A builds this LAST in its sequence, after closure 3, and only against this ruling as recorded
+here** — its override said "build only if controller-state.md records the owner's answer," and this is it.
 
 ## ⛔ BOTH SESSIONS QUOTA-BLOCKED 2026-09-06, RESET MON 2026-09-07 06:30 IST — READ BEFORE TOUCHING ANYTHING
 
