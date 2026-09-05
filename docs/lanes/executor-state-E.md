@@ -16,11 +16,11 @@ off `main`.
 | branch | `exec/23-plan11` |
 | worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane5-plan11` |
 | merge-base with `origin/main` | `1e372e3` |
-| HEAD at last refresh | `f621a8c` (verified reachable on `origin/exec/23-plan11`) |
-| ahead of `origin/main` | 2 — `22ba60d` state file, `f621a8c` `.nvmrc`/`.npmrc` |
+| HEAD at last refresh | `213ee34` (verified reachable on `origin/exec/23-plan11`) |
+| ahead of `origin/main` | 4 — `22ba60d` state, `f621a8c` nvmrc/npmrc, `e74fb43` reaper finding, `213ee34` pre-flight |
 | tree state | clean |
 | node | `v22.22.2` (`$HOME/.nvm/versions/node/v22.22.2/bin`), pnpm 9.15.0 |
-| gate composition | baseline run IN FLIGHT at `f621a8c` — see "Gate baseline" below |
+| gate composition | **BASELINE GREEN at `f621a8c`**: `GATE_EXIT=0`, `Tasks: 24 successful, 24 total`, `0 cached`, Node v22.22.2, 0 `Unsupported engine`, **234 test files / 3181 tests** (domain 464 · rule-engine 282 · app-core 1046 · server 975 · editor 178 · web 136 · sync-client 63 · ui 37) |
 
 ## ⚠️ CROSS-LANE HAZARD — `pgrep -f vitest` matches the PEER LANE SESSIONS, not vitest
 
@@ -38,16 +38,53 @@ matches another — inverted: that one left workers alive, this one kills sessio
 vitest:
 
 ```
-ps -eo pid=,comm=,args= | awk '$2 ~ /node$/ && index($0, "vitest") > 0 {print $1}'
+ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}'
 ```
 
+**The `$2 == 1` is the controller's correction, and it matters more than the rest of this section.** My
+first version omitted it, and it was wrong for a reason worth keeping: I wrote a FINDER ("which processes
+are vitest") and called it a REAPER ("which vitest processes are abandoned"). Those differ by exactly the
+orphan criterion — ppid=1, reparented to launchd — from the 2026-09-04 post-mortem. Without it, a lane
+reaping after its own fast return kills a PEER'S LIVE GATE: the same shape as the finding above, one step
+further along. My "negative control returns 0 rows" was true when measured and false minutes later, when a
+peer started a 10-worker pool. **An absolute is a fact about a moment, and nobody holds the moment** —
+including the person quoting that rule.
+
 Verified three ways, not reasoned about:
-- **negative control** — returns 0 rows now (no orphans exist);
+- **negative control** — returned 0 rows at the moment of measurement (see the caveat above);
 - **positive control** — a throwaway `node … /node_modules/vitest/dist/worker.js` IS matched, so the
   matcher is not vacuous. **This control earned its keep:** the first version of this awk had an
   unterminated character class and printed an *error* that read exactly like a clean empty result. Only
   the positive control separated "nothing there" from "the matcher is broken";
 - **safety check** — all four peer session PIDs explicitly NOT matched.
+
+## RULING P33 (controller, 2026-09-06) — the 18 deferred errands ARE Plan 11's work
+
+**Received and binding.** The owner's instruction is the answer: *"aside from the actual deployments to
+the servers, make sure every single thing is completed."* **A deferral carrying a file:line that names
+Plan 11 IS Plan 11's work, whatever T1–T16's text says.** All six seam-1 adoptions confirmed as mapped
+(HTTP-Origin, shutdown path, `LogOtpSender`, invite-issuance rate limiting, strict URL validation, the
+lockfile assertion in the Docker build), and all seam-2/3 adoptions confirmed.
+
+Two refinements to this lane's proposed defaults:
+
+1. **The repo-wide test-cases↔test citation convention goes to LANE F, named** — not to "an owner".
+   It is a convention rather than a deployment task, *and* it is the worst possible collision surface
+   while five lanes are writing tests, so it belongs in the serial end-of-run passes after all merges.
+   It is NOT dropped: the owner also said testing thoroughly done, and **a ✅ nobody can grep-check is
+   exactly the drift this series exists to refuse.** Stream load/soak (7.35) stays 🚫.
+
+2. **`/healthz` serves the DEPLOY SHA ONLY** — not the semver from `apps/server/package.json`, not
+   dependency versions — and it stays **unauthenticated**, because App Platform's health probe and an
+   operator verifying a rollout both need it without a session. **Record it at the handler as a
+   deliberate, bounded disclosure**, in the same register as `{kind: 'restricted', id}`. If T1's text
+   asks for more than the sha, the sha is what it gets, and the handler says why.
+   *This also dissolves the `resolveJsonModule`/TS2732 trap: a sha comes from the environment or the
+   build, never from a JSON import of `package.json`.*
+
+The controller also accepted this lane's correction to its own override: **`contact@artsourced.in` binds
+T15's `app.yaml` only**; a production domain in a code default or a unit test would be wrong. Recorded on
+main as part of P33.
 
 ## Where I am in the sequence
 
@@ -55,7 +92,7 @@ Verified three ways, not reasoned about:
 
 | # | item | state |
 |---|---|---|
-| A0 | wire `registerAttachmentRoutes` into `app.ts` (+ `Features.md` / cases 9.59, 9.61) | **next** |
+| A0 | wire `registerAttachmentRoutes` into `app.ts` (+ `Features.md`, case **9.59 only** — NOT 9.61) | **IN FLIGHT** — opus implementer → opus reviewer |
 | T1 | config surface + `/healthz` version | not started |
 | T2 | CORS + rate limiting (**HTTP-Origin**, not envelope-origin) | not started |
 | T3 | error alerting hook | not started |
