@@ -28,7 +28,7 @@ describe('nonTerminalStates', () => {
   });
 
   /**
-   * 12.191 — the divergence, pinned so the two answers cannot be mistaken for
+   * 12.222 — the divergence, pinned so the two answers cannot be mistaken for
    * one. `nonTerminalStates` reads a definition's state list; `reopenStateOptions`
    * reads its declared EDGES and is what the online reopen dialog is fed from
    * (`create-ticket-flow.tsx` -> `ReopenDialog`). On this definition — whose
@@ -42,7 +42,7 @@ describe('nonTerminalStates', () => {
    * `reopenStateOptions`) or `reopenStateOptions` lost one (a real regression
    * in the shipped online picker).
    */
-  it('12.191 — is NOT the reopen picker: it ignores reachability, reopenStateOptions does not', () => {
+  it('12.222 — is NOT the reopen picker: it ignores reachability, reopenStateOptions does not', () => {
     expect(reopenStateOptions(wf, 'done')).toEqual([]);
     expect(nonTerminalStates(wf)).toHaveLength(2);
     expect(nonTerminalStates(wf)).not.toEqual(reopenStateOptions(wf, 'done'));
@@ -65,7 +65,7 @@ describe('buildReopenPair', () => {
       origin: 'desktop',
     });
 
-  it('12.189 — emits parent transition WITH cause first, then the child event — order is the contract', () => {
+  it('12.220 — emits parent transition WITH cause first, then the child event — order is the contract', () => {
     const c = child();
     const [reopen, reissued] = buildReopenPair({
       workspaceId: WS,
@@ -84,7 +84,7 @@ describe('buildReopenPair', () => {
   });
 
   /**
-   * 12.190 — THE CHECK THE PLAN'S OWN TEST COULD NOT MAKE.
+   * 12.221 — THE CHECK THE PLAN'S OWN TEST COULD NOT MAKE.
    *
    * The prescribed test asserted `payload: { toStateId: 'doing', cause: … }`
    * with `toMatchObject` against an envelope this same function had just
@@ -100,7 +100,7 @@ describe('buildReopenPair', () => {
    * (a schema loosened to `z.unknown()`, a lookup returning undefined and a
    * `?.` swallowing it) would leave this test green while proving nothing.
    */
-  it('12.190 — the built payload parses under the REAL registration, and the plan-text spelling does not', () => {
+  it('12.221 — the built payload parses under the REAL registration, and the plan-text spelling does not', () => {
     const registration = domainRegistry.get('ticket.transitioned', 1);
     expect(registration, 'ticket.transitioned must be registered for this test to mean anything').toBeDefined();
     expect(registration?.entityKind).toBe('ticket');
@@ -124,10 +124,10 @@ describe('buildReopenPair', () => {
       cause: { kind: 'reopened-for-child', childTicketId: '01J9GCHD000000000000000000' },
     };
     const refused = registration?.payloadSchema.safeParse(planSpelling);
-    expect(refused?.success, 'if this passes, the schema no longer requires `to` and 12.189 is unpinned').toBe(false);
+    expect(refused?.success, 'if this passes, the schema no longer requires `to` and 12.220 is unpinned').toBe(false);
   });
 
-  it('12.192 — the cause names the child ENTITY id, not the child event id', () => {
+  it('12.223 — the cause names the child ENTITY id, not the child event id', () => {
     const c = child();
     const [reopen] = buildReopenPair({
       workspaceId: WS,
