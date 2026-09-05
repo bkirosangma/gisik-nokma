@@ -327,11 +327,19 @@ document will not have it.**
 
 ## Traps in T2 that would each cost a round
 
-- **`request.raw.url === '/v1/events'` carries the QUERY STRING** — `POST /v1/events?x=1` bypasses the
-  limiter entirely. Use `request.routeOptions.url`, or strip at `?`. Same for `/v1/sync`.
-- **`await reply.code(429).send(...)` in an `onRequest` hook then falling out returns `undefined`** —
-  Fastify halts an async hook only on `return reply` or a throw. Expect `FST_ERR_REP_ALREADY_SENT` and a
-  500 where a 429 was intended. **Verify at implementation.**
+- **CONFIRMED BY PROBE — `request.raw.url === '/v1/events'` carries the QUERY STRING**, and the bypass is
+  total. Measured on fastify 5.12.1: `POST /v1/events` → **429** (limited), `POST /v1/events?x=1` →
+  **200, handler ran, limiter never fired**. In the same run `request.raw.url` was `"/v1/events?x=1"`
+  while `request.routeOptions.url` was `"/v1/events"` — so **`routeOptions.url` is the fix** and it
+  matched correctly for BOTH requests. Applies equally to `/v1/sync`. This is a rate-limit bypass
+  reachable by appending one character.
+- **REFUTED BY PROBE — the `await reply.code(429).send(...)`-then-fall-out shape is FINE here.** The
+  pre-flight predicted `FST_ERR_REP_ALREADY_SENT` and a 500 where a 429 was intended, and flagged it
+  "verify at implementation". Verified: on fastify 5.12.1 the plan's form answers **429**, and so does the
+  `return reply.code(429).send(...)` control — identical observable behaviour, handler not run in either.
+  **Do not "fix" this**; an implementer acting on the warning would be changing working code to satisfy a
+  prediction that reproduction does not support. (`return reply` remains the documented form and is
+  better style — but it is style here, not a defect.)
 - **`GET /v1/sync/bootstrap` — the most expensive read the server serves — is unlimited** under an
   exact-match limiter on `POST /v1/sync`.
 - **`trustProxy` is NOT passed today** (`Fastify({...})` sets logger and ajv only). Behind App Platform
