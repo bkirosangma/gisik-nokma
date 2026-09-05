@@ -11,7 +11,146 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
-## ⏩ CONTROLLER CLEARED ITSELF 2026-09-06 ~02:10 IST AT THE OWNER'S INSTRUCTION (ctx 70%) — RESUME FROM HERE
+## ⏩ CONTROLLER RESUMED 2026-09-06 02:10 IST IN A FRESH CONTEXT (Fable, session name unchanged `gisik-nokma-0d`) — LIVE STATE, re-measured at `c017cdf`
+
+**This block supersedes the "CLEARED ITSELF" block below it; that one's per-lane table is history now.** The
+`/clear` worked exactly as designed: the fresh context read this file top-down, then every lane's handoff
+from its OWN branch, then measured. Nothing was adopted from prose. **Session model is Fable (owner-set);
+the brief's Sonnet gating does not apply; rulings are taken in-session.**
+
+### Anchors — re-measured 2026-09-06 ~02:30 IST
+
+| what | value |
+|---|---|
+| `main` | **`c017cdf`** — four merges this context, in order: **#127** (T16 promoted, `5abc113`) · **#121** (Plan 10 T17 Expo mobile, `dca435d`, independent CI green at `73f5fe7`) · **#125** (Lane A closure 2, `7bb93cc`, CI green at `53f2909`) · **#129** (T17 promoted, `c017cdf`). Each `gh pr merge` exit read from `$?` on its own line, never piped |
+| ledger | **`CHECK_EXIT=0` · 158/177 (89.3%)** · claimed 0 · in-flight 0 · todo 19 · Plan 10 **15/18** (T14, T15, T18 open) · Plan 11 1/16 done — both promotions independently re-run at the PR's exact tree, node 22 |
+| last forced gate | **`7bb93cc`** (code-identical to `c017cdf`, which added one ledger row) — ONE backgrounded invocation under the lock (queued 3 min behind Lane A's re-gate, acquired 02:29:14, released clean), `pnpm install --frozen-lockfile` exit 0, `pnpm rebuild better-sqlite3` exit 0, **`check:env` exit 0** on its own line, `pnpm turbo run build test typecheck --force --concurrency=1`: **`GATE_EXIT=0` · Tasks 30 successful, 30 total · 0 cached · 1m28.9s · node v22.22.2** (printed by the script, not read off turbo) · zero `Unsupported engine` · **3254 tests / 245 files** — domain 464 · rule-engine 282 · server 983 · app-core 1086 · web 136 · editor 178 · ui 37 · sync-client 63 · **desktop 5 · mobile 20** (30 tasks = 24 + the two new apps). **Corroborated by Lane A's independent 3254 at `4199b7a`.** |
+| open PRs | **#126** (Lane B, T14 rig, `1f9d7ef` — HELD for rebase past `7bb93cc`; catalogue gap closed on the branch, cases 12.260–12.266) · **#128** (Lane A, closure 3 `StreamItem`→`ServerStreamFrame`, `cb8374e` — stacked on #125, goes CONFLICTING at #125's squash; rebase `--onto origin/main 53f2909` instructed) |
+| watch | **re-armed as a `Monitor` task** (this session's `ctl-watch.sh`, 120 s poll: `origin/main`, open-PR set with head+mergeable, per-PR check-run state, pane set; sentinel-initialised so the zero→one PR transition IS reported). It is a child of this session and dies with it — re-arm at every relaunch |
+| machine | swap **3.8 GB of 5 GB used at 02:08, 3.6 at 02:26**, ~76 MB free pages — five lanes plus their fan-outs. The gate lock keeps pools at one at a time; nothing crashed. Not a blocker; watch it |
+| watchdogs | `launchctl list`: limit-resumer, net-resumer, idle-nudger all present (the nudger still does not submit — memory file) |
+
+### The five lanes NOW — verify with `gh pr view` / `git log origin/<branch>`, do not adopt
+
+| lane | session | branch | doing | controller's next action |
+|---|---|---|---|---|
+| **A** | `gisik-nokma-exec-06` (opus, ctx ~35%) | `exec/19-serving-gaps` merged as #125; **#128** on `exec/24-stream-frames`; `exec/25-snapshot-provenance` holds closure 4's escalation at `144ac55` | queue, in order: **closure 2b** (P34 items 1–2) → **closure 4 under P36** → C2's proper close (a cursor on `TicketListView`) → **HELD pair under P32** (guest-exclusion fixture is the whole test) → the mapper-vs-real-`/v1`-body contract test (devDep lands with #126 / E's T5) | merge #128 at the re-gated sha after CI green; merge each closure PR on arrival; promote nothing (closures are not ledger rows) |
+| **B** | `lane2-plan4-e5` (opus, ctx ~51%) | `exec/20-plan10-t13-t15`, **#126** | T14 rig done + catalogued; **T15 scenarios in flight** (Fable author running; P35 applied by the lane on its return); T18 HELD until #126 and #128 have merged AND Lane A's §12 writes are in | tell it every `main` move that touches `Features.md`/`test-cases/12`; merge #126 at the re-gated sha; **promote 10/14** then; T15 PR → promote 10/15; then release T18 |
+| **C** | `lane3-plan7-8-b6` → **RELAUNCHED 02:25** (sonnet, fresh) | new branch `exec/24-plan11-ci-deploy` (from `c017cdf`) | **Plan 11 T14** (extend `ci.yml`: wire `check:tasks`, postgres client + loud-skip guard, e2e job visibly skipped until T13's compose) → **T15** (`deploy/do/` spec FILE, env block from `.env.example` not the plan, two root-manifest lines pre-announced to E) | merge each PR on arrival after reading the Actions JOB STEPS, not the conclusion; **promote 11/14, 11/15**; then re-task (candidates: T9/T10 script lines if E frees the manifest) |
+| **D** | `lane4-periphery-e5` → **RELAUNCHED 02:24** (sonnet, fresh) | new branch `exec/25-plan11-seed` (from `dca435d`+) | **Plan 11 T7 + T8** (seed plumbing + Convenience Corner mapping — new files only, reads frozen `reference/`; opus impl+review for T8) | merge on arrival; **promote 11/7, 11/8**; then decide T9/T10's manifest routing WITH Lane E before dispatching them |
+| **E** | `lane5-plan11-1d` (opus) | `exec/23-plan11`, 13 commits, gate green at `a30496f` (24/24, 3183 tests, `check:env` 0) | seam 1: A0 ✓ `.nvmrc`/`engine-strict` ✓ T5 ✓ 25 MiB timeout ✓ → **T1 in flight** → T2 → T3 → T4 → shutdown path → T6 (port 54330) | merge seam-1 PR on arrival (`check:env` on its own line; **`engine-strict` lands for every lane** — under node 24 pnpm exits 1 SILENTLY); promote its T-rows; then seam 2 (T11/T12 stay E's) and seam 3 (T13, T16) |
+
+**Lane E's file map, adopted verbatim as the re-task basis (2026-09-06):** T7+T8 create only new files
+(`apps/server/src/seed/*`, `test/seed/*`) · T14 is one file · T15 is a new directory **plus two root
+edits** (a `package.json` script and `pg` at root for `check:db-tz`) that collide with the manifest owner ·
+T9/T10, T11/T12 and T15 **all collide on a manifest — never two of those three at once** ·
+`apps/server/package.json` is **Lane E's for all lanes** (B's two devDeps are already in E's T5) · T13
+needs T6's compose AND T9's seed AND `pnpm-workspace.yaml` — E keeps it (zero of fifteen pinned
+`data-testid`s exist; `getMyWorkspaces` refuses so the plan's navigation click cannot land) · T16 held.
+
+### RULING P35 (2026-09-06, controller as ruling tier; AMENDED the same hour) — Plan 10 T15's scenario S4 is written against the SHIPPED rule, and the absent purge is a RECORD, not an assertion
+
+Lane B found that Task 15's S4 expects a `purge` on `visibility.set`. **No such purge exists**: the per-event
+walk was DELETED under P23's disposition; the under-purge residual is accepted and disclosed (6.101/6.104).
+The rig reproduces the server correctly; the SCENARIO is the plan defect. **S4 asserts:** (b) after
+visibility narrows, B receives **no further events** for the ticket — the excluding half and the whole
+point, because continued delivery after narrowing is a disclosure; Lane B mutates the server's visibility
+gate to permit (locally, inside one locked run, restored with `git checkout HEAD -- <path>` — name the
+ref) and reports that (b) reddens ALONE; (c) re-widening re-delivers the full pre-cursor history and B's
+replica converges, `projTicket` equality included. **(a) — "no purge arrives" — is RECORDED at the case
+and in the docblock, cross-citing 6.104 and P23, and NOT asserted.** First issued as an assertion; Lane B
+stopped and showed that **case 6.104 on `main` explicitly declines to pin it** (*"a test asserting 'no
+purge arrives' would harden the wrong half of a gap this branch wants closed rather than preserved"*),
+owner Plan 10. A ruling applies existing rules; it does not override a landed case by accident, and a
+self-expiring assertion (P25 clause 3's shape) is a precedent for REFUSALS that go red when a route starts
+serving, not for pinning a behaviour a case chose not to pin. Specific beats general. **Adopted from Lane
+B's reading, to be written AT 6.104:** S4(c) is the first executable evidence for 6.104's MIRROR half
+(backfill on newly GRANTED visibility) and partially discharges it. **6.104's purge half** — the WS
+catch-up/purge protocol, closing the residual without recreating P23's disclosure — **stays open with Plan
+10 and no task**; carried for a ruling when Lane A reaches that surface (same surface as closure 4).
+
+### RULING P36 (2026-09-06, controller as ruling tier) — closure 4: the snapshot carries the RECORDED provenance; option 3 is refused in writing
+
+**Found by Lane B's T14 rig, measured not inferred:** after a snapshot pass a fresh client cannot read the
+snapshotted ticket through `ds.query.getTicket` — `ReplicaGapError` on `stateProvenance`, because
+`replica-data-source.ts` requires a `ticket.created`/`ticket.transitioned` in local events and a
+snapshot-bounded bootstrap ships neither below the line. `replica.getTicket` answers; only the DataSource
+door refuses. **Lane A escalated before building (correctly — a new data contract is P25's "new rule"
+class):** `TicketState.transitions[]` carries `{toStateId, actorId, seq, workflowId, workflowVersion}` —
+the ACTOR and not the CLOCK — and `ClaimProvenance` REQUIRES `serverTime`. Three candidates, non-equivalent:
+(1) widen the snapshot to carry the claim's recorded instant; (2) let the door report provenance absent for
+snapshot-bounded reads; (3) synthesise a time from a neighbouring event — **refused: that is exactly the
+move refused on `ContestedClaim.claim.serverTime`, and it is the one that would pass a gate.**
+**RULING: option 1.** The instant EXISTS — the ledger row at `transitions[last].seq` carries `serverTime`
+and the writer folds that very row — so copying it is not fabrication; the distinction from the
+contested-claim hold is that THERE no row ever recorded the instant. Option 2 rejected because a fresh
+device is snapshot-bounded for nearly every ticket, making "absent" the product's normal answer.
+**Constraints:** (a) the writer READS `serverTime` from the event row at that seq — copied, never
+computed; the excluding fixture asserts a snapshot-bounded client's `stateProvenance.serverTime` EQUALS
+the ledger row's, and a writer mutated to copy the adjacent event's time must redden it alone (that
+mutation IS option 3); (b) additive to the bootstrap payload — the rig's existing cases stay green
+unchanged; (c) prefer a sibling provenance block on the snapshot row over widening `TicketState.transitions[]`
+(the reducer's output; a PENDING transition has no `serverTime`, so widening reintroduces a null case for
+a different reason and touches Lane B's full-`TicketState`-equality rig) — widen only with a measurement
+that the sibling block cannot serve the door without duplicating fold logic, stated as a deviation;
+(d) every provenance-bearing field the door serves gets the same treatment in the same PR, or its
+snapshot-bounded refusal is a named ❌ case with P36 as owner (`assignedProvenance` to be measured);
+(e) P30 holds; the door serves anything the replica serves. Files: `snapshot-writer.ts`, the bootstrap
+payload in `sync-routes.ts`, `replica.ts`, `replica-data-source.ts` — none are B's or E's. Fable review at
+branch level (sync surface). Lane B carries a ❌ case for the door meanwhile and asserts through
+`replica.getTicket`; no red test on `main`, no skipped scenario.
+
+### §12 CASE-ID BLOCKS — allocated 2026-09-06 02:20, the only source of truth until the header says otherwise
+
+**Lane D 12.224–12.227 (landed with #121)** · **Lane C 12.228–12.239 (12.228–12.229 landed with #120)** ·
+**Lane A 12.240–12.259** (its former "240+" is now BOUNDED) · **Lane B 12.260–12.289** (T14's seven =
+12.260–12.266 on #126; T15 from 12.267) · **next block 12.290, controller-allocated on request only.**
+The header line in `test-cases/12` (Lane B rewrote it on #126) carries the four blocks and no derivable
+next-free id; every lane recounts the MAXIMUM against `origin/main` at rebase as the control and never
+mints from it. Lane B measured at allocation time: 181 ids, max 12.229, zero duplicates; after its
+catalogue commit 186, max 12.266, zero duplicates.
+
+### Carried this context, with owners
+
+- **#126 was opened without its catalogue** — seven rig tests, no case ids, `Features.md` §12 still
+  listing the harness as absent. Lane B found it against its own PR while asking for an id block, and
+  this controller reached the same hold independently a minute apart. **Held, not merged, per #47's
+  precedent** ("never a follow-up"); closed on the branch at `1f9d7ef` before any rebase.
+- **From Lane A's closure-2 review (52 agents, 6 lenses, Fable on visibility):** both Criticals were gaps
+  declared CLOSED that were closed only for the case the fixtures used — `getTicket` could not map a ticket
+  WITH CHILDREN (route returned `RollupView`, mapper read `TicketRollup`), `getTickets` served a project's
+  first 50 as the whole project (`nextCursor` had no field). **The fixtures were ENCODING the defects**
+  (`rollup: null` hard-coded; `nextCursor: 't3'` with every row asserted back) — 1033/1033 green with C1
+  present. → **Owner Lane A, last in its queue:** no test executes a mapper against a real `/v1` body
+  (`client-contract.test.ts` reads `mappers.ts` as TEXT; `apps/server` has no `app-core` dep) — the
+  devDependency now exists on E's T5 and B's #126. Also carried, Lane A: 7.210's folded-vs-latest
+  property unconstrained (every fixture workflow has one version); 7.211's dangling-`parent_id` branch has
+  no fixture and survives its own mutation.
+- **Closure 3 (#128) found the third stream divergence AS A COMPILE ERROR** — `StreamItem` declared
+  `code: string` where the domain declares `code: StreamErrorCode`; `online/stream.ts:118` had been
+  assigning an unvalidated wire string. 7.199's 🚫 owner clause named this work; flips to ✅. The contract
+  test was re-aimed at the only property the deletion makes checkable: `data-source.ts` re-exports the union
+  and declares no second one (mutation-measured). **Batch C's two guardrails on the deferral HELD** — it
+  landed as a rename, not a reconciliation. Carried, unassigned: a per-`StreamErrorCode` policy (an error
+  frame with an unrecognised code is now DROPPED like any unreadable frame — named in the code as a cost).
+- **Lane D's rebase finding, worth every lane's attention:** a plain `pnpm install` after a rebase bumped
+  `react-native-webview` 13.15.0 → 13.17.0 through its `^` range and **broke `apps/mobile`'s typecheck
+  outright** (WebView prop types resolved to `never` — three `@types/react` copies in the store). Pinned
+  exact. **A caret range is a rebase hazard on every native-toolchain package.**
+- **Lane B's phrasing, adopted as a method rule:** *a mutation that fails nothing is an UNCONSTRAINED
+  PATH only if the edit was confirmed present in the file before the run; otherwise it is a mutation that
+  never fired, and the two are indistinguishable from outside.* Say which, every time.
+
+> ### ⚠ A LANE PANE THAT RENDERS A PROMPT BUT TAKES NO KEYS — relaunch it, do not paste into it
+> Lane C's pane held an unsent line ("keep holding, no action needed yet" — the previous controller's
+> paste, or the idle-nudger's) and **accepted nothing**: Enter (INSERT mode), Escape then Enter (NORMAL
+> mode), Ctrl-C, and typed characters all left the buffer unchanged, with `pane_in_mode=0` and the
+> session listed `idle`. Cause unknown and not worth diagnosing: the lane had nothing unpushed (state
+> file at `913f6aa` = remote), so **`start-lanes.sh C` with a rewritten override** replaced the window in
+> one step, and the fresh session was reading `ci.yml` 60 s later. The launcher exists for exactly this;
+> the old override is saved beside it as `override-laneC-t16-done.md.bak`.
+
+## ⏩ CONTROLLER CLEARED ITSELF 2026-09-06 ~02:10 IST AT THE OWNER'S INSTRUCTION (ctx 70%) — SUPERSEDED BY THE BLOCK ABOVE, kept for the record
 
 **Deliberate, not a crash.** The owner said *"ctx is 70%. need to clear the main. do it automatically."*
 The controller merged what was ready, wrote this block, landed it on `main`, then typed `/clear` into its
