@@ -16,11 +16,11 @@ off `main`.
 | branch | `exec/23-plan11` |
 | worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane5-plan11` |
 | merge-base with `origin/main` | `1e372e3` |
-| HEAD at last refresh | `213ee34` (verified reachable on `origin/exec/23-plan11`) |
-| ahead of `origin/main` | 4 — `22ba60d` state, `f621a8c` nvmrc/npmrc, `e74fb43` reaper finding, `213ee34` pre-flight |
+| HEAD at last refresh | `bb174fe` (verified reachable on `origin/exec/23-plan11`) |
+| ahead of `origin/main` | **12** — see the commit table under "Where I am" |
 | tree state | clean |
 | node | `v22.22.2` (`$HOME/.nvm/versions/node/v22.22.2/bin`), pnpm 9.15.0 |
-| gate composition | **BASELINE GREEN at `f621a8c`**: `GATE_EXIT=0`, `Tasks: 24 successful, 24 total`, `0 cached`, Node v22.22.2, 0 `Unsupported engine`, **234 test files / 3181 tests** (domain 464 · rule-engine 282 · app-core 1046 · server 975 · editor 178 · web 136 · sync-client 63 · ui 37) |
+| gate composition | **GREEN at `a30496f`**: `EXIT=0`, `Tasks: 24 successful, 24 total`, `0 cached`, Node v22.22.2, 0 `Unsupported engine`, **235 files / 3183 tests**, `CHECK_ENV_EXIT=0`. *(Earlier baseline at `f621a8c`*: `GATE_EXIT=0`, `Tasks: 24 successful, 24 total`, `0 cached`, Node v22.22.2, 0 `Unsupported engine`, **234 test files / 3181 tests** (domain 464 · rule-engine 282 · app-core 1046 · server 975 · editor 178 · web 136 · sync-client 63 · ui 37) |
 
 ## ⚠️ CROSS-LANE HAZARD — `pgrep -f vitest` matches the PEER LANE SESSIONS, not vitest
 
@@ -92,14 +92,16 @@ main as part of P33.
 
 | # | item | state |
 |---|---|---|
-| A0 | wire `registerAttachmentRoutes` into `app.ts` (+ `Features.md`, case **9.59 only** — NOT 9.61) | **IN FLIGHT** — opus implementer → opus reviewer |
-| T1 | config surface + `/healthz` version | not started |
-| T2 | CORS + rate limiting (**HTTP-Origin**, not envelope-origin) | not started |
-| T3 | error alerting hook | not started |
-| T4 | SMTP magic-link sender | not started |
-| T5 | Dockerfiles (server migrates on boot; web `standalone`) | not started |
+| A0 | wire `registerAttachmentRoutes` into `app.ts` | **DONE — `b2682c6`.** Reviewer: no Critical/Important. 4 mutations, incl. the row mutation the reviewer ran itself |
 | — | `.nvmrc` = 22, `engine-strict=true` in `.npmrc` | **DONE — `f621a8c`** |
-| T6 | `docker-compose.dev.yml`, five services, self-verifying env contract | not started (LAST in seam) |
+| T5 | Dockerfiles + `node-pg-migrate` → `dependencies` + Lane B's two devDeps | **DONE — `a30496f`.** Both images BUILT: server 607 MB, web 241 MB |
+| — | 25 MiB ceiling test timeout (controller-assigned) | **DONE — `bb174fe`** |
+| T1 | config surface + `/healthz` **deploy SHA** (P33) + strict URL validation | **IN FLIGHT** — opus impl → opus review |
+| T2 | CORS + rate limiting (**HTTP-Origin**) + invite-mint bucket | not started |
+| T3 | error alerting hook | not started |
+| T4 | SMTP magic-link sender + `LogOtpSender`'s two faults | not started |
+| T5b | SIGTERM / shutdown path (inherited errand #2) | not started |
+| T6 | `docker-compose.dev.yml`, five services, port **54330** | not started (LAST in seam) |
 
 **Seam 2 (PR 2) — T7 seed plumbing · T8 Convenience Corner mapping · T9 seed runner · T10 dev seed ·
 T11 backups · T12 restore drill.** Not started.
