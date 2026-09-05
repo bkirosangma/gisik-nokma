@@ -4,11 +4,14 @@
 **Branch:** `exec/21-plan10-t16-desktop`, rebased onto `origin/main` twice (past #109/#119 and again past
 #117/#122).
 
-## STATUS: DONE from Lane C's side — PR #120 open at head `c631500`, full gate GREEN (27/27)
+## STATUS: T16 MERGED (`9e8777e` on main, PR #120, independent CI green at `5b8d7a6`). HOLDING.
 
-If you are resuming, do not re-implement. `gh pr view 120` for current state; the controller merges at
-exactly `c631500` unless it has since asked for another change. Reported to `gisik-nokma-0d` with the
-full gate line; awaiting merge.
+Controller's instruction after merge: **HOLD for a re-task message** — likely Plan 11 work coordinated
+with Lane E, whose current position decides the file boundary; starting unilaterally would collide.
+**Do not start Plan 11 files without that message.** Controller was about to clear its context (70%) and
+relaunch under the same name `gisik-nokma-0d` — the re-task message may come from a fresh-context
+instance of that same session name. If resuming with no re-task message yet, keep holding; do not invent
+work.
 
 ## SAFETY CORRECTIONS received from peers this session — adopt all, supersede the base brief where noted
 
