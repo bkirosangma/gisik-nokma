@@ -66,15 +66,24 @@ export type BootstrapTicket = {
   /**
    * `null` means `events` is the ticket's full history — no snapshot exists yet.
    *
-   * `provenance` is ADDITIVE (ruling P36 constraint (b)): a client that does not
-   * read it is unaffected, and every bootstrap case written before it stays
-   * green unchanged. It carries the two claims `TicketState` cannot —
+   * `provenance` is ADDITIVE (ruling P36 constraint (b)) and therefore OPTIONAL
+   * on this type, not merely nullable. It was required for one commit and the
+   * gate caught it: `test/dual-client/rig.ts` constructs this payload and
+   * stopped compiling, which is precisely the "every existing bootstrap case
+   * stays green unchanged" the constraint exists to protect. **Nullable is not
+   * additive** — a required field still forces every constructor to change.
+   *
+   * The server's own `Snapshot` row type keeps it REQUIRED, deliberately: there
+   * every write site must declare its intent, and being required is what
+   * surfaced the invalidation pass as a compile error instead of a silent NULL
+   * over a good block. Same field, opposite choice, because one is a wire
+   * payload with foreign constructors and the other is a row this code owns. It carries the two claims `TicketState` cannot —
    * the state claim and the assignment claim — because `transitions[]` has
    * `actorId` and `seq` and no clock, while every FIELD claim already travels
    * inside the state with its own. Its own `null` means a snapshot row written
    * before the column existed: unknown, never unattributed.
    */
-  snapshot: { seq: number; state: TicketState; provenance: SnapshotProvenance | null } | null;
+  snapshot: { seq: number; state: TicketState; provenance?: SnapshotProvenance | null } | null;
   events: LedgerEvent[];
 };
 
