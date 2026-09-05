@@ -2802,3 +2802,89 @@ The instruction classifies **ten** serving gaps; `client-contract.test.ts` and `
 pair, nor the held pair. Its stated reason — *"cards carry stateId only, and the card names no workflow
 version to read the name from"* — reads like a **data** gap rather than a serving gap, which would
 explain the omission. **Not built. Surfaced in PR #109's body.**
+
+## THE FIVE UNKNOWNS ARE NOW FOUR ANSWERED AND ONE REMAINING TASK (2026-09-06)
+
+Established directly, without dispatching an agent, because the quota limit hit the SUBAGENT pool and
+this session could still read, measure and run a gate. **The WIP branch is not "evidence of what an
+agent was doing" any more — it is a nearly-complete change with one bounded task left.**
+
+### 1. GATED. `GATE EXIT: 1` — 21/24 tasks, **three app-core test files red, and they are the EXPECTED red**
+
+```
+test/online/online-data-source.test.ts   3.40 "names its absences"                        1 failed
+test/views/ticket-sheet.test.tsx         expected '…' to contain 'TicketRead.title'       2 failed
+test/views/reopen-flow.test.tsx          3.80 · T13.4h + its control                      2 failed
+```
+
+**Every failure is a refusal test whose gap just closed.** `TicketRead.title` no longer appears in
+`getTicket`'s absences because `getTicket` no longer refuses for that reason. This is P25 clause 3's
+self-expiring gap doing exactly what it was built to do.
+
+**AND THE EXPIRY SURFACE IS WIDER THAN THE INSTRUCTION SAID.** The controller named
+`client-contract.test.ts` (server-side). The actual reds are three **app-core** files, two of them
+**VIEW tests** — `ticket-sheet` and `reopen-flow` — whose whole scenario is *"this read refuses, and
+the refusal renders verbatim."* A view test written around a refusal expires with the refusal, and
+nothing in the instruction predicted that class. **Whoever resumes should expect more expiry sites than
+any list names, and should find them by running the gate rather than by reading a list.**
+
+### 2. WHICH GAPS CLOSED — measured by enumerating both trees, not from a diff
+
+**All EIGHT in scope closed** — the six buildable AND both rule-first:
+
+```
+ListRow.typeRank   ListRow.epicId   ListRow.stateName   ListRow.assignedProvenance
+ListRow.hasRestrictedParent
+TicketRead.stateProvenance   TicketRead.ticket   TicketRead.title
+```
+
+**All eight out of scope still refuse**, including both HELD (`WorkspaceRef.projects`,
+`WorkItem.projectName`) and the unclassified eleventh (`WorkItem.stateName`). **Zero entries added.**
+16 before, 8 after.
+
+> **A `grep "^-.*field:"` over the diff returned NOTHING and I nearly reported "no gaps closed".** That
+> is silent-empty mode #4 — the proxy reformats `git diff` markers and defeats a `^[+-]` filter. It was
+> caught only because a second measurement disagreed: the remaining list had 8 entries where the tree
+> before had 16. **Enumerate both trees and subtract; never grep a diff for markers.**
+
+### 3. `hasRestrictedParent` APPLIES an existing rule — it does not author one
+
+`apps/server/src/read/restricted-parents.ts` delegates to **`canSeeResolved`**
+(`visibility/can-see.ts:94`), asked about the PARENT's resolved row exactly as `rollupFor` asks it about
+each CHILD's. **The cited precedent was verified, not taken:** `rollup.ts:267` does the same call with
+the same `roleByWorkspace` caching and the same comment about no SQL restating who may see what.
+Structurally confirmed too — its SQL carries no visibility predicate and the only logic is
+*known-and-not-visible*.
+
+Three judgements in it worth preserving:
+- **It discloses strictly LESS than the single-ticket read already does.** That route answers
+  `parent: {kind:'restricted', id}` — existence AND the id; this answers the same question with the id
+  removed. And `parentId` is already on every `TicketCard`, so the boolean adds no existence claim.
+- **The role is resolved in the PARENT's workspace, never the caller's** — a parent may sit in another
+  project (6.57) or another workspace (6.84); reusing the caller's role would be a second, quieter
+  visibility decision.
+- **A `parent_id` naming no row answers `false`**, joining "no parent" and "a parent you may see",
+  because `proj_visibility` resolves such a ticket as a ROOT (6.9) — reporting it restricted would
+  assert the existence of a ticket the system has no evidence for, **an invented existence leak, the
+  exact inverse of the disclosed one.**
+
+### 4. `TicketRead.title` SIDESTEPS the visibility decision rather than resolving it
+
+The gap's stated reason was *"reading `proj_tickets` here is a visibility decision."* The
+implementation reads the title from **the claim map the reducer maintains** (`titleOf(state:
+TicketState)`), not from `proj_tickets` — so the table that made it a visibility decision is never
+touched. The viewer already passed `canSee` to obtain the `TicketRead`; the title comes from state they
+are already entitled to. It throws loudly on two conditions it argues are impossible rather than
+defaulting.
+
+**No new rule was invented. The escalation condition did not fire.**
+
+### 5. STILL UNKNOWN — nothing, but ONE TASK REMAINS
+
+**Update the three expired refusal tests, in the same change set, without weakening them.** A refusal
+test edited merely to stay green is a check that cannot fail — the point is that each should now assert
+the *served* fact where it used to assert the absence. `reopen-flow`'s T13.4h is the delicate one: its
+scenario needs a read that still refuses, so it needs a gap that is still open rather than a softened
+assertion.
+
+**Then: review it.** None of the above is a substitute for the review phase that never ran.
