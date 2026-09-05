@@ -29,6 +29,8 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@gisik-nokma/app-core": "workspace:*",
+    "@gisik-nokma/sync-client": "workspace:*",
     "@types/node": "^22.10.0",
     "@types/pg": "^8.11.0",
     "@types/ws": "^8.5.0",
