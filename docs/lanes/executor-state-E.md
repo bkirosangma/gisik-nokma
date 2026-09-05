@@ -600,3 +600,177 @@ git show "origin/main:test-cases/<file>.md" | grep -oE "(^|[^0-9])<N>\.[0-9]+" \
 
 **A0's 9.240/9.241 are above main's 239 as of this measurement and must be re-checked before the seam-1
 PR.** If §9's max has moved, mine move above it, catalogue and citations together.
+
+---
+
+# SEAM 3 PRE-FLIGHT — findings (3 opus agents, 0 errors), 2026-09-06
+
+## T13 — the E2E. **The plan's own package would turn CI red on every PR.**
+
+**THE ONE THAT BREAKS CI TODAY.** The plan's `e2e/package.json` declares `"scripts": {"test": "playwright
+test"}` and adds `- 'e2e'` to `pnpm-workspace.yaml`. **Turbo enumerates the `test` script of EVERY
+workspace package**, and CI's only execution step is `pnpm turbo run build test typecheck`. Measured with
+`turbo run test --dry=json`: 8 tasks today, one per package declaring `test`. Add the plan's package
+verbatim and `@gisik-nokma/e2e#test` joins the gate — **on a runner with no compose stack, no Mailpit and
+no browser binary** (`playwright@1.62.1` declares no install script, so `pnpm install --frozen-lockfile`
+fetches nothing and CI never runs `playwright install`).
+**FIX: name the script `e2e`, not `test`**, with a root `"test:e2e": "pnpm --filter @gisik-nokma/e2e run e2e"`.
+Turbo defines no `e2e` task, so the suite is **structurally** unreachable from `turbo run test` — a guard,
+not a comment asking someone not to.
+
+**ZERO of the 15 pinned `data-testid`s exist.** Two independent sweeps (`grep -r` and a `find`-enumerated
+807-file `xargs grep`), **both with positive controls that fired** (`state-node-` → 3,
+`dialog-scrim` → 2). The client was built with **role/aria addressing throughout** —
+`apps/web/e2e/smoke.spec.ts` uses `getByRole` everywhere and `getByTestId` zero times. The 11 testids that
+DO exist are all workflow-builder or list-internals hooks. Split the amendment: the flat ones adapt today
+with **zero component edits** (`auth-email-input` → `getByLabel('Email')`, `auth-magic-link-submit` →
+`getByRole('button', {name:'Send magic link'})`); the per-entity ones (`ticket-card-<id>`,
+`board-column-<stateId>`) genuinely need component changes and belong to whoever owns those components.
+
+**Playwright is ALREADY installed and configured** — `@playwright/test` **1.62.1** in `apps/web`, a config
+at `apps/web/playwright.config.ts`, two specs, browser binaries already in `~/Library/Caches/ms-playwright`,
+and `apps/web` already TYPE-gates `e2e/**` via `tsconfig.e2e.json`. T13 is not greenfield. **Pin
+`^1.62.1`, not the plan's `^1.49.0`**, so both suites share one resolved version and one browser download.
+
+**The plan's navigation click CAN NEVER LAND.** `getMyWorkspaces` is an unconditional refusal —
+`online-data-source.ts:111` → `mapWorkspaceRefs`, which is `(_raw: unknown): never { throw new
+ServingGapError(...) }`. Reach the board by **direct URL** `/w/<id>/p/<id>`, taking ids from T7's
+deterministic ULIDs — the pattern `smoke.spec.ts:196-203` already uses for this reason.
+**FORBIDDEN: weakening `mapWorkspaceRefs` or any of the six `): never` mappers to make the click land.**
+They encode P25 clause 1, HELD pending an owner ruling; softening one converts a recorded gap into an
+invented fact.
+
+**The refusal assertion cannot fire.** `transition-dialog.tsx:160-166` DISABLES confirm when a
+require-comment transition has an empty comment, so the plan's bare-close never reaches the server and no
+refusal is ever produced. And the state choice is `<option>` inside `<select>` — drive it with
+`selectOption()`, not `click()`. **Do not put a `transition-refusal` testid on the client's own preview
+to make it green** — that proves nothing about the rule engine.
+
+Other T13 hazards: every URL (`:3001`, `:3000`, `:8025`) is satisfiable by **stray local dev processes
+with the compose stack entirely down** — assert `/healthz`'s version against the built image tag in
+globalSetup. `toHaveCount(0)` passes on a blank, 500'd or redirected page. `fetchMagicLink` takes
+`messages[0]` with no ordering and no nonce while globalSetup already burned one link per address —
+**if Mailpit sorts oldest-first, `signIn` follows a spent link and a green run means the globalSetup
+cookie was reused.** An empty `testDir` exits 0 with `0 passed` — **pin an expected test count.**
+
+## T15 — the DigitalOcean spec file
+
+**⚠️ ATTACHMENTS WOULD SILENTLY GO TO EPHEMERAL DISK.** `store-config.ts:26` is
+`const kind = OBJECT_STORE ?? 'local'`. The plan's `app.yaml` sets **no `OBJECT_STORE`**, so a production
+deploy builds `LocalDiskStore('var/attachments')` **inside an App Platform container** and every uploaded
+attachment is destroyed on the next redeploy — **no error, no log line, no failed request.** Set
+`OBJECT_STORE=s3` and the six `OBJECT_STORE_S3_*` names. **The plan's `S3_*` block is read by nothing.**
+
+**⚠️ THE FALSIFIABILITY PROOF IS ITSELF UNFALSIFIABLE.** T15 Step 2a offers a negative control —
+*"# Fails — the dev compose Postgres has not been altered"* — and **that invocation PASSES.**
+`docker-compose.yml:6` starts Postgres with `-c timezone=Asia/Kolkata`, a **CLUSTER-level** GUC, so every
+database on it (including `postgres`) already answers `Asia/Kolkata` with no `ALTER DATABASE` anywhere.
+CI does the same via the service container's `TZ`. An operator runs the demo, watches the "Fails" line
+pass, and concludes the check works. **Use the technique this repo already proved** —
+`migrations.test.ts:172-203` creates a scratch database and `ALTER DATABASE <scratch> SET timezone TO
+'UTC'`, the OPPOSITE of the product zone.
+
+**`check:db-tz` cannot resolve `pg` from the repo root** — root `package.json` declares exactly one
+devDependency (`turbo`), and pnpm's isolated `node_modules` has no hoisted `pg`. Either add `pg` to root
+devDependencies (a real new dependency the plan never mentions) or move the script under `apps/server`.
+
+**`DATABASE_CA_CERT` is INERT.** `db.ts:20-26` passes only `connectionString`, `max` and `options` — no
+`ssl`, no `ca`. Nothing in `apps/server/src` or `packages/` reads the variable. Either add TLS to
+`createPool` (**a Plan 1 file this lane does not own — route it, do not edit it**) or say in
+`deploy/do/README.md` that it is currently inert.
+
+**`NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_WS_URL` were DELETED as unread.** The shipped web reads
+`SERVER_ORIGIN` (`next.config.ts:9`) and `NEXT_PUBLIC_SERVER_URL` (`providers.tsx:104`). `NEXT_PUBLIC_WS_URL`
+was also the wrong SHAPE — `streamUrl()` appends `/v1/stream` itself.
+
+**The CSRF ruling's Plan-11 touchpoint is UNDISCHARGED.** `coordination:823-827` routes the
+provider-default-host question here explicitly. Measured in Plan 11: `ondigitalocean` **0×**, `SameSite`
+**0×**, `CSRF` **0×**, `Public Suffix` **0×** (positive control, same sweep: `TRUST_PROXY` 8×). T15 must
+state that the API is never served from a `*.ondigitalocean.app` host (that parent is not on the PSL, so
+every other tenant would be same-site) and that `Domain=` is never added to the session cookie.
+
+**NO GATE SEES `deploy/` OR `scripts/`.** `check-env-example.mjs:54` scans
+`['apps/server/src','apps/web','packages']`. Nothing compares `app.yaml` to `.env.example` or to
+`config.ts`'s schema, so **every defect above is invisible to CI.** A ~30-line check would close it.
+
+**Standing correction VERIFIED**: `MAGIC_LINK_FROM=contact@artsourced.in` at plan:3859, and an
+`@artsourced.in` sweep over the whole plan returns exactly three lines with **no line disagreeing**.
+
+## T16 — the runbook
+
+**IT NAMES SEVEN NONEXISTENT COMMANDS AND ONE BROKEN ONE.** `ops:backup-once`, `ops:fetch-backup`,
+`ops:sweep-orphans`, `seed:cc`, `seed:dev`, `check:db-tz` and `scripts/restore.sh` exist in **no
+package.json on this tree**; `verify:projections` exists but **throws `ConfigError` as the runbook invokes
+it** — `verify-projections.ts:108` calls `loadConfig`, which demands `BETTER_AUTH_URL`, a 32-char
+`BETTER_AUTH_SECRET` and `WEB_ORIGIN`, none of which the verifier uses. **A runbook is prose and prose
+cannot fail**; the only honest check is that every command it names resolves.
+
+**`test-cases/README.md` must be in T16's Modify list** — it carries a "Buckets so far" index that already
+reserves `13-deployment-dogfooding.md`. Adding a bucket without editing the index leaves the repo
+describing itself wrongly.
+
+## Ownership of `deploy/do/app.yaml` — RESOLVED HERE, no ruling needed
+
+`coordination:1610` says *"Lane 4 owns `deploy/do/app.yaml`"*. That is the **pre-2026-09-06 four-lane
+numbering**; the five-lane resume (`controller-state.md:73`) names *"T15 DO spec file"* for **Lane E**, is
+LATER, and the owner's 2026-09-06 instruction superseded the serial topology outright. **T15 is this
+lane's.** Note the collision hazard in the naming itself: `controller-state.md:70` gives Lane B *"T15
+scenarios"* — that is **Plan 10's T15**, a different task with the same number.
+**The §4 obligation travels with the file**: `deploy/do/` must carry EITHER a verifier credential OR an
+explicit recorded decision that it runs only against restore scratch DBs. **Recorded, not inferred.**
+
+---
+
+# THE DISK INCIDENT, 2026-09-06 — and this lane's share of causing it
+
+**The shared Postgres (`gisik-nokma-exec-postgres-1`, port 54329) went into a PANIC loop** because
+Docker's VM disk hit 100% (56.1 G / 58.4 G) — *"No space left on device"* on every checkpoint. Every
+lane's server gate went down with it. `docker ps` still reported the container **Up**, which is why it
+read as a code defect first.
+
+**What it looked like from inside a gate**, recorded because the visible error is not the real one:
+
+```
+TypeError: Cannot read properties of undefined (reading 'drop')   <- afterAll, MASKING the cause
+  ❯ test/engine-context.test.ts:47:12
+...
+error: the database system is in recovery mode                     <- the actual cause, visible only in
+                                                                      the two tests that got far enough
+```
+
+73 of 89 server test files "failed" at file level; `beforeAll` could not `CREATE DATABASE`, so `db` was
+undefined and **the teardown threw first**. A reader who stops at the first error diagnoses a test bug.
+
+**This lane caused most of the disk pressure.** Build cache went **986 MB → 12.6 GB** during the session:
+four Docker image builds for T5a. Cleared with `docker builder prune -f` — authorised cache-only by this
+lane's own T5a brief, and structurally incapable of touching images, containers or volumes (0 of 94
+entries were ACTIVE). Two superseded `gisik-server` images removed as well. **~13.1 GB reclaimed; the
+owner's 17 images and all 4 containers untouched; the 36.8 GB of unused images was NOT touched and
+remains the owner's call.**
+
+## STANDING FIX (assigned by the controller, owner: this lane) — sweep at the START, not the end
+
+`createTestDatabase` drops its database in `drop()`, called from `afterAll`. **A killed run, a crashed
+worker, a jetsam kill or a Postgres panic never reaches `afterAll`** — so the cleanup that exists is
+exactly the cleanup that does not run on the occasions that produce the mess. 39 orphaned
+`gisik_test_*` databases had accumulated.
+
+`scratchpad/sweep-test-dbs.sh`, wired into `locked-test.sh` **before** every run. Result: `39 present →
+39 dropped → 0 remain`. **The rule that makes it safe with five lanes on one cluster: it drops only
+databases with ZERO backends in `pg_stat_activity`**, selected in ONE query rather than a list-then-check
+round trip, because a `gisik_test_*` with a live connection is a **peer's running suite** and dropping it
+reddens their gate with something that reads exactly like a code defect.
+
+## For T6, carried
+
+The dev stack's volume lives on this same Docker disk. **State the budget in the compose file's docblock
+and in the runbook**, and make the seed runner **refuse rather than half-write** when `CREATE DATABASE`
+fails on space — the exact failure mode watched here.
+
+## A log line that will mislead the next reader
+
+Turbo's failure output names `/Users/kiro/.nvm/versions/node/v24.11.1/bin/pnpm`. **That is not a Node-24
+run.** Turbo prints the binary path ONLY on error, so it is absent from every green log and reads as a
+regression when compared against one. pnpm's shebang resolves `node` through `PATH`, and
+`node-version.test.ts` — which asserts the worker's Node from inside the worker — passed in both green
+gates. Do not chase it.
