@@ -933,3 +933,43 @@ B 260–289 — ASK before minting there.** §12 is not this lane's anyway.
 
 **The e2e job only DETECTS `docker-compose.dev.yml` and prints that T13 must supply the real invocation.
 T13 stays this lane's**, and so does T6's compose file that the detection looks for.
+
+---
+
+# SCOPE REDUCED — Lane D landed T7+T8, and continues into T9+T10
+
+`a1252bc` (#136) put **T7 and T8 on main**: `apps/server/src/seed/{cc-board,cc-map,doc-text,seed-ulid,
+templates,users}.ts` and the six matching test files. **`test-cases/13-deployment-dogfooding.md` now
+EXISTS on main** with the four-block header, D's cases at **13.41–13.76**, and `test-cases/README.md`
+claims §13.
+
+**The §13 block allocation is now IN THE FILE ITSELF**, which is better than in a message: C `13.1–13.40`
+· D `13.41–13.100` (T9/T10 continue inside it) · **E `13.101–13.200`** (seam 1, T11/T12, T13) · next
+block `13.201` on request. *"Never renumber a landed id; a lane exhausting its block asks the controller
+for another rather than borrowing a neighbour's."*
+
+**This lane's remaining scope is therefore:** seam 1 (**T2, T3, T4, the shutdown path, T6**), then
+**T11, T12, T13**, then **T16**. **T7–T10 are Lane D's — do not touch `apps/server/src/seed/` or
+`apps/server/test/seed/`.**
+
+## The seam-2 pre-flight paid for itself through ANOTHER lane
+
+My map's sharpest T7/T8 finding was that **`checkErrandTemplate` — the oracle T7 builds — would still
+return `ok:true` after someone "fixed" the two `rule-bypassable` advisories Ruling P29 exists to
+preserve**, because it checks state presence, reachability, `waiting.blocked` and `require-comment` into
+`done`, none of which changes when `later→waiting` acquires a guard.
+
+**Lane D closed exactly that hole**, and did it better than "add a test":
+- `13.55 ✅ planted defect: a rule on the one-hop seeding transition is named — Ruling P29's tripwire`
+- `13.57 ✅ Ruling P29 pinned by identity: the real template trips exactly two rule-bypassable advisories`
+
+**Pinned by IDENTITY, not by count** — a count of two survives someone swapping which two.
+
+## Rebase targets, in order
+
+1. **`a1252bc` #136** (Lane D T7+T8) — on main now; this branch is 3 behind.
+2. **`c25d7fe` #137** (Lane A closure 2b) — app-core offline-born union; touches `Features.md`,
+   `test-cases/03` and `/12`. **Watch `Features.md`**: this lane's edits sit at ~889–918, A's are
+   elsewhere, but that is a fact about the last measurement, not this one — re-preview at rebase.
+3. **#134** (Lane C, the eight-job `ci.yml`) — lands after its own rebase. **Rebase ONCE MORE after that
+   if the seam-1 PR is not yet open, so CI runs the new workflow rather than the old one.**
