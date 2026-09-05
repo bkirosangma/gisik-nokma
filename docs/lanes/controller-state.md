@@ -101,6 +101,49 @@ running server test suites at once is the Sep 4 crash with a multiplier. **Rule,
 **The controller's own forced gate at each merge stays `--force`, uncached, node 22, chained in one call
 — and takes the same lock.**
 
+> ### ⚠ `pgrep -f vitest` NAMES THE LANE SESSIONS, NOT THE WORKERS — found by Lane E within 20 minutes of launch
+> Every lane's command line embeds its brief, and the brief contains the word "vitest" (in the
+> never-pipe rule). So `pgrep -f vitest` matched **all five lane sessions** (`comm=claude`) — and, when
+> this controller re-measured, **also a peer's live 10-worker vitest pool.** The reap instruction in
+> every brief, this file's own Method rules, `CLAUDE.md`, and the memory file — *"reap `pgrep -f vitest`
+> survivors"* — resolved, today, to *"kill lanes A–E and a live gate."* **The inverse of the Sep 4 crash:
+> that command left workers alive; this one kills sessions that are not workers.** Same class — a command
+> that looks like it names one thing and names another.
+> **Lane E's replacement was a FINDER, not a REAPER** — its "negative control returns 0 rows" was true
+> for one quiet minute and false the next, because a live pool matches too. The orphan criterion is
+> **ppid=1** (reparented to launchd), the crash post-mortem's own definition. **The only reap command
+> from here, everywhere:**
+> `ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}'`
+> — verified on synthetic input (node+vitest matched; a claude line containing "vitest" not; a next.js
+> node not), and live (a running pool has a live parent and does not appear). **Never `pkill -f vitest`.
+> Never kill `pgrep -f vitest`'s output.** Corrected in all five overrides, `CLAUDE.md` (owner-approved
+> PR — outside `docs/`), and the memory file; every lane messaged and acknowledged.
+> **Credit where the method earned it:** Lane E caught its own first awk (an unterminated character
+> class that printed an ERROR reading exactly like a clean empty result) *only* because it ran a positive
+> control. The refinement it missed — a live pool — is the "a count is only true of a tree that has stopped
+> moving" lesson wearing a process-table costume.
+
+> ### Collision-map additions from the lanes' first hour — real, not hypothetical
+> - **Plan 11 T6's text pins the DEV stack's Postgres to host port 54329** — *the shared TEST Postgres all
+>   five lanes use.* Written verbatim it fails to bind or silently points the dev stack at the test
+>   database. **Lane E uses 54330** (confirmed free) and records the deviation. Add to any dev-stack docs.
+> - **Registering `@fastify/multipart` at the ROOT would silently convert `/v1/events`'s 415 into a 400
+>   with `request.body` undefined** — the events door's stated contract, broken invisibly, and **no
+>   existing test sends multipart to any non-attachment route**, so the suite could not have caught it.
+>   Lane E's A0 wiring (`registerAttachmentRoutes`, encapsulated `app.register(fn, deps)` from a
+>   synchronous `buildApp`) measured three variants (201/415 · 201/400 · 404/—) and carries the
+>   cross-route case explicitly. The nested-await-then-declare shape is the one `stream/routes.ts:165-178`
+>   already records as failing silently for websocket.
+> - **Lane D's T17 screens consume `syncStatusLabel`, `resolveContest`, `buildReopenPair` from app-core —
+>   Lane B's T13, not yet merged.** D builds everything self-contained first and renders sync/contest
+>   state honestly from raw `DataSource` fields meanwhile, naming the gap rather than duplicating T13's
+>   logic; rebases when T13 lands. Lane B told to export under those names or tell D directly.
+> - Lane D also found `ReplicaDataSource.ingest()` **throws** `OfflineAcceptError` on any pending write,
+>   where Plan 10's screens assumed fire-and-forget `void ds.ingest(...)` — an unhandled rejection on
+>   every offline write if transcribed. Fixing at the screen. And Plan 7's real editor webview bridge is a
+>   versioned `{bridge, kind}` protocol, not the plan's assumed `{type: 'editor-ready' | ...}` — using the
+>   real one.
+
 ### LAUNCHED 2026-09-06 00:47 IST — all five lanes live, verified working, not merely rendered
 
 | window | lane | session model | worktree · branch | verified doing |
