@@ -82,6 +82,49 @@ D — each lane appends ONLY in its own plan's section; T18 is the one that owns
 before opening its PR; the controller merges in arrival order; a `pnpm-lock.yaml` conflict is resolved
 by re-running `pnpm install`, never by hand.**
 
+### ⛔ THE INLINE LOCK BELOW NEVER HELD — superseded 2026-09-06 ~01:20 IST by the ONE-BACKGROUNDED-INVOCATION form
+
+**Found by Lane B, verified by this controller, and the flaw is the controller's.** Each Bash tool call
+is a fresh, short-lived shell, so `echo $$ > /tmp/gisik-gate.lock/pid` records a pid that exits within
+seconds — after which every peer's stale-check is **correct** to fire and reclaims the lock inside one
+15-second poll. **It released itself after every acquisition; it never held for anyone using the inline
+form.** Compounding it: the harness denies foreground `sleep`, so the one-liner could not run in the
+foreground at all; the natural repair — acquire in one call, gate in the next — is exactly the split that
+kills `$$`. **Consequence, measured by Lane B: two independent 9-worker vitest pools live at once, ~66 MB
+free, swap 1983 MB of 3072 — the Sep 4 shape with a multiplier.** Nothing crashed: both pools had live
+parents and finished; zero orphans after; swap peaked at 3.6 GB of 4 GB and is draining.
+**Lane E's `locked-test.sh`/`gate.sh` never had the bug** — acquire+pid+trap+run in one backgrounded
+invocation, evidenced by `LOCK ACQUIRED pid=77833` → `GATE FINISHED` 85 s later in one process. "Never
+held" is true of the inline form; the record distinguishes so nobody hunts a bug they do not have.
+
+**THE PROTOCOL NOW, every lane and this controller — ONE backgrounded invocation (`run_in_background:
+true`), never split, never foreground, no `kill`/`rm -rf`/`trap`-less forms (the harness denies `kill`
+even as `kill -0`; use `ps -p`):**
+```
+until mkdir /tmp/gisik-gate.lock 2>/dev/null; do p=$(cat /tmp/gisik-gate.lock/pid 2>/dev/null); if [ -n "$p" ] && ! ps -p "$p" >/dev/null 2>&1; then rm -f /tmp/gisik-gate.lock/pid; rmdir /tmp/gisik-gate.lock 2>/dev/null; fi; sleep 15; done
+echo $$ > /tmp/gisik-gate.lock/pid
+trap 'rm -f /tmp/gisik-gate.lock/pid; rmdir /tmp/gisik-gate.lock 2>/dev/null' EXIT
+while [ "$(ps -eo comm= | grep -c '^node (vitest')" -gt 0 ]; do sleep 15; done
+source ~/.nvm/nvm.sh && nvm use 22 && pnpm turbo run build test typecheck --force --concurrency=1 > gate.log 2>&1; echo GATE_EXIT=$? >> gate.log
+```
+`--concurrency=1` plus the zero-live-pools wait bounds the machine to **one pool at a time**. Package-
+scoped runs: `pnpm --filter <pkg> exec vitest run --maxWorkers=2` (direct CLI — turbo's `--` passthrough
+hands `--maxWorkers` to `tsc` and breaks `build`). **Two refinements from Lane E, adopted:** a lock dir
+with **no pid file** (holder died between `mkdir` and `echo`) is never reclaimed by the `[ -n "$p" ]`
+guard and wedges every lane — reclaim an empty-pid lock after 60 s, loudly; and bound the drain-wait at
+10 minutes with a loud proceed, or back-to-back unlocked package runs starve a gate silently. The live-pool
+matcher was **verified to fire on macOS** by Lane E against a real pool (0 → 3 during the run) after it
+had nearly refuted it from two `ps` snapshots taken at two instants — "a count is true of a tree that has
+stopped moving," in process-table costume.
+
+> ### ⚠ AND THIS CONTROLLER REPORTED A MERGE THAT DID NOT HAPPEN — the pipe trap, fourth costume
+> `gh pr merge 117 --squash 2>&1 | tail -1 && echo "#117 MERGED"` printed **MERGED** while `gh` had
+> **refused** ("the merge commit cannot be cleanly created" — #117 conflicts with `main` after #109) —
+> because `| tail -1` made the pipeline's status `tail`'s. Caught on re-check against `gh pr view` state,
+> not by the command. **Never pipe a merge; read `$?` on its own line. The same rule this file already
+> states for gates and for `check:tasks`, now proven to need stating for `gh pr merge` too.** #117 is OPEN,
+> rebasing; it merges at the re-gated sha Lane B reports, and at no other.
+
 ### THE GATE LOCK — the one physical constraint, because this machine has already been crashed once
 
 16 GB / 10 cores, no vitest worker caps, no turbo concurrency setting (both measured absent). Five lanes
