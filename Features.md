@@ -932,9 +932,14 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   — two different composition roots, and a reader who checks only the second finds no gates at all.
   (This bullet used to draw the contrast against the two attachment routes above, which were then
   registered at neither. They are now registered at `app.ts`, so that contrast is gone and the plain
-  claim is what is left.) The seam is wired even though that composition root itself is never started (`apps/server/src/index.ts`'s own comment records that
-  nothing boots it, and there is no `start` script, Dockerfile, or deployment target anywhere in the
-  repo, so "wired" here does not mean "live in production"; no production exists to be live in). Most
+  claim is what is left.) The seam is wired even though that composition root is never started in production
+  (`pnpm dev` boots it; `apps/server` has no `start` script. The claim that once stood here — no
+  `start` script, Dockerfile or deployment target *anywhere in the repo* — was wrong in one half from
+  the day it was written, since `apps/web/package.json` has carried a `start` script since earlier than
+  the sentence, and is wrong in the other half as of Plan 11: `apps/server/Dockerfile` and
+  `apps/web/Dockerfile` now exist and both build. What remains true is the part that matters here —
+  **nothing has been deployed to a live host** — so "wired" still does not mean "exercised in
+  production"). Most
   other call sites that build an ingest service leave `gates` out entirely and get the seam's default
   `[]` and no gating at all — but three of this task's own test suites deliberately pass
   `gates: buildServerGates()` to exercise the seam directly (`test/gates/gate-seam.test.ts`,

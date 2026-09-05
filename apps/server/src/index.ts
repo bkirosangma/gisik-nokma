@@ -32,10 +32,23 @@ async function main(): Promise<void> {
   //    copied from here into a `Features.md` bullet before anyone checked it.
   //
   // 2. It said "nothing boots this composition root". **`pnpm dev` boots it**
-  //    (`tsx src/index.ts`). What is true is narrower and worth stating
-  //    precisely: there is no `start` script, no Dockerfile and no deployment
-  //    target, so there is no PRODUCTION for these gates to be real in. "Wired
-  //    at the one composition root the repo has" is the honest claim.
+  //    (`tsx src/index.ts`). Its replacement claim — "there is no `start`
+  //    script, no Dockerfile and no deployment target" — has now been overtaken
+  //    TWICE, and both halves are worth stating precisely rather than quietly
+  //    deleting.
+  //
+  //    The `start` half was **already false when it was written**: `apps/web`
+  //    has carried `"start": "next start -p 3001"` since before this comment
+  //    landed (`git log -S` puts the script at an earlier commit than the
+  //    sentence). What was true, and is what the sentence meant, is that
+  //    `apps/server` has no `start` script — it still does not.
+  //
+  //    The Dockerfile half is false as of THIS lane: `apps/server/Dockerfile`
+  //    and `apps/web/Dockerfile` exist and both build. So the honest claim is
+  //    now narrower again: there is a way to package this server, and there is
+  //    still **no deployment** — nothing has been applied to a live host, by
+  //    deliberate scope. These gates are real in an image nobody has run in
+  //    production yet.
   //
   // 3. THE CONSEQUENCE NEITHER SENTENCE DREW — **now FIXED, and recorded here
   //    because the defect is the useful part.** `buildApp` did not call

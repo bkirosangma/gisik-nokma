@@ -43,6 +43,11 @@ const serverOrigin = process.env.SERVER_ORIGIN ?? 'http://localhost:3000';
  * socket and does not.
  */
 const nextConfig: NextConfig = {
+  // Standalone server output for the Docker image (apps/web/Dockerfile):
+  // bundles a minimal server.js plus only the node_modules it needs, at
+  // apps/web/.next/standalone/apps/web/server.js in this monorepo layout.
+  output: 'standalone',
+
   /**
    * Relative imports in this app carry an explicit `.js` suffix — the repo's
    * ESM convention, and what `packages/*` already ship. TypeScript resolves
