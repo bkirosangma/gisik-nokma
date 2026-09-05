@@ -14,7 +14,11 @@ Project management software ("the keeper of memory" — Garo: *gisik* mind/memor
   "success" in 2.5 s and left six vitest workers behind; twenty-three minutes later they held 22.4 GB on a
   16 GB machine, and three kernel jetsam events and a forced restart followed. Reproduced on demand.
   Use `| tail -N`, or `> /tmp/run.log 2>&1; head -N /tmp/run.log`, or a `grep` with no `-m`. After any run
-  that returned suspiciously fast or was cut short, reap it: `pgrep -f vitest` and kill survivors before
+  that returned suspiciously fast or was cut short, reap ORPHANED workers only — `ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}'` (ppid=1 = reparented to launchd) — before
+  calling the step done. **Never `pkill -f vitest` and never kill `pgrep -f vitest`'s output**: when
+  Claude sessions run with this file in their prompt, their own command lines contain the word "vitest",
+  so `pgrep -f vitest` names every such session plus every peer's live workers (measured 2026-09-06: five
+  sessions and a live 10-worker pool, zero orphans). Read the list
   calling the step done. **A `PreToolUse` hook on this machine now refuses the piped form**
   (`~/.claude/scripts/no-piped-test-runs.py`, registered in `~/.claude/settings.json`); it is machine-local,
   so a fresh machine needs it installed again — the rule above is the part that travels.
