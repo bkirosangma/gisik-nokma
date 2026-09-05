@@ -15,10 +15,10 @@ only what is written here.
 | anchor | value | how verified |
 |---|---|---|
 | branch | `exec/20-plan10-t13-t15` | `git branch --show-current` |
-| HEAD | `2aa1efa` (T13 + P34 + rebase + id allocation) | `git rev-parse HEAD` |
-| `origin/main` | `a23d686` (closure 1 / #109 landed) | `git rev-parse origin/main` after `git fetch origin main` |
-| ahead of `origin/main` | **6**, REBASED onto `a23d686` | `git rev-list --count origin/main..HEAD` |
-| HEAD reachable? | **YES** — `origin/exec/20-plan10-t13-t15` resolves to the same sha after `git fetch` | `git branch --contains 2aa1efa -a` + `git rev-parse origin/<branch>` |
+| HEAD | `cd584dd` (T14 + its fix round) | `git rev-parse HEAD` |
+| `origin/main` | `fc5cf0d` — **T13 + P34 MERGED as #117**, verified by content (case 12.220 and `syncErrorNotice` both present on main), not by report | `git rev-parse origin/main`; `git show origin/main:<file>` |
+| ahead of `origin/main` | **4** (blocker doc, T14, backfill case, fix round) | `git rev-list --count origin/main..HEAD` |
+| HEAD reachable? | **YES** — `origin/exec/20-plan10-t13-t15` resolves to the same sha after `git fetch` | `git rev-parse origin/<branch>` vs `git rev-parse HEAD` |
 | tree | clean | `git status --short` (empty) |
 | node | v22.22.2 | `node -v` after `export PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH"` |
 | install | `pnpm install --frozen-lockfile` exit 0, `pnpm rebuild better-sqlite3` exit 0 | `/tmp/laneB-install.log` |
@@ -42,8 +42,8 @@ the rule is print the rows, not the count. `main` was 3181; 3210 - 3181 = **29**
 | # | task | state |
 |---|---|---|
 | 1 | **T13** — app-core contested-claim UX, offline reopen pair, skew badge, sync status bar | **DONE.** PR #117 open, rebased onto `a23d686`, re-gated under the lock. Includes Ruling P34's follow-up and the §12 id re-allocation. |
-| 2 | T14 — dual-client harness rig (Fable author + reviewer) | **VERIFIED. Self-test 4 passed** under the lock at `0cbdc82`; `apps/server` typecheck exit 0. Three mutations run (below). **Fable review in flight** — not yet merged, no PR yet. |
-| 3 | T15 — scenarios S1–S6 (Fable author + reviewer) | not started |
+| 2 | T14 — dual-client harness rig (Fable author + reviewer) | **DONE. PR #126 open**, head `cd584dd`. Rig suite **7 passed**; full gate under the lock **24/24, 0 cached, 3225 tests / 8 packages** (server 979→986). Fable review returned: no Critical, three Important — all fixed and each pinned by a case that fails specifically. |
+| 3 | T15 — scenarios S1–S6 (Fable author + reviewer) | **IN PROGRESS** — Fable author writing `scenarios.test.ts` against a 16-item verified correction list. **S4's central premise is FALSE** (see below); the author is instructed to write it against what the product does and say so, not to bend the rig. |
 | 4 | T18 — `Features.md` §12 + `test-cases/12` final shape | **HELD** until Lanes C (T16) and D (T17) have MERGED to `main`. Poll `origin/main` for their merge commits. |
 
 **In flight: T13's PR, awaiting controller merge.** **One ruling is pending** (see OPEN RULINGS below)
@@ -273,6 +273,38 @@ M2's "benign for the six scenarios" rests on the S1 and S2 shapes only; S5 was n
 checked at all:** S3–S6 end to end, the stall path where `lastApplyFailure` is non-null, the
 no-progress guard, `bootstrapFor` under a concurrent writer, the JSON round trip, and `contests()`
 ordering with two contests in one batch.
+
+## T15 — THE SIXTEEN CORRECTIONS, and the one that is a PLAN DEFECT
+
+Verified against source before dispatch. The plan's T15 block repeats every T14 API error and adds more.
+
+**Rig API:** `ingestInteractive(userId, events)` is two-arg · admin-only claims (`workflow.defined` and
+kin) need `USER_ADMIN`, not a member · use the rig's exported ULIDs, never `'usr_a'`/`'wf_h'`/`'task'` ·
+`ticket.transitioned`'s key is **`to`**, not `toStateId` · **`ds.query.getTicket` returns `TicketRead` =
+`{ticket, title, stateProvenance, parent, rollup}` — it has NO `confirmed`, NO `contests`, NO `pending`,
+and the plan reads all three off it** (use `replica.getTicket`, `getTicketWithPending`, `listContests`) ·
+`listEntityEvents` is on the REPLICA · `ds.query.search` REFUSES on the replica, use
+`searchOfflineCopy` → `{offlineCopy, hits}` · `seedTicket(pool, args)` is ONE options object with **no
+`visibility` field at all** · S6 must use `h.sync(userId, events)`.
+
+**Correct as the plan has them, do NOT "fix":** `myWork(workspaceId, userId)` and
+`listContests(workspaceId, filter)` both exist on `ReplicaOnlyQuery` with those exact signatures.
+
+**⚠️ S4's CENTRAL PREMISE IS FALSE, and this is a PLAN defect, not a lane one.** S4 expects a `purge`
+on `visibility.set`. **There is no such purge in the product** — the per-event visibility walk was
+struck (coordination cases 6.101/6.104). Measured on this rig: after a narrowing `visibility.set`,
+client B KEEPS the ticket, B's cursor merely lags the head, and re-widening later re-delivers the full
+history. **The rig reproduces the server correctly; the SCENARIO is wrong.** The conservative default
+taken: write S4 against what the product actually does, assert that exactly, and say in a docblock which
+half of the plan's S4 was false and which half (the offline edit contesting) still holds. **Bending the
+rig to make the plan's S4 pass would be a harness excusing the server from existing** — this series'
+signature failure. Raised with the controller; not blocking.
+
+**Rig behaviours a scenario must work with:** `goOnline()` THROWS if any claim remains queued after the
+flush · `goOnline()` flushes then catches up, the INVERSE of the product, so call `syncDown()` first
+where the intermediate state matters (measured benign for S1/S2, **not measured for S5**) · do not
+`snapshotPass()` then create a client and call `ds.query.getTicket` (product defect M3) ·
+`engine.settled()` deadlocks while offline.
 
 ## ⚠️ THE FOUR THINGS A RESTART MUST KNOW BEFORE TOUCHING T14
 
