@@ -25,7 +25,7 @@ the brief's Sonnet gating does not apply; rulings are taken in-session.**
 | `main` | **`fdd3bad`** — fourteen merges this context, in order: #127 · #121 (T17, `dca435d`) · #125 (closure 2, `7bb93cc`) · #129 · #130 · #128 (closure 3, `e407bf5`) · #131 · #126 (T14+T15, `c7c2b8e`) · #132 · #133 · #135 · **#137** (Lane A closure 2b, `c25d7fe`, CI green at `973ed0b`; gate at `a173cd6`, one docs line after) · **#136** (Lane D Plan 11 T7+T8, `a1252bc`, CI green at `1d4f6b5`) · **#138** (11/7 + 11/8 promoted, `fdd3bad`). Every `gh pr merge` exit read from `$?` on its own line |
 | ledger | **`CHECK_EXIT=0` · 162/177 (91.5%)** · claimed 0 · in-flight 0 · todo 15 · Plan 10 **17/18** (T18 open, held on §12 stability) · Plan 11 **3/16** (T5 landed on Lane E's branch, unmerged; T7, T8 done; T14 in PR) — every promotion independently re-run at the PR's exact tree, node 22 |
 | last forced gate | **`a1252bc`** (code-identical to `fdd3bad`) — ONE backgrounded invocation under the lock (queued 3 min behind a lane, acquired 03:28:29, released clean), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m29.5s · node v22.22.2** · zero `Unsupported engine` · **3319 tests / 253 files** — domain 464 · rule-engine 282 · **server 1042** (+46 = D's six seed suites) · **app-core 1092** (+6 = closure 2b) · web 136 · editor 178 · ui 37 · sync-client 63 · desktop 5 · mobile 20. Matches Lane D's 1042 and reconciles Lane A's 3273 (pre-#136) + 46. *(`c25d7fe` itself was not gated locally — CI at `973ed0b` plus Lane A's own 30/30 covered it, and this gate followed within minutes; previous: `c7c2b8e` 3267, `e407bf5` 3254, `7bb93cc` 3254.)* |
-| open PRs | **#134** (Lane C, Plan 11 T14: the eight-job `ci.yml` — its own new workflow was FULLY green at `e78212b`, all eleven jobs; now CONFLICTING on `test-cases/13` add/add after #136, **rebasing with its amendment** (root-scripts statement + §13 header); merges at the new head after reading job steps; then **promote 11/14** and restart C onto T15 — override staged) · **#139** (Lane B, closure 5 under P37, `13586c6`/`4253fad`, 30/30 · 3280 tests · server 1008 · 0 cached; **HELD for its Fable branch-level review**; then merge, restart B onto closure 5b + T18 — override staged). Expected next: Lane A closure 4 stacked past #137's squash (`exec/26-provenance-block`, server+client halves committed); Lane E seam 1 (T2 in flight, 16 commits, 3285 tests at `1394396`); Lane D T9+T10 (restarted 03:24 on `exec/27-plan11-seed-runners`). |
+| open PRs | **three, all HELD on their lanes' reviews, none on the controller:** **#134** (Lane C T14, rebased at `dcdd310` — its own eight-job workflow fully green there; amendment pending: 13.7/13.8 flipped to ❌ because T15's artefacts are not in the PR, the root-scripts statement, the §13 header, and the new **`scripts/check-case-ids.mjs`** gate) · **#139** (Lane B closure 5, rebased at `f13264e`, Fable branch review in flight) · **#141** (Lane A closure 4 under P36, gate green at `badfce9`, Fable branch review in flight). Merge order = arrival of the verdicts; whichever of #139/#141 lands second rebases (file lists exchanged). Then: promote 11/14, restart C → T15 and B → closure 5b + T18 (overrides staged). Expected next: Lane D T9+T10 (`exec/27-plan11-seed-runners`, workflow running); Lane E seam 1 (21 commits, T2 mid-implementation: `src/http/`, `@fastify/cors`, HTTP-Origin). |
 | watch | **re-armed as a `Monitor` task** (this session's `ctl-watch.sh`, 120 s poll: `origin/main`, open-PR set with head+mergeable, per-PR check-run state, pane set; sentinel-initialised so the zero→one PR transition IS reported). It is a child of this session and dies with it — re-arm at every relaunch |
 | machine | swap **3.8 GB of 5 GB used at 02:08, 3.6 at 02:26**, ~76 MB free pages — five lanes plus their fan-outs. The gate lock keeps pools at one at a time; nothing crashed. Not a blocker; watch it |
 | watchdogs | `launchctl list`: limit-resumer, net-resumer, idle-nudger all present (the nudger still does not submit — memory file) |
@@ -187,8 +187,8 @@ a `test-cases/NN` file carries an allocation header, because two lanes minting f
 collision anyone can see until rebase.**
 
 **Lane session names rotated with the relaunches** — `ListAgents` is the source; these are for the reader:
-A `gisik-nokma-exec-06` · B `lane2-plan4-83` · C `lane3-plan7-8-3b` · D `lane4-periphery-ee` · E
-`lane5-plan11-1d`. A `SendMessage` to a dead name fails loudly with the live suggestion; not a trap, noted.
+A `gisik-nokma-exec-06` · B `lane2-plan4-83` · C `lane3-plan7-8-3b` · D `lane4-periphery-9d` (after its
+03:24 restart) · E `lane5-plan11-1d`. A `SendMessage` to a dead name fails loudly with the live suggestion; not a trap, noted.
 
 **#134 (Lane C, T14) at `e78212b` — HELD for an amendment before merge:** Plan 11 T14's `Files:` block
 declares `Modify: root package.json (scripts test:fixtures, test:dual-client)` and the PR does not touch
@@ -198,6 +198,100 @@ omission and what runs the dual-client suite instead (the sharded `server-tests`
 time), `e2e` (detect-only until T13) green; `check-env` green (with the new `.skipIf(`-coverage
 trip-wire); `build` → `typecheck` / `server-tests` (4 shards, `postgresql-client-16` pinned with a
 version check, `check-no-silent-skips.mjs`) / `other-tests` pending at this writing.
+
+### RULING P37.1 (2026-09-06 03:50, controller as ruling tier) — the push-shaped grant backfill WEDGES; disclosed and capped now, made pull-shaped and client-presented under closure 5b(d)
+
+**Found by #139's Fable branch review (8 raised, 6 survived refutation, one Important), traced link by link
+and refused refutation.** Before closure 5, every envelope the hub sent advanced a cursor; a backfill
+inverts that by construction — **every backfilled envelope is `≤ afterSeq`, so none moves any cursor, and
+the only one that does (the trigger) is yielded after the whole subtree's history.** `hub.ts` closes with
+1013 `slow-consumer` at `bufferedAmount > 1 MB` and detaches; no `caught-up` is sent; the engine persists
+its cursor only in `onCaughtUp`; app-core's `lastSeq = Math.max(...)` cannot move on envelopes below its
+own `afterSeq`; `needsBootstrap` refuses to re-bootstrap over a local baseline. **The client reconnects at
+the same cursor, receives the identical burst, is closed again — permanently and silently.** Independently:
+the per-trigger unit is the full pre-cursor history of an inheriting subtree read with `afterSeq = 0`, and
+`check-permission.ts` does not refuse a `visibility.set` that sets the mode a ticket already has, so a
+member can make the server re-walk and re-stream the subtree to every subscriber per commit. (The verifier
+did not MEASURE buffer growth; the amplification half does not depend on that.) **The cheap fix is unsafe
+and Lane B checked before proposing it:** yielding the trigger first makes `refoldTicket` replay a
+`ticket.reparented` for a client with no `ticket.created`, and `applyTicketEvent` throws — the engine's
+terminal stall.
+**RULING: Lane B's recommendation.** In #139 now: **(2) disclose** — the wedge is its own ❌ case with the
+mechanism in the line and owner closure 5b; **(1) cap the candidate walk** with a documented maximum and a
+truncation case; the trigger stays AFTER the burst. **Closure 5b gains (d), the real fix without the
+per-subscriber server state `visibleEventsFor` deliberately lacks: the grant side becomes PULL-SHAPED and
+CLIENT-PRESENTED, the narrow side's own principle.** The hub pushes only the trigger plus the ids it newly
+admits (a bounded notice); the client pulls each ticket it does not hold through a per-ticket bootstrap door
+(the rig's `bootstrapTicket` restates one; if no route exists it is (d)'s first artefact) BEFORE applying
+the trigger, persisting as it goes. A cut-short session resumes by pulling what it lacks; a repeated no-op
+`visibility.set` costs a holding client nothing (the amplifier is bounded by holdings, not by trust in
+`check-permission`); the refold hazard closes by *bootstrap-before-apply on any event for an entity not
+held* — the rule a replica needs for `ReplicaGapError` anyway. Excluding fixtures carry over; the wedge
+case flips to ✅ only when a slow-consumer close mid-pull is followed by convergence on reconnect.
+**Also from the review, kept:** 12.277's positive control was VACUOUS — `toContain(ticket)` passed because
+the narrowing event itself carries the ticket id, so it would have passed against an empty
+`grantBackfillFor`; now asserted by pre-cursor event id. A check passing for a reason unrelated to the
+property it names, in the case written to demonstrate that discipline.
+
+### RULING P38 (2026-09-06 03:45, controller as ruling tier; TO BE PUT BEFORE THE OWNER after the fact, revocable in a word) — the HELD pair's admin/member half: `WorkspaceRef.projects` is `eff.projects` for every role except owner
+
+**Lane A escalated before building, as P32 wrote into itself.** `canSeeResolved` (`visibility/can-see.ts:94`)
+settles three of four roles: owner → `true` unconditionally; guest → P32 (`eff.projects` and nothing
+else); admin/member → `workspace` mode true, `project` mode `eff.projects.has(v.projectId)` with the
+"no admin bypass — deliberate" comment. **The gap: a PROJECT has no `resolvedMode`** — the rule decides
+against a ticket's audience and a project has none — so two readings follow from the same switch: (a) all
+projects (the `workspace`-mode branch read across) or (b) only `eff.projects` (the `project`-mode branch).
+Measured fact that narrows it: an admin/member ALREADY receives the project IDs of projects they are not
+in — `TicketCard.projectId` (`read/ticket-cards.ts:138`) on any workspace-mode ticket — so existence is
+disclosed today through the ticket surface; the new disclosure would be the NAME only.
+**RULING: (b).** It is an APPLICATION, not a new rule: **P32 already ruled `WorkItem.projectName` for
+ALL viewers, role-independent** — *served iff the project is in `eff.projects`, otherwise the item carries
+the id and no name* — and stated the principle generally (*a project's NAME is itself a disclosure and is
+not served for any other project*). `WorkspaceRef.projects` is the same question one door over. The
+strangeness (an admin sees a project's workspace-mode tickets but not its name) is a shape P32 already
+accepted for the my-work item. **Tie-break: naming a thing whose id you already hold is a WIDENING, and
+widenings are reversible; narrowing after a disclosure is not** — the same direction 6.101's ruling
+chose. Owner sees all, pinned by its own case so the switch's exemption is a tested fact. Excluding
+fixtures on both doors, admin and member separately: not in project Y → neither Y's name nor id in the
+projects list, and Y's id with no name on a my-work item; mutate the `eff.projects` check to permit → red,
+alone. `Features.md` says a partial workspace is the correct answer for admin/member as it does for
+guests. If the owner prefers (a), the change is a widening on a branch, not a rollback.
+
+### THE CASE-ID RECOUNT WAS BLIND TO ITS OWN SUBJECT — three id styles, one grep (2026-09-06 03:30, Lane B, refined by Lanes E and C)
+
+`test-cases/12` carries ids as `- 12.274 🚫 …` (plain) AND `- **12.240** ✅ …` (bold, Lane A's closure 2b);
+`test-cases/13` adds a third, `- 🧪 **13.1 — …` (marker first, Lane C). **The control every lane cites —
+"recount the maximum against `origin/main` at rebase", run as `grep -o '^- 12\.[0-9]*'` — sees ONE style
+and reported "zero duplicates" through a collision it structurally could not see.** Lane B measured at
+its rebase: plain 215, bold 4, union 219, max 12.289, zero duplicates — and its earlier "215, zero
+duplicates" was correct for its tree and blind by method, which is the honest way to record it. Lane E:
+§12 on `main` = 200 plain + 4 bold; its own marker-first matcher returned **0 on all three real files,
+indistinguishable from a matcher that cannot fire**, resolved only by a synthetic file carrying every
+spelling — *a zero from a matcher you have not seen fire is not a measurement* (the `pgrep`/pool-matcher
+lesson, again). **Rules now:** ids are extracted from the LINE HEAD only (`^- (\S+ )?\*{0,2}(NN\.\d+)`;
+prose cites ids and a citation is not a definition); per-style counts are printed as the positive
+control and **the union is compared against their SUM — `union < sum` is the machine-readable signal
+that a style is being missed.** **`scripts/check-case-ids.mjs` (Lane C, in #134's amendment, wired into
+`check-env`, BLOCKING)** implements this with a checked-in fixture asserting known counts (bare 1, bold 1,
+marker-first 2, union = sum = 4, citation excluded) so the script's own blindness is a test failure. It
+found its first bug in itself (a greedy marker group swallowing `**7.1,` and reporting a false duplicate
+at 7.2) and its first true positives in `test-cases/07`: two "Reserved-block disposition" bullets that
+lead with a bare id (`- **7.1, 7.2 — written by this task.**`, `- **7.35 — …**`) beside the real entries.
+**Ruling: reworded in the same PR, no exception, no section heuristic** — a documented exception is a
+check that cannot fail for exactly the shape it exempts, and making the repo pass the gate a PR
+introduces is the same-change-set rule applied to a gate (#85's precedent).
+
+**Nullable describes the VALUE; additive describes the CONSTRUCTOR (Lane A, closure 4, #141).** P36(b)
+said the bootstrap field is ADDITIVE; the first draft wrote `provenance: SnapshotProvenance | null`, which
+is nullable and not additive — every existing constructor, including Lane B's rig, had to write
+`provenance: null`, and the rig stopped compiling. Now optional on the wire. The asymmetry is deliberate:
+the server's own `Snapshot` ROW type keeps it REQUIRED, because that is what surfaced `snapshot-refresh.ts`
+as a compile error instead of a NULL written over a good block — a wire payload with foreign constructors
+versus a row this code owns. **And the honest fixture overlap:** option 3 kills {12.244}; removing the
+carry-forward kills {12.244, 12.245} — not orthogonal, and left recorded rather than split, because two
+mutations with two different failure sets is what identifies the fault; manufacturing separation would
+remove the second pass that makes 12.244 exercise the carry-forward at all. `BoardCard.cause` is narrowed
+rather than served on the snapshot-bounded path — ❌ case owed, owner P36.
 
 ### Carried this context, with owners
 
