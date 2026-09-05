@@ -284,10 +284,16 @@ describe('the single read carries the rollup — true totals with the restrictio
     // answer where `3` used to be. `terminal: 0` is unchanged and is a fact
     // about the seed's `open` state, not a placeholder — the control below is
     // what keeps these four numbers from being an arithmetic accident.
+    // THE KEY NAMES ARE THE ASSERTION, not decoration. This route used to
+    // serve `rollupFor`'s own `RollupView` spelling (`total`/`terminal`/
+    // `uncategorized`), which no client reader on the `/v1` surface can read:
+    // `mapRollup` reads `TicketRollup`, so every ticket WITH CHILDREN came back
+    // a `MappingError` while leaves mapped fine. An exact `toEqual` is what
+    // makes this a check rather than a hope — a renamed key fails it.
     expect(res.json().rollup).toEqual({
-      total: 3,
-      terminal: 0,
-      uncategorized: 0,
+      totalChildren: 3,
+      terminalChildren: 0,
+      uncategorizedChildren: 0,
       restrictedCount: 1,
     });
 

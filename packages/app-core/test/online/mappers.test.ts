@@ -1046,6 +1046,59 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     expect(read.title).toBe('File the GST return');
   });
 
+  /**
+   * THE CASE EVERY OTHER TICKET-READ CASE SKIPS, and the reason it is written
+   * out rather than folded into one of them: `ticketReadBody`'s `rollup`
+   * defaulted to `null`, so all four cases above exercise a LEAF, and the
+   * branch that reads the rollup's keys was never entered. `getTicket` was
+   * recorded as SERVED on the strength of those four, and it answered a
+   * `MappingError` for every ticket that has children — the whole app-core
+   * suite green throughout.
+   *
+   * A fixture default is not neutral. `rollup: null` reads as "unset" and is
+   * in fact a choice of the one shape that skips the mapper's only branch.
+   */
+  it('maps a ticket that HAS CHILDREN — the branch four leaf fixtures never entered', () => {
+    const read = mapTicketRead(
+      ticketReadBody(
+        { kind: 'ticket', id: 'parent-1', title: 'Quarterly filings' },
+        { totalChildren: 3, terminalChildren: 1, uncategorizedChildren: 0, restrictedCount: 1 },
+      ),
+    );
+    // THREE keys, not four: `RollupToViewer` has no `uncategorizedChildren`
+    // field, and `mapRollup` refuses outright when that count is non-zero
+    // rather than rendering an admittedly incomplete total as a complete one.
+    // An exact `toEqual` is what says so — `toMatchObject` would have passed
+    // whether the key were dropped, kept, or renamed.
+    expect(read.rollup).toEqual({
+      totalChildren: 3,
+      terminalChildren: 1,
+      restrictedCount: 1,
+    });
+    // The control in the same run: a leaf still answers null, so this is a fact
+    // about the rollup branch and not about the mapper having stopped refusing.
+    expect(mapTicketRead(ticketReadBody({ kind: 'ticket', id: 'p', title: 't' })).rollup).toBeNull();
+  });
+
+  it("REFUSES rollupFor's own spelling, so a route regressing to it cannot pass silently", () => {
+    // `RollupView` — `{total, terminal, uncategorized, restrictedCount}` — is
+    // what `rollupFor` computes and what this route used to serve verbatim.
+    // The client has exactly ONE rollup vocabulary (`TicketRollup`, the shape
+    // `assembleTicketCards` already translates every card into), and a body in
+    // the other spelling is a body it cannot read. Pinning the REFUSAL matters
+    // more than pinning the success: the failure this guards against is the
+    // route quietly reverting, and a mapper that coerced the other spelling
+    // would hide that forever.
+    expect(() =>
+      mapTicketRead(
+        ticketReadBody(
+          { kind: 'ticket', id: 'parent-1', title: 'Quarterly filings' },
+          { total: 3, terminal: 1, uncategorized: 0, restrictedCount: 1 },
+        ),
+      ),
+    ).toThrow(MappingError);
+  });
+
   it('refuses a parent whose kind it does not know rather than reading it as no parent', () => {
     // `null` means "this ticket is a ROOT" — a statement about the work. A body
     // that could not be read must not become one.
@@ -1054,7 +1107,10 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     );
   });
 
-  function ticketReadBody(parent: Record<string, unknown>): Record<string, unknown> {
+  function ticketReadBody(
+    parent: Record<string, unknown>,
+    rollup: unknown = null,
+  ): Record<string, unknown> {
     return {
       // The `proj_visibility` row the route still serves. The client reads
       // nothing from it; it is here because the real body carries it.
@@ -1098,7 +1154,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
         cause: null,
       },
       parent,
-      rollup: null,
+      rollup,
     };
   }
 });

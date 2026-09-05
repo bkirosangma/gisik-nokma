@@ -1,5 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import type { TicketState } from '@gisik-nokma/domain';
+import type { TicketRollup, TicketState } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
 import { stateProvenanceFor } from '../read/state-provenance.js';
@@ -380,11 +380,37 @@ export function registerTicketRoutes(
       // 404. The leak is NOT observable through the responses — the 404 body is
       // fixed and identical either way — so it is recorded (case 6.85) rather
       // than pinned by a test that could only pass for the wrong reason.
-      const rollup: RollupView | null = await rollupFor(
+      const rollupView: RollupView | null = await rollupFor(
         deps.pool,
         request.currentUserId,
         ticketId,
       );
+
+      // TRANSLATED to `TicketRollup`, not served as the `RollupView` it arrives
+      // as, and the translation is the same one `assembleTicketCards` performs
+      // for every card (`read/ticket-cards.ts`). Returning `rollupFor`'s own
+      // shape here put a SECOND rollup spelling on the `/v1` surface: cards
+      // carried `totalChildren`/`terminalChildren`/`uncategorizedChildren` and
+      // this one route carried `total`/`terminal`/`uncategorized`. The client's
+      // `mapRollup` reads the first spelling and is the only rollup reader it
+      // has, so this route answered a `MappingError` for every ticket that HAS
+      // CHILDREN while every leaf mapped fine — a gap recorded CLOSED that was
+      // closed only for the case the fixtures used.
+      //
+      // `RollupView` is a VISIBILITY type (it is what `rollupFor` computes,
+      // restricted count and all); `TicketRollup` is the read-model the `/v1`
+      // surface is defined in. Serving the former was leaking an internal
+      // spelling, which is why the fix belongs here rather than in a second
+      // client-side reader.
+      const rollup: TicketRollup | null =
+        rollupView === null
+          ? null
+          : {
+              totalChildren: rollupView.total,
+              terminalChildren: rollupView.terminal,
+              uncategorizedChildren: rollupView.uncategorized,
+              restrictedCount: rollupView.restrictedCount,
+            };
 
       const provenance = await stateProvenanceFor(deps.pool, [ticketId]);
       const stateProvenance = provenance.get(ticketId);
