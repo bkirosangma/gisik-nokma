@@ -180,7 +180,7 @@ describe('12.154–12.155 recorded hazards on the replica, pinned as executable 
    * `ticket.transitioned` in the RESPONSE's tail (`ticket.events`), and it is
    * the SERVER's, because only a server-written snapshot above the event can
    * repair it — `apps/server/src/sync/snapshot-refresh.ts` now writes one on
-   * every version-raising publish (server cases 12.156–12.158), which closes
+   * every version-raising publish (server cases 12.189–12.191), which closes
    * that hazard and leaves THIS one exactly where it was.
    * Here `events` is `[]` on BOTH bootstraps — written out below, since that
    * emptiness is the whole distinction — and the throwing row is a LOCALLY

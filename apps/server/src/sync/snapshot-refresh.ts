@@ -105,8 +105,8 @@ const EMPTY: SnapshotRefreshOutcome = { rewritten: [], skipped: [] };
  * written — the test file added in the same commit as this module pins the
  * ordering. *Measured 2026-09-04: the `refreshSnapshotsForWorkflowPublish` call
  * in `ingest-service.ts` moved to sit AFTER the projection loop and nothing else
- * changed — `Test Files 2 failed (2)`, `Tests 4 failed (4)`; 12.156, 12.157 and
- * 12.159 all on `applyTicketEvent: workflow "…" has no state "doing"` and 12.158
+ * changed — `Test Files 2 failed (2)`, `Tests 4 failed (4)`; 12.189, 12.190 and
+ * 12.192 all on `applyTicketEvent: workflow "…" has no state "doing"` and 12.191
  * on the row list.* Every case that pins this module reds, which is what a
  * no-op means here. What a reader must not carry away is that the ordering is
  * unguarded; what stays true is that getting it wrong is a silence rather than
@@ -150,7 +150,7 @@ const EMPTY: SnapshotRefreshOutcome = { rewritten: [], skipped: [] };
  *   met a version-raising publish is in this case. It is a FIRST-publish cost per
  *   ticket rather than a standing one: this door leaves a row at that ticket's
  *   head, so its next publish resumes from there — the same induction the
- *   `belowWorkspaceSeq` section above runs, with 12.159's fixture as its base
+ *   `belowWorkspaceSeq` section above runs, with 12.192's fixture as its base
  *   case. The cost is deliberate, and the saving that suggests itself is a
  *   regression: a ticket with no snapshot is served its FULL history by
  *   bootstrap, and that history holds the offending `ticket.transitioned` too —
@@ -159,11 +159,11 @@ const EMPTY: SnapshotRefreshOutcome = { rewritten: [], skipped: [] };
  *   DELETING a superseded snapshot, reached from the other end. *Measured
  *   2026-09-04 with `AND EXISTS (SELECT 1 FROM snapshots …)` added to the
  *   candidate query below — the narrowing an outside review proposed — `Tests 1
- *   failed | 3 passed (4)`: 12.159 throwing `applyTicketEvent: workflow "…" has
- *   no state "doing"` while 12.156–12.158, every one of which uses a ticket that
+ *   failed | 3 passed (4)`: 12.192 throwing `applyTicketEvent: workflow "…" has
+ *   no state "doing"` while 12.189–12.191, every one of which uses a ticket that
  *   HAS a snapshot, stayed green.*
  * - **It therefore writes rows the background pass would not.** Measured in
- *   12.159: a ticket holding two events comes out of a publish with a snapshot
+ *   12.192: a ticket holding two events comes out of a publish with a snapshot
  *   at seq 2, eighteen events below the threshold whose whole purpose is to keep
  *   such rows out of the table. That is a CONSEQUENCE of the bullet above rather
  *   than a second decision — the row is the repair — and a `minEvents` guard

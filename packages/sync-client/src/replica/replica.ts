@@ -415,7 +415,7 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
    * client-side fold can repair it, because the fix is a snapshot ABOVE the
    * offending event: the server has to re-snapshot the tickets it folds when a
    * workflow is published. It now does — `apps/server/src/sync/snapshot-refresh.ts`,
-   * wired into the ingest transaction, server test cases 12.156–12.158. What it
+   * wired into the ingest transaction, server test cases 12.189–12.191. What it
    * does not reach is a tail that already spanned an older state-dropping
    * publish before that shipped; such a ticket is skipped there and still
    * arrives here able to throw.

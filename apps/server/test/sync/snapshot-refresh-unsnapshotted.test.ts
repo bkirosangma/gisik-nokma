@@ -19,14 +19,14 @@ import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
 /**
- * Case 12.159. The publish door repairs a ticket that has NO snapshot, and the
+ * Case 12.192. The publish door repairs a ticket that has NO snapshot, and the
  * candidate query's ABSENCE of a snapshot-existence filter is what makes that
  * happen.
  *
  * ## Why this is a separate file from `./snapshot-refresh.test.ts`
  *
  * That file's fixture snapshots BOTH its tickets at seq 21 before the publish,
- * and 12.158 asserts the WHOLE `snapshots` table. Adding a never-snapshotted
+ * and 12.191 asserts the WHOLE `snapshots` table. Adding a never-snapshotted
  * ticket to it would change those row lists — and those lists are quoted as a
  * historical mutation record in `test-cases/12-offline-sync-apps.md`, which
  * updating would falsify. A ticket with no snapshot is also a different fixture
@@ -42,7 +42,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * reading of "invalidation", and a remedy an outside review actually proposed to
  * spare the publish a full replay — passes all three of those cases and breaks
  * this one. Measured, both directions; the mutation record is in
- * `test-cases/12-offline-sync-apps.md` under 12.159.
+ * `test-cases/12-offline-sync-apps.md` under 12.192.
  *
  * The reason the narrowing is wrong is the same argument the module's docblock
  * already makes about DELETING a stale snapshot: a ticket with no snapshot is
@@ -51,7 +51,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * to repair" — the repair is a snapshot ABOVE the offending event, and a ticket
  * with none needs one MORE than a ticket that has one.
  *
- * The fixture is therefore the 12.156 fixture with the snapshot step removed:
+ * The fixture is therefore the 12.189 fixture with the snapshot step removed:
  * two events on the ticket, the second of them the transition into the state v2
  * drops.
  */
@@ -230,7 +230,7 @@ afterAll(async () => {
 });
 
 describe('refresh on publish, snapshot door — a ticket with no snapshot', () => {
-  it('12.159 a publish repairs a ticket that never crossed SNAPSHOT_MIN_EVENTS, writing its first snapshot at head', async () => {
+  it('12.192 a publish repairs a ticket that never crossed SNAPSHOT_MIN_EVENTS, writing its first snapshot at head', async () => {
     // The pre-state, printed rather than counted, and the positive control in
     // one: the table is empty, the served payload is full history, and that
     // full history REPLAYS CLEAN while v1 is still the newest version. So a
@@ -253,7 +253,7 @@ describe('refresh on publish, snapshot door — a ticket with no snapshot', () =
     const result = await publish(wfV2);
     expect(result.status).toBe('committed');
 
-    // Asserted in this order on purpose, following 12.156: the DAMAGE first,
+    // Asserted in this order on purpose, following 12.189: the DAMAGE first,
     // the mechanism second. Without the repair this line does not fail an
     // equality — it throws `applyTicketEvent: workflow "…" has no state
     // "doing"` out of the fold, which is the defect itself and not a
@@ -275,7 +275,7 @@ describe('refresh on publish, snapshot door — a ticket with no snapshot', () =
 
     // The repair is a snapshot above the offending event, never a rewrite of
     // history: the `ticket.transitioned` into the dropped state is still in the
-    // ledger, exactly as 12.156 asserts for the snapshotted case.
+    // ledger, exactly as 12.189 asserts for the snapshotted case.
     const client = await db.pool.connect();
     try {
       const all = await readEntityEvents(client, 'ticket', TICKET);

@@ -20,7 +20,7 @@ import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
 /**
- * Cases 12.156–12.158. Publishing a workflow version invalidates the snapshots
+ * Cases 12.189–12.191. Publishing a workflow version invalidates the snapshots
  * standing on the version it supersedes.
  *
  * ## The sequence, and why every step of it is needed
@@ -43,11 +43,11 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * fixture:
  *
  *  - `runSnapshotPass` after the publish: `applyTicketEvent: workflow "…" has
- *    no state "doing"` (the server's own door, 12.157)
+ *    no state "doing"` (the server's own door, 12.190)
  *  - replaying the served payload the way a replica does: the same error
- *    (12.156)
+ *    (12.189)
  *
- * That is why 12.156 asserts on the REPLAY of the response rather than on the
+ * That is why 12.189 asserts on the REPLAY of the response rather than on the
  * route returning 500. A test asserting the route throws would have been green
  * before and after, and would have distinguished nothing.
  *
@@ -315,7 +315,7 @@ afterAll(async () => {
 });
 
 describe('refresh on publish, snapshot door', () => {
-  it('12.156 a publish that drops a state re-snapshots the ticket at its head, and the bootstrap payload it then serves replays clean', async () => {
+  it('12.189 a publish that drops a state re-snapshots the ticket at its head, and the bootstrap payload it then serves replays clean', async () => {
     // The pre-state, printed rather than counted: a snapshot at 21 under
     // version 1, and a tail carrying the transition into the state about to be
     // dropped. Without this, a fix that produced an EMPTY tail by losing events
@@ -387,7 +387,7 @@ describe('refresh on publish, snapshot door', () => {
     expect(all.map((e) => `${e.seq}:${e.type}`)).toContain('22:ticket.transitioned');
   });
 
-  it("12.157 the background pass resumes over the refreshed snapshot instead of throwing on the old vocabulary", async () => {
+  it("12.190 the background pass resumes over the refreshed snapshot instead of throwing on the old vocabulary", async () => {
     // At `18b749c` this threw `applyTicketEvent: workflow "…" has no state
     // "doing"`: the pass resumed from the seq-21 snapshot and re-folded event
     // 22 against v2, which no longer has the state that event names. It is a
@@ -409,7 +409,7 @@ describe('refresh on publish, snapshot door', () => {
     ]);
 
     // And it keeps working on new events written in the new vocabulary. Only
-    // TICKET moves, so TICKET2 stays at head 22 — which is what makes 12.158's
+    // TICKET moves, so TICKET2 stays at head 22 — which is what makes 12.191's
     // in-place update and its added row two distinguishable outcomes rather
     // than one.
     await applyCommitted(db.pool, [
@@ -420,7 +420,7 @@ describe('refresh on publish, snapshot door', () => {
     expect(await replayServed()).toMatchObject({ stateId: 'done', workflowVersion: 2 });
   });
 
-  it('12.158 a publish that moves no state still re-stamps the head snapshot IN PLACE, and a first publish with no tickets writes nothing', async () => {
+  it('12.191 a publish that moves no state still re-stamps the head snapshot IN PLACE, and a first publish with no tickets writes nothing', async () => {
     const wfV3 = {
       id: WF,
       version: 3,
@@ -435,7 +435,7 @@ describe('refresh on publish, snapshot door', () => {
         { from: '*', to: 'todo', rules: [] },
       ],
     };
-    // 12.157 left the ticket snapshotted at seq 23 under v2, and the ticket's
+    // 12.190 left the ticket snapshotted at seq 23 under v2, and the ticket's
     // head has NOT moved since — no publish appends to a ticket's stream. So
     // this refresh lands on a seq that already has a row, which is the ordinary
     // case for the publish door and the one `writeSnapshot`'s bare INSERT dies
