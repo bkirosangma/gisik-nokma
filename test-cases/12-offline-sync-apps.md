@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.192`. THE NEXT FREE ID IS `12.193`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.223`. THE NEXT FREE ID IS `12.240` — NOT `12.224`.** **`12.224`–`12.239` ARE RESERVED**: 12.224–12.227 to Lane D (Task 17, Expo) and 12.228–12.239 to Lane C (Task 16, Tauri), by a cross-lane allocation taken 2026-09-06 after this file collided twice in one day. **Ids in §12 are now ALLOCATED, not discovered** — a lane takes its assigned range and does not read the next number off this line, because that is precisely what two branches did simultaneously, from correct readings, and collided. The recount rule below still applies to what is IN USE; it is the NEXT-FREE half that a lane may no longer derive for itself.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.193-12.223 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, and said `12.215` until Ruling P34's follow-up added 12.216-12.219, and said `12.219` until THIS branch's own rebase onto closure 1 moved Task 13's four colliding ids to 12.220-12.223 — the SECOND time in this file that two branches minted the same range from this one line off different fork points, and the clause above records the first. Both times both sides obeyed never-renumber and collided anyway, because that rule protects LANDED ids and neither branch can see the other. The range is re-checked against `main` at REBASE, not only at authoring, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives). Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -29,13 +29,15 @@ Task 7: `POST /v1/sync`. Task 9: the replica (12.119–12.137). Task 10: the out
 pre-check (12.138–12.153). Task 11: the sync engine and its HTTP/WS transport (12.156–12.171, the last two from its fix round).
 Task 12: the replica `DataSource` (12.172–12.187), which lives in `packages/app-core` and is the first
 part of this bucket that does. **Plus ONE section that belongs to no plan task at all**: refresh on
+Task 13: app-core's offline/sync UX (12.193–12.223), which also lives in `packages/app-core`.
 publish, snapshot door (12.189–12.192) — the snapshot-invalidation gap the ledger row for Task 5 flags
 in its own notes (`docs/lanes/task-ledger.tsv`, commit `b65f6fb`). It was carried with no owner, it
 gets no ledger row, and it is catalogued here because the surface it fixes is this bucket's, not
 because a task claims it. Nothing else from Plan 10 is catalogued — Task 8 (the `sync-client` scaffold
-and the storage seam), Task 13 (app-core's
-offline UX), Tasks 14–15 (the dual-client harness and its scenarios) and Tasks 16–17 (the two app
-shells) are absent rather than missing. **Task 12 came off that absent list in the change set that
+and the storage seam), Tasks 14–15 (the dual-client harness and its scenarios) and Tasks 16–17 (the two app
+shells) are absent rather than missing. **Task 13 came off that absent list in the change set that
+landed it**, together with the HIGHEST-ID line, its running parenthesis, and the section enumeration
+above — all four in one edit, which is what the sentence after this one exists to enforce. **Task 12 came off that absent list in the change set that
 landed it**, together with the HIGHEST-ID line and the section enumeration above — the omission that
 produced two of this work's false claims was updating one of those three and not the others. **Task 8's absence is measured, not assumed**: this file has no
 Task 8 section and no case id for it. **The command this sentence used to quote is the wrong command,
@@ -1459,3 +1461,152 @@ already makes against DELETING a superseded snapshot, reached from the other end
   rather than dead code.
 - **No case asserts the route's own 500-or-not.** It does not throw, before or after — asserting that
   it did would have been a check that could not fail.
+
+
+## Task 13 — app-core's offline/sync UX (`packages/app-core`)
+
+The contested-claim banner and its three resolutions, the offline reopen pair, the clock-skew flag and
+the sync-truth strip. Five source files, four test files, all under `packages/app-core`. **Two cases
+here exist because the plan text's own prescribed tests could not fail**, and they are marked as such
+rather than folded in silently.
+
+### The offline reopen pair — `test/reopen-pair.test.ts`
+
+- 12.220 ✅ `buildReopenPair` emits the parent's `ticket.transitioned` FIRST, carrying
+  `cause: { kind: 'reopened-for-child', childTicketId }`, then the child event byte-identical (same id,
+  same payload). Order is the contract: the caller enqueues them adjacently and the server sees the
+  same order at sync.
+- 12.221 ✅ **the check the plan's own test could not make.** The built payload is parsed through
+  `domainRegistry.get('ticket.transitioned', 1)`, the registration the ingest door itself consults, and
+  the plan text's spelling (`toStateId`) is built by hand in the same test and asserted to FAIL that
+  parse. *Plan 10 Task 13's published signature block prescribed `payload: { toStateId, cause }` and
+  asserted it with `toMatchObject` against an envelope the function had just built — green for any
+  spelling, including one the real door refuses. The schema names the destination `to`
+  (`packages/domain/src/workflow.ts:138`) and is not `.strict()`, so `toStateId` is stripped rather
+  than named and the parse fails on the missing required `to`.*
+  *Mutation: change `to:` back to `toStateId:` in `buildReopenPair` → red on 12.220 and 12.221 ALONE,
+  `Tests 2 failed | 3 passed (5)`, with 12.222 and 12.223 green — measured at this tree.*
+  Carries its own non-vacuity control: the negative half means a registry that answered `success: true`
+  for everything cannot leave this green.
+- 12.222 ✅ `nonTerminalStates` is NOT the reopen picker. On a definition with no declared
+  transitions it offers two states while `reopenStateOptions(def, 'done')` — the function the ONLINE
+  reopen dialog is fed from — offers none. Pinned so the two answers to "what may this parent be
+  reopened into" cannot be mistaken for one; if this ever goes green with equal arrays, either
+  `nonTerminalStates` grew a reachability filter (delete it) or the shipped picker lost one.
+- 12.223 ✅ the cause names the child ENTITY id, never the child EVENT id, with both asserted
+  distinct on the same envelope so a fixture reusing one id could not hide the mix-up.
+- 12.200 ✅ `nonTerminalStates` returns exactly the non-terminal states, in definition order.
+
+### The contested-claim banner and its resolutions — `test/contests.test.tsx`
+
+- 12.193 ✅ the banner names the claimant, the claim type, the refusing rule and its reason, prints
+  the instant in India time (`21 Aug 2026, 00:00 IST`) and never the raw ISO string, and offers all
+  three resolutions.
+- 12.194 ✅ **the banner's date is IST because the code says so, not because the machine is.** The
+  same assertion under `TZ=UTC`, `America/Los_Angeles` and `Pacific/Kiritimati`, with a probe FIRST
+  proving `process.env.TZ` actually moves the ambient clock in that worker (without it a green result
+  could come from `TZ` having been ignored). *Measured before writing: `packages/domain/test/` assigns
+  `process.env.TZ` on ZERO lines while `formatIstInstant` appears in two of its files — nothing
+  anywhere had varied the zone under this formatter.* The fixture instant is chosen so the UTC day and
+  the IST day differ, so a zone-dependent implementation gets the DAY wrong, not merely the hour.
+  *Mutation: `shifted.getUTCHours()` → `shifted.getHours()` in `packages/domain/src/clock-skew.ts`,
+  rebuilt → red on 12.194 naming its own zone (`under TZ=America/Los_Angeles: … received "21 Aug 2026,
+  17:00 IST"` — the label right, the hour the device's), and on 12.193 and 12.206 with it. Restored and
+  rebuilt; restoration verified by reading the file, not by a shell `diff`.*
+- 12.195 ✅ an offline-queued resolution propagates `OfflineAcceptError` and is NEVER laundered into
+  `ok: true`. The replica's `ingest` throws rather than returning a fourth status; catching it here
+  would put "the server accepted your discard" on screen for a discard the server has never seen.
+- 12.201 ✅ nothing renders when there is nothing contested. No empty chrome.
+- 12.202 ✅ nothing renders when every contest is already resolved.
+- 12.203 ✅ planted defect: "Redo legally" calls `onRedo` and NEVER `onResolve` with the contested
+  envelope as the replacement — that call would throw in `resolveContest`, so the banner must not be
+  able to make it.
+  *Mutation: rewire the Redo button to `onResolve(c, { resolution: 'redone', replacementEvent:
+  c.originalEvent })` → red on 12.203 ALONE, `Tests 1 failed | 12 passed (13)`.*
+- 12.204 ✅ a discard emits ONE `claim.contested_resolved`, attributed to whoever discarded, naming
+  the contested event id.
+- 12.205 ✅ a discard with no note carries no `note` key at all (asserted by exact key set, not by
+  `note === undefined`, which `toMatchObject` would satisfy either way).
+- 12.206 ✅ convert-to-comment emits `comment.added` carrying the claim text — claimant, rule and the
+  IST instant all surviving into a comment body that lives in the ledger forever — then the resolution
+  linking that comment's id.
+- 12.207 ✅ a redo sends the fresh replacement FIRST and links it from the resolution.
+- 12.208 ✅ a refused resolution comes back as the door's own `rule`/`reason`, not a sentence this
+  client invented.
+- 12.209 ✅ an `invalid` answer comes back as the door's `code`/`message`, not as a rule it never
+  named.
+- 12.210 ✅ planted defect: redoing with the contested envelope itself throws before `ingest` is
+  called at all. A redo is a fresh claim; re-sending the contested id would idempotently re-answer
+  `contested`.
+
+### The clock-skew flag and the sync-truth strip — `test/skew-and-status.test.tsx`
+
+- 12.196 ✅ the threshold is the domain's `GROSS_CLOCK_SKEW_MS` and it is INCLUSIVE: exactly at it
+  flags, one millisecond under does not. Read from the domain constant rather than a `600000` restated
+  here, so the case follows the threshold instead of going stale beside it. *A gate closing one end of
+  a range is a defect class this branch has already paid for.*
+- 12.197 ✅ no badge renders at all when the clocks agree.
+- 12.198 ✅ `connecting` and a queue-less `offline` both have labels; a clean client renders no
+  failure chrome, and the strip carries its status as a data attribute.
+- 12.211 ✅ no badge under the gross threshold. Both clocks are simply kept.
+- 12.212 ✅ planted defect: an 11-minute skew renders the flag in both directions, attributed to the
+  DEVICE clock ("device clock ran 11 min ahead of / behind the server"), never phrased as the event
+  having happened at the wrong time.
+- 12.213 ✅ an unparseable client claim is flagged *unreadable*, not hidden.
+- 12.214 ✅ an unparseable SERVER time is flagged the same way. The gate is symmetric.
+  *Mutation for 12.213/12.214: reorder `formatClockSkew` to gate on `clockSkewMs(env) === null` before
+  `hasGrossClockSkew` — the obvious-looking simplification, which returns `null` (no badge) for the
+  unreadable case → red on 12.213 and 12.214 ALONE, `Tests 2 failed | 6 passed (8)`.*
+- 12.215 ✅ the queue sentence is singular-aware and status-aware: `Live` · `3 claims waiting to
+  send` · `Offline — 3 claims waiting to send` · `Offline — 1 claim waiting to send` ·
+  `Catching up…`, and the rendered strip carries both the label and the "needs attention" count.
+
+### The classes and the stylesheet — `test/sync-ux-css-binding.test.tsx`
+
+- 12.199 ✅ the three components' BEM classes and the `ui.css` rules that style them are ONE fact,
+  tied by SET EQUALITY in both directions. *`ui.css` had no `gn-contest-banner`, `gn-clock-skew-badge`
+  or `gn-sync-status-bar` selector at all when these components were written (measured, with
+  `gn-inbox` as the positive control on the same file) — their class names bound to nothing, so the
+  token discipline the components' own interface contract names was not actually being consumed. The
+  rules were added in the same change set.* The technique is `inbox-css-binding.test.tsx`'s, and it
+  carries that file's cost: the fixture must render every conditional class, so `__action--discard`
+  needs an unresolved contest, `__failed` a non-zero count, and the badge a gross skew.
+  *Mutations, both directions: rename `gn-contest-banner__claim` → `…__claimx` in the component → red
+  on the equality case; delete the `.gn-clock-skew-badge` rule from `ui.css` → red on the equality case
+  AND on the harvest's own non-vacuity control, `Tests 2 failed | 1 passed (3)`.*
+
+### The stream error surface (Ruling P34) — `test/skew-and-status.test.tsx`
+
+- 12.216 ✅ no error, no notice, and no chrome for one — with `error` ABSENT and `error={null}` asserted
+  to mean the same thing, since the prop is optional precisely so a shell holding no engine yet can
+  mount the strip.
+- 12.217 ✅ **the notice may not claim a policy the engine does not implement.** Every code in the
+  domain's own `STREAM_ERROR_CODES` is asserted to produce a notice carrying the code verbatim, the
+  server's own message, and the words "still retrying" — and asserted NOT to contain "will not
+  reconnect". *Measured: `createSyncEngine` reconnects after an amendment-19 `error` frame on the same
+  delay as any other close, for all three codes; only `scope-revoked`, a different frame type, is
+  terminal. A surface saying otherwise would assert a decision on the engine's behalf — the same shape
+  as laundering "queued" into "accepted".* The loop reads the domain constant rather than a list
+  restated here, so a fourth code lands in it automatically, and carries a non-empty control so an
+  emptied constant cannot make it vacuous.
+- 12.218 ✅ an unrecognised code is printed raw rather than dropped for a friendlier sentence.
+- 12.219 ✅ the notice renders inside the strip BESIDE the label, not replacing it.
+
+### Carried, with owners — Task 13, as re-assigned by Ruling P34 (2026-09-06)
+
+All three of these named *"Plan 10 Task 13"* in code. Task 13's five files are the banner, the
+view-model, the reopen pair, the skew badge and the status bar — no ticket list, no `ListRow` renderer,
+no error surface among them — so all three named the next task touching app-core UX by NUMBER rather
+than by content. Raised as R-B1; **P34 ruled that none was Task 13's and that none stays unassigned.**
+
+- **An offline ticket list that unions `getTickets` with `listTicketSummaries`.** `OFFLINE_BORN_ABSENCE`
+  (`packages/app-core/src/replica/replica-data-source.ts`). *Owner: **Lane A, closure 2b** — an app-core
+  view/DataSource concern, queued after closure 3 and before the HELD pair. Annotation text updated in
+  the same change set as this line.*
+- **`ListRow.pending` has no renderer.** *Owner: **Lane A, closure 2b**, for the same reason.*
+- **A per-`StreamErrorCode` retry POLICY** (give up on `not-a-member`, retry on `bad-message`). **The
+  SURFACE half is now DONE** — cases 12.216–12.219 above, `syncErrorNotice` in
+  `packages/app-core/src/sync/sync-status-bar.tsx`. **The POLICY half is still open and still lives in
+  `createSyncEngine`**, not in a view: whether `not-a-member` should end the retry loop is a judgement
+  about a membership that may be restored, and no view can take it. The engine's docblock was split in
+  two to say exactly that. *Owner of the remaining policy half: unassigned.*

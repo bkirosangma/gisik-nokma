@@ -972,10 +972,10 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 
 ## 12. Offline sync & the apps
 
-*(Plan 10, Tasks 4, 5, 6, 7, 9, 10, 11 and 12 — the LIFTED §11 closer, the contested-claims read path, the
+*(Plan 10, Tasks 4, 5, 6, 7, 9, 10, 11, 12 and 13 — the LIFTED §11 closer, the contested-claims read path, the
 snapshot writer, the replica bootstrap, the sync ingress, the local replica, the outbox with its
-local pre-check, the sync engine with its HTTP/WS transport, and the replica `DataSource`. Plan 10's own catalogue task (Task 18) owns §12's full body and will replace this
-scope note; what follows is what those EIGHT tasks added — 4, 5, 6, 7, 9, 10, 11 and 12, the enumeration at the head of this banner — and nothing else. **It said "those six tasks" inside the change set that rewrote the head enumeration to seven**, which is the same head-and-tail split the closing paragraph of this banner already describes; the number is spelled against the list now rather than beside it. **§8 — Plan 6's web client —
+local pre-check, the sync engine with its HTTP/WS transport, the replica `DataSource`, and app-core's offline/sync UX surfaces. Plan 10's own catalogue task (Task 18) owns §12's full body and will replace this
+scope note; what follows is what those NINE tasks added — 4, 5, 6, 7, 9, 10, 11, 12 and 13, the enumeration at the head of this banner — and nothing else. **It said "those six tasks" inside the change set that rewrote the head enumeration to seven**, which is the same head-and-tail split the closing paragraph of this banner already describes; the number is spelled against the list now rather than beside it. **§8 — Plan 6's web client —
 stays absent**, because the coordination doc assigns `Features.md` sections one per implementation plan
 and numbering is claimed from that table, never taken next-free. That clause used to read "§8/§10/§11
 stay absent" and was still saying it here after Plan 8 wrote §10 and Plan 9 wrote §11: both are in this
@@ -983,8 +983,10 @@ file, BELOW this section (`grep -n '^## ' Features.md` — §10 at the workflow 
 and notifications, both after §12). The reservation table governs a section's NUMBER, not the order
 sections appear in the file, and §12 landing above §10 and §11 is that rule working rather than
 failing. Still absent rather than missing from this section:
-app-core's offline UX, the dual-client harness and both app
-shells — Plan 10 Tasks 13–17. **Task 11's sync engine came out of that list in the change set that
+the dual-client harness and both app
+shells — Plan 10 Tasks 14–17. **Task 13's offline/sync UX came out of that list in the change set that
+landed it**, and the range moved from 13–17 to 14–17 in the same edit, which is the discipline this
+banner's closing paragraph exists to enforce. **Task 11's sync engine came out of that list in the change set that
 landed it, and Task 12's replica `DataSource` came out of it the same way** — which is the discipline
 the closing paragraph of this banner exists to enforce; the
 enumeration above and this one were rewritten together, not one and then the other, and the range that
@@ -1319,6 +1321,70 @@ survived a whole task.)*
 - ⚙️ **A ticket born offline reaches THREE doors, and they now agree** — `listTicketSummaries` carries it (badged, with its queued event ids); `getTickets` and `getBoard` do not, because `ListRow` and `BoardCard` both require a `stateProvenance` whose `serverTime` no server has assigned. `buildPendingOverlay` folds such a ticket and fills `serverTime: submitted.clientTime`, a substitution it documents where it makes it; repeating it in a view row would launder a device clock into a field every consumer reads as the server's answer — the same shape as the `committed` this source refuses to say about the same claim. The FIRST DRAFT had all three doors behaving differently: `getTickets` included it and THREW on the ordinary offline path, `getBoard` omitted it silently, `listTicketSummaries` carried it. `OFFLINE_BORN_ABSENCE` names the gap and its owner (Task 13's offline list must union the two doors), and case 12.187 pins all three together.
 
 - ⚙️ **`hasRestrictedParent` is gated on being caught up, because lag is not restriction** — locally, "the server never sent you this parent" and "the server has not sent it yet" are the same observation, and the field names only the first. The true arm therefore requires `engine.status() === 'live'`; a device still catching up answers `false`, following `hierarchy/epic-ancestor.ts`'s own rule that narrower than the truth shows less while wrong about the truth shows the wrong work. `rollup` is `null` for the same family of reason: `restrictedCount` counts children this viewer may not see, and a replica cannot count what it was never sent.
+- ✅ **The contested-claim banner shows the claim verbatim, and the "when" is India time** — every open
+  contest on a ticket, rendered through the domain's one `renderContestedClaimText`: who claimed it, at
+  what instant *printed in IST and labelled IST*, what the claim was, and which rule now refuses it,
+  with the three resolutions beside it. A collaborator in another timezone reads their own action in
+  IST — the same instant, correctly labelled, and the label is what makes it honest rather than
+  confusing. The banner is dumb by construction: it holds no state and builds no envelope.
+  `packages/app-core/src/contests/contest-banner.tsx`
+- ✅ **Three resolutions, each of them recorded events rather than a mutation** — discard (itself an
+  attributed `claim.contested_resolved`, carrying an optional note), convert-to-comment (a
+  `comment.added` quoting the claim, then a resolution linking that comment's id), and redo (the fresh
+  replacement first, then a resolution linking it). One ordered `ingest` call each; a refusal comes back
+  named — the door's `rule`/`reason`, or an invalid answer's `code`/`message` — instead of being
+  swallowed. `packages/app-core/src/contests/contest-view-model.ts`
+- ⚙️ **A redo may not reuse the contested envelope, and saying so is a throw** — the original id is
+  already contested, so re-sending it would idempotently re-answer `contested`. `resolveContest` refuses
+  before it calls the door, which is why the banner's "Redo legally" button calls `onRedo` and never
+  `onResolve`: the host seeds a NEW envelope from the contested one and only then resolves.
+- ⚙️ **A queued resolution is never laundered into an accepted one** — against the replica source
+  `ingest` throws `OfflineAcceptError` for a claim it has only queued, and `resolveContest` deliberately
+  does not catch it. Catching it and answering `ok: true` would put "the server accepted your discard"
+  on screen for a discard the server has never seen — the same laundering the replica refuses one layer
+  down, for the same reason.
+- ✅ **The offline reopen pair, in the only order that can pass** — accepting "Parent X is done. Reopen
+  it and proceed?" builds the parent's `ticket.transitioned` carrying
+  `cause: { kind: 'reopened-for-child', childTicketId }` FIRST, then the child claim untouched, for the
+  caller to enqueue adjacently. The wire field is `to`, translated from the view's `toStateId` at the
+  envelope boundary — the same translation `reopenAndProceed` and `TicketSheet.submitTransition` make,
+  at the same seam. `packages/app-core/src/offline/reopen-pair.ts`
+- ⚙️ **`nonTerminalStates` is published API and is NOT the reopen picker** — it filters a definition's
+  states by category and cannot filter by reachability, because it never receives the parent's current
+  state. "Which states may this parent be reopened into" already has one answer,
+  `reopenStateOptions(def, currentStateId)`, which the online dialog is fed from and which the offline
+  dialog must be fed from too. The divergence is pinned by a test rather than left to be rediscovered
+  at a picker.
+- ✅ **Gross clock skew renders as a flag attributed to the DEVICE** — derived from the two kept
+  timestamps (neither is edited), shown only at or beyond the domain's 10-minute threshold, and phrased
+  as "device clock ran N min ahead of / behind the server". An unparseable client claim is flagged
+  *unreadable* rather than silently producing no badge — the gate runs on `hasGrossClockSkew` first
+  precisely so the unreadable case stays visible. `packages/app-core/src/history/clock-skew-badge.tsx`
+- ✅ **The sync-truth strip both apps mount** — connection status, how many claims are waiting to send
+  (singular-aware), and a "needs attention" count that renders only when non-zero, so a healthy client
+  shows no empty chrome. `role="status"`, not `alert`: a standing readout, not an interruption.
+  `packages/app-core/src/sync/sync-status-bar.tsx`
+- ⚙️ **These three surfaces' BEM classes and the rules that style them are tied by a test** — `ui.css`
+  had no `gn-contest-banner`, `gn-clock-skew-badge` or `gn-sync-status-bar` selector at all when the
+  components were written, so their class names bound to nothing and the token discipline their own
+  contract names was not actually being consumed. The rules were added and a set-equality binding test
+  now catches a rename on either side, plus a rule for a class nothing renders.
+  `packages/app-core/test/sync-ux-css-binding.test.tsx`
+- ✅ **The stream's own error, said out loud without claiming a policy that does not exist** *(Ruling
+  P34)* — the sync strip takes `engine.lastError()` and prints the code verbatim with the server's own
+  message. It says this client is **still retrying**, because that is what `createSyncEngine` does for
+  every one of the three `STREAM_ERROR_CODES`; only `scope-revoked`, a different frame type, is
+  terminal. A label reading "this device will not reconnect" would be the surface asserting a decision
+  on the engine's behalf. Whether `not-a-member` *should* end the retry loop is still open, still lives
+  in the engine, and is named there rather than implied here.
+  `packages/app-core/src/sync/sync-status-bar.tsx`
+- ⚙️ **THREE obligations pointed at Task 13 from code Task 13's own plan text does not reach, and
+  Ruling P34 re-assigned all three** — `OFFLINE_BORN_ABSENCE`'s offline union list and a renderer for
+  `ListRow.pending` are app-core view/DataSource concerns and went to **Lane A as closure 2b**; the
+  per-`StreamErrorCode` deferral split, its SURFACE half landing here (above) and its POLICY half
+  staying in `createSyncEngine`, unassigned. Task 13's Files block contains no ticket list, no `ListRow`
+  renderer and no error surface — those annotations named the next task touching app-core UX by NUMBER,
+  not by content, which is the failure mode P34 exists to stop repeating.
 
 ## 10. Workflow builder & ticket types
 

@@ -177,9 +177,19 @@ function messageOf(err: unknown): string {
  * same behaviour `packages/app-core/src/online/stream.ts` has today, where it
  * is also unaddressed. The revocation path that actually matters is
  * `scope-revoked`, which IS terminal here. *RECORDED, NOT FIXED: a policy per
- * `StreamErrorCode` (give up on `not-a-member`, retry on `bad-message`) belongs
- * with whoever owns the client's error surface — Plan 10 Task 13 is the first
- * task with a place to show it.*
+ * `StreamErrorCode` (give up on `not-a-member`, retry on `bad-message`).*
+ *
+ * SPLIT BY RULING P34 (2026-09-06), because "belongs with whoever owns the
+ * client's error surface" ran two different things together:
+ * - The SURFACE is done. `syncStatusBar`'s `syncErrorNotice`
+ *   (`packages/app-core/src/sync/sync-status-bar.tsx`, Plan 10 Task 13) shows
+ *   `lastError()` — the code verbatim and the server's own message. It states
+ *   that this client is STILL RETRYING, because that is what the code below
+ *   does for every one of the three `STREAM_ERROR_CODES`; a surface saying
+ *   otherwise would assert a decision on this engine's behalf.
+ * - The POLICY is still open and still lives HERE, not there. Whether
+ *   `not-a-member` should end the retry loop is a judgement about a membership
+ *   that may be restored, and no view can take it. **Owner: unassigned.**
  */
 export function createSyncEngine(deps: {
   replica: Replica;

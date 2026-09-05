@@ -347,8 +347,13 @@ const PREFERENCES_ABSENCES: readonly ReplicaAbsence[] = [
  *
  * RECORDED, NOT FIXED: an offline shell that wants one project list containing
  * both must union `getTickets` with `listTicketSummaries` and render the second
- * kind as claims. OWNER: **Plan 10 Task 13**, the first code to draw an offline
- * list beside an offline board.
+ * kind as claims. OWNER: **Lane A, closure 2b** (Ruling P34, 2026-09-06).
+ *
+ * This read "Plan 10 Task 13" until P34. Task 13 shipped the contested-claim
+ * banner, the reopen-pair builder, the skew badge and the sync strip — no
+ * ticket list among them — so the old owner named the next task touching
+ * app-core UX by NUMBER rather than by content, and Task 13 could not have
+ * discharged it without inventing a surface no plan specifies.
  */
 export const OFFLINE_BORN_ABSENCE: ReplicaAbsence = {
   // THE THIRD NAME WAS MISSING AND IS THE SAME ARGUMENT: `getTicket` returns
