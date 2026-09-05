@@ -364,7 +364,12 @@ export const OFFLINE_BORN_ABSENCE: ReplicaAbsence = {
     'ListRow.stateProvenance / BoardCard.stateProvenance / TicketRead.stateProvenance (for a ticket that exists only as a queued claim)',
   because:
     'ClaimProvenance requires a serverTime and a SubmittedEvent has none by construction; the pending overlay substitutes the device clock and says so, and repeating that substitution in a view row would read as the server\'s answer',
-  owner: 'Plan 10 Task 13 — an offline list that unions getTickets with listTicketSummaries',
+  // The docblock above was moved to Lane A / closure 2b by ruling P34 and THIS
+  // FIELD was not, so the entry contradicted itself: prose naming one owner, the
+  // enumerable datum naming the task P34 had just established could not
+  // discharge it. The field is the half a tool reads.
+  owner:
+    'Lane A, closure 2b (ruling P34) — an offline list that unions getTickets with listTicketSummaries and renders the second kind as claims',
 };
 
 /**

@@ -569,7 +569,20 @@ describe('12.187 the three doors an offline-born ticket reaches', () => {
 
     // And the absence has a NAME and an owner, so a shell can render the
     // union rather than rediscovering the gap.
-    expect(OFFLINE_BORN_ABSENCE.owner).toMatch(/^Plan 10 Task 13 — /);
+    //
+    // The owner MOVED: ruling P34 reassigned this to Lane A's closure 2b after
+    // establishing that Plan 10 Task 13 shipped no ticket list and so could
+    // never have discharged it — the old owner named the next task touching
+    // app-core UX by NUMBER rather than by content. P34 rewrote the docblock
+    // and left THIS field saying `Plan 10 Task 13`, so the entry contradicted
+    // itself: prose naming one owner, the enumerable datum naming another, and
+    // this assertion pinning the stale half. An owner-less gap gets dropped
+    // rather than deferred, and a gap owned by a task that cannot discharge it
+    // is the same thing wearing a name.
+    expect(OFFLINE_BORN_ABSENCE.owner).toMatch(/^Lane A, closure 2b \(ruling P34\) — /);
+    // Non-vacuity in the same run: the field is a real sentence naming the
+    // remedy, not just a prefix that satisfies the regex above.
+    expect(OFFLINE_BORN_ABSENCE.owner).toContain('unions getTickets with listTicketSummaries');
   });
 
   /**
