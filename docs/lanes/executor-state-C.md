@@ -5,6 +5,21 @@
 `git branch --contains` — empty means orphaned).
 **Base at last check:** `origin/main` = `1e372e3` ("Resume as five parallel lanes...", PR #111).
 
+## SAFETY CORRECTION (received from gisik-nokma-0d / Lane E, 2026-09-06) — supersedes the base brief's reap command
+
+The base brief's "reap `pgrep -f vitest` survivors" is DANGEROUS under five concurrent lane sessions:
+`pgrep -f vitest` matches every lane session's own command line (each embeds the brief text, which
+contains the word "vitest") plus any peer's live test run. Running `pkill -f vitest` or killing
+`pgrep -f vitest`'s output would kill lanes A–E and a peer's live gate.
+
+**The orphan criterion is `ppid=1` (reparented to launchd), never a name/arg substring match alone.** The
+only reap command to use from now on — lists ONLY orphaned vitest node workers:
+
+    ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}'
+
+Read the list before killing anything; expect it EMPTY. Never `pkill -f vitest`, never blind-kill
+`pgrep -f vitest` output.
+
 ## Where this is
 
 Fresh lane start, 2026-09-06. No prior executor-state-C.md existed. Read `docs/lanes/controller-state.md`
