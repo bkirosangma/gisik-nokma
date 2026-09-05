@@ -42,7 +42,7 @@ the rule is print the rows, not the count. `main` was 3181; 3210 - 3181 = **29**
 | # | task | state |
 |---|---|---|
 | 1 | **T13** — app-core contested-claim UX, offline reopen pair, skew badge, sync status bar | **DONE.** PR #117 open, rebased onto `a23d686`, re-gated under the lock. Includes Ruling P34's follow-up and the §12 id re-allocation. |
-| 2 | T14 — dual-client harness rig (Fable author + reviewer) | **WRITTEN, UNVERIFIED, BLOCKED.** `rig.ts` (472 lines) + `rig.test.ts` (149) exist and `apps/server` typecheck is exit 0. **The self-test has never completed a run** — Postgres is down (see the BLOCKER below). Not committed. Not reviewed. **Do not claim it works.** |
+| 2 | T14 — dual-client harness rig (Fable author + reviewer) | **VERIFIED. Self-test 4 passed** under the lock at `0cbdc82`; `apps/server` typecheck exit 0. Three mutations run (below). **Fable review in flight** — not yet merged, no PR yet. |
 | 3 | T15 — scenarios S1–S6 (Fable author + reviewer) | not started |
 | 4 | T18 — `Features.md` §12 + `test-cases/12` final shape | **HELD** until Lanes C (T16) and D (T17) have MERGED to `main`. Poll `origin/main` for their merge commits. |
 
@@ -123,9 +123,25 @@ re-measuring.
 
 ---
 
-## ⛔ BLOCKER (2026-09-06 ~01:45): DOCKER'S VOLUME IS FULL AND THE GISIK POSTGRES IS IN A CRASH-RECOVERY LOOP
+## ✅ RESOLVED (2026-09-06 ~01:50): the Docker blocker below is CLEARED — kept for its lessons
 
-**No lane can run `apps/server` tests or a full gate until disk is freed inside Docker.** Measured:
+`pg_isready` accepting; `/dev/vda1` 58.4G with **12.8 G available (77%)**; build cache 12.60 GB → 442 MB;
+images essentially untouched (39.79 → 39.35 GB, 29 → 28); all four containers up, **including the
+owner's `mongo`, `redis` and `postgres:15.3`**; zero `gisik_test_*` remaining. Lane E cleared its own
+build cache — 92% of which was its own image builds, zero entries active — and the owner independently
+authorised exactly that least-destructive option when this lane put the three choices to them. The
+36.8 GB of unused images stays the owner's call and is no longer urgent.
+
+**Two lessons kept because they will recur:**
+1. **`docker ps` said "Up 43 hours" throughout.** The container was up and the database was not. Never
+   read database liveness off `docker ps`; use `pg_isready`.
+2. **`createTestDatabase` drops its database in `drop()`, and a killed run never calls it** — which is
+   how 39 accumulated. A sweep belongs at the START of a gate, because the end is the part that does
+   not happen when it matters. Now Lane E's `sweep-test-dbs.sh`, dropping only idle ones (zero backends).
+
+### The original blocker, as measured
+
+**No lane could run `apps/server` tests or a full gate until disk was freed inside Docker.** Measured:
 
 - `docker exec gisik-nokma-exec-postgres-1 df -h /var/lib/postgresql/data` → `/dev/vda1 58.4G 56.1G **0 available** 100%`.
 - **The host Mac is fine** — 77 GB free on `/System/Volumes/Data`. This is Docker's own VM disk.
@@ -155,6 +171,35 @@ short, prune unused images → restart the gisik postgres container → `pg_isre
 killed or crashed run never calls it — which is exactly how 39 accumulated. A gate should sweep idle
 `gisik_test_*` databases at the START of a run, because the end is the part that does not happen when
 it matters.
+
+## T14 — WHAT IS BUILT, AND THE THREE MUTATIONS THAT MEASURE IT
+
+`apps/server/test/dual-client/rig.ts` (472 lines) and `rig.test.ts` (4 cases), plus **both**
+`@gisik-nokma/sync-client` **and** `@gisik-nokma/app-core` as `apps/server` devDependencies. Self-test
+**4 passed** under the lock at `0cbdc82`.
+
+The implementer's own least-sure claim **HELD**: full `TicketState` equality between the replica's
+reducer fold and the server's `rowToTicketState` row mapping. That is the property Task 15 leans on,
+now measured rather than assumed.
+
+| mutation | result |
+|---|---|
+| `ingestInteractive` swapped from `ingestClientBatch` back to `ingestBatch` | gated-door case red ALONE, `1 failed \| 2 passed` |
+| `BOOTSTRAP_BACKFILL_TYPES` → the plan's four-entry literal | **ALL THREE CASES STAYED GREEN.** The edit was confirmed present before the run, so an unconstrained path — not a mutation that never fired. |
+| the same, after adding the `visibility.set` case | that case red ALONE, `1 failed \| 3 passed`; `4 passed` on restore |
+
+**The middle row is the finding.** The backfill correction was right and nothing tested it. A dropped
+`visibility.set` would leave the replica holding a different AUDIENCE for a ticket than the server does,
+and every Task 15 scenario asserting who can see what would have been asserting it against a bootstrap
+the server never sends. The new case commits a `visibility.set`, runs the snapshot pass so the claim
+sits BELOW the snapshot line — the only position where the backfill is load-bearing — then requires a
+fresh client to still hold it. Its control (`not.toContain('ticket.created')`) proves the snapshot
+actually covered the ticket, so "below the line" is a fact about the run rather than an assumption.
+
+**Twenty-one departures from the plan's rig text**, of which two were errors in THIS FILE's own
+correction table: `me.projectIds` needs `[...eff.projects.keys()]` (`EffectiveRole.projects` is a `Map`,
+so the plan's spread yields `[key, value]` tuples — the shape matched, the value did not), and
+workflow/ticket-type ENTITY ids must be ULIDs too, not only users and the workspace.
 
 ## ⚠️ THE FOUR THINGS A RESTART MUST KNOW BEFORE TOUCHING T14
 
