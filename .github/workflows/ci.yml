@@ -3,12 +3,48 @@ name: ci
 # The independent-CI precondition for the coordination doc's auto-merge
 # protocol (docs/superpowers/plans/2026-08-20-00-series-coordination.md,
 # "Autonomous execution protocol", ruling 1): without a check that isn't a
-# lane's own word, "green" is self-certification. This is the skeleton —
-# Plan 11 Task 14's full six-job pipeline (lint -> typecheck -> unit ->
-# fixtures -> dual-client -> e2e, plus the interim-plumbing gate) scoped down
-# to what actually exists on `main` today. See the single `gate` job below
-# for exactly what's excluded and why; each exclusion names the plan that
-# owns it so that plan's executor extends this file instead of rewriting it.
+# lane's own word, "green" is self-certification. This file started as one
+# `gate` job (see git history for that version and why each split below was
+# deferred). Plan 11 Task 14 owns turning it into the split pipeline and
+# sharding the server suite -- this is that split, scoped to what actually
+# exists on `main` today. `gate` (bottom of this file) is still the single
+# check name the auto-merge precondition and any branch protection rule
+# reads; everything above it is real parallel work, aggregated there.
+#
+# What the plan's own six-job list (lint -> typecheck -> unit -> fixtures ->
+# dual-client -> e2e) still can't have, and why -- unchanged from the prior
+# version, still true at this task's own measurement:
+#   - lint: no root "lint" script exists yet (Plans 1-2 only wired
+#     build/test/typecheck). `check-env` (below) is the env-contract gate
+#     that plan text hangs off a future lint job; it runs as its own job,
+#     not gated on lint existing.
+#   - fixtures (client half): `packages/app-core` exists but does not yet run
+#     the shared rule-engine fixture harness against a client build --
+#     `test:fixtures` is not a script anywhere in this repo. Plan 6's own
+#     fixtures task owns this exclusion. The server-side half already runs
+#     as part of `packages/rule-engine`'s own `test` script, which the
+#     `other-tests` job below already executes via `turbo run test`.
+#   - dual-client: Plan 10's harness (`test:dual-client`) doesn't exist.
+#   - the interim-plumbing gate: guards Plan 10's own marked shortcuts
+#     (`Interim session plumbing until Plan 6`, `EXPO_PUBLIC_DEV_*`), which
+#     exist only in plan PROSE (docs/superpowers/plans/...), not in any
+#     tracked file under apps/, packages/, or scripts/ -- a `git grep` for
+#     either marker outside docs/ returns nothing. A gate wired against
+#     markers that don't exist yet would pass vacuously, which is worse than
+#     not having it: it would read as verification of a property nothing
+#     has shipped. Add it when (if) Plan 10 actually ships a shortcut.
+# What IS new here: the server suite (90 files, the critical path) is
+# sharded across `server-tests`' matrix instead of running serially inside
+# one job; `check:tasks` (scripts/check-task-ledger.mjs) is wired as its own
+# job, independent of the docs-only skip, because the ledger it validates
+# lives under docs/lanes/ and a ledger-only PR is exactly a docs-only diff --
+# the one case where "the gate was skipped" must not also mean "the ledger
+# was never checked"; and a guard against a skipIf'd suite silently
+# contributing zero tests (see `check-no-silent-skips.mjs`), wired ahead of
+# its first real trigger -- Plan 11 T11/T12 add
+# `describe.skipIf(!pgDumpAvailable())` around the restore-drill suite, and
+# this is what turns a missing pg_dump binary into a loud CI failure instead
+# of a quietly-empty green suite.
 on:
   pull_request:
   push:
@@ -18,66 +54,28 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Shared by every job below so the Postgres connection string and the
+  # docs-only skip's meaning are identical wherever they're read.
+  TEST_DATABASE_ADMIN_URL: postgres://gisik:gisik@localhost:54329/postgres
+
 jobs:
-  gate:
+  # Decides once, for every other job, whether this diff can possibly change
+  # a test outcome. Unchanged in substance from the single-job version:
+  # ONLY docs/** is treated as inert; an empty changed-file list is treated
+  # as "detection learned nothing" and takes the safe (full-gate) branch,
+  # never as evidence of a docs-only change (a wrong merge base once made a
+  # real 82-file change report zero files).
+  scope:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: gisik
-          POSTGRES_PASSWORD: gisik
-          POSTGRES_DB: gisik_nokma
-          # Best-effort container-level parity with docker-compose.yml's
-          # `command: ["postgres", "-c", "timezone=Asia/Kolkata"]` (GitHub
-          # Actions service containers have no `command:` override, so this
-          # can't be replicated exactly). It doesn't need to be: the owner's
-          # IST decision is actually enforced at the application layer, not
-          # the server default -- apps/server/test/helpers/db.ts runs
-          # `ALTER DATABASE ... SET timezone TO 'Asia/Kolkata'` on every
-          # per-test database it creates, and apps/server/src/db.ts's
-          # createPool sets the session timezone for the app pool. Both run
-          # unmodified in this job, so CI converges on the same clock local
-          # dev does regardless of what the service container's own GUC
-          # default is.
-          TZ: Asia/Kolkata
-        ports:
-          - 54329:5432
-        options: >-
-          --health-cmd "pg_isready -U gisik" --health-interval 5s
-          --health-timeout 5s --health-retries 10
-    env:
-      TEST_DATABASE_ADMIN_URL: postgres://gisik:gisik@localhost:54329/postgres
+    outputs:
+      code_changed: ${{ steps.scope.outputs.code_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
-          # The docs-only detection below diffs against the merge base, which
-          # needs history. The default depth-1 checkout has none.
+          # The diff below is against the merge base, which needs history.
           fetch-depth: 0
 
-      # ── Owner-directed CI optimisation, 2026-09-03 (items 1 and 2 of three;
-      # sharding the server suite was deferred to Plan 11 Task 14, which owns
-      # the pipeline). Measured baseline before this change: 5m19s per run,
-      # of which the turbo step was 5m18s -- setup was already only 24s. The
-      # server suite alone (81 files, 270s) is the critical path, so splitting
-      # server-vs-client into separate JOBS saves ~25s and is not worth it;
-      # what pays is (a) not re-running unchanged packages at all and (b) not
-      # running the suite for a change that cannot affect it. T14 still owns
-      # the full six-job split and the shard; extend this, don't revert it.
-
-      # Does this change touch anything the suite could possibly be testing?
-      # A PR that only edits docs/ cannot change a test outcome, and this repo
-      # merges a lot of controller docs PRs (rulings, re-anchors, ledger
-      # promotions). Conservative by construction: ONLY docs/** is treated as
-      # inert. Features.md and test-cases/** are deliberately NOT in the skip
-      # list even though CI does not execute them -- a narrower filter can
-      # only cost time, never correctness.
-      #
-      # This job always RUNS and always reports the `gate` check, green, so
-      # the coordination doc's auto-merge precondition ("an independent CI run
-      # green") still has a check to read. What it means for a docs-only PR is
-      # weaker, and the run says so out loud in its own log rather than
-      # letting a reader infer full verification from a green tick.
       - id: scope
         run: |
           set -euo pipefail
@@ -86,8 +84,6 @@ jobs:
           else
             base="${{ github.event.before }}"
           fi
-          # A first push to a branch, or a force-push, can leave `before` as
-          # the null sha; fall back to running everything rather than skipping.
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
             echo "no usable base sha -- running the full gate"
             echo "code_changed=true" >> "$GITHUB_OUTPUT"
@@ -96,12 +92,6 @@ jobs:
           changed="$(git diff --name-only "$base" HEAD)"
           echo "--- files changed against $base ---"
           echo "$changed"
-          # An EMPTY file list is not evidence of a docs-only change -- it is
-          # evidence the detection learned nothing (a base that resolved
-          # somewhere unexpected, a range that collapsed). Measured during
-          # development: a wrong base made a real 82-file code change report
-          # zero files, which would have skipped the gate on a full plan
-          # merge. An inability to tell two cases apart takes the safe branch.
           if [ -z "$changed" ]; then
             echo "empty file list -- detection learned nothing, running the full gate"
             echo "code_changed=true" >> "$GITHUB_OUTPUT"
@@ -110,9 +100,9 @@ jobs:
           outside_docs="$(echo "$changed" | grep -v '^docs/' || true)"
           if [ -z "$outside_docs" ]; then
             echo "DOCS-ONLY CHANGE: every changed path is under docs/."
-            echo "The build/test/typecheck gate is SKIPPED for this run."
-            echo "This check being green means 'nothing outside docs/ changed',"
-            echo "NOT 'the suite passed'. Nothing here was verified by tests."
+            echo "build/typecheck/test are SKIPPED for this run (see the"
+            echo "individual job summaries). This does NOT mean the suite"
+            echo "passed -- only check-tasks (the ledger gate) still runs."
             echo "code_changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "--- paths outside docs/, running the full gate ---"
@@ -120,89 +110,308 @@ jobs:
             echo "code_changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+  # The env contract gate (Plan 11 Task 6): fails if code reads a
+  # configuration variable `.env.example` does not document. Reads source
+  # text only, needs no build -- its own job so a stray variable is named in
+  # seconds rather than after a build+test run.
+  #
+  # Also runs check-skipif-coverage.mjs: `server-tests`' silent-skip guard
+  # only checks apps/server/test/, so a `.skipIf(` guard landing in any other
+  # package (or even inside apps/server outside that prefix) is covered by
+  # NOTHING. Same class of gate as check:env -- reads source text only, no
+  # build, so a guard appearing somewhere uncovered is named in seconds
+  # rather than passing silently through a job that never looks for it.
+  check-env:
+    needs: scope
+    if: needs.scope.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        if: steps.scope.outputs.code_changed == 'true'
-        # No version pinned here: reads root package.json's
-        # `"packageManager": "pnpm@9.15.0"` pin.
-
       - uses: actions/setup-node@v4
-        if: steps.scope.outputs.code_changed == 'true'
         with:
-          # No .nvmrc in the repo; root package.json pins
-          # `"engines": { "node": ">=22.0.0 <23" }`.
           node-version: 22
           cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:env
+      - run: node scripts/check-skipif-coverage.mjs
 
-      # Turbo's local cache, persisted between runs. `test` and `typecheck`
-      # were `"cache": false` in turbo.json until 2026-09-03, so every run
-      # re-executed all 24 tasks from scratch even when the packages they
-      # cover had not changed. Both are deterministic functions of their
-      # inputs, and turbo's hash covers the package plus its workspace
-      # dependencies -- PROVEN by paired control before this landed: with an
-      # unchanged tree all 20 tasks hit (17ms, FULL TURBO); touching one line
-      # of packages/domain re-ran domain AND all six packages that depend on
-      # it, leaving only `ui` (zero workspace deps) cached.
-      #
-      # THE SAFETY PROPERTY THAT MAKES THIS OK, stated so it is not lost: the
-      # controller's own pre-merge gate runs `--force`, so it never consults
-      # this cache. A cache hit here means "this exact input hash already
-      # passed"; the merge decision still rests on an uncached run.
+  # The task-ledger gate (scripts/check-task-ledger.mjs): every task in every
+  # plan has one ledger row, and every row claiming `done` names a merge
+  # commit reachable from origin/main. Deliberately NOT gated on
+  # `code_changed`: the ledger it reads lives under docs/lanes/, so a
+  # ledger-only promotion PR is exactly a docs-only diff by the `scope` job's
+  # own rule -- the one case this job exists to still cover. Needs full
+  # history (the script resolves `origin/main` and walks merge-base
+  # ancestry); no pnpm install -- the script imports only node builtins.
+  check-tasks:
+    needs: scope
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-task-ledger.mjs
+        env:
+          # Enables the reverse-drift section (merged PRs no ledger row
+          # cites) to actually query the API instead of degrading to
+          # "unknown" -- the script already treats a missing/unauthenticated
+          # `gh` as non-fatal (see its own try/catch), so this is an
+          # improvement, not a requirement.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Builds every package once and persists turbo's cache for the jobs below.
+  #
+  # THE SAFETY PROPERTY THAT MAKES THIS OK, carried over unchanged: the
+  # controller's own pre-merge gate runs `--force` and so never consults this
+  # cache. A cache hit here means "this exact input hash already passed
+  # somewhere"; the merge decision still rests on an uncached run.
+  build:
+    needs: scope
+    if: needs.scope.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
       - uses: actions/cache@v4
-        if: steps.scope.outputs.code_changed == 'true'
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             turbo-${{ runner.os }}-
-
       - run: pnpm install --frozen-lockfile
-        if: steps.scope.outputs.code_changed == 'true'
+      - run: pnpm turbo run build
 
-      # The env contract gate (Plan 11 Task 6): fails if code reads a
-      # configuration variable `.env.example` does not document. It reads
-      # source text and needs no build, so it runs before `turbo run` --
-      # a stray variable is named in seconds instead of after the suite.
-      - run: pnpm check:env
-        if: steps.scope.outputs.code_changed == 'true'
+  typecheck:
+    needs: [scope, build]
+    # Spelled out explicitly rather than relied on implicitly: whether
+    # GitHub Actions' own default needs-success gating would already prevent
+    # this job from running against a genuinely failed `build` is disputed
+    # and was not verified against a real run for this file. Writing
+    # `needs.build.result == 'success'` here removes the ambiguity rather
+    # than resting on an assumption either way.
+    if: needs.scope.outputs.code_changed == 'true' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      # Same key as `build` -- this job runs after it, so the cache `build`
+      # just saved is what gets restored, and `turbo run typecheck` replays
+      # its outputs instead of rebuilding from source.
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run typecheck
 
-      # Job layout: a single job, not Task 14's six-job split. What the plan
-      # splits into separate jobs either doesn't exist on `main` yet or
-      # doesn't apply to the packages that do:
-      #   - lint: no root "lint" script exists yet (Plans 1-2 only wired
-      #     build/test/typecheck). That is now the WHOLE of the reason. The
-      #     other half of it is spent: Plan 11 Task 6's env contract
-      #     (`.env.example` + `scripts/check-env-example.mjs`) has landed,
-      #     and its gate step `pnpm check:env` runs above as a step of THIS
-      #     job rather than waiting on a lint job that does not exist. What
-      #     a future lint job inherits is linting, not check:env.
-      #   - fixtures (client half): `test:fixtures` proves the shared rule-
-      #     engine fixture suite agrees across the server build AND a
-      #     client build. `packages/app-core` now EXISTS (Plan 6 Task 4
-      #     landed the DataSource/view-types scaffold), so the old "there
-      #     is no client package yet" reason is spent -- but the scaffold
-      #     does not yet run the fixture harness against a client build,
-      #     which is what this job would gate. Plan 6's own fixtures task
-      #     still owns the exclusion. The server-side half already runs as
-      #     a normal part of `packages/rule-engine`'s own `test` script,
-      #     which this job already executes via `turbo run test`.
-      #   - dual-client: Plan 10's harness (`test:dual-client`) doesn't
-      #     exist.
-      #   - e2e: needs a deployable stack (Plans 4/6) and Playwright infra
-      #     that isn't wired yet.
-      #   - the interim-plumbing gate: guards against Plan 10's own marked
-      #     shortcuts, which don't exist on `main` yet either. (NB: the
-      #     coordination doc's by-catch notes Plan 11's own draft YAML
-      #     omits this gate despite its Produces bullet promising it --
-      #     its Produces bullet is the authority when Plan 11 lands it,
-      #     not its own Step 2 draft.)
-      # What's left of the plan's split -- typecheck gating unit, both
-      # against packages that do exist (domain, rule-engine, server, and
-      # now the two client packages ui and app-core) -- is
-      # exactly what `turbo run build test typecheck` already orders via
-      # its own task graph; splitting it into two CI jobs would just pay
-      # for a second install + build from scratch (no turbo remote cache is
-      # configured here) for no fail-fast benefit at this repo's size.
-      # Extend this job list when a plan lands the piece it owns; don't
-      # replace it wholesale.
-      - run: pnpm turbo run build test typecheck
-        if: steps.scope.outputs.code_changed == 'true'
+  # The critical path (90 files, ~270s serially) sharded across a matrix.
+  # Postgres client tools are installed here, pinned to the SERVER's major
+  # version (16), not whatever ubuntu-latest's own default resolves to --
+  # measured locally: a v18 pg_dump against this server's v16 writes an
+  # archive a v16 pg_restore cannot always read. Not yet exercised by any
+  # test on `main` (Plan 11 T11/T12, which add the restore-drill suite that
+  # needs these binaries, haven't landed), but installing it now means the
+  # binaries are already present the day that suite arrives instead of it
+  # silently skipping on its first CI run.
+  server-tests:
+    needs: [scope, build]
+    # Spelled out explicitly rather than relied on implicitly: whether
+    # GitHub Actions' own default needs-success gating would already prevent
+    # this job from running against a genuinely failed `build` is disputed
+    # and was not verified against a real run for this file. Writing
+    # `needs.build.result == 'success'` here removes the ambiguity rather
+    # than resting on an assumption either way.
+    if: needs.scope.outputs.code_changed == 'true' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gisik
+          POSTGRES_PASSWORD: gisik
+          POSTGRES_DB: gisik_nokma
+          # Best-effort container-level parity with docker-compose.yml's
+          # `command: ["postgres", "-c", "timezone=Asia/Kolkata"]` (service
+          # containers have no `command:` override). Doesn't need to be exact:
+          # the owner's IST decision is enforced at the application layer --
+          # apps/server/test/helpers/db.ts ALTERs each per-test database's
+          # timezone, and apps/server/src/db.ts's createPool sets it for the
+          # app pool. Both run unmodified here.
+          TZ: Asia/Kolkata
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U gisik" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - name: install postgresql-client-16 (pinned to the server's major version)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+          # The whole point of pinning is a v16 archive-writer; a green apt
+          # install doesn't prove that's what's actually on PATH afterward.
+          pg_dump --version
+          pg_dump --version | grep -q ' 16\.' || {
+            echo "pg_dump did not resolve to major version 16 -- the pin failed silently"
+            exit 1
+          }
+      - name: server suite, shard ${{ matrix.shard }}/4
+        working-directory: apps/server
+        run: >-
+          pnpm exec vitest run --shard=${{ matrix.shard }}/4
+          --reporter=default --reporter=json
+          --outputFile.json=/tmp/vitest-server-shard-${{ matrix.shard }}.json
+      - name: fail loud on a fully-skipped skipIf suite (this shard)
+        run: node scripts/check-no-silent-skips.mjs /tmp/vitest-server-shard-${{ matrix.shard }}.json
+
+  # Everything that isn't @gisik-nokma/server: domain, rule-engine, ui,
+  # app-core, editor, sync-client, web, desktop. Runs on the same restored
+  # cache as `server-tests`, in parallel with it.
+  other-tests:
+    needs: [scope, build]
+    # Spelled out explicitly rather than relied on implicitly: whether
+    # GitHub Actions' own default needs-success gating would already prevent
+    # this job from running against a genuinely failed `build` is disputed
+    # and was not verified against a real run for this file. Writing
+    # `needs.build.result == 'success'` here removes the ambiguity rather
+    # than resting on an assumption either way.
+    if: needs.scope.outputs.code_changed == 'true' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gisik
+          POSTGRES_PASSWORD: gisik
+          POSTGRES_DB: gisik_nokma
+          TZ: Asia/Kolkata
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U gisik" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - run: pnpm turbo run test --filter='!@gisik-nokma/server'
+
+  # apps/web/e2e (Playwright) needs a deployable stack -- Plan 11 Task 13's
+  # docker-compose.dev.yml plus the compose-based E2E harness, neither of
+  # which exist on `main` yet (T13 hasn't landed). Rather than a job whose
+  # `if:` silently makes it vanish from the run, this one always runs and
+  # SAYS in its own log whether it did anything -- the same idiom `scope`
+  # already uses for the docs-only skip. Green here means "the stack this
+  # suite needs isn't present yet", never "the suite passed".
+  e2e:
+    needs: scope
+    if: needs.scope.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # NOT gated on apps/web/playwright.config.ts's existence: that file
+      # ALREADY EXISTS on `main` today, for a DIFFERENT suite --
+      # apps/web/e2e/{smoke,workflow-builder}.spec.ts, deliberately kept off
+      # the gate (playwright.config.ts's own docblock: "It is not on the
+      # gate and it must not become so by accident", because every server
+      # call in that suite is a `page.route` mock, not a real request to a
+      # compose stack). An earlier version of this job checked for that file
+      # alongside `docker-compose.dev.yml` and would have started treating
+      # ANY unrelated docker-compose.dev.yml as license to run that mock-only
+      # suite against a stack it never touches -- reporting compose-based
+      # E2E coverage this job would not actually have. This job does not
+      # guess Task 13's own file/script names; it only checks for the ONE
+      # artifact already known to be Task 13's (`docker-compose.dev.yml`,
+      # Task 6), and even once that exists, still does not attempt to run
+      # anything -- Task 13 must replace the branch below with its own real
+      # invocation when it lands, because only Task 13 knows what that is.
+      - name: check for the E2E stack (Plan 11 Task 13)
+        run: |
+          if [ -f docker-compose.dev.yml ]; then
+            echo "E2E STACK FILE PRESENT (docker-compose.dev.yml) but this job"
+            echo "does not yet know how to run Task 13's E2E suite against it --"
+            echo "Task 13 must replace this job's steps with the real invocation"
+            echo "when it lands. Reporting green means only that, NOT that any"
+            echo "E2E suite was run."
+          else
+            echo "E2E SKIPPED: docker-compose.dev.yml does not exist on this"
+            echo "checkout (Plan 11 Task 13 has not landed). This job reporting"
+            echo "green means only that the stack it needs is absent, NOT that"
+            echo "apps/web/e2e was run."
+          fi
+
+  # The single check name the auto-merge precondition and any branch
+  # protection rule reads. Fans in every job above; treats a job's own
+  # "skipped" (the expected shape on a docs-only change, or when a later job
+  # never got to run because an earlier `needs` dependency failed) as fine,
+  # and anything else (failure, cancelled, timed_out) as not.
+  gate:
+    if: always()
+    needs:
+      [scope, check-env, check-tasks, build, typecheck, server-tests, other-tests, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: require every job succeeded or was legitimately skipped
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          # The ${...} below are JS template-literal syntax for `node -e`,
+          # not shell expansions -- the single quotes are deliberate so the
+          # shell leaves them alone.
+          # shellcheck disable=SC2016
+          node -e '
+            const data = JSON.parse(process.env.NEEDS_JSON);
+            const rows = Object.entries(data).map(([name, v]) => `${name}=${v.result}`);
+            console.log("job results:", rows.join(", "));
+            const bad = Object.entries(data).filter(([, v]) => !["success", "skipped"].includes(v.result));
+            if (bad.length) {
+              console.error("FAILED:", bad.map(([n, v]) => `${n}=${v.result}`).join(", "));
+              process.exit(1);
+            }
+          '

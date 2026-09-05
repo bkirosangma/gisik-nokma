@@ -1,112 +1,117 @@
-# Lane C — live state (Plan 10 Task 16, `apps/desktop` Tauri shell)
+# Lane C — executor state (Plan 11 T14 → T15)
 
-**Worktree:** `/Users/kiro/my_projects/gisik-nokma-lanes/lane3-plan7-8`
-**Branch:** `exec/21-plan10-t16-desktop`, rebased onto `origin/main` twice (past #109/#119 and again past
-#117/#122).
+**This file is Lane C's restart surface, and nobody else's.** `executor-state.md` is Lane A's,
+`executor-state-B.md`/`-D.md`/`-E.md` belong to their own lanes — never edit them. A Lane C session
+relaunched from the controller's override recovers only what is written here.
 
-## STATUS: DONE from Lane C's side — PR #120 open at head `c631500`, full gate GREEN (27/27)
+> **Shas in narrative prose below are facts about when they were written.** Verify with
+> `git branch --contains <sha>` — **empty output means orphaned**. `git cat-file` passes on reflog-only
+> commits and will lie to you.
 
-If you are resuming, do not re-implement. `gh pr view 120` for current state; the controller merges at
-exactly `c631500` unless it has since asked for another change. Reported to `gisik-nokma-0d` with the
-full gate line; awaiting merge.
+---
 
-## SAFETY CORRECTIONS received from peers this session — adopt all, supersede the base brief where noted
+## RE-TASKED, 2026-09-06 ~02:25 IST
 
-**1. Reap by `ppid=1`, never `pgrep -f vitest`.** `pgrep -f vitest` matches every lane session's own
-command line (each embeds brief text containing the word "vitest") plus any peer's live test run.
-`pkill -f vitest` or killing its output would kill lanes A–E and a peer's live gate.
+T16 (Tauri desktop) **MERGED as PR #120 at `9e8777e`, promoted 157/177 by #127**. Do not re-implement it.
+Controller re-tasked this lane onto **Plan 11 T14 (extend `ci.yml`) then T15 (`deploy/do/` spec file)**,
+file-disjoint from Lane E's current seam (Lane E owns the manifest / config surface / Dockerfiles / dev
+compose stack; T14 is one file nobody else touches, T15 is a new directory).
 
-    ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}'
+## LIVE ANCHORS — verified 2026-09-06, re-verify before trusting
 
-Read the list before killing anything; expect it EMPTY. Landed on `main` in `CLAUDE.md` (commit
-`dc2ad58`).
+| anchor | value | how verified |
+|---|---|---|
+| worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane3-plan7-8` | `pwd` |
+| branch | `exec/24-plan11-ci-deploy` | `git branch --show-current`, cut fresh from `origin/main` (NOT the old `exec/21-plan10-t16-desktop`) |
+| `origin/main` at branch-cut | `5abc113` (Plan 10 T16 promoted 157/177, #127) | `git fetch origin && git log origin/main --oneline -5` |
+| ahead of `origin/main` | 0 commits made yet (working tree has staged/unstaged changes, nothing committed) | `git status` |
+| tree state | build/typecheck verified green at branch-cut sha via `pnpm turbo run build --concurrency=1` (9/9 cached, FULL TURBO) | ran directly |
+| Lane E's branch | `origin/exec/23-plan11` at `26c0f7e` (T1/config.ts NOT yet landed there — checked directly, no deploy-sha var exists in config.ts at this sha) | `git diff origin/main...origin/exec/23-plan11 --stat` |
+| gate composition at this sha | `pnpm turbo run build test typecheck --force --concurrency=1` — full run launched under the lock, see below for outcome | `/tmp/laneC-gate.log` |
 
-**2. The gate lock — the original `echo $$ > pid` pattern never actually held it** (each Bash tool call
-is a fresh shell, so the pid dies in seconds and every peer's stale-check reclaims almost immediately).
-Corrected protocol, refined twice more (empty-pid 60s grace; bounded 10-min zero-live-pools wait, loud on
-the bound), used successfully for this lane's own full gate run:
+## WHAT'S DONE (staged, not yet committed as of this write)
 
-    LOCK=/tmp/gisik-gate.lock
-    while ! mkdir "$LOCK" 2>/dev/null; do
-      p=$(cat "$LOCK/pid" 2>/dev/null)
-      if [ -n "$p" ]; then
-        ! ps -p "$p" >/dev/null 2>&1 && { rm -f "$LOCK/pid"; rmdir "$LOCK" 2>/dev/null; }
-      else
-        age=$(( $(date +%s) - $(stat -f %m "$LOCK" 2>/dev/null || echo 0) ))
-        [ "$age" -ge 60 ] && rmdir "$LOCK" 2>/dev/null
-      fi
-      sleep 15
-    done
-    echo $$ > "$LOCK/pid"
-    trap 'rm -f "$LOCK/pid"; rmdir "$LOCK" 2>/dev/null' EXIT
-    waited=0
-    while [ "$(ps -eo comm= | grep -c '^node (vitest')" -gt 0 ]; do
-      [ "$waited" -ge 600 ] && { echo "LOUD: 10-min bound hit, proceeding anyway"; break; }
-      sleep 15; waited=$((waited+15))
-    done
-    source ~/.nvm/nvm.sh && nvm use 22
-    pnpm turbo run build test typecheck --force --concurrency=1 > gate.log 2>&1
-    echo "GATE_EXIT=$?" >> gate.log
+**T14 files** (staged in git index): `.github/workflows/ci.yml` (single `gate` job → 8 jobs: `scope`,
+`check-env`, `check-tasks`, `build`, `typecheck`, `server-tests` [4-way sharded], `other-tests`, `e2e`,
+final `gate` aggregator), `scripts/check-no-silent-skips.mjs` (new — fails a shard if a `.skipIf(`-guarded
+file contributes zero passed/failed tests; verified with three planted, uncommitted probe files: no-skipIf
+ignored, partial-skip passes, fully-skipped-file fails at exit 1), `Features.md` §13 stub (Task 14 entries
+only — 2 bullets), `test-cases/13-deployment-dogfooding.md` (new, cases 13.1–13.5, opens the bucket early
+per README convention), `test-cases/README.md` (index entry for the new bucket).
 
-Run as ONE `run_in_background: true` invocation, never split across calls or foregrounded with a sleep.
+**T15 files** (unstaged/untracked, NOT yet committed — waiting on T14's PR first, per the "two PRs, T14
+first" instruction): `deploy/do/app.yaml`, `deploy/do/README.md`, `scripts/check-db-timezone.mjs` (verified
+falsifiable against a throwaway db forced to UTC — exit 1 — and against the shared dev postgres, server-
+wide `-c timezone=Asia/Kolkata` — exit 0), `package.json` (+`check:db-tz` script, +root `pg` dependency
+`^8.13.0` matching `apps/server`'s own range — pnpm resolved both to 8.23.0), `pnpm-lock.yaml` (regenerated
+by `pnpm install`, 26-line diff, not hand-edited).
 
-**3. Postgres went down mid-session** (Docker VM disk full, panic-loop on checkpoints) and came back
-(Lane E cleared its own build cache). **Verify independently before trusting either state** —
-`docker exec <postgres-container> pg_isready` — rather than taking a peer's word for it either way.
+**Corrections made against the plan's own draft** (docs/superpowers/plans/2026-08-20-11-deployment-
+dogfooding.md T15 section, ~lines 3780-4157) — the plan's `app.yaml` snippet uses `S3_ENDPOINT`/
+`S3_REGION`/`S3_BUCKET`/`S3_ACCESS_KEY`/`S3_SECRET_KEY` and `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_WS_URL`,
+and NONE of those five are read by any shipped code (confirmed via `pnpm check:env`, which passes
+unchanged with the corrected names: `OBJECT_STORE`, `OBJECT_STORE_S3_*` (attachments,
+`store-config.ts`), `SERVER_ORIGIN` + `NEXT_PUBLIC_SERVER_URL` (web, `next.config.ts` / `providers.tsx`)).
 
-## What Task 16 actually is
+**Two open items recorded, not resolved** (in `deploy/do/README.md`'s own "does NOT resolve" section):
+1. The **deploy-sha env var** `/healthz` is meant to serve (per a controller ruling recorded in
+   claude-mem, not yet in any file this lane can cite by path) — checked `origin/exec/23-plan11` at
+   `26c0f7e` directly, confirmed no such variable exists in `config.ts` yet. Lane E notified
+   (msg sent 2026-09-06, see SendMessage log) to reconcile the exact name once it lands.
+2. Whether the **backup worker's S3 credentials** are its own or shared with the app's
+   `OBJECT_STORE_S3_*` pair — `.env.example` only documents `BACKUP_S3_BUCKET` (a bucket name), no
+   separate credential vars exist yet. `app.yaml`'s `backup` worker currently reuses the app's pair as
+   a stated working assumption. Task 11 (not this lane's) settles it.
 
-`apps/desktop` — Tauri 2 + Vite React shell over the replica `DataSource`. Scaffolded via a background
-Workflow (sonnet implement → opus review of `tauri-sql-storage.ts`, the one honesty-carrying file; no
-fable anywhere in this lane), then hardened directly. Full detail is in the PR body and in
-`Features.md`/`test-cases/12` (case 12.228–12.229); the headline points:
+**Root `package.json` collision with Lane E**: flagged to `lane5-plan11-1d` via SendMessage BEFORE
+staging the T15 commit — the two-line addition (`check:db-tz` script, root `pg` dependency) is the exact
+shape to reconcile at rebase if Lane E's `exec/23-plan11` touches the same blocks first.
 
-- **Real deviations from the plan's stale Task 16 text**, verified against actual source:
-  `createReplicaDataSource`/`ReplicaDataSource`/`TicketSummary` live in `@gisik-nokma/app-core` (not
-  `sync-client`) with `workspaceId`/`storage` in its deps; `SyncStatusBar`/`ContestBanner` don't exist
-  yet (rendered inline); `listTicketSummaries` replaces the nonexistent `listTickets`; React `^19` to
-  match `app-core`'s peer dependency; separate `build`/`typecheck` scripts per this lane's override.
-- **Beyond the plan's fixture test**: a conformance test running the real `storageConformanceTests`
-  against the adapter backed by a genuine in-memory `better-sqlite3` database. Both test files proven
-  load-bearing by mutation.
-- **`apps/desktop/src-tauri/icons/icon.png`** (placeholder) required beyond the plan's file list —
-  `tauri::generate_context!()` needs it on Unix, verified in `tauri-codegen`'s own source.
-- **`.gitignore`** gained `**/src-tauri/target/` and `**/src-tauri/gen/`.
+## REVIEW STATUS
 
-**CRITICAL, MEASURED not fixed — reported to the controller, ruled on, re-measured per that ruling:**
-`tauri-plugin-sql` 2.4.1's public `Builder` exposes no pool-size/connection-pinning option. Per the
-controller's ruling, evaluated the TypeScript-side option too before accepting this as permanent: built
-a standalone `sqlx=0.8.6` probe (the plugin's own pinned version) replicating its exact
-`Pool::connect`/`sqlx::query`/`pool.execute` pattern. Result — this adapter's own BEGIN-then-INSERT
-pattern reproducibly hits `SQLITE_BUSY (code 5)` with **zero concurrency** (not just a race); a single
-`execute()` call carrying a whole transaction as one multi-statement string **does** work and pins the
-connection, but does **not** generalise here because every real production caller of
-`SyncStorage.transaction` (`schema.ts`, all four sites in `replica.ts`) reads with `tx.all()` inside the
-transaction and branches on the result — dynamic control flow no pre-built SQL string can express.
-Documented with this measurement in the adapter's docblock, `Features.md` §12, and `test-cases/12`
-(case 12.229's "RECORDED, NOT FIXED" item). Owner: whoever next hardens this adapter for real
-multi-device use. The paired Important finding (StrictMode double-invoke defeating the queue) **was**
-fixed with a per-`dbName` cache in `createTauriSqlStorage`.
+Two Workflow-orchestrated reviews launched (ultracode opt-in this session):
+- `ci-yml-opus-review` (opus, high effort) — adversarial review of the 8-job `ci.yml` split, hunting
+  specifically for "silently skips a suite" class bugs (this lane's own re-task brief names this as the
+  reason ci.yml gets an opus reviewer, not the table's default sonnet). Run id in `/tmp` workflow logs;
+  outcome not yet folded into this file as of this write — check for a later revision of this section.
+- `deploy-spec-review` (sonnet, medium effort) — independent verification of every env var name in
+  `deploy/do/app.yaml` against the actual `store-config.ts`/`next.config.ts`/`config.ts` reads, not
+  trusting this file's own comments.
+**If this file is being read after a restart and these reviews aren't mentioned as resolved below, they
+may still be running or their findings may not yet be applied — check `/tmp/laneC-*` logs and this
+session's workflow transcripts before assuming the diff is final.**
 
-## Gate — independently re-verified twice, not just self-reports
+## GATE LOCK PROTOCOL USED THIS SESSION
 
-Package-scoped (every push): node 22, `tsc -p apps/desktop/tsconfig.json` clean, `cargo check` in
-`src-tauri` clean, `vitest run` in `apps/desktop` → 5/5 (use `rtk proxy "pnpm exec vitest run
---reporter=verbose"` — the bare form collapses to a count-free `PASS/FAIL` line via the rtk hook).
+The current (not the stale inline `echo $$`) form, ONE backgrounded invocation, `mkdir`-based lock with
+a 60s empty-pid grace and a 10-minute loud-proceed bound on the live-vitest-pool drain wait. Script at
+`/tmp/laneC-gate.sh`, log at `/tmp/laneC-gate.log`. Reap orphans by `ppid=1` only if ever needed — never
+`pkill -f vitest`, never kill `pgrep -f vitest`'s output (five lanes' sessions all contain that string).
 
-**Full monorepo gate — corrected finding.** An earlier revision of this file and the PR claimed the full
-gate could not reach `apps/desktop` because `app-core` had 8 pre-existing TS errors on `origin/main`.
-**That was wrong** — it was a stale-`dist` artifact of this reused worktree (rebuild fresh:
-`pnpm turbo run build --filter=@gisik-nokma/app-core... --concurrency=1` → 5/5). The controller caught
-this; corrected in the PR body. The REAL full gate (run once Postgres was confirmed back, through the
-corrected lock protocol): **27/27 tasks, exit 0, 0 cached** — `@gisik-nokma/server:test` 90 files / 979
-tests against the recovered Postgres, `@gisik-nokma/desktop:test` 2/5 matching the package-scoped run,
-`@gisik-nokma/desktop:typecheck` clean. No orphaned vitest workers, lock released cleanly.
+## NEXT STEPS, IN ORDER
 
-**No simulator, no app launch, no `tauri build` claim anywhere.**
+1. Confirm `/tmp/laneC-gate.log`'s `GATE_EXIT=` line is `0` before committing anything (full forced gate,
+   no cache, against the T14-staged tree — T15's files are untracked so this run does NOT yet cover them).
+2. Fold both review workflows' findings in (fix only Important/Critical; note Minor/Nit as accepted or
+   fixed at discretion).
+3. Commit T14 alone (files listed above), push `exec/24-plan11-ci-deploy`, open PR #1. Report to
+   `gisik-nokma-0d` per the standard format (head sha, `Tasks:` line, test count, node version,
+   `0 cached`, `check:env` on its own line, honest not-verified sentence: "Actions job steps verified from
+   the PR's own run at <sha>: <list>" once that run exists).
+4. Rebase onto `origin/main` again (in case T14's own PR or anything else landed), re-run the gate scoped
+   to T15's files (a full forced gate again, since `package.json`/`pnpm-lock.yaml` change affects the
+   whole install), stage + commit T15 alone, push, open PR #2. Report similarly, with the honest sentence
+   "the spec was not applied to any live app".
+5. Do NOT start any other Plan 11 task without a controller message (Lane D has T7/T8, Lane E has
+   everything else named in the file map).
 
-## If resumed after a restart with no PR visible
+## THINGS A RESTARTED SESSION MUST NOT ASSUME
 
-Something went wrong between here and GitHub. `git log --oneline -8` on this branch should show the
-Task 16 commit plus two doc-fix/measurement commits; if branch content looks right but no PR exists,
-just `gh pr create` (see git history for the body shape) rather than redoing any of the above work.
+- The gate run launched at branch-cut may still be in flight, may have found a real failure, or may have
+  been superseded by a later run against a rebased tree — its log's mtime and `GATE_EXIT=` line are the
+  only trustworthy signal, not this prose.
+- Both review workflows' findings are NOT summarized here yet (written before they returned) — do not
+  proceed to commit without checking whether a later edit to this file folded them in, and if not,
+  checking the workflow transcripts directly before assuming "no findings" == "clean".
+- `origin/exec/23-plan11`'s sha will have moved. Re-check it before trusting anything above about Lane
+  E's current state (the deploy-sha variable, the root `package.json` collision shape).
