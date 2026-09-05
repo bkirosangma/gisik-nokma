@@ -224,16 +224,45 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
 });
 
 /**
- * `getTicket` REFUSES against the shipped server today (`ServingGapError`): the
- * route answers a `proj_visibility` row wrapped in `{ticket, parent, rollup}`,
- * which carries no title, no provenance block and no `TicketState`. The refusal
- * has to reach the surface AS a refusal.
+ * `getTicket` USED TO REFUSE here, and does not any more — ruling P25 clause 1
+ * closed `TicketRead.title`, `.stateProvenance` and `.ticket`, so the register
+ * names none of this view's four reads (`getTicket`, `getWorkflowDef`,
+ * `getMembers`, `getTicketHistory`).
+ *
+ * The refusal PATH in the view is still live and still worth pinning: nothing
+ * stops a future gap opening on one of those reads, and the failure this guards
+ * against — a refusal rendering as a wait that never ends — is a property of the
+ * view, not of which methods happen to refuse this week.
+ *
+ * So the absences below are CONSTRUCTED rather than read off `SERVING_GAPS`.
+ * The original case took them from the register on purpose, reasoning that "a
+ * hand-written Error would keep passing on the day the gap closes, which is the
+ * one day this case must change" — and that day arrived, which is what makes
+ * this edit the case changing rather than the case being weakened. The control
+ * below is INVERTED to carry the same duty: it asserts the register names none
+ * of this view's reads, which is the fact that licenses hand-construction, and
+ * it goes red the day a new gap opens on one of them.
  */
 describe('TicketSheet — a refused read is a refusal, never a wait that never ends', () => {
   it('PLANTED DEFECT: the serving gap renders under its own class, and "Loading…" is nowhere', async () => {
     const source = createFakeDataSource({
       getTicket: async () => {
-        throw new ServingGapError('getTicket', SERVING_GAPS['getTicket'] ?? []);
+        throw new ServingGapError('getTicket', [
+          {
+            field: 'TicketRead.title',
+            wireKey: 'title',
+            wireRoute: `/v1/workspaces/${WS}/tickets/${TICKET}`,
+            because: 'constructed: see this describe block on why it is not read off the register',
+            owner: 'test fixture — the real entry was closed by P25 clause 1',
+          },
+          {
+            field: 'TicketRead.stateProvenance',
+            wireKey: 'stateProvenance',
+            wireRoute: `/v1/workspaces/${WS}/tickets/${TICKET}`,
+            because: 'constructed: see this describe block on why it is not read off the register',
+            owner: 'test fixture — the real entry was closed by P25 clause 1',
+          },
+        ]);
       },
       getWorkflowDef: async () => WF_ERRAND,
       getMembers: async () => [],
@@ -259,8 +288,14 @@ describe('TicketSheet — a refused read is a refusal, never a wait that never e
     expect(document.querySelector('.gn-ticket-sheet__details')).toBeNull();
   });
 
-  it('CONTROL — the register really does carry getTicket absences, so the assertion above is a measurement', () => {
-    expect((SERVING_GAPS['getTicket'] ?? []).length).toBeGreaterThan(0);
+  it('CONTROL (inverted) — the register names NONE of this view\'s reads, which is what licenses constructing the absences above', () => {
+    for (const method of ['getTicket', 'getWorkflowDef', 'getMembers', 'getTicketHistory']) {
+      expect(SERVING_GAPS[method], method).toBeUndefined();
+    }
+    // Non-vacuity: the register is not simply empty. Four methods still refuse,
+    // so `toBeUndefined` above is a fact about THESE reads rather than about a
+    // register nobody populates any more.
+    expect(Object.keys(SERVING_GAPS).length).toBeGreaterThan(0);
   });
 });
 

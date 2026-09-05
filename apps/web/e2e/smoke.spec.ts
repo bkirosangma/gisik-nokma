@@ -127,8 +127,10 @@ async function stubApi(page: Page): Promise<void> {
   );
 
   // GET /v1/projects/:projectId/tickets — apps/server/src/routes/list.ts:480.
-  // Stubbed so the List tab makes its request; `getTickets` REFUSES in the
-  // client regardless of the body, so this stub cannot make the list render.
+  // Stubbed so the List tab makes its request. The body is deliberately a
+  // groupless one: `mapListView` maps it (it REFUSED outright until ruling P25
+  // clause 1) and answers zero rows, so this stub still cannot make the list
+  // render tickets — it only proves the request is made.
   await page.route(`**/v1/projects/${PRJ}/tickets*`, (route) =>
     route.fulfill({ json: { projectId: PRJ, groups: [], nextCursor: null } }),
   );

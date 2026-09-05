@@ -242,8 +242,6 @@ describe('3.40 the blocked methods refuse through the DataSource', () => {
     const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
     const expected: ReadonlyArray<[string, () => Promise<unknown>, string]> = [
       ['getMyWorkspaces', () => source.query.getMyWorkspaces(), 'WorkspaceRef.projects'],
-      ['getTickets', () => source.query.getTickets(PROJECT, {}, 'flat'), 'ListRow.typeRank'],
-      ['getTicket', () => source.query.getTicket(WORKSPACE, 't_1'), 'TicketRead.title'],
       ['search', () => source.query.search(WORKSPACE, 'q'), 'SearchHit.matchedIn'],
       ['getMyWork', () => source.query.getMyWork(WORKSPACE), 'ContestedClaim.title'],
       ['getAttention', () => source.query.getAttention(WORKSPACE), "kind 'contested'"],
@@ -251,6 +249,27 @@ describe('3.40 the blocked methods refuse through the DataSource', () => {
     for (const [method, call, field] of expected) {
       await expect(call(), method).rejects.toBeInstanceOf(ServingGapError);
       await expect(call(), method).rejects.toThrow(field);
+    }
+
+    // `getTickets` and `getTicket` WERE in the list above and are not any more
+    // (ruling P25 clause 1). Asserting their new silence rather than deleting
+    // two rows is the point: a refusal that stops refusing has to be pinned as
+    // SERVED, or the only record that it ever refused is a shorter array.
+    //
+    // The assertion is "not a serving gap" rather than "resolves", deliberately.
+    // These stubs are minimal bodies built to make a REFUSAL observable, not to
+    // satisfy a mapper, so demanding a resolved view here would test the fixture
+    // rather than the change.
+    const nowServed: ReadonlyArray<[string, () => Promise<unknown>]> = [
+      ['getTickets', () => source.query.getTickets(PROJECT, {}, 'flat')],
+      ['getTicket', () => source.query.getTicket(WORKSPACE, 't_1')],
+    ];
+    for (const [method, call] of nowServed) {
+      const outcome = await call().then(
+        () => 'resolved',
+        (err: unknown) => (err instanceof ServingGapError ? 'serving-gap' : 'other-error'),
+      );
+      expect(outcome, method).not.toBe('serving-gap');
     }
   });
 });

@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import {
+  BUILTIN_TICKET_TYPE_SEEDS,
+  SIMPLE_KANBAN_TEMPLATE,
+  newUlid,
+  type SubmittedEvent,
+} from '@gisik-nokma/domain';
 import type { FastifyInstance } from 'fastify';
 import type { LogOtpSender } from '../../src/auth/otp-sender.js';
 import { READ_NOT_FOUND_BODY } from '../../src/read/membership.js';
@@ -346,6 +351,42 @@ function expectedCard(over: {
   };
 }
 
+/**
+ * The LIST route's card: `expectedCard` plus the five facts ruling P25 clause 1
+ * added to it, and only the list route serves them.
+ *
+ * `stateName` is read out of `SIMPLE_KANBAN_TEMPLATE` rather than typed as a
+ * literal, for the reason `workflowId` and `stateId` are parameters above: the
+ * name is the SERVER's, out of the definition the bootstrap cloned, and a
+ * literal here would be this file and the assertion agreeing with each other
+ * instead of with the product. `typeRank` is read out of
+ * `BUILTIN_TICKET_TYPE_SEEDS` for the same reason — and it is the reason the
+ * epic RANK, not the id `'epic'`, is what the route groups by.
+ */
+function expectedListCard(
+  over: Parameters<typeof expectedCard>[0] & {
+    epicId: string | null;
+    assignedProvenance: Record<string, unknown> | null;
+    hasRestrictedParent: boolean;
+  },
+): Record<string, unknown> {
+  const rank = BUILTIN_TICKET_TYPE_SEEDS.find((seed) => seed.id === over.typeId)?.rank;
+  const stateName = SIMPLE_KANBAN_TEMPLATE.states.find((state) => state.id === over.stateId)?.name;
+  // Both lookups fail LOUDLY: `undefined` in either slot would compare equal to
+  // a route that omitted the field, which is the one way this pin could pass by
+  // being broken.
+  expect(rank, `no builtin seed for type ${over.typeId}`).toBeTypeOf('number');
+  expect(stateName, `no kanban state named ${over.stateId}`).toBeTypeOf('string');
+  return {
+    ...expectedCard(over),
+    typeRank: rank,
+    epicId: over.epicId,
+    stateName,
+    assignedProvenance: over.assignedProvenance,
+    hasRestrictedParent: over.hasRestrictedParent,
+  };
+}
+
 describe('the world was built through the doors, and the server chose these values', () => {
   it('the ticket resolved its type against the FOUNDING sequence — nothing here typed the workflow or the state', () => {
     // What a seeded board test cannot say. `applyCommitted` writes
@@ -515,7 +556,7 @@ describe('GET /v1/projects/:projectId/tickets — the list', () => {
     const byId = [parentId, childId].sort();
     const cards = byId.map((id) =>
       id === parentId
-        ? expectedCard({
+        ? expectedListCard({
             ticketId: parentId,
             parentId: null,
             typeId: 'story',
@@ -529,8 +570,13 @@ describe('GET /v1/projects/:projectId/tickets — the list', () => {
               uncategorizedChildren: 0,
               restrictedCount: 0,
             },
+            // A root, so no parent to be restricted; a story, so no epic-ranked
+            // ancestor-or-self; never assigned, so no assignment claim exists.
+            epicId: null,
+            assignedProvenance: null,
+            hasRestrictedParent: false,
           })
-        : expectedCard({
+        : expectedListCard({
             ticketId: childId,
             parentId,
             typeId: 'task',
@@ -539,6 +585,23 @@ describe('GET /v1/projects/:projectId/tickets — the list', () => {
             assigneeId: member.userId,
             title: 'Count the crates',
             rollup: null,
+            // Its parent is the story, which is rank 2 and not the epic rank, so
+            // the walk finds no epic — `null` here is the walk answering, not the
+            // field being absent.
+            epicId: null,
+            // The `ticket.assigned` this file posted, attributed and stamped by
+            // the server. Two different facts from two different events sit on
+            // this card now — the STATE claim is the `ticket.transitioned`, the
+            // ASSIGNMENT claim is the `ticket.assigned` — and a mapper reading
+            // one for the other would still satisfy a presence check.
+            assignedProvenance: {
+              actorId: member.userId,
+              clientTime: 'CLIENT-TIME',
+              serverTime: 'SERVER-TIME',
+            },
+            // The parent is visible to this viewer — the single-read case below
+            // is the same fact from the other side.
+            hasRestrictedParent: false,
           }),
     );
 
@@ -580,13 +643,23 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
 
     const body = res.json() as {
       ticket: Record<string, unknown>;
-      parent: { kind: string; id: string; ticket: Record<string, unknown> };
+      parent: { kind: string; id: string; title: string; ticket: Record<string, unknown> };
       rollup: unknown;
     };
     expect(typeof body.ticket['seq']).toBe('number');
     expect(typeof body.parent.ticket['seq']).toBe('number');
 
-    expect(body).toEqual({
+    // `ticketState.transitions[0].seq` is the ledger's own per-entity sequence,
+    // minted by the database exactly as the two `seq`s above are, so it is
+    // carried across rather than typed — and asserted to BE a number first, so
+    // carrying it cannot carry an absence.
+    const transitions = (body as unknown as {
+      ticketState: { transitions: Array<Record<string, unknown>> };
+    }).ticketState.transitions;
+    expect(transitions).toHaveLength(1);
+    expect(typeof transitions[0]?.['seq']).toBe('number');
+
+    expect(freezeClocks(body)).toEqual({
       ticket: {
         ticket_id: childId,
         workspace_id: workspaceId,
@@ -596,9 +669,52 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
         resolved_mode: 'project',
         seq: body.ticket['seq'],
       },
+      // The domain state, the title and the state provenance joined this body
+      // with ruling P25 clause 1. The title is served under `canSee` — the very
+      // guard that already stood in front of this handler — and the parent's
+      // title under the `canSee` call that chooses the parent's arm.
+      ticketState: {
+        kind: 'ticket',
+        id: childId,
+        workspaceId,
+        projectId,
+        typeId: 'task',
+        parentId,
+        workflowId,
+        workflowVersion: 1,
+        stateId: 'doing',
+        stateCategory: 'active',
+        assigneeId: member.userId,
+        collaboratorIds: [],
+        fields: {
+          title: {
+            value: 'Count the crates',
+            actorId: member.userId,
+            clientTime: 'CLIENT-TIME',
+            serverTime: 'SERVER-TIME',
+          },
+        },
+        transitions: [
+          {
+            toStateId: 'doing',
+            actorId: member.userId,
+            seq: transitions[0]?.['seq'],
+            workflowId,
+            workflowVersion: 1,
+          },
+        ],
+      },
+      title: 'Count the crates',
+      stateProvenance: {
+        actorId: member.userId,
+        clientTime: 'CLIENT-TIME',
+        serverTime: 'SERVER-TIME',
+        cause: null,
+      },
       parent: {
         kind: 'ticket',
         id: parentId,
+        title: 'Restock the chiller',
         ticket: {
           ticket_id: parentId,
           workspace_id: workspaceId,

@@ -40,7 +40,8 @@ export default function WorkspacesPage() {
       <AppNav />
       <h1 className="gn-page-title">Workspaces{user !== null ? ` — ${user.name}` : ''}</h1>
       {/* Error before data, everywhere in this shell. `getMyWorkspaces` is one
-          of the six refusing reads, so `workspaces === null` is its NORMAL
+          of the refusing reads (four of them since ruling P25 clause 1; this is
+          still one), so `workspaces === null` is its NORMAL
           resting state against the shipped server and a bare "Loading…" here
           would be a spinner that never stops. */}
       {expired ? (
@@ -76,7 +77,8 @@ export default function WorkspacesPage() {
 
       {/*
         OUTSIDE the list's three branches, and deliberately so. `getMyWorkspaces`
-        is one of the six refusing reads, so `error` is its NORMAL resting state
+        is one of the refusing reads — four of them since ruling P25
+        clause 1, and this is still one — so `error` is its NORMAL resting state
         against the shipped server — and a founding form nested inside the
         `workspaces.length === 0` arm would be a form nobody could ever reach.
         A person who cannot be told which workspaces they are in can still found

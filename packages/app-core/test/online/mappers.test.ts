@@ -4,6 +4,8 @@ import type {
   AttentionResponse,
   BoardResponse,
   MemberListResponse,
+  ListCard,
+  ListResponse,
   MyWorkResponse,
   SearchResponse,
   TicketCard,
@@ -768,8 +770,16 @@ describe('3.38 toServerFilterSpec — the plural/singular disagreement, made lou
 });
 
 /**
- * 3.39 — the six refusals. Each asserts the enumeration, not the partiality:
+ * 3.39 — the refusals. Each asserts the enumeration, not the partiality:
  * WHICH facts are absent and WHO closes them.
+ *
+ * **FOUR of them, and it was six.** `getTickets` and `getTicket` answered with a
+ * `ServingGapError` until ruling P25 clause 1's buildable subset landed; their
+ * entries are gone from `SERVING_GAPS` rather than emptied, and 3.42 below is
+ * what replaced them — the same two methods asserted to MAP, over bodies
+ * carrying the facts that used to be missing. The case id is kept and its claim
+ * inverted, on 7.189's precedent: a divergence that closed can silently re-open,
+ * and deleting the case is what makes that invisible.
  *
  * These are pinned on the SERVER side too, and that is where they can go red for
  * the right reason: `apps/server/test/integration/client-contract.test.ts` reads
@@ -788,26 +798,6 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
       method: 'getMyWorkspaces',
       call: () => mapWorkspaceRefs({ workspaces: [{ workspaceId: 'w', name: 'n', role: 'owner' }] }),
       fields: ['WorkspaceRef.projects'],
-    },
-    {
-      method: 'getTickets',
-      call: () => mapListView({ projectId: 'p', groupBy: 'flat', groups: [], nextCursor: null }),
-      fields: [
-        'ListRow.typeRank',
-        'ListRow.epicId',
-        'ListRow.stateName',
-        'ListRow.hasRestrictedParent',
-        'ListRow.assignedProvenance',
-      ],
-    },
-    {
-      method: 'getTicket',
-      call: () => mapTicketRead({ ticket: { ticket_id: 't' }, parent: null, rollup: null }),
-      fields: [
-        'TicketRead.title',
-        'TicketRead.stateProvenance',
-        'TicketRead.ticket (a domain TicketState)',
-      ],
     },
     {
       method: 'search',
@@ -931,18 +921,266 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
     expect(contested[1]?.because).toContain('never committed');
   });
 
-  it('3.39 the register covers exactly the six blocked methods', () => {
+  it('3.39 the register covers exactly the four blocked methods', () => {
     expect(Object.keys(SERVING_GAPS).sort()).toEqual([
       'getAttention',
       'getMyWork',
       'getMyWorkspaces',
-      'getTicket',
-      'getTickets',
       'search',
     ]);
-    // Positive control on the sort above: the six that are NOT here are the six
-    // this source answers, and `getBoard` is the one P25 clause 1 unblocked.
+    // Positive control on the sort above: the methods NOT here are the ones this
+    // source answers. `getBoard` is the one P25 clause 1 unblocked first;
+    // `getTickets` and `getTicket` are the two it unblocked in this change set,
+    // and they are asserted ABSENT here rather than merely left out, because an
+    // entry hollowed to `[]` would still be a key.
     expect(SERVING_GAPS['getBoard']).toBeUndefined();
     expect(SERVING_GAPS['getMembers']).toBeUndefined();
+    expect(SERVING_GAPS['getTickets']).toBeUndefined();
+    expect(SERVING_GAPS['getTicket']).toBeUndefined();
   });
 });
+/**
+ * 3.42 — the two methods ruling P25 clause 1 UNBLOCKED, asserted to map.
+ *
+ * This is what replaced two of 3.39's six entries. A deleted refusal leaves
+ * nothing that would notice the day the mapper is rewritten to invent a
+ * `stateName` again, so the refusal case is not merely removed: the same two
+ * methods are pinned mapping real bodies, and — the half a permitted-case suite
+ * would miss — pinned WITHHOLDING on the body where the rule excludes.
+ *
+ * The list fixture is typed `ListResponse`, so a `ListCard` field that is
+ * renamed or dropped on the server fails `typecheck` here rather than
+ * disagreeing with a comment. The ticket-read fixture cannot be: that route
+ * composes its body inline and no domain type names it. Stated rather than left
+ * looking equivalent — the server half of that shape is 7.203 in
+ * `apps/server/test/integration/client-contract.test.ts`, against a real body.
+ */
+describe('3.42 getTickets and getTicket map, and the withheld case is withheld', () => {
+  function serverListCard(overrides: Partial<ListCard> = {}): ListCard {
+    return {
+      ...serverCard(),
+      typeRank: 3,
+      epicId: '01J9GTKE000000000000000000',
+      stateName: 'Doing',
+      assignedProvenance: {
+        actorId: BIREN,
+        clientTime: '2026-08-19T09:59:00.000Z',
+        serverTime: '2026-08-19T10:01:00.000Z',
+      },
+      hasRestrictedParent: false,
+      ...overrides,
+    };
+  }
+
+  it('maps a list body into rows carrying all five formerly-absent facts', () => {
+    const body: ListResponse = {
+      projectId: '01J9GPRJ000000000000000000',
+      groupBy: 'flat',
+      groups: [{ key: 'all', label: 'All tickets', cards: [serverListCard()] }],
+      nextCursor: null,
+    };
+    const view = mapListView(body);
+    expect(view.projectId).toBe('01J9GPRJ000000000000000000');
+    const row = view.rows[0];
+    // The five, by value and not by presence: a `toHaveProperty` sweep would
+    // pass on a mapper that read every one of them off the wrong key.
+    expect(row?.typeRank).toBe(3);
+    expect(row?.epicId).toBe('01J9GTKE000000000000000000');
+    expect(row?.stateName).toBe('Doing');
+    expect(row?.assignedProvenance?.actorId).toBe(BIREN);
+    expect(row?.hasRestrictedParent).toBe(false);
+    // The roster is empty by force (no workspace id is on this body or in the
+    // signature), so the assignee degrades to its id and the provenance name to
+    // null — both documented absence values, neither an invented name.
+    expect(row?.assignee).toEqual({ id: ANSELMA, name: ANSELMA });
+    expect(row?.assignedProvenance?.actorName).toBeNull();
+  });
+
+  it('flattens groups in order and loses no card', () => {
+    const body: ListResponse = {
+      projectId: 'p',
+      groupBy: 'status',
+      groups: [
+        { key: 'a', label: 'A', cards: [serverListCard({ ticketId: 't1' })] },
+        {
+          key: 'b',
+          label: 'B',
+          cards: [serverListCard({ ticketId: 't2' }), serverListCard({ ticketId: 't3' })],
+        },
+      ],
+      // `null`, and it USED to read `'t3'` here. This case is about flattening
+      // groups in order, and it carried a non-null cursor incidentally — which
+      // means it asserted that a PAGE maps to a complete list. The fixture was
+      // encoding the defect, not merely failing to catch it.
+      nextCursor: null,
+    };
+    expect(mapListView(body).rows.map((row) => row.ticketId)).toEqual(['t1', 't2', 't3']);
+  });
+
+  it('REFUSES a page: a non-null nextCursor is not served as the whole project', () => {
+    // The server pages at 50 and emits a cursor when it saw a 51st row.
+    // `TicketListView` is `{projectId, rows}` — no cursor, no "there is more" —
+    // so dropping it hands the caller fifty rows meaning "this project's
+    // tickets". The project page renders that as the complete set and a
+    // calendar then asserts nothing is due on a day that has work on it.
+    const paged = {
+      projectId: 'p',
+      groupBy: 'flat',
+      groups: [{ key: 'all', label: 'A', cards: [serverListCard({ ticketId: 't1' })] }],
+      nextCursor: 't1',
+    };
+    expect(() => mapListView(paged)).toThrow(MappingError);
+
+    // THE CONTROL, in the same run and over the same body: with the cursor
+    // null, the identical rows map. So this is a fact about the cursor and not
+    // about `mapListView` having stopped answering — the distinction the
+    // "flattens groups" case above could not make while its own cursor was set.
+    expect(mapListView({ ...paged, nextCursor: null }).rows.map((r) => r.ticketId)).toEqual(['t1']);
+  });
+
+  it('refuses a row whose hasRestrictedParent is missing rather than reading it as false', () => {
+    // The harmful direction of this flag is `false` — "no parent is being kept
+    // from you" — so a body that lost it must fail loudly. `record['x'] === true`
+    // would have answered `false` here and rendered a complete-looking row.
+    const card = serverListCard() as Record<string, unknown>;
+    delete card['hasRestrictedParent'];
+    expect(() =>
+      mapListView({ projectId: 'p', groupBy: 'flat', groups: [{ key: 'all', label: 'A', cards: [card] }] }),
+    ).toThrow(MappingError);
+  });
+
+  it('maps a ticket read whose parent is VISIBLE, title and all', () => {
+    const read = mapTicketRead(ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' }));
+    expect(read.title).toBe('File the GST return');
+    expect(read.ticket.kind).toBe('ticket');
+    expect(read.ticket.stateId).toBe('doing');
+    expect(read.ticket.transitions).toHaveLength(1);
+    expect(read.stateProvenance.actorId).toBe(ANSELMA);
+    expect(read.parent).toEqual({ kind: 'ticket', id: 'parent-1', title: 'The epic' });
+  });
+
+  it('THE EXCLUSION — a restricted parent arrives as existence-without-title, and no title reaches the view', () => {
+    const read = mapTicketRead(ticketReadBody({ kind: 'restricted', id: 'parent-1' }));
+    expect(read.parent).toEqual({ kind: 'restricted', id: 'parent-1' });
+    // Structural, not merely absent-valued: the restricted arm of `ParentRef`
+    // has no `title` field, so this asserts the mapper did not smuggle one in
+    // under a shape the type would have allowed to pass unread.
+    expect(Object.keys(read.parent ?? {}).sort()).toEqual(['id', 'kind']);
+    // The control in the same run: the ticket's OWN title is still there, so
+    // "no title on the parent" is not "this mapper produced nothing".
+    expect(read.title).toBe('File the GST return');
+  });
+
+  /**
+   * THE CASE EVERY OTHER TICKET-READ CASE SKIPS, and the reason it is written
+   * out rather than folded into one of them: `ticketReadBody`'s `rollup`
+   * defaulted to `null`, so all four cases above exercise a LEAF, and the
+   * branch that reads the rollup's keys was never entered. `getTicket` was
+   * recorded as SERVED on the strength of those four, and it answered a
+   * `MappingError` for every ticket that has children — the whole app-core
+   * suite green throughout.
+   *
+   * A fixture default is not neutral. `rollup: null` reads as "unset" and is
+   * in fact a choice of the one shape that skips the mapper's only branch.
+   */
+  it('maps a ticket that HAS CHILDREN — the branch four leaf fixtures never entered', () => {
+    const read = mapTicketRead(
+      ticketReadBody(
+        { kind: 'ticket', id: 'parent-1', title: 'Quarterly filings' },
+        { totalChildren: 3, terminalChildren: 1, uncategorizedChildren: 0, restrictedCount: 1 },
+      ),
+    );
+    // THREE keys, not four: `RollupToViewer` has no `uncategorizedChildren`
+    // field, and `mapRollup` refuses outright when that count is non-zero
+    // rather than rendering an admittedly incomplete total as a complete one.
+    // An exact `toEqual` is what says so — `toMatchObject` would have passed
+    // whether the key were dropped, kept, or renamed.
+    expect(read.rollup).toEqual({
+      totalChildren: 3,
+      terminalChildren: 1,
+      restrictedCount: 1,
+    });
+    // The control in the same run: a leaf still answers null, so this is a fact
+    // about the rollup branch and not about the mapper having stopped refusing.
+    expect(mapTicketRead(ticketReadBody({ kind: 'ticket', id: 'p', title: 't' })).rollup).toBeNull();
+  });
+
+  it("REFUSES rollupFor's own spelling, so a route regressing to it cannot pass silently", () => {
+    // `RollupView` — `{total, terminal, uncategorized, restrictedCount}` — is
+    // what `rollupFor` computes and what this route used to serve verbatim.
+    // The client has exactly ONE rollup vocabulary (`TicketRollup`, the shape
+    // `assembleTicketCards` already translates every card into), and a body in
+    // the other spelling is a body it cannot read. Pinning the REFUSAL matters
+    // more than pinning the success: the failure this guards against is the
+    // route quietly reverting, and a mapper that coerced the other spelling
+    // would hide that forever.
+    expect(() =>
+      mapTicketRead(
+        ticketReadBody(
+          { kind: 'ticket', id: 'parent-1', title: 'Quarterly filings' },
+          { total: 3, terminal: 1, uncategorized: 0, restrictedCount: 1 },
+        ),
+      ),
+    ).toThrow(MappingError);
+  });
+
+  it('refuses a parent whose kind it does not know rather than reading it as no parent', () => {
+    // `null` means "this ticket is a ROOT" — a statement about the work. A body
+    // that could not be read must not become one.
+    expect(() => mapTicketRead(ticketReadBody({ kind: 'hidden', id: 'parent-1' }))).toThrow(
+      MappingError,
+    );
+  });
+
+  function ticketReadBody(
+    parent: Record<string, unknown>,
+    rollup: unknown = null,
+  ): Record<string, unknown> {
+    return {
+      // The `proj_visibility` row the route still serves. The client reads
+      // nothing from it; it is here because the real body carries it.
+      ticket: { ticket_id: '01J9GTKA000000000000000000', own_mode: 'inherit', seq: 4 },
+      ticketState: {
+        kind: 'ticket',
+        id: '01J9GTKA000000000000000000',
+        workspaceId: '01J9GWS0000000000000000000',
+        projectId: '01J9GPRJ000000000000000000',
+        typeId: 'task',
+        parentId: 'parent-1',
+        workflowId: 'wf-errand',
+        workflowVersion: 2,
+        stateId: 'doing',
+        stateCategory: 'active',
+        assigneeId: ANSELMA,
+        collaboratorIds: [BIREN],
+        fields: {
+          title: {
+            value: 'File the GST return',
+            actorId: ANSELMA,
+            clientTime: '2026-08-19T09:58:12.000Z',
+            serverTime: '2026-08-19T10:00:00.000Z',
+          },
+        },
+        transitions: [
+          {
+            toStateId: 'doing',
+            actorId: ANSELMA,
+            seq: 4,
+            workflowId: 'wf-errand',
+            workflowVersion: 2,
+          },
+        ],
+      },
+      title: 'File the GST return',
+      stateProvenance: {
+        actorId: ANSELMA,
+        clientTime: '2026-08-19T09:58:12.000Z',
+        serverTime: '2026-08-19T10:00:00.000Z',
+        cause: null,
+      },
+      parent,
+      rollup,
+    };
+  }
+});
+

@@ -17,6 +17,14 @@ export type ProjTicketRow = {
   type_id: string;
   parent_id: string | null;
   workflow_id: string;
+  /**
+   * The version of `workflow_id` this ticket is FOLDED TO — not the latest
+   * published one. Selected for `ListCard.stateName`, which must name the state
+   * in the vocabulary this ticket actually sits in; carried on the row rather
+   * than on the card, because no `TicketCard` field is derived from it and
+   * putting it on the card would change four other routes' bodies.
+   */
+  workflow_version: number;
   state_id: string;
   state_category: StateCategory;
   assignee_id: string | null;
@@ -26,7 +34,8 @@ export type ProjTicketRow = {
 
 export const PROJ_TICKET_COLUMNS =
   't.ticket_id, t.workspace_id, t.project_id, t.type_id, t.parent_id, ' +
-  't.workflow_id, t.state_id, t.state_category, t.assignee_id, t.collaborator_ids, t.fields';
+  't.workflow_id, t.workflow_version, t.state_id, t.state_category, ' +
+  't.assignee_id, t.collaborator_ids, t.fields';
 
 /**
  * Rows for explicit ids, in `ticket_id` order.

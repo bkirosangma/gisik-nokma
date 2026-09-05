@@ -139,12 +139,20 @@ export type TicketDueDate =
  *   the disclosed trade the single-ticket route already makes (spec line 117,
  *   "existence, no title"). So null is unambiguous.
  * - `assigneeId: null` — nobody is assigned RIGHT NOW. It does not distinguish
- *   "never assigned" from "unassigned by somebody", and it cannot:
+ *   "never assigned" from "unassigned by somebody", and on THIS type it cannot:
  *   `proj_tickets.assignee_id` is a bare column with no provenance beside it,
  *   so the projection does not hold the difference either. Recorded rather than
  *   invented — this view model does not claim to carry unassignment provenance,
  *   and inventing a union whose second arm could never be populated would be
  *   worse than the honest gap.
+ *
+ *   **The LEDGER does hold it, and `ListCard.assignedProvenance` reads it**
+ *   (`apps/server/src/read/assigned-provenance.ts`). This paragraph used to end
+ *   at "the projection does not hold the difference either", which is a true
+ *   sentence about a table that a reader takes as a statement about the system;
+ *   `ticket.assigned` is an event like any other and its actor and both clocks
+ *   are in `events`. What is still true of THIS type is that a card carries no
+ *   such field, which is a fact about the card and not about the product.
  * - `collaboratorIds: []` — nobody is a collaborator. Never "withheld": the
  *   list is not filtered per viewer anywhere on the read path.
  * - `title` — always a claimed string. `ticket.created` writes `fields.title`
@@ -217,7 +225,79 @@ export type BoardColumn = {
 
 export type BoardResponse = { projectId: string; workspaceId: string; columns: BoardColumn[] };
 
-export type ListGroup = { key: string; label: string; cards: TicketCard[] };
+/**
+ * Who claimed the current ASSIGNMENT, and when — by both clocks.
+ *
+ * No `cause`, unlike `StateProvenance`: a reopen names the child that caused it
+ * because `ticket.transitioned` carries a `cause` field, and
+ * `ticket.assigned`'s payload is `{ assigneeId }` and nothing else
+ * (`packages/domain/src/events/ticket-events.ts:50`). A nullable `cause` here
+ * would be a field no event could ever fill.
+ */
+export type AssignmentProvenance = {
+  actorId: string;
+  clientTime: string;
+  serverTime: string;
+};
+
+/**
+ * A `TicketCard` plus the five facts the LIST route — and only the list route —
+ * also serves (ruling P25 clause 1).
+ *
+ * ## Why this is a separate type and not five fields on `TicketCard`
+ *
+ * `TicketCard` is shared by the board, search, My Work and the attention strip.
+ * Adding these there would put `stateName` on `GET /v1/me/work`, whose
+ * `WorkItem.stateName` gap is a DATA gap with a different answer (a My Work card
+ * names no workflow version to read a name from, and the ticket is not fetched
+ * with its project's workflow defs in hand) and is with the owner. A field
+ * addition that closes a gap on one surface and half-closes a differently-shaped
+ * one on four others is the "implemented on ONE DOOR of a set" defect run
+ * backwards. So the list route widens its OWN card and nothing else moves.
+ *
+ * ## Field by field, what each value means
+ *
+ * - `typeRank` — `proj_ticket_types.rank` for this card's `typeId`, read in the
+ *   card's own workspace. The ladder's rung, which is what an outline indents
+ *   by. Absent type row → the assembler throws: a ticket's type is written by
+ *   `ticket.created`, which the door refuses for an unknown type, so a card
+ *   whose type has no row means the projection and the ledger disagree.
+ * - `epicId` — the nearest ancestor-or-self whose type carries the EPIC rank AND
+ *   which this viewer may see; `null` when there is none, when the walk is
+ *   stopped by a link the viewer may not follow, or when the card is not itself
+ *   under one. Exactly `epicAncestors`' answer, which the route already computed
+ *   for `groupBy=epic` and threw away for every other grouping.
+ * - `stateName` — the state's name **in the definition this ticket is folded
+ *   to**, `(workflow_id, workflow_version)` off the ticket's own row — never the
+ *   latest definition's. Reading the latest would be the `workflowVersion` lie
+ *   in miniature: a name from a vocabulary this ticket was never folded into.
+ *   No published definition at that version, or no such state in it → the
+ *   assembler throws rather than falling back to the state id, which would put
+ *   a slug where a name goes.
+ * - `assignedProvenance` — the claim that produced the CURRENT assignee, or
+ *   `null` when nobody is assigned. `ticket.assigned` is the only event that
+ *   writes `assigneeId` (`ticket-state.ts:195`; `ticket.created` sets it to
+ *   `null` at `:136`), so the latest one is that claim. Assigned with no such
+ *   event → throw, the same ledger/projection disagreement `assembleTicketCards`
+ *   throws on.
+ * - `hasRestrictedParent` — this card names a parent, the parent HAS a
+ *   `proj_visibility` row, and `canSeeResolved` says this viewer may not see it.
+ *   `false` covers all three of "no parent", "a parent you may see" and "a
+ *   `parent_id` naming no row at all" — the last because the projection already
+ *   resolved such a ticket as a root (`proj-visibility.ts`), and claiming a
+ *   restricted parent there would invent an existence the system has no evidence
+ *   for. Strictly less than the `parent: { kind: 'restricted', id }` the single
+ *   ticket read already serves for the same viewer over the same rows.
+ */
+export type ListCard = TicketCard & {
+  typeRank: number;
+  epicId: string | null;
+  stateName: string;
+  assignedProvenance: AssignmentProvenance | null;
+  hasRestrictedParent: boolean;
+};
+
+export type ListGroup = { key: string; label: string; cards: ListCard[] };
 
 export type ListResponse = {
   projectId: string;

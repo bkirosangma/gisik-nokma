@@ -44,9 +44,10 @@ import {
  *
  * ## The two new arms refuse; they do not draw an empty month
  *
- * Step 5b's snippet renders the views over `(list.rows ?? []).map(...)`. Against
- * the server that ships today `getTickets` REFUSES — `mapListView` throws a
- * `ServingGapError` over five absent `ListRow` fields — so `list.rows` is null,
+ * Step 5b's snippet renders the views over `(list.rows ?? []).map(...)`. Whenever
+ * the read does not answer — a transport failure, a `MappingError`, or (until
+ * ruling P25 clause 1 served its five absent `ListRow` fields) the
+ * `ServingGapError` `mapListView` used to throw — `list.rows` is null,
  * `?? []` is `[]`, and `CalendarView` would draw a complete month grid with
  * nothing on it. That grid says "no ticket in this project has a claimed date",
  * which is the same invented fact as `attention.data ?? []` and the spinner over
@@ -259,7 +260,8 @@ function ProjectBoard() {
    * ## THE `?? []` THAT TOLD THE USER THIS PROJECT HAS NO TICKETS
    *
    * This used to read `parentCandidates = (list.rows ?? []).map(…)`, and against
-   * the shipped server `getTickets` REFUSES — so `list.rows` is null forever,
+   * the shipped server of the day `getTickets` REFUSED (ruling P25 clause 1 has
+   * since served its gaps) — so `list.rows` was null forever,
    * `parentCandidates` was permanently `[]`, and the New-ticket dialog's parent
    * picker offered "None (project root)" and nothing else. Measured with this
    * branch's own `stubServices({})`: `PARENT OPTIONS: ['None (project root)']`,

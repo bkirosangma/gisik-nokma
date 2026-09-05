@@ -138,6 +138,17 @@ let childTicketId: string;
 /** Granted then revoked, so the stream really has a `scope-revoked` to emit. */
 let exMember: { userId: string; headers: { authorization: string } };
 
+/**
+ * The EXCLUSION fixture for 7.212: a member who may see a child and NOT its
+ * parent. Its own pair of tickets rather than the world's, so that making a
+ * parent unreachable cannot quietly change what every other case in this file
+ * is measuring — and seeded in `beforeAll` with everything else, so no case
+ * appends to the ledger while a later one is reading it.
+ */
+let restricted: { userId: string; headers: { authorization: string } };
+let restrictedParentId = '';
+let restrictedChildId = '';
+
 let phoneCounter = 0;
 
 async function signedIn(): Promise<{ userId: string; headers: { authorization: string } }> {
@@ -459,6 +470,60 @@ beforeAll(async () => {
     entity: membershipEntity,
     type: 'membership.revoked',
     payload: { userId: exMember.userId },
+    actorId: owner.userId,
+  });
+
+  // 7.212's exclusion fixture, seeded here with everything else. Two tickets of
+  // its own in the same project, each with an EXPLICIT audience naming different
+  // people, so `canSee` says yes to the child and no to the parent for the same
+  // viewer. Both are unassigned and their titles share no word with any other
+  // ticket here, for the reason the child above states: the My Work case counts
+  // cards and the search case counts hits.
+  restricted = await signedIn();
+  await post(owner.headers, {
+    workspaceId,
+    entity: { kind: 'membership', id: `${workspaceId}:${restricted.userId}` },
+    type: 'membership.granted',
+    payload: { userId: restricted.userId, role: 'member' },
+    actorId: owner.userId,
+  });
+  restrictedParentId = newUlid();
+  await post(owner.headers, {
+    workspaceId,
+    entity: { kind: 'ticket', id: restrictedParentId },
+    type: 'ticket.created',
+    payload: { typeId: 'task', projectId, parentId: null, title: 'Quarterly rent negotiation' },
+    actorId: owner.userId,
+  });
+  await post(owner.headers, {
+    workspaceId,
+    entity: { kind: 'ticket', id: restrictedParentId },
+    type: 'visibility.set',
+    payload: { ticketId: restrictedParentId, mode: 'explicit', userIds: [owner.userId] },
+    actorId: owner.userId,
+  });
+  restrictedChildId = newUlid();
+  await post(owner.headers, {
+    workspaceId,
+    entity: { kind: 'ticket', id: restrictedChildId },
+    type: 'ticket.created',
+    payload: {
+      typeId: 'sub-task',
+      projectId,
+      parentId: restrictedParentId,
+      title: 'Photocopy the meter reading',
+    },
+    actorId: owner.userId,
+  });
+  await post(owner.headers, {
+    workspaceId,
+    entity: { kind: 'ticket', id: restrictedChildId },
+    type: 'visibility.set',
+    payload: {
+      ticketId: restrictedChildId,
+      mode: 'explicit',
+      userIds: [owner.userId, restricted.userId],
+    },
     actorId: owner.userId,
   });
 
@@ -891,27 +956,41 @@ describe('GET /v1/me/workspaces vs WorkspaceRef', () => {
 });
 
 describe('GET /v1/workspaces/:ws/tickets/:id vs TicketRead', () => {
-  it('the route WRAPS a snake_case visibility row — no title, no state, no provenance', async () => {
+  it('7.203 SERVING GAPS CLOSED — the route now carries the title, the domain state and the provenance beside the visibility row', async () => {
     const res = await app.inject({
       method: 'GET',
       url: `/v1/workspaces/${workspaceId}/tickets/${ticketId}`,
       headers: owner.headers,
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { ticket: Record<string, unknown> };
+    const body = res.json() as {
+      ticket: Record<string, unknown>;
+      ticketState: Record<string, unknown>;
+      title: unknown;
+      stateProvenance: Record<string, unknown>;
+    };
 
-    // `view-types.ts:115` — `TicketRead = {ticket: TicketState, title,
-    // stateProvenance, parent, rollup}`. Two separate disagreements, and a
-    // contract register that names only the inner row misses the first:
-    //
-    //   1. The WRAPPER matches in `parent`/`rollup` and differs in that the
-    //      client's `title` and `stateProvenance` sit at the TOP level and are
-    //      absent here entirely.
-    //   2. The inner `ticket` is a `proj_visibility` row in snake_case, not a
-    //      domain `TicketState`.
-    expect(Object.keys(body).sort()).toEqual(['parent', 'rollup', 'ticket']);
-    expect(body).not.toHaveProperty('title');
-    expect(body).not.toHaveProperty('stateProvenance');
+    // **THE CLAIM OF THIS CASE INVERTED, and the case was kept** (7.189's
+    // precedent). It used to read "the route WRAPS a snake_case visibility row —
+    // no title, no state, no provenance", and asserted
+    // `Object.keys(body).sort()` was `['parent','rollup','ticket']` with both
+    // `title` and `stateProvenance` absent, because `view-types.ts:115` declares
+    // `TicketRead = {ticket: TicketState, title, stateProvenance, parent,
+    // rollup}` and none of the three was on the wire. Ruling P25 clause 1 closed
+    // all three. A deleted case would leave nothing to notice the day they
+    // regress, so what it pins now is the agreement.
+    expect(Object.keys(body).sort()).toEqual([
+      'parent',
+      'rollup',
+      'stateProvenance',
+      'ticket',
+      'ticketState',
+      'title',
+    ]);
+    // The `ticket` key is UNCHANGED — the visibility row's allow-list was argued
+    // column by column and no gap required touching it, so the domain state
+    // arrived BESIDE it rather than instead of it. Pinned whole, so a column
+    // appearing there still reddens this.
     expect(Object.keys(body.ticket).sort()).toEqual([
       'own_mode',
       'parent_id',
@@ -921,29 +1000,85 @@ describe('GET /v1/workspaces/:ws/tickets/:id vs TicketRead', () => {
       'ticket_id',
       'workspace_id',
     ]);
-    // Controls, same body, same run: the two keys that DO line up are present
-    // and answered, so "no title" is not "no body".
-    expect(body).toHaveProperty('parent');
-    expect(body).toHaveProperty('rollup');
     expect(body.ticket['ticket_id']).toBe(ticketId);
-    // The title exists in the product — it is on the board card — so its
-    // absence here is this route's shape and not a missing fact.
+
+    // The title is the SAME string the board serves for this ticket — the
+    // control that used to prove the fact existed in the product now proves the
+    // two surfaces agree about it.
     const board = await app.inject({
       method: 'GET',
       url: `/v1/projects/${projectId}/board`,
       headers: owner.headers,
     });
     expect(JSON.stringify(board.json())).toContain('Sweep the aisle');
+    expect(body.title).toBe('Sweep the aisle');
 
-    // 7.203 — the refusal, cross-checked. `getTicket` throws a
-    // `ServingGapError` naming `title`, `stateProvenance` and the absent
-    // `TicketState` (whose `transitions` is the key that would appear first).
-    expectStillUnserved(
-      'MAP_TICKET_READ_ABSENCES',
-      body,
-      'ticket',
-      '/v1/workspaces/:workspaceId/tickets/:ticketId',
-    );
+    // The domain `TicketState`, by the key whose absence the refusal named:
+    // `transitions`. Field-shaped rather than presence-shaped — `kind` is the
+    // discriminant every `EntityState` narrowing turns on.
+    expect(body.ticketState['kind']).toBe('ticket');
+    expect(body.ticketState['id']).toBe(ticketId);
+    expect(Array.isArray(body.ticketState['transitions'])).toBe(true);
+    expect(typeof body.ticketState['workflowVersion']).toBe('number');
+
+    // The provenance, whole: an actor and both clocks, which is what
+    // `ClaimProvenance` needs and what the refusal said was missing.
+    expect(body.stateProvenance['actorId']).toBe(owner.userId);
+    expect(typeof body.stateProvenance['clientTime']).toBe('string');
+    expect(typeof body.stateProvenance['serverTime']).toBe('string');
+  });
+
+  it('7.212 THE EXCLUSION — a viewer who may not see the parent gets its existence and NOT its title', async () => {
+    // The rule-first half of ruling P25 clause 1, measured on a real `/v1` body.
+    // The rule is `canSee` (`src/visibility/can-see.ts:227`) at the guard this
+    // handler already had; what this case asks is whether the TITLE travels only
+    // on the arm where it said yes. A suite built from the permitted case alone
+    // cannot tell a correct rule from no rule at all, so the withheld case is
+    // measured first and the permitted one is its control.
+    //
+    // The fixture is seeded in `beforeAll` with everything else — `restricted`
+    // is a member the child's explicit audience names and the parent's does not.
+    const parentDirect = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/tickets/${restrictedParentId}`,
+      headers: restricted.headers,
+    });
+    // The parent really is out of reach for this viewer — asserted rather than
+    // assumed, so a withheld title is the rule answering and not a route that
+    // never carries one.
+    expect(parentDirect.statusCode).toBe(404);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/tickets/${restrictedChildId}`,
+      headers: restricted.headers,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { parent: Record<string, unknown>; title: unknown };
+    expect(body.parent).toEqual({ kind: 'restricted', id: restrictedParentId });
+    // No key at any depth carries the parent's title, and the walker's own
+    // controls are in the same run: it found keys, and the CHILD's title IS one
+    // of them — so "withheld" is not "nothing was looked at".
+    const keys = allKeys(body);
+    expect(keys.length).toBeGreaterThan(0);
+    expect(body.title).toBe('Photocopy the meter reading');
+    expect(JSON.stringify(body)).not.toContain('Quarterly rent negotiation');
+    expect(keys.filter((key) => key.startsWith('parent.'))).toEqual(['parent.kind', 'parent.id']);
+
+    // THE OTHER DIRECTION, same row, same run: the owner may see the parent and
+    // gets its title on the same field. Without this the case would pass against
+    // a route that serves no parent title to anybody.
+    const forOwner = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/tickets/${restrictedChildId}`,
+      headers: owner.headers,
+    });
+    expect(forOwner.statusCode).toBe(200);
+    expect((forOwner.json() as { parent: Record<string, unknown> }).parent).toMatchObject({
+      kind: 'ticket',
+      id: restrictedParentId,
+      title: 'Quarterly rent negotiation',
+    });
   });
 });
 
@@ -1043,7 +1178,7 @@ describe('GET/PUT /v1/me/preferences vs UserPreferences', () => {
 });
 
 describe('GET /v1/projects/:projectId/tickets vs TicketListView', () => {
-  it('7.206 SERVING GAPS — five fields `ListRow` needs and no card carries', async () => {
+  it('7.206 SERVING GAPS CLOSED — every card carries all five fields `ListRow` needs', async () => {
     const res = await app.inject({
       method: 'GET',
       url: `/v1/projects/${projectId}/tickets?groupBy=flat`,
@@ -1054,27 +1189,50 @@ describe('GET /v1/projects/:projectId/tickets vs TicketListView', () => {
       groups: Array<{ cards: Array<Record<string, unknown>> }>;
     };
 
-    // The cards have to BE there, or "these five fields are absent" is a claim
-    // about an empty array. Both tickets from `beforeAll` are in this project.
+    // The cards have to BE there, or every claim below is a claim about an empty
+    // array. Both tickets from `beforeAll` are in this project.
     const cards = body.groups.flatMap((group) => group.cards);
     expect(cards.length).toBeGreaterThan(0);
 
-    // `view-types.ts` — `ListRow` needs `typeRank`, `epicId`, `stateName`,
-    // `hasRestrictedParent` and `assignedProvenance`. The route serves
-    // `TicketCard`s, which carry none of them, and four of the five cannot be
-    // derived client-side at all. The online `DataSource` therefore refuses
-    // `getTickets` outright; this is the server half of that refusal.
-    expectStillUnserved(
-      'MAP_LIST_VIEW_ABSENCES',
-      body,
-      'groups',
-      '/v1/projects/:projectId/tickets',
-    );
+    // **THE CLAIM OF THIS CASE INVERTED, and the case was kept** (7.189's
+    // precedent). It read "five fields `ListRow` needs and no card carries" and
+    // called `expectStillUnserved('MAP_LIST_VIEW_ABSENCES', …)`, because
+    // `view-types.ts` needs `typeRank`, `epicId`, `stateName`,
+    // `hasRestrictedParent` and `assignedProvenance` and the route served plain
+    // `TicketCard`s. Ruling P25 clause 1 closed all five, the absence list is
+    // deleted (7.209 asserts it is GONE, not emptied), and what this pins now is
+    // that every card really carries them.
+    //
+    // Counted against the CARD COUNT rather than asserted with a `toContain` a
+    // one-card fix would satisfy — the same shape 7.189 landed on for
+    // `workflowVersion`.
+    for (const field of [
+      'typeRank',
+      'epicId',
+      'stateName',
+      'hasRestrictedParent',
+      'assignedProvenance',
+    ]) {
+      expect(
+        cards.filter((card) => Object.hasOwn(card, field)).length,
+        `${field}: on every card, not merely on one`,
+      ).toBe(cards.length);
+    }
+    // …and the two that are not nullable are real values, not nulls sitting
+    // where a fact goes. `epicId`, `assignedProvenance` and (for a root)
+    // `hasRestrictedParent` all have true absence values, so their presence is
+    // what this case can honestly claim; their VALUES are pinned in
+    // `test/routes/list.test.ts` at 7.210 and 7.211, against the type ladder,
+    // the workflow definition and the ledger.
+    for (const card of cards) {
+      expect(typeof card['typeRank']).toBe('number');
+      expect(typeof card['stateName']).toBe('string');
+      expect(typeof card['hasRestrictedParent']).toBe('boolean');
+    }
 
-    // Controls, same cards, same run: what IS there, so "five keys absent" is
-    // not "the cards are empty". `stateId` is the one `stateName` would be read
-    // from and `typeId` the one `typeRank` would be ranked by, which is what
-    // makes each of those a SERVING gap rather than a data gap.
+    // Controls, same cards, same run: the fields these five were DERIVED from
+    // are still on the wire, so a card that lost `stateId` while gaining
+    // `stateName` reddens here rather than passing as an improvement.
     const card = cards[0] as Record<string, unknown>;
     expect(card).toHaveProperty('stateId');
     expect(card).toHaveProperty('typeId');
@@ -1184,19 +1342,16 @@ describe('GET /v1/contests vs the two contested refusals', () => {
    * `mappers.ts`, the other written here, and neither able to shrink quietly.
    */
   it('7.209 every route the refusals name is a route this file really fetches', () => {
-    const EXERCISED = [
-      '/v1/contests',
-      '/v1/me/work',
-      '/v1/me/workspaces',
-      '/v1/projects/:projectId/tickets',
-      '/v1/search',
-      '/v1/workspaces/:workspaceId/tickets/:ticketId',
-    ];
+    // FOUR routes, and it was six. `/v1/projects/:projectId/tickets` and
+    // `/v1/workspaces/:workspaceId/tickets/:ticketId` left this set when ruling
+    // P25 clause 1's buildable subset landed and their two absence lists were
+    // DELETED. This file still fetches both — 7.203 and 7.206 below assert what
+    // they now serve — so a route dropping out of this set is not the same claim
+    // as a route dropping out of the file, and the two are kept apart on purpose.
+    const EXERCISED = ['/v1/contests', '/v1/me/work', '/v1/me/workspaces', '/v1/search'];
     const named = new Set<string>();
     for (const constName of [
       'MAP_WORKSPACE_REFS_ABSENCES',
-      'MAP_LIST_VIEW_ABSENCES',
-      'MAP_TICKET_READ_ABSENCES',
       'MAP_SEARCH_HITS_ABSENCES',
       'MAP_MY_WORK_ABSENCES',
       'MAP_ATTENTION_ABSENCES',
@@ -1211,6 +1366,14 @@ describe('GET /v1/contests vs the two contested refusals', () => {
       }
     }
     expect([...named].sort()).toEqual(EXERCISED);
+    // The complement, in the same run: the two deleted lists are GONE from the
+    // source rather than emptied. `mapperAbsences` throws on a `const` it cannot
+    // find and throws again on one that parses to zero entries, so an entry
+    // hollowed to `[]` fails this the same way a surviving one does — which is
+    // what stops a closed gap from leaving a refusal nobody can read behind it.
+    for (const deleted of ['MAP_LIST_VIEW_ABSENCES', 'MAP_TICKET_READ_ABSENCES']) {
+      expect(() => mapperAbsences(deleted), deleted).toThrow(/no `const/);
+    }
   });
 });
 

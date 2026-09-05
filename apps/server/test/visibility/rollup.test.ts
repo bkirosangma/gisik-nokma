@@ -60,14 +60,22 @@ import {
  * 5 Task 7, which is the first construction site that needed the "5 of 8 done"
  * half, and every expectation here now names all four numbers.
  *
- * **This file cannot exercise `terminal`, and says so rather than pretending.**
- * `applyAll` (`test/helpers/seed.ts`) seeds four projections and `proj_tickets`
- * is not among them, so no child in any fixture below has a state category at
- * all — every one of them lands in `uncategorized`, which is the honest reading
- * of a world where nothing knows whether a child is done. A mutation that
- * hard-wired `terminal` to 0 would survive here and is killed in
- * `test/read/ticket-cards.test.ts`, whose fixtures go through the full
- * projection registry. Extending `applyAll` to register `proj_tickets` would
+ * **This file used to be unable to exercise `terminal`, and that limitation is
+ * now retired rather than restated.** `seedTicket` writes a `proj_tickets` head
+ * row (P25 clause 1's change set — a fixture without one seeds a world the
+ * ingest transaction cannot produce), so every child now HAS a state category
+ * and `uncategorized` is 0 where it used to be the whole total.
+ *
+ * That repair created a second problem, and the mixed-family case below exists
+ * for it: the head row hard-coded `state_category` to `'open'`, which left
+ * `terminal` 0 always AND `uncategorized` 0 always — two numbers that cannot
+ * vary are two assertions that cannot fail, so rewriting the expectations to
+ * match would have made this file LESS falsifiable while reading as if it had
+ * become more exact. `seedTicket` therefore takes an optional `stateCategory`
+ * (default `'open'`, so no other caller moves), and one fixture drives a
+ * terminal child and a category-less child through the same parent.
+ *
+ * The older note said extending `applyAll` to register `proj_tickets` would
  * change the seeded world of twenty test files and belongs to whoever owns that
  * helper's own recorded cleanup, not to a drive-by here.
  */
@@ -170,17 +178,17 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     await revokeMember(db.pool, ws, revoked);
     // `outsider` is granted nothing at all.
 
-    // `terminal: 0, uncategorized: 9` is a TRUE statement about this fixture,
-    // not a placeholder: `applyAll` seeds four projections and proj_tickets is
-    // not one of them, so no child here has a known state category. That is
-    // exactly what `uncategorized` exists to say — "nine children, none of them
-    // KNOWN to be done" rather than "nine children, none done". The `terminal`
-    // count is exercised where a fixture can actually feed it, in
-    // `test/read/ticket-cards.test.ts`.
+    // `uncategorized: 0` — and it read `9` until `seedTicket` began writing a
+    // `proj_tickets` head row. Every child here is now `open`: known, and known
+    // not to be done. What this case is ABOUT is `restrictedCount`, which is the
+    // only number that varies across the eight viewer classes below and the only
+    // one this fixture is built to drive. `terminal` and `uncategorized` are held
+    // constant here on purpose and are exercised in the mixed-family case below,
+    // which is where they can actually differ.
     const family = (restrictedCount: number): RollupView => ({
       total: 9,
       terminal: 0,
-      uncategorized: 9,
+      uncategorized: 0,
       restrictedCount,
     });
     const classes: Array<[string, string, RollupView]> = [
@@ -240,7 +248,7 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     await seedMember(db.pool, ws, onA, 'member', [{ projectId: prjA }]);
 
     const rollup = await rollupFor(db.pool, onA, parent);
-    expect(rollup).toEqual({ total: 9, terminal: 0, uncategorized: 9, restrictedCount: 3 });
+    expect(rollup).toEqual({ total: 9, terminal: 0, uncategorized: 0, restrictedCount: 3 });
 
     // Nine children, six this member can reach, three it cannot: three
     // DIFFERENT numbers, so no two can be swapped silently. The six comes from
@@ -281,6 +289,52 @@ describe('rollupFor — what null means, and what it must not invent', () => {
     expect(await rollupFor(db.pool, viewer, parent)).toEqual({
       total: 1,
       terminal: 0,
+      uncategorized: 0,
+      restrictedCount: 0,
+    });
+  });
+
+  it('counts a terminal child and a category-less child apart — the two numbers the seed used to hold constant', async () => {
+    // THE FALSIFIABILITY CASE. Every other fixture in this file seeds children
+    // at the default `open`, so `terminal` and `uncategorized` are 0 in all of
+    // them and a build that hard-wired either to 0 would pass the whole file.
+    // Here one child is terminal, one has NO category at all, and one is open —
+    // three different answers from one parent, so each number is measured
+    // against a fixture that could have produced a different one.
+    const ws = newUlid();
+    const prj = newUlid();
+    const parent = newUlid();
+    const done = newUlid();
+    const unknown = newUlid();
+    const open = newUlid();
+    const viewer = newUlid();
+    await seedMember(db.pool, ws, viewer, 'member', [{ projectId: prj }]);
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: parent });
+    await seedTicket(db.pool, {
+      workspaceId: ws, projectId: prj, ticketId: done, parentId: parent, stateCategory: 'terminal',
+    });
+    await seedTicket(db.pool, {
+      // NO head row. `proj_tickets.state_category` is NOT NULL, so an
+      // uncategorized child is not one with a null category — it is one the
+      // `LEFT JOIN proj_tickets` MISSES. The ticket is real in the ledger and in
+      // `proj_visibility`; only the head row is absent, which is the state every
+      // fixture here was in before that row began being written.
+      workspaceId: ws, projectId: prj, ticketId: unknown, parentId: parent, stateCategory: null,
+    });
+    await seedTicket(db.pool, {
+      workspaceId: ws, projectId: prj, ticketId: open, parentId: parent,
+    });
+    await applyAll(db.pool, [
+      setVisibilityEnv(ws, done, 'workspace'),
+      setVisibilityEnv(ws, unknown, 'workspace'),
+      setVisibilityEnv(ws, open, 'workspace'),
+    ]);
+
+    // Three children, one terminal, one uncategorized — and the third is neither,
+    // so neither count can be reading `total` under another name.
+    expect(await rollupFor(db.pool, viewer, parent)).toEqual({
+      total: 3,
+      terminal: 1,
       uncategorized: 1,
       restrictedCount: 0,
     });
@@ -336,7 +390,7 @@ describe('rollupFor — the role is resolved in each CHILD’s own workspace', (
     expect(await rollupFor(db.pool, viewer, parent)).toEqual({
       total: 3,
       terminal: 0,
-      uncategorized: 3,
+      uncategorized: 0,
       restrictedCount: 1,
     });
 

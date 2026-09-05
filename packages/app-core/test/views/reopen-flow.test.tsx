@@ -279,12 +279,25 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
 
   it('3.80 · T13.4h when the parent read REFUSES, the offer is not built and the refusal still renders verbatim', async () => {
     const user = userEvent.setup();
-    // The REAL `ServingGapError` carrying the REAL register entries, the shape
-    // 3.75 established: a hand-written Error would keep passing on the day the
-    // gap closes, which is the one day this case must change.
+    // THE DAY ARRIVED. 3.75's note said a hand-written Error "would keep passing
+    // on the day the gap closes, which is the one day this case must change" —
+    // ruling P25 clause 1 closed `getTicket`'s three absences, so the register
+    // no longer carries it and `SERVING_GAPS['getTicket'] ?? []` would now throw
+    // a refusal naming NOTHING. That fallback is the trap: it degrades silently
+    // to an empty absence list, and only the assertion below being specific
+    // caught it. The absences are constructed, and the inverted control beneath
+    // this case is what keeps that honest.
     const source = flowSource((_call, events) => events.map((event) => parentTerminal(event.id)), {
       getTicket: async () => {
-        throw new ServingGapError('getTicket', SERVING_GAPS['getTicket'] ?? []);
+        throw new ServingGapError('getTicket', [
+          {
+            field: 'TicketRead.title',
+            wireKey: 'title',
+            wireRoute: '/v1/workspaces/:workspaceId/tickets/:ticketId',
+            because: 'constructed — the real entry was closed by P25 clause 1',
+            owner: 'test fixture; see the inverted control below',
+          },
+        ]);
       },
     });
     const onCreated = renderFlow(source);
@@ -296,16 +309,29 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     );
     // The gap names its own first absence, read off the register at run time.
     expect(alertBox).toHaveTextContent('response mapping failed at getTicket');
-    expect(alertBox).toHaveTextContent(SERVING_GAPS['getTicket']?.[0]?.field ?? '__unset__');
+    expect(alertBox).toHaveTextContent('TicketRead.title');
     expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).not.toBeInTheDocument();
     // No invented offer, and no silent retry of the refused claim.
     expect(source.ingested).toHaveLength(1);
     expect(onCreated).not.toHaveBeenCalled();
   });
 
-  it('3.80 · T13.4h-control the register really does carry getTicket absences, so T13.4h is a measurement', () => {
-    expect((SERVING_GAPS['getTicket'] ?? []).length).toBeGreaterThan(0);
-    expect(SERVING_GAPS['getTicket']?.[0]?.field).toBeTruthy();
+  it('3.80 · T13.4h-control (INVERTED) getTicket no longer refuses, which is why T13.4h constructs its own absence', () => {
+    // The original control proved the register carried `getTicket`, so that
+    // T13.4h was a measurement rather than a story. P25 clause 1 closed it, and
+    // the control inverts rather than disappears: the same duty, pointed at the
+    // fact that now licenses hand-construction.
+    expect(SERVING_GAPS['getTicket']).toBeUndefined();
+    // Non-vacuity, so this is a fact about `getTicket` and not about an empty
+    // register: the methods that DO still refuse are named, and one of them
+    // carries a real absence.
+    expect(Object.keys(SERVING_GAPS).sort()).toEqual([
+      'getAttention',
+      'getMyWork',
+      'getMyWorkspaces',
+      'search',
+    ]);
+    expect((SERVING_GAPS['getMyWork'] ?? []).length).toBeGreaterThan(0);
   });
 
   it('T13.4k a workflow with no non-terminal move out of its terminal state offers no reopen, and says so', async () => {

@@ -22,16 +22,23 @@ import { signInWithPhone } from '../helpers/session.js';
  * answer field by field, status, body and headers, rather than checking a
  * status code twice.
  *
- * ## The rows are `proj_visibility`'s
+ * ## The rows are `proj_visibility`'s, and there is now a TITLE beside them
  *
- * `proj_tickets` does not exist on this branch (Plan 3 Task 12 owns it; cases
- * 6.61, 6.66), so no ticket title exists anywhere queryable and the
- * restricted-parent placeholder is measured as EXISTENCE-AND-ID against
- * EXISTENCE-AND-THE-ROW. The plan text's `expect(parent).not.toHaveProperty(
- * 'title')` is deliberately NOT written here: with no title anywhere in the
- * system it would pass for a reason unrelated to the property it names, which
- * is this series' signature defect. `toEqual({ kind: 'restricted', id })` is
- * exact, so any field the restricted branch grew would redden it.
+ * This section read "`proj_tickets` does not exist on this branch (Plan 3 Task
+ * 12 owns it; cases 6.61, 6.66), so no ticket title exists anywhere queryable"
+ * and concluded that the plan text's `expect(parent).not.toHaveProperty('title')`
+ * could not be written honestly — it would have passed for a reason unrelated to
+ * the property it names, which is this series' signature defect.
+ *
+ * Both halves have changed. `proj_tickets` landed, `seedTicket` writes the head
+ * row the ingest transaction really writes, and ruling P25 clause 1 put the
+ * ticket's `title`, its domain `ticketState` and its `stateProvenance` on this
+ * route — with the visible parent's title on the `kind: 'ticket'` arm only. So
+ * the withheld-title assertion is MEANINGFUL now and it is written: the
+ * restricted case asserts the parent's title appears on no key at any depth,
+ * with the child's own title in the same run as the control. `toEqual({ kind:
+ * 'restricted', id })` stays beside it — it is exact, so any field the
+ * restricted branch grew reddens it too.
  *
  * ## A fresh workspace per test, and no sequence reset
  *
@@ -269,14 +276,24 @@ describe('the single read carries the rollup — true totals with the restrictio
     // `uncategorized` landed with Plan 5 Task 7 and appear here because this
     // route returns the view verbatim.
     //
-    // `terminal: 0, uncategorized: 3` is TRUE of this fixture rather than a
-    // placeholder: `applyAll` does not seed `proj_tickets`, so no child here has
-    // a known state category, and `uncategorized` is what says that out loud
-    // instead of letting a 0 read as "none of them are done".
+    // `uncategorized: 3` here until `seedTicket` began writing the
+    // `proj_tickets` head row beside the visibility one (P25 clause 1's change
+    // set — the single read now serves the ticket's title and domain state, so a
+    // fixture with no head row was seeding a world one ingest transaction cannot
+    // produce). Every child now HAS a known category, and `0` is the honest
+    // answer where `3` used to be. `terminal: 0` is unchanged and is a fact
+    // about the seed's `open` state, not a placeholder — the control below is
+    // what keeps these four numbers from being an arithmetic accident.
+    // THE KEY NAMES ARE THE ASSERTION, not decoration. This route used to
+    // serve `rollupFor`'s own `RollupView` spelling (`total`/`terminal`/
+    // `uncategorized`), which no client reader on the `/v1` surface can read:
+    // `mapRollup` reads `TicketRollup`, so every ticket WITH CHILDREN came back
+    // a `MappingError` while leaves mapped fine. An exact `toEqual` is what
+    // makes this a check rather than a hope — a renamed key fails it.
     expect(res.json().rollup).toEqual({
-      total: 3,
-      terminal: 0,
-      uncategorized: 3,
+      totalChildren: 3,
+      terminalChildren: 0,
+      uncategorizedChildren: 0,
       restrictedCount: 1,
     });
 
@@ -335,6 +352,27 @@ describe('the restricted-parent placeholder — existence, and nothing else', ()
     const res = await get(`/v1/workspaces/${ws}/tickets/${childId}`, headers);
     expect(res.statusCode).toBe(200);
     expect(res.json().parent).toEqual({ kind: 'restricted', id: parentId });
+    // THE WITHHELD TITLE, asserted directly rather than left to `toEqual`'s
+    // exactness. The plan text's `expect(parent).not.toHaveProperty('title')`
+    // was deliberately NOT written here while no title existed anywhere in the
+    // system — it would have passed for a reason unrelated to the property it
+    // names. Titles exist now (this route serves one at the top level), so the
+    // assertion has become meaningful and is written: the parent's title is on
+    // NO key at any depth of this body, and the control in the same run is that
+    // the CHILD's title is, so "no title" is not "no body".
+    const dotted = (value: unknown, path = ''): string[] =>
+      Array.isArray(value)
+        ? value.flatMap((item, i) => dotted(item, `${path}[${i}]`))
+        : value === null || typeof value !== 'object'
+          ? []
+          : Object.entries(value as Record<string, unknown>).flatMap(([key, inner]) => {
+              const here = path === '' ? key : `${path}.${key}`;
+              return [here, ...dotted(inner, here)];
+            });
+    const body = res.json() as unknown;
+    expect(JSON.stringify(body)).not.toContain(`Ticket ${parentId}`);
+    expect(dotted(body).filter((key) => key.startsWith('parent.'))).toEqual(['parent.kind', 'parent.id']);
+    expect(res.json().title).toBe(`Ticket ${childId}`);
   });
 
   it('a visible parent comes through as kind ticket carrying the same row a direct read of it serves', async () => {
@@ -350,11 +388,20 @@ describe('the restricted-parent placeholder — existence, and nothing else', ()
     const parentDirect = await get(`/v1/workspaces/${ws}/tickets/${parentId}`, headers);
     const res = await get(`/v1/workspaces/${ws}/tickets/${childId}`, headers);
     expect(res.statusCode).toBe(200);
+    // The `title` joined this arm with P25 clause 1, under the SAME rule that
+    // chooses between the two arms — `canSee` on the parent. `toEqual` is exact
+    // both ways: a title missing here reddens, and the sibling case above pins
+    // that the restricted arm carries none.
     expect(res.json().parent).toEqual({
       kind: 'ticket',
       id: parentId,
+      title: `Ticket ${parentId}`,
       ticket: parentDirect.json().ticket,
     });
+    // Same title, same run, from the parent's own read — so "the parent's title"
+    // is the parent's and not a copy of the child's.
+    expect(parentDirect.json().title).toBe(`Ticket ${parentId}`);
+    expect(res.json().title).toBe(`Ticket ${childId}`);
   });
 
   it('a parent_id naming no ticket at all reports no parent, rather than inventing a restricted one', async () => {

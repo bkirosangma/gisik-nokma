@@ -12,14 +12,32 @@ import { stubServices } from './helpers/stub-services.js';
  * is Plan 6's Step 5b landed late by Plan 9's Task 14.
  *
  * The two questions this file exists for are the two the plan's snippet gets
- * wrong. First, `(list.rows ?? []).map(...)`: against the shipped server
- * `getTickets` REFUSES, so that spelling draws a complete month grid with
- * nothing in it — a page saying no ticket here has a claimed date. Second,
+ * wrong. First, `(list.rows ?? []).map(...)`: a REFUSED `getTickets` renders as
+ * a complete month grid with nothing in it — a page saying no ticket here has a
+ * claimed date. That sentence read "against the shipped server `getTickets`
+ * REFUSES" until ruling P25 clause 1 served its five gaps; the read can still
+ * fail, so the property is unchanged and the cases now stub the failure
+ * EXPLICITLY (`REFUSED_LIST` below) rather than leaning on a default that has
+ * gone. Second,
  * `today`: the plan's own note calls this line the single place the web client
  * decides which day it is, and an assertion about it is unfalsifiable unless the
  * instant is pinned, because `toISOString().slice(0, 10)` and `istToday()` agree
  * for eighteen and a half hours out of every twenty-four.
  */
+/**
+ * A `getTickets` that fails, stated in the case rather than inherited.
+ *
+ * `stubServices` used to refuse this read by default with the real
+ * `ServingGapError`, and the three cases below asserted on `ListRow.typeRank` —
+ * one of the five facts that gap named. Those facts are served now, so the
+ * assertion had to change or become a check that cannot fail. What the cases are
+ * ACTUALLY about is unchanged and is what they assert now: a read that did not
+ * answer is named on screen, in the failed view's own words, with no grid or
+ * lane standing in for it.
+ */
+const REFUSED_LIST = () =>
+  Promise.reject(new Error('the ticket list read did not answer')) as Promise<never>;
+
 const push = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
@@ -135,9 +153,10 @@ describe('the project page mounts four views over one list read', () => {
   /**
    * 11.161/11.162 — THE CASE THE PLAN'S SNIPPET FAILS.
    *
-   * `stubServices` refuses `getTickets` with the REAL `ServingGapError` the
-   * shipped mapper throws, so this is the state a person opening the tab today
-   * actually meets. `(list.rows ?? []).map(...)` renders a full month grid here.
+   * `getTickets` is stubbed to FAIL, which is the state a person meets whenever
+   * the read does not answer — a transport failure, a refusal, a 404 turned back
+   * into an exception. `(list.rows ?? []).map(...)` renders a full month grid
+   * here regardless of which one it was, which is the defect.
    */
   it('11.161 the Calendar tab names the refusal instead of drawing an empty month', async () => {
     render(
@@ -147,6 +166,7 @@ describe('the project page mounts four views over one list read', () => {
           getAttention: async () => [],
           getMembers: async () => MEMBERS,
           getTicketTypes: async () => [typeDef()],
+          getTickets: REFUSED_LIST,
         })}
       >
         <ProjectPage />
@@ -157,9 +177,11 @@ describe('the project page mounts four views over one list read', () => {
     const refusal = (await screen.findByText(/The calendar cannot be shown yet\./)).closest(
       '[role="status"]',
     );
-    // The authority's own words, not a paraphrase: the gap names the field and
-    // who closes it.
-    expect(refusal?.textContent).toContain('ListRow.typeRank');
+    // The CAUSE's own words, not a paraphrase — the shell reports what failed
+    // and does not summarise it. This used to read `ListRow.typeRank`, one of
+    // the five facts the serving gap named; those are served now, and asserting
+    // on a gap that no longer fires would have been a check that cannot fail.
+    expect(refusal?.textContent).toContain('the ticket list read did not answer');
     // The half that makes the line above a test: no grid stands in its place.
     expect(document.querySelector('.gn-calendar')).toBeNull();
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
@@ -173,6 +195,7 @@ describe('the project page mounts four views over one list read', () => {
           getAttention: async () => [],
           getMembers: async () => MEMBERS,
           getTicketTypes: async () => [typeDef()],
+          getTickets: REFUSED_LIST,
         })}
       >
         <ProjectPage />
@@ -334,6 +357,7 @@ describe('the project page mounts four views over one list read', () => {
           getAttention: async () => [],
           getMembers: async () => MEMBERS,
           getTicketTypes: async () => [typeDef()],
+          getTickets: REFUSED_LIST,
         })}
       >
         <ProjectPage />
@@ -347,7 +371,7 @@ describe('the project page mounts four views over one list read', () => {
     const refusal = (await screen.findByText(/The ticket list cannot be shown yet\./)).closest(
       '[role="status"]',
     );
-    expect(refusal?.textContent).toContain('ListRow.typeRank');
+    expect(refusal?.textContent).toContain('the ticket list read did not answer');
   });
 });
 

@@ -522,6 +522,143 @@ describe('GET /v1/projects/:projectId/tickets — groupings', () => {
   });
 });
 
+/**
+ * Ruling P25 clause 1 — the five facts the LIST card grew, and the one of them
+ * that is a visibility answer.
+ *
+ * The client's `ListRow` needed `typeRank`, `epicId`, `stateName`,
+ * `assignedProvenance` and `hasRestrictedParent`; the online `DataSource`
+ * refused `getTickets` outright rather than invent them, and
+ * `apps/server/test/integration/client-contract.test.ts` cross-checked that
+ * refusal against a real body. These serve them.
+ *
+ * Every value below is compared against the fact's OWN source — the type
+ * ladder's rank, the workflow definition's state name, the ledger's
+ * `ticket.assigned` — and never against a literal typed here, because a literal
+ * would be this file agreeing with itself.
+ */
+describe('GET /v1/projects/:projectId/tickets — the five ListCard facts (P25 clause 1)', () => {
+  it('7.210 a card carries its type RANK, its epic, its state NAME and its assignment claim — each read from that fact’s own source', async () => {
+    const list = await listOf('member', read.world.projectId);
+    const cards = list.groups.flatMap((group) => group.cards);
+    // The positive control this whole case rests on: there are cards. Five
+    // fields "present and correct" over an empty array is a claim about nothing.
+    expect(cards.map((card) => card.ticketId).sort()).toEqual(memberVisible());
+    const task = cards.find((card) => card.ticketId === read.world.taskInEpicId);
+    const epic = cards.find((card) => card.ticketId === read.world.epicId);
+    expect(task, 'the task under the epic is in this page').toBeDefined();
+    expect(epic, 'the epic is in this page').toBeDefined();
+
+    // typeRank — against `proj_ticket_types`, queried, not against `3`. The two
+    // cards carry DIFFERENT ranks, so a route answering one constant fails.
+    const ranks = await db.pool.query<{ type_id: string; rank: number }>(
+      'SELECT type_id, rank FROM proj_ticket_types WHERE workspace_id = $1 ORDER BY rank',
+      [read.world.workspaceId],
+    );
+    const rankOf = new Map(ranks.rows.map((row) => [row.type_id, row.rank]));
+    expect(task?.typeRank).toBe(rankOf.get('task'));
+    expect(epic?.typeRank).toBe(rankOf.get('epic'));
+    expect(task?.typeRank).not.toBe(epic?.typeRank);
+
+    // epicId — the epic is its OWN nearest epic-ranked ancestor-or-self, which
+    // is the walk's contract and not an accident; the shared task is under
+    // nothing and gets null. Both directions, so "always the parent id" and
+    // "always null" both fail.
+    expect(task?.epicId).toBe(read.world.epicId);
+    expect(epic?.epicId).toBe(read.world.epicId);
+    expect(
+      cards.find((card) => card.ticketId === read.world.sharedTaskId)?.epicId,
+    ).toBeNull();
+
+    // stateName — against the published definition the ticket is FOLDED TO,
+    // read out of `proj_workflows` at the ticket's own version. Not the latest
+    // definition, and not a literal: this is the whole reason the field was
+    // recorded as a gap rather than closed with `card.stateId`.
+    const defs = await db.pool.query<{ definition: { states: { id: string; name: string }[] } }>(
+      'SELECT definition FROM proj_workflows WHERE workspace_id = $1 AND workflow_id = $2 AND version = 1',
+      [read.world.workspaceId, read.world.workflowId],
+    );
+    const nameOf = new Map(
+      (defs.rows[0]?.definition.states ?? []).map((state) => [state.id, state.name]),
+    );
+    expect(nameOf.size, 'the definition really was read').toBeGreaterThan(0);
+    expect(task?.stateName).toBe(nameOf.get('doing'));
+    expect(epic?.stateName).toBe(nameOf.get('todo'));
+    // …and it is a NAME, not the id wearing one. The two differ in this
+    // workspace ('doing' vs 'Doing'), which is what makes the check able to fail.
+    expect(task?.stateName).not.toBe(task?.stateId);
+
+    // assignedProvenance — against the `ticket.assigned` row in the ledger, by
+    // all three of its fields. `epic` was never assigned and carries null, so
+    // "always an object" fails here too.
+    const assigned = await db.pool.query<{ actor_id: string; client_time: Date; server_time: Date }>(
+      `SELECT actor_id, client_time, server_time FROM events
+        WHERE entity_kind = 'ticket' AND entity_id = $1 AND type = 'ticket.assigned'
+        ORDER BY seq DESC LIMIT 1`,
+      [read.world.taskInEpicId],
+    );
+    const claim = assigned.rows[0];
+    expect(claim, 'the ledger holds the assignment this asserts about').toBeDefined();
+    expect(task?.assignedProvenance).toEqual({
+      actorId: claim?.actor_id,
+      clientTime: claim?.client_time.toISOString(),
+      serverTime: claim?.server_time.toISOString(),
+    });
+    expect(epic?.assignedProvenance).toBeNull();
+    expect(epic?.assigneeId).toBeNull();
+    // The assignment claim is NOT the state claim — two events, two instants.
+    // A route that filled this field from `stateProvenance` would satisfy every
+    // presence check and fail this one.
+    expect(task?.assignedProvenance?.serverTime).not.toBe(task?.stateProvenance.serverTime);
+  });
+
+  it('7.211 THE EXCLUSION — `hasRestrictedParent` is true only for the viewer the parent is kept from, and the same row is false for the one it is not', async () => {
+    // The rule is `canSeeResolved` (`src/visibility/can-see.ts:94`), asked about
+    // the PARENT's own resolved row — the same call `rollupFor` makes about each
+    // child. This fixture is the one 7.80 uses: an epic-rank ancestor the member
+    // may NOT see, holding a child they MAY. A suite built only from the
+    // permitted case cannot tell a correct rule from no rule at all, so both
+    // viewers are asked, on the same row, in the same test.
+    const forMember = await listOf('member', fixtures.epicProjectId, { limit: 200 });
+    const child = forMember.groups
+      .flatMap((group) => group.cards)
+      .find((card) => card.ticketId === fixtures.visibleChildId);
+    expect(child, 'the child is in the member’s page').toBeDefined();
+    expect(child?.hasRestrictedParent).toBe(true);
+
+    // The parent really is out of reach for this viewer — asserted rather than
+    // assumed, so `true` is the rule answering and not a constant.
+    const direct = await read.app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${read.world.workspaceId}/tickets/${fixtures.hiddenEpicId}`,
+      headers: read.authOf('member'),
+    });
+    expect(direct.statusCode).toBe(404);
+    // And the boolean discloses no more than the id already on the card: the
+    // parent's TITLE is still nowhere in this body.
+    expect(JSON.stringify(forMember)).not.toContain(fixtures.hiddenEpicTitle);
+    expect(child?.parentId).toBe(fixtures.hiddenEpicId);
+
+    // THE OTHER DIRECTION, same row, same run: the owner may see the parent, so
+    // the same card reports false. Without this, a route hard-coding `true`
+    // wherever `parentId !== null` would pass.
+    const forOwner = await listOf('owner', fixtures.epicProjectId, { limit: 200 });
+    const ownersChild = forOwner.groups
+      .flatMap((group) => group.cards)
+      .find((card) => card.ticketId === fixtures.visibleChildId);
+    expect(ownersChild?.parentId).toBe(fixtures.hiddenEpicId);
+    expect(ownersChild?.hasRestrictedParent).toBe(false);
+
+    // And a ROOT is false for everybody — the third value the field could have
+    // taken, so "no parent" is not being reported as "a parent you may not see".
+    expect(
+      forOwner.groups
+        .flatMap((group) => group.cards)
+        .find((card) => card.ticketId === fixtures.hiddenEpicId)?.hasRestrictedParent,
+    ).toBe(false);
+  });
+});
+
 describe('GET /v1/projects/:projectId/tickets — hierarchy', () => {
   it('7.20 answers direct children by `parentId` and roots by `parentId=root`', async () => {
     expect(await idsOf('member', read.world.projectId, { parentId: read.world.epicId })).toEqual([

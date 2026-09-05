@@ -2726,3 +2726,336 @@ narrowing), the cases that would notice it are exactly the ones the current fixt
 Closure 1's three existing cases all used a ticket that HAS a snapshot and stayed green under the
 mutation — `Tests 1 failed | 3 passed (4)` once the missing case existed. **An exclusion's blast radius
 is invisible to a suite built around the included case.**
+
+---
+
+# ⛔ BLOCKED ON QUOTA — WEEKLY LIMIT HIT, RESETS 2026-09-07 06:30 IST
+
+**Not blocked on the controller. Not blocked on a ruling. Blocked on the weekly quota**, which the
+stop point's own arithmetic predicted and which arrived during closure 2.
+
+Closure 2's implementer died on `You've hit your weekly limit · resets Sep 7 at 6:30am (Asia/Calcutta)`
+after **321k tokens and 141 tool calls**, having **committed nothing**.
+
+## WHAT IS SAFE, AND WHAT IS NOT
+
+| item | state |
+|---|---|
+| PR #98 Batch A (T5–T7) | **MERGED** `999d486` |
+| PR #102 Batch B (T9–T10) | **MERGED** `f03838d` |
+| PR #107 Batch C (T11–T12) | **OPEN**, gate green 24/24 `0 cached` 3,181 tests |
+| PR #109 Closure 1 (snapshot invalidation) | **OPEN**, gate green 24/24 `0 cached` 3,152 tests |
+| `exec/19-serving-gaps` closure 2 | **WIP, UNREVIEWED, UNGATED, DO NOT MERGE** — `d67b8a2`, pushed |
+
+**Step 15 stands at 7 of 8 permitted tasks** (T5, T6, T7, T9, T10, T11, T12 done; **T13 deferred by the
+owner**), plus closure 1 complete and closure 2 abandoned mid-implementation.
+
+## THE WIP BRANCH — what it is and what must be established before it is trusted
+
+`exec/19-serving-gaps` at `d67b8a2` carries **29 files, +1851/−274**, preserved as a WIP commit
+because uncommitted work from a dead fan-out has been lost on this project before and this was the
+largest instance of that hazard yet: 26 modified files, 3 new ones, zero commits.
+
+**Two of the three hardest constraints were verified to have HELD, before the block:**
+
+- **Ruling P30 respected.** `packages/app-core/src/data-source.ts` is modified by **one docblock line**
+  ("six of them until ruling P25 clause 1, four since") and **no type change**. `DataSourceQuery` was
+  not widened.
+- **Neither HELD gap was touched.** A sweep of the `mappers.ts` diff for `WorkspaceRef.projects`,
+  `WorkItem.projectName` and `HELD pending` returns **nothing**, against a control of **371** changed
+  lines in that same file — so the diff is substantial and the held entries genuinely do not appear.
+
+**FIVE THINGS REMAIN UNKNOWN and must be established before a line is added:**
+
+1. It has **never been gated**. No `--force` run exists against it.
+2. It has **never been reviewed** — the review and fix phases never started.
+3. **Which existing Plan 4 rule was applied** to `ListRow.hasRestrictedParent` and `TicketRead.title`
+   is unrecorded. The dispatch required it stated; the structured return never came back. A new
+   visibility rule built under an existing rule's citation is the failure mode this most needs checking
+   for, on the surface that produced P19, P22 and P23.
+4. **Which gaps it actually closed** — the docblock edit implies six refusals became four, so two
+   methods' worth, but that is inference from a comment rather than a measurement.
+5. **`apps/server/src/read/restricted-parents.ts` is a NEW FILE**, which suggests the restricted-parent
+   rule was built — one of the two that required a named existing rule and an escalation if none fitted.
+
+## RESUMING AFTER 2026-09-07 06:30
+
+**Do not continue closure 2 from where it stopped. Establish the five unknowns first, in that order.**
+The cheapest honest path is: gate it, then read `restricted-parents.ts` against
+`apps/server/src/visibility/`'s exports (`canSee`, `canSeeResolved`, `getResolvedVisibility`,
+`rollupFor`, `visibleEventsFor`, `listVisibleTickets`) and decide whether it APPLIES one or INVENTS one.
+**If it invents one, discard that part and escalate** — that boundary does not move because the work is
+already written.
+
+The excluding fixture is the other thing to check early: **a visibility rule is an exclusion, and an
+exclusion's blast radius is invisible to a suite built around the included case.** Find the case where
+the rule must EXCLUDE — the viewer who must not see the parent, the reader whose title must be withheld
+— and mutate the rule to permit. If nothing goes red, the rule is unconstrained however correct it looks.
+
+**Closure 3 (`StreamItem` → `ServerStreamFrame`) was never started, and the controller's own
+instruction said to expect it not to fit. It did not fit. Say so rather than starting it.**
+
+## ONE OPEN QUESTION FOR THE CONTROLLER, not blocking
+
+The instruction classifies **ten** serving gaps; `client-contract.test.ts` and `mappers.ts` enumerate
+**eleven**. **`WorkItem.stateName`** (`mappers.ts:1027`) is in neither the buildable six, the rule-first
+pair, nor the held pair. Its stated reason — *"cards carry stateId only, and the card names no workflow
+version to read the name from"* — reads like a **data** gap rather than a serving gap, which would
+explain the omission. **Not built. Surfaced in PR #109's body.**
+
+## THE FIVE UNKNOWNS ARE NOW FOUR ANSWERED AND ONE REMAINING TASK (2026-09-06)
+
+Established directly, without dispatching an agent, because the quota limit hit the SUBAGENT pool and
+this session could still read, measure and run a gate. **The WIP branch is not "evidence of what an
+agent was doing" any more — it is a nearly-complete change with one bounded task left.**
+
+### 1. GATED. `GATE EXIT: 1` — 21/24 tasks, **three app-core test files red, and they are the EXPECTED red**
+
+```
+test/online/online-data-source.test.ts   3.40 "names its absences"                        1 failed
+test/views/ticket-sheet.test.tsx         expected '…' to contain 'TicketRead.title'       2 failed
+test/views/reopen-flow.test.tsx          3.80 · T13.4h + its control                      2 failed
+```
+
+**Every failure is a refusal test whose gap just closed.** `TicketRead.title` no longer appears in
+`getTicket`'s absences because `getTicket` no longer refuses for that reason. This is P25 clause 3's
+self-expiring gap doing exactly what it was built to do.
+
+**AND THE EXPIRY SURFACE IS WIDER THAN THE INSTRUCTION SAID.** The controller named
+`client-contract.test.ts` (server-side). The actual reds are three **app-core** files, two of them
+**VIEW tests** — `ticket-sheet` and `reopen-flow` — whose whole scenario is *"this read refuses, and
+the refusal renders verbatim."* A view test written around a refusal expires with the refusal, and
+nothing in the instruction predicted that class. **Whoever resumes should expect more expiry sites than
+any list names, and should find them by running the gate rather than by reading a list.**
+
+### 2. WHICH GAPS CLOSED — measured by enumerating both trees, not from a diff
+
+**All EIGHT in scope closed** — the six buildable AND both rule-first:
+
+```
+ListRow.typeRank   ListRow.epicId   ListRow.stateName   ListRow.assignedProvenance
+ListRow.hasRestrictedParent
+TicketRead.stateProvenance   TicketRead.ticket   TicketRead.title
+```
+
+**All eight out of scope still refuse**, including both HELD (`WorkspaceRef.projects`,
+`WorkItem.projectName`) and the unclassified eleventh (`WorkItem.stateName`). **Zero entries added.**
+16 before, 8 after.
+
+> **A `grep "^-.*field:"` over the diff returned NOTHING and I nearly reported "no gaps closed".** That
+> is silent-empty mode #4 — the proxy reformats `git diff` markers and defeats a `^[+-]` filter. It was
+> caught only because a second measurement disagreed: the remaining list had 8 entries where the tree
+> before had 16. **Enumerate both trees and subtract; never grep a diff for markers.**
+
+### 3. `hasRestrictedParent` APPLIES an existing rule — it does not author one
+
+`apps/server/src/read/restricted-parents.ts` delegates to **`canSeeResolved`**
+(`visibility/can-see.ts:94`), asked about the PARENT's resolved row exactly as `rollupFor` asks it about
+each CHILD's. **The cited precedent was verified, not taken:** `rollup.ts:267` does the same call with
+the same `roleByWorkspace` caching and the same comment about no SQL restating who may see what.
+Structurally confirmed too — its SQL carries no visibility predicate and the only logic is
+*known-and-not-visible*.
+
+Three judgements in it worth preserving:
+- **It discloses strictly LESS than the single-ticket read already does.** That route answers
+  `parent: {kind:'restricted', id}` — existence AND the id; this answers the same question with the id
+  removed. And `parentId` is already on every `TicketCard`, so the boolean adds no existence claim.
+- **The role is resolved in the PARENT's workspace, never the caller's** — a parent may sit in another
+  project (6.57) or another workspace (6.84); reusing the caller's role would be a second, quieter
+  visibility decision.
+- **A `parent_id` naming no row answers `false`**, joining "no parent" and "a parent you may see",
+  because `proj_visibility` resolves such a ticket as a ROOT (6.9) — reporting it restricted would
+  assert the existence of a ticket the system has no evidence for, **an invented existence leak, the
+  exact inverse of the disclosed one.**
+
+### 4. `TicketRead.title` SIDESTEPS the visibility decision rather than resolving it
+
+The gap's stated reason was *"reading `proj_tickets` here is a visibility decision."* The
+implementation reads the title from **the claim map the reducer maintains** (`titleOf(state:
+TicketState)`), not from `proj_tickets` — so the table that made it a visibility decision is never
+touched. The viewer already passed `canSee` to obtain the `TicketRead`; the title comes from state they
+are already entitled to. It throws loudly on two conditions it argues are impossible rather than
+defaulting.
+
+**No new rule was invented. The escalation condition did not fire.**
+
+### 5. STILL UNKNOWN — nothing, but ONE TASK REMAINS
+
+**Update the three expired refusal tests, in the same change set, without weakening them.** A refusal
+test edited merely to stay green is a check that cannot fail — the point is that each should now assert
+the *served* fact where it used to assert the absence. `reopen-flow`'s T13.4h is the delicate one: its
+scenario needs a read that still refuses, so it needs a gap that is still open rather than a softened
+assertion.
+
+**Then: review it.** None of the above is a substitute for the review phase that never ran.
+
+---
+
+# LANE A — 2026-09-06, CLOSURE 2 REVIEWED. TWENTY SURVIVING FINDINGS, TWO CRITICAL. THIS SECTION SUPERSEDES EVERYTHING ABOVE.
+
+**Position:** `exec/19-serving-gaps`, rebased `--onto origin/main 631582e` after #109 merged. Four
+commits. **Verify the head with `git branch -r --contains` before trusting any sha written here.**
+
+**#109 IS MERGED** (`a23d686`). Its rebase surfaced an ID-space collision — this branch had minted
+`12.156`-`12.159`, Task 11/12 took the same range and landed first. Mine moved to `12.189`-`12.192`,
+30 code references followed, and the discriminator was *"server cases"* vs Task 11's own. **§12 ids are
+now ALLOCATED, not discovered: Lane A mints from `12.240`.**
+
+## THE REVIEW RAN. 6 lenses (1 Fable on visibility, 4 opus, 1 sonnet), 52 agents, 2 adversarial refuters per finding.
+
+**20 findings survived refutation; 3 were refuted; 3 refuter agents died on the session limit**, so
+`assignedProvenanceFor`'s ORDER BY and the `7.210` folded-version claim each carry ONE verdict rather
+than two — treat those two as less settled than the rest.
+
+### ⛔ TWO CRITICALS — BOTH ARE FALSE CLOSURES OF P25 CLAUSE 1. NEITHER IS FIXED YET.
+
+**C1. `getTicket` is declared served but cannot map a ticket that HAS CHILDREN.**
+`mapTicketRead` (`mappers.ts:1195`) hands the single-read route's `rollup` to `mapRollup`, which reads
+`TicketRollup`'s names (`totalChildren`/`terminalChildren`/`uncategorizedChildren`). The route returns
+`rollupFor`'s **`RollupView`** (`total`/`terminal`/`uncategorized`/`restrictedCount`) VERBATIM
+(`routes/tickets.ts:383` → `:403`). Every non-leaf ticket throws
+`MappingError: ... ticket.rollup.uncategorizedChildren: expected a number`. Reproduced by the reviewer
+against the exact body `real-door-round-trip.test.ts:661-728` pins, with `rollup: null` passing in the
+same run as the control.
+- **The card path already translates** (`ticket-cards.ts:131`, `uncategorizedChildren: rollupView.uncategorized`).
+  The single-read route is the only one that does not, so there are TWO rollup spellings on one `/v1`
+  surface and `mapRollup`'s docblock — *"`TicketRollup` is the only rollup on the `/v1` surface"* — is
+  now FALSE, made false by this very change set.
+- **Why nothing caught it:** the only `mapTicketRead` fixture added (`mappers.test.ts:1101`) hardcodes
+  `rollup: null`, so all four 3.42 cases skip the branch; and `client-contract.test.ts` reads
+  `mappers.ts` as TEXT (`readFileSync`) and never executes a mapper. 1033/1033 app-core green with the
+  defect present.
+- **MY DECISION, recorded, NOT yet measured — treat it as a hypothesis:** translate SERVER-side in
+  `routes/tickets.ts`, mirroring `ticket-cards.ts:131`, rather than adding a second client rollup
+  reader. That restores ONE wire shape, makes `mapRollup`'s docblock true again, and stops the route
+  leaking an internal visibility type. It costs an edit to `tickets-read.test.ts:287-292`'s exact
+  `toEqual` — **which this change set already edited once** (it changed the VALUES and left the
+  RollupView key names, which is how the mismatch got in).
+- **The test that must exist either way:** one `mapTicketRead` fixture with a NON-NULL rollup. Confirm
+  it is RED before the fix.
+
+**C2. `getTickets` serves the first 50 tickets of a project AS THE WHOLE PROJECT.**
+`mapListView` (`mappers.ts:1076`) discards the server's `nextCursor` into a `TicketListView` that has
+no field to hold it. `GET /v1/projects/:id/tickets` is called with no `limit`, the server caps at
+`DEFAULT_LIMIT = 50` and returns a non-null cursor. **No consumer can tell.** The project page renders
+50 rows as the complete set, and an empty calendar cell then asserts "nothing is due" about tickets it
+was never given. This became reachable the moment `mapListView` stopped refusing.
+- **Not yet designed.** Three candidates, none measured: carry the cursor on `TicketListView` (a type
+  change with N consumers — closure-3 shape, and `packages/app-core/src/index.ts` is on the collision
+  map with Lane B's T13); page until exhausted in the online source; or REFUSE when `nextCursor` is
+  non-null, which is the conservative default and the only one that cannot lie. **A partial answer
+  presented as complete is precisely what P25 clause 1 forbids, so silence is not an option.**
+
+### SEVEN IMPORTANT
+1. `restricted-parents.ts:112` — the `knownParents.has(card.parent_id)` conjunct (the branch stopping a
+   dangling `parent_id` from being reported restricted — the INVERSE existence leak) is **unconstrained**:
+   mutate it away and all 74 tests stay green. The excluding fixture does not exist.
+2. `list.test.ts:585` (7.210) — the entire reason `foldedWorkflowDefs` exists beside `latestWorkflowDefs`
+   is **unconstrained**: replace the ticket's own `workflow_version` with literal `1` and all 32 cases
+   stay green, because every fixture workflow has exactly one published version. (ONE verdict only.)
+3. `Features.md:45` — the reopen-flow bullet still says `getTicket` refuses ("Known gap").
+4. `Features.md:47` — "answers **seven of thirteen** `DataSourceQuery` methods" is now miscounted.
+5. `test-cases/03:45` (3.40) — "All six blocked methods refuse THROUGH the DataSource."
+6. `test-cases/07:306` — "Six refusing methods, seven `expectStillUnserved` calls ... the count is not a typo."
+7. `test-cases/03:113` (3.146) — describes `getTickets` as refusing, cites "six refusing methods".
+
+### ELEVEN MINOR (all recorded; none fixed)
+`assigned-provenance.ts:74` latest-assignment unconstrained (ONE verdict) · `mappers.test.ts:1038` the
+restricted-arm "EXCLUSION" measures the fixture, not the mapper · `restricted-parents.ts:21` cites
+`tickets.ts:304` which is now the LIST handler (the arm moved to `:373`) · **7.210/7.211/7.212 exist in
+the suites and were never added to `test-cases/07`** (highest recorded is still 7.209) · `Features.md:148`
+restricted-parent placeholder sentence inverted by this change · `Features.md:417` list-route bullet
+predates the five new fields and still credits `latestWorkflowDefs` for state names · `list-cards.ts:63`
+pinned-version property unconstrained (same root as Important 2) · `restricted-parents.ts:71` comment
+states the INVERSE of what the rejected alternative would do, on a visibility surface ·
+`page-refusals.test.tsx:13` + `ticket-list.test.tsx:500` + `visibility-editor.test.tsx:20` stale
+"six refusals"/"getTicket refuses" docblocks, one of which is the stated reason a component is not
+proven through its mount point — a reason this diff invalidated.
+
+## THE ORDER FROM HERE
+1. **Fix C1 and C2.** Nothing else ships first; both make the register lie.
+2. Important 1 and 2 — both are MISSING EXCLUDING FIXTURES, the failure this project pays for most.
+3. The doc sweep (Importants 3-7 + the Minor doc items) in the same change set.
+4. Then closure 3 (`StreamItem`→`ServerStreamFrame`), **closure 2b (Ruling P34)**, HELD pair LAST
+   under **Ruling P32** (guest sees only `eff.projects`; a project NAME is a disclosure; the excluding
+   fixture is a guest on X who must not receive Y's name OR id, mutated to permit and confirmed red).
+
+## THREE ENVIRONMENT FACTS THAT COST TIME TO LEARN
+- **Turbo's error line prints the pnpm LAUNCHER's path, not the interpreter.** A gate log saying
+  `/Users/kiro/.nvm/versions/node/v24.11.1/bin/pnpm` is NOT node drift: pnpm is a `#!/usr/bin/env node`
+  script that merely lives there. `pnpm exec node -e 'process.version'` prints **v22.22.2**. Probe the
+  SPAWN; I nearly filed a false drift finding off the path.
+- **The gate lock never held while it was split across two Bash calls** — each call is a fresh shell, so
+  `echo $$` recorded a pid that died immediately. One backgrounded invocation, `--concurrency=1`, plus a
+  drain-wait for live pools; reclaim a pid-less lock dir after 60s; bound the drain at 10 min and say so
+  loudly. Script: `scratchpad/gate19.sh`.
+- **`pgrep -f vitest` matches every lane session**, because their prompts contain the word. The only
+  reap criterion is ppid=1:
+  `ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0,"vitest") > 0 {print $1}'`.
+
+
+## GATE AT `eab6349`: 17/21, and the four reds are ONE cause the review never saw
+
+`apps/server/test/visibility/rollup.test.ts` — 4 failed, `Tests 4 failed | 978 passed (982)`. Neither I
+nor the WIP touched `rollup.ts` or `rollup.test.ts`. **The cause is `test/helpers/seed.ts`**, which the
+WIP extended to INSERT a `proj_tickets` head row beside the four projections it already seeded.
+
+That change is an IMPROVEMENT — a fixture with no head row was seeding a world the ingest transaction
+cannot produce — and the WIP updated `tickets-read.test.ts`'s expectations for it. It did not update
+`rollup.test.ts`, whose docblock still says *"This file cannot exercise `terminal` ... no child in any
+fixture below has a state category at all — every one of them lands in `uncategorized`."* Every child
+now HAS a category, so `uncategorized: 9` is `0`.
+
+**DO NOT just change 9 to 0.** `seedTicket` hard-codes `state_category` to `'open'` with no parameter,
+so after that edit EVERY seeded ticket is `open`: `terminal` is 0 always and `uncategorized` is 0
+always, and **both dimensions of `RollupView` become assertions that cannot fail.** The file's docblock
+was honest about being unable to exercise ONE of them; blindly rewriting the numbers would make it
+silently unable to exercise TWO while looking more precise than before.
+
+The fix that keeps the gate honest: give `seedTicket` an OPTIONAL `stateCategory` (default `'open'`, so
+every existing caller is unchanged), then one case with mixed children — one terminal, one NULL — that
+asserts `terminal: 1, uncategorized: 1`. That restores both dimensions and retires the docblock's
+limitation rather than quietly widening it.
+
+
+---
+
+# LANE A — CLOSURE 2 IS DONE AND IN PR #125. THIS IS THE CURRENT POSITION.
+
+**PR #125** (`exec/19-serving-gaps`), gate GREEN at `182d097`: 24/24, `0 cached`, 3,229 tests / 240
+files, node v22.22.2 (spawn-probed), `GATE_EXIT=0`. Awaiting controller merge. **#109 merged as
+`a23d686`.**
+
+## WHAT THE FIX ROUND ACTUALLY CHANGED — both Criticals, one build break, four reds, nine doc sites
+- **C1** rollup spelling: translated server-side in `routes/tickets.ts`, mirroring `ticket-cards.ts`.
+- **C2** truncated list: `mapListView` REFUSES a non-null `nextCursor`.
+- **`ListRow.pending: false`** — a required field whose justification was "the function throws".
+- **`seedTicket` gained optional `stateCategory`** (default `'open'`; `null` = NO head row, because
+  `state_category` is NOT NULL and `uncategorized` counts the LEFT JOIN's miss). One new
+  `rollup.test.ts` case drives terminal/uncategorized apart; mutation kills exactly it and leaves 5.
+- Doc sweep + 7.210/7.211/7.212 catalogued.
+
+## STILL OPEN FROM THE REVIEW — recorded, NOT fixed, with owners
+1. **No test executes a mapper against a real `/v1` body.** The hole BOTH Criticals came through.
+   `client-contract.test.ts` reads `mappers.ts` as text; `apps/server` has no `app-core` dependency and
+   `apps/server/package.json` is on the collision map. *Owner: client-contract harness.*
+2. **7.210 folded-versus-latest unconstrained** — every fixture workflow has ONE published version.
+3. **7.211's dangling-`parent_id` branch has no fixture** and survives its own mutation.
+4. Eleven Minor items are enumerated in the earlier review section above; the doc ones are now fixed,
+   the fixture ones (1-3) are not.
+
+## NEXT, IN ORDER — nothing here has started
+1. **Closure 3** — `StreamItem` → `ServerStreamFrame`. Also the natural home for **C2's proper close**
+   (a cursor on `TicketListView` or a paging loop): both are one-type/N-consumers/one-seam, and
+   `packages/app-core/src/index.ts` collides with Lane B's T13 — whoever lands second rebases.
+2. **Closure 2b (Ruling P34)** — the offline-born list unioning `getTickets` with
+   `listTicketSummaries` (`replica-data-source.ts:353`, `OFFLINE_BORN_ABSENCE`), and a renderer for
+   `ListRow.pending`. NOTE: `pending` now has a real value from the online mapper, so the renderer has
+   something true to render on both sources.
+3. **HELD pair LAST, under Ruling P32** — guest sees only `eff.projects`; a project NAME is a
+   disclosure; `WorkItem.projectName` served iff the project is in `eff.projects`, else id-only. **The
+   non-guest half must also be an application of existing role resolution — ESCALATE if it needs a rule
+   that does not exist.** The excluding fixture is the whole test: a guest on X who must not receive
+   Y's name OR id, mutated to permit, confirmed red.
+
+**§12 id allocation: Lane A mints from `12.240`.** Re-measure main's ceiling at rebase as the control.
