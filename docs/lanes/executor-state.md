@@ -3196,3 +3196,53 @@ Files: `snapshot-writer.ts`, the bootstrap payload in `sync-routes.ts`, `replica
 
 **Sequencing confirmed: finish closure 2b, THEN closure 4 under this ruling, then the rest of the
 queue.** "Keep going on closure 2b" was an aside, not a re-order.
+
+---
+
+---
+
+# LANE A — CLOSURE 4 IS BUILT; ONLY P36's TWO-PART FIXTURE REMAINS. 2026-09-06.
+
+**Branch `exec/26-provenance-block`** (worktree `gisik-nokma-lanes/laneA-closure4`), off `origin/main`.
+**Stack it on #137 (closure 2b) when that squashes**, then rebase past it as with #128.
+
+| commit | what |
+|---|---|
+| 11fd6da | server: migration, `SnapshotProvenance` type, writer capture + CARRY-FORWARD, both write sites |
+| 6488103 | client storage: sibling table, `writeSnapshot`, `readSnapshotProvenance`, bootstrap payload |
+| 28188ed | read door: `claimsFor` fallback wired into `getTickets` / `getBoard` / `getTicket` |
+
+Green: app-core 1086/1086 · sync-client 63/63 · build 10/10 · server+app-core+sync-client typecheck 0.
+
+## WHAT REMAINS — P36's excluding fixture, BOTH halves, and it is not optional
+1. **The copied instant.** A snapshot-bounded client's `stateProvenance.serverTime` must EQUAL the
+   ledger row's `serverTime` at that seq — **assert against the ROW, not a fixture constant.** Mutating
+   the writer to copy the ADJACENT event's time must redden it alone. That mutation IS option 3.
+2. **The carry-forward.** Snapshot a ticket, run the invalidation pass with an EMPTY tail, assert the
+   provenance survives. Mutating the carry-forward to write `null` must redden it alone. **Without this
+   the loss is latent until a workflow publish** — the P14 shape.
+Server-side, needs Postgres and the gate lock. §12 ids from **12.244** (block 12.240–12.259).
+
+## THREE THINGS ESTABLISHED HERE THAT ARE NOT IN THE RULING
+- **The local replica schema has NO migration path.** `migrateLocal` runs `CREATE TABLE IF NOT EXISTS`
+  only; `LOCAL_SCHEMA_VERSION` is written into `meta` and **never read by anything**. A column on the
+  local `snapshots` table would work on a fresh device and throw `no such column` on every existing one.
+  Hence the SIBLING TABLE. *Owner for the missing mechanism: the first change that must ALTER.*
+- **The same carry-forward omission exists on the CLIENT side.** `writeSnapshot` does not delete the
+  block when it has none: absent means "nothing new to say", not "forget what you knew". The identical
+  mistake was available twice in one change.
+- **`BoardCard.cause` is NARROWED, not served**, on the snapshot-bounded path — it comes off the event
+  payload and the block does not carry it. Missing badge, never a false one. ❌ case owed, P36 as owner.
+
+## SCOPE, MEASURED (P36 constraint (d))
+Exactly two claims: `stateClaimOf` → `stateProvenance`, `assignedClaimOf` → `assignedProvenance`.
+**`dueDate` is the control that explains why** — `dueDateOf` reads `state.fields['dueDate']`, a
+`FieldClaim` carrying its own actor and both clocks INSIDE `TicketState`, so it already survives a
+snapshot-bounded bootstrap untouched. Field claims travel in the state; the state claim and the
+assignment claim do not. Nothing else qualifies, and that is why rather than an assertion.
+
+## LANE B SHARES `replica.ts` (closure 5, P37) — regions named, no redesign needed
+Mine: the bootstrap payload type (~36), `writeSnapshot` (~247), the local schema. Theirs: the reconcile
+caller and its purge loop. **`SyncTransport`'s fourth method does not touch me** — closure 4 adds,
+wraps and constructs no transport. `sync-routes.ts` is shared too: they add a registration line inside
+`registerSyncRoutes`, I widen `bootstrapTicket`'s payload. Whoever lands second rebases.
