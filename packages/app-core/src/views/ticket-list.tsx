@@ -274,6 +274,11 @@ function ListTable({
           <button type="button" className="gn-list__open" onClick={() => onOpenTicket(node.row.ticketId)}>
             {node.row.title}
           </button>
+          {node.row.pending ? (
+            <Chip tone="pending" title="A claim for this ticket is queued and the server has not answered it yet">
+              claim in transit
+            </Chip>
+          ) : null}
           {node.row.hasRestrictedParent ? (
             <Chip tone="restricted" title="This ticket hangs under a ticket you may not see">
               under a restricted parent
