@@ -4,7 +4,7 @@ import type { LedgerEvent, TicketState, WorkspaceRole } from '@gisik-nokma/domai
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../ledger/event-store.js';
-import { readLatestSnapshot } from '../ledger/snapshot-store.js';
+import { readLatestSnapshot, type SnapshotProvenance } from '../ledger/snapshot-store.js';
 import { readStreamSeq } from './stream-seq.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
 import type { ServerAppend } from '../routes/invites.js';
@@ -63,8 +63,18 @@ export const BOOTSTRAP_BACKFILL_TYPES = [
 
 export type BootstrapTicket = {
   ticketId: string;
-  /** `null` means `events` is the ticket's full history — no snapshot exists yet. */
-  snapshot: { seq: number; state: TicketState } | null;
+  /**
+   * `null` means `events` is the ticket's full history — no snapshot exists yet.
+   *
+   * `provenance` is ADDITIVE (ruling P36 constraint (b)): a client that does not
+   * read it is unaffected, and every bootstrap case written before it stays
+   * green unchanged. It carries the two claims `TicketState` cannot —
+   * the state claim and the assignment claim — because `transitions[]` has
+   * `actorId` and `seq` and no clock, while every FIELD claim already travels
+   * inside the state with its own. Its own `null` means a snapshot row written
+   * before the column existed: unknown, never unattributed.
+   */
+  snapshot: { seq: number; state: TicketState; provenance: SnapshotProvenance | null } | null;
   events: LedgerEvent[];
 };
 
@@ -108,7 +118,14 @@ async function bootstrapTicket(client: PoolClient, ticketId: string): Promise<Bo
           // same cast), so this is the only option available, not a shortcut
           // past one. A corrupted snapshot row surfaces as a reducer throw or
           // a wrong state downstream, never here.
-          { seq: snapshot.seq, state: snapshot.state as unknown as TicketState },
+          {
+            seq: snapshot.seq,
+            state: snapshot.state as unknown as TicketState,
+            // Passed through as read. The server does not recompute it here and
+            // could not: the events it was read from are, by definition, below
+            // this snapshot's seq and are exactly what this payload omits.
+            provenance: snapshot.provenance,
+          },
     events,
   };
 }

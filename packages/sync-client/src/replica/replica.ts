@@ -30,10 +30,31 @@ import { isSyncInstruction, type ScopeRevokedInstruction, type SyncInstruction, 
  * same move-to-domain note applies.
  */
 export type Me = { userId: string; workspaceRole: WorkspaceRole; projectIds: string[] };
+/**
+ * One recorded claim: who, and BOTH clocks. Declared here rather than imported
+ * from the server, which shares no type with this package by design.
+ *
+ * `serverTime` is the point of the whole block. A snapshot-bounded replica has
+ * no `ticket.created` / `ticket.transitioned` below its seq to read one from,
+ * and `TicketState.transitions` carries `actorId` and `seq` and no clock at all.
+ */
+export type SnapshotClaim = { actorId: string; clientTime: string; serverTime: string };
+
+/**
+ * The two claims a `TicketState` cannot carry: the state claim and, when there
+ * is one, the assignment claim. Every FIELD claim already travels inside the
+ * state as a `FieldClaim` with its own clocks, which is why due dates need
+ * nothing here — the control that shows this is a real distinction rather than
+ * an arbitrary pair.
+ *
+ * `assigned: null` is a fact (nobody is assigned), not an absence.
+ */
+export type SnapshotProvenanceBlock = { state: SnapshotClaim; assigned: SnapshotClaim | null };
+
 export type BootstrapTicket = {
   ticketId: string;
   /** `null` means `events` is the ticket's full history — no snapshot exists yet. */
-  snapshot: { seq: number; state: TicketState } | null;
+  snapshot: { seq: number; state: TicketState; provenance?: SnapshotProvenanceBlock | null } | null;
   events: LedgerEvent[];
 };
 export type BootstrapResponse = {
@@ -212,12 +233,63 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
     return rows.length === 0 ? 0 : Number(rows[0]!.seq);
   }
 
-  async function writeSnapshot(tx: SyncStorage, ticketId: string, seq: number, state: TicketState): Promise<void> {
+  async function writeSnapshot(
+    tx: SyncStorage,
+    ticketId: string,
+    seq: number,
+    state: TicketState,
+    provenance: SnapshotProvenanceBlock | null = null,
+  ): Promise<void> {
     await tx.run(
       `INSERT INTO snapshots (entity_kind, entity_id, seq, state) VALUES ('ticket', ?, ?, ?)
        ON CONFLICT(entity_kind, entity_id) DO UPDATE SET seq = excluded.seq, state = excluded.state`,
       [ticketId, seq, JSON.stringify(state)],
     );
+    // NOT deleted when the block is absent. A local re-snapshot with no
+    // provenance to write — a server row predating ruling P36's column, or a
+    // fold this client performed itself — must not erase a block an earlier
+    // bootstrap DID deliver: absent means "nothing new to say", not "forget
+    // what you knew". This mirrors the server writer's carry-forward, where the
+    // same omission would have nulled a good block on every workflow publish.
+    if (provenance === null) return;
+    await tx.run(
+      `INSERT INTO snapshot_provenance (entity_kind, entity_id, state_claim, assigned_claim)
+         VALUES ('ticket', ?, ?, ?)
+       ON CONFLICT(entity_kind, entity_id)
+         DO UPDATE SET state_claim = excluded.state_claim, assigned_claim = excluded.assigned_claim`,
+      [
+        ticketId,
+        JSON.stringify(provenance.state),
+        provenance.assigned === null ? null : JSON.stringify(provenance.assigned),
+      ],
+    );
+  }
+
+  /** The block a bootstrap delivered for this ticket, or `null` if none has. */
+  async function readSnapshotProvenance(
+    tx: SyncStorage,
+    ticketId: string,
+  ): Promise<SnapshotProvenanceBlock | null> {
+    const rows = await tx.all(
+      `SELECT state_claim, assigned_claim FROM snapshot_provenance
+       WHERE entity_kind = 'ticket' AND entity_id = ?`,
+      [ticketId],
+    );
+    const row = rows[0];
+    if (row === undefined) return null;
+    const stateClaim = row['state_claim'];
+    if (typeof stateClaim !== 'string') return null;
+    const assignedClaim = row['assigned_claim'];
+    return {
+      state: JSON.parse(stateClaim) as SnapshotClaim,
+      // `null` here is the RECORDED fact that nobody is assigned, which the
+      // server derived from `state.assigneeId` rather than from a missing
+      // event. A non-string that is not null would be a corrupt row; it reads
+      // as no assignment rather than throwing, matching how this file treats
+      // every other unreadable local value — the ticket is still usable and the
+      // claim is simply not shown.
+      assigned: typeof assignedClaim === 'string' ? (JSON.parse(assignedClaim) as SnapshotClaim) : null,
+    };
   }
 
   async function upsertTicket(tx: SyncStorage, state: TicketState): Promise<void> {
