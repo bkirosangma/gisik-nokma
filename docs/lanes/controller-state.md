@@ -199,6 +199,40 @@ time), `e2e` (detect-only until T13) green; `check-env` green (with the new `.sk
 trip-wire); `build` → `typecheck` / `server-tests` (4 shards, `postgresql-client-16` pinned with a
 version check, `check-no-silent-skips.mjs`) / `other-tests` pending at this writing.
 
+### RULING P37.1 (2026-09-06 03:50, controller as ruling tier) — the push-shaped grant backfill WEDGES; disclosed and capped now, made pull-shaped and client-presented under closure 5b(d)
+
+**Found by #139's Fable branch review (8 raised, 6 survived refutation, one Important), traced link by link
+and refused refutation.** Before closure 5, every envelope the hub sent advanced a cursor; a backfill
+inverts that by construction — **every backfilled envelope is `≤ afterSeq`, so none moves any cursor, and
+the only one that does (the trigger) is yielded after the whole subtree's history.** `hub.ts` closes with
+1013 `slow-consumer` at `bufferedAmount > 1 MB` and detaches; no `caught-up` is sent; the engine persists
+its cursor only in `onCaughtUp`; app-core's `lastSeq = Math.max(...)` cannot move on envelopes below its
+own `afterSeq`; `needsBootstrap` refuses to re-bootstrap over a local baseline. **The client reconnects at
+the same cursor, receives the identical burst, is closed again — permanently and silently.** Independently:
+the per-trigger unit is the full pre-cursor history of an inheriting subtree read with `afterSeq = 0`, and
+`check-permission.ts` does not refuse a `visibility.set` that sets the mode a ticket already has, so a
+member can make the server re-walk and re-stream the subtree to every subscriber per commit. (The verifier
+did not MEASURE buffer growth; the amplification half does not depend on that.) **The cheap fix is unsafe
+and Lane B checked before proposing it:** yielding the trigger first makes `refoldTicket` replay a
+`ticket.reparented` for a client with no `ticket.created`, and `applyTicketEvent` throws — the engine's
+terminal stall.
+**RULING: Lane B's recommendation.** In #139 now: **(2) disclose** — the wedge is its own ❌ case with the
+mechanism in the line and owner closure 5b; **(1) cap the candidate walk** with a documented maximum and a
+truncation case; the trigger stays AFTER the burst. **Closure 5b gains (d), the real fix without the
+per-subscriber server state `visibleEventsFor` deliberately lacks: the grant side becomes PULL-SHAPED and
+CLIENT-PRESENTED, the narrow side's own principle.** The hub pushes only the trigger plus the ids it newly
+admits (a bounded notice); the client pulls each ticket it does not hold through a per-ticket bootstrap door
+(the rig's `bootstrapTicket` restates one; if no route exists it is (d)'s first artefact) BEFORE applying
+the trigger, persisting as it goes. A cut-short session resumes by pulling what it lacks; a repeated no-op
+`visibility.set` costs a holding client nothing (the amplifier is bounded by holdings, not by trust in
+`check-permission`); the refold hazard closes by *bootstrap-before-apply on any event for an entity not
+held* — the rule a replica needs for `ReplicaGapError` anyway. Excluding fixtures carry over; the wedge
+case flips to ✅ only when a slow-consumer close mid-pull is followed by convergence on reconnect.
+**Also from the review, kept:** 12.277's positive control was VACUOUS — `toContain(ticket)` passed because
+the narrowing event itself carries the ticket id, so it would have passed against an empty
+`grantBackfillFor`; now asserted by pre-cursor event id. A check passing for a reason unrelated to the
+property it names, in the case written to demonstrate that discipline.
+
 ### RULING P38 (2026-09-06 03:45, controller as ruling tier; TO BE PUT BEFORE THE OWNER after the fact, revocable in a word) — the HELD pair's admin/member half: `WorkspaceRef.projects` is `eff.projects` for every role except owner
 
 **Lane A escalated before building, as P32 wrote into itself.** `canSeeResolved` (`visibility/can-see.ts:94`)
