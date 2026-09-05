@@ -201,6 +201,79 @@ correction table: `me.projectIds` needs `[...eff.projects.keys()]` (`EffectiveRo
 so the plan's spread yields `[key, value]` tuples — the shape matched, the value did not), and
 workflow/ticket-type ENTITY ids must be ULIDs too, not only users and the workspace.
 
+## T14 FABLE REVIEW — no Critical; three Important, all FIXED; and what it means for T15
+
+**No Critical.** The reviewer compared every assembly the rig shares with the server — bootstrap,
+both ingest doors, the sync-down cursor, the parked transport — and found no silent divergence. It
+verified the load-bearing claim independently: *"flush hands back the in-flight promise"* is TRUE
+(`sync-engine.ts`: `if (flushing !== null) return flushing`), so no claim is lost, double-sent, or
+stranded by the gate.
+
+### The three Important findings, and why each was a real hole
+
+- **I1 — `goOnline()` could resolve "successfully" with a claim still queued and never sent.**
+  `flush` answers a `transport.sync` THROW with `outbox.recordFailure` and returns normally: the row
+  stays `'queued'`, `next_attempt_at` moves out, `lastApplyFailure()` stays null and **`failedItems`
+  stays EMPTY** — `recordFailure` deliberately does not mark `'failed'`, or every retryable claim
+  would strand forever. A Task 15 scenario would then assert one contest, see zero, and blame the
+  product; the reason sat in `outbox.last_error`, which nothing read. **Fixed:** `goOnline` now
+  reads `queuedCount` after the flush and throws carrying each row's `last_error`. In this harness
+  there is no network — `transport.sync` calls `processBatch` in-process — so a still-queued claim is
+  never transient and the backoff that would excuse it in the product excuses nothing here.
+- **I2 — S3, S4 and any revocation scenario were INEXPRESSIBLE.** `ADMIN_ONLY_TYPES` refuses
+  `workflow.defined`, `ticket-type.defined`, `project.created` and `ticket.workflow_rebound` from
+  every non-admin, and both users were `'member'`. An author hitting that reaches for the ungated
+  internal door and silently stops testing the product. **Fixed:** `USER_ADMIN`, seeded `'owner'` and
+  project-admin. Pinned by a case that asserts the MEMBER is refused and the owner commits, so it
+  proves the gate is live rather than absent.
+- **I3 — S6 (same batch twice) was INEXPRESSIBLE.** `engine.flush()` drains only what is queued and
+  the rows are gone after the first flush; the plan's S6 built its own `createSyncService({pool,
+  ingest})`, which does not compile (`serverAppend` is required) and would have been a SECOND
+  instance, hiding any per-instance duplicate-suppression bug. **Fixed:** `Harness.sync(userId,
+  events)` → the same `syncService.processBatch` the route delegates to.
+
+### Minor — recorded, and the third is a PRODUCT defect, not the rig's
+
+- **M1** `engine.settled()` deadlocks while a claim is parked on the offline gate (it awaits
+  `flushing`). Scenarios must not use it; documented at the engine field.
+- **M2** `goOnline` flushes then catches up; the product catches up, then flushes inside
+  `onCaughtUp`. Measured benign for the S1/S2 shapes (the reducer only throws on unknown
+  type/workflow/state or an uncreated ticket, which an assign/field/transition gap cannot produce),
+  but **T15 should `syncDown()` before `goOnline()`** where it cares about the intermediate state.
+- **M3 — PRODUCT DEFECT, owner unassigned.** After `snapshotPass()`, a fresh client's
+  `ds.query.getTicket` throws `ReplicaGapError`: `replica-data-source.ts` requires a
+  `ticket.created`/`ticket.transitioned` in local `events` for `stateProvenance`, and a
+  snapshot-bounded bootstrap ships neither below the line. `replica.getTicket` works; only the
+  DataSource door refuses. **The snapshot-bounded bootstrap and the DataSource's provenance rule
+  contradict each other.** Recorded, not fixed — it is not the rig's bug, but it will surface as one
+  in any scenario that snapshots before creating a client.
+- **M4** after a workspace-wide `scope-revoked` the cursor row is gone, so later `syncDown()`s
+  re-scan from 0 and re-yield it (idempotent; the engine delivers nothing further).
+- **M5** the roster seed is projection-only, so no `membership.granted` / `project.created` rows
+  exist in the ledger. Nothing in the replica reads them; cursors are just smaller.
+
+### T15 PITFALLS THE REVIEW MEASURED — read these before writing scenarios
+
+1. **S1's `ticket.field_set {fieldId:'notes'}` is refused LOCALLY** (`field.unknown`) — the seeded
+   types have `fields: []`. Use a built-in (`title`, `description`, `dueDate`, `startDate`) or seed a
+   field.
+2. **S4's expected `purge` on `visibility.set` DOES NOT EXIST in the product** — the per-event walk
+   was struck (cases 6.101/6.104). Measured: B keeps the ticket, B's cursor lags, and re-widening
+   re-delivers the full history. **The rig reproduces the server correctly; S4's script must change.**
+3. `ticket.transitioned`'s payload key is **`to`**, not the plan's `toStateId` — the same error T13
+   already paid for.
+4. The plan's T15 text repeats T14's API errors: `ingestInteractive` takes `(userId, events)`;
+   `ds.query.getTicket` takes `(workspaceId, ticketId)`; **`listEntityEvents` is on the REPLICA, not
+   `ds.query`**; `'usr_a'`/`'usr_b'`/`'task'` must be the rig's exported ULIDs; and `seedTicket` takes
+   `(pool, args)` with **no `visibility` field at all** (`setVisibilityEnv` is separate).
+
+### The reviewer's own least-sure claim, carried rather than absorbed
+
+M2's "benign for the six scenarios" rests on the S1 and S2 shapes only; S5 was not run. **Not
+checked at all:** S3–S6 end to end, the stall path where `lastApplyFailure` is non-null, the
+no-progress guard, `bootstrapFor` under a concurrent writer, the JSON round trip, and `contests()`
+ordering with two contests in one batch.
+
 ## ⚠️ THE FOUR THINGS A RESTART MUST KNOW BEFORE TOUCHING T14
 
 1. **The T14 plan text's rig code block is a DRAFT and ELEVEN of its details are wrong.** The verified

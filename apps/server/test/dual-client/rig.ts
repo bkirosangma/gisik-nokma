@@ -32,7 +32,7 @@ import {
 import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { getTicketStateFromDb } from '../../src/projections/tickets.js';
-import { createSyncService, type SyncService } from '../../src/sync/sync-service.js';
+import { createSyncService, type SyncEventResult, type SyncService } from '../../src/sync/sync-service.js';
 import {
   BOOTSTRAP_BACKFILL_TYPES,
   type BootstrapResponse,
@@ -114,6 +114,23 @@ export const HARNESS_WORKSPACE_ID = '01J9HWSA000000000000000000';
 export const HARNESS_PROJECT_ID = '01J9HPRJ000000000000000000';
 export const USER_A = '01J9HPERS0NA00000000000000';
 export const USER_B = '01J9HPERS0NB00000000000000';
+/**
+ * The workspace OWNER, and the reason a third identity exists at all.
+ *
+ * `USER_A` and `USER_B` are both `'member'`, and `ADMIN_ONLY_TYPES`
+ * (`apps/server/src/permissions/check-permission.ts`) refuses
+ * `workflow.defined`, `ticket-type.defined`, `project.created` and
+ * `ticket.workflow_rebound` from every non-admin at the gated door. Task 15's
+ * S3 republishes a workflow while a client is offline, and S4 revokes a
+ * membership; neither is expressible by a member. Without this identity a
+ * scenario author reaches for `ingestBatch` — the ungated internal door — and
+ * silently stops testing the product.
+ *
+ * It is an OWNER rather than an admin only because `seedMember` takes the role
+ * literally and owner is the strictly larger capability; nothing here depends
+ * on the difference.
+ */
+export const USER_ADMIN = '01J9HPERS0NADM000000000000';
 export const HARNESS_WORKFLOW_ID = '01J9HWFH000000000000000000';
 /** The payload `id` AND the entity id, as `sync-route.test.ts`'s fixture does. */
 export const TASK_TYPE_ID = '01J9HTASK00000000000000000';
@@ -125,7 +142,17 @@ export type HarnessClient = {
   userId: string;
   replica: Replica;
   outbox: Outbox;
-  /** Exposed so a scenario can read `lastApplyFailure()` / `status()` — never to `start()` it. */
+  /**
+   * Exposed so a scenario can read `lastApplyFailure()` / `status()` — never to
+   * `start()` it, and never to `settled()` it.
+   *
+   * **`settled()` DEADLOCKS here** (measured): it ends with
+   * `if (flushing !== null) await flushing`, and while this client is offline
+   * `flushing` is parked on the gate that only `goOnline()` opens. A scenario
+   * author reaching for the engine's documented wait primitive hangs to the
+   * 30 s test timeout with no message. Use `goOnline()` / `syncDown()`, which
+   * are the harness's own settle points.
+   */
   engine: SyncEngine;
   ds: ReplicaDataSource;
   /** Flush the outbox through the REAL sync service (the engine's own loop), then catch up. */
@@ -167,6 +194,11 @@ export type Harness = {
   ledger(entityId: string): Promise<LedgerRow[]>;
   /** `proj_contested` rows, in the order they were filed. */
   contests(): Promise<Array<Record<string, unknown>>>;
+  /**
+   * The REAL sync door, for a batch a scenario wants to send itself — S6 lands
+   * the same batch twice through it. Same object `POST /v1/sync` delegates to.
+   */
+  sync(userId: string, events: SubmittedEvent[]): Promise<SyncEventResult[]>;
   /**
    * The SERVER's read model (Plan 3's `proj_tickets`), so a scenario can prove
    * server ≡ replica and not only replica ≡ replica.
@@ -332,6 +364,22 @@ export async function createHarness(): Promise<Harness> {
       await replica.setCursor(workspaceId, cursor);
     }
 
+    /**
+     * ## THE ORDER HERE IS THE INVERSE OF THE PRODUCT'S, and Task 15 must know
+     *
+     * This flushes and THEN catches up. The engine does the opposite:
+     * `onCaughtUp` is what triggers its flush, so in the product a client is
+     * current before its own queued claims are folded through the flush door.
+     *
+     * Measured benign for the S1 and S2 shapes — the reducer throws only on an
+     * unknown type/workflow/state or an uncreated ticket, which an
+     * assign/field/transition gap cannot produce, so folding one's own claim
+     * over a gapped local history converges to the same final state. **It was
+     * NOT measured for S5**, and a scenario that asserts the INTERMEDIATE state
+     * (what a replica holds between the flush and the catch-up) is asserting
+     * something the product never shows. Call `syncDown()` first where that
+     * matters.
+     */
     async function goOnline(): Promise<void> {
       online = true;
       for (const wake of waiters.splice(0)) wake();
@@ -352,6 +400,37 @@ export async function createHarness(): Promise<Harness> {
       const failure = engine.lastApplyFailure();
       if (failure !== null) {
         throw new Error(`harness: replica for ${userId} could not fold a committed claim: ${failure.message}`);
+      }
+      // THE OTHER SILENT EXIT, and it is not the same one.
+      //
+      // `flush` answers a `transport.sync` THROW with `outbox.recordFailure`
+      // and returns normally: the row keeps status 'queued', its
+      // `next_attempt_at` moves out by the backoff, `lastApplyFailure()` stays
+      // null, and `failedItems` stays EMPTY (measured — `recordFailure` does
+      // not mark 'failed', deliberately, or every retryable claim would strand
+      // forever). So `goOnline()` used to resolve looking successful with the
+      // claim never sent, and a scenario asserting one contest would see zero
+      // and blame the product. The real reason sat in `outbox.last_error`,
+      // which nothing read.
+      //
+      // In THIS harness there is no network and no server to be briefly
+      // unavailable: `transport.sync` calls `syncService.processBatch`
+      // in-process. A claim still queued after a flush is therefore never
+      // transient — it is a real failure, and the backoff that would excuse it
+      // in the product excuses nothing here.
+      const stillQueued = await outbox.queuedCount(workspaceId);
+      if (stillQueued > 0) {
+        const rows = await storage.all(
+          'SELECT event_id, attempts, status, last_error FROM outbox WHERE workspace_id = ? ORDER BY position',
+          [workspaceId],
+        );
+        const detail = rows
+          .map((r) => `${String(r['event_id'])} (attempts=${String(r['attempts'])}, status=${String(r['status'])}): ${String(r['last_error'] ?? 'no error recorded')}`)
+          .join('; ');
+        throw new Error(
+          `harness: goOnline() for ${userId} left ${String(stillQueued)} claim(s) queued after the flush — ` +
+            `the sync door refused to accept them and the engine backed off instead of failing. ${detail}`,
+        );
       }
       await syncDown();
     }
@@ -396,7 +475,40 @@ export async function createHarness(): Promise<Harness> {
       return rows;
     },
 
+    /**
+     * Hand a batch straight to the REAL sync service — the same object
+     * `POST /v1/sync` delegates to, and the same call `goOnline`'s transport
+     * makes.
+     *
+     * It exists for Task 15's S6, which lands one outbox batch TWICE and
+     * requires identical results, an unchanged ledger and exactly one contest.
+     * No other accessor can express that: `engine.flush()` drains only what is
+     * queued, and after the first flush the rows are gone. The plan's S6 built
+     * its own `createSyncService({pool, ingest})`, which does not compile —
+     * `SyncServiceDeps` requires `serverAppend` — and would in any case have
+     * been a SECOND service instance, so a duplicate-suppression bug living in
+     * per-instance state would have been invisible to it. This is the one the
+     * route uses.
+     */
+    sync: (userId, events) => syncService.processBatch(userId, events),
+
     projTicket: (ticketId) => getTicketStateFromDb(pool, workspaceId, ticketId),
+    /**
+     * ## A PRODUCT DEFECT SURFACES THROUGH THIS, and it is not the rig's
+     *
+     * After a snapshot pass, a client created FRESH cannot read the snapshotted
+     * ticket through `ds.query.getTicket`: it throws `ReplicaGapError` for
+     * `stateProvenance`, because `replica-data-source.ts` requires a
+     * `ticket.created` or `ticket.transitioned` in the local `events` table and
+     * a snapshot-bounded bootstrap ships neither below the line.
+     * `replica.getTicket` answers fine — only the DataSource door refuses.
+     *
+     * **The snapshot-bounded bootstrap and the DataSource's provenance rule
+     * contradict each other.** Recorded, not fixed: it is a product question,
+     * not a harness one, and fixing it here would hide it. Owner: unassigned.
+     * A scenario that snapshots before creating a client will meet it as what
+     * looks like a rig failure.
+     */
 
     async snapshotPass() {
       await runSnapshotPass(pool, { minEvents: 1 });
@@ -422,6 +534,9 @@ export async function createHarness(): Promise<Harness> {
   await seedProject(pool, workspaceId, projectId);
   await seedMember(pool, workspaceId, USER_A, 'member', [{ projectId }]);
   await seedMember(pool, workspaceId, USER_B, 'member', [{ projectId }]);
+  // The owner (see USER_ADMIN): Task 15's S3/S4 need a workspace-admin claim to
+  // exist at the GATED door rather than smuggling one through the internal one.
+  await seedMember(pool, workspaceId, USER_ADMIN, 'owner', [{ projectId, projectAdmin: true }]);
 
   const define = (entity: SubmittedEvent['entity'], type: string, payload: unknown): SubmittedEvent =>
     newSubmittedEvent({ workspaceId, entity, type, payload, actorId: USER_A, origin: 'server' });

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newSubmittedEvent, newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import { PERMISSION_ROLE_RULE, SERVER_ORIGIN_REASON } from '../../src/permissions/check-permission.js';
 import { readStreamSeq } from '../../src/sync/stream-seq.js';
-import { createHarness, TASK_TYPE_ID, USER_A, USER_B, type Harness } from './rig.js';
+import { createHarness, HARNESS_WORKFLOW_ID, TASK_TYPE_ID, USER_A, USER_ADMIN, USER_B, type Harness } from './rig.js';
 
 /**
  * The rig proving itself before Task 15's scenarios trust it (Plan 10 Task 14).
@@ -181,6 +181,126 @@ describe('the rig', () => {
     // is a fact about this run and not an assumption. Without it, a snapshot
     // pass that skipped the ticket would make this case prove nothing.
     expect(types).not.toContain('ticket.created');
+  });
+
+  /**
+   * I1 — goOnline() MUST NOT RESOLVE WITH A CLAIM STILL QUEUED.
+   *
+   * `engine.flush()` answers a `transport.sync` throw with
+   * `outbox.recordFailure` and returns NORMALLY: the row keeps status
+   * 'queued', its `next_attempt_at` moves out by the backoff,
+   * `lastApplyFailure()` stays null and `failedItems` stays EMPTY — measured,
+   * and `recordFailure` deliberately does not mark 'failed' or every retryable
+   * claim would strand forever. So the old `goOnline()` resolved looking
+   * successful with the claim never sent, and a scenario asserting one contest
+   * would have seen zero and blamed the product.
+   *
+   * This drives that state directly — enqueue, then record a failure, then
+   * `goOnline()` — because there is no way to make the in-process sync service
+   * throw on demand without mutating it. The control is the SECOND half: after
+   * the failure is cleared the same claim goes through, so the throw above is
+   * the guard firing and not `goOnline` being broken for everything.
+   */
+  it('goOnline() throws rather than resolving with a claim the sync door never accepted', async () => {
+    const c = await h.client(USER_B);
+    const ticketId = newUlid();
+    const claim = createdBy(USER_B, ticketId, 'mobile', 'Never reaches the door');
+
+    // `outbox.enqueue` DIRECTLY, not `submit`. `submit` goes through
+    // `ds.ingest`, which fires `void engine.flush()`; that flush parks on the
+    // offline gate having ALREADY read its batch, so a `recordFailure` landing
+    // afterwards never reaches it and `goOnline()` sends the claim perfectly
+    // legitimately. Measured: the first version of this case did exactly that
+    // and failed with "promise resolved undefined instead of rejecting" — the
+    // rig was right and the test was wrong. Enqueueing directly leaves no
+    // flush in flight, so the backoff is the state `goOnline` actually meets.
+    await c.outbox.enqueue(claim);
+    await c.outbox.recordFailure([claim.id], 'planted: the door refused to answer');
+    expect(await c.outbox.queuedCount(h.workspaceId)).toBe(1);
+
+    const err = await c.goOnline().then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+    expect(err, 'goOnline() resolved with a claim still queued').not.toBeNull();
+    expect(err?.message).toMatch(/left 1 claim\(s\) queued after the flush/);
+    // the reason is CARRIED, not swallowed — the whole point of the finding
+    expect(err?.message).toMatch(/planted: the door refused to answer/);
+    expect(await h.ledger(ticketId)).toEqual([]);
+
+    // CONTROL: resolve the row and the very same `goOnline()` succeeds. Without
+    // this, a goOnline() broken for every input would satisfy everything above.
+    await c.outbox.applyResult(claim.id, {
+      status: 'refused',
+      eventId: claim.id,
+      rule: 'planted',
+      reason: 'discarded by the test',
+    });
+    expect(await c.outbox.queuedCount(h.workspaceId)).toBe(0);
+    await c.goOnline();
+  });
+
+  /**
+   * I2 — a workspace ADMIN claim must be expressible at the GATED door.
+   *
+   * `ADMIN_ONLY_TYPES` refuses `workflow.defined` and kin from every non-admin,
+   * and both scenario users are members. Task 15's S3 republishes a workflow
+   * while a client is offline; without an owner identity its author reaches for
+   * the ungated internal door and silently stops testing the product. The
+   * refusal half is the control: the same claim from a MEMBER is refused, so
+   * this proves the gate is live and that the owner passes it — not that the
+   * gate is absent.
+   */
+  it('an owner can publish a workflow through the gated door, and a member cannot', async () => {
+    const v2 = (actorId: string) =>
+      newSubmittedEvent({
+        workspaceId: h.workspaceId,
+        entity: { kind: 'workflow', id: HARNESS_WORKFLOW_ID },
+        type: 'workflow.defined',
+        payload: {
+          id: HARNESS_WORKFLOW_ID,
+          version: 2,
+          name: 'Harness v2',
+          initialStateId: 'todo',
+          states: [
+            { id: 'todo', name: 'To do', category: 'open' },
+            { id: 'done', name: 'Done', category: 'terminal' },
+          ],
+          transitions: [{ from: '*', to: 'done', rules: [] }],
+          stateMapping: { review: 'todo' },
+        },
+        actorId,
+        origin: 'web',
+      });
+
+    const [refused] = await h.ingestInteractive(USER_A, [v2(USER_A)]);
+    expect(refused).toMatchObject({ status: 'refused' });
+
+    const [committed] = await h.ingestInteractive(USER_ADMIN, [v2(USER_ADMIN)]);
+    expect(committed).toMatchObject({ status: 'committed' });
+  });
+
+  /**
+   * I3 — the same batch, twice, through the REAL sync door.
+   *
+   * Task 15's S6 requires identical results, an unchanged ledger and exactly
+   * one contest when an outbox batch lands twice. `engine.flush()` cannot
+   * express it: it drains only what is queued, and after the first flush the
+   * rows are gone. `Harness.sync` is the object `POST /v1/sync` itself
+   * delegates to, so a duplicate-suppression bug living in per-instance state
+   * is visible here where a second service instance would have hidden it.
+   */
+  it('the same batch sent twice through the real sync door is idempotent', async () => {
+    const ticketId = newUlid();
+    const claim = createdBy(USER_B, ticketId, 'mobile', 'Sent twice');
+
+    const first = await h.sync(USER_B, [claim]);
+    const second = await h.sync(USER_B, [claim]);
+    expect(first).toHaveLength(1);
+    expect(second).toEqual(first);
+    expect(first[0]).toMatchObject({ status: 'committed', eventId: claim.id });
+    // One row, not two — and the ledger is the witness, not the answer shape.
+    expect(await h.ledger(ticketId)).toHaveLength(1);
   });
 
   it('a client created after the fact bootstraps from the server cut: ticket present, cursor at the head', async () => {
