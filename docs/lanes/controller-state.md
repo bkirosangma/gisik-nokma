@@ -173,6 +173,32 @@ next-free id; every lane recounts the MAXIMUM against `origin/main` at rebase as
 mints from it. Lane B measured at allocation time: 181 ids, max 12.229, zero duplicates; after its
 catalogue commit 186, max 12.266, zero duplicates.
 
+### §13 CASE-ID BLOCKS — allocated 2026-09-06 03:10, after the §12 collision recurred one file over
+
+Lane C's #134 (Plan 11 T14) CREATED `test-cases/13-deployment-dogfooding.md` and minted **13.1–13.6**;
+Lane D had independently minted **13.1–13.36** for T7/T8, uncommitted. Caught by reading both branches
+before either landed — the check the §12 rule already prescribes. **BLOCKS: Lane C 13.1–13.40** (T14 =
+13.1–13.6 as pushed; T15 continues inside) · **Lane D 13.41–13.100** (T7/T8 renumbered by enumeration to
+13.41–13.76; T9/T10 continue inside) · **Lane E 13.101–13.200** (seam 1, T11/T12, T13; T16's final shape
+re-states the header) · **next block 13.201, controller-allocated on request only.** The header line in
+`test-cases/13` carries the four blocks and no derivable next-free id (Lane C adds it in its #134 amendment;
+whoever lands first carries it). **Rule restated for every section a lane opens: the FIRST PR that creates
+a `test-cases/NN` file carries an allocation header, because two lanes minting from "13.1" is not a
+collision anyone can see until rebase.**
+
+**Lane session names rotated with the relaunches** — `ListAgents` is the source; these are for the reader:
+A `gisik-nokma-exec-06` · B `lane2-plan4-83` · C `lane3-plan7-8-3b` · D `lane4-periphery-ee` · E
+`lane5-plan11-1d`. A `SendMessage` to a dead name fails loudly with the live suggestion; not a trap, noted.
+
+**#134 (Lane C, T14) at `e78212b` — HELD for an amendment before merge:** Plan 11 T14's `Files:` block
+declares `Modify: root package.json (scripts test:fixtures, test:dual-client)` and the PR does not touch
+root `package.json`; the lane lands the two lines (announced to Lane E, the manifest owner) or names the
+omission and what runs the dual-client suite instead (the sharded `server-tests` job). Its own new
+8-job workflow is the CI that counts, read by JOB STEPS: `scope`, `check-tasks` (wired for the first
+time), `e2e` (detect-only until T13) green; `check-env` green (with the new `.skipIf(`-coverage
+trip-wire); `build` → `typecheck` / `server-tests` (4 shards, `postgresql-client-16` pinned with a
+version check, `check-no-silent-skips.mjs`) / `other-tests` pending at this writing.
+
 ### Carried this context, with owners
 
 - **#126 was opened without its catalogue** — seven rig tests, no case ids, `Features.md` §12 still
