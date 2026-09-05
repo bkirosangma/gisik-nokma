@@ -2726,3 +2726,79 @@ narrowing), the cases that would notice it are exactly the ones the current fixt
 Closure 1's three existing cases all used a ticket that HAS a snapshot and stayed green under the
 mutation — `Tests 1 failed | 3 passed (4)` once the missing case existed. **An exclusion's blast radius
 is invisible to a suite built around the included case.**
+
+---
+
+# ⛔ BLOCKED ON QUOTA — WEEKLY LIMIT HIT, RESETS 2026-09-07 06:30 IST
+
+**Not blocked on the controller. Not blocked on a ruling. Blocked on the weekly quota**, which the
+stop point's own arithmetic predicted and which arrived during closure 2.
+
+Closure 2's implementer died on `You've hit your weekly limit · resets Sep 7 at 6:30am (Asia/Calcutta)`
+after **321k tokens and 141 tool calls**, having **committed nothing**.
+
+## WHAT IS SAFE, AND WHAT IS NOT
+
+| item | state |
+|---|---|
+| PR #98 Batch A (T5–T7) | **MERGED** `999d486` |
+| PR #102 Batch B (T9–T10) | **MERGED** `f03838d` |
+| PR #107 Batch C (T11–T12) | **OPEN**, gate green 24/24 `0 cached` 3,181 tests |
+| PR #109 Closure 1 (snapshot invalidation) | **OPEN**, gate green 24/24 `0 cached` 3,152 tests |
+| `exec/19-serving-gaps` closure 2 | **WIP, UNREVIEWED, UNGATED, DO NOT MERGE** — `d67b8a2`, pushed |
+
+**Step 15 stands at 7 of 8 permitted tasks** (T5, T6, T7, T9, T10, T11, T12 done; **T13 deferred by the
+owner**), plus closure 1 complete and closure 2 abandoned mid-implementation.
+
+## THE WIP BRANCH — what it is and what must be established before it is trusted
+
+`exec/19-serving-gaps` at `d67b8a2` carries **29 files, +1851/−274**, preserved as a WIP commit
+because uncommitted work from a dead fan-out has been lost on this project before and this was the
+largest instance of that hazard yet: 26 modified files, 3 new ones, zero commits.
+
+**Two of the three hardest constraints were verified to have HELD, before the block:**
+
+- **Ruling P30 respected.** `packages/app-core/src/data-source.ts` is modified by **one docblock line**
+  ("six of them until ruling P25 clause 1, four since") and **no type change**. `DataSourceQuery` was
+  not widened.
+- **Neither HELD gap was touched.** A sweep of the `mappers.ts` diff for `WorkspaceRef.projects`,
+  `WorkItem.projectName` and `HELD pending` returns **nothing**, against a control of **371** changed
+  lines in that same file — so the diff is substantial and the held entries genuinely do not appear.
+
+**FIVE THINGS REMAIN UNKNOWN and must be established before a line is added:**
+
+1. It has **never been gated**. No `--force` run exists against it.
+2. It has **never been reviewed** — the review and fix phases never started.
+3. **Which existing Plan 4 rule was applied** to `ListRow.hasRestrictedParent` and `TicketRead.title`
+   is unrecorded. The dispatch required it stated; the structured return never came back. A new
+   visibility rule built under an existing rule's citation is the failure mode this most needs checking
+   for, on the surface that produced P19, P22 and P23.
+4. **Which gaps it actually closed** — the docblock edit implies six refusals became four, so two
+   methods' worth, but that is inference from a comment rather than a measurement.
+5. **`apps/server/src/read/restricted-parents.ts` is a NEW FILE**, which suggests the restricted-parent
+   rule was built — one of the two that required a named existing rule and an escalation if none fitted.
+
+## RESUMING AFTER 2026-09-07 06:30
+
+**Do not continue closure 2 from where it stopped. Establish the five unknowns first, in that order.**
+The cheapest honest path is: gate it, then read `restricted-parents.ts` against
+`apps/server/src/visibility/`'s exports (`canSee`, `canSeeResolved`, `getResolvedVisibility`,
+`rollupFor`, `visibleEventsFor`, `listVisibleTickets`) and decide whether it APPLIES one or INVENTS one.
+**If it invents one, discard that part and escalate** — that boundary does not move because the work is
+already written.
+
+The excluding fixture is the other thing to check early: **a visibility rule is an exclusion, and an
+exclusion's blast radius is invisible to a suite built around the included case.** Find the case where
+the rule must EXCLUDE — the viewer who must not see the parent, the reader whose title must be withheld
+— and mutate the rule to permit. If nothing goes red, the rule is unconstrained however correct it looks.
+
+**Closure 3 (`StreamItem` → `ServerStreamFrame`) was never started, and the controller's own
+instruction said to expect it not to fit. It did not fit. Say so rather than starting it.**
+
+## ONE OPEN QUESTION FOR THE CONTROLLER, not blocking
+
+The instruction classifies **ten** serving gaps; `client-contract.test.ts` and `mappers.ts` enumerate
+**eleven**. **`WorkItem.stateName`** (`mappers.ts:1027`) is in neither the buildable six, the rule-first
+pair, nor the held pair. Its stated reason — *"cards carry stateId only, and the card names no workflow
+version to read the name from"* — reads like a **data** gap rather than a serving gap, which would
+explain the omission. **Not built. Surfaced in PR #109's body.**
