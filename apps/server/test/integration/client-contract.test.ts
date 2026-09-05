@@ -45,12 +45,12 @@ import { fakeSocket } from '../helpers/stream-socket.js';
  * reconciliation landing in `app-core` leaves every such line green. Measured,
  * not argued, and reproduced here: with the two lists typed as literals,
  * applying BOTH reconciliations to `app-core` at once — `scope-revoked` added
- * to `StreamItem`, `uncategorizedChildren` added to `RollupToViewer` — left
+ * to `ServerStreamFrame`, `uncategorizedChildren` added to `RollupToViewer` — left
  * this file at 15 passed, 0 failed. The divergences the file exists to pin were
  * gone and the suite did not notice.
  *
  * So the two cases that TURN on the client's shape — `RollupToViewer`'s three
- * fields and `StreamItem`'s union members — derive that shape from
+ * fields and `ServerStreamFrame`'s union members — derive that shape from
  * `packages/app-core/src/*.ts` with `readFileSync` on a relative path
  * (`clientTypeFields`, `clientUnionTags`). That reads the checked-in source
  * text, never `./dist`, so the build-order rationale above survives intact while
@@ -58,9 +58,9 @@ import { fakeSocket } from '../helpers/stream-socket.js';
  * simultaneously the positive control and the line that fires when either side
  * moves.
  *
- * ## `StreamItem`'s two divergences were RECONCILED (Plan 6 Task 8); the case stayed
+ * ## `ServerStreamFrame`'s two divergences were RECONCILED (Plan 6 Task 8); the case stayed
  *
- * The mechanism above did its job: adding `scope-revoked` to `StreamItem` turned
+ * The mechanism above did its job: adding `scope-revoked` to `ServerStreamFrame` turned
  * the stream case red, and the client's event member moved from `EventEnvelope`
  * to `LedgerEvent` in the same change. Both stream cases below were rewritten to
  * pin the RECONCILED state instead of being deleted — a divergence that closed is
@@ -224,7 +224,7 @@ function clientUnionTags(file: 'view-types.ts' | 'data-source.ts', name: string)
 
 /**
  * The type name a union member's field is declared with, e.g. `LedgerEvent` for
- * `StreamItem`'s `{ type: 'event'; envelope: LedgerEvent }`. Same fail-loud
+ * `ServerStreamFrame`'s `{ type: 'event'; envelope: LedgerEvent }`. Same fail-loud
  * contract as the two above: a rename that this regex cannot find throws, rather
  * than returning something a `not.toBe` would happily accept.
  */
@@ -1379,11 +1379,11 @@ describe('GET /v1/contests vs the two contested refusals', () => {
 
 describe('the stream union — RECONCILED: the client now has a member for every frame the server emits', () => {
   it('the server EMITS `scope-revoked`, the published schema accepts it, and the client union now carries it too', async () => {
-    // `data-source.ts:22-26` — the client's `StreamItem` union. READ OUT OF THE
+    // `data-source.ts:22-26` — the client's `ServerStreamFrame` union. READ OUT OF THE
     // CLIENT SOURCE as text, so a `dist` built from a different source cannot
     // decide whether this passes AND a reconciliation in `app-core` cannot pass
     // unnoticed. A transcribed literal would have done only the first.
-    const CLIENT_STREAM_TYPES = clientUnionTags('data-source.ts', 'StreamItem');
+    const CLIENT_STREAM_TYPES = clientUnionTags('data-source.ts', 'ServerStreamFrame');
     // The pin and its own positive control: the union is these five members and
     // no others. "Exactly five" is measured here rather than asserted in prose,
     // and the day somebody narrows that union back — or lets it drift ahead of
@@ -1464,7 +1464,7 @@ describe('the stream union — RECONCILED: the client now has a member for every
     // is renamed to something unexpected.
     const CLIENT_EVENT_ENVELOPE = clientUnionMemberFieldType(
       'data-source.ts',
-      'StreamItem',
+      'ServerStreamFrame',
       'event',
       'envelope',
     );

@@ -105,7 +105,7 @@ export type SyncEngine = {
    *
    * `onChange` is a bare "something moved" signal with no frame in it, and Plan
    * 10 Task 12's `DataSource.subscribe` must hand its callback the real 5-kind
-   * `StreamItem` — the executor ruling forbids declaring a parallel or
+   * `ServerStreamFrame` — the executor ruling forbids declaring a parallel or
    * truncated frame union to get around that. This engine is the only component
    * that ever holds a frame-shaped value, so the choice was to expose the one
    * it already has (`SyncItem`, no new union) or to let the replica source

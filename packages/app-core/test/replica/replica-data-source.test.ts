@@ -19,7 +19,7 @@ import {
   type SyncTransport,
 } from '@gisik-nokma/sync-client';
 import { createBetterSqliteStorage } from '@gisik-nokma/sync-client/testing';
-import type { DataSource, StreamItem } from '../../src/data-source.js';
+import type { DataSource, ServerStreamFrame } from '../../src/data-source.js';
 import {
   OFFLINE_BORN_ABSENCE,
   OfflineAcceptError,
@@ -471,7 +471,7 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
     await expect(ds.query.getTicketHistory(newUlid())).resolves.toEqual([]);
   });
 
-  it('12.186 subscribe hands its callback a real StreamItem — the kind useLiveQuery acts on', async () => {
+  it('12.186 subscribe hands its callback a real ServerStreamFrame — the kind useLiveQuery acts on', async () => {
     // A transport that hands the engine one stream, so a frame can be delivered
     // through the door a production stream uses.
     let handlers: StreamHandlers | null = null;
@@ -493,7 +493,7 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
     });
     const ds = createReplicaDataSource({ workspaceId: WS, replica, outbox, engine, storage });
 
-    const seen: StreamItem[] = [];
+    const seen: ServerStreamFrame[] = [];
     const off = ds.subscribe(WS, 0, (item) => seen.push(item));
     await engine.start(WS);
     const streamed = envelope({ kind: 'ticket', id: newUlid() }, 'ticket.created', {

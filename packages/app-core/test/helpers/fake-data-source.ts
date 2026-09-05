@@ -1,12 +1,12 @@
 import { builtinTicketTypeDefs, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
-import type { DataSource, DataSourceQuery, StreamItem, Unsubscribe } from '../../src/data-source.js';
+import type { DataSource, DataSourceQuery, ServerStreamFrame, Unsubscribe } from '../../src/data-source.js';
 
 export type IngestScript = (events: SubmittedEvent[]) => IngestResult[] | Promise<IngestResult[]>;
 
 export type FakeDataSource = DataSource & {
   ingested: SubmittedEvent[][];
   subscriptions: Array<{ workspaceId: string; afterSeq: number }>;
-  pushStreamItem(item: StreamItem): void;
+  pushStreamItem(item: ServerStreamFrame): void;
 };
 
 /**
@@ -27,7 +27,7 @@ export function createFakeDataSource(
   overrides: Partial<DataSourceQuery> = {},
   ingestScript?: IngestScript,
 ): FakeDataSource {
-  const listeners = new Set<(item: StreamItem) => void>();
+  const listeners = new Set<(item: ServerStreamFrame) => void>();
   let nextSeq = 1;
   const query: DataSourceQuery = {
     getMyWorkspaces: async () => [],

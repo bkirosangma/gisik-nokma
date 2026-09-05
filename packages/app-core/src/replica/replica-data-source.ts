@@ -21,7 +21,7 @@ import {
   type SyncStatus,
   type SyncStorage,
 } from '@gisik-nokma/sync-client';
-import type { DataSource, DataSourceQuery, StreamItem, Unsubscribe } from '../data-source.js';
+import type { DataSource, DataSourceQuery, ServerStreamFrame, Unsubscribe } from '../data-source.js';
 import { EPIC_RANK, epicAncestorOf } from '../hierarchy/epic-ancestor.js';
 import { matchesFilter } from '../filter/matches-filter.js';
 import type {
@@ -966,7 +966,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
      * ## Why this is not a bare change signal
      *
      * The plan's snippet is `cb: () => void` and the executor ruling forbids it:
-     * `DataSource.subscribe` carries the 5-kind `StreamItem`, and
+     * `DataSource.subscribe` carries the 5-kind `ServerStreamFrame`, and
      * `views/use-live-query.ts` **re-queries only on `event` and `purge`**. A
      * replica whose `subscribe` emitted anything else — or a synthesized
      * `caught-up` in place of the item — would leave every app-core view frozen
@@ -982,7 +982,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
      * - `error`: the engine keeps the server's amendment-19 error frame in
      *   `lastError()` and does not re-broadcast it. Emitting one here would
      *   require choosing a moment the engine never named.
-     * - a PROJECT-scoped `scope-revoked`: `StreamItem` declares
+     * - a PROJECT-scoped `scope-revoked`: `ServerStreamFrame` declares
      *   `projectId?: never` where `ScopeRevokedInstruction` admits a string, so
      *   the narrower client type cannot express it. The wire cannot carry one
      *   today (`ServerStreamFrame` says `projectId?: never` too), and the
@@ -993,7 +993,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
      * from `replica.getCursor`. A second cursor here would be a second opinion
      * about where this device is.
      */
-    subscribe(workspaceId: string, _afterSeq: number, cb: (item: StreamItem) => void): Unsubscribe {
+    subscribe(workspaceId: string, _afterSeq: number, cb: (item: ServerStreamFrame) => void): Unsubscribe {
       const offItem = engine.onItem((item) => {
         if (!isSyncInstruction(item)) {
           if (item.workspaceId === workspaceId) cb({ type: 'event', envelope: item });
