@@ -199,6 +199,30 @@ time), `e2e` (detect-only until T13) green; `check-env` green (with the new `.sk
 trip-wire); `build` → `typecheck` / `server-tests` (4 shards, `postgresql-client-16` pinned with a
 version check, `check-no-silent-skips.mjs`) / `other-tests` pending at this writing.
 
+### RULING P38 (2026-09-06 03:45, controller as ruling tier; TO BE PUT BEFORE THE OWNER after the fact, revocable in a word) — the HELD pair's admin/member half: `WorkspaceRef.projects` is `eff.projects` for every role except owner
+
+**Lane A escalated before building, as P32 wrote into itself.** `canSeeResolved` (`visibility/can-see.ts:94`)
+settles three of four roles: owner → `true` unconditionally; guest → P32 (`eff.projects` and nothing
+else); admin/member → `workspace` mode true, `project` mode `eff.projects.has(v.projectId)` with the
+"no admin bypass — deliberate" comment. **The gap: a PROJECT has no `resolvedMode`** — the rule decides
+against a ticket's audience and a project has none — so two readings follow from the same switch: (a) all
+projects (the `workspace`-mode branch read across) or (b) only `eff.projects` (the `project`-mode branch).
+Measured fact that narrows it: an admin/member ALREADY receives the project IDs of projects they are not
+in — `TicketCard.projectId` (`read/ticket-cards.ts:138`) on any workspace-mode ticket — so existence is
+disclosed today through the ticket surface; the new disclosure would be the NAME only.
+**RULING: (b).** It is an APPLICATION, not a new rule: **P32 already ruled `WorkItem.projectName` for
+ALL viewers, role-independent** — *served iff the project is in `eff.projects`, otherwise the item carries
+the id and no name* — and stated the principle generally (*a project's NAME is itself a disclosure and is
+not served for any other project*). `WorkspaceRef.projects` is the same question one door over. The
+strangeness (an admin sees a project's workspace-mode tickets but not its name) is a shape P32 already
+accepted for the my-work item. **Tie-break: naming a thing whose id you already hold is a WIDENING, and
+widenings are reversible; narrowing after a disclosure is not** — the same direction 6.101's ruling
+chose. Owner sees all, pinned by its own case so the switch's exemption is a tested fact. Excluding
+fixtures on both doors, admin and member separately: not in project Y → neither Y's name nor id in the
+projects list, and Y's id with no name on a my-work item; mutate the `eff.projects` check to permit → red,
+alone. `Features.md` says a partial workspace is the correct answer for admin/member as it does for
+guests. If the owner prefers (a), the change is a widening on a branch, not a rollback.
+
 ### THE CASE-ID RECOUNT WAS BLIND TO ITS OWN SUBJECT — three id styles, one grep (2026-09-06 03:30, Lane B, refined by Lanes E and C)
 
 `test-cases/12` carries ids as `- 12.274 🚫 …` (plain) AND `- **12.240** ✅ …` (bold, Lane A's closure 2b);
