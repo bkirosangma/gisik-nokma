@@ -51,7 +51,7 @@ function createdBy(
 }
 
 describe('the rig', () => {
-  it('a claim from A reaches B through sync exactly once, and syncing again changes nothing', async () => {
+  it('12.260 — a claim from A reaches B through sync exactly once, and syncing again changes nothing', async () => {
     const a = await h.client(USER_A);
     const b = await h.client(USER_B);
     const ticketId = newUlid();
@@ -106,7 +106,7 @@ describe('the rig', () => {
     expect(await h.ledger(ticketId)).toHaveLength(1);
   });
 
-  it('ingestInteractive is the GATED door: forged server provenance is refused, the honest claim commits', async () => {
+  it('12.261 — ingestInteractive is the GATED door: forged server provenance is refused, the honest claim commits', async () => {
     const ticketId = newUlid();
 
     // `checkRolePermission` refuses envelope-origin `'server'` from a client.
@@ -152,7 +152,7 @@ describe('the rig', () => {
    * event would arrive as an ordinary above-the-line event and the case would
    * pass for a reason that has nothing to do with the backfill.
    */
-  it('a visibility.set below the snapshot line still reaches a fresh client — the backfill is the server\'s list', async () => {
+  it('12.262 — a visibility.set below the snapshot line still reaches a fresh client — the backfill is the server\'s list', async () => {
     const ticketId = newUlid();
     const born = createdBy(USER_A, ticketId, 'web', 'Audience changes below the snapshot');
     const [commit] = await h.ingestInteractive(USER_A, [born]);
@@ -201,7 +201,7 @@ describe('the rig', () => {
    * the failure is cleared the same claim goes through, so the throw above is
    * the guard firing and not `goOnline` being broken for everything.
    */
-  it('goOnline() throws rather than resolving with a claim the sync door never accepted', async () => {
+  it('12.263 — goOnline() throws rather than resolving with a claim the sync door never accepted', async () => {
     const c = await h.client(USER_B);
     const ticketId = newUlid();
     const claim = createdBy(USER_B, ticketId, 'mobile', 'Never reaches the door');
@@ -251,7 +251,7 @@ describe('the rig', () => {
    * this proves the gate is live and that the owner passes it — not that the
    * gate is absent.
    */
-  it('an owner can publish a workflow through the gated door, and a member cannot', async () => {
+  it('12.264 — an owner can publish a workflow through the gated door, and a member cannot', async () => {
     const v2 = (actorId: string) =>
       newSubmittedEvent({
         workspaceId: h.workspaceId,
@@ -290,7 +290,7 @@ describe('the rig', () => {
    * delegates to, so a duplicate-suppression bug living in per-instance state
    * is visible here where a second service instance would have hidden it.
    */
-  it('the same batch sent twice through the real sync door is idempotent', async () => {
+  it('12.265 — the same batch sent twice through the real sync door is idempotent', async () => {
     const ticketId = newUlid();
     const claim = createdBy(USER_B, ticketId, 'mobile', 'Sent twice');
 
@@ -303,7 +303,7 @@ describe('the rig', () => {
     expect(await h.ledger(ticketId)).toHaveLength(1);
   });
 
-  it('a client created after the fact bootstraps from the server cut: ticket present, cursor at the head', async () => {
+  it('12.266 — a client created after the fact bootstraps from the server cut: ticket present, cursor at the head', async () => {
     const ticketId = newUlid();
     const born = createdBy(USER_B, ticketId, 'mobile', 'Born before the client');
     const [commit] = await h.ingestInteractive(USER_B, [born]);

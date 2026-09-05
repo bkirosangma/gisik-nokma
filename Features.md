@@ -974,10 +974,10 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 
 ## 12. Offline sync & the apps
 
-*(Plan 10, Tasks 4, 5, 6, 7, 9, 10, 11, 12 and 13 — the LIFTED §11 closer, the contested-claims read path, the
+*(Plan 10, Tasks 4, 5, 6, 7, 9, 10, 11, 12, 13 and 14 — the LIFTED §11 closer, the contested-claims read path, the
 snapshot writer, the replica bootstrap, the sync ingress, the local replica, the outbox with its
-local pre-check, the sync engine with its HTTP/WS transport, the replica `DataSource`, and app-core's offline/sync UX surfaces. Plan 10's own catalogue task (Task 18) owns §12's full body and will replace this
-scope note; what follows is what those NINE tasks added — 4, 5, 6, 7, 9, 10, 11, 12 and 13, the enumeration at the head of this banner — and nothing else. **It said "those six tasks" inside the change set that rewrote the head enumeration to seven**, which is the same head-and-tail split the closing paragraph of this banner already describes; the number is spelled against the list now rather than beside it. **§8 — Plan 6's web client —
+local pre-check, the sync engine with its HTTP/WS transport, the replica `DataSource`, app-core's offline/sync UX surfaces, and the dual-client harness rig. Plan 10's own catalogue task (Task 18) owns §12's full body and will replace this
+scope note; what follows is what those TEN tasks added — 4, 5, 6, 7, 9, 10, 11, 12, 13 and 14, the enumeration at the head of this banner — and nothing else. **It said "those six tasks" inside the change set that rewrote the head enumeration to seven**, which is the same head-and-tail split the closing paragraph of this banner already describes; the number is spelled against the list now rather than beside it. **§8 — Plan 6's web client —
 stays absent**, because the coordination doc assigns `Features.md` sections one per implementation plan
 and numbering is claimed from that table, never taken next-free. That clause used to read "§8/§10/§11
 stay absent" and was still saying it here after Plan 8 wrote §10 and Plan 9 wrote §11: both are in this
@@ -985,8 +985,11 @@ file, BELOW this section (`grep -n '^## ' Features.md` — §10 at the workflow 
 and notifications, both after §12). The reservation table governs a section's NUMBER, not the order
 sections appear in the file, and §12 landing above §10 and §11 is that rule working rather than
 failing. Still absent rather than missing from this section:
-the dual-client harness and both app
-shells — Plan 10 Tasks 14–17. **Task 13's offline/sync UX came out of that list in the change set that
+the dual-client SCENARIOS and both app
+shells — Plan 10 Tasks 15–17. **Task 14's harness came off that list in the change set that landed it**,
+and the range moved from 14–17 to 15–17 in the same edit — the enumeration above, this clause and the
+`test-cases/12` header were rewritten together, which is what the closing paragraph of this banner
+exists to enforce and what this PR was HELD for not doing the first time. **Task 13's offline/sync UX came out of that list in the change set that
 landed it**, and the range moved from 13–17 to 14–17 in the same edit, which is the discipline this
 banner's closing paragraph exists to enforce. **Task 11's sync engine came out of that list in the change set that
 landed it, and Task 12's replica `DataSource` came out of it the same way** — which is the discipline
@@ -1387,6 +1390,26 @@ survived a whole task.)*
   staying in `createSyncEngine`, unassigned. Task 13's Files block contains no ticket list, no `ListRow`
   renderer and no error surface — those annotations named the next task touching app-core UX by NUMBER,
   not by content, which is the failure mode P34 exists to stop repeating.
+- ⚙️ **The dual-client harness rig** — two sync-client replicas on in-memory SQLite driven against the
+  REAL ingest service, the REAL sync service, `visibleEventsFor` and real Postgres, with no sockets and
+  no HTTP: the spec's named testing discipline (§7) gets its instrument. It proves itself before any
+  scenario trusts it, and the property it exists to give Task 15 is asserted first — full `TicketState`
+  equality between a replica's reducer fold and the server's own `rowToTicketState`, so server and
+  clients can never quietly disagree. `apps/server/test/dual-client/rig.ts`
+- ⚙️ **The harness's online stand-in uses the GATED ingest door** — `ingestClientBatch(events, userId)`,
+  the same one `POST /v1/events` calls, never the internal `ingestBatch` that passes `door = null` and
+  skips `checkPermission` entirely. A harness whose "online user" skipped the gate would let a scenario
+  assert a permission outcome the product does not have; the internal door remains correct for the SEED
+  and is labelled as such where it is used. Pinned by a forged envelope-origin the internal door would
+  have committed.
+- ⚙️ **Its bootstrap is the server's, not a copy of it** — the backfill types are imported from
+  `BOOTSTRAP_BACKFILL_TYPES` rather than restated, because a hand-copied list was missing
+  `visibility.set` and would have had the harness proving replicas against a bootstrap the server never
+  sends: the replica would hold a different AUDIENCE for a ticket than the server does.
+- ⚙️ **`goOnline()` fails loudly rather than quietly** — a claim still queued after the flush throws,
+  carrying the outbox's own `last_error`. The engine answers a transport throw by backing off and
+  returning normally, which in a harness with no network is never transient; without this a scenario
+  would assert an outcome that never happened and blame the product.
 
 - ⚙️ **`apps/desktop` (Task 16) — a Tauri 2 + Vite React shell over the replica `DataSource`, not a verified running app** — `wrapTauriDatabase`/`createTauriSqlStorage` implement `SyncStorage` over `@tauri-apps/plugin-sql`, run through the SAME behavioural contract every adapter answers to: `storageConformanceTests` from `@gisik-nokma/sync-client/testing`, backed here by a real in-memory `better-sqlite3` database standing in for the plugin's own connection rather than another `vi.fn()` mock. `app.tsx` wires `createReplica`/`createOutbox`/`createSyncEngine`/`createHttpTransport` (`@gisik-nokma/sync-client`) and `createReplicaDataSource` (`@gisik-nokma/app-core`, not `@gisik-nokma/sync-client` as the plan's own snippet has it — Ruling P30's package) to the OS's `online`/`offline` events and renders sync status plus a `listTicketSummaries` list; `SyncStatusBar`/`ContestBanner` do not exist in `@gisik-nokma/app-core` yet (grepped, not assumed), so the strip is inline markup rather than the named component the plan's own text flags as an assumption. **The gate for this task is `cargo check` + `tsc` + `vitest` on the storage adapter — no simulator, no app launch, no `tauri build` claim** — `tauri::generate_context!()` additionally required an `icons/icon.png` the plan's file list omits (verified against `tauri-codegen`'s own source); a placeholder ships, real artwork does not. All three checks were re-run independently of the implementer's own report. `apps/desktop/src/app.tsx`, `apps/desktop/src/storage/tauri-sql-storage.ts`
 
