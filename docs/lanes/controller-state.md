@@ -125,6 +125,54 @@ stopped moving," in process-table costume.
 > states for gates and for `check:tasks`, now proven to need stating for `gh pr merge` too.** #117 is OPEN,
 > rebasing; it merges at the re-gated sha Lane B reports, and at no other.
 
+### ⚠ DOCKER'S DISK FILLED AND POSTGRES PANICKED — found by Lane B, cleared by Lane E within the hour
+
+Docker's VM volume hit **100%** (56.1 G of 58.4 G, 0 available) while the host had 77 GB free. The shared
+test Postgres (`gisik-nokma-exec-postgres-1`, 54329) went into a **crash-recovery PANIC loop** — `could not
+write to file "pg_logical/replorigin_checkpoint.tmp": No space left on device` → checkpointer signal 6 →
+reinitialize → repeat — with `pg_isready` rejecting and **`docker ps` still reporting "Up 43 hours"**, so a
+glance says healthy. Lane B found it when its T14 rig's `CREATE DATABASE` failed on space, dropped 39 idle
+orphaned `gisik_test_*` databases (331 MB, zero backends, checked first), and correctly refused to prune a
+daemon that also hosts the owner's `mongo`/`redis`/`postgres:15.3`. Verified line for line by this
+controller: `docker system df` showed **12.6 GB build cache, 0 active** and **36.8 GB unused images**.
+**Lane E then cleared its OWN artefacts** — the build cache had gone 986 MB → 12.6 GB during ITS four T5a
+image builds, so `docker builder prune -f` (cache-only by construction, 0 of 94 entries active) plus its two
+superseded `gisik-server` images: ~13.1 GB reclaimed, the owner's 17 images and 4 containers untouched,
+Postgres `accepting connections`. **Both lanes were right**: a lane may clean what it created; anything
+else is the owner's. **The 36.8 GB of unused images is still the owner's call and is no longer needed to
+unblock anything.** Every lane was told to stop server runs and then told they were back.
+**Standing fix, owner Lane E, DONE**: `sweep-test-dbs.sh` drops idle `gisik_test_*` databases — **zero
+backends in `pg_stat_activity`, computed in one query** so a peer's running suite is never touched —
+**before every gate**, because `createTestDatabase`'s `drop()` lives in `afterAll` and a killed run never
+reaches it: the cleanup that exists is precisely the one that does not run when it matters. 39 → 0.
+**Two more traps recorded from the outage:** turbo prints the pnpm LAUNCHER's path
+(`…/v24.11.1/bin/pnpm`) only on failure — it is absent from every green log and reads as a Node-24
+regression that is not real (`node-version.test.ts` asserts the worker's Node from inside); and a red
+server suite whose visible error is `TypeError: Cannot read properties of undefined (reading 'drop')` in
+`afterAll` is teardown masking the real cause (here: `the database system is in recovery mode`).
+
+**Session limits:** Lanes B and E stopped on `You've hit your session limit`; on the owner's instruction
+this controller typed `/limit-reset` into each pane via tmux (text, 1.2 s, Enter as a separate key) —
+both resumed (B's T14 rig self-test then passed under the lock). Lane A's window rolled on its own
+(97% → 4%). The machine-local hook's own advice text still said `pgrep -f vitest && pkill -f vitest` —
+**the hook was recommending the session-killing command to every lane** — fixed to the ppid=1 form,
+recompiled.
+
+**Lane C's "main is red" was the stale-dist trap, refuted by two instruments** — this controller's
+`turbo run build --filter=@gisik-nokma/app-core... --concurrency=1` at `6ed5b44` with current dists (5/5,
+exit 0) and #120's own full-suite CI (green). The three reused lane worktrees carried `dist/` from their
+old branches; `pnpm install` does not rebuild them. **Ruling on Lane C's CRITICAL** (tauri-plugin-sql's
+sqlx pool cannot pin a transaction to one connection): **not accepted as a permanent gap until the
+one-call form is measured** — the plugin acquires one pooled connection per `execute`, so a transaction
+issued as ONE multi-statement call is pinned by construction; measure both forms, and only if the one-call
+form genuinely cannot carry the adapter's transactions does the gap stand with its owner.
+
+**T13 promoted (PR #122): 156/177 (88.1%)**, Plan 10 **13/18**. #120 (T16) and #121 (T17) are rebasing past
+#117 — all three touch `Features.md`/`test-cases/12`. **Lane-table correction:** "T15" appears twice one
+letter apart — Lane B's is **Plan 10** T15 (dual-client scenarios), Lane E's is **Plan 11** T15 (the
+DigitalOcean spec FILE); `coordination:1610`'s "Lane 4 owns `deploy/do/app.yaml`" is the dead four-lane
+numbering, and Plan 11 T15 is Lane E's with §4's verifier-credential obligation travelling with the file.
+
 ### THE GATE LOCK — the one physical constraint, because this machine has already been crashed once
 
 16 GB / 10 cores, no vitest worker caps, no turbo concurrency setting (both measured absent). Five lanes
