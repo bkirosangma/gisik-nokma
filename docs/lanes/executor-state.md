@@ -2888,3 +2888,108 @@ scenario needs a read that still refuses, so it needs a gap that is still open r
 assertion.
 
 **Then: review it.** None of the above is a substitute for the review phase that never ran.
+
+---
+
+# LANE A — 2026-09-06, CLOSURE 2 REVIEWED. TWENTY SURVIVING FINDINGS, TWO CRITICAL. THIS SECTION SUPERSEDES EVERYTHING ABOVE.
+
+**Position:** `exec/19-serving-gaps`, rebased `--onto origin/main 631582e` after #109 merged. Four
+commits. **Verify the head with `git branch -r --contains` before trusting any sha written here.**
+
+**#109 IS MERGED** (`a23d686`). Its rebase surfaced an ID-space collision — this branch had minted
+`12.156`-`12.159`, Task 11/12 took the same range and landed first. Mine moved to `12.189`-`12.192`,
+30 code references followed, and the discriminator was *"server cases"* vs Task 11's own. **§12 ids are
+now ALLOCATED, not discovered: Lane A mints from `12.240`.**
+
+## THE REVIEW RAN. 6 lenses (1 Fable on visibility, 4 opus, 1 sonnet), 52 agents, 2 adversarial refuters per finding.
+
+**20 findings survived refutation; 3 were refuted; 3 refuter agents died on the session limit**, so
+`assignedProvenanceFor`'s ORDER BY and the `7.210` folded-version claim each carry ONE verdict rather
+than two — treat those two as less settled than the rest.
+
+### ⛔ TWO CRITICALS — BOTH ARE FALSE CLOSURES OF P25 CLAUSE 1. NEITHER IS FIXED YET.
+
+**C1. `getTicket` is declared served but cannot map a ticket that HAS CHILDREN.**
+`mapTicketRead` (`mappers.ts:1195`) hands the single-read route's `rollup` to `mapRollup`, which reads
+`TicketRollup`'s names (`totalChildren`/`terminalChildren`/`uncategorizedChildren`). The route returns
+`rollupFor`'s **`RollupView`** (`total`/`terminal`/`uncategorized`/`restrictedCount`) VERBATIM
+(`routes/tickets.ts:383` → `:403`). Every non-leaf ticket throws
+`MappingError: ... ticket.rollup.uncategorizedChildren: expected a number`. Reproduced by the reviewer
+against the exact body `real-door-round-trip.test.ts:661-728` pins, with `rollup: null` passing in the
+same run as the control.
+- **The card path already translates** (`ticket-cards.ts:131`, `uncategorizedChildren: rollupView.uncategorized`).
+  The single-read route is the only one that does not, so there are TWO rollup spellings on one `/v1`
+  surface and `mapRollup`'s docblock — *"`TicketRollup` is the only rollup on the `/v1` surface"* — is
+  now FALSE, made false by this very change set.
+- **Why nothing caught it:** the only `mapTicketRead` fixture added (`mappers.test.ts:1101`) hardcodes
+  `rollup: null`, so all four 3.42 cases skip the branch; and `client-contract.test.ts` reads
+  `mappers.ts` as TEXT (`readFileSync`) and never executes a mapper. 1033/1033 app-core green with the
+  defect present.
+- **MY DECISION, recorded, NOT yet measured — treat it as a hypothesis:** translate SERVER-side in
+  `routes/tickets.ts`, mirroring `ticket-cards.ts:131`, rather than adding a second client rollup
+  reader. That restores ONE wire shape, makes `mapRollup`'s docblock true again, and stops the route
+  leaking an internal visibility type. It costs an edit to `tickets-read.test.ts:287-292`'s exact
+  `toEqual` — **which this change set already edited once** (it changed the VALUES and left the
+  RollupView key names, which is how the mismatch got in).
+- **The test that must exist either way:** one `mapTicketRead` fixture with a NON-NULL rollup. Confirm
+  it is RED before the fix.
+
+**C2. `getTickets` serves the first 50 tickets of a project AS THE WHOLE PROJECT.**
+`mapListView` (`mappers.ts:1076`) discards the server's `nextCursor` into a `TicketListView` that has
+no field to hold it. `GET /v1/projects/:id/tickets` is called with no `limit`, the server caps at
+`DEFAULT_LIMIT = 50` and returns a non-null cursor. **No consumer can tell.** The project page renders
+50 rows as the complete set, and an empty calendar cell then asserts "nothing is due" about tickets it
+was never given. This became reachable the moment `mapListView` stopped refusing.
+- **Not yet designed.** Three candidates, none measured: carry the cursor on `TicketListView` (a type
+  change with N consumers — closure-3 shape, and `packages/app-core/src/index.ts` is on the collision
+  map with Lane B's T13); page until exhausted in the online source; or REFUSE when `nextCursor` is
+  non-null, which is the conservative default and the only one that cannot lie. **A partial answer
+  presented as complete is precisely what P25 clause 1 forbids, so silence is not an option.**
+
+### SEVEN IMPORTANT
+1. `restricted-parents.ts:112` — the `knownParents.has(card.parent_id)` conjunct (the branch stopping a
+   dangling `parent_id` from being reported restricted — the INVERSE existence leak) is **unconstrained**:
+   mutate it away and all 74 tests stay green. The excluding fixture does not exist.
+2. `list.test.ts:585` (7.210) — the entire reason `foldedWorkflowDefs` exists beside `latestWorkflowDefs`
+   is **unconstrained**: replace the ticket's own `workflow_version` with literal `1` and all 32 cases
+   stay green, because every fixture workflow has exactly one published version. (ONE verdict only.)
+3. `Features.md:45` — the reopen-flow bullet still says `getTicket` refuses ("Known gap").
+4. `Features.md:47` — "answers **seven of thirteen** `DataSourceQuery` methods" is now miscounted.
+5. `test-cases/03:45` (3.40) — "All six blocked methods refuse THROUGH the DataSource."
+6. `test-cases/07:306` — "Six refusing methods, seven `expectStillUnserved` calls ... the count is not a typo."
+7. `test-cases/03:113` (3.146) — describes `getTickets` as refusing, cites "six refusing methods".
+
+### ELEVEN MINOR (all recorded; none fixed)
+`assigned-provenance.ts:74` latest-assignment unconstrained (ONE verdict) · `mappers.test.ts:1038` the
+restricted-arm "EXCLUSION" measures the fixture, not the mapper · `restricted-parents.ts:21` cites
+`tickets.ts:304` which is now the LIST handler (the arm moved to `:373`) · **7.210/7.211/7.212 exist in
+the suites and were never added to `test-cases/07`** (highest recorded is still 7.209) · `Features.md:148`
+restricted-parent placeholder sentence inverted by this change · `Features.md:417` list-route bullet
+predates the five new fields and still credits `latestWorkflowDefs` for state names · `list-cards.ts:63`
+pinned-version property unconstrained (same root as Important 2) · `restricted-parents.ts:71` comment
+states the INVERSE of what the rejected alternative would do, on a visibility surface ·
+`page-refusals.test.tsx:13` + `ticket-list.test.tsx:500` + `visibility-editor.test.tsx:20` stale
+"six refusals"/"getTicket refuses" docblocks, one of which is the stated reason a component is not
+proven through its mount point — a reason this diff invalidated.
+
+## THE ORDER FROM HERE
+1. **Fix C1 and C2.** Nothing else ships first; both make the register lie.
+2. Important 1 and 2 — both are MISSING EXCLUDING FIXTURES, the failure this project pays for most.
+3. The doc sweep (Importants 3-7 + the Minor doc items) in the same change set.
+4. Then closure 3 (`StreamItem`→`ServerStreamFrame`), **closure 2b (Ruling P34)**, HELD pair LAST
+   under **Ruling P32** (guest sees only `eff.projects`; a project NAME is a disclosure; the excluding
+   fixture is a guest on X who must not receive Y's name OR id, mutated to permit and confirmed red).
+
+## THREE ENVIRONMENT FACTS THAT COST TIME TO LEARN
+- **Turbo's error line prints the pnpm LAUNCHER's path, not the interpreter.** A gate log saying
+  `/Users/kiro/.nvm/versions/node/v24.11.1/bin/pnpm` is NOT node drift: pnpm is a `#!/usr/bin/env node`
+  script that merely lives there. `pnpm exec node -e 'process.version'` prints **v22.22.2**. Probe the
+  SPAWN; I nearly filed a false drift finding off the path.
+- **The gate lock never held while it was split across two Bash calls** — each call is a fresh shell, so
+  `echo $$` recorded a pid that died immediately. One backgrounded invocation, `--concurrency=1`, plus a
+  drain-wait for live pools; reclaim a pid-less lock dir after 60s; bound the drain at 10 min and say so
+  loudly. Script: `scratchpad/gate19.sh`.
+- **`pgrep -f vitest` matches every lane session**, because their prompts contain the word. The only
+  reap criterion is ppid=1:
+  `ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0,"vitest") > 0 {print $1}'`.
+
