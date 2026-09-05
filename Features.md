@@ -908,7 +908,7 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   content-type, unidentifiable bytes are refused without ever falling back to the extension, and the
   allow-list is closed: a real file outside it is still refused. Every embeddable-image mime is a subset
   of the uploadable allow-list, by test. `apps/server/src/attachments/attachment-repo.ts`, `content-hash.ts`, `filename.ts`, `sniff.ts`
-- ⚙️ **`POST /v1/attachments` and `GET /v1/attachments/:id` — built and tested, NOT reachable on the server this repo boots.**
+- ✅ **`POST /v1/attachments` and `GET /v1/attachments/:id` — built, tested, and REGISTERED on the server this repo boots.**
   The route handlers are complete: upload answers `201 {attachmentId, url, mime, filename, size, sha256}`
   built from the server's own sniffed and hashed truth (never the client's claim about its file), refuses
   a session-less request 401, a malformed one 400, an oversize one 413 (the shipped ceiling is exactly
@@ -916,18 +916,23 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   BYTE-IDENTICAL to a nonexistent ticket; download streams the exact stored bytes under `canSee`, inline
   for images and as a sanitized-filename attachment otherwise, and answers that SAME 404 for an unshared
   guest, a nonexistent id, and metadata recorded with no bytes behind it — three different truths, one
-  frozen body, so nothing about which of the three happened leaks. **But `registerAttachmentRoutes` is
-  never called from `apps/server/src/app.ts`'s composition root** — every test that exercises these
-  routes calls it directly against a bare `Fastify()` instance; the real server this repo boots (`apps/server/src/index.ts` → `buildApp`) registers every OTHER route module and not this one, so today
-  no client can reach either endpoint on a running server. Recorded here rather than fixed: wiring the
-  composition root is outside this task's scope, and no task in this plan's text claims it (`test-cases/09-editor-attachments.md`'s case 9.59 carries the same finding, with the sweep that established it).
-  `apps/server/src/routes/attachments.ts`
+  frozen body, so nothing about which of the three happened leaks. `apps/server/src/app.ts` registers
+  both through `app.register(registerAttachmentRoutes, …)`, and `AppDeps.store` — required, like every
+  other field but `now`/`stream` — carries the `ObjectStore` the pair writes to, built at the one boot
+  path from `createObjectStoreFromEnv(process.env)`. **Until this landed the routes were reachable from
+  nothing**, and the reason it survived so long is worth keeping: both attachment suites mount a bare
+  `Fastify()` and register the routes BY HAND, so both were green against an empty composition root.
+  `apps/server/test/routes/attachments-wired.test.ts` is the test that can fail on it — it registers
+  nothing, goes through `buildApp`, and asserts the `attachments` ROW rather than the 201.
+  `apps/server/src/routes/attachments.ts`, `apps/server/src/app.ts`
 - ⚙️ **The server-gate seam is wired into the one composition root** — `apps/server/src/index.ts` is the
   ONE composition root that calls `buildServerGates()` and hands the result into `createIngestService`,
-  which is the narrower and true claim this bullet exists to draw: unlike the two attachment routes above
-  — which are NOT registered on `apps/server/src/app.ts`'s composition root and so unreachable on the
-  server this repo boots — the gate seam IS wired at the one composition root this repo has, even though
-  that composition root itself is never started (`apps/server/src/index.ts`'s own comment records that
+  which is the narrower and true claim this bullet exists to draw: the gate seam is wired at
+  `apps/server/src/index.ts`, NOT at `apps/server/src/app.ts` where every route module is registered
+  — two different composition roots, and a reader who checks only the second finds no gates at all.
+  (This bullet used to draw the contrast against the two attachment routes above, which were then
+  registered at neither. They are now registered at `app.ts`, so that contrast is gone and the plain
+  claim is what is left.) The seam is wired even though that composition root itself is never started (`apps/server/src/index.ts`'s own comment records that
   nothing boots it, and there is no `start` script, Dockerfile, or deployment target anywhere in the
   repo, so "wired" here does not mean "live in production"; no production exists to be live in). Most
   other call sites that build an ingest service leave `gates` out entirely and get the seam's default

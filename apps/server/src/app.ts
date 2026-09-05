@@ -7,6 +7,8 @@ import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
 import { createNotificationFanout } from './notifications/fanout.js';
 import { createInAppTransport } from './notifications/transport.js';
+import type { ObjectStore } from './attachments/object-store.js';
+import { registerAttachmentRoutes } from './routes/attachments.js';
 import { registerAttentionRoutes } from './routes/attention.js';
 import { registerBoardRoutes } from './routes/board.js';
 import { registerBuilderReadRoutes } from './routes/builder-reads.js';
@@ -72,6 +74,27 @@ export type AppDeps = {
    * await.
    */
   auth: Auth;
+  /**
+   * Where attachment BYTES live — the `ObjectStore` behind `POST /v1/attachments`
+   * and `GET /v1/attachments/:id`.
+   *
+   * Required, not optional, for the same reason `auth` above is and stated in
+   * the same terms: an assembled app with no attachment store is not a degraded
+   * product, it is a different one. The optional version of this field would
+   * have `buildApp` decide, silently and per-caller, whether half of the editor
+   * works — and the failure it produces is not a 500 anybody would trace back
+   * here. `image-embed-gate` refuses an embedded image whose `attachmentId` has
+   * no row, so an app assembled without a store answers every inline image with
+   * a correct-sounding refusal about a rule, and nothing says the bytes had
+   * nowhere to go.
+   *
+   * It costs no caller a database or a filesystem: `createObjectStoreFromEnv({})`
+   * defaults `OBJECT_STORE` to `'local'` and returns a `LocalDiskStore`, whose
+   * constructor stores a string and touches no `fs` — every `fs` call is inside
+   * `put`/`getStream`/`delete`. So `test/app.test.ts`, which is deliberately
+   * database-free, stays database-free.
+   */
+  store: ObjectStore;
   /**
    * The INTERNAL, ungated append path — for invite acceptance and nothing else.
    *
@@ -380,6 +403,84 @@ export function buildApp(
   // once per app ever built.
   app.addHook('onClose', () => {
     unsubscribeNotifications();
+  });
+  // The attachment doors (Plan 7 Tasks 9 and 10) — upload and download. This
+  // line is the whole of what was missing: the module was complete and tested
+  // and reachable from nothing, so on the server this repo booted the
+  // `attachments` table could never gain a row, and `image-embed-gate`'s
+  // `attachment.embed-unknown` branch therefore refused EVERY inline image —
+  // correct about the rule, useless as a product. `src/index.ts` carries the
+  // record of how that was found.
+  //
+  // ## `app.register`, not a direct call — MEASURED, three variants
+  //
+  // `registerAttachmentRoutes` is `async` and `await`s a nested
+  // `app.register(multipart, …)` before declaring its routes. That awaited-then-
+  // declare shape is exactly what `stream/routes.ts` records as failing SILENTLY
+  // for `@fastify/websocket`, so it was probed against this repo's own fastify
+  // 5.12.1 and the real `@fastify/multipart` rather than reasoned about:
+  //
+  //   `app.register(fn, deps)` from this synchronous builder → POST /v1/attachments 201
+  //   no registration at all (negative control)              → 404
+  //   `void registerAttachmentRoutes(app, deps)`             → `app.ready()` never resolves
+  //
+  // `void registerAttachmentRoutes(app, deps)` is NOT the alternative it looks
+  // like, and it fails HARDER than "the route is declared too late". MEASURED,
+  // as a mutation of this line: the app never becomes ready at all — `app.ready()`
+  // does not resolve, and every test on it dies on a 30 s hook timeout with no
+  // route and no error to name the cause. Reproduced outside this file in
+  // fourteen lines: `await app.register(multipart, …)` on the ROOT instance from
+  // outside avvio's boot makes the awaited promise wait on a boot that is itself
+  // waiting on that registration. A server assembled that way would hang before
+  // it could listen.
+  //
+  // `await`ing the function here is not the escape either: it would make
+  // `buildApp` async, and every one of its nine call sites would have to await a
+  // builder that is synchronous by decision (see `AppDeps.auth`). `register`
+  // hands the whole thing to avvio, which is the one arrangement that finishes
+  // before the instance is ready.
+  //
+  // ## The encapsulation is load-bearing, not stylistic
+  //
+  // `register` also puts the multipart content-type parser in a CHILD scope, and
+  // that containment is the point. Measured with `multipart` moved to the root
+  // instance: `POST /v1/attachments` still answered 201, and a
+  // `multipart/form-data` POST to `/v1/events` — which must answer 415, this
+  // server understanding no such body — answered `400 FST_ERR_VALIDATION`
+  // "body must be object" instead, with `request.body` undefined. Every other
+  // door in this file would have silently changed its refusal. `auth/routes.ts`
+  // encapsulates for the same reason. `test/routes/attachments-wired.test.ts`
+  // pins both halves on ONE assembled app, because until it existed no test in
+  // this repo sent a multipart body anywhere but the upload suite, and a root
+  // registration would have broken every other door with nothing to notice.
+  //
+  // ## The ONE way this differs from every neighbour above: it takes `auth`
+  //
+  // Every other route here takes `requireSession` by parameter. This one takes
+  // `deps.auth` and builds its own `makeRequireSession` internally.
+  // `routes/attachments.ts`'s "`requireSession`, and the rule it discharges"
+  // section says that is deliberate — it is the cross-plan signature Task 10's
+  // download half was written against — and it discharges the same rule the
+  // same way: there is no way to call the function without supplying an
+  // identity source. NAMED here, not corrected: making it
+  // match its neighbours is a change to a signature another plan's half is
+  // written against, and belongs in that change set, not this one.
+  //
+  // `deps.pool as Pool` is a TYPE accommodation and nothing more, and it is a
+  // WEAKER cast than the identically-spelled one on `registerSyncRoutes` above.
+  // That route genuinely needs a `Pool` — it calls `.connect()` — which is why
+  // its comment names the one caller the cast is unsafe for. This route calls
+  // only `.query` — checked, all five uses: `getResolvedVisibility`, `canSee`,
+  // `insertAttachment` and `getAttachment`, every one of which takes
+  // `Queryable` and none of which reaches `.connect()`. The cast exists
+  // solely because `AttachmentRouteDeps.pool` is DECLARED `Pool`. Narrowing
+  // that declaration to `Queryable` would delete this line, and it is a change
+  // to the signature Task 10's download half is written against, so it belongs
+  // to that owner rather than here.
+  app.register(registerAttachmentRoutes, {
+    pool: deps.pool as Pool,
+    store: deps.store,
+    auth: deps.auth,
   });
   registerAuthRoutes(app, deps.auth);
 

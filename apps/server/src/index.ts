@@ -1,5 +1,6 @@
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { buildApp } from './app.js';
+import { createObjectStoreFromEnv } from './attachments/store-config.js';
 import { createAuth } from './auth/auth.js';
 import { LogMagicLinkSender } from './auth/magic-link-sender.js';
 import { LogOtpSender } from './auth/otp-sender.js';
@@ -19,7 +20,9 @@ async function main(): Promise<void> {
   // This is the only NON-TEST site that passes them, and
   // `test/gates/gate-seam.test.ts` pins what `buildServerGates()` covers.
   //
-  // Two corrections to what this comment used to say, both found by review:
+  // Two corrections to what this comment used to say, both found by review —
+  // and, third, the consequence neither sentence drew, which has since been
+  // fixed rather than only recorded:
   //
   // 1. It claimed "every test suite" leaves `gates` out and gets the ungated
   //    default. **Three do not.** `test/gates/gate-seam.test.ts`,
@@ -34,20 +37,26 @@ async function main(): Promise<void> {
   //    target, so there is no PRODUCTION for these gates to be real in. "Wired
   //    at the one composition root the repo has" is the honest claim.
   //
-  // AND THE CONSEQUENCE NEITHER SENTENCE DREW, which is the part that matters:
-  // `buildApp` does not call `registerAttachmentRoutes` — swept, and the only
-  // occurrence in `src/` is its own definition at `routes/attachments.ts:211`,
-  // against a positive control where `registerEventRoutes` resolves to its real
-  // call site at `app.ts:204`. So on the server this repo actually starts, the
-  // `attachments` table can never gain a row, because the only writer is the
-  // POST handler in that unregistered module. `image-embed-gate`'s
-  // `attachment.embed-unknown` branch fires whenever an embedded attachmentId
-  // has no row for the ticket — so **every inline image would be refused**, and
-  // the refusal would be correct about the rule and useless as a product.
-  // Recorded, not fixed: registering those routes is not in Plan 7's task text,
-  // and turning an editor plan into a deployment change is not this step's call.
-  // **Owner: Plan 11's deployment work** — which owns the boot path, the
-  // `start` script and the deployment target this all waits on.
+  // 3. THE CONSEQUENCE NEITHER SENTENCE DREW — **now FIXED, and recorded here
+  //    because the defect is the useful part.** `buildApp` did not call
+  //    `registerAttachmentRoutes`: swept, and the only occurrence in `src/` was
+  //    its own definition, against a positive control where
+  //    `registerEventRoutes` resolved to a real call site. So on the server this
+  //    repo starts, the `attachments` table could never gain a row — the only
+  //    writer is the POST handler in that module — and `image-embed-gate`'s
+  //    `attachment.embed-unknown` branch fires whenever an embedded
+  //    attachmentId has no row for its ticket, so **every inline image was
+  //    refused**, correctly about the rule and uselessly as a product.
+  //
+  //    Plan 11 (this lane) owned it as deployment work and did it:
+  //    `app.ts` now registers both attachment routes, `AppDeps.store` carries
+  //    the `ObjectStore` they need, and it is built from `OBJECT_STORE*` right
+  //    below. What made the gap survive so long is the shape worth remembering:
+  //    the two attachment suites mount a bare `Fastify()` and register the
+  //    routes BY HAND, so both were green with the composition root empty. The
+  //    test that can actually fail on it is
+  //    `test/routes/attachments-wired.test.ts`, which registers nothing and
+  //    goes through `buildApp`.
   const ingest = createIngestService({
     pool,
     evaluate: evaluateEvent,
@@ -90,6 +99,14 @@ async function main(): Promise<void> {
       // but the one that was given this can reach the ungated path.
       serverAppend: (events) => ingest.ingestBatch(events),
       webOrigin: config.webOrigin,
+      // Where attachment bytes land, decided by `OBJECT_STORE` and nothing
+      // else: local disk in dev, S3-compatible where one is configured.
+      // `createObjectStoreFromEnv` is the ONE seam that reads those names, so
+      // no other file needs an `if (env.OBJECT_STORE === …)`; this is its only
+      // non-test call site. No new variable is introduced here — every name it
+      // reads is already documented in `.env.example` and already checked by
+      // `scripts/check-env-example.mjs`.
+      store: createObjectStoreFromEnv(process.env),
     },
     { logLevel: config.logLevel },
   );
@@ -122,8 +139,10 @@ async function main(): Promise<void> {
   //    SIGTERM handler in this file, no `pool.end()` and no `app.close()` — this
   //    process runs until it is killed. Inventing a signal handler here would be
   //    turning a snapshot task into a deployment change, and **Plan 11 owns the
-  //    boot path** (see the `attachments` note above, which defers to it for the
-  //    same reason). So the stop function is hung on the hook Fastify already
+  //    boot path** — the same owner the `attachments` note above named, and that
+  //    note has since been discharged; THIS claim has not, and stands: there is
+  //    still no SIGTERM handler here. So the stop function is hung on the hook
+  //    Fastify already
   //    provides: today nothing calls `app.close()` and the writer runs for the
   //    life of the dev process — which is correct, an unref'd interval holds
   //    nothing open — and on the day Plan 11 adds a real shutdown, the writer

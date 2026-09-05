@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { createObjectStoreFromEnv } from '../src/attachments/store-config.js';
 import { createAuth } from '../src/auth/auth.js';
 import { LogMagicLinkSender } from '../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../src/auth/otp-sender.js';
@@ -53,6 +54,13 @@ describe('GET /healthz', () => {
       // by being handed one, never by reaching for it.
       serverAppend: async () => [],
       webOrigin: 'http://localhost:3001',
+      // `AppDeps.store` is required too, and naming it here costs this file
+      // nothing it was built to avoid: `createObjectStoreFromEnv({})` defaults
+      // to `'local'` and returns a `LocalDiskStore` whose constructor stores a
+      // string and touches no filesystem — every `fs` call is inside
+      // `put`/`getStream`/`delete`, which `/healthz` never reaches. This file
+      // stays database-free AND filesystem-free.
+      store: createObjectStoreFromEnv({}),
     });
     const response = await app.inject({ method: 'GET', url: '/healthz' });
     expect(response.statusCode).toBe(200);
@@ -68,6 +76,7 @@ describe('GET /healthz', () => {
       auth: offlineAuth(),
       serverAppend: async () => [],
       webOrigin: 'http://localhost:3001',
+      store: createObjectStoreFromEnv({}),
     });
     const response = await app.inject({ method: 'GET', url: '/healthz' });
     expect(response.statusCode).toBe(503);
