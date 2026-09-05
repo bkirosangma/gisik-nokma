@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.229`. THE NEXT FREE ID IS `12.240` — NOT `12.230` AND NOT `12.224`.** **`12.230`–`12.239` remain RESERVED to Lane C (Task 16) and `12.224`–`12.227` to Lane D (Task 17, Expo)**, by the cross-lane allocation taken 2026-09-06 after this file collided twice in one day. **Ids in §12 are now ALLOCATED, not discovered** — a lane takes its assigned range and does not read the next number off this line, because that is precisely what two branches did simultaneously, from correct readings, and collided. The recount rule below still applies to what is IN USE; it is the NEXT-FREE half that a lane may no longer derive for itself.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.193-12.223 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, and said `12.215` until Ruling P34's follow-up added 12.216-12.219, and said `12.219` until THIS branch's own rebase onto closure 1 moved Task 13's four colliding ids to 12.220-12.223 — the SECOND time in this file that two branches minted the same range from this one line off different fork points, and the clause above records the first. Both times both sides obeyed never-renumber and collided anyway, because that rule protects LANDED ids and neither branch can see the other. The range is re-checked against `main` at REBASE, not only at authoring, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives), and said `12.223` until Task 17 (Lane D, `apps/mobile` — the THIRD package this bucket's cases live in) landed its own allocated range at `12.224`-`12.227` exactly as assigned, closing that reservation without a further collision, and said `12.227` until Task 16 filled the FIRST two of its own reserved block, 12.228-12.229 (`apps/desktop`'s storage adapter — a FOURTH package denominator: it lives in `apps/desktop` itself, consuming both prior packages without being either), minted from an allocation rather than derived from this line, so no further collision instance was possible here. `12.230`-`12.239` remain free for that lane's own later use without a further allocation request. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE ON THIS BRANCH IS `12.274`. A LANE DOES NOT DERIVE THE NEXT FREE ID HERE — IT USES ITS ALLOCATED BLOCK.** Blocks, controller-allocated 2026-09-06 after this file collided twice in one day: **Lane D 12.224–12.227** (Task 17, Expo) · **Lane C 12.228–12.239** (Task 16, Tauri) · **Lane A 12.240–12.259** · **Lane B 12.260–12.289** (Tasks 14, 15). **The next free block is `12.290`, and it is allocated by the controller ON REQUEST ONLY.** Recount the MAXIMUM against `origin/main` at every rebase — that is the control — but never mint from it. **Ids in §12 are now ALLOCATED, not discovered** — a lane takes its assigned range and does not read the next number off this line, because that is precisely what two branches did simultaneously, from correct readings, and collided. The recount rule below still applies to what is IN USE; it is the NEXT-FREE half that a lane may no longer derive for itself.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.193-12.223 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, and said `12.215` until Ruling P34's follow-up added 12.216-12.219, and said `12.219` until THIS branch's own rebase onto closure 1 moved Task 13's four colliding ids to 12.220-12.223 — the SECOND time in this file that two branches minted the same range from this one line off different fork points, and the clause above records the first. Both times both sides obeyed never-renumber and collided anyway, because that rule protects LANDED ids and neither branch can see the other. The range is re-checked against `main` at REBASE, not only at authoring, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives). Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -1736,3 +1736,193 @@ assertion. No case here is a distributed-systems scenario (that is Tasks 14–15
 running app on a device or simulator. One fix the editor review found (a rejected `onMentionQuery`
 leaving the webview's mention popup pending forever, now answered with an empty result on rejection)
 is a `.tsx` component-level change with no test at this layer for the same reason.
+
+
+## Task 14 — the dual-client harness rig (`apps/server/test/dual-client/`)
+
+Two sync-client replicas on in-memory SQLite against the REAL ingest service, the REAL sync service and
+real Postgres. The rig proves itself here before Task 15's scenarios trust it. **The rig is the
+instrument, so a defect in it is a defect in every scenario that uses it** — which is why the two cases
+that pin its own corrections (12.261, 12.262) matter as much as the three that pin its behaviour.
+
+- 12.260 ✅ a claim made offline by A reaches B through sync and every side holds it EXACTLY ONCE after
+  any number of further syncs. "Offline" is witnessed at the LEDGER, not at B — B has not synced, so
+  B's silence would prove nothing. Asserts replica ≡ replica ≡ the SERVER's `proj_tickets`, which is
+  the property Task 15 exists to lean on: full `TicketState` equality between the replica's reducer fold
+  and `rowToTicketState`, kept exact rather than weakened to `stateId`.
+- 12.261 ✅ **`ingestInteractive` is the GATED door.** A forged envelope-origin `'server'` is refused
+  with the gate's own `PERMISSION_ROLE_RULE`/`SERVER_ORIGIN_REASON`, and the same claim with honest
+  provenance commits through the same call. *The plan text used `ingestBatch` here — the INTERNAL door,
+  which passes `door = null` so `checkPermission` never runs and whose own docblock says "an HTTP route
+  must never call this". An online stand-in that skipped the gate would have let Task 15 assert
+  permission outcomes the product does not have.* `ingestBatch` remains correct for the SEED and a
+  comment says so where it is used.
+  *Mutation: swap `ingestClientBatch` back to `ingestBatch` → red on 12.261 ALONE, `1 failed | 2 passed`.*
+- 12.262 ✅ **a `visibility.set` BELOW the snapshot line still reaches a fresh client.** The rig imports
+  the server's `BOOTSTRAP_BACKFILL_TYPES` rather than restating it; the plan's hand-copied list has four
+  entries where the real one has five — it omits `visibility.set`. *Measured BEFORE this case existed:
+  replacing the import with the plan's literal left every other case GREEN, with the edit confirmed
+  present in the file before the run — an unconstrained path, not a mutation that never fired, and the
+  two are indistinguishable from outside while only one condemns a check.* The snapshot pass runs
+  between the claim and the fresh client so the event is genuinely below the line, which is the only
+  position where the backfill is load-bearing.
+  *Mutation: the four-entry literal → red on 12.262 ALONE, `1 failed | 3 passed`.* Carries its own
+  control: `not.toContain('ticket.created')` proves the snapshot actually covered the ticket, so "below
+  the line" is a fact about the run rather than an assumption.
+- 12.263 ✅ **`goOnline()` throws rather than resolving with a claim the sync door never accepted.**
+  `flush` answers a `transport.sync` throw with `outbox.recordFailure` and returns NORMALLY: the row
+  keeps status `'queued'`, `next_attempt_at` moves out, `lastApplyFailure()` stays null and
+  `failedItems` stays EMPTY — `recordFailure` deliberately does not mark `'failed'`, or every retryable
+  claim would strand forever. A scenario would then assert one contest, see zero, and blame the product
+  while the reason sat unread in `outbox.last_error`. *The FIRST version of this case failed and the RIG
+  WAS RIGHT: `submit` goes through `ds.ingest`, which fires a flush that parks on the offline gate
+  having ALREADY read its batch, so a later `recordFailure` never reaches it. The case enqueues directly
+  and says so, because the next author will reach for `submit` too.* Carries the control that the same
+  claim goes through once the failure is cleared.
+  *Mutation: the `queuedCount` guard replaced by a constant `0` → red on 12.263 ALONE, `1 failed | 6 passed`.*
+- 12.264 ✅ **an owner can publish a workflow through the GATED door and a member cannot.**
+  `ADMIN_ONLY_TYPES` refuses `workflow.defined` and kin from every non-admin, and both scenario users
+  are members — so Task 15's S3 and S4 were INEXPRESSIBLE until the rig grew a seeded owner. The
+  member-refused half is the control: without it this would prove the owner passes a gate that might
+  not exist.
+- 12.265 ✅ **the same batch sent twice through the real sync door is idempotent** — identical results,
+  one ledger row. Task 15's S6 was inexpressible until `Harness.sync` existed: `engine.flush()` drains
+  only what is queued and the rows are gone after the first flush. *The plan's S6 built its own
+  `createSyncService({pool, ingest})`, which does not compile — `serverAppend` is required — and would
+  have been a SECOND instance, hiding any duplicate-suppression bug living in per-instance state.*
+- 12.266 ✅ a client created AFTER a commit holds the ticket through `loadBootstrap` alone, with its
+  cursor at the stream head, so its first `syncDown()` delivers and moves nothing.
+
+### Carried, with owners — Task 14
+
+- **A per-`StreamErrorCode` retry POLICY** — unchanged from Task 13's record; the surface shipped, the
+  policy is still `createSyncEngine`'s. *Owner: unassigned.*
+- **PRODUCT DEFECT: the snapshot-bounded bootstrap and the DataSource's provenance rule contradict each
+  other.** After a snapshot pass, a FRESH client cannot read the snapshotted ticket through
+  `ds.query.getTicket` — `ReplicaGapError` on `stateProvenance`, because `replica-data-source.ts`
+  requires a `ticket.created`/`ticket.transitioned` in local `events` and a snapshot-bounded bootstrap
+  ships neither below the line. `replica.getTicket` answers fine; only the DataSource door refuses.
+  Found by the Task 14 review, NOT repaired in the harness — repairing it there would hide it.
+  *Owner: **Lane A, closure 4**, sequenced after closure 3 (same replica/DataSource surface).*
+- **Not measured by this task**, recorded so nobody reads the green as broader than it is: the stall
+  path where `lastApplyFailure()` is non-null, the engine's no-progress guard, `bootstrapFor` under a
+  concurrent writer, the JSON round trip the real WS performs, and `contests()` ordering with two
+  contests filed in one batch.
+
+
+## Task 15 — the dual-client scenarios (`apps/server/test/dual-client/scenarios.test.ts`)
+
+The spec's named discipline (§7), executed: two replicas diverge offline, sync, and the outcome —
+including every contested claim — is asserted EXACTLY, against the final ledger, the SERVER's own
+projection, BOTH replicas and `proj_contested`. A fresh harness and a fresh database per scenario.
+
+**The plan's scenario code assumed an API that does not exist** — `ds.query.getTicket` returns
+`TicketRead`, which has no `confirmed`, no `contests` and no `pending`, and nearly every assertion in
+the plan reads one of those off it. Sixteen corrections were verified against source before a line was
+written; they are recorded in `docs/lanes/executor-state-B.md`.
+
+- 12.267 ✅ **S1 — concurrent `field_set`: the later claim wins the projection and the earlier survives
+  in history.** Both offline edits `pending`; the ledger witnessed at `[created]` before anyone goes
+  online; after A then B land, the exact ledger `[created@1 A, claimA@2 A, claimB@3 B]`, the server's
+  `fields.title` carrying B's value AND B's `actorId` and `clientTime`, A's replica holding the
+  identical claim, A's history still containing claimA's id with its payload intact, and `contests()`
+  EMPTY — a race is not a rule violation. Server ≡ A ≡ B; both cursors at head.
+- 12.268 ✅ **S2 — a stale `restrict-to`: the offline claim contests with the exact rule.** B is
+  assignee locally (asserted, not assumed), claims Done, A reassigns meanwhile. The contest row is
+  asserted field-for-field including the embedded `original_event` deep-equal to what was sent, and the
+  refusal REASON as the sentence `evaluateRestrictTo` builds. B's `LocalContest` is checked including
+  `contestedAt` equal to the SERVER's instant — which is what proves the outbox's device-clock stub was
+  corrected by the streamed envelope. `myWork(B).contested` holds it and `myWork(A).contested` is empty.
+- 12.269 ✅ **S3 — a workflow changed while offline: the stranded transition contests with the engine's
+  own rule.** The owner (not a member — `ADMIN_ONLY_TYPES`) publishes v2 dropping `review` with
+  `stateMapping: { review: 'todo' }`; the server's projection is already folded onto v2 before B lands.
+  The contest rule is asserted as the single literal `REFUSAL_RULES.unknownState` with the reason naming
+  **"Harness v2"** — *the plan's three-way `toContain` replaced by strict equality, because a membership
+  test is not an exact outcome; and the v2 NAME in the reason is the control that the claim was judged
+  against v2 rather than v1.*
+- 12.270 ✅ **S4 — visibility narrowed while offline: the claim contests, NOTHING is delivered, and
+  re-widening converges both.** The queued edit is refused with `permission.visibility` /
+  "This ticket is not visible to you." and recorded as `claim.contested`. **The excluding half:** B
+  receives neither the narrowing `visibility.set` nor the contest — asserted BY EVENT ID, because a
+  count would pass if the wrong two events arrived — and B's cursor does not move, since only a
+  DELIVERED envelope moves it. A, still listed, sees both as history. Re-widening drains all four
+  events in order, the server's envelope corrects the stub's device timestamp, and the replicas
+  converge exactly — **and that convergence is a property of THIS SCENARIO'S SHAPE, not of the
+  product. See 12.274, which measures what happens when the shape is ordinary.** *Carries a control
+  that B's stub `contestedAt` differs from the server's before re-widening, so convergence is something
+  re-widening must DO rather than something already true — compared on that ONE field rather than by
+  whole-object inequality, which would have been a wall-clock race.*
+  *Mutation (Ruling P35(b)): the server's visibility gate in `visible-events-for.ts` forced to permit →
+  **12.270 and 12.272 both redden**, S1/S2/S3/S6 stay green. Not "12.270 alone" as the ruling
+  anticipated: 12.272 independently depends on the same gate for the child's contest reaching nobody.
+  Both reddenings are correct and for the same reason. Restored with `git checkout HEAD -- <path>`,
+  verified by reading the file and `git status --porcelain`.*
+- 12.271 🚫 **THE UNDER-PURGE RESIDUAL — recorded, deliberately NOT asserted.** After the narrowing, B
+  still holds its pre-narrowing copy in full: `listEntityEvents` unchanged, `getTicket().confirmed`
+  unchanged, and the ticket still returned by `searchOfflineCopy`. That is case **6.104**: the
+  per-event purge walk was DELETED, not narrowed (the ruling on 6.101), so a member un-shared by a
+  plain `visibility.set` keeps the stale copy until a full resync. **No test pins it, on 6.104's own
+  stated reason** — *"a test asserting 'no purge arrives' would harden the wrong half of a gap this
+  branch wants closed rather than preserved"* — and the reason is sharper here than there: **6.104's
+  owner is Plan 10, this plan**, so an assertion would be a test that whoever closes the gap must BREAK
+  to fix it, with a comment insisting its own redness is correct. The assertions 12.270 DOES keep
+  survive that fix: a purge instruction removes state and does not move a cursor, so "these two events
+  never arrived" and "the cursor did not move" both stay true. *Owner of the residual: Plan 10 — the WS
+  catch-up/purge protocol. Ruling P35(a), as amended after this lane raised the conflict.*
+- 12.272 ✅ **S5 — the offline reopen pair contests coherently when the world changed.** The bare child
+  creation is refused LOCALLY by the pre-check with `hierarchy.parent-terminal` and queues nothing; the
+  reopen pair is then built against a stale replica and both halves contest on arrival — the reopen
+  with `restrict-to`, the child with `hierarchy.parent-terminal` whose reason is asserted `===` the
+  sentence the LOCAL pre-check produced, which is what proves client and server refuse in the same
+  words. The contests are located by `original_event_id`, never by index, because `contested_at` can
+  tie. Nothing moved: the parent is still Done on the server, the child ticket does not exist, and the
+  child's contest is filed against the CHILD's entity id — a ticket that never came to be.
+  **THE FINDING THIS SCENARIO SURFACED, asserted as product behaviour:** the child's `claim.contested`
+  streams to NOBODY. `canSee` is false for a ticket with no `proj_visibility` row (unknown ≡ invisible,
+  by design), so `visibleEventsFor` never yields it — A never learns of it and B holds only the outbox
+  stub. Not mentioned anywhere in the plan. **CORRECTED after review: an earlier version of this line
+  said "both cursors sit PERMANENTLY at `head - 1`". That is false and is left visible rather than
+  edited into looking right.** What is permanent is the NON-DELIVERY; the next visible envelope in the
+  workspace carries both cursors past the invisible row (measured: one `field_set` on the parent takes
+  head to 8 and both cursors to 8, with the child's contest still reaching neither replica). `head - 1`
+  is also incidental to BATCH ORDER — the reopen is submitted before the child, so the child's contest
+  is the head row; child-first would leave the cursors AT head with the same non-delivery.
+- 12.273 ✅ **S6 — the same batch twice is idempotent to the byte.** Sent through `Harness.sync`, the
+  object `POST /v1/sync` itself delegates to: identical answers including the same contest id, the
+  ledger unchanged and asserted exactly, one contest row, and `readStreamSeq` unchanged across the
+  retry. *The plan built its own service instance here, which would have hidden a duplicate-suppression
+  bug living in per-instance state.*
+
+- 12.274 🚫 **A RE-WIDENED TICKET NEVER COMES BACK IF THE CLIENT READ ANYTHING ELSE MEANWHILE — recorded,
+  not asserted, and it is a PRODUCT DEFECT rather than a harness one.** The sync cursor is the highest
+  `workspaceSeq` DELIVERED, so any visible event committed while a ticket is narrowed carries the
+  client's cursor PAST the narrowing and past any contest on it. Re-widening then delivers only the
+  widening: the earlier rows are below the cursor and **nothing ever re-sends them**. There is no
+  backfill-on-grant in the product — `visible-events-for.ts` names it as "Plan 10's job, on top of this
+  primitive" and it has not been built.
+  *Measured twice and independently — by the Task 15 floor-list reviewer, then reproduced by this lane
+  with its own probe. Insert ONE unrelated visible commit between the narrowing and the re-widening:
+  the client's cursor goes 4 → 7, past narrow(5) and contest(6), head 8; after re-widening the client
+  holds 2 events where the server holds 4, `bHasNarrow: false`, `replicasEqual: false`. The divergence
+  is PERMANENT — no purge, no backfill, no resync path.*
+  **This is the sibling of 6.104 on the other side of the same gap**: 6.104 is the stale copy nobody
+  takes away, this is the fresh copy nobody gives back. It is recorded rather than asserted for 6.104's
+  own reason — a test pinning the divergence hardens the wrong half of a gap this branch wants closed.
+  **12.270's convergence assertion holds only because that scenario's workspace is quiet between the
+  narrow and the widen**, and its docblock now says so. *Owner: Plan 10 — the WS catch-up/purge
+  protocol, unassigned to any task, alongside 6.104's purge half.*
+
+### Carried, with owners — Task 15
+
+- **The contest event's `actor_id` is the CLAIMANT, not a server identity** (`sync-service.ts`'s own
+  docblock says so). Asserted in the exact ledger rows of 12.268 and 12.273 rather than left to be
+  rediscovered — a reader expecting a server actor would call these rows wrong.
+- **Two submits while a client is parked offline become TWO batches, not one.** `ds.ingest` fires a
+  flush after each enqueue; the first parks holding its batch and the second returns the in-flight
+  promise. The server outcome is identical, so nothing asserts batch COUNT — recorded so nobody adds an
+  assertion that one `processBatch` call happened.
+- **What a green run here does NOT prove**, recorded because these scenarios are this project's
+  evidence that sync works: the stall path where a committed claim cannot be folded, the engine's
+  no-progress guard, `bootstrapFor` under a concurrent writer, the JSON round trip the real WebSocket
+  performs (the rig hands objects to the replica), and `contests()` ordering when two contests are
+  filed inside one batch and tie on `contested_at`.

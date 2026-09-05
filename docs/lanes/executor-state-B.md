@@ -15,10 +15,10 @@ only what is written here.
 | anchor | value | how verified |
 |---|---|---|
 | branch | `exec/20-plan10-t13-t15` | `git branch --show-current` |
-| HEAD | `2aa1efa` (T13 + P34 + rebase + id allocation) | `git rev-parse HEAD` |
-| `origin/main` | `a23d686` (closure 1 / #109 landed) | `git rev-parse origin/main` after `git fetch origin main` |
-| ahead of `origin/main` | **6**, REBASED onto `a23d686` | `git rev-list --count origin/main..HEAD` |
-| HEAD reachable? | **YES** — `origin/exec/20-plan10-t13-t15` resolves to the same sha after `git fetch` | `git branch --contains 2aa1efa -a` + `git rev-parse origin/<branch>` |
+| HEAD | `cd584dd` (T14 + its fix round) | `git rev-parse HEAD` |
+| `origin/main` | `fc5cf0d` — **T13 + P34 MERGED as #117**, verified by content (case 12.220 and `syncErrorNotice` both present on main), not by report | `git rev-parse origin/main`; `git show origin/main:<file>` |
+| ahead of `origin/main` | **4** (blocker doc, T14, backfill case, fix round) | `git rev-list --count origin/main..HEAD` |
+| HEAD reachable? | **YES** — `origin/exec/20-plan10-t13-t15` resolves to the same sha after `git fetch` | `git rev-parse origin/<branch>` vs `git rev-parse HEAD` |
 | tree | clean | `git status --short` (empty) |
 | node | v22.22.2 | `node -v` after `export PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH"` |
 | install | `pnpm install --frozen-lockfile` exit 0, `pnpm rebuild better-sqlite3` exit 0 | `/tmp/laneB-install.log` |
@@ -42,8 +42,8 @@ the rule is print the rows, not the count. `main` was 3181; 3210 - 3181 = **29**
 | # | task | state |
 |---|---|---|
 | 1 | **T13** — app-core contested-claim UX, offline reopen pair, skew badge, sync status bar | **DONE.** PR #117 open, rebased onto `a23d686`, re-gated under the lock. Includes Ruling P34's follow-up and the §12 id re-allocation. |
-| 2 | T14 — dual-client harness rig (Fable author + reviewer) | **IN PROGRESS** — import surface verified (eleven plan-text errors, below); Fable implementer authoring `rig.ts` + `rig.test.ts` |
-| 3 | T15 — scenarios S1–S6 (Fable author + reviewer) | not started |
+| 2 | T14 — dual-client harness rig (Fable author + reviewer) | **DONE. PR #126 open**, head `cd584dd`. Rig suite **7 passed**; full gate under the lock **24/24, 0 cached, 3225 tests / 8 packages** (server 979→986). Fable review returned: no Critical, three Important — all fixed and each pinned by a case that fails specifically. |
+| 3 | T15 — scenarios S1–S6 (Fable author + reviewer) | **DONE.** Six scenarios, cases 12.267–12.274, Fable review returned 1 Critical + 2 Important, **all corrected**. In #126 with T14. *(old status below)* **WAS: IN PROGRESS** — Fable author writing `scenarios.test.ts` against a 16-item verified correction list. **S4's central premise is FALSE** (see below); the author is instructed to write it against what the product does and say so, not to bend the rig. |
 | 4 | T18 — `Features.md` §12 + `test-cases/12` final shape | **HELD** until Lanes C (T16) and D (T17) have MERGED to `main`. Poll `origin/main` for their merge commits. |
 
 **In flight: T13's PR, awaiting controller merge.** **One ruling is pending** (see OPEN RULINGS below)
@@ -122,6 +122,237 @@ re-measuring.
     clock-sensitive ones, so a task transcribing it inherits no discipline from the plan.
 
 ---
+
+## ✅ RESOLVED (2026-09-06 ~01:50): the Docker blocker below is CLEARED — kept for its lessons
+
+`pg_isready` accepting; `/dev/vda1` 58.4G with **12.8 G available (77%)**; build cache 12.60 GB → 442 MB;
+images essentially untouched (39.79 → 39.35 GB, 29 → 28); all four containers up, **including the
+owner's `mongo`, `redis` and `postgres:15.3`**; zero `gisik_test_*` remaining. Lane E cleared its own
+build cache — 92% of which was its own image builds, zero entries active — and the owner independently
+authorised exactly that least-destructive option when this lane put the three choices to them. The
+36.8 GB of unused images stays the owner's call and is no longer urgent.
+
+**Two lessons kept because they will recur:**
+1. **`docker ps` said "Up 43 hours" throughout.** The container was up and the database was not. Never
+   read database liveness off `docker ps`; use `pg_isready`.
+2. **`createTestDatabase` drops its database in `drop()`, and a killed run never calls it** — which is
+   how 39 accumulated. A sweep belongs at the START of a gate, because the end is the part that does
+   not happen when it matters. Now Lane E's `sweep-test-dbs.sh`, dropping only idle ones (zero backends).
+
+### The original blocker, as measured
+
+**No lane could run `apps/server` tests or a full gate until disk was freed inside Docker.** Measured:
+
+- `docker exec gisik-nokma-exec-postgres-1 df -h /var/lib/postgresql/data` → `/dev/vda1 58.4G 56.1G **0 available** 100%`.
+- **The host Mac is fine** — 77 GB free on `/System/Volumes/Data`. This is Docker's own VM disk.
+- Postgres cannot exit recovery: `PANIC: could not write to file "pg_logical/replorigin_checkpoint.tmp":
+  No space left on device` → `checkpointer process ... terminated by signal 6` → `all server processes
+  terminated; reinitializing` → repeat. `pg_isready` answers **no response**.
+- **`docker ps` still says "Up 43 hours".** The container is up; the database is not. Do not read
+  liveness off `docker ps` here.
+
+**Where the space went, and it is not this project:** `docker system df` → Images 39.79 GB (36.83 GB
+reclaimable), Build Cache 12.60 GB (12.60 GB reclaimable, **0 active**), Local Volumes 2.31 GB (1.44 GB
+reclaimable). The 39 orphaned `gisik_test_*` databases totalled **331 MB** — real litter, under 1% of
+the problem.
+
+**What this lane did and did not do.** It dropped the 39 orphaned test databases (all idle, zero active
+connections, checked before dropping). Those DROPs reached the WAL, and the checkpoint after them
+PANICked — but the volume was already at 100% and `CREATE DATABASE` was already failing before any of
+it, which is how the problem was found. Any write would have hit the same wall. **It did NOT run
+`docker system prune` or `docker builder prune`**: that is destructive and machine-wide, and this
+daemon also hosts `mongo`, `redis` and a `postgres:15.3` belonging to the owner's other projects. It
+needs the owner's authorization and was surfaced to them.
+
+**Recovery order when authorized:** `docker builder prune -f` (12.6 GB, nothing active) → if still
+short, prune unused images → restart the gisik postgres container → `pg_isready` → re-run the rig.
+
+**Standing fix worth making afterwards:** `createTestDatabase` drops its database in `drop()`, and a
+killed or crashed run never calls it — which is exactly how 39 accumulated. A gate should sweep idle
+`gisik_test_*` databases at the START of a run, because the end is the part that does not happen when
+it matters.
+
+## T14 — WHAT IS BUILT, AND THE THREE MUTATIONS THAT MEASURE IT
+
+`apps/server/test/dual-client/rig.ts` (472 lines) and `rig.test.ts` (4 cases), plus **both**
+`@gisik-nokma/sync-client` **and** `@gisik-nokma/app-core` as `apps/server` devDependencies. Self-test
+**4 passed** under the lock at `0cbdc82`.
+
+The implementer's own least-sure claim **HELD**: full `TicketState` equality between the replica's
+reducer fold and the server's `rowToTicketState` row mapping. That is the property Task 15 leans on,
+now measured rather than assumed.
+
+| mutation | result |
+|---|---|
+| `ingestInteractive` swapped from `ingestClientBatch` back to `ingestBatch` | gated-door case red ALONE, `1 failed \| 2 passed` |
+| `BOOTSTRAP_BACKFILL_TYPES` → the plan's four-entry literal | **ALL THREE CASES STAYED GREEN.** The edit was confirmed present before the run, so an unconstrained path — not a mutation that never fired. |
+| the same, after adding the `visibility.set` case | that case red ALONE, `1 failed \| 3 passed`; `4 passed` on restore |
+
+**The middle row is the finding.** The backfill correction was right and nothing tested it. A dropped
+`visibility.set` would leave the replica holding a different AUDIENCE for a ticket than the server does,
+and every Task 15 scenario asserting who can see what would have been asserting it against a bootstrap
+the server never sends. The new case commits a `visibility.set`, runs the snapshot pass so the claim
+sits BELOW the snapshot line — the only position where the backfill is load-bearing — then requires a
+fresh client to still hold it. Its control (`not.toContain('ticket.created')`) proves the snapshot
+actually covered the ticket, so "below the line" is a fact about the run rather than an assumption.
+
+**Twenty-one departures from the plan's rig text**, of which two were errors in THIS FILE's own
+correction table: `me.projectIds` needs `[...eff.projects.keys()]` (`EffectiveRole.projects` is a `Map`,
+so the plan's spread yields `[key, value]` tuples — the shape matched, the value did not), and
+workflow/ticket-type ENTITY ids must be ULIDs too, not only users and the workspace.
+
+## T14 FABLE REVIEW — no Critical; three Important, all FIXED; and what it means for T15
+
+**No Critical.** The reviewer compared every assembly the rig shares with the server — bootstrap,
+both ingest doors, the sync-down cursor, the parked transport — and found no silent divergence. It
+verified the load-bearing claim independently: *"flush hands back the in-flight promise"* is TRUE
+(`sync-engine.ts`: `if (flushing !== null) return flushing`), so no claim is lost, double-sent, or
+stranded by the gate.
+
+### The three Important findings, and why each was a real hole
+
+- **I1 — `goOnline()` could resolve "successfully" with a claim still queued and never sent.**
+  `flush` answers a `transport.sync` THROW with `outbox.recordFailure` and returns normally: the row
+  stays `'queued'`, `next_attempt_at` moves out, `lastApplyFailure()` stays null and **`failedItems`
+  stays EMPTY** — `recordFailure` deliberately does not mark `'failed'`, or every retryable claim
+  would strand forever. A Task 15 scenario would then assert one contest, see zero, and blame the
+  product; the reason sat in `outbox.last_error`, which nothing read. **Fixed:** `goOnline` now
+  reads `queuedCount` after the flush and throws carrying each row's `last_error`. In this harness
+  there is no network — `transport.sync` calls `processBatch` in-process — so a still-queued claim is
+  never transient and the backoff that would excuse it in the product excuses nothing here.
+- **I2 — S3, S4 and any revocation scenario were INEXPRESSIBLE.** `ADMIN_ONLY_TYPES` refuses
+  `workflow.defined`, `ticket-type.defined`, `project.created` and `ticket.workflow_rebound` from
+  every non-admin, and both users were `'member'`. An author hitting that reaches for the ungated
+  internal door and silently stops testing the product. **Fixed:** `USER_ADMIN`, seeded `'owner'` and
+  project-admin. Pinned by a case that asserts the MEMBER is refused and the owner commits, so it
+  proves the gate is live rather than absent.
+- **I3 — S6 (same batch twice) was INEXPRESSIBLE.** `engine.flush()` drains only what is queued and
+  the rows are gone after the first flush; the plan's S6 built its own `createSyncService({pool,
+  ingest})`, which does not compile (`serverAppend` is required) and would have been a SECOND
+  instance, hiding any per-instance duplicate-suppression bug. **Fixed:** `Harness.sync(userId,
+  events)` → the same `syncService.processBatch` the route delegates to.
+
+### Minor — recorded, and the third is a PRODUCT defect, not the rig's
+
+- **M1** `engine.settled()` deadlocks while a claim is parked on the offline gate (it awaits
+  `flushing`). Scenarios must not use it; documented at the engine field.
+- **M2** `goOnline` flushes then catches up; the product catches up, then flushes inside
+  `onCaughtUp`. Measured benign for the S1/S2 shapes (the reducer only throws on unknown
+  type/workflow/state or an uncreated ticket, which an assign/field/transition gap cannot produce),
+  but **T15 should `syncDown()` before `goOnline()`** where it cares about the intermediate state.
+- **M3 — PRODUCT DEFECT. OWNER: Lane A, closure 4. Owner ruling: P36 (2026-09-06).** P36 widens the
+  BOOTSTRAP payload ADDITIVELY — the snapshot carries the recorded `(actorId, serverTime, seq)`
+  provenance of the state claim, copied by the snapshot writer from the ledger row at that seq. The
+  preferred shape is a **sibling block on the snapshot row, NOT a widening of
+  `TicketState.transitions[]`** — deliberately, so **this rig's full-`TicketState` equality across the
+  fold stays untouched**. If Lane A measures that it must widen `TicketState` after all, the controller
+  says it will warn this lane before it lands; until then, 12.260's exact equality assertion is safe and
+  must NOT be pre-emptively weakened. T15's ❌ case for the DataSource door stands as written and cites
+  P36 as its owner ruling.
+  *Original wording, kept because it is what was measured:* After `snapshotPass()`, a fresh client's
+  `ds.query.getTicket` throws `ReplicaGapError`: `replica-data-source.ts` requires a
+  `ticket.created`/`ticket.transitioned` in local `events` for `stateProvenance`, and a
+  snapshot-bounded bootstrap ships neither below the line. `replica.getTicket` works; only the
+  DataSource door refuses. **The snapshot-bounded bootstrap and the DataSource's provenance rule
+  contradict each other.** Recorded, not fixed — it is not the rig's bug, but it will surface as one
+  in any scenario that snapshots before creating a client.
+- **M4** after a workspace-wide `scope-revoked` the cursor row is gone, so later `syncDown()`s
+  re-scan from 0 and re-yield it (idempotent; the engine delivers nothing further).
+- **M5** the roster seed is projection-only, so no `membership.granted` / `project.created` rows
+  exist in the ledger. Nothing in the replica reads them; cursors are just smaller.
+
+### T15 PITFALLS THE REVIEW MEASURED — read these before writing scenarios
+
+1. **S1's `ticket.field_set {fieldId:'notes'}` is refused LOCALLY** (`field.unknown`) — the seeded
+   types have `fields: []`. Use a built-in (`title`, `description`, `dueDate`, `startDate`) or seed a
+   field.
+2. **S4's expected `purge` on `visibility.set` DOES NOT EXIST in the product** — the per-event walk
+   was struck (cases 6.101/6.104). Measured: B keeps the ticket, B's cursor lags, and re-widening
+   re-delivers the full history. **The rig reproduces the server correctly; S4's script must change.**
+3. `ticket.transitioned`'s payload key is **`to`**, not the plan's `toStateId` — the same error T13
+   already paid for.
+4. The plan's T15 text repeats T14's API errors: `ingestInteractive` takes `(userId, events)`;
+   `ds.query.getTicket` takes `(workspaceId, ticketId)`; **`listEntityEvents` is on the REPLICA, not
+   `ds.query`**; `'usr_a'`/`'usr_b'`/`'task'` must be the rig's exported ULIDs; and `seedTicket` takes
+   `(pool, args)` with **no `visibility` field at all** (`setVisibilityEnv` is separate).
+
+### The reviewer's own least-sure claim, carried rather than absorbed
+
+M2's "benign for the six scenarios" rests on the S1 and S2 shapes only; S5 was not run. **Not
+checked at all:** S3–S6 end to end, the stall path where `lastApplyFailure` is non-null, the
+no-progress guard, `bootstrapFor` under a concurrent writer, the JSON round trip, and `contests()`
+ordering with two contests in one batch.
+
+## T15 — THE SIXTEEN CORRECTIONS, and the one that is a PLAN DEFECT
+
+Verified against source before dispatch. The plan's T15 block repeats every T14 API error and adds more.
+
+**Rig API:** `ingestInteractive(userId, events)` is two-arg · admin-only claims (`workflow.defined` and
+kin) need `USER_ADMIN`, not a member · use the rig's exported ULIDs, never `'usr_a'`/`'wf_h'`/`'task'` ·
+`ticket.transitioned`'s key is **`to`**, not `toStateId` · **`ds.query.getTicket` returns `TicketRead` =
+`{ticket, title, stateProvenance, parent, rollup}` — it has NO `confirmed`, NO `contests`, NO `pending`,
+and the plan reads all three off it** (use `replica.getTicket`, `getTicketWithPending`, `listContests`) ·
+`listEntityEvents` is on the REPLICA · `ds.query.search` REFUSES on the replica, use
+`searchOfflineCopy` → `{offlineCopy, hits}` · `seedTicket(pool, args)` is ONE options object with **no
+`visibility` field at all** · S6 must use `h.sync(userId, events)`.
+
+**Correct as the plan has them, do NOT "fix":** `myWork(workspaceId, userId)` and
+`listContests(workspaceId, filter)` both exist on `ReplicaOnlyQuery` with those exact signatures.
+
+**⚠️ S4's CENTRAL PREMISE IS FALSE, and this is a PLAN defect, not a lane one.** S4 expects a `purge`
+on `visibility.set`. **There is no such purge in the product** — the per-event visibility walk was
+struck (coordination cases 6.101/6.104). Measured on this rig: after a narrowing `visibility.set`,
+client B KEEPS the ticket, B's cursor merely lags the head, and re-widening later re-delivers the full
+history. **The rig reproduces the server correctly; the SCENARIO is wrong.** The conservative default
+taken: write S4 against what the product actually does, assert that exactly, and say in a docblock which
+half of the plan's S4 was false and which half (the offline edit contesting) still holds. **Bending the
+rig to make the plan's S4 pass would be a harness excusing the server from existing** — this series'
+signature failure. Raised with the controller; not blocking.
+
+**Rig behaviours a scenario must work with:** `goOnline()` THROWS if any claim remains queued after the
+flush · `goOnline()` flushes then catches up, the INVERSE of the product, so call `syncDown()` first
+where the intermediate state matters (measured benign for S1/S2, **not measured for S5**) · do not
+`snapshotPass()` then create a client and call `ds.query.getTicket` (product defect M3) ·
+`engine.settled()` deadlocks while offline.
+
+## ⭐ NEXT TASK: CLOSURE 5 — RULING P37 (2026-09-06). READ THIS BEFORE ANYTHING ELSE.
+
+**Owner: THIS LANE. Sequenced AFTER #126 merges and BEFORE T18.** The controller restarts this session
+at that boundary with closure 5 and T18 in the override. **Do not start it before #126 merges.**
+
+**What it is: "the copy nobody gives back and the copy nobody takes away" — two halves of one gap.**
+- **12.274, the GRANT side.** There is NO backfill-on-grant in the product. A client whose cursor moved
+  past a narrowing never gets the ticket's history back when it is re-widened. Measured twice: one
+  unrelated visible commit between narrow and widen → cursor 4→7 past narrow(5) and contest(6), client
+  holds 2 events where the server holds 4, **permanent, no resync path**.
+- **6.104's purge half, the NARROW side.** A member un-shared by a plain `visibility.set` keeps the
+  stale copy until a full resync.
+
+**P37's DESIGN CONSTRAINTS — these are constraints, not a design; measure within them:**
+1. **Grant side:** the trigger is the visibility EVENT ITSELF, never a reconstructed prior audience
+   (6.82/6.94 stand). On a widening, the server delivers that ticket's full history — or a per-ticket
+   snapshot in the bootstrap's own shape, whichever the replica already folds — to every viewer in the
+   NEW audience, cursor notwithstanding. Over-delivery to a viewer who already held it is acceptable
+   **iff replay is idempotent — MEASURE that, do not assume it.** A viewer NOT in the new audience gets
+   nothing: that is the excluding fixture. **Mutate the audience check to permit and confirm red.**
+2. **Narrow side:** the server NEVER initiates a purge for an entity a device may never have held —
+   that is P23 and it is not reopened. So the purge is **CLIENT-PRESENTED**: the client names the ids
+   it holds (on catch-up or a reconcile door) and the server answers only about ids the client named,
+   "no longer yours" for those outside the current audience. **Excluding fixtures: the answer must
+   never contain an id the client did not present (mutate to enumerate → red), and presenting an id
+   never held yields nothing beyond "not yours"** — the same register as `{kind:'restricted', id}`.
+   This resolves "cannot distinguish lost from never-had" in the SAFE direction: **the client's own
+   holding is the relationship.**
+3. **The 12.274 probe becomes the GREEN case** (`replicasEqual` true after narrow → other → widen).
+   6.104's residual flips 🚫 → ✅ **only when a narrowed ticket is actually removed by the
+   client-presented path** — never by an assertion bolted onto a scenario that is still divergent.
+4. **P30 holds.** Closure 1's snapshot invalidation and P36's provenance block are untouched. **If
+   either half needs a NEW visibility rule rather than an application of `canSee` /
+   `resolveEffectiveRole`, ESCALATE BEFORE BUILDING.**
+
+**Collision to manage:** Lane A's closure 4 (P36) touches `sync-routes.ts`'s bootstrap payload; this
+lane touches the CATCH-UP path. **Announce the file list to Lane A (`gisik-nokma-exec-06`) before
+starting; whoever lands second rebases.**
 
 ## ⚠️ THE FOUR THINGS A RESTART MUST KNOW BEFORE TOUCHING T14
 

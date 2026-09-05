@@ -974,10 +974,10 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 
 ## 12. Offline sync & the apps
 
-*(Plan 10, Tasks 4, 5, 6, 7, 9, 10, 11, 12 and 13 — the LIFTED §11 closer, the contested-claims read path, the
+*(Plan 10, Tasks 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 and 15 — the LIFTED §11 closer, the contested-claims read path, the
 snapshot writer, the replica bootstrap, the sync ingress, the local replica, the outbox with its
-local pre-check, the sync engine with its HTTP/WS transport, the replica `DataSource`, and app-core's offline/sync UX surfaces. Plan 10's own catalogue task (Task 18) owns §12's full body and will replace this
-scope note; what follows is what those NINE tasks added — 4, 5, 6, 7, 9, 10, 11, 12 and 13, the enumeration at the head of this banner — and nothing else. **It said "those six tasks" inside the change set that rewrote the head enumeration to seven**, which is the same head-and-tail split the closing paragraph of this banner already describes; the number is spelled against the list now rather than beside it. **§8 — Plan 6's web client —
+local pre-check, the sync engine with its HTTP/WS transport, the replica `DataSource`, app-core's offline/sync UX surfaces, the dual-client harness rig, and the six scripted divergence scenarios. Plan 10's own catalogue task (Task 18) owns §12's full body and will replace this
+scope note; what follows is what those ELEVEN tasks added — 4, 5, 6, 7, 9, 10, 11, 12, 13, 14 and 15, the enumeration at the head of this banner — and nothing else. **It said "those six tasks" inside the change set that rewrote the head enumeration to seven**, which is the same head-and-tail split the closing paragraph of this banner already describes; the number is spelled against the list now rather than beside it. **§8 — Plan 6's web client —
 stays absent**, because the coordination doc assigns `Features.md` sections one per implementation plan
 and numbering is claimed from that table, never taken next-free. That clause used to read "§8/§10/§11
 stay absent" and was still saying it here after Plan 8 wrote §10 and Plan 9 wrote §11: both are in this
@@ -985,8 +985,11 @@ file, BELOW this section (`grep -n '^## ' Features.md` — §10 at the workflow 
 and notifications, both after §12). The reservation table governs a section's NUMBER, not the order
 sections appear in the file, and §12 landing above §10 and §11 is that rule working rather than
 failing. Still absent rather than missing from this section:
-the dual-client harness and both app
-shells — Plan 10 Tasks 14–17. **Task 13's offline/sync UX came out of that list in the change set that
+both app shells — Plan 10 Tasks 16–17. **Task 15's scenarios came off that list in the change set that
+landed them**, and the range moved from 15–17 to 16–17 in the same edit. **Task 14's harness came off that list in the change set that landed it**,
+and the range moved from 14–17 to 15–17 in the same edit — the enumeration above, this clause and the
+`test-cases/12` header were rewritten together, which is what the closing paragraph of this banner
+exists to enforce and what this PR was HELD for not doing the first time. **Task 13's offline/sync UX came out of that list in the change set that
 landed it**, and the range moved from 13–17 to 14–17 in the same edit, which is the discipline this
 banner's closing paragraph exists to enforce. **Task 11's sync engine came out of that list in the change set that
 landed it, and Task 12's replica `DataSource` came out of it the same way** — which is the discipline
@@ -1387,6 +1390,26 @@ survived a whole task.)*
   staying in `createSyncEngine`, unassigned. Task 13's Files block contains no ticket list, no `ListRow`
   renderer and no error surface — those annotations named the next task touching app-core UX by NUMBER,
   not by content, which is the failure mode P34 exists to stop repeating.
+- ⚙️ **The dual-client harness rig** — two sync-client replicas on in-memory SQLite driven against the
+  REAL ingest service, the REAL sync service, `visibleEventsFor` and real Postgres, with no sockets and
+  no HTTP: the spec's named testing discipline (§7) gets its instrument. It proves itself before any
+  scenario trusts it, and the property it exists to give Task 15 is asserted first — full `TicketState`
+  equality between a replica's reducer fold and the server's own `rowToTicketState`, so server and
+  clients can never quietly disagree. `apps/server/test/dual-client/rig.ts`
+- ⚙️ **The harness's online stand-in uses the GATED ingest door** — `ingestClientBatch(events, userId)`,
+  the same one `POST /v1/events` calls, never the internal `ingestBatch` that passes `door = null` and
+  skips `checkPermission` entirely. A harness whose "online user" skipped the gate would let a scenario
+  assert a permission outcome the product does not have; the internal door remains correct for the SEED
+  and is labelled as such where it is used. Pinned by a forged envelope-origin the internal door would
+  have committed.
+- ⚙️ **Its bootstrap is the server's, not a copy of it** — the backfill types are imported from
+  `BOOTSTRAP_BACKFILL_TYPES` rather than restated, because a hand-copied list was missing
+  `visibility.set` and would have had the harness proving replicas against a bootstrap the server never
+  sends: the replica would hold a different AUDIENCE for a ticket than the server does.
+- ⚙️ **`goOnline()` fails loudly rather than quietly** — a claim still queued after the flush throws,
+  carrying the outbox's own `last_error`. The engine answers a transport throw by backing off and
+  returning normally, which in a harness with no network is never transient; without this a scenario
+  would assert an outcome that never happened and blame the product.
 
 - ⚙️ **`apps/desktop` (Task 16) — a Tauri 2 + Vite React shell over the replica `DataSource`, not a verified running app** — `wrapTauriDatabase`/`createTauriSqlStorage` implement `SyncStorage` over `@tauri-apps/plugin-sql`, run through the SAME behavioural contract every adapter answers to: `storageConformanceTests` from `@gisik-nokma/sync-client/testing`, backed here by a real in-memory `better-sqlite3` database standing in for the plugin's own connection rather than another `vi.fn()` mock. `app.tsx` wires `createReplica`/`createOutbox`/`createSyncEngine`/`createHttpTransport` (`@gisik-nokma/sync-client`) and `createReplicaDataSource` (`@gisik-nokma/app-core`, not `@gisik-nokma/sync-client` as the plan's own snippet has it — Ruling P30's package) to the OS's `online`/`offline` events and renders sync status plus a `listTicketSummaries` list; `SyncStatusBar`/`ContestBanner` do not exist in `@gisik-nokma/app-core` yet (grepped, not assumed), so the strip is inline markup rather than the named component the plan's own text flags as an assumption. **The gate for this task is `cargo check` + `tsc` + `vitest` on the storage adapter — no simulator, no app launch, no `tauri build` claim** — `tauri::generate_context!()` additionally required an `icons/icon.png` the plan's file list omits (verified against `tauri-codegen`'s own source); a placeholder ships, real artwork does not. All three checks were re-run independently of the implementer's own report. `apps/desktop/src/app.tsx`, `apps/desktop/src/storage/tauri-sql-storage.ts`
 
@@ -1397,6 +1420,37 @@ survived a whole task.)*
 - ⚙️ **The editor rides Plan 7's REAL webview bridge, not the plan text's assumed one** — `packages/editor/src/webview/bridge.ts` ships a versioned `{bridge, kind}` protocol and a single-file HTML bundle (`build:webview` → `dist-webview/index.html`, vite-plugin-singlefile) that predates this task's own planning text, which had assumed an unbuilt `getEditorWebviewHtml()` export and a bare `{type: 'editor-ready'|'set-doc'|'doc-changed'}` shape. `apps/mobile` speaks the real protocol; `editor-web-view.tsx` uses `WebView.postMessage`, which `entry.tsx` already listens for on both `window` and `document`, rather than hand-built `injectJavaScript` scripts. **The host-side validator for editor→host messages does not exist anywhere in the repo** (`packages/editor` exports only the host→editor direction, `parseHostMessage`) — `editor-bridge.ts`'s `parseEditorMessage` is the first one, scoped to this app rather than added to the shared package, because at write time Task 16 (Tauri) was landing in parallel and might have needed the identical function — two lanes editing the same shared file concurrently was judged the larger risk. **Task 16 landed without an editor webview integration at all** (checked: no `editor`/`bridge` file anywhere under `apps/desktop`), so the duplication did not happen this round; the concern stands for whenever Tauri's shell does add one. The bundled HTML itself is baked into a checked-in generated constant (`scripts/generate-editor-html.mjs` → `src/editor/editor-html.generated.ts`) since Metro has no runtime filesystem access to read it from `packages/editor` directly; **it goes stale the moment `packages/editor`'s webview content changes, and nothing in the gate checks its freshness** — regeneration is a manual, documented step. `apps/mobile/src/editor/`
 - ✅ **Contest resolution and sync status use the real app-core helpers, wired after Task 13 landed** — `board-screen.tsx` renders `syncStatusLabel` (the same wording the web `SyncStatusBar` shows, minus its `<div>` markup, which RN cannot mount); `ticket-screen.tsx`'s contest banner calls `resolveContest` for all three resolutions (redo, convert-to-comment, discard), rendered through `renderContestedClaimText` exactly as the web `ContestBanner` does. `resolveContest` deliberately does not catch `OfflineAcceptError` (answering `ok: true` for a queued claim would show "the server accepted your discard" for a discard the server has never seen) — the screen awaits/catches it explicitly, the same discipline as its comment-post path. "Redo legally" resubmits the identical claim under a fresh envelope rather than offering inline editing first — `ContestBanner`'s own docblock pushes building the replacement envelope to the host precisely because what "redo" means depends on the claim's type, and a full per-event-type redo editor is out of this task's scope. `apps/mobile/src/screens/`
 - ⚙️ **What Task 17 does NOT offer, named rather than silently absent** — no push transport on the server (`/v1/push/registrations` does not exist yet — `registerPushToken` exercises its real 404 path, not a hypothetical one). No attachment upload flow (`onRequestUpload` is wired but nothing answers it). No inline editing before a contest redo (see above). No device or simulator run of any kind. `apps/mobile/src/screens/`
+- ✅ **Six scripted divergences, asserted exactly** — two replicas diverge offline, sync, and the
+  outcome including every contested claim is checked against the final ledger, the SERVER's own
+  projection, both replicas and `proj_contested`: a concurrent field race (later wins, earlier survives
+  in history, nothing contested), a stale `restrict-to`, a workflow republished out from under a queued
+  transition, a narrowed visibility, the offline reopen pair, and a retried batch. This is the spec's
+  §7 discipline executed rather than described. `apps/server/test/dual-client/scenarios.test.ts`
+- ⚙️ **Client and server refuse in the SAME WORDS** — the reopen scenario asserts that the sentence the
+  local pre-check produced for a terminal parent is `===` the sentence the server's contest carries. A
+  device that explained a refusal differently from the server would be two products.
+- ⚙️ **Task 15's S4 predates Ruling P23 and its premise was false** — the plan expected a `purge` on
+  `visibility.set`, and the per-event purge walk was DELETED rather than narrowed. The scenario is
+  written against the SHIPPED rule: the claim contests, and nothing is delivered to the narrowed-out
+  replica. The stale copy that remains is the accepted under-purge residual of case 6.104 — **recorded,
+  and deliberately not pinned by a test**, because 6.104's owner is Plan 10 and an assertion would be a
+  test that closing the gap must break.
+- ⚙️ **A re-widened ticket does not come back if the client read anything else meanwhile** — found by
+  the Task 15 review and reproduced independently. The sync cursor is the highest sequence DELIVERED,
+  so any visible event committed while a ticket is narrowed carries the cursor past the narrowing;
+  re-widening then delivers only itself and the earlier rows are never re-sent. There is no
+  backfill-on-grant in the product. Measured: one unrelated commit between narrowing and re-widening
+  leaves the client holding two events where the server holds four, **permanently — no purge, no
+  backfill, no resync path.** It is the sibling of case 6.104 on the other side of one gap: 6.104 is
+  the stale copy nobody takes away, this is the fresh copy nobody gives back. Recorded as case 12.274,
+  owner Plan 10, no task. *The scenario that appeared to prove convergence only did so because its
+  workspace was quiet in between; that is now said at the scenario and in the case.*
+- ⚙️ **A contest filed against a ticket that never came to exist reaches nobody** — surfaced by the
+  reopen scenario and asserted as product behaviour: `canSee` is false for a ticket with no
+  `proj_visibility` row, so the child's `claim.contested` is streamed to no one. The claimant's only
+  record of it is the outbox stub. *What is permanent is the non-delivery, not any cursor lag — an
+  earlier version of this bullet said the cursors stay one behind the head for good, and the next
+  visible event moves them past.*
 
 ## 10. Workflow builder & ticket types
 

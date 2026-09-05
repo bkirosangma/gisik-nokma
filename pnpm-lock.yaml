@@ -170,6 +170,12 @@ importers:
         specifier: ^3.25.0
         version: 3.25.76
     devDependencies:
+      '@gisik-nokma/app-core':
+        specifier: workspace:*
+        version: link:../../packages/app-core
+      '@gisik-nokma/sync-client':
+        specifier: workspace:*
+        version: link:../../packages/sync-client
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.1

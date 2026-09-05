@@ -1,0 +1,323 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { newSubmittedEvent, newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
+import { PERMISSION_ROLE_RULE, SERVER_ORIGIN_REASON } from '../../src/permissions/check-permission.js';
+import { readStreamSeq } from '../../src/sync/stream-seq.js';
+import { createHarness, HARNESS_WORKFLOW_ID, TASK_TYPE_ID, USER_A, USER_ADMIN, USER_B, type Harness } from './rig.js';
+
+/**
+ * The rig proving itself before Task 15's scenarios trust it (Plan 10 Task 14).
+ *
+ * Three things a scenario will lean on, each pinned with the control that
+ * keeps it from passing for an unrelated reason:
+ *
+ * 1. A claim made offline reaches the server through `goOnline()`, reaches the
+ *    other client through `syncDown()`, and every side holds it EXACTLY ONCE
+ *    after any number of further syncs. "Offline" is witnessed at the LEDGER,
+ *    not at client B — B has not synced, so B's silence would prove nothing.
+ * 2. `ingestInteractive` is the GATED door. A forged envelope-origin is refused
+ *    with the gate's own rule and reason; the same claim wearing honest
+ *    provenance commits through the same call. The internal door would have
+ *    committed both, so this is the case that turns red if someone "fixes"
+ *    `ingestClientBatch` back into `ingestBatch`.
+ * 3. A client created after the fact starts from the server's cut: the ticket
+ *    is there without a sync-down, and its cursor is the stream head, so the
+ *    first `syncDown()` has nothing to deliver.
+ */
+
+let h: Harness;
+
+beforeAll(async () => {
+  h = await createHarness();
+});
+
+afterAll(async () => {
+  await h.drop();
+});
+
+function createdBy(
+  actorId: string,
+  ticketId: string,
+  origin: SubmittedEvent['origin'],
+  title: string,
+): SubmittedEvent {
+  return newSubmittedEvent({
+    workspaceId: h.workspaceId,
+    entity: { kind: 'ticket', id: ticketId },
+    type: 'ticket.created',
+    payload: { typeId: TASK_TYPE_ID, projectId: h.projectId, parentId: null, title },
+    actorId,
+    origin,
+  });
+}
+
+describe('the rig', () => {
+  it('12.260 — a claim from A reaches B through sync exactly once, and syncing again changes nothing', async () => {
+    const a = await h.client(USER_A);
+    const b = await h.client(USER_B);
+    const ticketId = newUlid();
+    const created = createdBy(USER_A, ticketId, 'desktop', 'Crosses the wire');
+
+    expect(await a.submit(created)).toEqual({ status: 'pending', eventId: created.id });
+    // Offline means NOTHING reached the server. The ledger is the witness.
+    expect(await h.ledger(ticketId)).toEqual([]);
+    expect(await h.projTicket(ticketId)).toBeNull();
+    // ...and A holds it only as a queued claim, never as settled state.
+    expect(await a.outbox.queuedCount(h.workspaceId)).toBe(1);
+    expect(await a.outbox.pendingFor(ticketId)).toMatchObject({ pendingEventIds: [created.id] });
+    expect(await a.replica.getTicket(ticketId)).toBeNull();
+    expect(await b.ds.query.getTicket(h.workspaceId, ticketId)).toBeNull();
+
+    await a.goOnline();
+
+    // The server holds it once, committed by A, at per-entity seq 1.
+    expect(await h.ledger(ticketId)).toEqual([{ id: created.id, type: 'ticket.created', seq: 1, actorId: USER_A }]);
+    expect((await h.projTicket(ticketId))?.stateId).toBe('todo');
+    // A's outbox is empty and A's replica now holds the claim as fact — folded
+    // through `applyResult`, the flush door, before any sync-down echoed it.
+    expect(await a.outbox.queuedCount(h.workspaceId)).toBe(0);
+    expect(await a.outbox.pendingFor(ticketId)).toBeNull();
+    expect((await a.replica.getTicket(ticketId))?.confirmed?.stateId).toBe('todo');
+    // Nothing pushes: B does not have it until B asks.
+    expect(await b.ds.query.getTicket(h.workspaceId, ticketId)).toBeNull();
+
+    await b.syncDown();
+
+    const onA = await a.ds.query.getTicket(h.workspaceId, ticketId);
+    const onB = await b.ds.query.getTicket(h.workspaceId, ticketId);
+    expect(onA?.ticket.stateId).toBe('todo');
+    expect(onB?.ticket.stateId).toBe('todo');
+    // Replica ≡ replica, and both ≡ the SERVER's own read model. The second is
+    // the property scenarios exist to assert, so the rig asserts it first.
+    expect(onB?.ticket).toEqual(onA?.ticket);
+    expect(onB?.ticket).toEqual(await h.projTicket(ticketId));
+
+    // Idempotent all the way: another sync-down on either side moves no
+    // cursor and duplicates no event. A's copy arrived through TWO doors —
+    // the flush echo and the stream — and is still held once.
+    const cursorA = await a.replica.getCursor(h.workspaceId);
+    const cursorB = await b.replica.getCursor(h.workspaceId);
+    expect(cursorB).toBe(await readStreamSeq(h.pool, h.workspaceId));
+    await a.syncDown();
+    await b.syncDown();
+    expect(await a.replica.getCursor(h.workspaceId)).toBe(cursorA);
+    expect(await b.replica.getCursor(h.workspaceId)).toBe(cursorB);
+    expect(await a.replica.listEntityEvents(ticketId)).toHaveLength(1);
+    expect(await b.replica.listEntityEvents(ticketId)).toHaveLength(1);
+    expect(await h.ledger(ticketId)).toHaveLength(1);
+  });
+
+  it('12.261 — ingestInteractive is the GATED door: forged server provenance is refused, the honest claim commits', async () => {
+    const ticketId = newUlid();
+
+    // `checkRolePermission` refuses envelope-origin `'server'` from a client.
+    // The internal door has no gate and would commit this.
+    const forged = createdBy(USER_A, ticketId, 'server', 'Wears the server provenance');
+    const [refusal] = await h.ingestInteractive(USER_A, [forged]);
+    expect(refusal).toEqual({
+      status: 'refused',
+      eventId: forged.id,
+      rule: PERMISSION_ROLE_RULE,
+      reason: SERVER_ORIGIN_REASON,
+    });
+    expect(await h.ledger(ticketId)).toEqual([]);
+
+    // Control, same door, same call: honest provenance commits — so the
+    // refusal above was the gate, not a broken fixture.
+    const honest = createdBy(USER_A, ticketId, 'web', 'Wears its own provenance');
+    const [commit] = await h.ingestInteractive(USER_A, [honest]);
+    expect(commit).toMatchObject({ status: 'committed', eventId: honest.id, seq: 1 });
+    expect(await h.ledger(ticketId)).toEqual([{ id: honest.id, type: 'ticket.created', seq: 1, actorId: USER_A }]);
+  });
+
+  /**
+   * THE BACKFILL LIST IS THE SERVER'S, AND UNTIL THIS CASE NOTHING PROVED IT.
+   *
+   * `bootstrapFor` sends a ticket's snapshot plus every event ABOVE the
+   * snapshot's seq, PLUS every `BOOTSTRAP_BACKFILL_TYPES` event regardless of
+   * position — because those are the ticket-entity types the reducer never
+   * folds, so a snapshot never carries them. The rig imports that constant from
+   * `sync-routes.ts` rather than restating it, and the plan text's hand-copied
+   * list was missing `visibility.set`.
+   *
+   * MEASURED: replacing the import with the plan's four-entry literal left all
+   * three cases above GREEN. The mutation ran — the edit was confirmed present
+   * before the run — so that was an unconstrained path, not a mutation that
+   * never fired. This case constrains it: a `visibility.set` filed BELOW the
+   * snapshot line is invisible to a fresh client unless the backfill carries
+   * its type, and a bootstrap that quietly drops it hands the replica a
+   * different audience for the ticket than the server has.
+   *
+   * The snapshot pass runs BETWEEN the visibility claim and the new client, so
+   * the event is genuinely below the snapshot's seq — without that ordering the
+   * event would arrive as an ordinary above-the-line event and the case would
+   * pass for a reason that has nothing to do with the backfill.
+   */
+  it('12.262 — a visibility.set below the snapshot line still reaches a fresh client — the backfill is the server\'s list', async () => {
+    const ticketId = newUlid();
+    const born = createdBy(USER_A, ticketId, 'web', 'Audience changes below the snapshot');
+    const [commit] = await h.ingestInteractive(USER_A, [born]);
+    expect(commit).toMatchObject({ status: 'committed' });
+
+    const scoped = newSubmittedEvent({
+      workspaceId: h.workspaceId,
+      entity: { kind: 'ticket', id: ticketId },
+      type: 'visibility.set',
+      payload: { ticketId, mode: 'project' },
+      actorId: USER_A,
+      origin: 'web',
+    });
+    const [set] = await h.ingestInteractive(USER_A, [scoped]);
+    expect(set).toMatchObject({ status: 'committed', eventId: scoped.id });
+
+    // Snapshot AFTER both, so the visibility claim sits below the line.
+    await h.snapshotPass();
+
+    const fresh = await h.client(USER_B);
+    const events = await fresh.replica.listEntityEvents(ticketId);
+    const types = events.map((e) => e.type);
+    expect(types, 'the visibility claim must survive the snapshot line').toContain('visibility.set');
+    expect(events.find((e) => e.type === 'visibility.set')?.id).toBe(scoped.id);
+    // Control: the snapshot really did cover this ticket, so "below the line"
+    // is a fact about this run and not an assumption. Without it, a snapshot
+    // pass that skipped the ticket would make this case prove nothing.
+    expect(types).not.toContain('ticket.created');
+  });
+
+  /**
+   * I1 — goOnline() MUST NOT RESOLVE WITH A CLAIM STILL QUEUED.
+   *
+   * `engine.flush()` answers a `transport.sync` throw with
+   * `outbox.recordFailure` and returns NORMALLY: the row keeps status
+   * 'queued', its `next_attempt_at` moves out by the backoff,
+   * `lastApplyFailure()` stays null and `failedItems` stays EMPTY — measured,
+   * and `recordFailure` deliberately does not mark 'failed' or every retryable
+   * claim would strand forever. So the old `goOnline()` resolved looking
+   * successful with the claim never sent, and a scenario asserting one contest
+   * would have seen zero and blamed the product.
+   *
+   * This drives that state directly — enqueue, then record a failure, then
+   * `goOnline()` — because there is no way to make the in-process sync service
+   * throw on demand without mutating it. The control is the SECOND half: after
+   * the failure is cleared the same claim goes through, so the throw above is
+   * the guard firing and not `goOnline` being broken for everything.
+   */
+  it('12.263 — goOnline() throws rather than resolving with a claim the sync door never accepted', async () => {
+    const c = await h.client(USER_B);
+    const ticketId = newUlid();
+    const claim = createdBy(USER_B, ticketId, 'mobile', 'Never reaches the door');
+
+    // `outbox.enqueue` DIRECTLY, not `submit`. `submit` goes through
+    // `ds.ingest`, which fires `void engine.flush()`; that flush parks on the
+    // offline gate having ALREADY read its batch, so a `recordFailure` landing
+    // afterwards never reaches it and `goOnline()` sends the claim perfectly
+    // legitimately. Measured: the first version of this case did exactly that
+    // and failed with "promise resolved undefined instead of rejecting" — the
+    // rig was right and the test was wrong. Enqueueing directly leaves no
+    // flush in flight, so the backoff is the state `goOnline` actually meets.
+    await c.outbox.enqueue(claim);
+    await c.outbox.recordFailure([claim.id], 'planted: the door refused to answer');
+    expect(await c.outbox.queuedCount(h.workspaceId)).toBe(1);
+
+    const err = await c.goOnline().then(
+      () => null,
+      (e: unknown) => e as Error,
+    );
+    expect(err, 'goOnline() resolved with a claim still queued').not.toBeNull();
+    expect(err?.message).toMatch(/left 1 claim\(s\) queued after the flush/);
+    // the reason is CARRIED, not swallowed — the whole point of the finding
+    expect(err?.message).toMatch(/planted: the door refused to answer/);
+    expect(await h.ledger(ticketId)).toEqual([]);
+
+    // CONTROL: resolve the row and the very same `goOnline()` succeeds. Without
+    // this, a goOnline() broken for every input would satisfy everything above.
+    await c.outbox.applyResult(claim.id, {
+      status: 'refused',
+      eventId: claim.id,
+      rule: 'planted',
+      reason: 'discarded by the test',
+    });
+    expect(await c.outbox.queuedCount(h.workspaceId)).toBe(0);
+    await c.goOnline();
+  });
+
+  /**
+   * I2 — a workspace ADMIN claim must be expressible at the GATED door.
+   *
+   * `ADMIN_ONLY_TYPES` refuses `workflow.defined` and kin from every non-admin,
+   * and both scenario users are members. Task 15's S3 republishes a workflow
+   * while a client is offline; without an owner identity its author reaches for
+   * the ungated internal door and silently stops testing the product. The
+   * refusal half is the control: the same claim from a MEMBER is refused, so
+   * this proves the gate is live and that the owner passes it — not that the
+   * gate is absent.
+   */
+  it('12.264 — an owner can publish a workflow through the gated door, and a member cannot', async () => {
+    const v2 = (actorId: string) =>
+      newSubmittedEvent({
+        workspaceId: h.workspaceId,
+        entity: { kind: 'workflow', id: HARNESS_WORKFLOW_ID },
+        type: 'workflow.defined',
+        payload: {
+          id: HARNESS_WORKFLOW_ID,
+          version: 2,
+          name: 'Harness v2',
+          initialStateId: 'todo',
+          states: [
+            { id: 'todo', name: 'To do', category: 'open' },
+            { id: 'done', name: 'Done', category: 'terminal' },
+          ],
+          transitions: [{ from: '*', to: 'done', rules: [] }],
+          stateMapping: { review: 'todo' },
+        },
+        actorId,
+        origin: 'web',
+      });
+
+    const [refused] = await h.ingestInteractive(USER_A, [v2(USER_A)]);
+    expect(refused).toMatchObject({ status: 'refused' });
+
+    const [committed] = await h.ingestInteractive(USER_ADMIN, [v2(USER_ADMIN)]);
+    expect(committed).toMatchObject({ status: 'committed' });
+  });
+
+  /**
+   * I3 — the same batch, twice, through the REAL sync door.
+   *
+   * Task 15's S6 requires identical results, an unchanged ledger and exactly
+   * one contest when an outbox batch lands twice. `engine.flush()` cannot
+   * express it: it drains only what is queued, and after the first flush the
+   * rows are gone. `Harness.sync` is the object `POST /v1/sync` itself
+   * delegates to, so a duplicate-suppression bug living in per-instance state
+   * is visible here where a second service instance would have hidden it.
+   */
+  it('12.265 — the same batch sent twice through the real sync door is idempotent', async () => {
+    const ticketId = newUlid();
+    const claim = createdBy(USER_B, ticketId, 'mobile', 'Sent twice');
+
+    const first = await h.sync(USER_B, [claim]);
+    const second = await h.sync(USER_B, [claim]);
+    expect(first).toHaveLength(1);
+    expect(second).toEqual(first);
+    expect(first[0]).toMatchObject({ status: 'committed', eventId: claim.id });
+    // One row, not two — and the ledger is the witness, not the answer shape.
+    expect(await h.ledger(ticketId)).toHaveLength(1);
+  });
+
+  it('12.266 — a client created after the fact bootstraps from the server cut: ticket present, cursor at the head', async () => {
+    const ticketId = newUlid();
+    const born = createdBy(USER_B, ticketId, 'mobile', 'Born before the client');
+    const [commit] = await h.ingestInteractive(USER_B, [born]);
+    expect(commit).toMatchObject({ status: 'committed' });
+
+    const late = await h.client(USER_A);
+    // No sync-down has run: this came through `loadBootstrap` or not at all.
+    const onLate = await late.ds.query.getTicket(h.workspaceId, ticketId);
+    expect(onLate?.ticket).toEqual(await h.projTicket(ticketId));
+    const head = await readStreamSeq(h.pool, h.workspaceId);
+    expect(await late.replica.getCursor(h.workspaceId)).toBe(head);
+    // ...so the first sync-down has nothing to deliver and moves nothing.
+    await late.syncDown();
+    expect(await late.replica.getCursor(h.workspaceId)).toBe(head);
+    expect(await late.replica.listEntityEvents(ticketId)).toHaveLength(1);
+  });
+});
