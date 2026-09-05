@@ -1385,7 +1385,13 @@ survived a whole task.)*
   `packages/app-core/src/sync/sync-status-bar.tsx`
 - ⚙️ **THREE obligations pointed at Task 13 from code Task 13's own plan text does not reach, and
   Ruling P34 re-assigned all three** — `OFFLINE_BORN_ABSENCE`'s offline union list and a renderer for
-  `ListRow.pending` are app-core view/DataSource concerns and went to **Lane A as closure 2b**; the
+  `ListRow.pending` are app-core view/DataSource concerns and went to **Lane A as closure 2b** — **both
+  are now BUILT**: `listProjectWithOfflineBorn` unions the settled list with the offline-born tickets and
+  tags each entry with its kind (cases 12.240–12.242), and the list badges a queued claim in the board's
+  own words (case 3.149). The union keeps the two kinds APART rather than flattening them, because an
+  offline-born ticket has no `serverTime` any server assigned — **the opposite answer to ruling P36 on the
+  same surface, and the distinction is why both are right**: P36 copies an instant a ledger row really
+  recorded, this one refuses to invent an instant nothing recorded. The
   per-`StreamErrorCode` deferral split, its SURFACE half landing here (above) and its POLICY half
   staying in `createSyncEngine`, unassigned. Task 13's Files block contains no ticket list, no `ListRow`
   renderer and no error surface — those annotations named the next task touching app-core UX by NUMBER,

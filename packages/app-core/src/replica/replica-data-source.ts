@@ -140,6 +140,14 @@ export class OfflineAcceptError extends Error {
  */
 export type TicketSummary = {
   ticketId: string;
+  /**
+   * Present so a project-scoped surface can filter these without a second read.
+   * It was ABSENT while every consumer was workspace-scoped, and `summarise`
+   * always had it — the value comes off `TicketState.projectId`, which the
+   * overlay fills for an offline-born ticket from the creating claim itself.
+   * An omission rather than a fact, which is why adding it invents nothing.
+   */
+  projectId: string;
   title: string;
   stateId: string;
   stateCategory: StateCategory;
@@ -168,9 +176,46 @@ export type TicketSummary = {
  * compile-time fact (12.172); "runs unchanged" is a claim about behaviour and
  * it is true of reads alone.
  */
+/**
+ * ONE PROJECT LIST WITH BOTH KINDS IN IT, and the two kinds stay DISTINGUISHABLE
+ * rather than being flattened into one row shape.
+ *
+ * A settled ticket is a `ListRow`. An offline-born one CANNOT be: `ListRow`
+ * requires a `stateProvenance` and `ClaimProvenance` requires a `serverTime`,
+ * and a ticket that exists only as a queued claim has none — `SubmittedEvent`
+ * omits `serverTime` and `seq` by construction, because they are the server's to
+ * assign and nothing has assigned them.
+ *
+ * **THIS IS THE OPPOSITE ANSWER TO RULING P36, on the same surface, and the
+ * distinction is the whole reason both can be right.** P36 widens the snapshot
+ * to carry a state claim's `serverTime` because *the instant exists* — the
+ * ledger row at that seq recorded one and the writer merely dropped it, so
+ * copying it is recovery and not invention. Here NO row anywhere recorded an
+ * instant: the claim has not reached a server. So the offline-born ticket is
+ * rendered AS A CLAIM rather than as a row missing a field, and the device clock
+ * `buildPendingOverlay` substitutes inside its own fold is not laundered into a
+ * `stateProvenance` that every consumer reads as the server's answer. Reading
+ * P36 as licence to fill this one in would reintroduce precisely the fabrication
+ * P36 refused in writing.
+ */
+export type OfflineListEntry =
+  | { kind: 'settled'; row: ListRow }
+  | { kind: 'offline-born'; summary: TicketSummary };
+
 export type ReplicaOnlyQuery = {
   /** Confirmed tickets plus offline-born ones, every one badged. */
   listTicketSummaries(workspaceId: string): Promise<TicketSummary[]>;
+  /**
+   * The settled list PLUS the tickets born on this device, in one answer, each
+   * tagged with which kind it is. `getTickets` alone omits the second kind
+   * SILENTLY (`OFFLINE_BORN_ABSENCE`), which on a plane is the ticket you just
+   * made vanishing from the only list you can see.
+   */
+  listProjectWithOfflineBorn(
+    projectId: string,
+    filter: FilterSpec,
+    grouping: Grouping,
+  ): Promise<{ projectId: string; entries: OfflineListEntry[] }>;
   /** Settled state and the outbox overlay side by side — never merged. */
   getTicketWithPending(
     ticketId: string,
@@ -514,6 +559,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     const pending = await outbox.pendingFor(state.id);
     return {
       ticketId: state.id,
+      projectId: state.projectId,
       title: titleOf(state),
       stateId: state.stateId,
       stateCategory: state.stateCategory,
@@ -861,6 +907,30 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     },
 
     listTicketSummaries,
+
+    async listProjectWithOfflineBorn(projectId, filter, grouping) {
+      const settled = await query.getTickets(projectId, filter, grouping);
+      const entries: OfflineListEntry[] = settled.rows.map((row) => ({ kind: 'settled', row }));
+
+      // DE-DUPLICATED against the settled rows by ticket id, and not for
+      // tidiness: a ticket created offline and then CONFIRMED appears in both
+      // reads for as long as its claim sits in the outbox — `pending` stays true
+      // on the summary while `getTickets` has already begun answering it.
+      // Listing it twice would show one ticket as two.
+      const alreadyListed = new Set(settled.rows.map((row) => row.ticketId));
+
+      // `ownWorkspaceId`, not an argument: this door is project-scoped and a
+      // replica holds exactly one workspace, so the project id IS the scope. The
+      // summaries are FILTERED by it rather than trusted — that is what
+      // `projectId` is on `TicketSummary` for, and a workspace-wide list leaking
+      // into a project view is the failure the filter prevents.
+      for (const summary of await listTicketSummaries(ownWorkspaceId)) {
+        if (summary.projectId !== projectId) continue;
+        if (alreadyListed.has(summary.ticketId)) continue;
+        entries.push({ kind: 'offline-born', summary });
+      }
+      return { projectId, entries };
+    },
 
     async getTicketWithPending(ticketId) {
       const confirmed = await replica.getTicket(ticketId);
