@@ -1,7 +1,12 @@
 import type { LedgerEvent, ServerStreamFrame, SubmittedEvent } from '@gisik-nokma/domain';
 import type { BootstrapResponse } from '../replica/replica.js';
 import type { SyncEventResult } from '../outbox/outbox.js';
-import type { StreamHandle, StreamHandlers, SyncTransport } from '../engine/sync-engine.js';
+import type {
+  ReconcileAnswer,
+  StreamHandle,
+  StreamHandlers,
+  SyncTransport,
+} from '../engine/sync-engine.js';
 
 /**
  * The subset of the DOM `WebSocket` this transport needs — injectable for tests
@@ -136,6 +141,20 @@ export function createHttpTransport(opts: {
       });
       if (!res.ok) throw new Error(`sync failed: ${res.status}`);
       return ((await res.json()) as { results: SyncEventResult[] }).results;
+    },
+
+    async reconcile(workspaceId: string, heldIds: string[]): Promise<ReconcileAnswer> {
+      const res = await doFetch(`${opts.baseUrl}/v1/sync/reconcile`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ workspaceId, heldIds }),
+      });
+      // Same shape as the two doors above: a non-2xx is a throw, never a silent
+      // empty answer. An empty `restricted` means "everything you named is still
+      // yours", and a failed request that returned one would be a device quietly
+      // concluding it had nothing to give back.
+      if (!res.ok) throw new Error(`reconcile failed: ${res.status}`);
+      return (await res.json()) as ReconcileAnswer;
     },
 
     openStream(workspaceId: string, afterSeq: number, handlers: StreamHandlers): StreamHandle {

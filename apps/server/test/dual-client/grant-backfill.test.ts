@@ -187,4 +187,68 @@ describe('closure 5 — the copy nobody gives back, against two replicas', () =>
     // Still agrees with the server after the double delivery.
     expect(await h.projTicket(ticketId)).toEqual((await b.replica.getTicket(ticketId))?.confirmed);
   });
+
+  it('12.289 6.104’s residual actually closes: the client presents what it holds and the narrowed ticket goes — while the claimant’s own contest survives', async () => {
+    const { ticketId } = await seedSharedTicket('Un-shared later');
+    const { ticketId: stillShared } = await seedSharedTicket('Never un-shared');
+
+    // B edits offline, then loses the ticket before the claim goes up. This is
+    // S4's shape, and it is here because the purge must not take the claimant's
+    // own record with it.
+    const edit = ticketEvent(USER_B, ticketId, 'ticket.field_set', {
+      fieldId: 'title',
+      value: 'B edited this offline',
+    });
+    expect(await b.submit(edit)).toEqual({ status: 'pending', eventId: edit.id });
+    const narrow = ticketEvent(USER_A, ticketId, 'visibility.set', {
+      ticketId,
+      mode: 'explicit',
+      userIds: [USER_A],
+    });
+    await commit(USER_A, narrow);
+    await b.goOnline();
+
+    // THE RESIDUAL, witnessed before it is closed. B still holds the ticket, its
+    // history and its searchable title: no tombstone ever arrived, because the
+    // per-event purge walk was struck (6.101) and P37 does not reopen it.
+    expect(await b.replica.getTicket(ticketId)).not.toBeNull();
+    expect((await b.replica.listEntityEvents(ticketId)).length).toBeGreaterThan(0);
+    expect((await b.replica.searchLocal(h.workspaceId, 'Un-shared later')).map((r) => r.ticketId)).toEqual([
+      ticketId,
+    ]);
+    const stubsBefore = await b.replica.listContests(h.workspaceId, { claimantId: USER_B });
+    expect(stubsBefore).toHaveLength(1);
+
+    // THE CLIENT-PRESENTED PATH. Not a driver calling `purgeEntity` per id —
+    // P37 constraint 3 is explicit that the residual flips only when a narrowed
+    // ticket is removed by this path, because a rig that purged directly would
+    // be asserting the harness rather than the product.
+    const outcome = await b.engine.reconcile(h.workspaceId);
+    expect(outcome.presented).toBe(2);
+    expect(outcome.purged).toEqual([ticketId]);
+
+    // Gone, by every door a replica answers through.
+    expect(await b.replica.getTicket(ticketId)).toBeNull();
+    expect(await b.replica.listEntityEvents(ticketId)).toEqual([]);
+    expect(await b.replica.searchLocal(h.workspaceId, 'Un-shared later')).toEqual([]);
+    // And BOUNDED: the ticket B still legitimately holds is untouched. Without
+    // this the same assertions would pass against a reconcile that wiped
+    // everything, which is the failure mode a purge has.
+    expect(await b.replica.getTicket(stillShared)).not.toBeNull();
+
+    // HONESTY INVARIANT 5: the claimant's own contested claim survives the
+    // purge. `purgeEntity` keeps contests whose `claimant_id` is this user
+    // deliberately — the `originalEvent` is what B typed on this device, and
+    // vanishing it would silently drop B's own claim. It leaks nothing: B
+    // authored it.
+    expect(await b.replica.listContests(h.workspaceId, { claimantId: USER_B })).toEqual(stubsBefore);
+
+    // A, still in the audience, is untouched by any of this.
+    await a.syncDown();
+    expect(await a.replica.getTicket(ticketId)).not.toBeNull();
+
+    // Idempotent: a second reconcile presents one fewer ticket and purges nothing.
+    const again = await b.engine.reconcile(h.workspaceId);
+    expect(again).toEqual({ presented: 1, purged: [] });
+  });
 });

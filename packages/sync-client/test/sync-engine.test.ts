@@ -9,6 +9,7 @@ import {
   type StreamHandlers,
   type SyncEngine,
   type SyncStatus,
+  type ReconcileAnswer,
   type SyncTransport,
 } from '../src/engine/sync-engine.js';
 import { createHttpTransport, type WebSocketLike } from '../src/net/http-transport.js';
@@ -143,6 +144,8 @@ type Script = {
   handlers: StreamHandlers | null;
   bootstrapImpl: () => Promise<BootstrapResponse>;
   syncImpl: (events: SubmittedEvent[]) => Promise<SyncEventResult[]>;
+  reconcileCalls: Array<{ workspaceId: string; heldIds: string[] }>;
+  reconcileImpl: (workspaceId: string, heldIds: string[]) => Promise<ReconcileAnswer>;
 };
 
 const committedFor = (events: SubmittedEvent[]): SyncEventResult[] =>
@@ -163,6 +166,13 @@ function fakeTransport(script: Script): SyncTransport {
     async sync(events) {
       script.syncBatches.push(events);
       return script.syncImpl(events);
+    },
+    async reconcile(workspaceId, heldIds) {
+      // Recorded, not merely answered: the reconcile cases assert WHAT was
+      // presented, and a fake that only returned a verdict could not tell a
+      // request naming three ids from one naming none.
+      script.reconcileCalls.push({ workspaceId, heldIds });
+      return script.reconcileImpl(workspaceId, heldIds);
     },
     openStream(_ws, afterSeq, handlers) {
       script.subscribes.push({ afterSeq });
@@ -189,7 +199,9 @@ function fakeTransport(script: Script): SyncTransport {
 
 type Fixture = { script: Script; replica: Replica; outbox: Outbox; engine: SyncEngine };
 
-async function fixture(over: Partial<Pick<Script, 'syncImpl' | 'bootstrapImpl'>> = {}): Promise<Fixture> {
+async function fixture(
+  over: Partial<Pick<Script, 'syncImpl' | 'bootstrapImpl' | 'reconcileImpl'>> = {},
+): Promise<Fixture> {
   seqCounter = 0;
   streamCounter = 0;
   const script: Script = {
@@ -200,6 +212,12 @@ async function fixture(over: Partial<Pick<Script, 'syncImpl' | 'bootstrapImpl'>>
     handlers: null,
     bootstrapImpl: over.bootstrapImpl ?? (async () => bootstrapOf()),
     syncImpl: over.syncImpl ?? (async (events) => committedFor(events)),
+    reconcileCalls: [],
+    // The default answer is "everything you named is still yours" — the state a
+    // reconcile finds when nothing was narrowed, and the one that must purge
+    // nothing.
+    reconcileImpl:
+      over.reconcileImpl ?? (async (workspaceId) => ({ workspaceId, restricted: [] })),
   };
   const storage = createBetterSqliteStorage();
   const replica = await createReplica({ storage });
@@ -948,5 +966,82 @@ describe('12.167-12.168 + 12.171 the HTTP/WS transport', () => {
     send(`{"type":"caught-up","workspaceId":"${WS}","seq":0}`);
     send(`{"type":"caught-up","workspaceId":"${WS}","seq":12}`);
     expect(seen).toEqual(['caught-up:0', 'caught-up:12']);
+  });
+});
+
+describe('reconcile — closure 5, the narrow half (ruling P37)', () => {
+  /**
+   * The engine presents what the replica holds and deletes what comes back
+   * `restricted`. Two properties matter here and neither is the server's:
+   *
+   * 1. **What is presented is what is held**, not a guess and not everything.
+   * 2. **What is purged is a subset of what was presented.** The server cannot
+   *    name anything else — its reply is built by walking the request — but a
+   *    purge is destructive and LOCAL, and this device does not need to trust a
+   *    remote party to be safe from it. That guard is the one 12.287 kills.
+   */
+  async function withTickets(
+    reconcileImpl?: Script['reconcileImpl'],
+  ): Promise<{ f: Fixture; a: string; b: string }> {
+    const a = newUlid();
+    const b = newUlid();
+    const f = await fixture(reconcileImpl === undefined ? {} : { reconcileImpl });
+    await f.replica.loadBootstrap(bootstrapOf());
+    for (const id of [a, b]) {
+      await f.replica.applyServerItem(
+        envelope({ kind: 'ticket', id }, 'ticket.created', {
+          typeId: TYPE,
+          projectId: PROJECT,
+          parentId: null,
+          title: `Ticket ${id}`,
+        }),
+      );
+    }
+    // The fixture is real before anything is asked of it: a reconcile against a
+    // replica holding nothing would satisfy every assertion below vacuously.
+    expect((await f.replica.listTickets(WS)).map((t) => t.ticketId).sort()).toEqual([a, b].sort());
+    return { f, a, b };
+  }
+
+  it('12.287 presents exactly the ids it holds, purges only those the server named among them, and refuses an id it never presented', async () => {
+    const { f, a, b } = await withTickets();
+    // First: the ordinary answer. Nothing is stale, so nothing goes — and
+    // `presented` still says the question was asked, which a bare void return
+    // could not distinguish from "there was nothing to ask about".
+    const quiet = await f.engine.reconcile(WS);
+    expect(quiet).toEqual({ presented: 2, purged: [] });
+    expect(f.script.reconcileCalls).toHaveLength(1);
+    expect(f.script.reconcileCalls[0]?.workspaceId).toBe(WS);
+    expect([...(f.script.reconcileCalls[0]?.heldIds ?? [])].sort()).toEqual([a, b].sort());
+    expect((await f.replica.listTickets(WS)).map((t) => t.ticketId).sort()).toEqual([a, b].sort());
+
+    // Now an answer that restricts one HELD id and one the client never
+    // presented. The unpresented id is a ticket the device legitimately holds
+    // in this very fixture — so a client that trusted the answer wholesale
+    // would delete real work on a server's say-so.
+    const neverPresented = newUlid();
+    // The answer names the FIRST id the replica presents plus one it did not.
+    // Reading the presented list inside the impl keeps the two in step without
+    // a forward reference to a value the fixture has not minted yet.
+    const { f: f2, b: b2 } = await withTickets(async (workspaceId, heldIds) => ({
+      workspaceId,
+      restricted: [
+        { kind: 'restricted' as const, id: heldIds[0] ?? '' },
+        { kind: 'restricted' as const, id: neverPresented },
+      ],
+    }));
+    const presentedFirst = (await f2.replica.listTickets(WS)).map((t) => t.ticketId)[0] ?? '';
+    const result = await f2.engine.reconcile(WS);
+    // ONLY the presented one went. The unpresented id named in the same answer
+    // purged nothing — and it is a ticket this replica really holds, so a client
+    // that trusted the answer wholesale would have deleted it.
+    expect(result.purged).toEqual([presentedFirst]);
+    expect(result.presented).toBe(2);
+    expect(await f2.replica.getTicket(presentedFirst)).toBeNull();
+    expect(await f2.replica.listEntityEvents(presentedFirst)).toEqual([]);
+    const survivors = (await f2.replica.listTickets(WS)).map((t) => t.ticketId);
+    expect(survivors).toHaveLength(1);
+    expect(survivors[0]).not.toBe(presentedFirst);
+    expect(neverPresented).not.toBe(b2);
   });
 });

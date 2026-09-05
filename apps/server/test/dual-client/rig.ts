@@ -41,6 +41,7 @@ import {
 import { readStreamSeq } from '../../src/sync/stream-seq.js';
 import { runSnapshotPass } from '../../src/sync/snapshot-writer.js';
 import { visibleEventsFor } from '../../src/visibility/visible-events-for.js';
+import { canSee } from '../../src/visibility/can-see.js';
 import { listVisibleTickets } from '../../src/visibility/visible-tickets.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../../src/ledger/event-store.js';
 import { readLatestSnapshot } from '../../src/ledger/snapshot-store.js';
@@ -332,6 +333,25 @@ export async function createHarness(): Promise<Harness> {
       async sync(events) {
         await whenOnline();
         return syncService.processBatch(userId, events);
+      },
+      /**
+       * Closure 5's reconcile door, on the same in-process service the HTTP
+       * route delegates to — `canSee` per presented id, nothing else consulted.
+       * Restated here rather than reached for through `registerReconcileRoute`
+       * for the same reason `bootstrapFor` restates `bootstrapTicket`: the route
+       * is Fastify-shaped and this harness has no HTTP. The ONE rule it
+       * reproduces is the one the route's safety rests on — existence is never
+       * asked, so an unknown id answers exactly as a lost one does.
+       */
+      async reconcile(ws, heldIds) {
+        const restricted: Array<{ kind: 'restricted'; id: string }> = [];
+        const asked = new Set<string>();
+        for (const id of heldIds) {
+          if (asked.has(id)) continue;
+          asked.add(id);
+          if (!(await canSee(pool, userId, id))) restricted.push({ kind: 'restricted', id });
+        }
+        return { workspaceId: ws, restricted };
       },
       // Only `engine.start()` opens a stream, and the harness never calls it:
       // sync-down is `syncDown()` below, on the same primitive the socket

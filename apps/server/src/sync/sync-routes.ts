@@ -10,6 +10,7 @@ import type { ClientIngest } from '../ingest/ingest-service.js';
 import type { ServerAppend } from '../routes/invites.js';
 import { MAX_BATCH_SIZE } from '../routes/events.js';
 import { createSyncService } from './sync-service.js';
+import { registerReconcileRoute } from './reconcile-route.js';
 
 /**
  * The ticket-entity event types a snapshot does NOT carry, so bootstrap must
@@ -162,6 +163,13 @@ export function registerSyncRoutes(
     ingest: deps.ingest,
     serverAppend: deps.serverAppend,
   });
+
+  // Closure 5's NARROW half (ruling P37): `POST /v1/sync/reconcile`. Registered
+  // from here because it is a sync door and this is where sync doors are
+  // registered, but it lives in its own file — it shares no dependency with the
+  // two above (no ingest, no serverAppend, only the pool) and its whole argument
+  // is about disclosure rather than about ingest.
+  registerReconcileRoute(app, { pool: deps.pool }, requireSession);
 
   app.get<{ Querystring: { workspaceId: string } }>(
     '/v1/sync/bootstrap',
