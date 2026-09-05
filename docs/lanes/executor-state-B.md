@@ -240,7 +240,16 @@ stranded by the gate.
   `onCaughtUp`. Measured benign for the S1/S2 shapes (the reducer only throws on unknown
   type/workflow/state or an uncreated ticket, which an assign/field/transition gap cannot produce),
   but **T15 should `syncDown()` before `goOnline()`** where it cares about the intermediate state.
-- **M3 — PRODUCT DEFECT, owner unassigned.** After `snapshotPass()`, a fresh client's
+- **M3 — PRODUCT DEFECT. OWNER: Lane A, closure 4. Owner ruling: P36 (2026-09-06).** P36 widens the
+  BOOTSTRAP payload ADDITIVELY — the snapshot carries the recorded `(actorId, serverTime, seq)`
+  provenance of the state claim, copied by the snapshot writer from the ledger row at that seq. The
+  preferred shape is a **sibling block on the snapshot row, NOT a widening of
+  `TicketState.transitions[]`** — deliberately, so **this rig's full-`TicketState` equality across the
+  fold stays untouched**. If Lane A measures that it must widen `TicketState` after all, the controller
+  says it will warn this lane before it lands; until then, 12.260's exact equality assertion is safe and
+  must NOT be pre-emptively weakened. T15's ❌ case for the DataSource door stands as written and cites
+  P36 as its owner ruling.
+  *Original wording, kept because it is what was measured:* After `snapshotPass()`, a fresh client's
   `ds.query.getTicket` throws `ReplicaGapError`: `replica-data-source.ts` requires a
   `ticket.created`/`ticket.transitioned` in local `events` for `stateProvenance`, and a
   snapshot-bounded bootstrap ships neither below the line. `replica.getTicket` works; only the
