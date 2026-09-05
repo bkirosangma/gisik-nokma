@@ -1,4 +1,11 @@
-import type { IngestResult, StateCategory, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
+import type {
+  FieldClaim,
+  IngestResult,
+  StateCategory,
+  TicketState,
+  TicketTypeDef,
+  WorkflowDef,
+} from '@gisik-nokma/domain';
 import type {
   Actor,
   BoardCard,
@@ -9,10 +16,14 @@ import type {
   FilterSpec,
   Grouping,
   ListColumnId,
+  ListRow,
+  ParentRef,
   ProjectViewPrefs,
   RollupToViewer,
   SavedFilter,
   TicketHistoryEvent,
+  TicketListView,
+  TicketRead,
   TransitionCause,
   UserPreferences,
 } from '../view-types.js';
@@ -37,8 +48,9 @@ import type {
  *
  * ## Why several mappers below are nothing but a refusal
  *
- * Six of the thirteen `DataSourceQuery` methods cannot be answered over the routes
- * that shipped. The register — coordination doc, "Step 11 (Plan 6 remainder) —
+ * Four of the thirteen `DataSourceQuery` methods cannot be answered over the routes
+ * that shipped — six until ruling P25 clause 1's buildable subset landed and
+ * `mapListView` and `mapTicketRead` became real mappers. The register — coordination doc, "Step 11 (Plan 6 remainder) —
  * the `DataSource` register, re-derived, and RULING REQUEST P25" — holds the
  * measurement; each refusal below repeats only its own half. A mapper that
  * returned a plausible-looking view with `stateName: card.stateId` or
@@ -907,88 +919,281 @@ export function mapWorkspaceRefs(_raw: unknown): never {
   throw new ServingGapError('getMyWorkspaces', MAP_WORKSPACE_REFS_ABSENCES);
 }
 
-const MAP_LIST_VIEW_ABSENCES: readonly Absence[] = [
-  {
-    field: 'ListRow.typeRank',
-    wireKey: 'typeRank',
-    wireRoute: '/v1/projects/:projectId/tickets',
-    because: 'proj_ticket_types.rank is never joined into the TicketCard the list route serves',
-    owner: 'P25 clause 1 — HELD',
-  },
-  {
-    field: 'ListRow.epicId',
-    wireKey: 'epicId',
-    wireRoute: '/v1/projects/:projectId/tickets',
-    because:
-      'routes/list.ts computes epicAncestors and uses the epic only as a group key, then discards it',
-    owner: 'P25 clause 1 — HELD',
-  },
-  {
-    field: 'ListRow.stateName',
-    wireKey: 'stateName',
-    wireRoute: '/v1/projects/:projectId/tickets',
-    because:
-      'cards carry stateId only; the route already fetches the workflow defs that name the state and drops the names. Reading the name from the latest definition instead would be the workflowVersion lie in miniature — the card names no version',
-    owner: 'P25 clause 1 — HELD',
-  },
-  {
-    field: 'ListRow.hasRestrictedParent',
-    wireKey: 'hasRestrictedParent',
-    wireRoute: '/v1/projects/:projectId/tickets',
-    because: 'it is a statement about what this viewer may not see, so serving it is a visibility decision under Plan 4 read enforcement',
-    owner: 'P25 clause 1 — HELD',
-  },
-  {
-    field: 'ListRow.assignedProvenance',
-    wireKey: 'assignedProvenance',
-    wireRoute: '/v1/projects/:projectId/tickets',
-    because:
-      'proj_tickets.assignee_id is a bare column; the provenance is reconstructible only from the raw events table, the shape read/state-provenance.ts already ships for state',
-    owner: 'P25 clause 1 — HELD',
-  },
-];
-
 /**
- * `GET /v1/projects/:projectId/tickets` → `TicketListView`. REFUSED.
+ * One `FieldClaim` map, verbatim but VALIDATED.
  *
- * Four of the five cannot be derived client-side at all, and the fifth
- * (`stateName`) only by reading a definition the card does not name. The
- * response's own shape — `groups` of `{key, label, cards}` with a `nextCursor` —
- * is adaptable and is not why this refuses.
+ * The two sides are the same type — `view-types.ts` imports `FieldClaim` from
+ * `@gisik-nokma/domain`, which is the type the server's reducer writes — so
+ * there is nothing to adapt and the temptation is a cast. A cast would let a
+ * claim with no actor render as a field somebody set, which is the provenance
+ * floor's exact inverse. `value` is deliberately NOT checked: it is `unknown` on
+ * both sides and every value including `null` is a claim somebody made.
  */
-export function mapListView(_raw: unknown): never {
-  throw new ServingGapError('getTickets', MAP_LIST_VIEW_ABSENCES);
+function mapFieldClaims(raw: unknown, path: string): Record<string, FieldClaim> {
+  const record = asRecord(raw, path);
+  const fields: Record<string, FieldClaim> = {};
+  for (const [key, entry] of Object.entries(record)) {
+    const claim = asRecord(entry, `${path}.${key}`);
+    fields[key] = {
+      value: claim['value'],
+      actorId: asString(claim['actorId'], `${path}.${key}.actorId`),
+      clientTime: asString(claim['clientTime'], `${path}.${key}.clientTime`),
+      serverTime: asString(claim['serverTime'], `${path}.${key}.serverTime`),
+    };
+  }
+  return fields;
 }
 
-const MAP_TICKET_READ_ABSENCES: readonly Absence[] = [
-  {
-    field: 'TicketRead.title',
-    wireKey: 'title',
-    wireRoute: '/v1/workspaces/:workspaceId/tickets/:ticketId',
-    because:
-      'the route answers a proj_visibility row wrapped in {ticket, parent, rollup}; the title is on the board card, so this is the route’s shape and not a missing fact',
-    owner: 'P25 clause 1 — HELD, because reading proj_tickets here is a visibility decision',
-  },
-  {
-    field: 'TicketRead.stateProvenance',
-    wireKey: 'stateProvenance',
-    wireRoute: '/v1/workspaces/:workspaceId/tickets/:ticketId',
-    because: 'the wrapper carries no provenance block at all',
-    owner: 'P25 clause 1 — HELD',
-  },
-  {
-    field: 'TicketRead.ticket (a domain TicketState)',
-    wireKey: 'transitions',
-    wireRoute: '/v1/workspaces/:workspaceId/tickets/:ticketId',
-    because:
-      'the inner ticket is a snake_case proj_visibility row — own_mode, resolved_mode, seq — with none of a TicketState’s fields or transitions',
-    owner: 'P25 clause 1 — HELD',
-  },
-];
+/**
+ * The server's three-state `TicketDueDate` → the client's
+ * `{date, claim} | null`.
+ *
+ * **`null` here covers TWO server states and the loss is named rather than
+ * hidden**: `never-claimed` (nobody ever gave this ticket a due date) and
+ * `cleared` (somebody removed the one it had). `ListRow` has one nullable field
+ * and no room for the difference, so both collapse — and the collapse is honest
+ * in the direction that matters, because `null` renders as "no due date", which
+ * is true of both. What is lost is the CLEARING's provenance, and it is not
+ * destroyed: the claim is in the ledger and `getTicketHistory` serves it.
+ *
+ * A `claimed` state with no `claim` object, or one missing its date, throws —
+ * a due date is a promise somebody made, and rendering one with an invented
+ * actor would attribute it to nobody.
+ */
+function mapDueDate(
+  raw: unknown,
+  path: string,
+  roster: ReadonlyMap<string, string>,
+): { date: string; claim: ClaimProvenance } | null {
+  const record = asRecord(raw, path);
+  const state = asString(record['state'], `${path}.state`);
+  if (state === 'never-claimed' || state === 'cleared') return null;
+  if (state !== 'claimed') {
+    throw new MappingError(`${path}.state`, 'one of claimed/cleared/never-claimed');
+  }
+  const claim = asRecord(record['claim'], `${path}.claim`);
+  return {
+    date: asString(claim['date'], `${path}.claim.date`),
+    claim: mapProvenance(claim, `${path}.claim`, roster),
+  };
+}
 
-/** `GET /v1/workspaces/:ws/tickets/:ticketId` → `TicketRead`. REFUSED. */
-export function mapTicketRead(_raw: unknown): never {
-  throw new ServingGapError('getTicket', MAP_TICKET_READ_ABSENCES);
+function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, string>): ListRow {
+  const record = asRecord(raw, path);
+  return {
+    ticketId: asString(record['ticketId'], `${path}.ticketId`),
+    title: asString(record['title'], `${path}.title`),
+    typeId: asString(record['typeId'], `${path}.typeId`),
+    typeRank: asNumber(record['typeRank'], `${path}.typeRank`),
+    // `parentId` and `epicId` are `string | null` and REQUIRED on both sides:
+    // null is the wire's own word for "no parent" / "under no epic this viewer
+    // may see", and an absent key is a different claim, left to `asString` to
+    // refuse.
+    parentId: record['parentId'] === null ? null : asString(record['parentId'], `${path}.parentId`),
+    epicId: record['epicId'] === null ? null : asString(record['epicId'], `${path}.epicId`),
+    stateId: asString(record['stateId'], `${path}.stateId`),
+    stateName: asString(record['stateName'], `${path}.stateName`),
+    stateCategory: asStateCategory(record['stateCategory'], `${path}.stateCategory`),
+    stateProvenance: mapProvenance(
+      record['stateProvenance'],
+      `${path}.stateProvenance`,
+      roster,
+    ),
+    assignee: mapAssignee(record['assigneeId'], `${path}.assigneeId`, roster),
+    // `null` is the truth when nobody is assigned; the server pairs the two, and
+    // `assembleListCards` throws rather than serving an assigned card without a
+    // claim, so a null here cannot mean "assigned by somebody unknown".
+    assignedProvenance:
+      record['assignedProvenance'] === null
+        ? null
+        : mapProvenance(record['assignedProvenance'], `${path}.assignedProvenance`, roster),
+    dueDate: mapDueDate(record['dueDate'], `${path}.dueDate`, roster),
+    fields: mapFieldClaims(record['fields'], `${path}.fields`),
+    rollup: mapRollup(record['rollup'], `${path}.rollup`),
+    hasRestrictedParent: asBoolean(
+      record['hasRestrictedParent'],
+      `${path}.hasRestrictedParent`,
+    ),
+  };
+}
+
+/**
+ * `GET /v1/projects/:projectId/tickets` → `TicketListView`. **This mapper used
+ * to REFUSE, and the five facts it refused over are served now** (ruling P25
+ * clause 1, this change set).
+ *
+ * The absence list this function threw is deleted rather than emptied: an
+ * `Absence[]` with no entries is a refusal nobody can read, and
+ * `client-contract.test.ts` throws on a list it cannot parse precisely so that
+ * closing a gap forces the record to be removed instead of hollowed out.
+ * `typeRank`, `epicId`, `stateName` and `assignedProvenance` are on every card;
+ * `hasRestrictedParent` is `canSeeResolved` applied to each card's parent
+ * (`apps/server/src/read/restricted-parents.ts`).
+ *
+ * ## The GROUPS are flattened, and that is not information lost here
+ *
+ * The server returns `groups` of `{key, label, cards}` and `TicketListView` is
+ * `{projectId, rows}` — flat. The grouping is a function of the `groupBy` this
+ * client SENT (`listQueryString`), and the client's own list view groups the
+ * rows it holds; keeping the server's buckets would give a view two disagreeing
+ * groupings of the same rows. Order is preserved exactly: groups in the order
+ * the server emitted them (sorted by key), cards in the `ticket_id` order the
+ * page arrived in. Flattening REARRANGES and never filters — every card the
+ * server sent becomes exactly one row.
+ *
+ * ## `nextCursor` is dropped, and that IS a limitation of the client type
+ *
+ * `TicketListView` has no cursor field, so a caller of `getTickets` sees the
+ * first page and cannot ask for the next. That is not a serving gap — the
+ * server sends the cursor — and it is not this module's to fix: the owner is
+ * `DataSourceQuery.getTickets`, whose signature has nowhere to put one.
+ * Recorded here so the next reader does not go looking on the server for it.
+ *
+ * ## The roster is EMPTY, by force rather than by choice
+ *
+ * `mapBoardView` joins the members route for display names because the board
+ * body names its workspace. This body does not, and `getTickets(projectId,
+ * filter, grouping)` does not take one either, so there is no id from which a
+ * roster could be fetched. `mapAssignee` and `mapProvenance` both degrade
+ * correctly on an empty roster — the assignee's `name` becomes the actor id,
+ * which is what `actorLabel(id, null)` renders everywhere else in this client,
+ * and `actorName` stays `null`, which is that field's documented absence value.
+ * A name is missing; no fact is invented. Growing the list route a
+ * `workspaceId` to close it would be a route change for a display convenience,
+ * and it is left to whoever owns the signature.
+ */
+export function mapListView(raw: unknown): TicketListView {
+  const record = asRecord(raw, 'list');
+  const roster: ReadonlyMap<string, string> = new Map();
+  const rows: ListRow[] = [];
+  asArray(record['groups'], 'list.groups').forEach((entry, groupIndex) => {
+    const path = `list.groups[${groupIndex}]`;
+    const group = asRecord(entry, path);
+    asArray(group['cards'], `${path}.cards`).forEach((card, cardIndex) => {
+      rows.push(mapListRow(card, `${path}.cards[${cardIndex}]`, roster));
+    });
+  });
+  return { projectId: asString(record['projectId'], 'list.projectId'), rows };
+}
+
+/**
+ * The wire's `ticketState` → the domain `TicketState` the client's `TicketRead`
+ * declares.
+ *
+ * Validated field by field rather than cast, and the reason is the same one
+ * `mapFieldClaims` gives: both sides name the SAME type
+ * (`packages/domain/src/entity-state.ts`), so a cast compiles and checks
+ * nothing. This is the object the rule engine reads; a `stateId` that arrived as
+ * a number, or a missing `workspaceId`, would surface far from here as a refusal
+ * that reads like a permissions problem (`checkTicketCreated`'s parent guard
+ * compares `parent.workspaceId !== env.workspaceId`, and `undefined !==
+ * anything` is always true).
+ *
+ * `kind` is asserted equal to `'ticket'` rather than copied from the wire: it is
+ * the discriminant every `EntityState` narrowing turns on, and a body carrying
+ * `kind: 'membership'` on this route is a body this client must not read.
+ */
+function mapTicketState(raw: unknown, path: string): TicketState {
+  const record = asRecord(raw, path);
+  const kind = asString(record['kind'], `${path}.kind`);
+  if (kind !== 'ticket') throw new MappingError(`${path}.kind`, `ticket (got ${kind})`);
+  return {
+    kind: 'ticket',
+    id: asString(record['id'], `${path}.id`),
+    workspaceId: asString(record['workspaceId'], `${path}.workspaceId`),
+    projectId: asString(record['projectId'], `${path}.projectId`),
+    typeId: asString(record['typeId'], `${path}.typeId`),
+    parentId: record['parentId'] === null ? null : asString(record['parentId'], `${path}.parentId`),
+    workflowId: asString(record['workflowId'], `${path}.workflowId`),
+    workflowVersion: asNumber(record['workflowVersion'], `${path}.workflowVersion`),
+    stateId: asString(record['stateId'], `${path}.stateId`),
+    stateCategory: asStateCategory(record['stateCategory'], `${path}.stateCategory`),
+    assigneeId:
+      record['assigneeId'] === null ? null : asString(record['assigneeId'], `${path}.assigneeId`),
+    collaboratorIds: asArray(record['collaboratorIds'], `${path}.collaboratorIds`).map(
+      (id, index) => asString(id, `${path}.collaboratorIds[${index}]`),
+    ),
+    fields: mapFieldClaims(record['fields'], `${path}.fields`),
+    transitions: asArray(record['transitions'], `${path}.transitions`).map((entry, index) => {
+      const at = `${path}.transitions[${index}]`;
+      const transition = asRecord(entry, at);
+      return {
+        toStateId: asString(transition['toStateId'], `${at}.toStateId`),
+        actorId: asString(transition['actorId'], `${at}.actorId`),
+        seq: asNumber(transition['seq'], `${at}.seq`),
+        workflowId: asString(transition['workflowId'], `${at}.workflowId`),
+        workflowVersion: asNumber(transition['workflowVersion'], `${at}.workflowVersion`),
+      };
+    }),
+  };
+}
+
+/**
+ * The wire's `parent` → the client's `ParentRef`.
+ *
+ * The union is discriminated on both sides and the two arms are read
+ * SEPARATELY, never as "read the title if it happens to be there": the
+ * restricted arm has no `title` on the wire because the server never put one in
+ * a variable on that branch (`routes/tickets.ts`), and this mapper's restricted
+ * arm has no field to receive one. A `kind` this client does not know throws
+ * rather than degrading to `null` — `null` means "this ticket has no parent",
+ * which is a statement about the shape of the work and not about a body that
+ * could not be read.
+ *
+ * The server's visible arm also carries `ticket`, a `proj_visibility` row. The
+ * client's `ParentRef` has no room for it and reads nothing from it; the server
+ * disclosing more than the client consumes is the safe direction, and dropping
+ * it here is not a loss of anything `TicketRead` can express.
+ */
+function mapParentRef(raw: unknown, path: string): ParentRef {
+  if (raw === null) return null;
+  const record = asRecord(raw, path);
+  const kind = asString(record['kind'], `${path}.kind`);
+  if (kind === 'restricted') {
+    return { kind: 'restricted', id: asString(record['id'], `${path}.id`) };
+  }
+  if (kind !== 'ticket') {
+    throw new MappingError(`${path}.kind`, `one of ticket/restricted (got ${kind})`);
+  }
+  return {
+    kind: 'ticket',
+    id: asString(record['id'], `${path}.id`),
+    title: asString(record['title'], `${path}.title`),
+  };
+}
+
+/**
+ * `GET /v1/workspaces/:ws/tickets/:ticketId` → `TicketRead`. **This mapper used
+ * to REFUSE** over `title`, `stateProvenance` and the absent domain
+ * `TicketState`; all three are served now (ruling P25 clause 1, this change
+ * set), and so is the visible parent's `title`, which the client's `ParentRef`
+ * requires and which was not in the recorded absence list at all.
+ *
+ * ## The wire key is `ticketState`, and the client field is `ticket`
+ *
+ * The route kept its original `ticket` — the `proj_visibility` row whose column
+ * allow-list is argued column by column in `routes/tickets.ts` — and added the
+ * domain state beside it rather than swapping it out. Renaming a key is exactly
+ * what this module is for, and it is not a serving gap; the visibility row is
+ * read by nothing here.
+ *
+ * ## The rule these titles are served under, named
+ *
+ * `canSee` (`apps/server/src/visibility/can-see.ts:227`, the async wrapper over
+ * Plan 4's one decision function `canSeeResolved` at `:94`), applied at the
+ * guard the route already had. The ticket's own title travels only after that
+ * guard said yes about THIS ticket; the parent's travels only inside the branch
+ * where it said yes about the PARENT. No new rule was authored to serve either.
+ */
+export function mapTicketRead(raw: unknown, roster: ReadonlyMap<string, string> = new Map()): TicketRead {
+  const record = asRecord(raw, 'ticket');
+  return {
+    ticket: mapTicketState(record['ticketState'], 'ticket.ticketState'),
+    title: asString(record['title'], 'ticket.title'),
+    stateProvenance: mapProvenance(record['stateProvenance'], 'ticket.stateProvenance', roster),
+    parent: mapParentRef(record['parent'], 'ticket.parent'),
+    rollup: mapRollup(record['rollup'], 'ticket.rollup'),
+  };
 }
 
 const MAP_SEARCH_HITS_ABSENCES: readonly Absence[] = [
@@ -1136,11 +1341,18 @@ export function mapAttention(_raw: unknown): never {
   throw new ServingGapError('getAttention', MAP_ATTENTION_ABSENCES);
 }
 
-/** Every refusal in this module, so a caller can enumerate the register. */
+/**
+ * Every refusal in this module, so a caller can enumerate the register.
+ *
+ * **`getTickets` and `getTicket` were here and are not any more** (ruling P25
+ * clause 1). Their entries are DELETED rather than mapped to `[]`: an empty
+ * absence list is a refusal nobody can read, `client-contract.test.ts` throws on
+ * a `const` it cannot parse rather than passing over one it can parse as empty,
+ * and `mappers.test.ts`'s register case asserts the exact key set — so hollowing
+ * an entry out would have left two methods claiming to refuse over nothing.
+ */
 export const SERVING_GAPS: Readonly<Record<string, readonly Absence[]>> = {
   getMyWorkspaces: MAP_WORKSPACE_REFS_ABSENCES,
-  getTickets: MAP_LIST_VIEW_ABSENCES,
-  getTicket: MAP_TICKET_READ_ABSENCES,
   search: MAP_SEARCH_HITS_ABSENCES,
   getMyWork: MAP_MY_WORK_ABSENCES,
   getAttention: MAP_ATTENTION_ABSENCES,

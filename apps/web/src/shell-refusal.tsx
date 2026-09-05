@@ -5,9 +5,13 @@
  *
  * ## Why this component exists, and why the plan has no line for it
  *
- * Six of the THIRTEEN `DataSourceQuery` methods throw a `ServingGapError` rather
- * than invent a fact — `getMyWorkspaces`, `getTickets`, `getTicket`, `search`,
- * `getMyWork` and `getAttention`. Every one of them is called by a page in this
+ * FOUR of the THIRTEEN `DataSourceQuery` methods throw a `ServingGapError` rather
+ * than invent a fact — `getMyWorkspaces`, `search`, `getMyWork` and
+ * `getAttention`. It was six: `getTickets` and `getTicket` refused too until
+ * ruling P25 clause 1 served their gaps, and this component is not narrower for
+ * it — a read that ANSWERS can still fail (a transport error, a 404 turned back
+ * into an exception, a `MappingError`), and every such failure lands here for the
+ * same reason. Every refusing read is called by a page in this
  * shell, and the plan text (written before those refusals existed) renders each
  * of them as `data === null ? <p>Loading…</p> : …`, or, for the attention
  * strip, as `items={attention.data ?? []}`. Both of those are false claims:

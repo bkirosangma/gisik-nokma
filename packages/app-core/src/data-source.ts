@@ -118,7 +118,8 @@ export type Unsubscribe = () => void;
  * `getWorkflowDef` returns `WorkflowDef`: the wire body is
  * `TicketTypeListResponse` (`packages/domain/src/read-models.ts:301`), whose
  * `ticketTypes` are `TicketTypeDef` already. There is no rename to adapt and
- * therefore no view model to invent. It is NOT one of the six refusals: every
+ * therefore no view model to invent. It is NOT one of the refusals (six of them
+ * until ruling P25 clause 1, four since): every
  * field the client needs is on the wire, pinned by case 7.38
  * (`apps/server/test/routes/builder-reads.test.ts:250`).
  */

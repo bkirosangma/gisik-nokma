@@ -693,11 +693,14 @@ describe('3.54 useTicketList — preferences are not ledger events, so the strea
 
 describe('3.146 useTicketList — a refusal is an error, never an empty list', () => {
   /**
-   * `getTickets` REFUSES today — the shipped route serves none of `typeRank`,
-   * `epicId`, `stateName`, `assignedProvenance` or `hasRestrictedParent`. The
-   * one thing this surface must never do with that refusal is render it as a
-   * project with no tickets in it. A plain `Error` is thrown rather than the
-   * real `ServingGapError`, so this view test does not reach into `online/`.
+   * `getTickets` REFUSED until ruling P25 clause 1 — the shipped route served
+   * none of `typeRank`, `epicId`, `stateName`, `assignedProvenance` or
+   * `hasRestrictedParent`, and it serves all five now. The property this case
+   * pins does not depend on that: the one thing this surface must never do with
+   * a read that FAILS, for any reason, is render it as a project with no tickets
+   * in it. A plain `Error` is thrown rather than the real `ServingGapError`, so
+   * this view test does not reach into `online/` — which is also why the case
+   * survives the gap closing at all.
    */
   it('PLANTED DEFECT: rows stay null and the reason surfaces — a serving gap never renders as "0 tickets"', async () => {
     const source = createFakeDataSource({

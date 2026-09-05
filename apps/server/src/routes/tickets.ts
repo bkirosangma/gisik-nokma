@@ -1,8 +1,36 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import type { TicketState } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
+import { getTicketStateFromDb } from '../projections/tickets.js';
+import { stateProvenanceFor } from '../read/state-provenance.js';
 import { canSee } from '../visibility/can-see.js';
 import { rollupFor, type RollupView } from '../visibility/rollup.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
+
+/**
+ * A ticket's title, out of the claim map the reducer maintains.
+ *
+ * Throws rather than emitting `''`, for the reason `assembleTicketCards` throws
+ * at the same fork: `ticket.created` writes `fields.title` unconditionally
+ * (`applyTicketEvent`), and the door refuses a non-string one
+ * (`checkTicketFieldSet`, ruling P15), so either absence means the projection
+ * and the ledger disagree — and the empty string would sit exactly where a real
+ * title goes.
+ */
+function titleOf(state: TicketState): string {
+  const claim = state.fields['title'];
+  if (claim === undefined) {
+    throw new Error(
+      `readTicket: no title claim on ticket ${state.id} — every ticket.created writes one, so proj_tickets and the ledger disagree`,
+    );
+  }
+  if (typeof claim.value !== 'string') {
+    throw new Error(
+      `readTicket: the title claim on ticket ${state.id} is not a string — the door refuses that (checkTicketFieldSet), so this event did not come through it`,
+    );
+  }
+  return claim.value;
+}
 
 /**
  * The one body every refusal on this surface carries.
@@ -18,27 +46,24 @@ export const NOT_FOUND_BODY = { error: 'not_found' } as const;
 /**
  * A ticket row as this branch can serve it.
  *
- * ## These are `proj_visibility` rows, and that is a fact about today
+ * ## These are `proj_visibility` rows, and they are now BESIDE the ticket, not
+ * ## instead of it
  *
- * The plan text has this route serving `proj_tickets` rows — `{ ticket: <row>,
- * parent: { kind: 'ticket', id, title } }`. **`proj_tickets` does not exist on
- * this branch.** Plan 3 Task 12 owns it, no migration for it is invented here
- * (a table this plan authored would be a second, competing definition of
- * another plan's projection), and no other table stores a ticket title: the
- * title lives in the `ticket.created` payload and is edited by
- * `ticket.field_set`, so producing one would mean computing `proj_tickets`'
- * head state inside a route — the same competing definition, written in a
- * worse place.
+ * This docblock used to open "**`proj_tickets` does not exist on this branch**"
+ * and defer the title to Plan 3 Task 12. That table landed; the sentence
+ * outlived the condition it described, which is why it is corrected here rather
+ * than deleted. The single read now serves `ticketState` (a domain
+ * `TicketState`, through `getTicketStateFromDb`), `title` and `stateProvenance`
+ * beside this row, and `parent.ticket` keeps this shape with a `title` added on
+ * the visible arm — so the restricted-parent placeholder finally ships as "no
+ * title" versus "title" and not merely as EXISTENCE-AND-ID versus
+ * EXISTENCE-AND-THE-ROW (case 6.66's condition, met).
  *
- * `listVisibleTickets` already returns `proj_visibility` rows for exactly this
- * reason (case 6.61), so the single read returns the same shape as the list,
- * and a test pins that the two agree. When `proj_tickets` lands, both sites
- * substitute the joined row together or that test reddens.
- *
- * The consequence for T8's own contract, stated rather than hidden: the
- * restricted-parent placeholder ships as EXISTENCE-AND-ID versus
- * EXISTENCE-AND-THE-ROW, not as "no title" versus "title". Recorded as case
- * 6.66, owner Plan 3 Task 12.
+ * The visibility row STAYS on the wire rather than being swapped out. Removing
+ * `own_mode` / `resolved_mode` / `seq` would be a decision about what this
+ * surface discloses — the allow-list below is argued column by column — and no
+ * gap this change closes requires it. `listVisibleTickets` still returns the
+ * same shape for the collection read (case 6.61), so the two sites still agree.
  */
 type VisibilityRow = {
   ticket_id: string;
@@ -141,8 +166,24 @@ function toTicketView(row: VisibilityRow): TicketView {
  * cannot be talked into filling one in.
  */
 export type ParentRef =
-  | { kind: 'ticket'; id: string; ticket: TicketView }
+  | { kind: 'ticket'; id: string; title: string; ticket: TicketView }
   | { kind: 'restricted'; id: string };
+
+/**
+ * `title` on the visible branch, and its ABSENCE on the restricted branch, are
+ * one decision made once (ruling P25 clause 1).
+ *
+ * The rule applied is `canSee` (`../visibility/can-see.ts:227`), at the call the
+ * handler below already makes about the parent — the branch that chooses between
+ * these two members IS the rule's answer. So the title travels on exactly the
+ * arm where the viewer may read the parent, which is the arm on which a direct
+ * read of that parent would serve them the same title anyway; and the restricted
+ * arm has no field for a title, so a serializer cannot be talked into filling
+ * one in. That is the shape `packages/app-core/src/view-types.ts:110` states as
+ * "Plan 4's read shape: a restricted parent is existence-without-title,
+ * structurally" — this makes the wire match it instead of leaving the client
+ * unable to form either arm.
+ */
 
 /**
  * One ticket's row IN THE NAMED WORKSPACE, or `undefined`.
@@ -291,6 +332,16 @@ export function registerTicketRoutes(
         return reply.code(404).send(NOT_FOUND_BODY);
       }
 
+      // The ticket's own domain state, read AFTER `canSee` said yes and scoped
+      // to the workspace the path names. `getTicketStateFromDb` is the reader
+      // Plan 3 Task 12 shipped for `proj_tickets`; nothing here re-expresses it.
+      const state = await getTicketStateFromDb(deps.pool, workspaceId, ticketId);
+      if (state === null) {
+        throw new Error(
+          `readTicket: proj_visibility holds ${ticketId} in workspace ${workspaceId} and proj_tickets does not — the two projections disagree`,
+        );
+      }
+
       let parent: ParentRef | null = null;
       if (ticket.parent_id !== null) {
         const parentRow = await loadTicketRow(deps.pool, workspaceId, ticket.parent_id);
@@ -299,7 +350,25 @@ export function registerTicketRoutes(
           // ticket as a root; claiming a restricted parent would invent one.
           parent = null;
         } else if (await canSee(deps.pool, request.currentUserId, ticket.parent_id)) {
-          parent = { kind: 'ticket', id: parentRow.ticket_id, ticket: toTicketView(parentRow) };
+          // The title is read INSIDE this branch, so the read itself is gated by
+          // the answer rather than being filtered afterwards — there is no code
+          // path on which a restricted parent's title is in a variable at all.
+          const parentState = await getTicketStateFromDb(
+            deps.pool,
+            workspaceId,
+            parentRow.ticket_id,
+          );
+          if (parentState === null) {
+            throw new Error(
+              `readTicket: proj_visibility holds parent ${parentRow.ticket_id} in workspace ${workspaceId} and proj_tickets does not — the two projections disagree`,
+            );
+          }
+          parent = {
+            kind: 'ticket',
+            id: parentRow.ticket_id,
+            title: titleOf(parentState),
+            ticket: toTicketView(parentRow),
+          };
         } else {
           parent = { kind: 'restricted', id: ticket.parent_id };
         }
@@ -317,7 +386,22 @@ export function registerTicketRoutes(
         ticketId,
       );
 
-      return { ticket: toTicketView(ticket), parent, rollup };
+      const provenance = await stateProvenanceFor(deps.pool, [ticketId]);
+      const stateProvenance = provenance.get(ticketId);
+      if (stateProvenance === undefined) {
+        throw new Error(
+          `readTicket: no provenance for ticket ${ticketId} — every state a ticket is in was claimed by an event, so proj_tickets and the ledger disagree`,
+        );
+      }
+
+      return {
+        ticket: toTicketView(ticket),
+        ticketState: state,
+        title: titleOf(state),
+        stateProvenance,
+        parent,
+        rollup,
+      };
     },
   );
 

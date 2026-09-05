@@ -5,14 +5,15 @@ import {
   groupingSchema,
   type FilterSpec,
   type Grouping,
+  type ListCard,
   type ListGroup,
   type ListResponse,
-  type TicketCard,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { BLOCKED_STATES_CTE, compileFilterSpec } from '../read/compile-filter.js';
 import { READ_NOT_FOUND_BODY, requireMember, workspaceOfProject } from '../read/membership.js';
+import { assembleListCards } from '../read/list-cards.js';
 import { SqlParams } from '../read/sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
 import { visibleTicketsWhere } from '../read/visible-where.js';
@@ -156,7 +157,28 @@ export async function readList(
   const overflowed = rows.length > query.limit;
   const pageRows = rows.slice(0, query.limit);
   const cards = await assembleTicketCards(db, viewerId, pageRows);
-  const groups = await groupCards(db, eff, viewerId, workspaceId, cards, pageRows, query.groupBy);
+  // The epic walk runs for EVERY grouping now, not only `groupBy=epic`.
+  // `ListCard.epicId` is a field on every row, so computing it inside the
+  // `case 'epic'` branch would have shipped it absent under the four other
+  // groupings — including `flat`, which is the default and the one the client
+  // contract suite reads. Its result is used twice: the ids become the field,
+  // and the titles stay where they were, labelling the epic buckets.
+  const epics = await epicAncestors(
+    db,
+    eff,
+    viewerId,
+    workspaceId,
+    cards.map((card) => card.ticketId),
+  );
+  const listCards = await assembleListCards(
+    db,
+    viewerId,
+    workspaceId,
+    pageRows,
+    cards,
+    new Map([...epics].map(([ticketId, found]) => [ticketId, found.epicId])),
+  );
+  const groups = await groupCards(db, workspaceId, listCards, pageRows, query.groupBy, epics);
 
   return {
     projectId,
@@ -192,12 +214,11 @@ export async function readList(
  */
 async function groupCards(
   db: Queryable,
-  eff: EffectiveRole,
-  viewerId: string,
   workspaceId: string,
-  cards: TicketCard[],
+  cards: ListCard[],
   rows: ProjTicketRow[],
   groupBy: Grouping,
+  epics: Map<string, EpicOf>,
 ): Promise<ListGroup[]> {
   if (cards.length === 0) {
     return [];
@@ -247,20 +268,17 @@ async function groupCards(
       );
     }
 
-    case 'epic': {
-      const epics = await epicAncestors(
-        db,
-        eff,
-        viewerId,
-        workspaceId,
-        cards.map((card) => card.ticketId),
-      );
+    case 'epic':
+      // The walk moved to `readList` (it feeds `ListCard.epicId` under every
+      // grouping); the key is now read off the card the walk already filled, so
+      // the bucket and the field cannot disagree. Titles still come from the
+      // walk's own rows, which is what keeps a label to a ticket this predicate
+      // admitted.
       return bucket(
         cards,
-        (card) => epics.get(card.ticketId)?.epicId ?? NO_EPIC,
+        (card) => card.epicId ?? NO_EPIC,
         (key) => (key === NO_EPIC ? 'No epic' : (titleOfEpic(epics, key) ?? key)),
       );
-    }
   }
 }
 
@@ -281,11 +299,11 @@ function titleOfEpic(epics: Map<string, EpicOf>, epicId: string): string | undef
  * arrived in.
  */
 function bucket(
-  cards: TicketCard[],
-  keyOf: (card: TicketCard) => string,
+  cards: ListCard[],
+  keyOf: (card: ListCard) => string,
   labelOf: (key: string) => string,
 ): ListGroup[] {
-  const buckets = new Map<string, TicketCard[]>();
+  const buckets = new Map<string, ListCard[]>();
   for (const card of cards) {
     const key = keyOf(card);
     const existing = buckets.get(key);

@@ -22,8 +22,13 @@ import type { CustomDateField, ListRow, TicketDatesInput } from '@gisik-nokma/ap
  * ## FOUR FIELDS ARE SYNTHESIZED, AND HERE IS EXACTLY WHICH
  *
  * `TicketDatesInput.state` is a domain `TicketState`. A `ListRow` is not one and
- * cannot be made into one: `online/mappers.ts` refuses `getTickets` outright,
- * and even the `TicketCard` behind it carries no `transitions`. FOUR of the
+ * cannot be made into one — not because the read refuses (it does not any more;
+ * ruling P25 clause 1 served `getTickets`'s five gaps and `mapListView` is a real
+ * mapper), but because `ListRow` is a narrower TYPE than `TicketState`: it names
+ * no workflow, no version, no collaborators and no transitions, and the
+ * `ListCard` behind it carries no `transitions` either. The synthesis below is
+ * therefore unchanged, and the reason for it is now the type rather than the
+ * refusal. FOUR of the
  * fourteen `TicketState` fields are therefore not the server's answer, and the
  * two the route segments supply are listed beside them so the table is the whole
  * account of where every field comes from:

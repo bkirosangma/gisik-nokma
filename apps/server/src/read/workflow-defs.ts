@@ -38,6 +38,54 @@ export async function latestWorkflowDefs(
 }
 
 /**
+ * The definitions tickets are FOLDED TO, keyed `` `${workflowId}@${version}` ``.
+ *
+ * ## Why this exists beside `latestWorkflowDefs` rather than replacing it
+ *
+ * They answer different questions and both are asked on the list route. A board
+ * COLUMN is a state of the current definition, so the columns and their labels
+ * come from the latest — that is what `latestWorkflowDefs` is for, and the
+ * `status` grouping's labels keep using it. A CARD's `stateName` is a name for
+ * the state that card is in, and the card is in a state of the definition its
+ * own row names: `proj_tickets.workflow_version` is the version in force after
+ * whatever forward fold it has been through (`applyTicketEvent`'s
+ * `ticket.transitioned` branch sets it). Reading a card's state name out of the
+ * newest definition would be `BoardGroup.workflowVersion`'s lie in miniature —
+ * a name from a vocabulary this ticket was never folded into — which is exactly
+ * why `ListRow.stateName` was recorded as a gap rather than closed with a
+ * one-line lookup.
+ *
+ * The version is passed as `getWorkflowDefFromProjection`'s numeric selector, so
+ * this is a by-version read and never an ordered `LIMIT 1`. Pairs are
+ * de-duplicated and sorted, so the query order is a function of the input SET;
+ * a pair with no published definition is ABSENT from the map, for the reason
+ * `latestWorkflowDefs` gives.
+ */
+export async function foldedWorkflowDefs(
+  db: Queryable,
+  workspaceId: string,
+  pairs: readonly { workflowId: string; version: number }[],
+): Promise<Map<string, PublishedWorkflowDef>> {
+  const defs = new Map<string, PublishedWorkflowDef>();
+  const keys = [...new Set(pairs.map((p) => `${p.workflowId}@${p.version}`))].sort();
+  for (const key of keys) {
+    const at = key.lastIndexOf('@');
+    const workflowId = key.slice(0, at);
+    const version = Number(key.slice(at + 1));
+    const def = await getWorkflowDefFromProjection(db, workspaceId, workflowId, version);
+    if (def !== null) {
+      defs.set(key, def);
+    }
+  }
+  return defs;
+}
+
+/** The key `foldedWorkflowDefs` returns, so callers do not spell it themselves. */
+export function foldedDefKey(workflowId: string, version: number): string {
+  return `${workflowId}@${version}`;
+}
+
+/**
  * `` `${workflowId}:${stateId}` `` for every state carrying amendment 9's
  * `blocked` flag.
  *

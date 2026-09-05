@@ -8,7 +8,8 @@ import { stubServices } from './helpers/stub-services.js';
 /**
  * ## THE ADAPTATION THIS FILE EXISTS TO PROVE
  *
- * Six of the THIRTEEN `DataSourceQuery` methods answer with a `ServingGapError`
+ * FOUR of the THIRTEEN `DataSourceQuery` methods answer with a `ServingGapError`
+ * — six until ruling P25 clause 1 served `getTickets`' and `getTicket`'s gaps
  * that ENUMERATES the facts the shipped routes do not serve. Four of the six —
  * `getMyWorkspaces`, `getMyWork`, `getAttention`, `getTickets` — are called by
  * pages in this shell, and the plan text (written before those refusals
@@ -243,7 +244,7 @@ describe('3.141 an expired session sends the viewer to sign in — on ALL THREE 
     // Without this, `useSignInOnExpiredSession` could push on every failure and
     // all three cases above would still be green — and the shell would send a
     // member with a perfectly good session to sign in again over a serving gap.
-    // `stubServices({})` is the shipped server's own state: six refusals whose
+    // `stubServices({})` is the shipped server's own state: four refusals whose
     // messages carry route names, field names and owners.
     render(
       <Providers services={stubServices({})}>

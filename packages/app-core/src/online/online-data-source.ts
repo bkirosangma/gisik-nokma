@@ -71,7 +71,7 @@ export function listQueryString(filter: FilterSpec, grouping: Grouping): string 
 /**
  * The online implementation of amendment 10's `DataSource`: HTTP + WS.
  *
- * ## Six of the THIRTEEN query methods REFUSE, and that is the design
+ * ## FOUR of the THIRTEEN query methods REFUSE, and that is the design
  *
  * They refuse in `mappers.ts`, with a `ServingGapError` that ENUMERATES the
  * facts the shipped routes do not serve and names who closes each. The
@@ -79,6 +79,17 @@ export function listQueryString(filter: FilterSpec, grouping: Grouping): string 
  * or a `MyWorkView` whose `contested` is `[]` — would put a view on screen that
  * is indistinguishable from an answer. See the coordination doc's "Step 11 (Plan
  * 6 remainder) — the `DataSource` register, re-derived, and RULING REQUEST P25".
+ *
+ * **It was six until ruling P25 clause 1's buildable subset landed.**
+ * `getTickets` and `getTicket` answer now: the list route serves `typeRank`,
+ * `epicId`, `stateName`, `assignedProvenance` and `hasRestrictedParent`, and the
+ * single read serves the domain `TicketState`, the title, the state provenance
+ * and the visible parent's title. The four that remain are `getMyWorkspaces` and
+ * `getMyWork` (both HELD with the owner — serving them means deciding what a
+ * project-scoped guest sees of a workspace's other projects, and there is no
+ * shipped project-list read at all), `search` (a data gap: `routes/search.ts`
+ * destroys which column matched inside the query) and `getAttention` (whose
+ * fourth item kind needs a title `GET /v1/contests` does not carry).
  *
  * ## Three methods take a `workspaceId` the plan's signature did not have
  *
@@ -153,9 +164,20 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
         await http.get(`/v1/projects/${projectId}/tickets?${listQueryString(filter, grouping)}`),
       ),
 
+    /**
+     * The roster join, the same one `getBoard` makes and for the same reason:
+     * this signature already names the workspace, so the display names are one
+     * shipped route away. `getTickets` above gets an EMPTY roster instead —
+     * neither its signature nor the list body names a workspace — and
+     * `mapListView`'s docblock argues why that degrades rather than lies.
+     *
+     * The roster is fetched only after a non-null body: a 404 here means "no
+     * such ticket, or not yours", and fetching a roster for it would be a round
+     * trip on behalf of an answer this method is about to give as `null`.
+     */
     getTicket: async (workspaceId, ticketId) => {
       const raw = await http.get(`/v1/workspaces/${workspaceId}/tickets/${ticketId}`);
-      return raw === null ? null : mapTicketRead(raw);
+      return raw === null ? null : mapTicketRead(raw, await workspaceRoster(workspaceId));
     },
 
     getTicketHistory: async (ticketId, afterSeq, limit) => {

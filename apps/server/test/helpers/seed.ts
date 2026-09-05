@@ -209,12 +209,36 @@ export interface SeedTicketArgs {
  * `workspaceHasLedger` answer truthfully for a workspace that has tickets in
  * it, which is what a real workspace looks like.
  *
- * The plan text's version also INSERTed a `proj_tickets` head row; that table
- * does not exist on this branch (Plan 3 Task 12 owns it), and its `ticket.created`
- * payload was missing the required `typeId` and `title` while spelling
- * `parentId` as an optional key — `ticketCreatedPayload` requires all three and
- * makes `parentId` nullable-but-present, so the plan's helper throws at the
- * parse before it reaches any assertion.
+ * ## The `proj_tickets` head row is written too, and it is a DIRECT INSERT
+ *
+ * The paragraph here used to read "the plan text's version also INSERTed a
+ * `proj_tickets` head row; that table does not exist on this branch (Plan 3 Task
+ * 12 owns it)". The table landed and the sentence outlived its condition — a
+ * docblock naming an absence is a claim with a shelf life — so the plan's row is
+ * restored, and the reason it MUST be is a property of the product rather than a
+ * convenience: `ticketsProjection` and `projVisibility` are both in the registry
+ * (`src/projections/index.ts`) and both run inside ONE ingest transaction, so no
+ * request can produce a `proj_visibility` row whose ticket has no
+ * `proj_tickets` row. A fixture that produced one was seeding a world the door
+ * cannot reach, and the single ticket read now throws on it — correctly, because
+ * that state means the two projections disagree.
+ *
+ * It is an INSERT rather than a run of `ticketsProjection`, which is a
+ * deliberate exception to this file's own rule, and the reason is stated rather
+ * than hidden. The real projection resolves the ticket's TYPE and WORKFLOW
+ * through `proj_ticket_types` and `proj_workflows` (`loadDeps`), which are
+ * populated by the founding sequence these fixtures deliberately do not run —
+ * they seed memberships and visibility directly. Running it would mean appending
+ * a workspace's whole founding sequence per seeded ticket, which moves every
+ * `workspace_seq` in twenty test files, several of which assert exact event
+ * sequences. So the head row is written with the values the reducer would
+ * produce from the very `ticket.created` above (its type, its parent, its title
+ * claim carrying that event's actor and both clocks) and fixture-chosen
+ * defaults for the workflow this world has no definition of.
+ *
+ * What this buys, beyond making the seeded world reachable: the title on it is
+ * the SAME claim the ledger event carries, so a route that serves the title and
+ * a check that reads the event cannot disagree about what somebody claimed.
  */
 export async function seedTicket(pool: Pool, args: SeedTicketArgs): Promise<void> {
   const created = testEnvelope({
@@ -231,6 +255,56 @@ export async function seedTicket(pool: Pool, args: SeedTicketArgs): Promise<void
   });
   await appendTestEvent(pool, created);
   await applyAll(pool, [created]);
+  await insertTicketHead(pool, args, created);
+}
+
+/** The fixture world's workflow: no `workflow.defined` is seeded here, so nothing names one. */
+const SEED_WORKFLOW_ID = 'wf-seed';
+const SEED_WORKFLOW_VERSION = 1;
+const SEED_STATE_ID = 'todo';
+
+/**
+ * The `proj_tickets` head row the ingest transaction would have written beside
+ * the `proj_visibility` one. See `seedTicket`'s docblock for why it is an
+ * INSERT.
+ *
+ * `ON CONFLICT DO NOTHING` because two fixtures may seed the same ticket id in
+ * one file and the first write is the one the event ledger already agrees with.
+ */
+async function insertTicketHead(
+  pool: Pool,
+  args: SeedTicketArgs,
+  created: LedgerEvent,
+): Promise<void> {
+  const title = args.title ?? `Ticket ${args.ticketId}`;
+  await pool.query(
+    `INSERT INTO proj_tickets
+       (ticket_id, workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
+        state_id, state_category, assignee_id, collaborator_ids, fields, transitions)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL, $10, $11, $12)
+     ON CONFLICT (ticket_id) DO NOTHING`,
+    [
+      args.ticketId,
+      args.workspaceId,
+      args.projectId,
+      args.typeId ?? 'task',
+      args.parentId ?? null,
+      SEED_WORKFLOW_ID,
+      SEED_WORKFLOW_VERSION,
+      SEED_STATE_ID,
+      'open',
+      JSON.stringify([]),
+      JSON.stringify({
+        title: {
+          value: title,
+          actorId: created.actorId,
+          clientTime: created.clientTime,
+          serverTime: created.serverTime,
+        },
+      }),
+      JSON.stringify([]),
+    ],
+  );
 }
 
 /**

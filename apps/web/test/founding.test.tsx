@@ -49,7 +49,8 @@ beforeEach(() => push.mockClear());
  *
  * The natural place for a founding form is inside the empty-state arm — "no
  * workspaces yet, make one". Against the shipped server that arm is
- * UNREACHABLE: `getMyWorkspaces` is one of the six refusing reads, so the page
+ * UNREACHABLE: `getMyWorkspaces` is one of the refusing reads (four of them
+ * since ruling P25 clause 1; this is still one), so the page
  * resolves to the refusal branch every time, and a form nested in the empty arm
  * would be a form nobody could ever open. The person who cannot be told which
  * workspaces they are in is exactly the person who most needs to found one.

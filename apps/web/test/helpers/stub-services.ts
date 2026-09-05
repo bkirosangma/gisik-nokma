@@ -34,10 +34,17 @@ export function refuse(method: keyof typeof SERVING_GAPS): () => Promise<never> 
 
 /**
  * A `DataSource` in the state the SHIPPED server actually puts this shell in:
- * the six refusing reads refuse, and everything a case has not deliberately
+ * the FOUR refusing reads refuse, and everything a case has not deliberately
  * stubbed rejects by name. Deliberate: a stub that answered `[]` or `null` for
  * an un-stubbed read would let a page under test render an invented blank and
  * call it a pass.
+ *
+ * **It was six.** `getTickets` and `getTicket` refused here until ruling P25
+ * clause 1's buildable subset landed and their absence lists were deleted from
+ * `SERVING_GAPS`. They are `unstubbed` now rather than answering something: this
+ * helper's whole rule is that a read a case did not stub must fail loudly, and a
+ * served read is no more entitled to a default `[]` than a refusing one was —
+ * the reason `getTicketTypes` is unstubbed too, which is stated below.
  */
 /**
  * The four gateways beside `DataSource`, in the state a case has not stubbed
@@ -77,8 +84,8 @@ export function stubServices(
     getMyWorkspaces: refuse('getMyWorkspaces'),
     getMembers: unstubbed('getMembers'),
     getBoard: unstubbed('getBoard'),
-    getTickets: refuse('getTickets'),
-    getTicket: refuse('getTicket'),
+    getTickets: unstubbed('getTickets'),
+    getTicket: unstubbed('getTicket'),
     getTicketHistory: unstubbed('getTicketHistory'),
     getWorkflowDef: unstubbed('getWorkflowDef'),
     // UNSTUBBED, not `[]`, even though the shipped server serves this one. The

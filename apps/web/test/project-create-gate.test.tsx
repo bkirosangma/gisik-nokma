@@ -15,8 +15,11 @@ import { EMPTY_PREFERENCES, stubServices } from './helpers/stub-services.js';
  * cannot be read:
  *
  * 1. **"This project has no ticket that could be a parent."** `parentCandidates`
- *    was `(list.rows ?? []).map(…)` and `getTickets` REFUSES against the shipped
- *    server, so `list.rows` is null forever and the picker offered *None
+ *    was `(list.rows ?? []).map(…)` and `getTickets` REFUSED against the shipped
+ *    server of the day (ruling P25 clause 1 has since served its five gaps; a
+ *    read that fails for any other reason lands in the same place, which is why
+ *    the case below stubs the failure rather than inheriting it), so `list.rows`
+ *    is null and the picker offered *None
  *    (project root)* and nothing else — while the Board tab on the same page
  *    rendered the very tickets the picker said did not exist, because `getBoard`
  *    IS served. That pairing is asserted below: it is what makes the defect a
@@ -169,8 +172,10 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
     render(
       <Providers
         services={stubServices({
-          // `getTickets` refuses BY DEFAULT here: it is one of the six, and this
-          // is the exact state the shipped server puts this page in.
+          // `getTickets` is left UNSTUBBED, so it rejects by name. It refused
+          // by default here until ruling P25 clause 1 served its gaps; what the
+          // case is about — a read that did not answer must not render as "this
+          // project has no tickets" — is the same for either cause.
           getBoard: async () => BOARD,
           getTicketTypes: async () => WORKSPACE_TYPES,
         })}
