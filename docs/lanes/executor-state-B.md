@@ -15,10 +15,10 @@ only what is written here.
 | anchor | value | how verified |
 |---|---|---|
 | branch | `exec/20-plan10-t13-t15` | `git branch --show-current` |
-| HEAD | `0b1b515` (T13) | `git rev-parse HEAD` |
-| `origin/main` | `1e372e3` | `git rev-parse origin/main` after `git fetch origin main` |
-| ahead of `origin/main` | **2** (`c71bfb6` state file, `0b1b515` T13) | `git rev-list --count origin/main..HEAD` |
-| HEAD reachable? | **YES** — contained by `exec/20-plan10-t13-t15` (local and remote, pushed) | `git branch --contains 0b1b515 -a` |
+| HEAD | `2aa1efa` (T13 + P34 + rebase + id allocation) | `git rev-parse HEAD` |
+| `origin/main` | `a23d686` (closure 1 / #109 landed) | `git rev-parse origin/main` after `git fetch origin main` |
+| ahead of `origin/main` | **6**, REBASED onto `a23d686` | `git rev-list --count origin/main..HEAD` |
+| HEAD reachable? | **YES** — `origin/exec/20-plan10-t13-t15` resolves to the same sha after `git fetch` | `git branch --contains 2aa1efa -a` + `git rev-parse origin/<branch>` |
 | tree | clean | `git status --short` (empty) |
 | node | v22.22.2 | `node -v` after `export PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH"` |
 | install | `pnpm install --frozen-lockfile` exit 0, `pnpm rebuild better-sqlite3` exit 0 | `/tmp/laneB-install.log` |
@@ -41,8 +41,8 @@ the rule is print the rows, not the count. `main` was 3181; 3210 - 3181 = **29**
 
 | # | task | state |
 |---|---|---|
-| 1 | **T13** — app-core contested-claim UX, offline reopen pair, skew badge, sync status bar | **DONE, committed `0b1b515`, pushed, gate green, PR open** |
-| 2 | T14 — dual-client harness rig (Fable author + reviewer) | not started |
+| 1 | **T13** — app-core contested-claim UX, offline reopen pair, skew badge, sync status bar | **DONE.** PR #117 open, rebased onto `a23d686`, re-gated under the lock. Includes Ruling P34's follow-up and the §12 id re-allocation. |
+| 2 | T14 — dual-client harness rig (Fable author + reviewer) | **IN PROGRESS** — import surface verified (eleven plan-text errors, below); Fable implementer authoring `rig.ts` + `rig.test.ts` |
 | 3 | T15 — scenarios S1–S6 (Fable author + reviewer) | not started |
 | 4 | T18 — `Features.md` §12 + `test-cases/12` final shape | **HELD** until Lanes C (T16) and D (T17) have MERGED to `main`. Poll `origin/main` for their merge commits. |
 
@@ -123,9 +123,59 @@ re-measuring.
 
 ---
 
+## ⚠️ THE FOUR THINGS A RESTART MUST KNOW BEFORE TOUCHING T14
+
+1. **The T14 plan text's rig code block is a DRAFT and ELEVEN of its details are wrong.** The verified
+   correction list is in the section "T14 — WHAT THE PLAN TEXT GETS WRONG" below. Do not implement from
+   the plan verbatim; the two that matter most are a security bypass and a fabricated bootstrap.
+2. **§12 case ids are ALLOCATED now, not discovered** (cross-lane, 2026-09-06). This lane keeps
+   **≤ 12.223**; Lane D holds 12.224–12.227, Lane C 12.228–12.239, Lane A 12.240+. The header's
+   NEXT-FREE sentence reads **12.240** deliberately. **Do not mint from 12.224.**
+3. **The gate lock protocol changed.** Acquire + pid + trap + drain-wait + run must be ONE backgrounded
+   invocation. **`rm -rf` is refused by this machine's permission layer** — use `rm -f <file>` plus
+   `rmdir <dir>`. Foreground `sleep` is refused too, which is why it must be backgrounded.
+4. **PR #117 is not merged and has been rebased twice.** Never assume a merge from a report; check
+   `gh pr view 117 --json state,mergedAt`. A `gh pr merge | tail -1` once hid its own exit code and was
+   reported as merged when GitHub had refused it.
+
+## T14 — WHAT THE PLAN TEXT GETS WRONG, verified against the tree at `a23d686`
+
+Plan lines 5897–6202. Every item below was read from source, not inferred.
+
+| # | plan says | truth |
+|---|---|---|
+| 1 | `createReplicaDataSource`, `ReplicaDataSource`, `LocalIngestResult` from `@gisik-nokma/sync-client` | They are in **`@gisik-nokma/app-core`** (Ruling P30). app-core→sync-client is the only dependency edge that exists. **`apps/server` needs BOTH packages as devDeps**, not the one the plan and the lane brief name. |
+| 2 | `IngestResult` from `ingest-service.js` | Not exported there — import from `@gisik-nokma/domain`. |
+| 3 | `listVisibleTickets` from `visibility/can-see.js` | It is in **`visibility/visible-tickets.ts`**, `(db: Queryable, userId, workspaceId)`. |
+| 4 | `ingestInteractive` uses `ingest.ingestBatch` | **SECURITY.** `ingestBatch` passes `door = null`, so `checkPermission` NEVER runs (`ingest-service.ts:437-442`); its docblock says *"An HTTP route must never call this"*. Every real online door uses `ingestClientBatch(events, userId)`. Using the internal door for the "online user stand-in" would let Task 15 assert permission outcomes the product does not have. `ingestBatch` **is** right for the SEED. |
+| 5 | `ds.query.getTicket(ticketId)` | Takes **two** args: `(workspaceId, ticketId)`. |
+| 6 | `ds.query.listEntityEvents(...)` | **Does not exist on `ds.query`.** It is `replica.listEntityEvents(ticketId)`. |
+| 7 | `seedMember(pool, workspaceId, userId)` | `role` is a **required 4th** positional arg. |
+| 8 | `'usr_a'`, `'ws_harness'` | Must be **ULIDs**. `membershipGrantedPayload` requires `ulidString` inside the projection's `apply()`, and `submittedEventSchema.workspaceId` is `ulidString` at `parseEvent`, which the real ingest door calls. |
+| 9 | a hardcoded 4-entry `BACKFILL` list | The server's `BOOTSTRAP_BACKFILL_TYPES` (`apps/server/src/sync/sync-routes.ts`) has **five** — it also carries `'visibility.set'`. Import it. A hand-copied list has the harness proving replicas against a bootstrap **the server never sends**, which is this series' signature failure wearing a new costume. |
+| 10 | `createReplica(...)` used synchronously | It is **async**; `createOutbox` and `createSyncEngine` are not. |
+| 11 | `export type Harness` omits `projTicket` | Its own interface block and implementation both include it. Include it. |
+
+**Verified CORRECT and not to be "fixed":** `createIngestService`, `buildProjectionRegistry`,
+`getTicketStateFromDb`, `createSyncService`, `visibleEventsFor`, `readStreamSeq`, `runSnapshotPass`,
+`readEntityEvents`, `rowToEnvelope`, `readLatestSnapshot`, `resolveEffectiveRole`, `createTestDatabase`,
+`createBetterSqliteStorage` from the `/testing` subpath, `processBatch(userId, rawEvents)`,
+`{ kind: 'restrict-to', assignee: true }`, `getCursor`/`setCursor` taking a workspaceId, and
+`loadBootstrap`'s shape. `apps/server/vitest.config.ts` includes `test/**/*.test.ts` recursively and CI
+runs `apps/server` with Postgres on 54329 — **a new `test/dual-client/` suite needs ZERO config change**,
+and the CI file's own comment already says the dual-client job is absent by design pending this task.
+
 ## OPEN RULINGS FROM THIS LANE
 
-**R-B1 (open, non-blocking): three in-code annotations name "Plan 10 Task 13" as the owner of work that
+**R-B1 — RULED (P34, 2026-09-06). Kept for its reasoning.** Of the three annotations, none was Task
+13's and none stays unassigned: the offline union list and the `ListRow.pending` renderer went to
+**Lane A as closure 2b**; the third was SPLIT — its surface half shipped here (`syncErrorNotice`,
+cases 12.216–12.219), its POLICY half stays in `createSyncEngine`, unassigned, and went to the owner as
+a task-wanting question. The split was this lane's pushback on the ruling's own wording and was
+accepted: a label asserting *"will not reconnect"* for a code the engine reconnects on would be a view
+deciding on the engine's behalf.
+
+**Original R-B1: three in-code annotations name "Plan 10 Task 13" as the owner of work that
 Task 13's own Files block does not reach.**
 
 1. `packages/app-core/src/replica/replica-data-source.ts:353` — `OFFLINE_BORN_ABSENCE`, owner
