@@ -887,6 +887,10 @@ Lane C's #134 (T14) **CREATES** `Features.md` §13 and `test-cases/13-deployment
 **So the standing instruction changes to:** this lane's seam-1 PR **APPENDS its own subsections to an
 existing §13** — it must NOT create the file, and a rebase must land C's version first.
 
+**PR-BODY OBLIGATION (controller, 2026-09-06):** the retroactive catalogue commit **counts as the same
+change set for promotion purposes ONLY because seam 1 is one PR** — and the PR body must **say so
+explicitly**. It is a stated exception to the same-change-set convention, not a silent one.
+
 **Owed, and to be cleared in one dedicated commit after rebasing onto C's #134:**
 - §13 + `test-cases/13` entries for **T1** (nine variables, `/healthz` deploy sha, the CA fix, the
   strict-URL refusal closing case 6.124) and **T5** (both Dockerfiles, the `node-pg-migrate` move).
