@@ -1143,3 +1143,88 @@
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
 }
+
+/* Plan 10 Task 13 — the offline/sync UX surfaces: the contested-claim banner,
+   the clock-skew flag and the sync-truth strip. Added here rather than left as
+   bare class names in app-core because the components' own interface contract
+   names these tokens: a class with no rule is a colour signal that silently
+   does not apply, which is the failure `inbox-css-binding.test.tsx` was written
+   after measuring. `test/sync-ux-css-binding.test.tsx` in app-core ties these
+   selectors to what the three components actually render, by set equality. */
+.gn-contest-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border: 1px solid var(--gn-contested);
+  border-radius: 6px;
+  background: var(--gn-surface-sunken);
+  color: var(--gn-text);
+  padding: 0.75rem 0.9rem;
+}
+.gn-contest-banner__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+/* `pre-wrap` because the claim is rendered VERBATIM — it carries the original
+   payload's JSON, and collapsing it would be this surface editing the thing it
+   exists to quote. */
+.gn-contest-banner__claim {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+}
+.gn-contest-banner__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.gn-contest-banner__action {
+  font: inherit;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 4px;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  cursor: pointer;
+}
+/* Discard is the one resolution that ends the claim without re-stating it, so
+   it wears the danger token — it is still a RECORDED event, not a deletion. */
+.gn-contest-banner__action--discard {
+  border-color: var(--gn-danger);
+  color: var(--gn-danger);
+}
+.gn-contest-banner__action:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+
+/* The skew flag reads as a note about the DEVICE, not an error about the
+   event, so it takes the warning token rather than danger. */
+.gn-clock-skew-badge {
+  display: inline-block;
+  font-size: 0.78rem;
+  color: var(--gn-warning);
+  border: 1px solid var(--gn-warning);
+  border-radius: 999px;
+  padding: 0 0.5rem;
+}
+
+.gn-sync-status-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--gn-text-muted);
+  background: var(--gn-surface);
+  border-top: 1px solid var(--gn-border);
+  padding: 0.3rem 0.75rem;
+}
+.gn-sync-status-bar__label { color: var(--gn-text); }
+.gn-sync-status-bar__failed { color: var(--gn-contested); }
+/* Keyed on the data attribute the component already sets rather than on a
+   modifier class the markup could forget to spell — the same choice
+   `.gn-saved-filters__submit:disabled` makes above. */
+.gn-sync-status-bar[data-status='offline'] { border-top-color: var(--gn-pending); }
+.gn-sync-status-bar[data-status='live'] { border-top-color: var(--gn-success); }

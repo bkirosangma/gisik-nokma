@@ -243,3 +243,25 @@ export {
   type ReplicaOnlyQuery,
   type TicketSummary,
 } from './replica/replica-data-source.js';
+
+// Plan 10 Task 13 — the offline/sync UX surfaces. Named exports, not
+// `export *`, for the reason the blocks above give: a star would publish each
+// module's internals as package surface.
+//
+// `ContestLike` is exported under its own name and NOT as `ContestedClaim`,
+// which this package already declares (`view-types.ts:165`, the `MyWorkView`
+// row) and which leaves through the `export *` on line 3. They are different
+// shapes for different jobs — the row renders a summary, `ContestLike` carries
+// the original envelope every resolution needs — and putting two declarations
+// behind one name at the package root is the drift the saved-filters block
+// above refuses for `SavedFilter`.
+export {
+  resolveContest,
+  type ContestLike,
+  type IngestFn,
+  type ResolveContestInput,
+} from './contests/contest-view-model.js';
+export { ContestBanner } from './contests/contest-banner.js';
+export { buildReopenPair, nonTerminalStates } from './offline/reopen-pair.js';
+export { ClockSkewBadge, formatClockSkew } from './history/clock-skew-badge.js';
+export { SyncStatusBar, syncStatusLabel } from './sync/sync-status-bar.js';
