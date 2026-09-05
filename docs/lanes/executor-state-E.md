@@ -891,8 +891,26 @@ existing §13** — it must NOT create the file, and a rebase must land C's vers
 - §13 + `test-cases/13` entries for **T1** (nine variables, `/healthz` deploy sha, the CA fix, the
   strict-URL refusal closing case 6.124) and **T5** (both Dockerfiles, the `node-pg-migrate` move).
 - Then **T2, T3, T4, T6** catalogue in their own change sets, as the convention actually requires.
-- **Case ids: re-measure §13's max on `origin/main` at rebase and mint above it.** C opened the bucket,
-  so its reserved range is C's to state; do not assume 13.1.
+### 🔒 §13 CASE-ID BLOCK — **LANE E OWNS 13.101–13.200**
+
+Allocated by the controller 2026-09-06 **after Lanes C and D both minted from 13.1** — the same collision
+class as §12's, one section over.
+
+| lane | block |
+|---|---|
+| C | 13.1 – 13.40 |
+| D | 13.41 – 13.100 |
+| **E (this lane)** | **13.101 – 13.200** — seam 1, T11/T12, T13 |
+| next | 13.201, on request |
+
+**MINT FROM 13.101. Never from the file's apparent next-free position** — that position is what produced
+the collision, because two lanes reading the same "next free" line at the same fork point both get it
+right and still collide. **T16 re-states the header; it never renumbers.**
+
+**Other sections this lane's 18 errands touch:** §6 (cases 6.123, 6.124), §7 (7.35), §9 (A0's 9.240/9.241,
+already minted and confirmed correct against `test-cases/README.md`'s "new cases continue from 9.240").
+For any NEW id in those: **measure `origin/main`'s maximum at rebase.** **§12 is BLOCKED — A 240–259,
+B 260–289 — ASK before minting there.** §12 is not this lane's anyway.
 
 # Lane C's #134 — what it does to this lane's CI surface
 
