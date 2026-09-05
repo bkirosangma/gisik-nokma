@@ -1644,13 +1644,24 @@ already collided twice on "next free" — see this file's HIGHEST-ID line.
 
 **RECORDED, NOT FIXED — one limitation neither case above can see.**
 
-0. **The queue above serialises this module's JS callers; it cannot pin a pooled connection.**
-   `tauri-plugin-sql` 2.4.1's public `Builder` exposes no pool-size or connection-pinning option, and
-   `DbPool::connect` opens the database through sqlx's `Pool::connect`, defaulting `max_connections` to
-   10 (read from the crate's own source in the local cargo registry cache, not inferred). So a
-   concurrent unqueued `run`/`all` call — which `app.tsx`'s `listTicketSummaries` issues on every change
-   notification — can be routed to a second pooled connection while a transaction is open on a first,
-   and `BEGIN IMMEDIATE`/`COMMIT`/`ROLLBACK` are not guaranteed to land on the connection that opened
-   them. Both 12.228 and 12.229 back the wrapper with exactly ONE `better-sqlite3` handle, which has no
-   pool to race against — no case here can fail on this, by construction, so none claims to have closed
-   it. OWNER: whoever next hardens this adapter for real multi-device use, a decision no task owns yet.
+0. **The queue above serialises this module's JS callers; it cannot pin a pooled connection — and this
+   is MEASURED as a live failure, not argued as a theoretical race.** `tauri-plugin-sql` 2.4.1's public
+   `Builder` exposes no pool-size or connection-pinning option, `DbPool::connect` opens the database
+   through sqlx's `Pool::connect` (default `max_connections` 10, no `busy_timeout` set anywhere in the
+   plugin), and every `execute`/`select` Tauri command independently acquires/releases a pooled
+   connection for one `sqlx::query(sql)` call — read from the crate's own source in the local cargo
+   registry cache, not inferred. *Standalone probe (a scratch `sqlx = "=0.8.6"` binary, the plugin's
+   pinned version, replicating its exact `Pool::connect`/`sqlx::query`/`pool.execute` calls): one
+   `BEGIN IMMEDIATE` then one `INSERT` as two sequential `pool.execute()` calls — this adapter's own
+   pattern, with ZERO concurrency — reproducibly errors `(code: 5) database is locked` on the INSERT,
+   the pool reporting a second physical connection opened despite the first sitting idle. A single
+   `execute()` call carrying a WHOLE transaction as one multi-statement string was also measured and
+   DOES work (all statements land on the one connection that call acquires, pool left clean after) —
+   but every real production caller of `SyncStorage.transaction`
+   (`packages/sync-client/src/storage/schema.ts`; all four transaction sites in
+   `packages/sync-client/src/replica/replica.ts`) reads with `tx.all()` INSIDE the transaction and
+   branches on what it reads, which no single pre-built SQL string can express.* Both 12.228 and 12.229
+   back the wrapper with exactly ONE `better-sqlite3` handle, which has no pool to race against and no
+   separate command boundary to violate — no case here can fail on this, by construction, so none
+   claims to have closed it. OWNER: whoever next hardens this adapter for real multi-device use, a
+   decision no task owns yet.
