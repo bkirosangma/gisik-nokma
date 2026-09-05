@@ -101,6 +101,35 @@ running server test suites at once is the Sep 4 crash with a multiplier. **Rule,
 **The controller's own forced gate at each merge stays `--force`, uncached, node 22, chained in one call
 — and takes the same lock.**
 
+### LAUNCHED 2026-09-06 00:47 IST — all five lanes live, verified working, not merely rendered
+
+| window | lane | session model | worktree · branch | verified doing |
+|---|---|---|---|---|
+| `gisik:1` | A | opus | `gisik-nokma-exec` · `exec/19-serving-gaps` @ `4af1426` | found the HELD pair stays unbuilt, started step 0 (the three uncommitted test files) |
+| `gisik:2` | B | opus | `lanes/lane2-plan4` · `exec/20-plan10-t13-t15` | verifying domain exports vs T13's plan assumptions |
+| `gisik:3` | C | sonnet | `lanes/lane3-plan7-8` · `exec/21-plan10-t16-desktop` | reading the topology (slow Sonnet start, working) |
+| `gisik:4` | D | sonnet | `lanes/lane4-periphery` · `exec/22-plan10-t17-mobile` | reading controller-state |
+| `gisik:5` | E | opus | `lanes/lane5-plan11` · `exec/23-plan11` | went straight to the attachment routes and `ci.yml` |
+
+**Launcher: `gisik-nokma-lanes/start-lanes.sh`** (brief + `override-lane{A..E}.md` concatenated per lane,
+`send-keys`, replaces a window at the same index; `./start-lanes.sh C E` relaunches a subset). **Relaunch
+a dead lane with it, not by hand.** All four new worktrees were cut from `1e372e3` with `pnpm install
+--frozen-lockfile` + `pnpm rebuild better-sqlite3` under node 22 before launch. The old lane branches
+(`lane2-handover`, `exec/07-editor-client`, `exec/06a-client-core`) were left in place, detached-from,
+not deleted — they are the record. The watch monitor survived (pid 23056) and logged the pane set going
+`0,1` → `0,1,2,3,4,5`.
+
+**Two facts about Lane A found at launch and written INTO its override rather than left to be
+rediscovered:** (1) its branch had moved to `4af1426` — a pushed handoff in which the executor answered
+**four of the five unknowns itself before the quota wall**, reaching the same APPLIES conclusion on
+`restricted-parents.ts` as Ruling P31 independently — **two instruments, one answer, which is the
+strongest form this file recognises**; (2) **three uncommitted test files** sat in the worktree
+(`app-core/test/online/online-data-source.test.ts`, `views/reopen-flow.test.tsx`,
+`views/ticket-sheet.test.tsx`, +97/−17) — the predecessor's in-progress fix for the expected red its own
+gate found (21/24), pinning `getTickets`/`getTicket` as **served** rather than deleting the refusal rows.
+The override's step 0 is "commit these first; never `git checkout --`". A window kill does not touch a
+worktree, so nothing was lost — but a fresh session reading `main` would not have known they existed.
+
 ### Still with the owner — the ONE thing that blocks work, restated with a recommended default
 
 **Guest visibility across projects** (`WorkspaceRef.projects` → `getMyWorkspaces`, `WorkItem.projectName`
