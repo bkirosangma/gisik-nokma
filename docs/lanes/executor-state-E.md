@@ -16,11 +16,38 @@ off `main`.
 | branch | `exec/23-plan11` |
 | worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane5-plan11` |
 | merge-base with `origin/main` | `1e372e3` |
-| HEAD at last refresh | `1e372e3` + this commit |
-| ahead of `origin/main` | 1 (this state file) |
+| HEAD at last refresh | `f621a8c` (verified reachable on `origin/exec/23-plan11`) |
+| ahead of `origin/main` | 2 — `22ba60d` state file, `f621a8c` `.nvmrc`/`.npmrc` |
 | tree state | clean |
-| node | `v22.22.2` (`$HOME/.nvm/versions/node/v22.22.2/bin`) |
-| gate composition | NOT yet recounted at this sha — no gate run taken yet this lane |
+| node | `v22.22.2` (`$HOME/.nvm/versions/node/v22.22.2/bin`), pnpm 9.15.0 |
+| gate composition | baseline run IN FLIGHT at `f621a8c` — see "Gate baseline" below |
+
+## ⚠️ CROSS-LANE HAZARD — `pgrep -f vitest` matches the PEER LANE SESSIONS, not vitest
+
+**Reported to the controller 2026-09-06.** Every lane brief, and the controller's own gate procedure, says
+to reap survivors with `pgrep -f vitest`. On this machine, today, that command returns **four PIDs, all of
+them `comm=claude`** — lanes A, B, C and D's own sessions — and **zero vitest processes**. `pgrep -f`
+matches the whole command line, and each lane session's command line embeds its brief, which contains the
+word "vitest" in the piped-into-`head` rule. **A lane that follows the instruction literally kills the
+other four lanes.**
+
+Same class as the 2026-09-04 crash the instruction exists to prevent — a command that names one thing and
+matches another — inverted: that one left workers alive, this one kills sessions that are not workers.
+
+**Use this instead.** It requires the executable to actually be `node` AND the command line to mention
+vitest:
+
+```
+ps -eo pid=,comm=,args= | awk '$2 ~ /node$/ && index($0, "vitest") > 0 {print $1}'
+```
+
+Verified three ways, not reasoned about:
+- **negative control** — returns 0 rows now (no orphans exist);
+- **positive control** — a throwaway `node … /node_modules/vitest/dist/worker.js` IS matched, so the
+  matcher is not vacuous. **This control earned its keep:** the first version of this awk had an
+  unterminated character class and printed an *error* that read exactly like a clean empty result. Only
+  the positive control separated "nothing there" from "the matcher is broken";
+- **safety check** — all four peer session PIDs explicitly NOT matched.
 
 ## Where I am in the sequence
 
@@ -34,7 +61,7 @@ off `main`.
 | T3 | error alerting hook | not started |
 | T4 | SMTP magic-link sender | not started |
 | T5 | Dockerfiles (server migrates on boot; web `standalone`) | not started |
-| — | `.nvmrc` = 22, `engine-strict=true` in `.npmrc` | not started (rides with T5) |
+| — | `.nvmrc` = 22, `engine-strict=true` in `.npmrc` | **DONE — `f621a8c`** |
 | T6 | `docker-compose.dev.yml`, five services, self-verifying env contract | not started (LAST in seam) |
 
 **Seam 2 (PR 2) — T7 seed plumbing · T8 Convenience Corner mapping · T9 seed runner · T10 dev seed ·
@@ -75,7 +102,18 @@ have MERGED.** Not started.
   are already in `apps/server/package.json`. One less `pnpm-lock.yaml` conflict with lanes C and D.
 - **`pnpm-workspace.yaml` globs are `packages/*` and `apps/*` only** — confirmed, so T13's root `e2e/`
   genuinely needs a third entry.
-- **`.nvmrc` and `.npmrc` do not exist** at the repo root (`ls` errored on both).
+- **`.nvmrc` and `.npmrc` did not exist** at the repo root (`ls` errored on both). **Now landed at
+  `f621a8c`**, and the flag was proved to BIND rather than assumed: node 22.22.2 + `engine-strict` → exit
+  0; node 24.11.1 + `engine-strict` → exit 1; node 24.11.1 with the flag removed → exit 0. The third row
+  is what attributes the failure to the flag rather than to node 24 breaking pnpm generally — without it
+  the negative control proves only that *something* went wrong.
+  **AND: that refusal is SILENT.** Under a wrong Node, pnpm 9.15.0 exits 1 and prints **nothing** — not
+  stdout, not stderr, at `--loglevel=info` and `--reporter=append-only` alike, four settings probed. A CI
+  log shows a bare non-zero exit with no explanation, and every natural reading of it (broken lockfile,
+  registry down) is wrong. `.npmrc` carries that warning in its own comment, which is the only place a
+  person debugging it will be looking. **Blast radius: lanes A–D inherit the flag when this merges**; they
+  are unaffected under node 22 (`pnpm install --frozen-lockfile` re-run in this worktree with the real
+  `.npmrc` in place: exit 0), and get the silent exit 1 under anything else.
 - **`.github/workflows/ci.yml` EXISTS**, 208 lines / 10.7K, one `gate` job with a docs-only scope skip.
   T14 EXTENDS it. Do not recreate it.
 - **`apps/server/test/node-version.test.ts` already asserts the running Node against root
