@@ -42,7 +42,7 @@ the rule is print the rows, not the count. `main` was 3181; 3210 - 3181 = **29**
 | # | task | state |
 |---|---|---|
 | 1 | **T13** — app-core contested-claim UX, offline reopen pair, skew badge, sync status bar | **DONE.** PR #117 open, rebased onto `a23d686`, re-gated under the lock. Includes Ruling P34's follow-up and the §12 id re-allocation. |
-| 2 | T14 — dual-client harness rig (Fable author + reviewer) | **IN PROGRESS** — import surface verified (eleven plan-text errors, below); Fable implementer authoring `rig.ts` + `rig.test.ts` |
+| 2 | T14 — dual-client harness rig (Fable author + reviewer) | **WRITTEN, UNVERIFIED, BLOCKED.** `rig.ts` (472 lines) + `rig.test.ts` (149) exist and `apps/server` typecheck is exit 0. **The self-test has never completed a run** — Postgres is down (see the BLOCKER below). Not committed. Not reviewed. **Do not claim it works.** |
 | 3 | T15 — scenarios S1–S6 (Fable author + reviewer) | not started |
 | 4 | T18 — `Features.md` §12 + `test-cases/12` final shape | **HELD** until Lanes C (T16) and D (T17) have MERGED to `main`. Poll `origin/main` for their merge commits. |
 
@@ -122,6 +122,39 @@ re-measuring.
     clock-sensitive ones, so a task transcribing it inherits no discipline from the plan.
 
 ---
+
+## ⛔ BLOCKER (2026-09-06 ~01:45): DOCKER'S VOLUME IS FULL AND THE GISIK POSTGRES IS IN A CRASH-RECOVERY LOOP
+
+**No lane can run `apps/server` tests or a full gate until disk is freed inside Docker.** Measured:
+
+- `docker exec gisik-nokma-exec-postgres-1 df -h /var/lib/postgresql/data` → `/dev/vda1 58.4G 56.1G **0 available** 100%`.
+- **The host Mac is fine** — 77 GB free on `/System/Volumes/Data`. This is Docker's own VM disk.
+- Postgres cannot exit recovery: `PANIC: could not write to file "pg_logical/replorigin_checkpoint.tmp":
+  No space left on device` → `checkpointer process ... terminated by signal 6` → `all server processes
+  terminated; reinitializing` → repeat. `pg_isready` answers **no response**.
+- **`docker ps` still says "Up 43 hours".** The container is up; the database is not. Do not read
+  liveness off `docker ps` here.
+
+**Where the space went, and it is not this project:** `docker system df` → Images 39.79 GB (36.83 GB
+reclaimable), Build Cache 12.60 GB (12.60 GB reclaimable, **0 active**), Local Volumes 2.31 GB (1.44 GB
+reclaimable). The 39 orphaned `gisik_test_*` databases totalled **331 MB** — real litter, under 1% of
+the problem.
+
+**What this lane did and did not do.** It dropped the 39 orphaned test databases (all idle, zero active
+connections, checked before dropping). Those DROPs reached the WAL, and the checkpoint after them
+PANICked — but the volume was already at 100% and `CREATE DATABASE` was already failing before any of
+it, which is how the problem was found. Any write would have hit the same wall. **It did NOT run
+`docker system prune` or `docker builder prune`**: that is destructive and machine-wide, and this
+daemon also hosts `mongo`, `redis` and a `postgres:15.3` belonging to the owner's other projects. It
+needs the owner's authorization and was surfaced to them.
+
+**Recovery order when authorized:** `docker builder prune -f` (12.6 GB, nothing active) → if still
+short, prune unused images → restart the gisik postgres container → `pg_isready` → re-run the rig.
+
+**Standing fix worth making afterwards:** `createTestDatabase` drops its database in `drop()`, and a
+killed or crashed run never calls it — which is exactly how 39 accumulated. A gate should sweep idle
+`gisik_test_*` databases at the START of a run, because the end is the part that does not happen when
+it matters.
 
 ## ⚠️ THE FOUR THINGS A RESTART MUST KNOW BEFORE TOUCHING T14
 
