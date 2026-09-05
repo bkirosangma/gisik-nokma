@@ -3,6 +3,7 @@ import type { Queryable } from '../db/queryable.js';
 import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { canSee } from './can-see.js';
+import { grantBackfillFor, isGrantBackfillTrigger } from './grant-backfill.js';
 
 /**
  * "This ticket is gone — delete whatever you hold for it."
@@ -278,7 +279,12 @@ async function nowInvisibleTicketsInScope(
  * **as of now**: an event about a ticket this user cannot see now is never
  * yielded, and whatever a revocation inside the range took away comes back as a
  * tombstone. Backfilling a ticket's pre-cursor history when visibility is newly
- * GRANTED is Plan 10's job, on top of this primitive.
+ * GRANTED **is done here now** — closure 5's grant half, ruling P37, in
+ * `grant-backfill.ts`. This docblock said it was "Plan 10's job, on top of this
+ * primitive" from Task 11 until 2026-09-06, and for that whole time nothing did
+ * it: case 12.274 measured a client left holding 2 events where the server held
+ * 4, permanently. The sentence that named an owner is what made the absence look
+ * like a decision.
  *
  * ## `afterSeq` is the WORKSPACE cursor
  *
@@ -365,6 +371,14 @@ export async function* visibleEventsFor(
 
   const isGuest = eff.workspaceRole === 'guest';
   const purged = new Set<string>();
+  // Closure 5's GRANT half, per drain: the tickets whose pre-cursor history has
+  // already been handed back in THIS drain. Two triggers on one ticket inside
+  // one range, or a trigger on a ticket an ancestor's subtree walk already
+  // covered, deliver once. Scoped to the drain and not to the subscription on
+  // purpose — a later drain that sees a NEW widening is owed the delivery again,
+  // and the alternative would need per-subscriber state this generator does not
+  // have and must not invent.
+  const backfilled = new Set<string>();
 
   async function* purge(ids: readonly string[]): AsyncGenerator<PurgeInstruction> {
     for (const id of ids) {
@@ -380,6 +394,22 @@ export async function* visibleEventsFor(
     switch (audienceClassOf(env.entity.kind)) {
       case 'ticket': {
         if (await canSee(db, userId, env.entity.id)) {
+          // CLOSURE 5, THE GRANT HALF (ruling P37). An event that can change
+          // this ticket's resolved audience, reaching a reader who may see it
+          // NOW, hands back the pre-cursor history their cursor ran past while
+          // they could not see it — for this ticket and every descendant that
+          // inherits from it. The whole argument, including why a NARROWING can
+          // never reach this line and therefore needs no before-image to
+          // exclude, is `grant-backfill.ts`'s docblock.
+          //
+          // Before the event, not after: the backfill is earlier history, and
+          // `seq` order is the order a consumer that is not a full-replay folder
+          // would need. Neither this nor any backfilled envelope can move a
+          // cursor — both consumers advance only on `workspaceSeq > cursor` and
+          // every backfilled envelope is at or below `afterSeq`.
+          if (isGrantBackfillTrigger(env.type)) {
+            yield* grantBackfillFor(db, userId, env.entity.id, afterSeq, backfilled);
+          }
           yield env;
         }
         // NO per-event purge here, and there used to be one — this is the site
