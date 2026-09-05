@@ -382,3 +382,182 @@ specifies **one** regex which the script's own header records as matching *nothi
 `pnpm check:env` is already wired and already runs in CI. **Re-implementing per the plan text would be a
 regression.** Remaining honest T6 scope: `docker-compose.dev.yml` (Step 1) and proving the checker against
 a planted defect (Step 4).
+
+---
+
+# THE BRIEF IS WRONG ABOUT TZ — measured, with a positive control
+
+The lane brief's **"TWO KNOWN GAPS" item 2** says: *"Zero of 48 test files vary `TZ`; seven are day- or
+clock-sensitive; all seven omit it."* **All three numbers are false.**
+
+| claim | measured |
+|---|---|
+| "48 test files" | **235** repo-wide (`apps` + `packages`, excluding `node_modules`); **89** under `apps/server/test` alone |
+| "zero vary `TZ`" | **11 files assign `process.env['TZ']`** |
+| implied: no controls exist | at least two carry an explicit control proving the assignment moves local time |
+
+The eleven: `apps/web/test/ist-today.test.ts` · `apps/server/test/integration/real-door-round-trip.test.ts`
+· `apps/server/test/routes/attention.test.ts` · `apps/server/test/helpers/read-scenario.test.ts` ·
+`apps/server/test/notifications/sweep.test.ts` · `packages/app-core/test/calendar/clock-free.test.ts` ·
+`packages/app-core/test/views/my-work.test.tsx` · `.../attention-strip.test.tsx` ·
+`.../history-list.test.tsx` · `packages/editor/test/google-picker.test.ts` ·
+`packages/editor/test/attachment-list-item.test.tsx`.
+
+**Positive control**: the same tooling found 89 files containing `describe(` under `apps/server/test`.
+Without it this measurement would have been worthless — **my first attempt returned 0 for the TZ sweep AND
+0 for the control**, because zsh expanded the unquoted `--include=*.test.ts` and the whole run errored.
+A bare "0 files vary TZ" from that run would have *confirmed the brief* and been pure artefact.
+
+**Consequence for this lane:** do NOT add TZ-varying cases to close a gap that is not there.
+`apps/server/test/routes/board.test.ts:80-87` already argues that a TZ case over clock-free output is
+itself a check that cannot fail. The brief's *rule* still stands — a clock-sensitive assertion must vary
+`TZ` explicitly — but its premise that nothing does was stale.
+
+## A NEW SILENT-EMPTY MODE — the ninth, and it hits the plan documents
+
+**`grep -c '^# '` returns an EMPTY STRING, not `0`, on the plan markdown files.** Measured on
+`2026-08-20-08-workflow-builder.md` and `2026-08-20-11-deployment-dogfooding.md`; both are *"UTF-8 text,
+with very long lines"*. `awk` on the identical pattern returns 2 and 53. So a count that should be a
+number comes back blank, and any arithmetic built on it silently degrades. **Use `awk` for counts over
+the plan documents.** Add to the recorded silent-empty set.
+
+---
+
+# SEAM 2 PRE-FLIGHT — findings (3 opus agents, 0 errors), 2026-09-06
+
+## T7 / T8 — the Convenience Corner mapping
+
+**The frozen record was actually parsed, not described.** `reference/convenience-corner-tracker/board.data.js`
+(231 KB) evaluated in a vm sandbox: `week1 = 2026-08-18`, **191 items over 16 epics**, 13 registrations +
+10 questions = **23 errands**, states `{later:5, next:14, in-progress:1, blocked:3, done:0}` — exactly the
+plan's table. Generator arithmetic reproduced for w0/w1/w7/w28. Every named fixture holds its claimed
+property.
+
+**What the record does NOT contain — this is what "nothing invented" guards:** no user identities of any
+kind (no emails, no user ids; `counterparty`/`who` are free text like "Dun & Bradstreet", "Accountant");
+no workspace, project, epic-ticket or workflow ids; no ticket type; no assignees; no comments; no
+attachments; no ordering/rank; no priority; no estimates; **no transition history or timestamps** (only
+the current state); **no `ended` date on any of the 191 items**; and **no origin date on 22 of the 23
+errands** — exactly one, `ops:accountant-hsn-digits`, carries `started`. Everything the seed adds beyond
+this (workspace, project, epics, type, workflow, actor, clientTime) is invented **by construction** and
+each needs a named justification.
+
+### ⚠️ RULING P29's TRIPWIRE — the oracle does NOT defend the ruling
+
+The two `rule-bypassable` advisories live at `packages/domain/src/workflows/errand-with-waits.ts`:
+`{from:'later',to:'waiting',rules:[]}` and `{from:'next',to:'waiting',rules:[]}`, beside
+`{from:'in-progress',to:'waiting',rules:[{kind:'require-comment'}]}`.
+
+**`checkErrandTemplate` — T7's own oracle — would still return `ok:true` after someone "fixed" them.** It
+checks state presence, one-hop reachability, `waiting.blocked`, and `require-comment` into `done`; none of
+that changes if `later→waiting` and `next→waiting` acquire a guard. **The ONLY thing that catches it is
+`packages/app-core/test/workflow-builder/templates.test.ts:80`**, which asserts the advisories equal
+`['rule-bypassable','rule-bypassable']`.
+
+The runtime consequence is concrete: the **3 blocked errands transition `later→waiting` in one hop**, so a
+`require-comment` there would make the seed's own transitions refusable — and the seed would have to
+**invent a comment**, the exact thing T8 forbids. A second temptation: `templates.test.ts:50-55` asserts
+every *other* template has zero advisories under the banner *"a shipped template that greets the author
+with a warning is a shipped template that is wrong"*; errand-with-waits is excluded **on purpose**.
+
+### Defects in T7/T8's own text
+
+- **PAYLOAD FIELD NAME MISMATCH — the most consequential.** T8 emits `ticket.transitioned` with
+  `{toStateId}`; the registered schema uses **`to`** (`packages/domain/src/workflow.ts:137-145`).
+- **`startDate` is a BUILT-IN field id.** T8 and the CC-seed prose declare it as a *custom* field;
+  `ticketTypeDefSchema`'s superRefine raises *"field id \"startDate\" shadows a built-in field"* and the
+  founding `ticket-type.defined` event would not parse. **Only `counterparty` is a legitimate custom field.**
+- **`startDate`'s VALUE takes the day-claim object** `{date, note?}`, not a bare string; a bare
+  `'2026-08-18'` is refused `field.type-mismatch`. The plan's own `dueDate` branch already has the right shape.
+- **Three hand-written "ULID" literals are not ULIDs** — `01J5SEEDUSER0000000000000A`,
+  `01J5OWNERUSER000000000000A` and a third all contain `U`/`O`, which Crockford base32 excludes. T7/T8
+  never parse them so their tests stay green; **T9/T10 call the real `ingestBatch` and would fail there.**
+- **`workflowFromTemplate`'s `{...template}` is a SHALLOW spread** — `states`/`transitions` are the very
+  arrays of the frozen module-level constant, so mutating a clone mutates the template for every importer.
+  Use `structuredClone`; assert non-sharing by **identity** (`not.toBe`), not `toEqual`.
+- `ERRAND_WITH_WAITS_TEMPLATE` is `Omit<WorkflowDef,'id'|'version'>`, **not** `WorkflowDef` — every T7
+  signature that says otherwise is a strict-mode error.
+- **`seedUlid` needs nothing from `ulidx`** — only `node:crypto` plus the shared `ULID_REGEX`. Verified:
+  output matches `ids.ts:9`'s regex and `seedUlid('ab','c') !== seedUlid('a','bc')`.
+- **Idempotence rests on `events_pkey` alone.** Only that violation is translated to `duplicate-event-id`;
+  the events table carries two further UNIQUEs whose violation escapes as a thrown error rejecting the
+  whole batch. Deterministic ids are therefore load-bearing: random ids on a re-run means **23 duplicate
+  tickets, not 23 no-ops**.
+
+## T9 / T10 — the seed runners
+
+- **`'errand'` as an entity id is refused.** Every entity kind except `membership` needs a **ULID** entity
+  id; `parseEvent` rejects it as invalid (not duplicate), so the seed throws and fails whole. File the
+  type against `seedUlid('ticket-type','cc#errand')` and keep `id:'errand'` **in the payload only**.
+- **`readPlanSeries`'s `/^### Task (\d+):/` misses ELEVEN task headings** carrying a letter suffix (4a,
+  9b, 12a, 15b, 9a, 11a, 12b, 12c, 13a …). The repo's own validator uses `(\d+[a-z]?)`. And
+  `Number('12a')` is `NaN`, so widening the regex without changing `PlanTask.number` to a **string** makes
+  Task 12 and Task 12a **share one seed id**.
+- **`createPool` is at `src/db.ts` and takes ONE argument** — not `src/db/pool.js`, no `caCert` option.
+  `AppConfig` has no `databaseCaCert`.
+- **A seed must not call `loadConfig`** — it requires `BETTER_AUTH_URL`, a 32-char `BETTER_AUTH_SECRET`
+  and `WEB_ORIGIN`, none of which a seed reads. Follow `tools/sweep-notifications.ts:12-18`, which recorded
+  this exact deviation. Same applies to T11's backup daemon.
+- **CLI convention**: all three existing tools live flat in `src/tools/` and run as `tsx src/tools/<name>.ts`.
+  **No package.json script anywhere in `apps/server` references `dist/`.**
+- **`report.tickets` is computed from the parsed INPUT before any database call** in both seeds — it
+  reports the source file's contents, never the ledger's. **Keep it, but it is not verification.** Assert
+  `committed + skippedExisting === events.length` and verify with a projection read.
+- **The simple-Kanban workflow id is minted with `newUlid()` inside the founding sequence** and is not the
+  seed's to fix — remove it from the published id contract.
+
+## T11 / T12 — backups and the restore drill
+
+- **`assertValidObjectKey`'s per-segment regex `^[A-Za-z0-9_-]+$` (`object-store.ts:30`) REFUSES BOTH of
+  T11's key formats** (`ledger/YYYY-MM-DD.ndjson.gz` — dots; `pg/…THH-mm.dump` — dot). Widening it touches
+  a **security control with a planted-defect test across all three S3 verbs** (`s3-store.test.ts:76-89`).
+  Make it an explicit recorded choice; if widened, extend the planted-defect test to prove `..` is still
+  unrepresentable.
+- **CONFIRMED: T11 needs no new dependency** — all three AWS packages already present, resolved 3.1124.0.
+  **Delete the plan's `pnpm add` line and its `git add pnpm-lock.yaml`.**
+- **`pg_dump` is NOT on PATH on this machine** — keg-only at `/opt/homebrew/opt/libpq/bin`, **v18.4** —
+  and `ci.yml` installs no postgres client. So `describe.skipIf(!pgDumpAvailable())` means **both suites
+  silently skip and the gate is green having tested nothing.** Either install client tools in CI or make
+  the skip LOUD.
+- **PG VERSION SKEW**: local `pg_dump`/`pg_restore` are **18.4**; the compose Postgres and the CI service
+  container are **16.15** (measured inside the container with a working negative control). v18 → v16 dump
+  is fine, but the **archive version** a v18 `pg_dump` writes is what a v16 `pg_restore` must read.
+- **Both acceptance assertions cannot fail for the reason their names imply.** "Two exports of the same
+  ledger are identical" is satisfied by two exports that both drop the same rows; `PGDMP` magic bytes
+  appear on a dump of an **empty** database. Assert the export's line count against an independently
+  issued `SELECT count(*)`, and the decoded tuples against a separately ordered query.
+- **`restore.sh`'s guard is its entire purpose and no test runs the script** — the drill calls
+  `spawnSync('pg_restore')` directly, and **no test in this repo executes any shell script.**
+- **T12 imports `verifyProjections` from `src/verify/`; it lives at `src/tools/`.** All six existing
+  consumers use `src/tools/`.
+- **T11's alerter (`src/alerts/error-alerter.ts`) does not exist** — Task 3 has not landed. Define a
+  minimal local shape and inject it, so T11 does not block on T3.
+
+## Full seam-2 map output
+
+`/private/tmp/.../4f2fa6a7-a0c3-491c-8589-fec56d263147/tasks/whbotz9a0.output` (~95 KB) — **a temp file;
+the distillation above is the durable copy.**
+
+---
+
+# T5a — Dockerfiles, DONE and actually BUILT
+
+| image | build | size | verified |
+|---|---|---|---|
+| `apps/server/Dockerfile` | **exit 0** | **823 MB** | node **v22.23.2**; `node-pg-migrate.js` present 0755; entrypoint runs migrations FIRST and **fails closed with no DB**; `dist/` and `migrations/` both landed |
+| `apps/web/Dockerfile` | **exit 0** | **241 MB** | `apps/web/server.js`, `.next/static` populated, `public/` present |
+
+Reviewer rebuilt with `--no-cache`; no Critical findings; implementer stayed inside its four allowed paths
+and touched no lockfile.
+
+**Two real defects, both disclosed rather than hidden:**
+1. **The runtime image ships the ENTIRE devDependency set** (typescript, vitest, tsx, aws-sdk-client-mock,
+   `@types/*`, ws) **plus `apps/server`'s `src/` and `test/` trees** — because `node-pg-migrate` had to stay
+   reachable at runtime and the lockfile was off-limits, so `pnpm deploy` ran **without `--prod`**.
+   823 MB is the honest cost. **RESOLUTION, serialized: move `node-pg-migrate` to `dependencies`, re-run
+   `pnpm install`, switch to `pnpm deploy --prod`.** Blocked only on the concurrent gate.
+2. **`apps/web` has no `public/` directory at all**, contradicting the plan; the build `mkdir -p`s it so
+   the COPY is stable and picks up real assets the day one appears.
+
+**Not proven, stated plainly:** neither image was ever run against a real Postgres, and
+`node apps/web/server.js` was never hit with a request. Both belong to T6/T13.
