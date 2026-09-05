@@ -15,17 +15,25 @@ only what is written here.
 | anchor | value | how verified |
 |---|---|---|
 | branch | `exec/20-plan10-t13-t15` | `git branch --show-current` |
-| HEAD | `1e372e3` | `git rev-parse HEAD` |
+| HEAD | `0b1b515` (T13) | `git rev-parse HEAD` |
 | `origin/main` | `1e372e3` | `git rev-parse origin/main` after `git fetch origin main` |
-| ahead of `origin/main` | **0** | `git rev-list --count origin/main..HEAD` |
-| HEAD reachable? | **YES** — contained by `exec/20-plan10-t13-t15`, `main`, and three sibling lane branches | `git branch --contains 1e372e3 -a` |
+| ahead of `origin/main` | **2** (`c71bfb6` state file, `0b1b515` T13) | `git rev-list --count origin/main..HEAD` |
+| HEAD reachable? | **YES** — contained by `exec/20-plan10-t13-t15` (local and remote, pushed) | `git branch --contains 0b1b515 -a` |
 | tree | clean | `git status --short` (empty) |
 | node | v22.22.2 | `node -v` after `export PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH"` |
 | install | `pnpm install --frozen-lockfile` exit 0, `pnpm rebuild better-sqlite3` exit 0 | `/tmp/laneB-install.log` |
 | domain+ui built | `pnpm turbo run build --filter=@gisik-nokma/domain --filter=@gisik-nokma/ui` → `2 successful, 2 total` | `/tmp/laneB-build.log` |
 
-**Gate composition NOT yet recounted at this sha by this lane.** The controller's last recorded figure
-(3181 tests / 24 tasks / 8 packages) is from `9a5275c`, two merges back. Recount before quoting it.
+**GATE RECOUNTED AT `0b1b515` BY THIS LANE.** `pnpm turbo run build test typecheck --force
+--concurrency=2`, node v22.22.2, **GATE_EXIT=0**, `Tasks: 24 successful, 24 total`,
+`Cached: 0 cached, 24 total`, `1m23.463s`, **zero** `Unsupported engine` lines, zero failures.
+
+**3210 tests across 8 packages** — ui 37 · domain 464 · editor 178 · rule-engine 282 · sync-client 63 ·
+app-core 1075 · web 136 · server 975. Enumerated per package and summed, NOT taken from a count:
+`grep -c` on the same pattern answered **19** for what enumeration shows is **8** distinct lines each
+appearing once. That is the wrong-COUNT silent failure mode this machine has on record, and it is why
+the rule is print the rows, not the count. `main` was 3181; 3210 - 3181 = **29**, which is exactly the
+29 `it(` blocks this branch adds (5 + 13 + 8 + 3). The delta reconciles.
 
 ---
 
@@ -33,12 +41,13 @@ only what is written here.
 
 | # | task | state |
 |---|---|---|
-| 1 | **T13** — app-core contested-claim UX, offline reopen pair, skew badge, sync status bar | **IN PROGRESS** — pre-flight verification running, nothing written, nothing committed |
+| 1 | **T13** — app-core contested-claim UX, offline reopen pair, skew badge, sync status bar | **DONE, committed `0b1b515`, pushed, gate green, PR open** |
 | 2 | T14 — dual-client harness rig (Fable author + reviewer) | not started |
 | 3 | T15 — scenarios S1–S6 (Fable author + reviewer) | not started |
 | 4 | T18 — `Features.md` §12 + `test-cases/12` final shape | **HELD** until Lanes C (T16) and D (T17) have MERGED to `main`. Poll `origin/main` for their merge commits. |
 
-**Nothing is in flight with the controller. No PR is open. No ruling is pending from this lane.**
+**In flight: T13's PR, awaiting controller merge.** **One ruling is pending** (see OPEN RULINGS below)
+— it does not block T14, and this lane proceeds to T14 rather than waiting.
 
 ---
 
@@ -116,18 +125,115 @@ re-measuring.
 
 ## OPEN RULINGS FROM THIS LANE
 
-None yet.
+**R-B1 (open, non-blocking): three in-code annotations name "Plan 10 Task 13" as the owner of work that
+Task 13's own Files block does not reach.**
 
-## KNOWN HAZARDS CARRIED INTO T13's IMPLEMENTATION
+1. `packages/app-core/src/replica/replica-data-source.ts:353` — `OFFLINE_BORN_ABSENCE`, owner
+   *"Plan 10 Task 13 — an offline list that unions `getTickets` with `listTicketSummaries`"*.
+2. `Features.md` §12 on `ListRow.pending` — *"the field exists and nothing renders it until Task 13"*.
+3. `packages/sync-client/src/engine/sync-engine.ts:181` — a per-`StreamErrorCode` retry policy, deferred
+   to *"whoever owns the client's error surface — Plan 10 Task 13 is the first task with a place to show it"*.
 
-- **`cause: { kind: 'reopened-for-child', childTicketId }` on a `ticket.transitioned` payload is
+T13's five files are the banner, the view-model, the reopen pair, the skew badge and the status bar.
+There is no ticket list, no `ListRow` renderer and no error surface among them. Those annotations named
+the next task touching app-core UX **by number, not by content**.
+
+**Conservative default taken, and it is reversible:** all three are RECORDED with owner *"unassigned —
+plausibly Tasks 16/17, the first code that actually draws a list"* in both `Features.md` §12 and
+`test-cases/12-offline-sync-apps.md`'s "Carried, with owners — Task 13" section, and **none is built**.
+Building any would be inventing a surface no plan specifies. Raised with the controller 2026-09-06; if
+it rules the other way, the cost is lowest before T14's harness lands.
+
+## WHAT T13 SHIPPED, AND THE FOUR DEVIATIONS FROM THE PLAN TEXT
+
+Commit `0b1b515`. Five source files under `packages/app-core/src/{contests,offline,history,sync}/`,
+four test files, `src/index.ts` exports appended at the tail (append-vs-append with Lane A's closure 3),
+three style blocks appended to `packages/ui/src/ui.css`, `Features.md` §12 extended, and
+`test-cases/12-offline-sync-apps.md` cases **12.189–12.215** with its HIGHEST-ID header, its running
+parenthesis and its scope enumeration all rewritten in the same change set.
+
+**Each deviation exists because the plan's own prescribed test could not have caught the thing it named.**
+
+1. **The wire field is `to`, not `toStateId`.** `ticketTransitionedPayloadSchema`
+   (`packages/domain/src/workflow.ts:138`) names the destination `to`; `cause` is its declared optional
+   sibling, exactly `{ kind: 'reopened-for-child', childTicketId }` — so the plan was right about
+   `cause` and wrong about the destination. The schema is NOT `.strict()`, so `toStateId` is stripped
+   rather than named and the parse then fails on the missing required `to`. The plan's test asserted
+   `toStateId` with `toMatchObject` against an envelope the function had just built — green for any
+   spelling. Case **12.190** parses through `domainRegistry` and carries the plan's spelling as a
+   negative control in the same test.
+2. **`nonTerminalStates` ships as declared but is documented as NOT the reopen picker.**
+   `reopenStateOptions(def, currentStateId)` (`flows/guarded-child-event.ts:106`) already answers
+   "what may this parent be reopened into", composing `transitionOptions`; it is what the ONLINE dialog
+   is fed from. `nonTerminalStates` cannot filter by reachability — it never receives the current state.
+   Case **12.191** pins the divergence on the plan's own fixture (two states versus none).
+3. **A queued resolution is not an accepted one.** The replica's `ingest` THROWS `OfflineAcceptError`;
+   `resolveContest` deliberately does not catch it. Case **12.195**.
+4. **The components' classes bound to nothing.** `ui.css` had no `gn-contest-banner`,
+   `gn-clock-skew-badge` or `gn-sync-status-bar` selector at all (measured, `gn-inbox` as the positive
+   control on the same file). Rules added; case **12.199** ties them by set equality in both directions.
+
+**Six mutations run, each failing at its own site and nowhere else** — `to:`→`toStateId:` (12.189 +
+12.190, 2 failed / 3 passed); `formatClockSkew` gate reordered (12.213 + 12.214, 2 / 6); Redo rewired to
+`onResolve` (12.203 alone, 1 / 12); domain `getUTCHours`→`getHours` rebuilt (12.194 naming its own zone,
+*"21 Aug 2026, 17:00 IST"* — label right, hour the device's); a class rename and a CSS-rule deletion
+(both directions of 12.199). **Every restore was verified by reading the file, never by a shell `diff`.**
+`git checkout --` does NOT restore these files — they were untracked when the mutations ran, and the
+command fails with *"pathspec did not match any file(s) known to git"*, which is easy to skim past.
+
+## THE OTHER LANES' NAMES FOR THINGS
+
+Lane D asked for `syncStatusLabel`, `resolveContest`, `buildReopenPair` from `@gisik-nokma/app-core`.
+All three are exported under exactly those names, plus `ContestBanner`, `ClockSkewBadge`,
+`formatClockSkew`, `SyncStatusBar`, `nonTerminalStates` and the types `ContestLike` / `IngestFn` /
+`ResolveContestInput`. Told Lane D three things it needs before rebasing: the `to`/`toStateId`
+correction, that `resolveContest` propagates `OfflineAcceptError` rather than swallowing it, and that
+its reopen picker must use `reopenStateOptions`, not `nonTerminalStates`.
+
+## ⛔ THE GATE LOCK DOES NOT HOLD IN THIS HARNESS — measured, reported, affects every lane
+
+**Each Bash tool call is a fresh, short-lived shell.** `echo $$ > /tmp/gisik-gate.lock/pid` therefore
+records a pid that exits seconds later, and every peer's stale-check is then CORRECT to fire —
+`kill -0 <dead pid>` fails, `rm -rf`, lock reclaimed within one 15-second poll. **The lock releases
+itself almost immediately after every acquisition.**
+
+Traced here: `mkdir` succeeded, pid written, `ls -la` confirmed the pid file; minutes later the
+backgrounded gate's own `echo $$ > .../pid` failed with *"no such file or directory"* because a peer had
+already removed the directory, and `ls` showed it gone while this lane's gate was still running. Two
+independent vitest pools (pids 98373 and 99418, nine workers each) were live at that moment, with
+**~66 MB free** (`vm_stat` Pages free 4119 x 16KB) and **1983.50M of 3072.00M swap used**.
+
+**The trap that makes it worse:** the brief's one-liner is DENIED as a foreground command — foreground
+`sleep` is blocked by this harness, so the `until … sleep 15; done` loop cannot run in the foreground at
+all. The natural repair is to split acquire and run across two tool calls, and **that split is exactly
+what breaks the lock.**
+
+**THE RULE: acquire + write pid + trap + run gate MUST be ONE backgrounded Bash invocation.**
+Backgrounded is the only form where the `sleep` is permitted AND `$$` is a pid that outlives the gate.
+Never split it.
+
+**Reaping:** `pgrep -f vitest` matches all five lane sessions (their command lines embed a brief
+containing the word) plus any peer's live run — never kill its output. The only correct reap, per the
+controller's 2026-09-06 correction:
+`ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}'`
+Read the list before killing anything; expect it empty. Checked after every run this session: empty.
+
+## KNOWN HAZARDS CARRIED INTO T13's IMPLEMENTATION — BOTH NOW RESOLVED
+
+- **RESOLVED:** `cause` IS declared, exactly as the plan assumed — but the destination field is `to`,
+  not `toStateId`. See deviation 1 above. Original note follows.
+  **`cause: { kind: 'reopened-for-child', childTicketId }` on a `ticket.transitioned` payload was
   UNVERIFIED against the real payload schema.** If that schema is `.strict()` and declares no `cause`,
   the plan's `buildReopenPair` builds an event the real door refuses — and the plan's own unit test
   (`toMatchObject` on a freshly built envelope) **cannot catch it**, because nothing in that test passes
   the event through a schema. This surfaces later, in T15's S5. Being verified now; if the field is
   absent, it is **recorded with a named owner, not fixed by widening the domain schema**.
-- **`IngestResult[]` → `Array<{status: string; eventId: string|null} & Record<string, unknown>>`
-  assignability is UNVERIFIED.** Turns on implicit index signatures (type aliases get them, interfaces
+- **RESOLVED: it compiles.** `IngestResult` is a discriminated union whose every arm satisfies the
+  shape; app-core `typecheck` is **0 errors against a 0-error baseline recorded at `1e372e3` before any
+  edit**. Note the baseline mattered: a probe run before the dependency dists were built reported ~90
+  errors that were entirely stale-dist artefact. Original note follows.
+  **`IngestResult[]` → `Array<{status: string; eventId: string|null} & Record<string, unknown>>`
+  assignability was UNVERIFIED.** Turns on implicit index signatures (type aliases get them, interfaces
   do not). T13's tests all pass `vi.fn()`, so they cannot detect a failure here. Being probed with real
   `tsc`, not by reading types.
 
