@@ -20,6 +20,7 @@ import {
   type SyncEngine,
   type SyncStatus,
   type SyncStorage,
+  type SnapshotProvenanceBlock,
 } from '@gisik-nokma/sync-client';
 import type { DataSource, DataSourceQuery, ServerStreamFrame, Unsubscribe } from '../data-source.js';
 import { EPIC_RANK, epicAncestorOf } from '../hierarchy/epic-ancestor.js';
@@ -490,6 +491,57 @@ function causeOf(event: LedgerEvent): TransitionCause | null {
 }
 
 /** The claim that put this ticket in the state it is in. */
+/**
+ * The state and assignment claims for one ticket: from its own events when it
+ * has them, and OTHERWISE from the snapshot block the bootstrap delivered.
+ *
+ * The fallback is not a second-best. A snapshot-bounded device ships no events
+ * below the snapshot's seq, so on a fresh device the creating and transitioning
+ * events are absent for nearly every ticket — that is the design of the
+ * bootstrap, not a gap in it, and reading the events first would refuse almost
+ * everything (the defect ruling P36 exists to close).
+ *
+ * Neither branch invents anything. The events branch reads the row that made the
+ * claim; the snapshot branch reads a value the SERVER copied off that same row
+ * before dropping the events. `null` from both means the device genuinely cannot
+ * name the claim — a store with neither events nor a delivered block — and the
+ * caller still refuses, which is the answer it gave before this fallback existed.
+ */
+async function claimsFor(
+  ticketId: string,
+  events: readonly LedgerEvent[],
+  assigneeId: string | null,
+  // Passed in rather than closed over, so this stays a module-scope function
+  // that a test can drive without standing up a whole data source.
+  getBlock: (id: string) => Promise<SnapshotProvenanceBlock | null>,
+): Promise<{ state: ClaimProvenance; assigned: ClaimProvenance | null } | null> {
+  const stateEvent = stateClaimOf(events);
+  if (stateEvent !== null) {
+    const assignedEvent = assignedClaimOf(events);
+    return {
+      state: provenanceOf(stateEvent),
+      assigned: assignedEvent === null ? null : provenanceOf(assignedEvent),
+    };
+  }
+  const block = await getBlock(ticketId);
+  if (block === null) return null;
+  const fromBlock = (c: { actorId: string; clientTime: string; serverTime: string }): ClaimProvenance => ({
+    actorId: c.actorId,
+    // `null` for the same reason `provenanceOf` gives: this client resolves
+    // display names from the roster, never from a stored copy that can go stale.
+    actorName: null,
+    clientTime: c.clientTime,
+    serverTime: c.serverTime,
+  });
+  return {
+    state: fromBlock(block.state),
+    // The server derived this from `state.assigneeId`, so it already agrees with
+    // the state. Re-checking here keeps the two from drifting if a local fold
+    // has moved the assignment on since the snapshot was taken.
+    assigned: assigneeId === null || block.assigned === null ? null : fromBlock(block.assigned),
+  };
+}
+
 function stateClaimOf(events: readonly LedgerEvent[]): LedgerEvent | null {
   for (let i = events.length - 1; i >= 0; i -= 1) {
     const event = events[i];
@@ -614,18 +666,23 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     pending: boolean,
   ): Promise<ListRow> {
     const events = await replica.listEntityEvents(state.id);
-    const stateClaim = stateClaimOf(events);
-    const assigned = assignedClaimOf(events);
-    if (stateClaim === null) {
-      // Every state a ticket can be in was claimed by exactly one event
-      // (`read-models.ts`). A local ticket with no creating or transitioning
-      // event in its own log is a corrupt store, and a synthesized provenance
-      // would put a claim on screen that nobody made.
+    // Events first, then the snapshot block the bootstrap delivered. On a
+    // fresh device the second branch is the ORDINARY one: a snapshot-bounded
+    // bootstrap ships no events below the snapshot's seq, so reading only the
+    // events refused nearly every ticket (ruling P36).
+    const claims = await claimsFor(state.id, events, state.assigneeId, (id) =>
+      replica.getSnapshotProvenance(id),
+    );
+    if (claims === null) {
+      // Neither the events nor a delivered block. A local ticket with no
+      // creating or transitioning event in its own log AND no provenance from
+      // the server is a store that cannot name the claim at all, and a
+      // synthesized provenance would put a claim on screen that nobody made.
       throw new ReplicaGapError('getTickets', [
         {
           field: 'ListRow.stateProvenance',
-          because: `no ticket.created or ticket.transitioned event is stored for ${state.id}, so no actor or clock can be named for the state it is in`,
-          owner: 'Plan 10 — the local events table',
+          because: `no ticket.created or ticket.transitioned event is stored for ${state.id}, and no snapshot provenance was delivered for it either, so no actor or clock can be named for the state it is in`,
+          owner: 'Plan 10 — the local events table, or a snapshot written before ruling P36 added the provenance column',
         },
       ]);
     }
@@ -639,9 +696,9 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       stateId: state.stateId,
       stateName: stateNameOf(state),
       stateCategory: state.stateCategory,
-      stateProvenance: provenanceOf(stateClaim),
+      stateProvenance: claims.state,
       assignee: actorOf(state.assigneeId),
-      assignedProvenance: assigned === null ? null : provenanceOf(assigned),
+      assignedProvenance: claims.assigned,
       dueDate: dueDateOf(state),
       fields: state.fields,
       // `restrictedCount` is the count of children this viewer may NOT see, and
@@ -750,12 +807,15 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       async function cardOf(state: TicketState) {
         const events = await replica.listEntityEvents(state.id);
         const claim = stateClaimOf(events);
-        if (claim === null) {
+        const claims = await claimsFor(state.id, events, state.assigneeId, (id) =>
+          replica.getSnapshotProvenance(id),
+        );
+        if (claims === null) {
           throw new ReplicaGapError('getBoard', [
             {
               field: 'BoardCard.stateProvenance',
-              because: `no ticket.created or ticket.transitioned event is stored for ${state.id}`,
-              owner: 'Plan 10 — the local events table',
+              because: `no ticket.created or ticket.transitioned event is stored for ${state.id}, and no snapshot provenance was delivered for it either`,
+              owner: 'Plan 10 — the local events table, or a snapshot written before ruling P36 added the provenance column',
             },
           ]);
         }
@@ -764,8 +824,21 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           title: titleOf(state),
           typeId: state.typeId,
           assignee: actorOf(state.assigneeId),
-          stateProvenance: provenanceOf(claim),
-          cause: causeOf(claim),
+          stateProvenance: claims.state,
+          // `cause` comes off the EVENT's payload and the snapshot block does
+          // not carry it, so on the snapshot-bounded path this is `null` — the
+          // "reopened — live work added" badge simply does not appear for a
+          // ticket whose reopening is below the snapshot line.
+          //
+          // NARROWER THAN THE TRUTH, never wrong about it: the failure mode is a
+          // missing badge, not a badge that says something false, which is the
+          // direction `restrictedParent` argues for a few lines up and for the
+          // same reason. Serving a cause here would mean inventing one.
+          // *Recorded as a ❌ case with ruling P36 as owner, per its own clause
+          // for fields it does not carry: the block would have to grow the
+          // cause, which couples sync-client to a domain type it does not
+          // otherwise know.*
+          cause: claim === null ? null : causeOf(claim),
           rollup: null,
           pending: pendingIds.has(state.id),
         };
@@ -845,13 +918,15 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       const state = ticket.confirmed;
       if (state.workspaceId !== workspaceId) return null;
       const events = await replica.listEntityEvents(ticketId);
-      const claim = stateClaimOf(events);
-      if (claim === null) {
+      const claims = await claimsFor(ticketId, events, state.assigneeId, (id) =>
+        replica.getSnapshotProvenance(id),
+      );
+      if (claims === null) {
         throw new ReplicaGapError('getTicket', [
           {
             field: 'TicketRead.stateProvenance',
-            because: `no ticket.created or ticket.transitioned event is stored for ${ticketId}`,
-            owner: 'Plan 10 — the local events table',
+            because: `no ticket.created or ticket.transitioned event is stored for ${ticketId}, and no snapshot provenance was delivered for it either`,
+            owner: 'Plan 10 — the local events table, or a snapshot written before ruling P36 added the provenance column',
           },
         ]);
       }
@@ -869,7 +944,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
               // ticket itself.
               { kind: 'restricted', id: state.parentId };
       }
-      return { ticket: state, title: titleOf(state), stateProvenance: provenanceOf(claim), parent, rollup: null };
+      return { ticket: state, title: titleOf(state), stateProvenance: claims.state, parent, rollup: null };
     },
 
     async getTicketHistory(ticketId: string, afterSeq?: number, limit?: number): Promise<TicketHistoryEvent[]> {

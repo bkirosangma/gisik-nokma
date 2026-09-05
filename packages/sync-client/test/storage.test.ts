@@ -14,7 +14,15 @@ describe('migrateLocal', () => {
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
     );
     expect(tables.map((t) => t.name)).toEqual([
-      'contests', 'events', 'meta', 'outbox', 'snapshots', 'ticket_types', 'tickets', 'workflows',
+      // `snapshot_provenance` joined the list with ruling P36. It is a SIBLING
+      // TABLE rather than a column on `snapshots` because `migrateLocal` runs
+      // `CREATE TABLE IF NOT EXISTS` and nothing else — there is no `ALTER`
+      // path, and `LOCAL_SCHEMA_VERSION` is written into `meta` and never read
+      // back — so a new column would work on a fresh device and throw
+      // `no such column` on every existing one. An exact `toEqual` here is what
+      // made that decision visible instead of silent.
+      'contests', 'events', 'meta', 'outbox', 'snapshot_provenance', 'snapshots',
+      'ticket_types', 'tickets', 'workflows',
     ]);
     const version = await storage.all("SELECT value FROM meta WHERE key = 'schema_version'");
     // Pin the LITERAL, not String(LOCAL_SCHEMA_VERSION): comparing the constant

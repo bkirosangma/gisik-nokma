@@ -96,6 +96,17 @@ export type Replica = {
   ): Promise<LocalContest[]>;
   /** Local history view, per-entity `seq` order. */
   listEntityEvents(ticketId: string): Promise<LedgerEvent[]>;
+  /**
+   * The provenance a BOOTSTRAP delivered for this ticket, or `null` when none
+   * has — a device that has never bootstrapped it, or a server snapshot written
+   * before ruling P36 added the column.
+   *
+   * This exists because `listEntityEvents` cannot answer the question on a
+   * snapshot-bounded device: the creating and transitioning events are below the
+   * snapshot's seq and were never shipped. It is the ONLY way to name who put a
+   * ticket in its state, and when, without them.
+   */
+  getSnapshotProvenance(ticketId: string): Promise<SnapshotProvenanceBlock | null>;
   searchLocal(workspaceId: string, text: string): Promise<Array<{ ticketId: string; title: string }>>;
   getCursor(workspaceId: string): Promise<number>;
   setCursor(workspaceId: string, seq: number): Promise<void>;
@@ -661,7 +672,19 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
               ticket.snapshot.state,
               latestByWorkflow.get(ticket.snapshot.state.workflowId),
             );
-            await writeSnapshot(tx, ticket.ticketId, ticket.snapshot.seq, folded);
+            // The provenance block travels with the snapshot and is NOT folded:
+            // folding rewrites state onto a newer vocabulary, and who claimed a
+            // state and when is not part of any vocabulary. `?? null` covers a
+            // server that has not shipped the field — an older build, or a row
+            // written before ruling P36's column — and `writeSnapshot` treats
+            // null as "nothing new to say" rather than "forget what you knew".
+            await writeSnapshot(
+              tx,
+              ticket.ticketId,
+              ticket.snapshot.seq,
+              folded,
+              ticket.snapshot.provenance ?? null,
+            );
           }
           // A ticket with NO snapshot needs no fold: `events` is then its full
           // history and `ticket.created` resolves the workflow through
@@ -826,7 +849,11 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
       return rows.map(rowToContest);
     },
 
-    async listEntityEvents(ticketId) {
+    async getSnapshotProvenance(ticketId) {
+    return storage.transaction((tx) => readSnapshotProvenance(tx, ticketId));
+  },
+
+  async listEntityEvents(ticketId) {
       const rows = await storage.all("SELECT * FROM events WHERE entity_kind = 'ticket' AND entity_id = ? ORDER BY seq", [
         ticketId,
       ]);
