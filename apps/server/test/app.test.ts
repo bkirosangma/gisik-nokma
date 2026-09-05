@@ -64,7 +64,11 @@ describe('GET /healthz', () => {
     });
     const response = await app.inject({ method: 'GET', url: '/healthz' });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: 'ok' });
+    // `sha` is Plan 11 Task 1's one bounded disclosure (Ruling P33), and it is
+    // `'dev'` here because nothing wired one in — which is the honest answer
+    // for a build that is not a deploy. Still a `toEqual`: the point of this
+    // assertion is that /healthz says NOTHING ELSE.
+    expect(response.json()).toEqual({ status: 'ok', sha: 'dev' });
     await app.close();
   });
 
@@ -80,7 +84,60 @@ describe('GET /healthz', () => {
     });
     const response = await app.inject({ method: 'GET', url: '/healthz' });
     expect(response.statusCode).toBe(503);
-    expect(response.json()).toEqual({ status: 'unavailable' });
+    expect(response.json()).toEqual({ status: 'unavailable', sha: 'dev' });
+    await app.close();
+  });
+
+  /**
+   * The sha `/healthz` reports, and the two facts about it worth pinning.
+   *
+   * FIRST, that it comes from the caller at all. Everything above proves the
+   * `'dev'` default, which a handler with the option ignored entirely would
+   * also satisfy — so this hands one in and reads it back.
+   *
+   * SECOND, that the 503 branch carries it too. That is a decision, argued at
+   * the handler: a 503 during a rollout is the difference between "the new
+   * build is broken, roll back" and "the database is down for every build",
+   * and a body that says `unavailable` and nothing else cannot tell an
+   * operator which. The failure path is also the one a monitor is written
+   * against, so a shape that differed between branches would read `undefined`
+   * exactly when it mattered.
+   */
+  it('reports the deploy sha it was handed, on the healthy path', async () => {
+    const app = buildApp(
+      {
+        db: healthyDb,
+        pool: offlinePool,
+        ingest: fakeIngest(),
+        auth: offlineAuth(),
+        serverAppend: async () => [],
+        webOrigin: 'http://localhost:3001',
+        store: createObjectStoreFromEnv({}),
+      },
+      { deploySha: '1e372e3' },
+    );
+    const response = await app.inject({ method: 'GET', url: '/healthz' });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: 'ok', sha: '1e372e3' });
+    await app.close();
+  });
+
+  it('carries the same sha on the 503 — a failing rollout must say WHICH build is failing', async () => {
+    const app = buildApp(
+      {
+        db: brokenDb,
+        pool: offlinePool,
+        ingest: fakeIngest(),
+        auth: offlineAuth(),
+        serverAppend: async () => [],
+        webOrigin: 'http://localhost:3001',
+        store: createObjectStoreFromEnv({}),
+      },
+      { deploySha: '1e372e3' },
+    );
+    const response = await app.inject({ method: 'GET', url: '/healthz' });
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ status: 'unavailable', sha: '1e372e3' });
     await app.close();
   });
 });

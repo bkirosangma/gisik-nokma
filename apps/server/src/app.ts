@@ -155,7 +155,7 @@ export function buildApp(
    * inferred: without a stream to read back, a test could assert the serializer
    * function in isolation and never learn whether it was wired in.
    */
-  options: { logLevel?: string; logStream?: NodeJS.WritableStream } = {},
+  options: { logLevel?: string; logStream?: NodeJS.WritableStream; deploySha?: string } = {},
 ): FastifyInstance {
   const app = Fastify({
     logger:
@@ -215,12 +215,67 @@ export function buildApp(
     return reply.status(INTERNAL_ERROR_BODY.statusCode).send(INTERNAL_ERROR_BODY);
   });
 
+  /**
+   * The probe, and the ONE fact it discloses beyond up/down.
+   *
+   * ## Unauthenticated, deliberately
+   *
+   * Two callers need this without a session and neither can get one: App
+   * Platform's health probe, which decides whether a container joins the
+   * router, and an operator watching a rollout, who is checking precisely
+   * whether the thing that mints sessions came up. A gate here would make the
+   * route useless to both.
+   *
+   * ## The sha, and only the sha (Ruling P33, 2026-09-06)
+   *
+   * This is a DELIBERATE, BOUNDED disclosure, in the same register as the
+   * `{ kind: 'restricted', id }` this codebase already returns for an entity a
+   * viewer may not read: the smallest fact that answers the operational
+   * question, chosen over both silence and the fuller answer.
+   *
+   * What it answers: "which build is live?" — the question every rollback,
+   * every "is my fix out yet", and every "the deploy said success" turns on.
+   * A version an operator has to infer from a changelog is not an answer.
+   *
+   * What it deliberately does NOT carry, and why: the semver from
+   * `package.json` (it moves on release, not on deploy, so two different
+   * builds share it — and it is the number an attacker maps to a CVE list);
+   * dependency versions (the same, multiplied); uptime, database name, pool
+   * counts, migration state (each an inference about internals, none of them
+   * something a probe needs). A commit sha is opaque to anyone without the
+   * repository and exact to everyone with it, which is the property that makes
+   * it the right size of leak.
+   *
+   * ## The 503 branch carries it too — decided, not overlooked
+   *
+   * The plan is silent here and the 503 body is the one an unauthenticated
+   * prober is most likely to see, so it is worth stating the case both ways.
+   *
+   * AGAINST: an unhealthy service is a service under some kind of stress, and
+   * the instinct is to say less on the failure path than on the success one.
+   *
+   * FOR, and this is what decides it: withholding the sha on 503 buys nothing,
+   * because the same prober gets it from any healthy replica of the same
+   * deployment on the very next request — the fact is not made secret by being
+   * omitted here, only made unavailable at the one moment it matters. And it
+   * matters most exactly here: a 503 during a rollout is the difference
+   * between "the NEW build is broken, roll back" and "the database is down for
+   * every build, rolling back changes nothing". A body that says `unavailable`
+   * and nothing else cannot tell those apart, and that is the diagnosis an
+   * operator is making at 2am. A shape that differed between branches would
+   * also be its own small trap: a monitor written against the 200 body would
+   * read `undefined` for the sha on the failure it exists to report.
+   */
   app.get('/healthz', async (_request, reply) => {
+    // `'dev'` when nothing wired a sha in — see `DEPLOY_SHA` in config.ts. A
+    // blank would read as an answered question; `'dev'` reads as "this is not
+    // a deploy", which is what an un-wired build actually is.
+    const sha = options.deploySha ?? 'dev';
     try {
       await deps.db.query('SELECT 1');
-      return { status: 'ok' };
+      return { status: 'ok', sha };
     } catch {
-      return reply.status(503).send({ status: 'unavailable' });
+      return reply.status(503).send({ status: 'unavailable', sha });
     }
   });
 

@@ -301,10 +301,13 @@ document will not have it.**
   .toBeNull()` (plan:196) — an assertion that **can never pass**. **T1 adds EIGHT variables, not nine.**
   Name collision to keep separate: `AppDeps.webOrigin` = invite-link host; T2's `security.webOrigin` =
   CORS allowlist. Same string today, two meanings.
-- **`/healthz` returns `{status:'ok'}`, not `{ok:...}`.** Adding `version` breaks `app.test.ts:59` AND
-  `events-route.test.ts:289` — **the plan names neither.** Decide explicitly whether the 503 branch
-  carries `version` too (if yes, `app.test.ts:74` breaks as well). T6's smoke line must become
-  `{"status":"ok","version":…}`.
+- **`/healthz` — RESOLVED BY T1. The field is `sha`, NOT `version`, and BOTH branches carry it:**
+  `{status:'ok', sha}` on 200 and `{status:'unavailable', sha}` on 503 (`app.ts:276,278`).
+  **T6's smoke line must therefore be `{"status":"ok","sha":…}`.** This bullet previously said `version`
+  and would have handed T6 an assertion that fails against the shipped route — caught by T1's own fix
+  round reading this file, not by anyone reading the route. The original note stands as history: adding
+  the field broke `app.test.ts:59`, `app.test.ts:74` and `events-route.test.ts:289`, and the plan named
+  none of the three.
 - **`config.test.ts:18-28` is an exact-shape `toEqual` over 9 fields** — eight new fields break it, and the
   plan never mentions the file. **`config.test.ts:197-207` is a hand-maintained array of the nine LIVE
   variable names**; extending the schema without extending that array leaves *a guard that passes while
@@ -776,3 +779,91 @@ run.** Turbo prints the binary path ONLY on error, so it is absent from every gr
 regression when compared against one. pnpm's shebang resolves `node` through `PATH`, and
 `node-version.test.ts` — which asserts the worker's Node from inside the worker — passed in both green
 gates. Do not chase it.
+
+---
+
+# T1 — landed. Three findings of one class, and two more recorded rather than fixed
+
+## The Critical, and why the guard could not fire
+
+`DATABASE_CA_CERT` was documented "LIVE AND CONSUMED" and was **silently discarded whenever
+`DATABASE_URL` carried any ssl parameter** — i.e. on every managed-Postgres URL, DigitalOcean's included.
+Mechanism, measured at the source: pg builds parameters with
+`config = Object.assign({}, config, parse(config.connectionString))`
+(`pg 8.23.0, lib/connection-parameters.js:60`), so the **parsed URL is applied ON TOP of the caller's
+object** and its `ssl` replaces `ssl: {ca}` wholesale.
+
+**And the guard asserted the wrong object.** It read `pool.options` — what the driver was *handed* —
+instead of `connectionParameters` — what it *connects with*. **Mutation C proved this by construction:**
+restore the defect AND revert the assertion to the old shape, and the CA assertions go **GREEN with the
+defect present**. That is not an argument that the old guard was blind; it is a demonstration.
+
+**The fix**: strip the ssl query parameters from the URL when, and only when, a CA is configured. Verified
+three ways independently — reviewer, fix agent, and the orchestrator against installed pg 8.23.0:
+
+```
+ssl:{ca} + ?sslmode=require   -> ssl={}          CA DISCARDED
+ssl:false + ?sslmode=require  -> ssl={} not false  (the docblock had precedence BACKWARDS)
+ssl:{ca} + plain URL          -> ssl={ca:...}    control
+ssl:{ca} + params stripped    -> ssl={ca:...}    the fix
+```
+
+**The fix round corrected the REVIEWER twice**, and both corrections matter:
+1. The finding prescribed "parse `databaseUrl` yourself (pg-connection-string is already a dependency)".
+   **It is not a dependency of `apps/server`** and does not resolve from it under pnpm's isolated
+   `node_modules`. The prescribed mechanism would not have compiled.
+2. The finding named **four** ssl parameters; there are **six**. `ssl` and `sslnegotiation` set the config
+   to a BOOLEAN, the other four to an object — read off `pg-connection-string/index.js:69-84` and then
+   confirmed one parameter at a time against the installed driver, not assumed.
+
+**A regression the fix introduced and then closed**: `withoutSslParameters` calls `new URL()`, which
+**throws on connection-string forms pg accepts** — a bare database name and an empty string both raise
+`TypeError: Invalid URL` (verified independently by the orchestrator; a unix socket path and a
+`?host=/var/run/...` form both parse fine). Gated behind `caCert !== null` and given an explicit
+boot-time refusal, so the eight non-CA call sites are byte-identical to before.
+
+## The stated trade — recorded because it is a JUDGEMENT, not a measurement
+
+With a CA configured, a `?sslmode=no-verify` or `?sslmode=disable` in the URL now **loses to the CA** and
+the connection becomes verified TLS. The reasoning: that configuration is self-contradictory (it supplies
+a trust anchor and then asks for no trust) and it is resolved in the direction that **cannot downgrade a
+deployment**. **The honest risk, in the fix author's own words:** an operator on a provider whose chain
+does not validate cleanly may have set `no-verify` deliberately *and* pasted the CA in, and for them this
+converts a working connection into a handshake failure at boot. Not reproducible from this machine.
+**If a managed deploy fails TLS at boot with a CA set, look here first.**
+
+## Two NEW findings of the identical class — recorded with owners, NOT fixed
+
+1. **An `options=` query parameter in `DATABASE_URL` silently CLOBBERS `-c timezone=Asia/Kolkata`**, by
+   the same `Object.assign` at `connection-parameters.js:60`. Every timestamptz an ad-hoc query prints
+   would quietly move off India time, with nothing failing. **Owner: unassigned — belongs with whoever
+   next touches `createPool`.**
+2. **`sslcert`/`sslkey`/`sslrootcert` in a URL make pg `readFileSync` the path at CLIENT CONSTRUCTION**,
+   so a missing cert file throws `ENOENT` at pool creation rather than on first query. Reproduced.
+   **Owner: T15's `deploy/do/` documentation.**
+
+Plus the review's two Minors, neither fixed and both now MORE worth doing: `verify-projections.ts:109`
+and `sweep-notifications.ts:26` call `createPool` without the CA — and as of T1 that second argument
+actually does something. `verify-projections` is the freshness gate **T12's restore drill schedules
+against production.**
+
+## T1's numbers, with the arithmetic stated rather than implied
+
+`EXIT=0` · `Tasks: 24 successful, 24 total` · `0 cached` · Node v22.22.2 · pnpm 9.15.0 ·
+0 `Unsupported engine` · **0 skips/todos** · `CHECK_ENV_EXIT=0`.
+**235 files / 3199 tests** — server 89/993.
+
+    header baseline   235 / 3183   (server 977)
+    at review         235 / 3193   (server 987)
+    final             235 / 3199   (server 993)
+
+`3193 − 2 + 8 = 3199`: the **2** are the replaced `pool.options` assertions, the **8** the new
+`connectionParameters` ones. File count unchanged — no test file added or removed.
+
+## Nine variables, not eight
+
+`DEPLOY_SHA` is the ninth, and it comes from the **environment**, never a JSON import — which is what
+dissolves the `resolveJsonModule`/TS2732 trap. `TRUST_PROXY` is `z.enum(['true','false'])` because
+`z.coerce.boolean()` turns the string `'false'` into `true` — the one spelling an operator writes for
+"off". `MAGIC_LINK_FROM` defaults to the **dev** `sign-in@gisik-nokma.local`; `contact@artsourced.in`
+appears in **no** code default and **no** test.

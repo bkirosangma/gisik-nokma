@@ -13,7 +13,9 @@ import { startSnapshotWriter } from './sync/snapshot-writer.js';
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env);
-  const pool = createPool(config.databaseUrl);
+  // The CA for managed Postgres, when one is configured. Local runs set nothing
+  // and the pool is byte-for-byte what it was.
+  const pool = createPool(config.databaseUrl, { caCert: config.databaseCaCert });
   const projections = buildProjectionRegistry();
   // `gates` switches on the server-owned refusals: an embedded attachment must
   // be this ticket's own image, and named evidence must exist on this ticket.
@@ -121,7 +123,13 @@ async function main(): Promise<void> {
       // `scripts/check-env-example.mjs`.
       store: createObjectStoreFromEnv(process.env),
     },
-    { logLevel: config.logLevel },
+    {
+      logLevel: config.logLevel,
+      // The one non-test boot path, so the one place the deploy sha reaches
+      // `/healthz`. Everything else gets the `'dev'` default, which is honest
+      // about what it is.
+      deploySha: config.deploySha,
+    },
   );
   // The snapshot writer (Plan 10 Task 5), and THREE deliberate departures from
   // what the plan text said to do here. Each is a place the repo disagreed with

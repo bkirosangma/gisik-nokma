@@ -291,7 +291,10 @@ describe('GET /healthz against the real database', () => {
     const server = app();
     const response = await server.inject({ method: 'GET', url: '/healthz' });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: 'ok' });
+    // `sha: 'dev'` — Plan 11 Task 1. `buildTestApp` wires no deploy sha, and
+    // the default is deliberately a word rather than a blank so an un-wired
+    // build reads as "not a deploy" instead of as an answered question.
+    expect(response.json()).toEqual({ status: 'ok', sha: 'dev' });
     await server.close();
   });
 });
