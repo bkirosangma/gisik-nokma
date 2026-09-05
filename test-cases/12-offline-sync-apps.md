@@ -1972,7 +1972,7 @@ written; they are recorded in `docs/lanes/executor-state-B.md`.
 ### Closure 5 — the narrow half (ruling P37, 2026-09-06)
 
 `apps/server/test/sync/reconcile-route.test.ts`, `packages/sync-client/test/sync-engine.test.ts` and the
-end-to-end case on the dual-client rig.
+client-half case on the dual-client rig (see 12.289 on what that does and does not reach).
 
 - 12.284 ✅ **`POST /v1/sync/reconcile` answers `{kind:'restricted', id}` for the narrowed ticket and says
   nothing about the one still held** — asserted as an EXACT response, because `toContainEqual` alone would
@@ -2003,7 +2003,7 @@ end-to-end case on the dual-client rig.
   correct and unscheduled. *Owner: unassigned.* **Its sibling, same owner:** the engine presents
   `replica.listTickets`, so a ticket held only as unfolded events with no local `tickets` row is not
   presented and therefore not reconciled.
-- 12.289 ✅ **6.104's residual actually closes, end to end, by the CLIENT-PRESENTED path.** The residual is
+- 12.289 ✅ **6.104's residual actually closes, by the CLIENT-PRESENTED path.** *(Not "end to end" — that word was here until the branch review measured it. The rig's transport RESTATES the route's rule in-process rather than calling it, the same way it restates `bootstrapTicket`; the ROUTE is covered by 12.284-12.286 through `app.inject`. **No single case runs the client and the real route together**, so a drift between them is caught by nothing until closure 5b points the rig at `inject()`.)* The residual is
   witnessed first — after a narrowing B still holds the ticket, its history and its searchable title, and
   no tombstone ever arrived — then `engine.reconcile` removes it: `getTicket` null, `listEntityEvents`
   empty, offline search blank. **Bounded:** a ticket B still legitimately holds is untouched, so the same

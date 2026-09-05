@@ -89,7 +89,7 @@ import { canSee } from './can-see.js';
  * that puts them on a project full of project-mode tickets. Those are roster
  * events, filed against the roster entity, and every ticket they newly reveal
  * carries the identical pre-cursor gap. P37 scopes closure 5 to "the visibility
- * event itself", so this is RECORDED and not built: case 12.281, *owner: the WS
+ * event itself", so this is RECORDED and not built: case 12.283, *owner: the WS
  * catch-up/purge protocol, unassigned to any task*, alongside the residual named
  * at 6.104. It is not closed by anything here, and a reader should not infer
  * from this module's existence that it is.
@@ -124,8 +124,14 @@ export function isGrantBackfillTrigger(type: string): boolean {
  * cycle-creating reparent, so a walk that assumed acyclicity would hang the
  * drain rather than serve a wrong answer. Termination is all it provides.
  *
- * A ticket with no `proj_visibility` row yields the empty set — `canSee` answers
- * false for it anyway, so this only saves the work.
+ * A ticket with no `proj_visibility` row yields ITSELF ALONE, not the empty set:
+ * the seed is pushed before any query runs, and only the children lookup can
+ * shorten the walk. `grantBackfillFor`'s own `canSee` then refuses it — a
+ * rowless ticket answers false there (`can-see.ts`: "unknown and invisible are
+ * the same answer") — so nothing is yielded for it either way. *This sentence
+ * said "the empty set … so this only saves the work" until the branch review
+ * measured it; both halves were false, and the second would have been a
+ * plausible reason for a later reader to drop the `canSee` below as redundant.*
  */
 async function audienceDependents(db: Queryable, ticketId: string): Promise<string[]> {
   const visited = new Set<string>();

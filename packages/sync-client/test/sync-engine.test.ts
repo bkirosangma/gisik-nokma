@@ -1016,9 +1016,16 @@ describe('reconcile — closure 5, the narrow half (ruling P37)', () => {
     expect((await f.replica.listTickets(WS)).map((t) => t.ticketId).sort()).toEqual([a, b].sort());
 
     // Now an answer that restricts one HELD id and one the client never
-    // presented. The unpresented id is a ticket the device legitimately holds
-    // in this very fixture — so a client that trusted the answer wholesale
-    // would delete real work on a server's say-so.
+    // presented.
+    //
+    // `neverPresented` is a fresh ULID the replica has never seen. An earlier
+    // version of this comment called it "a ticket the device legitimately holds
+    // in this very fixture", which was FALSE — the branch review caught it. The
+    // distinction matters for what the case proves: with a stranger id the
+    // guard's absence is observable only as an extra `purgeEntity` call on
+    // nothing, so the assertion that carries the property is `result.purged`
+    // being exactly one entry. That is asserted below, and `purged` is pushed
+    // only after the purge runs, so an unguarded engine would report two.
     const neverPresented = newUlid();
     // The answer names the FIRST id the replica presents plus one it did not.
     // Reading the presented list inside the impl keeps the two in step without

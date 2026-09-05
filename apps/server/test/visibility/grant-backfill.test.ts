@@ -119,7 +119,7 @@ describe('grant backfill — the copy nobody gives back (closure 5, ruling P37)'
     await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: ticket });
     await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: other });
     // Pre-cursor history on the ticket, while the viewer could still see it.
-    await record(ticketEvent(ws, 'comment.added', ticket, { body: 'while shared' }, insider));
+    const preCursor = await record(ticketEvent(ws, 'comment.added', ticket, { body: 'while shared' }, insider));
 
     const cursor = await head(ws);
     // The narrowing: explicit to the insider alone. For the VIEWER this is a
@@ -136,9 +136,18 @@ describe('grant backfill — the copy nobody gives back (closure 5, ruling P37)'
     expect(JSON.stringify(items)).not.toContain(ticket);
 
     // And the insider, who IS in the new audience, gets the backfill: the same
-    // call from the same cursor hands back the pre-cursor comment.
-    const forInsider = await collect(insider, ws, cursor);
-    expect(JSON.stringify(forInsider)).toContain(ticket);
+    // call from the same cursor hands back the PRE-CURSOR comment by id.
+    //
+    // BY ID, and not `JSON.stringify(...).toContain(ticket)`, which is what this
+    // assertion said until the branch review caught it. That form is VACUOUS:
+    // the insider is in the new audience, so the narrowing `visibility.set` is
+    // yielded to them by the ordinary range, and its `entity.id` and its
+    // `payload.ticketId` both carry the ticket — so the substring was present
+    // whether or not a single backfilled envelope existed. It would have passed
+    // against an empty `grantBackfillFor`. `preCursor.id` is below the cursor
+    // and reaches this call through the backfill or not at all.
+    const forInsider = envelopeIds(await collect(insider, ws, cursor));
+    expect(forInsider).toContain(preCursor.id);
   });
 
   it('12.278 a widening hands back the ticket’s pre-cursor history AND every inheriting descendant’s', async () => {

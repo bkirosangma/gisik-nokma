@@ -86,7 +86,14 @@ import { grantBackfillFor, isGrantBackfillTrigger } from './grant-backfill.js';
  * answers only about those (`../sync/reconcile-route.ts`). Nothing above this
  * line changes — a server-initiated purge is still refused, still for P23's
  * reason, and this module still emits none. What changed is that a device is no
- * longer without a way to ask. Cases 12.284-12.289; the end-to-end one runs on
+ * longer without a way to ask.
+ * Cases 12.284-12.286 exercise the ROUTE through `app.inject`; 12.289 drives
+ * the CLIENT half — engine, presentation, local purge — on the dual-client
+ * rig, whose transport RESTATES this route's rule in-process rather than
+ * calling it (the rig has no HTTP, and it restates `bootstrapTicket` the
+ * same way). **No single case runs the client and the real route together**,
+ * so a drift between them is caught by nothing until closure 5b's first
+ * commit points the rig at `inject()`.
  * the dual-client rig.
  * *Was: owner Plan 10 (the WS catch-up/purge protocol), case 6.104 — the
  * sibling of 6.102, which records the identical residual on the guest side.
