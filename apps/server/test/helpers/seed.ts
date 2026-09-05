@@ -193,6 +193,29 @@ export interface SeedTicketArgs {
   typeId?: string;
   title?: string;
   createdBy?: string;
+  /**
+   * The `proj_tickets` head row's `state_category`. Defaults to `'open'`, which
+   * is what every caller got before this parameter existed, so adding it changes
+   * no fixture that does not ask.
+   *
+   * It exists because writing the head row at all made two `RollupView`
+   * dimensions CONSTANT. Before the head row, no child had a category and every
+   * one landed in `uncategorized`; after it, every child is `open`, so
+   * `terminal` is 0 always AND `uncategorized` is 0 always. Two numbers that
+   * cannot vary are two assertions that cannot fail, and the honest repair is a
+   * fixture that can produce the other categories rather than expectations
+   * rewritten to match the only world the seed can build.
+   *
+   * **`null` writes NO head row at all**, which is what `uncategorized` actually
+   * counts. It is NOT a null column: `proj_tickets.state_category` is NOT NULL,
+   * and `rollupFor` derives `uncategorized` from a `LEFT JOIN proj_tickets` that
+   * MISSES — "a child `proj_visibility` knows and `proj_tickets` has no row
+   * for", in its own words. So the only way to seed an uncategorized child is a
+   * ticket that exists in the ledger and the visibility projection and has no
+   * head row — exactly the world every fixture in this file lived in before the
+   * head row was written, now available one ticket at a time.
+   */
+  stateCategory?: 'open' | 'active' | 'terminal' | null;
 }
 
 /**
@@ -255,7 +278,11 @@ export async function seedTicket(pool: Pool, args: SeedTicketArgs): Promise<void
   });
   await appendTestEvent(pool, created);
   await applyAll(pool, [created]);
-  await insertTicketHead(pool, args, created);
+  // `stateCategory: null` means NO head row — see `SeedTicketArgs`. Every other
+  // caller passes nothing and gets one, as they did before the option existed.
+  if (args.stateCategory !== null) {
+    await insertTicketHead(pool, args, created);
+  }
 }
 
 /** The fixture world's workflow: no `workflow.defined` is seeded here, so nothing names one. */
@@ -292,7 +319,7 @@ async function insertTicketHead(
       SEED_WORKFLOW_ID,
       SEED_WORKFLOW_VERSION,
       SEED_STATE_ID,
-      'open',
+      args.stateCategory ?? 'open',
       JSON.stringify([]),
       JSON.stringify({
         title: {
