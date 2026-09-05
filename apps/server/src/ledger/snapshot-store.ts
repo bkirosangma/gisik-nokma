@@ -6,17 +6,49 @@ import type { EntityKind } from '@gisik-nokma/domain';
  * the latest snapshot instead of event 1. Plan 1 ships the primitive only —
  * nothing writes snapshots yet (see Open questions).
  */
+/**
+ * The claims a snapshot cannot otherwise carry, RECOVERED rather than invented.
+ *
+ * `TicketState` carries every FIELD claim's provenance inside itself —
+ * `fields['dueDate']` is a `FieldClaim` with its own actor and both clocks, which
+ * is why due dates survive a snapshot-bounded bootstrap untouched. The STATE
+ * claim and the ASSIGNMENT claim are not in the state: `transitions[]` carries
+ * `actorId` and `seq` and **no clock at all**. So those two, and only those two,
+ * are what a snapshot has to carry separately — measured by enumerating every
+ * `provenanceOf(...)` call the replica door makes, with `dueDate` as the control
+ * that explains the mechanism rather than merely differing.
+ *
+ * `null` for `assigned` is a fact (nobody is assigned), not an absence.
+ */
+export type SnapshotProvenance = {
+  state: { actorId: string; clientTime: string; serverTime: string };
+  assigned: { actorId: string; clientTime: string; serverTime: string } | null;
+};
+
 export type Snapshot = {
   entityKind: EntityKind;
   entityId: string;
   seq: number;
   state: Record<string, unknown>;
+  /**
+   * `null` means a row written before ruling P36 added the column. It is shown
+   * as UNKNOWN and never as unattributed: the read door keeps refusing such a
+   * ticket until the next pass rewrites the row, which is the same answer it
+   * gave before this column existed rather than a new and quieter one.
+   */
+  provenance: SnapshotProvenance | null;
 };
 
 export async function writeSnapshot(client: PoolClient, snapshot: Snapshot): Promise<void> {
   await client.query(
-    'INSERT INTO snapshots (entity_kind, entity_id, seq, state) VALUES ($1, $2, $3, $4)',
-    [snapshot.entityKind, snapshot.entityId, snapshot.seq, JSON.stringify(snapshot.state)],
+    'INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance) VALUES ($1, $2, $3, $4, $5)',
+    [
+      snapshot.entityKind,
+      snapshot.entityId,
+      snapshot.seq,
+      JSON.stringify(snapshot.state),
+      snapshot.provenance === null ? null : JSON.stringify(snapshot.provenance),
+    ],
   );
 }
 
@@ -38,9 +70,21 @@ export async function writeSnapshot(client: PoolClient, snapshot: Snapshot): Pro
  */
 export async function overwriteSnapshot(client: PoolClient, snapshot: Snapshot): Promise<void> {
   await client.query(
-    `INSERT INTO snapshots (entity_kind, entity_id, seq, state) VALUES ($1, $2, $3, $4)
-     ON CONFLICT (entity_kind, entity_id, seq) DO UPDATE SET state = excluded.state`,
-    [snapshot.entityKind, snapshot.entityId, snapshot.seq, JSON.stringify(snapshot.state)],
+    `INSERT INTO snapshots (entity_kind, entity_id, seq, state, provenance)
+       VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (entity_kind, entity_id, seq)
+       DO UPDATE SET state = excluded.state, provenance = excluded.provenance`,
+    [
+      snapshot.entityKind,
+      snapshot.entityId,
+      snapshot.seq,
+      JSON.stringify(snapshot.state),
+      // `excluded.provenance` above means a re-state OVERWRITES this column, so
+      // a writer that passed `null` here on the invalidation pass would erase a
+      // good block. `writeSnapshotsForWorkspace` carries the previous row's
+      // block forward for exactly that reason — see its capture logic.
+      snapshot.provenance === null ? null : JSON.stringify(snapshot.provenance),
+    ],
   );
 }
 
@@ -49,8 +93,12 @@ export async function readLatestSnapshot(
   kind: EntityKind,
   id: string,
 ): Promise<Snapshot | null> {
-  const result = await client.query<{ seq: number; state: Record<string, unknown> }>(
-    `SELECT seq, state FROM snapshots
+  const result = await client.query<{
+    seq: number;
+    state: Record<string, unknown>;
+    provenance: SnapshotProvenance | null;
+  }>(
+    `SELECT seq, state, provenance FROM snapshots
      WHERE entity_kind = $1 AND entity_id = $2
      ORDER BY seq DESC LIMIT 1`,
     [kind, id],
@@ -59,5 +107,16 @@ export async function readLatestSnapshot(
   if (row === undefined) {
     return null;
   }
-  return { entityKind: kind, entityId: id, seq: row.seq, state: row.state };
+  // `provenance` is read BACK, not merely written: the snapshot writer folds
+  // from this row and reads only the tail past its seq, so on a re-state with an
+  // empty tail — the invalidation pass's ordinary case — there is no state claim
+  // to capture and the block has to be carried forward from here. A read that
+  // dropped this column would make every workflow publish quietly erase it.
+  return {
+    entityKind: kind,
+    entityId: id,
+    seq: row.seq,
+    state: row.state,
+    provenance: row.provenance ?? null,
+  };
 }

@@ -230,6 +230,17 @@ export async function refreshSnapshotsForWorkflowPublish(
         // Round-tripped through JSON so what is stored is byte-for-byte what a
         // client reads back, matching the background pass exactly.
         state: JSON.parse(JSON.stringify(folded)) as Record<string, unknown>,
+        // THE CARRY-FORWARD, and this is the site it exists for. This pass
+        // re-states head state under a new vocabulary with an EMPTY tail —
+        // `seq === previousSeq` is its ordinary case — so `foldTicketHead`
+        // folded no state-claiming event and `head.provenance` is the PREVIOUS
+        // row's block, read back and passed straight through. Omitting it here
+        // would not merely fail to add anything: `overwriteSnapshot` sets
+        // `provenance = excluded.provenance`, so it would write NULL over a good
+        // block, and every workflow publish would silently un-fix the tickets
+        // the previous pass had fixed. The loss would be invisible until a
+        // publish, which is why it has a case of its own rather than a comment.
+        provenance: head.provenance,
       });
       await client.query('RELEASE SAVEPOINT snapshot_refresh');
       outcome.rewritten.push({ ticketId: row.ticket_id, seq: head.seq });

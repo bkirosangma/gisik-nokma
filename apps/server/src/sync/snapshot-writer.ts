@@ -6,7 +6,7 @@ import {
   type TicketStateDeps,
 } from '@gisik-nokma/domain';
 import { readEntityEvents } from '../ledger/event-store.js';
-import { readLatestSnapshot, writeSnapshot } from '../ledger/snapshot-store.js';
+import { readLatestSnapshot, writeSnapshot, type SnapshotProvenance } from '../ledger/snapshot-store.js';
 import { buildLedgerDeps } from './ledger-deps.js';
 
 const DEFAULT_MIN_EVENTS = 20;
@@ -22,7 +22,12 @@ const DEFAULT_MIN_EVENTS = 20;
  * ticket event, so `seq === previousSeq` is its ordinary case and re-stating
  * the head state under the new vocabulary is the whole job.
  */
-export type FoldedTicketHead = { seq: number; state: TicketState; previousSeq: number };
+export type FoldedTicketHead = {
+  seq: number;
+  state: TicketState;
+  previousSeq: number;
+  provenance: SnapshotProvenance | null;
+};
 
 /**
  * Resume from a ticket's latest snapshot and fold its tail — THE one
@@ -58,18 +63,52 @@ export async function foldTicketHead(
   let state = previous?.state as TicketState | undefined;
   const previousSeq = previous?.seq ?? 0;
   let seq = previousSeq;
+
+  // CARRIED FORWARD from the previous row, then overwritten by anything the
+  // tail actually claims. The carry is the load-bearing half and it is easy to
+  // miss: this fold reads only the tail PAST `previousSeq`, and the
+  // invalidation pass's ordinary case is `seq === previousSeq` — a re-state
+  // with an EMPTY tail, re-folding head state onto a new vocabulary. Capturing
+  // only from folded events would write `null` over a good block on every
+  // workflow publish, and the read door would start refusing tickets it had
+  // just been fixed for. Carrying forward is copying the SAME recorded instant
+  // one more hop, which is what ruling P36 means by "copied, never computed".
+  let stateClaim = previous?.provenance?.state ?? null;
+  let assignedClaim = previous?.provenance?.assigned ?? null;
+
   const tail = await readEntityEvents(client, 'ticket', ticketId, seq);
   for (const env of tail) {
     seq = env.seq;
     if ((TICKET_EVENT_TYPES as readonly string[]).includes(env.type)) {
       state = applyTicketEvent(state, env, deps);
     }
+    // READ off the event row, never computed and never a neighbour's: these are
+    // the two claims `TicketState` cannot carry. Every FIELD claim already
+    // travels inside the state as a `FieldClaim` with its own clocks — which is
+    // why a due date survives a snapshot-bounded bootstrap untouched and needs
+    // nothing here. `transitions[]` carries `actorId` and `seq` and no clock at
+    // all, so the state claim does; and the assignment claim is on no part of
+    // the state.
+    if (env.type === 'ticket.created' || env.type === 'ticket.transitioned') {
+      stateClaim = { actorId: env.actorId, clientTime: env.clientTime, serverTime: env.serverTime };
+    }
+    if (env.type === 'ticket.assigned') {
+      assignedClaim = { actorId: env.actorId, clientTime: env.clientTime, serverTime: env.serverTime };
+    }
   }
   // A ticket entity carrying only non-ticket events — a contest filed
   // before its `ticket.created` arrived. Nothing to snapshot yet; the next
   // pass picks it up once the creation lands.
   if (state === undefined) return null;
-  return { seq, state, previousSeq };
+  // `assigned: null` is a FACT — nobody is assigned — and is not the same as
+  // "we lost the claim". A ticket whose assignment was cleared keeps no stale
+  // attribution, and one that was never assigned never had any; both read the
+  // state rather than the event history, so the two agree by construction.
+  const provenance: SnapshotProvenance | null =
+    stateClaim === null
+      ? null
+      : { state: stateClaim, assigned: state.assigneeId === null ? null : assignedClaim };
+  return { seq, state, previousSeq, provenance };
 }
 
 /**
@@ -234,6 +273,7 @@ export async function runSnapshotPass(
         // client reads back, rather than whatever the in-memory object happened
         // to serialise to.
         state: JSON.parse(JSON.stringify(head.state)) as Record<string, unknown>,
+        provenance: head.provenance,
       });
       written.push({ entityId: item.entityId, seq: head.seq });
     } finally {
