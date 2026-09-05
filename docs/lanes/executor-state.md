@@ -3114,3 +3114,85 @@ Branch `exec/24-stream-frames` is STACKED on `exec/19-serving-gaps`. #125 merges
   reach that surface, not for building now.**
 - 7.210's folded-versus-latest property and 7.211's dangling-`parent_id` fixture remain unconstrained;
   owner Lane F unless a closure touches those fixtures anyway.
+
+## CLOSURE 4 — THE LOAD-BEARING FACT, ESTABLISHED BEFORE ANY FIX WAS ATTEMPTED
+
+**The snapshot carries the ACTOR and not the CLOCK, so this is not a lookup in the wrong place.**
+
+`replica-data-source.ts:797` throws when `stateClaimOf(events)` finds no `ticket.created` /
+`ticket.transitioned` in LOCAL events. After a snapshot-bounded bootstrap those events are below the
+line and were never shipped. The obvious hypothesis — *the provenance is in the snapshot and the code
+is reading the wrong source* — is **FALSE**, and the type says so:
+
+```
+TicketState.transitions: { toStateId; actorId; seq; workflowId; workflowVersion }[]
+```
+
+`actorId` and `seq`, and **no `clientTime` / `serverTime`**. `ClaimProvenance` requires `serverTime`.
+So a snapshot-bounded replica genuinely cannot name WHEN the state was claimed, only BY WHOM. This is
+the same shape as `ContestedClaim.claim.serverTime`, which is a HELD gap for the same reason: **no
+route and no store can serve an instant the system never recorded.**
+
+**Therefore the three candidate fixes are not equivalent and one of them is a fabrication:**
+1. **Widen the snapshot** to carry the state claim's `clientTime`/`serverTime`. Honest; touches the
+   snapshot writer, the bootstrap payload and the replica's fold — i.e. server AND client, and it
+   changes what a snapshot IS. Largest, and the only one that makes the door able to answer truthfully.
+2. **Make the door's `stateProvenance` absent-able** for snapshot-bounded reads. `TicketRead` requires
+   it, so this is a client type change with N consumers — **and P30 forbids widening `data-source.ts`**,
+   so it would have to land in `view-types.ts`/`read-models.ts` instead. Check whether P30's wording
+   reaches the read model before assuming this is available.
+3. **Spend `transitions[last].actorId` with a synthesised time.** DO NOT. That is
+   `ContestedClaim.claim.serverTime`'s rejected move — attributing one instant to another event — and
+   this project has already refused it once, by name.
+
+**The contradiction the controller named is real and neither side is wrong**: the snapshot-bounded
+bootstrap (T5/T6) is authoritative below the line BY DESIGN, and T12's provenance rule requires an
+event that, by that same design, is not there. **Something has to give, and which one is an OWNER
+decision, not an implementer's** — option 1 changes the snapshot contract, option 2 weakens a read the
+whole client treats as the server's answer. *Recommended default if a ruling is wanted: option 1,
+because it is the only one where the client stops lying rather than starts admitting it cannot say.*
+
+**Not built. The constraint said escalate before building if the fix needs a new rule rather than an
+application of one — this needs a new DATA contract, which is the same class.**
+
+## RULING P36 (controller, 2026-09-06) — CLOSURE 4 IS OPTION 1. Recorded in full; it is checkable.
+
+**Widen the snapshot to carry the RECORDED provenance of every provenance-bearing field the client
+serves.** Option 3 is refused in writing. Option 2 is rejected because a fresh device is
+snapshot-bounded for nearly every ticket, so "provenance absent" would be the product's NORMAL answer
+rather than an edge.
+
+**THE FACT THAT DECIDES IT, and it must go in the docblock:** *the instant exists.* The ledger row at
+`transitions[last].seq` carries `serverTime`; the snapshot writer folds that very row and DROPS the
+field. **Copying a recorded instant is not fabrication; attributing one event's instant to another
+(option 3) is.** That is exactly what separates this from `ContestedClaim.claim.serverTime` — there NO
+row anywhere recorded the instant, here one did. **Name the distinction, or somebody reopens the
+contested-claim hold on the strength of this ruling.**
+
+Constraints, all checkable:
+- **(a)** `serverTime` is READ from the event row at that seq by the writer — copied, never computed,
+  never a neighbour's. **The excluding fixture IS the test:** a snapshot-bounded client's
+  `stateProvenance.serverTime` must EQUAL the ledger row's `serverTime` at that seq — **assert against
+  the ROW, not a fixture constant** — and a mutation making the writer copy the ADJACENT event's time
+  must redden it alone. That mutation is option 3; the test exists to catch it.
+- **(b)** ADDITIVE to the bootstrap payload. A client that does not read the new block is unaffected;
+  Lane B's existing bootstrap cases stay green unchanged.
+- **(c)** Shape is mine to choose with one rule: **prefer a sibling provenance block on the snapshot row
+  over widening `TicketState.transitions[]`.** `TicketState` is the reducer's output and a PENDING
+  transition has no `serverTime` yet, so widening it reintroduces a null case for a different reason and
+  touches the reducer plus Lane B's rig (which asserts full `TicketState` equality across the fold). If
+  measurement shows the sibling block cannot serve the door without duplicating fold logic, **say so
+  WITH the measurement and widen — but state it as a DEVIATION, not a default.**
+- **(d)** Scope by the same rule, **measured not assumed**: every field the client serves WITH
+  provenance — `stateProvenance` today; **check `assignedProvenance` (`read/state-provenance.ts` ships
+  the shape) and any other `(actor, serverTime)` pair the door derives from local events** — gets the
+  same treatment in the same change set, OR its snapshot-bounded refusal is named as a ❌ case with this
+  ruling as owner. One rule, applied to all, in one PR.
+- **(e)** P30 holds (`data-source.ts` not widened). The door serves anything the replica serves.
+  Closure 1's snapshot invalidation is unrelated and untouched.
+
+Files: `snapshot-writer.ts`, the bootstrap payload in `sync-routes.ts`, `replica.ts`'s fold/store,
+`replica-data-source.ts`. **None are Lane B's or E's.** Fable review at branch level.
+
+**Sequencing confirmed: finish closure 2b, THEN closure 4 under this ruling, then the rest of the
+queue.** "Keep going on closure 2b" was an aside, not a re-order.

@@ -223,6 +223,58 @@ describe('3.51 TicketList — Asana-shaped, honest to the row set', () => {
   });
 });
 
+describe('3.152 TicketList — a queued claim is badged on the LIST, not only on the board', () => {
+  /**
+   * THE ASYMMETRY THIS CLOSES, in `view-types.ts`'s own words: the badge "was on
+   * the board and not on the list, and the asymmetry was silent" — an offline
+   * list is the surface where a queued claim is most common, so the half that
+   * was missing is the half that needed it most. `ListRow.pending` has existed
+   * since ruling P30 permitted the widening; nothing rendered it until now
+   * (ruling P34, closure 2b).
+   *
+   * Both directions in ONE render, which is what makes this a measurement
+   * rather than a story: a badge wired to render always would fail the second
+   * assertion, and one wired to render never would fail the first. A single
+   * pending row asserted alone cannot tell those apart.
+   */
+  it('PLANTED DEFECT: the pending row says "claim in transit" and the settled row beside it does not', () => {
+    const rows = [
+      listRowSeed({ ticketId: 'q', title: 'Queued thing', pending: true }),
+      listRowSeed({ ticketId: 's', title: 'Settled thing', pending: false }),
+    ];
+    render(<ControlledList rows={rows} initial={chose([], 'flat')} />);
+
+    // Both rows render — the badge annotates a row, it never replaces or hides
+    // one, which is the same invariant 3.51 pins for restriction.
+    expect(screen.getByText('Queued thing')).toBeInTheDocument();
+    expect(screen.getByText('Settled thing')).toBeInTheDocument();
+
+    // Exactly ONE badge, so "the pending row is badged" is a fact about that
+    // row rather than about the list rendering a badge somewhere.
+    expect(screen.getAllByText('claim in transit')).toHaveLength(1);
+
+    // And it is attached to the right row. `getByRole('row')` scoping is what
+    // stops this passing when the badge lands on the settled row instead — the
+    // count above would be satisfied either way.
+    const settled = screen.getByText('Settled thing').closest('tr');
+    expect(settled).not.toBeNull();
+    expect(within(settled as HTMLElement).queryByText('claim in transit')).toBeNull();
+    const queued = screen.getByText('Queued thing').closest('tr');
+    expect(within(queued as HTMLElement).getByText('claim in transit')).toBeInTheDocument();
+  });
+
+  it('the badge is the SAME wording the board already uses, so one claim reads one way in both surfaces', () => {
+    // Not a style point. A user who sees "claim in transit" on the board and
+    // something else on the list has to learn that they mean the same thing;
+    // `board.tsx` renders this exact string for `card.pending`, and the two
+    // surfaces disagreeing is how the original asymmetry would come back
+    // wearing a different shape.
+    const rows = [listRowSeed({ ticketId: 'q', title: 'Queued thing', pending: true })];
+    render(<ControlledList rows={rows} initial={chose([], 'flat')} />);
+    expect(screen.getByText('claim in transit')).toBeInTheDocument();
+  });
+});
+
 describe('3.51 TicketList — restriction is named, never a vanish (invariant 5)', () => {
   const RESTRICTED_CHILD = listRowSeed({
     ticketId: 'child',

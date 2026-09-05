@@ -140,6 +140,14 @@ export class OfflineAcceptError extends Error {
  */
 export type TicketSummary = {
   ticketId: string;
+  /**
+   * Present so a project-scoped surface can filter these without a second read.
+   * It was ABSENT while every consumer was workspace-scoped, and `summarise`
+   * always had it — the value comes off `TicketState.projectId`, which the
+   * overlay fills for an offline-born ticket from the creating claim itself.
+   * An omission rather than a fact, which is why adding it invents nothing.
+   */
+  projectId: string;
   title: string;
   stateId: string;
   stateCategory: StateCategory;
@@ -150,6 +158,32 @@ export type TicketSummary = {
   pendingEventIds: string[];
   openContests: number;
 };
+
+/**
+ * ONE PROJECT LIST WITH BOTH KINDS IN IT, and the two kinds stay DISTINGUISHABLE
+ * rather than being flattened into one row shape.
+ *
+ * A settled ticket is a `ListRow`. An offline-born one CANNOT be: `ListRow`
+ * requires a `stateProvenance` and `ClaimProvenance` requires a `serverTime`,
+ * and a ticket that exists only as a queued claim has none — `SubmittedEvent`
+ * omits `serverTime` and `seq` by construction, because they are the server's to
+ * assign and nothing has assigned them.
+ *
+ * **THIS IS THE OPPOSITE ANSWER TO RULING P36, on the same surface, and the
+ * distinction is the whole reason both can be right.** P36 widens the snapshot
+ * to carry a state claim's `serverTime` because *the instant exists* — the
+ * ledger row at that seq recorded one and the writer merely dropped it, so
+ * copying it is recovery and not invention. Here NO row anywhere recorded an
+ * instant: the claim has not reached a server. So the offline-born ticket is
+ * rendered AS A CLAIM rather than as a row missing a field, and the device clock
+ * `buildPendingOverlay` substitutes inside its own fold is not laundered into a
+ * `stateProvenance` that every consumer reads as the server's answer. Reading
+ * P36 as licence to fill this one in would reintroduce precisely the fabrication
+ * P36 refused in writing.
+ */
+export type OfflineListEntry =
+  | { kind: 'settled'; row: ListRow }
+  | { kind: 'offline-born'; summary: TicketSummary };
 
 /**
  * The replica-only half of the query surface — the facts an offline device has
@@ -171,6 +205,17 @@ export type TicketSummary = {
 export type ReplicaOnlyQuery = {
   /** Confirmed tickets plus offline-born ones, every one badged. */
   listTicketSummaries(workspaceId: string): Promise<TicketSummary[]>;
+  /**
+   * The settled list PLUS the tickets born on this device, in one answer, each
+   * tagged with which kind it is. `getTickets` alone omits the second kind
+   * SILENTLY (`OFFLINE_BORN_ABSENCE`), which on a plane is the ticket you just
+   * made vanishing from the only list you can see.
+   */
+  listProjectWithOfflineBorn(
+    projectId: string,
+    filter: FilterSpec,
+    grouping: Grouping,
+  ): Promise<{ projectId: string; entries: OfflineListEntry[] }>;
   /** Settled state and the outbox overlay side by side — never merged. */
   getTicketWithPending(
     ticketId: string,
@@ -364,7 +409,12 @@ export const OFFLINE_BORN_ABSENCE: ReplicaAbsence = {
     'ListRow.stateProvenance / BoardCard.stateProvenance / TicketRead.stateProvenance (for a ticket that exists only as a queued claim)',
   because:
     'ClaimProvenance requires a serverTime and a SubmittedEvent has none by construction; the pending overlay substitutes the device clock and says so, and repeating that substitution in a view row would read as the server\'s answer',
-  owner: 'Plan 10 Task 13 — an offline list that unions getTickets with listTicketSummaries',
+  // The docblock above was moved to Lane A / closure 2b by ruling P34 and THIS
+  // FIELD was not, so the entry contradicted itself: prose naming one owner, the
+  // enumerable datum naming the task P34 had just established could not
+  // discharge it. The field is the half a tool reads.
+  owner:
+    'Lane A, closure 2b (ruling P34) — an offline list that unions getTickets with listTicketSummaries and renders the second kind as claims',
 };
 
 /**
@@ -509,6 +559,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     const pending = await outbox.pendingFor(state.id);
     return {
       ticketId: state.id,
+      projectId: state.projectId,
       title: titleOf(state),
       stateId: state.stateId,
       stateCategory: state.stateCategory,
@@ -856,6 +907,45 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     },
 
     listTicketSummaries,
+
+    async listProjectWithOfflineBorn(projectId, filter, grouping) {
+      const settled = await query.getTickets(projectId, filter, grouping);
+      const entries: OfflineListEntry[] = settled.rows.map((row) => ({ kind: 'settled', row }));
+
+      // THE BORN HALF READS `pendingCreatedTickets`, NOT `listTicketSummaries`,
+      // and the first draft of this door got that wrong in a way its own tests
+      // could not see. `listTicketSummaries` answers EVERY confirmed ticket as
+      // well as the offline-born ones — it is the my-work door's shape, not this
+      // one's. Deduping it against the SETTLED rows then looked correct and was
+      // not: `getTickets` applies the filter, so every confirmed ticket the
+      // filter excluded was missing from the dedup set, passed the project
+      // check, and was re-emitted as `offline-born` with `pending: false`.
+      // Typing in a search box turned settled tickets into "claims".
+      //
+      // Every case passed `{}`, where `matchesFilter` matches everything and the
+      // dedup hid the whole summary side. **A door that takes a filter needs a
+      // case with a filter**; an empty spec is not a neutral default, it is the
+      // one input under which the two halves cannot disagree.
+      //
+      // `pendingCreatedTickets` is the outbox's own word for "tickets that exist
+      // only as queued claims", so there is nothing confirmed in it to dedup
+      // against and no filtered-versus-unfiltered gap to get wrong.
+      for (const born of await outbox.pendingCreatedTickets(ownWorkspaceId)) {
+        // `ownWorkspaceId`, not an argument: this door is project-scoped and a
+        // replica holds exactly one workspace, so the project id IS the scope.
+        if (born.pending.projectId !== projectId) continue;
+        // FILTERED like the settled half. A door that filtered one side and not
+        // the other would answer a narrowed list with un-narrowed rows in it,
+        // which is a wrong answer wearing the right shape.
+        if (!matchesFilter(born.pending, filter)) continue;
+        const summary = await summarise(born.pending, []);
+        entries.push({
+          kind: 'offline-born',
+          summary: { ...summary, pending: true, pendingEventIds: born.pendingEventIds },
+        });
+      }
+      return { projectId, entries };
+    },
 
     async getTicketWithPending(ticketId) {
       const confirmed = await replica.getTicket(ticketId);
