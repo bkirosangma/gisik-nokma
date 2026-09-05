@@ -2993,3 +2993,27 @@ proven through its mount point — a reason this diff invalidated.
   reap criterion is ppid=1:
   `ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0,"vitest") > 0 {print $1}'`.
 
+
+## GATE AT `eab6349`: 17/21, and the four reds are ONE cause the review never saw
+
+`apps/server/test/visibility/rollup.test.ts` — 4 failed, `Tests 4 failed | 978 passed (982)`. Neither I
+nor the WIP touched `rollup.ts` or `rollup.test.ts`. **The cause is `test/helpers/seed.ts`**, which the
+WIP extended to INSERT a `proj_tickets` head row beside the four projections it already seeded.
+
+That change is an IMPROVEMENT — a fixture with no head row was seeding a world the ingest transaction
+cannot produce — and the WIP updated `tickets-read.test.ts`'s expectations for it. It did not update
+`rollup.test.ts`, whose docblock still says *"This file cannot exercise `terminal` ... no child in any
+fixture below has a state category at all — every one of them lands in `uncategorized`."* Every child
+now HAS a category, so `uncategorized: 9` is `0`.
+
+**DO NOT just change 9 to 0.** `seedTicket` hard-codes `state_category` to `'open'` with no parameter,
+so after that edit EVERY seeded ticket is `open`: `terminal` is 0 always and `uncategorized` is 0
+always, and **both dimensions of `RollupView` become assertions that cannot fail.** The file's docblock
+was honest about being unable to exercise ONE of them; blindly rewriting the numbers would make it
+silently unable to exercise TWO while looking more precise than before.
+
+The fix that keeps the gate honest: give `seedTicket` an OPTIONAL `stateCategory` (default `'open'`, so
+every existing caller is unchanged), then one case with mixed children — one terminal, one NULL — that
+asserts `terminal: 1, uncategorized: 1`. That restores both dimensions and retires the docblock's
+limitation rather than quietly widening it.
+
