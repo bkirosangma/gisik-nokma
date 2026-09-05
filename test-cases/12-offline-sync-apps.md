@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.188`. THE NEXT FREE ID IS `12.189`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.192`. THE NEXT FREE ID IS `12.193`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -28,7 +28,11 @@ Task 5: the snapshot writer and the ledger-sourced reducer deps. Task 6: `GET /v
 Task 7: `POST /v1/sync`. Task 9: the replica (12.119–12.137). Task 10: the outbox and the local
 pre-check (12.138–12.153). Task 11: the sync engine and its HTTP/WS transport (12.156–12.171, the last two from its fix round).
 Task 12: the replica `DataSource` (12.172–12.187), which lives in `packages/app-core` and is the first
-part of this bucket that does. Nothing else from Plan 10 is catalogued — Task 8 (the `sync-client` scaffold
+part of this bucket that does. **Plus ONE section that belongs to no plan task at all**: refresh on
+publish, snapshot door (12.189–12.192) — the snapshot-invalidation gap the ledger row for Task 5 flags
+in its own notes (`docs/lanes/task-ledger.tsv`, commit `b65f6fb`). It was carried with no owner, it
+gets no ledger row, and it is catalogued here because the surface it fixes is this bucket's, not
+because a task claims it. Nothing else from Plan 10 is catalogued — Task 8 (the `sync-client` scaffold
 and the storage seam), Task 13 (app-core's
 offline UX), Tasks 14–15 (the dual-client harness and its scenarios) and Tasks 16–17 (the two app
 shells) are absent rather than missing. **Task 12 came off that absent list in the change set that
@@ -641,10 +645,15 @@ the number Task 10's own echo case will want and the never-renumber rule would k
   vocabulary sitting ABOVE the snapshot, and `applyTicketEvent` throws on it
   (`applyTicketEvent: workflow "…" has no state "doing"`) whether or not the snapshot was folded first
   — measured on this branch both before and after the fold landed. The repair is a snapshot above the
-  offending event, which only the server can write: today `apps/server/src/sync/snapshot-writer.ts`
-  has no `workflowVersion` handling and `apps/server/src/ledger/snapshot-store.ts` has no DELETE, so
-  publishing a version invalidates no snapshot anywhere. *Owner: Plan 10 Task 6 (the bootstrap route
-  and the snapshot writer).* **RECORDED, NOT FIXED — the other direction of the baseline, and it is LIVE.**
+  offending event, which only the server can write. **NOW WRITTEN — this paragraph's "NOT FIXED" and
+  its two grep readings were true when written and are not now.** `apps/server/src/sync/snapshot-refresh.ts`
+  re-snapshots every affected ticket at its head inside the publish's own transaction; cases
+  12.156–12.158 in this file pinned it and were measured red first (`Tests 3 failed (3)`, both throwing
+  this exact message). 12.159 was added by that pass's own fix round and pins it too, for the ticket
+  that has never been snapshotted. The RESIDUE is a tail that already spanned an older state-dropping
+  publish before that shipped: such a ticket is skipped server-side and can still throw here, which is
+  why `foldSnapshotForward` stays. *No longer Plan 10 Task 6's; the closure took no ledger row.*
+  **RECORDED, NOT FIXED — the other direction of the baseline, and it is LIVE.**
   `writeSnapshot`'s `ON CONFLICT … DO UPDATE SET seq = excluded.seq` is unconditional, and this door
   passes the response's `snapshot.seq` with no `Math.max` against the baseline already standing
   locally, so a replica whose stream-door fold had raised its baseline to `MAX(events.seq) = 6` drops
@@ -1328,3 +1337,125 @@ failure this bucket has recorded before, caught here by a compiler instead of by
   and the restore verified by `git hash-object` matching the pre-mutation blob rather than by a diff.*
   Carries its own non-vacuity control: a needle that matches nothing returns without the born ticket,
   so a `searchOfflineCopy` answering every ticket unfiltered would not satisfy the case.
+
+## Refresh on publish, snapshot door — `apps/server/test/sync/snapshot-refresh.test.ts`
+
+**Owned by no plan task.** The gap is the one the Task 5 ledger row flags in its own notes
+(`docs/lanes/task-ledger.tsv`, commit `b65f6fb`): publishing a workflow version invalidated no
+snapshot. It was found by Plan 10 Batch B while building the replica, confirmed on `main` by the
+controller, and left unowned. This section is the closure; it takes no ledger row, on the precedent of
+the semantic-extraction and comment-cleanup passes.
+
+**The damage was never mainly the stale snapshot.** A snapshot's `state` is folded under whatever
+workflow version was current when the pass ran; `GET /v1/sync/bootstrap` serves it plus every event
+above its seq, and one of those can be a `ticket.transitioned` INTO a state the new version dropped —
+legal history when it was written. The ROUTE does not throw (`bootstrapTicket` reads a snapshot,
+filters events and returns; it replays nothing). What throws is whoever replays that tail: the
+replica's `loadBootstrap`, and the server's own `runSnapshotPass`. Both were measured at `18b749c`
+before a line was written, and both threw `applyTicketEvent: workflow "…" has no state "doing"`.
+
+**Deleting or refusing the stale snapshot makes it WORSE**, which is why neither is what shipped: both
+degenerate to serving the ticket's full history, which contains the same offending event EARLIER, and
+a full replay has been paid for the identical throw. `packages/sync-client/src/replica/replica.ts`
+reached the same conclusion from the other side and recorded it: *"No client-side fold can repair it,
+because the fix is a snapshot ABOVE the offending event."* So the fix is a re-snapshot at the ticket's
+HEAD on every version-raising publish, inside the publish's own transaction
+(`apps/server/src/sync/snapshot-refresh.ts`, wired in `commitOne`).
+
+*Mutation record — the whole fix reverted to `18b749c` (four files restored from that commit, plus
+`snapshot-refresh.ts` removed), test file unchanged: `Tests 3 failed (3)`. 12.189 and 12.190 both fail
+with `applyTicketEvent: workflow "01M1P1GB3VR8AXJMQDVW8D5FG2" has no state "doing"`; 12.191 fails on
+the row list (`expected [ 'ticket:A:21:todo:v1', …(1) ] to deeply equal [ 'ticket:A:21:todo:v1',
+…(4) ]` — two rows where five belong). Restored by `cp` from a backup taken first and verified by
+`git hash-object` on all five files, then `Tests 3 passed (3)`.*
+
+**The fixture carries TWO tickets on the workflow, and that is the second measurement this section
+owes.** The refresh walks a candidate list, hoisting the as-of deps and the version ladder out of the
+loop and re-using one `SAVEPOINT` name per iteration; a one-ticket fixture cannot tell "refreshes every
+affected ticket" from "refreshes the first one", which is the per-iteration form of the one-door class
+this repo has met five times. Both tickets are asserted on every claim below, so which ULID sorts first
+under `ORDER BY ticket_id` changes nothing about what is proven.
+
+- 12.189 ✅ **a publish that drops a state re-snapshots the ticket at its head, and the bootstrap
+  payload it then serves replays clean.** The fixture is ordered so the offending event sits ABOVE the
+  snapshot — snapshot at seq 21 under v1, `ticket.transitioned` to `doing` at seq 22, THEN v2 dropping
+  `doing` with `stateMapping {doing: todo}` — because with the transition BELOW the snapshot every
+  assertion here passes with the fix reverted: the client's own `foldSnapshotForward` already repairs
+  that case. The publish goes through the real `createIngestService(...).ingestBatch`, so the case
+  constrains the WIRING and not just the module. Asserted in this order on purpose: the publish
+  answers `committed` (a fold error escaping `commitOne` would roll the append back and 500 the
+  publish); the replayed payload lands on `todo`/v2 — this is where the case reds without the fix; the
+  snapshot rows are `[21 todo v1, 22 todo v2]`, so the repair is an ADDED higher-seq row and nothing is
+  deleted; the served tail above seq 22 is empty; and the `ticket.transitioned` is still in the ledger,
+  so the repair is not a rewrite of history. (snapshot-refresh.test.ts)
+- 12.190 ✅ **the background pass resumes over the refreshed snapshot instead of throwing on the old
+  vocabulary** — the SECOND door, which the brief for this work did not name. `runSnapshotPass` builds
+  its deps with `buildLedgerDeps` at the NEWEST version, so before the fix it re-folded event 22
+  against v2 and threw. It now resumes from the seq-22 snapshot over an empty tail and writes nothing;
+  the positive control that this is a real "nothing to do" rather than a pass that found no entity is
+  the row list asserted beside it, plus a following `ticket.transitioned` to `done` that the same pass
+  does snapshot, at seq 23. (snapshot-refresh.test.ts)
+- 12.191 ✅ **a publish that moves no state still re-stamps each head snapshot IN PLACE, and a first
+  publish with no tickets writes nothing.** A publish appends to no ticket's stream, so the refresh
+  routinely lands on a seq that ALREADY has a row — `writeSnapshot`'s bare INSERT dies there on
+  `snapshots_pkey`, which is why the publish door has its own `overwriteSnapshot`. v3 drops nothing:
+  five rows before and five after, ticket A's seq-23 row moving `done` v2 → `done` v3 and ticket B's
+  seq-22 row moving `todo` v2 → `todo` v3, each on its OWN head seq, no row added and none deleted.
+  The second half is the shape `bootstrap-workspace.ts` fires on every workspace creation — a
+  version-1 `workflow.defined` for a workflow with no tickets — which must commit and write nothing.
+  **Both halves assert the WHOLE `snapshots` table, not this ticket's rows**: a per-ticket read cannot
+  support "writes nothing", because rows for a ticket the publish never touched are unchanged whatever
+  it did to anything else — the check-that-cannot-fail shape this file's header warns about, and the
+  first draft of this case had exactly it. (snapshot-refresh.test.ts)
+
+**All three cases above use a ticket that HAS a snapshot, and that is a hole this fix round found.**
+`SNAPSHOT_MIN_EVENTS` is 20 and `runSnapshotPass` writes nothing below it, so a ticket under twenty
+events has never been snapshotted and never would be — a population none of 12.189–12.191 touches. The
+publish door repairs it anyway, because its candidate query carries no snapshot-existence filter, and
+that absence is load-bearing rather than an oversight: bootstrap serves an unsnapshotted ticket its
+FULL history, which holds the same offending `ticket.transitioned` the stale-snapshot case is about.
+*"No stale snapshot to invalidate" is not "nothing to repair"* — it is the same argument the module
+already makes against DELETING a superseded snapshot, reached from the other end.
+
+- 12.192 ✅ **a publish repairs a ticket that never crossed `SNAPSHOT_MIN_EVENTS`, writing its first
+  snapshot at head.** The 12.189 fixture with the snapshot step removed: two events on the ticket, the
+  second the `ticket.transitioned` into the state v2 drops, and no snapshot pass run at all. Asserted
+  in 12.189's order — damage first, mechanism second. Pre-publish the WHOLE `snapshots` table is `[]`,
+  the served payload is snapshot-`null` plus full history, and that full history replays clean to
+  `doing`/v1: the positive control, so a post-publish throw is caused by the publish and not by a
+  fixture that never replayed at all. Post-publish the replay lands `todo`/v2 — this is where the case
+  reds — the served tail is empty, the table holds exactly `['ticket:T:2:todo:v2']` (one row at the
+  ticket's own head seq 2, eighteen events below the threshold, a row the background pass would never
+  write), and the `ticket.transitioned` is still in the ledger, so the repair is not a rewrite of
+  history. In its own file rather than in `snapshot-refresh.test.ts`, because that fixture snapshots
+  both its tickets and 12.191 asserts the whole table — a third ticket would change row lists this file
+  quotes as historical evidence. *Mutation record — `AND EXISTS (SELECT 1 FROM snapshots …)` added to
+  the candidate query in `snapshot-refresh.ts`, the narrowing an outside review proposed to spare the
+  publish a full replay: `Test Files 1 failed | 1 passed (2)`, `Tests 1 failed | 3 passed (4)`. 12.192
+  fails with `applyTicketEvent: workflow "…" has no state "doing"`; 12.189, 12.190 and 12.191 all stay
+  GREEN — which is exactly why this case had to exist before the docblock could call that absence
+  deliberate. Restored by `cp` from a backup taken first and verified by `git hash-object`, then `Tests
+  4 passed (4)`.* A second mutation, of the wiring rather than the query — the
+  `refreshSnapshotsForWorkflowPublish` call moved to sit AFTER the projection loop in
+  `ingest-service.ts`, nothing else changed — gives `Test Files 2 failed (2)`, `Tests 4 failed (4)`:
+  12.189, 12.190 and 12.192 on the throw, 12.191 on the row list. Recorded because the module's own
+  prose used to call that late ordering a no-op "that every test still passes", and it is not.
+  (snapshot-refresh-unsnapshotted.test.ts)
+
+**What these four do NOT cover, enumerated.**
+- **A fold that throws is SKIPPED, silently, on the live path.** Each ticket is folded inside a
+  `SAVEPOINT`; a throw rolls back that ticket alone and leaves it with its stale snapshot, so the
+  publish still commits. That is deliberate — letting it escape trades a broken bootstrap for a broken
+  publish, the same reasoning `projections/tickets.ts` gives for its own `DOOR_LEAVES_EXISTENCE_UNCHECKED`
+  skip — but no case here exercises a throwing ticket, and `commitOne` discards the returned
+  `skipped` list because ingest has no logger. *Owner: whoever adds logging to ingest.*
+- **The pre-existing tail that already spans an older state-dropping publish.** The as-of deps bound
+  is "immediately below THIS publish", which is sufficient only by induction from this fix being
+  present at every earlier publish. A database that already holds such a tail when this ships takes the
+  skip above on its first publish and stays stale.
+- **The replica is untouched.** `packages/sync-client`'s `foldSnapshotForward` / `writeSnapshot` /
+  `applyServerItem` still hold the client-side fold, deliberately: it is the only fold on the LIVE
+  stream door, and after this fix the bootstrap-door fold merely becomes a no-op in the common case
+  rather than dead code.
+- **No case asserts the route's own 500-or-not.** It does not throw, before or after — asserting that
+  it did would have been a check that could not fail.

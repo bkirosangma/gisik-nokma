@@ -2697,3 +2697,32 @@ clause 3 described. **Update them in the same change set.**
 Closing all three still does NOT mean zero serving gaps. `SearchHit.matchedIn` and the two `FilterSpec`
 absences are **not** P25 items (owner: Plan 6's client type, not a route), and `ContestedClaim.title` /
 `claim.serverTime` belong to **T13, which is deferred.**
+
+---
+
+## A REVIEWER'S SUGGESTED FIX IS A HYPOTHESIS, NOT PART OF THE FINDING — twice measured
+
+Two remedies proposed by reviewers on this work were applied, measured, and **rejected**. Both times the
+FINDING was real and the REMEDY was wrong, which is a distinction the review format hides by putting
+them in the same paragraph.
+
+1. **Batch B, the baseline-lowering hazard.** Suggested: `Math.max(snapshot.seq, snapshotSeqOf(...))`
+   on the bootstrap door. Applied, it removes the throw and leaves every case green — **and writes the
+   server's seq-5 state under the local seq-6 baseline, so the seq-6 transition vanishes from the
+   transition log while its row still stands in `events`.** A loud throw traded for a silent divergence
+   in the log `require-different-user` sorts on. Rejected; the hazard was RECORDED and pinned instead.
+2. **Closure 1, the candidate query.** Suggested: narrow with `EXISTS (SELECT 1 FROM snapshots …)`,
+   because "a ticket with no snapshot has no stale one to invalidate". Measured: with the EXISTS, the
+   served tail becomes `[1,2]` and replay **throws**. **"No stale snapshot to invalidate" is not
+   "nothing to repair"** — an unsnapshotted ticket needs a snapshot above the offending event MORE than
+   a snapshotted one. The absent filter was load-bearing.
+
+**The rule: a finding earns its severity from reproduction; a remedy has to earn its own, separately.**
+Measure a suggested fix before applying it, and treat "the suite stays green under the remedy" as the
+beginning of the check rather than the end — both rejected remedies were green.
+
+**And a corollary that caught the second one:** when a remedy is an EXCLUSION (a filter, a guard, a
+narrowing), the cases that would notice it are exactly the ones the current fixtures do not have.
+Closure 1's three existing cases all used a ticket that HAS a snapshot and stayed green under the
+mutation — `Tests 1 failed | 3 passed (4)` once the missing case existed. **An exclusion's blast radius
+is invisible to a suite built around the included case.**

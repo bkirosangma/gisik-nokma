@@ -403,18 +403,27 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
    * response is the failure that would be discovered days later on a board that
    * disagrees with the server.
    *
-   * RECORDED, NOT FIXED — the pre-existing hazard this fold does not remove.
+   * THE PRE-EXISTING HAZARD THIS FOLD DOES NOT REMOVE — now CLOSED on the
+   * server, and the paragraph is kept rather than deleted because it is the
+   * argument for where the fix had to live.
+   *
    * A bootstrap tail can contain a `ticket.transitioned` INTO a state the new
    * version dropped. That event is history, written in the old vocabulary,
    * above the snapshot, and `applyTicketEvent` throws on it
    * (`workflow "…" has no state "doing"`) whether or not the snapshot was
    * folded first — measured on this branch before and after this change. No
    * client-side fold can repair it, because the fix is a snapshot ABOVE the
-   * offending event: the server would have to re-snapshot the tickets it folds
-   * when a workflow is published, and today `apps/server/src/sync/snapshot-writer.ts`
-   * has no `workflowVersion` handling and `snapshot-store.ts` has no DELETE, so
-   * a published version invalidates nothing. *Owner: Plan 10 Task 6 (the
-   * bootstrap route and the snapshot writer).*
+   * offending event: the server has to re-snapshot the tickets it folds when a
+   * workflow is published. It now does — `apps/server/src/sync/snapshot-refresh.ts`,
+   * wired into the ingest transaction, server test cases 12.189–12.191. What it
+   * does not reach is a tail that already spanned an older state-dropping
+   * publish before that shipped; such a ticket is skipped there and still
+   * arrives here able to throw.
+   *
+   * THIS FOLD STAYS REGARDLESS. It is the only fold on the BOOTSTRAP door, the
+   * server's repair is a different door, and a snapshot can still arrive at an
+   * older version than the definitions beside it — a skipped ticket, or any
+   * server that has not deployed the refresh.
    */
   async function foldSnapshotForward(
     tx: SyncStorage,

@@ -178,8 +178,11 @@ describe('12.154–12.155 recorded hazards on the replica, pinned as executable 
    * AND IT IS A DIFFERENT HAZARD FROM THE ONE `foldSnapshotForward` ALREADY
    * RECORDS TWO PARAGRAPHS EARLIER. That one needs the throwing
    * `ticket.transitioned` in the RESPONSE's tail (`ticket.events`), and it is
-   * Task 6's, because only a server-written snapshot above the event can repair
-   * it. Here `events` is `[]` on BOTH bootstraps — written out below, since that
+   * the SERVER's, because only a server-written snapshot above the event can
+   * repair it — `apps/server/src/sync/snapshot-refresh.ts` now writes one on
+   * every version-raising publish (server cases 12.189–12.191), which closes
+   * that hazard and leaves THIS one exactly where it was.
+   * Here `events` is `[]` on BOTH bootstraps — written out below, since that
    * emptiness is the whole distinction — and the throwing row is a LOCALLY
    * STORED event the stream-door fold had already moved past. Only the baseline
    * drop puts it back in front of the reducer, so this hazard belongs to the

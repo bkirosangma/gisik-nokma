@@ -1,10 +1,76 @@
-import type { Pool } from 'pg';
-import { applyTicketEvent, TICKET_EVENT_TYPES, type TicketState } from '@gisik-nokma/domain';
+import type { Pool, PoolClient } from 'pg';
+import {
+  applyTicketEvent,
+  TICKET_EVENT_TYPES,
+  type TicketState,
+  type TicketStateDeps,
+} from '@gisik-nokma/domain';
 import { readEntityEvents } from '../ledger/event-store.js';
 import { readLatestSnapshot, writeSnapshot } from '../ledger/snapshot-store.js';
 import { buildLedgerDeps } from './ledger-deps.js';
 
 const DEFAULT_MIN_EVENTS = 20;
+
+/**
+ * The result of one resume-and-replay: where the ticket's stream head is, what
+ * the reducer folds it to, and where the snapshot it resumed from sat.
+ *
+ * `previousSeq` is returned rather than kept private because the two callers
+ * want DIFFERENT things from it. The background pass skips when the head has
+ * not moved (a second pass at `minEvents: 0` would otherwise collide on the
+ * snapshots primary key). The publish door must NOT skip: a publish moves no
+ * ticket event, so `seq === previousSeq` is its ordinary case and re-stating
+ * the head state under the new vocabulary is the whole job.
+ */
+export type FoldedTicketHead = { seq: number; state: TicketState; previousSeq: number };
+
+/**
+ * Resume from a ticket's latest snapshot and fold its tail — THE one
+ * incremental-fold loop on the server, shared by the background pass below and
+ * by the publish door (`snapshot-refresh.ts`).
+ *
+ * It is extracted rather than copied because the two paths must agree about
+ * four separate things, and each one is a defect if they drift: `seq` advances
+ * over EVERY event on the stream while only `TICKET_EVENT_TYPES` are folded
+ * (see "seq counts events, not folds" below); the resume is from the previous
+ * snapshot's STATE, not from event 1; a ticket entity carrying only unfoldable
+ * events yields `null` rather than a snapshot of nothing; and the tail read's
+ * `afterSeq` bind is the previous snapshot's seq, which is the only observable
+ * difference between bounded replay and a full one (case 12.87).
+ *
+ * `deps` is the caller's choice and it is the one thing the two doors differ
+ * on: the pass hands the workspace's NEWEST definitions, the publish door hands
+ * the definitions in force strictly below the publish. See
+ * `ledger-deps.ts`'s `belowWorkspaceSeq` for why that difference exists.
+ */
+export async function foldTicketHead(
+  client: PoolClient,
+  ticketId: string,
+  deps: TicketStateDeps,
+): Promise<FoldedTicketHead | null> {
+  const previous = await readLatestSnapshot(client, 'ticket', ticketId);
+  // The bounded-replay claim, made structurally: the fold RESUMES from the
+  // previous snapshot's state and reads only the tail past its seq. Folding
+  // from event 1 would produce the same bytes and cost the whole history,
+  // which is the cost this table exists to remove — so it is unobservable
+  // in the result and pinned by the tail read's bind value instead
+  // (case 12.87).
+  let state = previous?.state as TicketState | undefined;
+  const previousSeq = previous?.seq ?? 0;
+  let seq = previousSeq;
+  const tail = await readEntityEvents(client, 'ticket', ticketId, seq);
+  for (const env of tail) {
+    seq = env.seq;
+    if ((TICKET_EVENT_TYPES as readonly string[]).includes(env.type)) {
+      state = applyTicketEvent(state, env, deps);
+    }
+  }
+  // A ticket entity carrying only non-ticket events — a contest filed
+  // before its `ticket.created` arrived. Nothing to snapshot yet; the next
+  // pass picks it up once the creation lands.
+  if (state === undefined) return null;
+  return { seq, state, previousSeq };
+}
 
 /**
  * Only what the loop reads. The query's `MAX(e.seq)` decides WHETHER an entity
@@ -70,7 +136,30 @@ type Due = { workspaceId: string; entityId: string };
  *   identity; the route that SERVES a snapshot owes the gate.
  * - **No deletion of superseded snapshots.** The table grows one row per
  *   snapshot per entity forever. Retention is nobody's task yet — recorded, not
- *   fixed.
+ *   fixed. Note this is NOT how a stale snapshot is invalidated: `readLatestSnapshot`
+ *   is `ORDER BY seq DESC LIMIT 1`, so a higher-seq row supersedes for every
+ *   reader and a DELETE would buy nothing but a longer replay. See
+ *   `snapshot-refresh.ts`.
+ * - **`deps` here resolve the NEWEST definitions, and that is safe only because
+ *   of the publish door.** `buildLedgerDeps` with no bound answers at the
+ *   latest workflow version, so folding a tail that spans a state-dropping
+ *   publish throws `applyTicketEvent: workflow "…" has no state "…"` — measured,
+ *   not feared. What removes the span is `snapshot-refresh.ts`: every publish
+ *   that raises a version re-snapshots each affected ticket AT ITS HEAD, so the
+ *   next tail this pass reads starts above that publish. The two are one
+ *   mechanism in two halves; weakening either re-opens the throw. A ticket the
+ *   refresh SKIPS (it enumerates those) is one this pass can still throw on —
+ *   but the converse fails, and the EQUALITY this sentence used to assert was
+ *   false. `snapshot-refresh.ts` names a second population in the same
+ *   enumeration: a ticket it never SEES. Its candidates come from
+ *   `proj_tickets`, while this pass's own due query reads `events` and
+ *   `snapshots` and never consults that table, so a workspace whose projections
+ *   were reset but not rebuilt refreshes nothing, enumerates nothing, and
+ *   arrives here with its tail unrepaired. A third difference is not about throwing at all: a
+ *   candidate whose fold returns `null` lands in neither `rewritten` nor
+ *   `skipped`, so that outcome does not partition its own candidates either.
+ *   `skipped` is a LOWER BOUND on what can still throw here, never the set. The
+ *   interval wrapper logs and swallows it whichever population it came from.
  * - **The whole due set is folded in one call, serially.** Bounded by the
  *   number of tickets that crossed the threshold since the last pass, not by
  *   ledger size, but nothing here yields between entities.
@@ -129,42 +218,24 @@ export async function runSnapshotPass(
     }
     const client = await pool.connect();
     try {
-      const previous = await readLatestSnapshot(client, 'ticket', item.entityId);
-      // The bounded-replay claim, made structurally: the fold RESUMES from the
-      // previous snapshot's state and reads only the tail past its seq. Folding
-      // from event 1 would produce the same bytes and cost the whole history,
-      // which is the cost this table exists to remove — so it is unobservable
-      // in the result and pinned by the tail read's bind value instead
-      // (case 12.87).
-      let state = previous?.state as TicketState | undefined;
-      let seq = previous?.seq ?? 0;
-      const tail = await readEntityEvents(client, 'ticket', item.entityId, seq);
-      for (const env of tail) {
-        seq = env.seq;
-        if ((TICKET_EVENT_TYPES as readonly string[]).includes(env.type)) {
-          state = applyTicketEvent(state, env, deps);
-        }
-      }
-      // A ticket entity carrying only non-ticket events — a contest filed
-      // before its `ticket.created` arrived. Nothing to snapshot yet; the next
-      // pass picks it up once the creation lands.
-      if (state === undefined) continue;
+      const head = await foldTicketHead(client, item.entityId, deps);
+      if (head === null) continue;
       // Reachable only through the programmatic door: `minEvents: 0` makes
       // every entity due on every pass, so a second pass would recompute a
       // snapshot at a seq that already has a row and collide on the snapshots
       // primary key. `SNAPSHOT_MIN_EVENTS` is `.positive()` in the config
       // schema, so no environment can produce a 0. Case 12.89 walks it.
-      if (seq <= (previous?.seq ?? 0)) continue;
+      if (head.seq <= head.previousSeq) continue;
       await writeSnapshot(client, {
         entityKind: 'ticket',
         entityId: item.entityId,
-        seq,
+        seq: head.seq,
         // Round-tripped through JSON so what is stored is byte-for-byte what a
         // client reads back, rather than whatever the in-memory object happened
         // to serialise to.
-        state: JSON.parse(JSON.stringify(state)) as Record<string, unknown>,
+        state: JSON.parse(JSON.stringify(head.state)) as Record<string, unknown>,
       });
-      written.push({ entityId: item.entityId, seq });
+      written.push({ entityId: item.entityId, seq: head.seq });
     } finally {
       client.release();
     }
