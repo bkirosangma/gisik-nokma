@@ -11,6 +11,105 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## ⚡ RESUMED 2026-09-06 00:30 IST — FIVE PARALLEL LANES, OWNER-DIRECTED. THIS SUPERSEDES THE SERIAL TOPOLOGY BELOW
+
+**Quota rolled to 0% weekly at ~00:30 IST Sunday, BEFORE the labeled Monday 06:30 reset.** Second
+observation of this (first: 62% → 1% Tue→Wed). **The weekly window ROLLS; the Monday label is not a
+cliff.** The rolling-window question this file has carried as "unresolved" is now resolved by two
+independent data points. Re-derive every quota-based stop point on that basis from here on.
+
+### Three owner instructions, in this order, all 2026-09-06 — recorded verbatim because each supersedes a standing ruling
+
+1. *"resume operations with the highest model and the highest parallelism"* — **supersedes the serial
+   topology** (one executor) and lifts the **HARD CAP 6 subagents/task** and **one fan-out per plan**
+   cost rulings, bounded only by the machine (16 GB / 10 cores) via the gate lock below.
+2. *"aside from the actual deployments to the servers, make sure every single thing is completed.
+   testing, and everything should be thoroughly done"* — **dissolves the T14 stop point** (its rationale
+   was quota, now rolled) and sets the scope: **Plan 10 T13–T18, all of Plan 11 except the act of
+   deploying to a live server, the three closures, the eleventh gap, the never-wired attachment routes,
+   and the two scheduled passes (semantic extraction, comment cleanup).** T15's DigitalOcean spec is a
+   FILE and is in scope; applying it to a live DO app is the one thing out.
+3. *"fable unblock is lifted. but fable should only be used for what is actually necessary. do not need
+   to use a butcher's knife to kill a chicken"* — **supersedes the 2026-08-31 "Fable out entirely"
+   ruling with a PROPORTIONALITY rule, not a reversal.** The brief's MODEL & EFFORT table stays as the
+   default (sonnet default, opus for core semantics / floor-list). **Fable is a new top tier, used ONLY
+   for: (a) the visibility/read-enforcement surface — the one that produced P19, P22, P23 — i.e. Lane A's
+   closure-2 reviewer and the HELD pair if/when unblocked; (b) the dual-client distributed-systems
+   scenarios, T14/T15 author AND reviewer; (c) a lane's final whole-branch reviewer when the branch touches
+   visibility or sync.** Scaffolds, Dockerfiles, CI YAML, catalogues, Tauri/Expo shells: sonnet, as the
+   table already says. The controller runs Fable because the owner set it.
+
+### RULING P31 (2026-09-06, controller as ruling tier) — `restricted-parents.ts` APPLIES `canSeeResolved`; it invents nothing
+
+The load-bearing unknown from the quota block, answered by reading the code against the real exports,
+with every docblock citation verified rather than trusted:
+- Decision function is **`canSeeResolved`** (`visibility/can-see.ts:94`, confirmed export, signature
+  `(eff, userId, v: ResolvedVisibility)`) — the new file passes exactly `{workspaceId, projectId,
+  resolvedMode, resolvedUserIds}` and adds **no branch**. The SQL fetches the parents' `resolved_*` rows and
+  restates nothing about who may see what.
+- Role is resolved via **`resolveEffectiveRole` per the PARENT's workspace** (brand-protected, Ruling P22),
+  cached per workspace — **byte-for-byte the call shape `rollup.ts:262–276` uses for children.** Verified.
+- Disclosure is **strictly weaker than an existing door**: `routes/tickets.ts:304` already serves
+  `parent = { kind: 'restricted', id }` (case 6.14, spec §6's deliberate existence leak — verified at the
+  line), and `parentId` is already on every `TicketCard`. This boolean drops the id.
+- Unknown parent → `false` mirrors the root-resolution ruling (case 6.9) rather than inventing existence.
+- **`TicketRead.title` also applies the existing gate**: the WIP's `titleOf(state: TicketState)` reads the
+  title from the reducer's claim map inside the single-ticket route that is ALREADY `canSee`-gated — not
+  a new `proj_tickets` read. **One residual check for Lane A's reviewer: confirm in control flow that the
+  route's gate precedes `titleOf`.** That is a reading, not a ruling.
+**So P25's condition is SATISFIED for both rule-first gaps. Closure 2's WIP may be gated and reviewed,
+not discarded.** Unknown #4 also measured: the WIP removed `mapListView: never` and `mapTicketRead:
+never` (closed `getTickets`, `getTicket`), touched neither HELD entry, and never reached `search` or
+`getAttention`.
+
+### THE FIVE LANES — file-disjoint by construction, collisions named, sequence inside each lane is fixed
+
+| lane | window · worktree · branch · state file | work, in order | model tier |
+|---|---|---|---|
+| **A** | `gisik:1` · `gisik-nokma-exec` · `exec/19-serving-gaps` (existing) · `executor-state.md` | rebase #109 → merge · gate+review closure-2 WIP (Fable reviewer) · finish `search`/`getAttention` buildable fields · `WorkItem.stateName` (11th gap) · closure 3 `StreamItem` · **HELD pair LAST, only if owner has answered — else stop and report** | opus impl, **Fable review** |
+| **B** | `gisik:2` · `lanes/lane2-plan4` · `exec/20-plan10-t13-t15` · `executor-state-B.md` | T13 (app-core UX) → T14 rig → T15 scenarios (**Fable author+review**) → **T18 catalogue held until C and D have MERGED** | table; Fable for T14/T15 |
+| **C** | `gisik:3` · `lanes/lane3-plan7-8` · `exec/21-plan10-t16-desktop` · `executor-state-C.md` | T16 Tauri desktop. Gate = `cargo check` + `tsc` + vitest on the storage adapter; **no simulator claim** | sonnet/opus per table |
+| **D** | `gisik:4` · `lanes/lane4-periphery` · `exec/22-plan10-t17-mobile` · `executor-state-D.md` | T17 Expo mobile (`npx expo`, no global CLI). Same honesty: built, typechecked, unit-tested, **not device-verified** | sonnet/opus per table |
+| **E** | `gisik:5` · `lanes/lane5-plan11` (new) · `exec/23-plan11` · `executor-state-E.md` | T1→T6 (config, CORS/rate-limit, alerting, SMTP, Dockerfiles, dev stack) **+ wire `registerAttachmentRoutes` into `app.ts` (owner: this lane, carried since step 12)** → T7→T12 (seeds, backups, restore) → T13 E2E vs compose → T14 (ci.yml EXISTS — extend #89, do not recreate) → T15 DO spec file → **T16 catalogue held until T1–T15 merged**. Live deploy: OUT | table; floor-list opus |
+| **F** (later) | after everything merges, serial | semantic-extraction pass (`--mode deep`, client packages) and the comment-cleanup pass | per their own sections |
+
+**Collision map, named so nobody rediscovers it:** `apps/server/package.json` (B's T14 devDep vs E's
+T2/T4/T5/T9/T10/T11) · `apps/server/src/app.ts` (E only — A's closures touch `read/` and
+`routes/tickets.ts`, verified from the WIP stat) · `packages/app-core/src/index.ts` (A's closure 3 vs B's
+T13 exports) · root `pnpm-lock.yaml` (C, D, E all add packages) · `Features.md` / `test-cases/12` (A, B, C,
+D — each lane appends ONLY in its own plan's section; T18 is the one that owns §12's final shape) ·
+`docs/lanes/executor-state*.md` (per-lane files, no sharing). **Every lane rebases onto `origin/main`
+before opening its PR; the controller merges in arrival order; a `pnpm-lock.yaml` conflict is resolved
+by re-running `pnpm install`, never by hand.**
+
+### THE GATE LOCK — the one physical constraint, because this machine has already been crashed once
+
+16 GB / 10 cores, no vitest worker caps, no turbo concurrency setting (both measured absent). Five lanes
+running server test suites at once is the Sep 4 crash with a multiplier. **Rule, in every lane's brief:**
+- **Any test run that includes `apps/server`** (package-scoped or full gate) takes the machine-wide lock
+  first: `until mkdir /tmp/gisik-gate.lock 2>/dev/null; do p=$(cat /tmp/gisik-gate.lock/pid 2>/dev/null);
+  [ -n "$p" ] && ! kill -0 $p 2>/dev/null && rm -rf /tmp/gisik-gate.lock; sleep 15; done; echo $$ >
+  /tmp/gisik-gate.lock/pid; trap 'rm -rf /tmp/gisik-gate.lock' EXIT` — `mkdir` is atomic, the PID file
+  makes it stale-safe, the trap releases it.
+- Full gates run `pnpm turbo run build test typecheck --force --concurrency=2`.
+- Non-server package tests (`domain`, `app-core`, `sync-client`, `ui`, `editor`, `web`) may run unlocked
+  with `--maxWorkers=2`.
+- **Never pipe a test run** (the hook refuses `| head`; the rule is broader — redirect to a file).
+- Test databases are `gisik_test_<uuid>` per run (verified `test/helpers/db.ts:32`), so lanes share the
+  one Postgres on 54329 safely under the lock.
+
+**The controller's own forced gate at each merge stays `--force`, uncached, node 22, chained in one call
+— and takes the same lock.**
+
+### Still with the owner — the ONE thing that blocks work, restated with a recommended default
+
+**Guest visibility across projects** (`WorkspaceRef.projects` → `getMyWorkspaces`, `WorkItem.projectName`
+→ `getMyWork`): *what does a project-scoped guest see of a workspace's other projects?* **Recommended
+default: only the projects the guest holds a membership in — the workspaces list shows a partial
+workspace, and a project name is itself treated as a disclosure.** Lane A sequences this LAST and **stops
+and reports rather than building if unanswered** — P25's condition does not move because five lanes are
+running.
+
 ## ⛔ BOTH SESSIONS QUOTA-BLOCKED 2026-09-06, RESET MON 2026-09-07 06:30 IST — READ BEFORE TOUCHING ANYTHING
 
 **Executor hit its weekly limit outright** (`You've hit your weekly limit · resets Sep 7 at 6:30am`) mid-
