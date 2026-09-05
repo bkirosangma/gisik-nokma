@@ -129,6 +129,60 @@ describe('the rig', () => {
     expect(await h.ledger(ticketId)).toEqual([{ id: honest.id, type: 'ticket.created', seq: 1, actorId: USER_A }]);
   });
 
+  /**
+   * THE BACKFILL LIST IS THE SERVER'S, AND UNTIL THIS CASE NOTHING PROVED IT.
+   *
+   * `bootstrapFor` sends a ticket's snapshot plus every event ABOVE the
+   * snapshot's seq, PLUS every `BOOTSTRAP_BACKFILL_TYPES` event regardless of
+   * position — because those are the ticket-entity types the reducer never
+   * folds, so a snapshot never carries them. The rig imports that constant from
+   * `sync-routes.ts` rather than restating it, and the plan text's hand-copied
+   * list was missing `visibility.set`.
+   *
+   * MEASURED: replacing the import with the plan's four-entry literal left all
+   * three cases above GREEN. The mutation ran — the edit was confirmed present
+   * before the run — so that was an unconstrained path, not a mutation that
+   * never fired. This case constrains it: a `visibility.set` filed BELOW the
+   * snapshot line is invisible to a fresh client unless the backfill carries
+   * its type, and a bootstrap that quietly drops it hands the replica a
+   * different audience for the ticket than the server has.
+   *
+   * The snapshot pass runs BETWEEN the visibility claim and the new client, so
+   * the event is genuinely below the snapshot's seq — without that ordering the
+   * event would arrive as an ordinary above-the-line event and the case would
+   * pass for a reason that has nothing to do with the backfill.
+   */
+  it('a visibility.set below the snapshot line still reaches a fresh client — the backfill is the server\'s list', async () => {
+    const ticketId = newUlid();
+    const born = createdBy(USER_A, ticketId, 'web', 'Audience changes below the snapshot');
+    const [commit] = await h.ingestInteractive(USER_A, [born]);
+    expect(commit).toMatchObject({ status: 'committed' });
+
+    const scoped = newSubmittedEvent({
+      workspaceId: h.workspaceId,
+      entity: { kind: 'ticket', id: ticketId },
+      type: 'visibility.set',
+      payload: { ticketId, mode: 'project' },
+      actorId: USER_A,
+      origin: 'web',
+    });
+    const [set] = await h.ingestInteractive(USER_A, [scoped]);
+    expect(set).toMatchObject({ status: 'committed', eventId: scoped.id });
+
+    // Snapshot AFTER both, so the visibility claim sits below the line.
+    await h.snapshotPass();
+
+    const fresh = await h.client(USER_B);
+    const events = await fresh.replica.listEntityEvents(ticketId);
+    const types = events.map((e) => e.type);
+    expect(types, 'the visibility claim must survive the snapshot line').toContain('visibility.set');
+    expect(events.find((e) => e.type === 'visibility.set')?.id).toBe(scoped.id);
+    // Control: the snapshot really did cover this ticket, so "below the line"
+    // is a fact about this run and not an assumption. Without it, a snapshot
+    // pass that skipped the ticket would make this case prove nothing.
+    expect(types).not.toContain('ticket.created');
+  });
+
   it('a client created after the fact bootstraps from the server cut: ticket present, cursor at the head', async () => {
     const ticketId = newUlid();
     const born = createdBy(USER_B, ticketId, 'mobile', 'Born before the client');
