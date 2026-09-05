@@ -220,7 +220,7 @@ describe('S1 — concurrent field_set: the later claim wins the projection, the 
    * scenario would never leave the device. `title` is a built-in the field
    * check accepts as non-blank text (`checks/fields.ts`).
    */
-  it('asserts the exact final ledger, the server projection, and both replicas byte-identical', async () => {
+  it('12.267 — asserts the exact final ledger, the server projection, and both replicas byte-identical', async () => {
     const { ticketId, created } = await seedSharedTicket();
     const claimA = ticketEvent(USER_A, ticketId, 'ticket.field_set', { fieldId: 'title', value: 'A said this' });
     const claimB = ticketEvent(USER_B, ticketId, 'ticket.field_set', { fieldId: 'title', value: 'B said this' });
@@ -264,7 +264,7 @@ describe('S2 — restrict-to violated because the world changed: contested with 
    * the refusal is recorded as a `claim.contested` event on the ticket, and the
    * claimant's attention is where the contest surfaces.
    */
-  it('B was assignee locally, reassignment landed meanwhile; the offline claim contests', async () => {
+  it('12.268 — B was assignee locally, reassignment landed meanwhile; the offline claim contests', async () => {
     const { ticketId, created } = await seedSharedTicket();
     const assignB = ticketEvent(USER_A, ticketId, 'ticket.assigned', { assigneeId: USER_B });
     await commitInteractive(USER_A, assignB);
@@ -383,7 +383,7 @@ describe('S3 — workflow changed while offline: the stranded transition contest
    * The publish goes through the GATED door as the workspace OWNER: a member's
    * `workflow.defined` is refused (`ADMIN_ONLY_TYPES`; rig.test.ts I2 pins it).
    */
-  it("v2 removed 'review'; B's queued transition to it contests with unknown-state, judged against v2", async () => {
+  it("12.269 — v2 removed 'review'; B's queued transition to it contests with unknown-state, judged against v2", async () => {
     const { ticketId, created } = await seedSharedTicket();
     // B offline: legal under v1 (`* → review` carries no rule).
     const toReview = ticketEvent(USER_B, ticketId, 'ticket.transitioned', { to: 'review' });
@@ -527,7 +527,7 @@ describe('S4 — visibility narrowed while offline: contest up, NO purge down, a
    * at all: `checkVisibilityPermission`'s check 5 admits project-admin rights
    * or creatorship, and A is a plain member.
    */
-  it('the claim contests permission.visibility; B keeps a stale copy and lags the head; A sees the contest; re-widening converges both', async () => {
+  it('12.270 — the claim contests permission.visibility; B keeps a stale copy and lags the head; A sees the contest; re-widening converges both', async () => {
     const { ticketId, created } = await seedSharedTicket();
     // B offline edits.
     const edit = ticketEvent(USER_B, ticketId, 'ticket.field_set', { fieldId: 'title', value: 'B edited this offline' });
@@ -540,7 +540,6 @@ describe('S4 — visibility narrowed while offline: contest up, NO purge down, a
     const headAfterNarrowing = await readStreamSeq(h.pool, h.workspaceId);
     const cursorBefore = await b.replica.getCursor(h.workspaceId);
     const heldBefore = await b.replica.listEntityEvents(ticketId);
-    const stateBefore = (await b.replica.getTicket(ticketId))?.confirmed;
     expect(heldBefore.map((e) => e.id)).toEqual([created.id]);
     expect(cursorBefore).toBeLessThan(headAfterNarrowing);
 
@@ -568,18 +567,40 @@ describe('S4 — visibility narrowed while offline: contest up, NO purge down, a
     // The refused edit moved nothing on the server.
     expect((await h.projTicket(ticketId))?.fields['title']).toMatchObject({ value: SHARED_TITLE, actorId: USER_A });
 
-    // DOWN: NO PURGE. B holds exactly what it held before — same events, same
-    // state, same searchable title — and its cursor has not moved, because
-    // nothing on the narrowed ticket was delivered. Each of these is the
-    // negation of one line of the plan's S4.
-    expect(await b.replica.listEntityEvents(ticketId)).toEqual(heldBefore);
-    expect((await b.replica.getTicket(ticketId))?.confirmed).toEqual(stateBefore);
-    expect((await b.replica.getTicket(ticketId))?.confirmed?.fields['title']?.value).toBe(SHARED_TITLE);
-    expect((await b.ds.query.searchOfflineCopy(h.workspaceId, SHARED_TITLE)).hits).toEqual([
-      { ticketId, title: SHARED_TITLE },
-    ]);
+    // DOWN: NOTHING IS DELIVERED. This is the EXCLUDING half and the point of
+    // the scenario — continued delivery to a narrowed-out replica is the
+    // disclosure, and it is what a broken visibility gate would produce.
+    // Asserted by ID, not by count: a count would pass if the wrong two events
+    // arrived in place of these two.
+    const heldAfter = await b.replica.listEntityEvents(ticketId);
+    expect(heldAfter.map((e) => e.id)).not.toContain(narrow.id);
+    expect(heldAfter.map((e) => e.id)).not.toContain(contestEventId);
+    // …and the cursor did not move, because only a DELIVERED envelope moves it.
     expect(await b.replica.getCursor(h.workspaceId)).toBe(cursorBefore);
-    // The claim is out of transit — answered, not stranded.
+
+    // WHAT IS *RECORDED* HERE AND DELIBERATELY NOT ASSERTED — Ruling P35(a),
+    // as amended after this lane raised the conflict below.
+    //
+    // MEASURED at this sha: B still holds its pre-narrowing copy in full —
+    // `listEntityEvents` still equals `heldBefore` (one `ticket.created`),
+    // `getTicket().confirmed` still holds the pre-narrowing state, and
+    // `searchOfflineCopy('${SHARED_TITLE}')` still returns the ticket. That is
+    // the accepted UNDER-PURGE RESIDUAL of case 6.104: the per-event purge walk
+    // was DELETED rather than narrowed (ruling on 6.101), so a member un-shared
+    // by a plain `visibility.set` keeps the stale copy until a full resync.
+    //
+    // **It is recorded and not asserted, on 6.104's own stated reason**: "a
+    // test asserting 'no purge arrives' would harden the wrong half of a gap
+    // this branch wants closed rather than preserved." 6.104's owner is
+    // **Plan 10 — this plan**. An assertion here would therefore be a test that
+    // whoever closes the gap must BREAK to fix it, with a comment insisting its
+    // own redness is correct — and the cheap move at that moment is to repair
+    // the test. The assertions kept above survive that fix: closing 6.104 adds
+    // a purge INSTRUCTION, which removes state and does not move the cursor,
+    // so "these two events never arrived" and "the cursor did not move" both
+    // stay true. Retention does not.
+    //
+    // The claim is out of transit either way, and that IS asserted:
     expect(await b.outbox.pendingFor(ticketId)).toBeNull();
     expect(await b.outbox.queuedCount(h.workspaceId)).toBe(0);
     expect(await b.outbox.failedItems(h.workspaceId)).toEqual([]);
@@ -684,7 +705,7 @@ describe('S5 — the offline reopen pair contests coherently when the world chan
    * catch-up that follows delivers A's re-assignment and the parent's contest.
    * The replica's INTERMEDIATE state is not asserted.
    */
-  it('reopen refused restrict-to, child then refused hierarchy.parent-terminal — two contests, exact rules and reasons', async () => {
+  it('12.272 — reopen refused restrict-to, child then refused hierarchy.parent-terminal — two contests, exact rules and reasons', async () => {
     // Parent assigned to A and finished by A (A is the assignee, so `todo → done` passes).
     const { ticketId: parentId, created } = await seedSharedTicket();
     const assignA1 = ticketEvent(USER_A, parentId, 'ticket.assigned', { assigneeId: USER_A });
@@ -848,7 +869,7 @@ describe('S6 — the same batch twice: idempotent to the byte', () => {
    * honesty. The two replicas then catch up, so the doubled batch is also
    * shown to leave one ledger both fold identically.
    */
-  it('replaying a mixed committed/contested batch changes nothing', async () => {
+  it('12.273 — replaying a mixed committed/contested batch changes nothing', async () => {
     const { ticketId, created } = await seedSharedTicket();
     const assignA = ticketEvent(USER_A, ticketId, 'ticket.assigned', { assigneeId: USER_A });
     await commitInteractive(USER_A, assignA);
