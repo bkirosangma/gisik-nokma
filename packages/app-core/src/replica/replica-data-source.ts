@@ -160,23 +160,6 @@ export type TicketSummary = {
 };
 
 /**
- * The replica-only half of the query surface — the facts an offline device has
- * and `DataSourceQuery` has no method for.
- *
- * Every member here is ADDITIVE. `ReplicaDataSource` is a structural SUPERSET
- * of `DataSource`, so a view's READ path runs unchanged against this one; these
- * are what a view written FOR the offline shells can ask on top.
- *
- * THE WRITE DOOR IS NOT UNCHANGED, and this sentence used to say it was.
- * `Features.md` §12 carried the qualification and this docblock did not — the
- * correction itself landed on one door of a pair, which is this codebase's
- * signature defect. `ingest` THROWS `OfflineAcceptError` where the online
- * source returns an `IngestResult[]`, so the six call sites `Features.md` §12
- * enumerates see a rejection where they saw an array. Assignability is a
- * compile-time fact (12.172); "runs unchanged" is a claim about behaviour and
- * it is true of reads alone.
- */
-/**
  * ONE PROJECT LIST WITH BOTH KINDS IN IT, and the two kinds stay DISTINGUISHABLE
  * rather than being flattened into one row shape.
  *
@@ -202,6 +185,23 @@ export type OfflineListEntry =
   | { kind: 'settled'; row: ListRow }
   | { kind: 'offline-born'; summary: TicketSummary };
 
+/**
+ * The replica-only half of the query surface — the facts an offline device has
+ * and `DataSourceQuery` has no method for.
+ *
+ * Every member here is ADDITIVE. `ReplicaDataSource` is a structural SUPERSET
+ * of `DataSource`, so a view's READ path runs unchanged against this one; these
+ * are what a view written FOR the offline shells can ask on top.
+ *
+ * THE WRITE DOOR IS NOT UNCHANGED, and this sentence used to say it was.
+ * `Features.md` §12 carried the qualification and this docblock did not — the
+ * correction itself landed on one door of a pair, which is this codebase's
+ * signature defect. `ingest` THROWS `OfflineAcceptError` where the online
+ * source returns an `IngestResult[]`, so the six call sites `Features.md` §12
+ * enumerates see a rejection where they saw an array. Assignability is a
+ * compile-time fact (12.172); "runs unchanged" is a claim about behaviour and
+ * it is true of reads alone.
+ */
 export type ReplicaOnlyQuery = {
   /** Confirmed tickets plus offline-born ones, every one badged. */
   listTicketSummaries(workspaceId: string): Promise<TicketSummary[]>;
@@ -912,22 +912,37 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       const settled = await query.getTickets(projectId, filter, grouping);
       const entries: OfflineListEntry[] = settled.rows.map((row) => ({ kind: 'settled', row }));
 
-      // DE-DUPLICATED against the settled rows by ticket id, and not for
-      // tidiness: a ticket created offline and then CONFIRMED appears in both
-      // reads for as long as its claim sits in the outbox — `pending` stays true
-      // on the summary while `getTickets` has already begun answering it.
-      // Listing it twice would show one ticket as two.
-      const alreadyListed = new Set(settled.rows.map((row) => row.ticketId));
-
-      // `ownWorkspaceId`, not an argument: this door is project-scoped and a
-      // replica holds exactly one workspace, so the project id IS the scope. The
-      // summaries are FILTERED by it rather than trusted — that is what
-      // `projectId` is on `TicketSummary` for, and a workspace-wide list leaking
-      // into a project view is the failure the filter prevents.
-      for (const summary of await listTicketSummaries(ownWorkspaceId)) {
-        if (summary.projectId !== projectId) continue;
-        if (alreadyListed.has(summary.ticketId)) continue;
-        entries.push({ kind: 'offline-born', summary });
+      // THE BORN HALF READS `pendingCreatedTickets`, NOT `listTicketSummaries`,
+      // and the first draft of this door got that wrong in a way its own tests
+      // could not see. `listTicketSummaries` answers EVERY confirmed ticket as
+      // well as the offline-born ones — it is the my-work door's shape, not this
+      // one's. Deduping it against the SETTLED rows then looked correct and was
+      // not: `getTickets` applies the filter, so every confirmed ticket the
+      // filter excluded was missing from the dedup set, passed the project
+      // check, and was re-emitted as `offline-born` with `pending: false`.
+      // Typing in a search box turned settled tickets into "claims".
+      //
+      // Every case passed `{}`, where `matchesFilter` matches everything and the
+      // dedup hid the whole summary side. **A door that takes a filter needs a
+      // case with a filter**; an empty spec is not a neutral default, it is the
+      // one input under which the two halves cannot disagree.
+      //
+      // `pendingCreatedTickets` is the outbox's own word for "tickets that exist
+      // only as queued claims", so there is nothing confirmed in it to dedup
+      // against and no filtered-versus-unfiltered gap to get wrong.
+      for (const born of await outbox.pendingCreatedTickets(ownWorkspaceId)) {
+        // `ownWorkspaceId`, not an argument: this door is project-scoped and a
+        // replica holds exactly one workspace, so the project id IS the scope.
+        if (born.pending.projectId !== projectId) continue;
+        // FILTERED like the settled half. A door that filtered one side and not
+        // the other would answer a narrowed list with un-narrowed rows in it,
+        // which is a wrong answer wearing the right shape.
+        if (!matchesFilter(born.pending, filter)) continue;
+        const summary = await summarise(born.pending, []);
+        entries.push({
+          kind: 'offline-born',
+          summary: { ...summary, pending: true, pendingEventIds: born.pendingEventIds },
+        });
       }
       return { projectId, entries };
     },

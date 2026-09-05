@@ -223,7 +223,7 @@ describe('3.51 TicketList — Asana-shaped, honest to the row set', () => {
   });
 });
 
-describe('3.149 TicketList — a queued claim is badged on the LIST, not only on the board', () => {
+describe('3.152 TicketList — a queued claim is badged on the LIST, not only on the board', () => {
   /**
    * THE ASYMMETRY THIS CLOSES, in `view-types.ts`'s own words: the badge "was on
    * the board and not on the list, and the asymmetry was silent" — an offline

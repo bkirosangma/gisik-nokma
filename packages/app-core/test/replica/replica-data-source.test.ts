@@ -667,6 +667,79 @@ describe('12.187 the three doors an offline-born ticket reaches', () => {
     expect(ids).not.toContain(thereId);
   });
 
+  /**
+   * 12.243 — THE CASE THE FIRST DRAFT COULD NOT HAVE FAILED, added after a
+   * reviewer reproduced the defect it now pins.
+   *
+   * Every case above passes `{}`. `matchesFilter` guards every axis on
+   * `!== undefined`, so an empty spec matches everything — and under it the
+   * settled half and the born half cannot disagree about what belongs in the
+   * list. The first draft read the born half out of `listTicketSummaries`,
+   * which answers EVERY confirmed ticket, and deduped it against the FILTERED
+   * settled rows; every confirmed ticket the filter excluded then came back
+   * tagged `offline-born` with `pending: false`. Typing in a search box turned
+   * settled tickets into claims.
+   *
+   * **An empty filter is not a neutral default. It is the one input under which
+   * a filter bug cannot show.**
+   */
+  it('12.243 a NON-EMPTY filter narrows both halves, and no confirmed ticket comes back tagged offline-born', async () => {
+    const { ds, replica } = await fixture();
+    const bornEpicId = newUlid();
+    const bornTaskId = newUlid();
+    for (const [id, typeId, title] of [
+      [bornEpicId, TYPE_EPIC, 'Born epic'],
+      [bornTaskId, TYPE_TASK, 'Born task'],
+    ] as const) {
+      await ds
+        .ingest([
+          newSubmittedEvent({
+            workspaceId: WS,
+            entity: { kind: 'ticket', id },
+            type: 'ticket.created',
+            payload: { typeId, projectId: PROJECT, parentId: null, title },
+            actorId: USER_A,
+            origin: 'desktop',
+          }),
+        ])
+        .catch(() => undefined);
+    }
+
+    const view = await ds.query.listProjectWithOfflineBorn(PROJECT, { typeIds: [TYPE_EPIC] }, 'flat');
+
+    // (a) NO entry tagged offline-born is actually a confirmed ticket. This is
+    // the assertion the defect failed: it re-tagged settled tickets.
+    for (const entry of view.entries) {
+      if (entry.kind !== 'offline-born') continue;
+      const confirmed = await replica.getTicket(entry.summary.ticketId);
+      expect(confirmed?.confirmed ?? null, `${entry.summary.ticketId} is confirmed`).toBeNull();
+      // And an offline-born entry is ALWAYS badged — it exists only as a claim.
+      expect(entry.summary.pending).toBe(true);
+    }
+
+    // (b) every entry satisfies the filter, on BOTH sides of the union.
+    for (const entry of view.entries) {
+      const typeId = entry.kind === 'settled' ? entry.row.typeId : entry.summary.ticketId;
+      if (entry.kind === 'settled') expect(typeId).toBe(TYPE_EPIC);
+      else expect(entry.summary.ticketId).toBe(bornEpicId);
+    }
+
+    // (c) ids are unique — the dedup is not doing the filter's job for it.
+    const ids = view.entries.map((e) => (e.kind === 'settled' ? e.row.ticketId : e.summary.ticketId));
+    expect(new Set(ids).size).toBe(ids.length);
+
+    // THE CONTROL, in the same run: the born TASK is excluded by this filter and
+    // present without it. Without this, "the born task is absent" would also
+    // pass against a door that dropped the born half entirely.
+    expect(ids).not.toContain(bornTaskId);
+    const unfiltered = await ds.query.listProjectWithOfflineBorn(PROJECT, {}, 'flat');
+    const allIds = unfiltered.entries.map((e) =>
+      e.kind === 'settled' ? e.row.ticketId : e.summary.ticketId,
+    );
+    expect(allIds).toContain(bornTaskId);
+    expect(allIds).toContain(bornEpicId);
+  });
+
   it('12.242 a ticket that is confirmed while its claim is still queued is listed ONCE, not twice', async () => {
     const { ds } = await fixture();
     // A ticket the replica already holds as CONFIRMED, with a queued claim
