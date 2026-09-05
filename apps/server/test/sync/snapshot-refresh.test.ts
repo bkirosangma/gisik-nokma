@@ -501,4 +501,66 @@ describe('refresh on publish, snapshot door', () => {
       'ticket:B:22:todo:v3',
     ]);
   });
+
+  /**
+   * 12.245 — RULING P36's EXCLUDING FIXTURE, second half, and the one without
+   * which the loss is LATENT UNTIL A WORKFLOW PUBLISH.
+   *
+   * `foldTicketHead` reads only the tail PAST the previous snapshot's seq, and
+   * this pass's ordinary case is `seq === previousSeq` — a re-state with an
+   * EMPTY tail, re-folding head state onto a new vocabulary. So there is no
+   * state-claiming event to capture from, and `overwriteSnapshot` sets
+   * `provenance = excluded.provenance`: a writer that captured only from folded
+   * events would write NULL over a good block on every publish, and the read
+   * door would start refusing tickets the previous pass had just fixed.
+   *
+   * That is the P14 shape — correct until the day something unrelated changes —
+   * which is why this is a case and not a comment.
+   */
+  it('12.245 a publish with an EMPTY tail carries the provenance block forward instead of erasing it', async () => {
+    const wfV4 = {
+      id: WF,
+      version: 4,
+      name: 'Basic',
+      initialStateId: 'todo',
+      states: [
+        { id: 'todo', name: 'To do', category: 'open' },
+        { id: 'done', name: 'Done', category: 'terminal' },
+      ],
+      transitions: [
+        { from: '*', to: 'done', rules: [] },
+        { from: '*', to: 'todo', rules: [] },
+      ],
+    };
+
+    const client = await db.pool.connect();
+    try {
+      // THE PRE-STATE, printed rather than assumed. A block must already be
+      // there, or "it survived" is satisfied by a world where nothing was ever
+      // written — the null that looks like success.
+      const before = await readLatestSnapshot(client, 'ticket', TICKET);
+      expect(before?.provenance, 'a block exists before the publish').not.toBeNull();
+      const beforeSeq = before?.seq;
+
+      // And the tail really is EMPTY at this point: the ticket's head has not
+      // moved, because a publish appends to the WORKFLOW's stream and never to
+      // a ticket's. Without this the case could pass through the capture branch
+      // and never exercise the carry at all.
+      const tail = await readEntityEvents(client, 'ticket', TICKET, beforeSeq ?? 0);
+      expect(tail, 'the tail past the snapshot is empty — this is the carry path').toEqual([]);
+
+      const result = await publish(wfV4);
+      expect(result).toMatchObject({ status: 'committed' });
+
+      const after = await readLatestSnapshot(client, 'ticket', TICKET);
+      // The state was re-folded onto v4 — the pass did its job — AND the block
+      // came through untouched. Both halves, because a pass that did nothing at
+      // all would also preserve the block.
+      expect(after?.state).toBeDefined();
+      expect(after?.provenance).toEqual(before?.provenance);
+      expect(after?.provenance?.state.serverTime).toBe(before?.provenance?.state.serverTime);
+    } finally {
+      client.release();
+    }
+  });
 });
