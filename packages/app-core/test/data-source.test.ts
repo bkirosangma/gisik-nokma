@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SubmittedEvent } from '@gisik-nokma/domain';
-import type { DataSource, StreamItem } from '../src/data-source.js';
+import type { DataSource, ServerStreamFrame } from '../src/data-source.js';
 import { DEFAULT_GROUPING, DEFAULT_LIST_COLUMNS, DEFAULT_VIEW_PREFS } from '../src/view-types.js';
 import { createFakeDataSource } from './helpers/fake-data-source.js';
 import { submittedTicketCreated } from './helpers/seed.js';
@@ -37,7 +37,7 @@ describe('the fake DataSource (the harness every view test rides on)', () => {
 
   it('fans stream items out to subscribers and honours unsubscribe', () => {
     const source = createFakeDataSource();
-    const seen: StreamItem[] = [];
+    const seen: ServerStreamFrame[] = [];
     const unsubscribe = source.subscribe('ws_1', 0, (item) => seen.push(item));
     expect(source.subscriptions).toEqual([{ workspaceId: 'ws_1', afterSeq: 0 }]);
     source.pushStreamItem({ type: 'caught-up', workspaceId: 'ws_1', seq: 7 });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newUlid, serverStreamFrameSchema } from '@gisik-nokma/domain';
-import type { StreamItem } from '../../src/data-source.js';
+import type { ServerStreamFrame } from '../../src/data-source.js';
 import {
   BACKOFF_CAP_MS,
   BACKOFF_INITIAL_MS,
@@ -158,7 +158,7 @@ describe('streamUrl and backoff', () => {
 describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', () => {
   it('sends the subscribe frame on open and delivers event, purge, caught-up and error frames', () => {
     const { subscribe, socketAt, sentFrame } = harness();
-    const seen: StreamItem[] = [];
+    const seen: ServerStreamFrame[] = [];
     subscribe('ws_1', 41, (item) => seen.push(item));
     socketAt(0).serverOpen();
     expect(sentFrame(0)).toEqual({ type: 'subscribe', workspaceId: 'ws_1', afterSeq: 41 });
@@ -174,7 +174,7 @@ describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', ()
   });
 
   /**
-   * DRIFT 1, closed. `StreamItem` had four members and no `scope-revoked`, so the
+   * DRIFT 1, closed. `ServerStreamFrame` had four members and no `scope-revoked`, so the
    * one instruction that tells a removed device to empty itself arrived as an
    * unrecognised `type` and was dropped — leaving stale authorization in any cache
    * fed by this stream. This is the named case that dies when the union is
@@ -182,7 +182,7 @@ describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', ()
    */
   it('DRIFT 1: a `scope-revoked` frame reaches the callback — it is a fifth member, not an unknown type', () => {
     const { subscribe, socketAt } = harness();
-    const seen: StreamItem[] = [];
+    const seen: ServerStreamFrame[] = [];
     subscribe('ws_1', 7, (item) => seen.push(item));
     socketAt(0).serverOpen();
     socketAt(0).serverSend({ type: 'scope-revoked', workspaceId: 'ws_1' });
@@ -195,7 +195,7 @@ describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', ()
 
   it('PLANTED DEFECT: drops purge/caught-up frames addressed to another workspace', () => {
     const { subscribe, socketAt, sentFrame } = harness();
-    const seen: StreamItem[] = [];
+    const seen: ServerStreamFrame[] = [];
     subscribe('ws_1', 5, (item) => seen.push(item));
     socketAt(0).serverOpen();
     socketAt(0).serverSend({ type: 'purge', workspaceId: 'ws_OTHER', entityId: 't_gone' });
@@ -210,7 +210,7 @@ describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', ()
 
   it("a foreign workspace's `scope-revoked` neither reaches the callback nor ends this subscription", () => {
     const { sockets, subscribe, socketAt } = harness();
-    const seen: StreamItem[] = [];
+    const seen: ServerStreamFrame[] = [];
     subscribe('ws_1', 5, (item) => seen.push(item));
     socketAt(0).serverOpen();
     socketAt(0).serverSend({ type: 'scope-revoked', workspaceId: 'ws_OTHER' });
@@ -258,12 +258,12 @@ describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', ()
     expect(parsed).toHaveProperty('envelope.workspaceSeq', 4);
 
     const { subscribe, socketAt } = harness();
-    const seen: StreamItem[] = [];
+    const seen: ServerStreamFrame[] = [];
     subscribe('ws_1', 0, (item) => seen.push(item));
     socketAt(0).serverOpen();
     socketAt(0).serverSend({ type: 'event', envelope: ENVELOPE });
     expect(seen).toHaveLength(1);
-    const delivered = seen[0] as Extract<StreamItem, { type: 'event' }>;
+    const delivered = seen[0] as Extract<ServerStreamFrame, { type: 'event' }>;
     expect(delivered.envelope.workspaceSeq).toBe(4);
     // Control, same assertion site: the per-entity counter is still there too, so
     // this is not "the envelope was replaced by a cursor".
@@ -334,7 +334,7 @@ describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', ()
 
   it('a purge carries no cursor and moves nothing — purges are re-emitted and must stay idempotent', () => {
     const { subscribe, socketAt, sentFrame } = harness();
-    const seen: StreamItem[] = [];
+    const seen: ServerStreamFrame[] = [];
     subscribe('ws_1', 6, (item) => seen.push(item));
     socketAt(0).serverOpen();
     socketAt(0).serverSend({ type: 'purge', workspaceId: 'ws_1', entityId: 't_gone' });
@@ -348,7 +348,7 @@ describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', ()
 
   it('answers ping with pong without delivering it', () => {
     const { subscribe, socketAt } = harness();
-    const seen: StreamItem[] = [];
+    const seen: ServerStreamFrame[] = [];
     subscribe('ws_1', 0, (item) => seen.push(item));
     socketAt(0).serverOpen();
     socketAt(0).serverSend({ type: 'ping' });
@@ -400,7 +400,7 @@ describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', ()
 
   it('`scope-revoked` is TERMINAL: the subscriber closes and never reconnects into a workspace it was removed from', () => {
     const { sockets, subscribe, socketAt } = harness();
-    const seen: StreamItem[] = [];
+    const seen: ServerStreamFrame[] = [];
     const unsubscribe = subscribe('ws_1', 0, (item) => seen.push(item));
     socketAt(0).serverOpen();
     socketAt(0).serverSend({ type: 'scope-revoked', workspaceId: 'ws_1' });

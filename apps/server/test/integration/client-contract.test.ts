@@ -45,12 +45,12 @@ import { fakeSocket } from '../helpers/stream-socket.js';
  * reconciliation landing in `app-core` leaves every such line green. Measured,
  * not argued, and reproduced here: with the two lists typed as literals,
  * applying BOTH reconciliations to `app-core` at once — `scope-revoked` added
- * to `StreamItem`, `uncategorizedChildren` added to `RollupToViewer` — left
+ * to `ServerStreamFrame`, `uncategorizedChildren` added to `RollupToViewer` — left
  * this file at 15 passed, 0 failed. The divergences the file exists to pin were
  * gone and the suite did not notice.
  *
  * So the two cases that TURN on the client's shape — `RollupToViewer`'s three
- * fields and `StreamItem`'s union members — derive that shape from
+ * fields and `ServerStreamFrame`'s union members — derive that shape from
  * `packages/app-core/src/*.ts` with `readFileSync` on a relative path
  * (`clientTypeFields`, `clientUnionTags`). That reads the checked-in source
  * text, never `./dist`, so the build-order rationale above survives intact while
@@ -58,9 +58,9 @@ import { fakeSocket } from '../helpers/stream-socket.js';
  * simultaneously the positive control and the line that fires when either side
  * moves.
  *
- * ## `StreamItem`'s two divergences were RECONCILED (Plan 6 Task 8); the case stayed
+ * ## `ServerStreamFrame`'s two divergences were RECONCILED (Plan 6 Task 8); the case stayed
  *
- * The mechanism above did its job: adding `scope-revoked` to `StreamItem` turned
+ * The mechanism above did its job: adding `scope-revoked` to `ServerStreamFrame` turned
  * the stream case red, and the client's event member moved from `EventEnvelope`
  * to `LedgerEvent` in the same change. Both stream cases below were rewritten to
  * pin the RECONCILED state instead of being deleted — a divergence that closed is
@@ -188,10 +188,18 @@ async function post(
  * by which a build artefact could reach this file.
  */
 const APP_CORE_SRC = fileURLToPath(new URL('../../../../packages/app-core/src/', import.meta.url));
+const DOMAIN_SRC = fileURLToPath(new URL('../../../../packages/domain/src/', import.meta.url));
 
-/** One client module's source text. */
-function clientSource(file: 'view-types.ts' | 'data-source.ts'): string {
-  const text = readFileSync(`${APP_CORE_SRC}${file}`, 'utf8');
+/**
+ * One client module's source text — or, since closure 3, the DOMAIN module that
+ * now holds the stream frame union. `data-source.ts` used to declare its own
+ * `StreamItem` beside the domain's `ServerStreamFrame`, and keeping the two in
+ * step is exactly what this file existed to police; closure 3 deleted the
+ * duplicate, so the union is read where it now lives.
+ */
+function clientSource(file: 'view-types.ts' | 'data-source.ts' | 'stream-frames.ts'): string {
+  const root = file === 'stream-frames.ts' ? DOMAIN_SRC : APP_CORE_SRC;
+  const text = readFileSync(`${root}${file}`, 'utf8');
   // The read found the real module and not an empty or moved file. Every claim
   // derived below is a claim about THIS text, so the text has to be here.
   expect(text, file).toContain('export type');
@@ -206,7 +214,7 @@ function clientSource(file: 'view-types.ts' | 'data-source.ts'): string {
  * satisfies every `not.toContain` in this file, which is the one way a derived
  * pin could pass by being broken.
  */
-function clientTypeFields(file: 'view-types.ts' | 'data-source.ts', name: string): string[] {
+function clientTypeFields(file: 'view-types.ts' | 'data-source.ts' | 'stream-frames.ts', name: string): string[] {
   const block = new RegExp(`export type ${name} = \\{([^{}]*)\\}`).exec(clientSource(file));
   if (block === null) throw new Error(`${file}: no \`export type ${name} = { ... }\` block`);
   return [...(block[1] ?? '').matchAll(/^\s*(\w+)\??:/gm)].map(([, field]) => field ?? '');
@@ -216,7 +224,7 @@ function clientTypeFields(file: 'view-types.ts' | 'data-source.ts', name: string
  * The `type: '...'` discriminants of a union `export type <name> = | ... ;` in
  * a client module. Same fail-loud contract as `clientTypeFields`.
  */
-function clientUnionTags(file: 'view-types.ts' | 'data-source.ts', name: string): string[] {
+function clientUnionTags(file: 'view-types.ts' | 'data-source.ts' | 'stream-frames.ts', name: string): string[] {
   const decl = new RegExp(`export type ${name} =([\\s\\S]*?);\\s*$`, 'm').exec(clientSource(file));
   if (decl === null) throw new Error(`${file}: no \`export type ${name} = ... ;\` declaration`);
   return [...(decl[1] ?? '').matchAll(/type: '([^']+)'/g)].map(([, tag]) => tag ?? '');
@@ -224,12 +232,12 @@ function clientUnionTags(file: 'view-types.ts' | 'data-source.ts', name: string)
 
 /**
  * The type name a union member's field is declared with, e.g. `LedgerEvent` for
- * `StreamItem`'s `{ type: 'event'; envelope: LedgerEvent }`. Same fail-loud
+ * `ServerStreamFrame`'s `{ type: 'event'; envelope: LedgerEvent }`. Same fail-loud
  * contract as the two above: a rename that this regex cannot find throws, rather
  * than returning something a `not.toBe` would happily accept.
  */
 function clientUnionMemberFieldType(
-  file: 'view-types.ts' | 'data-source.ts',
+  file: 'view-types.ts' | 'data-source.ts' | 'stream-frames.ts',
   name: string,
   tag: string,
   field: string,
@@ -1379,11 +1387,32 @@ describe('GET /v1/contests vs the two contested refusals', () => {
 
 describe('the stream union — RECONCILED: the client now has a member for every frame the server emits', () => {
   it('the server EMITS `scope-revoked`, the published schema accepts it, and the client union now carries it too', async () => {
-    // `data-source.ts:22-26` — the client's `StreamItem` union. READ OUT OF THE
-    // CLIENT SOURCE as text, so a `dist` built from a different source cannot
-    // decide whether this passes AND a reconciliation in `app-core` cannot pass
+    // READ OUT OF SOURCE as text, so a `dist` built from different source cannot
+    // decide whether this passes and a change in the package cannot pass
     // unnoticed. A transcribed literal would have done only the first.
-    const CLIENT_STREAM_TYPES = clientUnionTags('data-source.ts', 'StreamItem');
+    //
+    // It read `data-source.ts` until closure 3. That file declared a SECOND
+    // stream union, `StreamItem`, and this case's job was to catch the two
+    // drifting apart — which they had already done once (`code` was a bare
+    // `string` on the client side). Closure 3 deleted the duplicate, so the
+    // union is read where it now lives, and the drift this case policed is
+    // replaced by the stronger check below: there is nothing left to drift.
+    const CLIENT_STREAM_TYPES = clientUnionTags('stream-frames.ts', 'ServerStreamFrame');
+
+    // THE ANTI-DIVERGENCE PIN, newly possible and stronger than what it
+    // replaces. `data-source.ts` must RE-EXPORT the union, never redeclare one:
+    // a second `export type ... = | { type: '...' }` in that file is how the
+    // first divergence happened, and it compiled fine for as long as the two
+    // spellings happened to agree. This goes red the day somebody writes a
+    // client-local copy again, which no type-level check can catch.
+    const dataSource = clientSource('data-source.ts');
+    expect(dataSource, 'data-source.ts must re-export the domain union').toContain(
+      'export type { ServerStreamFrame }',
+    );
+    expect(
+      /export type \w+ =\s*\|?\s*\{\s*type: '/.test(dataSource),
+      'data-source.ts declares a second stream-frame union — closure 3 removed exactly this',
+    ).toBe(false);
     // The pin and its own positive control: the union is these five members and
     // no others. "Exactly five" is measured here rather than asserted in prose,
     // and the day somebody narrows that union back — or lets it drift ahead of
@@ -1462,9 +1491,15 @@ describe('the stream union — RECONCILED: the client now has a member for every
     // thing it is named for. `EventEnvelope` is asserted against by name as the
     // positive control: the pin fails if the member is reverted, not merely if it
     // is renamed to something unexpected.
+    // Read from `stream-frames.ts` since closure 3 — see the union case above:
+    // the client no longer declares its own copy, so there is one declaration to
+    // check and no second one to drift from it. The assertion is unchanged and
+    // still the reason this case is not server-only: `LedgerEvent` carries the
+    // `workspaceSeq` the cursor is made of and `EventEnvelope` does not, so the
+    // `not.toBe` is a pin against a broken resume, not a cosmetic mismatch.
     const CLIENT_EVENT_ENVELOPE = clientUnionMemberFieldType(
-      'data-source.ts',
-      'StreamItem',
+      'stream-frames.ts',
+      'ServerStreamFrame',
       'event',
       'envelope',
     );

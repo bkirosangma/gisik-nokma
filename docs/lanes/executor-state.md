@@ -3059,3 +3059,58 @@ files, node v22.22.2 (spawn-probed), `GATE_EXIT=0`. Awaiting controller merge. *
    Y's name OR id, mutated to permit, confirmed red.
 
 **§12 id allocation: Lane A mints from `12.240`.** Re-measure main's ceiling at rebase as the control.
+
+---
+
+# LANE A — CLOSURE 3 IS IN PR #128. CURRENT POSITION, 2026-09-06.
+
+| item | state |
+|---|---|
+| PR #109 closure 1 | **MERGED** `a23d686` |
+| PR #125 closure 2 | OPEN, green at `53f2909`; controller merges after #121 (shared `Features.md`) |
+| PR #128 closure 3 | OPEN, gate green at `b08b690` — 24/24, `0 cached`, 3,229 tests / 240 files |
+
+Branch `exec/24-stream-frames` is STACKED on `exec/19-serving-gaps`. #125 merges first.
+
+**§12 ID ALLOCATION IS NOW BOUNDED: Lane A = `12.240`–`12.259`.** (Lane B 12.260-12.289; next free
+12.290, controller-allocated on request.) **Put the reservation in the header line whenever you touch
+`test-cases/12`.** Still re-measure main's ceiling at rebase as the control.
+
+## THE QUEUE, IN ORDER — nothing below has started
+
+1. **CLOSURE 4 (controller, owner Lane A) — the snapshot/provenance contradiction.** Measured by Lane
+   B's T14 rig, not inferred: after a snapshot pass a fresh client CANNOT read the snapshotted ticket
+   through `ds.query.getTicket` — `ReplicaGapError` on `stateProvenance`, because
+   `replica-data-source.ts` requires a `ticket.created`/`ticket.transitioned` in local events and a
+   snapshot-bounded bootstrap ships neither below the line. **`replica.getTicket` answers; only the
+   DataSource door refuses** — so the snapshot-bounded bootstrap (T5/T6) and T12's provenance rule
+   contradict each other. Constraints: the door must serve any ticket the replica serves; the snapshot
+   line is authoritative below it; **P30 holds (`data-source.ts` not widened); if the fix needs a NEW
+   visibility rule rather than an application of one, ESCALATE before building.** Same surface as
+   closure 3 → **Fable review at branch level.** Lane B carries a ❌ case for the door with the defect
+   named, so this flips a catalogued case rather than an unnamed one.
+2. **Closure 2b (Ruling P34)** — offline-born list unioning `getTickets` with `listTicketSummaries`
+   (`replica-data-source.ts:353`, `OFFLINE_BORN_ABSENCE`), and a renderer for `ListRow.pending`.
+   `pending` now has a real value from the online mapper, so the renderer has something true to render
+   on both sources.
+3. **C2's proper close** — a cursor on `TicketListView` or a paging loop. `mapListView` currently
+   REFUSES a non-null `nextCursor`, which is honest but blunt. Lane B's T13 is MERGED (#117), so the
+   `app-core/src/index.ts` collision is with `main`, not a live branch.
+4. **HELD pair LAST, under Ruling P32** — guest sees only `eff.projects`; a project NAME is a
+   disclosure; `WorkItem.projectName` served iff the project is in `eff.projects`, else id-only. **The
+   non-guest half must ALSO be an application of existing role resolution — ESCALATE if it needs a rule
+   that does not exist.** The excluding fixture IS the test: a guest on X who must not receive Y's name
+   OR id, mutated to permit, confirmed red.
+5. **The mapper-vs-real-`/v1`-body contract test — RE-ROUTED TO LANE A, last.** The structural hole both
+   closure-2 Criticals came through: no test executes a mapper against a real body.
+   `client-contract.test.ts` reads `mappers.ts` as TEXT. **Lane E's T5 (`a30496f`) and Lane B's #126 each
+   add the `app-core` devDependency to `apps/server/package.json`** — once either lands, import app-core
+   from `apps/server/test` and write it.
+
+## CARRIED, NOT MINE TO BUILD
+- **6.104's purge half** (WS catch-up/purge protocol — closing the under-purge residual on visibility
+  narrowing WITHOUT recreating P23's disclosure) has no task. Ruling P35 made S4's "no purge arrives" a
+  RECORD rather than an assertion, because 6.104 explicitly declined to pin it. **For a ruling when I
+  reach that surface, not for building now.**
+- 7.210's folded-versus-latest property and 7.211's dangling-`parent_id` fixture remain unconstrained;
+  owner Lane F unless a closure touches those fixtures anyway.

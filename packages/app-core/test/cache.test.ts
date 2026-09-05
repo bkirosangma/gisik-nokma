@@ -16,7 +16,7 @@ const WF_ULID = '01J9GWFA000000000000000000';
 const WF_REAL: WorkflowDef = { ...WF_ERRAND, id: WF_ULID };
 
 /**
- * A `LedgerEvent`, not a bare `EventEnvelope`: Plan 6 Task 8 widened `StreamItem`'s
+ * A `LedgerEvent`, not a bare `EventEnvelope`: Plan 6 Task 8 widened `ServerStreamFrame`'s
  * event member to carry the workspace stream position the resume protocol is
  * defined in terms of. `noteEvent` still takes an `EventEnvelope`, and a
  * `LedgerEvent` is one — the widening costs those call sites nothing.

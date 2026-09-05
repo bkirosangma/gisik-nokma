@@ -32,7 +32,7 @@ import type { LedgerEvent } from '@gisik-nokma/domain';
  *
  * **TASK 11 DID NOT INHERIT A THIRD COPY, AND THAT MUCH IS ENFORCED.**
  * `net/http-transport.ts` translates the wire into THESE types and declares no
- * frame union of its own; the executor ruling deferring `StreamItem` →
+ * frame union of its own; the executor ruling deferring `ServerStreamFrame` →
  * `ServerStreamFrame` forbids one, and the transport carries a compile-time
  * assertion that every member of `@gisik-nokma/domain`'s `ServerStreamFrame`
  * has a branch (verified by deletion: dropping one makes `typecheck` red with

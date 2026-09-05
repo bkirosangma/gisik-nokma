@@ -40,7 +40,7 @@ export function streamUrl(baseUrl: string): string {
  *
  * THIS IS NOT A PARALLEL FRAME UNION — it is a union of the discriminant's
  * string literals, checked below against the real one. The executor ruling
- * deferring `StreamItem` → `ServerStreamFrame` is protected by two constraints,
+ * deferring `ServerStreamFrame` → `ServerStreamFrame` is protected by two constraints,
  * and one of them is that no client declares a truncated copy of the frame
  * union locally. The plan's own `openStream` snippet declares exactly such a
  * copy and its five members omit `scope-revoked`, so a revoked device would be
@@ -104,7 +104,7 @@ type _FramesHandled = AssertTrue<ServerStreamFrame['type'] extends HandledFrameT
  *
  * ## Why this is not `app-core`'s `parseFrame` called from here
  *
- * `parseFrame` returns `app-core`'s `StreamItem`, the very union the executor
+ * `parseFrame` returns `app-core`'s `ServerStreamFrame`, the very union the executor
  * ruling defers replacing, and moving it would BE that replacement. The
  * duplication is one lenient switch, and it is bounded by the compile-time link
  * above rather than by anyone remembering.

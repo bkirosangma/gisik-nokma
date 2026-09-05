@@ -1,6 +1,7 @@
 import type {
   IngestResult,
   LedgerEvent,
+  ServerStreamFrame,
   SubmittedEvent,
   TicketTypeDef,
   WorkflowDef,
@@ -48,7 +49,7 @@ import type {
  *    `EventEnvelope` itself is untouched, because it is the coordination-pinned
  *    wire type the server, the domain and Plan 10 all share.
  *
- * Widening rather than narrowing is what makes both safe. `StreamItem` has two
+ * Widening rather than narrowing is what makes both safe. `ServerStreamFrame` has two
  * implementers — the online source (`src/online/stream.ts`) and Plan 10's replica —
  * and the coordination doc records `replica.revokeScope` as already **Done**, i.e.
  * Plan 10 already consumes `ScopeRevokedInstruction`. Adding the member ALIGNS the
@@ -58,16 +59,20 @@ import type {
  * reader does not have to rediscover it: `code` is a bare `string` rather than
  * `StreamErrorCode`, so a misspelled code is a runtime surprise instead of a
  * compile error. Separately — a judgement about the end state rather than a
- * divergence — `stream-frames.ts`'s own docblock argues `StreamItem` should be
+ * divergence — `stream-frames.ts`'s own docblock argues `ServerStreamFrame` should be
  * REPLACED by `ServerStreamFrame` rather than re-synchronised with it, owner
  * Plan 10. This task performs the two measured widenings only.
  */
-export type StreamItem =
-  | { type: 'event'; envelope: LedgerEvent }
-  | { type: 'purge'; workspaceId: string; entityId: string }
-  | { type: 'scope-revoked'; workspaceId: string; projectId?: never }
-  | { type: 'caught-up'; workspaceId: string; seq: number }
-  | { type: 'error'; workspaceId: string | null; code: string; message: string };
+
+
+// RE-EXPORTED, not redeclared. `StreamItem` used to be a second spelling of
+// this union living here, and `stream-frames.ts`'s docblock argued it should be
+// REPLACED by `ServerStreamFrame` rather than kept in sync — which had already
+// cost one silent divergence (`code` was a bare `string` here, so a misspelled
+// stream error code was a runtime surprise instead of a compile error). One
+// type, one seam. The re-export keeps `@gisik-nokma/app-core` a complete import
+// surface for a client that never depends on the domain package directly.
+export type { ServerStreamFrame };
 
 export type Unsubscribe = () => void;
 
@@ -143,5 +148,5 @@ export type DataSourceQuery = {
 export type DataSource = {
   ingest(events: SubmittedEvent[]): Promise<IngestResult[]>;
   query: DataSourceQuery;
-  subscribe(workspaceId: string, afterSeq: number, cb: (item: StreamItem) => void): Unsubscribe;
+  subscribe(workspaceId: string, afterSeq: number, cb: (item: ServerStreamFrame) => void): Unsubscribe;
 };

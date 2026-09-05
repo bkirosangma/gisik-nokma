@@ -1259,7 +1259,7 @@ failure this bucket has recorded before, caught here by a compiler instead of by
   the CLIENT would have to change. And the two methods that do NOT refuse are named beside them
   (`getTicketTypes`, `getTicketHistory`), because a refusal list is only evidence next to the list of
   what answers.
-- 12.186 ✅ **`subscribe` hands its callback a real `StreamItem` — the kind `useLiveQuery` acts on.**
+- 12.186 ✅ **`subscribe` hands its callback a real `ServerStreamFrame` — the kind `useLiveQuery` acts on.** *(Written as `StreamItem`; closure 3 deleted that duplicate and the client now re-exports the domain union.)*
   A frame delivered through the engine's own stream door arrives at the subscriber as
   `{type:'event', envelope}`, and after `off()` a second frame arrives at nobody. **This case exists
   because the plan's `subscribe(..., cb: () => void)` would have shipped a source that looks wired up
@@ -1268,7 +1268,7 @@ failure this bucket has recorded before, caught here by a compiler instead of by
   leaves every app-core view frozen against the offline copy with no type error anywhere. The frames
   come from `SyncEngine.onItem`, added by this task: the engine is the only component that holds a
   frame-shaped value, and it exposes the union it already has (`SyncItem`) rather than declaring a
-  parallel or truncated one, which the deferred `StreamItem` → `ServerStreamFrame` ruling forbids.
+  parallel or truncated one, which the then-deferred `StreamItem` → `ServerStreamFrame` ruling forbade — **that deferral ENDED with closure 3 (2026-09-06)**: the replacement is done, and the guardrail held long enough to make it a rename rather than a reconciliation.
   *Mutation: delete the `itemListeners` fan-out at the end of the engine's `applyOne` → red HERE ALONE,
   `Tests 1 failed | 14 passed (15)`, with zero `event` frames delivered where the case expects one.*
 

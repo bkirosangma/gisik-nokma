@@ -1,5 +1,6 @@
-import type { LedgerEvent } from '@gisik-nokma/domain';
-import type { StreamItem, Unsubscribe } from '../data-source.js';
+import { STREAM_ERROR_CODES } from '@gisik-nokma/domain';
+import type { LedgerEvent, StreamErrorCode } from '@gisik-nokma/domain';
+import type { ServerStreamFrame, Unsubscribe } from '../data-source.js';
 
 /** The subset of the DOM WebSocket the stream needs — injectable for tests and non-browser shells. */
 export type WebSocketLike = {
@@ -76,7 +77,7 @@ type PingFrame = { type: 'ping' };
  * resume cursor into `NaN` on the next `Math.max`. Refusing is the only honest
  * answer, and the schema agrees.
  */
-export function parseFrame(data: unknown): StreamItem | PingFrame | null {
+export function parseFrame(data: unknown): ServerStreamFrame | PingFrame | null {
   if (typeof data !== 'string') return null;
   let raw: unknown;
   try {
@@ -110,7 +111,7 @@ export function parseFrame(data: unknown): StreamItem | PingFrame | null {
   if (frame.type === 'caught-up' && typeof frame.seq === 'number' && typeof frame.workspaceId === 'string') {
     return { type: 'caught-up', workspaceId: frame.workspaceId, seq: frame.seq };
   }
-  if (frame.type === 'error' && typeof frame.code === 'string' && typeof frame.message === 'string') {
+  if (frame.type === 'error' && isStreamErrorCode(frame.code) && typeof frame.message === 'string') {
     // workspaceId is null for connection-level errors (bad-message before any subscribe).
     return {
       type: 'error',
@@ -120,6 +121,27 @@ export function parseFrame(data: unknown): StreamItem | PingFrame | null {
     };
   }
   return null; // unknown frames are ignored, never guessed at
+}
+
+/**
+ * `code` is VALIDATED against the shipped enum rather than accepted as any
+ * string, which is the one divergence closure 3 removed: this client's own copy
+ * of the frame union declared `code: string`, so a server that sent — or a
+ * refactor that introduced — a code nothing handles produced a runtime surprise
+ * instead of a compile error.
+ *
+ * **The cost is named rather than hidden: an error frame carrying an
+ * unrecognised code is now DROPPED**, exactly as any other unreadable frame is,
+ * per this parser's stated policy that unknown frames are ignored and never
+ * guessed at. Dropping a server error is not free — it is a message the user
+ * does not see — and the alternative was worse: to surface it this client would
+ * have to invent a code the type does not admit, which is the same class of
+ * fabrication `mapListView` refuses a truncated page for. The day the server
+ * grows a fourth code, `STREAM_ERROR_CODES` is the single place that changes and
+ * this function follows it automatically.
+ */
+function isStreamErrorCode(value: unknown): value is StreamErrorCode {
+  return typeof value === 'string' && (STREAM_ERROR_CODES as readonly string[]).includes(value);
 }
 
 /**
@@ -179,7 +201,7 @@ export function createStreamSubscriber(deps: StreamDeps) {
   return function subscribe(
     workspaceId: string,
     afterSeq: number,
-    cb: (item: StreamItem) => void,
+    cb: (item: ServerStreamFrame) => void,
   ): Unsubscribe {
     let lastSeq = afterSeq;
     let attempt = 0;
