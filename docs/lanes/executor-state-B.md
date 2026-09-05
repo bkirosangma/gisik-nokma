@@ -39,13 +39,31 @@ the `12.156` id collision that cost a day. Lane A pushed first and declined to r
 | 2 | T14 — dual-client harness rig | **DONE, MERGED** (#126) |
 | 3 | T15 — scenarios S1–S6 | **DONE, MERGED** (#126) |
 | 4 | **CLOSURE 5 — ruling P37, both halves** | **BUILT AND MEASURED.** Two commits on this branch; catalogue in the same change set. See the section below. |
-| 5 | T18 — `Features.md` §12 + `test-cases/12` final shape | **NEXT, and STILL HELD.** Plan lines 7471–7629. **Precondition unchanged: it cannot be complete while what it catalogues is still moving.** Lane A's closure 2b, closure 4 and the HELD pair (ids 12.240–12.259) were still landing in §12 when closure 5 was written. **Re-measure §12 against `origin/main` at the moment T18 starts**; if Lane A's §12 writes have not landed, tell the controller and HOLD rather than catalogue a moving target — the controller decides whether T18 waits or closes with Lane A's items named as "landing under Lane A". |
+| 5 | **CLOSURE 5b — controller-assigned 2026-09-06, AFTER #139 merges and BEFORE T18.** Three items closure 5 recorded rather than fixed, now owned: **(a) 12.283** — widening because the READER's reach grew (`membership.granted` / `project.member_added`); same P37 shape, the trigger is the membership event itself, deliver what the new reach admits, excluding fixture as before. **(b) 12.288** — the engine calls `reconcile` on every reconnect/catch-up completion (the moment its cursor is current is the moment its holdings can be stale), measured by a scenario that narrows while offline and asserts removal after reconnect with NO manual call. **(c) 6.102's guest side** — close through the same client-presented path IF it is an application of the same rule; **if it needs a NEW rule, escalate before building.** Plus, as 5b's first commit if cheap: make the dual-client rig call the REAL reconcile route through `inject()` instead of restating its rule in-process. **Use ids 12.290+.** | NEXT |
+| 6 | T18 — `Features.md` §12 + `test-cases/12` final shape | **NEXT, and STILL HELD.** Plan lines 7471–7629. **Precondition unchanged: it cannot be complete while what it catalogues is still moving.** Lane A's closure 2b, closure 4 and the HELD pair (ids 12.240–12.259) were still landing in §12 when closure 5 was written. **Re-measure §12 against `origin/main` at the moment T18 starts**; if Lane A's §12 writes have not landed, tell the controller and HOLD rather than catalogue a moving target — the controller decides whether T18 waits or closes with Lane A's items named as "landing under Lane A". |
 
-**⚠️ THIS LANE'S §12 BLOCK (12.260–12.289) IS NOW EXHAUSTED.** 12.289 is its last id and it is used.
-Any further §12 case from this lane needs a controller-allocated block. Do not mint from the header's
-maximum — that is exactly what collided twice in one day. Recounted at this sha: **215 ids, max 12.289,
-zero duplicates, nothing above 12.289** (enumerated with `grep -o '^- 12\.[0-9]*' | sort -t. -k2 -n`,
-rows printed rather than counted).
+**⚠️ THIS LANE'S §12 BLOCK (12.260–12.289) IS EXHAUSTED. The controller ALLOCATED 12.290–12.319 to
+this lane on 2026-09-06** (next free 12.320, on request only). Do not mint from the header's maximum.
+
+**⚠️ AND THE RECOUNT ITSELF WAS WRONG-METHOD — read this before running the control.** `test-cases/12`
+carries ids in TWO styles: `- 12.274 🚫 …` and `- **12.240** ✅ …` (Lane A's closure-2b cases).
+`grep -o '^- 12\.[0-9]*'` — the pattern a lane naturally writes, and the one this lane used — matches
+215 and **silently misses 4**. The true figure at this sha is **219 ids, max 12.289, zero duplicates**.
+The number being wrong is the smaller half: **the control exists to catch a BLOCK COLLISION and in that
+form it cannot see one against a bold-style id**, so two lanes could both recount, both read "zero
+duplicates", and both be wrong — the exact double-mint this file has paid for twice. Use, and print both
+per-style counts beside the total as the positive control:
+```
+grep -oE '^- (\*\*)?12\.[0-9]+' test-cases/12-offline-sync-apps.md | sed -E 's/^- (\*\*)?//' | sort -t. -k2 -n
+```
+Now written into `test-cases/12`'s own header so the next lane copies a working control rather than
+writing its own. *Reported to the controller as a method finding, not as a defect in this branch.*
+
+**A third silent-empty mode fired during the same rebase check, and it is already on this machine's
+record:** `git show <sha> -- <file> | grep "^+"` returned **0 matches** on a diff that visibly contains
+added lines — the markers come back INDENTED (`  +- **12.240**`). Closure 2b's survival across the
+rebase was therefore verified against the FILE (`grep -- "\*\*12.240\*\*"`, four for four), never
+against a diff.
 
 ---
 
