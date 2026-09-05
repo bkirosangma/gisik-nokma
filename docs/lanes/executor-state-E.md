@@ -561,3 +561,42 @@ and touched no lockfile.
 
 **Not proven, stated plainly:** neither image was ever run against a real Postgres, and
 `node apps/web/server.js` was never hit with a request. Both belong to T6/T13.
+
+---
+
+# TEST-CASE ID COLLISION PROTOCOL — controller broadcast 2026-09-06, adopted
+
+Two lanes minting from the same "NEXT FREE ID" line at the same time collided twice in the first hour
+(Lanes A and B, four ids each). **It is only visible at rebase; no header can prevent it.**
+
+**Rule.** Whatever is already on `main` keeps its numbers. **At every rebase, RE-MEASURE main's maximum in
+every section this lane mints into, and move MY ids above it**, renumbering the catalogue and every
+citation in one commit. **Measure, do not recall.**
+
+**Do NOT fix it with a project-wide `sed`.** It silently repoints *other lanes'* citations in files this
+change never touches. Lane A found two such comments in `sync-client` that a `sed` would have broken
+**while every test stayed green — because a comment does not run.**
+
+## Extraction that actually works across both catalogue formats
+
+§6 writes `- **6.17** ✅ …` (bold ids); §9 writes `- 9.200 ✅ …` (bare). A `^- N\.` pattern silently
+returns NOTHING for §6 — measured: it produced an empty result for §6 while returning real numbers for
+§9, so the naive pattern *looks* fine on whichever file you happen to check first. Use:
+
+```
+git show "origin/main:test-cases/<file>.md" | grep -oE "(^|[^0-9])<N>\.[0-9]+" \
+  | grep -oE "<N>\.[0-9]+" | cut -d. -f2 | sort -n | tail -1
+```
+
+## Maxima on `origin/main`, measured 2026-09-06 — **re-measure at rebase, these WILL move**
+
+| section | max on main | this lane's interest |
+|---|---|---|
+| §6 auth/visibility | **137** | the 18 errands cite 6.123, 6.124, 6.131 — other lanes are minting here NOW |
+| §7 api/realtime/search | **209** | 7.35 (stream soak, 🚫) |
+| §9 editor/attachments | **239** | **A0 minted 9.240 and 9.241 — currently correct, above 239** |
+| §12 offline sync | **193** | **NOT this lane's** — do not touch |
+| §13 deployment | does not exist | **this lane creates it, at T16** |
+
+**A0's 9.240/9.241 are above main's 239 as of this measurement and must be re-checked before the seam-1
+PR.** If §9's max has moved, mine move above it, catalogue and citations together.
