@@ -22,10 +22,10 @@ the brief's Sonnet gating does not apply; rulings are taken in-session.**
 
 | what | value |
 |---|---|
-| `main` | **`ece4b24`** — nine merges this context, in order: **#127** (T16 promoted) · **#121** (Plan 10 T17 Expo mobile, `dca435d`, CI green at `73f5fe7`) · **#125** (Lane A closure 2, `7bb93cc`) · **#129** (T17 promoted) · **#130** (this file) · **#128** (Lane A closure 3, `e407bf5`, CI green at the rebased `4199b7a`) · **#131** (anchors) · **#126** (Lane B **T14 + T15**, `c7c2b8e`, CI green at `dc382d5`; gated by the lane at `65eaa31`, the head adds one docs file — verified by the controller) · **#132** (T14+T15 promoted, `ece4b24`). Every `gh pr merge` exit read from `$?` on its own line |
-| ledger | **`CHECK_EXIT=0` · 160/177 (90.4%)** · claimed 0 · in-flight 0 · todo 17 · Plan 10 **17/18** (only T18 open) · Plan 11 1/16 — every promotion independently re-run at the PR's exact tree, node 22, exit read from `$?` |
-| last forced gate | **`c7c2b8e`** (code-identical to `ece4b24`, which added two ledger rows) — ONE backgrounded invocation under the lock (queued 30 s, acquired 02:56:37, released clean), `pnpm install --frozen-lockfile` exit 0, `pnpm rebuild better-sqlite3` exit 0, **`check:env` exit 0** on its own line, `pnpm turbo run build test typecheck --force --concurrency=1`: **`GATE_EXIT=0` · Tasks 30 successful, 30 total · 0 cached · 1m27.8s · node v22.22.2** (printed by the script) · zero `Unsupported engine` · **3267 tests / 247 files** — domain 464 · rule-engine 282 · **server 996** (was 983: +7 rig cases +6 scenarios, exactly #126's delta) · app-core 1086 · web 136 · editor 178 · ui 37 · sync-client 63 · desktop 5 · mobile 20. **Matches Lane B's independent 3267 at `65eaa31`.** *(Previous gates this context: `e407bf5` 3254, `7bb93cc` 3254 — same composition minus #126.)* |
-| open PRs | **none** at 03:00. Expected next: Lane A closure 2b (`exec/25-snapshot-provenance`, built + green at `9cfa978`, Fable whole-branch review running) → closure 4 stacked on it; Lane C T14 (`exec/24-plan11-ci-deploy`); Lane D T7+T8 (`exec/25-plan11-seed`); Lane E seam 1 (`exec/23-plan11`, T1 in flight at last report); Lane B closure 5 (`exec/26-closure5-catchup`) |
+| `main` | **`fdd3bad`** — fourteen merges this context, in order: #127 · #121 (T17, `dca435d`) · #125 (closure 2, `7bb93cc`) · #129 · #130 · #128 (closure 3, `e407bf5`) · #131 · #126 (T14+T15, `c7c2b8e`) · #132 · #133 · #135 · **#137** (Lane A closure 2b, `c25d7fe`, CI green at `973ed0b`; gate at `a173cd6`, one docs line after) · **#136** (Lane D Plan 11 T7+T8, `a1252bc`, CI green at `1d4f6b5`) · **#138** (11/7 + 11/8 promoted, `fdd3bad`). Every `gh pr merge` exit read from `$?` on its own line |
+| ledger | **`CHECK_EXIT=0` · 162/177 (91.5%)** · claimed 0 · in-flight 0 · todo 15 · Plan 10 **17/18** (T18 open, held on §12 stability) · Plan 11 **3/16** (T5 landed on Lane E's branch, unmerged; T7, T8 done; T14 in PR) — every promotion independently re-run at the PR's exact tree, node 22 |
+| last forced gate | **`a1252bc`** (code-identical to `fdd3bad`) — ONE backgrounded invocation under the lock (queued 3 min behind a lane, acquired 03:28:29, released clean), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m29.5s · node v22.22.2** · zero `Unsupported engine` · **3319 tests / 253 files** — domain 464 · rule-engine 282 · **server 1042** (+46 = D's six seed suites) · **app-core 1092** (+6 = closure 2b) · web 136 · editor 178 · ui 37 · sync-client 63 · desktop 5 · mobile 20. Matches Lane D's 1042 and reconciles Lane A's 3273 (pre-#136) + 46. *(`c25d7fe` itself was not gated locally — CI at `973ed0b` plus Lane A's own 30/30 covered it, and this gate followed within minutes; previous: `c7c2b8e` 3267, `e407bf5` 3254, `7bb93cc` 3254.)* |
+| open PRs | **#134** (Lane C, Plan 11 T14: the eight-job `ci.yml` — its own new workflow was FULLY green at `e78212b`, all eleven jobs; now CONFLICTING on `test-cases/13` add/add after #136, **rebasing with its amendment** (root-scripts statement + §13 header); merges at the new head after reading job steps; then **promote 11/14** and restart C onto T15 — override staged) · **#139** (Lane B, closure 5 under P37, `13586c6`/`4253fad`, 30/30 · 3280 tests · server 1008 · 0 cached; **HELD for its Fable branch-level review**; then merge, restart B onto closure 5b + T18 — override staged). Expected next: Lane A closure 4 stacked past #137's squash (`exec/26-provenance-block`, server+client halves committed); Lane E seam 1 (T2 in flight, 16 commits, 3285 tests at `1394396`); Lane D T9+T10 (restarted 03:24 on `exec/27-plan11-seed-runners`). |
 | watch | **re-armed as a `Monitor` task** (this session's `ctl-watch.sh`, 120 s poll: `origin/main`, open-PR set with head+mergeable, per-PR check-run state, pane set; sentinel-initialised so the zero→one PR transition IS reported). It is a child of this session and dies with it — re-arm at every relaunch |
 | machine | swap **3.8 GB of 5 GB used at 02:08, 3.6 at 02:26**, ~76 MB free pages — five lanes plus their fan-outs. The gate lock keeps pools at one at a time; nothing crashed. Not a blocker; watch it |
 | watchdogs | `launchctl list`: limit-resumer, net-resumer, idle-nudger all present (the nudger still does not submit — memory file) |
@@ -165,7 +165,7 @@ lie; stale dist does. Not broadcast, because it was checked first.**
 
 ### §12 CASE-ID BLOCKS — allocated 2026-09-06 02:20, the only source of truth until the header says otherwise
 
-**Lane D 12.224–12.227 (landed with #121)** · **Lane C 12.228–12.239 (12.228–12.229 landed with #120)** ·
+**Lane D 12.224–12.227 (landed)** · **Lane C 12.228–12.239 (12.228–12.229 landed)** · **Lane A 12.240–12.259** (12.240–12.243 landed with #137) · **Lane B 12.260–12.289 (EXHAUSTED at #139: T14 260–266, T15 267–274, closure 5 275–289)** · **Lane B 12.290–12.319 (allocated 03:30 for closure 5b)** · **next block 12.320, controller-allocated on request only.** Lane B's recount at #139: 215 ids, max 12.289, zero duplicates.
 **Lane A 12.240–12.259** (its former "240+" is now BOUNDED) · **Lane B 12.260–12.289** (T14's seven =
 12.260–12.266 on #126; T15 from 12.267) · **next block 12.290, controller-allocated on request only.**
 The header line in `test-cases/12` (Lane B rewrote it on #126) carries the four blocks and no derivable
@@ -226,6 +226,63 @@ version check, `check-no-silent-skips.mjs`) / `other-tests` pending at this writ
   `react-native-webview` 13.15.0 → 13.17.0 through its `^` range and **broke `apps/mobile`'s typecheck
   outright** (WebView prop types resolved to `never` — three `@types/react` copies in the store). Pinned
   exact. **A caret range is a rebase hazard on every native-toolchain package.**
+- **CLOSURE 5 is BUILT (#139, Lane B, held for review):** `visibility/grant-backfill.ts` wired into
+  `visibleEventsFor`; `sync/reconcile-route.ts` + a FOURTH `SyncTransport` method + `SyncEngine.reconcile`.
+  Mutations verbatim: triggers → `[]` reddens 5 of 6 (the survivor 12.277 is held by the caller's `canSee`,
+  which is the finding); `grantBackfillFor`'s `canSee` → permit reddens **12.280 alone**; the route
+  enumerating `proj_visibility` reddens 12.285/12.286 (**12.284 stayed green, which is why 12.285
+  exists**); the engine dropping `chunk.includes(item.id)` reddens **12.287 alone**. 12.274 🚫 → ✅; **6.104 ✅
+  both halves** (its earlier withdrawal stands as written). **CLOSURE 5b assigned, Lane B, after #139 and
+  before T18:** 12.283 (the READER's reach grows — `membership.granted`/`project.member_added`, same P37
+  shape keyed on the viewer), 12.288 (nothing calls `reconcile` on a schedule — the engine calls it on
+  every reconnect/catch-up completion, proved by an offline-narrow scenario with no manual call), 6.102's
+  guest side (same client-presented path if an application; escalate if a new rule). Carried, closes when
+  cheap: the dual-client rig RESTATES the reconcile route's rule in-process instead of calling it
+  (Lane B's own least-sure claim) — the same shape as Lane A's `/v1`-mapper item.
+- **The compiler is the enumerator; the grep is a hint (Lane B, #139):** the grep the controller asked for
+  found FOUR `SyncTransport` implementors; `pnpm turbo run typecheck` found a FIFTH — an inline object
+  literal at `packages/app-core/test/replica/replica-data-source.test.ts:486` with no `: SyncTransport`
+  annotation, structurally typed by inference and invisible to any textual search for the type name.
+- **"An empty filter is not a neutral default — it is the one input under which a filter bug cannot
+  show" (Lane A, closure 2b's Critical, found by the Fable review):** `listProjectWithOfflineBorn` read its
+  born half from an unfiltered `listTicketSummaries` and deduped against the FILTERED settled rows, so
+  typing in a search box turned settled tickets into claims; all three of its cases passed `{}` because
+  `matchesFilter` guards every axis on `!== undefined`. The mirror of closure 2's `rollup: null`. **A door
+  that takes a filter needs a case with a filter.** Fixed at the root; restoring the old code reddens
+  12.243 alone.
+- **A measurement that looked careful and was wrong (Lane A):** `test-cases/03` carried `**3.149–3.151**`
+  as ONE bullet; a ceiling grep requiring `**` straight after the digits read past the range and reported
+  3.148 as the max, so 3.149 was minted twice an hour after range-collisions became a rule. Renumbered to
+  3.152; §3 now has a header that says *recount with a pattern that catches a range*. **§12 — header AND
+  allocation — collided on nothing but one prose line at the same rebase**: the scheme worked on its first
+  real test.
+- **The local replica schema has NO migration path (Lane A, closure 4 prep):** `migrateLocal` runs
+  `CREATE TABLE IF NOT EXISTS` only; `LOCAL_SCHEMA_VERSION` is written into `meta` and **never read by
+  anything** (checked across sync-client, app-core, both shells). A new COLUMN works on a fresh device and
+  throws `no such column` on every existing one — so P36's provenance block is a sibling TABLE. **Named
+  owner: the first change that must ALTER rather than CREATE needs a mechanism that does not exist.**
+  The client-side carry-forward omission was also available and is handled (a local re-snapshot with no
+  block must not erase one an earlier bootstrap delivered).
+- **"A behaviour correct today for a reason nobody is asserting" — raised as a CLASS by Lanes C and E,
+  three instances in one night:** `DATABASE_CA_CERT` was documented as consumed and silently discarded
+  on every managed-Postgres URL (pg applies the parsed connection string over the caller's object; `ssl`
+  replaced `ssl: {ca}` wholesale) and its guard asserted `pool.options` (what the driver was handed) not
+  `connectionParameters` (what it connects with); Lane C's timezone demo; the `sslmode=require` warning.
+  **The test form: a mutation that restores the defect AND reverts the assertion, proving the old guard
+  blind by construction** — the paired-mutation rule's third costume.
+- **`nohup … &` inside a `run_in_background` call reports "completed" the instant the outer shell
+  returns (Lane D):** a gate was still genuinely running when the harness said done, and its lock was
+  nearly reclaimed as stale. `ps -p` before any reclaim; never nest a detach inside the harness's own.
+- **Lane E's catalogue debt:** T1 and T5 landed on its branch with NO `Features.md`/`test-cases` entries
+  (two instructions composed into "catalogue nothing"); accepted as one dedicated commit after its rebase
+  onto #134, counted as the same change set only because seam 1 is one PR — said so in the PR body.
+- **Session limits:** every lane's five-hour session meter read **80% at 03:25 (resets 06:40 IST)**;
+  weekly 34%. Expect `/limit-reset` work before dawn; the launchd limit-resumer is loaded.
+- **Restarts this context:** C (02:25, T14→T15) · D (02:24, T7+T8; 03:24, T9+T10 on
+  `exec/27-plan11-seed-runners` — manifest ruling: D takes its own `seed:cc`/`seed:dev` script lines,
+  announced to E first) · B (02:55, closure 5). Staged: C → T15 on `exec/28-plan11-do-spec` at #134's
+  merge; B → closure 5b + T18 on `exec/29-closure5b-reach` at #139's merge. Old overrides saved as
+  `override-lane{B,C,D}-*.md.bak`.
 - **P36 constraint (d) is MEASURED (Lane A):** the door derives provenance from local events in exactly two
   places — `stateClaimOf` → `stateProvenance` (three doors) and `assignedClaimOf` → `assignedProvenance`
   (`getTickets`). The control that explains why nothing else qualifies: `dueDate` is a `FieldClaim` carrying
