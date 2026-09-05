@@ -11,6 +11,70 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## ⛔ BOTH SESSIONS QUOTA-BLOCKED 2026-09-06, RESET MON 2026-09-07 06:30 IST — READ BEFORE TOUCHING ANYTHING
+
+**Executor hit its weekly limit outright** (`You've hit your weekly limit · resets Sep 7 at 6:30am`) mid-
+closure-2, and **this controller session is at 99% weekly** as this is written — assume it may stop
+mid-sentence. **Do not spend either session's remaining runway trying to finish closure 2 or resolve PR
+#109's conflict** — both need real judgment (semantic doc content, a visibility-rule correctness call) that
+a nearly-exhausted session should not gamble on. Write state, stop, resume Monday.
+
+**CORRECTION to the executor's own last report, verified rather than trusted**: it said *"PR #107 ... open
+and green and yours to merge."* **False — #107 merged 2026-09-04 10:44:55Z, and #108 (its ledger promotion)
+merged 10:49:55Z, both already recorded above.** The executor's message was composed from stale local
+state, not re-checked against GitHub. **Standard practice held**: verify before merging, never their word.
+
+### Exactly where the two open threads stand
+
+1. **PR #109 (closure 1, snapshot invalidation) — still `CONFLICTING`/`DIRTY` at `631582e`.** Conflicts in
+   `docs/lanes/executor-state.md` and `test-cases/12-offline-sync-apps.md` only (both drifted after Batch C
+   merged past this branch's fork point) — verified with `git merge-tree`, the actual server-side code files
+   (`snapshot-writer.ts`, `ledger-deps.ts`, `snapshot-refresh.ts`, `replica.ts`) merge clean. **The executor
+   never got to rebase it before the quota wall hit.** Do not resolve this doc conflict from the controller
+   side — it requires reading both documents' semantic content to merge correctly, which is implementer
+   judgment, not a mechanical resolution. **Resume: the executor rebases its own branch onto current
+   `origin/main`, then this controller verifies + merges as normal.**
+2. **`exec/19-serving-gaps` (closure 2) — WIP commit `143f279`, PUSHED, marked DO NOT MERGE.** The
+   implementer died at 321k tokens / 141 tool calls with 26 modified + 3 new files, never gated, never
+   reviewed. **Two of three hard constraints verified HELD by the executor before it died** (not re-verified
+   here — record the executor's method so Monday's session can re-run it cheaply rather than redo it blind):
+   - **Ruling P30 intact**: `data-source.ts` changed by one docblock line only, no type change, `DataSourceQuery` not widened. Re-check: `git show 143f279 -- packages/app-core/src/data-source.ts` should show a comment-only diff.
+   - **Neither HELD gap touched**: a sweep of the `mappers.ts` diff for `WorkspaceRef.projects`, `WorkItem.projectName`, `HELD pending` returned nothing, against a control of 371 changed lines in that same file (so the absence is real, not a broken grep). Re-check the same way before trusting it a second time — a control from a dead session is still worth re-running once, cheaply.
+   - **⛔ THE THIRD IS UNKNOWN AND IT IS THE ONE THAT MATTERS**: whether `ListRow.hasRestrictedParent` and `TicketRead.title` applied an EXISTING Plan 4 visibility rule (P25's condition) or invented a new one. A new file `apps/server/src/read/restricted-parents.ts` exists — its presence alone doesn't answer the question. **Read it against `apps/server/src/visibility/`'s actual exports before this branch is trusted with anything.** Executor's own hypothesis, explicitly flagged as unverified: `visible-events-for.ts:328` already serves an unreachable parent as `{ kind: 'restricted', id }`, so `hasRestrictedParent` is *probably* an application of the existing `canSee` machinery — but "probably" from a dead agent's plan text is not evidence. **If it invented a rule: discard and escalate, per the standing P25 condition — do not fix in place.** This is exactly the failure class that produced P19, P22, P23.
+3. **Closure 3 (`StreamItem`→`ServerStreamFrame`) correctly never started.** Its two guardrails (T11 reused
+   `online/stream.ts`'s pattern; neither T11 nor T12 declared a parallel frame union) hold it stable while
+   waiting — verified in PR #107, already recorded above. No decay risk from the pause.
+
+### State of the three-item priority order at the quota wall
+
+**7 of 8 permitted Plan 10 tasks done** (T5–T12; T13 deferred by owner). Closure 1 shipped (conflicting,
+unmerged). Closure 2 half-built, unreviewed, DO NOT MERGE. Closure 3 untouched by design.
+
+### RESUME MONDAY, in this order — do not reorder, each step's safety depends on the one before it
+
+1. Restart the executor from `dispatch-executor-serial.md` per the normal fixed-point procedure — nothing
+   about this is mid-step in the ledger sense (no ledger row is `in-flight`), so this is a clean restart, not
+   the mid-step override shape.
+2. Executor reads `docs/lanes/executor-state.md`'s **⛔ heading** — its own account says this names five
+   specific unknowns in resume order, not a general caution. Follow that order.
+3. Executor rebases `exec/18-snapshot-invalidation` (PR #109) onto current `origin/main`, resolving the two
+   doc conflicts by content, re-verifies both directions with positive controls per this file's own stacked-
+   PR procedure. Controller re-verifies CI + gate independently, merges.
+4. **Only after #109 merges**: the `restricted-parents.ts` APPLIES-vs-INVENTS question gets answered, by
+   reading the code, not by inheriting the dead agent's hypothesis. If it invented a rule, the WIP commit is
+   discarded (not repaired) and escalated per P25's standing condition, and closure 2 restarts clean.
+5. Closure 2 resumes or restarts depending on step 4's answer. Closure 3 stays last, still the one to drop
+   if quota is tight again.
+
+### Still open, unchanged by any of this — carried forward again so it isn't lost across the reset
+
+- **The `getMyWorkspaces`/`getMyWork` guest-visibility question** — with the owner, held, not built.
+- **`WorkItem.stateName`** — an eleventh gap the executor surfaced in #109's body but did not build; not yet
+  triaged into the buildable/rule-first/held buckets the other ten got.
+- **Two merged-code items already with the owner**: `StreamItem`→`ServerStreamFrame`'s missing task
+  allocation, and the snapshot-invalidation defect (now being fixed by closure 1, but the OWNER decision
+  about who owns this class of gap going forward is separate from fixing this one instance).
+
 ## BATCH C CLOSED AS T11+T12 (PR #107) — 155/177, and the promotion was taken IN-SESSION, not delegated
 
 **PR #107 merged (`270f0f9` → `9a5275c`)**, T13 deferred per the owner priority change. Independently
