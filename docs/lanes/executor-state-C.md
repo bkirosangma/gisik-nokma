@@ -93,7 +93,9 @@ a concurrent unqueued read (which `app.tsx` issues on every change notification)
 second connection mid-transaction. **This cannot be closed from apps/desktop's TypeScript** — it needs
 either a Rust-side fork of the plugin or a different plugin/architecture, both outside a Tauri-shell
 scaffold task. Documented in the adapter's own docblock, in `Features.md` §12, and in `test-cases/12`
-(12.190's "RECORDED, NOT FIXED" item 0), each naming the owner as "whoever next hardens this adapter for
+(12.229's "RECORDED, NOT FIXED" item 0 — renumbered from 12.189/12.190 at rebase per the controller's
+explicit 12.228–12.239 allocation to this lane, after two prior collisions on "next free" across three
+concurrently-minting lanes), each naming the owner as "whoever next hardens this adapter for
 real multi-device use — a decision no task owns yet." The Important finding from the same review (
 `createTauriSqlStorage` minted a fresh queue on every call, defeated by React.StrictMode's double-invoke)
 WAS fixed — see the module-level `openStorages` cache in `tauri-sql-storage.ts`.
