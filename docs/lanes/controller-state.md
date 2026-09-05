@@ -11,6 +11,35 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## ⏩ CONTROLLER CLEARED ITSELF 2026-09-06 ~02:10 IST AT THE OWNER'S INSTRUCTION (ctx 70%) — RESUME FROM HERE
+
+**Deliberate, not a crash.** The owner said *"ctx is 70%. need to clear the main. do it automatically."*
+The controller merged what was ready, wrote this block, landed it on `main`, then typed `/clear` into its
+own tmux pane (`gisik:0`) followed by a paste of `dispatch-controller-serial.md` as the first message of the
+fresh context — the same in-pane mechanism used for the executors' `/limit-reset`. **The session model is
+Fable (owner-set); the brief's Sonnet gating does not apply to this session.** The ⚡ section below this
+one is the live topology; everything above the old serial sections is current.
+
+**`main` at the clear: `9e8777e`** (PR #120, Plan 10 T16 desktop, merged after independent CI at
+`5b8d7a6`). **Ledger 156/177** (T13 promoted, PR #122). **Open: #121 only.**
+
+### Per-lane position at the clear — verify each with `gh pr view` / `git log origin/<branch>`, do not adopt
+
+| lane | session name | state at clear | next action for the controller |
+|---|---|---|---|
+| **A** | `gisik-nokma-exec-06` | closure 2 under Fable review (6 lenses) on `exec/19-serving-gaps`; then buildable gaps → 11th gap → closure 3 → **closure 2b** (P34 items 1–2) → **HELD pair, unblocked by P32** | merge its PRs on arrival; promote nothing (closures are not ledger rows) |
+| **B** | `lane2-plan4-e5` | T13 **merged + promoted**. **T14 rig VERIFIED** — self-test 4/4 under the lock at `0cbdc82`, Fable review running; then T15 scenarios (Fable) → **T18 held until T16 AND T17 have merged** (T16 has; T17 = #121) | merge T14/T15 PR on arrival; promote 10/14, 10/15 |
+| **C** | `lane3-plan7-8-b6` | **T16 MERGED at `9e8777e`, NOT YET PROMOTED.** Pool-pinning gap accepted as MEASURED (SQLITE_BUSY with zero concurrency in the two-call form; one-call form pins but cannot carry callers that read inside the transaction) — case 12.229, owner named. **Holding for a re-task; told not to start Plan 11 files unilaterally** | **(1) promote 10/16** — evidence: `gh pr view 120 --json files` vs T16's `Files:` block; **(2) re-task C onto Plan 11 work file-disjoint from Lane E's current seam** (the ETA lever) — ask E its position first |
+| **D** | `lane4-periphery-e5` | #121 (T17) re-gated 27/27, 3238 tests at `a38b3de` — **conflicted after #120 landed** (adjacent §12 blocks); **rebasing past `9e8777e` now**, will report a new head | merge at the sha D reports after CI green there; **promote 10/17**; then re-task D like C |
+| **E** | `lane5-plan11-1d` | Plan 11 seam 1 in flight on `exec/23-plan11` (attachment routes A0, T5a Dockerfiles, `.nvmrc`/`.npmrc` landed, sweep-test-dbs.sh); **P33's 18 errands adopted** | merge seam-1 PR on arrival (`check:env` on its own line); promote its T-rows; coordinate C/D's re-task boundaries with it |
+
+**Pending decisions, none blocking:** the not-a-member retry POLICY (Lane B, P34 item 3: surface shipped,
+policy refused) wants a TASK, with the owner; the 36.8 GB of unused Docker images is the owner's call and
+no longer needed. **Standing protocol reminders for the fresh context:** never pipe `gh pr merge` (read
+`$?`); ledger-only PRs need an independent `check:tasks` re-run (CI skips); the gate lock is ONE
+backgrounded invocation; reap by ppid=1 only; case-ids in §12 are ALLOCATED (see the collision map);
+`SendMessage` to lane names works — tmux `gisik:N` is the fallback.
+
 ## ⚡ RESUMED 2026-09-06 00:30 IST — FIVE PARALLEL LANES, OWNER-DIRECTED. THIS SUPERSEDES THE SERIAL TOPOLOGY BELOW
 
 **Quota rolled to 0% weekly at ~00:30 IST Sunday, BEFORE the labeled Monday 06:30 reset.** Second
