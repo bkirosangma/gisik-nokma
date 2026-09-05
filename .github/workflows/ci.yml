@@ -141,6 +141,17 @@ jobs:
   # NOTHING. Same class of gate as check:env -- reads source text only, no
   # build, so a guard appearing somewhere uncovered is named in seconds
   # rather than passing silently through a job that never looks for it.
+  #
+  # And check-case-ids.mjs: multiple test-cases/NN-*.md files use more than
+  # one id-line style (bare, bold, marker-first) in the same section, and a
+  # recount that only recognises one style reports "zero duplicates" through
+  # a collision it structurally cannot see -- measured (case ids in §12).
+  # This script self-tests against scripts/fixtures/check-case-ids-fixture.md
+  # BEFORE trusting a result from the real files, because a matcher that
+  # returns zero on every real file is otherwise indistinguishable from one
+  # that never fires at all -- measured too, while building it: an earlier
+  # regex greedily swallowed a compound id line (`**7.1, 7.2 — ...`) whole as
+  # its "marker" and misreported the wrong number as duplicated.
   check-env:
     needs: scope
     if: needs.scope.outputs.code_changed == 'true'
@@ -155,6 +166,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:env
       - run: node scripts/check-skipif-coverage.mjs
+      - run: node scripts/check-case-ids.mjs
 
   # The task-ledger gate (scripts/check-task-ledger.mjs): every task in every
   # plan has one ledger row, and every row claiming `done` names a merge
