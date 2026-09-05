@@ -15,12 +15,12 @@ off `main`.
 |---|---|
 | branch | `exec/23-plan11` |
 | worktree | `/Users/kiro/my_projects/gisik-nokma-lanes/lane5-plan11` |
-| merge-base with `origin/main` | `1e372e3` |
-| HEAD at last refresh | `bb174fe` (verified reachable on `origin/exec/23-plan11`) |
-| ahead of `origin/main` | **12** — see the commit table under "Where I am" |
+| merge-base with `origin/main` | `1394396` — **REBASED 2026-09-06**, was `1e372e3` |
+| HEAD at last refresh | `0d9e24c` (verified reachable on `origin/exec/23-plan11`) |
+| ahead of `origin/main` | **14**, 0 behind |
 | tree state | clean |
 | node | `v22.22.2` (`$HOME/.nvm/versions/node/v22.22.2/bin`), pnpm 9.15.0 |
-| gate composition | **GREEN at `a30496f`**: `EXIT=0`, `Tasks: 24 successful, 24 total`, `0 cached`, Node v22.22.2, 0 `Unsupported engine`, **235 files / 3183 tests**, `CHECK_ENV_EXIT=0`. *(Earlier baseline at `f621a8c`*: `GATE_EXIT=0`, `Tasks: 24 successful, 24 total`, `0 cached`, Node v22.22.2, 0 `Unsupported engine`, **234 test files / 3181 tests** (domain 464 · rule-engine 282 · app-core 1046 · server 975 · editor 178 · web 136 · sync-client 63 · ui 37) |
+| gate composition | **GREEN at the REBASED sha**: `EXIT=0`, `Tasks: 30 successful, 30 total`, `0 cached`, Node v22.22.2, 0 `Unsupported engine`, **248 files / 3285 tests**, `CHECK_ENV_EXIT=0`, no orphaned workers |
 
 ## ⚠️ CROSS-LANE HAZARD — `pgrep -f vitest` matches the PEER LANE SESSIONS, not vitest
 
