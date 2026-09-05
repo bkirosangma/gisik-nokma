@@ -166,6 +166,25 @@ running server test suites at once is the Sep 4 crash with a multiplier. **Rule,
 > control. The refinement it missed — a live pool — is the "a count is only true of a tree that has stopped
 > moving" lesson wearing a process-table costume.
 
+> ### CASE-ID RANGES COLLIDE ACROSS LANES — a collision class the map did not cover, now ALLOCATED not discovered
+> The map listed FILES that collide; **ID RANGES collide too, and no header can prevent it.** Two lanes
+> minting from the same "NEXT FREE ID" line at the same fork point each mint the same ids, and neither
+> breaks never-renumber (that rule protects LANDED ids). It is only visible at rebase. **Twice in the first
+> hour:** #109 (closure 1) minted 12.156–12.159, which T11/T12 had taken and merged first — moved to
+> 12.189–12.192, thirty code citations followed, and **a project-wide `sed` would have silently repointed
+> Task 11's own citations in a file the change never touched, with every test green, because a comment
+> does not run**; then Lane D minted exactly 12.189–12.192 against its branch's base, unaware #109 had
+> landed them. **Rules:** (1) whatever is on `main` keeps its numbers; (2) **measure against
+> `origin/main`, never your branch's base** — a fork point is a fact about a moment; (3) renumber the
+> catalogue and every citation in ONE commit, by enumeration, never by `sed`; (4) re-run the measurement
+> at rebase as the control, and if the ceiling has passed your floor, say so rather than re-pick.
+> **§12 allocation as of 2026-09-06 01:35 IST** (`main` highest in use **12.192**, 152 ids; Lane A's):
+> **Lane B ≤ 12.223** (12.193–12.219 + its four moved to 12.220–12.223, landing with #117) ·
+> **Lane D 12.224–12.227** · **Lane C 12.228–12.239** · **Lane A 12.240+**. When #117 lands, §12's header
+> must read *next free 12.240* with the reservations named, or the next reader mints from 12.224 and
+> collides with D on the day D lands. Lane E mints into `test-cases/13` alone but its 18 errands cite §6,
+> §7 and §12 — same rule applies to any id it adds there.
+
 > ### Collision-map additions from the lanes' first hour — real, not hypothetical
 > - **Plan 11 T6's text pins the DEV stack's Postgres to host port 54329** — *the shared TEST Postgres all
 >   five lanes use.* Written verbatim it fails to bind or silently points the dev stack at the test
