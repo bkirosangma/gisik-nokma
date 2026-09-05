@@ -188,3 +188,152 @@ stack its own port.
   Rebase before every PR.
 - `Features.md` §13 and `test-cases/13` are this lane's. **Do not touch §12 / `test-cases/12`.**
 - Never edit `docs/lanes/task-ledger.tsv`. Never merge this lane's own PR. Never commit to `main`.
+
+---
+
+# SEAM 1 PRE-FLIGHT — findings, 2026-09-06 (4 read-only agents, 0 errors)
+
+## THE BIG ONE: Plan 11's task text does not contain the work Plan 11 was assigned
+
+**Eighteen errands were deferred to this plan BY NAME from other plans and from the coordination doc, and
+Plan 11's T1–T16 claims almost none of them.** They are invisible to a `Plan 11` grep — several say only
+"the deployment errand" or "Owner: whoever owns the boot path". Reported to the controller for a ruling;
+**absent a ruling the lane proceeds on the defaults below and records each one.**
+
+### Adopt into seam 1 — the server's deployment surface, files this lane owns alone
+
+| # | errand | where it was deferred from | lands in |
+|---|---|---|---|
+| 1 | **HTTP-Origin on cookie-authenticated product mutations** (CSRF ruling item 1) | `coordination:936-937` assigned it to Plan 4 T5; **T5 DECLINED it in writing and named Plan 11.** No line in `apps/server/src` reads the `Origin` header. | **T2** |
+| 2 | **The shutdown path** — no SIGTERM handler, no `pool.end()`, no `app.close()` | `index.ts:124-131`; the snapshot writer's stop hangs on `onClose` *specifically* so it works "on the day Plan 11 adds a real shutdown". **Plan 11 contains ZERO occurrences of sigterm/shutdown/app.close.** | **T5** |
+| 3 | `registerAttachmentRoutes` never called | `index.ts:37-49` | **A0 — in flight** |
+| 4 | **`LogOtpSender`'s two production faults** — logs every code, AND accumulates every code ever issued in an unbounded in-process array | `coordination:2455-2460` "Plan 11 owns the replacement"; `index.ts:60-73` | **T4** |
+| 5 | **Invite-issuance rate limiting** — each issuance mints a credential | `check-permission.ts:321-329`, case 6.123, both "Owner: Plan 11, which owns `RATE_LIMIT_*`" | **T2** |
+| 6 | **`WEB_ORIGIN`/`BETTER_AUTH_URL` accept `localhost:3001`** — `z.string().url()` only requires a scheme, so a bad value mints dead invitation links | case 6.124, "Owner: Plan 11" | **T1** |
+| 7 | **Assert `pnpm-lock.yaml` carries no `@better-auth/cli` INSIDE the Docker build** (not in CI — so it cannot regress) | `coordination:1791-1803` | **T5** |
+| 8 | `.nvmrc` + `engine-strict` | `coordination:5040-5051` | **DONE `f621a8c`** |
+
+### Adopt into seams 2/3 — same family as work already scheduled there
+
+`ops:sweep-orphans` (monthly, 30-day, only objects no ledger event ever named — `coordination:310`,
+`:1115`: *"no task, no Files entry, no steps anywhere in Plan 11"*) · the `invite_tokens` sweep (6.131) ·
+`user_preferences` retention for revoked members (`coordination:5495-5502`) · scheduling the notification
+sweep CLI (`tools/sweep-notifications.ts:8`) · the verifier's DDL credential in `app.yaml`
+(`coordination:1607-1611`; its sibling §2 autocommit MUST is **discharged**, `:1602-1606`) · the
+interim-plumbing CI gate (`coordination:296`, `:1114`; `ci.yml:192-196` documents it as absent) · CI
+wiring for `apps/web/e2e` (`plan-06:8993`; those specs are outside every automated gate today because
+`turbo.json` defines only build/test/typecheck).
+
+### DEFERRED, recorded with owners rather than dropped
+
+- **The repo-wide test-cases↔test citation convention** (`coordination:3749`, `:4108`). Today **no ✅
+  marker is grep-checkable and deleting a test reddens nothing.** That is a repo-wide convention, not a
+  deployment task. Owner: workspace convention.
+- **Stream load/soak** (7.35, already 🚫; `plan-05:6122`).
+
+## Corrections to THIS LANE'S OWN BRIEF, found by agents contradicting the orchestrator
+
+1. **The `contact@artsourced.in` correction binds T15 ONLY — not T4.** Measured: no line in T1–T4 is wrong
+   about the sender. Every `sign-in@gisik-nokma.local` in that range is the DEV/CI default the correction
+   explicitly preserves, and `contact@artsourced.in` appears **once in the whole plan**, at line 3859, in
+   T15's `app.yaml`. **Do not put a real production domain into a code default or a unit test.** The lane
+   brief (and this file's earlier "standing corrections" section) said otherwise; the plan was right.
+2. **Case 9.61 is NOT about server wiring** and must not be touched by A0 — it is the editor's React
+   surface not existing in `apps/web`, and stays ❌. The wiring claim lives at **9.59** (line 315) and in
+   the file header (lines 31–34), which no brief named. **9.59 stays 🟡** — its marker is for a CLIENT-side
+   gap (`uploadAttachmentHttp` has zero coverage) that A0 does not close.
+3. **`.nvmrc`/`.npmrc` were reported UNTRACKED** by an agent whose sweep ran *before* the commit. They are
+   tracked at `f621a8c` (`git ls-files` returns both, against a positive control). A clean instance of
+   *a sweep is a fact about a tree, and the tree moved.*
+
+## `/healthz`'s version string is an UNRULED DISCLOSURE DECISION this lane ORIGINATES
+
+`healthz` and `health check` occur **ZERO times** in the 6592-line coordination doc. The only disclosure
+rulings there are about guest/purge visibility and `LogOtpSender`'s heap transcript. So putting a build
+version on an unauthenticated endpoint is **not** an inherited decision. Two defensible shapes: an opaque
+build id rather than the semver from `apps/server/package.json`, or the version behind auth with
+`/healthz` staying `{status}` only. **Whichever is chosen, the reasoning goes at the handler — the
+document will not have it.**
+
+## Where the plan text is WRONG about this repo — T1–T6
+
+- **`WEB_ORIGIN` is already REQUIRED and LIVE** (`config.ts:39`, `z.string().url()`, no default), read by
+  Plan 4 T14 as the invite-link host. T1 says add it as *optional* with `expect(config.webOrigin)
+  .toBeNull()` (plan:196) — an assertion that **can never pass**. **T1 adds EIGHT variables, not nine.**
+  Name collision to keep separate: `AppDeps.webOrigin` = invite-link host; T2's `security.webOrigin` =
+  CORS allowlist. Same string today, two meanings.
+- **`/healthz` returns `{status:'ok'}`, not `{ok:...}`.** Adding `version` breaks `app.test.ts:59` AND
+  `events-route.test.ts:289` — **the plan names neither.** Decide explicitly whether the 503 branch
+  carries `version` too (if yes, `app.test.ts:74` breaks as well). T6's smoke line must become
+  `{"status":"ok","version":…}`.
+- **`config.test.ts:18-28` is an exact-shape `toEqual` over 9 fields** — eight new fields break it, and the
+  plan never mentions the file. **`config.test.ts:197-207` is a hand-maintained array of the nine LIVE
+  variable names**; extending the schema without extending that array leaves *a guard that passes while
+  covering nothing new* — the classic non-falsifiable check.
+- **T3's error handler already exists** and already does everything T3 describes except the alert call.
+  Its 5xx body is the exported `INTERNAL_ERROR_BODY`, pinned by `toEqual` in four places. **Do NOT change
+  the 5xx body**; T3's real diff is ~3 lines.
+- **`createPool` is at `apps/server/src/db.ts:20`, not `src/db/pool.ts`.** The existing Pool already passes
+  `options: '-c timezone=Asia/Kolkata'` — an `ssl` addition sits ALONGSIDE it, never replacing the object.
+- **T2 hand-rolls `makeFixedWindowLimiter`; it does NOT use `@fastify/rate-limit`.** Packages actually
+  needed: `@fastify/cors` (T2), `nodemailer` + `-D @types/nodemailer` (T4). **T11 needs none** — the three
+  AWS packages are already present.
+- **The plan's T1 `problems: string[]` accumulator does not exist to reuse** — `loadConfig` is one
+  `safeParse`. Traps named: `z.coerce.boolean()` accepts any non-empty string (use
+  `z.enum(['true','false'])` for `TRUST_PROXY`).
+- **`import pkg from '../package.json' with { type: 'json' }` fails two ways**, each caught by a different
+  gate: `apps/server/tsconfig.json` has no `resolveJsonModule` → TS2732 under both build and typecheck.
+- **T5's `files` field warning is a false positive** — `apps/server/package.json` has no `files` key. The
+  real edit there is moving `node-pg-migrate` from devDependencies to dependencies.
+- **`apps/web/next.config.ts` does NOT set `output: 'standalone'`** and is **not** in the controller's
+  collision map — safe for this lane, additive only, leave the webpack/rewrites logic alone.
+
+## Traps in T2 that would each cost a round
+
+- **`request.raw.url === '/v1/events'` carries the QUERY STRING** — `POST /v1/events?x=1` bypasses the
+  limiter entirely. Use `request.routeOptions.url`, or strip at `?`. Same for `/v1/sync`.
+- **`await reply.code(429).send(...)` in an `onRequest` hook then falling out returns `undefined`** —
+  Fastify halts an async hook only on `return reply` or a throw. Expect `FST_ERR_REP_ALREADY_SENT` and a
+  500 where a 429 was intended. **Verify at implementation.**
+- **`GET /v1/sync/bootstrap` — the most expensive read the server serves — is unlimited** under an
+  exact-match limiter on `POST /v1/sync`.
+- **`trustProxy` is NOT passed today** (`Fastify({...})` sets logger and ajv only). Behind App Platform
+  `request.ip` is the router, so **enabling rate limiting without `TRUST_PROXY=true` is worse than not
+  enabling it** — every client shares one bucket.
+- **T2's CORS has no shipped browser caller.** Next rewrites `/v1/*` and `/api/auth/*` to `SERVER_ORIGIN`
+  server-side, so the browser only ever talks to its own origin. Keep CORS (bearer-token mobile/desktop
+  are the future callers) but **do not claim it fixes a live breakage.**
+- **`void app.register(...)` is the settled pattern, not an open question** — `auth/routes.ts:44` already
+  does it, and 18 files depend on `buildApp` returning synchronously. **Do not make `buildApp` async.**
+
+## Checks that pass for the wrong reason — seam 1
+
+- **`pnpm check:env` green is NOT evidence T1 landed.** `.env.example` already documents all eight T1
+  variables while `config.ts` reads none, and the gate only fails on code-that-reads-but-is-undocumented,
+  never the reverse.
+- **`.env.example:15` asserts the LIVE list is "exactly `config.ts`'s zod schema".** That sentence goes
+  false the instant the schema grows, and **no gate catches it.**
+- **The compose healthcheck `wget -qO- http://localhost:3000/healthz` runs INSIDE the container**, so it
+  is green whether or not the service is reachable from outside.
+
+## T6 — the port collision, stated plainly
+
+**The plan pins the DEV stack's Postgres to host port 54329** ("kept identical here so every documented
+`DATABASE_URL` works against either stack", plan T6 header). **54329 is the shared TEST Postgres all five
+lanes are using right now** (`docker ps`: `gisik-nokma-exec-postgres-1`). Written verbatim the dev stack
+would either fail to bind or silently point at the test database. **Use 54330** (confirmed free by `lsof`).
+Occupied on this machine and therefore also unusable: 5432, 27017, 6379, 8001.
+
+**And the MinIO variable split, which the plan does not catch:** the plan's compose wires MinIO with
+`S3_ENDPOINT`/`S3_REGION`/`S3_BUCKET`/`S3_ACCESS_KEY`/`S3_SECRET_KEY`. **The shipped code reads a
+different set** — `OBJECT_STORE`, `OBJECT_STORE_DIR`, `OBJECT_STORE_S3_*` (`store-config.ts:15-24`) —
+and nothing in `src/` reads any `S3_*` name. Written verbatim, **attachments silently stay on the
+local-disk store inside the container** instead of reaching MinIO.
+
+## T6's env-contract slice is ALREADY DONE and BETTER than the plan asks
+
+`scripts/check-env-example.mjs` exists with **three** detectors plus two anti-vacuity guards; the plan
+specifies **one** regex which the script's own header records as matching *nothing* on this codebase.
+`pnpm check:env` is already wired and already runs in CI. **Re-implementing per the plan text would be a
+regression.** Remaining honest T6 scope: `docker-compose.dev.yml` (Step 1) and proving the checker against
+a planted defect (Step 4).
