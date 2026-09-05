@@ -511,12 +511,24 @@ describe('S4 — visibility narrowed while offline: contest up, NO purge down, a
    *   the refusal, and then this stub is the claimant's only record").
    * - **Viewers see it.** A, still listed, receives the `visibility.set` and
    *   the contest as ledger history.
-   * - **Re-widening re-delivers.** Once A puts the ticket back on `'project'`
-   *   mode, B's lagging cursor drains the narrowing, the contest and the
-   *   widening in order, the server's envelope corrects the stub's device
-   *   timestamp through `applyContest`'s upsert, and the two replicas converge
-   *   exactly. The stale copy was stale, not wrong; it is corrected by the next
-   *   delivery rather than by a tombstone.
+   * - **Re-widening re-delivers HERE — and that is a property of this
+   *   scenario's shape, NOT of the product.** Once A puts the ticket back on
+   *   `'project'` mode, B drains the narrowing, the contest and the widening in
+   *   order and the replicas converge exactly. **This works only because B's
+   *   cursor is still BELOW the narrowing.** The cursor is the highest
+   *   `workspaceSeq` DELIVERED (`rig.ts`'s `syncDown`, mirroring `hub.ts`), so
+   *   any later visible event in the workspace carries it past the invisible
+   *   rows, and re-widening then delivers only the widening. **There is no
+   *   backfill-on-grant anywhere in the product** — `visible-events-for.ts`
+   *   says so in terms: that is "Plan 10's job, on top of this primitive", and
+   *   it has not been built.
+   *
+   *   MEASURED (case 12.274): insert ONE unrelated visible commit between the
+   *   narrow and the widen and B's cursor goes 4 → 7, past narrow(5) and
+   *   contest(6); after widening B holds 2 events where A holds 4, B never
+   *   receives the narrowing or the contest, and **the divergence is permanent
+   *   — no purge, no backfill, no resync path.** The one-commit shape is the
+   *   ordinary case; the shape asserted below is the quiet one.
    *
    * What this scenario does NOT prove: that the retained copy is ever purged
    * without a re-widening. It is not — that is case 6.104, recorded, owner
@@ -645,12 +657,26 @@ describe('S4 — visibility narrowed while offline: contest up, NO purge down, a
     // Control: A's copy is the SERVER's, not a stub — A never queued anything.
     expect(onA?.confirmed?.fields['title']?.value).toBe(SHARED_TITLE);
     await expectCurrent(a);
-    // Control on B: the stub's timestamp is B's device clock, so the two
-    // replicas do NOT yet agree on this ticket. Convergence below is therefore
-    // something the re-widening has to DO, not a state both were already in.
-    expect((await b.replica.getTicket(ticketId))?.contests).not.toEqual(onA?.contests);
+    // Control on B: the two replicas do NOT yet agree on this ticket, so the
+    // convergence below is something the re-widening has to DO rather than a
+    // state both were already in.
+    //
+    // Compared on the ONE field that differs — `contestedAt` — rather than with
+    // `not.toEqual` on the whole object. The stub carries B's device clock
+    // (`outbox.ts`, `new Date()`) and the server's envelope carries the ingest
+    // clock; every other field is identical. A whole-object `not.toEqual` would
+    // therefore be a WALL-CLOCK race: two calls landing in the same millisecond
+    // make the objects equal and redden a correct scenario. It fails safe
+    // rather than falsely green, but the rig's claim is to be deterministic
+    // without timers, and this keeps it so.
+    const bStubBefore = (await b.replica.getTicket(ticketId))?.contests?.[0];
+    expect(bStubBefore?.contestedEventId).toBe(contestEventId);
+    expect(bStubBefore?.contestedAt).not.toBe(instantOf(contest['contested_at']));
 
-    // RE-WIDEN: the lag is recoverable, by delivery rather than by tombstone.
+    // RE-WIDEN. **Recoverable HERE because B's cursor never passed the
+    // narrowing** — not because the product backfills on grant. It does not
+    // (case 12.274 records the measurement). Asserted as the behaviour of this
+    // shape, and the docblock above says which shape it is.
     const widen = ticketEvent(USER_A, ticketId, 'visibility.set', { ticketId, mode: 'project' });
     await commitInteractive(USER_A, widen);
     await b.syncDown();
@@ -690,8 +716,21 @@ describe('S5 — the offline reopen pair contests coherently when the world chan
    *    contest to A OR to B. A learns nothing of it; B holds only the
    *    outbox's response stub. And because the hub's cursor rule advances only
    *    on a DELIVERED envelope, both replicas' cursors stand one below the
-   *    stream head afterwards — permanently, for this workspace, since nothing
-   *    will ever make that row visible. The parent's contest, on a ticket both
+   *    stream head AT THIS INSTANT.
+   *
+   *    **What is PERMANENT is the NON-DELIVERY, not the lag** — an earlier
+   *    version of this comment said the cursors stay at `head - 1` for good,
+   *    and that is false. The next visible envelope in this workspace carries
+   *    both cursors past the invisible row (measured: after one `field_set` on
+   *    the parent, head 8 and both cursors 8, with the child's contest still
+   *    reaching neither replica). The value `head - 1` is also incidental to
+   *    BATCH ORDER: the reopen is submitted before the child, so the child's
+   *    contest happens to be the head row; child-first would leave the cursors
+   *    AT head with the same non-delivery. The assertion below is therefore a
+   *    fact about this scenario's ordering, and the durable claim is the one
+   *    above it — the child's contest reaches nobody, ever.
+   *
+   *    The parent's contest, on a ticket both
    *    can see, streams normally. The plan asserted `myWork(...).contested`
    *    has two entries for B; it does — one from the server, one a stub — and
    *    that difference is asserted rather than glossed.
@@ -845,8 +884,10 @@ describe('S5 — the offline reopen pair contests coherently when the world chan
       reason: parentTerminalReason(SHARED_TITLE, 'Done'),
       originalEvent: child,
     });
-    // The parent converges exactly; the cursor consequence of the undeliverable
-    // child contest is asserted rather than hidden — see the docblock.
+    // The parent converges exactly. The cursor values below are a fact about
+    // THIS scenario's batch order at THIS instant, not a permanent state — see
+    // the docblock. What is durable is that the child's contest reached neither
+    // replica, which is asserted above by id.
     await expectReplicasConverged(parentId);
     const head = await readStreamSeq(h.pool, h.workspaceId);
     expect(await a.replica.getCursor(h.workspaceId)).toBe(head - 1);

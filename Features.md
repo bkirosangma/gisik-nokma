@@ -1431,15 +1431,26 @@ survived a whole task.)*
   device that explained a refusal differently from the server would be two products.
 - ⚙️ **Task 15's S4 predates Ruling P23 and its premise was false** — the plan expected a `purge` on
   `visibility.set`, and the per-event purge walk was DELETED rather than narrowed. The scenario is
-  written against the SHIPPED rule: the claim contests, nothing is delivered to the narrowed-out
-  replica, and re-widening re-delivers the history so the replicas converge. The stale copy that
-  remains is the accepted under-purge residual of case 6.104 — **recorded, and deliberately not pinned
-  by a test**, because 6.104's owner is Plan 10 and an assertion would be a test that closing the gap
-  must break.
+  written against the SHIPPED rule: the claim contests, and nothing is delivered to the narrowed-out
+  replica. The stale copy that remains is the accepted under-purge residual of case 6.104 — **recorded,
+  and deliberately not pinned by a test**, because 6.104's owner is Plan 10 and an assertion would be a
+  test that closing the gap must break.
+- ⚙️ **A re-widened ticket does not come back if the client read anything else meanwhile** — found by
+  the Task 15 review and reproduced independently. The sync cursor is the highest sequence DELIVERED,
+  so any visible event committed while a ticket is narrowed carries the cursor past the narrowing;
+  re-widening then delivers only itself and the earlier rows are never re-sent. There is no
+  backfill-on-grant in the product. Measured: one unrelated commit between narrowing and re-widening
+  leaves the client holding two events where the server holds four, **permanently — no purge, no
+  backfill, no resync path.** It is the sibling of case 6.104 on the other side of one gap: 6.104 is
+  the stale copy nobody takes away, this is the fresh copy nobody gives back. Recorded as case 12.274,
+  owner Plan 10, no task. *The scenario that appeared to prove convergence only did so because its
+  workspace was quiet in between; that is now said at the scenario and in the case.*
 - ⚙️ **A contest filed against a ticket that never came to exist reaches nobody** — surfaced by the
   reopen scenario and asserted as product behaviour: `canSee` is false for a ticket with no
-  `proj_visibility` row, so the child's `claim.contested` is streamed to no one and both clients' sync
-  cursors sit permanently one behind the head. The claimant's only record of it is the outbox stub.
+  `proj_visibility` row, so the child's `claim.contested` is streamed to no one. The claimant's only
+  record of it is the outbox stub. *What is permanent is the non-delivery, not any cursor lag — an
+  earlier version of this bullet said the cursors stay one behind the head for good, and the next
+  visible event moves them past.*
 
 ## 10. Workflow builder & ticket types
 
