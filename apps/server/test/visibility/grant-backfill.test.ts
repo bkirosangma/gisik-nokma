@@ -5,6 +5,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { testEnvelope } from '../helpers/envelope.js';
 import { appendTestEvent } from '../helpers/ledger.js';
 import { applyAll, seedMember, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
+import { GRANT_BACKFILL_MAX_TICKETS } from '../../src/visibility/grant-backfill.js';
 
 /**
  * Closure 5's GRANT half (ruling P37) — backfill on newly granted visibility,
@@ -288,6 +289,50 @@ describe('grant backfill — the copy nobody gives back (closure 5, ruling P37)'
     const ids = envelopeIds(await collect(viewer, ws, cursor));
     expect(ids).toContain(hidden.id);
     expect(ids).toContain(reparent.id);
+  });
+
+  it(`12.291 the walk is capped at GRANT_BACKFILL_MAX_TICKETS (${String(GRANT_BACKFILL_MAX_TICKETS)}) — ruling P37.1's interim guard against the atomic burst`, async () => {
+    const ws = newUlid();
+    const prj = newUlid();
+    const viewer = newUlid();
+    const author = newUlid();
+    const parent = newUlid();
+    await seedMember(db.pool, ws, viewer, 'member', [{ projectId: prj }]);
+    await seedMember(db.pool, ws, author, 'member', [{ projectId: prj }]);
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: parent });
+    // OVER the cap by two, so the fixture cannot pass by being exactly at it.
+    // All direct children of one parent, so the whole excess sits in a single
+    // breadth-first frontier — the shape the cap actually has to survive.
+    const children: string[] = [];
+    for (let i = 0; i < GRANT_BACKFILL_MAX_TICKETS + 1; i += 1) {
+      const child = newUlid();
+      children.push(child);
+      await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: child, parentId: parent });
+    }
+    await record(setVisibilityEnv(ws, parent, 'explicit', [author], author));
+
+    const cursor = await head(ws);
+    expect(envelopeIds(await collect(viewer, ws, cursor))).toEqual([]);
+    await record(setVisibilityEnv(ws, parent, 'workspace', undefined, author));
+
+    const items = await collect(viewer, ws, cursor);
+    const ticketsTouched = new Set(
+      items.filter((i): i is LedgerEvent => !('kind' in i)).map((i) => i.entity.id),
+    );
+    // EXACTLY the cap, not merely "at most" — an `expect(...).toBeLessThanOrEqual`
+    // would also pass against a backfill that delivered nothing at all, and the
+    // whole family of defects here is a check that passes for the wrong reason.
+    expect(ticketsTouched.size).toBe(GRANT_BACKFILL_MAX_TICKETS);
+    // The trigger ticket is never the one dropped: it is the walk's seed and the
+    // cap is checked before each pop.
+    expect(ticketsTouched.has(parent)).toBe(true);
+    // And the excess really is excess — at least two children got nothing, which
+    // is what makes this fixture over-cap rather than exactly at it.
+    const missing = children.filter((c) => !ticketsTouched.has(c));
+    expect(missing.length).toBe(children.length - (GRANT_BACKFILL_MAX_TICKETS - 1));
+    expect(missing.length).toBeGreaterThanOrEqual(2);
+    // Removing the cap from `audienceDependents` delivers all 202 and reddens
+    // this case alone — that mutation is recorded in the branch's case table.
   });
 
   it('12.282 the backfill is bounded to PRE-cursor rows, and re-drains do not repeat it once the cursor has passed the trigger', async () => {

@@ -373,6 +373,52 @@ door is the second reader depending on that sentence.
 | reconcile route enumerates `proj_visibility` | `2 failed \| 10 passed` — 12.285 + 12.286. **12.284 stayed GREEN, which is why 12.285 exists.** |
 | engine drops `chunk.includes(item.id)` | `1 failed \| 63 passed` — **12.287 ALONE.** |
 
+### ⚠️ THE BRANCH REVIEW — 8 raised, 6 SURVIVED refutation. ONE IS OPEN AND ESCALATED.
+
+Fable reviewer + one Fable refuter per finding, each briefed to default to refuted. Two were refuted
+(a `canSee` timing side-channel that is pre-existing and reachable at a door with a weaker gate; a
+comment enumerating "both consumers" that is complete for what it names).
+
+**🔴 OPEN — RULING REQUESTED FROM THE CONTROLLER, NOT YET ANSWERED. Do not treat closure 5 as finished
+until this is ruled.**
+
+**The backfill is an ATOMIC, NON-PROGRESSING BURST.** Before this branch every envelope the hub sent
+advanced a cursor, so a drain cut short resumed where it stopped. A backfill inverts that by
+construction: **every backfilled envelope is `≤ afterSeq`, so none moves any cursor**, and the only one
+that does — the trigger — is yielded AFTER the whole subtree's history. `hub.ts`'s `send` closes the
+socket 1013 `slow-consumer` above 1 MB buffered and `detach`es; no `caught-up` is sent, so the engine
+(which persists its cursor ONLY in `onCaughtUp`) never advances, and app-core's `lastSeq = Math.max(…)`
+cannot move on envelopes below its own `afterSeq`. **The client reconnects at the same cursor, is handed
+the identical burst, and is closed again — permanently and silently.** `needsBootstrap` refuses to
+re-bootstrap over a local baseline, so there is no client-side escape. Second half, independent of the
+wedge: **a cost amplifier the docblock's "bounded to once per subscriber per trigger" does not bound** —
+`readEntityEvents` runs with the default `afterSeq = 0`, and `check-permission.ts` does not refuse a
+`visibility.set` that sets the mode a ticket already has, so one member can re-issue it and make the
+server re-walk and re-stream a whole subtree to every subscriber, per commit.
+
+**THE CHEAP FIX IS UNSAFE AND A RESTART MUST NOT REACH FOR IT.** Yielding the trigger FIRST (so the
+cursor advances before the burst) breaks `ticket.reparented`: it IS folded, so a client that never held
+the ticket replays a transition with no `ticket.created` and `applyTicketEvent` throws — the engine's
+terminal stall, a worse failure than the one it fixes, and it looks like a one-line win.
+
+Options put to the controller: **(1)** bound the walk with a documented cap and record the truncation;
+**(2)** accept and disclose with a named owner, on 6.101/6.104's own precedent; **(3)** make the backfill
+resumable, which needs per-subscriber state `visibleEventsFor` deliberately does not have — its own task.
+Recommended (2)+(1) now, (3) into closure 5b. **Not taken as a conservative default unilaterally**,
+because "accept a silent permanent wedge" is not conservative and the alternative is a completeness
+trade the owner has priced before.
+
+**FIVE MINORS, ALL FIXED (commit `aa50e04`).** The one to read: **12.277's positive control was
+VACUOUS** — `JSON.stringify(forInsider).toContain(ticket)` passed because the *narrowing event itself*
+carries the ticket id in `entity.id` and `payload.ticketId`, so it would have passed against an empty
+`grantBackfillFor`. A check passing for a reason unrelated to the property it names, **in the very case
+written to demonstrate that discipline.** Now asserted by the pre-cursor event's **id**. Also: an
+`audienceDependents` docblock claiming a rowless ticket "yields the empty set" (it yields itself, and
+the "saves the work" clause was false too); a wrong case citation (12.281 → **12.283**); a 12.287
+comment calling a fresh ULID "a ticket the device holds"; and **"end to end" on 12.289 in three places**
+— the rig restates the route's rule rather than calling it, so no case runs client and real route
+together.
+
 ### TWO LESSONS THAT COST A ROUND EACH — both will recur
 
 1. **`git checkout HEAD -- <path>` DOES NOT RESTORE AN UNTRACKED FILE.** It fails with *"pathspec did not

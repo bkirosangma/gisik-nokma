@@ -51,6 +51,29 @@ import { canSee } from './can-see.js';
  *   narrowing self-excludes. No before-image is needed to tell them apart, and
  *   that is the whole reason this shape is legal under 6.82/6.94.
  *
+ * ## The burst is ATOMIC and does not self-limit — ruling P37.1, and the cap below
+ *
+ * **Every envelope this module yields is at or below `afterSeq`, so NONE of them
+ * moves a cursor**, and the only one that does — the trigger — is yielded AFTER
+ * the whole subtree's history. That is a real difference from every other
+ * envelope the hub sends, and it has a consequence: `stream/hub.ts`'s `send`
+ * closes a socket 1013 `slow-consumer` above `maxBufferedBytes` and detaches,
+ * no `caught-up` is sent, the sync engine persists its cursor ONLY in
+ * `onCaughtUp`, and `needsBootstrap` refuses to re-bootstrap over a local
+ * baseline — so a client cut short mid-burst reconnects at the same cursor, is
+ * handed the identical burst, and is cut short again. **Case 12.290 records the
+ * mechanism; owner closure 5b.**
+ *
+ * **DO NOT "FIX" THIS BY YIELDING THE TRIGGER FIRST.** It is the obvious
+ * one-line repair — the cursor would advance before the burst — and it is
+ * UNSAFE. `ticket.reparented` IS folded, so a client that never held the ticket
+ * would replay a transition with no `ticket.created` and `applyTicketEvent`
+ * throws, which is the engine's terminal stall: a worse failure than the one it
+ * fixes. Measured before the option was proposed, and written here so nobody
+ * spends the round again.
+ *
+ * `GRANT_BACKFILL_MAX_TICKETS` below is the ruling's interim guard, not the fix.
+ *
  * ## Cost is bounded to once per subscriber per trigger
  *
  * The trigger event is itself an ordinary visible ticket event, so the caller
@@ -96,6 +119,33 @@ import { canSee } from './can-see.js';
  */
 export const GRANT_BACKFILL_TRIGGERS = ['visibility.set', 'ticket.reparented'] as const;
 
+/**
+ * The most tickets one trigger will back-fill in one drain (ruling P37.1).
+ *
+ * An interim guard against the atomic-burst problem above, and **explicitly not
+ * its fix** — the fix is closure 5b item (d), which makes the grant side
+ * pull-shaped so the client fetches what it lacks and a cut-short session
+ * resumes instead of wedging.
+ *
+ * **What it bounds and what it does NOT.** It bounds the WALK: a widening on a
+ * root with thousands of inheriting descendants can no longer stream all of
+ * them in one burst. It does **not** bound a single ticket with a very long
+ * history — one ticket over the wire is one ticket, whatever its event count —
+ * so the guard narrows the reachable burst without closing it. Stated rather
+ * than implied, because a cap that reads as a bound and is not one is worse than
+ * no cap.
+ *
+ * **Truncation is SILENT on the wire**, and there is nowhere honest to put a
+ * notice: this is a generator over `SyncItem`, and inventing a wire member to
+ * announce "your backfill was clipped" would be a protocol nobody agreed and a
+ * fourth `SyncItem` arm that `applyInstruction`'s fail-closed switch exists to
+ * make deliberate. What a truncated client loses is history it did not have a
+ * moment ago — the pre-P37 behaviour — so it is left where a full resync
+ * corrects it, which is the direction this module's stakes already run.
+ * Case 12.291 pins the cap; case 12.290 owns the residual.
+ */
+export const GRANT_BACKFILL_MAX_TICKETS = 200;
+
 export function isGrantBackfillTrigger(type: string): boolean {
   const triggers: readonly string[] = GRANT_BACKFILL_TRIGGERS;
   return triggers.includes(type);
@@ -137,7 +187,12 @@ async function audienceDependents(db: Queryable, ticketId: string): Promise<stri
   const visited = new Set<string>();
   const out: string[] = [];
   const frontier: string[] = [ticketId];
-  while (frontier.length > 0) {
+  // `out.length < GRANT_BACKFILL_MAX_TICKETS` is ruling P37.1's interim guard.
+  // Breadth-first, so what survives the cap is the trigger ticket and the
+  // shallowest descendants — the ones a viewer is most likely to be looking at
+  // — rather than an arbitrary slice. The trigger ticket itself is always
+  // reached: it is the seed, and the cap is checked before the pop.
+  while (frontier.length > 0 && out.length < GRANT_BACKFILL_MAX_TICKETS) {
     const current = frontier.shift();
     if (current === undefined || visited.has(current)) continue;
     visited.add(current);
