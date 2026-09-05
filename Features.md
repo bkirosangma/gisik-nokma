@@ -1464,6 +1464,16 @@ survived a whole task.)*
   destructive and local and this device does not need to trust the server to be safe from it. Nothing
   calls it on a schedule yet; when a device should reconcile is a product decision no plan states.
   Cases 12.284-12.289. `apps/server/src/sync/reconcile-route.ts`, `packages/sync-client/src/engine/sync-engine.ts`
+- ⚙️ **The backfill is an ATOMIC burst, and a large one can wedge a subscriber — disclosed, capped, not
+  closed** *(ruling P37.1)* — every backfilled envelope sits at or below the client's cursor, so none of
+  them advances it, and the only one that does arrives last. A slow-consumer close before that point
+  leaves the client reconnecting into the identical burst for ever, because the cursor is persisted only
+  on catch-up and a fresh bootstrap is refused over an existing local baseline. An interim cap bounds the
+  WALK at 200 tickets — breadth-first, so the trigger ticket and the shallowest descendants survive — and
+  it is explicitly not a bound on a single ticket's history. **The one-line repair of sending the trigger
+  first is unsafe and the code says so**: `ticket.reparented` is folded, so a client that never held the
+  ticket would replay a transition with no creation event and stall its engine. Case 12.290 owns the
+  residual, 12.291 pins the cap. `apps/server/src/visibility/grant-backfill.ts`
 - ⚙️ **Still open on the same surface, named rather than left to be inferred** — visibility that widens
   because the READER's reach grew (`membership.granted`, `project.member_added`) rather than the ticket's
   carries the identical pre-cursor gap and is out of ruling P37's scope (case 12.283); and case 6.102's

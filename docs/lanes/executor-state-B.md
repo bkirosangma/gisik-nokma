@@ -379,8 +379,7 @@ Fable reviewer + one Fable refuter per finding, each briefed to default to refut
 (a `canSee` timing side-channel that is pre-existing and reachable at a door with a weaker gate; a
 comment enumerating "both consumers" that is complete for what it names).
 
-**🔴 OPEN — RULING REQUESTED FROM THE CONTROLLER, NOT YET ANSWERED. Do not treat closure 5 as finished
-until this is ruled.**
+**✅ RULED — P37.1 (2026-09-06). (2)+(1) landed in #139; the real fix is closure 5b item (d).**
 
 **The backfill is an ATOMIC, NON-PROGRESSING BURST.** Before this branch every envelope the hub sent
 advanced a cursor, so a drain cut short resumed where it stopped. A backfill inverts that by
@@ -401,12 +400,30 @@ cursor advances before the burst) breaks `ticket.reparented`: it IS folded, so a
 the ticket replays a transition with no `ticket.created` and `applyTicketEvent` throws — the engine's
 terminal stall, a worse failure than the one it fixes, and it looks like a one-line win.
 
-Options put to the controller: **(1)** bound the walk with a documented cap and record the truncation;
-**(2)** accept and disclose with a named owner, on 6.101/6.104's own precedent; **(3)** make the backfill
-resumable, which needs per-subscriber state `visibleEventsFor` deliberately does not have — its own task.
-Recommended (2)+(1) now, (3) into closure 5b. **Not taken as a conservative default unilaterally**,
-because "accept a silent permanent wedge" is not conservative and the alternative is a completeness
-trade the owner has priced before.
+**What landed under P37.1:** `GRANT_BACKFILL_MAX_TICKETS = 200`, breadth-first so the trigger ticket and
+the shallowest descendants survive, plus case **12.290** (❌, the wedge, mechanism and the unsafe
+one-line repair both spelled out, owner 5b) and case **12.291** (✅, the cap, over-cap fixture, EXACTLY
+the cap rather than at-most). Measured: `12.291` reddens **ALONE** when the cap is removed
+(`1 failed | 6 passed`).
+
+**What the cap does NOT bound, and the case says so:** a single ticket with a very long history. One
+ticket over the wire is one ticket whatever its event count, so the reachable burst is narrowed, not
+closed.
+
+**CLOSURE 5b GAINED ITEM (d) — the real fix, and it is a DESIGN, not just an owner.** Make the grant
+side PULL-shaped and client-presented, the same principle as the narrow half: the hub pushes a bounded
+NOTICE (the trigger plus the ids it newly admits — not history), and the client, which already knows its
+own holdings, pulls each ticket it does not hold through the per-ticket bootstrap door BEFORE applying
+the trigger, persisting each as it lands. *(If no server route exists for that door yet, it is 5b(d)'s
+first artefact — the rig's `bootstrapTicket` restates it.)* Consequences, each to be MEASURED: a
+cut-short session resumes by pulling what it lacks (no wedge, no per-subscriber server state); a
+repeated no-op `visibility.set` costs a client that already holds the subtree nothing, so the amplifier
+is bounded by holdings rather than by trust in `check-permission`; and the refold hazard closes as
+"bootstrap-before-apply on any event for an entity not held", which is the rule a replica needs for
+`ReplicaGapError` anyway. Excluding fixtures carry over: a viewer not in the new audience gets no notice
+(mutate → red); the notice never names an id outside the viewer's audience (mutate to enumerate → red).
+**12.290 flips ❌ → ✅ only when a slow-consumer close MID-PULL is followed by convergence on reconnect.**
+If the notice must carry more than ids and the trigger, ESCALATE.
 
 **FIVE MINORS, ALL FIXED (commit `aa50e04`).** The one to read: **12.277's positive control was
 VACUOUS** — `JSON.stringify(forInsider).toContain(ticket)` passed because the *narrowing event itself*
