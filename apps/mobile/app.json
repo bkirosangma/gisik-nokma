@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Gisik Nokma",
+    "slug": "gisik-nokma",
+    "scheme": "gisik-nokma",
+    "version": "0.1.0",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "in.artsourced.gisiknokma"
+    },
+    "android": {
+      "package": "in.artsourced.gisiknokma"
+    }
+  }
+}

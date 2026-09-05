@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.229`. THE NEXT FREE ID IS `12.240` — NOT `12.230` AND NOT `12.224`.** **`12.230`–`12.239` remain RESERVED to Lane C (Task 16) and `12.224`–`12.227` to Lane D (Task 17, Expo)**, by the cross-lane allocation taken 2026-09-06 after this file collided twice in one day. **Ids in §12 are now ALLOCATED, not discovered** — a lane takes its assigned range and does not read the next number off this line, because that is precisely what two branches did simultaneously, from correct readings, and collided. The recount rule below still applies to what is IN USE; it is the NEXT-FREE half that a lane may no longer derive for itself.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.193-12.223 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, and said `12.215` until Ruling P34's follow-up added 12.216-12.219, and said `12.219` until THIS branch's own rebase onto closure 1 moved Task 13's four colliding ids to 12.220-12.223 — the SECOND time in this file that two branches minted the same range from this one line off different fork points, and the clause above records the first. Both times both sides obeyed never-renumber and collided anyway, because that rule protects LANDED ids and neither branch can see the other. The range is re-checked against `main` at REBASE, not only at authoring, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives), and said `12.223` until Task 16 filled the FIRST two of its own reserved block, 12.228-12.229 (`apps/desktop`'s storage adapter — a THIRD package denominator: it lives in `apps/desktop` itself, consuming both prior packages without being either), minted from an allocation rather than derived from this line, so no third collision instance was possible here. Those two ids were minted twice before landing on their allocated range — 12.189-12.190 at this branch's own fork point where those were free, then 12.193-12.194 once this branch discovered the snapshot-door section's prior landing — a per-branch history the allocation system now makes unnecessary going forward. `12.230`-`12.239` remain free for this lane's own later use without a further allocation request. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.229`. THE NEXT FREE ID IS `12.240` — NOT `12.230` AND NOT `12.224`.** **`12.230`–`12.239` remain RESERVED to Lane C (Task 16) and `12.224`–`12.227` to Lane D (Task 17, Expo)**, by the cross-lane allocation taken 2026-09-06 after this file collided twice in one day. **Ids in §12 are now ALLOCATED, not discovered** — a lane takes its assigned range and does not read the next number off this line, because that is precisely what two branches did simultaneously, from correct readings, and collided. The recount rule below still applies to what is IN USE; it is the NEXT-FREE half that a lane may no longer derive for itself.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.193-12.223 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, and said `12.215` until Ruling P34's follow-up added 12.216-12.219, and said `12.219` until THIS branch's own rebase onto closure 1 moved Task 13's four colliding ids to 12.220-12.223 — the SECOND time in this file that two branches minted the same range from this one line off different fork points, and the clause above records the first. Both times both sides obeyed never-renumber and collided anyway, because that rule protects LANDED ids and neither branch can see the other. The range is re-checked against `main` at REBASE, not only at authoring, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives), and said `12.223` until Task 17 (Lane D, `apps/mobile` — the THIRD package this bucket's cases live in) landed its own allocated range at `12.224`-`12.227` exactly as assigned, closing that reservation without a further collision, and said `12.227` until Task 16 filled the FIRST two of its own reserved block, 12.228-12.229 (`apps/desktop`'s storage adapter — a FOURTH package denominator: it lives in `apps/desktop` itself, consuming both prior packages without being either), minted from an allocation rather than derived from this line, so no further collision instance was possible here. `12.230`-`12.239` remain free for that lane's own later use without a further allocation request. Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -22,26 +22,29 @@ One consequence worth stating rather than leaving to be discovered: **12.15 is a
 — `apps/server/test/sync/stream-seq.test.ts` shipped with Plan 10 Task 2 — but it is a reserved id and
 is deliberately not flipped here. *Owner: Plan 10 Task 18.*
 
-**Scope of this file today.** Plan 10 Tasks 4, 5, 6, 7, 9, 10, 11 and 12. Task 4 as lifted out of the plan's
+**Scope of this file today.** Plan 10 Tasks 4, 5, 6, 7, 9, 10, 11, 12, 13, 16 and 17. Task 4 as lifted out of the plan's
 position: the §11 envelope-coherence closer, `proj_contested`, `getContest` and `GET /v1/contests`.
 Task 5: the snapshot writer and the ledger-sourced reducer deps. Task 6: `GET /v1/sync/bootstrap`.
 Task 7: `POST /v1/sync`. Task 9: the replica (12.119–12.137). Task 10: the outbox and the local
 pre-check (12.138–12.153). Task 11: the sync engine and its HTTP/WS transport (12.156–12.171, the last two from its fix round).
 Task 12: the replica `DataSource` (12.172–12.187), which lives in `packages/app-core` and is the first
-part of this bucket that does. Task 13: app-core's offline/sync UX (12.193–12.223), which also lives in
-`packages/app-core`. **Plus ONE section that belongs to no plan task at all**: refresh on publish,
-snapshot door (12.189–12.192) — the snapshot-invalidation gap the ledger row for Task 5 flags
+part of this bucket that does. **Task 13: app-core's offline/sync UX (12.193–12.223), which also lives
+in `packages/app-core`.** Plus ONE section that belongs to no plan task at all: refresh on
+publish, snapshot door (12.189–12.192) — the snapshot-invalidation gap the ledger row for Task 5 flags
 in its own notes (`docs/lanes/task-ledger.tsv`, commit `b65f6fb`). It was carried with no owner, it
 gets no ledger row, and it is catalogued here because the surface it fixes is this bucket's, not
-because a task claims it. Task 16: `apps/desktop`'s storage adapter (12.228–12.229, from this lane's
-12.228–12.239 allocation — see the HIGHEST-ID line) — its whole test surface, since the lane owning
-this task scoped its gate to `cargo check` + `tsc` + `vitest` on the adapter alone, with no case for the
-shell's UI wiring or for anything a simulator/app-launch would show. Nothing else from Plan 10 is
-catalogued — Task 8 (the `sync-client` scaffold and the storage seam), Tasks 14–15 (the dual-client
-harness and its scenarios) and Task 17 (the Expo mobile shell) are absent rather than missing. **Task 13
-came off that absent list in the change set that landed it**, together with the HIGHEST-ID line, its
-running parenthesis, and the section enumeration above — all four in one edit, which is what the
-sentence after this one exists to enforce. **Task 12 came off that absent list in the change set that
+because a task claims it. **Task 17: the `apps/mobile` shell (12.224–12.227)** — its OWN unit coverage
+only (storage adapter, editor bridge protocol, push stub), not a distributed-systems scenario suite; no
+case here asserts anything about a running app, a simulator, or a device, because none has been run.
+**Task 16: `apps/desktop`'s storage adapter (12.228–12.229, from this lane's own 12.228–12.239
+allocation — see the HIGHEST-ID line)** — its whole test surface, since the lane owning this task scoped
+its gate to `cargo check` + `tsc` + `vitest` on the adapter alone, with no case for the shell's UI
+wiring or for anything a simulator/app-launch would show. **Task 13, Task 16 and Task 17 each came off
+the absent list below in the change set that landed them**, together with the HIGHEST-ID line, its
+running parenthesis, and the section enumeration — all four in one edit per task, which is what this
+sentence and the one after it exist to enforce. Nothing else from Plan 10 is catalogued — Task 8 (the
+`sync-client` scaffold and the storage seam) and Tasks 14–15 (the dual-client harness and its
+scenarios) are absent rather than missing. **Task 12 came off that absent list in the change set that
 landed it**, together with the HIGHEST-ID line and the section enumeration above — the omission that
 produced two of this work's false claims was updating one of those three and not the others. **Task 8's absence is measured, not assumed**: this file has no
 Task 8 section and no case id for it. **The command this sentence used to quote is the wrong command,
@@ -1665,3 +1668,71 @@ already collided twice on "next free" — see this file's HIGHEST-ID line.
    separate command boundary to violate — no case here can fail on this, by construction, so none
    claims to have closed it. OWNER: whoever next hardens this adapter for real multi-device use, a
    decision no task owns yet.
+
+## The `apps/mobile` shell (Task 17) — `apps/mobile/src/**/*.test.ts`
+
+Fourth package, fourth denominator (`packages/sync-client`, `packages/app-core`, `apps/desktop`, now
+`apps/mobile`): 20 tests across three files, all module-seam unit tests — no RN component is rendered
+under vitest (no simulator, no device; see `Features.md` §12). Two are the task's declared
+honesty-carrying pieces and were opus-reviewed for exactly the failure class this whole bucket is
+about: a check that passes for a reason unrelated to the property it claims to verify — both reviews
+found real defects, fixed here, not only in this file's history but in the code itself.
+**This section uses `12.224`–`12.227`, allocated by the controller after two same-day collisions in
+this file** (see the header line) rather than measured off `main` alone. Both Task 13 (12.193–12.223)
+and Task 16 (12.228–12.229, of its own `12.228`–`12.239` allocation, above) had already landed by the
+time this branch took its final rebase past them.
+
+- 12.224 ✅ `wrapOpSqliteDatabase` conforms to `SyncStorage` against the SAME shared behavioural suite
+  (`storageConformanceTests`, `@gisik-nokma/sync-client/testing`) the `better-sqlite3` adapter runs —
+  DDL/DML round-trip, transaction commit/rollback, serialised concurrent transactions — run against a
+  fake `execute(sql, params) → {rows}` facade that is itself backed by a REAL in-memory `better-sqlite3`
+  database rather than canned responses, because op-sqlite is a native module unavailable under vitest.
+  The docblock originally claimed this canned shape "would pass every conformance assertion by
+  construction"; the opus review actually ran it and found it passes only 1 of 3 (the one whose fixture
+  coincides with the expectation) — corrected in place. Two properties the shared suite does not reach
+  are pinned directly: a nested transaction (`tx.transaction(...)`) rejects with `'no nested
+  transactions'` rather than silently forwarding to the outer connection, and `close()` closes the
+  underlying database rather than resolving as a no-op — both were unverified before the review; the
+  second was a real latent bug (a delete-local-data flow awaiting `close()` then unlinking the DB file
+  would have failed or left a partial file). (`apps/mobile/src/storage/op-sqlite-storage.test.ts`)
+- 12.225 ✅ the adapter's exact SQL shape is pinned against a SEPARATE recording fake (`vi.fn()`,
+  canned responses) for the one thing the real-engine fake cannot check — literal SQL text: `run`/`all`
+  map onto `execute` unchanged, and a transaction emits exactly `BEGIN IMMEDIATE`, the caller's SQL,
+  `COMMIT` on success or `ROLLBACK` on throw, serialised across two overlapping transactions.
+  (`apps/mobile/src/storage/op-sqlite-storage.test.ts`)
+- 12.226 ✅ the mobile app's HOST-side reader for Plan 7's real editor webview bridge
+  (`packages/editor/src/webview/bridge.ts`'s versioned `{bridge, kind}` protocol — NOT the task
+  plan text's originally assumed `{type: 'editor-ready'|'set-doc'|'doc-changed'}` shape, which this
+  build does not use) parses all five `EditorToHostMessage` kinds (`ready`, `change`, `submit`,
+  `requestUpload`, `mentionQuery`), and rejects — without throwing — the wrong bridge version, a
+  missing version field, an unrecognised `kind` (the tolerated-forward-compat case), a recognised
+  `kind` missing its required field, non-object payloads, arrays, and unparseable JSON strings.
+  `packages/editor` exports no validator for this direction at all (only the reverse, host→editor,
+  used inside its own webview bundle); this is the first one, scoped to `apps/mobile` rather than
+  the shared package. **The opus review caught the first version of the `doc`-field check accepting
+  `[]`, `{}` and `{type:'paragraph'}`** — one check short of the real `isDocJson`'s four (object,
+  non-null, not-array, `type === 'doc'`) — which a `change`/`submit` message carrying any of those
+  would have persisted as a comment body the real validator refuses on the next load; now pinned
+  directly against all three, and a round-trip test drives `serializeHostMessage`'s output through
+  the REAL `parseHostMessage` (imported from `packages/editor`, not reimplemented) for every
+  `HostToEditorMessage` kind including `loadDoc` with `doc: null` — the case that would have caught a
+  second review finding, a `doc: undefined` that `JSON.stringify` drops entirely, silently sending a
+  `loadDoc` the editor refuses whole and leaving a read-only request fully editable with nothing
+  loaded; closed by typing `EditorWebView`'s `initialDoc` prop as the protocol's own `DocJson | null`
+  rather than `unknown`, so passing `undefined` is now a typecheck error, not a runtime one.
+  (`apps/mobile/src/editor/editor-web-view.test.ts`)
+- 12.227 ✅ push registration degrades honestly against the routes that actually exist today: a 200
+  response registers the Expo token; a 404 (the real answer — no `/v1/push/registrations` route is
+  registered on `apps/server`, verified by reading its routes rather than assumed) reports
+  `transport-unavailable` rather than throwing; a denied OS permission reports `no-token`; a non-404
+  error status reports `http-<status>`. None of these is hypothetical — the 404 path is what this
+  route actually answers on `main` as of this task. (`apps/mobile/src/push/register-push.test.ts`)
+
+**What Task 17 does NOT cover here, named rather than left to be inferred.** No test exercises
+`app.tsx`, `board-screen.tsx` or `ticket-screen.tsx` — they are thin RN components wiring the tested
+modules together, per this project's own vitest-environment limits (no RN renderer under `node`), and
+their correctness rests on the reviewed module seams above plus manual reading, not an executed
+assertion. No case here is a distributed-systems scenario (that is Tasks 14–15); no case touches a
+running app on a device or simulator. One fix the editor review found (a rejected `onMentionQuery`
+leaving the webview's mention popup pending forever, now answered with an empty result on rejection)
+is a `.tsx` component-level change with no test at this layer for the same reason.
