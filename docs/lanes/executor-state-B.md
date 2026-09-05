@@ -16,12 +16,12 @@ only what is written here.
 |---|---|---|
 | branch | `exec/26-closure5-catchup` | `git branch --show-current` |
 | cut from | `origin/main` = **`c7c2b8e`** (the #126 merge — T14 + T15) | `git checkout -b … origin/main` |
-| HEAD | **`__HEAD__`** | `git rev-parse HEAD` |
-| ahead of `origin/main` | **__AHEAD__** | `git rev-list --count origin/main..HEAD` |
-| HEAD reachable? | **__REACHABLE__** | `git branch --contains HEAD` — empty output would mean orphaned |
-| tree | __TREE__ | `git status --short` |
+| HEAD | **`13586c68`** | `git rev-parse HEAD` |
+| ahead of `origin/main` | **3** | `git rev-list --count origin/main..HEAD` |
+| HEAD reachable? | **YES — `git branch --contains 13586c68` prints `exec/26-closure5-catchup`** | `git branch --contains HEAD` — empty output would mean orphaned |
+| tree | clean (`git status --short` empty) | `git status --short` |
 | node | v22.22.2 | `node -v` after `source ~/.nvm/nvm.sh && nvm use 22` |
-| gate | __GATE__ | one backgrounded invocation under the lock |
+| gate | **`GATE_EXIT=0` · `Tasks: 30 successful, 30 total` · `Cached: 0 cached, 30 total` · 1m29.168s · node v22.22.2 · zero `Unsupported engine` · `check:env` exit 0 on its own line · `pg_isready` exit 0.** **3280 tests / 10 packages**, enumerated per package and summed rather than taken from a total: domain 464 · ui 37 · editor 178 · rule-engine 282 · sync-client 64 · app-core 1086 · web 136 · server 1008 · desktop 5 · mobile 20. **The delta is stated against `c7c2b8e`, NOT against the controller's 3254/983 figure — that one was measured at `e407bf5`, BEFORE #126 merged, and this branch is cut from `c7c2b8e`.** This branch adds 13 `it` blocks, enumerated: server 12 (12.277-12.282 at the filter, 12.284-12.286 at the route, 12.275/12.276/12.289 on the rig) and sync-client 1 (12.287, `sync-engine.test.ts:1006`). So `c7c2b8e` held server 996 and sync-client 63, and #126 accounts for the rest. *The `it`-block count was read from the FILES, not from `git diff | grep -c '^+'`, which answered **0** here — the reformatted-diff-marker silent-empty mode this machine has on record.* | one backgrounded invocation under the lock |
 
 **⚠️ BRANCH-NUMBER COLLISION, flagged by Lane A and NOT resolved by either of us.** Lane A's branch is
 `exec/26-provenance-block` and this one is `exec/26-closure5-catchup` — two `exec/26-*` branches. Not a
