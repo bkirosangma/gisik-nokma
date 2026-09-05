@@ -4,11 +4,20 @@ Mirrors `Features.md` §13. Status: `❌` not covered · `✅` covered · `🟡`
 
 **Numbering, and why this file starts at 13.1.** `Features.md` §13 and this bucket belong to Plan 11 by
 the coordination doc's reservation table. Plan 11's own Task 16 normally opens this section (held until
-Tasks 1–15 merge) and would pin its own numbering across the whole plan. Task 14 landed ahead of that —
-lifted to close the Plan 5 gate's CI precondition sooner — so this file opens the bucket early,
-numbering ONLY its own cases from 13.1. **Never renumber**: when Task 15, Task 16, or any of Tasks 1–13
-land, they continue from this file's then-highest id rather than renumbering these, exactly as
-`09-editor-attachments.md` and `12-offline-sync-apps.md` did for the reservation gaps they each recorded.
+Tasks 1–15 merge) and would pin its own numbering across the whole plan. Tasks 14 and 15 landed ahead of
+that, in separate PRs — lifted to close the Plan 5 gate's CI precondition sooner — so this file opens the
+bucket early: 13.1–13.6 are Task 14's (added first), 13.7+ are Task 15's, continuing from Task 14's
+then-highest id rather than renumbering. **Never renumber**: when Task 16, or any of Tasks 1–13, land,
+they continue from this file's then-highest id in turn, exactly as `09-editor-attachments.md` and
+`12-offline-sync-apps.md` did for the reservation gaps they each recorded.
+
+**IDS IN §13 ARE ALLOCATED, NOT DISCOVERED — the same collision class §12 recorded, one file over: Lane D
+independently minted its own 13.1–13.36 for Tasks 7/8 against this file's 13.1–13.6, from a fork point
+that couldn't see this branch.** Blocks, controller-allocated 2026-09-06: **Lane C 13.1–13.40** (Tasks 14
+[13.1–13.6, pushed] and 15 [13.7+, this PR]) · **Lane D 13.41–13.100** (Tasks 7, 8) · **Lane E
+13.101–13.200** (the rest of Plan 11). **The next free block is `13.201`, controller-allocated ON REQUEST
+ONLY.** A lane takes its assigned block and does not derive the next free id from this file — recount the
+MAXIMUM in use against `origin/main` at every rebase as the control, but never mint from it.
 
 **Numbering is BLOCK-allocated across parallel lanes, controller-assigned 2026-09-06, because more than
 one lane opened this section before Plan 11 Task 16's own catalogue pass (normally the sole opener, held
@@ -73,6 +82,29 @@ below it is ordinary `vitest` coverage and uses `✅` throughout.
   this branch today (verifying the bug was real, not hypothetical); the job's own logic change was
   verified by reading, not by a real Actions run — confirm from the PR's own CI run once Task 13 lands
   that this job does not silently start running the mock smoke. `.github/workflows/ci.yml` (`e2e` job)
+- 🧪 **13.7 — the deploy spec's object-storage and web-client env var names match what code actually
+  reads, not the plan's original draft.** `pnpm check:env` passes unchanged after `deploy/do/app.yaml`
+  was written using `OBJECT_STORE`, `OBJECT_STORE_S3_ENDPOINT`, `OBJECT_STORE_S3_REGION`,
+  `OBJECT_STORE_S3_BUCKET`, `OBJECT_STORE_S3_ACCESS_KEY_ID`, `OBJECT_STORE_S3_SECRET_ACCESS_KEY`,
+  `OBJECT_STORE_S3_FORCE_PATH_STYLE` (confirmed by `check:env`'s own output as the names
+  `apps/server/src/attachments/store-config.ts` destructures) and `SERVER_ORIGIN`/
+  `NEXT_PUBLIC_SERVER_URL` (confirmed as the names `apps/web/next.config.ts` and
+  `apps/web/src/providers.tsx` actually read) — not the plan's original `S3_*` /
+  `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_WS_URL`, none of which any shipped code reads. Independently
+  re-verified by a sonnet review agent reading every one of those source files directly, which found
+  one comment-precision nit (fixed) and no functional defect. `deploy/do/app.yaml`
+- 🧪 **13.8 — the database-timezone check is genuinely falsifiable, against the failure mode that
+  actually would have hidden a broken deployment.** `check-db-timezone.mjs` reproduced against a
+  throwaway database explicitly `ALTER`ed to `UTC` (exit 1, names the wrong zone and the fix). The first
+  attempt to prove this — pointing the check at the shared dev Postgres's own admin `postgres` database,
+  expecting it to fail because nothing had `ALTER`ed it — instead PASSED, because
+  `docker-compose.yml`'s `-c timezone=Asia/Kolkata` sets the timezone at the **cluster** level, so every
+  database on that server (the admin one included) already answers `Asia/Kolkata` with no per-database
+  `ALTER` anywhere — exactly the trap the plan's own suggested falsifiability demo (pointing at "the dev
+  compose Postgres has not been altered yet") would have fallen into, independently confirmed by a
+  cross-lane review as a real bug in the plan text, not this file. The corrected demo (a database
+  explicitly forced to `UTC`, overriding the cluster default) is what actually falsifies the check.
+  `scripts/check-db-timezone.mjs`
 
 ## Seed plumbing (Task 7)
 - 13.41 ✅ `seedUlid` is a valid, `ULID_REGEX`-matching id — `seed-ulid.test.ts`

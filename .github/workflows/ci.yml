@@ -25,6 +25,26 @@ name: ci
 #     as part of `packages/rule-engine`'s own `test` script, which the
 #     `other-tests` job below already executes via `turbo run test`.
 #   - dual-client: Plan 10's harness (`test:dual-client`) doesn't exist.
+#
+#     ON THE ROOT `package.json` SCRIPTS THIS TASK'S OWN FILES: BLOCK NAMES
+#     ("Modify: root package.json (scripts test:fixtures, test:dual-client)"):
+#     deliberately NOT added. The plan's own executor note anticipates this --
+#     "open those packages as landed, confirm the package names and the
+#     fixture-runner invocation, and correct these two lines to the real
+#     commands" -- but there is no real command to correct them TO yet:
+#     `packages/app-core` has no `--project fixtures` vitest config, and
+#     `apps/server/test/dual-client/` does not exist. Adding either script
+#     today would point at a path that isn't there, which fails the moment
+#     anyone runs it -- not silently, but also not usefully, and a script
+#     that exists in package.json reads as "wired up" even when calling it
+#     always errors. Left out rather than stubbed; add both, and the CI
+#     steps that call them, in the same commit that lands the artifact each
+#     one actually names (Plan 6's client fixture harness; Plan 10's
+#     dual-client harness). Until then, this is the honest state: neither
+#     cross-build fixture agreement nor a dual-client sync check runs in CI.
+#     The rule-engine fixture suite's server-side half is not a substitute
+#     for either -- it proves the server build agrees with itself, not with
+#     a client build, and it is not what dual-client means.
 #   - the interim-plumbing gate: guards Plan 10's own marked shortcuts
 #     (`Interim session plumbing until Plan 6`, `EXPO_PUBLIC_DEV_*`), which
 #     exist only in plan PROSE (docs/superpowers/plans/...), not in any
