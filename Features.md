@@ -1370,16 +1370,21 @@ survived a whole task.)*
   contract names was not actually being consumed. The rules were added and a set-equality binding test
   now catches a rename on either side, plus a rule for a class nothing renders.
   `packages/app-core/test/sync-ux-css-binding.test.tsx`
-- ⚙️ **THREE obligations point at Task 13 from code Task 13's own plan text does not reach, and they are
-  RECORDED, NOT BUILT** — `OFFLINE_BORN_ABSENCE` names "Plan 10 Task 13 — an offline list that unions
-  `getTickets` with `listTicketSummaries`"; `ListRow.pending` was catalogued as "nothing renders it
-  until Task 13"; and `createSyncEngine`'s docblock defers a per-`StreamErrorCode` retry policy to
-  "whoever owns the client's error surface — Plan 10 Task 13 is the first task with a place to show
-  it". Task 13's Files block contains no ticket list, no `ListRow` renderer and no error surface — its
-  five files are the banner, the view-model, the reopen pair, the skew badge and the status bar. Those
-  three annotations named the next task that touches app-core UX by NUMBER, not by content, and
-  building any of them here would be inventing a surface no plan specifies. **Owner: unassigned —
-  plausibly Tasks 16/17, the first code that actually draws a list.**
+- ✅ **The stream's own error, said out loud without claiming a policy that does not exist** *(Ruling
+  P34)* — the sync strip takes `engine.lastError()` and prints the code verbatim with the server's own
+  message. It says this client is **still retrying**, because that is what `createSyncEngine` does for
+  every one of the three `STREAM_ERROR_CODES`; only `scope-revoked`, a different frame type, is
+  terminal. A label reading "this device will not reconnect" would be the surface asserting a decision
+  on the engine's behalf. Whether `not-a-member` *should* end the retry loop is still open, still lives
+  in the engine, and is named there rather than implied here.
+  `packages/app-core/src/sync/sync-status-bar.tsx`
+- ⚙️ **THREE obligations pointed at Task 13 from code Task 13's own plan text does not reach, and
+  Ruling P34 re-assigned all three** — `OFFLINE_BORN_ABSENCE`'s offline union list and a renderer for
+  `ListRow.pending` are app-core view/DataSource concerns and went to **Lane A as closure 2b**; the
+  per-`StreamErrorCode` deferral split, its SURFACE half landing here (above) and its POLICY half
+  staying in `createSyncEngine`, unassigned. Task 13's Files block contains no ticket list, no `ListRow`
+  renderer and no error surface — those annotations named the next task touching app-core UX by NUMBER,
+  not by content, which is the failure mode P34 exists to stop repeating.
 
 ## 10. Workflow builder & ticket types
 

@@ -1228,3 +1228,8 @@
    `.gn-saved-filters__submit:disabled` makes above. */
 .gn-sync-status-bar[data-status='offline'] { border-top-color: var(--gn-pending); }
 .gn-sync-status-bar[data-status='live'] { border-top-color: var(--gn-success); }
+/* Ruling P34 — the stream's own error frame, shown in the sync strip. The
+   server named a reason and this client is still retrying, so this reads as a
+   warning rather than a failure: `--gn-danger` would claim a finality the
+   engine does not implement. */
+.gn-sync-status-bar__error { color: var(--gn-warning); }

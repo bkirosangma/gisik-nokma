@@ -31,7 +31,8 @@ import type { ContestLike } from '../src/contests/contest-view-model.js';
  *
  * The cost is that the fixture must render EVERY conditional class:
  * `__action--discard` needs an unresolved contest, `__failed` needs a non-zero
- * failure count, and the badge needs a GROSS skew or it renders null. A
+ * failure count, `__error` needs a non-null stream error (Ruling P34), and the
+ * badge needs a GROSS skew or it renders null. A
  * fixture that missed one would fail here and the tempting repair is to weaken
  * this to a subset, which throws away half the finding. Add the render.
  *
@@ -120,7 +121,7 @@ describe('12.199 — Plan 10 Task 13 classes and ui.css are one fact', () => {
         <ClockSkewBadge
           env={{ clientTime: '2026-08-20T12:11:00.000Z', serverTime: '2026-08-20T12:00:00.000Z' }}
         />
-        <SyncStatusBar status="offline" queued={2} failed={1} />
+        <SyncStatusBar status="offline" queued={2} failed={1} error={{ code: 'not-a-member', message: 'x' }} />
       </div>,
     );
     expect(renderedClasses(container)).toEqual(styledClasses(css));

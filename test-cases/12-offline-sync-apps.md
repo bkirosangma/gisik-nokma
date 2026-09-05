@@ -9,7 +9,7 @@ only".** That task has not run, so those ids are RESERVED and are not claimed he
 from **12.45**, following the precedent `09-editor-attachments.md` set when Plan 7 Task 16's 9.1–9.34
 were reserved the same way. **Never renumber; when Task 18 lands, its 12.1–12.44 fill in above these.**
 
-**HIGHEST ID IN USE HERE IS `12.215`. THE NEXT FREE ID IS `12.216`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.189-12.215 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives). Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
+**HIGHEST ID IN USE HERE IS `12.219`. THE NEXT FREE ID IS `12.220`.** *(Recount it from the case lines before trusting it — this very line said `12.81` for the few minutes between being written and three carried gaps being appended below it, said `12.93` for the time between that and Task 6's four bootstrap cases landing, said `12.97` for the time between that and a fix round hardening 12.94/12.96 and adding 12.98–12.99, said `12.99` until Task 7's fourteen `POST /v1/sync` cases landed, said `12.113` until Task 7's fix round added the cross-workspace batch case, said `12.114` until Batch A's whole-branch review round added 12.115–12.118, said `12.118` until Task 9's replica landed 12.119–12.135, and said `12.135` until Task 9's fix round added 12.136 (the bootstrap door's own refresh-on-publish fold, which did not exist) and 12.137 (the type filter in front of `claim.contested`, the type the docs call the common path), said `12.137` until Task 10 added 12.138-12.153 (the outbox and the local pre-check), and said `12.155` until Task 11 added 12.156-12.169 (the sync engine and its transport) — a line that read `12.168` for the few minutes between Task 11's first draft and its review round adding 12.169, and `12.169` until Task 11's FIX round added 12.170 (the third door into `applyServerItem`) and 12.171 (`caught-up.seq`, the value this client persists), and said `12.171` until Task 12 added 12.172-12.188 (it read `12.186` for the minutes between Task 12's first draft and the review round that found the offline-born defect and added 12.187 — the same inside-one-change-set staleness this parenthesis exists to record) (the replica `DataSource`) — the first cases in this bucket that live in `packages/app-core` rather than `packages/sync-client`, which is why this file now quotes TWO current package denominators and they are not interchangeable. A stated maximum is a fact about a moment, and the file is the only thing that holds the moment — and the same staleness bit 12.113's and 12.77's own prose in the 12.114 round, where THIS line was updated and those two sentences were not. and said `12.188` until the snapshot-invalidation section was RENUMBERED into 12.189-12.192 when this branch rebased: it had minted 12.156-12.159 off a fork point where those were free, and Task 11 merged into the same range first, so four ids collided. Both sides obeyed never-renumber and still collided, because that rule protects LANDED ids and neither branch could see the other. A branch that mints ids re-checks the range against `main` at rebase, not only at authoring. and said `12.188` until Task 13 added 12.189-12.215 (the offline/sync UX surfaces — a round in which the numbers were NOT minted in file order: 12.189-12.199 were written into the tests first and 12.200-12.215 assigned afterwards to the cases that had none, and said `12.215` until Ruling P34's follow-up added 12.216-12.219, so scanning this file's tail for the largest id is wrong here in a second way, on top of the grouping-by-surface reason this line already gives). Updating the header is not the whole job: grep the file for the old maximum.)* Stated explicitly because the cases
 below are grouped by SURFACE — the coherence check, then `proj_contested`, then the route — and not by
 number, so the largest id is **not** the last line of the file. `12.81` sits in the projection section
 and `12.76`/`12.77` trail the route's. An author who scans the tail for the next free number reads
@@ -1575,20 +1575,38 @@ rather than folded in silently.
   on the equality case; delete the `.gn-clock-skew-badge` rule from `ui.css` → red on the equality case
   AND on the harvest's own non-vacuity control, `Tests 2 failed | 1 passed (3)`.*
 
-### Carried, with owners — Task 13
+### The stream error surface (Ruling P34) — `test/skew-and-status.test.tsx`
+
+- 12.216 ✅ no error, no notice, and no chrome for one — with `error` ABSENT and `error={null}` asserted
+  to mean the same thing, since the prop is optional precisely so a shell holding no engine yet can
+  mount the strip.
+- 12.217 ✅ **the notice may not claim a policy the engine does not implement.** Every code in the
+  domain's own `STREAM_ERROR_CODES` is asserted to produce a notice carrying the code verbatim, the
+  server's own message, and the words "still retrying" — and asserted NOT to contain "will not
+  reconnect". *Measured: `createSyncEngine` reconnects after an amendment-19 `error` frame on the same
+  delay as any other close, for all three codes; only `scope-revoked`, a different frame type, is
+  terminal. A surface saying otherwise would assert a decision on the engine's behalf — the same shape
+  as laundering "queued" into "accepted".* The loop reads the domain constant rather than a list
+  restated here, so a fourth code lands in it automatically, and carries a non-empty control so an
+  emptied constant cannot make it vacuous.
+- 12.218 ✅ an unrecognised code is printed raw rather than dropped for a friendlier sentence.
+- 12.219 ✅ the notice renders inside the strip BESIDE the label, not replacing it.
+
+### Carried, with owners — Task 13, as re-assigned by Ruling P34 (2026-09-06)
+
+All three of these named *"Plan 10 Task 13"* in code. Task 13's five files are the banner, the
+view-model, the reopen pair, the skew badge and the status bar — no ticket list, no `ListRow` renderer,
+no error surface among them — so all three named the next task touching app-core UX by NUMBER rather
+than by content. Raised as R-B1; **P34 ruled that none was Task 13's and that none stays unassigned.**
 
 - **An offline ticket list that unions `getTickets` with `listTicketSummaries`.** `OFFLINE_BORN_ABSENCE`
-  (`packages/app-core/src/replica/replica-data-source.ts:353`) names its owner as *"Plan 10 Task 13 — an
-  offline list that unions `getTickets` with `listTicketSummaries`"*. **Task 13's Files block contains no
-  ticket list**; its five files are the banner, the view-model, the reopen pair, the skew badge and the
-  status bar. That annotation named the next task touching app-core UX by NUMBER, not by content.
-  *Owner: unassigned — plausibly Tasks 16/17, the first code that actually draws a list.*
-- **`ListRow.pending` has no renderer.** Catalogued in `Features.md` §12 as *"the field exists and
-  nothing renders it until Task 13"*. Same reasoning as above: Task 13 renders no ticket list.
-  *Owner: unassigned — plausibly Tasks 16/17.*
-- **A per-`StreamErrorCode` retry policy** (give up on `not-a-member`, retry on `bad-message`).
-  `createSyncEngine`'s docblock (`packages/sync-client/src/engine/sync-engine.ts:181`) defers it to
-  *"whoever owns the client's error surface — Plan 10 Task 13 is the first task with a place to show
-  it"*. Task 13 adds a status STRIP, which reports queue depth and a failure count; it is not an error
-  surface with per-code policy, and inventing one here would be a client policy no plan specifies.
-  *Owner: unassigned.*
+  (`packages/app-core/src/replica/replica-data-source.ts`). *Owner: **Lane A, closure 2b** — an app-core
+  view/DataSource concern, queued after closure 3 and before the HELD pair. Annotation text updated in
+  the same change set as this line.*
+- **`ListRow.pending` has no renderer.** *Owner: **Lane A, closure 2b**, for the same reason.*
+- **A per-`StreamErrorCode` retry POLICY** (give up on `not-a-member`, retry on `bad-message`). **The
+  SURFACE half is now DONE** — cases 12.216–12.219 above, `syncErrorNotice` in
+  `packages/app-core/src/sync/sync-status-bar.tsx`. **The POLICY half is still open and still lives in
+  `createSyncEngine`**, not in a view: whether `not-a-member` should end the retry loop is a judgement
+  about a membership that may be restored, and no view can take it. The engine's docblock was split in
+  two to say exactly that. *Owner of the remaining policy half: unassigned.*

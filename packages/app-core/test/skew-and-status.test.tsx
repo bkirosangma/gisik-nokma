@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { GROSS_CLOCK_SKEW_MS } from '@gisik-nokma/domain';
+import { GROSS_CLOCK_SKEW_MS, STREAM_ERROR_CODES } from '@gisik-nokma/domain';
 import { ClockSkewBadge, formatClockSkew } from '../src/history/clock-skew-badge.js';
-import { SyncStatusBar, syncStatusLabel } from '../src/sync/sync-status-bar.js';
+import { SyncStatusBar, syncErrorNotice, syncStatusLabel } from '../src/sync/sync-status-bar.js';
 
 describe('clock skew in history', () => {
   it('12.211 — no badge under the gross threshold — both clocks are simply kept', () => {
@@ -80,5 +80,53 @@ describe('sync status bar', () => {
     expect(screen.getByRole('status').textContent).toBe('Live');
     expect(container.querySelector('.gn-sync-status-bar__failed')).toBeNull();
     expect(container.querySelector('[data-status="live"]')).not.toBeNull();
+  });
+});
+
+describe('the stream error surface (Ruling P34)', () => {
+  it('12.216 — no error, no notice, and no chrome for one', () => {
+    expect(syncErrorNotice(null)).toBeNull();
+    const { container } = render(<SyncStatusBar status="live" queued={0} failed={0} />);
+    expect(container.querySelector('.gn-sync-status-bar__error')).toBeNull();
+    // `error` absent and `error={null}` must mean the same thing — the prop is
+    // optional precisely so a shell that holds no engine yet can mount the strip.
+    const second = render(<SyncStatusBar status="live" queued={0} failed={0} error={null} />);
+    expect(second.container.querySelector('.gn-sync-status-bar__error')).toBeNull();
+  });
+
+  /**
+   * 12.217 — THE NOTICE MAY NOT CLAIM A POLICY THE ENGINE DOES NOT IMPLEMENT.
+   *
+   * `createSyncEngine` reconnects after an amendment-19 `error` frame on the
+   * same delay as any other close, for EVERY code in `STREAM_ERROR_CODES` —
+   * only `scope-revoked`, a different frame type, is terminal. So the tempting
+   * sentence, "this device will not reconnect", would be the surface asserting
+   * a decision on the engine's behalf. This asserts the opposite: whatever the
+   * code, the notice ends "still retrying", and it says so for all three codes
+   * read from the domain's own constant rather than a list restated here — a
+   * fourth code added upstream lands in this loop automatically.
+   */
+  it('12.217 — every code says the server refused and that this client is still retrying', () => {
+    expect(STREAM_ERROR_CODES.length).toBeGreaterThan(0); // control: the loop below is not empty
+    for (const code of STREAM_ERROR_CODES) {
+      const notice = syncErrorNotice({ code, message: 'planted reason' });
+      expect(notice, code).toContain(code);          // the code verbatim, not translated away
+      expect(notice, code).toContain('planted reason'); // the server's own words
+      expect(notice, code).toContain('still retrying');
+      expect(notice, code).not.toContain('will not reconnect');
+    }
+  });
+
+  it('12.218 — an unrecognised code is printed raw rather than dropped for a friendlier sentence', () => {
+    const notice = syncErrorNotice({ code: 'a-code-this-build-has-never-seen', message: 'x' });
+    expect(notice).toContain('a-code-this-build-has-never-seen');
+  });
+
+  it('12.219 — the notice renders inside the strip, beside the label rather than replacing it', () => {
+    render(<SyncStatusBar status="connecting" queued={2} failed={0} error={{ code: 'not-a-member', message: 'no' }} />);
+    const strip = screen.getByRole('status');
+    expect(strip.textContent).toContain('Connecting…');           // the label survives
+    expect(strip.textContent).toContain('not-a-member');
+    expect(strip.querySelector('.gn-sync-status-bar__error')).not.toBeNull();
   });
 });
