@@ -1,169 +1,162 @@
-# Lane D (periphery) — execution state, Plan 10 Task 17 (`apps/mobile`)
+# Lane D — executor state
 
-**Written 2026-09-06, after both opus reviews, three rebases (past Closure 1, past T13/#117 with real
-rewiring, past T16/#120), a Postgres outage (resolved), and a floating-semver typecheck break (fixed).**
-This file is Lane D's own restart surface — never edit `executor-state.md` (Lane A's) or the other
-lanes' `executor-state-{B,C,E}.md`.
+**This file is Lane D's restart surface.** Rewritten for THIS work (Plan 11 T7+T8) on branch
+`exec/25-plan11-seed`, cut fresh from `origin/main` on 2026-09-06 after T17 (Expo mobile shell) merged
+as PR #121 and was promoted in Plan 10's ledger (mobile). **Do not re-implement T17.**
 
-## 1. Position
+> Shas below are facts about when this file was written. Verify with `git branch --contains` — empty
+> means orphaned. `git cat-file`/`git show` pass on orphaned shas and will lie.
 
-- Worktree: `/Users/kiro/my_projects/gisik-nokma-lanes/lane4-periphery`, branch `exec/22-plan10-t17-mobile`.
-- HEAD is `fd5cf24`, one commit on top of `origin/main` @ `9e8777e` (Plan 10 Task 16, Lane C, PR #120)
-  — rebased there, not merged. Verify with `git merge-base --is-ancestor origin/main HEAD` before
-  trusting this; re-fetch/re-rebase if `origin/main` has moved since (it has moved twice already after
-  this PR first opened — check every time, don't assume this is still current). Prior heads
-  (`c8d1079`, `a38b3de`) and prior bases (`1e372e3`, `db64de5`, `fc5cf0d`) are behind and not
-  meaningful to cite except in the history recorded in §3/§5.
-- `git status` is clean. Pushed twice already (`c8d1079` then `a38b3de`, both `--force-with-lease`
-  after their respective rebases); this head needs the same treatment before the next report.
-- The controller merges at the EXACT head sha reported — always confirm the sha you report matches
-  `git rev-parse HEAD` at the moment you message it, after any last-minute fix.
+## 1. Where things stand right now
 
-## 2. What is built and verified
+- **Worktree**: `/Users/kiro/my_projects/gisik-nokma-lanes/lane4-periphery`, branch `exec/25-plan11-seed`.
+- **PR #136 is OPEN**, awaiting controller merge: `https://github.com/bkirosangma/gisik-nokma/pull/136`
+- **Head sha `a2e226fc22dd0b1827ff7dc396a79aa6f3f53559`** — rebased onto `origin/main` at
+  `538beb6c4b83fa65e0f1eed2d23f782266a59f7b` (the §13 block-allocation commit, PR #135) as of this write.
+  `git branch --contains a2e226f` returns `exec/25-plan11-seed` only (not yet merged, as expected for an
+  open PR) — re-verify reachability against whatever `origin/main` is at restart time, not this sha.
+- **4 commits ahead of the `origin/main` sha above**: T7 (seed plumbing), T8 (Convenience Corner
+  mapping), the Features.md §13 / test-cases/13 stub, and the §13 renumbering (see §4 below).
+- Full gate ran green at this head before push: `pnpm turbo run build test typecheck --force
+  --concurrency=1` → **30/30 tasks, 0 cached, exit 0**, server suite 1042/1042 tests. Scoped
+  `pnpm --filter @gisik-nokma/server exec vitest run test/seed/ --maxWorkers=2` → **6 files, 46 tests,
+  exit 0** (re-confirmed at the post-rebase head, not just pre-rebase).
 
-All under `apps/mobile/`, package-scoped and typechecked; the full gate ran twice before this rebase
-(27/27 at `c8d1079`; 27/27, 3238 tests, 0 cached at `a38b3de`) and must run again at this head before
-merge (§6).
+## 2. What was built (Plan 11 Tasks 7 + 8)
 
-- **Scaffold**: `package.json`, `app.json`, `tsconfig.json`, `vitest.config.ts`, `index.ts`.
-  `npx expo install --check` reports clean. **`react-native-webview` is PINNED to the exact `13.15.0`,
-  not `^13.15.0`** — a plain `pnpm install` after Task 16 (Lane C) added its own deps to the shared
-  lockfile silently resolved the caret range up to `13.17.0`, which broke `EditorWebView`'s typecheck
-  outright (`WebView`'s prop overloads resolved to `never` — a `@types/react` version-duplication
-  symptom: the pnpm store held three copies, `19.0.14`/`19.1.17`/`19.2.18`, and the newer webview
-  version's types resolved against a different one than this package's own `tsconfig` does). Pinning
-  the exact version was the fix that didn't require untangling the hoisting. **If this recurs, check
-  `find node_modules/.pnpm -maxdepth 1 -iname "@types+react@*"` for more than one match before assuming
-  it's a code regression** — a floating range on this dependency is a booby trap for the next rebase.
-- **`src/storage/op-sqlite-storage.ts`** + test (7 tests). Opus-reviewed; fixed: `close()` now actually
-  closes the underlying database (was a silent no-op); the double-cast `open({name}) as unknown as
-  OpSqliteDb` is gone; nested-transaction rejection is now tested; the test docblock's false "every
-  conformance assertion" claim is corrected to the measured "1 of 3".
-- **`src/editor/editor-bridge.ts`** + **`src/editor/editor-web-view.tsx`** + test (9 tests, named
-  `editor-web-view.test.ts` per the plan's declared file list). Opus-reviewed; fixed: `initialDoc` is
-  typed as the protocol's own `DocJson | null` (was `unknown`, which let `undefined` through and
-  silently made a read-only editor fully editable with nothing loaded); `isDocShaped` now does the
-  real `isDocJson`'s full 4-check validation (was one check short); a rejected `onMentionQuery` now
-  always answers (was: could hang the webview's mention popup forever). A round-trip test drives
-  `serializeHostMessage`'s output through the REAL `parseHostMessage` for all 5 host→editor kinds.
-- **`src/push/register-push.ts`** + test (4 tests). Not opus-reviewed — self-contained, scaffold-tier.
-- **`src/screens/board-screen.tsx`, `src/screens/ticket-screen.tsx`, `src/app.tsx`** — use the real
-  app-core helpers from Task 13 (§4). Untested directly (no RN renderer under this project's vitest
-  config); typechecks clean.
-- **`scripts/generate-editor-html.mjs`** + **`src/editor/editor-html.generated.ts`** (checked in,
-  ~750KB, real content from `packages/editor`'s `build:webview` output). Goes stale the moment Plan 7's
-  webview content changes; nothing in the gate checks its freshness. Regenerate with the two commands
-  in the generated file's own header comment.
-- `pnpm exec tsc -p tsconfig.json --noEmit` → exit 0. `pnpm test` → **20/20 passing, 3/3 files**, node
-  v22.22.2. Rebuild the dependency chain after every rebase in this worktree —
-  `pnpm turbo run build --filter=@gisik-nokma/mobile` — its `dist/` goes stale otherwise.
+All under `apps/server/src/seed/` + `apps/server/test/seed/`, nothing touched outside those two
+directories plus the catalogue files in §4.
 
-## 3. Deviations from the plan's assumed API
+- **Task 7** (`seed-ulid.ts`, `doc-text.ts`, `users.ts`, `templates.ts`): `seedUlid` (deterministic
+  ULID via SHA-256), `plainTextDoc` (built on the domain's existing `plainTextToDoc` per line — not a
+  duplicate), `findUserIdByEmail` (looks up better-auth's `"user"` table, never invents a person), and
+  `checkErrandTemplate` — the executable pin on Plan 8's `ERRAND_WITH_WAITS_TEMPLATE`.
+- **Task 8** (`cc-board.ts`, `cc-map.ts`): `readCcBoard` reads the frozen
+  `reference/convenience-corner-tracker/board.data.js` snapshot (read-only, `vm` sandbox) — 23 errands
+  (13 registrations + 10 questions), 0 `done`, `week1 = 2026-08-18`. `buildErrandEvents` maps one
+  tracker item to its full `ticket.created`/`field_set`/`transitioned` sequence.
+- Both went through implement → independent review before landing (sonnet tier for T7, opus tier for
+  T8, per this lane's model policy — no fable anywhere in this lane). Both reviews passed with only
+  Minor findings; no fix rounds were needed. One Minor finding (the done-refusal should check
+  `item.done` directly, not just `item.state === 'done'`) was cheap enough that I applied it myself
+  after the workflow returned, with a new planted-defect test proving it (`13.72`).
 
-1. `createReplicaDataSource`, `ReplicaDataSource`, `TicketSummary`, `StreamItem`, `OfflineAcceptError`
-   live in **`@gisik-nokma/app-core`**, not `@gisik-nokma/sync-client`.
-2. **`ReplicaDataSource.ingest()` THROWS `OfflineAcceptError` on any queued write.** Both `onComment`
-   and `onResolve` (via `resolveContest`) in `ticket-screen.tsx` catch it explicitly.
-3. Query methods are `listTicketSummaries`, `searchOfflineCopy`, `getTicketWithPending` — not
-   `listTickets`/`search`/`getTicket(ticketId)`. `getTicketWithPending` is what the ticket screen uses.
-4. **Plan 7's real editor webview bridge** (`packages/editor/src/webview/bridge.ts`'s versioned
-   `{bridge: 1, kind: ...}` union) replaces the plan text's stale assumed protocol.
-5. **`packages/editor` exports no host-side validator for editor→host messages.**
-   `editor-bridge.ts`'s `parseEditorMessage` is the first one, scoped to this app. **Confirmed after
-   Task 16 landed: the desktop shell did NOT add an editor webview integration this round** (no
-   `editor`/`bridge` file anywhere under `apps/desktop`), so the anticipated duplication risk did not
-   materialise — the concern stands for whenever Tauri's shell adds one.
-6. `emptyDoc()`/`isDocJson` (root-barrel VALUE exports) are not imported; `editor-bridge.ts`
-   reimplements `isDocJson`'s 4-check logic locally, to avoid touching the shared package's export map.
-7. **`plainTextToDoc` now exists** (landed with T13, `packages/domain/src/events/contest-events.ts`,
-   root-barrel re-exported). `ticket-screen.tsx` uses the REAL `plainTextToDoc('')` for the comment
-   draft's initial doc. Its real output has NO `attrs.schemaVersion` — an earlier hand-rolled literal
-   had guessed one; the actual convention omits it.
-8. `Origin` is `'web'|'mobile'|'desktop'|'server'` (`'mobile'` is valid, used throughout).
+## 3. Corrections applied against the plan text — verified, not assumed
 
-## 4. T13 wiring — real, done
+The plan document (`docs/superpowers/plans/2026-08-20-11-deployment-dogfooding.md`, T7 lines
+1310-1658, T8 lines 1659-2088) has bugs in its own example code, found by reading the actual domain
+source (`packages/domain/src/workflow.ts`, `ticket-types.ts`, `workflows/errand-with-waits.ts`,
+`advise-workflow.ts`, `events/contest-events.ts`) and the actual frozen snapshot before writing anything:
 
-`board-screen.tsx` renders `syncStatusLabel(status, queued)` (app-core's real helper) plus a
-hand-matched "`{failed}` needs attention" line (the web `SyncStatusBar` component inlines that half;
-there's no dedicated helper for it, and the component itself is DOM-only — `<div>`/`<span>` — so it
-can't be mounted in RN directly regardless).
+1. `ticket.transitioned`'s payload key is `to`, not `toStateId` (the plan used `toStateId` throughout).
+2. `startDate` is a BUILT-IN field (`BUILTIN_FIELD_IDS` in `ticket-types.ts`), value shaped
+   `{date, note?}` (`dueDateValueSchema`, shared with `dueDate`) — never a bare string (the plan sent one).
+3. `ERRAND_WITH_WAITS_TEMPLATE`/`SIMPLE_KANBAN_TEMPLATE` are typed `Omit<WorkflowDef, 'id'|'version'>`,
+   not `WorkflowDef` — `checkErrandTemplate`/`workflowFromTemplate`'s parameter types were adjusted
+   accordingly (return type of `workflowFromTemplate` stays `WorkflowDef`).
+4. Three hand-typed "ULID" literals in the plan's own fixtures are invalid (contain I/L/O/U, outside
+   Crockford base32 / `ULID_REGEX`) — every fixture id now comes from `seedUlid(...)` itself.
+5. `checkErrandTemplate` needed a FIFTH check beyond the plan's four (missing state / not reachable in
+   one hop / waiting not blocked / done not guarded): every one-hop transition it accepts must carry
+   ZERO rules, because the seed submits a bare event with no comment/evidence and any rule there would
+   make the real engine refuse the seed's own event at ingest. This is **Ruling P29's tripwire** —
+   `errand-with-waits.ts`'s docblock records that the template deliberately trips two `rule-bypassable`
+   ADVISORIES on `later->waiting`/`next->waiting`, which is correct and must never be "fixed" on the
+   template itself; `checkErrandTemplate` is the thing that must redden if a COPY of the template ever
+   grows a rule there to silence the advisory. Three tests pin this (13.57-13.59): the real template
+   trips exactly 2 advisories; a single-edge "fix" genuinely silences that one advisory by identity
+   while `checkErrandTemplate` still reddens; guarding both edges clears the advisory panel to 0 while
+   `checkErrandTemplate` still refuses it. **Correction to my own dispatch spec, found by the T7
+   implementer**: my instruction asked for a literal `.length === 1` advisory-count assertion after the
+   single-edge fix — this is arithmetically impossible (`adviseLowerGuardBypasses` emits one advisory
+   per guarded/unguarded EDGE PAIR, not per silenced path; the count stays at 2, just a different pair).
+   The implementer caught this empirically and substituted an identity assertion instead — a correct
+   self-repair, not a deviation to chase.
+6. `readCcBoard`'s planted-defect test as the plan wrote it never reaches its own shape check: passing
+   a `.ts` file (the test file itself) throws a `SyntaxError` ("Cannot use import statement outside a
+   module") inside the `vm` sandbox before any `!data || !Array.isArray(...)` check runs — proven by
+   removing the wrap and watching the assertion fail on the wrong error text. Fixed by wrapping the
+   sandbox eval and rethrowing with the path named; two NEW tests (an alien global, a `CC_TRACKER`
+   missing `items`) exercise the actual shape-check branch via `mkdtempSync`/`os.tmpdir()`, cleaned up
+   in a `finally`.
 
-`ticket-screen.tsx`'s contest banner calls the real `resolveContest` for all three resolutions, via
-`renderContestedClaimText`. Lane B's three rebase traps: (1) `buildReopenPair`/`nonTerminalStates` —
-not used, T17 has no reopen flow; (2) **`resolveContest` does NOT catch `OfflineAcceptError`** — both
-`onComment` and `onResolve` await/catch it explicitly; (3) not applicable, same reason as (1).
+Every specific fact the plan's tests assume about the frozen snapshot (dates, `blocked_by` chains,
+item titles, the 23/13/10/0 counts) was independently verified against
+`reference/convenience-corner-tracker/board.data.js` directly and is correct — only the event-shape
+code above needed fixing, not the tracker facts.
 
-**Deliberate scope decision**: "Redo legally" resubmits the identical claim under a fresh envelope
-(fresh id/`clientTime`, actor = `contest.claimantId`) rather than opening an edit affordance first —
-matching why `ContestBanner`'s own docblock pushes building the replacement envelope to the HOST rather
-than handling it itself. A full per-event-type redo editor is out of Task 17's scope. Named in
-`Features.md`, not hidden.
+## 4. The §13 catalogue collision — resolved, not merely noted
 
-**Actor identity remains interim** (no real session/auth in this shell): comment posting uses
-`state.assigneeId ?? 'me'`; contest resolution/redo uses `contest.claimantId`. Both become the real
-signed-in user once Plan 6's session handling reaches this app.
+`Features.md` §13 and `test-cases/13-deployment-dogfooding.md` did not exist on `origin/main` when this
+task started. **Lane C's PR #134 (Plan 11 Task 14) independently opened the same section on its own
+branch first**, at cases 13.1-13.6, before either PR merged. The controller allocated blocks (landed on
+`main` at `538beb6`, PR #135, AFTER I had already committed my first pass at 13.1-13.36): **Lane C
+13.1-13.40 · Lane D (this lane) 13.41-13.100 · Lane E 13.101-13.200**. I renumbered my 36 cases by
+enumeration (never `sed`) into **13.41-13.76** (Task 7: 13.41-13.59, Task 8: 13.60-13.76) in a dedicated
+commit, re-counting against both `origin/main` and Lane C's then-unmerged branch
+(`origin/exec/24-plan11-ci-deploy`) as the control immediately before committing and again immediately
+before pushing.
 
-## 5. Test-case numbering — 12.224–12.227, survived THREE rebases without a further collision
+**Still true at push time**: PR #134 (Lane C) had NOT merged. `test-cases/13-deployment-dogfooding.md`
+therefore exists as two DIFFERENT, non-overlapping-in-numbering files on two open PRs (mine has the
+allocation-block header; #134's has its own "why this file starts at 13.1" header). **Whichever of
+#136 and #134 merges second will hit a genuine add/add git conflict on this one file** — the resolution
+is to keep BOTH lanes' sections (concatenate, task order, headers reconciled to state the block
+allocation once) — flagged explicitly in this PR's description so whoever merges second is not
+surprised. This is not a bug to fix now; it is the expected shape of two lanes opening one section
+before its designated owner (Task 16) could.
 
-History, in order: this branch's first draft collided with Closure 1's independently-landed
-12.189–12.192 → controller allocated **12.224–12.227 to Task 17, 12.228–12.239 to Task 16** → T13
-(Lane B) landed its own real range at 12.193–12.223 in the next rebase, confirmed no overlap → T16
-(Lane C) landed its own real range at 12.228–12.229 (of its own allocation) in the rebase after that,
-confirmed no overlap. **This branch's ids have never needed to move.** `origin/main`'s own header line
-is the authority on the current allocation table — re-read it (not this file) before any future rebase:
-`git show origin/main:test-cases/12-offline-sync-apps.md | grep -n "HIGHEST ID"`.
+## 5. An operational mistake I made and caught myself — record it so it isn't repeated
 
-## 6. The gate
+While gating, I ran the full-gate script wrapped in my own `nohup ... &` INSIDE a Bash call that was
+*also* marked `run_in_background: true`. The tool's completion notification fired almost immediately —
+reflecting only that the outer shell (which forked and returned) had exited, not that the detached gate
+script had finished. Reading the log at that point, it looked stalled mid-task; I nearly reclaimed the
+gate lock believing its holder had died. `ps -p <pid>` and a growing log proved the gate was still
+genuinely alive and running; I restored the lock (correct pid) within seconds and no collision resulted
+(no second vitest pool ever appeared). **Lesson: `run_in_background: true` on the Bash tool already
+keeps a long-running foreground command alive and reports on its real completion — do not also wrap the
+command body in `nohup ... &`. Pass the actual long-running command directly.** Filed as product
+feedback separately; recording here so the next lane (or a restarted me) doesn't repeat it against a
+gate that is genuinely still running.
 
-**Postgres outage (2026-09-06, Docker VM disk full) is resolved** — confirmed via
-`docker exec gisik-nokma-exec-postgres-1 pg_isready` and clean recent checkpoint logs before gating
-again. If `apps/server` tests fail with connection/disk errors in a future session, treat it as a
-possible repeat and check with the controller before diagnosing it as a code defect. Lane E's
-`sweep-test-dbs.sh` now runs before every gate, dropping idle `gisik_test_*` databases.
+## 6. The gate lock — unchanged from prior lane briefings
 
-Gate lock (empty-pid lock reclaimed after 60s, drain-wait bounded at 10min, loud on either timeout), as
-ONE backgrounded invocation, never split across separate tool calls:
-
-```
-lock_wait=0
-until mkdir /tmp/gisik-gate.lock 2>/dev/null; do
-  p=$(cat /tmp/gisik-gate.lock/pid 2>/dev/null)
-  if [ -n "$p" ]; then
-    if ! ps -p "$p" >/dev/null 2>&1; then rm -f /tmp/gisik-gate.lock/pid; rmdir /tmp/gisik-gate.lock 2>/dev/null; fi
-  else
-    lock_wait=$((lock_wait+15))
-    if [ "$lock_wait" -ge 60 ]; then echo "RECLAIMING stale empty-pid lock after 60s"; rmdir /tmp/gisik-gate.lock 2>/dev/null; lock_wait=0; fi
-  fi
-  sleep 15
-done
-echo $$ > /tmp/gisik-gate.lock/pid
-trap 'rm -f /tmp/gisik-gate.lock/pid; rmdir /tmp/gisik-gate.lock 2>/dev/null' EXIT
-drain_wait=0
-while [ "$(ps -eo comm= | grep -c '^node (vitest')" -gt 0 ]; do
-  drain_wait=$((drain_wait+15))
-  if [ "$drain_wait" -ge 600 ]; then echo "PROCEEDING after 10min drain-wait timeout — vitest pool still nonzero, may be a peer's unlocked run"; break; fi
-  sleep 15
-done
-source ~/.nvm/nvm.sh && nvm use 22 && pnpm turbo run build test typecheck --force --concurrency=1 > gate.log 2>&1; echo GATE_EXIT=$? >> gate.log
-```
-
-Package-scoped, no lock needed: `pnpm --filter @gisik-nokma/mobile exec vitest run --maxWorkers=2`.
-Reap orphans by `ppid=1` only, never `pgrep -f vitest`/`pkill -f vitest`.
-
-**Push**: always `--force-with-lease` after a rebase (the remote branch already has prior pushed
-commits) — a plain push is rejected as non-fast-forward, and a plain `--force` skips the safety check
-that would catch a concurrent push you didn't know about.
+T7/T8's own tests need NO Postgres (pure unit tests, no `createTestDatabase` import) — safe to run
+scoped and unlocked: `pnpm --filter @gisik-nokma/server exec vitest run test/seed/ --maxWorkers=2`. The
+FULL monorepo gate does touch Postgres via other `apps/server` suites and takes the lock, as ONE
+backgrounded invocation (see §5's caveat on how NOT to background it), reap orphans by `ppid=1` only
+(`ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}'`),
+never `pkill -f vitest`, never kill `pgrep -f vitest`'s output (it also names live lane sessions and
+peers' live pools). Postgres verified healthy via `docker exec gisik-nokma-exec-postgres-1 pg_isready`
+(not just `docker ps`'s "Up" status) before and after gating.
 
 ## 7. Remaining steps, in order
 
-1. Run the full gate (§6).
-2. If green, `git push --force-with-lease`, then message the controller (`gisik-nokma-0d`) with the
-   exact head sha (re-check `git rev-parse HEAD` at message time) and the gate's `Tasks:` line.
-3. **Expect at least one more rebase request before merge** — three have landed already
-   (Closure 1, T13/#117, T16/#120) and this is a shared-file (`Features.md`, `test-cases/12`)
-   collision by construction, not a fault, per the controller's own framing: whoever lands second in a
-   shared file rebases; arrival order is not something this branch controls. Re-fetch and re-check
-   `git diff HEAD origin/main --stat -- Features.md test-cases/12-offline-sync-apps.md` before
-   reporting done each time.
-4. If the controller says its own context is about to clear/relaunch, a quiet window afterward is
-   the relaunch, not a stall — don't re-send the same report speculatively.
+1. **Report to the controller** (message sent to `gisik-nokma-0d`): PR #136 open, head sha, test/gate
+   summary, the §13 collision handled, and the earlier flagged discrepancy — PR #121 (T17) is genuinely
+   merged (`gh pr view 121` confirms `mergedAt`) but ledger row 10/17 was still `todo` as of the
+   `9e8777e`/`dca435d` window I first checked; worth a controller re-check, not a Lane D action (never
+   edit `docs/lanes/task-ledger.tsv`).
+2. **Await the controller's word on T9+T10** (`apps/server/src/tools/seed-*.ts` plus
+   `apps/server/package.json` script lines) — those collide with Lane E's manifest ownership and Lane
+   C's T15; do not start until told whether to route the script lines through Lane E or take the
+   manifest myself. Three things T9/T10 need from T8, already recorded in the implementer's own notes
+   and reproduced here so they survive a restart:
+   - `ops:owner-github-plan` has `meta.needed_week: "0"`, so its `dueDate` lands at `2026-08-17` — one
+     day BEFORE `week1`. Faithful to the tracker's own arithmetic, not a bug, but T9/T10 is where this
+     first becomes visible (attention strip / overdue badge) — decide there whether a day-one-overdue
+     errand needs a note.
+   - `ctx.errandTypeId`/`ctx.initialStateId` in T8's tests are FIXTURE values only; nothing in T8 pins
+     them to the real Errand ticket-type id or the real template's `initialStateId`. T9/T10 should add
+     an assertion tying `ctx.initialStateId` to the live cloned template rather than assuming it matches.
+   - Plan text (line ~2317, not yet read closely by this lane) declares `counterparty` as a custom field
+     on the Errand ticket type — `startDate` must NOT also be declared custom (§3 point 2 above); T9's
+     ticket-type definition needs to reflect that split, not the plan's original text.
+3. **Never edit `docs/lanes/task-ledger.tsv`. Never merge own PR. Never commit to `main`.**
+
+## 8. Handoff freshness
+
+Written and pushed at head `a2e226fc22dd0b1827ff7dc396a79aa6f3f53559` on branch `exec/25-plan11-seed`,
+PR #136 open. If resumed: re-verify `origin/main`'s HEAD, re-check PR #136 and PR #134's states with
+`gh pr view`, and re-run `git branch --contains` on every sha in this file before trusting any of them.
