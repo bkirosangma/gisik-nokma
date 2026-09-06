@@ -950,25 +950,31 @@ describe('GET /v1/me/workspaces vs WorkspaceRef', () => {
     const ref = body.workspaces[0] as Record<string, unknown>;
 
     // `view-types.ts:5` — `WorkspaceRef = {id, name, projects: ProjectRef[]}`.
-    // `projects` is a DATA gap on this surface: no projects-per-workspace read
-    // exists anywhere in `/v1`, so an adapter has nothing to call. The `id` vs
-    // `workspaceId` rename is adaptable and is pinned beside it so a future
-    // reader does not have to re-derive which half is the hard one.
-    expect(ref).not.toHaveProperty('projects');
+    // **THE CLAIM INVERTED and the case stayed** (7.189's precedent). It read:
+    // "`projects` is a DATA gap on this surface: no projects-per-workspace read
+    // exists anywhere in `/v1`, so an adapter has nothing to call." That was
+    // true, and rulings P32/P38 closed it — not by finding a read that existed,
+    // but by ruling WHO may be told a project's name, which is what made a read
+    // writeable at all (`read/visible-projects.ts`).
+    expect(ref).toHaveProperty('projects');
+    expect(Array.isArray(ref['projects'])).toBe(true);
+    // The `id` vs `workspaceId` rename is still adaptable and still not a gap —
+    // kept beside it so a reader does not re-derive which half was the hard one.
     expect(ref).not.toHaveProperty('id');
     // Controls, same object, same run.
     expect(ref).toHaveProperty('workspaceId');
     expect(ref['workspaceId']).toBe(workspaceId);
-    expect(Object.keys(ref).sort()).toEqual(['name', 'role', 'workspaceId']);
+    expect(Object.keys(ref).sort()).toEqual(['name', 'projects', 'role', 'workspaceId']);
     // And the client type has no `role` at all — the server discloses MORE
     // here, which is the one direction that is safe.
 
-    // 7.202 — THE REFUSAL, cross-checked against this very body. The online
-    // `DataSource` answers `getMyWorkspaces` with a `ServingGapError` naming
-    // `WorkspaceRef.projects`; this asserts the fact it names is still absent
-    // here. The day this route joins `proj_projects`, the case reddens and the
-    // refusal has to go.
-    expectStillUnserved('MAP_WORKSPACE_REFS_ABSENCES', body, 'workspaces', '/v1/me/workspaces');
+    // 7.202 — THE REFUSAL IS GONE, and this is the line that said it would be.
+    // It read: "the day this route joins `proj_projects`, the case reddens and
+    // the refusal has to go." It did, and it has. `MAP_WORKSPACE_REFS_ABSENCES`
+    // no longer exists, so `mapperAbsences` throws on it — asserted here rather
+    // than deleted, because a removed cross-check leaves nothing to notice a
+    // refusal being reinstated without its read.
+    expect(() => mapperAbsences('MAP_WORKSPACE_REFS_ABSENCES')).toThrow(/no `const/);
   });
 });
 
@@ -1427,10 +1433,13 @@ describe('GET /v1/contests vs the two contested refusals', () => {
     // DELETED. This file still fetches both — 7.203 and 7.206 below assert what
     // they now serve — so a route dropping out of this set is not the same claim
     // as a route dropping out of the file, and the two are kept apart on purpose.
-    const EXERCISED = ['/v1/contests', '/v1/me/work', '/v1/me/workspaces', '/v1/search'];
+    // `/v1/me/workspaces` left this set with rulings P32/P38, the same way the
+    // two ticket routes left it with P25 clause 1: the file still FETCHES it
+    // (above), and a route dropping out of the refusal set is not the same
+    // claim as a route dropping out of the file.
+    const EXERCISED = ['/v1/contests', '/v1/me/work', '/v1/search'];
     const named = new Set<string>();
     for (const constName of [
-      'MAP_WORKSPACE_REFS_ABSENCES',
       'MAP_SEARCH_HITS_ABSENCES',
       'MAP_MY_WORK_ABSENCES',
       'MAP_ATTENTION_ABSENCES',

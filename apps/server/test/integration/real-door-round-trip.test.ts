@@ -415,8 +415,25 @@ describe('GET /v1/me/workspaces — the directory', () => {
     // Nothing in this file granted anybody anything.
     const res = await app.inject({ method: 'GET', url: '/v1/me/workspaces', headers: member.headers });
     expect(res.statusCode).toBe(200);
+    // `projects` since rulings P32/P38. EMPTY here and that is the honest
+    // answer, not a stub: this workspace was founded by `bootstrapWorkspace`
+    // and nothing in this file created a project, so there is none to name.
+    // Asserted as part of the exact `toEqual` rather than omitted, because an
+    // absent key and an empty list are different claims on this surface.
     expect(freezeClocks(res.json())).toEqual({
-      workspaces: [{ workspaceId, name: 'Round Trip Corner', role: 'owner' }],
+      // `projects` since rulings P32/P38, and NOT empty: this world founds
+      // 'Shop floor' through the real door, and the caller is the owner — the
+      // one role the shipped `canSeeResolved` switch exempts by name, so they
+      // are told every project's name. Asserted inside the exact `toEqual`,
+      // so a rule that started withholding it from an owner reddens here.
+      workspaces: [
+        {
+          workspaceId,
+          name: 'Round Trip Corner',
+          role: 'owner',
+          projects: [{ projectId, name: 'Shop floor' }],
+        },
+      ],
     });
   });
 
@@ -923,6 +940,12 @@ describe('GET /v1/me/work', () => {
     expect(res.statusCode).toBe(200);
     expect(freezeClocks(res.json())).toEqual({
       workspaceId,
+      // `projectNames` since rulings P32/P38 — the names of the projects THESE
+      // cards are in, for a viewer who may be told them. The owner may, and the
+      // card is in 'Shop floor', so the map has exactly that one entry: a map
+      // carrying the viewer's whole visible set would disclose names through a
+      // door nobody asked that question of.
+      projectNames: { [projectId]: 'Shop floor' },
       groups: {
         open: [],
         active: [
