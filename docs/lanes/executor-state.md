@@ -16,7 +16,145 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — **MAPPER-WITNESS PASS BUILT AND REVIEWED. NO FULL GATE YET — TWO OOM KILLS.** `exec/41-mapper-witnesses` @ `ea97f90`
+# LANE A — **PR #204 COMPLETE: eight witnesses, EIGHT KILLS, GATE GREEN.** `exec/44-next-cluster`
+
+**FULL UNCACHED GATE, GREEN**, lock v3.3 captured form, acquired 17:24:07:
+`GATE_EXIT=0` · `Tasks: 30 successful, 30 total` · `0 cached, 30 total` · `--force --concurrency=1` ·
+2m3.722s · node **v22.22.2** · `Unsupported engine` 0 · failures section EMPTY · no orphaned workers ·
+**3,652 tests / 284 files** (3,647 passed, 5 skipped).
+`pnpm check:env` → **`CHECK_ENV_EXIT=0`** · `node scripts/check-case-ids.mjs` → **exit 0**, 1,562 ids.
+Two separate commands.
+
+**Everything owed on #204 is now discharged:** eight witnesses, eight kills, one full uncached gate.
+The only thing still blocking merge is the account-wide CI billing outage, which is not this branch.
+
+**All seven owed mutations ran inside ONE lock acquisition, each PREDICTED in writing first, and every
+prediction matched** — including 7.234's blast radius of 2. **Every red is an `AssertionError` from an
+`expect` in the case itself; not one is a `MappingError` shape gate and not one is grey.**
+
+**The two earlier failures are what taught the design.** 7.231's first plant refused on three ambiguous
+sites (the guard working); its replacement anchors on unique surrounding text. 7.233's first mutation
+renamed the founding 201's key and produced **`EXIT=1` with 20 SKIPPED** — `beforeAll` reads that key,
+so the fixture's own setup broke and nothing ran; its replacement leaves the seed intact and corrupts a
+value only 7.233 reads. **The rule now written into the catalogue: where a mutation could die at a shape
+gate, keep the KEY and corrupt the VALUE** (7.232, 7.233, 7.237), because a renamed key dies in
+`asString`/`asRecord` before any assertion runs and measures the parse, not the property.
+
+**Disclosed:** the 7.233 attempt ran a test file while a peer held the lock — zero pools, no
+contention, but the protocol says otherwise and that is mine to fix.
+
+**Pre-halt state, written against the controller's 15:10 deadline.** Branch cut from `d5b8bfd`, first
+commit is the #198 handoff correction, second is the eight witnesses. **Local == remote, tree clean.**
+
+**7.230–7.237 built and GREEN: 20 passed / 0 failed** in
+`apps/server/test/integration/fixture-witnesses.test.ts` (12 pre-existing + 8 new), typecheck clean,
+node **v22.22.2**, zero orphaned workers. §7 next free **7.238**. **No §12 line** — this surface is
+§7's; block 12.320–12.339 still at 12.329.
+
+> **A GREEN RUN AND A CLEAN TYPECHECK ARE NOT A KILL.** At the time of writing, **no mutation has been
+> run against any of the eight.** The catalogue block in `test-cases/07` says so explicitly. Whatever
+> the sweep below reports, **every case without a recorded kill stays marked as unmutated** rather than
+> quietly ✅ — that distinction is the entire subject of this lane's last two passes.
+
+**The four things the implementer corrected, which arrived WITH the work rather than from a review:**
+1. **7.231 could not be built as I specified.** `createHttpClient`'s `send` turns a GET 404 into `null`
+   before the gateway sees a body, so `getInvite` **structurally cannot** reach
+   `INVITE_NOT_OPENABLE_BODY.message`. Built as two arms, the unreachability named and attributed to
+   the transport's method gate, and the title says *accept*.
+2. **7.235 had a vacuity hole.** The admin-only body is served to a `member` AND to a non-member, so a
+   `membership.granted` that never landed would leave the case green under a false title. The member's
+   own directory is asserted at `member` first.
+3. **An unfailable assertion was found and removed in 7.234** — `mapIngestResults` returns the same
+   object, so comparing the mapped status to the raw one compared a value to itself. **Third such
+   assertion caught in this lane's work; the second caught before it merged.**
+4. **A candidate divergence was written up and then RETRACTED.** `/v1/me/workspaces` serves a `role`
+   the client never reads — but `mapWorkspaceRefs`'s own docblock already declares it, so it was never
+   a gap. Retracted in both places rather than left standing.
+
+**The constants are IMPORTED, never retyped:** `INVITE_NOT_OPENABLE_BODY`, `INVITE_ADMIN_ONLY_BODY`
+(`routes/invites.ts`), `PERMISSION_ROLE_RULE`, `adminOnlyReason` (`permissions/check-permission.ts`).
+That is the whole point of the cluster — the app-core fixture retypes the first, discriminant and full
+sentence, then asserts the gateway hands its own transcription back.
+
+**Carried, with owners:** 7.237's and 7.235's exact-count non-vacuity (`toHaveLength(1)`) couples to the
+shared world — anyone granting a second workspace in `beforeAll` reddens them for a reason unrelated to
+the mapper. Named in both docblocks; a convention a future edit can break silently.
+
+---
+
+# ↓ LANE A — #198 (mapper cluster) RECORD. **MERGED as `d5b8bfd`; its position line is superseded.**
+
+**The mapper cluster is closed.** 7.222–7.229 are on `main`; the carried item *"no test executes a
+mapper against a real `/v1` body — 18 of 20 entry points"* closes by name. Next free **§7 7.230**;
+§12 block 12.320–12.339 still at **12.329**, unused by this pass by decision.
+
+**FULL UNCACHED GATE, GREEN, at the merged head `297ab82`** — third attempt, in the controller's
+signalled window: `GATE_EXIT=0` · `Tasks: 30 successful, 30 total` · `0 cached, 30 total` ·
+`--force --concurrency=1` · 2m6.65s · node **v22.22.2** · `Unsupported engine` 0 · failures section
+EMPTY · no orphaned workers · **3,611 tests / 282 files** (3,606 passed, 5 skipped).
+`CHECK_ENV_EXIT=0` · `CHECK_CASE_IDS_EXIT=0` (1,527 ids, union == sum) — two separate commands.
+**CI: all TWELVE jobs pass**, one generation (run `34023067679`), verified from a single capture.
+
+> ## THE CORRECTION THIS BLOCK EXISTS TO MAKE
+>
+> The header here previously read **"NO FULL GATE YET — TWO OOM KILLS"** and that text **merged to
+> `main` in #198**, because the head was frozen for the merge and I chose to report the green gate to
+> the controller by message rather than push again. That was the right call for the freeze and the
+> WRONG state to leave on the restart surface: for the minutes between the gate going green and this
+> commit, `main` carried a Lane A position that was false in the direction that matters — it said the
+> branch was ungated when it was gated and merging.
+>
+> **A handoff is only worth what it says at the moment someone reads it.** The freeze protected the
+> merge; it did not license the file to lie. **The rule for next time: when a frozen head makes the
+> handoff stale, correct it in the FIRST commit after the merge — before anything else — and say what
+> was stale, not merely what is now true.**
+
+## THE NEXT CLUSTER I WOULD TAKE — scoped on request so the re-task is a message, not an inventory
+
+**Proposal: the INVITE AND REFUSAL surface — eight MIRRORs, one shape, zero collisions.** All model
+server-owned bodies, all have a real route that exists today, and all are witnessable in
+`apps/server/test/integration/fixture-witnesses.test.ts` with the harness already merged. Read-only
+scoping; nothing built.
+
+| # | fixture (symbol, not line — they drift) | models | real producer | witness shape |
+|---|---|---|---|---|
+| 1 | `invites.test.ts` — the invite summary body | `{workspaceId, workspaceName, role}` | `GET /v1/invites/:token` | mint a real invite, fetch it, run the real `createHttpInviteGateway` |
+| 2 | `invites.test.ts` — `INVITE_NOT_OPENABLE_BODY`, **transcribed** | the refusal body verbatim | `INVITE_NOT_OPENABLE_BODY` in `routes/invites.ts` | real 4xx through the door → real gateway → compare against the server's own constant, imported |
+| 3 | `invites-admin.test.ts` — the pending-invite list rows | the admin list body | `GET /v1/workspaces/:workspaceId/invites` | real mint + real list → real `createHttpInviteAdminGateway` |
+| 4 | `founding.test.ts` — the 201 answer | `{workspaceId}` | `POST /v1/workspaces` (composed inline; **no shared type ties the halves**) | real 201 → real `createHttpFoundingGateway`, assert the id round-trips |
+| 5 | `founding.test.ts` — the 422 `IngestResult` refusal | `{status:'refused', rule, reason}` | `packages/domain` `ingest-result.ts` + the ingest path | real refusal through `POST /v1/events` → real `refusalText` |
+| 6 | `http.test.ts` — the 403 admin-only refusal body | `{error, rule, message}` | `INVITE_ADMIN_ONLY_BODY` in `routes/invites.ts` | non-admin hits the real admin route → real `refusalText` reads the real body |
+| 7 | `http.test.ts` — `refusalText`'s two vocabularies | `{error,message}` and the refused arm | the frozen refusal bodies + `ingest-result.ts` | as above, both arms over real bytes |
+| 8 | `online-data-source.test.ts` — the `/v1/me/workspaces` answer | `{workspaces:[…]}` | `GET /v1/me/workspaces` | real route → real `mapWorkspaceRefs` |
+
+**Why this cluster and not another.** (a) Every one models a body a real route emits **today**, so no
+fixture has to be invented. (b) Items 2 and 6 are the sharpest: they **transcribe a server constant**,
+which is the `founding.test.ts:64` defect I already found and fixed once — the same failure, twice more,
+in the same package. (c) Item 4 has **no shared type** tying client and server, so nothing but a round
+trip can catch a rename. (d) It reuses the merged harness verbatim; no new machinery.
+
+**Collisions: NONE, measured not assumed.** B's sync-surface set (`online/stream.ts`,
+`sync-client/net/http-transport.ts`, `sync-client/test/sync-engine.test.ts`, `sync/sync-routes.ts`) and
+D's rig files (`test/dual-client/rig.ts`, `stream-socket.ts`, `grant-backfill`) are **disjoint** from
+every file above. The only shared file is `fixture-witnesses.test.ts`, which is Lane A's own.
+
+**What I would NOT take next, and why — so the choice is legible.** The `editor/` group (6) needs a
+real Google Picker/Drive; `desktop`/`mobile` storage (4) needs a real device runtime; `s3-store` needs
+a real bucket. Those are not cheaper later, but they are not buildable here at all, and taking them
+would mean softening assertions to fit — which is the one thing this pass exists to refuse.
+
+**ONE NUMBER I DISAGREE WITH, stated rather than smoothed.** The controller's re-task says **23**
+remaining addressable; my own re-count says **29**. The gap is a judgment call, not a measurement
+error: my filter counts a row as addressable when its `blocked_reason` names a real route or a real DB
+— the thing `fixture-witnesses.test.ts` now provides — and reasonable filters differ on about six
+borderline rows in `helpers/seed.ts` and `flows/`. **Neither number should be treated as firm without
+re-reading those six.** The eight above are unambiguous under either filter.
+
+**The two OOM kills were real and are kept below as history, not as position.** They are a fact about
+the machine on 2026-09-06, not about this branch: swap 69% then 89%, both at `--concurrency=1`. What
+resolved them was the controller signalling a window on **pool count and lock state**, not on the swap
+percentage — **I had flagged swap 83% against the advisory's 60% and predicted it might bite; it did
+not, and I had the number right and its significance wrong.**
 
 > **READ THIS BEFORE TRUSTING ANY GATE CLAIM BELOW.** The full gate has been **killed by the system
 > for low memory TWICE** at this head. Per the controller's 14:22 advisory (and my own rule, now
@@ -38,7 +176,10 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > second — worse after, not better. Both at `--concurrency=1`, which is already the mitigation. **The
 > lock serialises gates; it does not serialise seven Claude sessions and their subagents.**
 >
-> **OWED BEFORE MERGE: one full gate at this head in a quiet window.** Do not merge on the partial.
+> ~~**OWED BEFORE MERGE: one full gate at this head in a quiet window.**~~ **DISCHARGED** — the
+> third attempt went green at `297ab82` and is recorded above. Kept struck through rather than deleted,
+> because the sequence (two kills → partial evidence labelled → a signalled window → green) is the
+> useful part, and a debt that vanishes without a trace reads as a debt that was never owed.
 
 > Re-tasked by the controller after #187 merged (`e33c429`). Closes the carried item *"no test
 > executes a mapper against a real `/v1` body — 18 of 20 entry points"* **by name**.

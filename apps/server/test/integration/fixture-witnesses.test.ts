@@ -4,6 +4,8 @@ import type { FastifyInstance } from 'fastify';
 import type { LogOtpSender } from '../../src/auth/otp-sender.js';
 import { insertNotification } from '../../src/notifications/store.js';
 import { INVALID_NAME_BODY } from '../../src/routes/workspaces.js';
+import { INVITE_ADMIN_ONLY_BODY, INVITE_NOT_OPENABLE_BODY } from '../../src/routes/invites.js';
+import { PERMISSION_ROLE_RULE, adminOnlyReason } from '../../src/permissions/check-permission.js';
 // THE CLIENT HALF, EXECUTED. Not read as text, not restated as a literal.
 // `client-contract.test.ts` measured why that distinction is the whole game:
 // with its two client lists typed as literals, applying BOTH reconciliations to
@@ -16,8 +18,12 @@ import { INVALID_NAME_BODY } from '../../src/routes/workspaces.js';
 import {
   createHttpClient,
   createHttpFoundingGateway,
+  createHttpInviteAdminGateway,
+  createHttpInviteGateway,
   createOnlineDataSource,
   FoundingError,
+  InviteAcceptanceError,
+  InviteAdminError,
   mapActors,
   mapAttention,
   mapBoardView,
@@ -26,10 +32,11 @@ import {
   mapMyWork,
   mapPreferences,
   mapWorkflowDef,
+  mapWorkspaceRefs,
   rosterByActorId,
   type FetchLike,
 } from '@gisik-nokma/app-core/online';
-import { buildTestApp } from '../helpers/app.js';
+import { buildTestApp, TEST_WEB_ORIGIN } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { signInWithPhone } from '../helpers/session.js';
 
@@ -707,5 +714,491 @@ describe('the mapper cluster, against real routes', () => {
     // `contests.contests`, both fire against real bodies from two real routes,
     // which is what the mutation below kills. The fold itself needs a world with
     // a stale ticket or an open contest. *Owner: whoever builds that world.*
+  });
+});
+
+/**
+ * **THE ONBOARDING CLUSTER — three gateways and one refusal vocabulary, none of
+ * which had ever met a running door.**
+ *
+ * `packages/app-core/test/online/invites.test.ts`, `invites-admin.test.ts` and
+ * `founding.test.ts` measure `createHttpInviteGateway`,
+ * `createHttpInviteAdminGateway` and `createHttpFoundingGateway` against a
+ * `fakeHttp` whose bodies the same sitting wrote. `invites.test.ts` is the
+ * sharpest instance in the repo: its dead-link case RETYPES
+ * `INVITE_NOT_OPENABLE_BODY` as a literal — both the `error` discriminant and
+ * the whole sentence — and then asserts the gateway carries `body.message`
+ * back. It reads back its own transcription, which is 7.221's defect exactly,
+ * one module over. Every case below imports the server's constants instead, so
+ * a change to a door's wording moves both sides of the assertion at once.
+ *
+ * ## The member this cluster needs, and why it is granted HERE
+ *
+ * Three cases need somebody who is INSIDE the workspace and is not an admin —
+ * that is the only role from which `permission.role` and
+ * `INVITE_ADMIN_ONLY_BODY` are both reachable. The grant is in this describe's
+ * OWN `beforeAll`, not the file's, so 7.222–7.229 run against the one-member
+ * world their docblocks describe. **`vitest.config.ts` sets no
+ * `sequence.shuffle`, so declaration order is what makes that true — the same
+ * latent dependency 7.226 records, and the same owner: whoever introduces
+ * shuffled ordering here.** Nothing above is live-broken by a second member
+ * (7.222's `roster.size === actors.length` holds at 2 as it did at 1); what
+ * would go stale is its PROSE, which says this workspace has exactly one
+ * member. Recorded rather than left to be discovered.
+ */
+describe('the onboarding gateways and the refusal vocabulary, against real routes', () => {
+  let member: { userId: string; headers: { authorization: string } };
+  let outsider: { userId: string; headers: { authorization: string } };
+
+  beforeAll(async () => {
+    member = await signedIn();
+    await post(owner.headers, {
+      workspaceId,
+      entity: { kind: 'membership', id: `${workspaceId}:${member.userId}` },
+      type: 'membership.granted',
+      payload: { userId: member.userId, role: 'member' },
+      actorId: owner.userId,
+    });
+    // Signed in and in NOTHING. 7.230 uses them to show the invite summary is
+    // served on the strength of the TOKEN and not of a membership.
+    outsider = await signedIn();
+  });
+
+  /**
+   * Mint through the REAL admin door and hand back the one copy of the raw
+   * token, which the response carries only inside `url`.
+   *
+   * The token is SLICED off the server's own `${webOrigin}/invite/` prefix
+   * rather than reassembled from a token this test chose: the server builds
+   * that URL (`registerInviteRoutes`' mint handler, from `deps.webOrigin`) and
+   * a test that built its own would be a second opinion about where the link
+   * points. The prefix is asserted before the slice, so a route that changed
+   * the shape fails here — where it names the mint — instead of producing a
+   * garbled token that fails later as "this link opens nothing".
+   */
+  async function mintRaw(body: {
+    address: string;
+    channel: string;
+    role: string;
+    projectIds?: string[];
+  }): Promise<{ inviteId: string; url: string; expiresAt: string; token: string }> {
+    const res = await app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${workspaceId}/invites`,
+      headers: owner.headers,
+      payload: body,
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const json = res.json() as { inviteId: string; url: string; expiresAt: string };
+    const prefix = `${TEST_WEB_ORIGIN}/invite/`;
+    expect(json.url.startsWith(prefix), `mint url must start with ${prefix}, got ${json.url}`).toBe(
+      true,
+    );
+    return { ...json, token: json.url.slice(prefix.length) };
+  }
+
+  it('7.230 the real invite gateway opens a REAL minted link and reports the door’s own summary', async () => {
+    const minted = await mintRaw({
+      address: 'accountant@example.com',
+      channel: 'email',
+      // GUEST, deliberately. `createHttpInviteGateway`'s own docblock indicts
+      // the plan snippet's `(record.role ?? 'member')`, which would invent a
+      // role for a response that named none — and against a `member` invitation
+      // that default is INDISTINGUISHABLE from reading the wire. A guest
+      // invitation is what makes a client that reintroduced it go red.
+      role: 'guest',
+    });
+
+    // NON-VACUITY FIRST, and it is the precondition that makes the summary
+    // mean what the title says: this viewer holds no membership anywhere, so
+    // the answer below is served on the strength of the TOKEN alone. Without
+    // it, a route that had quietly become membership-gated would still pass.
+    const directory = await app.inject({
+      method: 'GET',
+      url: '/v1/me/workspaces',
+      headers: outsider.headers,
+    });
+    expect(directory.statusCode).toBe(200);
+    expect((directory.json() as { workspaces: unknown[] }).workspaces).toHaveLength(0);
+
+    const gateway = createHttpInviteGateway(createHttpClient('', injectFetch(outsider.headers)));
+    const summary = await gateway.getInvite(minted.token);
+
+    // THE ROUND TRIP. Every field is the server's own: `workspaceId` is the id
+    // `POST /v1/workspaces` minted in `beforeAll`, `workspaceName` is folded
+    // out of the ledger by `workspaceNameFromLedger`, and `role` is the one the
+    // mint request carried through `invite.sent` into `proj_invites`.
+    expect(summary).not.toBeNull();
+    expect(summary?.workspaceId).toBe(workspaceId);
+    expect(summary?.workspaceName).toBe('Witness Corner');
+    expect(summary?.role).toBe('guest');
+  });
+
+  /**
+   * 7.231 — **THE DEAD-LINK SENTENCE, ON THE ARM THAT CAN CARRY IT.**
+   *
+   * **The `getInvite` arm CANNOT reach `INVITE_NOT_OPENABLE_BODY.message`, and
+   * saying so is half this case.** `createHttpClient`'s `send` turns a 404 into
+   * `null` on a GET — before the gateway sees a body — so the sentence is
+   * structurally unreachable there, which the gateway's own docblock states and
+   * this case does not paper over. The title says ACCEPT for that reason.
+   *
+   * The POST arm is where the body survives, and it survives because the
+   * 404-as-null affordance is gated on the METHOD. So `acceptInvite` is the one
+   * place a person is told why a link is dead, and it is measured here against
+   * the server module's constant — imported, never retyped, which is precisely
+   * what `packages/app-core/test/online/invites.test.ts`'s dead-link case does
+   * not do.
+   */
+  it('7.231 an unknown token opens nothing, and ACCEPTING it carries the door’s own sentence', async () => {
+    const dead = 'not-a-token-anyone-ever-minted';
+    const gateway = createHttpInviteGateway(createHttpClient('', injectFetch(outsider.headers)));
+
+    // NON-VACUITY FIRST, in two parts. (a) The constant is a real non-empty
+    // sentence, or the comparison below is '' against ''. (b) THE POSITIVE
+    // CONTROL: the same gateway, the same fetch, a LIVE token — non-null. A
+    // gateway that answered `null` for everything would satisfy the dead-link
+    // arm below while telling nobody anything, and nothing else here would
+    // notice.
+    expect(INVITE_NOT_OPENABLE_BODY.message.length).toBeGreaterThan(0);
+    const live = await mintRaw({ address: 'cashier@example.com', channel: 'email', role: 'member' });
+    expect(await gateway.getInvite(live.token)).not.toBeNull();
+
+    // ARM ONE: the read affordance. `null` and NOT the sentence — the loss is
+    // the transport's, by design.
+    expect(await gateway.getInvite(dead)).toBeNull();
+
+    // ARM TWO: the write. THE ROUND TRIP the fixture only mimed.
+    const refused = await gateway.acceptInvite(dead).catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(InviteAcceptanceError);
+    const error = refused as InviteAcceptanceError;
+    expect(error.status).toBe(404);
+    expect(error.serverMessage).toBe(INVITE_NOT_OPENABLE_BODY.message);
+  });
+
+  it('7.232 the real invite-admin gateway lists a REAL pending invitation, with the door’s own expiry', async () => {
+    const minted = await mintRaw({
+      address: 'stockist@example.com',
+      channel: 'email',
+      role: 'member',
+      // A NON-EMPTY array, so the gateway's `projectIds` pass-through is
+      // measured rather than satisfied by the `[]` it substitutes for anything
+      // that is not an array. `member` and not `guest` because
+      // `inviteSentPayload` refuses the key on a guest invitation.
+      projectIds: [projectId],
+    });
+
+    const gateway = createHttpInviteAdminGateway(createHttpClient('', injectFetch(owner.headers)));
+    const rows = await gateway.listPending(workspaceId);
+
+    // NON-VACUITY FIRST, and it is not `length > 0`: the row that must be here
+    // is the one just minted, named by the id the SERVER put in the 201. An
+    // empty list, or a list of somebody else's invitations, fails here.
+    expect(rows.length).toBeGreaterThan(0);
+    const row = rows.find((entry) => entry.inviteId === minted.inviteId);
+    expect(
+      row,
+      `the invitation just minted must be listed; got ${rows.map((r) => r.inviteId).join(', ')}`,
+    ).toBeDefined();
+
+    // The fields the mint request carried, back out through a DIFFERENT route.
+    expect(row?.address).toBe('stockist@example.com');
+    expect(row?.channel).toBe('email');
+    expect(row?.role).toBe('member');
+    expect(row?.projectIds).toEqual([projectId]);
+    // Attribution: the admin who sent it, by the id the SERVER resolved from
+    // the session — not a name this case chose. Said precisely, because the
+    // loose version is this file's own recurring defect: the gateway's
+    // `(no inviter recorded)` substitute is NOT observable here and this case
+    // does not make it so — the shipped route always serves the field, which is
+    // exactly why that substitute has never been seen. What this line does is
+    // make the substitute FALSIFIABLE: the day the route stops serving
+    // `invitedBy`, the substitute appears and this assertion is what says so.
+    expect(row?.invitedBy).toBe(owner.userId);
+    expect(
+      Number.isNaN(Date.parse(row?.invitedAt ?? '')),
+      `invitedAt must be a real instant, got ${String(row?.invitedAt)}`,
+    ).toBe(false);
+    // THE SERVER'S OWN VALUE CARRIED BETWEEN TWO CALLS, which is this file's
+    // whole discipline: the expiry the mint response announced is the expiry
+    // the list reports. The two are read from one `invite_tokens` row by two
+    // routes, so a drift between them is a real product defect — an admin told
+    // one lapse date at issue time and another on the screen they manage from.
+    expect(row?.expiresAt).toBe(minted.expiresAt);
+  });
+
+  /**
+   * 7.233 — **THE 201's `workspaceId` IS THE WORKSPACE THE SERVER FOUNDED.**
+   *
+   * `createHttpFoundingGateway` reads `workspaceId` off the 201 body and
+   * `POST /v1/workspaces` writes it there, and **no shared type ties those two
+   * halves**: the route builds an ad-hoc `reply.send({ workspaceId })` and the
+   * gateway does an ad-hoc `record['workspaceId']` lookup. A rename on either
+   * side typechecks on both. The gateway would then throw `FoundingError(201,
+   * null)` — "founded, and the founder cannot be sent anywhere" — which is a
+   * failure only a round trip can produce.
+   *
+   * The id is checked against a SECOND route rather than against itself: the
+   * founder's own directory must name it. An assertion that the returned id is
+   * merely a string could not fail, because the gateway throws unless it is.
+   */
+  it('7.233 the real founding gateway’s workspaceId is the id the server minted', async () => {
+    const founder = await signedIn();
+    const gateway = createHttpFoundingGateway(createHttpClient('', injectFetch(founder.headers)));
+
+    // NON-VACUITY FIRST: this person belongs to nothing, so the single row
+    // below is a delta THIS case caused. Without it, a directory that listed
+    // every workspace on the instance would satisfy the assertions that follow.
+    const before = await app.inject({
+      method: 'GET',
+      url: '/v1/me/workspaces',
+      headers: founder.headers,
+    });
+    expect(before.statusCode).toBe(200);
+    expect((before.json() as { workspaces: unknown[] }).workspaces).toHaveLength(0);
+
+    const founded = await gateway.foundWorkspace('The back room');
+
+    const after = await app.inject({
+      method: 'GET',
+      url: '/v1/me/workspaces',
+      headers: founder.headers,
+    });
+    expect(after.statusCode).toBe(200);
+    const listed = (
+      after.json() as { workspaces: { workspaceId: string; name: string; role: string }[] }
+    ).workspaces;
+    expect(listed).toHaveLength(1);
+    // THE ROUND TRIP: the id the CLIENT reports is the id the SERVER founded.
+    expect(listed[0]?.workspaceId).toBe(founded.workspaceId);
+    // The name reaches the ledger untouched — the gateway sends what was typed
+    // and `workspaceNameFromLedger` folds it back.
+    expect(listed[0]?.name).toBe('The back room');
+    // ALSO PINNED, and named rather than smuggled: founding grants the founder
+    // `owner` (`bootstrapWorkspace`'s sequence). It is one assertion beyond
+    // this case's title, kept because a founding that left no grant would show
+    // up here as an empty directory and the length check above would already
+    // have failed — so this line is what distinguishes "granted the wrong role"
+    // from "granted nothing".
+    expect(listed[0]?.role).toBe('owner');
+  });
+
+  /**
+   * 7.234 — **`mapIngestResults` OVER A REAL RULE REFUSAL.**
+   *
+   * 7.226 ran the mapper over a real COMMITTED result. The refused arm had
+   * never seen one: `mappers.test.ts` builds its refusals by hand, and the
+   * three keys `INGEST_ARMS.refused` demands — `eventId`, `rule`, `reason` —
+   * were a client-side list agreeing with a client-side fixture.
+   *
+   * **What this witnesses, stated narrowly because the mapper is a
+   * pass-through:** `mapIngestResults` ends `return result as unknown as
+   * IngestResult`, so `mapped.rule === raw.rule` is true by construction and
+   * asserting the mapped value proves no transformation. The mapper's ONE
+   * contribution on this arm is the ARM CHECK — it throws unless all three keys
+   * are present — so what is measured is that **a real refusal satisfies the
+   * client's arm requirement**. The day the ingest layer drops `eventId` from a
+   * refusal, or renames `rule`, this case reddens and no fixture would have.
+   *
+   * The `reason` is compared to `adminOnlyReason('member')` — the server's own
+   * function, imported — which is the half a fixture cannot fake, and which
+   * also proves the refusal is the MEMBER's: a non-member would draw
+   * `NOT_A_MEMBER_REASON` instead and this line would go red.
+   */
+  it('7.234 mapIngestResults over a REAL permission.role refusal from POST /v1/events', async () => {
+    const submitted: SubmittedEvent = {
+      id: newUlid(),
+      version: 1,
+      origin: 'web',
+      clientTime: new Date().toISOString(),
+      workspaceId,
+      entity: { kind: 'project', id: newUlid() },
+      // `project.created` is in `ADMIN_ONLY_TYPES`, so a member's claim is
+      // refused by the role gate BEFORE the engine — a rule refusal and not a
+      // schema `invalid`, which is the arm this case needs.
+      type: 'project.created',
+      payload: { name: 'The back office' },
+      actorId: member.userId,
+    };
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/events',
+      headers: member.headers,
+      payload: { events: [submitted] },
+    });
+
+    // NON-VACUITY FIRST: the door HEARD the batch (200 — a rule refusal is not
+    // an HTTP error on this route) and REFUSED the claim. Without both, the
+    // mapper below could be running over a committed result, or over a 400 that
+    // never reached the gate, and every assertion after it would be about the
+    // wrong thing.
+    expect(res.statusCode).toBe(200);
+    const raw = res.json() as { results: Array<Record<string, unknown>> };
+    expect(raw.results).toHaveLength(1);
+    expect(raw.results[0]?.status, JSON.stringify(raw.results[0])).toBe('refused');
+
+    const [result] = mapIngestResults(res.json(), 1);
+    // `expect(result?.status).toBe('refused')` used to sit here and is GONE, for
+    // 7.227's reason: the mapper RETURNS THE SAME OBJECT (`result as unknown as
+    // IngestResult`), so with the raw body's `status` already asserted above,
+    // that line compared a value to itself and no server behaviour could move
+    // it. What is left is a THROW, which is a narrowing guard and not an
+    // assertion — TypeScript needs it to reach the refused arm's fields without
+    // a cast, and `if (…) expect(…)` would be worse than either, because a
+    // conditional assertion does nothing at all when its condition is false.
+    if (result === undefined || result.status !== 'refused') {
+      throw new Error(`expected a refused result, got ${JSON.stringify(result)}`);
+    }
+    expect(result.rule).toBe(PERMISSION_ROLE_RULE);
+    expect(result.reason).toBe(adminOnlyReason('member'));
+    // Index alignment is only useful if the result names the event it answers.
+    expect(result.eventId).toBe(submitted.id);
+  });
+
+  /**
+   * 7.235 — **`INVITE_ADMIN_ONLY_BODY` REACHES THE CALLER, THROUGH THE REAL
+   * ADMIN GATEWAY.**
+   *
+   * **The vacuity hole this case would otherwise have, closed first.**
+   * `INVITE_ADMIN_ONLY_BODY` is served for TWO different viewers — a `member`
+   * and a NON-member — because the route's gate is
+   * `workspaceRole !== 'owner' && !== 'admin'` and `null` fails it too. So a
+   * `membership.granted` that silently never landed would leave this case green
+   * with a title ("a plain member") it does not keep. The member's own
+   * directory is therefore read FIRST and must name this workspace at
+   * `member`.
+   *
+   * 7.234 and 7.236 need no such guard and it is worth saying why: their
+   * refusal sentence is `adminOnlyReason(role)`, which EMBEDS the resolved role
+   * — a non-member draws `NOT_A_MEMBER_REASON` and they redden by themselves.
+   * This case's body is role-independent, and that is exactly what makes the
+   * precondition load-bearing here and nowhere else in the cluster.
+   */
+  it('7.235 a plain member’s listPending is refused 403 and the real gateway carries the door’s sentence', async () => {
+    // NON-VACUITY FIRST — see the docblock; this is the assertion that makes
+    // the word "member" in the title true.
+    const mine = await app.inject({
+      method: 'GET',
+      url: '/v1/me/workspaces',
+      headers: member.headers,
+    });
+    expect(mine.statusCode).toBe(200);
+    const rows = (mine.json() as { workspaces: { workspaceId: string; role: string }[] }).workspaces;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.workspaceId).toBe(workspaceId);
+    expect(rows[0]?.role).toBe('member');
+    expect(INVITE_ADMIN_ONLY_BODY.message.length).toBeGreaterThan(0);
+
+    const gateway = createHttpInviteAdminGateway(createHttpClient('', injectFetch(member.headers)));
+    const refused = await gateway.listPending(workspaceId).catch((error: unknown) => error);
+
+    // A THROW and not an empty list. The gateway's `listPending` has a branch
+    // that would answer `[]` for a body it could not read, and an admin screen
+    // drawing "no invitations outstanding" over a refusal is the failure that
+    // branch exists to avoid — so the class matters as much as the sentence.
+    expect(refused).toBeInstanceOf(InviteAdminError);
+    const error = refused as InviteAdminError;
+    expect(error.status).toBe(403);
+    expect(error.serverMessage).toBe(INVITE_ADMIN_ONLY_BODY.message);
+  });
+
+  /**
+   * 7.236 — **`refusalText`'s SECOND KEY, over a real refused result.**
+   *
+   * `refusalText` reads `message` first and falls back to `reason`, and the two
+   * branches serve two different producers: the frozen refusal bodies
+   * (`INVITE_ADMIN_ONLY_BODY`, `INVALID_NAME_BODY`) carry `message`, and an
+   * `IngestResult` whose status is `refused` carries `reason` and no `message`
+   * at all. 7.221 and 7.235 witness the first branch. **Nothing had ever run
+   * the second over bytes a server sent** — `http.test.ts` feeds it literals.
+   *
+   * The mint door is where a real `IngestResult` becomes an HTTP body: it
+   * answers `reply.code(422).send(result)` verbatim. So this is not a direct
+   * call to `refusalText` but the shipped path — `mintInvite` → `HttpError` →
+   * `refusalText` → `InviteAdminError.serverMessage` — over a refusal the role
+   * gate really produced.
+   */
+  it('7.236 a member’s mint is refused as an IngestResult and the ROLE GATE’s `reason` reaches the caller', async () => {
+    const request = { address: 'lender@example.com', channel: 'email', role: 'member' };
+
+    // NON-VACUITY FIRST, and it is what pins WHICH branch of `refusalText`
+    // fires. If the body carried a `message`, the sentence below would be
+    // coming from the first branch and this case would be a second copy of
+    // 7.235 wearing a different title. `message` must be ABSENT.
+    const raw = await app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${workspaceId}/invites`,
+      headers: member.headers,
+      payload: request,
+    });
+    expect(raw.statusCode, raw.body).toBe(422);
+    const body = raw.json() as Record<string, unknown>;
+    expect(body['status']).toBe('refused');
+    expect(body['rule']).toBe(PERMISSION_ROLE_RULE);
+    expect(
+      body['message'],
+      'an IngestResult carries no `message`; if one appears, this case has silently moved to refusalText’s FIRST branch',
+    ).toBeUndefined();
+    expect(typeof body['reason']).toBe('string');
+
+    const gateway = createHttpInviteAdminGateway(createHttpClient('', injectFetch(member.headers)));
+    const refused = await gateway.mintInvite(workspaceId, request).catch((error: unknown) => error);
+
+    expect(refused).toBeInstanceOf(InviteAdminError);
+    const error = refused as InviteAdminError;
+    expect(error.status).toBe(422);
+    // THE SERVER'S OWN VALUE, carried between two calls to the same door.
+    expect(error.serverMessage).toBe(body['reason']);
+    // And it is the ROLE GATE's sentence rather than a paraphrase of it, compared
+    // against the server module's own function.
+    expect(error.serverMessage).toBe(adminOnlyReason('member'));
+  });
+
+  /**
+   * 7.237 — **`mapWorkspaceRefs` OVER THE REAL DIRECTORY ROUTE.**
+   *
+   * The mapper RENAMES on two levels — wire `workspaceId` → client `id`, wire
+   * `projects[].projectId` → client `id` — and `mappers.test.ts` feeds it a
+   * body it wrote in the same file, so both renames agreed with themselves.
+   * A route serving `id` instead of `workspaceId` would make `asString` throw
+   * here; a route serving a project's key differently would throw at the nested
+   * path.
+   *
+   * **WHAT THIS CASE CANNOT WITNESS, and it is a DECLARED non-gap rather than
+   * the finding an earlier draft of this comment called it.**
+   * `/v1/me/workspaces` serves a `role` per workspace and `WorkspaceRef` has no
+   * key for it, so the value is dropped — but `mapWorkspaceRefs`'s own docblock
+   * already says so in terms: *"`role` is a field the server discloses that the
+   * client does not read; neither was ever a gap."* It is therefore not an
+   * undeclared drop and this case must not report it as one; it is simply a
+   * field no round trip through this mapper can reach. (7.233 and 7.235 read
+   * the role off the RAW body for their own preconditions, which is the only
+   * place in this file it is observable at all.)
+   */
+  it('7.237 mapWorkspaceRefs over the REAL /v1/me/workspaces route', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/v1/me/workspaces',
+      headers: owner.headers,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const refs = mapWorkspaceRefs(res.json());
+
+    // NON-VACUITY FIRST, and exact rather than `> 0`: the founder of this file's
+    // world belongs to exactly one workspace holding exactly one project, so
+    // `[0]` below is a claim about the list's LENGTH as much as its contents.
+    // 7.233 founds its workspace under a FRESH founder precisely so this count
+    // stays 1.
+    expect(refs).toHaveLength(1);
+    const ref = refs[0];
+    expect(ref?.id).toBe(workspaceId);
+    expect(ref?.name).toBe('Witness Corner');
+    // THE NESTED RENAME, which is the half no other case in this file reaches:
+    // the wire says `projectId`, the client type says `id`, and the project is
+    // the one `beforeAll` really created.
+    expect(ref?.projects).toHaveLength(1);
+    expect(ref?.projects[0]?.id).toBe(projectId);
+    expect(ref?.projects[0]?.name).toBe('The aisle');
   });
 });
