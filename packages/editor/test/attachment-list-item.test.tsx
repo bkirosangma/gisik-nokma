@@ -60,6 +60,9 @@ function referenceCapturedAt(capturedAt: string): AttachmentListEntry {
 /** Words that would claim knowledge this product does not have. */
 const FORBIDDEN = ['deleted', 'missing', 'no longer', 'available', 'verified', 'up to date'];
 
+/**
+ * 9.60 — ROLLUP, not a distinct assertion — the attachment list surface as a whole, including a Drive reference rendering as a link rather than an embed. Covered by the cases in this file (9.131–9.139) plus 3.76, the app-core `AttachmentList` consuming the same union.
+ */
 describe('AttachmentListItem', () => {
   /**
    * 9.131 — an upload renders as a file this board holds: `data-attachment-kind="upload"`, class `attachment-item--upload`, an `<a>` pointed at `/v1/attachments/:id`, filename on the surface.
@@ -252,6 +255,9 @@ describe('the captured day is the UTC day, under every zone a reader might sit i
     });
   }
 
+  /**
+   * 9.137 — an unparseable `capturedAt` renders verbatim (`captured not-an-instant`) rather than inventing a day.
+   */
   it('renders the capture date verbatim when the instant is unparseable, never an invented day', () => {
     const entry = referenceCapturedAt('not-an-instant');
     const view = render(
@@ -298,6 +304,9 @@ const STYLED = [
 ];
 
 describe('the BEM classes the attachment item contract names', () => {
+  /**
+   * 9.138 — the stylesheet declares exactly the `attachment-item*` classes the component actually styles — set equality against an explicit list.
+   */
   it('the stylesheet declares exactly the attachment-item classes that carry structure', () => {
     const cssPath = resolve(dirname(fileURLToPath(import.meta.url)), '../src/styles/editor.css');
     const css = readFileSync(cssPath, 'utf8');
@@ -312,6 +321,9 @@ describe('the BEM classes the attachment item contract names', () => {
     expect(STYLED.every((name) => BEM_CONTRACT.includes(name))).toBe(true);
   });
 
+  /**
+   * 9.139 — planted defect: the two fixtures (upload, reference) between them emit exactly the seven contract classes, no more and no fewer — set equality in the EMITTING direction.
+   */
   it('PLANTED DEFECT: and the two items emit exactly those seven, no more and no fewer', () => {
     const emitted = new Set<string>();
     for (const entry of [UPLOAD, REFERENCE]) {
