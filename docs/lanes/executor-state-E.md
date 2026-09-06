@@ -1422,3 +1422,29 @@ Checked, and it is unaffected **for a reason worth naming rather than by luck:**
 
 **T13 seeds through the real `seed:dev` CLI** (Lane D's, now on main), which is the right door and outside
 this hazard entirely. **The hazard binds unit fixtures only.**
+
+---
+
+# ⚠️ THE SEAM-3 MAP IS PARTLY STALE — T13's navigation finding is OVERTAKEN
+
+**Do not act on the seam-3 T13 entry above without re-checking it.** Two of its claims have moved, and a
+restarted session reading this file would otherwise design T13 around a gap that has closed.
+
+**OVERTAKEN — `getMyWorkspaces` SERVES.** Verified on `origin/main` (not in this worktree, which was 11
+behind when checked): `mapWorkspaceRefs(raw: unknown): WorkspaceRef[]` — it parses and returns. Landed as
+**#150 / `b4e2f14`**, *"a partial workspace is the correct answer"*, under **Ruling P38**. So the map's
+*"the plan's navigation click can never land; reach the board by direct URL"* was **true when written and
+is false now**. T13 may navigate through the workspaces list.
+
+**STILL TRUE — three refusals remain**, count down from four:
+`mapSearchHits`, `mapMyWork`, `mapAttention` are still `): never`. **Any T13 scenario touching search,
+My Work or the attention strip still meets a serving gap**, and the standing rule holds: **recorded, never
+softened to make a test or a hook reachable.**
+
+**The method note, since this is the second time tonight a map entry aged out:** I measured my own
+worktree first and it was **11 commits behind**, so the stale answer looked current. The check that
+mattered was `git show origin/main:<path>`. **A finding about a repository is a finding about a tree, and
+the tree a lane holds is not the tree that ships.**
+
+**Also on main:** GATE LOCK **v3.2** (#157) — the token matcher, citing this lane's reference copy at
+`e814f49`. The three corrections this lane measured are in the shared protocol.
