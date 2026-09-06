@@ -16,7 +16,28 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — **INVITE/REFUSAL CLUSTER BUILT on `exec/44-next-cluster` @ `dae6473`. NO PR YET. Mutations in flight.**
+# LANE A — **PR #204 IS OPEN on `exec/44-next-cluster` @ `cfc76aa`. REVIEWED. ONE MUTATION KILL of eight. NO GATE.**
+
+**https://github.com/bkirosangma/gisik-nokma/pull/204** — cannot merge: **CI is down account-wide since
+~14:42 on the owner's billing**, so no PR can show an independent run green. Not this branch; nothing
+re-run to chase it.
+
+**What is proven:** 7.230–7.237 green (**20 passed / 0 failed**), typecheck clean, node v22.22.2,
+`check-case-ids` 0, zero orphaned workers. **Reviewed by an opus reviewer that found NO assertion
+which cannot fail** — the first clean result on that axis in three rounds.
+
+**What is NOT proven, and must not be read as ✅:**
+- **Only 7.230 has a mutation kill.** 7.231's plant refused (three ambiguous sites — the guard
+  working). **7.233's mutation was INVALID: `EXIT=1` with `PASS (0) FAIL (0) skipped (20)`** — nothing
+  ran, because `beforeAll` founds the shared workspace from that same 201. `EXIT=1` looked exactly
+  like a kill. **7.232/7.234/7.235/7.236/7.237 have NO mutation.**
+- **NO FULL GATE at this head.** A peer's forced gate held the lock through the window.
+
+**OWED NEXT SESSION, in order:** the five missing mutations (inside a lock acquisition), a corrected
+7.231/7.233 plant, and one full uncached gate.
+
+**Disclosed:** the 7.233 attempt ran a test file while a peer held the lock — zero pools, no
+contention, but the protocol says otherwise and that is mine to fix.
 
 **Pre-halt state, written against the controller's 15:10 deadline.** Branch cut from `d5b8bfd`, first
 commit is the #198 handoff correction, second is the eight witnesses. **Local == remote, tree clean.**
