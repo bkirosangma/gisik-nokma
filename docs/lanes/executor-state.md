@@ -16,7 +16,48 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — **IDLE. #198 IS MERGED as `d5b8bfd`. Nothing is in flight. Awaiting re-tasking.**
+# LANE A — **INVITE/REFUSAL CLUSTER BUILT on `exec/44-next-cluster` @ `dae6473`. NO PR YET. Mutations in flight.**
+
+**Pre-halt state, written against the controller's 15:10 deadline.** Branch cut from `d5b8bfd`, first
+commit is the #198 handoff correction, second is the eight witnesses. **Local == remote, tree clean.**
+
+**7.230–7.237 built and GREEN: 20 passed / 0 failed** in
+`apps/server/test/integration/fixture-witnesses.test.ts` (12 pre-existing + 8 new), typecheck clean,
+node **v22.22.2**, zero orphaned workers. §7 next free **7.238**. **No §12 line** — this surface is
+§7's; block 12.320–12.339 still at 12.329.
+
+> **A GREEN RUN AND A CLEAN TYPECHECK ARE NOT A KILL.** At the time of writing, **no mutation has been
+> run against any of the eight.** The catalogue block in `test-cases/07` says so explicitly. Whatever
+> the sweep below reports, **every case without a recorded kill stays marked as unmutated** rather than
+> quietly ✅ — that distinction is the entire subject of this lane's last two passes.
+
+**The four things the implementer corrected, which arrived WITH the work rather than from a review:**
+1. **7.231 could not be built as I specified.** `createHttpClient`'s `send` turns a GET 404 into `null`
+   before the gateway sees a body, so `getInvite` **structurally cannot** reach
+   `INVITE_NOT_OPENABLE_BODY.message`. Built as two arms, the unreachability named and attributed to
+   the transport's method gate, and the title says *accept*.
+2. **7.235 had a vacuity hole.** The admin-only body is served to a `member` AND to a non-member, so a
+   `membership.granted` that never landed would leave the case green under a false title. The member's
+   own directory is asserted at `member` first.
+3. **An unfailable assertion was found and removed in 7.234** — `mapIngestResults` returns the same
+   object, so comparing the mapped status to the raw one compared a value to itself. **Third such
+   assertion caught in this lane's work; the second caught before it merged.**
+4. **A candidate divergence was written up and then RETRACTED.** `/v1/me/workspaces` serves a `role`
+   the client never reads — but `mapWorkspaceRefs`'s own docblock already declares it, so it was never
+   a gap. Retracted in both places rather than left standing.
+
+**The constants are IMPORTED, never retyped:** `INVITE_NOT_OPENABLE_BODY`, `INVITE_ADMIN_ONLY_BODY`
+(`routes/invites.ts`), `PERMISSION_ROLE_RULE`, `adminOnlyReason` (`permissions/check-permission.ts`).
+That is the whole point of the cluster — the app-core fixture retypes the first, discriminant and full
+sentence, then asserts the gateway hands its own transcription back.
+
+**Carried, with owners:** 7.237's and 7.235's exact-count non-vacuity (`toHaveLength(1)`) couples to the
+shared world — anyone granting a second workspace in `beforeAll` reddens them for a reason unrelated to
+the mapper. Named in both docblocks; a convention a future edit can break silently.
+
+---
+
+# ↓ LANE A — #198 (mapper cluster) RECORD. **MERGED as `d5b8bfd`; its position line is superseded.**
 
 **The mapper cluster is closed.** 7.222–7.229 are on `main`; the carried item *"no test executes a
 mapper against a real `/v1` body — 18 of 20 entry points"* closes by name. Next free **§7 7.230**;
