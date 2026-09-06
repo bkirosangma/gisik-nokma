@@ -16,6 +16,179 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# LANE A — **PR OPEN on `exec/48-refusal-vocabulary`: the TRANSCRIBED REFUSAL VOCABULARY. Nothing else in flight.**
+
+**Five witnesses (7.238–7.242), six catalogue rows (7.243–7.248), two fabricated constants corrected,
+one handed finding REFUTED.** Branch cut from `9d2a0b2`; rebased past the seven commits `main` gained
+while this was building. **No ledger row** — a Lane F witness pass, closes by name.
+
+**§7 next free: 7.249.** No §12 line was written: the surface is §7's; block 12.320–12.339 stays at
+**12.329**.
+
+## THE ONE RULE THIS PASS ADDS, AND IT SHOULD OUTLIVE THE CLUSTER
+
+**Where a producer BUILDS its refusal from an exported constant, asserting the wire value against that
+same constant is a self-comparison through one module and CANNOT FAIL.** It reddens for a broken route
+or a broken mapper — which is worth something — and it is blind to the rename it looks like it is
+watching. `contests.ts` refuses with `CONTEST_RULES.alreadyResolved`; a witness asserting
+`rule === CONTEST_RULES.alreadyResolved` compares the constant to itself over a longer path.
+
+Two forms are not blind, and every case here says which it uses:
+1. **the wire value against a LITERAL** — in a witness that is the *observed bytes of a producer that
+   ran*, not a transcription, and it reddens on any rename at the producer;
+2. **the wire value against a SECOND, INDEPENDENTLY-OWNED constant** — the strongest form, and **7.238
+   is the only case in the file that has it.**
+
+Where a producer's constant is asserted at all it is carried ALONGSIDE a literal, never instead of one.
+**M7 is the demonstration:** corrupting `MIGRATION_RULES.unknownTargetState` reddened 7.241's literal
+line and left its `MIGRATION_RULES` line green, because that one moved with the constant.
+
+**Reconciled with `checks/refusals.ts`'s own doctrine** (*"Tests and fixtures assert the LITERAL
+strings, never these constants, so a typo here cannot certify itself"*) — that is about the ENGINE'S
+OWN unit tests, whose job is to pin wording a human approved; a witness asks whether the value the
+CONSUMER sees is still the value the PRODUCER emitted after a real round trip. Neither replaces the
+other, and this pass added no literal to `packages/rule-engine/test`.
+
+## TWO FINDINGS, AND THE SECOND REFUTES THE SCOPING THAT COMMISSIONED IT
+
+**(1) THE FABRICATION, MEASURED AND CORRECTED IN TWO FILES.** `guarded-child-event.test.ts:15` carried
+`'Parent "Registrations" is Done; it must reopen because it is acquiring live work.'` under the comment
+*"The engine's own words, copied from `checks/hierarchy.ts`'s refusal shape"*, and
+`reopen-flow.test.tsx:16` carried the identical string as `SERVER_PARENT_TERMINAL_REASON`. **The engine
+has never emitted it.** `parentTerminalRefusal` (`checks/refusals.ts:197`) builds
+`"<title>" is finished (<state>). <remedy>`; the two share the title and the word "Done" and nothing
+else. Nothing in `app-core` could see it: every case fed the client the constant and read it back.
+
+**SCOPE CALL, STATED NOT BURIED: `reopen-flow.test.tsx` was NOT in the scoped row table.** It was
+reached through the table's `'hierarchy.rank'` / `'hierarchy.parent-terminal'` site clause. Correcting
+only its twin would have left the repo carrying two constants for one sentence **with different
+values** — strictly worse than what was found. The controller can reverse it in one revert of one
+string; it is flagged rather than assumed.
+
+**(2) `'ticket.unknown-state'` IS NOT A DEAD SENTENCE — AND THE WAY THE SCOPING GOT IT WRONG IS THE
+FINDING.** It was handed to this pass as a rule name no producer emits, swept across
+`rule-engine/src`, `apps/server/src`, `domain/src` and `app-core/src` with a fabricated-name control
+returning zero files. **Well-formed search, valid control, wrong conclusion.** The slot has a real
+vocabulary: `MIGRATION_RULES` (`apps/server/src/routes/builder-reads.ts:444`) on a real route (`:693`),
+spelling the same refusal `migration.unknown-target-state`.
+
+> **FOR THE SILENT-WRONG-ANSWER LIST, as a mode of its own:** *a sweep for the fixture's OWN string
+> cannot find a producer that uses a DIFFERENT string for the same slot.* It does not return an error
+> and it does not return an empty result about the right question — it returns a well-formed empty
+> result **about the wrong question**, and nothing inside that run could have shown it. The existing
+> six modes are all about a search that failed to look; this one looked correctly at the wrong thing.
+
+Converted rather than merely carried: **7.241 witnesses the real route** and asserts the fixture's
+spelling ABSENT by name, so the finding stays falsifiable. The fixture SITE is recorded with an owner
+(7.246) and not corrected — `MIGRATION_RULES` lives in `apps/server` and `app-core` neither does nor
+should depend on it, so where that vocabulary belongs is a product decision.
+
+**`'state-machine'` is filed one severity LOWER (7.247) and deliberately not smoothed together with
+it.** `mapMyWork`/`mapAttention` carry a contest's `rule` through opaquely and nothing branches on it,
+so it pins no discriminant: fixture-realism, not a dead discriminant of the `'bad-envelope'` class.
+
+**`'require-different-user'` DISSOLVES.** Its grep count is not an addressable count: every hit outside
+`packages/rule-engine/test` is `{ kind: … }`, a member of the domain's `Rule` union already pinned by
+the type system. The only `rule:` sites are the producer's own tests, where the literal is correct.
+Nothing to build — said plainly rather than padded into a witness that measures nothing.
+
+## WHAT IS ON THE BRANCH — five witnesses, six catalogue rows, no source file touched
+
+All five live in `apps/server/test/integration/fixture-witnesses.test.ts`, in the 7.220 shape: a real
+`POST /v1/events` (or the real migrate route) through `app.inject()` producing the REAL refusal, read
+by the shipped `mapIngestResults` imported from `@gisik-nokma/app-core/online`. Non-vacuity first in
+every one, and in four of the five the control is the SAME request differing in exactly one variable.
+
+| case | what it drives | comparison form | non-vacuity control |
+|---|---|---|---|
+| **7.238** | `hierarchy.parent-terminal`, CREATE arm | **(2)** — `PARENT_TERMINAL_RULE` from `app-core` vs the engine's bare literal | same create, same type, under a parent of the SAME TYPE that is not terminal → commits |
+| **7.239** | the same rule, REPARENT arm; the reason's structure | (1) + structural | 7.238's committed child is the subject |
+| **7.240** | `hierarchy.rank` | (1) | the same `story` create under an `epic` → commits |
+| **7.241** | `migration.unknown-target-state` on the real migrate route | (1) + the constant alongside | the same request with a target the destination DOES define → 200 |
+| **7.242** | `restrict-to` on a real role-gated edge | (1) + the constant alongside | the SAME actor, SAME type, SAME source state, along the UNGATED edge → commits |
+
+**A FRESH FOUNDER AND A FRESH WORKSPACE, not the file's**, and that is arithmetic rather than tidiness:
+`7.237` asserts the file's founder holds exactly one workspace with exactly one project, `7.223`
+asserts `toEqual(ticketIds)` over the shared project and `12.324` asserts `toHaveLength(3)`. A second
+project, a second workspace on that founder, or three more tickets in the shared project each breaks
+one of the three by counting.
+
+**RANKS ARE LOAD-BEARING IN TWO PLACES.** `hierarchy.rank` is checked BEFORE `parent-terminal`, so
+7.238's parent is a `story` (2) and its child a `task` (3) — a same-rank parent would leave the case
+green on the wrong refusal entirely. And 7.240 is a `story` under a `task` rather than the obvious
+task-under-task, because with both names "Task" the refusal sentence is byte-identical under an
+argument swap in `rankRefusal` and **mutation M6 survives**. That was designed before the battery ran.
+
+**Six catalogue rows carry what is NOT buildable, each with an owner and none softened to fit:**
+7.243 the web notifications gateway (`apps/server` has no dependency on `apps/web` and must not gain
+one — owner Lane F, a web-side harness) · 7.244 the contest round trip (a contest can only be OPENED
+with envelope-origin `'server'`, which the HTTP door refuses from every client by design — the very
+gate 7.230–7.237 witnessed; the client half IS un-literalled to `CONTEST_RULES.alreadyResolved`) ·
+7.245 `rule-engine` exports no path to its own refusal words · 7.246 the migration fixture's wrong
+family name · 7.247 `'state-machine'`, filed one severity lower on purpose · 7.248 Lane B's
+`sync-client` `rule: 'restrict-to'` literals, deliberately not taken.
+
+## MUTATIONS — nine kills, one deliberate survivor, one contaminated run
+
+Every prediction written before its run; **all nine matched**, blast radius 1 each, every red an
+`AssertionError` from the case's own `expect` — none at a `MappingError` shape gate, none grey.
+Full table with messages at the catalogue's mutation block. The three worth carrying:
+
+- **M6** (`rankRefusal`'s arguments swapped) is the one 7.240 was redesigned for. It **survives**
+  task-under-task. A check that could not fail, caught by asking what would kill it *before* writing it.
+- **THE DELIBERATE SURVIVOR.** M7 re-run with 7.241's LITERAL assertion deleted, leaving only
+  `expect(body.rule).toBe(MIGRATION_RULES.unknownTargetState)`: **25 passed, 0 failed.** The standing
+  rule measured rather than argued.
+- **THE CONTAMINATED RUN, REPORTED NOT TRIMMED.** M7's first execution killed **two** cases; the second
+  was 7.240 dying with M6's message. M7 touches `apps/server/src` (imported by relative path), so the
+  harness skipped its rebuild — and M6's restore had not been followed by one either, so
+  `rule-engine/dist` still held M6's mutant. **A blast radius that was an artefact of my own harness.**
+  Re-run with a rebuild first: 7.241 alone. *A CONDITIONAL rebuild is the shape that defeats the repo's
+  own stale-dist rule; rebuild unconditionally after every restore.*
+- M8's first attempt anchored on `REFUSAL_RULES.restrictTo`, which matches **twice**; the harness
+  refused to apply it. **An anchor failure is a mutation that never ran** — reporting it as a survivor
+  would have condemned a check that is fine.
+
+## THE CLAIM I AM LEAST SURE OF
+
+**7.242's reason assertion is the weakest line on the branch.** It asserts only
+`expect(result.reason).toContain('admin')`, because the sentence `Only ${allowed.join(', or ')} may
+make this move, and ${env.actorId} is not among them.` embeds a generated actor id. The RULE is pinned
+hard and the control is tight, so the case's title holds; the reason half is closer to non-vacuity than
+to a property. A reviewer aiming limited budget should aim it there.
+
+## COLLISIONS — re-measured from origin at the rebase, not adopted
+
+At the rebase, `origin/main` had gained seven commits and **all three peer branches had merged**:
+Lane E's #205 (`f4a8cca`), Lane B's 12.365 (`d5e562e`), Lane D's 12.344 (`81ccb68`). Nothing is in
+flight against this branch. My branch-vs-base diff is **six files**, all test and catalogue:
+`Features.md` · `test-cases/07-api-realtime-search.md` ·
+`apps/server/test/integration/fixture-witnesses.test.ts` ·
+`packages/app-core/test/{contests.test.tsx, flows/guarded-child-event.test.ts, views/reopen-flow.test.tsx}`.
+**No `src` file is touched anywhere** — verified from `git status --porcelain`, not from memory.
+
+## WHAT A FRESH LANE A WOULD TAKE NEXT
+
+Of the 21 addressable rows the previous handoff established, this cluster takes 5 buildable + 6
+catalogued, so **roughly ten remain**, and the honest answer is that the cheap ones are gone: what is
+left needs either a web-side `inject()` harness (7.243, and the `apps/web` mirrors behind it) or a
+real device/bucket/Picker runtime, which is not a budget problem but a buildability one. **The single
+highest-value item that IS buildable here is 7.245** — exporting `checks/refusals.ts` from
+`rule-engine`'s index so no downstream test ever has to transcribe a refusal sentence again. It is a
+one-line source change, which makes it a ruling and not this lane's to take.
+
+---
+
+# ↓ LANE A — #204 (the invite/refusal cluster) RECORD. **MERGED as `ebba353`; its "IDLE / awaiting
+# re-tasking" position line and its "NEXT CLUSTER" scoping are both SUPERSEDED by the block above.**
+
+**The scoping below was the input to this pass and it is kept for its reasoning, not its conclusions.**
+Two of its statements are now known false and are corrected in the block above rather than edited here,
+so the correction stays legible: (a) rows 1 and 2 said the client's `PARENT_TERMINAL_REASON` models the
+engine's refusal — it models nothing the engine emits; (b) the "LIVE FINDING" said
+`'ticket.unknown-state'` has no producer — it has one under a different name
+(`migration.unknown-target-state`), and the sweep that missed it was well-formed.
+
 # LANE A — **IDLE. #204 IS MERGED as `ebba353`. Nothing is in flight. Awaiting re-tasking.**
 
 **The invite/refusal cluster is closed.** 7.230–7.237 are on `main`: eight witnesses, **eight mutation
