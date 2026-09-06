@@ -900,7 +900,39 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   per restart. Object keys are traversal-proof by CONSTRUCTION, not by blocklist: `w/<ulid>/a/<ulid>`
   segments admit only letters, digits, `_` and `-` — no dot is a legal character in any segment, so `.`
   and `..` are unrepresentable rather than merely refused. `LocalDiskStore.put` writes to a temp file and
-  `rename`s into place, so a torn write can never surface as a readable half-object. `apps/server/src/attachments/object-store.ts`, `local-disk-store.ts`, `s3-store.ts`, `store-config.ts`
+  `rename`s into place, so a torn write can never surface as a readable half-object. A fourth verb,
+  **`list(prefix?)`**, was added for Plan 11's orphan sweep: `LocalDiskStore.list` walks `rootDir`
+  structurally rather than by a traversal check — `readdir(..., {withFileTypes:true})` reports a symlink's
+  `Dirent` as neither `isDirectory()` nor `isFile()`, so the walk recurses into real directories and reports
+  real files only, never following a symlink planted inside the root — and `S3ObjectStore.list` PAGINATES
+  via `ContinuationToken` rather than trusting one response, since `ListObjectsV2` truncates at 1000 keys
+  regardless of bucket size. `apps/server/src/attachments/object-store.ts`, `local-disk-store.ts`,
+  `s3-store.ts`, `store-config.ts`
+- ⚙️ **`ops:sweep-orphans` — the bytes an upload can leave behind with no row naming them** —
+  `sweepOrphanObjects` walks the attachment store's own `list()` against a UNION of the two things that can
+  name an attachment id: the `attachments` table row, and a ledger `attachment.added` event
+  (`payload->>'attachmentId'`, the same shape `evidence-gate.ts` already reads). The union is deliberate and
+  the more conservative of the two possible readings — **the web client does not currently post the ledger
+  event at all**, so treating it as the only survival signal would flag nearly every live attachment as an
+  orphan, while treating the table row as the only signal risks the opposite the day some other path
+  registers an attachment through the ledger alone. Keys are only ever considered if they have the exact
+  shape `w/<workspaceId>/a/<id>`; anything else — including a torn-write `.tmp-<pid>-<ms>` leftover, which
+  splits into four segments shaped exactly like a real key — is recorded as `unrecognizedShape` and NEVER
+  touched, at any age, because handing such a key to `store.delete` would throw on the store's own key
+  validator and take the whole sweep down. An unnamed, recognized object survives for
+  `ORPHAN_OBJECT_RETENTION_MS` (30 days, matching the user-preferences sweep's constant) before a live run
+  deletes it; a dry run reports the identical list with nothing actually removed. **Known ceiling, the same
+  class 13.34 already names for `readLedger`:** `store.list()` is called unprefixed and materialises every
+  object in memory before the loop starts, so peak memory scales with object COUNT rather than anything
+  bounded — a constant-memory sweep needs a paged/streaming `list()`, a change to the `ObjectStore` contract
+  itself, not fixed here. **KNOWN GAP, OWNED HERE
+  RATHER THAN FIXED**: `deploy/do/app.yaml`'s `backup` worker env block does not yet include `OBJECT_STORE`
+  or `OBJECT_STORE_S3_BUCKET` — it carries only the five `OBJECT_STORE_S3_*` variables the SEPARATE backup
+  object-sink needs, under a different bucket variable. Without those two added to that worker's block,
+  `createObjectStoreFromEnv` in the deployed worker silently falls back to a LOCAL DISK store no other
+  process can see, and the scheduled sweep collects nothing real in production. Editing `deploy/do/app.yaml`
+  is out of scope here (another lane's file at the time this shipped); this is the handoff for whoever next
+  touches it. `apps/server/src/tools/sweep-orphans.ts`
 - ⚙️ **`readAtMost` — the size ceiling enforced DURING the stream, not after buffering it** — an oversize
   upload is refused while its bytes are still arriving, so it cannot exhaust memory on the way to being
   refused; the refusal names the ceiling in the units a person reads (MB), and a sub-mebibyte ceiling
@@ -1792,6 +1824,36 @@ task's own change set — see the note at the top of `test-cases/13-deployment-d
   stops the schedule and ends the pool.
   `apps/server/src/ops/{schedule,export-ledger,pg-dump,backup-daemon-main}.ts`, `apps/server/package.json`'s
   `ops:backup-once` script
+- ⚙️ **The scheduler generalised to N jobs, and two more Plan 11 "ops errands" registered on it** —
+  `startScheduler(jobs: ScheduledJob[], alerter)` extracts the daemon's private `loop`/`onFailure`
+  primitive above into a standalone function over an arbitrary list of `{name, run, delayMs}` jobs, arming
+  every job's first timer SYNCHRONOUSLY at construction and re-arming each independently after it settles —
+  one job's failure or schedule never touches another's. `startBackupDaemon` becomes a thin wrapper over it
+  with an unchanged external signature, so its own existing tests (the stderr shape, the
+  `` `backup:${name}` `` alerter key, the two-timer construction) pin the wrapper byte-for-byte with no
+  edits — but **`backup-daemon-main.ts` itself now calls `startScheduler` directly with all four jobs**,
+  not `startBackupDaemon`: one scheduler, one `stop()`, one `'backup daemon scheduled'` log line, for the
+  two backup jobs and the two errands below alike. `startBackupDaemon`'s only remaining caller is its own
+  test file, kept because it is what pins `startScheduler`'s stderr/alerter contract in one place; a
+  `sweep-orphans` failure in production alerts through that SAME contract, as `` `backup:sweep-orphans` ``
+  with `msg: 'backup job failed'` (cases 13.25/13.27's naming, extended to the two new jobs by construction
+  rather than by a fifth case). `backup-daemon-main.ts` puts two more jobs on the SAME scheduler as the
+  nightly dump and weekly export: **`sweep-orphans`**, running `sweepOrphanObjects` against the worker's own object store on a
+  fixed 30-day interval (first run 30 days after boot; "monthly" in the calendar sense would need real new
+  day-of-month logic this maintenance sweep does not need enough to justify) and logging COUNTS only, never
+  the swept key list, at `info` level; and **`sweep-notifications`**, running the existing
+  `runNotificationSweep` on `NOTIFICATION_SWEEP_INTERVAL_MS` (optional, default one hour — unset or empty
+  both mean "use the default," the same equivalence `ALERT_WEBHOOK_URL || null` already draws elsewhere in
+  this file, because an unset App Platform binding resolves to `''`). Neither new job runs under `--once`
+  — that flag is "run the two BACKUP jobs right now," and folding an unrecoverable delete into it silently
+  would surprise whoever reaches for it expecting only a backup — and `requirePositiveIntervalMs`, beside
+  `msUntilNextUtc`, REFUSES rather than clamps a non-positive, non-finite or non-integer interval, naming
+  the bad value, so a mistyped variable exits the worker 1 on its first `delayMs()` call rather than
+  spinning it at 100% of a core or never firing at all. Construction is ALL-OR-NOTHING: `startScheduler`
+  now calls every job's `delayMs()` up front, before arming any of their timers, so a later job's refusal
+  (review-round fix, 2026-09-06) leaves zero timers live rather than orphaning the earlier, correctly-
+  configured jobs' timers with no `stop()` ever returned to cancel them.
+  `apps/server/src/ops/{schedule,backup-daemon-main}.ts`
 - ⚙️ **The backup object sink — a second, deliberately separate S3 client, and why it is not the
   attachment one** — `s3TargetFromEnv`/`s3SinkFromEnv` build a near-put-only `ObjectSink` (multipart via
   `@aws-sdk/lib-storage`, so a multi-gigabyte dump never lands in the worker's memory; plus a `discard`

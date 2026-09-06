@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { msUntilNextUtc, startBackupDaemon } from '../../src/ops/schedule.js';
+import {
+  msUntilNextUtc,
+  requirePositiveIntervalMs,
+  startBackupDaemon,
+  startScheduler,
+  type ScheduledJob,
+} from '../../src/ops/schedule.js';
 
 describe('msUntilNextUtc', () => {
   it('later today when the time is still ahead', () => {
@@ -209,5 +215,190 @@ describe('startBackupDaemon', () => {
     await vi.advanceTimersByTimeAsync(14 * 24 * HOUR);
     expect(runPgDump).not.toHaveBeenCalled();
     expect(runLedgerExport).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * `startScheduler` is the generalised primitive `startBackupDaemon` above now
+ * wraps — it is proven, byte-for-byte, by every case in that `describe`
+ * already, so this suite covers what a fixed two-job schedule cannot: an
+ * arbitrary NUMBER of independent jobs, and `stop()` clearing every one of
+ * their timers rather than just two.
+ */
+describe('startScheduler', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('arms every job synchronously at construction — N jobs means N timers before any delay elapses', () => {
+    const jobs: ScheduledJob[] = [
+      { name: 'a', run: vi.fn().mockResolvedValue(undefined), delayMs: () => 1000 },
+      { name: 'b', run: vi.fn().mockResolvedValue(undefined), delayMs: () => 2000 },
+      { name: 'c', run: vi.fn().mockResolvedValue(undefined), delayMs: () => 3000 },
+    ];
+    const scheduler = startScheduler(jobs, { notify: vi.fn() });
+    try {
+      expect(vi.getTimerCount()).toBe(3);
+    } finally {
+      scheduler.stop();
+    }
+  });
+
+  it("one job's failure and re-arm never affects another job's schedule", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const failing = vi.fn().mockRejectedValue(new Error('job a exploded'));
+    const steady = vi.fn().mockResolvedValue(undefined);
+    const scheduler = startScheduler(
+      [
+        { name: 'a', run: failing, delayMs: () => 1000 },
+        { name: 'b', run: steady, delayMs: () => 1000 },
+      ],
+      { notify: vi.fn() },
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(failing).toHaveBeenCalledTimes(1);
+      expect(steady).toHaveBeenCalledTimes(1);
+      // job 'a' re-arms despite failing, and job 'b' is unaffected by it.
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(failing).toHaveBeenCalledTimes(2);
+      expect(steady).toHaveBeenCalledTimes(2);
+    } finally {
+      scheduler.stop();
+    }
+  });
+
+  it('each job re-arms on its OWN delayMs, independent of the others', async () => {
+    const fast = vi.fn().mockResolvedValue(undefined);
+    const slow = vi.fn().mockResolvedValue(undefined);
+    const scheduler = startScheduler(
+      [
+        { name: 'fast', run: fast, delayMs: () => 100 },
+        { name: 'slow', run: slow, delayMs: () => 10_000 },
+      ],
+      { notify: vi.fn() },
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(100);
+      expect(fast).toHaveBeenCalledTimes(1);
+      expect(slow).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(200); // two more 'fast' occurrences
+      expect(fast).toHaveBeenCalledTimes(3);
+      expect(slow).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(9700); // total 10,000ms elapsed
+      expect(slow).toHaveBeenCalledTimes(1);
+    } finally {
+      scheduler.stop();
+    }
+  });
+
+  /**
+   * Regression flagged in review, not in the original plan (catalogued in the
+   * `startScheduler` PENDING BLOCK in test-cases/13 — no id allocated yet):
+   * if a LATER job's `delayMs()` throws, earlier jobs must not end up
+   * with live, orphaned timers — `startScheduler` must arm all of them or
+   * none of them. Before the fix, arming happened one job at a time in loop
+   * order, so job 'a' (and 'b') got a real `setTimeout` before job 'c' ever
+   * threw, and `startScheduler` propagated the exception with no `stop()` to
+   * cancel what was already armed. `vi.getTimerCount()` after the throw is
+   * the direct witness: 0 means "nothing was armed", matching this test;
+   * before the fix it was 2 (the two jobs ahead of the throwing one) —
+   * mutation-verified by reverting the fix's construction loop back to
+   * `for (const job of jobs) loop(job);`, which reddens exactly this
+   * assertion (at exactly 2, not some other count) with every sibling case
+   * in this file, including the one directly below, still green.
+   */
+  it("a later job's throwing delayMs() leaves NO job armed — not even the earlier ones", () => {
+    const a = { name: 'a', run: vi.fn().mockResolvedValue(undefined), delayMs: () => 1000 };
+    const b = { name: 'b', run: vi.fn().mockResolvedValue(undefined), delayMs: () => 2000 };
+    const c = {
+      name: 'c',
+      run: vi.fn().mockResolvedValue(undefined),
+      delayMs: (): number => {
+        throw new Error('NOTIFICATION_SWEEP_INTERVAL_MS must be a positive integer, got \'nope\'');
+      },
+    };
+    expect(() => startScheduler([a, b, c], { notify: vi.fn() })).toThrowError(
+      /NOTIFICATION_SWEEP_INTERVAL_MS/,
+    );
+    // The regression: this used to be 2 (job 'a' and 'b' already armed via
+    // setTimeout before job 'c' threw), leaking timers `stop()` could never
+    // reach because `startScheduler` never returned one.
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('a job earlier in the list throwing means nothing after it is even asked for a delay', () => {
+    const bCalled = vi.fn(() => 1000);
+    const a = {
+      name: 'a',
+      run: vi.fn().mockResolvedValue(undefined),
+      delayMs: (): number => {
+        throw new Error('a is misconfigured');
+      },
+    };
+    const b = { name: 'b', run: vi.fn().mockResolvedValue(undefined), delayMs: bCalled };
+    expect(() => startScheduler([a, b], { notify: vi.fn() })).toThrowError(/a is misconfigured/);
+    expect(bCalled).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("stop() clears EVERY job's timer, not merely the first two", async () => {
+    const jobs: ScheduledJob[] = Array.from({ length: 5 }, (_, i) => ({
+      name: `job-${i}`,
+      run: vi.fn().mockResolvedValue(undefined),
+      delayMs: () => 1000,
+    }));
+    const scheduler = startScheduler(jobs, { notify: vi.fn() });
+    expect(vi.getTimerCount()).toBe(5);
+    scheduler.stop();
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(60_000);
+    for (const job of jobs) {
+      expect(job.run).not.toHaveBeenCalled();
+    }
+  });
+});
+
+/**
+ * The interval-validator half of the "refuse, don't clamp" rule
+ * `msUntilNextUtc`'s HH:MM and day-of-week checks already make above — this
+ * is the same discipline applied to a plain millisecond interval, for the
+ * notification-sweep job `backup-daemon-main.ts` adds on top of the
+ * scheduler. Every legitimate value passes; every illegitimate one throws
+ * synchronously, naming the value, rather than producing a tight re-arm loop
+ * (`0`/negative) or a call that never fires (`NaN`).
+ */
+describe('requirePositiveIntervalMs', () => {
+  it('a positive integer millisecond value passes through unchanged', () => {
+    expect(requirePositiveIntervalMs(3_600_000, 'NOTIFICATION_SWEEP_INTERVAL_MS')).toBe(3_600_000);
+    expect(requirePositiveIntervalMs(1, 'NOTIFICATION_SWEEP_INTERVAL_MS')).toBe(1);
+  });
+
+  it('zero is refused, named', () => {
+    expect(() => requirePositiveIntervalMs(0, 'NOTIFICATION_SWEEP_INTERVAL_MS')).toThrowError(
+      /NOTIFICATION_SWEEP_INTERVAL_MS.*'0'/,
+    );
+  });
+
+  it('a negative value is refused, named', () => {
+    expect(() => requirePositiveIntervalMs(-500, 'NOTIFICATION_SWEEP_INTERVAL_MS')).toThrowError(
+      /NOTIFICATION_SWEEP_INTERVAL_MS.*'-500'/,
+    );
+  });
+
+  it('NaN is refused, named', () => {
+    expect(() => requirePositiveIntervalMs(Number('not-a-number'), 'X')).toThrowError(/X.*'NaN'/);
+  });
+
+  it('a non-integer (fractional) value is refused', () => {
+    expect(() => requirePositiveIntervalMs(1000.5, 'X')).toThrowError(/X/);
+  });
+
+  it('Infinity is refused — finite is part of "positive integer", not assumed', () => {
+    expect(() => requirePositiveIntervalMs(Number.POSITIVE_INFINITY, 'X')).toThrowError(/X/);
   });
 });

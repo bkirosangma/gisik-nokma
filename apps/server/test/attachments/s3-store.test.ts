@@ -1,5 +1,11 @@
 import { Readable } from 'node:stream';
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { mockClient } from 'aws-sdk-client-mock';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { InvalidObjectKeyError, ObjectNotFoundError } from '../../src/attachments/object-store.js';
@@ -50,6 +56,44 @@ describe('S3ObjectStore', () => {
   it('other S3 failures propagate untranslated', async () => {
     s3Mock.on(GetObjectCommand).rejects(Object.assign(new Error('denied'), { name: 'AccessDenied' }));
     await expect(makeStore().getStream('w/ws1/a/x')).rejects.toThrow('denied');
+  });
+
+  it('list maps Contents Key/LastModified, and applies Prefix when given', async () => {
+    const lastModified = new Date('2026-08-01T00:00:00.000Z');
+    s3Mock.on(ListObjectsV2Command).resolves({
+      Contents: [
+        { Key: 'w/ws1/a/att1', LastModified: lastModified },
+        { Key: 'w/ws1/a/att2', LastModified: lastModified },
+      ],
+      IsTruncated: false,
+    });
+    const listing = await makeStore().list('w/ws1/a/');
+    expect(listing).toEqual([
+      { key: 'w/ws1/a/att1', lastModified },
+      { key: 'w/ws1/a/att2', lastModified },
+    ]);
+    expect(s3Mock.commandCalls(ListObjectsV2Command)[0]!.args[0].input.Prefix).toBe('w/ws1/a/');
+  });
+
+  it('list paginates via ContinuationToken rather than stopping at one page', async () => {
+    const t = new Date('2026-08-01T00:00:00.000Z');
+    s3Mock
+      .on(ListObjectsV2Command)
+      .resolvesOnce({
+        Contents: [{ Key: 'w/ws1/a/page1', LastModified: t }],
+        IsTruncated: true,
+        NextContinuationToken: 'token-2',
+      })
+      .resolvesOnce({
+        Contents: [{ Key: 'w/ws1/a/page2', LastModified: t }],
+        IsTruncated: false,
+      });
+    const listing = await makeStore().list();
+    expect(listing.map((entry) => entry.key)).toEqual(['w/ws1/a/page1', 'w/ws1/a/page2']);
+    const calls = s3Mock.commandCalls(ListObjectsV2Command);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.args[0].input.ContinuationToken).toBeUndefined();
+    expect(calls[1]!.args[0].input.ContinuationToken).toBe('token-2');
   });
 
   it('delete sends DeleteObject', async () => {

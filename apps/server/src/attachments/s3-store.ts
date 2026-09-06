@@ -1,9 +1,15 @@
 import type { Readable } from 'node:stream';
-import { DeleteObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import {
   ObjectNotFoundError,
   assertValidObjectKey,
+  type ObjectListing,
   type ObjectMeta,
   type ObjectStore,
 } from './object-store.js';
@@ -87,5 +93,35 @@ export class S3ObjectStore implements ObjectStore {
   async delete(key: string): Promise<void> {
     assertValidObjectKey(key);
     await this.client.send(new DeleteObjectCommand({ Bucket: this.config.bucket, Key: key }));
+  }
+
+  /**
+   * `prefix` is a SEARCH FILTER, not a key — `w/` is a legitimate prefix and
+   * would fail `assertValidObjectKey`'s per-segment check, so unlike the
+   * other three verbs this one does not validate it.
+   *
+   * Paginates via `ContinuationToken` rather than trusting one response:
+   * `ListObjectsV2` truncates at 1000 keys per call regardless of how many
+   * the bucket holds, and a bucket this sweep runs against for months will
+   * cross that line.
+   */
+  async list(prefix?: string): Promise<ObjectListing[]> {
+    const results: ObjectListing[] = [];
+    let continuationToken: string | undefined;
+    do {
+      const response = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.config.bucket,
+          ...(prefix === undefined ? {} : { Prefix: prefix }),
+          ...(continuationToken === undefined ? {} : { ContinuationToken: continuationToken }),
+        }),
+      );
+      for (const object of response.Contents ?? []) {
+        if (object.Key === undefined || object.LastModified === undefined) continue;
+        results.push({ key: object.Key, lastModified: object.LastModified });
+      }
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+    } while (continuationToken !== undefined);
+    return results;
   }
 }
