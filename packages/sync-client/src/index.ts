@@ -21,6 +21,7 @@ export { createReplica } from './replica/replica.js';
 export type {
   BootstrapResponse,
   BootstrapTicket,
+  TicketBootstrap,
   LocalContest,
   Me,
   Replica,

@@ -66,6 +66,40 @@ export type BootstrapResponse = {
   tickets: BootstrapTicket[];
 };
 
+/**
+ * ONE ticket's replica-build payload — the per-ticket bootstrap door's request
+ * body, and the thing `Replica.loadTicketBootstrap` applies.
+ *
+ * It is `BootstrapResponse` with everything workspace-wide removed except the
+ * definitions, and the removals are the design:
+ *
+ * - **No `streamSeq`, and no cursor is written.** That is the whole reason this
+ *   type exists separately. See `loadTicketBootstrap`.
+ * - **No `me`.** A device pulling one ticket learns nothing new about its own
+ *   role, and re-writing `me` from a per-ticket response would let a stale
+ *   answer overwrite a fresher one for no benefit.
+ * - **`definitions` STAYS, and it is not optional.** A ticket arriving through
+ *   this door can sit on a workflow version this device has never seen — the
+ *   push path is safe only because definitions are class `'definition'` and
+ *   stream unconditionally in `workspaceSeq` order ahead of anything that
+ *   depends on them, and a separate HTTP pull has no such ordering. Handed an
+ *   empty list, `foldSnapshotForward` SILENTLY no-ops and the failure surfaces
+ *   one step later as `applyTicketEvent: workflow "…" vanished — replay
+ *   integrity is broken`. The server sends the full VERSION CHAIN of every
+ *   workflow the ticket references, not merely the latest, because
+ *   `foldTicketToWorkflowVersion` walks versions one at a time and a gap throws
+ *   *version chain has a hole*.
+ */
+export type TicketBootstrap = {
+  workspaceId: string;
+  /**
+   * Every version of every workflow / ticket-type the ticket below references,
+   * ascending `workspaceSeq` — the same order `buildLedgerDeps` folds them in.
+   */
+  definitions: LedgerEvent[];
+  ticket: BootstrapTicket;
+};
+
 export type LocalContest = {
   contestedEventId: string;
   originalEventId: string;
@@ -84,6 +118,17 @@ export type ReplicaTicket = { ticketId: string; confirmed: TicketState | null; c
 
 export type Replica = {
   loadBootstrap(data: BootstrapResponse): Promise<void>;
+  /**
+   * Apply ONE ticket pulled through the per-ticket bootstrap door, WITHOUT
+   * touching the workspace cursor. Ruling P37.1 / closure 5b(d).
+   */
+  loadTicketBootstrap(data: TicketBootstrap): Promise<void>;
+  /** Ticket ids this device has been told it may now read but has not pulled yet. */
+  listPendingPulls(workspaceId: string): Promise<string[]>;
+  /** Record ids as owed. Idempotent, and a re-record does not duplicate. */
+  addPendingPulls(workspaceId: string, ticketIds: readonly string[]): Promise<void>;
+  /** Forget one owed id — called only after its pull has actually landed. */
+  clearPendingPull(workspaceId: string, ticketId: string): Promise<void>;
   /** `{ applied: false }` means a duplicate event id was ignored — delivery is at-least-once. */
   applyServerItem(item: SyncItem): Promise<{ applied: boolean }>;
   purgeEntity(entityId: string): Promise<void>;
@@ -600,7 +645,41 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
    * `buildPendingOverlay` therefore stands on purpose and both sides now say
    * so. Cases 12.163 and 12.164.*
    */
-  async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: TicketStateDeps): Promise<void> {
+  /**
+ * The `meta` key one workspace's owed ticket ids live under.
+ *
+ * Namespaced by workspace exactly as `cursor:` is: one storage file can hold
+ * more than one workspace, and a device removed from one of them must not have
+ * the other's owed ids deleted with it. `revokeScope` clears this key for the
+ * workspace it names, for that reason.
+ */
+function pendingPullsKey(workspaceId: string): string {
+  return `pending-pulls:${workspaceId}`;
+}
+
+/**
+ * A stored pending-pull value → the ids.
+ *
+ * Fail-SOFT rather than fail-closed, and the asymmetry is deliberate: a
+ * corrupt or absent value yields the empty set, so a device that cannot read
+ * what it was owed is a device that has not been told, which is the state it
+ * was in before any notice arrived. Throwing here would reach `applyOne`, and
+ * `applyOne`'s rejection is the terminal stall this whole set exists to avoid —
+ * a parse failure would then brick a client over a value nothing but this file
+ * writes.
+ */
+function parsePendingPulls(value: unknown): string[] {
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === 'string');
+  } catch {
+    return [];
+  }
+}
+
+async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: TicketStateDeps): Promise<void> {
     const snapRows = await tx.all("SELECT seq, state FROM snapshots WHERE entity_kind = 'ticket' AND entity_id = ?", [
       ticketId,
     ]);
@@ -703,6 +782,145 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
         );
       });
       notify();
+    },
+
+    /**
+     * ONE ticket, applied without moving the workspace cursor — closure 5b(d),
+     * ruling P37.1.
+     *
+     * ## Why this is not `loadBootstrap` with a shorter list
+     *
+     * `loadBootstrap` ends by writing `cursor:<workspaceId>` to the server's
+     * head, unconditionally. That is right for what it is: a whole-workspace
+     * consistent cut, where the head is exactly the position the response
+     * covers. It is CATASTROPHIC for one ticket. A device at cursor 40 pulling
+     * one ticket from a server at 900 would have its cursor set to 900, and
+     * every event between 41 and 899 for every OTHER ticket would be skipped —
+     * silently, permanently, and looking exactly like convergence in any
+     * fixture quiet enough not to have those events. The pull would fix one
+     * ticket by losing the workspace.
+     *
+     * So this door writes no cursor at all, and the pulled ticket's own
+     * position is not tracked anywhere: the events it just persisted are
+     * duplicate-guarded by id, so when the stream later re-delivers them from
+     * below the cursor, `applyServerItem` ignores them and nothing is folded
+     * twice. Case 12.293 asserts the cursor is unmoved and reddens alone
+     * against a door that writes one.
+     *
+     * ## The rollback is per TICKET, not per session
+     *
+     * `loadBootstrap` wraps every ticket in ONE transaction, so one unfoldable
+     * ticket rolls back the whole response. That is correct there — a partial
+     * cut is not a cut. Here the opposite is correct: this is one ticket's
+     * worth of work, and wedging a pull the way the burst wedged the stream is
+     * the failure closure 5b exists to remove. One transaction, one ticket; if
+     * it throws, this ticket is untouched and the caller leaves the id pending
+     * for the next drain.
+     *
+     * Definitions land INSIDE that same transaction deliberately. They are
+     * workspace-global and idempotent, so rolling them back with a failed
+     * ticket costs nothing and re-applying them next time is free — whereas
+     * committing them separately would leave a device holding definitions it
+     * has no ticket for, which is harmless but is a state no other door can
+     * produce and therefore one no reader expects.
+     */
+    async loadTicketBootstrap(data) {
+      await storage.transaction(async (tx) => {
+        // Definitions first, for `loadBootstrap`'s own reason: the reducer must
+        // be able to resolve ANY workflow id an event names, and a deps object
+        // built before they landed throws on the very event they exist for.
+        const latestByWorkflow = new Map<string, PublishedWorkflowDef>();
+        for (const def of data.definitions) {
+          const dupe = await tx.all('SELECT 1 FROM events WHERE id = ?', [def.id]);
+          if (dupe.length === 0) await insertEnvelope(tx, def);
+          const published = await applyDefinition(tx, def);
+          if (published === null) continue;
+          const held = latestByWorkflow.get(published.id);
+          if (held === undefined || published.version > held.version) latestByWorkflow.set(published.id, published);
+        }
+        const localDeps = await buildLocalDeps(tx);
+        const ticket = data.ticket;
+        if (ticket.snapshot !== null) {
+          const folded = await foldSnapshotForward(
+            tx,
+            ticket.snapshot.state,
+            latestByWorkflow.get(ticket.snapshot.state.workflowId),
+          );
+          await writeSnapshot(tx, ticket.ticketId, ticket.snapshot.seq, folded);
+        }
+        for (const env of ticket.events) {
+          const dupe = await tx.all('SELECT 1 FROM events WHERE id = ?', [env.id]);
+          if (dupe.length === 0) await insertEnvelope(tx, env);
+          if (CONTEST_TYPES.includes(env.type)) await applyContest(tx, env);
+        }
+        await refoldTicket(tx, ticket.ticketId, localDeps);
+      });
+      notify();
+    },
+
+    /**
+     * ## The pending-pull set: durable, because the alternatives are a brick or a bet
+     *
+     * When a notice names a ticket this device may now read, and the pull for
+     * it fails or times out, exactly one of three things can happen and two of
+     * them are wrong:
+     *
+     * 1. **Throw.** `applyOne`'s rejection reaches `stall()`, whose flag is
+     *    cleared by `start()` and by nothing else — mobile never calls it
+     *    again, and the UI renders the state as plain "Offline". A flaky
+     *    network would brick the device until the process restarts, where
+     *    before closure 5b it merely lost a backfill. Refused.
+     * 2. **Swallow and forget.** The cursor advances past the trigger, the
+     *    notice is never regenerated for that drain, and the ids are lost with
+     *    no recovery short of a full bootstrap — which `needsBootstrap`
+     *    refuses over a local baseline. Refused.
+     * 3. **Swallow and REMEMBER.** The cursor is free to advance, nothing
+     *    stalls, and the next catch-up drains what is owed.
+     *
+     * It is stored rather than held in memory because a process restart is the
+     * one recovery a user actually performs, and an in-memory set makes the
+     * restart the thing that loses the ids. It lives in `meta` beside
+     * `cursor:` and `me` — key/value, so no schema change — as a JSON array.
+     *
+     * **This is also what makes convergence independent of the notice arriving
+     * twice**, which matters because `net/http-transport.ts`'s frame dispatch
+     * is an if/return ladder with no trailing branch: a frame a client build
+     * does not recognise is dropped in silence while the event behind it is
+     * accepted. Not reachable for this change set — client and server ship
+     * together — but a design that leaned on re-delivery would be leaning on
+     * that ladder staying exhaustive forever.
+     */
+    async listPendingPulls(workspaceId) {
+      const rows = await storage.all('SELECT value FROM meta WHERE key = ?', [pendingPullsKey(workspaceId)]);
+      return parsePendingPulls(rows[0]?.['value']);
+    },
+
+    async addPendingPulls(workspaceId, ticketIds) {
+      if (ticketIds.length === 0) return;
+      await storage.transaction(async (tx) => {
+        // Read-modify-write INSIDE the transaction. Two notices in one drain
+        // are applied one after another on the engine's serial chain, but the
+        // set is public API and a shell may add to it too; a read outside the
+        // transaction would lose one writer's ids to the other's write.
+        const rows = await tx.all('SELECT value FROM meta WHERE key = ?', [pendingPullsKey(workspaceId)]);
+        const held = new Set(parsePendingPulls(rows[0]?.['value']));
+        for (const id of ticketIds) held.add(id);
+        await tx.run(
+          'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          [pendingPullsKey(workspaceId), JSON.stringify([...held])],
+        );
+      });
+    },
+
+    async clearPendingPull(workspaceId, ticketId) {
+      await storage.transaction(async (tx) => {
+        const rows = await tx.all('SELECT value FROM meta WHERE key = ?', [pendingPullsKey(workspaceId)]);
+        const held = parsePendingPulls(rows[0]?.['value']).filter((id) => id !== ticketId);
+        await tx.run(
+          'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          [pendingPullsKey(workspaceId), JSON.stringify(held)],
+        );
+      });
     },
 
     async applyServerItem(item) {
@@ -812,6 +1030,14 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
           await tx.run('DELETE FROM workflows', []);
           await tx.run('DELETE FROM ticket_types', []);
           await tx.run('DELETE FROM meta WHERE key = ?', [`cursor:${instruction.workspaceId}`]);
+          // And what this device was OWED but never pulled (closure 5b(d)).
+          // Left behind, the pending set would have a removed device asking
+          // `/v1/sync/bootstrap/ticket` for ids in a workspace it is no longer
+          // in, on every catch-up, forever — answered 403 each time. It is also
+          // the only per-workspace key besides the cursor, so it belongs in the
+          // same statement group rather than in a later one somebody has to
+          // remember to add.
+          await tx.run('DELETE FROM meta WHERE key = ?', [pendingPullsKey(instruction.workspaceId)]);
         }
       });
       notify();
