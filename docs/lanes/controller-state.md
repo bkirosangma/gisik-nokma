@@ -11,6 +11,49 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
+## ⛔ OWNER INSTRUCTION 2026-09-06 18:41 IST — AFTER MONDAY'S WEEKLY RESET, BACK TO SERIAL EXECUTION, TOKEN ECONOMY FIRST. READ THIS BEFORE ANY RELAUNCH.
+
+**Owner, verbatim:** *"after monday morning weekly reset, switch back to serial execution, doing the best to save
+token limits. (what we were doing the day before)"* — i.e. the two-session topology of 2026-09-05 (controller +
+ONE executor, `dispatch-controller-serial.md` / `dispatch-executor-serial.md`), not the five owner-directed
+parallel lanes of 2026-09-06 (00:30 block below). **The five lanes run only until their in-flight PRs land or the
+weekly meter halts them** (81% at 18:45, reset **Mon 2026-09-07 06:30 IST**).
+
+**Tonight (the last controller before the halt):** land what is in flight — #205 (E), #213 (D), B's wire witness,
+A's cluster — under the waiver with the forced gate at merged `main`; **dispatch nothing new**; each lane's LAST
+act is a handoff a reader with none of its context can pick up; Lane C is released (nothing more tonight). Then
+write **`gisik-nokma-lanes/override-serial-monday.md`** for the serial executor from the final positions (the
+queue below), commit it to this file's branch, and stop. If the halt arrives first, Monday's controller writes it
+from this block.
+
+**Monday, the controller's procedure (no written procedure is invented — this IS it):**
+1. Confirm the weekly meter is reset. Read this file top-down; every lane's handoff from `main` (`docs/lanes/executor-state.md`
+   = A's and the serial executor's, `executor-state-{B,C,D,E}.md`) — from its BRANCH if a lane's PR is still open.
+2. Merge nothing that lacks a review verdict and a gate at its exact head; a still-open lane PR is the serial
+   executor's first item (rebase, re-gate, report), not the controller's to finish.
+3. **Do NOT run `start-lanes.sh`; do not relaunch any `lane*` session.** `tmux kill-session -t gisik` (the launcher
+   refuses to run while the session exists), then `cd gisik-nokma-lanes && ./start-serial.sh override-serial-monday.md`
+   — controller **Sonnet** (the launcher's default; rulings go back to the owner for an Opus session per the serial
+   brief's seven triggers), executor **Opus** in `gisik-nokma-exec`. One executor, one PR per step, one subagent at a
+   time, no Workflow fan-outs, `--concurrency=1`, docs re-anchors batched per merge rather than per boundary.
+4. The Monitor (`ctl-watch.sh`) and `gate.sh` v3.3 live in the controller's scratchpad; re-arm at the relaunch.
+
+**The Monday executor's queue, in order (finalise in the override from the final positions):**
+(a) any of #205 / #213 / B's `exec/46-reach-granted-wire` / A's `exec/48-refusal-vocabulary` that did not land —
+rebase, reinstall, re-gate at the head, report; (b) **Plan 11 T16** (E's §2 in `override-laneE.md`: runbook,
+`Features.md` §13, `test-cases/13` final shape, the verifier's DDL decision written into `deploy/do/README.md`;
+precondition met on `main`) → **promote 11/16 → Plan 11 COMPLETE → 177/177**; (c) the Lane F serial passes 1–3
+(the test-cases↔test citation convention, semantic extraction `--mode deep` on client packages, the comment
+tightening pass) — one PR each; (d) the carried items with owners: the `'ticket.unknown-state'`/`'state-machine'`
+no-producer finding (Plan 5, if A did not settle it), 13.176 (a guest has no navigation to explicitly shared
+tickets — Plan 6 / visibility), the `notifications-gateway` web-side harness (row 8 of A's cluster), 12.321/12.322/
+12.258, `TicketPullNotFound` after `withTimeout` abandonment, `seed:dev` runtime coverage (13.181), the six
+`helpers/seed.ts` items A classified 17:35. Every ❌ keeps its owner; nothing is promoted without a witness.
+
+**Process note from Lane D, 18:41, for every lane and for Monday:** a subagent dispatch that "failed" on the
+account-side access error had already committed real, correct work before its final report call errored —
+**treat a failed dispatch as UNVERIFIED, not as EMPTY**: read the tree and the log before re-dispatching.
+
 ## ⏩ CONTROLLER RESUMED 2026-09-06 17:23 IST IN A FRESH CONTEXT (Fable, session name unchanged `gisik-nokma-0d`) — LIVE STATE, re-measured at `131b283` (17:26)
 
 **The 17:20 `/clear` worked as designed.** The fresh context read this file top-down (the 12:26 block's
@@ -77,6 +120,17 @@ section is the dispatch record this block confirms — every lane was observed a
   evening: land what is in flight (#205, B's and D's small PRs, A's cluster); past ~90% take pushed handoffs
   and dispatch nothing new; at 100% everything halts together until Monday.** The session meter (20%, reset
   22:20) is not the constraint.
+
+- **Machine ASLEEP ~17:50–18:34** (every lane's turn timer read 2–4 min at 18:37; the Monitor's 120 s poll emitted
+  nothing across the span; weekly meter unchanged at 81%). All lanes resumed on wake, nothing lost.
+- **#213 OPEN (Lane D, 12.344 — the protocol ping answered as a text pong earns `bad-message`, an excluding pair on
+  one real `ws` connection; test-only: `socket-cut.test.ts` +235, §12, one Features.md line; the four protected
+  sync-surface files verified untouched; head `cca84af`, 18:41).** D's workflow's implementer committed its work
+  and then errored on the access error; **no review agent ran**; D read both commits in full and re-ran the
+  excluding mutation independently (1 failed | 3 passed at the case's own sentence; restore verified by sha256).
+  **Held 18:45 for the FULL GATE at the exact head** (only the targeted 4/4, server typecheck, `check:env`,
+  `check-case-ids` ran) — the waiver covers CI, not the gate; D's own read stands as the second party, to be said
+  in the PR body. Merge on the gate line → forced gate at merged `main` → D's last act is its handoff.
 
 **Controller's next actions, in order (17:34; #204 done):** E's report → the reviewer's verdict + the re-gate
 at the exact head (+ the non-docs-delta test if it rebased after gating) → merge #205 under the waiver →
