@@ -33,6 +33,7 @@ import {
   mapPreferences,
   mapWorkflowDef,
   mapWorkspaceRefs,
+  refusalText,
   rosterByActorId,
   type FetchLike,
 } from '@gisik-nokma/app-core/online';
@@ -1446,6 +1447,17 @@ describe('the refusal vocabulary, against the real engine over the real door', (
    *
    * This is the file's ONE case of comparison form (2) — a second,
    * independently-owned constant — and it is the reason this cluster exists.
+   *
+   * **A NARROWER CLAIM THAN AN EARLIER DRAFT MADE, corrected by review.** That draft
+   * said "a rename on either side reddens here and nowhere else in the repo",
+   * which is false: an engine-side rename also reddens
+   * `rule-engine/test/hierarchy.test.ts:138`, `reparent.test.ts:371`,
+   * `sync-client/test/precheck.test.ts:169` and three sites in
+   * `dual-client/scenarios.test.ts`; a client-side rename reddens
+   * `app-core/test/views/reopen-flow.test.tsx:85`. What is unique to this case is
+   * that it is **the only place the two spellings are compared with each other** —
+   * every one of those sites pins one side against a literal of its own, so they
+   * all stay green while the two packages disagree.
    */
   it('7.238 a live child under a FINISHED parent is refused under the client’s own PARENT_TERMINAL_RULE', async () => {
     // NON-VACUITY FIRST, and it is the tightest control available: the same
@@ -1472,9 +1484,33 @@ describe('the refusal vocabulary, against the real engine over the real door', (
 
     // THE PROPERTY. Left side: the engine's bare literal, carried over HTTP and
     // through the shipped mapper. Right side: the client's exported constant,
-    // owned by another package, and the one `submitChildEvent` branches on.
-    // A rename on either side reddens here and nowhere else in the repo.
+    // owned by another package, and the one `submitChildEvent` branches on. This
+    // is the only place in the repo the two spellings meet.
     expect(result.rule).toBe(PARENT_TERMINAL_RULE);
+
+    // THE ADD-ARM SENTENCE, READ OFF THE WIRE — and this assertion is here
+    // because review caught its absence. Without it the corrected constant in
+    // `app-core/test/flows/guarded-child-event.test.ts` and
+    // `views/reopen-flow.test.tsx` would still be a transcription verified only by
+    // a human reading `refusals.ts`, which is the failure this cluster exists to
+    // close, at one remove. The battery said so before the reviewer did: M4 mutates
+    // the SHARED return template both arms build from, and it killed 7.239 alone —
+    // there was nothing here for it to redden.
+    //
+    // Comparison form (1): the observed bytes. The title is the one `beforeAll`
+    // gave the parent and `Done` is the workflow definition's NAME for the state
+    // id `done`, resolved by the server through `ctx.getWorkflowDef`; a reason
+    // reading `(done)` would mean that lookup failed and the refusal degraded.
+    // The same bytes are carried by the producer package's own fixture
+    // `packages/rule-engine/fixtures/created-under-terminal-parent.json`, whose
+    // `expected.reason` the engine's suite asserts against `evaluateEvent` — so
+    // this literal and that fixture redden together and neither certifies itself.
+    expect(result.reason).toBe(
+      `"${TERMINAL_PARENT_TITLE}" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.`,
+    );
+    // THE VERB PAIR from this side, so a producer that collapsed the two arms into
+    // one sentence reddens at BOTH 7.238 and 7.239 rather than at neither.
+    expect(result.reason).not.toContain('Moving live work');
   });
 
   /**
@@ -1666,13 +1702,21 @@ describe('the refusal vocabulary, against the real engine over the real door', (
     // unnoticed. This pair is weaker than it looks on its own — see the header —
     // and is why the literal is written out rather than replaced by the import.
     expect(body.rule).toBe(MIGRATION_RULES.unknownTargetState);
-    // THE FINDING, FALSIFIABLE. The `app-core` fixture's spelling is not the
-    // route's, and this line is what will notice if that ever changes.
-    expect(body.rule).not.toBe('ticket.unknown-state');
     // The reason names the DESTINATION workflow and the offending state, both
     // resolved by the server; a client reading it learns which map entry to fix.
     expect(body.reason).toContain('"Back-office flow"');
     expect(body.reason).toContain('"never-a-state"');
+
+    // A SHIPPED CLIENT MODULE OVER THESE REAL BYTES, and it is what keeps this
+    // case a witness rather than a route test. `refusalText`
+    // (`app-core/src/online/http.ts:69`) is the one narrowing this package ships
+    // for a refusal body: it reads `message` first and falls back to `reason`.
+    // The migrate route's 422 carries `reason` and no `message`, so this exercises
+    // the SECOND branch over bytes a server really sent — asserted below rather
+    // than assumed, because if a `message` ever appears this case has silently
+    // moved to the first branch and stopped measuring what its title says.
+    expect(body).not.toHaveProperty('message');
+    expect(refusalText(body)).toBe(body.reason);
   });
 
   /**
@@ -1691,11 +1735,15 @@ describe('the refusal vocabulary, against the real engine over the real door', (
    * `REFUSAL_RULES.restrictTo`, so an assertion against that constant alone would
    * be a self-comparison through one module.
    *
-   * **What makes this a rank-and-role measurement rather than a permission one:**
-   * the member is granted workspace membership AND project membership first, and
-   * the control below is the SAME actor moving the SAME ticket along an UNGATED
-   * edge. If the refusal were really about permission or visibility, the control
-   * would be refused too.
+   * **What makes this a role measurement rather than a permission one:** the
+   * member is granted workspace membership AND project membership first, and the
+   * control is the SAME actor moving a ticket of the SAME TYPE out of the SAME
+   * state along the UNGATED edge. *A different ticket instance* — `approvalTicket()`
+   * mints a fresh ULID per call, and an earlier version of this sentence said "the
+   * same ticket", which was wrong. The instance difference is inert (both created
+   * identically by the owner, both sitting in `todo`); what the control excludes is
+   * everything the committed move had to satisfy — session, workspace membership,
+   * project membership, submit permission, and type/workflow resolution.
    */
   it('7.242 a non-admin on a role-gated edge is refused restrict-to, not by permission', async () => {
     const vocMember = await signedIn();
@@ -1799,8 +1847,15 @@ describe('the refusal vocabulary, against the real engine over the real door', (
 
     expect(result.rule).toBe('restrict-to');
     expect(result.rule).toBe(REFUSAL_RULES.restrictTo);
-    // Non-empty and the engine's, not a placeholder: the reason names the role
-    // the edge requires, which is the only thing the actor can act on.
-    expect(result.reason).toContain('admin');
+    // THE WHOLE SENTENCE, and it replaces a `toContain('admin')` that review
+    // correctly called dressed-up non-vacuity: `'admin'` is a value THIS TEST typed
+    // into the workflow definition above, so a producer that hard-coded it would
+    // have satisfied that line. The equality below pins the frame, the `', or '`
+    // join implied by the single-criterion phrasing, and — the half no fixture can
+    // fake — that the refusal names the ACTOR, whose id the server resolved from
+    // the session and which nothing in the workflow definition carries.
+    expect(result.reason).toBe(
+      `Only anyone with the role admin may make this move, and ${vocMember.userId} is not among them.`,
+    );
   });
 });

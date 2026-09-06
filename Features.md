@@ -807,12 +807,18 @@ reason on record, not an oversight:*
   module and cannot fail — so every case pairs the producer's constant with a literal, and 7.238 is
   the one case comparing two INDEPENDENTLY-OWNED constants (`app-core`'s `PARENT_TERMINAL_RULE`
   against the engine's bare literal), which is the pair the whole reopen affordance hangs on and which
-  nothing had ever compared. Two fabrications were found and corrected in the client fixtures: a
-  parent-terminal reason no engine version emits, present in two files under comments naming the
-  producer; and a migration rule name from the wrong family (7.246). Not buildable from a server test
-  and recorded with owners instead: the web notifications gateway (7.243), the contest round trip
-  (7.244), `rule-engine`'s unexported refusal words (7.245), and Lane B's `sync-client` literals
-  (7.248). `apps/server/test/integration/fixture-witnesses.test.ts`
+  nothing had ever compared. Four of the five run a client mapper (`mapIngestResults`); 7.241's typed
+  consumer lives in `apps/web`, which `apps/server` cannot depend on, so it runs the shipped
+  `refusalText` over the real bytes instead and the case says so rather than presenting the narrower
+  witness as the wider one. **One fabrication was found and CORRECTED** — a parent-terminal reason no
+  engine version emits, carried by two client files under a comment and an identifier naming the
+  producer. **A second was found and RECORDED, not corrected** (7.246): a migration rule name from the
+  wrong family, where the real vocabulary lives in `apps/server` and the client must not depend on it.
+  Not buildable from a server test and recorded with owners: the web notifications gateway (7.243),
+  the contest round trip (7.244), the ergonomics of `rule-engine`'s refusal words (7.245 — the bytes
+  ARE reachable through the `./fixtures` subpath; the function is not), and one `sync-client` mirror
+  (7.248, reduced from five to one on review — three of the cited sites were not mirrors at all).
+  `apps/server/test/integration/fixture-witnesses.test.ts`
 
 
 ## 9. Editor, documents & attachments
