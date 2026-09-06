@@ -639,6 +639,11 @@ describe('SIGNATURE GAP RECONCILED — the three client methods now name their w
   });
 
   for (const { method, url } of NO_WORKSPACE) {
+    /**
+     * 7.184 — SIGNATURE GAP: `getMyWork()` takes no `workspaceId`, and `GET /v1/me/work` without one is 400 `invalid_query`.
+     * 7.185 — the same for `getPreferences()` on `GET /v1/me/preferences`.
+     * 7.186 — and for `putPreferences(preferences)` on `PUT /v1/me/preferences`. One parametrised case proves all three, which is why they are stacked here.
+     */
     it(`${method} ${url} with no workspaceId — the request the OLD signature could build — is 400 invalid_query`, async () => {
       const refused = await app.inject({
         method,
@@ -696,6 +701,9 @@ describe('GET /v1/projects/:projectId/board vs BoardView', () => {
     expect(card).toBeDefined();
   });
 
+  /**
+   * 7.187 — DATA GAP: `BoardCard.assignee` is an `Actor`, dereferenced by the view, while the server sends a bare `assigneeId` and resolves no name.
+   */
   it('DATA GAP — `BoardCard.assignee` is an `Actor`; the server sends a bare `assigneeId` and resolves no name', () => {
     // `view-types.ts:38` — `assignee: Actor | null`, and `Actor = {id, name}`.
     // `views/board.tsx:94` calls `actorLabel(card.assignee.id, card.assignee.name)`,
@@ -708,6 +716,9 @@ describe('GET /v1/projects/:projectId/board vs BoardView', () => {
     expect(card['assigneeId']).toBe(owner.userId);
   });
 
+  /**
+   * 7.188 — the board body is `columns` FLAT, where `BoardView` is `groups` of `BoardGroup`, each holding its own `columns`.
+   */
   it('the response is `columns` flat; the client reads `groups` of `BoardGroup`, each holding its own `columns`', () => {
     // `view-types.ts:67` — `BoardView = {projectId, groups: BoardGroup[]}`, and
     // `BoardGroup = {workflowId, workflowVersion, workflowName, columns}`. The
@@ -799,6 +810,9 @@ describe('GET /v1/projects/:projectId/board vs BoardView', () => {
     // on both roads into it — so a case here would be a check that cannot fail.
   });
 
+  /**
+   * 7.190 — the server’s `TicketRollup` carries `uncategorizedChildren`, a FOURTH field `RollupToViewer` has no room for.
+   */
   it('the rollup carries a FOURTH field `RollupToViewer` has no room for', () => {
     // `RollupToViewer` (`view-types.ts:28-32`). READ OUT OF THE CLIENT SOURCE,
     // not transcribed: a literal typed here changes only when somebody edits
@@ -849,6 +863,9 @@ describe('GET /v1/projects/:projectId/board vs BoardView', () => {
 });
 
 describe('GET /v1/search vs SearchHit', () => {
+  /**
+   * 7.191 — DATA GAP: `SearchHit.matchedIn` is on no hit and at no depth; the server cannot compute it.
+   */
   it('DATA GAP — `matchedIn` is on no hit, and the server cannot compute it', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -888,6 +905,9 @@ describe('GET /v1/search vs SearchHit', () => {
 });
 
 describe('GET /v1/me/work vs MyWorkView', () => {
+  /**
+   * 7.192 — the My Work grouping MODEL differs: `{open, active, terminal}` against `MyWorkView`’s `{assigned, inTransit, contested}`.
+   */
   it('the grouping MODEL differs — `{open,active,terminal}` against `{assigned,inTransit,contested}`', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -977,6 +997,9 @@ describe('GET /v1/me/work vs MyWorkView', () => {
 });
 
 describe('GET /v1/me/workspaces vs WorkspaceRef', () => {
+  /**
+   * 7.193 — DATA GAP: `WorkspaceRef` is `{id, name, projects}`; the row has no `projects`, and the key is `workspaceId` where the client reads `id`.
+   */
   it('DATA GAP — no `projects`, and the key is `workspaceId` where the client reads `id`', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -1017,6 +1040,9 @@ describe('GET /v1/me/workspaces vs WorkspaceRef', () => {
   });
 });
 
+/**
+ * 7.194 — cited on the block: `TicketRead`’s two disagreements with the served body are worked through the tests here rather than asserted once.
+ */
 describe('GET /v1/workspaces/:ws/tickets/:id vs TicketRead', () => {
   /**
    * 7.213 — THE ROUND TRIP THIS FILE HAS NEVER DONE, and the hole BOTH of
@@ -1207,6 +1233,9 @@ describe('GET /v1/workspaces/:ws/tickets/:id vs TicketRead', () => {
 });
 
 describe('GET/PUT /v1/me/preferences vs UserPreferences', () => {
+  /**
+   * 7.195 — the client’s `UserPreferences` document is REFUSED WHOLE: `.strict()` turns three renames into one 400 rather than three partial acceptances.
+   */
   it("the client's document is REFUSED whole — `.strict()` turns three renames into one 400", async () => {
     // `view-types.ts:220` — `UserPreferences = {version: 1, projects:
     // Record<id, ProjectViewPrefs>, savedFilters}`, with
@@ -1261,6 +1290,9 @@ describe('GET/PUT /v1/me/preferences vs UserPreferences', () => {
     expect(stored.json()).toEqual(serverDoc);
   });
 
+  /**
+   * 7.196 — `FilterSpec` disagrees on PLURALITY: the client’s `assigneeIds` array is refused where the server stores a singular `assigneeId`.
+   */
   it("`FilterSpec` disagrees on plurality — the client's `assigneeIds` array is refused where `assigneeId` is stored", async () => {
     // `view-types.ts:70-81` — the client's `FilterSpec` is
     // `{assigneeIds?: string[], collaboratorIds?: string[], typeIds?: string[],
@@ -1555,6 +1587,9 @@ describe('GET /v1/contests vs the two contested refusals', () => {
 });
 
 describe('the stream union — RECONCILED: the client now has a member for every frame the server emits', () => {
+  /**
+   * 7.197 — the STREAM UNION, reconciled: the server emits `scope-revoked`, the published schema accepts it, and the client union now carries it too. The case stayed and its claim inverted.
+   */
   it('the server EMITS `scope-revoked`, the published schema accepts it, and the client union now carries it too', async () => {
     // READ OUT OF SOURCE as text, so a `dist` built from different source cannot
     // decide whether this passes and a change in the package cannot pass
@@ -1654,6 +1689,9 @@ describe('the stream union — RECONCILED: the client now has a member for every
     expect(types).toContain('scope-revoked');
   });
 
+  /**
+   * 7.198 — the event frame’s envelope carries `workspaceSeq`, and the client’s event member is now typed to hold it.
+   */
   it("the event frame's envelope carries `workspaceSeq`, and the client's event member is now typed to hold it", async () => {
     // The client half FIRST, derived from the checked-in source and not from a
     // literal typed here. Until Plan 6 Task 8 this member was
