@@ -384,10 +384,14 @@ describe('GET /v1/me/workspaces — the directory', () => {
       workspaces: Array<{ workspaceId: string; name: string | null; role: string }>;
     };
 
+    // `projects: []` since rulings P32/P38, and empty is the TRUE answer here:
+    // `found()` creates a workspace and no project, so there is none to name.
+    // Inside the exact `toEqual` rather than omitted — an absent key and an
+    // empty list are different claims on this surface.
     expect(workspaces).toEqual(
       [
-        { workspaceId: a, name: 'Alpha', role: 'owner' },
-        { workspaceId: b, name: 'Beta', role: 'owner' },
+        { workspaceId: a, name: 'Alpha', role: 'owner', projects: [] },
+        { workspaceId: b, name: 'Beta', role: 'owner', projects: [] },
       ].sort((x, y) => x.workspaceId.localeCompare(y.workspaceId)),
     );
     expect(workspaces.map((w) => w.workspaceId)).not.toContain(theirs);
@@ -432,8 +436,12 @@ describe('GET /v1/me/workspaces — the directory', () => {
     await seedGuest(db.pool, workspaceId, guest.userId);
 
     const res = await app.inject({ method: 'GET', url: '/v1/me/workspaces', headers: guest.headers });
+    // A PARTIAL WORKSPACE, and ruling P32 says that is the correct answer
+    // rather than a defect: this guest holds no project membership, so they are
+    // told the workspace they are in and the name of no project in it. The
+    // empty list is the rule applying, not a fixture that forgot to seed one.
     expect(res.json()).toEqual({
-      workspaces: [{ workspaceId, name: 'Hosted', role: 'guest' }],
+      workspaces: [{ workspaceId, name: 'Hosted', role: 'guest', projects: [] }],
     });
   });
 
@@ -460,6 +468,10 @@ describe('GET /v1/me/workspaces — the directory', () => {
       workspaceId,
       name: 'Leaving',
       role: 'owner',
+      // `toContainEqual` is a DEEP equality on the whole object, so the new
+      // field belongs here too — this is not a partial match that would have
+      // ignored it.
+      projects: [],
     });
   });
 
