@@ -494,6 +494,38 @@ restored; `git diff -- packages/app-core/src/online/mappers.ts` clean afterwards
 - 7.252 ❌ **THE SAME GAP ONE LEVEL DOWN: the TRANSITION-RULE sentences and the client pre-check's sentence are inline templates with no symbol to import.** `packages/rule-engine/src/rules/*.ts` builds all seven of its reasons inline at the `reason:` key — `require-comment.ts:14`, `require-evidence.ts:14`, `require-field.ts:16`, `require-different-user.ts:109,120`, `restrict-to.ts:40,47` — and `packages/app-core/src/precheck.ts:268` does the same for the client's own parent-terminal refusal. 7.249's export cannot reach any of them; they are not in `checks/refusals.ts`. **Consequence, measured rather than assumed:** `app-core/test/precheck.test.ts:119` and `app-core/test/inbox/fixtures.ts:49` transcribe `require-comment`'s and `require-evidence`'s sentences — **and both are byte-accurate**, so this row records a STRUCTURAL exposure and not a live defect, which is the distinction 7.247 exists to keep. `reopen-flow.test.tsx`'s `INSTANT_PARENT_TERMINAL_REASON` is the third accurate transcription. *Minting builders for them is a source change to shipped client and engine paths, therefore a ruling. Owner: whoever next touches `rule-engine/src/rules/` or `app-core/src/precheck.ts`.*
 - 7.253 ❌ **`apps/web/test/data-source-gateway.test.ts:243,259` TRUNCATE the `migration.unmapped-state` sentence.** The fixture carries `'Tickets are sitting in "todo" and the map gives it no target.'`; the route (`apps/server/src/routes/builder-reads.ts:773`) ends `… no target. Every occupied state needs one.` — the clause that tells an admin what to DO is the half that was dropped. **Graded one severity below 7.250, deliberately:** the web gateway passes `reason` through opaquely (`if (cause instanceof HttpError && isRefusal(cause.body)) return cause.body`) and nothing branches on it, so this pins no discriminant — fixture-realism. **Not correctable by an import:** the sentence lives in `apps/server`, which `apps/web` neither does nor should depend on — the same wall as 7.246. *Owner: whoever owns the web authoring gateway's fixtures.*
 
+> **MUTATION STATUS FOR 7.249–7.251 — THREE MUTATIONS, EACH RUN AGAINST BOTH SUITES AT ONCE, because
+> for this change the finding is WHICH SIDE REDDENS.** `apps/server`'s witness file (25 tests) and the
+> three rewritten `app-core` files (37 tests) in one pass, `rule-engine` rebuilt unconditionally after
+> every apply and every restore.
+>
+> - **M12** — `parentTerminalRefusal`'s ADD remedy reworded (`choose` → `pick`). **SERVER RED, CLIENT
+>   GREEN:** 7.238 alone fails at its LITERAL `toBe`; all 37 client tests pass. **This asymmetry is the
+>   entire claim of 7.249, measured.** The three fixtures now import the builder, so they move with the
+>   reword in silence — and that is not a defect, it is the division of labour: the import stops the
+>   fixture from being a lie, the witness's literal catches the reword, and neither can do the other's
+>   job.
+> - **M13** — `rankRefusal`'s sentence reworded (`a ticket's parent` → `a parent`). **SERVER RED, CLIENT
+>   GREEN**, same shape: 7.240 alone, at its full-sentence `toBe`. The client stays green *including*
+>   `reopen-flow.test.tsx:214`, which interpolates the builder into a RENDERED assertion — so even the
+>   rendered half moves with the producer now.
+> - **M14 — THE MIS-WIRED EXPORT.** `src/index.ts` re-exports `deepestRankParentRefusal` under the name
+>   `parentTerminalRefusal`. **SERVER RED at the NEW export assertion and nowhere else:**
+>   `expected '"Quarterly filings" is finished (Done…' to be '"Quarterly filings" is the smallest k…'`
+>   — the wire on the left is unchanged and correct, the mis-wired export on the right is not, and the
+>   LITERAL assertion one line above stays green because the wire never moved. **That is 7.238's new
+>   line earning its place**, and it is the only failure in the repo that a wrong export would produce.
+>
+> **ONE PREDICTION REFUTED, AND BY MY OWN RULE.** M14 was predicted as *"Client: expected RED too …
+> honest evidence the client really does consume the export."* **The client was GREEN — 37 passed.**
+> Obvious in hindsight and written three paragraphs above it: an importing fixture FEEDS the builder's
+> output to a fake and reads it back, so both sides move together whatever the builder returns. The
+> prediction contradicted the property this whole case documents, one line after documenting it.
+> Recorded rather than quietly corrected, because it is the third time in this series a prediction about
+> *which side goes red* has erred toward over-claiming, and the pattern is worth more than the instance.
+> **What the client-green actually shows: there is no test anywhere that would notice the export being
+> mis-wired, except 7.238's new line.**
+
 > **MUTATION STATUS FOR 7.238–7.242 — TWELVE KILLS, EVERY RED AN
 > `AssertionError` FROM THE CASE'S OWN `expect`.** Nine before the review fix round, three after it.
 > None died at a `MappingError` shape gate and none was grey. Each was written down with its prediction BEFORE it ran; all nine matched. Run serially
