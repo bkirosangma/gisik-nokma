@@ -16,7 +16,29 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — **MAPPER-WITNESS PASS IN PROGRESS** on `exec/41-mapper-witnesses`
+# LANE A — **MAPPER-WITNESS PASS BUILT AND REVIEWED. NO FULL GATE YET — TWO OOM KILLS.** `exec/41-mapper-witnesses` @ `ea97f90`
+
+> **READ THIS BEFORE TRUSTING ANY GATE CLAIM BELOW.** The full gate has been **killed by the system
+> for low memory TWICE** at this head. Per the controller's 14:22 advisory (and my own rule, now
+> everyone's) **a gate killed twice is a fact about the machine — it is reported, not retried.**
+> **There is NO green full gate at `ea97f90`.** What exists instead, each measured and each labelled:
+>
+> | evidence | result |
+> |---|---|
+> | **`pnpm turbo run typecheck --force --concurrency=1`** | **`TYPECHECK_EXIT=0` · 16/16 tasks · 0 cached · 0 `error TS`** — the class that failed #187's first gate |
+> | partial gate (killed mid-run) | **16 of 30 tasks successful, ZERO failures**: domain 464, ui 37, rule-engine 282, editor 178, sync-client 87 = **1,048 tests passed**. `app-core`, `server` and `web` **never ran** — which is exactly where this branch's change lives, so the partial run is NOT evidence for it |
+> | the witness file itself, post-rebase | **12/12 passed** at the rebased tree |
+>
+> **After BOTH kills, checked before anything else and clean each time:** no lock file (the `trap` in
+> `locked-test.sh` released it), **zero** orphaned workers by the `ppid=1` criterion, zero pools, tree
+> clean. Nothing needed reaping — which matters, because the wrong reap takes out a peer's live pool
+> or a Claude session.
+>
+> **The machine, measured:** ~66 MB free pages and swap 69% at the first kill; ~90 MB and **89%** at the
+> second — worse after, not better. Both at `--concurrency=1`, which is already the mitigation. **The
+> lock serialises gates; it does not serialise seven Claude sessions and their subagents.**
+>
+> **OWED BEFORE MERGE: one full gate at this head in a quiet window.** Do not merge on the partial.
 
 > Re-tasked by the controller after #187 merged (`e33c429`). Closes the carried item *"no test
 > executes a mapper against a real `/v1` body — 18 of 20 entry points"* **by name**.
