@@ -5,12 +5,12 @@ Mirrors `Features.md` §12. Status: `❌` not covered · `✅` covered · `🟡`
 **ID BLOCKS — allocated by the controller, and a lane MINTS FROM ITS BLOCK, never from the maximum.**
 **Lane A `12.320–12.339`** (used through `12.328`, next free `12.329`) · **Lane B `12.290–12.319`**
 (**EXHAUSTED** — `12.319` was spent by Task 18 on the two `sync-client` guard suites that had no id) · **Lane D `12.340–12.359`**
-(unstarted) · **next block `12.360`, controller-allocated ON REQUEST ONLY.** Earlier, exhausted blocks,
+(used through `12.343` — the socket-cutting fixture) · **next block `12.360`, controller-allocated ON REQUEST ONLY.** Earlier, exhausted blocks,
 kept because their ids are live in this file: Lane D `12.224–12.227` · Lane C `12.228–12.239` · Lane A
 `12.240–12.259` · Lane B `12.260–12.289`. **`12.1–12.44` belonged to Plan 10 Task 18 and are now WRITTEN
 by it** — the reservation is discharged, not outstanding.
 
-**MAXIMUM IN USE: `12.328`** — recounted at this commit across all three id styles, not carried.
+**MAXIMUM IN USE: `12.343`** — recounted at this commit across all three id styles, not carried.
 *A maximum is a fact about a moment and this line is the only thing holding the moment.* It has gone
 stale **twenty times** in this file's life (counted from the running parenthesis it used to carry — and counted with `uniq -c`, because `grep -c` counts matching LINES and that whole parenthesis was ONE line, which is its own instance of a check answering a question nobody asked), twice inside a single change set, and twice that staleness
 became a real double-mint that two branches both reached from correct readings of it. That is why ids
@@ -33,8 +33,12 @@ never carried forward from the previous one.
 
 **Style: BARE is canonical here** (`- 12.45 ✅ …`). Task 18 normalised this file's 23 bold-style line
 heads to bare — **marker and bold placement only; no id was renumbered, and never may be.** Census at
-this commit: **bare 318, bold 0, marker-first 0; sum 318 == union 318, zero duplicates** — the 267 that
-were here (bare 244 + bold 23), plus Task 18's 44 and `12.319`, plus Lane A's `12.323–12.328` from #187.
+this commit: **bare 322, bold 0, marker-first 0; sum 322 == union 322, zero duplicates** — the 267 that
+were here (bare 244 + bold 23), plus Task 18's 44 and `12.319`, plus Lane A's `12.323–12.328` from #187,
+plus Lane D's `12.340–12.343` (the socket-cutting fixture), which were authored BOLD against the header
+this branch forked from and are written bare here because Task 18's rule above is the one that now
+holds. *Recounted at this sha rather than carried: it read `318` until this branch rebased past Task 18,
+which is the twenty-third instance of exactly what this section is about.*
 **Those six were authored bold and normalised to bare by Task 18 in its rebase, with Lane A informed** —
 by the controller's ruling of 2026-09-06, since Task 18 owns §12's final shape and a marker/bold change
 is not a renumber. That ownership ends when this task merges. New cases in any block are written bare.
@@ -2209,27 +2213,45 @@ written; they are recorded in `docs/lanes/executor-state-B.md`.
 Raised by the branch review, survived adversarial refutation, ruled the same hour. **This lane's block
 12.290–12.319, controller-allocated after 12.260–12.289 was exhausted.**
 
-- 12.290 🟡 **THE MECHANISM IS GONE; THE CONVERGENCE IT ASKED FOR IS STILL NOT MEASURED.**
-  *(Was ❌, owner closure 5b(d). Closure 5b removed the wedge and DELIBERATELY DOES NOT FLIP THIS TO ✅.)*
-  **What changed:** the grant side no longer streams history at all — `grantNoticeFor` returns ids and
-  `visible-events-for.ts` yields ONE bounded `reach-granted` frame — so the atomic non-progressing burst
-  the wedge was made of does not exist. A list of ids is a list of ids however long the histories behind
-  it are.
-  **Why this is 🟡 and not ✅, which is the honest half.** The ruling's own flip condition was *"a
-  slow-consumer close MID-PULL followed by convergence on reconnect"*, and **nothing on this branch can
-  cut a socket**: the dual-client rig has no socket by construction (`openStream` throws, deliberately,
-  so a scenario cannot believe a subscription exists), and the engine's socket tests use a fake transport
-  with no buffer bound. So the re-delivery chain — notice carries no cursor → `onCaughtUp` never fires →
-  reconnect at the same cursor → `visibleEventsFor` re-yields the trigger and regenerates the notice —
-  is argued from the code and **measured only link by link**, never end to end. *Flipping this on the
-  strength of "the burst is gone" would be exactly the move 12.274's own history warns about: the mirror
-  half was once called "partly discharged" on a reading, and that claim had to be withdrawn.*
-  **What IS measured instead**, and it is the property that makes the wedge unreachable rather than
-  merely smaller: a failed or timed-out pull leaves its id in a DURABLE pending set and the next
-  catch-up retries it (12.306), and an unsettling pull is abandoned rather than parking the apply chain
-  (12.308). Convergence after an interruption therefore does not depend on the notice arriving twice —
-  which matters, because `net/http-transport.ts`'s frame dispatch is an if/return ladder with no
-  trailing branch and an unrecognised frame is dropped in silence.
+- 12.290 ✅ **THE MECHANISM IS GONE, AND THE CONVERGENCE IT ASKED FOR IS NOW MEASURED END TO END.**
+  *(Was ❌ under closure 5b(d), then 🟡 for the whole of ruling P37.1's life. Flipped 2026-09-06 by
+  `apps/server/test/dual-client/socket-cut.test.ts`, cases 12.340-12.343 — Lane D, the fixture the
+  🟡 entry named as the only thing that could flip it.)*
+  **What changed first:** the grant side no longer streams history at all — `grantNoticeFor` returns ids
+  and `visible-events-for.ts` yields ONE bounded `reach-granted` frame — so the atomic non-progressing
+  burst the wedge was made of does not exist. A list of ids is a list of ids however long the histories
+  behind it are.
+  **What changed second, and is why this is ✅.** The ruling's flip condition was *"a slow-consumer close
+  MID-PULL followed by convergence on reconnect"*, and the 🟡 entry's stated blocker was that **nothing
+  on this branch could cut a socket** — the dual-client rig has none by construction (`openStream`
+  throws, deliberately) and the engine's tests use a fake transport with no buffer bound. That is no
+  longer true. `socket-cut.test.ts` stands a REAL `buildApp` on a REAL `listen()` (so a real HTTP
+  upgrade happens, which `app.inject` cannot make), against real Postgres, the real
+  `visibleEventsFor`, and **`stream/hub.ts` and `stream/routes.ts` completely unmodified** — driven from
+  outside by the real, unmodified `@gisik-nokma/sync-client` engine, replica, outbox and HTTP transport
+  over a real `ws` socket authenticated by a real better-auth bearer token at the upgrade.
+  **How the cut is real.** `bufferedAmount` is a PROTOTYPE accessor on `ws`'s `WebSocket`, so an own
+  property of that name on ONE live instance shadows it for that instance and nothing else — no
+  prototype touched, no other connection affected, the hub told nothing, and the bound it trips is the
+  shipped `DEFAULT_MAX_BUFFERED_BYTES` (1 MB, which `buildApp` does not even expose) rather than a
+  shrunken test value. The next ordinary commit makes `hub.ts`'s `send` close that peer for real.
+  **MEASURED client-side, not assumed: close code `1013`, reason `'slow-consumer'`, twice**, recorded on
+  the client's own `ws` instance (the transport discards the close event, so it is visible nowhere
+  else). Status sequence across the run, asserted whole:
+  `connecting, catching-up, live` × 3 — which is the evidence the two reconnects really ran rather than
+  the fixture timing out into a pass.
+  **The re-delivery chain is now measured in TWO halves, because one cut cannot see both** (12.340 and
+  12.341, and the split is itself a finding): `visible-events-for.ts` scopes `backfilled` PER DRAIN and
+  a notice advances no cursor, so a cut before the pulls finish is repaired by the REGENERATED notice on
+  the reconnect — and while the notice comes back, `onCaughtUp`'s own drain is unreachable. A second cut
+  taken after the cursor has passed the trigger removes the notice from the wire and leaves
+  `onCaughtUp`'s pre-cursor drain as the only path, which is where the pull that failed under the first
+  cut finally lands. Both ends compare against SERVER TRUTH (`getTicketStateFromDb`), the comparator
+  `grant-backfill.test.ts` already uses.
+  **What was already measured and still is:** a failed or timed-out pull leaves its id in a DURABLE
+  pending set and the next catch-up retries it (12.306), and an unsettling pull is abandoned rather than
+  parking the apply chain (12.308). 12.340-12.343 are what make those link-by-link facts an end-to-end
+  one.
   **The residual kept from the old entry, because it is unchanged:** `check-permission.ts` still does not
   refuse a `visibility.set` that sets the mode a ticket already has. What changed is the cost of one — a
   client that already holds the subtree now does no work for it (12.276), so the amplifier is bounded by
@@ -2237,10 +2259,14 @@ Raised by the branch review, survived adversarial refutation, ruled the same hou
   **⚠️ THE OLD WARNING STILL APPLIES to anyone restoring a push shape:** do not yield the trigger first.
   `ticket.reparented` IS folded, so a client that never held the ticket replays a transition with no
   `ticket.created` and `applyTicketEvent` throws — the engine's terminal stall, worse than the failure it
-  fixes. **OWNER of the remaining measurement: Lane F (test infrastructure), ruled by the controller
-  2026-09-06 — a socket-cutting fixture for the dual-client rig. 12.290 flips to ✅ only when that fixture
-  exists; the reason it cannot flip before is recorded verbatim above: nothing in this repo can cut a
-  socket, so the ruling's own flip condition is unmeasurable here.**
+  fixes. **The measurement that was owed — Lane F (test infrastructure), ruled by the controller
+  2026-09-06, "a socket-cutting fixture" — was BUILT AND RUN on 2026-09-06 and this entry is flipped on
+  it.** The old owner line said *"12.290 flips to ✅ only when that fixture exists; nothing in this repo
+  can cut a socket, so the ruling's own flip condition is unmeasurable here"*, and it is quoted rather
+  than deleted because it states the exact condition that has now been discharged. The fixture is NOT
+  built on the dual-client rig, which is where the ruling expected it: the rig's whole design is a
+  socketless in-process mirror, so the fixture stands its own real server instead and leaves
+  `rig.ts` untouched.
 
 - 12.291 ✅ **The walk is capped at `GRANT_BACKFILL_MAX_TICKETS` (200) — P37.1's interim guard, and not
   its fix.** Fixture is OVER the cap by two, all direct children of one parent so the whole excess sits
@@ -2436,3 +2462,88 @@ comparison, so the honest prediction at this tree is **9** — reported here as 
 measurement reads as a finding. The `<=` prediction is unchanged at either tree: an unheld id satisfies
 `0 < h` and `0 <= h` alike, so neither new case can see that mutant.*
 
+## A REAL socket, really cut (Lane D, block 12.340–12.359) — `apps/server/test/dual-client/socket-cut.test.ts`
+
+**These four discharge case 12.290's flip condition.** Ruling P37.1 asked for *"a slow-consumer close
+MID-PULL followed by convergence on reconnect"*, and 12.290 stood 🟡 for the whole of that ruling's life
+on one stated blocker: *nothing on this branch can cut a socket.* The dual-client rig has none by
+construction (`rig.ts`'s `openStream` throws on purpose, so a scenario cannot believe a subscription
+exists) and the engine's own tests drive a fake transport with no buffer bound at all.
+
+**What is real here, enumerated rather than claimed.** A real `buildApp` on a real `listen()` — so a real
+HTTP **upgrade** happens, which is the one request `app.inject` cannot make and therefore the reason no
+existing test could have reached this; real Postgres and real projections; the real `visibleEventsFor`;
+the real `createStreamHub` and `registerStreamRoute`, **both completely unmodified and driven only from
+outside**; real better-auth sign-in for two people, with a real bearer token on the HTTP calls *and* on
+the WebSocket handshake headers; and the real, unmodified `@gisik-nokma/sync-client` engine, replica,
+outbox and HTTP transport. Only the transport's two DECLARED seams are supplied — `fetchImpl`, to inject
+one transient wobble on one ticket, and `webSocketFactory`, to send the bearer header the default
+`new WebSocket(url)` cannot and to record close codes.
+
+**How the cut is a real 1013.** `bufferedAmount` is a PROTOTYPE accessor on `ws`'s `WebSocket`, so an own
+property of that name on ONE live instance shadows it for that instance and for nothing else — no
+prototype is touched, no other connection is affected, and the hub is told nothing. The bound it trips is
+the shipped `DEFAULT_MAX_BUFFERED_BYTES` (1 MB), which `buildApp` does not even expose, rather than a
+shrunken test value. The next ordinary commit makes `hub.ts`'s `send` close that peer for real.
+**Measured on the client's own `ws` instance, not assumed:** `1013 / 'slow-consumer'`, twice — and it has
+to be read there, because `http-transport.ts` sets `socket.onclose = () => handlers.onClose()` and throws
+the event away, so the code the server sent is visible nowhere else on the client. The whole status
+sequence is asserted by equality: `connecting, catching-up, live` three times over, which is the evidence
+the two reconnects really ran instead of the fixture timing out into a pass.
+
+- 12.340 ✅ **A slow-consumer close lands MID-PULL and the REGENERATED NOTICE repairs it.** "Mid-pull"
+  is a fact, not a label: the transport holds one child's `GET /v1/sync/bootstrap/ticket` open until the
+  case releases it, so the engine's apply chain is demonstrably parked inside `applyOne` — asserted off
+  the REPLICA (the parent already pulled and cleared, the faulted child in flight, the second child still
+  owed) rather than off the engine's item listener, which does not fire until `applyOne` finishes and is
+  therefore exactly what the held pull is stopping. The cursor is asserted UNCHANGED across the cut,
+  which is the property the whole chain rests on. The engine then reconnects on its own real timer at
+  that unchanged cursor, `visible-events-for.ts` re-scans the trigger, and **the notice comes back** —
+  its `backfilled` set is scoped per drain and a notice moves no cursor, deliberately, *"because the
+  notice must be RE-DELIVERED if the socket dies before the client finishes pulling"*. That sentence was
+  the argued half of 12.290; this is it measured.
+- 12.341 ✅ **A SECOND cut, with the cursor past the trigger, and `onCaughtUp`'s drain is the only
+  path left — convergence still happens.** *Two cuts rather than one is a finding, not a preference:*
+  while the notice is regenerated, `onCaughtUp`'s retry is unreachable, so a one-cut fixture cannot see
+  it and deleting that line changes nothing. Taken after the cursor has passed the trigger, no notice can
+  be regenerated, and the pull that failed under the first cut lands on the pre-cursor drain of the third
+  subscription's catch-up. **The notice COUNT is pinned across the second cut**, so this convergence
+  cannot be the regeneration 12.340 already measured. Convergence is against SERVER TRUTH
+  (`getTicketStateFromDb`) for all three tickets plus both commits that tripped the bound — the
+  comparator `grant-backfill.test.ts` already uses for *server ≡ replica*.
+- 12.342 ✅ **THE CONTROL: no cut, no injected failure — one pull per ticket, one socket, zero
+  closes.** A permanent case rather than a step of the mutation sweep, so *"control green, headline red"*
+  is one run's evidence instead of two runs a reader has to trust were the same harness. It is also the
+  positive control on the close-recording apparatus itself: the headline's two 1013s are a mechanism
+  firing, not a socket this harness drops on its own. **And it MEASURES the property that makes the
+  second cut necessary** — the widening commits, the pull it causes completes, and the cursor does not
+  move, because `hub.ts` gates `caught-up` on `caughtUpSent` and so sends exactly one per SUBSCRIPTION.
+- 12.343 ✅ **Per-ticket persistence, measured where batching would differ.** `drainPendingPulls`
+  clears each id INSIDE the loop, right after that ticket's own pull lands; a loop running to its natural
+  end reaches an identical final state either way, so the difference is observable only when the loop is
+  genuinely interrupted part-way. `stop()` during an in-flight pull is that interruption — the flag is
+  re-read at the TOP of the next iteration, so the in-flight pull still completes and persists while the
+  two behind it are never reached. Asserts the pending set immediately afterwards holds exactly the two
+  that were never reached, then restarts the engine on the same durable replica and asserts the
+  discriminator: **the ticket that already landed is fetched exactly ONCE across the whole run**, and only
+  what was still owed is re-fetched.
+
+### Mutations run for the socket-cut fixture — denominator 3 cases in this one file
+
+*Run under ONE gate-lock acquisition. `apps/server` resolves `@gisik-nokma/sync-client` through the
+package's `exports` to `dist/`, so each mutation was applied to the source, the package REBUILT, and the
+mutant's presence in `dist` proved before the run — a green under an unbuilt mutation would be
+indistinguishable from a mutation that never fired. Restored with `git checkout HEAD --` after each, with
+`git diff` clean AND the restored lines read back.*
+
+| mutation | predicted | measured |
+|---|---|---|
+| *(none — the unmutated baseline)* | `3 passed (3)` | **`3 passed (3)`.** Dist control: `drainPendingPulls(ws)` appears **2×** (its declaration and `onCaughtUp`'s call). |
+| **(a)** delete `onCaughtUp`'s `await drainPendingPulls(ws)` | 12.340+12.341 RED; 12.342 and 12.343 green | **`1 failed \| 2 passed (3)` — exactly as predicted.** Dist proof: the occurrence count fell 2 → 1. The failure is 12.341's convergence, with its own message: *"C1 never converged (last status: live, attempts: 2)"* — two network attempts, the mid-pull one and the regenerated notice's, and never the third that `onCaughtUp` would have made. **12.342 (the control) stayed green**, so the redness is the mechanism and not the harness. |
+| **(b)** defer per-ticket `clearPendingPull` to one batch pass after the loop (NOT in a `finally`, or the early `return` would still clear) | 12.343 RED on the pull count; the others green | **`2 failed \| 1 passed (3)` — it bit HARDER than predicted, and the extra kill is the honest part.** 12.343 red as predicted, and 12.340 red too: both fail at their *pending-set* assertion rather than at the pull COUNT, because with the clear deferred the parent is still owed at the moment each is read (three ids where two were expected). That is a more direct measurement of per-ticket persistence than the count is, and it means the property has two independent witnesses rather than one. **12.342 stayed green.** |
+| **(c)** the control — the whole fixture with the cut and the injected failure removed | must stay green | **Green in all three blocks above.** It is case 12.342, permanently in the file, so this is a reading taken in the same run as each mutation rather than a separate run. |
+
+*Not claimed: that these four kill anything in `hub.ts` or `routes.ts`. Neither file was touched, and no
+mutation of either was run — this fixture's subject is the CLIENT's convergence across a real close, and
+the hub's own bound already has its unit coverage in `test/stream/hub.test.ts`. Owner of a hub-side
+mutation sweep through this door: unassigned.*

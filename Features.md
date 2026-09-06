@@ -1586,18 +1586,27 @@ and leaves the head lying, which is how a contradiction survives a whole task.)*
   guest through the explicit share list exactly as it resolves a member through a project, so nothing
   about it was ever role-aware — what was missing was the measurement.
   Cases 12.284-12.289, 12.304. `apps/server/src/sync/reconcile-route.ts`, `packages/sync-client/src/engine/sync-engine.ts`
-- 🟡 **The backfill was an ATOMIC burst that could wedge a subscriber — the MECHANISM is gone; the
-  convergence it asked for is not measured end to end** *(ruling P37.1; disclosed and capped by closure
-  5, re-shaped by closure 5b)* — the grant side streams no history at all now, so the non-progressing
-  burst does not exist, and the 200-ticket cap survives bounding the WALK and the client's pull fan-out
-  rather than the wire. **It is 🟡 rather than ✅ deliberately:** the ruling's flip condition was a
-  slow-consumer close MID-PULL followed by convergence on reconnect, and nothing in this repo can cut a
-  socket — the dual-client rig has none by construction and the engine's tests use a fake transport with
-  no buffer bound. The re-delivery chain is argued from the code and measured link by link, never end to
-  end. What IS measured is what makes the wedge unreachable rather than merely smaller: a failed or
-  timed-out pull leaves its id in durable client storage and the next catch-up retries it, so
-  convergence after an interruption does not depend on the notice arriving twice. Case 12.290 carries
-  the remaining measurement; *owner: unassigned — it needs a harness that can cut a socket mid-drain.* *The defect it replaces, kept
+- ✅ **The backfill was an ATOMIC burst that could wedge a subscriber — the MECHANISM is gone, and the
+  convergence it asked for is now measured END TO END against a real socket** *(ruling P37.1; disclosed
+  and capped by closure 5, re-shaped by closure 5b, flip condition discharged 2026-09-06)* — the grant
+  side streams no history at all now, so the non-progressing burst does not exist, and the 200-ticket cap
+  survives bounding the WALK and the client's pull fan-out rather than the wire. **What kept it 🟡 until
+  now, and what changed:** the ruling's flip condition was a slow-consumer close MID-PULL followed by
+  convergence on reconnect, and nothing in this repo could cut a socket — the dual-client rig has none by
+  construction and the engine's tests use a fake transport with no buffer bound — so the re-delivery
+  chain was argued from the code and measured only link by link. `apps/server/test/dual-client/socket-cut.test.ts`
+  now cuts one for real: a real `buildApp` on a real `listen()` (a real HTTP upgrade, which `app.inject`
+  cannot make), real Postgres, real bearer-token auth on the handshake, the real unmodified sync-client
+  engine over a real `ws` socket, and **`stream/hub.ts` and `stream/routes.ts` unmodified and driven only
+  from outside**. Shadowing `bufferedAmount` on one live socket instance — an own property over `ws`'s
+  prototype accessor, so nothing else is affected — makes the next ordinary commit trip the shipped 1 MB
+  bound, and the client records a real `1013 / 'slow-consumer'`. Convergence is asserted against server
+  truth after the reconnect. The chain has **two halves and one cut cannot see both**: while the notice is
+  regenerated (its `backfilled` set is per-drain and a notice moves no cursor) the reconnect repairs the
+  pull by itself, so a second cut taken with the cursor past the trigger is what reaches `onCaughtUp`'s
+  own retry. Cases 12.290 and 12.340–12.343. What was already measured and still is: a failed or
+  timed-out pull leaves its id in durable client storage and the next catch-up retries it, so convergence
+  after an interruption does not depend on the notice arriving twice. *The defect it replaces, kept
   because it constrained the fix:* every backfilled envelope sat at or below the client's cursor, so none of
   them advanced it, and the only one that did arrived last. A slow-consumer close before that point
   leaves the client reconnecting into the identical burst for ever, because the cursor is persisted only
@@ -1605,8 +1614,9 @@ and leaves the head lying, which is how a contradiction survives a whole task.)*
   WALK at 200 tickets — breadth-first, so the trigger ticket and the shallowest descendants survive — and
   it is explicitly not a bound on a single ticket's history. **The one-line repair of sending the trigger
   first is unsafe and the code says so**: `ticket.reparented` is folded, so a client that never held the
-  ticket would replay a transition with no creation event and stall its engine. Case 12.290 owns the
-  residual, 12.291 pins the cap. `apps/server/src/visibility/grant-backfill.ts`
+  ticket would replay a transition with no creation event and stall its engine. 12.291 pins the cap;
+  12.290 no longer owns a residual, and the residual it DID own is the one 12.340–12.343 discharged.
+  `apps/server/src/visibility/grant-backfill.ts`, `apps/server/test/dual-client/socket-cut.test.ts`
 - ✅ **Visibility that widens because the READER's reach grew, not the ticket's** *(closure 5b, case
   12.283)* — `membership.granted` and `project.member_added` reveal tickets whose history sits below the
   client's cursor, the identical gap. It could not be another entry in the ticket-event trigger list, for
