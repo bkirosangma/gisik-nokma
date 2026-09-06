@@ -510,7 +510,13 @@ Lane B already had was NOT enough:** it staged by explicit path, and the contami
 had every reason to stage. **The real rule: never commit a shared source file while another party is
 mutating it** — a mutation sweep runs in a quiet window under the lock with nothing else touching the
 tree, from a handed-over list; the third distinct way shared-worktree mutation produced a wrong answer
-today (the first two were `git checkout` restores). The stale partial copy is
+today (the first two were `git checkout` restores). **Two rules, not one with two spellings (Lane E):**
+the PATH rule — stage explicit paths, never `git add -A` — stops an UNRELATED in-flight file being swept
+in (how E broke a HEAD earlier, sweeping a subagent's test file into a docs commit); the TEMPORAL rule —
+commit only after the workflow's completion notification, never during — stops a RELATED file being
+captured mid-mutation (B's case, where the file was one it had every reason to stage). **Neither subsumes
+the other; a lane told only the path rule will still hit B's case.** E checked T4 retroactively against
+both, four ways (each planted mutation absent from the committed blob, with a positive control). The stale partial copy is
 stale in its CONTENT; `canSee` answers about its AUDIENCE. Reconcile is the wrong instrument, not a
 mistimed one — the escalation clause in 5b's override ("if the notice must carry more than ids and the
 trigger, escalate") fired correctly.
