@@ -16,6 +16,111 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# LANE A — `exec/37-c2-cursor`, C2's proper close. **ESCALATED BEFORE BUILDING — awaiting ruling P41.**
+
+> Shas in narrative prose are facts about when they were written. Verify with `git branch --contains`
+> — EMPTY OUTPUT MEANS ORPHANED. `git cat-file` passes on reflog-only commits and hands back
+> pre-rebase content while looking like it worked.
+
+## ANCHORS — measured 2026-09-06 ~09:45 IST
+
+| what | value |
+|---|---|
+| branch | `exec/37-c2-cursor`, cut from `origin/main` `aa17046` (#169, Rulings P39+P40, MERGED) |
+| merge-base | `aa17046` — `git branch --contains aa17046` lists `main`, so it is REACHABLE, not orphaned |
+| HEAD | this commit |
+| tree | clean at cut |
+| node | **v22.22.2** |
+| build | `pnpm turbo run build --force --concurrency=1` → **BUILD_EXIT=0, `0 cached, 10 total`** |
+
+`SERVING_GAPS` now carries **`search` alone**. Closures 2 (#125), 3 (#128), 2b (#137), the mapper
+round trip (#143), 4 (#141), the HELD pair (#150) and #169 are all on `main`. Do not re-implement them.
+
+## WHY C2 IS ESCALATED RATHER THAN BUILT — three measurements, none of them a reading of prose
+
+The override says: *"a cursor on `TicketListView` … the web list view pages through it … P30 holds:
+`data-source.ts` is not widened … If it turns out to need a `DataSourceQuery` change, escalate before
+building."* **It needs one.** Measured at `aa17046`:
+
+1. **`FilterSpec` has no cursor key** — `view-types.ts:70-81`, ten optional fields (`text`,
+   `assigneeIds`, `collaboratorIds`, `typeIds`, `stateIds`, `stateCategories`, `projectIds`,
+   `dueBefore`, `dueAfter`, `fields`). None is a position.
+2. **`listQueryString(filter, grouping)`** — `online-data-source.ts:63` — takes exactly two arguments
+   and builds the entire query string. `getTickets` calls it at line 164 with nothing else.
+3. **`DataSourceQuery.getTickets(projectId, filter, grouping)`** — `data-source.ts:135`. Three
+   parameters, no cursor in.
+
+**So a cursor on the RETURN type reports "there is more" and no caller can ask for the next page.**
+A view type that can say *incomplete* but not *continue* is strictly better than today's refusal only
+if some consumer can act on it; the web list view cannot. `mappers.ts:1114-1118` already says this in
+its own words — *"a caller of `getTickets` sees the first page and cannot ask for the next … the owner
+is `DataSourceQuery.getTickets`, whose signature has nowhere to put one."* The override's P30 clause
+and its "pages through it" clause are in direct conflict, and the override itself names the tie-break:
+escalate.
+
+### The second, independent blocker: the cursor INVERTS a decision that was deliberately tripwired
+
+`views/list-model.ts:9-31` states that **client-side grouping is licensed only because
+`TicketListView` is the complete row set**, and that the shipped `/v1/list` route groups PER PAGE, so
+a client regrouping a page labels sections with the project's name — *"the grouping-as-filter lie
+wearing a pagination costume … worse than the plain one because the number looks authoritative."*
+`test/views/list-model.test.ts:53-71` carries a **TYPE tripwire** — `paginationTripwire(key: keyof
+TicketListView): CompleteRowSetOnly` — whose kill is a `typecheck` error, and whose docblock records
+the measurement: *adding `nextCursor: string | null` fails `pnpm --filter @gisik-nokma/app-core
+typecheck` with TS2322.*
+
+**That tripwire is not an obstacle to route around. It is a decision point, and its own text says the
+decision "has to be retaken rather than silently inverted."** A bare `nextCursor` added to the view
+type deletes the tripwire and inverts the grouping decision in the same commit, with no consumer
+able to page and therefore no way for grouping to recover completeness.
+
+### THE RULING I AM ASKING FOR (P41) — three doors, my recommendation last
+
+- **Door A — widen `DataSourceQuery.getTickets` to take a cursor** (breaks P30 for this one signature;
+  `data-source.ts` is on the collision map). The view type grows `nextCursor`, the web view pages, and
+  `groupRows` must then be re-licensed: grouping accepts only a set proven complete, so the tripwire is
+  REPLACED by a completeness precondition rather than deleted.
+- **Door B — a paging loop inside the online source** (the OTHER closure `mappers.ts:1156` names).
+  `TicketListView` stays `{projectId, rows}`, the tripwire stays intact and untouched, grouping stays
+  licensed, P30 is untouched, and `getTickets` answers the whole project by looping until the cursor is
+  null. Cost: unbounded round trips on a large project, and the client cannot show partial progress.
+- **Door C — cursor rides in `FilterSpec`.** **I recommend AGAINST it and did not cost it further:** a
+  cursor is not a filter, and `FilterSpec` also feeds `search` and is embedded in `SavedFilter`
+  (`view-types.ts:264`), so a cursor key would become a persistable saved-filter field.
+
+**My recommendation is Door B**, and the reason is that it is the only door that closes C2 without
+inverting a decision the codebase deliberately tripwired: it makes the view type's completeness claim
+TRUE again rather than making it expressible-but-unactionable. Door A is the right answer only if the
+owner wants partial-page rendering as a product behaviour, which is a product call, not mine.
+
+**I am least sure of:** whether Door B's unbounded loop is acceptable at the project sizes this
+product targets. I have not measured a realistic ticket count per project, and `DEFAULT_LIMIT = 50`
+is the only number I have.
+
+## FAN-OUT DEFERRED, AND RECORDED AS THE BRIEF REQUIRES
+
+Session meter read **87% at 09:40** with the reset at **12:20**; the controller's own message says a
+Fable dispatch dies with zero findings and looks clean. Per the brief — *"No fan-out starts against a
+pool that cannot finish it … defer and record the deferral"* — **no fan-out was started this task.**
+The three measurements above were made directly. When C2 is ruled and built, it needs an opus reviewer
+(client type change, N consumers — closure 3's class).
+
+## NEXT, IN ORDER
+
+1. **BLOCKED on ruling P41** — C2's cursor. Do not build any door before the ruling.
+2. **Unblocked and started while P41 is pending:** the owed ❌ cases under P36 — `BoardCard.cause`
+   narrowed on the snapshot-bounded path (build or catalogue with the reason), and **7.211** (the
+   dangling-`parent_id` branch has no fixture and survives its own mutation).
+3. **7.210 is DISCHARGED** — `projections/tickets.ts` forward-folds on `workflow.defined`, so `folded`
+   and `latest` agree on the product path by construction; 7.214/7.215 pin it. **Do not reopen it.**
+4. Report and STOP; the controller re-tasks.
+
+## IDS
+
+§12 block 12.240–12.259, **used through 12.254 — FIVE left; ask before 12.259.** §7 next free
+**7.219** (recount at rebase). §6: 6.180+ on request. `scripts/check-case-ids.mjs` runs in CI.
+Never edit `docs/lanes/task-ledger.tsv`. Never merge my own PR. Never commit to `main`.
+
 # LANE A — `exec/31-mywork-residuals`, getMyWork's residuals + getAttention. PR OPEN, AWAITING CONTROLLER MERGE.
 
 > **Shas in narrative prose are facts about when they were written.** Verify with
