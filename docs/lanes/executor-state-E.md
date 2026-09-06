@@ -16,7 +16,8 @@ set, and the gate was re-run at the head that carries them.
 
 | anchor | value |
 |---|---|
-| HEAD | **`945f1769f3bfad6b1c904758a8bfd70eb69b2eec` (this commit's parent chain; the handoff commit itself is the head)** — verify with `git branch -r --contains`, never `cat-file` |
+| gated anchor | **`0e7ee2f`** — the §13 catalogue commit, the last commit carrying CONTENT, and the sha the gate below was run at. The branch head is the handoff commit sitting on top of it: read it with `git rev-parse HEAD`, never from this table. |
+| why not a head sha here | **a handoff commit cannot name its own sha.** The first version of this row did, by substituting a sha and then `--amend`ing — which minted a NEW commit and left the row pointing at an orphan. Measured immediately after: `git branch -a --contains 945f176` printed NOTHING while `git cat-file -t 945f176` still answered `commit`. That is the trap this file's own header warns about, walked into by the file itself. |
 | base | `origin/main` = `cd0844c` (rebase #2; #203 and #202 had landed) |
 | PR | **#205**, open, MERGEABLE |
 | gate | **`GATE_EXIT=0` · 30/30 · 0 cached · 1m52.211s · node v22.22.2 · 285 files / 3644 passed / 5 skipped · Unsupported engine 0 · no orphaned workers** |
