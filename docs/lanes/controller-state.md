@@ -54,7 +54,29 @@ tickets — Plan 6 / visibility), the `notifications-gateway` web-side harness (
 account-side access error had already committed real, correct work before its final report call errored —
 **treat a failed dispatch as UNVERIFIED, not as EMPTY**: read the tree and the log before re-dispatching.
 
-## ✅ THE PLAN SERIES IS COMPLETE — 177/177 (100%), Plan 11 16/16 — 2026-09-06 19:50 IST. END OF THE FIVE-LANE RUN. THIS IS THE STATE MONDAY STARTS FROM.
+## ▶ OWNER 20:03: "we can start the monday queue" — the first two items DISPATCHED TONIGHT with the remaining weekly quota (~14%); two lanes only, B/D/E stay released
+
+**Owner, 20:03, on the controller's three options (fix Actions billing / start the Monday queue now with one or two cheap
+lanes / hold the quota): *"cant do anything about the github billings. we can start the monday queue."*** So CI stays
+waived to the end of the weekend, and the Monday override's queue starts now, serially-minded — two contexts, not five.
+
+- **Lane A** (`gisik-nokma-exec-8e`, ctx 39%) → **RULING P43** on `exec/50-p43-refusal-exports` from `bf40c5c`: the bounded
+  re-export from `packages/rule-engine/src/index.ts`; the four `'hierarchy.rank'` client sites and the parent-terminal reason
+  un-literalled with a literal ALONGSIDE the import; the excluding mutation on the exported VALUE predicted first, serial under
+  the lock; 7.245 closed with the test read; ONE opus reviewer; gate at the head. Owns rule-engine `src/index.ts`, the client
+  test sites, `fixture-witnesses.test.ts`, `test-cases/07`, Features.md §7.
+- **Lane C** (`lane3-plan7-8-34`, Sonnet, ctx 40%) → **LANE F PASS 1, the test-cases↔test CITATION CHECK** on
+  `exec/51-case-citation-check` from `bf40c5c`: `scripts/check-case-citations.mjs` in the `check-case-ids` / `check-runbook`
+  shape (every ✅ id must appear in a test file; deleting a cited test reddens it; self-test plants one defect per SHAPE);
+  **measure the current gap first and report the number before choosing** — cite in-PR if small, else a RATCHET baseline that
+  may only go down with the backfill carried with an owner; **its own UNGATED CI job in `gate`'s `needs`** (E's Critical);
+  `check:citations` on its own line; `test-cases/README.md` states the convention; §13 from C's **13.204**; ONE opus
+  reviewer. Owns `scripts/`, `ci.yml`, root `package.json`, `test-cases/README.md`, `test-cases/13`, Features.md §13.
+- **Stop rule:** the controller dispatches nothing more and tells both lanes to push handoffs at **weekly ~93%**; at 100%
+  everything halts together. The Monday override's §1 then starts at whatever these two did not land: (b′) and (c) if open
+  (rebase, re-gate, report), else (d).
+
+## ✅ THE PLAN SERIES IS COMPLETE — 177/177 (100%), Plan 11 16/16 — 2026-09-06 19:50 IST. END OF THE FIVE-LANE RUN. THIS IS THE STATE MONDAY STARTS FROM (before the 20:04 dispatches above).
 
 | what | value |
 |---|---|
