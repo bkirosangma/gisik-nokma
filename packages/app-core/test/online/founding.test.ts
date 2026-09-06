@@ -60,10 +60,24 @@ describe('3.100 createHttpFoundingGateway', () => {
    * never read, on the founding path, which is the last hole in the onboarding
    * story — the reader would be told a number and not what to do.
    */
-  it('carries the 400 whitespace-name refusal out with the door’s sentence', async () => {
+  it('carries a 400 refusal body’s sentence out as serverMessage', async () => {
+    // THE DOOR'S OWN BODY, character for character: `INVALID_NAME_BODY` in
+    // `apps/server/src/routes/workspaces.ts:10`. This literal previously read
+    // `{ error: 'invalid_name', message: '… Whitespace alone is not one.' }` —
+    // a discriminant no server sends and a sentence no door speaks — and the
+    // case still passed, because it asserts `serverMessage` against
+    // `body.message`, reading back the literal it had just written. Its title
+    // claimed "the door's sentence" while pinning its own paraphrase.
+    //
+    // The title now says what this case actually keeps: that a 400 body's
+    // `message` reaches `FoundingError.serverMessage`. **That the sentence is
+    // the DOOR's is a claim only a round trip can make, and it is made at
+    // 7.221** (`apps/server/test/integration/fixture-witnesses.test.ts`), where
+    // the real gateway meets the real route and compares against the server
+    // module's own constant.
     const body = {
-      error: 'invalid_name',
-      message: 'A workspace needs a name. Whitespace alone is not one.',
+      error: 'invalid',
+      message: 'A workspace needs a name.',
     };
     const http = fakeHttp(new HttpError(400, '/v1/workspaces', body));
     await expect(createHttpFoundingGateway(http).foundWorkspace('   ')).rejects.toMatchObject({

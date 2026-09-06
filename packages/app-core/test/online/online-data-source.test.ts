@@ -64,7 +64,23 @@ function pagingFetch(pages: readonly { ticketIds: readonly string[] }[]) {
       cursor === null ? 0 : pages.findIndex((page) => page.ticketIds.at(-1) === cursor) + 1;
     const page = pages[index];
     if (page === undefined) {
-      return { ok: false, status: 404, json: async () => undefined } as Response;
+      // AN UNRECOGNISED CURSOR NARROWS TO AN EMPTY PAGE. It does NOT 404, and
+      // this arm said 404 until case 12.323 measured the route. `routes/list.ts`
+      // binds the cursor as a VALUE — `t.ticket_id > $n` — so a cursor naming a
+      // ticket that does not exist, belongs to another tenancy, or is invisible
+      // to the caller is just a text comparison that narrows; the route's own
+      // docblock says its tests "hand back all three (foreign, invisible,
+      // hostile) and pin that". An empty page has NO groups (`list.ts:205`).
+      //
+      // This is the SECOND invented rule found in this helper. The first was the
+      // cursor itself, implemented as a page index against a keyset route, and
+      // fixing it did not make the fixture a witness — it only moved the lie.
+      // That is why 12.323 exists and why it lives against the real route.
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ projectId: PROJECT, groupBy: 'flat', groups: [], nextCursor: null }),
+      } as Response;
     }
     return {
       ok: true,
