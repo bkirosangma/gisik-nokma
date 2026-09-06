@@ -1,4 +1,4 @@
-# Lane B — executor state (Plan 10 T13–T15 · closure 5 · **closure 5b** → T18)
+# Lane B — executor state (Plan 10 T13–T15 · closure 5 · closure 5b · **T18**)
 
 **This file is Lane B's restart surface, and nobody else's.** `executor-state.md` is Lane A's — never
 edit it. A Lane B session relaunched from `dispatch-executor-serial.md` + the Lane B override recovers
@@ -6,13 +6,84 @@ only what is written here.
 
 > **Shas in narrative prose below are facts about when they were written.** Verify with
 > `git branch --contains <sha>` — **empty output means orphaned**. `git cat-file` passes on reflog-only
-> commits and will lie to you. The NARRATIVE SECTIONS BELOW THE PRE-FLIGHT (T13, T14, T15, closure 5)
-> are history: their anchors were true when written and most are now orphaned by rebases. The LIVE
-> ANCHORS table immediately below is the only part measured at this HEAD.
+> commits and will lie to you. Every block below this one is HISTORY. The LIVE ANCHORS table
+> immediately below is the only part measured at this HEAD.
 
 ---
 
-## ✅ POSITION AT 13:11 IST — #161 IS GREEN AND RE-REPORTED. WAITING ON THE CONTROLLER'S MERGE.
+## ▶ LIVE — Plan 10 **T18** (`Features.md` §12 + `test-cases/12` final shape), started 13:2x IST 2026-09-06
+
+Closure 5b merged as **`2f18f3f`** (#161). T13 (#117), T14+T15 (#126), closure 5 (#139) and closure 5b are
+**all on `main`** — none of them is re-implemented here.
+
+| anchor | value | how verified |
+|---|---|---|
+| branch | `exec/33-plan10-t18`, cut from `origin/main` | `git checkout -b … origin/main` |
+| merge-base / HEAD at cut | **`2f18f3f`** | `git rev-parse HEAD`; **`git branch --contains 2f18f3f` → `exec/33-plan10-t18`, `main` = REACHABLE, not orphaned** |
+| toolchain | node **v22.22.2**, `pnpm install --frozen-lockfile` + `pnpm rebuild better-sqlite3` + `pnpm turbo run build --force --concurrency=1` → **`BUILD_EXIT=0`** | one shell invocation, `$?` on its own line |
+| `check-case-ids` (repo-wide) | **`EXIT=0`** — bare 865 + bold 492 + marker-first 40 = **sum 1397 == union 1397**, zero duplicates, highest `13.100`, 10 files | `node scripts/check-case-ids.mjs`; **a SEPARATE step, NOT part of `pnpm check:env`** |
+| **§12 max, recounted** | **`12.322`** — bare 244 + bold 23 + marker-first 0 = **sum 267 == union 267**, zero duplicates | §12-scoped, three styles, per-style counts printed as the control |
+| ruling | **Door A**, controller 13:2x: proceed now, do not wait for A or D | `SendMessage` reply, quoted in full below |
+
+### The §12 header on `main` is FALSE, and T18 is what fixes it
+
+`test-cases/12`'s header says **"HIGHEST ID IN USE ON THIS BRANCH IS `12.318`"**. It is not: **`12.322` is
+in use**, landed by Lane A's #176 (`2d2bc5c`) as bold-style line heads. The controller caught this against
+my own measurement 2 and was right; I verified it rather than adopting it — `git log -S'12.322'` names
+`2d2bc5c`, and the three lines sit two sections above the closure-5b block. **`12.319` is genuinely free**
+(the recounted list runs `… 12.317 12.318 12.320 …`), so Lane B's block 12.290–12.319 is used through
+12.318 exactly as the previous block claimed.
+
+⚠️ **marker-first = 0 in §12 is a MEASUREMENT, not a dead matcher** — the same pattern returns **40** on
+`test-cases/13`, watched firing before the zero was believed. This is the exact trap this file recorded on
+2026-09-06 03:30 (*a zero from a matcher you have not seen fire is not a measurement*), and the rule now
+costs one extra command instead of a false clean.
+
+### `listPendingPulls` — the consumer enumeration owed from `fff3cbf`
+
+Recorded here because the previous block asserted "the rig was the only miss" without ever committing the
+enumeration that would let a reader check it. **Two independent sweeps, agreeing**, plus a positive control
+from the same runs:
+
+| file | lines | role |
+|---|---|---|
+| `packages/sync-client/src/replica/replica.ts` | 2 (`:128` declaration, `:959` impl) | **definition — not a consumer** |
+| `packages/sync-client/src/engine/sync-engine.ts` | 1 (`:484`) | **real consumer**, destructures `{ id: ticketId, headSeq }` — updated by P37.2 |
+| `apps/server/test/dual-client/rig.ts` | 4 (`:480` iteration + 3 docblock) | **the miss** — kept iterating the array as ids |
+| `packages/sync-client/test/sync-engine.test.ts` | 13 | shape-aware (`.map((t) => t.id)`, `toEqual([{ id, headSeq }])`) |
+| `packages/sync-client/test/ticket-bootstrap.test.ts` | 9 | shape-aware (`idsOwed(…)`, `.find((t) => t.id === …)?.headSeq`) |
+| `apps/server/test/dual-client/grant-backfill.test.ts` | 4 | **shape-BLIND — every site is `toEqual([])`** |
+
+**Six files, 33 lines; minus the definition file, FIVE consumer files.** Positive control from the same two
+sweeps: `addPendingPulls` = **13 lines across 6 files** (both methods agreed on 13), so neither sweep was a
+silent-empty. Method 1 `/usr/bin/grep -rn … | grep -v node_modules | grep -v dist`; method 2 `git grep -n`
+(tracked files only, so `dist/` is excluded by construction rather than by a filter that can be wrong).
+
+**The honest refinement to "the rig was the only miss":** it was the only site that *iterated the element
+shape wrongly*, but `grant-backfill.test.ts` is the file where the failure *showed*, and it is itself
+**shape-blind** — four `toEqual([])` assertions that pass against `string[]` and `{id,headSeq}[]` alike.
+An empty-array assertion cannot witness an element-shape change. So of the five consumers, three were
+shape-aware and updated, one was shape-aware and wrong (the rig), and one could never have caught it.
+*That is why typecheck, not the suite, was the instrument that identified the site.*
+
+### Position in T18
+
+T18 is the **last task in Plan 10** (17/18 → 18/18). Its content is the **RESERVED block 12.1–12.44** —
+the plan text (`docs/superpowers/plans/2026-08-20-10-offline-sync-apps.md:7471–7629`) pins those ids and
+`test-cases/12`'s own header says the file "continues from 12.45 … those ids are RESERVED … when Task 18
+lands, its 12.1–12.44 fill in above these." **12.1–12.44 is disjoint from Lane A's 12.320–12.339 and Lane
+D's 12.340–12.359**, which is why the controller ruled Door A: no id can collide, and the three genuinely
+shared surfaces (the header line, `Features.md` §12's banner and "still absent" list, and the statuses A or
+D flip) are ordinary rebase conflicts for whoever lands second.
+
+**Live at this writing:** Lane A `exec/39-fixture-witnesses` @ `4f7751f` — four commits, `git diff --stat
+origin/main...` = **one file, `docs/lanes/executor-state.md`, docs-only**; it has minted nothing on top of
+the 12.320–12.322 already on `main`. Lane D has **pushed no branch** (`git ls-remote --heads origin
+'exec/40*'` empty). **12.290 stays 🟡, owner Lane D.**
+
+---
+
+## ✅ (HISTORY) POSITION AT 13:11 IST — #161 IS GREEN AND RE-REPORTED. WAITING ON THE CONTROLLER'S MERGE.
 
 **Everything the 12:35 override asked for is done.** The block below this one is that override's position
 and is now HISTORY; this block is the live state.
