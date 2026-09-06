@@ -122,6 +122,9 @@ async function seedAttachmentAddedEvent(
 }
 
 describe('sweepOrphanObjects', () => {
+  /**
+   * 9.247 — an object named ONLY by an `attachments` table row survives, however old.
+   */
   it('an object named ONLY by an attachments-table row survives, however old', async () => {
     const ws = newUlid();
     const id = newUlid();
@@ -136,6 +139,9 @@ describe('sweepOrphanObjects', () => {
     expect(await storeHasKey(key)).toBe(true);
   });
 
+  /**
+   * 9.248 — an object named ONLY by an `attachment.added` ledger event (`kind: 'upload'`) survives, however old — the union's OTHER half.
+   */
   it('an object named ONLY by an attachment.added ledger event survives, however old', async () => {
     const ws = newUlid();
     const id = newUlid();
@@ -151,6 +157,9 @@ describe('sweepOrphanObjects', () => {
     expect(await storeHasKey(key)).toBe(true);
   });
 
+  /**
+   * 9.249 — an unnamed object 10 days old survives, inside the 30-day retention window.
+   */
   it('an unnamed object 10 days old survives — inside the retention window', async () => {
     const ws = newUlid();
     const id = newUlid();
@@ -164,6 +173,9 @@ describe('sweepOrphanObjects', () => {
     expect(await storeHasKey(key)).toBe(true);
   });
 
+  /**
+   * 9.250 — an unnamed object 40 days old is swept on the first run, and a second run at the same clock finds nothing left to sweep — the idempotence property.
+   */
   it('an unnamed object 40 days old is swept on the first run; a second run finds nothing left', async () => {
     const ws = newUlid();
     const id = newUlid();
@@ -182,6 +194,9 @@ describe('sweepOrphanObjects', () => {
     expect(second.deleted).toBe(0);
   });
 
+  /**
+   * 9.251 — a key that does not match the `w/<workspaceId>/a/<id>` shape is left alone whatever its age or naming — recorded in `unrecognizedShape`, never `swept`.
+   */
   it('a key that does not match w/<workspaceId>/a/<id> is left alone, whatever its age or naming', async () => {
     const key = 'w/ws1/other-thing';
     await putBytes(key);
@@ -204,6 +219,9 @@ describe('sweepOrphanObjects', () => {
    * `assertValidObjectKey`, so this lands in `unrecognizedShape` instead and
    * the file is untouched.
    */
+  /**
+   * 9.252 — a torn-write `.tmp-<pid>-<ms>` leftover is refused as unrecognized shape rather than accepted and later crashing `store.delete`.
+   */
   it('a torn-write .tmp- leftover is refused as unrecognized shape, not deleted', async () => {
     const ws = newUlid();
     const id = newUlid();
@@ -217,6 +235,9 @@ describe('sweepOrphanObjects', () => {
     expect(await storeHasKey(key)).toBe(true);
   });
 
+  /**
+   * 9.253 — a dry run makes no `store.delete` calls and reports the identical `swept` list a live run at the same clock would actually delete.
+   */
   it('a dry run makes no store.delete calls and reports the same swept list a live run would delete', async () => {
     const ws = newUlid();
     const id = newUlid();
@@ -249,6 +270,9 @@ describe('sweepOrphanObjects', () => {
    * than 1ms, to stay clear of filesystems whose mtime resolution is coarser
    * than a millisecond.
    */
+  /**
+   * 9.256 — the retention boundary is "sweep at or past 30 days," not "sweep only when older": an object aged to EXACTLY `ORPHAN_OBJECT_RETENTION_MS` is swept, and one 1 second inside the window survives.
+   */
   it('the retention boundary is a "sweep at or past 30 days", not "sweep only when older"', async () => {
     const now = new Date();
 
@@ -273,6 +297,9 @@ describe('sweepOrphanObjects', () => {
     expect(report.withinWindow).toEqual([justInsideKey]);
   });
 
+  /**
+   * 9.254 — `ORPHAN_OBJECT_RETENTION_MS` is exactly 30 days — the boundary constant every fixture above is measured against.
+   */
   it('the retention constant is exactly 30 days — a boundary sanity check the fixtures above rely on', () => {
     expect(ORPHAN_OBJECT_RETENTION_MS).toBe(30 * 24 * 60 * 60 * 1000);
   });

@@ -86,6 +86,9 @@ async function ledgerCount(eventId: string): Promise<number> {
 }
 
 describe('evidence gate', () => {
+  /**
+   * 9.223 — evidence gate: a transition carrying real evidence from this ticket commits.
+   */
   it('a transition carrying real evidence from this ticket commits', async () => {
     const event = transition({ to: 'done', evidenceAttachmentId: EVIDENCE_ID });
     const [result] = await ingest.ingestBatch([event]);
@@ -93,11 +96,17 @@ describe('evidence gate', () => {
     expect(await ledgerCount(event.id)).toBe(1);
   });
 
+  /**
+   * 9.224 — a transition without evidence at all is not this gate's business — `require-evidence` itself is Plan 2's rule-engine rule, and this gate only judges evidence that IS named.
+   */
   it("a transition without evidence is not this gate's business (require-evidence is Plan 2's rule)", async () => {
     const [result] = await ingest.ingestBatch([transition({ to: 'done' })]);
     expect(result).toMatchObject({ status: 'committed' });
   });
 
+  /**
+   * 9.225 — fabricated evidence is refused `attachment.evidence-unknown` and leaves no trace.
+   */
   it('fabricated evidence is refused attachment.evidence-unknown and leaves no trace', async () => {
     const event = transition({ to: 'done', evidenceAttachmentId: newUlid() });
     const [result] = await ingest.ingestBatch([event]);
@@ -106,6 +115,9 @@ describe('evidence gate', () => {
     expect(await ledgerCount(event.id)).toBe(0);
   });
 
+  /**
+   * 9.226 — another ticket's real attachment as evidence is refused IDENTICALLY to fabricated evidence — no existence leak.
+   */
   it("another ticket's attachment as evidence is refused identically — no existence leak", async () => {
     // FOREIGN_ID is a real, existing row. The only thing wrong with it is whose
     // it is, so this reddens for a gate that looks an evidence id up by id
@@ -122,6 +134,9 @@ describe('evidence gate', () => {
     expect(await ledgerCount(foreignEvent.id)).toBe(0);
   });
 
+  /**
+   * 9.227 — planted defect: a Drive reference on THIS ticket named as evidence is refused `attachment.evidence-drive-reference`, with the reason BYTE-IDENTICAL to `EVIDENCE_DRIVE_REFERENCE_REASON` and no id leaked into it.
+   */
   it('planted defect: a Drive reference on THIS ticket is refused as evidence, with the remedy named', async () => {
     const referenceId = newUlid();
     await seedDriveReference(db.pool, { workspaceId: WS, ticketId: TICKET, attachmentId: referenceId, actorId: ACTOR });
@@ -136,6 +151,9 @@ describe('evidence gate', () => {
     expect(await ledgerCount(event.id)).toBe(0);
   });
 
+  /**
+   * 9.228 — planted defect: a Drive reference on ANOTHER ticket refuses as `attachment.evidence-unknown`, identically to a fabricated id — the Drive-specific refusal never leaks that a reference exists elsewhere.
+   */
   it('planted defect: a Drive reference on ANOTHER ticket refuses as unknown — the drive refusal never leaks existence elsewhere', async () => {
     const elsewhere = newUlid();
     await seedDriveReference(db.pool, { workspaceId: WS, ticketId: OTHER_TICKET, attachmentId: elsewhere, actorId: ACTOR });

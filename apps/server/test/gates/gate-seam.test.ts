@@ -141,6 +141,9 @@ afterAll(async () => {
 });
 
 describe('the gate seam', () => {
+  /**
+   * 9.229 — `buildServerGates()` covers exactly `comment.added`, `ticket.field_set` and `ticket.transitioned` — and nothing else.
+   */
   it('buildServerGates covers comment.added, ticket.field_set and ticket.transitioned — and nothing else', () => {
     // The event types themselves, not a count. A length assertion goes green
     // for a build that dropped the evidence gate and added a second embed gate,
@@ -153,6 +156,9 @@ describe('the gate seam', () => {
     ]);
   });
 
+  /**
+   * 9.230 — a gate reads and writes through the SAME transaction client as the rest of ingest: a refusal takes the gate's own writes back with it.
+   */
   it('a gate reads and writes through the TRANSACTION client: a refusal takes the gate own writes back', async () => {
     const service = createIngestService({
       pool: db.pool,
@@ -172,6 +178,9 @@ describe('the gate seam', () => {
     expect(await ledgerCount(event.id)).toBe(0);
   });
 
+  /**
+   * 9.231 — POSITIVE CONTROL: the same gate write SURVIVES when the gate accepts — proving the rollback above is a rollback and not merely a no-op write.
+   */
   it('POSITIVE CONTROL: the same gate write SURVIVES when the gate accepts, so the empty table above is a rollback and not a no-op', async () => {
     const service = createIngestService({
       pool: db.pool,
@@ -188,6 +197,9 @@ describe('the gate seam', () => {
     await db.pool.query('DELETE FROM gate_marker');
   });
 
+  /**
+   * 9.232 — a gate refusal rolls back ONLY its own event and leaves its batch neighbours committed.
+   */
   it('a gate refusal rolls back ITS OWN event and leaves its batch neighbours committed', async () => {
     // The batch answer, stated as a test because the alternative — one refusal
     // discarding the whole push — would make an offline client's legitimate
@@ -207,6 +219,9 @@ describe('the gate seam', () => {
     ]);
   });
 
+  /**
+   * 9.233 — no commit listener fires for a gate-refused event, and one fires for its committing neighbour in the same batch.
+   */
   it('no commit listener fires for a gate-refused event, and one fires for its committing neighbour', async () => {
     const heard: string[] = [];
     const unsubscribe = gated.onEventCommitted((event: LedgerEvent) => heard.push(event.id));
@@ -222,6 +237,9 @@ describe('the gate seam', () => {
     expect(heard).toEqual([committedEvent.id]);
   });
 
+  /**
+   * 9.234 — the seam is inert when omitted: the same document commits through an ingest service built with no `gates` at all.
+   */
   it('the seam is inert when omitted: the same document commits through a service built with no gates', async () => {
     // `gates` defaults to `[]`, which is what leaves Plan 1's ingest suite, the
     // permission suites and the route suites unchanged by this task. It is also
@@ -235,6 +253,9 @@ describe('the gate seam', () => {
     expect(await ledgerCount(event.id)).toBe(1);
   });
 
+  /**
+   * 9.235 — the gate loop runs AFTER the rule engine: an engine refusal wins over a gate refusal on the same event.
+   */
   it('the gate loop runs AFTER the rule engine: an engine refusal wins over a gate refusal on the same event', async () => {
     // The seam's declared slot is "after the rule engine accepts and before the
     // append" (plan Task 11; `ingest-service.ts` says "the position is the whole
@@ -273,6 +294,9 @@ describe('the gate seam', () => {
     expect(await ledgerCount(engineEvent.id)).toBe(0);
   });
 
+  /**
+   * 9.236 — an event whose entity is not a ticket never reaches a gate at all — `parseEvent` refuses the entity kind first.
+   */
   it('an event whose entity is not a ticket never reaches a gate — parseEvent refuses the kind first', async () => {
     // `image-embed-gate.ts` records that the registry's `entityKind: 'ticket'`
     // binding is load-bearing: the gate compares `attachments.ticket_id`
@@ -358,6 +382,9 @@ describe('the gate seam at the CLIENT door', () => {
     };
   }
 
+  /**
+   * 9.237 — CONTROL at the CLIENT door: a permitted member embedding the ticket's own PNG commits through `ingestClientBatch` — proving the refusal below is about embedding, not permission.
+   */
   it('CONTROL: a permitted member embedding the ticket own png commits through ingestClientBatch', async () => {
     // Without this, the refusal below would be satisfied by a permission gate
     // refusing this member for reasons that have nothing to do with embedding.
@@ -366,6 +393,9 @@ describe('the gate seam at the CLIENT door', () => {
     expect(result).toMatchObject({ status: 'committed' });
   });
 
+  /**
+   * 9.238 — the same permitted member embedding a PDF is refused `attachment.embed-not-image` at the CLIENT door too — gates apply unconditionally across both ingest doors, not only the internal one.
+   */
   it('the same permitted member embedding a pdf is refused attachment.embed-not-image at the client door', async () => {
     const event = clientComment(CLIENT_PDF);
     const [result] = await clientIngest.ingestClientBatch([event], MEMBER);
@@ -373,6 +403,9 @@ describe('the gate seam at the CLIENT door', () => {
     expect(await ledgerCount(event.id)).toBe(0);
   });
 
+  /**
+   * 9.239 — the gate loop runs AFTER the permission gate: a stranger (non-member) embedding a PDF is told a permission refusal, never which attachment this ticket actually holds.
+   */
   it('the gate loop runs AFTER the permission gate: a stranger embedding a pdf is told permission, never which attachment this ticket holds', async () => {
     // The other half of the position claim, and the half with teeth. Hoisted
     // above `checkPermission`, the gate answers a NON-MEMBER — who then learns

@@ -46,26 +46,41 @@ const EXE = Uint8Array.from([
 const NOISE = Uint8Array.from(new Array<number>(64).fill(0x07));
 
 describe('sniffAllowedMime', () => {
+  /**
+   * 9.186 — `sniffAllowedMime` identifies a PNG by its bytes alone.
+   */
   it('identifies a png by bytes alone', async () => {
     expect(await sniffAllowedMime(PNG)).toEqual({ ok: true, mime: 'image/png' });
   });
 
+  /**
+   * 9.187 — it identifies a PDF by its bytes alone.
+   */
   it('identifies a pdf by bytes alone', async () => {
     expect(await sniffAllowedMime(PDF)).toEqual({ ok: true, mime: 'application/pdf' });
   });
 
+  /**
+   * 9.188 — planted defect: an executable is refused no matter what it claims to be named or typed as.
+   */
   it('planted defect: an executable is refused no matter what it is called', async () => {
     const result = await sniffAllowedMime(EXE);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toContain('not accepted');
   });
 
+  /**
+   * 9.189 — planted defect: unidentifiable bytes are refused, with the filename extension never consulted as a fallback.
+   */
   it('planted defect: unidentifiable bytes are refused, extensions never consulted', async () => {
     const result = await sniffAllowedMime(NOISE);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toContain('never trusted');
   });
 
+  /**
+   * 9.190 — every embeddable-image MIME (the domain's `EMBEDDABLE_IMAGE_MIME`) is a subset of the uploadable allow-list.
+   */
   it('every embeddable image mime is uploadable (subset invariant)', () => {
     // A positive control on the loop itself: an empty EMBEDDABLE_IMAGE_MIME
     // would make the assertions below vacuous and the test green, which is the
@@ -76,6 +91,9 @@ describe('sniffAllowedMime', () => {
     }
   });
 
+  /**
+   * 9.191 — the allow-list is closed: a real file of a type outside it is still refused, sniffing notwithstanding.
+   */
   it('the allow-list is closed: types outside it are refused even when they are real', async () => {
     // A real, correctly-detected file type that we deliberately do not accept.
     // Distinct from the .exe case: this one names the CLOSEDNESS of the list

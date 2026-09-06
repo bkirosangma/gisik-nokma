@@ -263,6 +263,9 @@ function comparableHeaders(res: InjectResponse): Record<string, unknown> {
 }
 
 describe('GET /v1/attachments/:id', () => {
+  /**
+   * 9.208 — a member streams the exact bytes with honest headers — the positive control the four refusal cases below are checked against.
+   */
   it('a member streams the exact bytes with honest headers (positive control)', async () => {
     const res = await download(memberToken, IMG_ID);
     expect(res.statusCode).toBe(200);
@@ -273,6 +276,9 @@ describe('GET /v1/attachments/:id', () => {
     expect(res.rawPayload.equals(PNG_BYTES)).toBe(true);
   });
 
+  /**
+   * 9.209 — non-image attachments download as an attachment with the sanitized filename; images render inline.
+   */
   it('non-images download as attachments with the sanitized filename', async () => {
     const res = await download(memberToken, PDF_ID);
     expect(res.statusCode).toBe(200);
@@ -281,6 +287,9 @@ describe('GET /v1/attachments/:id', () => {
     expect(res.rawPayload.equals(PDF_BYTES)).toBe(true);
   });
 
+  /**
+   * 9.210 — a filename a stored row already holds unsanitized is still sanitized on the way out — proven as composition through the route, not merely the `sanitizeFilename` unit alone.
+   */
   it('sanitizes a filename a row already holds unsanitized (composition, not the unit)', async () => {
     // Mutation that reddens this: replace `sanitizeFilename(row.filename)`
     // with `row.filename` at the call site in the GET handler. MEASURED:
@@ -296,6 +305,9 @@ describe('GET /v1/attachments/:id', () => {
     expect(res.rawPayload.equals(UNSAFE_BYTES)).toBe(true);
   });
 
+  /**
+   * 9.211 — case (a) vs (b): an unshared guest and a nonexistent id answer BYTE-IDENTICAL `404`s.
+   */
   it('case (a) vs (b): an unshared guest and a nonexistent id are byte-identical 404s', async () => {
     // Mutation that reddens this: give the `canSee` refusal inside the GET
     // handler any answer of its own — a distinct body, a 403, or an extra
@@ -335,6 +347,9 @@ describe('GET /v1/attachments/:id', () => {
     }
   });
 
+  /**
+   * 9.212 — case (c): metadata-without-bytes answers the SAME `404` as (a) and (b) — revealing nothing about which of the three actually happened.
+   */
   it('case (c): metadata without bytes answers the same 404 as (a) and (b), revealing nothing', async () => {
     // Mutation that reddens this: let the `ObjectNotFoundError` catch in the
     // handler fall through uncaught (removing the catch) turns this into an
@@ -359,6 +374,9 @@ describe('GET /v1/attachments/:id', () => {
     expect(orphan.headers['x-content-type-options']).toBeUndefined();
   });
 
+  /**
+   * 9.213 — no session → `401`.
+   */
   it('no session → 401', async () => {
     const res = await app.inject({ method: 'GET', url: `/v1/attachments/${IMG_ID}` });
     expect(res.statusCode).toBe(401);

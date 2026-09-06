@@ -39,6 +39,9 @@ afterAll(async () => {
 });
 
 describe('LocalDiskStore', () => {
+  /**
+   * 9.144 — `LocalDiskStore.put` → `getStream` round-trips the exact bytes.
+   */
   it('put → getStream round-trips the exact bytes', async () => {
     const bytes = Buffer.from('these are the attachment bytes, verbatim');
     await store.put('w/ws1/a/att1', Readable.from(bytes), { mime: 'application/pdf', size: bytes.length });
@@ -46,10 +49,16 @@ describe('LocalDiskStore', () => {
     expect(back.equals(bytes)).toBe(true);
   });
 
+  /**
+   * 9.145 — `getStream` on a missing key throws `ObjectNotFoundError`.
+   */
   it('getStream on a missing key throws ObjectNotFoundError', async () => {
     await expect(store.getStream('w/ws1/a/nothere')).rejects.toBeInstanceOf(ObjectNotFoundError);
   });
 
+  /**
+   * 9.146 — `delete` removes the object; deleting an already-deleted key is a quiet no-op.
+   */
   it('delete removes the object; deleting again is a quiet no-op', async () => {
     const bytes = Buffer.from('short-lived');
     await store.put('w/ws1/a/gone', Readable.from(bytes), { mime: 'image/png', size: bytes.length });
@@ -58,6 +67,9 @@ describe('LocalDiskStore', () => {
     await expect(store.delete('w/ws1/a/gone')).resolves.toBeUndefined();
   });
 
+  /**
+   * 9.147 — planted defect: traversal (`..`) and malformed keys are refused before the disk is ever touched.
+   */
   it('planted defect: traversal and malformed keys are refused before touching the disk', async () => {
     const bytes = Buffer.from('x');
     const maliciousKeys = ['../escape', 'w/../../etc/passwd', '/absolute', 'w//a', '', 'w/a/.', 'w/a/..', 'a.b/c', 'w/a b'];
@@ -82,6 +94,9 @@ describe('LocalDiskStore', () => {
     await expect(stat(join(sandbox, 'etc', 'passwd'))).rejects.toThrow();
   });
 
+  /**
+   * 9.242 — `LocalDiskStore.list` round-trips every key it was given, each with a `Date` `lastModified`.
+   */
   it('list round-trips every key it was given, each with a Date lastModified', async () => {
     await store.put('w/wsL/a/one', Readable.from(Buffer.from('a')), { mime: 'text/plain', size: 1 });
     await store.put('w/wsL/a/two', Readable.from(Buffer.from('b')), { mime: 'text/plain', size: 1 });
@@ -94,6 +109,9 @@ describe('LocalDiskStore', () => {
     }
   });
 
+  /**
+   * 9.243 — `LocalDiskStore.list` with a prefix returns only keys starting with it.
+   */
   it('list with a prefix returns only keys starting with it', async () => {
     await store.put('w/wsP/a/only', Readable.from(Buffer.from('x')), { mime: 'text/plain', size: 1 });
     await store.put('w/wsP/b/other', Readable.from(Buffer.from('y')), { mime: 'text/plain', size: 1 });
@@ -110,6 +128,9 @@ describe('LocalDiskStore', () => {
    * symlinks would surface as a leaked out-of-root key, not merely a
    * differently-named in-root one.
    */
+  /**
+   * 9.255 — `LocalDiskStore.list` skips a symlink planted inside `rootDir`, even one pointing outside `root` — structural: neither `isDirectory()` nor `isFile()` matches its `Dirent`.
+   */
   it('list skips a symlink planted inside rootDir, even one pointing outside root', async () => {
     const outsideTarget = join(sandbox, 'outside-target.txt');
     await writeFile(outsideTarget, 'not a real attachment');
@@ -124,6 +145,9 @@ describe('LocalDiskStore', () => {
     }
   });
 
+  /**
+   * 9.244 — `LocalDiskStore.list` on an empty store returns an empty array — including a store directory that does not exist yet.
+   */
   it('list on an empty store returns an empty array', async () => {
     const emptySandbox = await mkdtemp(join(tmpdir(), 'gisik-store-empty-'));
     try {
@@ -134,6 +158,9 @@ describe('LocalDiskStore', () => {
     }
   });
 
+  /**
+   * 9.148 — a failed write leaves no partial object behind — the torn-write-proof property.
+   */
   it('a failed write leaves no partial object behind', async () => {
     const bad = new Readable({
       read() {

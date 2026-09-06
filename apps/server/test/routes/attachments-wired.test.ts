@@ -136,6 +136,9 @@ afterAll(async () => {
 });
 
 describe('the composition root wires the attachment routes', () => {
+  /**
+   * 9.240 — the COMPOSITION ROOT registers the upload route: an upload through the app `buildApp` assembles answers `201` AND leaves a row in `attachments` for the named ticket.
+   */
   it('an upload through the ASSEMBLED app lands a row in `attachments`', async () => {
     const ticketId = newUlid();
     await seedTicket(db.pool, { workspaceId: WS, projectId: PRJ, ticketId });
@@ -164,6 +167,9 @@ describe('the composition root wires the attachment routes', () => {
     expect(row?.size).toBe(PNG.length);
   });
 
+  /**
+   * 9.241 — registering `@fastify/multipart` for the upload route does not change what the OTHER `/v1/events` door says: a multipart POST there still answers `415` on the same assembled app.
+   */
   it('registering multipart does NOT change what `/v1/events` says to a multipart body', async () => {
     // Same assembled app, a different door. 415 is "this server has no parser
     // for that content type" — the answer every route but the upload one must
