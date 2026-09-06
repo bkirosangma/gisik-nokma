@@ -261,7 +261,36 @@ hazard requires it — and that is before any reconcile in the same catch-up.
    **What caught it was the RUNNER's own line** (`Tests 10 passed`), not any review. Count `it` blocks
    with `grep -nE "^\s*it\("`, or better, read the runner's number.
 
-3. **THE COMPILER IS THE ENUMERATOR, twice more, and both times the grep would have been wrong.**
+3. **THE COMPILER IS THE ENUMERATOR — except for the ONE it could not see, which was the dangerous one.**
+   Adding a fourth arm to `SyncItem` / `ServerStreamFrame` located **SEVEN** consumers. Six were compile
+   errors: `http-transport`'s `TS2344` exhaustiveness assertion, `replica.applyInstruction`'s `TS2366`
+   no-default switch, `app-core`'s `replica-data-source` (`TS2339`), two test helpers (`TS2322`,
+   `TS2339`), and `hub.ts` — whose `if/else` read *"purge, otherwise scope-revoked"*, so a new
+   instruction would have been handled AS A REVOCATION, which detaches the subscription and tells the
+   replica to empty itself; what saved it was an accident of field names, and it is a `switch` with no
+   `default` now.
+   **The seventh was `packages/app-core/src/online/stream.ts`'s `parseFrame`, and it returned `null`.**
+   It is a SECOND, INDEPENDENT reader of this wire — the other is sync-client's transport — linked to the
+   published union by nothing but `serverStreamFrameSchema` and one case that walks its option list.
+   Without the branch the notice was silently dropped there while the trigger behind it was accepted:
+   the exact failure `parseFrame`'s own closing comment warns about, one line below where it happened.
+   **What caught it was a RUNTIME COMPLETENESS GUARD in the full gate, not the typechecker and not a
+   review** — and it reddened twice in the right order, first for a missing fixture and then for the
+   missing branch. *A typecheck is not a sweep for a WIRE union; only a case that walks the published
+   schema is.*
+
+4. **GATE ENVIRONMENT: the gate script printed `v22.22.2`, and turbo's own error line named
+   `/Users/kiro/.nvm/versions/node/v24.11.1/bin/pnpm`.** The failure it reported was real and
+   Node-independent, so nothing was lost this time — but the drift is exactly the one this machine's
+   record warns about, where a native binding turns it into a false green instead. **Report the Node the
+   script printed AND note that turbo's task spawn resolves pnpm from elsewhere.**
+
+5. **THE PERMISSION HOOK BLOCKS THE WHOLE COMPOUND COMMAND, not just the offending clause.** A
+   `python3 <<EOF … EOF` edit followed by `… | head` in ONE Bash call ran NEITHER: the edit silently did
+   not happen, the next run reported the same failure, and it read exactly like the edit having no
+   effect. **Verify an edit landed (`grep -c`) before concluding anything from the run after it.**
+
+6. **THE COMPILER IS THE ENUMERATOR FOR INTERFACES TOO.**
    Adding a fourth arm to `SyncItem` / `ServerStreamFrame` located **five** consumers — the transport's
    `TS2344` exhaustiveness assertion, `replica.applyInstruction`'s `TS2366` no-default switch,
    `app-core`'s `replica-data-source` (`TS2339`), and two test helpers — plus `hub.ts`, which was the
