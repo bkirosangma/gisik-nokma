@@ -1,7 +1,7 @@
-// `ErrorAlerter` comes from the shim next door rather than `../alerts/
-// error-alerter.js` only because Task 3 has not merged yet — see
-// `./error-alerter-shim.ts`'s header for the one-line change that undoes this.
-import type { ErrorAlerter } from './error-alerter-shim.js';
+// Task 3 has merged (Lane E seam 1) and `./error-alerter-shim.ts` is deleted;
+// this is the real module. The shim mirrored this exact type, so the swap is an
+// import line: `notify(context, error)` returns `Promise<void>` here too.
+import type { ErrorAlerter } from '../alerts/error-alerter.js';
 
 /**
  * Milliseconds from `from` until the next `HH:MM` in UTC — optionally the next
@@ -52,8 +52,8 @@ export type BackupTimes = {
  * daemon re-arms rather than dying. Covered by cases 13.25–13.29.
  *
  * THE STDERR LINE IS WRITTEN HERE, BY THE DAEMON, ON PURPOSE. It used to be
- * written by `alerterFromConfig` — but that is `error-alerter-shim.ts`, a file
- * whose own header schedules its deletion, and Task 3's real module does not
+ * written by `alerterFromConfig` — but that was `error-alerter-shim.ts`, now
+ * deleted as its own header promised, and Task 3's real module does not
  * log: `WebhookErrorAlerter` POSTs and swallows (reasoning that the original
  * error is already in the structured log, which is true of `buildApp`'s error
  * handler and false of this caller), and `NoopErrorAlerter.notify()` is an
