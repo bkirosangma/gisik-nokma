@@ -28,16 +28,25 @@ const ATTACHMENTS = [
 ];
 
 describe('transitionRequiresEvidence', () => {
+  /**
+   * 9.107 — `transitionRequiresEvidence` reads the exact `(from, to)` transition's `require-evidence` rule when the workflow definition states one.
+   */
   it('reads the exact transition', () => {
     expect(transitionRequiresEvidence(DEF, 'doing', 'done')).toBe(true);
     expect(transitionRequiresEvidence(DEF, 'todo', 'doing')).toBe(false);
   });
 
+  /**
+   * 9.108 — a from-any (`*`) rule matches every origin state, and an unrecognised `(from, to)` pair answers `false` rather than throwing.
+   */
   it('matches from-any transitions and unknown pairs answer false', () => {
     expect(transitionRequiresEvidence(DEF, 'doing', 'abandoned')).toBe(false); // rule there is require-comment
     expect(transitionRequiresEvidence(DEF, 'done', 'todo')).toBe(false); // no such transition
   });
 
+  /**
+   * 9.109 — a from-any transition DOES carry a `require-evidence` rule when the definition states one there — the wildcard path is live and exercised.
+   */
   it('a from-any transition DOES carry a require-evidence rule when the def says so — the wildcard path is live, not merely declined', () => {
     // Distinct from the above: that def's only wildcard edge carries
     // require-comment, so a mutation that dropped the wildcard branch
@@ -54,6 +63,9 @@ describe('transitionRequiresEvidence', () => {
     expect(transitionRequiresEvidence(def, 'doing', 'archived')).toBe(true);
   });
 
+  /**
+   * 9.110 — an exact `(from, to)` rule wins over a from-any rule aimed at the same destination state.
+   */
   it('an exact transition wins over a from-any to the same state', () => {
     const def: WorkflowDef = {
       ...DEF,
@@ -68,6 +80,9 @@ describe('transitionRequiresEvidence', () => {
 });
 
 describe('EvidencePicker', () => {
+  /**
+   * 9.111 — `EvidencePicker` lists a ticket's existing (uploaded) attachments as offerable options, and picking one hands its id to the caller.
+   */
   it('lists existing attachments and picking one hands over its id', () => {
     const onPick = vi.fn();
     const view = render(
@@ -87,6 +102,9 @@ describe('EvidencePicker', () => {
     view.unmount();
   });
 
+  /**
+   * 9.112 — uploading fresh evidence emits `attachment.added` FIRST, then picks the freshly-uploaded id — a claim is never picked before it exists.
+   */
   it('uploading new evidence emits attachment.added first, then picks the fresh id', async () => {
     const order: string[] = [];
     const uploaded = {
@@ -126,6 +144,9 @@ describe('EvidencePicker', () => {
     view.unmount();
   });
 
+  /**
+   * 9.113 — a failed upload cancels nothing already picked and picks nothing new — the picker's prior state survives an upload failure untouched.
+   */
   it('a failed upload cancels nothing and picks nothing', async () => {
     const onPick = vi.fn();
     const onCancel = vi.fn();
@@ -150,6 +171,9 @@ describe('EvidencePicker', () => {
     view.unmount();
   });
 
+  /**
+   * 9.114 — cancel is an explicit act with its own handler, not a fallthrough of some other control.
+   */
   it('cancel is an explicit act', () => {
     const onCancel = vi.fn();
     const view = render(
@@ -171,6 +195,9 @@ describe('EvidencePicker', () => {
     },
   ];
 
+  /**
+   * 9.63 — a Drive reference passed on `driveReferences` never appears among the offerable `.evidence-picker__option` buttons, even when its name matches an offerable upload's name exactly, and clicking anything in the unavailable section picks nothing.
+   */
   it('planted defect: a Drive reference is never among the offerable options', () => {
     const onPick = vi.fn();
     const view = render(
@@ -197,6 +224,9 @@ describe('EvidencePicker', () => {
     view.unmount();
   });
 
+  /**
+   * 9.64 — the Drive reference's unavailable section shows the server's own `EVIDENCE_DRIVE_REFERENCE_REASON`, asserted against the exported constant rather than a retyped copy.
+   */
   it("planted defect: the reference is shown with the server's own reason, word for word", () => {
     const view = render(
       <EvidencePicker

@@ -61,6 +61,9 @@ function referenceCapturedAt(capturedAt: string): AttachmentListEntry {
 const FORBIDDEN = ['deleted', 'missing', 'no longer', 'available', 'verified', 'up to date'];
 
 describe('AttachmentListItem', () => {
+  /**
+   * 9.131 — an upload renders as a file this board holds: `data-attachment-kind="upload"`, class `attachment-item--upload`, an `<a>` pointed at `/v1/attachments/:id`, filename on the surface.
+   */
   it('an upload renders as a file the board holds, downloadable from the board', () => {
     const view = render(
       <ul>
@@ -77,6 +80,9 @@ describe('AttachmentListItem', () => {
     view.unmount();
   });
 
+  /**
+   * 9.132 — planted defect: a Drive reference renders as external and last-seen, never as a held file — distinct kind attribute and class, the link is the Drive `webViewLink` and never contains `/v1/attachments/`.
+   */
   it('planted defect: a Drive reference renders as external and last-seen, never as a held file', () => {
     const view = render(
       <ul>
@@ -100,6 +106,9 @@ describe('AttachmentListItem', () => {
     view.unmount();
   });
 
+  /**
+   * 9.133 — planted defect: an unreachable link reads as unknown, never absent and never fine — checked both unchecked and after a failed reachability check, and none of the forbidden words appears in either state, which nonetheless read as two different sentences.
+   */
   it('planted defect: an unreachable link is unknown — never absent, never fine', () => {
     const unchecked = render(
       <ul>
@@ -122,6 +131,9 @@ describe('AttachmentListItem', () => {
     failed.unmount();
   });
 
+  /**
+   * 9.134 — an upload carries no reachability language at all — the `.attachment-item__reachability` element does not exist for an upload, because the board holds the file.
+   */
   it('an upload never carries reachability language at all — the board holds it', () => {
     const view = render(
       <ul>
@@ -138,6 +150,9 @@ describe('AttachmentListItem', () => {
    * exists, in the pattern `EVIDENCE_DRIVE_REFERENCE_REASON` sets in the
    * domain. Retyping the copy here would let the two drift and leave both
    * green.
+   */
+  /**
+   * 9.135 — the reachability sentence rendered is exactly what the exported `describeDriveReachability` returns, for both `not-checked` and `unreachable`, asserted against the function rather than a retyped copy.
    */
   it('renders the reachability sentence the exported describer returns, both states', () => {
     for (const check of ['not-checked', 'unreachable'] as const) {
@@ -206,6 +221,9 @@ describe('the captured day is the UTC day, under every zone a reader might sit i
   ];
 
   for (const { label, capturedAt } of cases) {
+    /**
+     * 9.136 — the capture day renders as the UTC day across four zones, checked with two fixtures straddling a day boundary in OPPOSITE directions, with an in-file positive control proving the `TZ` reassignment reached this worker's `Date` getters at all.
+     */
     it(`renders 2026-08-20 for ${label}, and the zones really did move`, () => {
       const entry = referenceCapturedAt(capturedAt);
       const originalTz = process.env['TZ'];

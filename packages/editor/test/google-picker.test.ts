@@ -80,6 +80,9 @@ function deps(google: unknown, loaded: string[] = []): DrivePickerDeps {
 }
 
 describe('the Google Picker path', () => {
+  /**
+   * 9.119 — `openDrivePicker` requests exactly the `drive.file` scope and nothing else, with incremental consent (`prompt: ''`) rather than a fresh full consent screen.
+   */
   it('asks for the per-file scope and nothing else, with incremental consent', async () => {
     const { google, seen } = fakeGoogle('picked');
     const token = await requestDriveFileToken(CONFIG, deps(google));
@@ -89,6 +92,9 @@ describe('the Google Picker path', () => {
     expect(seen.prompts).toEqual(['']);
   });
 
+  /**
+   * 9.120 — planted defect: the requested scope really is exactly one, non-sensitive, scope — proven against the configured value, not the library's documentation.
+   */
   it('planted defect: the requested scope is exactly one non-sensitive scope', async () => {
     const { google, seen } = fakeGoogle('picked');
     await requestDriveFileToken(CONFIG, deps(google));
@@ -100,6 +106,9 @@ describe('the Google Picker path', () => {
     }
   });
 
+  /**
+   * 9.121 — the picker loads both Google scripts (GSI + Picker API), configures the `PickerBuilder` with the developer key and app id, and maps a picked file to a `DriveReference`.
+   */
   it('loads both Google scripts, configures the picker, and maps the picked file to a reference', async () => {
     const loaded: string[] = [];
     const { google, seen } = fakeGoogle('picked');
@@ -118,16 +127,25 @@ describe('the Google Picker path', () => {
     expect(isDriveReference(references[0])).toBe(true);
   });
 
+  /**
+   * 9.122 — cancelling the picker attaches nothing — no claim, no reference.
+   */
   it('cancelling attaches nothing', async () => {
     const { google } = fakeGoogle('cancel');
     await expect(openDrivePicker(CONFIG, deps(google))).resolves.toEqual([]);
   });
 
+  /**
+   * 9.123 — planted defect: a picked doc with no usable view link is dropped rather than have a URL invented for it.
+   */
   it('planted defect: a doc without a usable view link is dropped, never guessed at', async () => {
     const { google } = fakeGoogle('picked', [{ ...DOC, url: undefined } as unknown as typeof DOC]);
     await expect(openDrivePicker(CONFIG, deps(google))).resolves.toEqual([]);
   });
 
+  /**
+   * 9.124 — a failed load of the GSI script rejects and never opens the picker.
+   */
   it('a failed load of the GSI script rejects and never opens the picker', async () => {
     const { google, seen } = fakeGoogle('picked');
     const failing: DrivePickerDeps = {
@@ -144,6 +162,9 @@ describe('the Google Picker path', () => {
     expect(seen.token).toBe('');
   });
 
+  /**
+   * 9.125 — a failed load of the Picker API script rejects — even after the OAuth token was already granted — and never opens the picker.
+   */
   it('a failed load of the picker API script rejects after the token is already granted, and never opens the picker', async () => {
     const { google, seen } = fakeGoogle('picked');
     const loaded: string[] = [];
@@ -220,6 +241,9 @@ describe('the Google Picker path', () => {
     // — it overrides whatever TZ the test runner was launched with, so a
     // shell-level `TZ=... vitest run` in front of this file is inert for
     // this test specifically.
+    /**
+     * 9.126 — `capturedAt` is the UTC serialization of the injected instant, per ECMA-262's guarantee that `toISOString` reads no local zone — checked fixed across `TZ=UTC` and `TZ=Pacific/Kiritimati` as a REGRESSION guard, not TZ-dependent evidence.
+     */
     it('is fixed across TZ="UTC" and TZ="Pacific/Kiritimati" (regression guard, not TZ-dependent evidence — see comment above)', () => {
       const originalTz = process.env['TZ'];
       try {
@@ -235,6 +259,9 @@ describe('the Google Picker path', () => {
     });
   });
 
+  /**
+   * 9.127 — `composeUploadAttachmentAdded` composes an `attachment.added` upload claim from the server's own answer, hash included.
+   */
   it('composes an upload claim from the server answer, hash included', () => {
     const event = composeUploadAttachmentAdded({
       attachmentId: '01J9GATA000000000000000000',
@@ -256,6 +283,9 @@ describe('the Google Picker path', () => {
     expect(event.payload).not.toHaveProperty('url');
   });
 
+  /**
+   * 9.128 — `composeDriveReferenceAdded` composes an `attachment.added` drive-reference claim with a freshly-minted ULID for the attachment id.
+   */
   it('composes attachment.added as a drive-reference claim with a fresh ULID', () => {
     const reference = toDriveReference(DOC, new Date('2026-08-20T10:00:00.000Z'));
     const event = composeDriveReferenceAdded(reference, () => '01J9GATD000000000000000000');
@@ -274,6 +304,9 @@ describe('the Google Picker path', () => {
     });
   });
 
+  /**
+   * 9.129 — the composed upload claim parses against the door-facing wire schema (`attachmentUploadedPayload`), not merely the structural guard.
+   */
   it('the composed upload claim parses against the door-facing wire schema, not merely the structural guard', () => {
     const event = composeUploadAttachmentAdded({
       attachmentId: '01J9GATA000000000000000000',
@@ -286,6 +319,9 @@ describe('the Google Picker path', () => {
     expect(attachmentUploadedPayload.safeParse(event.payload).success).toBe(true);
   });
 
+  /**
+   * 9.130 — the composed drive-reference claim parses against the door-facing wire schema (`attachmentDriveReferencePayload`), not merely `isDriveReference`.
+   */
   it('the composed drive-reference claim parses against the door-facing wire schema, not merely isDriveReference', () => {
     const reference = toDriveReference(DOC, new Date('2026-08-20T10:00:00.000Z'));
     const event = composeDriveReferenceAdded(reference, () => '01J9GATD000000000000000000');

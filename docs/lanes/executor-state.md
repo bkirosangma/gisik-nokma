@@ -16,7 +16,81 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# ⛔ SERIAL EXECUTOR, SUNDAY 2026-09-06 21:30 IST — **§10 BACKFILLED TO ZERO UNCITED (gate green, PR open); LANE F PASS 2 CANNOT DELIVER WHAT IT WAS SCHEDULED TO DELIVER (ruling pending); AND IT IS SUNDAY, NOT MONDAY.**
+# 🔴 SERIAL EXECUTOR — SUNDAY 2026-09-06 ~22:35 IST. §09 BATCH 1 DONE (98 cited, gate green, PR open). **A VERIFICATION METHOD USED THROUGHOUT THIS SESSION WAS BROKEN — IT PRODUCED THREE FALSE GREENS, ONE OF THEM IN THE MERGED #230. READ THE NEXT SECTION BEFORE YOU VERIFY ANYTHING.**
+
+| anchor | value |
+|---|---|
+| `main` | **`fcf39ab`** (#230 merged at `1bc6e01`, + the controller's anchor commit) |
+| my branch | **`exec/54-cite-section-09`** off `fcf39ab`, **ONE commit**, head **`04082b2`**, worktree clean, PR open |
+| why a new branch | `exec/53` could not rebase: #230 was **squash**-merged, so `exec/53` still carried §10's original commits and its rebase conflicted on this very file. Rebuilt clean off `main` by cherry-picking the §09 commit alone. **`exec/52` and `exec/53` are DEAD — do not resume either** |
+| §09 | **98 cited / 121 uncited / 219** (was 0/219). Baseline **121** |
+| §05 | **68 → 67**, deliberate and correct — see below |
+| **gate** | **`GATE_EXIT=0` at `97d7451`** · 30/30 · 0 cached · 1m31.9s · node v22.22.2 · **3666 passed \| 5 skipped (3671) / 285 files** — identical to `bf1c517`, the prediction a comments-only change owes. **The non-docs content of `04082b2` is byte-identical to that gated tree** (`git diff 97d7451 HEAD -- . ':(exclude)docs'` empty), so the gate carries. `check:env` 0 · `check:citations` 0 (879 cited / 650 uncited, ratchet holds everywhere) · `check-case-ids` 0 (1614) · `check:runbook` 0 |
+
+## 🔴 THE BROKEN INSTRUMENT — three false greens, and the merged #230 is one of them
+
+**`git diff | grep "^+"` IS ALWAYS EMPTY UNDER THE RTK PROXY.** The proxy reformats `git diff` into a stat header,
+a `--- Changes ---` banner, and hunk lines **indented two spaces**, so an added line arrives as `␣␣+␣␣/**`.
+Measured: **`git diff | grep -c "^+"` → `0`** on a **31 KB** diff with **294 additions**.
+
+**The three claims it produced, all re-checked — every conclusion held, every piece of evidence was worthless:**
+1. **§10 comments-only, in the MERGED #230.** Re-checked at `a69b64d`: 200 added / 200 expected, the only
+   non-comment add and only removal being the baseline `66 → 0`. **True. No defect reached `main`.**
+2. **§09 comments-only.** Re-checked: 294 / 294, **0 non-comment, 0 removed**. True.
+3. **"`exec/50` is subsumed — `git diff origin/main HEAD` has zero `+` lines."** **There were NINE.** They are
+   stale counterparts of lines later PRs changed (1 line against main's 29 in `ci.yml`, etc.), not unique work,
+   so the branch *was* subsumed — **for a different reason than the one recorded.** The `--stat` printed
+   *"9 insertions"* directly beside the grep's "zero", and the contradiction went unread.
+
+**How it was caught:** a *different* question — why did §05 move? — returned *"no numeric tokens at all in the
+added lines"*, impossible for docblocks reading `9.36 —`. The absurd answer to the second question exposed the
+first. **The positive control had tested the FILTER, on a `printf`, and never the SOURCE:** it proved the
+instrument worked, never that it was aimed at the question. **A control must run through the same path as the
+measurement, or it certifies nothing.**
+
+**USE THIS INSTEAD:** `git show <sha>:<file>` vs the other version through Python `difflib`, **asserting the
+added-line count equals `git diff --numstat` before believing anything else it reports.** That count-match is the
+control that binds. For pure counts, `git diff --numstat` is safe — it is not line-prefix parsing.
+
+**Sibling traps met the same session:** `sed -E 's/(.{400}).*/\1…/'` → *"maximum repetition exceeds 255"*;
+`grep`/`sed` dying of SIGPIPE mid-pipeline; and a `--include=*.md` glob eaten by zsh. All three ERRORED, which is
+why they were harmless — **the dangerous one is the pipeline that succeeds and returns nothing.**
+
+## Why §05 moved 68 → 67 — correct, but check the same signal every time
+
+`9.57`'s docblock names **5.26**. Legitimate: §09's own row for 9.57 says the test lives in
+`packages/domain/test/ticket-events.test.ts` and is *"already catalogued as case 5.26, whose text covers the
+identical behaviour"*, and the test asserts it. **But an ACCIDENTAL cross-section citation produces an identical
+signal and is worse than an uncited row** — always read the row before tightening.
+
+## The dead subagent had done far more than it said
+
+Batch 1 died on the 429 wall. Its last note said it was *starting* `attachment-list-item.test.tsx`; the tree
+showed that file finished **and eleven more** — 17 files, +294. *Treat a failed dispatch as UNVERIFIED, not
+EMPTY* was worth 98 citations. **Read the tree before re-dispatching.**
+
+## Mutation evidence for §09 batch 1
+
+Removing the sole `9.36` citation → **`EXIT=1`, §09 `97 cited / 122 uncited`** — the count moving by exactly one,
+`9.36` named. Restored; tree matches HEAD. ⚠ **§09 has NO prefix pairs** (live ids are **9.35–9.256**; 9.1–9.34
+are permanently unused), so §10's `10.1`-style substring probe **does not apply here** — and note §09 lists many
+uncited ids on failure, so **the delta of exactly 1 is the evidence, not the length of the list.**
+
+## NEXT, in order — ruling A+C is GIVEN, do not re-ask
+
+1. **§09 batch 2** — the **113 rows naming `apps/server/`**, one subagent, same method; then set the §09 baseline
+   to the new real count and re-run the mutation shape above.
+2. **Then (A)**, the approved semble hunt: ranked candidates as rows with **named owners, not fixes**. First row
+   already evidenced: `packages/app-core/src/precheck.ts:375` (`needsMembership`) ↔ `rule-engine`, **0.61–0.67**,
+   cross-package, no import and no call. §7 next free was **7.254** — recount at your sha before minting.
+
+**§09 mapping, measured — do not re-derive:** 219 ✅ rows, 218 naming a full test path in parentheses, 41 files;
+split **98 `packages/editor/` · 113 `apps/server/` · 7 `packages/domain/`**.
+
+**Standing:** the ultracode harness reminder is **overridden** by the owner's serial instruction — no Workflow,
+one subagent at a time. Two sonnet subagents this session, sequential.
+
+# ⛔ SUPERSEDED — SERIAL EXECUTOR, SUNDAY 2026-09-06 21:30 IST — **§10 BACKFILLED TO ZERO UNCITED (gate green, PR open); LANE F PASS 2 CANNOT DELIVER WHAT IT WAS SCHEDULED TO DELIVER (ruling pending); AND IT IS SUNDAY, NOT MONDAY.**
 
 | anchor | value |
 |---|---|

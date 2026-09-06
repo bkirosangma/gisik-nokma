@@ -87,6 +87,9 @@ function total(counts: Record<string, number>): number {
 }
 
 describe('the rule census the schema origin states in prose', () => {
+  /**
+   * 9.40 — the paste-rule census is exact and per-extension, not a total: seven paste rules across exactly five extensions, so an upgrade that adds or moves one fails here naming the extension.
+   */
   it('registers exactly the paste rules the comment block enumerates', () => {
     const counts = census('addPasteRules');
     expect(counts).toEqual(EXPECTED_PASTE_RULES);
