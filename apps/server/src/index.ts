@@ -129,6 +129,40 @@ async function main(): Promise<void> {
       // `/healthz`. Everything else gets the `'dev'` default, which is honest
       // about what it is.
       deploySha: config.deploySha,
+      // The one non-test boot path, so the one place the security surface is
+      // ON (Plan 11 Task 2). Absent everywhere else, which is the contract
+      // `SecurityOptions` states: the controls are opt-in so that around sixty
+      // test files keep the throughput they were written against.
+      security: {
+        // Feeds BOTH the CORS allow-list and the HTTP-`Origin` check the CSRF
+        // ruling requires on cookie-authenticated product mutations. It is the
+        // same value that hosts every invitation link this server mints, which
+        // is the point: there is one web client, and one origin it lives at.
+        webOrigin: config.webOrigin,
+        rateLimit: {
+          authMax: config.rateLimitAuthMax,
+          eventsMax: config.rateLimitEventsMax,
+          // NO NEW ENVIRONMENT VARIABLE, deliberately. The invite bucket takes
+          // the AUTH budget (10/min by default), not the events one (120/min),
+          // because minting an invitation is the same KIND of scarce act as
+          // asking for a sign-in code: each one produces a credential that
+          // reaches a person's inbox and grants membership when spent. 120 a
+          // minute is a batch-ingest budget and would be no bound at all here.
+          // It is a separate LIMITER over the same number, so invite issuance
+          // and sign-in cannot spend each other's window. The day this wants
+          // its own knob, `RATE_LIMIT_INVITE_MAX` lands on this line and on
+          // `.env.example`, and nothing else moves.
+          inviteMax: config.rateLimitAuthMax,
+          windowSec: config.rateLimitWindowSec,
+        },
+        // Without this, `request.ip` behind App Platform's router is the ROUTER
+        // for every client, so all of them share one bucket and the limiter
+        // becomes a shared outage. `config.trustProxy` is the deployment saying
+        // there is a trusted proxy in front; the default is `false` because
+        // believing `X-Forwarded-For` from an untrusted hop lets a caller pick
+        // its own source address and mint unlimited buckets.
+        trustProxy: config.trustProxy,
+      },
     },
   );
   // The snapshot writer (Plan 10 Task 5), and THREE deliberate departures from

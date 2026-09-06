@@ -318,15 +318,23 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
  *   answered. The entry stays open for `workflow`, `ticket-type`, `project` and
  *   `membership`, whose ordinary events are still unexamined beyond the types
  *   `ADMIN_ONLY_TYPES` and the two membership branches happen to name.
- * - **An invitation's ADDRESS is unchecked, and nothing rate-limits issuance.**
- *   Task 14 refuses a blank address and refuses `owner`, and stops there. An
- *   admin may invite the same address a thousand times, or an address that
- *   reaches nobody, and this gate has no opinion — every one of those is an
- *   attributed claim by somebody who could already grant membership directly.
- *   What makes it an absence rather than an emergency is that issuance needs
- *   admin already; what makes it worth naming is that each issuance mints a
- *   credential. *Owner: Plan 11, which owns rate limiting
- *   (`RATE_LIMIT_*` in `.env.example`) and delivery.*
+ * - **An invitation's ADDRESS is unchecked. Issuance IS now rate-limited —
+ *   Plan 11 Task 2 closed that half.** Task 14 refuses a blank address and
+ *   refuses `owner`, and stops there. An admin may still invite an address that
+ *   reaches nobody, and this gate has no opinion — that is an attributed claim
+ *   by somebody who could already grant membership directly.
+ *
+ *   The rate-limiting half is no longer an absence. `POST
+ *   /v1/workspaces/:workspaceId/invites` has its OWN fixed-window bucket in
+ *   `app.ts` (`invite:${ip}`, budgeted from `RATE_LIMIT_AUTH_MAX` rather than
+ *   the far larger events budget, because each issuance mints a credential),
+ *   separate from the auth and events buckets so neither can spend the other's
+ *   window. It is per SOURCE ADDRESS, not per issuer: the limiter is an
+ *   `onRequest` hook and `request.currentUserId` is written by `requireSession`,
+ *   a route-level `preHandler` that runs later. **A per-issuer budget remains
+ *   open** and would be a different seam — a `preHandler` on that one route.
+ *   *Owner: Plan 4 Task 14's successor.* The address check is likewise still
+ *   open, with delivery. *Owner: Plan 11's delivery task.*
  * - **Nothing checks that an invitation's promised projects still exist, or
  *   that they belong to the inviting workspace.** `invite.sent.projectIds` is
  *   shape-checked (ULIDs) and never resolved. `checkProjectExists` runs on
