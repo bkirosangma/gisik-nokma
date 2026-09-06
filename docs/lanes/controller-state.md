@@ -11,7 +11,7 @@ parallel-wave one. The "READ FIRST" section below still applies to anyone holdin
 > a branch that had already merged, so a restart read a copy 70 lines out of date. **Once the branch
 > carrying a handoff merges, the next update branches off `main`.**
 
-## ⏩ CONTROLLER RESUMED 2026-09-06 12:26 IST IN A FRESH CONTEXT (Fable, session name unchanged `gisik-nokma-0d`) — LIVE STATE, re-measured at `2f18f3f` (13:25; earlier at `ea34c09` 12:53 and `3e6d606` 12:38)
+## ⏩ CONTROLLER RESUMED 2026-09-06 12:26 IST IN A FRESH CONTEXT (Fable, session name unchanged `gisik-nokma-0d`) — LIVE STATE, re-measured at `e33c429` (13:50; earlier at `2f18f3f` 13:25, `ea34c09` 12:53, `3e6d606` 12:38)
 
 **The 12:25 `/clear` worked as designed.** The fresh context read this file top-down (the 12:25 block, then
 the 02:10 block in full — the standing rules and Rulings P35–P41 live there), then every lane's handoff from
@@ -24,9 +24,11 @@ remain true history; **this block is the live state.**
 | what | value |
 |---|---|
 | `main` | **`2f18f3f`** — since `5fca89e`: #181 (Lane A's post-#176 handoff, docs-only; the controller opened the PR for A's pushed-and-stopped branch) · #182 · **#183 (Lane C: Plan 11 T11 + T12, `81a7e44`, 12:50)** · #184 (their promotion) · #185 (docs) · **#161 (Lane B: CLOSURE 5b under P37.1/P37.2/P37.3 — the grant side pull-shaped and client-presented, the per-ticket bootstrap door, the durable pending-pull set, `headSeq` on the notice, drop-on-404 keyed by notice; `2f18f3f`, 13:17, twelve green at `fff3cbf`)**. #161's CI at its first rebased head `20c1844` was RED (typecheck TS2345 ×2 in `rig.ts`; 12.275/12.276/12.316 asserting bare ids against `{id, headSeq}`) — the controller read the two job logs and relayed the lines while B's own fix was already committed at `bdc93d7`: same root cause, two parties, the topology working. **B's lesson, kept:** turbo stopped at `server#test` (20/30) so `server#typecheck` never reported — *a failing test can hide a type error behind it*; the defect was statically catchable the whole time. B's post-merge enumeration: five `listPendingPulls` consumers, the rig was the only miss (positive control `addPendingPulls` = 13) |
-| ledger | **`CHECK_EXIT=0` · 168/177 (94.9%)** at `2f18f3f` — unchanged by #161 (closures have no rows). Plan 10 **17/18** (T18 IN FLIGHT, Lane B), Plan 11 **8/16**. Remaining: 10/18 · 11/1–11/6 (E's seam 1, one PR) · 11/13, 11/16 (E, seam 3) |
-| last forced gate | **`2f18f3f`** — lock v3.2 acquired immediately (pid 61757), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 2m22s · node v22.22.2 · 3470 tests / 272 files** (sync-client 87 · app-core 1102 · server 1157 \| 5 skipped — the local pg-client skew, CI runs them). **Matches Lane B's 3470 / 272 exactly.** Zero orphans. *(Previous: `81a7e44` 3439 / 269; `2d2bc5c` 3393 / 264.)* |
-| open PRs | **none** (13:20). Five branches in flight: A `exec/39-fixture-witnesses` · B `exec/33-plan10-t18` · C `exec/34-plan11-scheduler-errands` · D `exec/40-socket-cut-fixture` · E `exec/23-plan11` |
+| `main` (13:46) | **`e33c429`** — **#187 (Lane A: the Lane F fixture-witness pass, 13:46; twelve green at `1c7f4e4`, gate at `cf18d9e` code-identical)**: `apps/server/test/integration/fixture-witnesses.test.ts` (NEW — the harness every later witness uses), `pagingFetch`'s 404 arm corrected to the route's real rule (an unknown cursor NARROWS to 200/empty — 12.323), the shipped `getTickets` loop executed against the shipped route (12.324, which asserts its own reach: one page, not "to exhaustion"), the notifications `nextCursor` pinned to the LAST id (12.325 — the existing suite could not see a broken keyset cursor; the new case can, with `limit=2`), `founding.test.ts`'s self-authored 400 body replaced by the real gateway over the real door (7.221, `INVALID_NAME_BODY.message` read from the module); ❌ 12.326 (the rig's restated envelope; the optional-wire-field principle), 12.327 (`'bad-envelope'`, a code no server emits), 12.328 (the dead text ping/pong). **A's own two records:** a red on the case you aimed at is not evidence until you have read WHICH assertion produced it (7.221's first mutant died at its non-vacuity guard; 12.323's first mutant 500'd where no `reply` was in scope — both replaced); and its first local gate was `EXIT=2` on `server#typecheck` with every test green — *a gate whose tests are all green is not a green gate.* **Three pushes after the report each cancelled the twelve-job run** (handoff refreshes); rule below |
+| ledger | **`CHECK_EXIT=0` · 168/177 (94.9%)** at `e33c429` — unchanged (#187 has no row). Plan 10 **17/18** (T18 = #188 open), Plan 11 **8/16**. Remaining: 10/18 · 11/1–11/6 (E's seam 1, one PR) · 11/13, 11/16 (E, seam 3) |
+| last forced gate | **`e33c429`** — lock v3.2 (pid 94699, immediate), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 2m05s · node v22.22.2 · 3474 tests / 273 files** (server 1161 \| 5 skipped; app-core 1102). Matches A's 3,474 passed + 5 skipped / 273. Zero orphans. *(Previous: `2f18f3f` 3470 / 272 — matched B exactly; `81a7e44` 3439 / 269.)* |
+| open PRs | **#188** — Lane B's **Plan 10 T18** (`exec/33-plan10-t18`): §12's final shape, 12.1–12.44 filled from tests; gate at `4d2d398` 30/30 · 0 cached · 3470 / 272; **seven pre-written ✅ REFUSED** with the test read for each (12.5, 12.6, **12.13** — `attachment.added` deletable from `BOOTSTRAP_BACKFILL_TYPES` with the suite green, **12.16** — a constant 0 in `workspace_seq` leaves the suite green, 12.24, 12.33 — the plan's S4 purge that 6.101/6.104 struck, 12.38); 36 of 44 are cross-references to landed cases (zero dangling, positive-controlled); **§12 NORMALISED TO BARE STYLE** (zero renumbered). **Rebased past #187 at 13:48 → head `6677bdb`, MERGEABLE/CLEAN**, recount at that head: **bare 318 · bold 0 · max 12.328**, `check-case-ids` 0 on its own line; the one conflict hunk resolved by keeping A's six and normalising all 19 bold heads (ruling (i)); re-gate NOT owed — B's branch-vs-base diff is three docs files, so the code at its head IS `e33c429`, gated. (B's correction of the controller: #187 never touched the header, so "keep both sides on the header" had nothing to keep; and an old-head→new-head diff across a rebase lists the WORLD's changes, not the branch's — the branch-vs-base diff is the one that decides a re-gate.) **HELD for one thing: its opus review's verdict.** Merge → **promote 10/18 → Plan 10 COMPLETE.** Four branches otherwise in flight: A `exec/41-mapper-witnesses` (re-tasked 13:50) · C `exec/34-plan11-scheduler-errands` (not pushed) · D `exec/40-socket-cut-fixture` (not pushed) · E `exec/23-plan11` |
+| session meters | lanes read **~51% at 13:47** (A), reset **17:20 IST**; weekly 66%. At the current burn the ~80% line arrives ~15:00–15:30: **before then, merge what is green, take pushed handoffs, dispatch nothing Fable-tier** |
 | watch | the `Monitor` task from 02:14 (`bw9fyoz9c`) **SURVIVED the `/clear`** — its first event landed in this context at 12:25:50 (`MAIN MOVED dfd9485 -> 5fca89e`); not re-armed. It dies with the session PROCESS, not the context; re-arm `ctl-watch.sh` (copied with `gate.sh` v3.2 into this session's scratchpad `75988d28-…`) only at a relaunch |
 | lock · machine | lock free at 12:27; 0 vitest pools; swap **4.0 of 5 GB used** (3.6 at 02:26) — five lanes plus fan-outs, not a blocker, watch it |
 | session meters | fresh after the 12:20 reset — lanes read 8–12% at 12:38, **next reset 17:20 IST**; weekly 58% |
@@ -49,6 +51,40 @@ errands) · `override-laneD.md` (socket-cut fixture) · `override-laneE.md` (fin
 next 12.360 on request; T18 fills the RESERVED 12.1–12.44; §13 — C 1–40 (C says it uses 13.40 — its last;
 ask before more), D 41–100 (exhausted), E 101–200 (through 104; catalogue from 105); §6 — D 143–159
 (through 149), B 160–179, A 180+.
+
+### Since 13:25 — #187, the T18 rulings, A re-tasked (13:50)
+- **Bare id style is CANONICAL in §12** (ruled on Lane B's request, 13:43; broadcast to A and D). T18
+  normalised every line head; ruling **(i)**: T18 normalises A's 12.323–12.328 in its rebase too — T18 owns
+  §12's final shape until it merges, which is what licenses touching a peer's line heads, and that licence
+  ends at the merge. **§12 blocks:** A 12.320–12.339 (through 12.328), **B 12.290–12.319 EXHAUSTED** (12.319
+  spent on the barrel-guard/storage-conformance suites), D 12.340–12.359, next 12.360 on request.
+- **12.328 ruled (13:44): NO runtime measurement; the four ping/pong sites are DELETABLE on source
+  evidence.** A's read-only measurement: both clients default to the PLATFORM WebSocket (`stream.ts:235`,
+  `http-transport.ts:126`), no client package depends on `ws`, no production site injects a
+  `webSocketFactory` (positive control: 3 test files do) — the platform API exposes no ping/pong to
+  JavaScript. A runtime run through `onHeartbeat` with a `ws` client would measure a configuration nothing
+  ships. Residual as an OWNER-RULE at both default-application lines, not a test: never inject a raw `ws`
+  socket into `webSocketFactory`. **Lane B's post-T18 source PR** (opus reviewer): delete the four sites
+  and two test arms with that docblock; correct 12.327's discriminant; add the 12.13 and 12.16 cases that
+  redden on exactly their mutation. A briefed B directly with the three grep SHAPES and their controls.
+- **A re-tasked 13:50 by message (ctx 40%, the inventory in context) onto the `mappers.test.ts` cluster** —
+  13 MIRRORs in one file, eight entry points (`mapBoardView`, `mapActors`/`rosterByActorId`, `mapHistory`,
+  `mapWorkflowDef`, `mapIngestResults`, `mapPreferences`, `mapMyWork`, `mapAttention`), witnesses in the
+  7.220 shape in `fixture-witnesses.test.ts`, **§7 ids from 7.222, §12 FROZEN for A until #188 merges**,
+  branch `exec/41-mapper-witnesses` from `e33c429`, one PR. Closes the carried item "18 of 20 mapper entry
+  points have never seen a real server body". **A's ownership measurement (13:48), for the next re-task:**
+  64 of the 80 remaining MIRRORs are in files no live lane touches; 36 are addressable with the merged
+  harness (19 marked buildable + 17 whose "needs a real route/DB" reason expired when #187 landed); the
+  blocked remainder needs a device/runtime (6), an external service (4), a socket (2 — D's), and 16 are
+  unclassified. B's 13, D's 2, E's 1 are in live territory.
+- **The executor brief's "TWO KNOWN GAPS §2" is amended** (`dispatch-executor-serial.md`): "zero of 48
+  test files vary `TZ`" is dated 2026-08-31; at `2f18f3f` 17 of 272 do (B's measurement; `contests.test.tsx:97`
+  = 12.194). The rule stands; the gap has been closing.
+- **Rule from #187's three cancelled runs: once a lane reports its PR head, the head is FROZEN** — no
+  handoff refresh, no docs line; every push cancels the in-flight twelve-job run and restarts it. A record
+  that must be written goes into a message or the NEXT branch's state file. (A's instinct — "handoff
+  current at every boundary" — was right in general and wrong at exactly this boundary.) The controller
+  polls the reported sha and confirms it is still the head before merging.
 
 ### Since 12:53 — the merges and what each taught (13:25)
 - **#161 merged 13:17 at `2f18f3f`.** B re-gated a second time on its own rule (a docs commit had landed on
