@@ -8,22 +8,41 @@ import {
 } from '../../src/ops/schedule.js';
 
 describe('msUntilNextUtc', () => {
+  /**
+   * 13.9 — msUntilNextUtc returns the delay to a time still ahead today.
+   * 20:00 → 21:00 is exactly one hour.
+   */
   it('later today when the time is still ahead', () => {
     const from = new Date('2026-08-20T20:00:00.000Z');
     expect(msUntilNextUtc('21:00', from)).toBe(60 * 60 * 1000);
   });
 
+  /**
+   * 13.10 — a time already past rolls to tomorrow, not to a negative delay.
+   * 21:30 → 21:00 is 23.5 hours.
+   */
   it('tomorrow when the time has passed', () => {
     const from = new Date('2026-08-20T21:30:00.000Z');
     expect(msUntilNextUtc('21:00', from)).toBe(23.5 * 60 * 60 * 1000);
   });
 
+  /**
+   * 13.11 — a day-of-week constraint is honoured, asserted by the
+   * resulting instant rather than by an arithmetic re-derivation. From
+   * Thursday 2026-08-20, the next Sunday 22:00 UTC is
+   * 2026-08-23T22:00:00.000Z.
+   */
   it('honours a day-of-week (0 = Sunday): from Thursday 2026-08-20, next Sunday 22:00 is the 23rd', () => {
     const from = new Date('2026-08-20T12:00:00.000Z'); // a Thursday
     const ms = msUntilNextUtc('22:00', from, 0);
     expect(new Date(from.getTime() + ms).toISOString()).toBe('2026-08-23T22:00:00.000Z');
   });
 
+  /**
+   * 13.12 — planted defect: a malformed schedule time is refused and
+   * NAMED. '9pm' throws an error containing '9pm', so an operator sees
+   * which value they mistyped rather than a generic parse failure.
+   */
   it('planted defect: a malformed time is refused, named', () => {
     expect(() => msUntilNextUtc('9pm', new Date())).toThrowError(/9pm/);
   });
@@ -106,6 +125,10 @@ describe('startBackupDaemon', () => {
   });
 
   /**
+   * 13.25 — a failing backup job is written to stderr BY THE DAEMON, as
+   * structured JSON, AND handed to the alerter.
+   */
+  /**
    * The alerter is deliberately NOT the only witness asserted here. Every real
    * `ErrorAlerter` this daemon can be handed may be silent — Task 3's
    * `NoopErrorAlerter.notify()` is an empty async function and `.env.example`
@@ -140,6 +163,11 @@ describe('startBackupDaemon', () => {
     }
   });
 
+  /**
+   * 13.27 — an alerter that THROWS is logged and swallowed; it does not
+   * take the daemon down or skip the re-arm. Failing to report a failure
+   * must not become a second failure.
+   */
   it('an alerter that throws is logged and swallowed — it does not take the daemon down or skip the re-arm', async () => {
     const stderr = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const runPgDump = vi.fn().mockRejectedValue(new Error('pg_dump exited 1'));
@@ -164,6 +192,10 @@ describe('startBackupDaemon', () => {
     }
   });
 
+  /**
+   * 13.26 — the daemon re-arms after a failure: the next night runs the
+   * job again, and not one millisecond early.
+   */
   it('re-arms after a failure: the next night runs the job again, on the same clock', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const runPgDump = vi.fn().mockRejectedValue(new Error('pg_dump exited 1'));
@@ -184,6 +216,10 @@ describe('startBackupDaemon', () => {
     }
   });
 
+  /**
+   * 13.28 — the weekly ledger export keeps its day-of-week across the
+   * re-arm and does not degrade to nightly.
+   */
   it('the weekly export keeps its day-of-week across the re-arm, and does not fire nightly', async () => {
     const runLedgerExport = vi.fn().mockResolvedValue(undefined);
     const daemon = startBackupDaemon(
@@ -205,6 +241,10 @@ describe('startBackupDaemon', () => {
     }
   });
 
+  /**
+   * 13.29 — stop() clears the pending timers: the count goes 2 → 0, and a
+   * fortnight of advanced time runs neither job.
+   */
   it('stop() clears the pending timers — nothing runs after it, and nothing keeps the process alive', async () => {
     const runPgDump = vi.fn().mockResolvedValue(undefined);
     const runLedgerExport = vi.fn().mockResolvedValue(undefined);

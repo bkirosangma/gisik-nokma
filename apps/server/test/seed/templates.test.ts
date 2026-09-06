@@ -16,10 +16,16 @@ describe('the status mapping table', () => {
 });
 
 describe('checkErrandTemplate — the executable pin on Plan 8', () => {
+  /**
+   * 13.50 — checkErrandTemplate accepts the real errand-with-waits template.
+   */
   it('the real errand-with-waits template carries the tracker board', () => {
     expect(checkErrandTemplate(ERRAND_WITH_WAITS_TEMPLATE)).toEqual({ ok: true });
   });
 
+  /**
+   * 13.51 — planted defect: a template missing the `waiting` state is named.
+   */
   it('planted defect: a template missing the waiting state is named', () => {
     const broken = {
       ...ERRAND_WITH_WAITS_TEMPLATE,
@@ -33,6 +39,10 @@ describe('checkErrandTemplate — the executable pin on Plan 8', () => {
     if (!verdict.ok) expect(verdict.problems.join(' ')).toContain("missing state 'waiting'");
   });
 
+  /**
+   * 13.52 — planted defect: a mapped state reachable only in two hops is
+   * refused — no fabricated intermediate claims.
+   */
   it('planted defect: a mapped state reachable only in two hops is refused — no fabricated intermediate claims', () => {
     const initial = ERRAND_WITH_WAITS_TEMPLATE.initialStateId;
     const broken = {
@@ -46,6 +56,10 @@ describe('checkErrandTemplate — the executable pin on Plan 8', () => {
     if (!verdict.ok) expect(verdict.problems.join(' ')).toContain('one transition');
   });
 
+  /**
+   * 13.53 — planted defect: `waiting` without `blocked: true` is named
+   * (attention-strip contract).
+   */
   it('planted defect: waiting without blocked:true is named (attention-strip contract)', () => {
     const broken = {
       ...ERRAND_WITH_WAITS_TEMPLATE,
@@ -57,6 +71,10 @@ describe('checkErrandTemplate — the executable pin on Plan 8', () => {
     expect(verdict.ok).toBe(false);
   });
 
+  /**
+   * 13.54 — planted defect: an unguarded way into `done` is named (closing
+   * an errand must say what happened).
+   */
   it('planted defect: an unguarded way into done is named (closing an errand must say what happened)', () => {
     const broken = {
       ...ERRAND_WITH_WAITS_TEMPLATE,
@@ -69,6 +87,10 @@ describe('checkErrandTemplate — the executable pin on Plan 8', () => {
     if (!verdict.ok) expect(verdict.problems.join(' ')).toContain('require-comment');
   });
 
+  /**
+   * 13.55 — planted defect: a rule on the one-hop seeding transition is
+   * named — Ruling P29's tripwire.
+   */
   it('planted defect: a rule on the one-hop seeding transition is named (Ruling P29 tripwire)', () => {
     const broken = {
       ...ERRAND_WITH_WAITS_TEMPLATE,
@@ -85,6 +107,10 @@ describe('checkErrandTemplate — the executable pin on Plan 8', () => {
 });
 
 describe('workflowFromTemplate', () => {
+  /**
+   * 13.56 — workflowFromTemplate clones with a fresh id at version 1,
+   * leaving the template untouched.
+   */
   it('clones with a fresh id at version 1, leaving the template untouched', () => {
     const workflowId = seedUlid('workflow', 'test-fixture');
     const cloned = workflowFromTemplate(ERRAND_WITH_WAITS_TEMPLATE, workflowId);
@@ -96,12 +122,20 @@ describe('workflowFromTemplate', () => {
 });
 
 describe('Ruling P29 — the two rule-bypassable advisories are the correct, pinned shape', () => {
+  /**
+   * 13.57 — Ruling P29 pinned by identity: the real template trips exactly
+   * two rule-bypassable advisories.
+   */
   it('a live errand-with-waits def trips exactly two rule-bypassable advisories', () => {
     const live = workflowFromTemplate(ERRAND_WITH_WAITS_TEMPLATE, seedUlid('workflow', 'ruling-p29-live'));
     const advisories = adviseWorkflowDef(live).filter((advisory) => advisory.code === 'rule-bypassable');
     expect(advisories).toHaveLength(2);
   });
 
+  /**
+   * 13.58 — Ruling P29: "fixing" one advisory genuinely silences that
+   * advisory by identity, and checkErrandTemplate still reddens.
+   */
   it('"fixing" the later->waiting advisory by adding a rule genuinely silences THAT advisory, but checkErrandTemplate still reddens', () => {
     // NOTE ON DEVIATION FROM THE PLAN'S PRESCRIBED ASSERTION: adviseLowerGuardBypasses
     // emits one advisory per (guarded edge, uncovered other edge) PAIR, not one per
@@ -133,6 +167,10 @@ describe('Ruling P29 — the two rule-bypassable advisories are the correct, pin
     expect(checkErrandTemplate(mutated).ok).toBe(false);
   });
 
+  /**
+   * 13.59 — Ruling P29: guarding both `waiting` paths clears the advisory
+   * panel to zero, and checkErrandTemplate still refuses it.
+   */
   it('guarding BOTH waiting paths clears the advisory panel entirely, and checkErrandTemplate still reddens', () => {
     const live = workflowFromTemplate(ERRAND_WITH_WAITS_TEMPLATE, seedUlid('workflow', 'ruling-p29-both-fixed'));
     const fixedBoth: WorkflowDef = {

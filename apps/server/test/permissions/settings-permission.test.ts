@@ -38,6 +38,9 @@ function roleCtx(workspaceRole: EffectiveRole['workspaceRole']): { sessionUserId
   return { sessionUserId: 'usr_actor', eff, workspaceExists: false };
 }
 
+/**
+ * 7.58 — cited on the block: the row states both halves and each has its own test below — `checkRolePermission` on `workspace.settings_set` admits workspace `owner` and `admin` (null), and refuses `member` and `guest` under `permission.role` by EXACT equality on rule and reason.
+ */
 describe('workspace.settings_set permission', () => {
   it('allows owners and admins', () => {
     expect(checkRolePermission(settingsEnvelope('usr_actor'), roleCtx('owner'))).toBeNull();

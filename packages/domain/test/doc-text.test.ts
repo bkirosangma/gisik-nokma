@@ -6,6 +6,9 @@ const p = (...content: unknown[]) => ({ type: 'paragraph', content });
 const text = (t: string) => ({ type: 'text', text: t });
 
 describe('docToPlainText', () => {
+  /**
+   * 7.1 — the row’s first clause: paragraphs render with a newline BETWEEN blocks rather than after each. Its other clauses — hard breaks as newlines, and a mention as `@label` falling back to `@userId` — are the neighbouring tests in this block.
+   */
   it('renders paragraphs with a newline between blocks', () => {
     expect(docToPlainText(doc(p(text('File the GST return')), p(text('before Friday'))))).toBe(
       'File the GST return\nbefore Friday',
@@ -44,6 +47,9 @@ describe('docToPlainText', () => {
     );
   });
 
+  /**
+   * 7.2 — `docToPlainText` is TOTAL: `null`, `undefined`, a number, a bare string, an array of paragraphs, a doc with no `content` and a text node with no `text` all render `''` rather than throwing.
+   */
   it('is total: junk input renders as the empty string, never throws', () => {
     expect(docToPlainText(null)).toBe('');
     expect(docToPlainText(undefined)).toBe('');
@@ -54,6 +60,9 @@ describe('docToPlainText', () => {
     expect(docToPlainText([p(text('an array is not a doc'))])).toBe('');
   });
 
+  /**
+   * 7.159 — the first of three termination cases the row states: a root that is its own descendant. The cycle-one-level-down case (so the guard is not a root special-case) and the no-cycle deep chain are the two tests below.
+   */
   it('terminates on a root node that is its own descendant, no editor can produce this', () => {
     const cyclic: Record<string, unknown> = { type: 'doc' };
     cyclic.content = [cyclic];

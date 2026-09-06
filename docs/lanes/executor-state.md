@@ -16,6 +16,105 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 MONDAY 2026-09-07 ~01:50 IST — **§07 AND §13 ARE BACKFILLED TO THE LIMIT OF WHAT NAMING ALLOWS. PR open. Nothing in flight, no subagent. Weekly reset ~4.5h away.**
+
+| what | value |
+|---|---|
+| `main` | `749cc46` (#240 merged) |
+| branch | **`exec/62-s13-backfill`** off `749cc46`, head below, pushed. **PR open — head FROZEN** |
+| **§07** | **198 cited / 36 uncited / 234** (was 155/78). Baseline **36** |
+| **§13** | **88 cited / 72 uncited / 160** (was 7/153). Baseline **72** |
+| repo-wide | **1124 cited / 406 uncited** (was **815 uncited** Sunday morning) |
+| sections at ZERO | §09 · §10 · §11 |
+| **gate** | **`GATE_EXIT=0` · 30/30 · 0 cached · 1m29.8s · node v22.22.2 · 3666 passed \| 5 skipped (3671) / 285** — **eleventh identical run**. `check:env` 0 · `check:citations` 0 · `check-case-ids` 0 (**1620**) · `check:runbook` 0 · `check:tasks` 0 (ledger 177/177). Zero orphans |
+
+## ⛔ BOTH SECTIONS ARE DONE — what remains is NOT more of the same
+
+**Every remaining uncited row in §07 (36) and §13 (72) names NO covering test file.** They are a **reading job**:
+someone must decide what covers them. **Do not hand them to a transcriber, do not expect a per-file batch to fit
+them, and do not read the remaining count as unfinished transcription.** Controller has agreed they stay.
+
+## TWO DEFECTS IN MY OWN DISPATCH BRIEF — the reusable part of today
+
+1. **TWO FILES ARE NAMED `doc-text.test.ts`.** `packages/domain/test/doc-text.test.ts` tests `docToPlainText`;
+   `apps/server/test/seed/doc-text.test.ts` tests **`plainTextDoc`**, the inverse function. §13's rows cite the
+   **bare filename**. I excluded the *domain* path (I was editing it), and the bare name plus my qualified
+   exclusion made the subagent skip three rows that were never in the file I held — and report them under the
+   wrong path, faithfully repeating my error back to me. **A bare filename in a catalogue row is not an address.**
+2. **My cluster list disagreed with my own headline count.** I briefed "81 in-scope rows" while the list beside it
+   enumerated thirteen files summing to 77, omitting `null-otp-sender.test.ts`. The subagent summed 77+3=80, said
+   so, and **refused to invent an 81st.** Its arithmetic and its refusal were both right. **Generate the cluster
+   list from the same measurement as the headline number; never type one beside the other.**
+
+## Method notes that cost a wrong number first
+
+- **A catalogue-id regex written for one style silently misses the other** (`- 13.5 ✅` vs `- ✅ **13.9 —**`).
+  Mine read §13 as **133 ids where the checker read 160**. **Make a private instrument agree with the checker
+  before believing it.**
+- **`7.72` vindicated a refusal.** Declined in `compile-filter.test.ts` because nothing there asserted it despite
+  the row naming that file; its real home was `projections/search.test.ts:305`, matching almost sentence for
+  sentence.
+- **I quoted a number the control did not print, three times** (18 for 19, 21 for 23) — the code-only line count
+  stated as git's total, with the real figure printed directly above. Each caught on re-read and amended before
+  the head was reported. **Copy the printed number; do not restate it from memory.**
+
+## NEXT — no ruling needed for (1); (2) needs the controller
+
+1. **Other sections' named clusters** are the remaining transcribable work: §12 **78** · §05 **67** · §06 **63** ·
+   §03 **45** · §04 **45**. Measure each with the BOTH-STYLES regex, cross-check against the checker, then decide
+   per section whether it is hand-sized (~10) or dispatch-sized (~100).
+2. **§12 block `12.380–12.399` is ALLOCATED but NOT CLEARED to start** — controller: *"one thing at a time."*
+
+
+# 🟣 MONDAY 2026-09-07 ~01:20 IST — **§07 HAND-BACKFILL EXHAUSTED at 39 uncited (was 78). §13 SUBAGENT IS IN FLIGHT.** Branch `exec/62-s13-backfill`, pushed. Weekly reset ~5h away.
+
+| what | value |
+|---|---|
+| `main` | **`749cc46`** (#240 merged) |
+| branch | **`exec/62-s13-backfill`** off `749cc46`, head **`8a06ce4`**, pushed. **No PR yet** |
+| **§07** | **195 cited / 39 uncited / 234** (was 155/78 this session). Baseline **39** |
+| repo-wide | **1040 cited / 490 uncited** (was 815 uncited Sunday morning) |
+| **IN FLIGHT** | **§13 subagent**, ONE dispatch, all in-scope rows — cleared by the controller. **It was told NOT to touch `scripts/fixtures/check-case-citations-baseline.json`, so `check:citations` failing with "baseline is STALE — committed 153, reality is N" is its SUCCESS signal, not a regression.** It was also told to skip `packages/domain/test/doc-text.test.ts` (I hold it) |
+| gate | **NOT run since `4fb18fc`.** My §07 commits here are ungated — **gate before opening the PR** |
+
+## §07 is DONE as far as hand-work reaches — and the remainder is NOT more of the same
+
+Six per-file batches today: `compile-filter` 8 · `ticket-cards` 7 · `visible-where` 6 · `filter-spec` 3 ·
+`projections/search` 5 · `workspace-settings` (two files) 7 · three singletons. **78 → 39.**
+
+**Of the 39 left: 36 name NO test file at all, and 3 are in `doc-text.test.ts` (blocked only while §13 runs).**
+The 36 are a **reading job** — someone must decide what covers them. **Do not hand them to a transcriber and do
+not expect a per-file batch to fit them.** Controller has agreed they stay.
+
+## Two method facts earned today — both cost a wrong number first
+
+1. **A catalogue-id regex written for one style silently misses the other.** `- 7.x ✅` and `- ✅ **7.x —**`
+   both occur. Mine matched only the first and read **§13 as 133 ids where the checker read 160** — a 27-id gap I
+   caught only by comparing against `pnpm check:citations`. **Make a private instrument agree with the checker
+   before believing it**, and treat the checker as authoritative.
+2. **`7.72` vindicated the refusal.** I declined to cite it in `compile-filter.test.ts` this morning because the
+   row is about `tsvector` under `verify-projections` and nothing there asserts it — even though the row names
+   that file. Its real home turned out to be `apps/server/test/projections/search.test.ts:305`, which matches the
+   row almost sentence for sentence. **The refusal cost one uncited row for a few hours and bought a citation
+   that points at the test that actually proves the case.**
+
+## Citation shapes used, so the convention stays honest
+
+Cited on a **block** where the row's clauses are asserted by several tests (7.3, 7.55, 7.58, 7.69), on the
+**primary clause** with the docblock naming where the rest live (7.8, 7.11, 7.56), on **one half** of a two-file
+claim (7.49, 7.53), and on the **named control** where the row is a mutation RECORD rather than an assertion
+(7.66). **Never let a docblock imply one test proves a whole row.**
+
+## NEXT
+
+1. **When §13 lands:** verify comments-only with the controlled instrument, set its baseline to the measured
+   count, mutation-test, **gate** (my §07 commits are ungated), then open ONE PR covering §13 + §07 batches 4–6.
+2. **If §13's subagent died:** treat as **UNVERIFIED, not EMPTY** — read the tree first; a previous batch died
+   mid-run and all 98 of its citations were recovered.
+3. Then the 3 `doc-text.test.ts` rows, which unblock once §13 releases the file.
+4. **§12 block `12.380–12.399` is ALLOCATED but NOT CLEARED to start** — controller: "one thing at a time."
+
+
 # 🟣 MONDAY 2026-09-07 ~00:55 IST — **PR OPEN: clause A's last row + §07 backfill 78 → 57. Clause A is COMPLETE. Nothing in flight, no subagent, weekly reset ~5.5h away.**
 
 | what | value |

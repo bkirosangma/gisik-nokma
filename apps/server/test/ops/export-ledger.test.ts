@@ -73,6 +73,10 @@ describe('exportLedger — the source of truth, exported', () => {
     expect(envelopes.every((envelope) => Number.isInteger(envelope.seq))).toBe(true);
   });
 
+  /**
+   * 13.14 — the export is byte-deterministic: two exports of the same
+   * ledger are identical.
+   */
   it('is byte-deterministic — two exports of the same ledger are identical', async () => {
     const first = new CaptureSink();
     const second = new CaptureSink();
@@ -81,6 +85,11 @@ describe('exportLedger — the source of truth, exported', () => {
     expect(onlyPut(first).bytes.equals(onlyPut(second).bytes)).toBe(true);
   });
 
+  /**
+   * 13.15 — the export holds exactly what the events table holds, proven
+   * against the DATABASE rather than against another export, via three
+   * independently-issued queries.
+   */
   /**
    * The byte-equality check above compares an export to ANOTHER EXPORT, so two
    * exports that both silently dropped the same rows would agree with each
@@ -121,6 +130,10 @@ describe('exportLedger — the source of truth, exported', () => {
 
 describe('gzippedNdjson — a generator failure is a rejected read, not a hang', () => {
   /**
+   * 13.32 — a throwing row source makes the export's gzip stream REJECT
+   * rather than HANG.
+   */
+  /**
    * `source.pipe(gzip)` does not forward errors. Before the fix, a throwing row
    * source emitted `'error'` on a stream with no listener — an uncaught
    * exception — while `gzip` never ended, so the consumer (`sink.put`, and here
@@ -143,6 +156,10 @@ describe('gzippedNdjson — a generator failure is a rejected read, not a hang',
     ).rejects.toThrowError(/row 2 is not serialisable/);
   }, 5000);
 
+  /**
+   * 13.33 — gzippedNdjson is the same stream the happy path uses: one
+   * gzipped ndjson line per row, in order.
+   */
   it('is the same stream the happy path uses — one gzipped line per row', async () => {
     const chunks: Buffer[] = [];
     for await (const chunk of gzippedNdjson([{ a: 1 }, { b: 2 }])) {

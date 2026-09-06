@@ -3,10 +3,10 @@
   "04-workflow-engine.md": 45,
   "05-tickets-hierarchy.md": 67,
   "06-auth-visibility.md": 63,
-  "07-api-realtime-search.md": 57,
+  "07-api-realtime-search.md": 36,
   "09-editor-attachments.md": 0,
   "10-workflow-builder.md": 0,
   "11-calendar-notifications.md": 0,
   "12-offline-sync-apps.md": 78,
-  "13-deployment-dogfooding.md": 153
+  "13-deployment-dogfooding.md": 72
 }

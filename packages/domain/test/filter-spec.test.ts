@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { filterSpecSchema, groupingSchema, GROUPINGS } from '../src/filter-spec.js';
 
+/**
+ * 7.3 — the whole-schema row, cited on the block because no single test carries it: `filterSpecSchema` refuses unknown keys, bad ops, malformed dates, empty identifiers and oversized inputs, accepts its own boundaries, and keeps hostile bytes intact — each clause asserted by its own test below.
+ */
 describe('filterSpecSchema', () => {
   it('accepts a composed filter', () => {
     const spec = {
@@ -100,6 +103,9 @@ describe('filterSpecSchema', () => {
     expect(filterSpecSchema.safeParse({ due: { before: '2026-08-31' } }).success).toBe(true);
   });
 
+  /**
+   * 7.50 — ONLY U+0000 is refused — BEL, TAB, LF, CR, ESC, DEL and a lone surrogate all parse and come back unchanged, because Postgres carries every one of them.
+   */
   it('refuses ONLY NUL — every other control character the store can hold still parses', () => {
     // Measured against this product's Postgres: BEL, TAB, LF, ESC, DEL and a
     // lone surrogate all round-trip through `text` and `websearch_to_tsquery`.
@@ -112,6 +118,9 @@ describe('filterSpecSchema', () => {
     }
   });
 
+  /**
+   * 7.54 — a due bound constrains day SHAPE, not calendar existence: `9999-99-99` and `2026-02-30` are admitted, because fixed-width zero-padding is what makes the compiled text comparison correct.
+   */
   it('the due bound constrains day SHAPE, not calendar existence — the text comparison needs the padding, not the calendar', () => {
     // Stated because the docblock now claims exactly this: `9999-99-99` is not
     // a day, and it is admitted on purpose. Fixed-width zero-padding is what

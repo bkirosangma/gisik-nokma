@@ -239,6 +239,19 @@ async function eventCount(pool: Pool): Promise<number> {
  * restore target is most likely to be typed by hand. The drill below is the
  * part that needs a matched server.
  */
+/**
+ * 13.40 — restore.sh refuses a target whose database name is not a scratch
+ * database, and lets a scratch-named one through. Both halves are asserted
+ * against the real file through bash: a live-database-shaped target exits
+ * 1 with `refusing` and the offending name in stderr and nothing on
+ * stdout; the same invocation with a scratch-shaped name instead gets PAST
+ * the guard and fails at the NEXT check, distinguishing a name test from a
+ * blanket refusal. `--force-live` overriding the guard, and the usage text
+ * carrying the version rule in both directions (exit 2), are asserted in
+ * this same ungated describe — deliberately ungated because these cases
+ * need only bash and would go dark on exactly the machines where a
+ * restore target is mistyped by hand.
+ */
 describe('restore.sh’s guard — the refusal, and the rule the usage text carries', () => {
   let guardDir: string;
   let decoyDump: string;

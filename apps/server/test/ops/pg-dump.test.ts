@@ -90,6 +90,10 @@ afterAll(async () => {
 });
 
 describe.skipIf(!pgDumpAvailable())('dumpDatabaseToSink (needs pg_dump on PATH — CI installs it)', () => {
+  /**
+   * 13.16 — dumpDatabaseToSink streams a custom-format dump to a dated
+   * pg/YYYY-MM-DDTHH-mm.dump key and the bytes start with the PGDMP magic.
+   */
   it('streams a custom-format dump to a dated key', async () => {
     const sink = new CaptureSink();
     const key = await dumpDatabaseToSink(db.url, sink, () => new Date('2026-08-20T21:00:00.000Z'));
@@ -97,6 +101,10 @@ describe.skipIf(!pgDumpAvailable())('dumpDatabaseToSink (needs pg_dump on PATH �
     expect(sink.bytes.subarray(0, 5).toString('latin1')).toBe('PGDMP');
   });
 
+  /**
+   * 13.17 — the captured bytes are an archive pg_restore can actually
+   * read, whose table of contents names events.
+   */
   it('the archive is a real one pg_restore can read, and its table of contents names the events table', async () => {
     const sink = new CaptureSink();
     await dumpDatabaseToSink(db.url, sink, () => new Date('2026-08-20T21:00:00.000Z'));
@@ -111,6 +119,10 @@ describe.skipIf(!pgDumpAvailable())('dumpDatabaseToSink (needs pg_dump on PATH �
     }
   });
 
+  /**
+   * 13.18 — the seeded event is INSIDE the archive — the one assertion
+   * here an empty database fails.
+   */
   it('the seeded event is actually INSIDE the archive — the assertion an empty database fails', async () => {
     const sink = new CaptureSink();
     await dumpDatabaseToSink(db.url, sink, () => new Date('2026-08-20T21:00:00.000Z'));
@@ -129,6 +141,11 @@ describe.skipIf(!pgDumpAvailable())('dumpDatabaseToSink (needs pg_dump on PATH �
     }
   });
 
+  /**
+   * 13.19 — planted defect: a bad database url fails loudly, carrying
+   * pg_dump's own stderr. The call rejects rather than resolving with a
+   * key to an empty object.
+   */
   it('planted defect: a bad database url fails loudly with pg_dump’s stderr', async () => {
     const sink = new CaptureSink();
     await expect(

@@ -85,6 +85,9 @@ describe('getWorkspaceSettings — what the server answers', () => {
     });
   });
 
+  /**
+   * 7.8 — the row’s primary clause: the LAST claim per key with that claim’s provenance, and a partial update leaving the other key alone. Its defaults-with-null-provenance clause is the neighbouring test above.
+   */
   it('holds the last claim per key, with a partial update leaving the other key alone', async () => {
     // Mutation: drop the COALESCE from the upsert and `dueSoonDays` comes back
     // as the default here, because Bala's claim carries a NULL for it. That is
@@ -175,6 +178,9 @@ describe('workspaceSettingsProjection — the handler', () => {
     expect(await rowsFor([workspaceId])).toHaveLength(0);
   });
 
+  /**
+   * 7.62 — replaying the same canonical sequence a second time changes nothing — stated with its limit rather than as a general idempotence claim.
+   */
   it('replaying the same canonical sequence a second time changes nothing', async () => {
     // Idempotence in the sense a rebuild needs it: the same events, in the same
     // canonical order, applied again. Mutation: drop the
@@ -228,6 +234,9 @@ describe('workspaceSettingsProjection — the handler', () => {
  * A `new Date()` in place of `event.serverTime` fails it too.
  */
 describe('proj_workspace_settings is a pure function of the ledger, not of arrival order', () => {
+  /**
+   * 7.61 — `proj_workspace_settings` rebuilds byte-identically from a ledger whose CANONICAL order is not the order it arrived in — a pure function of the ledger, not of arrival order.
+   */
   it('rebuilds byte-identically from a ledger whose canonical order is NOT the order it arrived in', async () => {
     const [workspaceA, workspaceB] = [newUlid(), newUlid()].sort();
     if (workspaceA === undefined || workspaceB === undefined) throw new Error('unreachable');
@@ -280,6 +289,9 @@ describe('proj_workspace_settings is a pure function of the ledger, not of arriv
  * would not have supplied.
  */
 describe('proj_workspace_settings under verify-projections', () => {
+  /**
+   * 7.63 — `proj_workspace_settings` under `verify-projections`: a planted live corruption is REPORTED against the shadow rebuild, and live is left alone.
+   */
   it('a corrupted live row is reported against the ledger rebuild, and live is left alone', async () => {
     const workspaceId = newUlid();
     await applyCommitted(db.pool, [settingsEvent(workspaceId, newUlid(), { staleDays: 21 })]);

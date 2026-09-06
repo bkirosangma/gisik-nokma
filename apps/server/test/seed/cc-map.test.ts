@@ -34,6 +34,10 @@ const eventsFor = (id: string): SubmittedEvent[] => buildErrandEvents(byId(id), 
 const fieldSet = (events: SubmittedEvent[], fieldId: string): SubmittedEvent | undefined =>
   events.find((event) => event.type === 'ticket.field_set' && (event.payload as { fieldId: string }).fieldId === fieldId);
 
+/**
+ * 13.64 — neededWeekEnd reproduces the tracker generator's own week
+ * arithmetic (build_tracker.py:390) at weeks 0, 1, 7, 28.
+ */
 describe('neededWeekEnd — the tracker generator’s own arithmetic (build_tracker.py:390)', () => {
   it('week 1 ends 2026-08-24', () => expect(neededWeekEnd('2026-08-18', 1)).toBe('2026-08-24'));
   it('week 7 ends 2026-10-05', () => expect(neededWeekEnd('2026-08-18', 7)).toBe('2026-10-05'));
@@ -43,10 +47,19 @@ describe('neededWeekEnd — the tracker generator’s own arithmetic (build_trac
 });
 
 describe('invariant 4 — a record without a date stays undated', () => {
+  /**
+   * 13.65 — invariant 4: an item with no asked/submitted date gets no
+   * startDate claim.
+   */
   it('an item with no asked/submitted date gets NO startDate claim (ops:owner-github-plan)', () => {
     expect(fieldSet(eventsFor('ops:owner-github-plan'), 'startDate')).toBeUndefined();
   });
 
+  /**
+   * 13.66 — invariant 4, the record's own natural planted defect: ops:duns
+   * carries an attention `since` but no origin `started` — no startDate
+   * claim.
+   */
   it('planted defect from the record itself: ops:duns carries an attention `since` but no origin `started` — NO startDate claim', () => {
     const duns = byId('ops:duns');
     expect(duns.since).toBeDefined();
@@ -54,6 +67,10 @@ describe('invariant 4 — a record without a date stays undated', () => {
     expect(fieldSet(eventsFor('ops:duns'), 'startDate')).toBeUndefined();
   });
 
+  /**
+   * 13.67 — the one origin-dated item (ops:accountant-hsn-digits) gets its
+   * startDate claim verbatim, shaped {date, note?}.
+   */
   it('the one origin-dated item gets its startDate verbatim (ops:accountant-hsn-digits, asked 2026-08-18)', () => {
     const claim = fieldSet(eventsFor('ops:accountant-hsn-digits'), 'startDate');
     expect(claim).toBeDefined();
@@ -62,12 +79,20 @@ describe('invariant 4 — a record without a date stays undated', () => {
     expect((claim?.payload as { value: { date: string } }).value.date).toBe('2026-08-18');
   });
 
+  /**
+   * 13.68 — planted defect: stripping needed_week removes the dueDate
+   * claim.
+   */
   it('planted defect: strip needed_week from a copy and the dueDate claim disappears', () => {
     const original = byId('ops:accountant-hsn-digits');
     const stripped: CcItem = { ...original, meta: { ...original.meta, needed_week: undefined } };
     expect(fieldSet(buildErrandEvents(stripped, ctx), 'dueDate')).toBeUndefined();
   });
 
+  /**
+   * 13.69 — needed_week becomes a dueDate claim carrying the derivation in
+   * its note.
+   */
   it('needed_week becomes a dueDate claim carrying the derivation in its note', () => {
     const claim = fieldSet(eventsFor('ops:accountant-hsn-digits'), 'dueDate');
     const value = claim?.payload as { value: { date: string; note: string } };
@@ -77,6 +102,11 @@ describe('invariant 4 — a record without a date stays undated', () => {
 });
 
 describe('statuses map without invention', () => {
+  /**
+   * 13.70 — statuses map without invention: `next` maps correctly (this
+   * test), and a `later` item emits no transition while `blocked` maps to
+   * `waiting` (the two tests below) — one row, three tests.
+   */
   it('a `next` item transitions once, from initial, to next', () => {
     const events = eventsFor('ops:dlt-entity');
     const transitions = events.filter((event) => event.type === 'ticket.transitioned');
@@ -85,22 +115,40 @@ describe('statuses map without invention', () => {
     expect((transitions[0]?.payload as { to: string }).to).toBe('next');
   });
 
+  /**
+   * 13.70 — statuses map without invention: a `later` item emits no
+   * transition (part of the same row as the `next`/`blocked` tests above
+   * and below).
+   */
   it('a `later` item emits NO transition — it sits in the initial state', () => {
     const events = eventsFor('ops:sms-header');
     expect(events.filter((event) => event.type === 'ticket.transitioned')).toHaveLength(0);
   });
 
+  /**
+   * 13.70 — statuses map without invention: `blocked` maps to `waiting`
+   * (part of the same row as the `next`/`later` tests above).
+   */
   it('a `blocked` item maps to waiting (ops:apple-developer)', () => {
     const events = eventsFor('ops:apple-developer');
     const transition = events.find((event) => event.type === 'ticket.transitioned');
     expect((transition?.payload as { to: string }).to).toBe('waiting');
   });
 
+  /**
+   * 13.71 — planted defect: a done item is refused — the seed never claims
+   * completion on anyone's behalf.
+   */
   it('planted defect: a done item is refused — the seed never claims completion on anyone’s behalf', () => {
     const original = byId('ops:sms-header');
     expect(() => buildErrandEvents({ ...original, state: 'done', done: true }, ctx)).toThrowError(/terminal/);
   });
 
+  /**
+   * 13.72 — planted defect: done: true against a stale non-done state
+   * string is still refused — the flag is checked, not just the state
+   * string.
+   */
   it('planted defect: done:true with a stale non-done state is still refused — the flag is checked, not just the state string', () => {
     // A re-snapshot could in principle carry done:true against a lagging state
     // string (0 of 191 items in snapshot 24e2240 disagree, but the refusal
@@ -112,6 +160,10 @@ describe('statuses map without invention', () => {
     expect(() => buildErrandEvents({ ...original, state: 'next', done: true }, ctx)).toThrowError(/terminal/);
   });
 
+  /**
+   * 13.73 — planted defect: an unknown tracker state is refused, never
+   * guessed.
+   */
   it('planted defect: an unknown state is refused, never guessed', () => {
     const original = byId('ops:sms-header');
     expect(() => buildErrandEvents({ ...original, state: 'someday' }, ctx)).toThrowError(/someday/);
@@ -119,6 +171,12 @@ describe('statuses map without invention', () => {
 });
 
 describe('the body carries the record verbatim', () => {
+  /**
+   * 13.74 — the body carries the record verbatim: tracker id, origin,
+   * attention schedule (this test); counterparty/who and ask text, and
+   * blocked-by resolved to the blocking item's human title (the two tests
+   * below) — one row, three tests.
+   */
   it('body text, counterparty, ask text and attention schedule are all present and literal', () => {
     const text = errandDescriptionText(byId('ops:duns'), titleById);
     expect(text).toContain('tracker id: ops:duns');
@@ -128,6 +186,10 @@ describe('the body carries the record verbatim', () => {
     expect(text).toContain('since 2026-08-19');
   });
 
+  /**
+   * 13.74 — the body carries the record verbatim: counterparty/who and ask
+   * text (part of the same row as the tests above and below).
+   */
   it('a question’s who and ask ride along (ops:accountant-cloud-gst)', () => {
     const text = errandDescriptionText(byId('ops:accountant-cloud-gst'), titleById);
     expect(text).toContain('who: Accountant');
@@ -135,12 +197,21 @@ describe('the body carries the record verbatim', () => {
     expect(text).toContain('reverse charge');
   });
 
+  /**
+   * 13.74 — the body carries the record verbatim: blocked-by resolved to
+   * the blocking item's human title (part of the same row as the two
+   * tests above).
+   */
   it('blocked_by resolves to the blocking item’s human title', () => {
     const text = errandDescriptionText(byId('ops:apple-developer'), titleById);
     expect(text).toContain('blocked by: Can the proprietorship enrol as an organisation');
     expect(text).toContain('(tracker id ops:owner-store-account-entity)');
   });
 
+  /**
+   * 13.75 — the description event carries the text as a literal-text doc,
+   * round-tripped through the domain's own docToPlainText.
+   */
   it('the description event carries the text as a literal-text doc', () => {
     const claim = fieldSet(eventsFor('ops:dlt-entity'), 'description');
     const text = docToPlainText((claim?.payload as { value: unknown }).value);
@@ -148,6 +219,10 @@ describe('the body carries the record verbatim', () => {
   });
 });
 
+/**
+ * 13.76 — determinism: two builds of the same item are identical id-for-id;
+ * every event id is namespaced to the item so a re-snapshot cannot collide.
+ */
 describe('determinism — the idempotence substrate', () => {
   it('two builds of the same item are identical, id for id', () => {
     expect(eventsFor('ops:duns')).toEqual(eventsFor('ops:duns'));
