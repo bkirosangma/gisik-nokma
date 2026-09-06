@@ -92,9 +92,20 @@ visibility decision table — asking only what the pass would ask:
 - rank 2 `apps/server/src/read/visible-where.ts:4` — docblock: *"This is an EXTRACTION, not a new copy — **and two copies remain**"*
 - rank 6 `apps/server/src/visibility/visible-tickets.ts:6` — docblock: *"**The decision table used to be WRITTEN HERE**, and is not any more"*
 
-**Honest limit, stated because it is the claim I am least sure of:** that control lands in `apps/server`, which is
-**explicitly out of the pass's scope**. It proves the instrument detects the class; **it does not prove the four
-client packages contain anything worth finding.** A scoping probe over `packages/app-core` is the next cheap step.
+**That limit is now CLOSED — and it was the claim I told the controller I was least sure of.** The control above
+lands in `apps/server`, which is out of pass 2's scope, so I ran the scoping probe it called for, still at zero
+token cost. `find_related` on `packages/app-core/src/precheck.ts:375` (`needsMembership`, which re-derives a
+transition by `from`/`to` with the `'*'` wildcard fallback) returns **cross-package neighbours at 0.61–0.67**:
+`rule-engine/src/rules/types.ts`, `checks/workflow-rebind.ts`, `fixtures/harness.ts`, and its own sibling
+`precheck.ts:345` `acceptRestsOnUnseenChildren`. **`packages/app-core` IS in scope**, and the relation is exactly
+the one the pass exists to name: the client's precheck re-implements decisions `rule-engine` owns, with no import
+and no call between them.
+
+**Do not read that as a confirmed defect.** These are nearest-neighbour scores, so they rank candidates; they do
+not prove duplication, and a client-side precheck mirroring server rules may well be deliberate here. The point
+that is established is narrower and sufficient: **the instrument yields in-scope client-package candidates**, so
+option (A) is not speculative. Whether each candidate is a real duplication is a reading job, and per the brief's
+rule it ends in a recorded row with a named owner, not in a fix.
 
 **Scope has also doubled since the spec was written:** the spec priced ~74 files / ~4 subagents. Recounted at
 `873b86b`: **141 src files** (app-core 96, editor 23, sync-client 13, ui 9), 254 including tests. The spec
