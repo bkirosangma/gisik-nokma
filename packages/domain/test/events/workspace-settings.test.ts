@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { newUlid, parseEvent } from '../../src/index.js';
 import { workspaceSettingsSetPayloadSchema } from '../../src/events/workspace-settings.js';
 
+/**
+ * 7.55 — cited on the block because the row states three clauses asserted by three tests below: `workspaceSettingsSetPayloadSchema` accepts either knob alone or both, refuses the empty claim, and refuses unknown keys, non-integers and out-of-range values.
+ */
 describe('workspaceSettingsSetPayloadSchema', () => {
   it('accepts either knob alone or both together', () => {
     expect(workspaceSettingsSetPayloadSchema.parse({ staleDays: 3 })).toEqual({ staleDays: 3 });
@@ -26,6 +29,9 @@ describe('workspaceSettingsSetPayloadSchema', () => {
 });
 
 describe('workspace.settings_set registration', () => {
+  /**
+   * 7.56 — a well-formed `workspace.settings_set` v1 envelope round-trips `parseEvent` as `ok: true`. The malformed-payload half of the row is the refusal test below.
+   */
   it('round-trips parseEvent as a registered v1 type', () => {
     const workspaceId = newUlid();
     const raw = {
@@ -67,6 +73,9 @@ describe('workspace.settings_set registration', () => {
   // 'ticket', or omitted. This test discriminates: an envelope claiming
   // `workspace.settings_set` but pointing `entity.kind` at 'ticket' must be
   // refused by `parseEvent`'s kind guard (parse-event.ts), not admitted.
+  /**
+   * 7.57 — planted-defect proof that the registration’s `entityKind: 'workspace'` is load-bearing rather than decorative — an envelope whose `entity.kind` disagrees is refused.
+   */
   it('refuses a settings claim whose entity.kind disagrees with the registration', () => {
     const workspaceId = newUlid();
     const ticketId = newUlid();

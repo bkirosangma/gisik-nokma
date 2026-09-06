@@ -112,6 +112,9 @@ describe('proj_search', () => {
     );
   });
 
+  /**
+   * 7.71 — the A/B/C weights asserted against `tsv::text` — the ONLY place they are observable, since `tsv @@ websearch_to_tsquery(...)` ignores weights.
+   */
   it('weights title A, description B and comments C — the one place setweight is observable', async () => {
     // `@@` ignores weights, so no matching case in this file can see them. Read
     // off `tsv::text` instead: dropping any one setweight renders that source's
@@ -137,6 +140,9 @@ describe('proj_search', () => {
     expect(await ftsHits('Kiro')).toEqual([world.taskInEpicId]);
   });
 
+  /**
+   * 7.11 — the row’s first clause: titles indexed from `ticket.created` in the `simple` configuration, nothing stemmed. Its other clauses — descriptions through `docToPlainText`, comments, and the title re-claim — are asserted by the neighbouring tests in this block.
+   */
   it("indexes titles from ticket.created, in the 'simple' configuration — nothing is stemmed", async () => {
     expect(await ftsHits('licence')).toEqual([world.sharedTaskId]);
     expect(await ftsHits('return')).toEqual([world.taskInEpicId]);
@@ -182,6 +188,9 @@ describe('proj_search', () => {
     expect(await ftsHits('zebra-confidential')).toEqual([world.hiddenTaskId]);
   });
 
+  /**
+   * 7.73 — one of the three guards, each proven by a mutation that dies on it alone: a comment whose document renders to no text adds NOTHING, not even a separator.
+   */
   it('adds nothing at all for a comment whose document renders to no text — not even a separator', async () => {
     await applyCommitted(db.pool, [
       makeCommitted({
@@ -256,6 +265,9 @@ describe('proj_search', () => {
     expect(names.at(-1)).toBe('proj_search');
   });
 
+  /**
+   * 7.12 — `proj_search` reproduces byte-identically on reset-and-replay in canonical `(entity_kind, entity_id, seq)` order — the whole row, tsvector included.
+   */
   it('reproduces byte-identically on reset-and-replay in canonical order', async () => {
     const before = await db.pool.query('SELECT * FROM proj_search ORDER BY ticket_id');
     // Non-vacuity: a replay that agreed about nothing would agree here too.
@@ -301,6 +313,9 @@ describe('proj_search', () => {
    *   because `tsv` is GENERATED: corrupting the text makes the generated
    *   column follow, so the differing rows differ in `tsv` too and the tsvector
    *   genuinely participates in the comparison rather than riding along equal.
+   */
+  /**
+   * 7.72 — `tsvector` under `verify-projections`, proven by EXECUTION rather than reasoned from the type name: a clean verdict over a non-empty table, and a planted live corruption reported in both directions. `title` is corrupted rather than `tsv` precisely because `tsv` is GENERATED, so the tsvector genuinely participates in the comparison instead of riding along equal.
    */
   it('tsvector survives the verifier: clean over a non-empty table, and a planted live corruption is REPORTED', async () => {
     const projections = buildProjectionRegistry();
