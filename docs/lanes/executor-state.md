@@ -16,6 +16,23 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 LIVE — SUNDAY 2026-09-06 ~22:55 IST, branch `exec/56-semble-duplicate-hunt` off `68f0859`. Ruling P44 A+C CLEARED TO RUN by the controller. **§7 ROWS COMMITTED (`8261001`). §09 BATCH 2 IS IN FLIGHT RIGHT NOW — if you are reading this after a restart, ITS EDITS ARE IN THE TREE, UNCOMMITTED AND UNVERIFIED. Read the tree; do not re-dispatch blind.**
+
+| what | value |
+|---|---|
+| `main` | **`68f0859`** |
+| branch | **`exec/56-semble-duplicate-hunt`**, head **`8261001`**, pushed. No PR open yet |
+| committed | **7.254 / 7.255** in `test-cases/07-api-realtime-search.md` — ruling P44 clause A's first rows, ❌ with named owners, no fixes. `check-case-ids` **0**, 1616 unique (was 1614, +2, sum == union) |
+| **IN FLIGHT** | **§09 batch 2** — one sonnet subagent, all **113 `apps/server/` rows**, owner's explicit choice over splitting. It was told **NOT to touch `scripts/fixtures/check-case-citations-baseline.json`** — I set the baseline myself after confirming the real count. **So `pnpm check:citations` FAILING with `baseline is STALE -- committed 121, reality is N` is the EXPECTED success signal, not a regression** |
+| §09 before batch 2 | 98 cited / 121 uncited / 219 |
+
+**IF BATCH 2 DIED:** treat it as **UNVERIFIED, not EMPTY** — batch 1 died mid-run and all 98 of its citations were recovered from the tree. Read `git status --porcelain`, verify comments-only **with the controlled instrument below (NOT `git diff | grep`)**, run `pnpm check:citations` to learn the real count, set the baseline to it, gate, commit.
+
+**THE INSTRUMENT — `git diff | grep "^+"` IS ALWAYS EMPTY UNDER THE PROXY** (added lines arrive indented `␣␣+␣␣`); measured `grep -c "^+"` → 0 on a 31 KB diff with 294 additions. Use `git show <sha>:<file>` vs the working file through Python `difflib`, **asserting the added-line count equals `git diff --numstat`** before believing anything. That count-match is the control that binds; a control that does not run the same path certifies nothing.
+
+**Probe result, for the record (22:50):** a trivial sonnet subagent returned `PROBE_OK` in 6.9s with no rejection — the dispatch path was open — **but it cost 45,877 tokens for one word.** That is the floor cost of ANY dispatch. Batch 1 (98 citations) cost 171,618.
+
+
 # 🔴 SERIAL EXECUTOR — SUNDAY 2026-09-06, closed ~22:50 IST. §09 BATCH 1 **MERGED** (#232, `1bf5e92`). **NOTHING IS IN FLIGHT. NO PR IS OPEN. THE EXECUTOR IS HOLDING ON THE WEEKLY METER — see the STOP box below before dispatching anything.** **A VERIFICATION METHOD USED THROUGHOUT THIS SESSION WAS BROKEN — IT PRODUCED THREE FALSE GREENS, ONE OF THEM IN THE MERGED #230. READ THE NEXT SECTION BEFORE YOU VERIFY ANYTHING.**
 
 | anchor | value |
