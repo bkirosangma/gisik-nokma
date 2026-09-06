@@ -7,7 +7,7 @@ Mirrors `Features.md` §12. Status: `❌` not covered · `✅` covered · `🟡`
 (**EXHAUSTED** — `12.319` was spent by Task 18 on the two `sync-client` guard suites that had no id;
 Lane B now mints from **`12.360–12.379`**, allocated with the sync-surface override, used through
 `12.365`) · **Lane D `12.340–12.359`**
-(used through `12.343` — the socket-cutting fixture) · **next block `12.380`, controller-allocated ON REQUEST ONLY.** Earlier, exhausted blocks,
+(used through `12.344` — the socket-cutting fixture, and the ping hazard built in it) · **next block `12.380`, controller-allocated ON REQUEST ONLY.** Earlier, exhausted blocks,
 kept because their ids are live in this file: Lane D `12.224–12.227` · Lane C `12.228–12.239` · Lane A
 `12.240–12.259` · Lane B `12.260–12.289`. **`12.1–12.44` belonged to Plan 10 Task 18 and are now WRITTEN
 by it** — the reservation is discharged, not outstanding.
@@ -35,12 +35,17 @@ never carried forward from the previous one.
 
 **Style: BARE is canonical here** (`- 12.45 ✅ …`). Task 18 normalised this file's 23 bold-style line
 heads to bare — **marker and bold placement only; no id was renumbered, and never may be.** Census at
-this commit: **bare 322, bold 0, marker-first 0; sum 322 == union 322, zero duplicates** — the 267 that
+this commit: **bare 329, bold 0, marker-first 0; sum 329 == union 329, zero duplicates** — the 267 that
 were here (bare 244 + bold 23), plus Task 18's 44 and `12.319`, plus Lane A's `12.323–12.328` from #187,
 plus Lane D's `12.340–12.343` (the socket-cutting fixture), which were authored BOLD against the header
 this branch forked from and are written bare here because Task 18's rule above is the one that now
-holds. *Recounted at this sha rather than carried: it read `318` until this branch rebased past Task 18,
-which is the twenty-third instance of exactly what this section is about.*
+holds, plus Lane B's `12.360–12.364` from the sync-surface override, plus Lane D's `12.344` (the ping
+hazard built inside that same fixture), plus Lane B's `12.365` (#215, the reach-granted wire witness,
+which landed on `main` and was rebased past while this catalogue commit was in flight). *Recounted at
+this sha rather than carried: it read `318` until this branch rebased past Task 18 — the twenty-third
+instance of exactly what this section is about — `322` until the sync surface landed on `main`, the
+twenty-fourth, and `328` until #215 landed and this branch rebased past it, the twenty-fifth — each found
+the same way, by recounting instead of reading.*
 **Those six were authored bold and normalised to bare by Task 18 in its rebase, with Lane A informed** —
 by the controller's ruling of 2026-09-06, since Task 18 owns §12's final shape and a marker/bold change
 is not a renumber. That ownership ends when this task merges. New cases in any block are written bare.
@@ -2342,7 +2347,7 @@ before mutating, not to remember.*
 - 12.362 ✅ **THE SYNC DOOR'S ENVELOPE REFUSAL, AS A VALUE ON THE WIRE.** `POST /v1/sync` through `inject()` with a non-ULID `actorId` answers `{status:'invalid', eventId: <the claimed id>, code:'malformed-envelope'}` and appends nothing to the ledger. 12.109 already pinned `unknown-event-type` and 12.107 `actor-mismatch`, so two of the door's `invalid` codes were values here; **`malformed-envelope` appeared in this suite only in prose** — and it is the one a client fixture had drifted from for the whole life of 12.327. The malformation is chosen so `submittedEventSchema` refuses BEFORE the session's actor comparison, and `.not.toBe('actor-mismatch')` says so rather than leaving the ordering to the reader; `eventId` is asserted non-null because `extractClaimedId` reads the id off an envelope it could not otherwise parse, which is what lets a client match a verdict to the claim it sent. *Mutation: change all five `'malformed-envelope'` sites in `packages/domain/src/parse-event.ts` → **red here, and the sibling count is MEASURED and reported rather than bought off by loosening the assertion**. Within `sync-route.test.ts` it is 12.362 ALONE (1 failed / 15 passed). Across every test file that mentions the code at all (enumerated by grep, with `unknown-event-type` as the positive control that the shape finds widely-asserted codes): `packages/domain` **6 failed / 28 passed** across `parse-event.test.ts` and `events/invites.test.ts` — the package that OWNS the string; the other four server files **0 failed / 40 passed**, their mentions being prose. Seven reddened tests in total, six of them in the string's own package, which is the right shape: this case constrains the DOOR'S ANSWER, not the string's uniqueness. **`sync-client` also stays green (29/29), and that is the point of 12.327 rather than a gap** — its fixture now READS the parser, so it follows a rename instead of drifting from it.* (`apps/server/test/sync/sync-route.test.ts`)
 - 12.328 ✅ **THE TEXT `ping`/`pong` PROTOCOL NOTHING IMPLEMENTS IS DELETED FROM ALL FOUR PRODUCTION SITES.** Was ❌. The client declared `PingFrame` (`app-core/src/online/stream.ts:35`), parsed it (`:93`) and replied `{type:'pong'}` (`:283`), and `sync-client/src/net/http-transport.ts:202` did the same. **The server sends no such frame:** `stream/routes.ts:319` calls `socket.ping()`, a WebSocket PROTOCOL control frame that `ws` answers automatically and routes to a dedicated `socket.on('pong')` listener (`:290`), never to `message`; and `:342` accepts only `subscribeFrameSchema`, answering `bad-message` to anything else. **Ruled 13:44: no runtime measurement is owed — the sites are deletable on SOURCE evidence**, because a runtime run through a `ws` client would measure a configuration nothing ships. The three grep shapes were **re-run at the deleting commit rather than adopted from the finding**: (a) **`webSocketFactory` is injected by FOUR test files** — `sync-engine.test.ts`, `online-data-source.test.ts`, `stream.test.ts`, and **`apps/server/test/dual-client/socket-cut.test.ts:379`, which injects a REAL `ws` socket against a real server** (`new WsWebSocket(url, …)` at `:384`, handed to `createHttpTransport` at `:398`); the production hits are the two default-application lines plus one PASS-THROUGH at `online-data-source.ts:403`, which forwards a caller's option and injects nothing — that last reading is the load-bearing half of the claim. **This clause said THREE, and said so at the head where its own text calls the enumeration load-bearing.** The fourth arrived with Lane D's #196 in the rebase between the measurement and the PR, and the interaction check run at that rebase grepped `socket-cut.test.ts` for `ping|pong` — which finds nothing and could not have found anything — instead of re-running THIS grep. *A check aimed at the wrong term is not a weaker check; it is no check.* Corrected on review, and the deletion survives it: `ws` surfaces protocol pings on `socket.on('ping')`, which `WebSocketLike` does not expose, so the injected socket cannot deliver one to either parser; (b) **only `apps/server` depends on `ws`**, enumerated package.json by package.json with each package's name printed beside its answer, so a silent-empty sweep would have been visible as a short list rather than as a clean zero; (c) the four sites and two agreeing test arms, with `type:'subscribe'` at `stream.ts` and `http-transport.ts` as the same-run positive control that the shape fires. **What replaced the two test arms are EXCLUDING fixtures, not deletions** → **12.360** (app-core: a text ping is neither answered nor delivered) and the second clause of **12.167** (sync-client: the sent list is exactly `['subscribe']`). **The two are not symmetric, and saying so matters**: 12.167 reddens on restoring its single arm, because that arm sits on the raw parsed object; **12.360 needs BOTH of app-core's arms restored** — the parse arm as well as the send arm — because `parseFrame` now answers `null` for a ping and the send arm alone is unreachable and does not typecheck. The measurement was made with both; an earlier draft of this line said "either arm", which would have sent a maintainer to a mutation that never runs and a case that looks vacuous. *The residual — never inject a raw `ws` socket into `webSocketFactory` — is a DOCBLOCK at both default-application lines and therefore not a check: see 12.361, which says so under its own marker rather than letting this ✅ carry it.*
 - 12.360 ✅ **A TEXT `ping` REACHING `createStreamSubscriber` IS NEITHER ANSWERED NOR DELIVERED.** The excluding fixture for 12.328's app-core half, replacing the deleted `answers ping with pong without delivering it` — a test that agreed with a protocol nothing implements. It asserts the sent list EXACTLY (`['{"type":"subscribe",…}']`) rather than `not.toContain('pong')`, because a negative containment also passes on a subscriber that sent nothing at all, including one that never opened; the `subscribe` frame is the assertion's own positive control that sends are observable on this fake. *Mutation: restore the `pong` arm in `stream.ts`'s `onmessage` → red here alone.* (`packages/app-core/test/online/stream.test.ts`)
-- 12.361 🚫 **THE OWNER RULE AT BOTH `webSocketFactory` DEFAULTS IS A DOCBLOCK, NOT A CHECK — out of scope by construction, and recorded rather than implied.** 12.328's deletion rests on the PLATFORM `WebSocket` never surfacing a protocol ping to JavaScript. `webSocketFactory` is an INJECTED seam, so that is a property of what gets injected, not of either module: Node's `ws` does surface protocol pings to a listener, and a shell that injected one and answered with a text `pong` would earn `bad-message` from `stream/routes.ts:342` — a live defect in a configuration nothing ships. **The reason this is 🚫 is SCOPE, not impossibility — and the first draft said impossibility, which was refuted within the hour by a file the rebase brought in.** That draft read *"no test can hold this, because the failing case requires a dependency no client package has and a construction no production site performs"*. Both halves are false in `apps/server`, which DOES depend on `ws` and which — since Lane D's #196 — injects a real `ws` socket into `createHttpTransport` at `socket-cut.test.ts:398`. **An assertion is buildable there today**: wire that socket's `on('ping')` to a TEXT `{type:'pong'}` and assert the server answers `bad-message`. It is not built here because it belongs to whoever owns that fixture and would be a new hazard case rather than a correction, and because the rule it would pin is about a shell nothing in this repo ships. So the rule lives as prose at `stream.ts`'s and `http-transport.ts`'s default-application lines, citing 12.328, and this line exists so that "12.328 ✅" is never read as covering it. *Owner if a client shell ever adopts `ws`: whoever adds that dependency — the grep in 12.328(b) is the tripwire, and it is a human one.*
+- 12.361 🚫 **THE OWNER RULE AT BOTH `webSocketFactory` DEFAULTS IS A DOCBLOCK, NOT A CHECK — out of scope by construction, and recorded rather than implied.** 12.328's deletion rests on the PLATFORM `WebSocket` never surfacing a protocol ping to JavaScript. `webSocketFactory` is an INJECTED seam, so that is a property of what gets injected, not of either module: Node's `ws` does surface protocol pings to a listener, and a shell that injected one and answered with a text `pong` would earn `bad-message` from `stream/routes.ts:342` — a live defect in a configuration nothing ships. **The reason this is 🚫 is SCOPE, not impossibility — and the first draft said impossibility, which was refuted within the hour by a file the rebase brought in.** That draft read *"no test can hold this, because the failing case requires a dependency no client package has and a construction no production site performs"*. Both halves are false in `apps/server`, which DOES depend on `ws` and which — since Lane D's #196 — injects a real `ws` socket into `createHttpTransport` at `socket-cut.test.ts:398`. **An assertion is buildable there today**: wire that socket's `on('ping')` to a TEXT `{type:'pong'}` and assert the server answers `bad-message`. It was not built here because it belongs to whoever owns that fixture and would be a new hazard case rather than a correction, and because the rule it would pin is about a shell nothing in this repo ships. **It is now BUILT, by that fixture's owner, as `12.344`** — an excluding pair on one connection: the same server-side `.ping()` twice, one line apart, drawing no error frame under `ws`'s default alone and the exact `bad-message` frame once the listener is wired. *This line STAYS 🚫 and its claim is unchanged:* what 12.344 measures is one shell's naive reaction, not the rule — the rule is still that **no client shell may inject a raw `ws` socket into `webSocketFactory` and answer a protocol ping as an application frame**, and that rule lives as prose at `stream.ts`'s and `http-transport.ts`'s default-application lines, citing 12.328. A case showing what happens when the rule is broken is not a check that it is kept. This line exists so that "12.328 ✅" is never read as covering it, and so that "12.344 ✅" is not read as covering it either. *Owner if a client shell ever adopts `ws`: whoever adds that dependency — the grep in 12.328(b) is the tripwire, and it is a human one.*
 
 ## Closure 5b — ruling P37.1's real fix: the grant side becomes PULL-shaped (cases 12.292–12.308)
 
@@ -2504,6 +2509,12 @@ the event away, so the code the server sent is visible nowhere else on the clien
 sequence is asserted by equality: `connecting, catching-up, live` three times over, which is the evidence
 the two reconnects really ran instead of the fixture timing out into a pass.
 
+**A fifth case lives here and discharges nothing of 12.290's** — `12.344` is a hazard case, added because
+this fixture is the only place in the repo that can hold it (real `ws` on BOTH ends of a real upgrade),
+not because it belongs to the flip condition. It is the assertion `12.361` named and left to whoever owns
+this file. Kept in the same block and the same file rather than filed elsewhere, since the thing that
+makes it buildable is this fixture and nothing else.
+
 - 12.340 ✅ **A slow-consumer close lands MID-PULL and the REGENERATED NOTICE repairs it.** "Mid-pull"
   is a fact, not a label: the transport holds one child's `GET /v1/sync/bootstrap/ticket` open until the
   case releases it, so the engine's apply chain is demonstrably parked inside `applyOne` — asserted off
@@ -2540,6 +2551,39 @@ the two reconnects really ran instead of the fixture timing out into a pass.
   that were never reached, then restarts the engine on the same durable replica and asserts the
   discriminator: **the ticket that already landed is fetched exactly ONCE across the whole run**, and only
   what was still owed is re-fetched.
+- 12.344 ✅ **A PROTOCOL PING ANSWERED AS IF IT WERE AN APPLICATION FRAME EARNS `bad-message` — the
+  hazard 12.361 named and left unbuilt, built here.** 12.328 deleted a text `ping`/`pong` protocol
+  nothing implements, and the deletion rests on a client never seeing a protocol ping at all:
+  `routes.ts:319` sends `socket.ping()`, `ws` answers it automatically and routes the answer to
+  `socket.on('pong')` (`:290`) rather than to `message`, and `WebSocketLike` exposes only
+  `onopen`/`onmessage`/`onclose`/`onerror`. **`webSocketFactory` is an injected seam, so that is a
+  property of what gets injected** — and this fixture is the one place in the repo holding a real `ws`
+  socket on BOTH ends of a real upgrade, which is precisely why 12.361 named it and assigned the
+  assertion to whoever owns it. The case adds ONE listener on the client's real socket —
+  `on('ping')` → `send('{"type":"pong"}')`, the naive shell 12.361 describes — and the server answers
+  `{type:'error', workspaceId:null, code:'bad-message', message:'expected {type:"subscribe",
+  workspaceId, afterSeq}'}`, quoted here from the frame that actually crossed the wire. **No source file
+  is touched:** `badMessage` already does this, unmodified. *Built as an EXCLUDING PAIR on ONE
+  connection, which is the whole of its rigour:* the same server-side `.ping()` twice, one line apart —
+  the CONTROL first, with `ws`'s automatic pong alone, drawing **no error frame at all** (the two frames
+  the client held at that point were its one `caught-up` and one ordinary `event`), then the listener,
+  then the second ping. A single hazard run would leave the complaint attributable to the connection or
+  to the heartbeat; the pair leaves only the added frame. **The ping is SENT, not waited for** —
+  `DEFAULT_HEARTBEAT_MS` is 30 s and no scheduler is injected: the case calls `.ping()` on the SERVER's
+  end of the live connection, the same handle `forceSlowConsumer` shadows `bufferedAmount` on, so a real
+  control frame crosses a real TCP connection at a moment the case chooses. **The default auto-pong is
+  asserted STILL FIRING under the added listener** (the server's own `pong` count grows in the hazard
+  phase too), because "an extra reaction on top of the default" is otherwise indistinguishable from a
+  handler that replaced it. The `code` is read as a typed `StreamErrorCode` rather than spelled inline —
+  12.327's lesson at the other end of the same wire; the `message` has no constant to read and is copied
+  deliberately. The control's *absence* is closed by ORDERING rather than by a sleep: frames arrive in
+  the order the server wrote them, so a commit made after the pong was observed, and its own `event`
+  frame on the wire, is a point past which "no complaint" is a fact about the whole round trip. **A
+  complaint, not a disconnect:** zero closes, one connection for both halves, `statuses` exactly
+  `connecting, catching-up, live`. (Mutation: delete the added `on('ping')` listener → **`1 failed | 3
+  passed (4)`, 12.344 ALONE**, at *"no complaint came back: expected 0 to be greater than or equal to
+  1"* — and the ping and pong assertions in that same `waitFor` still pass, so what the mutation removes
+  is the stray frame and nothing else.) — `apps/server/test/dual-client/socket-cut.test.ts`
 
 ### Mutations run for the socket-cut fixture — denominator 3 cases in this one file
 
@@ -2555,6 +2599,10 @@ indistinguishable from a mutation that never fired. Restored with `git checkout 
 | **(a)** delete `onCaughtUp`'s `await drainPendingPulls(ws)` | 12.340+12.341 RED; 12.342 and 12.343 green | **`1 failed \| 2 passed (3)` — exactly as predicted.** Dist proof: the occurrence count fell 2 → 1. The failure is 12.341's convergence, with its own message: *"C1 never converged (last status: live, attempts: 2)"* — two network attempts, the mid-pull one and the regenerated notice's, and never the third that `onCaughtUp` would have made. **12.342 (the control) stayed green**, so the redness is the mechanism and not the harness. |
 | **(b)** defer per-ticket `clearPendingPull` to one batch pass after the loop (NOT in a `finally`, or the early `return` would still clear) | 12.343 RED on the pull count; the others green | **`2 failed \| 1 passed (3)` — it bit HARDER than predicted, and the extra kill is the honest part.** 12.343 red as predicted, and 12.340 red too: both fail at their *pending-set* assertion rather than at the pull COUNT, because with the clear deferred the parent is still owed at the moment each is read (three ids where two were expected). That is a more direct measurement of per-ticket persistence than the count is, and it means the property has two independent witnesses rather than one. **12.342 stayed green.** |
 | **(c)** the control — the whole fixture with the cut and the injected failure removed | must stay green | **Green in all three blocks above.** It is case 12.342, permanently in the file, so this is a reading taken in the same run as each mutation rather than a separate run. |
+
+*The denominator above is 3 because it is a reading from the moment that sweep ran; the file now holds
+FOUR blocks, and 12.344's own mutation is recorded at its own entry with its own denominator (4) rather
+than folded into this table, which would restate a measurement nobody re-ran.*
 
 *Not claimed: that these four kill anything in `hub.ts` or `routes.ts`. Neither file was touched, and no
 mutation of either was run — this fixture's subject is the CLIENT's convergence across a real close, and

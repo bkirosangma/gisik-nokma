@@ -1,145 +1,204 @@
 # Lane D — executor state
 
-**This file is Lane D's restart surface.** Rewritten for THIS work (the real socket-cutting fixture for
-case 12.290) on branch `exec/40-socket-cut-fixture`, cut from `origin/main` at `2f18f3f` on 2026-09-06,
-per the controller's re-task at the fixed point after PR #161 (Lane B's closure 5b) merged.
-**Do not re-implement T7/T8/T9/T10/T17, the two retention sweeps, or the four `data-testid` hooks — all
-merged, all promoted (see the prior block below, kept for the record).**
+**This file is Lane D's restart surface, and this update is Lane D's LAST ACT for the night** — the owner
+has ruled that after Monday's 06:30 weekly reset, execution goes back to SERIAL (one executor), so
+whoever reads this next may have none of this session's context. Read this whole top section before
+doing anything.
+
+**What Lane D is, for a reader with zero context:** one of five parallel executor lanes on the
+`gisik-nokma` project (a project-management tool codebase), each working an independent branch under a
+controller session (`gisik-nokma-0d`) that is the only one that merges. Lane D's own two pieces of work
+this session, both now shipped:
+
+1. **PR #196** (branch `exec/40-socket-cut-fixture`) — **MERGED at `c5dfdcd`.** Built the first real,
+   end-to-end socket-cutting test fixture for Plan 10's closure 5b, flipping case 12.290 (offline-sync
+   test catalogue) from partial to fully covered on MEASURED convergence, not argument. Full detail in the
+   "PRIOR WORK" section below the line.
+2. **PR #213** (branch `exec/45-ping-hazard`) — **OPEN, MERGEABLE, awaiting the controller's merge under
+   an explicit CI-billing waiver.** Built case 12.344, a hazard case named by a sibling case (12.361) and
+   left unbuilt. Full detail in section 1-3 below.
+
+**Live position as of this write (head `552dc26`, frozen — do not push to this branch without the
+controller's say-so):**
+
+- PR #213: https://github.com/bkirosangma/gisik-nokma/pull/213 — MERGEABLE. `mergeStateStatus` reads
+  `UNKNOWN`/`UNSTABLE` because **GitHub Actions is refusing to start any CI job on this account since
+  ~14:42** ("recent account payments have failed or your spending limit needs to be increased") — this is
+  an account-billing outage, NOT a defect in this PR. The controller has granted an explicit merge waiver
+  covering the CI run only; everything else (a full local gate, a real review) is still owed and has now
+  been done — see section 1.
+- **Rebased once, after this position was first reported**, because Lane B's #215 merged
+  (`origin/main` = `d5e562e`) and both PRs appended to `test-cases/12` and `Features.md` §12 — docs
+  hunks only, B's own code (`packages/sync-client/test/sync-engine.test.ts`) disjoint from this PR's.
+  One conflict, in `test-cases/12`'s own allocation-header line, resolved by keeping BOTH sides (B's
+  `12.365` and this PR's `12.344`); `Features.md` auto-merged clean with both bullets present. Also
+  fixed one now-stale-by-one census sentence the merge exposed (`bare 328` → `329`, since Lane B's own
+  `12.365` line is one of the 329). **The code diff is UNCHANGED by the rebase** —
+  `git diff --stat origin/main...HEAD -- . ':!docs' ':!test-cases' ':!Features.md'` is still exactly
+  `apps/server/test/dual-client/socket-cut.test.ts`, 235 insertions/1 deletion, same as before — so **the
+  gate below still stands for this PR's actual code** (the #188/#202 precedent the controller cited: a
+  docs-only rebase does not owe a re-gate when the code diff provably has not moved), and the controller's
+  own forced gate at merged `main` covers the combination.
+- **The full forced gate has been run and is GREEN**, under gate-lock v3.3, at the PRE-REBASE head
+  `cca84af` (still valid per the point above — re-run `pnpm install --frozen-lockfile` after any further
+  rebase, a stale `node_modules` reads as a false regression):
+  `GATE_EXIT=0` (`WRAPPER_EXIT=0` from the wrapper's own stdout), `Tasks: 30 successful, 30 total`,
+  `Cached: 0 cached, 30 total`, `2m1.172s`, node v22.22.2, zero `Unsupported engine`, zero orphaned vitest
+  workers. **3645 tests / 284 files, 5 skipped** (server) — ui 37 · domain 464 · rule-engine 282 ·
+  editor 178 · sync-client 88 · app-core 1102 · server 1326+5 skipped · mobile 20 · web 138 · desktop 5.
+  `check:env` on its own line: `CHECK_ENV_EXIT=0`. **`check-case-ids` RE-RUN at the post-rebase head**
+  (required — two lanes minted §12 ids): `CHECK_CASE_IDS_EXIT=0`, 1052 bare + 469 bold + 43 marker-first
+  = 1564 = union, zero duplicates, highest `13.203`.
+- The PR body has been edited (via `gh pr edit`, no new commits from body edits, head unaffected by them)
+  to disclose: (a) no review agent ever ran on this PR — an account-side access error killed the
+  dispatched reviewer before its first action, so the "verification" in the PR body is the orchestrating
+  session's own independent re-work, not a separate reviewer; (b) the full gate result above.
+- **Nothing further is owed from Lane D on this PR.** It is waiting on the controller's merge. If you are
+  a fresh session picking this up: check `gh pr view 213 --json state,mergedAt` first — it may already be
+  merged, in which case skip straight to "what's next" at the very bottom of this file.
 
 > Shas below are facts about when this file was written. Verify with `git branch --contains` — empty
 > means orphaned. `git cat-file`/`git show` pass on orphaned shas and will lie.
 
 ## 1. Where things stand right now
 
-- **PR #196 IS OPEN, MERGEABLE, CLEAN**: https://github.com/bkirosangma/gisik-nokma/pull/196. Pushed, not
-  merged. Branch `exec/40-socket-cut-fixture`, head `ec5beca` (force-pushed after a rebase onto
-  `origin/main` at `fb5e4c2`, past PR #188 (T18, §12's final shape and bare-id normalisation), #193/#195
-  (gate lock v3.3's correction), #198/#199 (the mapper-cluster witness pass and ruling P42) — none of
-  which touch anything this PR touches; the rebase applied with zero conflicts). Commits, in order:
-  `cbd43f3` (the fixture itself, 872 lines), `aeb1e1c` (a flake fix found by the sweep's own baseline —
-  sibling ULIDs minted in the same millisecond sorted randomly, so the drain order of two children was a
-  coin flip; sorted them), `c36a8f8` (catalogue: 12.290 flips 🟡→✅, mints 12.340–12.343 bare-style),
-  `ec5beca` (one more assertion: the socket count on both sides of the convergence check).
-- **CI**: triggered by the force-push, `gh pr checks 196` shows the `scope` check `pending` as of this
-  writing (checked immediately after push) — **re-check before treating this as ready to merge; it had not
-  had time to run.**
-- **Diff is exactly three files**: `Features.md` (+46/-14 after the rebase's line-number shift; the actual
-  prose delta is the same content the review verified), `apps/server/test/dual-client/socket-cut.test.ts`
-  (new, 872 lines), `test-cases/12-offline-sync-apps.md` (+169/-... — same content, shifted). Confirmed
-  `git diff origin/main -- apps/server/src/stream/hub.ts apps/server/src/stream/routes.ts
-  packages/sync-client/src/engine/sync-engine.ts packages/sync-client/src/replica/replica.ts` is EMPTY at
-  this head — the four protected sync-surface files are byte-identical to `origin/main`.
-- **Full verification run AFTER the rebase** (not carried across it — this lane's own prior handoff already
-  states the rule that a gate carried across intervening commits is not a gate):
-  - `pnpm install --frozen-lockfile` + `pnpm rebuild better-sqlite3` + `pnpm turbo run build --force
-    --concurrency=1` → **BUILD_EXIT=0**, 10/10 tasks.
-  - Server package under gate-lock v3.3's `locked-test.sh` (`pnpm --filter @gisik-nokma/server exec vitest
-    run`): **126 test files passed, 1296 tests passed, 5 skipped**, 0 `Unsupported engine`, 0 orphaned
-    vitest workers, node v22.22.2.
-  - `node scripts/check-case-ids.mjs` → **CHECK_CASE_IDS_EXIT=0**: bare 1022 + bold 469 + marker-first 40 =
-    sum 1531 = union 1531, zero duplicates, highest `13.168`.
-  - `pnpm check:env` → **CHECK_ENV_EXIT=0** (separate step from check-case-ids, run and reported on its own
-    line per the standing rule).
-  - `pnpm turbo run typecheck --filter=@gisik-nokma/server --concurrency=1` → **6/6 tasks, exit 0**.
-  - Did **not** re-run the full 30-task cross-workspace gate after the rebase — the rebase touched zero
-    source files (confirmed by diffing `8373ae5..origin/main`: docs/lanes/*, a new Lane A test file, and
-    one unrelated `Features.md` §7 addition, none overlapping this PR's three files) and the mechanical
-    replay carried no code change, so the server-package run above plus build+typecheck is the equivalent
-    evidence the branch review round itself used for an identical situation (see §3 below).
+- **PR #213 IS OPEN, MERGEABLE**: https://github.com/bkirosangma/gisik-nokma/pull/213. Head
+  `bc576aa5780c4fecf25d31f0b85b62b8d7d42c07`. `mergeStateStatus: UNSTABLE` — **this is the CI billing
+  outage, not a defect**: GitHub Actions has been refusing to start jobs on this account since ~14:42
+  ("recent account payments have failed or your spending limit needs to be increased"), stated explicitly
+  in the PR body so it is not mistaken for a real red run. Diff is exactly three files: `Features.md`
+  (+16), `apps/server/test/dual-client/socket-cut.test.ts` (+235/-1), `test-cases/12-offline-sync-apps.md`
+  (+51/-5).
+- **How this got built — worth recording because it is an unusual shape.** The dispatched
+  implement→review Workflow's two agents both errored on their FINAL response with an account-side
+  message ("Your organization has disabled Claude subscription access for Claude Code · Use an Anthropic
+  API key instead, or ask your admin to enable access") — but the implementer's actual TOOL CALLS had
+  already landed on disk and been committed (two commits, `fa9635c` and `bc576aa`) before that failure hit.
+  **The lesson: a subagent's "failed" status describes its final report, not necessarily its tool effects
+  — check `git log`/`git status` before assuming a failed dispatch produced nothing.** No review agent ever
+  ran (its call errored identically, before doing any verification), so every verification claim in this
+  file is the ORCHESTRATING SESSION'S OWN independent work, not a reviewer's.
+- **My own independent verification, after the fact, exactly as if a review had run:**
+  - Read both commits in full (`git show fa9635c`, `git show bc576aa`) — the test code and the catalogue
+    prose.
+  - Ran the new/changed test file under gate-lock v3.3 (`locked-test.sh`, fixed path form
+    `pnpm --filter @gisik-nokma/server exec vitest run test/dual-client/socket-cut.test.ts` — NOTE the path
+    is relative to `apps/server`, not the repo root, once `--filter` has already cd'd there; got this wrong
+    once, `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`/"No test files found", before correcting it): **4 passed
+    (4)**.
+  - Independently re-ran the excluding mutation (removed the added `clientEnd.on('ping', ...)` block at
+    the time, line ~1059): **`1 failed | 3 passed (4)`**, failing at exactly `"no complaint came back:
+    expected 0 to be greater than or equal to 1"` — matching the commit message's claimed measurement
+    exactly. Restored with `git checkout HEAD --` and verified BOTH by `git diff` (empty) AND by
+    `sha256sum` matching a pre-mutation snapshot.
+  - `node scripts/check-case-ids.mjs` → **CHECK_CASE_IDS_EXIT=0**: 1043 bare + 469 bold + 43 marker-first =
+    1555 = union, zero duplicates, highest `13.203`.
+  - `pnpm check:env` → **CHECK_ENV_EXIT=0** (separate step, own line).
+  - `pnpm turbo run typecheck --filter=@gisik-nokma/server` → 6/6 tasks, exit 0 (cached).
+  - `git diff origin/main -- apps/server/src/stream/hub.ts apps/server/src/stream/routes.ts
+    packages/sync-client/src/engine/sync-engine.ts packages/sync-client/src/replica/replica.ts` → **empty**
+    — all four protected files byte-identical to `origin/main` at this head.
+  - Did NOT rebase before pushing: `origin/main` had moved 6 commits ahead of this branch's base
+    (`5e3a9d5`) by the time I pushed, but `git diff --stat 5e3a9d5..origin/main` touches only
+    `apps/server/test/integration/fixture-witnesses.test.ts` (Lane A's own file, confirmed disjoint by
+    direct message exchange with Lane A before this branch existed), `docs/lanes/*`, and
+    `test-cases/07-api-realtime-search.md` — zero overlap with this PR's three files, and `gh pr view`
+    confirms `mergeable: MERGEABLE`.
 
-## 2. What was built, and where — the mechanism, in outline
+## 2. What was built — the hazard, in outline
 
-`apps/server/test/dual-client/socket-cut.test.ts` (new file; `rig.ts` and `grant-backfill.test.ts`
-untouched — the existing dual-client rig is socketless by construction, so this fixture stands its own
-real server rather than extending the rig, and that deviation is recorded in both the PR body and case
-12.290's text):
+`apps/server/test/dual-client/socket-cut.test.ts` grows a new `describe('12.344 — ...')` block plus four
+new observers on the existing fixture (all additive, nothing removed): `viewerClientSockets` (the CLIENT's
+end of each connection — `viewerSockets` was already the SERVER's end), `clientFrames` (every raw TEXT
+frame the client's end received), `clientPings` (every PROTOCOL ping the client's end saw), `serverPongs`
+(every PROTOCOL pong the server's end saw back).
 
-- A REAL `buildTestApp` + `app.listen({port: 0, host: '127.0.0.1'})`, real Postgres, two real
-  `signInWithPhone` sign-ins (bearer tokens used on both HTTP calls and the WS handshake headers).
-  Membership/project seeding goes through the real `POST /v1/events` door (as
-  `test/integration/client-contract.test.ts` does), not `seedMember`/`seedProject` — more end-to-end than
-  the brief asked for.
-- A REAL client: `createHttpTransport`/`createSyncEngine`/`createReplica`/`createOutbox` from
-  `@gisik-nokma/sync-client`, unmodified, resolved through the package's own `dist` build (no alias). Only
-  two of its declared seams are supplied — `fetchImpl` (to inject one transient, non-404 pull failure so a
-  ticket stays durably pending) and `webSocketFactory` (bearer header on the WS handshake) — plus the
-  public `reconnectDelayMs: 80` engine option (disclosed inline in the test; the outward-facing prose in
-  the PR/Features.md omits this third knob, a Minor/cosmetic gap the review left open, see §4).
-- The REAL socket cut: `app.websocketServer.on('connection', ...)` (the real `ws.Server` `@fastify/websocket`
-  decorates the app with) hands back the live raw socket for the connection under test;
-  `Object.defineProperty(socket, 'bufferedAmount', {get: () => 999_999_999})` shadows the `ws` library's own
-  getter on that one instance; a subsequent real, ordinary commit makes `hub.ts`'s unmodified `send()` see
-  the forced value and close with the REAL 1013 `slow-consumer` code — measured, not assumed
-  (`toEqual([{1013,'slow-consumer'}, {1013,'slow-consumer'}])`, two cuts — see the finding below for why
-  two). `hub.ts`'s bound is the shipped `DEFAULT_MAX_BUFFERED_BYTES` (1 MB), never shrunk.
-- **Key finding, load-bearing for why the fixture needs TWO cuts, not one:** `visible-events-for.ts` scopes
-  `backfilled` per drain and a `reach-granted` notice advances no cursor, so a cut taken while the cursor is
-  still below the trigger reconnects into a re-generated notice that repairs the pull by itself — during
-  which `onCaughtUp`'s own `drainPendingPulls` retry is unreachable, and deleting it changes nothing. The
-  second cut, taken after the cursor has passed the trigger, is the one no notice can regenerate — that is
-  the case that actually exercises the retry mutation (a) targets.
+The case itself, on ONE connection, as an excluding pair:
+1. **Control**: `serverEnd.ping()` — a real protocol ping over the real live connection, sent directly by
+   calling `.ping()` on the raw server-side socket (the SAME handle the socket-cutting cases already use to
+   shadow `bufferedAmount`) rather than waiting on the real 30s heartbeat interval. `ws`'s own automatic
+   pong fires; NO error frame is received. Closed by an ORDERING argument rather than a sleep: a further
+   commit is made and its own `event` frame is awaited on the wire, so "no complaint" is a fact about the
+   whole round trip up to a known point, not about how long the case waited.
+2. **Hazard**: one listener added to the CLIENT's raw socket — `on('ping', () => send('{"type":"pong"}'))`
+   — simulating a shell that (mis)treats a low-level ping as needing an application-level answer. A second
+   `serverEnd.ping()` now produces exactly `{type:'error', workspaceId:null, code:'bad-message',
+   message:'expected {type:"subscribe", workspaceId, afterSeq}'}` from `routes.ts`'s unmodified
+   `badMessage` path. The default auto-pong is asserted to KEEP firing under the added listener (not
+   suppressed by it), and the connection is asserted to stay open (a complaint, not a disconnect).
 
-## 3. Mutation sweep — predicted then measured, restored, and independently re-run by the reviewer
+No source file is touched — `routes.ts`'s `badMessage` path already does exactly this.
 
-Run under one locked acquisition; every mutation applied to `packages/sync-client/src/engine/sync-engine.ts`
-SOURCE, the package rebuilt (`apps/server` resolves it by package name through `dist`), the mutant's
-presence in `dist` PROVED before running, and `git checkout HEAD -- <path>` + `git diff` + a read-back after
-every one:
+## 3. Catalogue
 
-| mutation | predicted | measured |
-|---|---|---|
-| baseline | 3/3 pass | 3 passed (3) |
-| (a) delete `onCaughtUp`'s `await drainPendingPulls(ws)` | 12.340+12.341 red, rest green | **`1 failed \| 2 passed (3)`, exactly as predicted** — "C1 never converged" |
-| (b) batch `clearPendingPull` after the loop instead of per-ticket | 12.343 red on the pull count | **`2 failed \| 1 passed (3)`** — 12.340 AND 12.343 red, both at their *pending-set* assertion, not at the pull-count assertion (which is never reached under this mutation — disclosed as an open, unkilled assertion in the case text itself, not hidden) |
-| (c) control, cut removed | stays green | green in all three blocks (permanent case 12.342) |
+- **12.344 minted BARE** in Lane D's own block (12.340–12.359, now used through 12.344; 12.345–12.359
+  still free). §12 census after this commit: bare 328 / bold 0 / marker-first 0, sum == union, zero
+  duplicates (recounted fresh rather than carried forward, per this file's own standing rule — it had
+  drifted stale by five before this change touched it, since Lane B's sync-surface block had landed on
+  `main` in the meantime).
+- **12.361 STAYS 🚫** — its point (the owner rule at both `webSocketFactory` defaults is a docblock, not a
+  check) is unchanged by building 12.344; the two are cross-referenced to each other explicitly so neither
+  is misread as covering the other.
+- A short Features.md bullet added in the same §12 area PR #196 already added to, naming itself and citing
+  case 12.344.
 
-The opus reviewer independently reconstructed all three mutations from prose alone (not from a saved patch)
-and reproduced the same measured results, including reproducing mutation (b)'s exact non-obvious failure
-signature. **Verdict: clean.** Three Minor/cosmetic findings only, all pre-closed or already disclosed in
-the case text (see §4) — no fix round was needed or run.
+## 4. Coordination
 
-## 4. Left open, named rather than glossed (all Minor, not blocking)
+- **Told Lane A (`gisik-nokma-exec-f3`) this branch's file list before it existed on origin**, confirming no
+  overlap with their refusal-vocabulary cluster scoping (`packages/app-core/test/flows/`,
+  `packages/rule-engine/`, `apps/server/test/integration/fixture-witnesses.test.ts`,
+  `apps/web/test/notifications-gateway.test.ts` — none touched).
+- **No ledger row** (Lane F item, closed by name in the PR).
 
-- The PR/Features.md/test-file-docblock prose says the real sync-client is used "with only its two
-  declared seams supplied" — a third, `reconnectDelayMs: 80`, is also supplied (a legitimate public engine
-  option, disclosed inline in the test at the point of use, just not repeated in the outward-facing prose).
-  No measurement is affected by this.
-- Case 12.343's headline prose calls the pull-count assertion "the discriminator" for mutation (b), but the
-  mutation table in the same file correctly and voluntarily records that under (b) that specific assertion
-  is never reached (the pending-set assertion above it fires first) — the file is self-consistent read
-  whole, the one-line headline overstates it read alone. Cosmetic; not fixed, since the honest disclosure
-  already exists two paragraphs below it.
-- These two are the kind of thing worth a one-line prose tighten in a future pass over this file, but do not
-  rise to a fix-round threshold on their own (both Minor, both already substantively disclosed).
+## 5. A note on the account-side outage, for whoever restarts next
 
-## 5. Coordination notes for whoever restarts this lane or reads this file next
-
-- **§12 ids: this lane's block is 12.340–12.359, used through 12.343 (12.344–12.359 still free).** Written
-  BARE style (`- 12.34X ✅ …`) per PR #188's normalisation — the file's whole §12 is bare now, 322 ids at
-  this head, zero bold.
-- **Gate lock: use v3.3** (`docs/lanes/gate-lock/` on `origin/main`, NOT this lane's own earlier scratchpad
-  copies) — v3.2 and this lane's own earlier hand-patch both undercounted `peer_gates`'s own `$( )` subshell
-  as a peer; v3.3's `README.md` carries the corrected form and now reads `REPO="${GATE_REPO:-$PWD}"` rather
-  than a hard-coded worktree path, so no per-lane `sed` adaptation is needed — just `cd` into the worktree
-  and optionally set `GATE_REPO`.
-- **Exchanged file lists with Lane B (`lane2-plan4-a2`) before pushing**, since Lane B is landing a
-  sync-surface SOURCE PR (`exec/43-sync-surface-fixes`: deletions in `http-transport.ts`/`stream.ts`'s dead
-  ping/pong arm, a narrowed `parseFrame` return type in `app-core`, docblock-only prose in `outbox.ts`, and
-  test/catalogue changes with §12 ids 12.360–12.379). Confirmed: none of it touches anything this fixture
-  imports by signature. Lane B was told this PR's head sha (`ec5beca`) and asked to rebase past it, or vice
-  versa — whoever lands second rebases, per the controller's rule.
-- **No ledger row for this task** (Lane F item, closed by name in the PR — `docs/lanes/task-ledger.tsv`
-  untouched, correctly).
+At 17:38 IST this session's dispatched Workflow agents failed with "Your organization has disabled Claude
+subscription access for Claude Code" — an ACCOUNT-level error, not a session-limit or model error. The
+controller confirmed a freshly-launched session (Lane A) worked normally minutes later, so treat this as
+possibly transient/dispatch-specific rather than assuming all subagent dispatch is down — but **verify a
+subagent's tool effects on disk before concluding it "did nothing"**, since this session's own failed
+dispatch had in fact completed two real commits before its final report call errored.
 
 ## 6. Remaining steps, in order
 
-1. ~~Confirm #161 merged, cut branch, verify build~~ — done.
-2. ~~Design the real seam (read hub.ts, routes.ts, sync-engine.ts, replica.ts, http-transport.ts, rig.ts,
-   the test helpers) and dispatch an opus implementer → opus reviewer pipeline~~ — done; workflow returned
-   `verdict: clean`.
-3. ~~Rebase past #187/#188/#193/#195/#198/#199 (main moved twice more during and after the build), rebuild,
-   re-verify (server suite, check-case-ids, check:env, typecheck), force-push~~ — done, head `ec5beca`,
-   PR #196 now MERGEABLE/CLEAN.
-4. **Confirm CI goes green on PR #196** (was `pending` immediately after the force-push — re-check before
-   reporting this as merge-ready) and report to the controller.
-5. **Never edit `docs/lanes/task-ledger.tsv`. Never merge own PR. Never commit to `main`.**
+1. ~~Confirm PR #196 merged, note the account-side CI-billing block, hold~~ — done (prior session block).
+2. ~~Re-task by controller message: build case 12.344~~ — dispatched, agents errored on final report but
+   left two real commits; discovered and verified independently.
+3. ~~Verify: re-run the test, re-run and restore the excluding mutation, check-case-ids, check:env,
+   typecheck, confirm protected files untouched~~ — done, all as claimed.
+4. ~~Push, open PR #213, note the CI billing block in the body~~ — done.
+5. **Report to the controller** — this handoff commit is part of that report's evidence trail.
+6. **Never edit `docs/lanes/task-ledger.tsv`. Never merge own PR. Never commit to `main`.**
+
+---
+
+## PRIOR WORK (exec/40-socket-cut-fixture, PR #196 — MERGED at c5dfdcd) — kept for the record
+
+**This file is Lane D's restart surface.** Rewritten for THIS work (the real socket-cutting fixture for
+case 12.290) on branch `exec/40-socket-cut-fixture`, cut from `origin/main` at `2f18f3f` on 2026-09-06,
+per the controller's re-task at the fixed point after PR #161 (Lane B's closure 5b) merged.
+**Do not re-implement T7/T8/T9/T10/T17, the two retention sweeps, or the four `data-testid` hooks — all
+merged, all promoted.**
+
+- **PR #196 MERGED at `c5dfdcd`** — twelve green CI checks at frozen head `7c9ba94`, review verdict CLEAN
+  (opus reviewer independently re-ran all three mutations and the baseline, reproduced every measured
+  result). Case 12.290 flipped 🟡→✅ on measured convergence: a real fastify server, real Postgres, real
+  bearer auth, a real WebSocket connection genuinely cut with a real 1013 slow-consumer close (via
+  `app.websocketServer`'s `connection` event and an `Object.defineProperty` override of `bufferedAmount` on
+  one live socket instance), and the real, unmodified `@gisik-nokma/sync-client` engine reconnecting and
+  converging. Cases 12.340–12.343 minted (originally bold, normalised bare by Plan 10 T18's #188 which
+  landed mid-flight).
+- **Key finding recorded in the case text:** one cut is not enough to prove anything, because
+  `visible-events-for.ts` scopes `backfilled` per drain and a `reach-granted` notice carries no cursor, so
+  a cut taken before the trigger crosses the cursor just reconnects into a regenerated notice that repairs
+  itself — the fixture needed a SECOND cut, taken after the cursor passes the trigger, to actually exercise
+  `onCaughtUp`'s retry path.
+- **Gate-lock v3.3 lesson learned and recorded for the next restart:** `peer_gates()`'s own `$( )`
+  command-substitution subshell was undercounting itself as a peer in TWO successive "fixes" — first
+  entirely unaddressed (v3.2), then addressed with an INLINE `-v fork=$BASHPID` in the awk argument list
+  (my own first attempt, based on an earlier controller message) which measurably does NOT work (bash
+  expands that argument in the child forked for `awk`, not in the command-substitution subshell itself) —
+  the CORRECT form captures `local fork=$BASHPID` as a plain assignment FIRST, then passes `-v fork="$fork"`.
+  **Always pull `docs/lanes/gate-lock/` fresh from `origin/main` rather than trusting an old scratchpad
+  copy** — this exact mistake was caught and self-corrected mid-session by a dispatched subagent that
+  re-pulled the canonical form, not by me.

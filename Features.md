@@ -1651,6 +1651,22 @@ and leaves the head lying, which is how a contradiction survives a whole task.)*
   ticket would replay a transition with no creation event and stall its engine. 12.291 pins the cap;
   12.290 no longer owns a residual, and the residual it DID own is the one 12.340–12.343 discharged.
   `apps/server/src/visibility/grant-backfill.ts`, `apps/server/test/dual-client/socket-cut.test.ts`
+- ⚙️ **The heartbeat is a PROTOCOL ping, and a peer that answers one as if it were an application frame
+  is told so** *(case 12.344)* — `stream/routes.ts` pings with a WebSocket control frame, which `ws`
+  answers automatically and routes to `socket.on('pong')`, never to `message`; the abstraction the sync
+  client declares for its transport (`WebSocketLike`) has no ping event at all, so a client built against
+  it cannot see one. That reasoning is what 12.328's deletion of a text `ping`/`pong` protocol rests on,
+  and `webSocketFactory` being an injected seam is what keeps it a property of what gets INJECTED rather
+  than of either module. The socket-cut fixture holds a real `ws` socket on **both** ends of a real
+  upgrade, so it is the only place the hazard is expressible: wiring the client's own `on('ping')` to a
+  text `{"type":"pong"}` draws `{type:'error', workspaceId:null, code:'bad-message', …}` from the
+  unmodified `badMessage` path — a complaint, not a disconnect. **Measured as an excluding pair on one
+  connection**, the same server-side `.ping()` twice with only that listener added in between, so the
+  complaint is attributable to the added frame and not to the connection or the heartbeat; the control
+  half is production's own behaviour, every thirty seconds, on every socket. The residual 12.361 records
+  is untouched by this: the owner rule at both `webSocketFactory` defaults is still a docblock, and a
+  case showing what breaking it costs is not a check that it is kept.
+  `apps/server/src/stream/routes.ts`, `apps/server/test/dual-client/socket-cut.test.ts`
 - ✅ **Visibility that widens because the READER's reach grew, not the ticket's** *(closure 5b, case
   12.283)* — `membership.granted` and `project.member_added` reveal tickets whose history sits below the
   client's cursor, the identical gap. It could not be another entry in the ticket-event trigger list, for
