@@ -4,45 +4,50 @@
 finish is here. Verify anchors with `git branch -r --contains` — empty means orphaned; `git cat-file`
 passes on orphaned commits and will lie to you.
 
-# ▶ T16 IS WRITTEN AND GATED at content commit `07ab5fa`. Review IN FLIGHT. **Plan 11 is otherwise done.**
+# ✅ T16 IS DONE AND REVIEWED. **PLAN 11 IS COMPLETE.** PR open at content commit `b3f005c`.
 
-**If the session halted here, T16's work is COMMITTED AND PUSHED — do not rewrite it.** What remains is:
-read the opus reviewer's verdict, fix what it finds, re-gate, push, open the PR. If the reviewer's output
-was lost with the session, re-dispatch one over `git diff origin/main...HEAD` rather than trusting this
-file's "gate green" as a substitute — **no independent party has checked T16 yet.**
+Reviewed by one opus reviewer: **1 Critical, 5 Important, 6 Minor — all fixed**, re-gated green.
 
-| fact | value |
+| anchor | value |
 |---|---|
 | branch | `exec/46-plan11-t16` from `origin/main` `fcd39e7` |
-| content commit | **`07ab5fa`** (the handoff commit sits on top; read the head with `git rev-parse HEAD`) |
-| gate | **30/30 · 0 cached · 1m57.32s · node v22.22.2 · 285 files / 3655 passed / 5 skipped · Unsupported engine 0 · no orphans** |
-| `check:env` | **`CHECK_ENV_EXIT=0`** |
-| `check-case-ids` | **ok**, 1590 ids, highest 13.203 |
-| `check:runbook` | **ok**, all 12 resolve *(NEW in T16, its own CI step)* |
-| §13 | used through **13.195. Next free: 13.196.** |
-| PR | **NOT OPENED YET** |
+| content commit | **`b3f005c`** (handoff sits on top; read the head with `git rev-parse HEAD`) |
+| gate | **30/30 · 0 cached · 1m48.51s · node v22.22.2 · 285 files / 3655 passed / 5 skipped · engine 0 · no orphans** |
+| `check:env` | **0** · `check-case-ids` **ok, 1591 ids** · `check:runbook` **ok, 14 refs / 12 distinct** |
+| §13 | used through **13.196. Next free: 13.197.** |
 
-## What T16 landed
+## What the review caught, worth carrying forward
 
-1. **`docs/runbook.md`** — deploy, the three Asia/Kolkata settings, rotation, backups, orphan sweep,
-   restore drill, seeding, incidents.
-2. **`scripts/check-runbook-commands.mjs`** + root `check:runbook` + a step in `ci.yml`'s `check-env`
-   job — **the only falsifiable thing about a runbook**: every command it names must resolve. Self-tests
-   against 4 planted defects and 3 known-good before it will report clean; proven against the REAL
-   runbook by restoring the `ops:sweep-orphans` ghost, which reddens it naming the site.
-3. **`verify-projections.ts` now reads `DATABASE_URL` directly.** It used to call `loadConfig`, demanding
-   `BETTER_AUTH_URL` + `BETTER_AUTH_SECRET` + `WEB_ORIGIN` — none of which it reads — so the runbook's
-   own restore-drill step 4 answered `ConfigError`. **A drill nobody can run is not a recovery procedure.**
-4. **THE DDL DECISION IS DISCHARGED** (carried since seam 1) in `docs/runbook.md` AND
-   `deploy/do/README.md`: the verifier runs only against restore scratch databases, never production, and
-   no DDL credential is added — it detects drift by rebuilding and diffing, so against production it would
-   rewrite the rows it judges. **Cost recorded with it:** production drift surfaces only at the next
-   monthly drill, so the exposure window is up to a month.
-5. `Features.md` §13 intro reconciled (it claimed the runbook's gate was "NOT cleared") + two bullets;
-   cases **13.190–13.195**.
+- **CRITICAL: the runbook check was skipped on exactly the diff class it guards.** It landed as a step in
+  `check-env`, which is gated on `code_changed == 'true'`; `docs/runbook.md` is under `docs/`, so a
+  runbook-only PR skipped it and `gate` counts `skipped` as success. `ci.yml` already named and solved
+  this trap for `check-tasks` and I put mine in the gated job anyway. **Now its own ungated job.**
+- **The DDL decision's first reason was contradicted by the code it described.** I wrote that a
+  production run "would rewrite the rows being judged"; `verifyProjections` rebuilds into a
+  `verify_shadow` schema and its docblock says *"Live tables are never written."* Decision kept, ground
+  replaced: it needs `CREATE SCHEMA`/`CREATE TABLE`, and the shadow trick is safe only while every
+  projection declares its table — one missing from `tables` truncates the LIVE table.
+- **"`seed:cc` runs in-container" was measured in the wrong environment** — `reference/` is in the DEV
+  container via a bind mount, not in the image. **Third time this lane measured the wrong environment**
+  (stale image reporting healthy; stale log; this). Corrected in the runbook, case 13.180 and the E2E
+  docblock.
+- The orphan-sweep section described three things the code does not do, including a one-signal rule the
+  source says would flag every live attachment as an orphan.
 
-**Two ghosts the first draft carried, both now fixed and both the reason (2) exists:** `ops:sweep-orphans`
-has never existed (the script is `sweep:orphans`), and the restore drill's step 4 could not run at all.
+## Carried, with owners — none blocking
+
+- **13.196 ❌** the runbook checker reads no file CONTENTS — it asserts `deploy/do/README.md` exists,
+  never what it says, so the recorded DDL decision could be deleted with the check still green. Owner:
+  this lane.
+- **13.195 🟡** the plan's Step 4 whole-stack smoke: gate half and E2E half ran; the docker half
+  (`compose up --build`, `check:db-tz` against the compose DB, in-container `--once` backup) did not.
+- **13.176 / 13.179 / 13.181** unchanged, owners Plan 6 / Plan 6 / Lane D. **13.90 is Lane D's to flip.**
+- Step 4's own text names four root scripts that do not exist (`lint`, `test:fixtures`,
+  `test:dual-client`, `test:e2e`) and a stale port 54329 — a plan-text defect, recorded not fixed.
+
+## If you are the Monday executor
+
+Plan 11 has nothing left but this PR merging. Everything is committed and pushed. **Do not re-run T16.**
 
 # ▶ WHERE THIS LANE IS: T13 IS MERGED. **T16 IS THE ONLY THING LEFT IN PLAN 11.**
 
