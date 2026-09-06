@@ -86,6 +86,9 @@ async function settled(): Promise<void> {
   await waitFor(() => expect(screen.getByText(PROVENANCE_LINE)).toBeInTheDocument());
 }
 
+/**
+ * 3.73 — cited on the block: every field wears its CLAIM (a value is never a standing property, and a nameless actor is attributed by id rather than blank or "system"), and the three parent facts stay three — visible parent, restricted parent as existence-without-title, and root said distinctly.
+ */
 describe('TicketSheet — full state with per-field claim attribution', () => {
   it('renders the state with its provenance line and each field with its claim', async () => {
     renderSheet(ticketRead());
@@ -300,6 +303,9 @@ describe('TicketSheet — a refused read is a refusal, never a wait that never e
 });
 
 describe('TicketSheet — the transition round-trip', () => {
+  /**
+   * 3.74 — the ledger payload is the SHIPPED spelling, `{to, comment:{text}}` and not `{toStateId}`, and the proof runs the real engine rather than restating the schema.
+   */
   it('PLANTED DEFECT: the ledger payload is the SHIPPED spelling — {to, comment:{text}}, not {toStateId}', async () => {
     // `ticketTransitionedPayloadSchema` (packages/domain/src/workflow.ts) names
     // the destination `to` and wraps the comment as `{text}`. The plan's snippet
@@ -553,6 +559,9 @@ describe('TicketSheet — the attachment list (Task 12a wiring)', () => {
  * one. Each names what the other two must NOT be showing, so collapsing any
  * pair reddens here rather than passing quietly.
  */
+/**
+ * 3.81 — cited on the block: the history tab’s THREE states, where two of them used to be the third. `useLiveQuery` leaves `data` at `null` both while a load is in flight AND when it failed, so in-flight, rejected and empty are told apart here rather than collapsing into one notice.
+ */
 describe('TicketSheet — the History tab: loading, failed and empty are three different things', () => {
   /** A read that never settles. The tab must say it is waiting, not that there is nothing. */
   function pendingHistorySource() {
@@ -671,6 +680,9 @@ describe('TicketSheet — the History tab: loading, failed and empty are three d
  * `HISTORY_PAGE_LIMIT` entries, and the boundary case is asserted below rather
  * than hidden: an occasional "there may be more" is a weaker claim than the
  * truth, where a silent truncation is a stronger one.
+ */
+/**
+ * 3.82 — cited on the block: a truncated ledger SAYS it is truncated. The client asks for an explicit limit rather than taking the server default, a full page says the history may go on past it, and a short page invents no "more".
  */
 describe('TicketSheet — a truncated ledger says it is truncated', () => {
   function page(count: number): TicketHistoryEvent[] {
