@@ -55,6 +55,33 @@ next 12.360 on request; T18 fills the RESERVED 12.1–12.44; §13 — C 1–40 (
 ask before more), D 41–100 (exhausted), E 101–200 (through 104; catalogue from 105); §6 — D 143–159
 (through 149), B 160–179, A 180+.
 
+### ⛔ PRE-HALT POSITIONS, 14:50 — session meters 75–78% at 14:46, RESET 17:20 IST; every lane told at 14:38 to push its handoff by 15:10 and dispatch nothing after 15:00 that cannot finish by 15:25
+
+| what | value at 14:50 |
+|---|---|
+| `main` | **`c5dfdcd`** — **#196 (Lane D: a REAL socket-cutting fixture for 12.290 — `socket-cut.test.ts`, a real `buildApp` on a real `listen()` so a real HTTP upgrade happens, `bufferedAmount` shadowed on the live socket so `hub.ts`'s UNMODIFIED close path fires a real 1013 over real TCP; hub/routes/engine/replica byte-identical; TWO cuts needed — `visible-events-for.ts` scopes `backfilled` per drain and a `reach-granted` carries no cursor, so a cut before the trigger just reconnects into a regenerated notice; mutations (a) exactly as predicted, (b) bit harder and says so; review CLEAN; twelve green at `7c9ba94`; **12.290 🟡 → ✅ on measured convergence**, 12.340–12.343; `c5dfdcd`, 14:42)** |
+| ledger | **175/177 (98.9%)** at `c5dfdcd`, `CHECK_EXIT=0` — remaining **11/13, 11/16** (Lane E) |
+| last forced gate | **`c5dfdcd`** — lock v3.3 (pid 79131, waited 15 s), install 0, rebuild 0, `check:env` 0: **`GATE_EXIT=0` · 30/30 · 0 cached · 2m20s · node v22.22.2 · 3609 tests / 283 files** (server 1296 \| 5 skipped — matches D's 1296). Zero orphans. Swap 85% after |
+| open PRs | **none** |
+| lock · pools | free after the gate; 0 pools at 14:45 |
+
+**Every lane's position at 14:48, measured from its worktree and `origin` (`ListAgents` names: A `gisik-nokma-exec-f3` · B `lane2-plan4-a2` · C `lane3-plan7-8-34` · D `lane4-periphery-2d` · E `lane5-plan11-c9`):**
+
+| lane | branch · head | pushed? | state | first action after the reset |
+|---|---|---|---|---|
+| **A** | `exec/44-next-cluster` · `cf3e41c` (+2 dirty lines: an opus implementer mid-flight on the eight invite/refusal witnesses, dispatched 14:36, ONE subagent) | yes at `cf3e41c` (its first commit corrects the stale "no full gate" header that merged with #198) | building the invite/refusal cluster under the one-subagent rule; will checkpoint "WIP, unreviewed, mutations not run" if the implementer is still running at 15:05 | continue: verify, mutations under the lock, opus reviewer, rebase, gate, PR; §7 from 7.230 |
+| **B** | `exec/43-sync-surface-fixes` · origin `20e89db` ("position at 14:47 — four items landed"), local `6e965d3`, tree clean | yes | the four sync-surface items are LANDED on the branch per its own handoff; PR not yet open | rebase past `c5dfdcd` (§12 moved: 12.340–12.343, 12.290 ✅), recount, gate, open the PR, report |
+| **C** | `exec/34-plan11-scheduler-errands` · local `d5ea37a`, tree clean, **NOT on origin at 14:48** | **NO — told at 14:38 to push by 15:10** | scheduler errands: implement/review workflow was running; rebase past seam 1 (schedule.ts conflict: keep E's import, add C's scheduler) owed | push first if the halt caught it; then rebase, gate, PR |
+| **D** | `exec/40-socket-cut-fixture` · `7c9ba94` → MERGED #196 | n/a | **DONE; HOLDING through the halt by instruction** | relaunch with a new override — candidates: the six borderline fixture rows (`helpers/seed.ts`, `flows/`), `seed:dev`'s runtime coverage (E's ❌-with-owner line) |
+| **E** | `exec/43-plan11-t13` · local `3dd9c9f` (+2 dirty), **NOT on origin at 14:48** | **NO — told at 14:38 to push by 15:10, `docker compose down` before the window** | T13: second Playwright config, global-setup gated on the proxy hop, Mailpit exactly-one, P42's `trustedOrigins` commit owed, specs unrun past globalSetup until P42 lands; the CI e2e hunk to C first; §13 from 13.169 | push first if the halt caught it; then P42's commit + fixture, run the specs against the real stack, report |
+
+**If this controller is halted with the lanes:** the Monitor task dies with the session (re-arm `ctl-watch.sh`);
+`gate.sh` (v3.3, captured form) and both scripts are in this session's scratchpad `75988d28-…`; the memory
+advisory (fan-out cap while the lock is held) and the frozen-head rule stand; **`gh pr list --author @me`
+cannot distinguish lanes — every lane pushes under one account; filter by `headRefName`** (Lane A's catch);
+**the machine-local hook does not refuse a piped GATE script** (owner's to extend). Rulings P35–P42 are all
+on `main`. Next controller-state refresh at ~15:10 with the pushed heads, if the meter allows.
+
 ### RULING P42 (2026-09-06 14:32, controller as ruling tier) — the compose stack cannot sign in: `WEB_ORIGIN` joins `trustedOrigins`, in T13's PR, one commit, with its excluding fixture
 
 **Found by Lane E with a real browser against the shipped UI in the compose stack, not with curl:** `POST
