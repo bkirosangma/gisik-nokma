@@ -81,6 +81,12 @@ describe('sniffAllowedMime', () => {
   /**
    * 9.190 — every embeddable-image MIME (the domain's `EMBEDDABLE_IMAGE_MIME`) is a subset of the uploadable allow-list.
    */
+  /**
+   * 7.258 — the falsifiable half of the closure-pattern reference row: two independent
+   * statements of the image-mime set, so deleting a mime from either side reddens here.
+   * (The row’s other half — one definition of `isEmbeddableImageMime` imported by both
+   * the editor and the server gate — is structural, held at compile time, not by a test.)
+   */
   it('every embeddable image mime is uploadable (subset invariant)', () => {
     // A positive control on the loop itself: an empty EMBEDDABLE_IMAGE_MIME
     // would make the assertions below vacuous and the test green, which is the
