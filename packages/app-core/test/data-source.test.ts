@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parentTerminalRefusal } from '@gisik-nokma/rule-engine';
 import type { SubmittedEvent } from '@gisik-nokma/domain';
 import type { DataSource, ServerStreamFrame } from '../src/data-source.js';
 import { DEFAULT_GROUPING, DEFAULT_LIST_COLUMNS, DEFAULT_VIEW_PREFS } from '../src/view-types.js';
@@ -28,7 +29,14 @@ describe('the fake DataSource (the harness every view test rides on)', () => {
         status: 'refused' as const,
         eventId: event.id,
         rule: 'hierarchy.parent-terminal',
-        reason: 'Parent is Done; it must reopen because it is acquiring live work.',
+        // THE THIRD COPY of the parent-terminal fabrication, and a third wording
+        // again: this said `'Parent is Done; it must reopen because it is acquiring
+        // live work.'` where the two other files said `'Parent "Registrations" is
+        // Done; …'`. Neither is a sentence the engine can build. This one carried no
+        // comment claiming a source, so it is the mildest of the three — a fake's
+        // stimulus rather than a false claim — but it modelled an answer no producer
+        // gives, and the imported builder costs nothing. See case 7.250.
+        reason: parentTerminalRefusal('Registrations', 'Done', 'add'),
       })),
     );
     const [result] = await source.ingest([submittedTicketCreated()]);

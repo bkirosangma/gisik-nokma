@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { IngestResult, SubmittedEvent, WorkflowDef } from '@gisik-nokma/domain';
-import { REFUSAL_RULES } from '@gisik-nokma/rule-engine';
+import { REFUSAL_RULES, parentTerminalRefusal, rankRefusal } from '@gisik-nokma/rule-engine';
 import {
   UnansweredClaimError,
   reopenAndProceed,
@@ -15,39 +15,33 @@ import { PARENT, TICKET, WF_ERRAND, WS, submittedTicketCreated } from '../helper
 const make = makeSubmittedFactory({ actorId: 'user_kiro', origin: 'web' });
 
 /**
- * The engine's real sentence for the CREATE arm, and the comment above it used
- * to be false.
+ * The engine's real CREATE-arm sentence, and it is now IMPORTED rather than typed.
  *
- * It read *"the engine's own words, copied from `checks/hierarchy.ts`'s refusal
- * shape"* over the string `'Parent "Registrations" is Done; it must reopen
- * because it is acquiring live work.'` — which the engine has never emitted, in
- * any version reachable from this tree. `parentTerminalRefusal`
- * (`packages/rule-engine/src/checks/refusals.ts:197`) builds
- * `"<title>" is finished (<state>). <remedy>`, and the two share nothing but the
- * title and the word "Done". The same fabricated string sits in
- * `test/views/reopen-flow.test.tsx` under the name `SERVER_PARENT_TERMINAL_REASON`.
- * Nothing in this package could see it: every case here feeds the client this
- * constant and reads it back, so the fixture was only ever compared with itself.
+ * Two states of this constant are worth keeping visible, because the second was
+ * only reachable after the first was fixed. It began as `'Parent "Registrations"
+ * is Done; it must reopen because it is acquiring live work.'` under a comment
+ * calling it *"the engine's own words, copied from `checks/hierarchy.ts`"* — a
+ * sentence the engine has never emitted. #219 corrected the VALUE by reading the
+ * wire (cases 7.238/7.239) but had to leave it a literal, because
+ * `checks/refusals.ts` was re-exported from nowhere. That gap was case 7.245 and
+ * it is now closed: `parentTerminalRefusal` is exported from the package index.
  *
- * It is now the sentence the running engine produces, read off the wire by case
- * **7.238/7.239** in `apps/server/test/integration/fixture-witnesses.test.ts` —
- * a real `POST /v1/events` under a real terminal parent. That case, not this
- * constant, is what keeps the wording honest.
- *
- * **It is a literal and not an import, and that is a gap rather than a choice.**
- * `checks/refusals.ts` is not re-exported from `packages/rule-engine/src/index.ts`
- * and no subpath reaches it (`package.json` exposes `.` and `./fixtures`), so no
- * consumer of the package can compare against the producer's own words. Recorded
- * as case 7.245; owner is whoever next touches `rule-engine/src/index.ts`.
- *
- * The remedy clause is the ADD arm's. The reparent arm says something different
- * — one constant standing in for two sentences is a limitation of this fixture
- * that 7.239 exists to state.
+ * **What the import buys, and what it does NOT.** It does not make this file a
+ * witness. Reword `parentTerminalRefusal` and this constant moves with it in
+ * silence — the two sides are one function. **The reword is caught by 7.238/7.239,
+ * which hold a LITERAL over a real round trip, and by nothing else.** What the
+ * import buys is that this fixture can never again claim to be the engine's words
+ * while being a fabrication: it now carries a value production really produces.
+ * Removing a class of lie, not adding a check.
  */
-const PARENT_TERMINAL_REASON =
-  '"Registrations" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.';
+const PARENT_TERMINAL_REASON = parentTerminalRefusal('Registrations', 'Done', 'add');
 
-function parentTerminalRefusal(eventId: string): IngestResult {
+/**
+ * Renamed from `parentTerminalRefusal` when the engine's real builder of that
+ * name became importable: two different things had one name, and the local one
+ * was the mis-named half — it builds an `IngestResult` ARM, not a sentence.
+ */
+function parentTerminalRefusalResult(eventId: string): IngestResult {
   return {
     status: 'refused',
     eventId,
@@ -141,7 +135,7 @@ describe('3.77 · T13.2 submitChildEvent — one refusal is a remedy, the rest a
 
   it('T13.2b surfaces hierarchy.parent-terminal as needs-reopen, rule and reason intact', async () => {
     const source = createFakeDataSource({}, (events) =>
-      events.map((event) => parentTerminalRefusal(event.id)),
+      events.map((event) => parentTerminalRefusalResult(event.id)),
     );
     const outcome = await submitChildEvent(source, submittedTicketCreated());
     expect(outcome).toEqual({
@@ -152,7 +146,7 @@ describe('3.77 · T13.2 submitChildEvent — one refusal is a remedy, the rest a
 
   it('T13.2c reparent refusals take the same path — the rule is shared', async () => {
     const source = createFakeDataSource({}, (events) =>
-      events.map((event) => parentTerminalRefusal(event.id)),
+      events.map((event) => parentTerminalRefusalResult(event.id)),
     );
     const reparent = make({
       workspaceId: WS,
@@ -164,21 +158,27 @@ describe('3.77 · T13.2 submitChildEvent — one refusal is a remedy, the rest a
   });
 
   it('T13.2d any other refusal stays an ordinary refusal, reason verbatim', async () => {
-    // `'hierarchy.rank'` STAYS A LITERAL here and at the three sites below, and
-    // it is the only rule in this file that does. It belongs to no exported
-    // constant anywhere: `checks/hierarchy.ts:134` and `:282` write it out at the
-    // `refuse()` call, and `REFUSAL_RULES` does not carry it. There is nothing to
-    // import. The running producer is witnessed instead — case **7.240**, a real
-    // task-under-task create through `POST /v1/events` — and that case, not this
-    // literal, is what reddens if the engine ever renames it.
+    // TWO DIFFERENT THINGS, and only one of them can be imported.
+    //
+    // The RULE NAME `'hierarchy.rank'` stays a literal here and at the three sites
+    // below: it belongs to no exported constant anywhere — `checks/hierarchy.ts:134`
+    // and `:282` write it out at the `refuse()` call and `REFUSAL_RULES` does not
+    // carry it — so there is nothing to import, and case **7.240** witnesses the
+    // running producer instead.
+    //
+    // The REASON was `'A task cannot sit under a sub-task.'`, which reads like the
+    // engine's and is not: `rankRefusal` builds `"X" cannot go under "Y": a
+    // ticket's parent must be a bigger kind of work.` It was the same fabrication
+    // as the parent-terminal one two files over, found by the same sweep, and it is
+    // now the imported builder called with the two type names this scenario means.
     const source = createFakeDataSource({}, (events) =>
       events.map((event) =>
-        refusedWith(event.id, 'hierarchy.rank', 'A task cannot sit under a sub-task.'),
+        refusedWith(event.id, 'hierarchy.rank', rankRefusal('Task', 'Sub-task')),
       ),
     );
     expect(await submitChildEvent(source, submittedTicketCreated())).toEqual({
       kind: 'refused',
-      refusal: { rule: 'hierarchy.rank', reason: 'A task cannot sit under a sub-task.' },
+      refusal: { rule: 'hierarchy.rank', reason: rankRefusal('Task', 'Sub-task') },
     });
   });
 
@@ -315,7 +315,7 @@ describe('3.78 · T13.3 reopenAndProceed — parent first, cause attached, refus
       call += 1;
       if (call === 1) return events.map((event) => committed(event.id));
       return events.map((event) =>
-        refusedWith(event.id, 'hierarchy.rank', 'A task cannot sit under a sub-task.'),
+        refusedWith(event.id, 'hierarchy.rank', rankRefusal('Task', 'Sub-task')),
       );
     });
     const outcome = await reopenAndProceed(source, plan, make);
@@ -325,7 +325,7 @@ describe('3.78 · T13.3 reopenAndProceed — parent first, cause attached, refus
       expect(outcome.parentResult.status).toBe('committed');
       expect(outcome.refusal).toEqual({
         rule: 'hierarchy.rank',
-        reason: 'A task cannot sit under a sub-task.',
+        reason: rankRefusal('Task', 'Sub-task'),
       });
     }
     // Two claims went out and NO third: nothing compensates the reopen away.

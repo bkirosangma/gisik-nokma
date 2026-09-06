@@ -47,7 +47,7 @@ import { PARENT_TERMINAL_RULE } from '@gisik-nokma/app-core';
 // carried ALONGSIDE a literal at every case that uses them, never instead of
 // one — see the refusal-vocabulary describe's header for why an assertion
 // against a producer's own constant, on its own, cannot fail.
-import { REFUSAL_RULES } from '@gisik-nokma/rule-engine';
+import { REFUSAL_RULES, parentTerminalRefusal } from '@gisik-nokma/rule-engine';
 import { MIGRATION_RULES } from '../../src/routes/builder-reads.js';
 import { buildTestApp, TEST_WEB_ORIGIN } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -1508,6 +1508,16 @@ describe('the refusal vocabulary, against the real engine over the real door', (
     expect(result.reason).toBe(
       `"${TERMINAL_PARENT_TITLE}" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.`,
     );
+    // AND THE NEWLY EXPORTED BUILDER, over the same bytes. **This line cannot catch
+    // a reword** — `parentTerminalRefusal` is the function the route just ran, so a
+    // change to its body moves this side too; the LITERAL above is what catches a
+    // reword and it stays for that reason alone. What this line CAN catch is the
+    // export being wired to the wrong thing: `packages/rule-engine/src/index.ts`
+    // now re-exports `checks/refusals.js` (case 7.249, closing 7.245), and a
+    // same-named symbol re-exported from a forked or stale module would disagree
+    // with the wire here and nowhere else. Narrow, real, and stated rather than
+    // dressed up as the stronger check next to it.
+    expect(result.reason).toBe(parentTerminalRefusal(TERMINAL_PARENT_TITLE, 'Done', 'add'));
     // THE VERB PAIR from this side, so a producer that collapsed the two arms into
     // one sentence reddens at BOTH 7.238 and 7.239 rather than at neither.
     expect(result.reason).not.toContain('Moving live work');

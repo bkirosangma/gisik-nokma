@@ -819,6 +819,22 @@ reason on record, not an oversight:*
   ARE reachable through the `./fixtures` subpath; the function is not), and one `sync-client` mirror
   (7.248, reduced from five to one on review — three of the cited sites were not mirrors at all).
   `apps/server/test/integration/fixture-witnesses.test.ts`
+- ⚙️ **The refusal vocabulary is exported (7.249–7.253).** `packages/rule-engine/src/index.ts` now
+  re-exports `REFUSALS` and the eight refusal-sentence builders from `checks/refusals.ts`, closing the
+  gap recorded as 7.245: until now no consumer could import the engine's refusal WORDS, and three
+  `app-core` fixtures had retyped the parent-terminal sentence in three different wordings, each under
+  a comment or identifier naming the engine as its source. **`refuse()` and `ACCEPT` are deliberately
+  not exported** — they are how a check constructs a verdict, and exporting them would let any
+  consumer mint a `Refusal` that looks engine-made. The finding is sharper than "a fabrication":
+  **two producers say this refusal in different words** — the engine (`checks/refusals.ts:197`) and
+  the client's own pre-check (`app-core/src/precheck.ts:268`) — and the fixtures carried a hybrid of
+  the two that neither emits. `hierarchy.rank`'s reason was wrong the same way in two more files.
+  **The export removes a class of fabrication; it does not add a check** — an importing fixture moves
+  with a reword in silence, and only 7.238/7.239, holding a literal over a real round trip, catch
+  that. Two gaps remain recorded with owners: the transition-rule and pre-check sentences are inline
+  templates with no symbol to import (7.252), and a web fixture truncates the server's
+  `migration.unmapped-state` sentence (7.253).
+  `packages/rule-engine/src/index.ts`
 
 
 ## 9. Editor, documents & attachments
