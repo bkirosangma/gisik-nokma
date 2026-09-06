@@ -30,6 +30,9 @@ describe('validateWorkflowDef — identity checks', () => {
     expect(validateWorkflowDef(def({}))).toEqual([]);
   });
 
+  /**
+   * 4.1 — a definition with no states reports exactly `no-states`, and nothing else.
+   */
   it('an empty definition reports no-states and nothing else', () => {
     expect(validateWorkflowDef(def({ states: [], transitions: [] }))).toEqual([
       { code: 'no-states', message: 'This workflow has no states at all.' },
@@ -111,6 +114,9 @@ describe('validateWorkflowDef — identity checks', () => {
 });
 
 describe('validateWorkflowDef — reachability', () => {
+  /**
+   * 4.6 — an UNREACHABLE state is refused at publish: a state no transition can reach is dead weight on the board. The row’s other half — that from-any targets count as reachable — is the test below.
+   */
   it('a state no transition can reach is dead weight on the board', () => {
     const d = def({
       states: [
@@ -141,6 +147,9 @@ describe('validateWorkflowDef — reachability', () => {
     expect(codes(d)).toEqual([]);
   });
 
+  /**
+   * 4.7 — a TERMINAL state with no way in is refused. The row’s other half — that a self-loop is not a way in — is the test below.
+   */
   it('a terminal state nothing leads into can never be entered', () => {
     const d = def({
       initialStateId: 'done',
@@ -201,6 +210,9 @@ describe('validateWorkflowDef — rule-level checks', () => {
     ]);
   });
 
+  /**
+   * 4.31 — a require-different-user rule watching a state that EXISTS but that nothing in this version enters is refused at publish: it could never require a second person.
+   */
   it('a four-eyes rule watching a state nothing enters can never require a second person', () => {
     // The narrow case that survives the reachability checks: the rule watches
     // the INITIAL state, which every ticket starts in and nothing loops back
@@ -241,6 +253,9 @@ describe('validateWorkflowDef — rule-level checks', () => {
     expect(codes(d)).toEqual([]);
   });
 
+  /**
+   * 4.32 — an unknown watched state reports ONLY `rdu-unknown-state`: the two four-eyes codes never both fire for one rule.
+   */
   it('an unknown watched state reports only rdu-unknown-state, never both codes', () => {
     // One authoring mistake, one message: enterability is checked only for
     // states that exist, so the two rdu codes can never fire for one rule.
@@ -284,6 +299,9 @@ describe('validateWorkflowDef — issue order and the branches nothing else pins
     ]);
   });
 
+  /**
+   * 4.43 — an `initialStateId` naming no declared state is refused as `unknown-initial-state` and is the ONLY issue, because there is no start to walk from and the reachability walk never runs.
+   */
   it('an initial state that names nothing is the only issue — there is no start to walk from', () => {
     // Not merely "reports unknown-initial-state": a walk that ran anyway from a
     // start that does not exist would call every real state unreachable and
