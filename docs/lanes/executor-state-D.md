@@ -1,12 +1,45 @@
 # Lane D — executor state
 
-**This file is Lane D's restart surface.** Rewritten for THIS work (case 12.344 — the ping/text-pong
-hazard case 12.361 named and left unbuilt) on branch `exec/45-ping-hazard`, cut from `origin/main` at
-`5e3a9d5` on 2026-09-06, per the controller's re-task by message after the 17:20 reset.
-**Do not re-implement anything from `exec/40-socket-cut-fixture` — PR #196 (the real socket-cutting
-fixture for case 12.290, cases 12.340–12.343) is merged at `c5dfdcd`.** That branch's own handoff (kept
-below the line, for the record) still describes its own work accurately; this file's LIVE state is the
-block above the line.
+**This file is Lane D's restart surface, and this update is Lane D's LAST ACT for the night** — the owner
+has ruled that after Monday's 06:30 weekly reset, execution goes back to SERIAL (one executor), so
+whoever reads this next may have none of this session's context. Read this whole top section before
+doing anything.
+
+**What Lane D is, for a reader with zero context:** one of five parallel executor lanes on the
+`gisik-nokma` project (a project-management tool codebase), each working an independent branch under a
+controller session (`gisik-nokma-0d`) that is the only one that merges. Lane D's own two pieces of work
+this session, both now shipped:
+
+1. **PR #196** (branch `exec/40-socket-cut-fixture`) — **MERGED at `c5dfdcd`.** Built the first real,
+   end-to-end socket-cutting test fixture for Plan 10's closure 5b, flipping case 12.290 (offline-sync
+   test catalogue) from partial to fully covered on MEASURED convergence, not argument. Full detail in the
+   "PRIOR WORK" section below the line.
+2. **PR #213** (branch `exec/45-ping-hazard`) — **OPEN, MERGEABLE, awaiting the controller's merge under
+   an explicit CI-billing waiver.** Built case 12.344, a hazard case named by a sibling case (12.361) and
+   left unbuilt. Full detail in section 1-3 below.
+
+**Live position as of this write (head `cca84af`, frozen — do not push to this branch without the
+controller's say-so):**
+
+- PR #213: https://github.com/bkirosangma/gisik-nokma/pull/213 — MERGEABLE. `mergeStateStatus` reads
+  `UNKNOWN`/`UNSTABLE` because **GitHub Actions is refusing to start any CI job on this account since
+  ~14:42** ("recent account payments have failed or your spending limit needs to be increased") — this is
+  an account-billing outage, NOT a defect in this PR. The controller has granted an explicit merge waiver
+  covering the CI run only; everything else (a full local gate, a real review) is still owed and has now
+  been done — see section 1.
+- **The full forced gate has been run and is GREEN at this exact head**, under gate-lock v3.3:
+  `GATE_EXIT=0` (`WRAPPER_EXIT=0` from the wrapper's own stdout), `Tasks: 30 successful, 30 total`,
+  `Cached: 0 cached, 30 total`, `2m1.172s`, node v22.22.2, zero `Unsupported engine`, zero orphaned vitest
+  workers. **3645 tests / 284 files, 5 skipped** (server) — ui 37 · domain 464 · rule-engine 282 ·
+  editor 178 · sync-client 88 · app-core 1102 · server 1326+5 skipped · mobile 20 · web 138 · desktop 5.
+  `check:env` on its own line: `CHECK_ENV_EXIT=0`.
+- The PR body has been edited (twice, via `gh pr edit`, no new commits, head unchanged) to disclose: (a)
+  no review agent ever ran on this PR — an account-side access error killed the dispatched reviewer before
+  its first action, so the "verification" in the PR body is the orchestrating session's own independent
+  re-work, not a separate reviewer; (b) the full gate result above.
+- **Nothing further is owed from Lane D on this PR.** It is waiting on the controller's merge. If you are
+  a fresh session picking this up: check `gh pr view 213 --json state,mergedAt` first — it may already be
+  merged, in which case skip straight to "what's next" at the very bottom of this file.
 
 > Shas below are facts about when this file was written. Verify with `git branch --contains` — empty
 > means orphaned. `git cat-file`/`git show` pass on orphaned shas and will lie.
