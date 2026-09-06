@@ -808,6 +808,12 @@ describe('3.39 the blocked methods refuse, and enumerate what is absent', () => 
         const body: MyWorkResponse = {
           workspaceId: 'w',
           groups: { open: [serverCard()], active: [], terminal: [] },
+          // REQUIRED since rulings P32/P38, and empty here on purpose: this
+          // fixture exists to observe the REFUSAL, and an empty map is the
+          // honest shape for a viewer told no project names. Filling it would
+          // make the case about the names rather than about the three absences
+          // that still refuse.
+          projectNames: {},
         };
         return mapMyWork(body);
       },
