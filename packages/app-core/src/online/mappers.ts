@@ -165,6 +165,19 @@ export type ListPage = { projectId: string; rows: ListRow[]; nextCursor: string 
  * Owner: whoever first has a real project-size distribution. Raising it is a
  * one-line change and needs no new argument; the loud refusal below is what
  * makes the limit safe to be wrong about.
+ *
+ * ## This absence is NOT added to `SERVING_GAPS`, and that is a decision
+ *
+ * P41 said "a loud refusal in the `ServingGapError` register". It is one — it
+ * throws `ServingGapError` carrying a named `Absence`, which is what a shell
+ * renders. It is deliberately NOT a `SERVING_GAPS['getTickets']` key, because
+ * that map means *this method refuses ALWAYS*, and `getTickets` answers for
+ * every project small enough to finish. Adding the key would also detonate
+ * `stub-services.ts`'s `refuse(method)` register lookup — the mechanism that
+ * took 86 web tests down in one line last change set — and would contradict
+ * the standing fact that `SERVING_GAPS` carries `search` alone. Written down
+ * because "in the register" admits the other reading and a reviewer should see
+ * the choice rather than infer it.
  */
 export const LIST_PAGE_CAP = 40;
 
