@@ -500,6 +500,14 @@ describe('parseFrame against the published schema', () => {
     },
     purge: { type: 'purge', workspaceId: WORKSPACE_ID, entityId: newUlid() },
     'scope-revoked': { type: 'scope-revoked', workspaceId: WORKSPACE_ID },
+    // Closure 5b(d), ruling P37.1. This entry exists because the case below
+    // DEMANDED it: adding the union member without a fixture reddened
+    // "covers every member of the published union" and nothing else. It is the
+    // SIXTH consumer of this union on the branch and the only one the COMPILER
+    // could not find — the other five were type errors. A runtime completeness
+    // guard is what catches a wire member that typechecks everywhere and is
+    // simply never exercised, which is the shape a new frame arrives in.
+    'reach-granted': { type: 'reach-granted', workspaceId: WORKSPACE_ID, ticketIds: [newUlid(), newUlid()] },
     'caught-up': { type: 'caught-up', workspaceId: WORKSPACE_ID, seq: 4 },
     error: {
       type: 'error',

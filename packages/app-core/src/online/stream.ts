@@ -108,6 +108,26 @@ export function parseFrame(data: unknown): ServerStreamFrame | PingFrame | null 
   if (frame.type === 'scope-revoked' && typeof frame.workspaceId === 'string') {
     return { type: 'scope-revoked', workspaceId: frame.workspaceId };
   }
+  // Closure 5b(d), ruling P37.1 — "your reach grew, and here are the ids it now
+  // admits". This is the SECOND independent reader of this wire; the other is
+  // `@gisik-nokma/sync-client`'s `net/http-transport.ts`, and the two are linked
+  // by nothing but `serverStreamFrameSchema` and the case that walks its option
+  // list. **The compiler could not find this branch** — the five other consumers
+  // of the union on this branch were type errors and this one was a runtime
+  // `null`, caught only because `test/online/stream.test.ts` asserts every
+  // published member round-trips. Without it the notice would be silently
+  // dropped here while the trigger behind it was accepted, which is exactly the
+  // failure mode `parseFrame`'s own closing comment warns about.
+  //
+  // Elements are FILTERED rather than the frame refused whole, matching the
+  // transport's handling and for its reason: a dropped id costs one un-pulled
+  // ticket that the next widening names again, where refusing the frame would
+  // discard the good ids with the bad one.
+  if (frame.type === 'reach-granted' && typeof frame.workspaceId === 'string' && Array.isArray(frame.ticketIds)) {
+    const ticketIds = frame.ticketIds.filter((id): id is string => typeof id === 'string' && id !== '');
+    if (ticketIds.length === 0) return null;
+    return { type: 'reach-granted', workspaceId: frame.workspaceId, ticketIds };
+  }
   if (frame.type === 'caught-up' && typeof frame.seq === 'number' && typeof frame.workspaceId === 'string') {
     return { type: 'caught-up', workspaceId: frame.workspaceId, seq: frame.seq };
   }
