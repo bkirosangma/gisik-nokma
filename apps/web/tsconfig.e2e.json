@@ -1,9 +1,19 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "incremental": false
   },
-  "include": ["e2e/**/*", "playwright.config.ts"],
-  "exclude": ["node_modules", ".next"]
+  "include": [
+    "e2e/**/*",
+    "e2e-stack/**/*",
+    "playwright.config.ts",
+    "playwright.stack.config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next"
+  ]
 }
