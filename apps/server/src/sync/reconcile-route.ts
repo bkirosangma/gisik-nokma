@@ -111,7 +111,8 @@ export type ReconcileRouteDeps = { pool: Pool };
  * better-auth mints and the rig cannot choose. That is a large mechanical
  * ripple through shared test files for a property already covered: the HTTP
  * shell — bearer session, the 403 membership gate, the body schema and its
- * bounds — has eight cases of its own in `test/sync/reconcile-route.test.ts`.
+ * bounds — has its own cases in `test/sync/reconcile-route.test.ts` (12.284-12.286,
+ * plus 12.304's guest side from closure 5b).
  * What those cases could NOT cover is the rig holding a second copy of the
  * rule, and that is precisely what this extraction removes. One implementation,
  * two callers, and the HTTP layer tested where it lives.

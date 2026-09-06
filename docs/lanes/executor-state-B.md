@@ -243,7 +243,7 @@ better-auth's session — so the rig's three seeded users (`USER_A`/`USER_B`/`US
 **96 references across `scenarios.test.ts`**) would have to become real auth users signed in through
 `signInWithPhone`, whose ids better-auth mints and the rig cannot choose. And the HTTP shell those users
 would exercise — bearer session, the 403 membership gate, the body schema and its `MAX_BATCH_SIZE` bound
-— **already has eight cases in `test/sync/reconcile-route.test.ts`.**
+— **already has cases of its own in `test/sync/reconcile-route.test.ts` (12.284-12.286).**
 
 What no existing case could cover is the rig holding a SECOND COPY of the rule, which is the hazard
 #139's review actually named. `reconcileHeldIds` is that loop, extracted; the route and the rig are its

@@ -378,7 +378,8 @@ export async function createHarness(): Promise<Harness> {
        * What this call does NOT reach is the route's HTTP shell — the bearer
        * session, the 403 membership gate, the body schema and its
        * `MAX_BATCH_SIZE` bound. Those are covered by
-       * `test/sync/reconcile-route.test.ts`'s eight cases, and reaching them
+       * `test/sync/reconcile-route.test.ts` (12.284-12.286, and 12.304's
+       * guest side), and reaching them
        * from here would mean the harness's three seeded users had to be real
        * better-auth users with ids better-auth chose. Stated so nobody reads
        * "calls the real route" as more than it is.
