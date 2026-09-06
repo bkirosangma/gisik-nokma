@@ -1,5 +1,46 @@
 # Cross-lane controller — live state
 
+## ▶ CORRECTION AT 23:2x IST — THE "WEEKLY RESET USED" BANNER DOES NOT MEAN BLOCKED. `main` is `e673ecb`, gate green, §09 at 211/219 (8 left). Batch 2 ran in full. Owner overruled the HOLD below on a direct question; empirically right to.
+
+**What actually happened, for the next reader who sees the banner and assumes the block below still applies.**
+The owner asked directly: "there's still 7% weekly quota left, we should be able to continue right?" That's a
+fair challenge to the HOLD this controller had just imposed on the strength of the status-line banner alone.
+Tested it rather than re-asserting the banner: a bare `date` probe (worthless — it never touches the model API,
+only proves the CLI can run a shell tool) was correctly rejected by the executor itself as non-evidence; the
+real test was a **trivial dispatched subagent** (one word, zero tools) on the same tier a real batch would use.
+**It completed normally — no rejection, no 429.** The banner was not currently enforcing anything on that path.
+**Lesson, stated for reuse: the status-line weekly/session banner is informational, not authoritative for
+"can I dispatch right now" — the only real test is a cheap, instant, disposable dispatch on the actual tier
+in question.** Cost of that test: 45,877 tokens for zero tool uses — the fixed floor of any dispatch, worth
+knowing before treating "just try a small one" as free.
+
+**Given the path was open, owner chose to run all of §09 batch 2 (113 `apps/server/` rows) in one subagent
+rather than split it — explicitly weighing the ~200K-token cost and the mid-run-death risk against speed.**
+It survived the full run this time (no repeat of the batch-1 death). Landed as **PR #235** together with Ruling
+P44(A)'s first two rows (7.254/7.255, `precheck.ts`↔`rule-engine`, written as candidates with named owners, not
+fixes) — merged to **`e673ecb`**. Forced gate re-verified: `GATE_EXIT=0` · 30/30 · 0 cached · node v22.22.2 ·
+3666 passed | 5 skipped (3671), identical for the fourth time running. `check:citations`: **§09 now 211 cited /
+8 uncited** (was 98/121 after batch 1); the 8 remaining are `9.60` + `9.137`–`9.143`, batch 1's editor
+territory, named not absorbed. `check:runbook`/`check:env` both 0. `pnpm check:tasks`: 177/177 unchanged.
+
+**A second verification-method lesson from inside batch 2, worth keeping next to the rtk `git diff` one:** the
+executor mutation-tested UNCOMMITTED work and restored with `git checkout -- <file>` — which restores from
+**HEAD**, silently reverting the whole file and destroying 16 already-cited rows in it, because the same
+restore command had been safe twice earlier that same session when run against *committed* work. **Rule: commit
+before mutating, always — `git checkout -- <file>` is only a safe undo when HEAD already contains what you're
+about to test.** What actually caught the damage was a COUNT with a predicted value attached (211/8 expected,
+195/24 observed); reading the line back had already shown the reverted content and was not itself noticed as
+wrong — **a check only works when you know the expected output before you look, not after.** Recovery was
+exact because the catalogue's own id↔test mapping doubled as a backup.
+
+**Cost data point for future planning, all real dispatches tonight:** trivial probe 45,877 · batch 1 (98
+citations, 17 files) 171,618 · batch 2 (113 citations, 15 files) 245,189.
+
+**Owner cleared two more zero-cost, no-ruling items after this** — the 8 remaining §09 rows by hand, and
+further Ruling P44(A) `find_related` passes from 7.256, both local/zero-token, in progress as this section is
+written. Next restart (if the session outruns this one) reads `docs/lanes/executor-state.md` on `main` as
+always.
+
 ## ⏹ CONTROLLER `gisik-nokma-0c` STOPS AT 22:4x IST — `main` is `de33c07`, gate green, §09 at 98/219, EXECUTOR HOLDING (nothing in flight). WEEKLY METER READS "Weekly reset used · available again Sep 7 at 6:30am" — that banner, not the 93% figure, is what ends tonight.
 
 **Since the block below (21:20ish): PR #232 (§09 batch 1, 98 more citations) and #233 (handoff header
