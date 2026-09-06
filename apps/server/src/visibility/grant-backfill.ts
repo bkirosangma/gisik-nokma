@@ -87,7 +87,15 @@ import { listVisibleTickets } from './visible-tickets.js';
  * at reduced width — bounded in time where it used to be permanent and
  * unconditional — and it is not closed here. *Owner: unassigned.*
  *
- * **The obvious repair is worse and is named so nobody spends the round.**
+ * **THE CANDIDATE CLOSE, ruled by the controller 2026-09-06 and deliberately NOT
+ * built here — "closure 5c: reconcile-on-notice", OWNER: Lane F.** A grant
+ * notice naming a ticket the client already holds triggers a reconcile of THAT
+ * ID before the pull decision, which makes `RECONCILE_MIN_INTERVAL_MS`
+ * irrelevant for exactly the tickets a notice names — the stale copy is purged
+ * on the spot and the pull then finds a ticket not held. Written down so nobody
+ * re-derives it, and NOT taken into this change set.
+ *
+ * **The other obvious repairs are worse and are named so nobody spends the round.**
  * Dropping the holdings filter — pull every id a notice names — closes this and
  * reopens the amplifier the filter exists to bound, because
  * `check-permission.ts` does not refuse a `visibility.set` that sets the mode a

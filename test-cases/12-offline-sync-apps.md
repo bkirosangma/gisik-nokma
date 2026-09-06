@@ -1947,7 +1947,11 @@ written; they are recorded in `docs/lanes/executor-state-B.md`.
   `refoldTicket` inside `loadTicketBootstrap`, so it now compares two different construction paths.
   *Residual recorded at the case and in `grant-backfill.ts`: `RECONCILE_MIN_INTERVAL_MS` bounds the
   reconcile, so a narrow-and-re-widen inside that window leaves the stale copy with no repair — 12.274 at
-  reduced width, bounded in time where it used to be permanent. Owner: unassigned.*
+  reduced width, bounded in time where it used to be permanent.* **Accepted as a disclosed residual in
+  6.104/12.274's family (controller, 2026-09-06). OWNER: Lane F, as "closure 5c: reconcile-on-notice".
+  The candidate close, stated so nobody re-derives it: a grant notice naming a ticket the client already
+  holds triggers a reconcile of THAT id before the pull decision, which makes the minimum interval
+  irrelevant for exactly the tickets a notice names. Deliberately NOT built in #161.**
 - 12.276 ✅ **A repeated no-op `visibility.set` costs a holding client NOTHING** *(retitled: it used to
   measure "the same history handed back twice is idempotent", which was the push shape's property and has
   no subject now)*. This is the amplifier bound ruling P37.1 claims, measured rather than cited —
@@ -2120,8 +2124,10 @@ Raised by the branch review, survived adversarial refutation, ruled the same hou
   **⚠️ THE OLD WARNING STILL APPLIES to anyone restoring a push shape:** do not yield the trigger first.
   `ticket.reparented` IS folded, so a client that never held the ticket replays a transition with no
   `ticket.created` and `applyTicketEvent` throws — the engine's terminal stall, worse than the failure it
-  fixes. *Owner of the remaining measurement: unassigned — it needs a harness that can cut a socket
-  mid-drain, which no lane has built.*
+  fixes. **OWNER of the remaining measurement: Lane F (test infrastructure), ruled by the controller
+  2026-09-06 — a socket-cutting fixture for the dual-client rig. 12.290 flips to ✅ only when that fixture
+  exists; the reason it cannot flip before is recorded verbatim above: nothing in this repo can cut a
+  socket, so the ruling's own flip condition is unmeasurable here.**
 
 - 12.291 ✅ **The walk is capped at `GRANT_BACKFILL_MAX_TICKETS` (200) — P37.1's interim guard, and not
   its fix.** Fixture is OVER the cap by two, all direct children of one parent so the whole excess sits
