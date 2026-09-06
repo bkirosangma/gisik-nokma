@@ -64,6 +64,9 @@ const ctx = () => buildMemoryContext([WF, WF_OPS], [typeDefined(TASK), created(T
  * typo in that constant as correct copy.
  */
 describe('checkTicketWorkflowRebound', () => {
+  /**
+   * 5.47 — the PREMISE under case 5.43, asserted here rather than left to the neighbouring assertion. That a DIFFERENT workflow is accepted says the check works; it does not say the ticket’s own type binding resolves in this context, which is what the P13 argument rests on. The added line asserts that premise directly. It is true by construction — which is exactly why leaving it implicit cost the claim its evidence rather than making it wrong.
+   */
   it('accepts a migration onto a different workflow at a state that workflow has', async () => {
     expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ops', 'shipped'), ctx())).toEqual({ refused: false });
   });
@@ -91,6 +94,9 @@ describe('checkTicketWorkflowRebound', () => {
    * `require-comment`, `require-evidence`, `require-field` or
    * `require-different-user`, and without leaving the log entry four-eyes reads
    * (the reducer appends none). The reason names that, not the redundancy.
+   */
+  /**
+   * 5.35 — a rebound to the ticket’s OWN workflow is refused `ticket.rebound-same-workflow`.
    */
   it('planted defect: a rebound to the workflow the ticket is already on', async () => {
     expect(await checkTicketWorkflowRebound(rebind(T, 'wf-basic', 'done'), ctx())).toEqual({
@@ -139,6 +145,9 @@ describe('checkTicketWorkflowRebound', () => {
    * (`ticket-state.ts:229-232`), so an accepted one would be unprojectable. The
    * state named is one of the OUTGOING workflow's, which is the mistake an
    * admin authoring a cross-workflow map actually makes.
+   */
+  /**
+   * 5.34 — a rebound naming a state the target workflow does not have is refused `ticket.rebound-unknown-state`. The row’s other half — a rebound onto an undefined workflow naming THAT workflow rather than the type’s binding — is the test above.
    */
   it('planted defect: a rebound naming a state the target workflow does not have', async () => {
     expect(await checkTicketWorkflowRebound(rebind(T, 'wf-ops', 'done'), ctx())).toEqual({
@@ -258,6 +267,9 @@ describe('the scope threaded into the target-workflow lookup', () => {
     transitions: [],
   };
 
+  /**
+   * 5.70 — the scope threaded into the target-workflow lookup on the rebind path is the EVENT’s workspace, never the resolved ticket’s.
+   */
   it("is the EVENT's workspace, never the resolved ticket's", async () => {
     const asked: string[] = [];
     const spy: EngineContext = {
