@@ -54,6 +54,23 @@ next 12.360 on request; T18 fills the RESERVED 12.1–12.44; §13 — C 1–40 (
 ask before more), D 41–100 (exhausted), E 101–200 (through 104; catalogue from 105); §6 — D 143–159
 (through 149), B 160–179, A 180+.
 
+### ⚠ MEMORY ADVISORY IN FORCE (14:22) — swap 90%, one gate already OOM-killed; temporary fan-out cap
+Lane A's full gate, QUEUED behind Lane D's lock, was **killed by the system for low memory** at ~14:18. A
+checked before anything else — no stale lock (the EXIT trap fired), zero `ppid=1` orphans, tree clean —
+and retried once on a quiet box. **Controller's measurement at 14:22:** swap **3.67 of 4.00 GB (90%)**, 409 MB
+free pages, compressor 5.6 GB, 6 GB paged out; seven Claude sessions (five lanes, this controller, and the
+owner's `farm-5d`/`observer-sessions-*`), a 10-worker vitest pool (D's gate, under the lock), Docker with
+E's five-container compose stack up for T13 plus the owner's three long-lived containers. The gate lock
+serialises GATES; nothing serialises the sessions' fan-outs, and that is where the pressure comes from.
+**Temporary rule, sent to all five lanes, lifted when swap reads under 60%:** (1) while
+`/tmp/gisik-gate.lock` exists, no Workflow/Agent fan-out of more than TWO concurrent subagents — queue it
+behind the lock as gates queue, or run it after your own gate; (2) `--concurrency=1` everywhere; (3) a gate
+killed twice is a fact about the machine — report, no third retry; (4) past ~70% context, push the handoff
+now. E told to `docker compose down` between scenario runs. **Also from this hour, for the owner:** Lane
+C's `source gate.sh | head -1` (killed within seconds; no lock, no orphans) shows the machine-local
+`no-piped-test-runs.py` hook refuses piped TEST runs but not a piped GATE SCRIPT — the same orphan hazard
+one wrapper out; the hook is the owner's to extend, not the controller's.
+
 ### Since 14:10 — Plan 10 complete, B relaunched, the v3.3 form CORRECTED (14:20)
 - **#188 merged 14:11 → #194 promoted 10/18 → Plan 10 is 18/18.** Lane B relaunched 14:12 as
   **`lane2-plan4-a2`** on `exec/43-sync-surface-fixes` (`override-laneB-next.md` swapped in; old →
