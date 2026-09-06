@@ -142,3 +142,33 @@ startup options and runs no `SET TIME ZONE`, so the only thing that can make
 it print `Asia/Kolkata` is the database's own default. It can fail, which is
 the entire point of having it — proven above against a throwaway database
 forced to `UTC`.
+
+## The projection verifier's database privileges — RECORDED DECISION (Plan 11 Task 16)
+
+The coordination doc requires this directory to carry **either** a DDL-capable credential for the
+projection verifier **or** an explicit recorded decision that it runs only against restore scratch
+databases. Until now it carried neither, which is why this section exists rather than a credential.
+
+**Decision: `verify:projections` runs ONLY against restore scratch databases, never against production.
+`deploy/do/` therefore carries no DDL-capable credential, and none should be added.**
+
+Reasons, in order of weight:
+
+1. **The verifier detects drift by rebuilding projections and diffing.** Run against production it would
+   rewrite the rows it is judging — destroying its own evidence, and unable to distinguish "projections
+   were correct" from "projections have just been made correct".
+2. **A DDL credential in the deploy spec is a standing privilege for one monthly procedure.** The restore
+   drill already yields a scratch database with full rights by construction, so the privilege exists
+   exactly when needed and never otherwise.
+3. **The scratch database is the honest place to verify a backup.** Verifying production says production
+   is consistent; verifying the restored copy says the *backup* is restorable and consistent — the
+   question a drill actually asks.
+
+**What it costs, recorded so it can be revisited rather than rediscovered:** production projection drift
+is not detected continuously. It surfaces at the next monthly drill against the most recent dump, so the
+exposure window is up to a month and drift introduced after the last dump is invisible until the
+following one. If that becomes unacceptable, the answer is a read-only continuous checker that compares
+without rebuilding — **not** a DDL credential here.
+
+*(This file is Lane C's, from Plan 11 Task 15; Lane C is finished with it. The obligation this discharges
+travels with the file, which is why the decision is recorded here as well as in `docs/runbook.md`.)*

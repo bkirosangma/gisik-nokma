@@ -890,3 +890,50 @@ only one side of its line.
   answers 200 under curl and **403 `MISSING_OR_NULL_ORIGIN`** under node, because node presents
   `Sec-Fetch-*` headers and so takes `validateFormCsrf`'s force-validate branch while curl falls through
   unchecked. Pinned by the E2E's own setup, which sends the web origin as a browser does
+
+### Runbook, and the decision the deploy spec owed (Task 16)
+
+Plan 11's last task. `docs/runbook.md` is created here; `Features.md` §13 and this file get their final
+shape rather than a first draft — both had been filled incrementally by Tasks 1–15 across five lanes, so
+the plan's Step 2 and Step 3 texts (which write them as if new) are stale by construction and were
+reconciled, never overwritten.
+
+- 13.190 ✅ every command `docs/runbook.md` names RESOLVES — each `pnpm --filter <pkg> run <script>`, each
+  root `pnpm <script>`, and each repo-relative script path — checked by `scripts/check-runbook-commands.mjs`,
+  wired as its own CI step in the `check-env` job and reported on its own line. **12 commands/paths named,
+  all resolving.** A runbook is prose and prose cannot fail; this is the one thing about it that can be
+  made falsifiable, and it is claimed as nothing more — it does not prove a procedure is correct, that the
+  arguments are right, or that the steps are ordered correctly
+- 13.191 ✅ the checker refuses a clean answer it has not earned: a SELF-TEST runs first against four
+  planted defects (an unknown script under a real package, an unknown package, an unknown root script, a
+  missing file path) and exits 1 unless all four are caught, and a mirror control requires three
+  known-good commands to be accepted. Without it, deleting a matcher would make the real sweep report a
+  clean zero — and a zero from a matcher never watched to fire is not a measurement. A runbook naming zero
+  commands is also an error, not a pass
+- 13.192 ✅ planted defect against the REAL runbook, not a synthetic one: restoring the first draft's
+  `ops:sweep-orphans` reddens the check with the site named — *"no such script in
+  apps/server/package.json"* — and the file restores to a clean sweep. **That name is the defect this
+  check was built for: it has never existed; the script is `sweep:orphans`**
+- 13.193 ✅ `verify:projections` runs from `DATABASE_URL` alone, which is how the runbook's restore drill
+  invokes it. It previously opened with `loadConfig(process.env)` and so demanded `BETTER_AUTH_URL`, a
+  32-character `BETTER_AUTH_SECRET` and `WEB_ORIGIN` — **none of which it reads** — and the drill's own
+  step 4 answered `ConfigError: invalid server configuration — check: BETTER_AUTH_URL,
+  BETTER_AUTH_SECRET, WEB_ORIGIN`. Measured both ways: with `DATABASE_URL` it now reaches the database;
+  with none it exits 2 saying `DATABASE_URL is required`. A drill nobody can run is not a recovery
+  procedure, and demanding three auth secrets to read a scratch database invites an operator to invent
+  production-shaped values while holding a restored copy of production
+- 13.194 🧪 the projection verifier's privilege question is DISCHARGED AS A RECORDED DECISION, in both
+  `docs/runbook.md` and `deploy/do/README.md` (coordination doc lines 1607–1611, which required either a
+  DDL-capable credential or an explicit decision, and neither existed): **`verify:projections` runs only
+  against restore scratch databases, never production, and no DDL credential is added.** Because the
+  verifier detects drift by rebuilding and diffing, running it against production would rewrite the rows
+  it is judging and could not distinguish "was correct" from "has just been made correct". 🧪 and not ✅
+  because a recorded decision is a document, and the only automated part of it — that the two files say
+  so — is what 13.190 checks. **Its cost is recorded with it:** production drift is not detected
+  continuously, surfacing at the next monthly drill against the latest dump, so the exposure window is up
+  to a month; the answer if that becomes unacceptable is a read-only continuous checker, not a DDL
+  credential in the deploy spec
+- 13.195 🚫 the whole-stack final smoke the plan names as Task 16 Step 4 is **not run here**: it requires
+  the production deployment, and the live deploy is explicitly OUT of this lane's scope by the owner's
+  instruction. The deployed-stack E2E against the dev compose stack (13.169–13.175) is the automated part
+  of it and has run; production provisioning stays 🧪 at deploy time

@@ -176,6 +176,14 @@ jobs:
   # own rule -- the one case this job exists to still cover. Needs full
   # history (the script resolves `origin/main` and walks merge-base
   # ancestry); no pnpm install -- the script imports only node builtins.
+
+      # A SEPARATE STEP AND A SEPARATE LINE, deliberately. Folding it into
+      # check:env's exit code would make it a check nobody reads -- the same
+      # reason check-case-ids is its own step. It runs here because it is cheap
+      # and needs no build.
+      - name: check the runbook's commands resolve
+        run: pnpm check:runbook
+
   check-tasks:
     needs: scope
     runs-on: ubuntu-latest
