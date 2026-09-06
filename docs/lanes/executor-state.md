@@ -16,7 +16,21 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — **PR #187 IS OPEN AND AWAITING THE CONTROLLER'S MERGE.** `exec/39-fixture-witnesses` @ `cf18d9e`
+# LANE A — **PR #187 IS OPEN AND AWAITING THE CONTROLLER'S MERGE.** `exec/39-fixture-witnesses` @ `137d48a`
+
+**https://github.com/bkirosangma/gisik-nokma/pull/187** · MERGEABLE / UNSTABLE (CI in flight).
+
+**The gate ran at `cf18d9e`; HEAD is `137d48a`, and the two are CODE-IDENTICAL.** Enumerated, not
+asserted: `git diff --name-only cf18d9e 137d48a | grep -vE '^(docs/|test-cases/|Features\.md)'`
+returns EMPTY; the range touches `docs/lanes/executor-state.md` and `test-cases/12-offline-sync-apps.md`
+only. `check-case-ids` re-run after the test-cases edit → `CHECK_CASE_IDS_EXIT=0`, 1,404 ids,
+union == sum.
+
+**CI at the shipped head** — Actions run `34021043124`: `scope` pass · `e2e` pass · `check-tasks` pass ·
+`check-env` and `build` in flight; the server-test shards spawn after `build`. *A prior reading of
+"no checks reported" at this sha was me reading one instant and reaching for a path-filter
+explanation instead of re-reading — corrected to the controller. The checks were still registering.*
+
 
 **Gate at `cf18d9e`, forced and uncached under lock v3.2:** `GATE_EXIT=0` · `Tasks: 30 successful,
 30 total` · `0 cached, 30 total` · 1m57s · node **v22.22.2** · `Unsupported engine` 0 · failures
