@@ -1,5 +1,28 @@
 # Cross-lane controller — live state
 
+## ⏸ 23:3x IST — §09, §10, §11 ALL AT ZERO UNCITED. `main` is `e6e16c6`, gate green (5th identical run tonight). §12 BLOCK ALLOCATED (12.380–12.399). Controller HOLDS the remaining large backfills (~529 uncited across 7 files) pending an owner scope check — clause A continues at zero cost.
+
+**PR #237 merged**: the last 8 §09 rows by hand (219/219 — §09 CLOSED), clause A rows 7.256/7.257, and the two
+verification-method rules (rtk `git diff` blind spot; commit-before-mutate) promoted into
+`docs/superpowers/plans/2026-08-20-00-series-coordination.md`. Forced gate re-verified at `e6e16c6`:
+`GATE_EXIT=0` · 30/30 · 0 cached · node v22.22.2 · 3666 passed | 5 skipped (3671) — identical for the fifth
+time tonight. `check:citations`: **§09 219/0 (closed)**, repo-wide 1000 cited / 529 uncited. `check:runbook`/
+`check:tasks` both clean, ledger 177/177 unchanged. One judgment call worth keeping: `9.60` is a rollup row
+("See cases 9.131–9.139 … and 3.76") — citing it against a single test would have overclaimed coverage, so it
+was cited on the file's top-level `describe` instead. **§7 next free is now 7.258** after 7.256/7.257 (the
+second, `sync-client/local-deps.ts`'s bare `MAX(version)` vs. the two server readers' `published_workspace_seq`
+bound, is the sharper of the two — a falsifiable disagreement stated as a question, not a bug claim).
+
+**§12 block allocated: `12.380–12.399`** (20 ids, matching the established block-size convention), on request
+as usual — a numbering reservation only, not a go-ahead to backfill §12 tonight.
+
+**Why this controller is holding here rather than clearing the rest:** what's left is §13 (153 uncited), §07
+(78), §12 (78), §05 (67), §06 (63), §03/§04 (45 each) — **~529 rows**, realistically several more subagent runs
+at tonight's observed cost (98–113 citations ran 171–245K tokens each), past 23:30 IST. That is a materially
+bigger commitment than the batch-2 go/no-go already put to the owner once tonight, so it goes back to them
+rather than being decided as a routine continuation. **Clause A (`find_related` passes from 7.258, local,
+zero-token) is NOT held** — cleared to continue regardless of the backfill answer.
+
 ## ▶ CORRECTION AT 23:2x IST — THE "WEEKLY RESET USED" BANNER DOES NOT MEAN BLOCKED. `main` is `e673ecb`, gate green, §09 at 211/219 (8 left). Batch 2 ran in full. Owner overruled the HOLD below on a direct question; empirically right to.
 
 **What actually happened, for the next reader who sees the banner and assumes the block below still applies.**
