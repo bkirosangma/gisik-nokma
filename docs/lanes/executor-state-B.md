@@ -14,14 +14,14 @@ only what is written here.
 
 ## ⏸ POSITION AT THE 10:05 SESSION HALT — READ THIS FIRST
 
-**PR #161 is OPEN and HELD at `e52673e`.** It is NOT clear to merge. The fix round
+**PR #161 is OPEN and HELD at `21ba6f4`.** It is NOT clear to merge. The fix round
 following the Fable branch review is nearly complete; what remains is enumerated at the bottom of this
 block. A resumed session finishes those, re-gates, and reports the head to the controller.
 
 | anchor | value |
 |---|---|
 | branch | `exec/29-closure5b-reach`, pushed at every commit |
-| HEAD | **`e52673e`** — P37.3 landed |
+| HEAD | **`21ba6f4`** — P37.3 landed, `TicketPullNotFound` exported. Pushed; `git status` clean |
 | rebase owed | onto **`aa17046`** (#169 Lane A getMyWork residuals) — also #167 (`5ca3be1`, Lane D sweeps). Expect `test-cases/12` and `Features.md` hunks, KEEP BOTH, and re-run `pnpm install` |
 | node | v22.22.2 (`source ~/.nvm/nvm.sh && nvm use 22`) — the machine default is v24 and gives a FALSE RED of ~14 better-sqlite3 failures |
 | last full gate | **RED at `f814db3`** on one app-core fixture, since FIXED (`ticketIds` → `tickets`); **no green full gate exists after P37.2/P37.3** |
