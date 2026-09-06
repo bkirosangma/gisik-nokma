@@ -22,8 +22,13 @@ import { buildLocalEngineContext, buildPendingOverlay, type LocalContextDeps } f
  * counted rather than guessed (`grep -rln 'SyncEventResult\|SyncInvalidCode'
  * --include='*.ts' packages apps`, `dist/` and `node_modules` excluded):
  *
- * - **`apps/server`: 2 files** — `sync/sync-service.ts` (the declaration and
- *   its docblock) and `sync/sync-routes.ts`.
+ * - **`apps/server`: 3 files** — `sync/sync-service.ts` (the declaration and
+ *   its docblock), `sync/sync-routes.ts`, and `test/dual-client/rig.ts` (`:36` a
+ *   type import, `:229` a return-type annotation — both CODE uses). **This
+ *   bullet said 2, and was re-signed at 2 by the change set that repriced the
+ *   fixture below** — the exact defect the next bullet congratulates itself for
+ *   catching, committed inside the paragraph that celebrates it. Re-run the
+ *   stated command before trusting either number.
  * - **`packages/sync-client`: 6 files** — this one, `engine/sync-engine.ts`,
  *   `net/http-transport.ts`, `index.ts`, `test/sync-engine.test.ts`, and
  *   `replica/sync-item.ts`. **This bullet said 5 and enumerated 5, and the
@@ -63,7 +68,7 @@ import { buildLocalEngineContext, buildPendingOverlay, type LocalContextDeps } f
  *   `code: import('@gisik-nokma/domain').IngestErrorCode` and running
  *   `pnpm --filter @gisik-nokma/sync-client exec tsc -p tsconfig.typecheck.json`
  *   exits **0**; the SAME narrowing with the old `'bad-envelope'` literal put
- *   back exits **1** with `test/sync-engine.test.ts(668,43): error TS2322: Type
+ *   back exits **1** with `test/sync-engine.test.ts: error TS2322: Type
  *   '"bad-envelope"' is not assignable to type 'IngestErrorCode'`. Without that
  *   second run the exit 0 would have been indistinguishable from a typecheck
  *   that never looked at the file. *(The old bullet said exit 2; measured here
@@ -74,8 +79,8 @@ import { buildLocalEngineContext, buildPendingOverlay, type LocalContextDeps } f
  *
  * The blocker that remains is scope, not difficulty: the move edits a shipped
  * server module and a shipped server route from inside a client task, on a
- * branch carrying two more tasks behind it. *Owner: still open — with an
- * eight-file cost and, since 12.327, no fixture cost at all.*
+ * branch carrying two more tasks behind it. *Owner: still open — with a NINE-
+ * file cost by the stated command and, since 12.327, no fixture cost at all.*
  *
  * TWO DELIBERATE DIFFERENCES FROM THE SERVER'S DECLARATION, both widenings:
  *

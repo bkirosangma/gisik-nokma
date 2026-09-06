@@ -227,10 +227,9 @@ function isStreamErrorCode(value: unknown): value is StreamErrorCode {
  * notice a connected guest gets, and the host needs it to empty its caches — and
  * then this subscriber shuts itself down exactly as `unsubscribe()` would. The
  * returned `Unsubscribe` stays safe to call afterwards.
- */
-/**
- * OWNER RULE — case 12.328. **Never inject a raw `ws` socket into
- * `webSocketFactory`.**
+ *
+ * ## OWNER RULE — case 12.328. A shell that injects `ws` must not answer a
+ * ## protocol ping with a TEXT frame.
  *
  * The default below is the PLATFORM `WebSocket`, and on that API a
  * protocol-level ping is answered by the implementation and never surfaces to
@@ -240,15 +239,30 @@ function isStreamErrorCode(value: unknown): value is StreamErrorCode {
  * message door (`:342`) accepts `subscribeFrameSchema` and NOTHING else, and
  * answers `bad-message` to anything it cannot parse.
  *
- * `webSocketFactory` is an injected seam, so that reasoning is a property of
- * what gets injected, not of this file. Node's `ws` DOES surface protocol pings
- * to a listener, and a shell that injected one and wired a text `pong` back
- * would have the server answer `bad-message` — a live defect, in a
- * configuration nothing ships today. Measured at the deletion: only
- * `apps/server` depends on `ws`, no client package does, and the three sites
- * that inject a factory at all are test fakes.
+ * `webSocketFactory` is an INJECTED seam, so that is a property of what gets
+ * injected, not of this file — and **the repository already injects a raw `ws`
+ * socket here**: `apps/server/test/dual-client/socket-cut.test.ts:384`
+ * constructs `new WsWebSocket(url, …)` and hands it to `createHttpTransport`.
+ * An earlier draft of this rule said "never inject a raw `ws` socket" flatly,
+ * and a maintainer obeying it would have deleted that fixture. The prohibition
+ * was wrong; the property it was reaching for is narrower:
  *
- * This is a docblock, not a check — see 12.361, which records exactly that.
+ * **`ws` surfaces protocol pings on `socket.on('ping')`, which `WebSocketLike`
+ * does not expose** — the seam carries `onmessage` and nothing else — so an
+ * injected `ws` socket cannot deliver one to this parser and `socket-cut`'s
+ * injection is safe. What WOULD be a live defect is a shell that wired
+ * `on('ping')` to a TEXT `{type:'pong'}` reply: `routes.ts:342` answers that
+ * `bad-message`. **Do not do that.**
+ *
+ * Measured at the deletion, and re-measured after the rebase that brought
+ * `socket-cut.test.ts` onto this tree: only `apps/server` depends on `ws`, no
+ * client package does, and **four** test files inject a factory — three fakes
+ * plus that one real socket. The first count said three and was written before
+ * the rebase; it is corrected here rather than left, because 12.328's own text
+ * calls that enumeration load-bearing.
+ *
+ * This is a docblock, not a check — see 12.361, which records exactly that, and
+ * now records the buildable assertion this correction exposes.
  */
 export function createStreamSubscriber(deps: StreamDeps) {
   const factory = deps.webSocketFactory ?? ((url: string) => new WebSocket(url) as unknown as WebSocketLike);

@@ -20,7 +20,7 @@ excluding fixtures.
 | anchor | value | how verified |
 |---|---|---|
 | branch | `exec/43-sync-surface-fixes`, cut from `origin/main` | `git checkout -b … origin/main` |
-| base / HEAD at cut | **`8d6b756`** (#193, lock v3.3 + `REPO=`) — NOT `8373ae5`: `origin/main` moved twice between the fetch and the cut (#194 `f2ab4b2` promoting T18, then #193), and the branch was reset onto the newer tip **before** any commit rather than rebased after | `git rev-parse origin/main` twice, the second after a re-fetch; `git merge-base --is-ancestor 8373ae5 origin/main` → YES |
+| base at cut (SUPERSEDED — rebased onto `c5dfdcd`, #196) | **`8d6b756`** (#193, lock v3.3 + `REPO=`) — NOT `8373ae5`: `origin/main` moved twice between the fetch and the cut (#194 `f2ab4b2` promoting T18, then #193), and the branch was reset onto the newer tip **before** any commit rather than rebased after | `git rev-parse origin/main` twice, the second after a re-fetch; `git merge-base --is-ancestor 8373ae5 origin/main` → YES |
 | T18's final head | **`c2d2e3b`** — **squash-merged as `8373ae5` (#188)**, then promoted by **`f2ab4b2` (#194)**. `git branch -a --contains c2d2e3b` names only the stale local `exec/33-plan10-t18`; **it is NOT reachable from `main` or from `origin/*`** — a squash merge orphans its inputs, so every sha in the T18 narrative below is unreliable exactly as the banner warns. Positive control for the same command: `--contains 8373ae5` names `main`, four branches and `origin/main` | `git branch -a --contains`, both directions |
 | toolchain | node **v22.22.2**; `pnpm install --frozen-lockfile` **`INSTALL_EXIT=0`** · `pnpm rebuild better-sqlite3` **`REBUILD_EXIT=0`** · `pnpm turbo run build --force --concurrency=1` **`BUILD_EXIT=0`** | one shell invocation, each `$?` on its own line |
 | `check-case-ids` (repo-wide) | **`CHECK_CASE_IDS_EXIT=0`** — bare 1010 + bold 469 + marker-first 40 = **sum 1519 == union 1519**, highest `13.168`, 10 files. **A SEPARATE CI step, NOT part of `pnpm check:env`; its own line in every report** | `node scripts/check-case-ids.mjs` |
@@ -34,7 +34,7 @@ excluding fixtures.
 
 | anchor | value | how verified |
 |---|---|---|
-| branch · HEAD | `exec/43-sync-surface-fixes` · **`250f02b`** (8 commits on top of `8d6b756`) | `git rev-parse HEAD` |
+| branch · HEAD | `exec/43-sync-surface-fixes` — **SEE THE REVIEW-ROUND BLOCK BELOW for the live head; the sha in this row was true at 14:47 and the branch has been rebased and extended twice since.** A restart reads the LAST block in this file, not this table | `git rev-parse HEAD` |
 | base | **`8d6b756`** (#193) — REACHABLE, `git branch --contains` names `main` | not `git cat-file` |
 | tree | clean; every mutation restored and verified BY READING plus an empty `git diff` | stated either way |
 | dist | `app-core`, `sync-client` and `domain` REBUILT after their mutations — no mutated `dist` left for Lane D's rebase | `grep` for the mutant marker in `dist/` after each restore |
@@ -101,9 +101,17 @@ counters were resolved to their FINAL values once rather than replayed per inter
 
 **The re-gate was genuinely owed and is not a formality**: the branch-vs-base diff carries SOURCE
 (`stream.ts`, `http-transport.ts`, `outbox.ts`), and D's new fixture drives the very transport whose
-ping/pong arm this branch deleted. Checked directly as well as by gate: `grep` for `ping|pong` in
-`apps/server/test/dual-client/socket-cut.test.ts` finds no protocol use, so the two changes are
-independent — but that was measured, not assumed.
+ping/pong arm this branch deleted. **⚠️ THE INTERACTION CHECK I RAN HERE WAS THE WRONG GREP, and the review caught it.** I grepped
+`socket-cut.test.ts` for `ping|pong` — which finds nothing and **could not have found anything** — and
+wrote "measured, not assumed". The grep that mattered was 12.328's own clause (a), `webSocketFactory`
+over `packages` AND `apps`, and re-running it at the rebased head returns **FOUR** test files, not
+three: `socket-cut.test.ts:379` injects a **real `ws` socket** into `createHttpTransport`. That
+falsified four shipped sentences at once — 12.328(a)'s enumeration, `stream.ts`'s "three sites … are
+test fakes", both OWNER-RULE docblocks' absolute *never inject a raw `ws` socket* (which the repo now
+violates, so a maintainer obeying it would delete Lane D's day-old fixture), and 12.361's "no test can
+hold this". **A check aimed at the wrong term is not a weaker check; it is no check** — and the term I
+aimed at was the one I had just been thinking about, which is how it happened. All four corrected in
+the review round below.
 
 **A worktree trap, paid for here:** `[ -d .git/rebase-merge ]` is ALWAYS false in a git worktree, because
 `.git` is a FILE pointing at the real gitdir. A resolve-and-continue loop guarded on it reported
@@ -1595,3 +1603,51 @@ Read the list before killing anything; expect it empty. Checked after every run 
   it — whoever lands second rebases) · `apps/server/package.json` at T14 (Lane E) · `Features.md` /
   `test-cases/12` (append only in Plan 10's section).
 - Never edit `docs/lanes/task-ledger.tsv`. Never merge this lane's own PR. Never commit to `main`.
+
+
+## ▶ REVIEW ROUND — opus reviewer, three CRITICAL, five IMPORTANT, five MINOR; all verified and all fixed
+
+The reviewer also caught that **`rtk`-proxied `git` handed it a stale log and diff** (pre-rebase shas)
+and re-read everything through `/usr/bin/git`. Worth carrying: the proxy's staleness is a known
+silent-wrong-answer mode on this machine and it reached a *reviewer*, the party least able to notice.
+
+**Three Critical, every one confirmed by me directly with `/usr/bin/grep` before acting on it:**
+
+1. **`Features.md:1384` still ended `` `ping` is answered with `pong`. ``** — the transport bullet, 1,351
+   lines below the app-core bullet I did correct. My own check read the first 1,500 characters of that
+   bullet and stopped short of the sentence. **A one-line diff to a file this size is not evidence the
+   file is consistent.**
+2. **`test-cases/03-foundation-ledger.md:39`, case 3.33 ✅**, still claimed *"answers `ping` with `pong`
+   without delivering it"* — and its cited witness is `stream.test.ts`, the very arm 12.360 replaced with
+   the OPPOSITE assertion. A ✅ naming behaviour its own witness contradicts. `test-cases/12` was updated
+   in the change set; `test-cases/03` was never looked at.
+3. **12.328's ✅ rested on 12.361's 🚫, whose stated reason was refuted by a file the rebase pulled in.**
+   See the corrected interaction-check note above. The deletion itself survives — `ws` surfaces protocol
+   pings on `socket.on('ping')`, which `WebSocketLike` does not expose — but the enumeration, the
+   absolute prohibition and 12.361's "no test can hold this" were all false, and 12.361's reason is now
+   SCOPE with the buildable assertion named.
+
+**Five Important, all fixed:** `outbox.ts`'s `apps/server` count was 2 by the bullet and **3** by the
+bullet's own stated command (`rig.ts` — a type import and a return-type annotation, both code uses), so
+the total is **9 files, not 8** — and my change set **re-signed the wrong number in the very bullet that
+congratulates itself for catching that class**. `replica.test.ts`'s recount excluded 12.127 and summed
+to 22 against its own measured 23: the extractor required a SINGLE quote after `it(`, and 12.127's title
+carries an apostrophe. **12.360's shipped mutation text said "restore the pong arm"; it takes BOTH arms**
+— the parse arm too, since `parseFrame` now answers `null` and the send arm alone is unreachable and does
+not typecheck. I measured it with both and then wrote the docblock as one, so the docblock would have
+sent the next maintainer to a mutation that never runs. **12.167's title re-affirmed "all five server
+frames" over a SIX-member union** (`reach-granted` since closure 5b), and the transport's `reach-granted`
+wire branch has no witness — a pre-existing gap, but re-signing "five" in a line I rewrote is the same
+defect as `outbox.ts`'s count. And this file's own position table was stale on the commit that shipped it.
+
+**The through-line, and it is one thing:** every Critical and three of the five Importants are a NUMBER
+OR SENTENCE I RE-SIGNED WITHOUT RE-DERIVING — an enumeration measured before a rebase, a count carried
+into a bullet I was editing, a title I rewrote and left, a mutation I ran one way and described another.
+The branch's own commit messages argue this exact point four times. **Editing a line does not verify it;
+it re-signs it.**
+
+**Two the reviewer flagged its own uncertainty on, and my resolution:** its `ws` `on('ping')` reading is
+reasoned rather than measured — I have not run the recorder it proposed, so 12.361 keeps the residual and
+the docblocks now state the mechanism as the reason rather than asserting a prohibition. And it asked
+whether I3 was a mis-run or a mis-description: it is a **mis-description** — the handoff at 14:47 already
+said "BOTH halves", so the measurement was sound and only the shipped wording understated it.

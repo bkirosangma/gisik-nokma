@@ -38,9 +38,18 @@ import { workflowVersionsOf } from '../src/replica/local-deps.js';
  * prints **23** declarations, and the runner's own line reads
  * `Tests 24 passed (24)` — one more than the declarations, because 12.132's
  * `it` sits inside a two-zone loop and executes twice. The ids declared at an
- * `it(` head are 12.119–12.126, 12.128–12.131, 12.133–12.137, 12.246–12.248
- * and 12.364; 12.127 and 12.132 are real cases that do not head their own
- * `it(`, which is why "one per id" was never quite the right sentence either.
+ * `it(` head are 12.119–12.131, 12.133–12.137, 12.246–12.248 and 12.364 —
+ * twenty-two ids across twenty-three heads, the twenty-third being 12.132's
+ * two-zone loop, which carries its id inside the loop rather than in the head
+ * and is why the runner's 24 exceeds the 23 declarations.
+ *
+ * A first draft of THIS paragraph also excluded 12.127, and summed to 22
+ * against its own measured 23. The cause outlives the correction: the
+ * enumeration came from a grep requiring a SINGLE quote after `it(`, and
+ * 12.127's title contains an apostrophe, so it is written `it("12.127 …")`.
+ * **A recount that does not reconcile with its own total is not a recount** —
+ * and this one was caught by a reviewer, in a paragraph whose entire thesis is
+ * that a number in prose needs a reader who recounts.
  *
  * ## `to` versus `toStateId`, and please do not "reconcile" them
  *

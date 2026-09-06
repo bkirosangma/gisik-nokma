@@ -250,9 +250,12 @@ beforeAll(async () => {
   ]);
   for (const result of ws3Defs) expect(result.status).toBe('committed');
 
-  // AUDIT's stream: created, a REAL `visibility.set` ledger row, a comment, a
-  // contest and its resolution — then 22 field_sets to push the snapshot above
-  // all five. The three non-folded types are the point: the snapshot writer
+  // AUDIT's stream: created, a REAL `visibility.set` ledger row, a comment, an
+  // attachment, a contest and its resolution — then 22 field_sets to push the
+  // snapshot above all SIX. (It said five until 12.363 seeded the attachment;
+  // the `beforeAll` premise 70 lines below was re-enumerated in that change set
+  // and this sentence was not, which is the same one-line-diff blindness that
+  // left Features.md's transport bullet asserting a deleted `pong`.) The three non-folded types are the point: the snapshot writer
   // skips them while still advancing `seq` past them, so they exist ONLY in the
   // backfill or nowhere.
   const ws3Ticket = await ingest.ingestBatch([
@@ -579,7 +582,9 @@ describe('GET /v1/sync/bootstrap', () => {
     // has nothing to do with the backfill list.
     //
     // Stated RELATIVE to the snapshot seq the response carries, not against the
-    // literal 27: the numbers are a fact about today's seed order, and this
+    // literal (28 today, 27 before 12.363 seeded the attachment — and the fact
+    // that this sentence had to be edited to say so is the argument for the
+    // relative form, not against it): the numbers are a fact about today's seed order, and this
     // file has one shared `beforeAll` that later rounds will add to. A literal
     // would redden this case for a fixture edit that changed nothing it is
     // about. "Below the cut" is the property; the number is not.

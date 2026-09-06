@@ -365,8 +365,16 @@ describe('subscribe / resume protocol (amendments 13 + 19, verbatim frames)', ()
    * fake in this run, so the absence of a second one is a fact about the
    * client rather than about the harness.
    *
-   * *Mutation: restore `if (frame.type === 'ping') { socket?.send(…pong…); }`
-   * in `stream.ts`'s `onmessage` → red HERE and nowhere else in this file.*
+   * *Mutation: restore **BOTH** deleted arms in `stream.ts` — the PARSE arm in
+   * `parseFrame` and the send arm in `onmessage` → red HERE and nowhere else in
+   * this file (measured: 1 failed / 26 passed). **The send arm alone does not
+   * redden it and does not even typecheck**: `parseFrame` now answers `null` for
+   * a ping, `onmessage`'s `if (frame === null) return` fires first, and `'ping'`
+   * is no longer a member of `ServerStreamFrame['type']`. A maintainer who
+   * restored one arm, saw green, and concluded this case was vacuous would be
+   * reading a mutation that never ran. `http-transport.ts` is different — its arm
+   * sits on the raw parsed object — which is why 12.167's single-arm mutation IS
+   * correct.*
    */
   it('12.360 a text ping is neither answered nor delivered', () => {
     const { subscribe, socketAt } = harness();
