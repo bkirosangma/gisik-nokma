@@ -14,7 +14,22 @@
 set -u
 OUT="${1:?usage: gate.sh <logfile>}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
-REPO=/Users/kiro/my_projects/gisik-nokma-lanes/lane5-plan11
+# WHICH TREE THIS GATES. Until v3.2 this was hard-coded to Lane E's worktree,
+# and these files are copied between lanes: a peer that copied the FILE gated
+# Lane E's tree and read Lane E's `check:env` exit while believing it had
+# measured its own (Lane B, 2026-09-06). A wrong tree here does not fail — it
+# returns a well-formed green about somebody else's work.
+#
+# Resolution order, and it FAILS LOUDLY rather than falling back to anyone's
+# tree: $GATE_REPO if set (for a copy run from a scratchpad, where nothing
+# relative to $0 can find the repo), else the caller's cwd. A git WORKTREE has
+# `.git` as a FILE, not a directory, so both forms are accepted.
+REPO="${GATE_REPO:-$PWD}"
+if [ ! -e "$REPO/.git" ]; then
+  echo "FATAL: '$REPO' is not the root of a git worktree." >&2
+  echo "Run this from your worktree root, or set GATE_REPO=/path/to/your/worktree." >&2
+  exit 3
+fi
 
 cd "$REPO" || exit 3
 exec bash "$HERE/locked-test.sh" "$OUT" \

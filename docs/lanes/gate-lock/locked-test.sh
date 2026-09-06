@@ -43,7 +43,22 @@
 set -u
 
 LOCK=/tmp/gisik-gate.lock
-REPO=/Users/kiro/my_projects/gisik-nokma-lanes/lane5-plan11
+# WHICH TREE THIS GATES. Until v3.2 this was hard-coded to Lane E's worktree,
+# and these files are copied between lanes: a peer that copied the FILE gated
+# Lane E's tree and read Lane E's `check:env` exit while believing it had
+# measured its own (Lane B, 2026-09-06). A wrong tree here does not fail — it
+# returns a well-formed green about somebody else's work.
+#
+# Resolution order, and it FAILS LOUDLY rather than falling back to anyone's
+# tree: $GATE_REPO if set (for a copy run from a scratchpad, where nothing
+# relative to $0 can find the repo), else the caller's cwd. A git WORKTREE has
+# `.git` as a FILE, not a directory, so both forms are accepted.
+REPO="${GATE_REPO:-$PWD}"
+if [ ! -e "$REPO/.git" ]; then
+  echo "FATAL: '$REPO' is not the root of a git worktree." >&2
+  echo "Run this from your worktree root, or set GATE_REPO=/path/to/your/worktree." >&2
+  exit 3
+fi
 OUT="${1:?usage: locked-test.sh <logfile> <command...>}"
 shift
 
@@ -81,7 +96,29 @@ shift
 #     real gate-shaped processes and requiring the matcher to see them; a zero
 #     from a matcher never watched to fire is not a measurement.
 peer_gates() {
-  ps -eo pid=,comm=,args= | awk -v self=$$ -v parent=$PPID '
+  # 5. EXCLUDE THIS FUNCTION'S OWN COMMAND-SUBSTITUTION SUBSHELL, and capture its
+  #    pid with a PLAIN ASSIGNMENT FIRST. `pg=$(peer_gates)` forks a subshell
+  #    that inherits this script's argv, so `ps` shows it as a bash process
+  #    carrying `locked-test.sh` — a peer by every term of the predicate. It is
+  #    not excluded by `self`: inside `$( )`, `$$` is still the PARENT's pid.
+  #    v3.2 therefore counted itself, `peer_gates` never returned 0, and the
+  #    empty-lock reclaim below could never fire — the wedge v3 exists to remove.
+  #
+  #    `-v fork=$BASHPID` written INLINE IN THE AWK ARGUMENT LIST DOES NOT FIX
+  #    IT. Bash expands that argument in the child it forks for `awk`, so it
+  #    yields AWK's pid, and awk is excluded by `comm` already. Measured on this
+  #    machine, one live peer gate present throughout:
+  #
+  #      inline `-v fork=$BASHPID`        -> fork arg 98845 (awk)      count 2
+  #      captured first, as below         -> fork arg 98846 (subshell) count 1
+  #
+  #    with a gate-shaped SLEEPER started (never a copy of this script, which
+  #    would only prove the instrument counts instruments): 3 and 2. Reaped: 2
+  #    and 1. The inline form is the captured form plus one, always — it never
+  #    excludes anything real. The assignment must therefore be its own simple
+  #    command, executed by the substitution subshell before any pipeline fork.
+  local fork=$BASHPID
+  ps -eo pid=,comm=,args= | awk -v self=$$ -v parent=$PPID -v fork="$fork" '
     { c = $2; sub(/.*\//, "", c); hit = 0
       # Fields 3..NF are the argv; the SCRIPT PATH is a token in there (field 4
       # for `bash /path/gate19.sh`). Requiring a token that ENDS in the script
@@ -91,7 +128,7 @@ peer_gates() {
       for (i = 3; i <= NF; i++)
         if ($i ~ /(^|\/)(gate[^\/]*|locked-test[^\/]*)\.sh$/) hit = 1 }
     (c == "bash" || c == "sh" || c == "zsh") && hit &&
-    $1 != self && $1 != parent { n++ }
+    $1 != self && $1 != parent && $1 != fork { n++ }
     END { print n + 0 }'
 }
 # `node (vitest N)` DOES render on macOS — measured against a real pool after an
