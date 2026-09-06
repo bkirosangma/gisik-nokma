@@ -25,6 +25,8 @@ export type {
   Me,
   Replica,
   ReplicaTicket,
+  SnapshotProvenanceBlock,
+  SnapshotClaim,
 } from './replica/replica.js';
 export { buildLocalEngineContext, buildPendingOverlay } from './precheck/local-context.js';
 export type { LocalContextDeps, PendingOverlay } from './precheck/local-context.js';

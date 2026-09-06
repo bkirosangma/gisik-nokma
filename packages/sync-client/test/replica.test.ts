@@ -164,6 +164,102 @@ function bootstrapOf(overrides: Partial<BootstrapResponse> = {}): BootstrapRespo
   };
 }
 
+/**
+ * 12.246–12.248 — THE CLIENT HALF OF RULING P36, which shipped with none.
+ *
+ * A whole-branch review found this: `getSnapshotProvenance` had five references
+ * repo-wide — one declaration, one implementation, three call sites — and NO
+ * test called it. Replacing its body with `return null` left sync-client 63/63
+ * and app-core 1092/1092 green, so the read-door defect P36 exists to close was
+ * not shown by any case to be closed. The two cases that did exist (12.244,
+ * 12.245) are both server-side.
+ *
+ * An untested half is how the Critical in `claimsFor` got through: nothing
+ * executed the branch it lived in.
+ */
+describe('12.246-12.248 the provenance block on the client', () => {
+  const TICKET = 'tkt-prov';
+  const CLAIM = { actorId: USER_A, clientTime: '2026-08-20T00:00:00.000Z', serverTime: '2026-08-20T00:00:01.000Z' };
+
+  function bootstrapWithBlock(provenance: unknown): BootstrapResponse {
+    return bootstrapOf({
+      tickets: [
+        {
+          ticketId: TICKET,
+          snapshot: {
+            seq: 1,
+            state: {
+              kind: 'ticket',
+              id: TICKET,
+              workspaceId: WS,
+              projectId: PROJECT,
+              typeId: TYPE,
+              parentId: null,
+              workflowId: wfV1.id,
+              workflowVersion: 1,
+              stateId: wfV1.initialStateId,
+              stateCategory: 'open',
+              assigneeId: null,
+              collaboratorIds: [],
+              fields: {},
+              transitions: [],
+            },
+            ...(provenance === undefined ? {} : { provenance }),
+          },
+          events: [],
+        } as unknown as BootstrapResponse['tickets'][number],
+      ],
+    });
+  }
+
+  it('12.246 a bootstrap-delivered block is STORED and read back — the door that had no test at all', async () => {
+    const replica = await createReplica({ storage: createBetterSqliteStorage() });
+    await replica.loadBootstrap(bootstrapWithBlock({ state: CLAIM, assigned: null }));
+
+    const block = await replica.getSnapshotProvenance(TICKET);
+    // Field by field, not `toBeTruthy`: a body returning a constructed empty
+    // object would satisfy a truthiness check and name nobody.
+    expect(block?.state.actorId).toBe(USER_A);
+    expect(block?.state.serverTime).toBe(CLAIM.serverTime);
+    expect(block?.assigned).toBeNull();
+
+    // The control that makes this a fact about DELIVERY rather than about the
+    // reader: a ticket nobody delivered a block for answers null.
+    expect(await replica.getSnapshotProvenance('tkt-nobody')).toBeNull();
+  });
+
+  it('12.247 a later snapshot write with NO block does not erase the one a bootstrap delivered', async () => {
+    // `writeSnapshot` returns early on an absent block by design: absent means
+    // "nothing new to say", never "forget what you knew". This is the client
+    // side of the server's carry-forward, and the identical omission was
+    // available on both — one of them would have nulled a good block on every
+    // workflow publish.
+    const storage = createBetterSqliteStorage();
+    const replica = await createReplica({ storage });
+    await replica.loadBootstrap(bootstrapWithBlock({ state: CLAIM, assigned: null }));
+    expect((await replica.getSnapshotProvenance(TICKET))?.state.actorId).toBe(USER_A);
+
+    // A second bootstrap for the same ticket carrying NO provenance at all —
+    // an older server, or a snapshot row written before the column existed.
+    const replica2 = await createReplica({ storage });
+    await replica2.loadBootstrap(bootstrapWithBlock(undefined));
+    expect((await replica2.getSnapshotProvenance(TICKET))?.state.actorId).toBe(USER_A);
+  });
+
+  it('12.248 purgeEntity removes the block — a forgotten ticket leaves no actor or instant behind', async () => {
+    // The invariant this file states for itself: "a replica for a workspace you
+    // are not in should hold nothing of it beyond your own authored stubs." A
+    // surviving block is an actorId and two instants for a ticket the server
+    // told this device to forget. It was MISSED when the table was added.
+    const replica = await createReplica({ storage: createBetterSqliteStorage() });
+    await replica.loadBootstrap(bootstrapWithBlock({ state: CLAIM, assigned: null }));
+    expect(await replica.getSnapshotProvenance(TICKET)).not.toBeNull();
+
+    await replica.purgeEntity(TICKET);
+    expect(await replica.getSnapshotProvenance(TICKET)).toBeNull();
+  });
+});
+
 async function seededReplica(storage: SyncStorage = createBetterSqliteStorage()): Promise<Replica> {
   seqCounter = 0;
   const replica = await createReplica({ storage });

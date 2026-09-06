@@ -368,6 +368,80 @@ describe('runSnapshotPass', () => {
  * the writer. Polling for the expected state with a deadline is slower and
  * fails loudly instead.
  */
+/**
+ * 12.244 — RULING P36's EXCLUDING FIXTURE, first half.
+ *
+ * The snapshot carries the RECORDED provenance of the state claim, and the test
+ * that matters is not "a serverTime is present" — a fabricated one is present
+ * too. It is that the value EQUALS the ledger row's own `server_time` at the seq
+ * the claim was made, **read out of the events table in the same run rather than
+ * compared against a fixture constant**. A constant would pass against a writer
+ * that copied the right value and equally against one that happened to compute
+ * the same string; the row is the only thing that can tell those apart.
+ *
+ * The mutation this exists to catch is option 3 — the remedy P36 refused in
+ * writing: spending a NEIGHBOURING event's instant, which is attributing one
+ * event's time to another. It looks like provenance and is a fabrication.
+ */
+describe('12.244 the snapshot copies the state claim’s recorded instant, not a neighbour’s', () => {
+  it('12.244 stateProvenance.serverTime equals the ledger row at that seq — asserted against the ROW', async () => {
+    // A SECOND state-claiming event, and the case could not test its own title
+    // without it. `TICKET` was created and then only ever `field_set`, so
+    // `ticket.created` was the ONLY candidate — "the LAST such event wins" was
+    // unconstrained, and a capture-first-only writer passed. It still would
+    // have caught option 3 (a non-state neighbour's instant), which is why the
+    // gap was easy to miss: the case DID kill the mutation it was written for,
+    // while its stated property went untested.
+    await seed([ticketEvent('ticket.transitioned', { to: 'doing' }, TICKET)]);
+
+    await runSnapshotPass(db.pool, { minEvents: 0 });
+
+    const client = await db.pool.connect();
+    try {
+      const snapshot = await readLatestSnapshot(client, 'ticket', TICKET);
+      expect(snapshot?.provenance, 'a provenance block was written at all').not.toBeNull();
+
+      // The ledger's own answer for the LAST state-claiming event on this
+      // ticket — the row the writer folded and, before P36, dropped.
+      const { rows } = await db.pool.query<{ seq: number; server_time: string; actor_id: string }>(
+        `SELECT seq, server_time, actor_id FROM events
+          WHERE entity_kind = 'ticket' AND entity_id = $1
+            AND type IN ('ticket.created', 'ticket.transitioned')
+          ORDER BY seq DESC LIMIT 1`,
+        [TICKET],
+      );
+      const row = rows[0];
+      // Positive control for the query itself: a null here would make every
+      // comparison below vacuously true against `undefined`.
+      expect(row, 'the ledger has a state-claiming event for this ticket').toBeDefined();
+
+      expect(snapshot?.provenance?.state.serverTime).toBe(
+        new Date(row!.server_time).toISOString(),
+      );
+      expect(snapshot?.provenance?.state.actorId).toBe(row!.actor_id);
+
+      // AND IT IS NOT A NEIGHBOUR'S. The ticket's stream carries other events
+      // with their own instants; asserting equality above does not by itself
+      // show the writer picked the right row unless a wrong row would differ.
+      // This is that check: the adjacent event's time is asserted DIFFERENT, so
+      // the equality above is discriminating rather than lucky.
+      const { rows: others } = await db.pool.query<{ server_time: string }>(
+        `SELECT server_time FROM events
+          WHERE entity_kind = 'ticket' AND entity_id = $1 AND seq <> $2
+          ORDER BY seq DESC LIMIT 1`,
+        [TICKET, row!.seq],
+      );
+      if (others[0] !== undefined) {
+        expect(new Date(others[0].server_time).toISOString()).not.toBe(
+          snapshot?.provenance?.state.serverTime,
+        );
+      }
+    } finally {
+      client.release();
+    }
+  });
+});
+
 describe('startSnapshotWriter', () => {
   it('12.90 writes real snapshots on its interval, and the returned stop function halts it', async () => {
     const ticket = newUlid();

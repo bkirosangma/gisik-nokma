@@ -43,6 +43,30 @@ const TABLES = [
      entity_kind TEXT NOT NULL, entity_id TEXT NOT NULL, seq INTEGER NOT NULL, state TEXT NOT NULL,
      PRIMARY KEY (entity_kind, entity_id)
    )`,
+  /**
+   * The snapshot's provenance block (ruling P36) — a SIBLING TABLE and not a
+   * column on `snapshots`, and the reason is a property of this file rather
+   * than a preference.
+   *
+   * `migrateLocal` runs `CREATE TABLE IF NOT EXISTS` and nothing else. There is
+   * no `ALTER` path and **`LOCAL_SCHEMA_VERSION` is written into `meta` and
+   * never read back by anything** — checked across `sync-client`, `app-core`
+   * and both shells — so a version stamp exists and an upgrade mechanism does
+   * not. Adding a column to `snapshots` would therefore work on a fresh device
+   * and fail on an existing one with `no such column: provenance`, at the first
+   * write, at runtime. A new table is created by the same idempotent DDL on
+   * both, and an existing device simply has no rows in it until its next
+   * bootstrap — which reads as "unknown", the same answer it gave before.
+   *
+   * *Recorded, not fixed: this schema has no migration path at all. The next
+   * change that must ALTER rather than CREATE will need one. Owner: whoever
+   * owns `sync-client`'s storage seam.*
+   */
+  `CREATE TABLE IF NOT EXISTS snapshot_provenance (
+     entity_kind TEXT NOT NULL, entity_id TEXT NOT NULL,
+     state_claim TEXT NOT NULL, assigned_claim TEXT,
+     PRIMARY KEY (entity_kind, entity_id)
+   )`,
   // confirmed read model — folded by applyTicketEvent, NEVER downloaded projections
   `CREATE TABLE IF NOT EXISTS tickets (
      ticket_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, parent_id TEXT, state TEXT NOT NULL

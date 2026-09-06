@@ -25,12 +25,21 @@ describe('snapshot store', () => {
         entityId: '01J60000000000000000000WKA',
         seq: 1,
         state: { name: 'Convenience Corner' },
+        // REQUIRED, not optional, and stated even where it is null. Ruling P36
+        // made `provenance` a required field precisely so every write site has
+        // to declare its intent: an optional one would let a caller omit it and
+        // silently write NULL, which on the invalidation pass overwrites a good
+        // block. Being required is what surfaced that site as a compile error.
+        // A `workspace` snapshot has no state claim to carry — the block is a
+        // ticket concern — so `null` here is the honest value, not a stub.
+        provenance: null,
       });
       await writeSnapshot(client, {
         entityKind: 'workspace',
         entityId: '01J60000000000000000000WKA',
         seq: 3,
         state: { name: 'CC HQ' },
+        provenance: null,
       });
     } finally {
       client.release();
@@ -42,6 +51,7 @@ describe('snapshot store', () => {
       entityId: '01J60000000000000000000WKA',
       seq: 3,
       state: { name: 'CC HQ' },
+      provenance: null,
     });
   });
 });

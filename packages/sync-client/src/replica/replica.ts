@@ -30,10 +30,31 @@ import { isSyncInstruction, type ScopeRevokedInstruction, type SyncInstruction, 
  * same move-to-domain note applies.
  */
 export type Me = { userId: string; workspaceRole: WorkspaceRole; projectIds: string[] };
+/**
+ * One recorded claim: who, and BOTH clocks. Declared here rather than imported
+ * from the server, which shares no type with this package by design.
+ *
+ * `serverTime` is the point of the whole block. A snapshot-bounded replica has
+ * no `ticket.created` / `ticket.transitioned` below its seq to read one from,
+ * and `TicketState.transitions` carries `actorId` and `seq` and no clock at all.
+ */
+export type SnapshotClaim = { actorId: string; clientTime: string; serverTime: string };
+
+/**
+ * The two claims a `TicketState` cannot carry: the state claim and, when there
+ * is one, the assignment claim. Every FIELD claim already travels inside the
+ * state as a `FieldClaim` with its own clocks, which is why due dates need
+ * nothing here — the control that shows this is a real distinction rather than
+ * an arbitrary pair.
+ *
+ * `assigned: null` is a fact (nobody is assigned), not an absence.
+ */
+export type SnapshotProvenanceBlock = { state: SnapshotClaim; assigned: SnapshotClaim | null };
+
 export type BootstrapTicket = {
   ticketId: string;
   /** `null` means `events` is the ticket's full history — no snapshot exists yet. */
-  snapshot: { seq: number; state: TicketState } | null;
+  snapshot: { seq: number; state: TicketState; provenance?: SnapshotProvenanceBlock | null } | null;
   events: LedgerEvent[];
 };
 export type BootstrapResponse = {
@@ -75,6 +96,17 @@ export type Replica = {
   ): Promise<LocalContest[]>;
   /** Local history view, per-entity `seq` order. */
   listEntityEvents(ticketId: string): Promise<LedgerEvent[]>;
+  /**
+   * The provenance a BOOTSTRAP delivered for this ticket, or `null` when none
+   * has — a device that has never bootstrapped it, or a server snapshot written
+   * before ruling P36 added the column.
+   *
+   * This exists because `listEntityEvents` cannot answer the question on a
+   * snapshot-bounded device: the creating and transitioning events are below the
+   * snapshot's seq and were never shipped. It is the ONLY way to name who put a
+   * ticket in its state, and when, without them.
+   */
+  getSnapshotProvenance(ticketId: string): Promise<SnapshotProvenanceBlock | null>;
   searchLocal(workspaceId: string, text: string): Promise<Array<{ ticketId: string; title: string }>>;
   getCursor(workspaceId: string): Promise<number>;
   setCursor(workspaceId: string, seq: number): Promise<void>;
@@ -212,12 +244,63 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
     return rows.length === 0 ? 0 : Number(rows[0]!.seq);
   }
 
-  async function writeSnapshot(tx: SyncStorage, ticketId: string, seq: number, state: TicketState): Promise<void> {
+  async function writeSnapshot(
+    tx: SyncStorage,
+    ticketId: string,
+    seq: number,
+    state: TicketState,
+    provenance: SnapshotProvenanceBlock | null = null,
+  ): Promise<void> {
     await tx.run(
       `INSERT INTO snapshots (entity_kind, entity_id, seq, state) VALUES ('ticket', ?, ?, ?)
        ON CONFLICT(entity_kind, entity_id) DO UPDATE SET seq = excluded.seq, state = excluded.state`,
       [ticketId, seq, JSON.stringify(state)],
     );
+    // NOT deleted when the block is absent. A local re-snapshot with no
+    // provenance to write — a server row predating ruling P36's column, or a
+    // fold this client performed itself — must not erase a block an earlier
+    // bootstrap DID deliver: absent means "nothing new to say", not "forget
+    // what you knew". This mirrors the server writer's carry-forward, where the
+    // same omission would have nulled a good block on every workflow publish.
+    if (provenance === null) return;
+    await tx.run(
+      `INSERT INTO snapshot_provenance (entity_kind, entity_id, state_claim, assigned_claim)
+         VALUES ('ticket', ?, ?, ?)
+       ON CONFLICT(entity_kind, entity_id)
+         DO UPDATE SET state_claim = excluded.state_claim, assigned_claim = excluded.assigned_claim`,
+      [
+        ticketId,
+        JSON.stringify(provenance.state),
+        provenance.assigned === null ? null : JSON.stringify(provenance.assigned),
+      ],
+    );
+  }
+
+  /** The block a bootstrap delivered for this ticket, or `null` if none has. */
+  async function readSnapshotProvenance(
+    tx: SyncStorage,
+    ticketId: string,
+  ): Promise<SnapshotProvenanceBlock | null> {
+    const rows = await tx.all(
+      `SELECT state_claim, assigned_claim FROM snapshot_provenance
+       WHERE entity_kind = 'ticket' AND entity_id = ?`,
+      [ticketId],
+    );
+    const row = rows[0];
+    if (row === undefined) return null;
+    const stateClaim = row['state_claim'];
+    if (typeof stateClaim !== 'string') return null;
+    const assignedClaim = row['assigned_claim'];
+    return {
+      state: JSON.parse(stateClaim) as SnapshotClaim,
+      // `null` here is the RECORDED fact that nobody is assigned, which the
+      // server derived from `state.assigneeId` rather than from a missing
+      // event. A non-string that is not null would be a corrupt row; it reads
+      // as no assignment rather than throwing, matching how this file treats
+      // every other unreadable local value — the ticket is still usable and the
+      // claim is simply not shown.
+      assigned: typeof assignedClaim === 'string' ? (JSON.parse(assignedClaim) as SnapshotClaim) : null,
+    };
   }
 
   async function upsertTicket(tx: SyncStorage, state: TicketState): Promise<void> {
@@ -589,7 +672,19 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
               ticket.snapshot.state,
               latestByWorkflow.get(ticket.snapshot.state.workflowId),
             );
-            await writeSnapshot(tx, ticket.ticketId, ticket.snapshot.seq, folded);
+            // The provenance block travels with the snapshot and is NOT folded:
+            // folding rewrites state onto a newer vocabulary, and who claimed a
+            // state and when is not part of any vocabulary. `?? null` covers a
+            // server that has not shipped the field — an older build, or a row
+            // written before ruling P36's column — and `writeSnapshot` treats
+            // null as "nothing new to say" rather than "forget what you knew".
+            await writeSnapshot(
+              tx,
+              ticket.ticketId,
+              ticket.snapshot.seq,
+              folded,
+              ticket.snapshot.provenance ?? null,
+            );
           }
           // A ticket with NO snapshot needs no fold: `events` is then its full
           // history and `ticket.created` resolves the workflow through
@@ -654,6 +749,16 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
         await tx.run('DELETE FROM events WHERE entity_id = ?', [entityId]);
         await tx.run('DELETE FROM tickets WHERE ticket_id = ?', [entityId]);
         await tx.run('DELETE FROM snapshots WHERE entity_id = ?', [entityId]);
+      // The provenance block goes with the snapshot it belongs to. It was
+      // MISSED when the table was added, and the omission is the shape this
+      // file's own invariant warns about — "a replica for a workspace you are
+      // not in should hold nothing of it beyond your own authored stubs". A
+      // block left behind is an actorId and two instants for a ticket the
+      // server told this device to forget. Nothing serves an orphaned row
+      // today, but `writeSnapshot` deliberately does not overwrite with an
+      // absent block, so a future re-delivery would resurface it rather than
+      // replace it — retention now, a wrong answer later.
+      await tx.run('DELETE FROM snapshot_provenance WHERE entity_id = ?', [entityId]);
         // Contests OTHERS raised vanish with the ticket. The local user's OWN
         // contested claims survive as content-light stubs: their `originalEvent`
         // is what this user typed on this device, purging it would silently
@@ -688,6 +793,8 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
           await tx.run('DELETE FROM events WHERE entity_id = ?', [ticketId]);
           await tx.run('DELETE FROM tickets WHERE ticket_id = ?', [ticketId]);
           await tx.run('DELETE FROM snapshots WHERE entity_id = ?', [ticketId]);
+        // Same reason as `purgeEntity`: the block follows the snapshot.
+        await tx.run('DELETE FROM snapshot_provenance WHERE entity_id = ?', [ticketId]);
           if (me === null) await tx.run('DELETE FROM contests WHERE ticket_id = ?', [ticketId]);
           else await tx.run('DELETE FROM contests WHERE ticket_id = ? AND claimant_id <> ?', [ticketId, me.userId]);
         }
@@ -754,7 +861,11 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
       return rows.map(rowToContest);
     },
 
-    async listEntityEvents(ticketId) {
+    async getSnapshotProvenance(ticketId) {
+    return storage.transaction((tx) => readSnapshotProvenance(tx, ticketId));
+  },
+
+  async listEntityEvents(ticketId) {
       const rows = await storage.all("SELECT * FROM events WHERE entity_kind = 'ticket' AND entity_id = ? ORDER BY seq", [
         ticketId,
       ]);
