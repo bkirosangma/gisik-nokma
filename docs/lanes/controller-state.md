@@ -576,6 +576,40 @@ SERIALLY inside one lock acquisition, from a written list, nothing else touching
 Its handoff was PREPENDED to `executor-state.md` above the serial-executor history — it nearly overwrote
 3,285 lines of lessons and stopped.
 
+### RULING P37.3 (2026-09-06 09:40, controller as ruling tier) — a pending pull is DROPPED on 404, keyed by the notice that issued it; a newer notice re-arms it. Plus two fixture findings and `headSeq`'s correct definition
+
+**The question (Lane B):** the Critical's fix — `recoverByPull` swallows a fold failure for a ticket the
+device does not hold — turned the revoked-project sequence from a loud stall into **a quiet permanent
+leak**: a pull that 404s and an id owed on EVERY catch-up, for ever (the un-pruned pending set, the branch
+review's Finding 8, biting the one case that reliably produces it). The obvious bound — drop on 404 — was
+deliberately not built, because a 404 means "may not see" and "never existed" identically, so the device
+cannot tell a race (visibility narrowed again between notice and pull) from a phantom.
+**RULING: drop on 404, KEYED BY THE NOTICE THAT ISSUED THE PULL.** The deciding fact: every re-widening
+emits a new grant/reach notice naming the id, so the notice mechanism IS the recovery path — a 404 is not
+the last word, the next notice is. Each pending entry carries the `workspaceSeq` of the notice that named
+it (already in the notice; nothing new to persist); a 404 drops the entry only if its recorded seq equals
+the one the pull was issued for; a notice arriving in between has already replaced that seq, so the
+entry stays and the next catch-up pulls it. No counter, no disclosure (the 404 tells the client nothing
+the notice did not). Excluding fixtures both directions, alone: after ONE 404 no request on any later
+catch-up (mutate the drop away → red); a second notice during the pull → the id stays and the next
+catch-up pulls it (mutate the drop to unconditional → red). The case says why the drop is keyed to the
+notice rather than to the status code. 12.163/12.164, which drove their stall with the swallowed shape,
+are re-witnessed against a HELD ticket (property unchanged, trigger changed; the retired witness recorded,
+not deleted).
+**`headSeq`'s correct definition — 12.276 caught the wrong one on the first run:** the notice is yielded
+BEFORE its trigger, so the trigger's own row always sits above the client's local maximum at compare
+time; an absolute head makes `localHead < headSeq` true for every trigger ticket, for ever, pulling on
+every no-op `visibility.set` — precisely the amplifier bound P37.1 exists to hold. **The right value is
+`MAX(workspace_seq)` at or below `afterSeq`: how much of this ticket's history the client will NOT receive
+by staying subscribed.** And **12.283's fixture never tested its own subject**: it collected from
+`afterSeq = 0`, modelling a client already CURRENT — for whom the correct notice is empty — the opposite of
+a reader whose reach just grew; it passed only because `headSeq` did not yet exist to make the
+distinction observable. **The third fixture on the branch that could not express its own subject; all
+three caught by a mutation or a schema, none by reading.** Also carried to every lane: **a schema
+violation in a frame does NOT surface as a rejected frame** — an earlier draft emitted `headSeq: 0`, the
+schema refused it, the drain THREW, the hub closed 1011, and the symptom was a MISSING `caught-up` three
+assertions away in a contract test about `workspaceSeq`; nothing in the failure pointed at the notice.
+
 ### RULING P40 (2026-09-06 08:45, controller as ruling tier) — `/v1/me/work` serves the viewer's OWN contested claims (Door B); mappers.ts's "never will" was wrong and is corrected in place
 
 **Lane A found two landed docblocks contradicting each other** on which door serves `MyWorkView.contested`
