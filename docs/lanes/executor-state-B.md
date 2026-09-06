@@ -47,7 +47,8 @@ one-style grep cannot see a collision against a bold-style id.
 | 8 | **(c)** 6.102's guest side — 12.304, an APPLICATION, no escalation | **DONE** |
 | 9 | 12.275–12.282, 12.289, 12.291 rewritten for the notice shape | **DONE**, 5 mutations |
 | 10 | catalogue — `Features.md` §12 + `test-cases/12` (12.292–12.308, 12.283 and 12.288 flipped) | **DONE** |
-| 11 | rebase onto `b4e2f14` (#150) · full gate · Fable branch review · PR | **IN FLIGHT** |
+| 11 | rebase onto `b4e2f14` (#150) · full gate · PR | **DONE — PR #161 OPEN at `89b29ca`, MERGE HELD** |
+| 11b | Fable branch review | **IN FLIGHT.** The PR body and the controller both say merge waits on its outcome |
 | 12 | **T18** — still HELD, after 5b merges, re-measured against `origin/main` at the moment it starts | |
 
 ### MUTATIONS RUN — every result is the measurement, not the intent
@@ -309,6 +310,30 @@ hazard requires it — and that is before any reconcile in the same catch-up.
    name the count could never reach zero. Same class as `pgrep -f vitest`, one turn later. This lane's
    working copy of the v3.1 script is in the session scratchpad and has been exercised once
    (acquire → drain → run → clean release).
+
+## WHAT CLOSURE 5b DID NOT CLOSE — recorded with owners, not fixed
+
+- **12.290 stays 🟡.** The wedge's mechanism is gone, but the ruling's flip condition — a slow-consumer
+  close MID-PULL followed by convergence on reconnect — is unmeasurable here: the dual-client rig has no
+  socket by construction (`openStream` throws, deliberately) and the engine's tests use a fake transport
+  with no buffer bound. Measured link by link, never end to end. *Owner of the remaining measurement:
+  unassigned — it needs a harness that can cut a socket mid-drain, which no lane has built.*
+- **The stale-partial-copy window.** `RECONCILE_MIN_INTERVAL_MS` bounds the reconcile, so a
+  narrow-and-re-widen inside it leaves a stale partial copy with no repair. *Owner: unassigned.*
+- **The subtree walk has no workspace predicate** — inherited from `reResolveSubtree`, whose own children
+  query has none. Not a disclosure (`canSee` resolves each candidate's own workspace). *Owner: whoever
+  refuses or legalises a cross-workspace `parent_id`.*
+- **`http-transport.ts`'s frame ladder** ends with no `else`/`default`; an unrecognised frame is dropped
+  silently. Not live (client and server ship together). *Owner: unassigned.*
+- **`SyncTransport` takes no `AbortSignal`**, so the engine's pull timeout bounds the WAIT and cannot
+  cancel the request. *Owner: unassigned — a signature change to a type with seven implementors.*
+- **The per-ticket route re-sends all workspace definitions per pull.** Small while definitions are
+  configuration. *Owner: unassigned — a client-side definition cache closes it without changing the
+  route's contract.*
+- **`foldSnapshotForward` tolerates a version-down fold silently** (a snapshot naming v2 folded under a
+  local v1). Reachable through `loadBootstrap` too; not introduced here. *Owner: unassigned.*
+- **The 200 cap now bounds a cost dimension it was not chosen for** — the client's pull fan-out. *That
+  200 is the right number for it is NOT established.* *Owner: unassigned.*
 
 ## THE CASE-ID CONTROL — copy this, do not write your own
 
