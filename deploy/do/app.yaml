@@ -101,6 +101,20 @@ services:
       # but the forged-header gap above is open on whatever is on main.
       - key: TRUST_PROXY
         value: "true"
+      # These two are DIFFERENT ORIGINS, and that is the condition that broke
+      # sign-in in the dev compose stack before Plan 11 Task 13 measured it.
+      # WEB_ORIGIN is appended to better-auth's `trustedOrigins`, which
+      # otherwise holds only BETTER_AUTH_URL's origin -- the API host, which no
+      # browser ever sends. Without that, a browser on pm.artsourced.in posting
+      # to the auth surface is answered `403 {"code":"INVALID_ORIGIN"}`. This
+      # deploy would have met it exactly as the compose stack did.
+      #
+      # STILL OPEN FOR THIS TOPOLOGY, and it is not the same gap: if the web app
+      # ever calls the API host CROSS-ORIGIN instead of proxying same-origin,
+      # the CORS preflight has to be answered too -- `OPTIONS` is not mounted on
+      # the auth catch-all and 404s before better-auth is reached
+      # (`apps/server/test/auth/sign-in-flows.test.ts`, "known gap: OPTIONS and
+      # HEAD are not mounted"). Trusting the origin is necessary, not sufficient.
       - key: WEB_ORIGIN
         value: https://pm.artsourced.in
       - key: BETTER_AUTH_URL

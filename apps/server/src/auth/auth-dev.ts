@@ -31,4 +31,7 @@ export const auth = createAuth({
   // sessions. Production reads BETTER_AUTH_SECRET, and nothing in this file
   // is on the production path.
   secret: process.env['BETTER_AUTH_SECRET'] ?? 'dev-only-secret-change-me',
+  // The dev web app's origin (`apps/web` serves on 3001), so a browser against
+  // this dev instance is trusted the same way the containerised stack is.
+  webOrigin: process.env['WEB_ORIGIN'] ?? 'http://localhost:3001',
 });

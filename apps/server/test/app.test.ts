@@ -38,6 +38,8 @@ function offlineAuth(): ReturnType<typeof createAuth> {
     magicLinkSender: new LogMagicLinkSender(() => {}),
     baseUrl: 'http://localhost:3000',
     secret: 'test-secret-not-used-anywhere-real',
+    // The browser's origin, so better-auth trusts the product's own client.
+    webOrigin: 'http://localhost:3001',
   });
 }
 

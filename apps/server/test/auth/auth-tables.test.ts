@@ -28,6 +28,8 @@ function authForTestDb(): ReturnType<typeof createAuth> {
     magicLinkSender: new LogMagicLinkSender(() => {}),
     baseUrl: 'http://localhost:3000',
     secret: TEST_SECRET,
+    // The browser's origin, so better-auth trusts the product's own client.
+    webOrigin: 'http://localhost:3001',
   });
 }
 

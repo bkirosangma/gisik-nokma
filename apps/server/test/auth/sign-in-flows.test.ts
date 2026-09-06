@@ -59,6 +59,8 @@ function buildServer(baseUrl: string): {
     magicLinkSender,
     baseUrl,
     secret: TEST_SECRET,
+    // The browser's origin, so better-auth trusts the product's own client.
+    webOrigin: 'http://localhost:3001',
   });
   const ingest = createIngestService({
     pool: db.pool,

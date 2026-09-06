@@ -9,6 +9,204 @@ off `main`.
 > `git branch --contains` — empty output means orphaned. `git cat-file` passes on reflog-only commits and
 > will lie to you.
 
+# ✅ REVIEWED: **YES** — one opus reviewer, Critical + 5 Important fixed, re-gated. #205 ready.
+
+**The review found a Critical that I had already flagged as my least-confident claim, and it was worse
+than I thought.** The `POST /v1/events` probe in `smoke.spec.ts` **never reached the door it named**:
+`/v1/events` is in `HTTP_ORIGIN_PROTECTED_ROUTES`, `httpOriginRefused` ends
+`input.origin !== input.expectedOrigin`, and Playwright's `page.request` sends **no Origin header**
+(measured) — so the POST was refused **403 by an `onRequest` hook before routing**, `requireSession`
+never ran, and both assertions (`not.toBe(401)`, `toBeLessThan(500)`) passed on that 403. **"It is
+authenticated" had no failure mode at all** — an expired or forged cookie gave the same answer.
+
+Fixed and verified: the Origin a browser sends, a real `newUlid()`, `actorId` from the browser's OWN
+session, **200 exactly**, a parsed body with one `results` entry that is not `malformed-envelope`, and
+**the other side of the line** — the same POST from a session-less context must answer 401. The server
+named the last gap itself ("malformed at actorId: Required"). **Three specs green.**
+
+| finding | disposition |
+|---|---|
+| **C1** probe could not fail | FIXED, re-run green, 13.174 rewritten to say what it now proves |
+| **I1** "off the gate" false in 2 of 3 senses | RESTATED in the config docblock, `Features.md` and 13.177 — off `turbo run test` (twice over), ON `turbo run typecheck` (wanted), ON CI's `gate` (the point of T13) |
+| **I2** `webOrigin` un-normalised | FIXED — `normalizeOrigin`; a trailing slash would have reinstated the 403. Case **13.188** |
+| **I3** wildcard reachable via config | FIXED — throws at assembly; `auth.ts` had asserted "never a wildcard" as a property nothing enforced. Case **13.189** |
+| **I4** CI presence gate = green-by-absence | FIXED — gate removed; absence now fails loudly |
+| **I5** 13.170 / 13.187 ✅ with no check | DOWNGRADED to 🧪 |
+| Minors | mailpit guard settles before deciding · `fileURLToPath` · verify refuses 4xx · 13.186's inverted line attributions · two no-op-click comments |
+
+**Reviewer's own least-confident call was I3** (would an operator ever write a `*`); I fixed it anyway
+because the guard is one line and the comment already claimed it.
+
+| anchor | value |
+|---|---|
+| gated content head | **`8b6e9b6`** — the handoff commit sits on top; read the head with `git rev-parse HEAD`, never from this table |
+| base | `origin/main` = `a224d5f` |
+| gate | **`GATE_EXIT=0` · 30/30 · 0 cached · 2m5.701s · node v22.22.2 · 285 files / 3654 passed / 5 skipped · Unsupported engine 0 · no orphans** |
+| `check:env` | **`CHECK_ENV_EXIT=0`** (separate from the gate) |
+| `check-case-ids` | **exit 0**, highest 13.203 (separate CI step) |
+| E2E | **3 passed**, exit 0, against the rebuilt stack |
+| §13 | used through **13.189. Next free: 13.190.** |
+| CI | still **none** — account billing block |
+
+**A re-gate WAS owed** and was decided, not assumed: the non-docs delta against the previously gated
+content head `0e7ee2f` was **8 files** (my six fixes plus `fixture-witnesses.test.ts` arriving from main).
+
+## Still owed: T16 only
+
+The runbook, §13's and `test-cases/13`'s final shape, and the verifier's **DDL / restore-scratch-DB
+written decision**, which remains T16's and undischarged. Re-measure T16's catalogue precondition against
+`origin/main` rather than assuming it.
+
+# ▶ T13 IS COMPLETE — catalogue in, gate green at the head. PR #205. (this block first on restart)
+
+**Everything T13 owed is in.** The §13 catalogue and the `Features.md` §13 bullets landed in this change
+set, and the gate was re-run at the head that carries them.
+
+| anchor | value |
+|---|---|
+| gated anchor | **`0e7ee2f`** — the §13 catalogue commit, the last commit carrying CONTENT, and the sha the gate below was run at. The branch head is the handoff commit sitting on top of it: read it with `git rev-parse HEAD`, never from this table. |
+| why not a head sha here | **a handoff commit cannot name its own sha.** The first version of this row did, by substituting a sha and then `--amend`ing — which minted a NEW commit and left the row pointing at an orphan. Measured immediately after: `git branch -a --contains 945f176` printed NOTHING while `git cat-file -t 945f176` still answered `commit`. That is the trap this file's own header warns about, walked into by the file itself. |
+| base | `origin/main` = `cd0844c` (rebase #2; #203 and #202 had landed) |
+| PR | **#205**, open, MERGEABLE |
+| gate | **`GATE_EXIT=0` · 30/30 · 0 cached · 1m52.211s · node v22.22.2 · 285 files / 3644 passed / 5 skipped · Unsupported engine 0 · no orphaned workers** |
+| `check:env` | **`CHECK_ENV_EXIT=0`** (separate from the gate; not in the turbo graph) |
+| `check-case-ids` | **exit 0**, 1573 unique ids, highest **13.203** (separate CI step, NOT part of `check:env`) |
+| §13 | Lane E block used through **13.187. Next free: 13.188.** |
+| CI | **none has ever run on this branch** — Actions fails account-wide before the first step on the owner's billing block |
+
+**A re-gate WAS owed and this is how that was decided, not assumed.** The controller's test was whether
+the rebase's non-docs delta is empty:
+`git diff --name-only cf824df HEAD | grep -vE '^(docs/|test-cases/|Features\.md)'` printed **20 files** —
+other lanes' code (`attachments/*`, `ops/schedule.ts`, `sweep-orphans.ts`, `online/stream.ts`,
+`sync-client/*` and their tests) arriving with the base move. So Lane B's #188 reasoning (*docs-only diff
+⇒ the code is already-gated code*) did **NOT** apply here, and the `cf824df` numbers were retired rather
+than carried. Test/file counts moved 284/3614 → 285/3644 for that reason, not because of anything of mine.
+
+## The four §13 cases that are NOT green, because they are the honest part
+
+- **13.176 ❌** a guest has **no navigation** to the four errands explicitly shared with them — the only
+  path to a ticket is through a project they cannot see. The case says in terms that **13.175 passing does
+  NOT mean the shared tickets were verified reachable; none was ever reached.** Owner Plan 6 / visibility.
+- **13.179 ❌** 12.258, the shell's render past the 2000-row cap — T13 does not cover it. Owner Plan 6 / web.
+- **13.181 ❌** `seed:dev` has no runtime coverage and cannot run the plan's way (`docs/superpowers/plans`
+  absent from the image, measured against `reference/` present as the control). Owner Lane D; **13.90
+  stays Lane D's to flip.**
+- **13.178 🧪** the `ci.yml` e2e job — never executed by any CI run (billing block), so verified only by a
+  local YAML parse and Lane C's review.
+- **13.186 🚫** the header-less request that is not origin-checked — deliberate `better-auth@1.7.2` policy,
+  cited to `dist/api/middlewares/origin-check.mjs:131,137,141,152` → `:96,101,108`, **with the version
+  pinned in the case text** because a dist line number without one is stale the moment the lockfile moves.
+
+## Still owed, and it is only this
+
+- **T16** — the runbook, `Features.md` §13's final shape, `test-cases/13`'s final shape. Its catalogue
+  precondition must be **re-measured against `origin/main`**, never assumed.
+- **The verifier's DDL / restore-scratch-DB written decision is T16's** and remains undischarged.
+
+# ⚠ HEAD MOVED TWICE AFTER PR #205 WAS OPENED — read this before trusting the block below
+
+**The gate reported in PR #205 (30/30, 3603 passed, at `1772056`) DOES NOT COVER THE CURRENT HEAD.**
+Two things happened after it:
+
+1. **`apps/server/src/auth/auth-dev.ts` was missing from the P42 commit, so the pushed head did not
+   compile.** `webOrigin` became REQUIRED on `AuthDeps`; the P42 commit staged explicit paths and missed
+   the second production caller. The edit was in my working tree the whole time — which is precisely why
+   nothing complained: the typecheck and the full gate both read the tree I was HOLDING, and the tree I
+   PUSHED was short by that file. **The gate was a true statement about my tree and a false one about the
+   branch.** Found in the post-PR durability check, by `git status --porcelain`, which named it the moment
+   I asked. Fixed; server typecheck exit 0 at a tree that now equals the head.
+   *The rule earned twice now, from both directions: a gate is a fact about a TREE, and the tree a lane
+   holds is not the tree that ships.*
+2. **Rebased onto `origin/main` `c5dfdcd`** (#193 merged). Both inherited gate-lock commits DROPPED —
+   "patch contents already upstream" — zero conflicts.
+
+| anchor | value |
+|---|---|
+| HEAD | **`3a47b966f737348d94a010de7bf42c48a0d6418e`** (was `1772056`) |
+| base | `origin/main` = `c5dfdcd` |
+| commits | 5: `0057317` T13 harness · `ca009d8` **P42 auth fix** · `7cfd0fa` T13 green + ci.yml · `0391418` handoff · `3a47b96` the auth-dev fix |
+| diff scope | **32 files**, all in the T13/P42 set; **zero** gate-lock files (verified with `git diff --name-only origin/main...HEAD`) |
+| gate | **OWED at this head.** The `1772056` run is superseded — `auth-dev.ts` is a real code change it never saw. |
+| PR | **#205**, open, no CI run possible (account billing block) |
+
+**Still owed before merge, unchanged:** the full gate at THIS head, the §13 catalogue from **13.169**,
+the `Features.md` §13 bullets. The DDL / restore-scratch-DB written decision remains **T16's**.
+
+# ▶ SEAM 3 — LIVE STATE at `f22e8b4`, branch `exec/43-plan11-t13` (this block first on restart)
+
+**T13 IS WRITTEN AND RUNS GREEN AGAINST THE REAL STACK: 3 passed, exit 0.** Not yet gated, not yet
+catalogued, no PR. §13 still consumed through 13.168 — **next free 13.169** (recounted from the file:
+128 case lines, max 13.168; `grep -oE "13\.[0-9]+"` also returns `13.201`, which is the PROSE naming
+the next block — count `^- 13\.` only).
+
+| anchor | value |
+|---|---|
+| branch | `exec/43-plan11-t13`, pushed, cut from `exec/42-plan11-seam3` (which is PR #193, merging) |
+| HEAD | `f22e8b497f3a6e0bd6c6ebf98791f82bda9f7208` — verify with `git branch -r --contains`, never `cat-file` |
+| commits | `c1df783` gate-lock v3.3 · `1276427` handoff · `ff524ba` T13 harness · `3dd9c9f` **P42 auth fix** · `f22e8b4` T13 green + ci.yml |
+| E2E | `pnpm --filter @gisik-nokma/web run test:e2e:stack` → **3 passed, exit 0**, against the compose stack |
+| server typecheck | `tsc -p tsconfig.typecheck.json` exit 0 after the 15 `createAuth` call sites were updated |
+| fixture | `test/auth/trusted-origins.test.ts` **5 passed**; both mutations run (below) |
+| NOT DONE | the §13 catalogue (from 13.169), `Features.md` §13 bullets, the **full gate**, the PR, T16 |
+
+## What T13 found, in order, each measured
+
+1. **The stale-image trap — the check-that-cannot-fail in compose's costume.** `up -d` WITHOUT `--build`
+   reuses an image built before `SERVER_ORIGIN` landed; that image proxies `/v1/*` at itself.
+   `GET :3001/v1/me/workspaces` → **500 after 30.014 s**. After `--build` → **401
+   `{"error":"unauthenticated"}` in 0.059 s**. `docker compose ps` reported **every container healthy in
+   BOTH states.** globalSetup's stack assertion is built on exactly this pair.
+2. **Sign-in was BROKEN in the stack — 403 `INVALID_ORIGIN`, "Invalid origin" rendered on the page.**
+   Ruling **P42** → fixed in `3dd9c9f`. `trustedOrigins` held only `baseURL`'s origin, which no browser
+   sends. **`deploy/do/app.yaml` has the same condition waiting** (`WEB_ORIGIN=pm.artsourced.in` vs
+   `BETTER_AUTH_URL=pm-api.artsourced.in`). Mutations: delete the fix → 4 pass / 1 fail, the WEB_ORIGIN
+   acceptance ALONE (`expected 403 to be 200`); trust every origin → 3 pass / **2** fail (P42 predicted
+   one — the same-origin case carries its own permissiveness assertion, so both permissiveness bounds
+   redden: more constraint than predicted, not less).
+3. **Node's `fetch` is not curl.** Same request: curl 200, node 403 `MISSING_OR_NULL_ORIGIN`. Node
+   presents `Sec-Fetch-*`, so `validateFormCsrf` force-validates and an absent Origin is a refusal;
+   curl sends none and falls through unchecked. **A curl probe cannot stand in for the client here.**
+4. **My own error message hid a cause.** It printed `answered 403` with no body, which cannot separate
+   INVALID_ORIGIN (the product defect) from MISSING_OR_NULL_ORIGIN (my missing header). Fixed, and it
+   immediately named a 429 from my own T2 rate limiter on the next run.
+5. **The guest spec was wrong and the PRODUCT was right.** It expected the accountant to reach "Shop
+   operations"; that project is not on their page at all. The seed makes them a WORKSPACE member with
+   role `guest` plus explicit visibility on four TICKETS and never emits `project.member_added` —
+   `eff.projects` comes from that event and nowhere else. Empty project list = ruling **P38**'s partial
+   workspace, seen from a browser for the first time.
+
+## Two override claims that did not survive, and one figure of the controller's
+
+- **13.90 is `seed:cc`, not `seed:dev`, and is in LANE D's block** — accepted by the controller.
+- **`seed:dev` cannot run the plan's way**: it reads `docs/superpowers/plans`, and that directory is
+  **absent** from the image (measured), while `reference/` **IS present** — so `seed:cc` runs
+  in-container exactly as the plan wrote, and T13 uses it.
+- **`turbo run test --dry=json` is 16 tasks / 10 `#test` / 0 e2e**, not the pre-flight's "8". Re-measure
+  after any package.json edit; that is the structural guard keeping the browser off the gate.
+
+## Carried, with owners — none fixed here
+
+- **A guest has NO NAVIGATION to the four errands explicitly shared with them**: the only path to a
+  ticket is through a project they cannot see. Explicit per-ticket visibility exists and is unreachable
+  from the UI. Owner: Plan 6 / visibility. **Not softened, not fixed.**
+- **The verifier's DDL / restore-scratch-DB written decision is still T16's** and still undischarged.
+- **12.258** — what the shell renders when `getTickets` throws past the 2000-row cap. T13 does not cover
+  it; say so at the case.
+- **OPTIONS is unmounted on the auth catch-all**, so a genuinely cross-origin deployment still needs the
+  preflight answered — `sign-in-flows.test.ts` already pins it as a known gap. Trusting the origin is
+  necessary, not sufficient.
+- **The E2E is close to the auth rate limit**: 2 user creations + 3 sign-ins per run. A re-run inside the
+  window meets 429. Restarting the server clears the in-memory bucket.
+
+## The next session picks up here
+
+1. `pnpm turbo run build test typecheck --force --concurrency=1` — the FULL gate has never run on this
+   branch. The P42 commit touched 15 test files; a green targeted run is not a green gate.
+2. §13 catalogue from **13.169** + `Features.md` §13 bullets (T13, the E2E; the auth fix; the
+   stale-image case; the header-less inversion as **🚫** with the vendor citation
+   `origin-check.mjs:131,137,141,152,96,101,108`).
+3. The PR, then **T16**.
+
 # ▶ SEAM 3 — LIVE STATE, branch `exec/42-plan11-seam3` (this block first on restart)
 
 **Position: T13 not started. First commit on the branch is GATE LOCK v3.3, and it carries a correction

@@ -384,36 +384,67 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # NOT gated on apps/web/playwright.config.ts's existence: that file
-      # ALREADY EXISTS on `main` today, for a DIFFERENT suite --
-      # apps/web/e2e/{smoke,workflow-builder}.spec.ts, deliberately kept off
-      # the gate (playwright.config.ts's own docblock: "It is not on the
-      # gate and it must not become so by accident", because every server
-      # call in that suite is a `page.route` mock, not a real request to a
-      # compose stack). An earlier version of this job checked for that file
-      # alongside `docker-compose.dev.yml` and would have started treating
-      # ANY unrelated docker-compose.dev.yml as license to run that mock-only
-      # suite against a stack it never touches -- reporting compose-based
-      # E2E coverage this job would not actually have. This job does not
-      # guess Task 13's own file/script names; it only checks for the ONE
-      # artifact already known to be Task 13's (`docker-compose.dev.yml`,
-      # Task 6), and even once that exists, still does not attempt to run
-      # anything -- Task 13 must replace the branch below with its own real
-      # invocation when it lands, because only Task 13 knows what that is.
-      - name: check for the E2E stack (Plan 11 Task 13)
+      # Task 13's real invocation. The job this replaces only DETECTED
+      # docker-compose.dev.yml and printed that Task 13 must supply the
+      # invocation -- which meant that the moment Task 6 landed that file, this
+      # job started reporting GREEN while running nothing. Green-by-absence had
+      # become green-by-presence, which is worse: the absence was at least
+      # honest about what it did not know.
+      #
+      # The suite is NOT `apps/web/e2e` (that one is mock-only: every server
+      # call is a `page.route` stub and it must never be pointed at a stack it
+      # does not touch). It is `apps/web/e2e-stack`, under its own config with
+      # no `webServer`, reached by `test:e2e:stack` -- a script name turbo
+      # defines no task for, so it stays off `turbo run build test typecheck`
+      # structurally rather than by request.
+      # NO PRESENCE GATE. An earlier version of this job set an output from
+      # `[ -f docker-compose.dev.yml ] && [ -f apps/web/playwright.stack.config.ts ]`
+      # and made every step below conditional on it. That re-created, one level
+      # up, the exact failure this job was rewritten to remove: rename or move
+      # either file and the condition goes false, every step skips, the job
+      # SUCCEEDS, and `gate` accepts success — the suite silently stops running
+      # while CI stays green. Both files are part of this branch and
+      # `test:e2e:stack` is a real script, so their absence is a defect and
+      # must fail loudly rather than skip quietly. The docs-only case is
+      # already handled by `scope`, which skips this whole job.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      # The browser binary is NOT fetched by `pnpm install` -- playwright
+      # declares no install script -- so it is an explicit step here and
+      # nowhere else. This is the reason the suite must stay off the LOCAL gate.
+      - name: install the browser
+        run: pnpm --filter @gisik-nokma/web exec playwright install --with-deps chromium
+
+      - name: bring the stack up
+        run: docker compose -f docker-compose.dev.yml up -d --build --wait
+
+      # A stack that will not start is a finding about the deployment, which is
+      # this job's whole subject -- never a reason to report green.
+      - name: the stack did not come up
+        if: failure()
         run: |
-          if [ -f docker-compose.dev.yml ]; then
-            echo "E2E STACK FILE PRESENT (docker-compose.dev.yml) but this job"
-            echo "does not yet know how to run Task 13's E2E suite against it --"
-            echo "Task 13 must replace this job's steps with the real invocation"
-            echo "when it lands. Reporting green means only that, NOT that any"
-            echo "E2E suite was run."
-          else
-            echo "E2E SKIPPED: docker-compose.dev.yml does not exist on this"
-            echo "checkout (Plan 11 Task 13 has not landed). This job reporting"
-            echo "green means only that the stack it needs is absent, NOT that"
-            echo "apps/web/e2e was run."
-          fi
+          echo "THE COMPOSE STACK FAILED TO START. Container state and logs follow."
+          docker compose -f docker-compose.dev.yml ps || true
+          docker compose -f docker-compose.dev.yml logs --tail=100 || true
+
+      # Seeding and user creation happen inside the suite's own globalSetup,
+      # which also REFUSES the run unless what is listening is really the stack.
+      - name: run the deployed-stack E2E
+        run: pnpm run test:e2e:stack
+
+      - name: stack logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.dev.yml logs --tail=200 || true
+
+      - name: tear the stack down
+        if: always()
+        run: docker compose -f docker-compose.dev.yml down -v || true
 
   # The single check name the auto-merge precondition and any branch
   # protection rule reads. Fans in every job above; treats a job's own

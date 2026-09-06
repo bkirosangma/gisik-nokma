@@ -11,7 +11,8 @@
     "typecheck": "turbo run typecheck",
     "check:env": "node scripts/check-env-example.mjs",
     "check:tasks": "node scripts/check-task-ledger.mjs",
-    "check:db-tz": "node scripts/check-db-timezone.mjs"
+    "check:db-tz": "node scripts/check-db-timezone.mjs",
+    "test:e2e:stack": "pnpm --filter @gisik-nokma/web run test:e2e:stack"
   },
   "devDependencies": {
     "pg": "^8.13.0",

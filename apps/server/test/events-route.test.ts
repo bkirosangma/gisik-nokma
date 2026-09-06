@@ -40,6 +40,8 @@ function buildServer() {
     magicLinkSender: new LogMagicLinkSender(() => {}),
     baseUrl: 'http://localhost:3000',
     secret: 'test-secret-not-used-anywhere-real',
+    // The browser's origin, so better-auth trusts the product's own client.
+    webOrigin: 'http://localhost:3001',
   });
   const ingest = createIngestService({
     pool: db.pool,
@@ -249,6 +251,8 @@ describe('POST /v1/events', () => {
       magicLinkSender: new LogMagicLinkSender(() => {}),
       baseUrl: 'http://localhost:3000',
       secret: 'test-secret-not-used-anywhere-real',
+      // The browser's origin, so better-auth trusts the product's own client.
+      webOrigin: 'http://localhost:3001',
     });
     const brokenIngest = createIngestService({ pool: db.pool, evaluate: evaluateEvent, projections });
     const server = buildApp({
