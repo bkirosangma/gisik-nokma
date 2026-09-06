@@ -1,162 +1,245 @@
 # Lane D — executor state
 
-**This file is Lane D's restart surface.** Rewritten for THIS work (Plan 11 T7+T8) on branch
-`exec/25-plan11-seed`, cut fresh from `origin/main` on 2026-09-06 after T17 (Expo mobile shell) merged
-as PR #121 and was promoted in Plan 10's ledger (mobile). **Do not re-implement T17.**
+**This file is Lane D's restart surface.** Rewritten for THIS work (Plan 11 T9+T10, the two seed RUNNERS)
+on branch `exec/27-plan11-seed-runners`, cut fresh from `origin/main` at `a1252bc` (PR #136, this lane's
+own T7+T8) on 2026-09-06, per the controller's relaunch at the #136 fixed point. **Do not re-implement
+T7/T8/T17.**
 
 > Shas below are facts about when this file was written. Verify with `git branch --contains` — empty
 > means orphaned. `git cat-file`/`git show` pass on orphaned shas and will lie.
 
 ## 1. Where things stand right now
 
-- **Worktree**: `/Users/kiro/my_projects/gisik-nokma-lanes/lane4-periphery`, branch `exec/25-plan11-seed`.
-- **PR #136 is OPEN**, awaiting controller merge: `https://github.com/bkirosangma/gisik-nokma/pull/136`
-- **Head sha `a2e226fc22dd0b1827ff7dc396a79aa6f3f53559`** — rebased onto `origin/main` at
-  `538beb6c4b83fa65e0f1eed2d23f782266a59f7b` (the §13 block-allocation commit, PR #135) as of this write.
-  `git branch --contains a2e226f` returns `exec/25-plan11-seed` only (not yet merged, as expected for an
-  open PR) — re-verify reachability against whatever `origin/main` is at restart time, not this sha.
-- **4 commits ahead of the `origin/main` sha above**: T7 (seed plumbing), T8 (Convenience Corner
-  mapping), the Features.md §13 / test-cases/13 stub, and the §13 renumbering (see §4 below).
-- Full gate ran green at this head before push: `pnpm turbo run build test typecheck --force
-  --concurrency=1` → **30/30 tasks, 0 cached, exit 0**, server suite 1042/1042 tests. Scoped
-  `pnpm --filter @gisik-nokma/server exec vitest run test/seed/ --maxWorkers=2` → **6 files, 46 tests,
-  exit 0** (re-confirmed at the post-rebase head, not just pre-rebase).
+- **Worktree**: `/Users/kiro/my_projects/gisik-nokma-lanes/lane4-periphery`, branch
+  `exec/27-plan11-seed-runners`, cut from `origin/main` at `a1252bc`.
+- **Not yet pushed, not yet a PR.** Locally gated green at the pre-rebase base (30/30 tasks, 0 cached,
+  server 1062/1062, 3339 tests monorepo-wide) — **but `origin/main` has moved twice since the cut**:
+  `#139` (Lane B closure 5, `1b72900` — sync/visibility/sync-client/app-core) and `#146` (Lane C T15,
+  `56cd091` — root `package.json` gains `check:db-tz` + a `pg` devDependency, so `pnpm-lock.yaml`
+  changed). **Rebase onto latest `origin/main`, re-run `pnpm install` for the lockfile (never hand-merge
+  it), and re-gate before pushing** — this file is being written mid-way through that step; if you are
+  resuming, check whether the rebase in §7 below completed.
+- Full gate ran green pre-rebase: `pnpm turbo run build test typecheck --force --concurrency=1` →
+  **30/30 tasks, 0 cached, exit 0**. Server suite **1062/1062** (was 1042 at T7/T8's baseline; +20 net
+  new from `test/seed/` going from 6 files/46 tests to 9 files/66 tests).
 
-## 2. What was built (Plan 11 Tasks 7 + 8)
+## 2. What was built (Plan 11 Tasks 9 + 10)
 
-All under `apps/server/src/seed/` + `apps/server/test/seed/`, nothing touched outside those two
-directories plus the catalogue files in §4.
+Dispatched as a Workflow (implement → review → fix per task; opus implementer+reviewer for T9 per the
+lane override's "first real door" instruction, sonnet implementer / opus reviewer for T10). The first
+attempt burned the whole session's usage limit and all four agents errored ("session limit · resets
+6:40am Asia/Calcutta") with zero usable output; retried after the reset (07:28 IST) and it completed
+clean — 6 agents, both tasks got a fix round.
 
-- **Task 7** (`seed-ulid.ts`, `doc-text.ts`, `users.ts`, `templates.ts`): `seedUlid` (deterministic
-  ULID via SHA-256), `plainTextDoc` (built on the domain's existing `plainTextToDoc` per line — not a
-  duplicate), `findUserIdByEmail` (looks up better-auth's `"user"` table, never invents a person), and
-  `checkErrandTemplate` — the executable pin on Plan 8's `ERRAND_WITH_WAITS_TEMPLATE`.
-- **Task 8** (`cc-board.ts`, `cc-map.ts`): `readCcBoard` reads the frozen
-  `reference/convenience-corner-tracker/board.data.js` snapshot (read-only, `vm` sandbox) — 23 errands
-  (13 registrations + 10 questions), 0 `done`, `week1 = 2026-08-18`. `buildErrandEvents` maps one
-  tracker item to its full `ticket.created`/`field_set`/`transitioned` sequence.
-- Both went through implement → independent review before landing (sonnet tier for T7, opus tier for
-  T8, per this lane's model policy — no fable anywhere in this lane). Both reviews passed with only
-  Minor findings; no fix rounds were needed. One Minor finding (the done-refusal should check
-  `item.done` directly, not just `item.state === 'done'`) was cheap enough that I applied it myself
-  after the workflow returned, with a new planted-defect test proving it (`13.72`).
+- **Task 9** (`seed-convenience-corner.ts`, `cli-seed-convenience-corner.ts`, `seed-cc.test.ts`): the
+  implementer found all three files **already existed, complete and untracked, from a prior interrupted
+  session** (claude-mem id=31738) and chose to verify rather than rewrite from a fresh red test — a
+  named deviation from strict TDD, not glossed over. 55 tests initially, 56 after the fix round added a
+  DIRECT door assertion (case 13.91) on top of the indirect one the review found.
+- **Task 10** (`plan-series.ts`, `seed-dev-workspace.ts`, `cli-seed-dev-workspace.ts`,
+  `plan-series.test.ts`, `seed-dev.test.ts`): built from a fresh TDD pass, imports `CcSeedDeps`/
+  `SeedReport` as types from Task 9's module. `test/seed/` totals **9 files, 66/66 tests**.
+- Both reviews independently re-ran the tests and typecheck rather than trusting the implementer's
+  report; both found real, non-cosmetic gaps (see §3) and both fix rounds stayed inside the named
+  findings' scope (verified: `git status --porcelain` unchanged file count before/after each fix).
 
-## 3. Corrections applied against the plan text — verified, not assumed
+## 3. Corrections applied against the plan text — verified against real source, not assumed
 
-The plan document (`docs/superpowers/plans/2026-08-20-11-deployment-dogfooding.md`, T7 lines
-1310-1658, T8 lines 1659-2088) has bugs in its own example code, found by reading the actual domain
-source (`packages/domain/src/workflow.ts`, `ticket-types.ts`, `workflows/errand-with-waits.ts`,
-`advise-workflow.ts`, `events/contest-events.ts`) and the actual frozen snapshot before writing anything:
+Same discipline as T7/T8. Six corrections were pre-loaded into the dispatch from this session's own
+research **before** the workflow ran (found by reading `apps/server/src/routes/workspaces.ts`'s docblock
+in full, which documents that "Plan 11's seed CLIs found workspaces through the same path" as the real
+`POST /v1/workspaces` route — i.e. through `ingestClientBatch`, not `ingestBatch` — and states plainly
+that a plan-text call to `ingestBatch` for founding "is wrong on three counts"):
 
-1. `ticket.transitioned`'s payload key is `to`, not `toStateId` (the plan used `toStateId` throughout).
-2. `startDate` is a BUILT-IN field (`BUILTIN_FIELD_IDS` in `ticket-types.ts`), value shaped
-   `{date, note?}` (`dueDateValueSchema`, shared with `dueDate`) — never a bare string (the plan sent one).
-3. `ERRAND_WITH_WAITS_TEMPLATE`/`SIMPLE_KANBAN_TEMPLATE` are typed `Omit<WorkflowDef, 'id'|'version'>`,
-   not `WorkflowDef` — `checkErrandTemplate`/`workflowFromTemplate`'s parameter types were adjusted
-   accordingly (return type of `workflowFromTemplate` stays `WorkflowDef`).
-4. Three hand-typed "ULID" literals in the plan's own fixtures are invalid (contain I/L/O/U, outside
-   Crockford base32 / `ULID_REGEX`) — every fixture id now comes from `seedUlid(...)` itself.
-5. `checkErrandTemplate` needed a FIFTH check beyond the plan's four (missing state / not reachable in
-   one hop / waiting not blocked / done not guarded): every one-hop transition it accepts must carry
-   ZERO rules, because the seed submits a bare event with no comment/evidence and any rule there would
-   make the real engine refuse the seed's own event at ingest. This is **Ruling P29's tripwire** —
-   `errand-with-waits.ts`'s docblock records that the template deliberately trips two `rule-bypassable`
-   ADVISORIES on `later->waiting`/`next->waiting`, which is correct and must never be "fixed" on the
-   template itself; `checkErrandTemplate` is the thing that must redden if a COPY of the template ever
-   grows a rule there to silence the advisory. Three tests pin this (13.57-13.59): the real template
-   trips exactly 2 advisories; a single-edge "fix" genuinely silences that one advisory by identity
-   while `checkErrandTemplate` still reddens; guarding both edges clears the advisory panel to 0 while
-   `checkErrandTemplate` still refuses it. **Correction to my own dispatch spec, found by the T7
-   implementer**: my instruction asked for a literal `.length === 1` advisory-count assertion after the
-   single-edge fix — this is arithmetically impossible (`adviseLowerGuardBypasses` emits one advisory
-   per guarded/unguarded EDGE PAIR, not per silenced path; the count stays at 2, just a different pair).
-   The implementer caught this empirically and substituted an identity assertion instead — a correct
-   self-repair, not a deviation to chase.
-6. `readCcBoard`'s planted-defect test as the plan wrote it never reaches its own shape check: passing
-   a `.ts` file (the test file itself) throws a `SyntaxError` ("Cannot use import statement outside a
-   module") inside the `vm` sandbox before any `!data || !Array.isArray(...)` check runs — proven by
-   removing the wrap and watching the assertion fail on the wrong error text. Fixed by wrapping the
-   sandbox eval and rethrowing with the path named; two NEW tests (an alien global, a `CC_TRACKER`
-   missing `items`) exercise the actual shape-check branch via `mkdtempSync`/`os.tmpdir()`, cleaned up
-   in a `finally`.
+1. **The door.** `deps.ingest.ingestClientBatch(events, ownerUserId)`, never `ingestBatch`. The plan's own
+   example code uses the ungated internal door; this is wrong for a *dogfooding* seed, whose whole point
+   is that the product's own permission gate and rule engine admit the record. Enforced at the type level:
+   `SeedIngest = Pick<IngestService, 'ingestClientBatch'>` — an `IngestService` still satisfies it, but
+   widening the field to `IngestService` (regaining `ingestBatch`) is the actual regression a reviewer's
+   mutation test reproduced (see below).
+2. **Origin.** `origin: 'web'` throughout, never `'server'` — `check-permission.ts:395` refuses
+   server-origin at the client door. T8's `cc-map.ts:72` **hardcodes `origin: 'server'`** in its push
+   helper (correct for T10's internal-door dev-seed use, wrong for T9's client-door use); T9 overrides it
+   post-hoc with a spread (`{...event, origin: 'web'}`), verified as the only two construction sites in
+   the seed's output path. **Left as a known fragility, not fixed**: correctness depends on the consumer
+   remembering to override; a future task should have T8 take origin from `CcMapContext` instead.
+3. **Custom fields.** The 'errand' `ticket-type.defined` payload declares **only** `counterparty` as
+   custom — `startDate` is a BUILT-IN field id and `ticketTypeDefSchema`'s superRefine refuses a custom
+   field that shadows one.
+4. **CLI plumbing.** `createPool(config.databaseUrl)` — one argument, no `caCert` option (`AppConfig` has
+   no such field) — mirroring `apps/server/src/index.ts`/`tools/sweep-notifications.ts`, not the plan's
+   `new Pool({...})`-shaped example.
+5. **Import paths.** `verifyProjections` is at `apps/server/src/tools/verify-projections.ts` (not
+   `src/verify/...` as the plan says).
+6. **`apps/server/package.json` script convention.** Every existing tool script in this package
+   (`verify:projections`, `auth:schema`, `sweep:notifications`) uses `tsx src/tools/....ts`, never
+   `node dist/...`. Landed **`"seed:cc": "tsx src/seed/cli-seed-convenience-corner.ts"`** and
+   **`"seed:dev": "tsx src/seed/cli-seed-dev-workspace.ts"`** — a deliberate departure from the plan
+   text's containerised `node dist/...` form, matching local convention instead. Lane E confirmed no
+   collision (its own diff touches only `dependencies`) and confirmed the convention is right for a
+   second, independent reason found by Lane C: `deploy/do/app.yaml`'s worker `run_command` invokes
+   `node dist/ops/...` directly for the deployed image, so `tsx src/...` scripts are specifically the
+   **operator's door**, run from source — matters for Task 16's runbook, since a runbook command that
+   only works after `pnpm build` fails the first time someone follows it during an incident.
+7. **Neither CLI calls `loadConfig(process.env)`.** Flagged by Lane E (seam-2 pre-flight) after both
+   CLIs were built calling it, mirroring `src/index.ts`'s composition-root pattern too literally: the
+   real schema (`src/config.ts`) requires `BETTER_AUTH_URL`, a 32-character `BETTER_AUTH_SECRET`, and
+   `WEB_ORIGIN`, **none with defaults**, none of which either seed reads — a seed run would refuse to
+   start over unrelated auth secrets. Verified directly against `config.ts` before fixing (not taken on
+   Lane E's word alone). Both CLIs now read `process.env['DATABASE_URL']` directly and exit(2) with a
+   named message if absent, mirroring `src/tools/sweep-notifications.ts`'s own identical deviation from
+   its plan text. Re-typechecked clean after the fix (`pnpm --filter @gisik-nokma/server run typecheck`,
+   exit 0). **This was NOT caught by either review agent in the dispatched workflow** — both flagged the
+   `loadConfig`-before-guard ordering as a Minor readability issue without noticing `loadConfig` itself
+   would hard-refuse absent three unrelated env vars; worth remembering that a review scoped to "does
+   this compile and pass" can still miss "does this run at all outside the test harness's mocked deps."
 
-Every specific fact the plan's tests assume about the frozen snapshot (dates, `blocked_by` chains,
-item titles, the 23/13/10/0 counts) was independently verified against
-`reference/convenience-corner-tracker/board.data.js` directly and is correct — only the event-shape
-code above needed fixing, not the tracker facts.
+**Two more corrections the *implementers themselves* found, not anticipated by this session's dispatch:**
 
-## 4. The §13 catalogue collision — resolved, not merely noted
+7. **`project.member_added` before any `ticket.created`.** `check-permission.ts`'s `ticket.created`
+   branch requires `ctx.eff.projects.has(payload.projectId)`, built only from `project.member_added`.
+   Neither T9 nor T10's target shape in the plan text mentions this event — both seeds now emit
+   `project.member_added {userId: ownerUserId, projectAdmin: true}` for the owner immediately after
+   `project.created` and before the first ticket. Confirmed empirically both ways (present → passes;
+   removed → `permission.role` refusal, then reverted).
+8. **Idempotence is a pre-submission ledger lookup (`existingEventIds`/`existingSeedEventIds`), not
+   `duplicate-event-id`.** The plan's mechanism (re-submit and count `duplicate-event-id` refusals) is
+   largely unreachable through the gated door: the permission gate and rule engine answer *before*
+   `insertEvent` reaches the primary key for most of this seed's event types. Landed `CcSeedDeps` therefore
+   diverges from the plan's `{ingest; resolveUserId; now?}` Produces — it carries a **required** fourth
+   field, `existingEventIds`. **This is a load-bearing contract change**: a caller (or a future task)
+   written to the plan's three-field shape will not compile. `SeedReport` is exported from the same module
+   Task 10 imports, so this was flagged explicitly to the T10 dispatch and T10 follows the same mechanism
+   (`existingSeedEventIds`) rather than the plan's.
 
-`Features.md` §13 and `test-cases/13-deployment-dogfooding.md` did not exist on `origin/main` when this
-task started. **Lane C's PR #134 (Plan 11 Task 14) independently opened the same section on its own
-branch first**, at cases 13.1-13.6, before either PR merged. The controller allocated blocks (landed on
-`main` at `538beb6`, PR #135, AFTER I had already committed my first pass at 13.1-13.36): **Lane C
-13.1-13.40 · Lane D (this lane) 13.41-13.100 · Lane E 13.101-13.200**. I renumbered my 36 cases by
-enumeration (never `sed`) into **13.41-13.76** (Task 7: 13.41-13.59, Task 8: 13.60-13.76) in a dedicated
-commit, re-counting against both `origin/main` and Lane C's then-unmerged branch
-(`origin/exec/24-plan11-ci-deploy`) as the control immediately before committing and again immediately
-before pushing.
+**Noted, no action needed:** Lane E's T2 landed an HTTP-Origin check on cookie-authenticated mutations at
+seven routes; it fires only on requests carrying a `Cookie` header, so these library-level seed CLIs
+(which never touch HTTP) are unaffected. Relevant only if a future task drives either seed through the
+HTTP API instead of the library — it would then need an `Origin` header or a bearer token.
 
-**Still true at push time**: PR #134 (Lane C) had NOT merged. `test-cases/13-deployment-dogfooding.md`
-therefore exists as two DIFFERENT, non-overlapping-in-numbering files on two open PRs (mine has the
-allocation-block header; #134's has its own "why this file starts at 13.1" header). **Whichever of
-#136 and #134 merges second will hit a genuine add/add git conflict on this one file** — the resolution
-is to keep BOTH lanes' sections (concatenate, task order, headers reconciled to state the block
-allocation once) — flagged explicitly in this PR's description so whoever merges second is not
-surprised. This is not a bug to fix now; it is the expected shape of two lanes opening one section
-before its designated owner (Task 16) could.
+## 4. Review findings not fixed (deliberately, in scope discipline) — read before touching these files
 
-## 5. An operational mistake I made and caught myself — record it so it isn't repeated
+- `cli-seed-convenience-corner.ts` has **zero runtime coverage** (typecheck only) — Step 5's smoke needs
+  the dev compose stack (Tasks 1–3/6, not landed). Case 13.90 is honestly `❌` for this. Two latent,
+  unfixed issues in that file: `loadConfig(process.env)` runs before the `ownerEmail` guard (needs a full
+  valid config to reach the usage/exit-2 path), and `argValue` will consume a following flag as a value
+  (`--owner-email --allow-missing-guest` reads the flag as the email).
+- `plan-series.test.ts` asserts plan 11's task count with `toBeGreaterThanOrEqual(16)` (inherited from the
+  plan text) rather than `toBe(16)`, even though the real count was independently re-derived as exactly
+  16 — a looser assertion than necessary given fenced code blocks are common in these plan documents and
+  the parser has no fence-awareness. Not fixed (Minor, inherited from plan text, out of the fix round's
+  named scope).
+- `seedDevWorkspace`'s integration tests assert only in-process report numbers, never read the ledger or
+  projections back (contrast with T9's `verifyProjections` call). Mitigated by the seed's own
+  throw-on-any-non-committed-result design; Plan 11 Task 10's text specifies no verify step. Not fixed.
 
-While gating, I ran the full-gate script wrapped in my own `nohup ... &` INSIDE a Bash call that was
-*also* marked `run_in_background: true`. The tool's completion notification fired almost immediately —
-reflecting only that the outer shell (which forked and returned) had exited, not that the detached gate
-script had finished. Reading the log at that point, it looked stalled mid-task; I nearly reclaimed the
-gate lock believing its holder had died. `ps -p <pid>` and a growing log proved the gate was still
-genuinely alive and running; I restored the lock (correct pid) within seconds and no collision resulted
-(no second vitest pool ever appeared). **Lesson: `run_in_background: true` on the Bash tool already
-keeps a long-running foreground command alive and reports on its real completion — do not also wrap the
-command body in `nohup ... &`. Pass the actual long-running command directly.** Filed as product
-feedback separately; recording here so the next lane (or a restarted me) doesn't repeat it against a
-gate that is genuinely still running.
+## 5. The §13 catalogue — verified with the controller's recount method, clean
+
+Cases **13.77–13.91** (Task 9, added by the implementer + one more by the fix round) and **13.92–13.100**
+(Task 10, added by the fix round after review flagged Task 9's catalogue entries as the ONLY ones present)
+— **exactly fills** Lane D's `13.41–13.100` block allocation, zero overflow into Lane E's `13.101+`.
+
+Recounted per the controller's method note (line-head regex `^- (\S+ )?\*{0,2}(13\.[0-9]+)`, positive
+control against total `^- ` lines): **60 matches, 60 total `^- ` lines — every bullet in the file uses one
+style and every one of them matched the id regex** (no missed style, no silent gap). Sorted, contiguous
+`13.41`–`13.100`, **zero duplicates**. `Features.md` §13 updated in both the implement and fix rounds (the
+fix round corrected a stale "Tasks 7-8" note the implement round left behind to "Tasks 7-10" and added the
+two Task 10 bullets that were missing).
+
+**Caveat, not yet re-verified at the time of writing**: this recount was run against MY branch's version of
+the file, cut before Lane C's T14 (`#134`)/T15 (`#146`) merged their own CI/deploy section (`13.1–13.8`,
+well inside their own `13.1–13.40` block) into `test-cases/13-deployment-dogfooding.md`. The rebase in §7
+will merge that section in; **re-run the exact same recount against the post-rebase file before trusting
+it** — the header prose block-allocation text may also need reconciling (Lane C's merge already rewrote it
+once to describe all three lanes' blocks together, per the collision precedent T7/T8 already hit and
+resolved the same way: keep both lanes' sections, reconcile the header to state the allocation once).
 
 ## 6. The gate lock — unchanged from prior lane briefings
 
-T7/T8's own tests need NO Postgres (pure unit tests, no `createTestDatabase` import) — safe to run
-scoped and unlocked: `pnpm --filter @gisik-nokma/server exec vitest run test/seed/ --maxWorkers=2`. The
-FULL monorepo gate does touch Postgres via other `apps/server` suites and takes the lock, as ONE
-backgrounded invocation (see §5's caveat on how NOT to background it), reap orphans by `ppid=1` only
-(`ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}'`),
-never `pkill -f vitest`, never kill `pgrep -f vitest`'s output (it also names live lane sessions and
-peers' live pools). Postgres verified healthy via `docker exec gisik-nokma-exec-postgres-1 pg_isready`
-(not just `docker ps`'s "Up" status) before and after gating.
+Postgres verified via `pg_isready`/`docker exec ... pg_isready` before and after every locked run.
+Lock: atomic `mkdir /tmp/gisik-gate.lock`, released with `rmdir`. ONE backgrounded Bash invocation per run
+(never `nohup ... &` inside a `run_in_background: true` call — T7/T8's own §5 near-miss). Reap orphans by
+`ppid=1` only, never `pkill -f vitest`. `test/seed/` files that don't import `createTestDatabase`
+(`plan-series.test.ts`, the pure half of `cc-map.test.ts` etc.) don't need the lock.
 
-## 7. Remaining steps, in order
+## 6b. Gate-lock exclusion gap found while releasing — reported, not resolved by this lane
 
-1. **Report to the controller** (message sent to `gisik-nokma-0d`): PR #136 open, head sha, test/gate
-   summary, the §13 collision handled, and the earlier flagged discrepancy — PR #121 (T17) is genuinely
-   merged (`gh pr view 121` confirms `mergedAt`) but ledger row 10/17 was still `todo` as of the
-   `9e8777e`/`dca435d` window I first checked; worth a controller re-check, not a Lane D action (never
-   edit `docs/lanes/task-ledger.tsv`).
-2. **Await the controller's word on T9+T10** (`apps/server/src/tools/seed-*.ts` plus
-   `apps/server/package.json` script lines) — those collide with Lane E's manifest ownership and Lane
-   C's T15; do not start until told whether to route the script lines through Lane E or take the
-   manifest myself. Three things T9/T10 need from T8, already recorded in the implementer's own notes
-   and reproduced here so they survive a restart:
-   - `ops:owner-github-plan` has `meta.needed_week: "0"`, so its `dueDate` lands at `2026-08-17` — one
-     day BEFORE `week1`. Faithful to the tracker's own arithmetic, not a bug, but T9/T10 is where this
-     first becomes visible (attention strip / overdue badge) — decide there whether a day-one-overdue
-     errand needs a note.
-   - `ctx.errandTypeId`/`ctx.initialStateId` in T8's tests are FIXTURE values only; nothing in T8 pins
-     them to the real Errand ticket-type id or the real template's `initialStateId`. T9/T10 should add
-     an assertion tying `ctx.initialStateId` to the live cloned template rather than assuming it matches.
-   - Plan text (line ~2317, not yet read closely by this lane) declares `counterparty` as a custom field
-     on the Errand ticket type — `startDate` must NOT also be declared custom (§3 point 2 above); T9's
-     ticket-type definition needs to reflect that split, not the plan's original text.
-3. **Never edit `docs/lanes/task-ledger.tsv`. Never merge own PR. Never commit to `main`.**
+After the post-rebase gate run, `rmdir /tmp/gisik-gate.lock` failed with "Directory not empty": it held a
+`pid` file (`21361`, a bash process in Lane E's worktree, alive ~2 min, **no vitest/Postgres children** —
+no active test run). My own `mkdir /tmp/gisik-gate.lock` immediately before that gate run had **succeeded**
+(only possible when the directory is absent), so Lane E's pid write landing inside it afterward implies
+their lock script is not using `mkdir`'s atomicity as the actual exclusion check (a `mkdir -p` +
+unconditional `echo $$ > pid` would explain it — it never fails even when someone else already holds the
+directory). **No corruption evidence this time** — my gate had already finished cleanly, no concurrent
+vitest activity was observed — but the next overlap could genuinely run two test pools against the shared
+Postgres at once. Reported to Lane E and the controller; **deliberately left the lock directory untouched**
+(did not `rmdir` over their pid) rather than guessing at resolution. If resumed and this is still open,
+check with Lane E/the controller before touching `/tmp/gisik-gate.lock` yourself.
+
+## 7. Remaining steps, in order (mid-execution at time of writing)
+
+1. ~~Dispatch T9+T10 implement/review/fix~~ — done, both landed clean after one fix round each.
+2. ~~Verify door/origin/custom-fields directly in the diff (not trusting subagent reports)~~ — done,
+   confirmed: zero live `ingestBatch(` call sites, `origin: 'web'` at both construction sites, `fields`
+   array carries only `counterparty`.
+3. ~~Run the full gate myself, pre-rebase~~ — done, 30/30, exit 0, 1062/1062 server.
+4. ~~Add the two `package.json` script lines~~ — done (`tsx src/...` form, see §3.6).
+5. ~~Message Lane E with the exact script lines before pushing~~ — done, 2026-09-06.
+6. ~~Rewrite this handoff~~ — in progress (this write).
+7. ~~Commit everything on this branch~~ — done (`ac8f234`, pre-rebase).
+8. ~~Rebase onto latest `origin/main`~~ — done, onto `9024bb5` (past `#139` closure 5, `#141` closure 4,
+   `#146` T15, ruling P39). Conflict was in `Features.md` (Task 9/10 bullets vs Lane C's Task 14/15
+   bullets in the same §13 section — resolved by keeping both, Task 9/10 ordered before 14/15 to match
+   the existing 7/8 numeric order) and the intro paragraph (merged to name all six tasks: 7,8,9,10,14,15).
+   `test-cases/13-deployment-dogfooding.md` **auto-merged cleanly** (purely additive on both sides) — one
+   stale prose fix applied by hand ("Tasks 7/8 section" → "Tasks 7–10 sections"). Final rebased head:
+   `79fb739`. **Re-ran the §13 recount against the merged file**: 68 total `^- ` lines, 68 regex matches
+   (positive control holds), zero duplicates, Lane C's 8 ids confined to 1–40, Lane D's 60 ids confined
+   to 41–100, nothing outside either block.
+9. ~~Re-run the full gate at the rebased head~~ — done: `pnpm install --frozen-lockfile` (no lockfile
+   diff vs `origin/main` — I added no dependencies), `pnpm rebuild better-sqlite3`, full build clean,
+   then `pnpm turbo run build test typecheck --force --concurrency=1` under the lock →
+   **30/30 tasks, 0 cached, exit 0**, node v22.22.2. Server **104 files / 1078 tests**, all green
+   (up from 1062 pre-rebase — the +16 is `#141`/`#146`'s own new tests, not anything from this PR).
+   Monorepo total 3360 tests. **Gate-lock exclusion gap found and reported during release — see §6b.**
+10. ~~Push, open the PR~~ — **done. PR #154: https://github.com/bkirosangma/gisik-nokma/pull/154**,
+    head `b0ec3c5` on `exec/27-plan11-seed-runners`, rebased onto `origin/main` at `32af21f` (GATE LOCK v3
+    ruling incorporated — see §6c below), gate green: 30/30 tasks, 0 cached, exit 0, server 104/1078.
+11. ~~Report to the controller~~ — done (status messages sent throughout; PR link sent below).
+12. **Never edit `docs/lanes/task-ledger.tsv`. Never merge own PR. Never commit to `main`.**
+
+## 6c. GATE LOCK v3 — controller ruling 08:15, adopted this PR's re-gate
+
+**Root cause, confirmed by measurement (mine) + diagnosis (Lane E):** my lock script never wrote a pid file
+(bare `mkdir`/`rmdir`, exactly as this file's §6/the override brief described). Lane E's `locked-test.sh` had
+a THIRD reclaim path beyond the documented two (mkdir-succeeds; dead-pid reclaim): an empty/unreadable pid
+file older than 60s was reclaimed with **no `ps -p` check at all** — indistinguishable, from their script's
+view, from a holder that died between `mkdir` and writing its pid. Lane E's diagnosis, verbatim: "A peer that
+acquires the directory and does not write a pid file inside it is, to my script, indistinguishable from a
+holder that died." This is what actually took my post-rebase lock — not a race in `mkdir`'s atomicity (which
+held throughout, confirmed by both parties) and not a stale pid of mine (I had none). **Both lanes were
+following the protocol as written in their own briefs; the protocol itself was the defect.**
+
+**Controller's GATE LOCK v3 (binding for all five lanes from 08:15 onward, this PR's re-gate already uses
+it):** the lock is a **file**, created and filled in one atomic step (`set -o noclobber; echo $$ > "$LOCK"`)
+— no interval exists where the lock exists but is unattributed. Reclaim rules: a **dead pid** reclaims
+immediately (`ps -p` fails); an **empty/unreadable pid file** reclaims only after **10 minutes** AND with
+**zero live vitest workers** AND **zero other gate/lock scripts running** — never on a bare timer. An
+**old directory-form lock** (the pre-v3 shape, possibly still in use by a lane that hasn't picked up v3 yet)
+makes the pid read fail, which reads as "empty" and falls into the same 10-minute+idle-machine rule — **never
+`rmdir`/`rm` a directory you did not create**. Release is `rm -f` (the file), never `rm -rf`. `$$` must name
+the process that survives the whole gate — one script, one backgrounded invocation, never a subshell,
+pipeline, or `nohup` wrapper (this is the SAME constraint §5's `nohup`-inside-`run_in_background` near-miss
+already named, generalised). The exact script is in the controller's ruling message; this lane's copy that
+ran the re-gate is `/private/tmp/.../scratchpad/gate-v3.sh` (session-local, not committed — every lane should
+have its own copy or a shared one the controller lands centrally).
+
+**If resumed and about to run the gate: use v3, not the bare `mkdir`/`rmdir` form §6 above still documents
+for historical accuracy.** §6 is now superseded by this section for the lock mechanics; its Postgres-health
+and orphan-reaping guidance is unaffected and still applies.
 
 ## 8. Handoff freshness
 
-Written and pushed at head `a2e226fc22dd0b1827ff7dc396a79aa6f3f53559` on branch `exec/25-plan11-seed`,
-PR #136 open. If resumed: re-verify `origin/main`'s HEAD, re-check PR #136 and PR #134's states with
-`gh pr view`, and re-run `git branch --contains` on every sha in this file before trusting any of them.
+Written mid-execution, before the commit in step 7 above — if resumed, check `git log` / `git status` on
+this branch first to see how much of §7 already happened, then re-verify `origin/main`'s HEAD and
+`git branch --contains` on every sha named above before trusting any of them.
