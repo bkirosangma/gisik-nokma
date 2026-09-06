@@ -16,6 +16,56 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 MONDAY 2026-09-07 ~01:50 IST — **§07 AND §13 ARE BACKFILLED TO THE LIMIT OF WHAT NAMING ALLOWS. PR open. Nothing in flight, no subagent. Weekly reset ~4.5h away.**
+
+| what | value |
+|---|---|
+| `main` | `749cc46` (#240 merged) |
+| branch | **`exec/62-s13-backfill`** off `749cc46`, head below, pushed. **PR open — head FROZEN** |
+| **§07** | **198 cited / 36 uncited / 234** (was 155/78). Baseline **36** |
+| **§13** | **88 cited / 72 uncited / 160** (was 7/153). Baseline **72** |
+| repo-wide | **1124 cited / 406 uncited** (was **815 uncited** Sunday morning) |
+| sections at ZERO | §09 · §10 · §11 |
+| **gate** | **`GATE_EXIT=0` · 30/30 · 0 cached · 1m29.8s · node v22.22.2 · 3666 passed \| 5 skipped (3671) / 285** — **eleventh identical run**. `check:env` 0 · `check:citations` 0 · `check-case-ids` 0 (**1620**) · `check:runbook` 0 · `check:tasks` 0 (ledger 177/177). Zero orphans |
+
+## ⛔ BOTH SECTIONS ARE DONE — what remains is NOT more of the same
+
+**Every remaining uncited row in §07 (36) and §13 (72) names NO covering test file.** They are a **reading job**:
+someone must decide what covers them. **Do not hand them to a transcriber, do not expect a per-file batch to fit
+them, and do not read the remaining count as unfinished transcription.** Controller has agreed they stay.
+
+## TWO DEFECTS IN MY OWN DISPATCH BRIEF — the reusable part of today
+
+1. **TWO FILES ARE NAMED `doc-text.test.ts`.** `packages/domain/test/doc-text.test.ts` tests `docToPlainText`;
+   `apps/server/test/seed/doc-text.test.ts` tests **`plainTextDoc`**, the inverse function. §13's rows cite the
+   **bare filename**. I excluded the *domain* path (I was editing it), and the bare name plus my qualified
+   exclusion made the subagent skip three rows that were never in the file I held — and report them under the
+   wrong path, faithfully repeating my error back to me. **A bare filename in a catalogue row is not an address.**
+2. **My cluster list disagreed with my own headline count.** I briefed "81 in-scope rows" while the list beside it
+   enumerated thirteen files summing to 77, omitting `null-otp-sender.test.ts`. The subagent summed 77+3=80, said
+   so, and **refused to invent an 81st.** Its arithmetic and its refusal were both right. **Generate the cluster
+   list from the same measurement as the headline number; never type one beside the other.**
+
+## Method notes that cost a wrong number first
+
+- **A catalogue-id regex written for one style silently misses the other** (`- 13.5 ✅` vs `- ✅ **13.9 —**`).
+  Mine read §13 as **133 ids where the checker read 160**. **Make a private instrument agree with the checker
+  before believing it.**
+- **`7.72` vindicated a refusal.** Declined in `compile-filter.test.ts` because nothing there asserted it despite
+  the row naming that file; its real home was `projections/search.test.ts:305`, matching almost sentence for
+  sentence.
+- **I quoted a number the control did not print, three times** (18 for 19, 21 for 23) — the code-only line count
+  stated as git's total, with the real figure printed directly above. Each caught on re-read and amended before
+  the head was reported. **Copy the printed number; do not restate it from memory.**
+
+## NEXT — no ruling needed for (1); (2) needs the controller
+
+1. **Other sections' named clusters** are the remaining transcribable work: §12 **78** · §05 **67** · §06 **63** ·
+   §03 **45** · §04 **45**. Measure each with the BOTH-STYLES regex, cross-check against the checker, then decide
+   per section whether it is hand-sized (~10) or dispatch-sized (~100).
+2. **§12 block `12.380–12.399` is ALLOCATED but NOT CLEARED to start** — controller: *"one thing at a time."*
+
+
 # 🟣 MONDAY 2026-09-07 ~01:20 IST — **§07 HAND-BACKFILL EXHAUSTED at 39 uncited (was 78). §13 SUBAGENT IS IN FLIGHT.** Branch `exec/62-s13-backfill`, pushed. Weekly reset ~5h away.
 
 | what | value |
