@@ -272,6 +272,51 @@ the narrowing event itself carries the ticket id, so it would have passed agains
 `grantBackfillFor`; now asserted by pre-cursor event id. A check passing for a reason unrelated to the
 property it names, in the case written to demonstrate that discipline.
 
+### ⛔ GATE LOCK v3 (2026-09-06 08:15) — the directory form's empty-pid reclaim ROBBED A LIVE HOLDER; the lock is now a FILE created and filled in one atomic open(O_EXCL). Supersedes every lock snippet below this line.
+
+**Found by Lane D, diagnosed by Lane E, both measuring rather than arguing.** D's gate ran with a bare
+`mkdir /tmp/gisik-gate.lock` and **never wrote a pid file** (its script had no `echo $$ > pid`); E's
+`locked-test.sh` had three acquisition paths — `mkdir` succeeds; pid dead (`ps -p` fails) → reclaim; and
+**pid file EMPTY for 60 s → reclaim, with no `ps -p` anywhere in it** — and the third fired on exactly
+D's shape, deleting a live holder's lock while its gate ran. No collision resulted this time (D's gate
+finished first). **Both lanes were following the protocol as written in this file** — the "reclaim an
+empty-pid lock after 60 s, loudly" refinement adopted 01:20 — which makes the protocol the defect: **a
+holder with no pid is indistinguishable from a corpse, and *a lock protocol shared by scripts that differ
+is not one protocol* (Lane E).** E had written the residual risk into its own state file two hours before
+it happened: *"empty pid ⇒ dead holder is an inference, not a measurement."* Predicting a failure is not
+preventing it. The emptiness window between `mkdir` and `echo` is the entire attack surface, so v3 removes
+it: `set -o noclobber; echo $$ > /tmp/gisik-gate.lock` creates and fills the lock in ONE atomic operation.
+
+```
+LOCK=/tmp/gisik-gate.lock; empty_wait=0
+until ( set -o noclobber; echo $$ > "$LOCK" ) 2>/dev/null; do
+  if [ -f "$LOCK" ]; then
+    p=$(cat "$LOCK" 2>/dev/null)
+    if [ -n "$p" ]; then
+      if ! ps -p "$p" >/dev/null 2>&1; then echo "RECLAIMING stale lock: holder $p dead"; rm -f "$LOCK"; fi
+    else
+      empty_wait=$((empty_wait+15))
+      if [ "$empty_wait" -ge 600 ] && [ "$(ps -eo comm= | grep -c '^node (vitest')" -eq 0 ] && [ "$(pgrep -fl 'gate.sh|locked-test.sh' | grep -vc "^$$ ")" -eq 0 ]; then echo "RECLAIMING empty lock after 10 min, machine idle"; rm -f "$LOCK"; empty_wait=0; fi
+    fi
+  fi
+  sleep 15
+done
+trap 'rm -f "$LOCK"' EXIT
+# then the drain-wait on live vitest pools (unchanged), then the run — ONE backgrounded invocation.
+```
+**Rules:** (1) `$$` is the process that survives the whole gate — one script, one `run_in_background`
+invocation, never a subshell, pipeline or `nohup … &` (Lane D's earlier near-miss); (2) the ONLY stale
+reclaim is a dead pid; an EMPTY file (a crash between open and write — microseconds) is reclaimed only
+after 10 minutes AND with zero vitest workers and zero other gate scripts alive — E's idle criterion,
+which fails SAFE (a session whose command line mentions a gate script counts as alive and merely delays
+the reclaim); (3) mixed period: an OLD directory-form lock at the path makes `[ -f ]` false and `cat`
+fail → WAIT; never `rmdir`/`rm` a directory you did not create; old-form holders cannot reclaim a file
+either (their `rmdir` fails), so the two forms wait for each other correctly until every lane is on v3;
+(4) `rm -f` on release, never `rm -rf`. **The controller's `gate.sh` is on v3; all five lanes were sent
+the form at 08:15 and adopt it at their next gate; Lane E's `locked-test.sh` is the reference copy.**
+*Earlier "RECLAIMING stale empty-pid lock after 60s" lines in this file's gate rows (07:43) were this
+mechanism firing benignly — the holder was still in its acquire loop.*
+
 ### RULING P39 (2026-09-06 08:05, controller as ruling tier) — `ContestedClaim.claim` is NOT a `ClaimProvenance`; it gets its own shape, with no `serverTime` member and no synthesis
 
 **Measured by Lane A on #150 before asking, after it had inherited "unservable by anyone" from the
