@@ -16,7 +16,7 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
-# LANE A — `exec/37-c2-cursor`. **P41 RULED: DOOR B. Two items landed; Door B is NEXT and unstarted.**
+# LANE A — `exec/37-c2-cursor`. **DOOR B BUILT + both P36 residuals done. GATE PENDING, then review, then PR.**
 
 > Shas in narrative prose are facts about when they were written. Verify with `git branch --contains`
 > — EMPTY OUTPUT MEANS ORPHANED. `git cat-file` passes on reflog-only commits and hands back
@@ -145,10 +145,63 @@ the server needs to change either. **Not started — the halt arrived first.**
    `sync-client` to a domain type it does not otherwise know — which is why P36 left it. §12 now used
    through **12.255; FOUR left (12.256–12.259); ask before 12.259.**
 
+## DOOR B IS BUILT — committed and pushed; the FULL GATE is the only thing outstanding
+
+All five of P41's conditions are met. `mapListView` is gone; `mapListPage` maps ONE page to a new
+`ListPage {projectId, rows, nextCursor}` and `onlineDataSource.getTickets` follows the cursor to
+exhaustion. **`TicketListView` is UNCHANGED**, so `test/views/list-model.test.ts`'s
+`paginationTripwire` still compiles and still guards the grouping decision — that was the whole point
+of Door B over Door A.
+
+| condition | state |
+|---|---|
+| bounded loop, 40 pages × 50 = 2000 rows | `LIST_PAGE_CAP` in `mappers.ts`, docblock says DISCLOSED ASSUMPTION |
+| loud refusal in the register | `LIST_TOO_LARGE_ABSENCE`, `wireKey`/`wireRoute` both null (no route can close it) |
+| two-page assembly, disjoint + complete | **12.257** |
+| cap refuses loudly | **12.258** |
+| C2 refusal flips to served | **12.256** |
+| replica needs no change, SAID at the case | 12.257's describe block |
+| control: one page, one request | **12.259** |
+
+**Measured:** app-core `tsc --noEmit` exit 0; 155 tests pass across `test/online` + the tripwire.
+
+### MUTATIONS — both run, both outputs read, one recorded against my own interest
+
+| mutation | result |
+|---|---|
+| loop stops after page one | **2 failed, 21 passed** — 12.257 (`expected [ 't1', 't2' ] to deeply equal [ 't1', 't2', 't3', 't4' ]`) AND 12.258, since the cap becomes unreachable |
+| cap removed (`Number.MAX_SAFE_INTEGER`) | **1 failed, 22 passed — 12.258 alone** |
+
+**The second mutation reddens for a mechanism that is not the naive one, and this is written into the
+case:** it fails as `expected MappingError … to be an instance of ServingGapError`, because the
+unbounded loop runs off the end of the fixture and 404s. The property killed is correct — the refusal
+never fires — but a reader comparing that message to the case text would reasonably think the mutation
+had missed.
+
+### THE MISTAKE THIS TASK MADE, so the next session does not repeat it
+
+**`git checkout HEAD -- <path>` on an UNCOMMITTED file deletes the work, not the mutation.** I mutated
+the loop before committing it; HEAD predated Door B, so the restore wiped the whole loop and it had to
+be rewritten. The restore idiom in the brief assumes the file is committed. **Commit, then mutate.**
+
+## STILL OUTSTANDING
+
+1. **The full gate** (`pnpm turbo run build test typecheck`) — `/tmp/gate37b.sh`, queued behind
+   another lane's lock (holder pid 46785) as designed. **Door B touches an exported surface and this
+   file already records that running only the files you edited is NOT the gate** — 88 failures in
+   three fixtures were found that way last session. Do not open the PR before it is green.
+2. **Then the opus reviewer** P41 named (client-path change, N consumers — closure 3's class), then
+   the PR. **The controller merges; I never do.**
+
+## §12 IS EXHAUSTED
+
+**12.240–12.259 is fully used** (12.255 ❌ catalogue, 12.256–12.259 this build). The header in
+`test-cases/12-offline-sync-apps.md` says so. **The next Lane A §12 id needs a controller-allocated
+block — ask, do not derive.** §7 next free **7.220**.
+
 ## NEXT, IN ORDER
 
-1. **BUILD DOOR B** under ruling P41's five conditions above. This is the first item for the resumed
-   session.
+1. **Gate → reviewer → PR.** Nothing else starts before the gate is green.
 2. **Unblocked and started while P41 is pending:** the owed ❌ cases under P36 — `BoardCard.cause`
    narrowed on the snapshot-bounded path (build or catalogue with the reason), and **7.211** (the
    dangling-`parent_id` branch has no fixture and survives its own mutation).
@@ -158,8 +211,7 @@ the server needs to change either. **Not started — the halt arrived first.**
 
 ## IDS
 
-§12 block 12.240–12.259, **used through 12.255 — FOUR left; ask before 12.259.** §7 next free
-**7.220** (7.219 minted this session) (recount at rebase). §6: 6.180+ on request. `scripts/check-case-ids.mjs` runs in CI.
+§12 block 12.240–12.259 is **EXHAUSTED** — ask the controller for a new block. §7 next free **7.220** (recount at rebase). §6: 6.180+ on request. `scripts/check-case-ids.mjs` runs in CI.
 Never edit `docs/lanes/task-ledger.tsv`. Never merge my own PR. Never commit to `main`.
 
 # LANE A — `exec/31-mywork-residuals`, getMyWork's residuals + getAttention. PR OPEN, AWAITING CONTROLLER MERGE.
