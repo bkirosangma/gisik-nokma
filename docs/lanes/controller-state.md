@@ -22,10 +22,10 @@ the brief's Sonnet gating does not apply; rulings are taken in-session.**
 
 | what | value |
 |---|---|
-| `main` | **`e0c8294`** — thirty-one merges this context; since `9024bb5`: #152 · #153 (lock v3) · #155 (lock v3.1 + errand split) · **#154** (Lane D Plan 11 T9+T10, the seed runners through the REAL client ingest door, `de88248`, eleven jobs green at `7b10cb1`, re-gated under v3) · **#156** (11/9 + 11/10 promoted, `e0c8294`). Every `gh pr merge` exit read from `$?` on its own line |
+| `main` | **`b4e2f14`** — thirty-three merges this context; since `e0c8294`: #157 (lock v3.2) · **#150** (Lane A, the HELD pair under P38, `b4e2f14`, eleven jobs green at `063f6af` — **P25 clause 1 is DISCHARGED: every `owner: 'P25 clause 1 — HELD'` absence in `mappers.ts` is served or catalogued**; `getMyWorkspaces` closes completely, `getMyWork` still refuses on three fields, all now assigned under P39). Every `gh pr merge` exit read from `$?` on its own line |
 | ledger | **`CHECK_EXIT=0` · 166/177 (93.8%)** · claimed 0 · in-flight 0 · todo 11 · Plan 10 **17/18** (T18 held) · Plan 11 **7/16** (T7–T10, T14, T15 done; T1–T5/A0 on Lane E's branch unmerged; T11/T12 C in flight; T13/T16 E) |
 | last forced gate | **`c8268e1`** (code-identical to `9024bb5`) — ONE backgrounded invocation under the lock (acquired 08:04:19, released clean), install 0, rebuild 0, **`check:env` 0**, `--force --concurrency=1`: **`GATE_EXIT=0` · 30/30 · 0 cached · 1m34.3s · node v22.22.2** · zero `Unsupported engine` · **3340 tests / 256 files** — server **1058** (+2), app-core **1093** (+1), sync-client **67** (+3 — closure 4's client half, which had ZERO tests before 12.246–12.249), the rest unchanged. **Matches Lane A's 3340 at `09c03d3`.** *(Previous: `56cd091` 3334.)* |
-| open PRs | **#150 only** (Lane A, the HELD pair under P38, rebased and RE-GATED at `063f6af` — 30/30 · 0 cached · **3344 tests** under lock v3; eleven-job run on its last job; **merge on its gate, then restart A (ctx 77%) — override staged**). **The earlier red was NOT a semantic conflict with closure 4** — it was A's own required `projectNames` against A's own fixture, surfaced only when the branch was first type-checked against a tree with both, because **A's local check was an ad-hoc `tsc --noEmit -p tsconfig.json` (src only) while the gate runs `tsc -p tsconfig.typecheck.json` (src + test)** — every "typecheck clean" on that branch had been a claim about a smaller thing. *Run the package's own `typecheck` script; an ad-hoc `tsc -p` is a different tool wearing the same name.* Expected next: Lane B closure 5b (`exec/29-closure5b-reach`); Lane C T11+T12 (workflow running, then the two scheduler errands as a follow-up PR); Lane D the two retention sweeps (`exec/32-plan11-retention-sweeps`, restarted 08:27, session `lane4-periphery-84`); Lane E seam 1 (T1–T3 landed, T4 staged, then shutdown, T6; 29 ahead at `5744489`, rebased onto `de88248`; then T13, T16). |
+| open PRs | **none** at 08:35. In flight: Lane A `getMyWork`'s three residuals under P39 (`exec/31-mywork-residuals`, restarted 08:33 at ctx 8%); Lane B closure 5b (`exec/29-closure5b-reach`, holds the gate lock now); Lane C T11+T12 (`exec/30-plan11-backups`, opus workflow running); Lane D the two retention sweeps (`exec/32-plan11-retention-sweeps`, restarted 08:27); Lane E seam 1 (T1–T3 landed, T4 staged, 29 ahead at `5744489` rebased onto `de88248`; then shutdown, T6, T13, T16). Session meters ~44% at 08:33 (reset 12:20). |
 | watch | **re-armed as a `Monitor` task** (this session's `ctl-watch.sh`, 120 s poll: `origin/main`, open-PR set with head+mergeable, per-PR check-run state, pane set; sentinel-initialised so the zero→one PR transition IS reported). It is a child of this session and dies with it — re-arm at every relaunch |
 | machine | swap **3.8 GB of 5 GB used at 02:08, 3.6 at 02:26**, ~76 MB free pages — five lanes plus their fan-outs. The gate lock keeps pools at one at a time; nothing crashed. Not a blocker; watch it |
 | watchdogs | `launchctl list`: limit-resumer, net-resumer, idle-nudger all present (the nudger still does not submit — memory file) |
@@ -230,6 +230,30 @@ a written decision (Lane E measured `deploy/do/` on `main`: every "verif" hit is
 requirement that `deploy/do/` carry either a DDL-capable credential for the projection verifier or an
 explicit recorded decision that it runs only against restore scratch DBs. **Lane E's T3 committed at
 `b5ec53a`** (two more guards-that-could-not-fire found by its reviewer, repaired with positive controls).
+
+### ⚠ THE CONTROLLER'S OWN CONTROL FIXTURE HELD THE LOCK (08:28–08:31) — a control never launches the instrument it is testing
+
+To positive-control the v3.2 peers matcher this controller copied its gate script to `/tmp/gate77.sh` and
+launched it with a made-up flag. **The script has no dry-run flag: it took `--dry-run-never-runs` as its
+log label, acquired the lock for real, and ran a real gate on the primary worktree**, orphaned at `ppid=1`
+the moment the tool shell returned and outliving its own deleted script file (bash keeps the fd). Under
+v3's rules — the only ordinary reclaim is a DEAD pid — **no lane could reclaim it by protocol**, and every
+gate on the machine would have queued behind it. **Found by Lane A** while measuring the peers term
+(`ps -p 8994` alive, `ppid=1`, no vitest pools, script file gone), reported rather than killed — correctly,
+because killing another session's process is exactly what the standing rule forbids. The controller killed
+its own process; the EXIT trap released the lock; **Lane B's waiting gate acquired it within one poll**
+(pid 9775, a legitimate 10-worker pool under B's session, zero orphans). Three minutes lost, no
+collision. **Rules:** (1) **a control never launches the instrument it is testing** — a control for a
+process matcher runs the matcher against a process that only LOOKS like the instrument (a shell named
+`gate*.sh` that sleeps), never a copy of the instrument itself; (2) *the instrument becoming the fault* is
+now the lock's fourth defect class in one night (the inline form, the empty-pid reclaim, the line-count
+idle check, and this) — every one caught by a lane measuring rather than reading; (3) Lane A's residual
+stands with no protocol answer: v3 has no rule for a LIVE pid that is not a gate ("alive" is doing more
+work than it can carry), and every argv-based test of "is this a gate" has produced a defect today, so it
+stays a human rule — **a live holder you do not recognise is a message to the controller, never a kill.**
+Also from Lane A's measurement: the peers count over-counts a shell TREE (E's `locked-test.sh` counted
+twice — its zsh wrapper and its bash child both match) — **never read it as "how many gates"**; it is a
+zero-or-not signal.
 
 ### ⛔ THE 06:40 SESSION-LIMIT WINDOW TOOK EVERY LANE AND THIS CONTROLLER DOWN FOR ~3.5 HOURS (03:5x → ~07:20 IST)
 
