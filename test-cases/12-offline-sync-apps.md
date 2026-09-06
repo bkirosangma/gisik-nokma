@@ -3,20 +3,23 @@
 Mirrors `Features.md` §12. Status: `❌` not covered · `✅` covered · `🟡` partial · `🧪` manual · `🚫` out of scope (with reason).
 
 **ID BLOCKS — allocated by the controller, and a lane MINTS FROM ITS BLOCK, never from the maximum.**
-**Lane A `12.320–12.339`** (used through `12.322`, next free `12.323`) · **Lane B `12.290–12.319`**
+**Lane A `12.320–12.339`** (used through `12.328`, next free `12.329`) · **Lane B `12.290–12.319`**
 (**EXHAUSTED** — `12.319` was spent by Task 18 on the two `sync-client` guard suites that had no id) · **Lane D `12.340–12.359`**
 (unstarted) · **next block `12.360`, controller-allocated ON REQUEST ONLY.** Earlier, exhausted blocks,
 kept because their ids are live in this file: Lane D `12.224–12.227` · Lane C `12.228–12.239` · Lane A
 `12.240–12.259` · Lane B `12.260–12.289`. **`12.1–12.44` belonged to Plan 10 Task 18 and are now WRITTEN
 by it** — the reservation is discharged, not outstanding.
 
-**MAXIMUM IN USE: `12.322`** — recounted at this commit across all three id styles, not carried.
+**MAXIMUM IN USE: `12.328`** — recounted at this commit across all three id styles, not carried.
 *A maximum is a fact about a moment and this line is the only thing holding the moment.* It has gone
 stale **twenty times** in this file's life (counted from the running parenthesis it used to carry — and counted with `uniq -c`, because `grep -c` counts matching LINES and that whole parenthesis was ONE line, which is its own instance of a check answering a question nobody asked), twice inside a single change set, and twice that staleness
 became a real double-mint that two branches both reached from correct readings of it. That is why ids
 here are **allocated rather than discovered**: recount the maximum as the *control* at every rebase, and
 never mint from it. Before this rewrite the line read `12.318` while `12.322` had been on `main` since
-#176 — the twenty-first instance, found by Task 18's own recount.
+#176 — the twenty-first instance, found by Task 18's own recount. It then went stale a twenty-second
+time *inside Task 18's own change set*, between the catalogue commit saying `12.322` and the rebase past
+#187 making it `12.328` — which is precisely why this line is recounted at the sha being reported and
+never carried forward from the previous one.
 
 > **⚠ RECOUNT WITH ALL THREE STYLES, AND PRINT THE PER-STYLE COUNTS.** Ids appear as `- 12.274 🚫 …`
 > (bare), `- **12.240** ✅ …` (bold) and `- 🧪 **13.1 — …` (marker-first, in sibling files). A recount
@@ -30,8 +33,11 @@ never mint from it. Before this rewrite the line read `12.318` while `12.322` ha
 
 **Style: BARE is canonical here** (`- 12.45 ✅ …`). Task 18 normalised this file's 23 bold-style line
 heads to bare — **marker and bold placement only; no id was renumbered, and never may be.** Census at
-this commit: **bare 312, bold 0, marker-first 0; sum 312 == union 312, zero duplicates** — the 267 that
-were here (bare 244 + bold 23) plus Task 18's 44 and `12.319`. New cases in any block are written bare.
+this commit: **bare 318, bold 0, marker-first 0; sum 318 == union 318, zero duplicates** — the 267 that
+were here (bare 244 + bold 23), plus Task 18's 44 and `12.319`, plus Lane A's `12.323–12.328` from #187.
+**Those six were authored bold and normalised to bare by Task 18 in its rebase, with Lane A informed** —
+by the controller's ruling of 2026-09-06, since Task 18 owns §12's final shape and a marker/bold change
+is not a renumber. That ownership ends when this task merges. New cases in any block are written bare.
 
 **Scope — every Plan 10 task, and where each one's cases actually live.** In this file: **Task 4** (the
 LIFTED §11 envelope-coherence closer, `proj_contested`, `getContest`, `GET /v1/contests`) · **Task 5**
