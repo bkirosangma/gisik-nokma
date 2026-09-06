@@ -1,4 +1,4 @@
-# Lane B — executor state (Plan 10 T13 → T14 → T15 → T18)
+# Lane B — executor state (Plan 10 T13–T15 · closure 5 · **closure 5b** → T18)
 
 **This file is Lane B's restart surface, and nobody else's.** `executor-state.md` is Lane A's — never
 edit it. A Lane B session relaunched from `dispatch-executor-serial.md` + the Lane B override recovers
@@ -6,41 +6,251 @@ only what is written here.
 
 > **Shas in narrative prose below are facts about when they were written.** Verify with
 > `git branch --contains <sha>` — **empty output means orphaned**. `git cat-file` passes on reflog-only
-> commits and will lie to you.
+> commits and will lie to you. The NARRATIVE SECTIONS BELOW THE PRE-FLIGHT (T13, T14, T15, closure 5)
+> are history: their anchors were true when written and most are now orphaned by rebases. The LIVE
+> ANCHORS table immediately below is the only part measured at this HEAD.
 
 ---
 
-## LIVE ANCHORS — measured 2026-09-06 after the #126 relaunch. RE-VERIFY BEFORE TRUSTING.
+## LIVE ANCHORS — measured 2026-09-06 after the #139 merge and the closure-5b relaunch. RE-VERIFY BEFORE TRUSTING.
 
 | anchor | value | how verified |
 |---|---|---|
-| branch | `exec/26-closure5-catchup` | `git branch --show-current` |
-| cut from | originally `origin/main` = `c7c2b8e` (the #126 merge); **REBASED TWICE** — onto `fdd3bad` (closure 2b #137 + Plan 11 T7/T8 #136) and onto **`4f748d9`** (controller docs only) | `git rebase origin/main`, exit 0 both times |
-| HEAD | **`9762cda`** — pushed; PR **#139** open, MERGEABLE, held for the controller's merge | `git rev-parse HEAD`; `git rev-parse origin/exec/26-closure5-catchup` matches |
-| ahead of `origin/main` | **8** | `git rev-list --count origin/main..HEAD` |
-| HEAD reachable? | **YES — `git branch --contains 9762cda` prints `exec/26-closure5-catchup`** | `git branch --contains HEAD` — empty output would mean orphaned |
-| tree | clean (`git status --short` empty) | `git status --short` |
+| branch | `exec/29-closure5b-reach` | `git branch --show-current` |
+| cut from | `origin/main` = **`1b72900`** (the #139 merge — closure 5, ruling P37 + P37.1's cap) | `git checkout -b … origin/main`; `git branch --contains 1b72900` prints this branch, `main`, `exec/23-plan11` |
+| HEAD | **`ba5e85d`** — commit 1 of closure 5b (the reconcile extraction). NOT yet pushed at this writing | `git rev-parse HEAD` |
+| ahead of `origin/main` | 1 | `git rev-list --count origin/main..HEAD` |
+| tree | clean | `git status --porcelain` |
 | node | v22.22.2 | `node -v` after `source ~/.nvm/nvm.sh && nvm use 22` |
-| gate | **`GATE_EXIT=0` at the PUSHED head `9762cda`** · `Tasks: 30 successful, 30 total` · `Cached: 0 cached, 30 total` · 1m34.064s · node v22.22.2 · zero `Unsupported engine` · `check:env` exit 0 on its own line · `pg_isready` exit 0 · orphan reap by `ppid=1` empty. **3333 tests / 10 packages**, enumerated: domain 464 · ui 37 · editor 178 · rule-engine 282 · sync-client 64 · app-core 1092 · mobile 20 · desktop 5 · web 136 · server 1055. *Re-run at the pushed head rather than carried over from `10b3249` on the argument that the intervening commits were docs — a gate is a fact about a tree. Identical composition (1m25.68s there).* **This branch adds 14 `it` blocks**: server 13 (12.277-12.282 + 12.291 at the filter, 12.284-12.286 at the route, 12.275/12.276/12.289 on the rig), sync-client 1 (12.287). | one backgrounded invocation under the lock |
+| build | `pnpm install --frozen-lockfile` + `pnpm rebuild better-sqlite3` + `pnpm turbo run build --concurrency=1` → **exit 0**, 10/10 tasks | one backgrounded invocation, `/tmp/laneB-build.log` |
+| typecheck | `apps/server` `tsc -p tsconfig.typecheck.json --noEmit` → **exit 0** at `ba5e85d` | direct run, not the gate |
+| gate | **NOT YET RUN on this branch.** The last gate this lane owns is `9762cda` (30/30, 3333 tests) and it is a fact about a tree that no longer exists | — |
 
-**⚠️ BRANCH-NUMBER COLLISION, flagged by Lane A and NOT resolved by either of us.** Lane A's branch is
-`exec/26-provenance-block` and this one is `exec/26-closure5-catchup` — two `exec/26-*` branches. Not a
-git conflict (different refs), but ambiguous in the ledger and in PR titles, which is one level up from
-the `12.156` id collision that cost a day. Lane A pushed first and declined to rename unilaterally;
-**the controller decides who renumbers.** Neither lane should assume the other did.
+**§12 ids: this lane holds 12.290–12.319. 12.290 (the wedge, ❌) and 12.291 (the cap) were consumed by
+#139 — MINT FROM 12.292.** Ask the controller before 12.320. Use the union-vs-sum control (below); the
+one-style grep cannot see a collision against a bold-style id.
 
 ---
 
-## POSITION IN THE LANE SEQUENCE
+## POSITION — closure 5b, and the commit plan it is being built to
 
-| # | task | state |
+| # | commit | state |
 |---|---|---|
-| 1 | T13 — app-core contested-claim UX, reopen pair, skew badge, status bar | **DONE, MERGED** (#117) |
-| 2 | T14 — dual-client harness rig | **DONE, MERGED** (#126) |
-| 3 | T15 — scenarios S1–S6 | **DONE, MERGED** (#126) |
-| 4 | **CLOSURE 5 — ruling P37, both halves** | **BUILT AND MEASURED.** Two commits on this branch; catalogue in the same change set. See the section below. |
-| 5 | **CLOSURE 5b — controller-assigned 2026-09-06, AFTER #139 merges and BEFORE T18.** Three items closure 5 recorded rather than fixed, now owned: **(a) 12.283** — widening because the READER's reach grew (`membership.granted` / `project.member_added`); same P37 shape, the trigger is the membership event itself, deliver what the new reach admits, excluding fixture as before. **(b) 12.288** — the engine calls `reconcile` on every reconnect/catch-up completion (the moment its cursor is current is the moment its holdings can be stale), measured by a scenario that narrows while offline and asserts removal after reconnect with NO manual call. **(c) 6.102's guest side** — close through the same client-presented path IF it is an application of the same rule; **if it needs a NEW rule, escalate before building.** Plus, as 5b's first commit if cheap: make the dual-client rig call the REAL reconcile route through `inject()` instead of restating its rule in-process. **Use ids 12.290+.** | NEXT |
-| 6 | T18 — `Features.md` §12 + `test-cases/12` final shape | **NEXT, and STILL HELD.** Plan lines 7471–7629. **Precondition unchanged: it cannot be complete while what it catalogues is still moving.** Lane A's closure 2b, closure 4 and the HELD pair (ids 12.240–12.259) were still landing in §12 when closure 5 was written. **Re-measure §12 against `origin/main` at the moment T18 starts**; if Lane A's §12 writes have not landed, tell the controller and HOLD rather than catalogue a moving target — the controller decides whether T18 waits or closes with Lane A's items named as "landing under Lane A". |
+| 1 | **reconcile extraction** — `reconcileHeldIds` out of the route body; the rig calls it instead of restating it | **DONE, `ba5e85d`** |
+| 2 | **(d)(i)** replica per-ticket bootstrap door + the durable pending-pull store | NEXT |
+| 3 | **(d)(ii)+(iii)** export `bootstrapTicket`; the per-ticket route, carrying scoped definitions | |
+| 4 | **(d)** the NOTICE — domain frame arm, both `SyncItem` mirrors, hub, http-transport branch, `grant-backfill.ts` reshaped from push to notice, `visible-events-for.ts` wiring | |
+| 5 | **(d)** the engine — bootstrap-before-apply inside `applyOne`, the pending drain, the pull timeout | |
+| 6 | **(a)** 12.283 — widening because the READER's reach grew, as a viewer-keyed NOTICE | |
+| 7 | **(b)** 12.288 — reconcile on reconnect/catch-up, with a single-flight latch and a minimum interval | |
+| 8 | **(c)** 6.102's guest side, or an escalation if it needs a new visibility rule | |
+| 9 | catalogue (`Features.md` §12 + `test-cases/12`), gate, Fable branch review, PR | |
+| 10 | **T18** — `Features.md` §12 + `test-cases/12` final shape. **STILL HELD**, after 5b merges, re-measured against `origin/main` at the moment it starts | |
+
+### ⚠️ (a) MUST COME AFTER (d), AND IT IS NOT THE ORDER THE OVERRIDE WRITES
+
+The override says (a) uses *"the same backfill shape as `grant-backfill.ts`, keyed on the viewer"*. That
+sentence was written while `grant-backfill.ts` was PUSH-shaped, and (d) deletes that shape. A
+`membership.granted` at a higher role, or a `project.member_added` onto a project full of project-mode
+tickets, admits **far more** than one inheriting subtree — so (a) built on the current shape would
+reintroduce P37.1's wedge at larger scale, **in the same PR that fixes it**. (a) is therefore built as a
+viewer-keyed NOTICE, after (d) exists to be keyed. *Not a ruling ask: it follows from the override's own
+(d). Recorded so a restart does not "correct" the order back.*
+
+---
+
+## WHAT THE CLOSURE-5b PRE-FLIGHT ESTABLISHED — four verifications, 2026-09-06, read from source
+
+**These cost ~343K subagent tokens to establish. A restart should read them before re-measuring.**
+Two of the four changed the design rather than confirming it.
+
+### 1. The wedge fix's load-bearing chain — SPLIT: four links hold, the fifth was overclaimed, and a SECOND door reaches the residual
+
+Links **ESTABLISHED**: an instruction-shaped notice cannot move either cursor (`hub.ts:253` advances
+`sub.cursor` only inside the ENVELOPE arm at `:248`; the instruction arm `:216-247` never touches it) ·
+a cut-short socket sends no `caught-up` (`hub.ts:206-209` closes and detaches, `:163-164` sets
+`sub.ended`, and the caught-up send is guarded at `:268` by `!sub.ended`) · the client's ONLY production
+cursor write is `sync-engine.ts:388` inside the `onCaughtUp` link · reconnect resubscribes at the
+persisted cursor (`sync-engine.ts:401-411` → `replica.getCursor`) · the trigger is strictly above
+`afterSeq` so it is re-yielded (`visible-events-for.ts:373`), and `backfilled` is per-DRAIN
+(`:399`), so the notice is regenerated with it.
+
+**THE RESIDUAL IS UNREACHABLE VIA `applyChain` — but only under THREE OBLIGATIONS on code not yet
+written**, and the reason is not promise adoption, it is that the caught-up link reads its guard INSIDE
+the link (`sync-engine.ts:385-392`), so a pull that throws retroactively cancels an already-queued
+cursor write:
+- **(a) the pull must be `await`ed inside `applyOne`, NEVER in an item listener.** `sync-engine.ts:363-369`
+  calls listeners synchronously and swallows their throws; a pull there is outside the chain and
+  `setCursor` runs first.
+- **(b) it must be all-or-nothing across the notice's ids** — a swallowed per-id failure lets `setCursor`
+  run with ids unpulled. *(See the pending-pull store below: this obligation and the anti-brick policy
+  are in direct tension, and the store is how both are satisfied.)*
+- **(c) the per-ticket applier must NEVER write `cursor:<workspaceId>`.** `loadBootstrap`
+  (`replica.ts:607`) does, unconditionally — a `loadBootstrap`-shaped applier would advance the
+  WORKSPACE cursor from inside a one-ticket pull.
+
+**⚠️ AND A DOOR THE CHAIN NEVER TOUCHES REACHES THE RESIDUAL ANYWAY.**
+`packages/sync-client/src/net/http-transport.ts:169-245` is an **if/return ladder with no `else` and no
+`default`** — it ends at `:245` with no trailing branch. A frame type a client build does not know is
+**dropped silently**, while the trigger event that follows it is accepted (`:189`) and the `caught-up`
+behind it still advances the cursor past the trigger (`:243` → `sync-engine.ts:388`), after which
+`needsBootstrap` (`sync-engine.ts:463`, `getCursor !== 0`) will never re-bootstrap over it. **Version
+skew — server ahead of client — is a normal deployment state, not an exotic interleaving.** The same
+door drops a notice whose `workspaceId` is absent or mismatched (`:205`). *Client and server ship
+together here, so this is not live for THIS change set; it is the reason convergence must not depend on
+notice re-delivery alone, and it is recorded with an owner rather than fixed inside closure 5b.*
+
+**Link 5 as stated is FALSE and the weaker form is what holds.** The slow-consumer bound reads the
+socket's currently-unflushed backlog BEFORE the send (`hub.ts:206`, `DEFAULT_MAX_BUFFERED_BYTES = 1_000_000`
+at `:75`), so an arbitrarily large single frame is admitted whenever the backlog is clear — the bound is
+not on the size of the re-delivered unit. What is true, and sufficient: **the notice is strictly smaller
+than today's burst.** Also: `GRANT_BACKFILL_MAX_TICKETS` is **per trigger**, and `backfilled` dedupes
+only within one drain, so N triggers in one drain produce up to N notices.
+
+### 2. A stall is a ONE-WAY LATCH, so the anti-brick policy is mandatory — and the candidate policy was incomplete
+
+`stalled` has exactly three touches (`sync-engine.ts:268` declare, `:336` set inside `stall`, `:472`
+cleared inside `start`). **Nothing else clears it.** Mobile never calls `start()` again; desktop calls it
+only on an OS `online` event; the UI renders the state as plain *"Offline"*. So a transient failure at
+either new call site would BRICK the client until process restart, where before (d) it merely lost a
+backfill.
+
+The candidate policy — *swallow, leave the id unheld, let the next event's bootstrap-before-apply catch
+it* — is right in direction and **incomplete on two counts**:
+- **Non-convergence.** Nothing re-drives a swallowed id. → **the durable pending-pull store.**
+- **Hung-request silence.** `http-transport.ts:124` is a bare `fetch` with **no `AbortSignal` anywhere in
+  the file**, and `applyChain` is strictly serial. Without a per-pull timeout, (d) trades today's LOUD
+  terminal brick for a SILENT one: status stuck at `live`, `stalled` false, `settled()` never resolving,
+  nothing surfaced. **A timeout is a prerequisite of (d), not a polish item**, and the same timeout is
+  required on (b)'s reconcile call.
+
+### 3. THE DESIGN DECISION THIS FORCED — a DURABLE pending-pull set, not a re-delivery bet
+
+Obligation 1(b) (all-or-nothing, or the cursor advances with ids unpulled) and finding 2 (never stall on
+a transient failure) pull in opposite directions. Both are satisfied by making the unpulled ids
+**durable client state** rather than something re-derived from a re-delivered notice:
+
+- a failed or timed-out pull records its id under a `meta` key on the replica (key/value, no migration —
+  `meta` is where `cursor:` and `me` already live);
+- the cursor is then free to advance, so **nothing bricks**;
+- every catch-up drains the pending set before it does anything else, so **it converges**;
+- it survives process restart, which a re-delivered notice does not;
+- and convergence stops depending on the notice arriving twice — which matters precisely because
+  finding 1's transport ladder can drop it silently.
+
+*The excluding fixture writes itself: fail a pull, assert the id is still pending after a fresh replica
+is opened over the same storage, and that the next catch-up pulls it. Mutate the persistence to be
+in-memory → red.*
+
+### 4. The per-ticket route MUST carry definitions — and the LATEST one is not enough
+
+**ESTABLISHED, hazard REAL.** The full bootstrap ships every `workflow.defined` / `ticket-type.defined`
+in the workspace inside the same `REPEATABLE READ` cut as `streamSeq` (`sync-routes.ts:77-83`, `:193-224`),
+and over the live stream definitions are class `'definition'` and yielded **unconditionally to everyone**
+(`visible-events-for.ts:212-215`, `:519-533`) — which is exactly how the push path avoids the hazard
+today: a ticket's workflow necessarily has a lower `workspace_seq` than any event depending on it, and
+single ordered delivery means the definition lands first.
+
+**A per-ticket HTTP pull breaks that invariant** — it is a separate request with no analogue of
+"read the stream position first, ship the definitions for that same cut". Reached with an empty
+`definitions`, `latestByWorkflow` is empty, `foldSnapshotForward` **silently no-ops**
+(`replica.ts:479-482`: `if (latest === undefined || …) return state;`) and the failure surfaces one step
+later in `refoldTicket`'s replay against `buildLocalDeps` (`local-deps.ts:49-62`).
+
+Exact throws a client would see: `applyTicketEvent: workflow "<id>" vanished — replay integrity is
+broken` (`ticket-state.ts:153-157`, the realistic 5b case: an existing ticket newly made visible whose
+tail carries a `ticket.transitioned`), or `unknown ticket type "<id>"` / `workflow "<id>" is not defined`
+(`:108-117`) for a tail beginning at `ticket.created`.
+
+**Minimum fix: the FULL VERSION CHAIN of every workflow/ticket-type the pulled ticket's snapshot and tail
+reference — not just the latest.** `foldTicketToWorkflowVersion` / `workflowVersionsOf` need every
+intermediate version to walk a stale snapshot forward, and a gap throws *version chain has a hole*
+(`ticket-state.ts:311-313`). Shipping only the latest is not "cheaper but safe".
+
+### 5. The cap and case 12.291 change MEANING under the notice shape
+
+12.291's assertion counts `ticketsTouched` — a Set built from `entity.id` across delivered **LedgerEvents**
+(`apps/server/test/visibility/grant-backfill.test.ts:318-333`). Under the notice shape there is no
+per-candidate history stream to filter, so **that assertion mechanism ceases to exist** and must be
+rewritten against the notice's id list. The constant's UNIT (per-ticket-count) survives; its
+JUSTIFICATION does not.
+
+**And `grant-backfill.ts`'s own docblock paragraph becomes FALSE**: *"Truncation is SILENT on the wire,
+and there is nowhere honest to put a notice: … inventing a wire member … would be a protocol nobody
+agreed and a fourth `SyncItem` arm."* P37.1 agreed exactly that protocol, so the paragraph must be
+rewritten rather than left to contradict the code beneath it.
+
+**The real cost site moved and the cap does not sit on it.** The walk is still N `proj_visibility`
+queries; the notice is N ids (trivial at any N); but the CLIENT now makes up to N HTTP pulls — a cost
+dimension that did not exist when P37.1 was ruled and that 200 was never chosen to bound.
+
+**12.290 (the wedge) may flip to ✅ but MUST NOT be flipped on this analysis** — it is a prediction until
+a slow-consumer close mid-pull is followed by measured convergence.
+
+---
+
+## THE CASE-ID CONTROL — copy this, do not write your own
+
+`test-cases/12` carries ids in three styles across the repo (`- 12.274 🚫`, `- **12.240** ✅`,
+`- 🧪 **13.1 —`). The one-style grep every lane reaches for **reported "zero duplicates" through a
+collision it structurally could not see.** Extract from the LINE HEAD only, print per-style counts as the
+positive control, and compare the union against their SUM — `union < sum` is the machine-readable signal
+that a style is being missed. `scripts/check-case-ids.mjs` (blocking, in `check-env`) implements this
+with a fixture asserting known counts, so the script's own blindness is a test failure.
+
+```
+grep -oE '^- (\*\*)?12\.[0-9]+' test-cases/12-offline-sync-apps.md | sed -E 's/^- (\*\*)?//' | sort -t. -k2 -n
+```
+
+---
+
+## CROSS-LANE — Lane A, closure 4 (#141), and the four files we share
+
+**Agreed with Lane A 2026-09-06, both directions confirmed in writing: LANE A LANDS FIRST, THIS LANE
+REBASES.** #141 was `CONFLICTING/DIRTY` against `1b72900` and has to rebase past closure 5 regardless.
+
+| file | Lane A's region | this lane's region |
+|---|---|---|
+| `packages/sync-client/src/replica/replica.ts` | the bootstrap type (~36), `writeSnapshot` (~247), `readSnapshotProvenance`/`getSnapshotProvenance`, **and one line inside `loadBootstrap` (~675, the `provenance` argument on the `writeSnapshot` call)** | a NEW exported per-ticket door + impl; `loadBootstrap`'s body otherwise untouched |
+| `apps/server/src/sync/sync-routes.ts` | the bootstrap payload type and its return | export `bootstrapTicket`; register the per-ticket route |
+| `packages/sync-client/src/index.ts` | appends `SnapshotProvenanceBlock`, `SnapshotClaim` | append-vs-append |
+| `test-cases/12-offline-sync-apps.md` | 12.240–12.245 | 12.292+ |
+
+**Lane A's confirmation, load-bearing for (d)(iii):** the provenance block lands ON the snapshot object
+inside `BootstrapTicket` as `provenance?: SnapshotProvenance | null` — **OPTIONAL, not required-nullable**
+(*"nullable describes the VALUE while additive describes the CONSTRUCTOR"*; a required nullable field
+still forces every constructor to change, and it broke this lane's rig for one commit). It is populated
+inside `bootstrapTicket` itself, **so exporting that function unchanged gets the block for free — which
+is a second reason to export rather than reimplement.** On the client, `writeSnapshot` stores it in a
+SIBLING TABLE and **deliberately does not delete the block when it has none**: absent means "nothing new
+to say", never "forget what you knew" — so a per-ticket apply path passes the block through or passes
+nothing, and never an explicit constructed `null`.
+
+**Lane A's rebase warning, taken:** after rebasing past a merge that adds a package or changes exports,
+`pnpm install` AND rebuild the dists before running app-core or sync-client tests. Imports by package
+name resolve through `./dist`; a stale dist gives `X is not a function` and reads as a real regression.
+Lane A lost a diagnosis to exactly that today (seventeen failures, `createSyncEngine is not a function`).
+
+---
+
+## DEVIATION TAKEN ON COMMIT 1 — extraction instead of `inject()`, and why
+
+The override asked for the rig to call the real reconcile route through `inject()`. **Measured, and it
+costs more than it buys.** The route reads `request.currentUserId`, which `makeRequireSession` fills from
+better-auth's session — so the rig's three seeded users (`USER_A`/`USER_B`/`USER_ADMIN`, fixed ULIDs,
+**96 references across `scenarios.test.ts`**) would have to become real auth users signed in through
+`signInWithPhone`, whose ids better-auth mints and the rig cannot choose. And the HTTP shell those users
+would exercise — bearer session, the 403 membership gate, the body schema and its `MAX_BATCH_SIZE` bound
+— **already has eight cases in `test/sync/reconcile-route.test.ts`.**
+
+What no existing case could cover is the rig holding a SECOND COPY of the rule, which is the hazard
+#139's review actually named. `reconcileHeldIds` is that loop, extracted; the route and the rig are its
+only two callers; there is one implementation to drift. Both files state what the call does NOT reach, so
+*"calls the real route"* is not read as more than it is. **The same shape is what (d)(ii) prescribes for
+`bootstrapTicket`** — one function, route and rig as its two callers — so this is the branch's pattern
+rather than a one-off.
+
+---
 
 **⚠️ THIS LANE'S §12 BLOCK (12.260–12.289) IS EXHAUSTED. The controller ALLOCATED 12.290–12.319 to
 this lane on 2026-09-06** (next free 12.320, on request only). Do not mint from the header's maximum.
