@@ -104,6 +104,9 @@ describe('phone sign-in with the production OTP sender', () => {
     expect(Object.keys(body).sort()).toEqual(['code', 'message']);
   });
 
+  /**
+   * 13.149 — the refusal never answers with the string `'code sent'` — a code nobody will receive must not be reported as sent.
+   */
   it('never answers "code sent" for a code nobody will receive', async () => {
     const response = await sendOtp(refusing, '+919000000102');
     expect(response.body).not.toContain('code sent');
