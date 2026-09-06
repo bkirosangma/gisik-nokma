@@ -23,7 +23,31 @@ Closure 5b merged as **`2f18f3f`** (#161). T13 (#117), T14+T15 (#126), closure 5
 | toolchain | node **v22.22.2**, `pnpm install --frozen-lockfile` + `pnpm rebuild better-sqlite3` + `pnpm turbo run build --force --concurrency=1` → **`BUILD_EXIT=0`** | one shell invocation, `$?` on its own line |
 | `check-case-ids` (repo-wide) | **`EXIT=0`** — bare 865 + bold 492 + marker-first 40 = **sum 1397 == union 1397**, zero duplicates, highest `13.100`, 10 files | `node scripts/check-case-ids.mjs`; **a SEPARATE step, NOT part of `pnpm check:env`** |
 | **§12 max, recounted** | **`12.322`** — bare 244 + bold 23 + marker-first 0 = **sum 267 == union 267**, zero duplicates | §12-scoped, three styles, per-style counts printed as the control |
-| ruling | **Door A**, controller 13:2x: proceed now, do not wait for A or D | `SendMessage` reply, quoted in full below |
+| ruling | **Door A**, controller 13:2x: proceed now, do not wait for A or D | `SendMessage` reply |
+| **PR** | **#188 OPEN**, `exec/33-plan10-t18` → main, head **`4d2d398`**, MERGEABLE. **NOT clear to merge while the opus review is outstanding** | `gh pr view 188` |
+| **full gate at `4d2d398`** | **`GATE_EXIT=0` · 30/30 · 0 cached · 1m47.837s · node v22.22.2 · `CHECK_ENV_EXIT=0` · `CHECK_CASE_IDS_EXIT=0`.** Lock v3.2 acquired 13:39:58 pid 74149, **released clean**; **0 orphans** | ONE backgrounded invocation, `$?` on its own line |
+| tests at that sha | **3470 passed / 272 files** (+5 skipped). domain 464 · ui 37 · editor 178 · rule-engine 282 · sync-client 87 · app-core 1102 · web 138 · mobile 20 · desktop 5 · server 1157 | **recounted from the log by `awk`** |
+| §12 census after | **bare 312 · bold 0 · marker-first 0; sum 312 == union 312**, zero duplicates, max **`12.322`**, 19 headings | §12-scoped, three styles |
+
+**What T18 delivered:** the reserved block `12.1–12.44` written from tests rather than from the plan text
+(35 ✅ · 7 🟡 · 2 🧪 · 0 ❌); `12.319` spent on the two `sync-client` guard suites, **exhausting Lane B's
+block**; §12 normalised to bare (23 bold heads, no id renumbered); `Features.md` §12's banner rewritten so
+its "still absent" list is EMPTY; and three live falsehoods removed, two of them Lane B's own.
+
+**36 of the 44 are cross-references, not new coverage** — verified **zero dangling**, 33 distinct refs all
+resolving, with a positive control that a planted bad reference IS detected. Eight ids add coverage:
+`12.1`, `12.2`, `12.3`, `12.5`, `12.15`, `12.40`, `12.41`, `12.42`.
+
+**Downgraded from the plan's pre-written ✅ (each names the conjunct with no witness):** `12.5`
+("identically" — one runner), `12.6` ("exactly like ingest" — both cross-door comparisons compare a
+refusal), `12.13` (attachments — `attachment.added` deletable with the server suite still green), `12.16`
+(`workspace_seq`), `12.24` (the user-visible label), `12.33` (**the plan is wrong, not the test** — the
+per-event purge walk was struck by 6.101/6.104), `12.38` (component wiring).
+
+⚠️ **OPEN AT THIS WRITING: Lane A began writing §12 after the Door A ruling** — `exec/39-fixture-witnesses`
+at `137d48a` adds **12.323–12.328 in BOLD**. T18's header is true at merge and stale the moment A lands;
+the controller has been asked to **broadcast that bare is canonical in §12**. `git log 2f18f3f..origin/main
+-- test-cases/12 Features.md` is **still empty**, so the merge condition holds.
 
 ### The §12 header on `main` is FALSE, and T18 is what fixes it
 
