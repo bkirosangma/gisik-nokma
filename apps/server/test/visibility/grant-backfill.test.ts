@@ -62,19 +62,30 @@ import { GRANT_BACKFILL_MAX_TICKETS } from '../../src/visibility/grant-backfill.
  * a guard no mutation can kill is unmeasured code a later reader trusts —
  * `stream/hub.ts` paid four masked `sub.ended` guards to learn that.
  *
- * - `GRANT_BACKFILL_TRIGGERS` → emptied: **all seven redden**, 12.277 included.
- *   Under the push shape the measurement was `5 failed | 1 passed` and 12.277
- *   was the informative survivor — its property is exclusion, and exclusion was
- *   held by `visibleEventsFor`'s own `canSee` on the trigger event rather than
- *   by this list. That survivor is GONE, for a reason worth stating: 12.277's
- *   positive control used to be a backfilled envelope reaching the insider and
- *   is now the insider's NOTICE, which only the trigger list can produce. The
- *   `5 failed | 1 passed` figure is retained above as the push-shape
- *   measurement it was and is NOT a claim about this file.
- *   *The seven-way expectation is REASONED, not measured: the gate lock was
- *   held by another process when this rewrite was written.*
+ * - `GRANT_BACKFILL_TRIGGERS` → emptied: **all seven should redden**, 12.277
+ *   included.
+ *
+ *   The figure this docblock carried — `5 failed | 1 passed`, with 12.277 as the
+ *   informative survivor — was STALE when the reshape found it, and the way it
+ *   went stale is worth more than the number. It was the measurement from before
+ *   the review round; that round re-aimed 12.277's positive control from
+ *   `JSON.stringify(forInsider).toContain(ticket)` at `preCursor.id` precisely
+ *   because the stringify form could not fail, and the re-measurement was
+ *   `6 failed (6)` — every case in the file. The catalogue
+ *   (`test-cases/12-offline-sync-apps.md`, closure 5's mutation table) was
+ *   updated and THIS HEADER WAS NOT, so the file's own docblock went on
+ *   describing a survivor that had already stopped surviving.
+ *
+ *   Under the notice shape the survivor is gone for a second, independent
+ *   reason: 12.277's control is now the insider's NOTICE, which only the trigger
+ *   list can produce. With 12.291 that is seven cases, not six.
+ *   *REASONED, not measured — the gate lock was held by another process when
+ *   this rewrite was written, and an unmeasured expectation is exactly what the
+ *   paragraph above is about. Re-run the mutation and replace this sentence with
+ *   the number.*
  * - `grantNoticeFor`'s own `canSee` → mutated to permit, **12.280** reddens
- *   ALONE, and under the notice shape it guards more than it did. That case
+ *   ALONE — `1 failed | 5 passed` under the push shape, and expected to be
+ *   `1 failed | 6 passed` here for the same reason (also unmeasured). That case
  *   exists for exactly this reason: the guard is redundant for every ORDINARY
  *   descendant (an inheriting child copies the authoring ancestor's
  *   `resolved_mode` and `resolved_user_ids`, so `canSee` returns the same answer
@@ -91,19 +102,29 @@ import { GRANT_BACKFILL_MAX_TICKETS } from '../../src/visibility/grant-backfill.
  *
  * ## One mutation this file could kill under P37 and cannot under P37.1
  *
- * Hoisting the notice block out of `visibleEventsFor`'s own
- * `if (await canSee(...))` used to redden 12.277, and the line saying so stood
- * in this docblock until the reshape made it false. It no longer reddens
- * anything here: `grantNoticeFor` asks its OWN `canSee` about the trigger
- * ticket too, answers false for the viewer the narrowing narrowed away, returns
- * an empty list, and `ticketIds.length > 0` suppresses the yield. The defence in
- * depth is deliberate and correct; the consequence is that the caller's guard is
- * no longer measured from here.
+ * This docblock claimed that hoisting the backfill call out of
+ * `visibleEventsFor`'s own `if (await canSee(...))` reddens 12.277, and under
+ * the push shape the mechanism was there to believe: `grantBackfillFor` yielded
+ * the TRIGGER EVENT itself last, so a hoisted call handed the narrowing to the
+ * very viewer it narrowed away and the `not.toContain(ticket)` line caught it.
+ * (The claim carried no measurement, unlike the two above it.)
+ *
+ * Under P37.1 it is false. Hoisting the notice block out of that guard reddens
+ * NOTHING here: `grantNoticeFor` asks its OWN `canSee` about the trigger ticket
+ * too, answers false for the narrowed-away viewer, returns an empty list, and
+ * `ticketIds.length > 0` suppresses the yield — while the trigger envelope stays
+ * behind under the caller's guard, where the ordinary filter's own cases
+ * (`visible-events-for.test.ts`, 6.16) hold it. The defence in depth is
+ * deliberate and correct; the consequence is that the caller's guard is no
+ * longer measured from this file, and that is a lost kill rather than a tidier
+ * design.
  *
  * What WOULD measure it is a fixture where the trigger ticket is invisible to
  * the reader while an inheriting descendant is visible — the cross-project shape
  * of 12.280 run in the opposite direction. It is not added, because it needs a
- * case id and 12.292–12.303 are taken on this branch, and it is not bolted onto
+ * case id and §12's ids are controller-ALLOCATED rather than derived (12.290–
+ * 12.308 in use on this branch; the next block is issued on request), and it is
+ * not bolted onto
  * 12.280 because that case's whole value is reddening ALONE for the `canSee`
  * mutation. *Recorded rather than closed. Owner: unassigned.*
  */
@@ -183,6 +204,10 @@ function soleNotice(items: readonly SyncItem[]): ReachGrantedInstruction {
   const found = noticesOf(items);
   expect(found).toHaveLength(1);
   const only = found[0];
+  // UNREACHABLE, and kept: the `expect` above has already thrown by the time an
+  // empty list could get here. It exists because `noUncheckedIndexedAccess`
+  // types `found[0]` as possibly-undefined and this is the narrowing that does
+  // not weaken the assertion. Deleting either line breaks the other.
   if (only === undefined) throw new Error('no reach-granted notice in this drain');
   return only;
 }
@@ -478,13 +503,18 @@ describe('grant notice — the copy nobody gives back (closure 5, rulings P37 an
     // the trigger by luck.
     expect(named[0]).toBe(parent);
     // The excess really is excess — two children got nothing. Spelled as the
-    // arithmetic rather than as `2` so that a changed cap or a changed fixture
-    // moves both halves together; the `toBeGreaterThanOrEqual` below is what
-    // says the fixture is genuinely OVER the cap rather than sitting on it.
+    // arithmetic (201 seeded, 199 named beside the parent) rather than as `2`, so
+    // that a changed cap or a changed fixture moves both halves together.
     const namedSet = new Set(named);
     const missing = children.filter((c) => !namedSet.has(c));
     expect(missing).toHaveLength(children.length - (GRANT_BACKFILL_MAX_TICKETS - 1));
-    expect(missing.length).toBeGreaterThanOrEqual(2);
+    // The FIXTURE guard, and it is about `children`, not about `missing`: a
+    // `expect(missing.length).toBeGreaterThanOrEqual(2)` here would be a check
+    // that CANNOT FAIL — the exact line above already pins the number, so the
+    // floor could only be violated by a run that had already gone red. What the
+    // over-cap claim actually rests on is that more children were seeded than the
+    // cap can hold, and shrinking the loop is the edit that would break it.
+    expect(children.length).toBeGreaterThan(GRANT_BACKFILL_MAX_TICKETS);
     // The drain carries the trigger and nothing else. Under the push shape this
     // fixture streamed the whole history of 200 tickets in one atomic burst —
     // case 12.290's wedge — and this single line is what would catch its return.
@@ -508,7 +538,7 @@ describe('grant notice — the copy nobody gives back (closure 5, rulings P37 an
     // What survives is the `backfilled` Set, and it is worth more under the
     // notice shape than it was under the push one: it is per-DRAIN, deliberately
     // not per-subscriber, because `visibleEventsFor` has no per-subscriber state
-    // and must not invent any. Both directions of that are measured here.
+    // and must not invent any. Both directions of that are asserted below.
     const ws = newUlid();
     const prj = newUlid();
     const viewer = newUlid();

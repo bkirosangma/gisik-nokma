@@ -64,6 +64,38 @@ import { listVisibleTickets } from './visible-tickets.js';
  *   entity not held* — which is the rule a replica needs for `ReplicaGapError`
  *   anyway, rather than a special case for this module.
  *
+ * ## ⚠️ THE GRANT HALF DOES NOT CLOSE 12.274 ON ITS OWN, and the reason is subtle
+ *
+ * The client's filter is *"do I hold this ticket"* (`applyInstruction`'s
+ * `reach-granted` arm asks `getTicket(id) === null`). **A device can hold a
+ * STALE PARTIAL copy**, because a narrowing purges nothing — the per-event walk
+ * was struck on 6.101 and the residual is 6.104, both deliberate. So in 12.274's
+ * own script the re-widening's notice names a ticket the client "holds", nothing
+ * is fetched, and the divergence survives wearing this fix's clothes.
+ *
+ * **What actually closes it is BOTH halves of closure 5, in the order
+ * `onCaughtUp` runs them:** `reconcile` purges the stale copy first, and only
+ * then does a notice find a ticket the device does not hold. The narrow half is
+ * not an independent feature that happens to ship alongside this one; it is a
+ * precondition of this one converging.
+ *
+ * **The residual that leaves, stated rather than implied.** `reconcile` is
+ * bounded by `RECONCILE_MIN_INTERVAL_MS`, so a narrow-and-re-widen inside that
+ * window of the last automatic reconcile leaves the device holding the stale
+ * partial copy with no repair: the notice is spent, and the next reconcile will
+ * not purge a ticket the device may now legitimately see. It is 12.274's defect
+ * at reduced width — bounded in time where it used to be permanent and
+ * unconditional — and it is not closed here. *Owner: unassigned.*
+ *
+ * **The obvious repair is worse and is named so nobody spends the round.**
+ * Dropping the holdings filter — pull every id a notice names — closes this and
+ * reopens the amplifier the filter exists to bound, because
+ * `check-permission.ts` does not refuse a `visibility.set` that sets the mode a
+ * ticket already has. Moving the filter from record-time to drain-time does not
+ * help either: the drain that matters runs inside `applyOne`, ahead of the
+ * trigger, which is where it must be for the refold hazard, and that is before
+ * any reconcile in the same catch-up.
+ *
  * ## This is NOT case 6.101's purge walk arriving from the other side
  *
  * The server enumerating ids to a client inverts `reconcile-route.ts`'s safety

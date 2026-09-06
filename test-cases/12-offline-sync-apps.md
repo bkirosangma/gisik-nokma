@@ -1930,56 +1930,90 @@ written; they are recorded in `docs/lanes/executor-state-B.md`.
 `apps/server/test/dual-client/grant-backfill.test.ts` (against two real replicas) and
 `apps/server/test/visibility/grant-backfill.test.ts` (at the filter, where the decision is made).
 
-- 12.275 ✅ **12.274's probe, executable and green.** Narrow → ONE unrelated visible commit → re-widen.
-  B ends holding all four of the ticket's events, `replicasEqual` in both directions, and the SERVER's
-  `proj_tickets` equals the folded replica. **The control is the case:** the workspace_seq of the
-  narrowing and of the row filed after it are both asserted BELOW B's cursor before the widening, so a
-  green run cannot be 12.270's quiet shape. Both cursors stand at the stream head afterwards.
-- 12.276 ✅ **Replay is idempotent — MEASURED, because P37 makes over-delivery acceptable only if it is.**
-  A ticket's whole history handed back to a replica that already holds it: `applyServerItem` answers
-  `[false, false, false]`, and the ticket, the full local history, the contest table and the cursor are
-  all equal to what they were. The rows, not a count. Vacuity is excluded first — the replica is asserted
-  to hold three events and a non-null confirmed state before anything is re-delivered.
+- 12.275 ✅ **A re-widened ticket comes back even if the client read something else meanwhile — and it
+  takes BOTH halves of closure 5 to make it.** *(REWRITTEN by closure 5b. The old entry said "the control
+  is the case"; that is no longer true — the RECONCILE is.)* This is 12.274's own script: narrow, one
+  unrelated visible commit so the cursor passes the narrowing, re-widen. **A straight port would have been
+  green-looking and false.** The client's filter is *"do I hold this ticket"*, and a narrowing purges
+  nothing (6.101 struck the walk; 6.104 is the disclosed residual), so B holds a STALE PARTIAL copy right
+  through the narrowing — the notice names a ticket B "holds", nothing is fetched, and 12.274's
+  divergence survives wearing closure 5's clothes. What closes it is `reconcile` purging the stale copy
+  FIRST, so the later notice finds a ticket B does not hold. The `reconcile` call is therefore asserted as
+  a step of the real path (`{presented: 2, purged: [ticketId]}`), not slipped in as setup. Asserts the
+  wire (exactly one notice naming exactly that ticket; the drain's only envelope is the widening, because
+  the pushed tail is gone), the pull (exactly that one id, pending set empty), and convergence (full
+  `TicketState` equality, `projTicket` equality, both cursors at the head). **The equality is load-bearing
+  for a NEW reason:** A's state is the incremental `applyServerItem` fold and B's was rebuilt by
+  `refoldTicket` inside `loadTicketBootstrap`, so it now compares two different construction paths.
+  *Residual recorded at the case and in `grant-backfill.ts`: `RECONCILE_MIN_INTERVAL_MS` bounds the
+  reconcile, so a narrow-and-re-widen inside that window leaves the stale copy with no repair — 12.274 at
+  reduced width, bounded in time where it used to be permanent. Owner: unassigned.*
+- 12.276 ✅ **A repeated no-op `visibility.set` costs a holding client NOTHING** *(retitled: it used to
+  measure "the same history handed back twice is idempotent", which was the push shape's property and has
+  no subject now)*. This is the amplifier bound ruling P37.1 claims, measured rather than cited —
+  `check-permission.ts` does not refuse a `visibility.set` that sets the mode a ticket already has, so
+  without this property one member could make the server re-serve a subtree per commit. The notice is
+  witnessed on the wire first, then the pull count is exactly zero, the pending set empty and the local
+  history gains exactly the trigger. **Same-run positive control:** widening a ticket the client never
+  held costs exactly one pull, and its history arrives BY PULL and not by push (the drain's envelope list
+  is the trigger alone). Then the loop closes — a further no-op on that now-held ticket costs zero again.
 - 12.277 ✅ **A viewer OUTSIDE the new audience receives nothing, and a narrowing is not a trigger for the
-  person it narrowed away.** The excluding fixture P37 names. The narrowed ticket's id appears in NO field
-  of ANY yielded item; the insider, from the same cursor on the same call, does get the backfill.
-  *This is the one case the trigger-list mutation does NOT redden, and that is the informative half: its
-  property is held by `visibleEventsFor`'s own `canSee`, not by the trigger list. A widening self-selects,
-  a narrowing self-excludes, and that is why no before-image is needed and 6.82/6.94 stay untouched.*
-- 12.278 ✅ **A widening hands back the ticket's pre-cursor history AND every inheriting descendant's** —
-  parent, child and grandchild, eight envelopes, each delivered exactly once (`new Set(ids).size ===
-  ids.length`, so the per-drain ledger is asserted rather than assumed). The viewer is current at the head
-  first and receives nothing, so the delivery is the backfill's doing and not the ordinary range's.
+  person it narrowed away.** *(REWRITTEN by closure 5b: the observation moved from "which history
+  envelopes arrived" to "which ids the notice named".)* The excluding fixture P37 names. Asserted as ONE
+  exact drain list, which fails if a notice appears at all; the insider, from the same cursor on the same
+  call, does get the notice. **The vacuity trap this case is famous for SURVIVED the reshape and got
+  worse**: its old control read `JSON.stringify(delivered).toContain(ticket)`, which passed because the
+  narrowing event itself carries the ticket id — and under the notice shape the trigger still travels
+  beside the notice, while the ids are now the entire payload. So the control asserts the NOTICE's
+  `ticketIds`, never a dump. *A widening self-selects, a narrowing self-excludes, and that is why no
+  before-image is needed and 6.82/6.94 stay untouched.*
+- 12.278 ✅ **A widening NAMES the ticket and every inheriting descendant** *(was: "hands back the
+  pre-cursor history … eight envelopes")* — parent, child and grandchild, in the walk's breadth-first
+  order, with no duplicates, asserted as one exact sequence that also pins two further properties: the
+  notice arrives BEFORE its trigger, and the trigger is the drain's only envelope. Under the push shape
+  this drain carried eight; it now carries one plus a notice.
 - 12.279 ✅ **A descendant that AUTHORED its own audience is pruned** — the ancestor's widening does not
-  reach it, and its id appears nowhere in the answer. Positive control on the same call: the parent's
-  history did come back. This is `reResolveSubtree`'s own prune, applied read-only.
-- 12.280 ✅ **An inheriting child in ANOTHER project is refused by the backfill's own `canSee`.** The case
-  exists to make that guard killable: for every ORDINARY descendant the guard is redundant (an inheriting
-  child copies the authoring ancestor's `resolved_mode` and `resolved_user_ids`, so `canSee` returns the
-  answer the caller already had), and it is load-bearing only where the inherited mode is `'project'` and
-  the child's OWN `project_id` differs — because `canSeeResolved` asks `eff.projects.has(v.projectId)`
-  against the CHILD's row. **Without this fixture the guard would be unkillable and would have had to be
-  dropped**, on `stream/hub.ts`'s own precedent of four masked `sub.ended` guards.
+  name it. Asserted as the notice's exact id list, so the exclusion and its positive control are one
+  assertion rather than a `toContain`/`not.toContain` pair. This is `reResolveSubtree`'s own prune,
+  applied read-only.
+- 12.280 ✅ **An inheriting child in ANOTHER project is refused by the notice's own `canSee`.** The case
+  exists to make that guard killable: for every ORDINARY descendant the guard is redundant, and it is
+  load-bearing only where the inherited mode is `'project'` and the child's OWN `project_id` differs —
+  because `canSeeResolved` asks `eff.projects.has(v.projectId)` against the CHILD's row. **Without this
+  fixture the guard would be unkillable and would have had to be dropped**, on `stream/hub.ts`'s own
+  precedent of four masked `sub.ended` guards. **Under the notice shape it matters MORE than it did**:
+  the ids ARE the payload now, so this guard is the only thing between a subtree walk and a notice naming
+  ids the reader may not see.
 - 12.281 ✅ **`ticket.reparented` is a trigger too** — inheritance is an audience, so moving an unauthored
   ticket under a visible parent widens it exactly as a `visibility.set` does. The payload field is
-  `newParentId`; `parentId` is the plan text's spelling and leaves `parent_id` unchanged for ever.
-- 12.282 ✅ **Bounded to PRE-cursor rows, and once per widening.** An event above the cursor arrives
-  exactly once (from the ordinary range, not also as backfill), and a second drain from the advanced
-  cursor yields nothing — the trigger is out of range, so the cost is one backfill per subscriber per
-  widening rather than one per drain.
-- 12.283 🚫 **The THIRD shape of grant, recorded and NOT built.** Visibility also widens when the READER's
-  reach grows rather than the ticket's — `membership.granted` at a higher role, or a `project.member_added`
-  onto a project full of project-mode tickets. Every ticket those newly reveal carries the identical
-  pre-cursor gap. They are ROSTER events, and P37 scopes closure 5 to "the visibility event itself", so
-  this is disclosed rather than fixed. It is named in `GRANT_BACKFILL_TRIGGERS`' own docblock so a reader
-  cannot infer from the module's existence that it is covered. *Owner: the WS catch-up/purge protocol,
-  unassigned to any task.*
-
-### Closure 5 — the narrow half (ruling P37, 2026-09-06)
-
-`apps/server/test/sync/reconcile-route.test.ts`, `packages/sync-client/test/sync-engine.test.ts` and the
-client-half case on the dual-client rig (see 12.289 on what that does and does not reach).
-
+  `newParentId`; `parentId` is the plan text's spelling and leaves `parent_id` unchanged for ever. The
+  notice-before-trigger ordering is asserted here specifically, because `ticket.reparented` is the folded
+  event: a client handed the trigger first would replay a transition with no `ticket.created`.
+- 12.282 ✅ **Once per widening, per drain** *(the "bounded to PRE-cursor rows" half DIED with the push
+  shape — a notice carries no rows, so that clause has no subject; the exact-envelope-list assertions in
+  12.278, 12.281 and 12.291 are what replaced it)*. Two triggers on one ticket in one drain — deliberately
+  one `visibility.set` and one `ticket.reparented`, so nothing rests on a same-value short-circuit — name
+  it once; a LATER drain that sees a NEW widening is owed the notice again, because the ledger is scoped
+  to the drain and not to the subscription.
+- 12.283 ✅ **The THIRD shape of grant — CLOSED by closure 5b(a).** *(Was 🚫, recorded and not built;
+  P37 scoped closure 5 to "the visibility event itself".)* Visibility also widens when the READER's reach
+  grew rather than the ticket's — `membership.granted`, `project.member_added` — and every ticket such an
+  event reveals carries the identical pre-cursor gap. **It could not be another entry in
+  `GRANT_BACKFILL_TRIGGERS`, for a structural reason rather than a scoping choice:** those are roster
+  events filed against the roster entity, so there is no ticket to start a subtree walk from, and the
+  question inverts with the widening — not who can now see this ticket, but which tickets can this viewer
+  now see. `readerReachNoticeFor` answers it with `listVisibleTickets`, the same predicate every read
+  endpoint uses, rather than a second definition of visibility. It answers what the reader can see NOW,
+  not what they gained, because there is no before-image to subtract; it therefore OVER-NAMES, which is
+  affordable only because the client drops ids it already holds without asking the server anything.
+  Two cases in `apps/server/test/visibility/reader-reach.test.ts`, each with its excluding half in the
+  same run against the same ledger. The project case asserts the notice EXACTLY — a workspace-wide
+  listing would satisfy "contains the joined project's ticket" while disclosing one in a project the
+  member still cannot see — and the membership case plants an owner-only ticket in the same project for
+  the same reason, plus a bystander who CAN see the named ticket and would be a plausible recipient for
+  an implementation keyed on the ticket rather than on the event's subject. *The file's own docblock
+  records the trap that would have made both pass for the wrong reason: `seedMember` writes the
+  projections and NOT the ledger, so in most fixtures no roster row exists to be drained at all.*
 - 12.284 ✅ **`POST /v1/sync/reconcile` answers `{kind:'restricted', id}` for the narrowed ticket and says
   nothing about the one still held** — asserted as an EXACT response, because `toContainEqual` alone would
   pass on an answer that restricted both, and that answer wipes a replica. A caller with no role gets
