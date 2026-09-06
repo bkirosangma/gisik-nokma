@@ -162,6 +162,35 @@ nothing — they measured it, applying both reconciliations to `app-core` at onc
 client code through the `@gisik-nokma/app-core/online` subpath. That import resolves through `dist`,
 so any mutation run must rebuild rather than use bare `vitest`.
 
+## CONTROLLER CORRECTION RECEIVED 2026-09-06 ~12:53 — ADOPTED, AND ONE COVERAGE GAP IT OPENS
+
+**`pnpm check:env` is `scripts/check-env-example.mjs` ALONE** — verified at `package.json:12`.
+`scripts/check-case-ids.mjs` is a SEPARATE CI step (`ci.yml:169`). **"check:env 0" says NOTHING about
+case ids.** This lane did not conflate them — the anchors table above reports `CHECK_IDS_EXIT=0` from
+its own `node scripts/check-case-ids.mjs` run, on its own row — but the distinction is recorded here
+because it binds every future report from this lane.
+
+**`main` moved to `81a7e44` (#183, Lane C's T11+T12) while this inventory was running.** That opens a
+real gap and I am not going to paper over it:
+
+> **`apps/server/test/ops/` had ZERO files on my base `3e6d606`.** `git ls-tree -r 3e6d606 --
+> apps/server/test/ops` returns nothing; the same command against `origin/main` returns five files.
+> **My scanners structurally could not see them.** The inventory below is a fact about the tree at
+> `3e6d606`, not about `main` — which is this repo's own rule that a sweep is a fact about a tree,
+> arriving on schedule.
+
+Closed by hand from `origin/main` rather than left as a hole. **Both are Lane C's files, C is live on
+`src/ops/schedule.ts`, so no witness is built here — these are catalogue rows:**
+
+| fixture | models | verdict | why |
+|---|---|---|---|
+| `test/ops/object-sink.test.ts:7` — `mockClient(S3Client)` | the S3 / DO Spaces object API | **MIRROR, narrow** | It mocks the transport but builds **real `PutObjectCommand` / `DeleteObjectCommand`** from `@aws-sdk/client-s3`, so the command encoding is the VENDOR's, not hand-authored — far stronger than a hand-rolled sink. What stays unwitnessed is only whether a real bucket ACCEPTS them. Witness needs a real bucket → **Lane C / deployment**, not buildable here. |
+| `test/ops/pg-dump.test.ts` | `pg_dump` / `pg_restore` invocation | **WITNESSED by construction** | It does not fake the binary — it `spawnSync`s the REAL `pg_dump`, with `describe.skipIf(!pgDumpAvailable())` and a probe. Not a mirror at all. Its docblock also records the right lesson: **the guard and the subject must probe the same `PATH`**, after a per-child `env:` override made all four cases fail `ENOENT` including the planted-defect one. |
+
+**Consequence for the PR, and it is mine to carry:** this branch must rebase onto `81a7e44` before any
+PR, and #183 touched `Features.md` and `test-cases/13` — the same `Features.md` this pass appends to.
+Whoever lands second rebases; that is me.
+
 ## WHAT I FOUND BY LOOKING, THAT CHANGES THE SHAPE OF PHASE 2
 
 The override anticipated a sibling file "until #161 merges". Finding 1 says that is not a
