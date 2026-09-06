@@ -16,6 +16,64 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🔴 MONDAY 2026-09-07 ~04:15 IST — **CORRECTION: my "reader job" figures were WRONG. ~127 rows are citable, not ~90-mostly-unreachable. §07 is at 1 uncited.** Three branches in flight; nothing running.
+
+## ⛔ THE CORRECTED PICTURE — supersedes every earlier estimate in this file
+
+| § | uncited | **NAMED (citable)** | genuinely unnamed |
+|---|---|---|---|
+| §03 | 22 | **19** | 3 |
+| §04 | 39 | **10** | 29 |
+| §06 | 28 | **21** | 7 |
+| §12 | 78 | **31** | 47 |
+| §13 | 72 | **46** | 26 |
+| §07 | **1** | — | — |
+| §05 | 17 (on #244) | 17 | 0 |
+
+**I previously reported §13's 72 as "reader job" and §12 as "2 transcribable of 78". Both wrong.**
+
+## THE CAUSE — my extractor answered the wrong SHAPE, four times, and each wrong number was reported before it was checked
+
+| # | assumed | the catalogue actually does | hidden |
+|---|---|---|---|
+| 1 | ids look like `- 7.5 ✅` | §13 uses **marker-first** `- ✅ **13.9 — …**` | 27 |
+| 2 | ids are single tokens | §03 uses **ranges** `- **3.89–3.94** ✅` | 50 |
+| 3 | **a row is ONE LINE** | rows **WRAP**; the path is often on the continuation line | **46** |
+| 4 | a path ends at `.ts` | paths carry **line numbers** `` `x.test.ts:45` `` | 23 |
+| 5 | the row names its file | §07 names it once in the **BLOCK HEADER** | 36 |
+
+**None errored. All five produced clean numbers.** Recorded as **verification-method rule 9** in the coordination
+doc, and in memory.
+
+> **A count is a claim about the SHAPE of the source, not just its content.** And **an authority validates only
+> the question it answers** — `check:citations` agreed with my totals throughout, because it counts ✅ ids and has
+> no opinion on which rows NAME a file. That agreement felt like corroboration and was not.
+
+**What found them was never more counting.** Defect 3 surfaced only after **stopping to read six raw rows
+verbatim**, one ending mid-sentence at *"each refused by name when"*. **A truncated sentence is a shape error you
+can SEE; a wrong total is not.**
+
+**Use `/tmp/cite2.py`** (multi-line aware, `:line` suffixes, range form, marker-first) — and still check it
+against the checker before believing it.
+
+## STATE
+
+| branch | state | sections |
+|---|---|---|
+| `exec/63` | **PR #244 OPEN** | §05 67 → 17 |
+| `exec/64` | **PR #245 OPEN** | §06 63 → 37 |
+| `exec/65` | pushed, **NO PR**, stacked on `exec/64` | §03 45→22 · §06 →28 · §04 45→39 · **§07 78→1** |
+
+Gate green at `f717189` (sixteenth identical run) — **the coordination-doc and handoff commits after it are
+docs-only, so the gated code head stands.**
+
+## NEXT — and the dispatch case is now much stronger
+
+**~127 citable rows remain**, not ~90. That is ~16 more hand rounds versus one or two sonnet dispatches.
+**Tenth ask.** Also still open: **merge order for #244/#245**, and **§12's block — now worth backfilling at 31
+citable rows rather than the 2 I reported.**
+
+
 # 🟢 MONDAY 2026-09-07 ~03:45 IST — **BACKFILL CONSOLIDATED. Every section is taken to the point where only SCATTERED SINGLETONS or reader-job rows remain.** Three branches in flight. Nothing running, no subagent. Weekly reset ~2.5h away.
 
 | branch | state | sections |
