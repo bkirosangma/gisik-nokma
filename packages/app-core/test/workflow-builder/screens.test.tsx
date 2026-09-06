@@ -48,6 +48,9 @@ describe('WorkflowBuilderScreen', () => {
     expect(nameField).toHaveValue('Shop errands');
   });
 
+  /**
+   * 10.10 — add state from the header.
+   */
   it('adds a state from the header button', async () => {
     const user = userEvent.setup();
     render(
@@ -113,6 +116,9 @@ describe('WorkflowBuilderScreen', () => {
 });
 
 describe('WorkflowListScreen', () => {
+  /**
+   * 10.62 — published workflows list with name, v<version> and a state count; Open hands the route the id.
+   */
   it('lists published workflows with version and state count, and opens one', async () => {
     const user = userEvent.setup();
     const first = cloneTemplate(kanban);
@@ -134,6 +140,9 @@ describe('WorkflowListScreen', () => {
     expect(onOpen).toHaveBeenCalledWith(first.id);
   });
 
+  /**
+   * 10.63 — an author is offered New workflow, and an empty list says so in its own words.
+   */
   it('offers New workflow to authors and says when the list is empty', async () => {
     const user = userEvent.setup();
     const onNew = vi.fn();
@@ -151,6 +160,9 @@ describe('WorkflowListScreen', () => {
     expect(onNew).toHaveBeenCalledOnce();
   });
 
+  /**
+   * 10.64 — a rejected list read gets its own sentence, never the empty-list one.
+   */
   it('says so when the workflow list cannot load', async () => {
     const gateway = createFakeGateway();
     gateway.listWorkflows = async () => {
@@ -184,6 +196,9 @@ describe('WorkflowListScreen', () => {
 });
 
 describe('TemplateGallery', () => {
+  /**
+   * 10.40 — the gallery offers the three templates plus Start blank.
+   */
   it('offers the three templates and Start blank', async () => {
     const user = userEvent.setup();
     const onPick = vi.fn();

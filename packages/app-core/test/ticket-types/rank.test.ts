@@ -14,6 +14,9 @@ describe('rankImplications', () => {
     expect(parents.map((parent) => parent.name)).toEqual(['Epic', 'Story']);
   });
 
+  /**
+   * 10.44 — rank implications derived live; a type at or below the deepest rank says plainly that its tickets will need a parent.
+   */
   it('the deepest rank requires a parent — built-in or workspace-invented alike (owner decision 2026-08-20)', () => {
     expect(rankImplications('sub-task', 4, BUILTINS).mustHaveParent).toBe(true);
     expect(rankImplications('invoice', 4, BUILTINS).mustHaveParent).toBe(true);

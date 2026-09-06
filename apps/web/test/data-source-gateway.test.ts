@@ -76,6 +76,9 @@ function fakeDataSource(overrides: Partial<DataSource['query']> = {}) {
 }
 
 describe('the three reads and the one write that Plan 6’s DataSource already serves go through it', () => {
+  /**
+   * 10.59 — getWorkflow/listTicketTypes/submit route through Plan 6's DataSource; the rest route over the online HTTP client.
+   */
   it('getWorkflow, listTicketTypes and submit delegate to DataSource and speak no HTTP', async () => {
     const dataSource = fakeDataSource();
     // No routes scripted at all: any HTTP call from these three throws by name.

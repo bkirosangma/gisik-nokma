@@ -100,6 +100,9 @@ describe('state actions', () => {
     expect('blocked' in (store.getState().def.states.find((s) => s.id === 'doing') ?? {})).toBe(false);
   });
 
+  /**
+   * 10.7 — deleting a state cascades its edges but leaves the start marker and rdu references dangling for validation to name.
+   */
   it('removeState cascades transitions touching the state but leaves the initial marker dangling', () => {
     const store = storeWith(kanbanDef());
     store.actions.removeState('todo');

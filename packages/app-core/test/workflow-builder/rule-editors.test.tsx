@@ -56,6 +56,9 @@ function renderInspector(store: DraftStore, envOverrides: Partial<BuilderEnviron
 }
 
 describe('RestrictToEditor', () => {
+  /**
+   * 10.11 — restrict-to: assignee/role/member pickers write the rule; dead keys omitted.
+   */
   it('toggles assignee, roles, and named members into the rule', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));
@@ -88,6 +91,9 @@ describe('RestrictToEditor', () => {
     expect(within(editor).queryByRole('checkbox', { name: 'Asha' })).not.toBeInTheDocument();
   });
 
+  /**
+   * 10.12 — the restrict-to emptiness helper appears when nobody is picked.
+   */
   it('shows the emptiness helper when nobody is picked', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));
@@ -102,6 +108,9 @@ describe('RestrictToEditor', () => {
 });
 
 describe('RequireFieldEditor', () => {
+  /**
+   * 10.13 — require-field is picker-only: built-ins plus bound types' fields.
+   */
   it('offers built-ins plus the bound types fields, and picks into the rule', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));
@@ -128,6 +137,9 @@ describe('RequireFieldEditor', () => {
     expect(screen.queryByText('This field is not on any ticket type bound to this workflow.')).not.toBeInTheDocument();
   });
 
+  /**
+   * 10.14 — require-field warns on a field no bound type carries.
+   */
   it('warns when the rule names a field no bound type carries', () => {
     const store = createDraftStore(draftFromTemplate(kanban));
     store.actions.addRule(0, { kind: 'require-field', field: 'ghost-field' });
@@ -145,6 +157,9 @@ describe('RequireFieldEditor', () => {
 });
 
 describe('RequireDifferentUserEditor', () => {
+  /**
+   * 10.15 — require-different-user picks among transition targets, naming the move.
+   */
   it('offers only states some transition points at, naming the move', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));
@@ -167,6 +182,9 @@ describe('RequireDifferentUserEditor', () => {
     expect(screen.queryByText(/has nobody to differ from/)).not.toBeInTheDocument();
   });
 
+  /**
+   * 10.16 — the rdu start-state vacuous case carries its honesty note.
+   */
   it('notes the vacuous case when the rule watches the start state', () => {
     const store = createDraftStore(draftFromTemplate(kanban));
     // 'todo' is already a transition target (doing -> todo) AND the initial state — the vacuous case

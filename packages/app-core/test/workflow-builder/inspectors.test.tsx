@@ -54,6 +54,9 @@ describe('StateInspector', () => {
     expect(store.getState().def.states.find((state) => state.id === 'doing')?.name).toBe('In review');
   });
 
+  /**
+   * 10.4 — the start marker is settable from the inspector, and disabled on the current start.
+   */
   it('sets the selected state as the start state', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));
@@ -104,6 +107,9 @@ describe('TransitionInspector', () => {
   // exercises exactly ONE kind (require-comment) — misdescribed coverage
   // recorded here rather than left implicit. This pair closes the gap: the
   // menu's full contents, and every kind's default, asserted directly.
+  /**
+   * 10.18 — the add-rule menu offers exactly the five kinds with honest defaults.
+   */
   it('offers exactly the five Rule kinds and no sixth thing', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(kanban));

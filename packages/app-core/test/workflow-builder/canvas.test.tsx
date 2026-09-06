@@ -36,6 +36,9 @@ function renderCanvas(store: DraftStore, env = testEnv()) {
 }
 
 describe('WorkflowCanvas', () => {
+  /**
+   * 10.1 — states render as nodes with name, category, blocked flag, and a start marker.
+   */
   it('renders every state as a node with its name', () => {
     renderCanvas(createDraftStore(draftFromTemplate(errand)));
     for (const name of ['Later', 'Next', 'In progress', 'Waiting', 'Done']) {
@@ -60,6 +63,9 @@ describe('WorkflowCanvas', () => {
     ).not.toBeChecked();
   });
 
+  /**
+   * 10.2 — the category picker on a node edits the def.
+   */
   it('changes a state category through the node picker', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(errand));
@@ -69,6 +75,9 @@ describe('WorkflowCanvas', () => {
     expect(store.getState().def.states.find((state) => state.id === 'done')?.category).toBe('active');
   });
 
+  /**
+   * 10.3 — the blocked checkbox toggles the amendment-9 flag; unchecking removes the key rather than storing false.
+   */
   it('toggles the blocked flag through the node checkbox', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(errand));
@@ -79,6 +88,9 @@ describe('WorkflowCanvas', () => {
     expect(store.getState().def.states.find((state) => state.id === 'in-progress')?.blocked).toBe(true);
   });
 
+  /**
+   * 10.8 — click node/edge to select; inspectors follow the selection.
+   */
   it('selects a state on click', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(errand));
@@ -98,6 +110,9 @@ describe('WorkflowCanvas', () => {
   // would fail against the real template. Rewritten here to assert what the
   // template as measured actually carries, addressed by the edge's own
   // data-testid rather than by an ambiguous getAllByText[i] ordering guess.
+  /**
+   * 10.17 — plain-language rule summaries render on edges and in the inspector.
+   */
   it('renders rule summaries on edges and selects the transition when a label is clicked', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(errand));
@@ -107,6 +122,9 @@ describe('WorkflowCanvas', () => {
     expect(store.getState().selection).toEqual({ kind: 'transition', index: 3 });
   });
 
+  /**
+   * 10.6 — the distinguished any-state source renders with its hint.
+   */
   it('renders the distinguished any-state source node', () => {
     renderCanvas(createDraftStore(draftFromTemplate(errand)));
     expect(screen.getByText('Any state')).toBeInTheDocument();

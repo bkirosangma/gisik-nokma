@@ -43,6 +43,9 @@ describe('WORKFLOW_TEMPLATES', () => {
     }
   });
 
+  /**
+   * 10.57 — simple-kanban and approval-chain produce no advisories.
+   */
   it('simple-kanban and approval-chain warn about nothing', () => {
     // errand-with-waits is excluded here, not weakened: see the next test and
     // its comment for why, with a named owner (record, not fix — this
@@ -55,6 +58,9 @@ describe('WORKFLOW_TEMPLATES', () => {
     }
   });
 
+  /**
+   * 10.61 — errand-with-waits trips rule-bypassable twice — recorded and ruled (RULING P29), not a gap.
+   */
   it('errand-with-waits trips rule-bypassable — recorded, not adjudicated (coordination doc §Plan 8/5)', () => {
     // ERRAND_WITH_WAITS_TEMPLATE is FROZEN — its shape is pinned by Plan 11's
     // checkErrandTemplate oracle (not yet landed on this branch; verified
@@ -80,6 +86,9 @@ describe('WORKFLOW_TEMPLATES', () => {
     expect(advisories.map((advisory) => advisory.code)).toEqual(['rule-bypassable', 'rule-bypassable']);
   });
 
+  /**
+   * 10.37 — the three templates validate clean and clone with fresh ids, never sharing structure.
+   */
   it('cloning twice mints two distinct workflow ids and never shares state arrays', () => {
     const template = WORKFLOW_TEMPLATES[0]!;
     const first = cloneTemplate(template);
@@ -90,6 +99,9 @@ describe('WORKFLOW_TEMPLATES', () => {
     expect(template.def.states[0]!.name).not.toBe('Mutated');
   });
 
+  /**
+   * 10.38 — errand-with-waits blocked-flags exactly its one waiting state.
+   */
   it('the errand card IS the domain template, and its waiting state is blocked-flagged', () => {
     const errand = WORKFLOW_TEMPLATES.find((template) => template.id === 'errand-with-waits')!;
     // Identity, not resemblance — the same guarantee the Kanban card carries:
@@ -103,6 +115,9 @@ describe('WORKFLOW_TEMPLATES', () => {
     }
   });
 
+  /**
+   * 10.39 — approval-chain requires a second person on the approve move.
+   */
   it('approval-chain requires a second person on the approve move', () => {
     const approval = WORKFLOW_TEMPLATES.find((template) => template.id === 'approval-chain')!;
     const approve = approval.def.transitions.find((transition) => transition.to === 'approved')!;

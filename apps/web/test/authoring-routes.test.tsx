@@ -61,6 +61,9 @@ const READ_ONLY_COPY =
   'You can look, not touch — only a workspace owner or admin can change workflows and ticket types.';
 
 describe('the template gallery is a route-level authoring entry point, and a member is not offered it', () => {
+  /**
+   * 10.65 — a MEMBER typing /settings/workflows/new gets the read-only sentence and neither half of the gallery.
+   */
   it('a MEMBER typing /settings/workflows/new gets the read-only sentence and no gallery', async () => {
     render(
       <Providers
@@ -78,6 +81,9 @@ describe('the template gallery is a route-level authoring entry point, and a mem
     expect(screen.getByRole('link', { name: 'Back to the workflows' })).toBeInTheDocument();
   });
 
+  /**
+   * 10.66 — CONTROL for 10.65: an ADMIN gets exactly those buttons on the same page.
+   */
   it('CONTROL — an ADMIN gets exactly those buttons on the same page', async () => {
     render(
       <Providers
@@ -96,6 +102,9 @@ describe('the template gallery is a route-level authoring entry point, and a mem
     expect(screen.queryByText(READ_ONLY_COPY)).not.toBeInTheDocument();
   });
 
+  /**
+   * 10.67 — a MEMBER typing /settings/ticket-types/new gets the sentence, no editor form and a link back.
+   */
   it('a MEMBER typing /settings/ticket-types/new gets the sentence and no editor form', async () => {
     render(
       <Providers
@@ -123,6 +132,9 @@ describe('the template gallery is a route-level authoring entry point, and a mem
     expect(screen.getByRole('link', { name: 'Back to the ticket types' })).toBeInTheDocument();
   });
 
+  /**
+   * 10.68 — CONTROL for 10.67: an ADMIN gets the editor form on the same page.
+   */
   it('CONTROL — an ADMIN gets the editor form on the same page', async () => {
     render(
       <Providers
@@ -153,6 +165,9 @@ describe('the template gallery is a route-level authoring entry point, and a mem
  * of a 500.
  */
 describe('a role read that FAILS is a refusal on screen, never a quietly read-only page', () => {
+  /**
+   * 10.69 — a rejected roster read renders the refusal's own words and mounts no screen.
+   */
   it('a rejected roster read renders the cause’s own words and mounts no screen', async () => {
     render(
       <Providers
@@ -175,6 +190,9 @@ describe('a role read that FAILS is a refusal on screen, never a quietly read-on
     expect(screen.queryByRole('heading', { name: 'Workflows', level: 2 })).not.toBeInTheDocument();
   });
 
+  /**
+   * 10.70 — CONTROL for 10.69: the GUEST refusal shape is an answer, not a failure — mounts read-only.
+   */
   it('CONTROL — the SAME refusal shape, but the one the door really sends, is a GUEST and not a failure', async () => {
     // `AuthoringReadRefused` is what the adapter throws for a 404, which is what
     // the no-guests door answers a guest. That one IS an answer: read-only.

@@ -76,6 +76,9 @@ describe('IssuesPanel planted defects — every validateWorkflowDef code', () =>
     expect(screen.getByText('No issues — this workflow can be published.')).toBeInTheDocument();
   });
 
+  /**
+   * 10.19 — planted defect: no-states.
+   */
   it('plants no-states by deleting every state', () => {
     const store = kanbanStore();
     for (const stateId of ['todo', 'doing', 'done']) store.actions.removeState(stateId);
@@ -83,6 +86,9 @@ describe('IssuesPanel planted defects — every validateWorkflowDef code', () =>
     expect(expectPanelMatchesValidator(store)).toContain('no-states');
   });
 
+  /**
+   * 10.20 — planted defect: duplicate-state-id (via a loaded def — the store mints unique ids).
+   */
   it('plants duplicate-state-id via a loaded def', () => {
     // the store mints ULID state ids, so a duplicate can only arrive inside a
     // loaded def (a clone or an externally saved draft) — still the canvas's model
@@ -93,6 +99,9 @@ describe('IssuesPanel planted defects — every validateWorkflowDef code', () =>
     expect(expectPanelMatchesValidator(store)).toContain('duplicate-state-id');
   });
 
+  /**
+   * 10.21 — planted defect: no-terminal-state.
+   */
   it('plants no-terminal-state by recategorising the only terminal state', () => {
     const store = kanbanStore();
     store.actions.setStateCategory('done', 'active');
@@ -100,6 +109,9 @@ describe('IssuesPanel planted defects — every validateWorkflowDef code', () =>
     expect(expectPanelMatchesValidator(store)).toContain('no-terminal-state');
   });
 
+  /**
+   * 10.22 — planted defect: unknown-transition-state (via a loaded def — removeState cascades edges).
+   */
   it('plants unknown-transition-state via a loaded def', () => {
     // removeState cascades a state's edges, so a dangling edge too can only
     // arrive inside a loaded def
@@ -110,6 +122,9 @@ describe('IssuesPanel planted defects — every validateWorkflowDef code', () =>
     expect(expectPanelMatchesValidator(store)).toContain('unknown-transition-state');
   });
 
+  /**
+   * 10.23 — planted defect: duplicate-transition.
+   */
   it('plants duplicate-transition by drawing the same edge twice', () => {
     const store = kanbanStore();
     store.actions.addTransition('todo', 'doing');
@@ -117,6 +132,9 @@ describe('IssuesPanel planted defects — every validateWorkflowDef code', () =>
     expect(expectPanelMatchesValidator(store)).toContain('duplicate-transition');
   });
 
+  /**
+   * 10.24 — planted defect: unreachable-state.
+   */
   it('plants unreachable-state by adding an unconnected state', () => {
     const store = kanbanStore();
     store.actions.addState({ name: 'Island' });
@@ -124,6 +142,9 @@ describe('IssuesPanel planted defects — every validateWorkflowDef code', () =>
     expect(expectPanelMatchesValidator(store)).toContain('unreachable-state');
   });
 
+  /**
+   * 10.25 — planted defect: terminal-no-inbound.
+   */
   it('plants terminal-no-inbound by making the start state terminal', () => {
     const store = kanbanStore();
     // a two-state def whose start has no inbound edge, authored entirely by gestures
@@ -137,6 +158,9 @@ describe('IssuesPanel planted defects — every validateWorkflowDef code', () =>
     expect(expectPanelMatchesValidator(store)).toContain('terminal-no-inbound');
   });
 
+  /**
+   * 10.26 — planted defect: unknown-initial-state.
+   */
   it('plants unknown-initial-state by deleting the start state', () => {
     const store = kanbanStore();
     store.actions.removeState('todo');
@@ -144,6 +168,9 @@ describe('IssuesPanel planted defects — every validateWorkflowDef code', () =>
     expect(expectPanelMatchesValidator(store)).toContain('unknown-initial-state');
   });
 
+  /**
+   * 10.27 — planted defect: empty-restrict-to.
+   */
   it('plants empty-restrict-to by unpicking everyone', () => {
     const store = kanbanStore();
     store.actions.addRule(0, { kind: 'restrict-to', assignee: true });
@@ -152,6 +179,9 @@ describe('IssuesPanel planted defects — every validateWorkflowDef code', () =>
     expect(expectPanelMatchesValidator(store)).toContain('empty-restrict-to');
   });
 
+  /**
+   * 10.28 — planted defect: rdu-unknown-state.
+   */
   it('plants rdu-unknown-state by deleting the watched state', () => {
     const store = kanbanStore();
     // rule sits on todo -> doing and watches 'done'; deleting 'done' leaves the
@@ -162,6 +192,9 @@ describe('IssuesPanel planted defects — every validateWorkflowDef code', () =>
     expect(expectPanelMatchesValidator(store)).toContain('rdu-unknown-state');
   });
 
+  /**
+   * 10.54 — planted defect: rdu-unenterable-state — a four-eyes rule watching a state no transition enters.
+   */
   it('plants rdu-unenterable-state by watching a state nothing enters', () => {
     const store = kanbanStore();
     // drop the only way back into the start state, then ask for a second person
@@ -239,6 +272,9 @@ describe('IssuesPanel advisories — a second tier that blocks nothing', () => {
     expect(screen.getByText('No issues — this workflow can be published.')).toBeInTheDocument();
   });
 
+  /**
+   * 10.58 — rule-bypassable advisory: a guard sidestepped by a lower/no-guard edge into the same target, anchored to the GUARDED edge.
+   */
   it('warns about a guard another edge into the same state sidesteps, without calling it an issue', () => {
     const store = lowerGuardStore();
     expect(validateWorkflowDef(store.getState().def)).toEqual([]);
@@ -306,6 +342,9 @@ describe('IssuesPanel anchoring', () => {
 });
 
 describe('SystemRulesPanel', () => {
+  /**
+   * 10.49 — the system-rules panel names provenance and the parent-terminal refusal, citing spec §4.
+   */
   it('names the two invariants no workflow can author away, citing the spec', () => {
     render(<SystemRulesPanel />);
     expect(screen.getByText('System rules — in every workflow')).toBeInTheDocument();
