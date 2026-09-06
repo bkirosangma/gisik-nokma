@@ -227,6 +227,9 @@ describe('compileFilterSpec — hostile bytes never reach SQL text', () => {
     ]);
   });
 
+  /**
+   * 7.4 — the compiled SQL is a CONSTANT across all thirteen hostile inputs, with the bytes only ever in the parameter array — the form that replaced an `expect(sql).not.toContain(value)` which reddened on a correct compiler.
+   */
   it('the compiled SQL is a CONSTANT — identical for all thirteen inputs, with the bytes only ever in the parameters', () => {
     for (const hostile of HOSTILE_VALUES) {
       const params = new SqlParams();
@@ -424,6 +427,9 @@ describe('compileFilterSpec — executed against Postgres', () => {
     expect(await run({ fields: [{ fieldId: 'notes', op: 'contains', value: '50%_done' }] })).toEqual(['tkt-1']);
   });
 
+  /**
+   * 7.48 — LIKE metacharacters inside a `contains` value are literal: `50%_done` matches the ticket claiming exactly that, and the wildcard reading matches nothing.
+   */
   it('LIKE metacharacters in a contains value are literal, not wildcards', async () => {
     // '50%_done' matches only because the % and _ are escaped; if they were
     // wildcards, '5%d' would match too — and it must not.
@@ -432,6 +438,9 @@ describe('compileFilterSpec — executed against Postgres', () => {
     expect(await run({ fields: [{ fieldId: 'notes', op: 'contains', value: '0%_d' }] })).toEqual(['tkt-1']);
   });
 
+  /**
+   * 7.47 — the blocked-state filter answers from the ticket’s OWN workspace, not from a neighbouring tenant reusing the same `workflow_id` at a higher version.
+   */
   it('the blocked filter answers from the ticket own workspace, not from a neighbouring tenant reusing the workflow id', async () => {
     // wsA's own definition blocks 'waiting' → tkt-2. wsB's higher-versioned
     // row for the same workflow_id blocks 'doing' → tkt-1. A global
@@ -441,6 +450,9 @@ describe('compileFilterSpec — executed against Postgres', () => {
     expect(await run({ blocked: false })).toEqual(['tkt-1', 'tkt-3', 'tkt-4']);
   });
 
+  /**
+   * 7.46 — the compiled filter EXECUTED against Postgres with thirteen hostile inputs through every slot — no error, no damage, empty only where empty is the truth.
+   */
   it('executes every hostile input as data: no error, no damage, and empty only where empty is the truth', async () => {
     const before = await db.pool.query('SELECT count(*)::int AS n FROM proj_tickets');
     const eventsBefore = await db.pool.query('SELECT count(*)::int AS n FROM events');
@@ -494,6 +506,9 @@ describe('compileFilterSpec — executed against Postgres', () => {
    * than a hypothesis. So the spec is built as a `FilterSpec` DIRECTLY — past
    * the door, which is the only way to reach the compiler with a NUL at all —
    * and the query is run.
+   */
+  /**
+   * 7.49 — the compile-filter half: past the door each of the seven NUL-bearing specs raises SQLSTATE 22021, which is what the schema’s refusal exists to prevent. (The door-refusal half is also asserted in `packages/domain/test/filter-spec.test.ts`.)
    */
   describe('U+0000 — refused at the door because Postgres cannot carry it', () => {
     const NUL = String.fromCharCode(0);
@@ -572,6 +587,9 @@ describe('compileFilterSpec — executed against Postgres', () => {
     return rows.map((r) => (r as { ticket_id: string }).ticket_id).sort();
   }
 
+  /**
+   * 7.51 — a concatenated `fieldId` is shown to WIDEN across the tenant boundary, not merely to break, while the bound one narrows to nothing.
+   */
   it('a concatenated fieldId WIDENS the answer across the tenant boundary; the bound one narrows to nothing', async () => {
     // Concatenated, this closes the jsonb key literal, ORs a tautology and
     // comments away the tail — including the caller's own ORDER BY and, by
@@ -593,6 +611,9 @@ describe('compileFilterSpec — executed against Postgres', () => {
     expect(await run({ fields: [{ fieldId: 'amount', op: 'eq', value: '4200' }] })).toEqual(['tkt-1']);
   });
 
+  /**
+   * 7.52 — the `proj_search` tenancy correlation is EXECUTABLE: a ticket whose search row is mis-filed under another workspace is not found, and the correlation is what refuses it.
+   */
   it('a mis-filed search row cannot answer out of the wrong workspace — the correlation is what refuses it', async () => {
     // tkt-4 is a WS_A ticket whose proj_search row is filed under WS_B.
     // With the correlation, a WS_A search for its title finds nothing.
@@ -621,6 +642,9 @@ describe('compileFilterSpec — executed against Postgres', () => {
     expect(await run({ text: 'licence' })).toEqual(['tkt-1']);
   });
 
+  /**
+   * 7.53 — the `contains: ''` half — a field-PRESENCE predicate that still cannot widen. (The `eq: ''` half is asserted in `packages/domain/test/filter-spec.test.ts`.)
+   */
   it("contains: '' is a field-PRESENCE predicate, exactly as the schema declares — and still cannot widen", async () => {
     // `eq: ''` is a value claim: only the ticket whose `memo` IS the empty string.
     expect(await run({ fields: [{ fieldId: 'memo', op: 'eq', value: '' }] })).toEqual(['tkt-4']);

@@ -16,6 +16,62 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟣 MONDAY 2026-09-07 ~00:55 IST — **PR OPEN: clause A's last row + §07 backfill 78 → 57. Clause A is COMPLETE. Nothing in flight, no subagent, weekly reset ~5.5h away.**
+
+| what | value |
+|---|---|
+| `main` | **`f035215`** (#239 merged) |
+| branch | **`exec/61-s07-backfill`** off `f035215`, FOUR commits, head below. **PR open — head FROZEN** |
+| commits | `7c80c66` 7.259 · `5b79e34` §07 batch 1 · `c6cbab0` batch 2 · `eec2120` batch 3 |
+| **§07** | **177 cited / 57 uncited / 234** (was 155/78). Baseline **57** |
+| repo-wide | **1022 cited / 508 uncited** (was 815 uncited on Sunday morning) |
+| gate | **`GATE_EXIT=0` · 30/30 · 0 cached · 1m32.9s · node v22.22.2 · 3666 passed \| 5 skipped (3671) / 285** — **ninth identical run**. Measured at `4fb18fc`; **this branch's non-docs content is byte-identical to that tree**, so the gate carries. `check:env` 0 · `check:citations` 0 · `check-case-ids` 0 (**1620**) · `check:runbook` 0 |
+| dead branches | `exec/50, 52–60` — all merged or superseded. **Branch fresh off `main`.** |
+
+## §07 backfill — three per-file batches, by hand, no dispatch
+
+| batch | file | rows | §07 after |
+|---|---|---|---|
+| 1 | `compile-filter.test.ts` | 8 | 164/70 |
+| 2 | `ticket-cards.test.ts` | 7 | 171/63 |
+| 3 | `visible-where.test.ts` | 6 | **177/57** |
+
+**Each batch predicted its resulting count before running; all three matched exactly.** Batch 1 mutation-verified
+(`7.52` → `EXIT=1`, 163/71, named; restored).
+
+**Authorization:** override §1(c), *"small per-file PRs when nothing else is queued"* — §09 and §10, its named
+first targets, are both closed. **By hand needs no dispatch clearance.**
+
+**DO NOT convert small batches into dispatches.** A dispatch costs **45,877 tokens before it does anything**
+(measured). These three batches were 21 citations. **The subagent is the cheap option at ~100 rows, not at ~10.**
+
+## Three calls in this work that were NOT mechanical — read before continuing the backfill
+
+1. **`7.72` REFUSED, deliberately.** It names `compile-filter.test.ts` among its files, but the row is about
+   **`tsvector` under `verify-projections`** and nothing in that file asserts it. **A citation that satisfies the
+   checker while pointing at a test that does not assert the case is the exact failure the convention exists to
+   prevent.** Still uncited. *Look in the verify-projections / `projections/search.test.ts` area.*
+2. **`7.66` is a MUTATION RECORD, not an assertion** — six mutations each dying at a named cell, four
+   over-permissive, one of which first died on a Postgres type-inference error rather than on the leak (a mutation
+   that never ran, rewritten with an explicit cast before being counted). **No single test asserts that.** Cited on
+   the null control the row itself names, with the docblock saying the six mutations live at the case.
+3. **`7.75` cited on a `describe`**, its two clauses being asserted by two different tests; and `7.49`/`7.53` are
+   cited on ONE HALF of a two-file claim, each docblock naming which half. **Never let a citation imply one test
+   proves a whole row.**
+
+## §07's remaining 57 — the shape of what is left
+
+Named clusters still open: `filter-spec.test.ts` (5) · `projections/search.test.ts` (5) ·
+`workspace-settings.test.ts` (4) · `doc-text.test.ts` (3). **But 36 of the original 78 name NO test file at all**
+(`7.163`–`7.174` and neighbours). **That tail is a reading job, not a transcription job — do not hand it to a
+transcriber, and do not expect a per-file batch to fit it.**
+
+## OPEN ASKS FOR THE CONTROLLER (both still unanswered)
+
+1. **Subagent clearance for §13** — 153 uncited, genuinely subagent-shaped. **Not dispatched without a word.**
+2. **A §12 block allocation** — §12 (78 uncited) mints from controller-allocated blocks only.
+
+
 # 🟢 SUNDAY 2026-09-06 ~23:45 IST — **CLAUSE A CONTINUED: 7.258 written, the pass's COUNTER-EXAMPLES. Gate green, PR open. Nothing in flight, no subagent, no ruling outstanding.**
 
 | what | value |
