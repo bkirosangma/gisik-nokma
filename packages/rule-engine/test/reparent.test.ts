@@ -92,6 +92,9 @@ describe('checkTicketReparented', () => {
     expect(await checkTicketReparented(reparent(C, null), chainCtx())).toEqual({ refused: false });
   });
 
+  /**
+   * 5.9 — cycles refused, starting with the self-parent case this row names by title. Its other half — reparenting under a DESCENDANT after a rank re-definition made the loop rank-legal — is the test below.
+   */
   it('planted defect: a ticket as its own parent', async () => {
     expect(await checkTicketReparented(reparent(A, A), chainCtx())).toEqual({
       refused: true,
@@ -229,6 +232,9 @@ describe('checkTicketReparented', () => {
    * in this workspace." sends the actor to define a type that is already
    * defined.
    */
+  /**
+   * 5.40 — the first of the two rulings the create path was corrected by and reparenting inherits: a parent that EXISTS but whose type does not. The second (the MOVED ticket’s own type missing) is the test below, and the row’s "check ORDER is pinned rather than described" clause is the precedence block further down.
+   */
   it('refuses when the PARENT exists but its type does not — the guard the reducer cannot stage', async () => {
     const ctx: EngineContext = {
       getEntityState: async (kind, id) => {
@@ -321,6 +327,9 @@ describe('checkTicketReparented', () => {
    * Staged with two tickets that are each other's parent and neither of which is
    * the ticket being moved, so the walk never terminates on its own.
    */
+  /**
+   * 5.41 — an ancestor chain that never ends THROWS rather than refusing, staged against two tickets that are each other’s parent and neither of which is the ticket being moved.
+   */
   it('throws rather than looping forever when the ancestor chain is already cyclic', async () => {
     const ctx: EngineContext = {
       getEntityState: async (kind, id) => {
@@ -374,6 +383,9 @@ describe('checkTicketReparented under a terminal parent (owner decision 2026-08-
     });
   });
 
+  /**
+   * 5.22 — a terminal child moving under a terminal parent is ACCEPTED: nothing contradicts and nothing reopens. This is the test 5.22’s own row names.
+   */
   it('accepts a terminal child moving under a terminal parent — nothing contradicts, nothing reopens', async () => {
     const ctx = buildMemoryContext(
       [WF],
@@ -521,6 +533,9 @@ describe('checkTicketReparented — which refusal names the event when two are a
  * would accept every reparent through the pass-through default.
  */
 describe('evaluateEvent dispatches ticket.reparented', () => {
+  /**
+   * 5.42 — `evaluateEvent` actually ROUTES the event rather than passing it through. Every other case calls its check directly, so without this assertion deleting a `case` from the dispatcher would go unnoticed.
+   */
   it('routes the event to checkTicketReparented rather than passing it through', async () => {
     expect(await evaluateEvent(reparent(A, A), chainCtx())).toEqual({
       refused: true,
