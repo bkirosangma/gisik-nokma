@@ -1605,6 +1605,56 @@ Read the list before killing anything; expect it empty. Checked after every run 
 - Never edit `docs/lanes/task-ledger.tsv`. Never merge this lane's own PR. Never commit to `main`.
 
 
+
+## ▶ LIVE — `exec/46-reach-granted-wire` (case 12.365), re-tasked after the 17:20 reset
+
+**#202 is MERGED as `cd0844c`** and the controller's forced gate at the merged main (the #196+#203+#202
+combination nothing else covered) was green: 30/30, 3639 tests / 284 files. Its delta against my own
+`338a996` gate reconciles exactly — **+27 tests, +1 file, all in `apps/server`**, the file being Lane C's
+`sweep-orphans.test.ts`. Nothing from #202 is re-done here.
+
+| anchor | value | how verified |
+|---|---|---|
+| branch · base | `exec/46-reach-granted-wire` from **`5e3a9d5`** — REACHABLE (`git branch -r --contains` names `origin/main`) and equal to `origin/main` at the cut | `git rev-parse`, both sides compared |
+| toolchain | node **v22.22.2**; `INSTALL_EXIT=0` · `REBUILD_EXIT=0` · `BUILD_EXIT=0` | one shell invocation, each `$?` on its own line |
+| id | **12.365**, bare, from Lane B's block `12.360–12.379` (used through `12.365`; next free block `12.380` on request) | header updated, recounted |
+| `check-case-ids` | **`EXIT=0`**, 1555 unique, union == sum | its own step, NOT part of `check:env` |
+
+### THE CARRIED ITEM WAS HALF RIGHT, AND THE HALF IS THE POINT
+
+It read *"the transport's `reach-granted` WIRE branch has no witness … `parseFrame`/transport"*. Measured
+at this head rather than adopted:
+
+- **`app-core`'s `parseFrame` is ALREADY witnessed, deeply.** `stream.test.ts`'s `SCHEMA_FIXTURES` loop
+  asserts `parseFrame(JSON.stringify(frame))` **equals** the frame, so both `{id, headSeq}` pairs survive
+  by deep equality, and a seventh union member would land there as a missing fixture.
+- **`http-transport.ts`'s branch was the unwitnessed one**, and it is the only branch in that switch
+  reading fields out of a nested array. Every `reach-granted` in `sync-engine.test.ts` arrived PRE-PARSED
+  as `{kind:…}` through `script.handlers.onItem` — the engine's door, not the wire's.
+
+Positive control for that sweep: `caught-up`, three hits in the same file. **A carried item is a fact
+about the tree that produced it; this one was mine, from this morning, and it was still wrong by half.**
+
+### WHAT 12.365 ASSERTS, AND THE TWO CLAUSES THAT ARE NOT DECORATION
+
+The whole item by value — `kind` translated from `type`, the workspace taken from the SUBSCRIPTION rather
+than echoed from the frame, both pairs with their own numbers. Ids and `headSeq`s are **distinct and
+non-sequential**, because equal values (or values equal to their array index) would let a transposition or
+an index-for-value substitution pass, and `headSeq` feeds the comparison deciding whether a ticket is
+pulled at all. Then: **a junk element is dropped while the good id beside it travels** (the arm filters
+rather than refusing whole, and the site argues why), and **a notice for another workspace is refused** —
+without which the case cannot tell *extracted correctly* from *extracted regardless of address*.
+
+**Mutations, both named by the case and both run**, over the whole sync-client suite (8 files, 89 tests):
+constant-for-`headSeq` → **1 failed / 88 passed, 12.365 alone**; rename `headSeq` → `seq` → **1 failed /
+88 passed, 12.365 alone**. Confirmed present before each run; restored by `git checkout HEAD --` verified
+by READING plus an empty `git diff`; `dist` rebuilt after, checked for both mutant markers.
+
+**12.167 keeps "five of six" rather than being folded up to six** — what it drives is five, the sixth is a
+different case against a different door, and the split says more than one number would. The owner line
+12.167 carried is discharged.
+
+---
 ## ▶ REVIEW ROUND — opus reviewer, three CRITICAL, five IMPORTANT, five MINOR; all verified and all fixed
 
 The reviewer also caught that **`rtk`-proxied `git` handed it a stale log and diff** (pre-rebase shas)
