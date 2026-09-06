@@ -16,6 +16,37 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🟢 SUNDAY 2026-09-06 ~23:45 IST — **CLAUSE A CONTINUED: 7.258 written, the pass's COUNTER-EXAMPLES. Gate green, PR open. Nothing in flight, no subagent, no ruling outstanding.**
+
+| what | value |
+|---|---|
+| `main` | **`998044d`** (#237 merged) |
+| branch | **`exec/59-clauseA-closure-patterns`** off `998044d`, ONE commit `914988a`, 2 files, +7. PR open, head FROZEN |
+| gate | **`GATE_EXIT=0` · 30/30 · 0 cached · 1m28.8s · node v22.22.2 · 3666 passed \| 5 skipped (3671) / 285** — sixth identical run. Measured at `180fd3e`; **this branch's code is byte-identical to that tree** (`git diff 180fd3e HEAD -- . ':(exclude)docs' ':(exclude)test-cases'` empty), so the gate carries. `check:citations` 0 (1530 ✅ / **1001 cited / 529 uncited**) · `check-case-ids` 0 (**1619**) · `check:runbook` 0 |
+| §7 | 7.254–7.258 minted. **Next free: 7.259** |
+| dead branches | `exec/50`, `52`, `53`, `54`, `55`, `56`, `57`, `58` — **all merged or superseded. Branch fresh off `main`.** |
+
+## Clause A's yield so far — TWO candidates and TWO closed exemplars, stated honestly
+
+**7.256 / 7.257** are ❌ candidates (see #237). **7.258 is the reference row**, and it is the one that changes what the other two should do.
+
+The sweep found two places where this hazard is ALREADY closed, by different methods:
+- **(a) one definition, shared symbol** — `isEmbeddableImageMime` lives once in `packages/domain/src/doc-embeds.ts` and both `packages/editor/src/extensions/*` and `apps/server/src/gates/image-embed-gate.ts` import it.
+- **(b) DELIBERATE duplication with a falsifiable witness** — `apps/server/src/attachments/sniff.ts` spells the image mimes out literally rather than spreading `EMBEDDABLE_IMAGE_MIME`, and its docblock says why: spreading *"makes the subset invariant … a check that CANNOT FAIL"* because the allow-list would derive from the set it is checked against.
+
+> **The redirection this puts on 7.256/7.257's owner: de-duplication is NOT automatically the closure.** Where two statements must AGREE, collapsing them into one deletes the only thing that could ever detect disagreement. The closure is a shared symbol **only** where the rule is genuinely one rule; otherwise it is two independent spellings plus a differential witness, chosen deliberately and with the reason written where the next reader looks.
+
+**Also probed, and NOT a finding:** `app-core/src/submit.ts` vs `domain/src/submit.ts` — a real near-duplicate, but `app-core/test/submit.test.ts:101` already pins it (*"produces exactly what the domain builder produces from the same inputs — id apart"*). Recorded so nobody re-probes it. **Two of four probes returned counter-examples; that is the pass's honest yield, not a shortfall.**
+
+**The ratchet fired on its author:** 7.258 was written ✅, and `check:citations` refused it within seconds for having no citation. Cited at `apps/server/test/attachments/sniff.test.ts:84` (the subset-invariant test — the falsifiable half), with the docblock stating that the row's other half is structural/compile-time so the citation claims no more than it proves.
+
+## NEXT — no ruling, no dispatch needed
+
+1. **Clause A continues from 7.259** — unprobed areas: `packages/ui`, `packages/editor`'s non-attachment surfaces, `app-core/src/{cache,cache-feed,provenance}.ts`, `sync-client/src/{outbox,engine}`. Local, zero token cost.
+2. **Backfill targets** (uncited): §13 **153** · §07 **78** · §12 **78** · §05 **67** · §06 **63** · §03 **45** · §04 **45**. **§12 mints from CONTROLLER-ALLOCATED BLOCKS — ask first.** §07 and §13 are sequential.
+3. Override §1(f) carried items.
+
+
 # 🟢 SUNDAY 2026-09-06 ~23:45 IST — **§09 IS CLOSED AT ZERO UNCITED. Clause A rows 7.256/7.257 written. Both method findings promoted into the COORDINATION DOC. Gate green, PR open, NOTHING IN FLIGHT, no subagent running, no ruling outstanding.**
 
 | what | value |
