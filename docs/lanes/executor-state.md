@@ -16,6 +16,53 @@ brief recovers only what is written here. Refreshed at every task boundary.
 > so is a `grep` without `-m`. If a run returned suspiciously fast, `pgrep -f vitest` before you move on.
 > A machine-local `PreToolUse` hook now refuses the piped form outright.
 
+# 🚨 EMERGENCY HANDOFF, SUNDAY 2026-09-06 ~21:40 IST — SESSION METER AT **97%** (resets 22:20). #230 IS MERGED. RULING A+C RECEIVED. **A §09 SUBAGENT WAS IN FLIGHT WHEN THIS WAS WRITTEN AND ITS EDITS ARE UNCOMMITTED AND UNVERIFIED — READ THE TREE, DO NOT TRUST THIS PARAGRAPH.**
+
+**READ THIS BLOCK FIRST; the 21:30 block below it is still true but was written before the merge and the ruling.**
+
+| what | value |
+|---|---|
+| `main` | **`1bc6e014`** — PR #230 MERGED (controller, ~21:40). §10 is at 0 uncited on `main`; its ratchet baseline entry is `0` there |
+| my branch | **`exec/53-cite-section-09`**, head **`3edd02e`** — which is #230's PR head, now merged. **So this branch's committed content is already in `main`; it carries NO unique commits.** Rebase onto `1bc6e014` and it becomes empty of commits, keeping only the working-tree edits below |
+| **UNCOMMITTED, UNVERIFIED** | A sonnet subagent was backfilling §09 batch 1 (rows naming `packages/editor/` or `packages/domain/`) when the meter warning arrived. At that moment `git status --porcelain` showed **6 modified test files**: `packages/domain/test/doc-embeds.test.ts`, `packages/editor/test/{doc-text-conformance,mention,rule-census,schema,ticket-image}.test.ts`. **It had NOT yet updated the ratchet baseline, so `pnpm check:citations` will FAIL (baseline 219, real count lower) until the baseline is corrected.** That failure is EXPECTED and is not a regression |
+| gate | **NOT run on any §09 work.** The last green gate is `a69b64d` (= #230's code head), recorded in the block below |
+
+## THE RULING — owner chose **A + C, both** (controller, ~21:40). This closes the pass-2 question.
+
+- **(A) APPROVED — semble substitution.** Drop `graphify --mode deep` as the named mechanism; run the
+  duplicate-logic hunt with `semble`'s `find_related` instead, at zero token cost. **Write ranked candidates as
+  rows with a NAMED OWNER — not fixes.** The first row is already identified and evidenced:
+  **`packages/app-core/src/precheck.ts:375` (`needsMembership`) ↔ `rule-engine` at 0.61–0.67**, cross-package,
+  no import and no call between them. §7's next free id was **7.254** — RECOUNT at your sha before minting.
+- **(C) CONFIRMED — keep going on the citation backfill.** §10 done and merged; **§09 in progress is correct.**
+- **No further ruling is needed.** Do not re-ask.
+
+## WHAT THE NEXT SESSION DOES, IN ORDER
+
+1. **Re-anchor.** `git fetch origin main`; confirm `main` = `1bc6e014` or later. This branch has no unique
+   commits — either rebase it onto `main` or start a fresh branch off `main` and carry the working-tree edits.
+2. **Finish §09 batch 1.** Read the six modified files, finish any rows the subagent had not reached, then
+   **set `scripts/fixtures/check-case-citations-baseline.json`'s `09-editor-attachments.md` entry to the REAL
+   remaining uncited count** and confirm `pnpm check:citations` exits 0. Treat the subagent's work as
+   **UNVERIFIED, not empty** — the failed-dispatch rule: read the tree and the log before re-dispatching.
+3. **§09 batch 2** — the ~113 rows naming `apps/server/`. Same method, one subagent.
+4. **Then (A)** — the semble duplicate-logic hunt, rows with named owners.
+
+**§09's mapping is already measured, so nobody需 re-derive it:** 219 ✅ rows, **218 of them name their covering
+test as a FULL PATH in parentheses at the end of the row** (e.g. ``(`packages/editor/test/schema.test.ts`)``),
+across 41 distinct test files. Split: **98 rows `packages/editor/`, 113 `apps/server/`, 7 `packages/domain/`.**
+*(Caution recorded: my first tally of this used a bare-filename pattern and returned 8 — a well-formed wrong
+answer, because §09 uses full paths where §10 used bare names. Match the pattern to the file, not to the last file.)*
+
+## THE VERIFICATION THAT MUST NOT BE SKIPPED WHEN §09 CLOSES
+
+§10's zero was only trustworthy because it was **mutation-tested**: `10.1` is a prefix of `10.10`–`10.19`, so a
+substring-matching checker would report the file clean regardless. Removing the sole `10.1` citation gave
+`EXIT=1`, "65 cited / 1 uncited", naming **10.1 and only 10.1** — proving site-specificity. **Do the same for
+§09** (`9.35` is a prefix of `9.350`… and more importantly of nothing, so pick an id that IS a prefix of another
+live id — e.g. `9.11` against `9.115`–`9.118`, which exist). A count that has not been mutation-tested is a
+count, not evidence.
+
 # ⛔ SERIAL EXECUTOR, SUNDAY 2026-09-06 21:30 IST — **§10 BACKFILLED TO ZERO UNCITED (gate green, PR open); LANE F PASS 2 CANNOT DELIVER WHAT IT WAS SCHEDULED TO DELIVER (ruling pending); AND IT IS SUNDAY, NOT MONDAY.**
 
 | anchor | value |
