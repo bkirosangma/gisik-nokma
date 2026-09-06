@@ -1012,15 +1012,20 @@ offline/sync UX surfaces, the dual-client harness rig, the six scripted divergen
 surface afterwards. **Task 18 is this banner and `test-cases/12`'s header**; it owns §12's final shape
 and the reconciliation the notes below record.*
 
-***Where the rest of Plan 10 is catalogued, measured rather than assumed.** Tasks 1–2's shared
-vocabulary is NOT here and should not be moved here: `formatIstInstant`, `IST_CLOCK_NOTE`,
-`istDayOf`/`istDayBounds` and the clock-skew derivation live in **§3**, and the contest *evaluators*
-(`contest.server-only`, `contest.unknown`, `contest.already-resolved`, `contest.wrong-ticket`) in
-**§4** — the sections that own the domain and the rule engine. **Task 8's** `sync-client` scaffold and
-storage seam sit in **§3** beside the ledger and its persistence. Measured at this commit: those four
+***Where the rest of Plan 10 is catalogued, measured rather than assumed.** Four of this plan's tasks are
+NOT here and should not be moved here. **Tasks 1–2's** shared vocabulary: `formatIstInstant`,
+`IST_CLOCK_NOTE`, `istDayOf`/`istDayBounds` and the clock-skew derivation live in **§3**, and the contest
+*evaluators* (`contest.server-only`, `contest.unknown`, `contest.already-resolved`,
+`contest.wrong-ticket`) in **§4** — the sections that own the domain and the rule engine. **Task 3's**
+workspace stream cursor is in **§3** as two bullets, *Workspace stream cursor* and *Workspace stream
+cursor read* (`readStreamSeq`), even though this plan's own text declared a §12 bullet for it — it went
+where the ledger column it reads lives. **Task 8's** `sync-client` scaffold and storage seam sit in **§3**
+beside the ledger and its persistence. Measured at this commit: those four
 tokens return **0** occurrences inside §12 and **7 / 2 / 4 / 2** elsewhere in this file, with
 `proj_contested` at **9** inside §12 as the positive control that the same method can find a §12 string
 at all — a zero with no positive control beside it is indistinguishable from a search that cannot fire.
+The same method settles Task 3: a `^- .*[Ss]tream cursor` matcher returns **0** inside §12 and **2** over
+the whole file, so the matcher fires and the §12 zero is a measurement rather than a broken pattern.
 The split is real and is left standing rather than tidied, exactly as the §3 notes say.*
 
 ***Still absent from `Features.md`, and genuinely so: §8 alone.** The coordination doc's reservation
