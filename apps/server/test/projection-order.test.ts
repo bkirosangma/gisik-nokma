@@ -64,6 +64,7 @@ describe('projection registration order (coordination §8)', () => {
    * 5.55 — the registry’s own pins admit `proj_ticket_types` at coordination §8 position 3, an INSERT above `proj_projects`.
    * 5.57 — and `proj_tickets` at position 5, an INSERT into the MIDDLE of the array between `proj_projects` and `proj_memberships`.
    * 5.63 — and `proj_rollups` at position 6, directly after `proj_tickets` and still ABOVE `proj_memberships`. One assertion of the whole pinned order carries all three rows.
+   * 6.79 — `proj_projects` INSERTS at its coordination §8 position (fourth) rather than being appended: it is the first registrant to EXERCISE the insert-at-your-position rule instead of stating it. This is the DB-free pin of record the row names; `entity-heads.test.ts` is the second pin, which goes silent when Postgres is down.
    */
   it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, tickets, rollups, memberships, invites, visibility, contested, workspace settings, search', () => {
     const registry = buildProjectionRegistry();
