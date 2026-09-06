@@ -69,7 +69,7 @@ source text, not with a running producer** (the controller's sharpening, and it 
 
 | case | property | mutation | result |
 |---|---|---|---|
-| **12.323** | an unrecognised cursor yields 200 + empty page, never 404 | route refuses when the cursor matched nothing | **1 failed, 3 passed** — 12.323 alone, `expected 500 to be 200` |
+| **12.323** | an unrecognised cursor yields 200 + empty page, never 404 | route returns a real **404** when the cursor matched nothing — the invented rule itself | **1 failed, 3 passed** — 12.323 alone, `expected 404 to be 200` |
 | **12.324** | the shipped `getTickets` loop returns the complete row set | route drops the last card of the page | **2 failed** — 12.324 on `length of 3 but got 2`, and 12.323's own non-vacuity precondition, which is the guard working |
 | **7.221** | the door's sentence reaches `FoundingError.serverMessage` | route sends `{error, detail}`, constant keeps `message` | **1 failed, 3 passed** — 7.221 alone, `expected null to be 'A workspace needs a name.'` |
 | **12.325** | `nextCursor` is the LAST id of the page | `store.ts:96` emits the FIRST row instead | **one run over BOTH files: 1 failed, 13 passed** — 12.325 red, `notifications.test.ts`'s ten green beside it |
@@ -91,6 +91,16 @@ suite green and the new case red.
 **12.325's mutation is the measurement this whole pass exists to produce:** the existing suite cannot
 see a broken keyset cursor and the new case can. It works because the case uses `limit=2`, where the
 last row differs from the first; the existing test uses `limit=1`, where they coincide.
+
+### A SECOND mutation that reddened the right case for the wrong reason
+
+12.323's first mutant threw inside `readList`, where no `reply` is in scope, so the refusal surfaced
+as a **500**. It reddened 12.323 alone and looked like a clean kill. But the case's claim is *200 and
+an empty page, **never a 404***, and a mutant producing some other refusal does not falsify the rule
+`pagingFetch` actually invented. Re-run at the handler, where `reply` IS in scope, as a real
+`reply.status(404)` — `expected 404 to be 200`. **Same case, same colour, different evidence.**
+This is the second time in this pass that a mutation reddened its target without measuring its
+property, which is worth noticing as a pattern rather than twice as an accident.
 
 ### A mutation that was WORSE than it looked, kept because the lesson is the point
 
