@@ -4,6 +4,7 @@ import { membershipsProjection } from '../../src/projections/proj-memberships.js
 import { projInvites } from '../../src/projections/proj-invites.js';
 import { projProjects } from '../../src/projections/proj-projects.js';
 import { projVisibility } from '../../src/projections/proj-visibility.js';
+import { workflowsProjection } from '../../src/projections/workflows.js';
 import { testEnvelope } from './envelope.js';
 import { appendTestEvent } from './ledger.js';
 
@@ -64,6 +65,20 @@ export async function applyAll(pool: Pool, envs: readonly LedgerEvent[]): Promis
       await membershipsProjection.apply(env, client);
       await projInvites.apply(env, client);
       await projVisibility.apply(env, client);
+      // **ADDED with `seedWorkflowDef()` below, and a no-op for every caller
+      // that existed before it.** A projection ignores the event types it does
+      // not handle, and this one handles only `workflow.*` — which nothing else
+      // passes here, because until now nothing could: this helper's four
+      // projections were projects, memberships, invites and visibility, so a
+      // `workflow.defined` handed to it went NOWHERE and reported nothing.
+      // That silence cost a gate round: `seedWorkflowDef` was written, called,
+      // and had no effect, and the throw it was meant to prevent fired again
+      // with the fixture looking correct. **A helper named `applyAll` that
+      // applies four of the registry's projections is a name that lies**; the
+      // list is enumerated here rather than widened to the whole registry,
+      // because the registry's ticket projection would then fold rows these
+      // callers never asked to be folded.
+      await workflowsProjection.apply(env, client);
     }
   } finally {
     client.release();
